@@ -105,12 +105,13 @@ Future<String> uploadClaudeFile({
       ),
     );
   final http.StreamedResponse response;
+  final String body;
   try {
     response = await client.send(request);
+    body = await response.stream.bytesToString();
   } catch (e) {
     throw ClaudeFileUploadException(displayName, e.toString());
   }
-  final body = await response.stream.bytesToString();
   if (response.statusCode < 200 || response.statusCode >= 300) {
     throw ClaudeFileUploadException(
       displayName,
@@ -309,6 +310,15 @@ Future<void> _discard(File file) async {
   try {
     await file.delete();
   } catch (_) {}
+}
+
+/// Removes a downloaded file no message will refer to — a turn cancelled
+/// after the download completed. A file the download found already present
+/// belongs to whichever message had it first and stays.
+Future<void> discardClaudeGeneratedFile(GeneratedFile file) async {
+  final path = SandboxPathResolver.resolveForIo(file.uri);
+  if (path == null || UploadDedupe.isShared(path)) return;
+  await _discard(File(path));
 }
 
 /// The container names the file, so it can name a path or nothing at all.

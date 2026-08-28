@@ -214,12 +214,17 @@ Stream<StreamChunk> sendClaudeStream(
   final hasCodeExecution = declaredServerToolNames.contains('code_execution');
   // The data files the message builder left out of the prompt, on the
   // strength of the same predicate, go up to the container instead. The tool
-  // has to be in this request for a `container_upload` to be accepted: a
-  // utility call never declares it, and a client tool of the same name
-  // displaces it above.
+  // has to be in this request for a `container_upload` to be accepted, and a
+  // utility call never declares it.
   final uploadsDataFiles =
       hasCodeExecution &&
-      BuiltInToolsHelper.sendsDataFilesToSandbox(cfg: config, modelId: modelId);
+      BuiltInToolsHelper.sendsDataFilesToSandbox(
+        cfg: config,
+        modelId: modelId,
+        clientToolNames: [
+          for (final t in tools ?? const []) (t['name'] ?? '').toString(),
+        ],
+      );
 
   // Headers (constant across rounds)
   final baseHeaders = customHeaders(
@@ -273,26 +278,35 @@ Stream<StreamChunk> sendClaudeStream(
   final nonStreamText = StringBuffer();
   var pauseTurn = false;
 
-  // A container the conversation goes on using already has the earlier
-  // turns' files, so only this turn's go up; a fresh one — none stored, or
-  // the stored one found expired — gets every file the user attached. Either
-  // way the uploads ride the last user message, and each file goes once.
+  // A container the conversation goes on using gets the files it has not
+  // seen; a fresh one — none stored, or the stored one found expired — gets
+  // every file the user attached. Either way the uploads ride the last user
+  // message, and each file goes once. A file this turn is about that cannot
+  // go up fails the turn before any request is made; an earlier turn's is
+  // reported in its place instead, so one lost attachment from long ago does
+  // not end the conversation.
   final uploadedPaths = <String>{};
+  final turnFileUris = {for (final doc in history.turnDataFiles) doc.uri};
   Future<void> uploadDataFiles() async {
     if (!uploadsDataFiles) return;
     final blocks = <Map<String, dynamic>>[];
     for (final doc
-        in container == null ? history.dataFiles : history.turnDataFiles) {
+        in container == null ? history.dataFiles : history.unseenDataFiles) {
       if (!uploadedPaths.add(doc.uri)) continue;
-      final fileId = await uploadClaudeFile(
-        client: client,
-        base: base,
-        headers: baseHeaders,
-        path: doc.uri,
-        name: doc.name,
-        mime: doc.mime,
-      );
-      blocks.add({'type': 'container_upload', 'file_id': fileId});
+      try {
+        final fileId = await uploadClaudeFile(
+          client: client,
+          base: base,
+          headers: baseHeaders,
+          path: doc.uri,
+          name: doc.name,
+          mime: doc.mime,
+        );
+        blocks.add({'type': 'container_upload', 'file_id': fileId});
+      } on ClaudeFileUploadException catch (e) {
+        if (turnFileUris.contains(doc.uri)) rethrow;
+        blocks.add({'type': 'text', 'text': e.toString()});
+      }
     }
     if (blocks.isEmpty) return;
     final last = convo.last;
@@ -513,6 +527,7 @@ Stream<StreamChunk> sendClaudeStream(
       // SSE events unread, and the text after the tool frozen, for as long as
       // the file takes.
       final downloads = <Future<GeneratedFile?>>[];
+      var streamCompleted = false;
 
       try {
         await for (final event in parseSseEventStrings(sse)) {
@@ -565,10 +580,17 @@ Stream<StreamChunk> sendClaudeStream(
           }
           if (decoded.completed) break;
         }
+        streamCompleted = true;
       } finally {
         // A turn that stops here — cancelled, or on an in-band error — still
-        // sees its downloads out rather than closing the client under them.
-        await Future.wait(downloads);
+        // sees its downloads out rather than closing the client under them;
+        // what they wrote has no message to go to, so it is removed again.
+        final files = await Future.wait(downloads);
+        if (!streamCompleted) {
+          for (final file in files) {
+            if (file != null) await discardClaudeGeneratedFile(file);
+          }
+        }
       }
       for (final chunk in decoder.onClosed()) {
         yield chunk;

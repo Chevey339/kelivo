@@ -124,6 +124,14 @@ class ChatService extends ChangeNotifier {
     claudeTurnArtifactKind,
   };
   final Map<String, Map<String, String>> _providerArtifactsCache = {};
+
+  /// The per-message caches are loaded and dropped together.
+  void _evictMessageCaches(String messageId) {
+    _toolEventsCache.remove(messageId);
+    _geminiThoughtSigsCache.remove(messageId);
+    _providerArtifactsCache.remove(messageId);
+  }
+
   final Map<String, Map<String, String>> _temporaryProviderArtifacts = {};
   final Map<String, Map<String, int>> _firstGroupIndicesCache = {};
   final Map<String, int> _messageCounts = {};
@@ -933,9 +941,7 @@ class ChatService extends ChangeNotifier {
         _repo.getProviderArtifactsForMessages(ids, kind),
     ]);
     for (final id in ids) {
-      _toolEventsCache.remove(id);
-      _geminiThoughtSigsCache.remove(id);
-      _providerArtifactsCache.remove(id);
+      _evictMessageCaches(id);
     }
     _toolEventsCache.addAll(
       results[0] as Map<String, List<Map<String, dynamic>>>,
@@ -1025,9 +1031,7 @@ class ChatService extends ChangeNotifier {
         drop++;
       }
       for (final message in messages.sublist(0, drop)) {
-        _toolEventsCache.remove(message.id);
-        _geminiThoughtSigsCache.remove(message.id);
-        _providerArtifactsCache.remove(message.id);
+        _evictMessageCaches(message.id);
       }
       if (drop >= messages.length) {
         _messagesCache.remove(conversationId);
@@ -1061,9 +1065,7 @@ class ChatService extends ChangeNotifier {
         (sum, message) => sum + _estimateCachedMessageBytes(message),
       );
       for (final message in candidate.value) {
-        _toolEventsCache.remove(message.id);
-        _geminiThoughtSigsCache.remove(message.id);
-        _providerArtifactsCache.remove(message.id);
+        _evictMessageCaches(message.id);
       }
     }
   }
@@ -1976,8 +1978,7 @@ class ChatService extends ChangeNotifier {
       ...?removedOrder,
     };
     for (final messageId in artifactMessageIds) {
-      _toolEventsCache.remove(messageId);
-      _geminiThoughtSigsCache.remove(messageId);
+      _evictMessageCaches(messageId);
     }
 
     if (_currentConversationId == id) {
@@ -4096,8 +4097,7 @@ class ChatService extends ChangeNotifier {
     final deletedIds = <String>{};
     for (final message in result.messages) {
       deletedIds.add(message.id);
-      _toolEventsCache.remove(message.id);
-      _geminiThoughtSigsCache.remove(message.id);
+      _evictMessageCaches(message.id);
     }
     _messagesCache.remove(conversationId);
     _messageOrderIds.remove(conversationId);

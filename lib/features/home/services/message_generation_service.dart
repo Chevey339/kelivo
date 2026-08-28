@@ -201,9 +201,23 @@ class MessageGenerationService {
     // and it only claims to be parsing files when the retained messages really
     // carry files to parse. A text-only send that is merely slow (frozen prompt
     // reads, memory injection, templating) must never show the bar.
+    // Tools are assembled first: whether a data file is read into the prompt
+    // or left for the sandbox depends on which tools go with it.
+    final mcpRouteSnapshot = generationController.captureMcpToolRoutes(
+      assistant,
+    );
+    final toolDefs = generationController.buildToolDefinitions(
+      settings,
+      assistant,
+      providerKey,
+      modelId,
+      hasBuiltInSearch,
+      mcpRouteSnapshot: mcpRouteSnapshot,
+    );
     final sandboxDataFiles = BuiltInToolsHelper.sendsDataFilesToSandbox(
       cfg: cfg,
       modelId: modelId,
+      clientToolNames: toolDefs.map((t) => (t['name'] ?? '').toString()),
     );
     final indicatorMessageId =
         processingMessageId != null &&
@@ -249,18 +263,6 @@ class MessageGenerationService {
     }
     messageBuilderService.stripInternalRevisionIds(apiMessages);
 
-    // Prepare tools
-    final mcpRouteSnapshot = generationController.captureMcpToolRoutes(
-      assistant,
-    );
-    final toolDefs = generationController.buildToolDefinitions(
-      settings,
-      assistant,
-      providerKey,
-      modelId,
-      hasBuiltInSearch,
-      mcpRouteSnapshot: mcpRouteSnapshot,
-    );
     final onToolCall = toolDefs.isNotEmpty
         ? generationController.buildToolCallHandler(
             settings,

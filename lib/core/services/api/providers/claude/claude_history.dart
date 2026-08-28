@@ -118,12 +118,18 @@ class ClaudeHistory {
   /// against that assistant message. The latest one wins. Set by [build].
   ClaudeContainerRef? storedContainer;
 
-  /// The data files the user attached, in conversation order, and those of
-  /// the last message alone — what a fresh container needs and what one the
-  /// conversation is still using needs. Only a user's own attachments count;
-  /// what the model produced lives on its messages and is the container's to
-  /// keep or lose. Set by [build].
+  /// The data files the user attached, in conversation order — what a fresh
+  /// container needs; [unseenDataFiles] are those attached after the message
+  /// that recorded [storedContainer] — what that container still lacks, all
+  /// of them when there is none. A deleted reply, a send that failed before
+  /// its request, a turn with the tool off: each leaves files between the
+  /// container and the last message, so "the last message's" is the wrong
+  /// rule. [turnDataFiles] names the last message's, the ones this turn is
+  /// about. Only a user's own attachments count; what the model produced
+  /// lives on its messages and is the container's to keep or lose. Set by
+  /// [build].
   final dataFiles = <InternalDocumentRef>[];
+  final unseenDataFiles = <InternalDocumentRef>[];
   final turnDataFiles = <InternalDocumentRef>[];
 
   /// The blocks of one response as this endpoint may be sent them.
@@ -229,13 +235,17 @@ class ClaudeHistory {
         final ref = ClaudeContainerRef.decode(
           m[multimodalInternalClaudeContainerKey],
         );
-        if (ref != null) storedContainer = ref;
+        if (ref != null) {
+          storedContainer = ref;
+          unseenDataFiles.clear();
+        }
       }
       if (role == 'user') {
         final files = parseInternalDocumentRefs(
           m[multimodalInternalDocumentPathsKey],
         ).where((doc) => isSandboxDataFile(fileName: doc.name, mime: doc.mime));
         dataFiles.addAll(files);
+        unseenDataFiles.addAll(files);
         if (i == messages.length - 1) turnDataFiles.addAll(files);
       }
       if (role == 'tool') {

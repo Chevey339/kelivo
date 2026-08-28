@@ -39,14 +39,13 @@ const Set<String> _sandboxDataFileExtensions = <String>{
 };
 
 /// Whether an attachment is a data file a code execution sandbox should
-/// receive whole, judged by its extension. Text extraction has nothing better
-/// to do with an `application/octet-stream` either, so an unknown binary
-/// counts too — the sandbox can at least inspect it.
+/// receive whole, judged by its extension alone: pickers report a
+/// `Dockerfile` or `LICENSE` as an octet stream too, and those read fine as
+/// text.
 bool isSandboxDataFile({required String fileName, required String mime}) {
   final dot = fileName.lastIndexOf('.');
   final ext = dot < 0 ? '' : fileName.substring(dot + 1).toLowerCase();
-  if (_sandboxDataFileExtensions.contains(ext)) return true;
-  return ext.isEmpty && mime.trim().toLowerCase() == 'application/octet-stream';
+  return _sandboxDataFileExtensions.contains(ext);
 }
 
 /// One `_kelivo_document_paths` entry.

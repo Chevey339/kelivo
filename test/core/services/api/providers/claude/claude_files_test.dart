@@ -175,6 +175,47 @@ void main() {
       expect(stored, ['chart.png']);
     });
 
+    test(
+      'a cancelled turn discards its own download, not a shared one',
+      () async {
+        final server = await _filesServer(
+          meta: <String, dynamic>{
+            'id': 'file_1',
+            'filename': 'chart.png',
+            'mime_type': 'image/png',
+            'size_bytes': 4,
+            'downloadable': true,
+          },
+          bytes: const <int>[1, 2, 3, 4],
+        );
+        addTearDown(() => server.close(force: true));
+
+        final client = http.Client();
+        addTearDown(client.close);
+        Future<GeneratedFile?> download() => downloadClaudeGeneratedFile(
+          client: client,
+          base: 'http://${server.address.address}:${server.port}/v1',
+          headers: const <String, String>{'x-api-key': 'sk-test'},
+          fileId: 'file_1',
+        );
+        List<String> stored() => Directory(
+          '${tempDir.path}/upload',
+        ).listSync().map((entity) => entity.path.split('/').last).toList();
+
+        // A file nobody else has goes with the cancelled turn.
+        final own = await download();
+        await discardClaudeGeneratedFile(own!);
+        expect(stored(), isEmpty);
+
+        // Two turns draw the same chart and the second is cancelled: the file
+        // it found is the first turn's and stays.
+        await download();
+        final shared = await download();
+        await discardClaudeGeneratedFile(shared!);
+        expect(stored(), ['chart.png']);
+      },
+    );
+
     test('a chart the API cannot type is still a chart', () async {
       final server = await _filesServer(
         meta: <String, dynamic>{

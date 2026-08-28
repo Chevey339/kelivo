@@ -40,6 +40,31 @@ void main() {
       );
     });
 
+    test('a client tool named code_execution takes the files with it', () {
+      final cfg = _cfg(
+        kind: ProviderKind.claude,
+        baseUrl: 'https://api.anthropic.com',
+        modelId: claudeModel,
+      );
+      // The hosted tool gives way to the client's, and so does the upload.
+      expect(
+        BuiltInToolsHelper.sendsDataFilesToSandbox(
+          cfg: cfg,
+          modelId: claudeModel,
+          clientToolNames: ['get_weather', 'code_execution'],
+        ),
+        isFalse,
+      );
+      expect(
+        BuiltInToolsHelper.sendsDataFilesToSandbox(
+          cfg: cfg,
+          modelId: claudeModel,
+          clientToolNames: ['get_weather'],
+        ),
+        isTrue,
+      );
+    });
+
     test('official Claude without the tool', () {
       expect(
         BuiltInToolsHelper.sendsDataFilesToSandbox(
@@ -118,12 +143,15 @@ void main() {
       }
     });
 
-    test('unknown binary without an extension goes to the sandbox', () {
-      expect(
-        isSandboxDataFile(fileName: 'dump', mime: 'application/octet-stream'),
-        isTrue,
-      );
-      expect(isSandboxDataFile(fileName: 'dump', mime: 'text/plain'), isFalse);
+    test('a file without an extension stays in the prompt', () {
+      // Pickers call a Dockerfile an octet stream; it reads fine as text.
+      for (final mime in ['application/octet-stream', 'text/plain', '']) {
+        expect(
+          isSandboxDataFile(fileName: 'Dockerfile', mime: mime),
+          isFalse,
+          reason: mime,
+        );
+      }
     });
   });
 }

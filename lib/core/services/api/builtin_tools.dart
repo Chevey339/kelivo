@@ -855,14 +855,18 @@ abstract class BuiltInToolsHelper {
   /// that does the upload: today only the official Claude endpoint, whose
   /// Files API feeds `container_upload`. Gemini shares the
   /// `code_execution` tool name but takes no files from us yet, so
-  /// [BuiltInToolsState.codeExecutionActive] alone is the wrong test.
+  /// [BuiltInToolsState.codeExecutionActive] alone is the wrong test. A
+  /// client tool of that name displaces the hosted one in the request, and
+  /// with it the upload, so [clientToolNames] are part of the answer too.
   static bool sendsDataFilesToSandbox({
     required ProviderConfig? cfg,
     required String? modelId,
+    Iterable<String> clientToolNames = const [],
   }) {
     final upstreamModelId = _claudeUpstreamModelId(cfg: cfg, modelId: modelId);
     if (upstreamModelId == null) return false;
     if (!isClaudeCodeExecutionSupportedModel(upstreamModelId)) return false;
+    if (clientToolNames.contains('code_execution')) return false;
     return getActiveTools(cfg: cfg, modelId: modelId).codeExecutionActive;
   }
 

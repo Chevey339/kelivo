@@ -72,6 +72,9 @@ class NetworkProxyConfig {
   bool get isValid => enabled && host.trim().isNotEmpty && port > 0;
 }
 
+/// Bodies past this are file uploads; the log records their size only.
+const int _loggedBodyLimit = 4 * 1024 * 1024;
+
 class DioHttpClient extends http.BaseClient {
   DioHttpClient({this._proxy, CancelToken? cancelToken, Duration? timeout})
     : _cancelToken = cancelToken ?? CancelToken(),
@@ -174,10 +177,9 @@ class DioHttpClient extends http.BaseClient {
     final uri = request.url;
     final method = request.method.toUpperCase();
 
-    List<int> bodyBytes = const <int>[];
-    try {
-      bodyBytes = await request.finalize().toBytes();
-    } catch (_) {}
+    // A body that cannot be read (a file upload whose file went away) must
+    // fail as such, not go out empty and come back as the server's 400.
+    final bodyBytes = await request.finalize().toBytes();
 
     final reqHeaders = Map<String, String>.from(request.headers);
     reqHeaders.putIfAbsent('User-Agent', () => 'Kelivo');
@@ -191,7 +193,13 @@ class DioHttpClient extends http.BaseClient {
           '[REQ $reqId] headers=${RequestLogger.encodeObject(LogRedactor.redactHeaders(reqHeaders))}',
         );
       }
-      if (bodyBytes.isNotEmpty) {
+      if (bodyBytes.length > _loggedBodyLimit) {
+        // A file upload is bytes the log has no use for, and decoding them
+        // would hold the body in memory a second and third time.
+        RequestLogger.logLine(
+          '[REQ $reqId] body=<${bodyBytes.length} bytes, not logged>',
+        );
+      } else if (bodyBytes.isNotEmpty) {
         final decoded = RequestLogger.safeDecodeUtf8(bodyBytes);
         // Elide first: a multi-MB image request drops to a few KB, which
         // brings it back under redactBody's JSON-parsing size limit.

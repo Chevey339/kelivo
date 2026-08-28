@@ -111,6 +111,7 @@ void main() {
   /// text reply, refusing the given container once as expired.
   ({List<http.Request> requests, http.Client client}) fakeApi({
     String? staleContainer,
+    String? refusedUpload,
   }) {
     final requests = <http.Request>[];
     final client = MockClient((request) async {
@@ -119,6 +120,13 @@ void main() {
         final name = RegExp(
           r'filename="([^"]+)"',
         ).firstMatch(request.body)!.group(1)!;
+        if (name == refusedUpload) {
+          return http.Response(
+            '{"type":"error","error":{"type":"rate_limit_error",'
+            '"message":"Too many requests"}}',
+            429,
+          );
+        }
         return http.Response('{"id":"file_$name"}', 200);
       }
       final body = jsonDecode(request.body) as Map<String, dynamic>;
@@ -248,20 +256,58 @@ void main() {
     expect((body['messages'] as List).last['content'], 'analyse this');
   });
 
-  test('a refused upload fails the turn before the messages request', () async {
-    final requests = <http.Request>[];
-    final client = MockClient((request) async {
-      requests.add(request);
-      return http.Response(
-        '{"type":"error","error":{"type":"rate_limit_error",'
-        '"message":"Too many requests"}}',
-        429,
-      );
-    });
+  test(
+    'files attached after the stored container go up with this turn\'s',
+    () async {
+      // The reply to the second question was deleted (or its send failed
+      // before a request), so the stored container is the first reply's and
+      // has never seen q2.csv.
+      final q2 = File('${tempDir.path}/q2.csv')..writeAsStringSync('q\n2\n');
+      final api = fakeApi();
+
+      await sendClaudeStream(api.client, _officialClaude(), _model, [
+        {
+          'role': 'user',
+          'content': 'first question',
+          multimodalInternalDocumentPathsKey: [
+            _doc(stock, 'stock.xlsx', 'application/vnd.ms-excel'),
+          ],
+        },
+        {
+          'role': 'assistant',
+          'content': 'first answer',
+          multimodalInternalClaudeContainerKey: '{"id":"container_1"}',
+        },
+        {
+          'role': 'user',
+          'content': 'second question',
+          multimodalInternalDocumentPathsKey: [_doc(q2, 'q2.csv', 'text/csv')],
+        },
+        {
+          'role': 'user',
+          'content': 'third question',
+          multimodalInternalDocumentPathsKey: [
+            _doc(sales, 'sales.csv', 'text/csv'),
+          ],
+        },
+      ], stream: false).toList();
+
+      final body = jsonDecode(api.requests.last.body) as Map<String, dynamic>;
+      expect(body['container'], 'container_1');
+      expect(_blocks(body).map((b) => b['file_id']), [
+        null,
+        'file_q2.csv',
+        'file_sales.csv',
+      ]);
+    },
+  );
+
+  test('a refused upload of this turn\'s file fails the turn first', () async {
+    final api = fakeApi(refusedUpload: 'sales.csv');
 
     await expectLater(
       sendClaudeStream(
-        client,
+        api.client,
         _officialClaude(),
         _model,
         conversation(),
@@ -271,11 +317,57 @@ void main() {
         isA<ClaudeFileUploadException>().having(
           (e) => e.toString(),
           'message',
-          'Attachment "stock.xlsx" could not be uploaded: '
+          'Attachment "sales.csv" could not be uploaded: '
               'HTTP 429: Too many requests',
         ),
       ),
     );
-    expect(requests.map((r) => r.url.path), ['/v1/files']);
+    expect(api.requests.map((r) => r.url.path), ['/v1/files', '/v1/files']);
+  });
+
+  test('an earlier turn\'s lost file is reported, not fatal', () async {
+    // The spreadsheet from the first turn was cleared from the device; a
+    // fresh container wants it, but this turn is about the CSV.
+    stock.deleteSync();
+    final api = fakeApi();
+
+    await sendClaudeStream(
+      api.client,
+      _officialClaude(),
+      _model,
+      conversation(),
+      stream: false,
+    ).toList();
+
+    expect(api.requests.map((r) => r.url.path), ['/v1/files', '/v1/messages']);
+    final body = jsonDecode(api.requests.last.body) as Map<String, dynamic>;
+    expect(_blocks(body).map((b) => b['type']), [
+      'text',
+      'text',
+      'container_upload',
+    ]);
+    expect(
+      _blocks(body)[1]['text'],
+      'Attachment "stock.xlsx" could not be uploaded: the file cannot be read',
+    );
+  });
+
+  test('an error about a container_upload block is not a stale container', () {
+    expect(
+      isClaudeStaleContainerError(
+        400,
+        '{"error":{"message":"messages.2.content.1.container_upload.file_id: '
+        'file not found"}}',
+      ),
+      isFalse,
+    );
+    expect(
+      isClaudeStaleContainerError(
+        400,
+        '{"error":{"message":"container container_01 not found"}}',
+      ),
+      isTrue,
+    );
+    expect(isClaudeStaleContainerError(500, 'container'), isFalse);
   });
 }

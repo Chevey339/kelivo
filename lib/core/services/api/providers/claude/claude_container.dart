@@ -50,8 +50,11 @@ class ClaudeContainerRef {
 ///
 /// The API has no dedicated error code for an expired or unknown container,
 /// so this reads the message. The caller only asks when the request carried
-/// a `container`, which makes an error that mentions one about that one.
-bool isClaudeStaleContainerError(int statusCode, String errorBody) =>
-    statusCode >= 400 &&
-    statusCode < 500 &&
-    errorBody.toLowerCase().contains('container');
+/// a `container`, which makes an error that mentions one about that one —
+/// unless it is about a `container_upload` block, which a new container
+/// would not cure.
+bool isClaudeStaleContainerError(int statusCode, String errorBody) {
+  if (statusCode < 400 || statusCode >= 500) return false;
+  final message = errorBody.toLowerCase();
+  return message.replaceAll('container_upload', '').contains('container');
+}
