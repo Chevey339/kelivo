@@ -215,6 +215,7 @@ String collectGeminiThoughtSignatureFromParts(List<dynamic> parts) {
         p['file_data'] is Map;
     final isText =
         !hasInline && p['thought'] != true && p['functionCall'] is! Map;
+    // The first signed text part is the turn's, as in the streaming decoder.
     if (isText && sigKey != null && sigVal != null && textKey == null) {
       textKey = sigKey;
       textVal = sigVal;

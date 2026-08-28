@@ -341,7 +341,8 @@ class GoogleStreamDecoder implements StreamChunkDecoder {
     final inline = p['inlineData'] ?? p['inline_data'];
     final hasFile = p['fileData'] is Map || p['file_data'] is Map;
     // Gemini 3 hangs the turn's signature on a trailing part whose text is
-    // empty, so the text guard must not require a body.
+    // empty, so the text guard must not require a body. One text signature is
+    // kept per turn — the first; a response has not been seen to carry two.
     if (persistThoughtSigs &&
         !thought &&
         fc == null &&

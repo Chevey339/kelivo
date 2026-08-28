@@ -10,6 +10,7 @@ import 'package:Kelivo/core/providers/settings_provider.dart';
 import 'package:Kelivo/core/services/api/providers/claude/claude_container.dart';
 import 'package:Kelivo/core/services/api/providers/claude/claude_history.dart';
 import 'package:Kelivo/core/services/chat/chat_service.dart';
+import 'package:Kelivo/core/services/api/providers/google/gemini_thought_signature.dart';
 import 'package:Kelivo/core/utils/multimodal_input_utils.dart';
 import 'package:Kelivo/features/home/services/message_builder_service.dart';
 import 'package:Kelivo/features/home/services/message_generation_service.dart';
@@ -673,6 +674,32 @@ void main() {
         );
       },
     );
+
+    test('a stored Gemini signature rides on the final assistant message', () {
+      final service = MessageBuilderService(
+        chatService: _FakeChatService({}),
+        contextProvider: _FakeBuildContext(),
+        providerArtifactLookup: (message, kind) =>
+            kind == geminiThoughtSignatureArtifactKind && message.id == 'a1'
+            ? 'sig-stored'
+            : null,
+      );
+
+      final apiMessages = service.buildApiMessages(
+        messages: [
+          _message(id: 'u1', role: 'user', content: '你好'),
+          _message(id: 'a1', role: 'assistant', content: '你好呀'),
+          _message(id: 'u2', role: 'user', content: '再见'),
+        ],
+        versionSelections: const {},
+        currentConversation: Conversation(title: 'test'),
+      );
+
+      expect(
+        apiMessages.map((m) => m[multimodalInternalGeminiThoughtSignatureKey]),
+        [null, 'sig-stored', null],
+      );
+    });
 
     test(
       'a turn that ran code and said nothing still carries its container',
