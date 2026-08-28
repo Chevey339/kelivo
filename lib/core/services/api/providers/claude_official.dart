@@ -18,6 +18,13 @@ import '../stream/stream_chunk_emit.dart';
 import '../stream/stream_chunk_ids.dart';
 import 'claude/claude_decoder.dart';
 
+/// One API response of a replayed turn: the blocks it produced, and the ones
+/// left after sanitising them for this endpoint.
+typedef _ReplayResponse = ({
+  List<Map<String, dynamic>> raw,
+  List<Map<String, dynamic>> blocks,
+});
+
 int _defaultClaudeMaxOutputTokens(String modelId) {
   final lower = modelId.trim().toLowerCase();
   if (RegExp(
@@ -209,14 +216,16 @@ Stream<StreamChunk> sendClaudeStream(
 
   /// Order the responses of one turn by their hand-off: a response opening
   /// with the result of a `server_tool_use` it does not hold itself continues
-  /// the response that does.
-  List<List<Map<String, dynamic>>> responsesInHandOffOrder(
-    List<List<Map<String, dynamic>>> responses,
+  /// the response that does. The order is read off the blocks the API
+  /// produced, not the ones being sent: everywhere but the official endpoint
+  /// the hosted blocks are dropped, and with them what said which came first.
+  List<_ReplayResponse> responsesInHandOffOrder(
+    List<_ReplayResponse> responses,
   ) {
     if (responses.length < 2) return responses;
     final callOwner = <String, int>{};
     for (var i = 0; i < responses.length; i++) {
-      for (final block in responses[i]) {
+      for (final block in responses[i].raw) {
         if (block['type'] != 'server_tool_use') continue;
         final id = (block['id'] ?? '').toString();
         if (id.isNotEmpty) callOwner.putIfAbsent(id, () => i);
@@ -228,7 +237,7 @@ Stream<StreamChunk> sendClaudeStream(
     for (var pass = 0; pass < responses.length; pass++) {
       var moved = false;
       for (var i = 0; i < responses.length; i++) {
-        for (final block in responses[i]) {
+        for (final block in responses[i].raw) {
           if (!(block['type'] ?? '').toString().endsWith('_tool_result')) {
             continue;
           }
@@ -264,7 +273,7 @@ Stream<StreamChunk> sendClaudeStream(
         .where((id) => id.isNotEmpty)
         .toSet();
 
-    final responses = <List<Map<String, dynamic>>>[];
+    final responses = <_ReplayResponse>[];
     final seenResponses = <String>{};
     for (final tc in toolCalls) {
       if (tc is! Map) continue;
@@ -274,12 +283,15 @@ Stream<StreamChunk> sendClaudeStream(
       if (anthropic is! Map) continue;
       final blocks = anthropic['assistant_blocks'];
       if (blocks is! List || blocks.isEmpty) continue;
-      final candidate = assistantBlocksForClaudeRequest(
-        blocks.whereType<Map>(),
-      );
+      final raw = [
+        for (final block in blocks.whereType<Map>())
+          block.map((key, value) => MapEntry(key.toString(), value)),
+      ];
+      if (raw.isEmpty) continue;
+      final candidate = assistantBlocksForClaudeRequest(raw);
       if (candidate.isEmpty) continue;
       if (!seenResponses.add(jsonEncode(candidate))) continue;
-      responses.add(candidate);
+      responses.add((raw: raw, blocks: candidate));
     }
     if (responses.isEmpty) return null;
 
@@ -289,13 +301,14 @@ Stream<StreamChunk> sendClaudeStream(
     for (final response in responsesInHandOffOrder(responses)) {
       // Only a response opening with the result of a call an earlier one left
       // running is the far side of a hand-off. Anything else — a snapshot cut
-      // mid-stream, a card of the same response — is more of the same one.
-      final opener = response.first;
+      // mid-stream, a card of the same response, a hand-off whose hosted
+      // blocks this endpoint drops — is more of the same one.
+      final opener = response.blocks.first;
       final continues =
           (opener['type'] ?? '').toString().endsWith('_tool_result') &&
           callsSoFar.contains((opener['tool_use_id'] ?? '').toString());
       final blocks = [
-        for (final block in response)
+        for (final block in response.blocks)
           if (seenBlocks.add(replayBlockKey(block))) block,
       ];
       callsSoFar.addAll(toolUseIdsInBlocks(blocks));
@@ -631,6 +644,18 @@ Stream<StreamChunk> sendClaudeStream(
       );
       if (blocks.isEmpty) initialMessages.remove(turn.message);
     }
+    // The client calls those responses declared went with them, so a result
+    // still waiting would point at a `tool_use` no longer in the history —
+    // which the API rejects outright. It goes the same way as the call.
+    final replayedCalls = <String>{
+      for (final message in initialMessages)
+        if (message['content'] case final List content)
+          ...toolUseIdsInBlocks(content.whereType<Map<String, dynamic>>()),
+    };
+    pendingToolResults.removeWhere(
+      (result) =>
+          !replayedCalls.contains((result['tool_use_id'] ?? '').toString()),
+    );
   }
   flushPendingToolResults();
 
