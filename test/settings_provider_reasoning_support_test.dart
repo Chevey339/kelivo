@@ -58,14 +58,14 @@ void main() {
       );
     });
 
-    test('ZenMux model discovery uses the configured Base URL', () {
+    test('ZenMux model discovery uses configured origin and catalog path', () {
       final config = ProviderConfig.defaultsFor('ZenMux').copyWith(
-        baseUrl: 'https://gateway.example.com/custom/v1/',
+        baseUrl: 'https://gateway.example.com:8443/custom/v1/?tenant=a',
       );
 
       expect(
         ZenMuxProvider.modelsUriFor(config).toString(),
-        'https://gateway.example.com/custom/v1/models',
+        'https://gateway.example.com:8443/api/v1/models',
       );
     });
 

@@ -210,10 +210,18 @@ class ZenMuxProvider extends BaseProvider {
     if (baseUrl.isEmpty) {
       throw const FormatException('ZenMux Base URL cannot be empty');
     }
-    final base = baseUrl.endsWith('/')
-        ? baseUrl.substring(0, baseUrl.length - 1)
-        : baseUrl;
-    return Uri.parse('$base/models');
+    final configured = Uri.parse(baseUrl);
+    if (!configured.hasScheme || configured.host.isEmpty) {
+      throw FormatException('Invalid ZenMux Base URL: $baseUrl');
+    }
+    // Model discovery is shared across ZenMux protocols. Keep the configured
+    // scheme, host, and port, but replace protocol-specific paths such as
+    // /api/anthropic/v1 or /api/vertex-ai with the public catalog endpoint.
+    return configured.replace(
+      path: '/api/v1/models',
+      query: null,
+      fragment: null,
+    );
   }
 
   @override
@@ -222,22 +230,7 @@ class ZenMuxProvider extends BaseProvider {
     final client = _Http.clientFor(cfg);
     try {
       final headers = <String, String>{};
-      final kind = ProviderConfig.classify(
-        cfg.id,
-        explicitType: cfg.providerType,
-      );
-      switch (kind) {
-        case ProviderKind.openai:
-          if (key.isNotEmpty) headers['Authorization'] = 'Bearer $key';
-          break;
-        case ProviderKind.claude:
-          headers['anthropic-version'] = ClaudeProvider.anthropicVersion;
-          if (key.isNotEmpty) headers['x-api-key'] = key;
-          break;
-        case ProviderKind.google:
-          if (key.isNotEmpty) headers['x-goog-api-key'] = key;
-          break;
-      }
+      if (key.isNotEmpty) headers['Authorization'] = 'Bearer $key';
       final res = await client.get(modelsUriFor(cfg), headers: headers);
       if (res.statusCode < 200 || res.statusCode >= 300) {
         throw HttpException(
