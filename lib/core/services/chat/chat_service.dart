@@ -2524,8 +2524,10 @@ class ChatService extends ChangeNotifier {
     _temporaryConversationIds.clear();
     _temporaryToolEvents.clear();
     _temporaryGeminiThoughtSigs.clear();
+    _temporaryProviderArtifacts.clear();
     _toolEventsCache.clear();
     _geminiThoughtSigsCache.clear();
+    _providerArtifactsCache.clear();
     _messageCounts.clear();
     _messageOrderIds.clear();
     _currentConversationId = null;
@@ -4129,8 +4131,10 @@ class ChatService extends ChangeNotifier {
     _temporaryConversationIds.clear();
     _temporaryToolEvents.clear();
     _temporaryGeminiThoughtSigs.clear();
+    _temporaryProviderArtifacts.clear();
     _toolEventsCache.clear();
     _geminiThoughtSigsCache.clear();
+    _providerArtifactsCache.clear();
     _messageCounts.clear();
     _messageOrderIds.clear();
     _firstGroupIndicesCache.clear();
