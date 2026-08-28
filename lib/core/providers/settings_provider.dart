@@ -93,12 +93,16 @@ class SettingsProvider extends ChangeNotifier {
   static const String _pinnedModelsKey = 'pinned_models_v1';
   static const String _selectedModelKey = 'selected_model_v1';
   static const String _titleModelKey = 'title_model_v1';
+  static const String _titleGenerationEnabledKey =
+      'title_generation_enabled_v1';
   static const String _titlePromptKey = 'title_prompt_v1';
   static const String _ocrModelKey = 'ocr_model_v1';
   static const String _ocrPromptKey = 'ocr_prompt_v1';
   static const String _summaryModelKey = 'summary_model_v1';
   static const String _summaryPromptKey = 'summary_prompt_v1';
   static const String _suggestionModelKey = 'suggestion_model_v1';
+  static const String _suggestionGenerationEnabledKey =
+      'suggestion_generation_enabled_v1';
   static const String _suggestionPromptKey = 'suggestion_prompt_v1';
   static const String _suggestionInsertOnTapOnlyKey =
       'suggestion_insert_on_tap_only_v1';
@@ -839,6 +843,8 @@ class SettingsProvider extends ChangeNotifier {
         _titleModelId = parts.sublist(1).join('::');
       }
     }
+    _titleGenerationEnabled =
+        prefs.getBool(_titleGenerationEnabledKey) ?? true;
     // load title prompt
     final tp = prefs.getString(_titlePromptKey);
     _titlePrompt = (tp == null || tp.trim().isEmpty) ? defaultTitlePrompt : tp;
@@ -901,6 +907,8 @@ class SettingsProvider extends ChangeNotifier {
         _suggestionModelId = parts.sublist(1).join('::');
       }
     }
+    _suggestionGenerationEnabled =
+        prefs.getBool(_suggestionGenerationEnabledKey) ?? suggestionSel != null;
     // load chat suggestion prompt
     final suggestionp = prefs.getString(_suggestionPromptKey);
     _suggestionPrompt = (suggestionp == null || suggestionp.trim().isEmpty)
@@ -3172,7 +3180,9 @@ class SettingsProvider extends ChangeNotifier {
     if (_titleModelProvider == providerKey) {
       _titleModelProvider = null;
       _titleModelId = null;
+      _titleGenerationEnabled = false;
       await prefs.remove(_titleModelKey);
+      await prefs.setBool(_titleGenerationEnabledKey, false);
       changed = true;
     }
     if (_translateModelProvider == providerKey) {
@@ -3198,7 +3208,9 @@ class SettingsProvider extends ChangeNotifier {
     if (_suggestionModelProvider == providerKey) {
       _suggestionModelProvider = null;
       _suggestionModelId = null;
+      _suggestionGenerationEnabled = false;
       await prefs.remove(_suggestionModelKey);
+      await prefs.setBool(_suggestionGenerationEnabledKey, false);
       changed = true;
     }
     if (_compressModelProvider == providerKey) {
@@ -3233,7 +3245,9 @@ class SettingsProvider extends ChangeNotifier {
     if (_titleModelProvider == providerKey && _titleModelId == modelId) {
       _titleModelProvider = null;
       _titleModelId = null;
+      _titleGenerationEnabled = false;
       await prefs.remove(_titleModelKey);
+      await prefs.setBool(_titleGenerationEnabledKey, false);
       changed = true;
     }
     if (_translateModelProvider == providerKey &&
@@ -3261,7 +3275,9 @@ class SettingsProvider extends ChangeNotifier {
         _suggestionModelId == modelId) {
       _suggestionModelProvider = null;
       _suggestionModelId = null;
+      _suggestionGenerationEnabled = false;
       await prefs.remove(_suggestionModelKey);
+      await prefs.setBool(_suggestionGenerationEnabledKey, false);
       changed = true;
     }
     if (_compressModelProvider == providerKey && _compressModelId == modelId) {
@@ -3305,7 +3321,9 @@ class SettingsProvider extends ChangeNotifier {
     if (_titleModelProvider == key) {
       _titleModelProvider = null;
       _titleModelId = null;
+      _titleGenerationEnabled = false;
       await prefs.remove(_titleModelKey);
+      await prefs.setBool(_titleGenerationEnabledKey, false);
     }
     if (_translateModelProvider == key) {
       _translateModelProvider = null;
@@ -3327,7 +3345,9 @@ class SettingsProvider extends ChangeNotifier {
     if (_suggestionModelProvider == key) {
       _suggestionModelProvider = null;
       _suggestionModelId = null;
+      _suggestionGenerationEnabled = false;
       await prefs.remove(_suggestionModelKey);
+      await prefs.setBool(_suggestionGenerationEnabledKey, false);
     }
     if (_compressModelProvider == key) {
       _compressModelProvider = null;
@@ -3400,6 +3420,7 @@ class SettingsProvider extends ChangeNotifier {
   // Title model and prompt
   String? _titleModelProvider;
   String? _titleModelId;
+  bool _titleGenerationEnabled = true;
   String? get titleModelProvider => _titleModelProvider;
   String? get titleModelId => _titleModelId;
   String? get titleModelKey =>
@@ -3407,9 +3428,7 @@ class SettingsProvider extends ChangeNotifier {
       ? '${_titleModelProvider!}::${_titleModelId!}'
       : null;
 
-  /// Title summarization is opt-in: unset model means the feature is off.
-  bool get isTitleGenerationEnabled =>
-      _titleModelProvider != null && _titleModelId != null;
+  bool get isTitleGenerationEnabled => _titleGenerationEnabled;
 
   static const String defaultTitlePrompt =
       '''I will give you some dialogue content in the `<content>` block.
@@ -3430,17 +3449,31 @@ You need to summarize the conversation between user and assistant into a short t
   Future<void> setTitleModel(String providerKey, String modelId) async {
     _titleModelProvider = providerKey;
     _titleModelId = modelId;
+    _titleGenerationEnabled = true;
     notifyListeners();
     final prefs = _preferences;
     await prefs.setString(_titleModelKey, '$providerKey::$modelId');
+    await prefs.setBool(_titleGenerationEnabledKey, true);
   }
 
   Future<void> resetTitleModel() async {
     _titleModelProvider = null;
     _titleModelId = null;
+    _titleGenerationEnabled = true;
     notifyListeners();
     final prefs = _preferences;
     await prefs.remove(_titleModelKey);
+    await prefs.setBool(_titleGenerationEnabledKey, true);
+  }
+
+  Future<void> disableTitleGeneration() async {
+    _titleModelProvider = null;
+    _titleModelId = null;
+    _titleGenerationEnabled = false;
+    notifyListeners();
+    final prefs = _preferences;
+    await prefs.remove(_titleModelKey);
+    await prefs.setBool(_titleGenerationEnabledKey, false);
   }
 
   Future<void> setTitlePrompt(String prompt) async {
@@ -3642,11 +3675,14 @@ Generate or update a brief summary of the user's questions and intentions.
   Future<void> resetSummaryPrompt() async =>
       setSummaryPrompt(defaultSummaryPrompt);
 
-  // Chat suggestion model and prompt. Null model means the feature is disabled.
+  // Chat suggestion model and prompt.
+  // A null model follows the current chat when the feature is enabled.
   String? _suggestionModelProvider;
   String? _suggestionModelId;
+  bool _suggestionGenerationEnabled = false;
   String? get suggestionModelProvider => _suggestionModelProvider;
   String? get suggestionModelId => _suggestionModelId;
+  bool get isSuggestionGenerationEnabled => _suggestionGenerationEnabled;
   String? get suggestionModelKey =>
       (_suggestionModelProvider != null && _suggestionModelId != null)
       ? '${_suggestionModelProvider!}::${_suggestionModelId!}'
@@ -3676,17 +3712,31 @@ Rules:
   Future<void> setSuggestionModel(String providerKey, String modelId) async {
     _suggestionModelProvider = providerKey;
     _suggestionModelId = modelId;
+    _suggestionGenerationEnabled = true;
     notifyListeners();
     final prefs = _preferences;
     await prefs.setString(_suggestionModelKey, '$providerKey::$modelId');
+    await prefs.setBool(_suggestionGenerationEnabledKey, true);
   }
 
   Future<void> resetSuggestionModel() async {
     _suggestionModelProvider = null;
     _suggestionModelId = null;
+    _suggestionGenerationEnabled = true;
     notifyListeners();
     final prefs = _preferences;
     await prefs.remove(_suggestionModelKey);
+    await prefs.setBool(_suggestionGenerationEnabledKey, true);
+  }
+
+  Future<void> disableSuggestionGeneration() async {
+    _suggestionModelProvider = null;
+    _suggestionModelId = null;
+    _suggestionGenerationEnabled = false;
+    notifyListeners();
+    final prefs = _preferences;
+    await prefs.remove(_suggestionModelKey);
+    await prefs.setBool(_suggestionGenerationEnabledKey, false);
   }
 
   Future<void> setSuggestionPrompt(String prompt) async {
@@ -5418,12 +5468,14 @@ Requirements:
     copy._currentModelId = _currentModelId;
     copy._titleModelProvider = _titleModelProvider;
     copy._titleModelId = _titleModelId;
+    copy._titleGenerationEnabled = _titleGenerationEnabled;
     copy._titlePrompt = _titlePrompt;
     copy._summaryModelProvider = _summaryModelProvider;
     copy._summaryModelId = _summaryModelId;
     copy._summaryPrompt = _summaryPrompt;
     copy._suggestionModelProvider = _suggestionModelProvider;
     copy._suggestionModelId = _suggestionModelId;
+    copy._suggestionGenerationEnabled = _suggestionGenerationEnabled;
     copy._suggestionPrompt = _suggestionPrompt;
     copy._insertSuggestionOnTapOnly = _insertSuggestionOnTapOnly;
     copy._compressModelProvider = _compressModelProvider;

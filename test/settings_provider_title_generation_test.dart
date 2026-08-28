@@ -7,7 +7,7 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   group('SettingsProvider title generation', () {
-    test('defaults title model to disabled', () async {
+    test('defaults title model to follow the current chat', () async {
       final harness = await createBusinessTestHarness(initial: {});
       final settings = SettingsProvider(harness.preferences);
 
@@ -15,7 +15,7 @@ void main() {
 
       expect(settings.titleModelProvider, isNull);
       expect(settings.titleModelId, isNull);
-      expect(settings.isTitleGenerationEnabled, isFalse);
+      expect(settings.isTitleGenerationEnabled, isTrue);
     });
 
     test('enables title generation after a model is selected', () async {
@@ -29,7 +29,7 @@ void main() {
       expect(settings.titleModelKey, 'OpenAI::gpt-4o-mini');
     });
 
-    test('disables title generation when the model is reset', () async {
+    test('reset follows the current chat model', () async {
       final harness = await createBusinessTestHarness(
         initial: {'title_model_v1': 'OpenAI::gpt-4o-mini'},
       );
@@ -40,8 +40,32 @@ void main() {
 
       await settings.resetTitleModel();
 
-      expect(settings.isTitleGenerationEnabled, isFalse);
+      expect(settings.isTitleGenerationEnabled, isTrue);
+      expect(settings.titleModelProvider, isNull);
+      expect(settings.titleModelId, isNull);
       expect(harness.preferences.getString('title_model_v1'), isNull);
+      expect(
+        harness.preferences.getBool('title_generation_enabled_v1'),
+        isTrue,
+      );
+    });
+
+    test('can explicitly disable title generation', () async {
+      final harness = await createBusinessTestHarness(
+        initial: {'title_model_v1': 'OpenAI::gpt-4o-mini'},
+      );
+      final settings = SettingsProvider(harness.preferences);
+
+      await settings.loaded;
+      await settings.disableTitleGeneration();
+
+      expect(settings.isTitleGenerationEnabled, isFalse);
+      expect(settings.titleModelProvider, isNull);
+      expect(settings.titleModelId, isNull);
+      expect(
+        harness.preferences.getBool('title_generation_enabled_v1'),
+        isFalse,
+      );
     });
   });
 }

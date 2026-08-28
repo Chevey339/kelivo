@@ -3071,7 +3071,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get defaultModelPageTitleModelSubtitle =>
-      '用于总结对话标题的模型，推荐使用快速且便宜的模型。选择模型后才会启用。';
+      '用于总结对话标题，默认跟随当前对话模型，也可指定其他模型。';
 
   @override
   String get titleModelThinkingTitle => '是否开启思考';
@@ -3087,7 +3087,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get defaultModelPageSuggestionModelSubtitle =>
-      '用于在助手回复后生成继续对话的建议气泡。选择模型后才会启用。';
+      '用于在助手回复后生成聊天建议，可跟随当前对话模型或指定其他模型。默认未启用。';
 
   @override
   String get assistantEditRecentChatsSummaryFrequencyTitle => '摘要更新频率';
@@ -3164,6 +3164,9 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get defaultModelPageResetDefault => '重置为默认';
+
+  @override
+  String get defaultModelPageDisable => '禁用';
 
   @override
   String get defaultModelPageSave => '保存';
@@ -10880,7 +10883,7 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get defaultModelPageTitleModelSubtitle =>
-      '用于总结对话标题的模型，推荐使用快速且便宜的模型。选择模型后才会启用。';
+      '用于总结对话标题，默认跟随当前对话模型，也可指定其他模型。';
 
   @override
   String get titleModelThinkingTitle => '是否开启思考';
@@ -10896,7 +10899,7 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get defaultModelPageSuggestionModelSubtitle =>
-      '用于在助手回复后生成继续对话的建议气泡。选择模型后才会启用。';
+      '用于在助手回复后生成聊天建议，可跟随当前对话模型或指定其他模型。默认未启用。';
 
   @override
   String get assistantEditRecentChatsSummaryFrequencyTitle => '摘要更新频率';
@@ -10973,6 +10976,9 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get defaultModelPageResetDefault => '重置为默认';
+
+  @override
+  String get defaultModelPageDisable => '禁用';
 
   @override
   String get defaultModelPageSave => '保存';
@@ -18614,7 +18620,7 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get defaultModelPageTitleModelSubtitle =>
-      '用於總結對話標題的模型，推薦使用快速且便宜的模型。選擇模型後才會啟用。';
+      '用於總結對話標題，預設跟隨目前對話模型，也可指定其他模型。';
 
   @override
   String get titleModelThinkingTitle => '是否開啟思考';
@@ -18630,7 +18636,7 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get defaultModelPageSuggestionModelSubtitle =>
-      '用於在助手回覆後生成繼續對話的建議氣泡。選擇模型後才會啟用。';
+      '用於在助手回覆後生成聊天建議，可跟隨目前對話模型或指定其他模型。預設未啟用。';
 
   @override
   String get assistantEditRecentChatsSummaryFrequencyTitle => '摘要更新頻率';
@@ -18707,6 +18713,9 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get defaultModelPageResetDefault => '重設為預設';
+
+  @override
+  String get defaultModelPageDisable => '停用';
 
   @override
   String get defaultModelPageSave => '儲存';

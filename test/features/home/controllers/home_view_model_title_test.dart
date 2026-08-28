@@ -50,6 +50,7 @@ void main() {
   late SettingsProvider settings;
   late AssistantProvider assistantProvider;
   var generateTextRequestCount = 0;
+  String? generateTextModel;
   final titleErrors = <Object>[];
 
   Future<void> handleApiRequest(HttpRequest request) async {
@@ -58,6 +59,7 @@ void main() {
             as Map<String, dynamic>;
     if (body['stream'] != true) {
       generateTextRequestCount++;
+      generateTextModel = body['model'] as String?;
     }
     request.response.statusCode = HttpStatus.ok;
     request.response.headers.contentType = ContentType.json;
@@ -85,6 +87,7 @@ void main() {
     chatService = ChatService(existingRepository: repository);
     await chatService.init();
     generateTextRequestCount = 0;
+    generateTextModel = null;
     titleErrors.clear();
     server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
     server.listen(handleApiRequest);
@@ -178,10 +181,11 @@ void main() {
   }
 
   testWidgets(
-    'skips title generation and makes no model call when title model is unset',
+    'skips title generation and makes no model call when explicitly disabled',
     (tester) async {
       final controller = await pumpHarness(tester);
       await tester.runAsync(() async {
+        await settings.disableTitleGeneration();
         final convo = await chatService.createConversation(
           title: 'New Chat',
           assistantId: assistantProvider.currentAssistantId,
@@ -191,6 +195,7 @@ void main() {
         await controller.debugViewModel.debugMaybeGenerateTitleFor(convo.id);
 
         expect(generateTextRequestCount, 0);
+        expect(generateTextModel, isNull);
         expect(titleErrors, isEmpty);
         expect(chatService.getConversation(convo.id)!.title, 'New Chat');
       });
@@ -213,6 +218,33 @@ void main() {
       await controller.debugViewModel.debugMaybeGenerateTitleFor(convo.id);
 
       expect(generateTextRequestCount, 1);
+      expect(generateTextModel, 'test-model');
+      expect(titleErrors, isEmpty);
+      expect(chatService.getConversation(convo.id)!.title, 'Dark mode chat');
+    });
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('follow-current title generation uses the conversation model', (
+    tester,
+  ) async {
+    final controller = await pumpHarness(tester);
+    await tester.runAsync(() async {
+      final convo = await chatService.createConversation(
+        title: 'New Chat',
+        assistantId: assistantProvider.currentAssistantId,
+      );
+      await chatService.setConversationModel(
+        convo.id,
+        providerKey: 'SiliconFlow',
+        modelId: 'conversation-model',
+      );
+      await seedTwoTurnConversation(convo.id);
+
+      await controller.debugViewModel.debugMaybeGenerateTitleFor(convo.id);
+
+      expect(generateTextRequestCount, 1);
+      expect(generateTextModel, 'conversation-model');
       expect(titleErrors, isEmpty);
       expect(chatService.getConversation(convo.id)!.title, 'Dark mode chat');
     });

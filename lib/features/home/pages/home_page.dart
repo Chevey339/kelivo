@@ -1265,9 +1265,7 @@ class _HomePageState extends State<HomePage>
     }
 
     final settings = context.watch<SettingsProvider>();
-    final suggestionsEnabled =
-        settings.suggestionModelProvider != null &&
-        settings.suggestionModelId != null;
+    final suggestionsEnabled = settings.isSuggestionGenerationEnabled;
     final assistant = context.watch<AssistantProvider>().currentAssistant;
     return MessageListView(
       processingFilesMessageId: _controller.processingFilesMessageId,

@@ -166,7 +166,7 @@ void main() {
       );
       await settings.setCurrentModel('SiliconFlow', 'test-model');
       if (withSuggestions) {
-        await settings.setSuggestionModel('SiliconFlow', 'test-model');
+        await settings.resetSuggestionModel();
       }
 
       final assistantPrefs = createBusinessTestPreferences();

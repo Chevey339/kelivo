@@ -49,6 +49,7 @@ import '../../../desktop/desktop_settings_navigation_bus.dart';
 import 'dart:async';
 import '../../../features/search/services/global_session_search_service.dart';
 import '../controllers/chat_actions.dart';
+import '../utils/model_display_helper.dart';
 import 'assistant_avatar.dart';
 import 'assistant_entry_actions.dart';
 import 'sidebar_selection_bars.dart';
@@ -920,15 +921,20 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
     final assistantProvider = context.read<AssistantProvider>();
     final convo = chatService.getConversation(conversationId);
     if (convo == null) return;
-
-    final provKey = settings.titleModelProvider;
-    final mdlId = settings.titleModelId;
-    if (provKey == null || mdlId == null) return;
+    if (!settings.isTitleGenerationEnabled) return;
 
     // Get assistant for this conversation
     final assistant = convo.assistantId != null
         ? assistantProvider.getById(convo.assistantId!)
         : assistantProvider.currentAssistant;
+    final chatModel = resolveChatModel(
+      settings,
+      conversation: convo,
+      assistant: assistant,
+    );
+    final provKey = settings.titleModelProvider ?? chatModel.providerKey;
+    final mdlId = settings.titleModelId ?? chatModel.modelId;
+    if (provKey == null || mdlId == null) return;
     final cfg = settings.getProviderConfig(provKey);
     final budget = settings.titleGenerationThinkingBudgetFor(
       assistant?.thinkingBudget,

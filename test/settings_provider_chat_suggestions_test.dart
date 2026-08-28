@@ -16,6 +16,7 @@ void main() {
       expect(settings.suggestionModelProvider, isNull);
       expect(settings.suggestionModelId, isNull);
       expect(settings.suggestionModelKey, isNull);
+      expect(settings.isSuggestionGenerationEnabled, isFalse);
       expect(
         settings.suggestionPrompt,
         SettingsProvider.defaultSuggestionPrompt,
@@ -33,10 +34,12 @@ void main() {
       expect(settings.suggestionModelProvider, 'OpenAI');
       expect(settings.suggestionModelId, 'gpt-test');
       expect(settings.suggestionModelKey, 'OpenAI::gpt-test');
+      expect(settings.isSuggestionGenerationEnabled, isTrue);
       expect(settings.suggestionPrompt, 'Custom {content} {locale}');
 
       final prefs = harness.preferences;
       expect(prefs.getString('suggestion_model_v1'), 'OpenAI::gpt-test');
+      expect(prefs.getBool('suggestion_generation_enabled_v1'), isTrue);
       expect(
         prefs.getString('suggestion_prompt_v1'),
         'Custom {content} {locale}',
@@ -82,9 +85,34 @@ void main() {
 
         expect(settings.suggestionModelProvider, isNull);
         expect(settings.suggestionModelId, isNull);
+        expect(settings.isSuggestionGenerationEnabled, isFalse);
         final prefs = harness.preferences;
         expect(prefs.getString('suggestion_model_v1'), isNull);
+        expect(prefs.getBool('suggestion_generation_enabled_v1'), isFalse);
       },
     );
+
+    test('reset follows the current chat model until disabled', () async {
+      final harness = await createBusinessTestHarness(initial: {});
+      final settings = SettingsProvider(harness.preferences);
+
+      await settings.loaded;
+      await settings.resetSuggestionModel();
+
+      expect(settings.isSuggestionGenerationEnabled, isTrue);
+      expect(settings.suggestionModelKey, isNull);
+      expect(
+        harness.preferences.getBool('suggestion_generation_enabled_v1'),
+        isTrue,
+      );
+
+      await settings.disableSuggestionGeneration();
+
+      expect(settings.isSuggestionGenerationEnabled, isFalse);
+      expect(
+        harness.preferences.getBool('suggestion_generation_enabled_v1'),
+        isFalse,
+      );
+    });
   });
 }

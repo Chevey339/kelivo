@@ -3174,7 +3174,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get defaultModelPageTitleModelSubtitle =>
-      'Used for summarizing conversation titles; prefer fast & cheap models. Disabled until a model is selected.';
+      'Summarizes conversation titles using the current chat model by default, or a selected model.';
 
   @override
   String get titleModelThinkingTitle => 'Enable Thinking';
@@ -3191,7 +3191,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get defaultModelPageSuggestionModelSubtitle =>
-      'Used for follow-up suggestion bubbles after assistant replies. Disabled until a model is selected.';
+      'Generates follow-up suggestion bubbles using the current chat model or a selected model. Disabled by default.';
 
   @override
   String get assistantEditRecentChatsSummaryFrequencyTitle =>
@@ -3277,6 +3277,9 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get defaultModelPageResetDefault => 'Reset to default';
+
+  @override
+  String get defaultModelPageDisable => 'Disable';
 
   @override
   String get defaultModelPageSave => 'Save';

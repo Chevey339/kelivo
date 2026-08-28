@@ -5923,7 +5923,7 @@ abstract class AppLocalizations {
   /// No description provided for @defaultModelPageTitleModelSubtitle.
   ///
   /// In en, this message translates to:
-  /// **'Used for summarizing conversation titles; prefer fast & cheap models. Disabled until a model is selected.'**
+  /// **'Summarizes conversation titles using the current chat model by default, or a selected model.'**
   String get defaultModelPageTitleModelSubtitle;
 
   /// No description provided for @titleModelThinkingTitle.
@@ -5953,7 +5953,7 @@ abstract class AppLocalizations {
   /// No description provided for @defaultModelPageSuggestionModelSubtitle.
   ///
   /// In en, this message translates to:
-  /// **'Used for follow-up suggestion bubbles after assistant replies. Disabled until a model is selected.'**
+  /// **'Generates follow-up suggestion bubbles using the current chat model or a selected model. Disabled by default.'**
   String get defaultModelPageSuggestionModelSubtitle;
 
   /// No description provided for @assistantEditRecentChatsSummaryFrequencyTitle.
@@ -6087,6 +6087,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Reset to default'**
   String get defaultModelPageResetDefault;
+
+  /// No description provided for @defaultModelPageDisable.
+  ///
+  /// In en, this message translates to:
+  /// **'Disable'**
+  String get defaultModelPageDisable;
 
   /// No description provided for @defaultModelPageSave.
   ///

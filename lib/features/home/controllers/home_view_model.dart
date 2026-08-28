@@ -20,6 +20,7 @@ import '../../chat/widgets/chat_message_widget.dart' show ToolUIPart;
 import '../services/message_builder_service.dart';
 import '../services/message_generation_service.dart';
 import '../services/chat_suggestion_service.dart';
+import '../utils/model_display_helper.dart';
 import 'chat_actions.dart';
 import 'file_processing_indicator_controller.dart';
 import 'chat_controller.dart';
@@ -1483,12 +1484,7 @@ class HomeViewModel extends ChangeNotifier {
     }
 
     final settings = _contextProvider.read<SettingsProvider>();
-    final provKey = settings.titleModelProvider;
-    final mdlId = settings.titleModelId;
-    // Opt-in: do not fall back to the chat model. Falling back made every
-    // reply try title summarization and toast failures for users who never
-    // configured it.
-    if (provKey == null || mdlId == null) return;
+    if (!settings.isTitleGenerationEnabled) return;
 
     final assistantProvider = _contextProvider.read<AssistantProvider>();
 
@@ -1496,6 +1492,14 @@ class HomeViewModel extends ChangeNotifier {
     final assistant = convo.assistantId != null
         ? assistantProvider.getById(convo.assistantId!)
         : assistantProvider.currentAssistant;
+    final chatModel = resolveChatModel(
+      settings,
+      conversation: convo,
+      assistant: assistant,
+    );
+    final provKey = settings.titleModelProvider ?? chatModel.providerKey;
+    final mdlId = settings.titleModelId ?? chatModel.modelId;
+    if (provKey == null || mdlId == null) return;
     final cfg = settings.getProviderConfig(provKey);
     final budget = settings.titleGenerationThinkingBudgetFor(
       assistant?.thinkingBudget,
@@ -1746,15 +1750,21 @@ class HomeViewModel extends ChangeNotifier {
     if (convo == null) return;
 
     final settings = _contextProvider.read<SettingsProvider>();
-    final provKey = settings.suggestionModelProvider;
-    final mdlId = settings.suggestionModelId;
-    if (provKey == null || mdlId == null) return;
+    if (!settings.isSuggestionGenerationEnabled) return;
 
     // Read context-dependent inputs before the async gap below.
     final assistantProvider = _contextProvider.read<AssistantProvider>();
     final assistant = convo.assistantId != null
         ? assistantProvider.getById(convo.assistantId!)
         : assistantProvider.currentAssistant;
+    final chatModel = resolveChatModel(
+      settings,
+      conversation: convo,
+      assistant: assistant,
+    );
+    final provKey = settings.suggestionModelProvider ?? chatModel.providerKey;
+    final mdlId = settings.suggestionModelId ?? chatModel.modelId;
+    if (provKey == null || mdlId == null) return;
     final locale = Localizations.localeOf(_contextProvider).toLanguageTag();
     final budget = settings.suggestionGenerationThinkingBudgetFor(
       assistant?.thinkingBudget,

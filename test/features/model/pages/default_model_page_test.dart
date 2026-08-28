@@ -14,7 +14,7 @@ void main() {
     SharedPreferences.setMockInitialValues(const {});
   });
 
-  testWidgets('title summary card shows not enabled until a model is selected', (
+  testWidgets('title summary follows the current chat model by default', (
     tester,
   ) async {
     final settings = SettingsProvider(createBusinessTestPreferences());
@@ -36,11 +36,19 @@ void main() {
     expect(find.text('Title Summary Model'), findsOneWidget);
     expect(
       find.text(
-        'Used for summarizing conversation titles; prefer fast & cheap models. Disabled until a model is selected.',
+        'Summarizes conversation titles using the current chat model by default, or a selected model.',
       ),
       findsOneWidget,
     );
-    expect(find.text('Not enabled'), findsWidgets);
+    expect(settings.isTitleGenerationEnabled, isTrue);
     expect(find.text('Use current chat model'), findsWidgets);
+    expect(find.byTooltip('Disable'), findsOneWidget);
+
+    await tester.tap(find.byTooltip('Disable'));
+    await tester.pumpAndSettle();
+
+    expect(settings.isTitleGenerationEnabled, isFalse);
+    expect(find.text('Not enabled'), findsWidgets);
+    expect(find.byTooltip('Use current chat model'), findsWidgets);
   });
 }
