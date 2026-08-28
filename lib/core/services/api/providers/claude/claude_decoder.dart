@@ -542,17 +542,10 @@ class ClaudeStreamDecoder implements StreamChunkDecoder {
   /// opened in an earlier response of the turn: that decoder held the input,
   /// and an empty map here would erase it from the card.
   Map<String, dynamic>? _serverArgsOrNull(String id) =>
-      _serverArgs.containsKey(id) ? _serverArgsFor(id) : null;
+      _serverArgs.containsKey(id) ? decodeStreamedInput(_serverArgs[id]) : null;
 
-  Map<String, dynamic> _serverArgsFor(String id) {
-    final raw = _serverArgs[id]?.toString();
-    if (raw == null || raw.isEmpty) return const <String, dynamic>{};
-    try {
-      return (jsonDecode(raw) as Map).cast<String, dynamic>();
-    } catch (_) {
-      return const <String, dynamic>{};
-    }
-  }
+  Map<String, dynamic> _serverArgsFor(String id) =>
+      decodeStreamedInput(_serverArgs[id]);
 
   List<StreamChunk> _flushCitations() {
     if (_citationItems.isEmpty) return const <StreamChunk>[];
@@ -614,6 +607,18 @@ class ClaudeStreamDecoder implements StreamChunkDecoder {
   }
 }
 
+/// A tool's streamed input arrives as partial JSON in a buffer, and an
+/// incomplete or absent one reads as no arguments at all.
+Map<String, dynamic> decodeStreamedInput(StringBuffer? buffer) {
+  final raw = buffer?.toString() ?? '';
+  if (raw.isEmpty) return const <String, dynamic>{};
+  try {
+    return (jsonDecode(raw) as Map).cast<String, dynamic>();
+  } catch (_) {
+    return const <String, dynamic>{};
+  }
+}
+
 class ClaudeClientTool {
   ClaudeClientTool({required this.id, this.name = ''});
 
@@ -621,14 +626,7 @@ class ClaudeClientTool {
   String name;
   final StringBuffer input = StringBuffer();
 
-  Map<String, dynamic> get decodedArguments {
-    try {
-      return (jsonDecode(input.isEmpty ? '{}' : input.toString()) as Map)
-          .cast<String, dynamic>();
-    } catch (_) {
-      return <String, dynamic>{};
-    }
-  }
+  Map<String, dynamic> get decodedArguments => decodeStreamedInput(input);
 }
 
 TokenUsage claudeUsageFromMap(Map<String, dynamic> usage) {

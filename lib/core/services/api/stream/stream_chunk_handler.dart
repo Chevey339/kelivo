@@ -302,7 +302,12 @@ class StreamChunkHandler {
     if (name != null && name.isNotEmpty) buffer.name = name;
     if (nameDelta.isNotEmpty) buffer.name += nameDelta;
     if (inputDelta.isNotEmpty) buffer.input.write(inputDelta);
-    if (argumentsObject != null) buffer.arguments = argumentsObject;
+    // A decoder that never saw the call reports no arguments; empty ones are
+    // no news either, and would erase the input already streamed for it.
+    if (argumentsObject != null &&
+        !(argumentsObject is Map && argumentsObject.isEmpty)) {
+      buffer.arguments = argumentsObject;
+    }
     if (content != null) buffer.content = content;
     buffer.server = buffer.server || server;
     if (metadata != null && metadata.isNotEmpty) {

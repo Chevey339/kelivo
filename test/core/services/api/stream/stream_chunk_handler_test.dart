@@ -42,6 +42,34 @@ void main() {
     },
   );
 
+  test(
+    'an empty input reported for a card does not erase the streamed one',
+    () {
+      // Empty arguments are no news, whoever reports them: a decoder closing an
+      // unfinished call still knows less about its input than the deltas do.
+      final handler = StreamChunkHandler();
+      handler.handle(const ToolCallStart(id: 'srvtoolu_1', toolName: 'web 获取'));
+      handler.handle(
+        const ToolCallDelta(
+          id: 'srvtoolu_1',
+          inputDelta: '{"url":"https://example.com"}',
+        ),
+      );
+      handler.handle(
+        const ServerToolEnd(
+          id: 'srvtoolu_1',
+          input: <String, dynamic>{},
+          status: ServerToolStatus.failed,
+        ),
+      );
+
+      final card = jsonDecode(
+        handler.parts.whereType<ToolCallPart>().single.payloadJson,
+      );
+      expect(card['arguments'], {'url': 'https://example.com'});
+    },
+  );
+
   test('creates a text part on Delta when Start was omitted', () {
     final handler = StreamChunkHandler();
     handler.handle(const TextDelta(id: 't', text: 'Hello'));
