@@ -5951,6 +5951,9 @@ class ChatDatabaseRepository {
         _db.generationRunRows,
       )..where((row) => row.targetRevisionId.isIn(deletedIds))).go();
       await (_db.delete(
+        _db.providerArtifactRows,
+      )..where((row) => row.revisionId.isIn(deletedIds))).go();
+      await (_db.delete(
         _db.messageRows,
       )..where((row) => row.id.isIn(deletedIds))).go();
       for (final rewrite in anchorRewrites.entries) {
