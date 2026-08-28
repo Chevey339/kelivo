@@ -157,7 +157,7 @@ Stream<StreamChunk> sendClaudeStream(
   }
 
   Set<String> toolUseIdsInBlocks(
-    Iterable<Map<String, dynamic>> blocks, {
+    Iterable<Map> blocks, {
     bool clientOnly = false,
   }) {
     return blocks
@@ -171,7 +171,7 @@ Stream<StreamChunk> sendClaudeStream(
         .toSet();
   }
 
-  Set<String> toolResultIdsInBlocks(Iterable<Map<String, dynamic>> blocks) {
+  Set<String> toolResultIdsInBlocks(Iterable<Map> blocks) {
     return blocks
         .where(
           (block) => (block['type'] ?? '').toString().endsWith('_tool_result'),
@@ -300,7 +300,10 @@ Stream<StreamChunk> sendClaudeStream(
       final raw = blocks.whereType<Map>().toList();
       final candidate = assistantBlocksForClaudeRequest(raw);
       if (candidate.isEmpty) continue;
-      if (!seenResponses.add(jsonEncode(candidate))) continue;
+      // Keyed on the produced blocks, for the same reason the order and the
+      // hand-off below are: two responses this endpoint sanitises alike are
+      // still two, and one of them would be dropped.
+      if (!seenResponses.add(jsonEncode(raw))) continue;
       responses.add((raw: raw, blocks: candidate));
     }
     if (responses.isEmpty) return null;
@@ -309,19 +312,20 @@ Stream<StreamChunk> sendClaudeStream(
     final seenBlocks = <String>{};
     final callsSoFar = <String>{};
     for (final response in responsesInHandOffOrder(responses)) {
-      // Only a response opening with the result of a call an earlier one left
+      // Only a response carrying the result of a call an earlier one left
       // running is the far side of a hand-off. Anything else — a snapshot cut
-      // mid-stream, a card of the same response, a hand-off whose hosted
-      // blocks this endpoint drops — is more of the same one.
-      final opener = response.blocks.first;
-      final continues =
-          (opener['type'] ?? '').toString().endsWith('_tool_result') &&
-          callsSoFar.contains((opener['tool_use_id'] ?? '').toString());
+      // mid-stream, another card of the same response — is more of the same
+      // one. Read off the blocks the API produced, like the order above and
+      // for the same reason: an endpoint that drops the hosted blocks drops
+      // the hand-off they mark, and the two responses would merge into one.
+      final continues = toolResultIdsInBlocks(
+        response.raw,
+      ).any(callsSoFar.contains);
       final blocks = [
         for (final block in response.blocks)
           if (seenBlocks.add(replayBlockKey(block))) block,
       ];
-      callsSoFar.addAll(toolUseIdsInBlocks(blocks));
+      callsSoFar.addAll(toolUseIdsInBlocks(response.raw));
       if (blocks.isEmpty) continue;
       if (continues || ordered.isEmpty) {
         ordered.add(blocks);

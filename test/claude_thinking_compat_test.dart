@@ -164,6 +164,20 @@ List<Object?> _resultIds(Map message) => (message['content'] as List)
     .map((block) => block['tool_use_id'])
     .toList();
 
+/// The text of a whole replayed turn: every assistant message it spans, with a
+/// plain-string content read as the one text block it stands for.
+String _assistantText(List<Map> messages) => messages
+    .where((message) => message['role'] == 'assistant')
+    .expand(
+      (message) => message['content'] is List
+          ? (message['content'] as List)
+                .cast<Map>()
+                .where((block) => block['type'] == 'text')
+                .map((block) => (block['text'] ?? '').toString())
+          : [(message['content'] ?? '').toString()],
+    )
+    .join();
+
 /// One finished web search turn, as the app persists it: the card's tool call
 /// carries the blocks the API sent, and the card summary is the tool message.
 const _webSearchHistory = <Map<String, dynamic>>[
@@ -2460,10 +2474,13 @@ data: {"type":"message_stop"}
 
     test('a relayed hand-off keeps the order the API produced', () async {
       // Everywhere but the official endpoint the hosted blocks are dropped and
-      // the calls replay as the client pair. What ordered the responses goes
-      // with them, so the order has to be read off the blocks as produced —
-      // otherwise the turn replays with its text out of order and the thinking
-      // block, which Anthropic requires first, somewhere in the middle.
+      // the calls replay as the client pair. Both what ordered the responses
+      // and what marks the hand-off between them go with those blocks, so each
+      // has to be read off the blocks as produced. Order read off the sent ones
+      // replays the turn with its text reversed and the thinking block, which
+      // Anthropic requires first, somewhere in the middle; a hand-off read off
+      // them merges the second response back into the first, and the persisted
+      // message then has no adjacent turn to fold into and repeats the turn.
       final firstResponse = [
         {'type': 'thinking', 'thinking': '先查页面。', 'signature': 'sig-handoff'},
         {'type': 'text', 'text': '我查一下。'},
@@ -2478,9 +2495,11 @@ data: {"type":"message_stop"}
         modelId: 'claude-sonnet-4-6',
         messages: [
           {'role': 'user', 'content': '看看这个页面'},
+          // The shape the app persists: the message holding the cards has no
+          // text of its own, and the turn's text follows as its own message.
           {
             'role': 'assistant',
-            'content': '我查一下。查到了。',
+            'content': '\n\n',
             'tool_calls': [
               _replayCall('srvtoolu_relay', 'web_fetch', secondResponse),
               _replayCall('toolu_client', 'create_memory', firstResponse),
@@ -2488,20 +2507,25 @@ data: {"type":"message_stop"}
           },
           _toolResult('srvtoolu_relay', 'web_fetch', '{"url":"https://e.com"}'),
           _toolResult('toolu_client', 'create_memory', 'test'),
+          {'role': 'assistant', 'content': '我查一下。查到了。'},
           {'role': 'user', 'content': '再说说'},
         ],
       );
 
       final messages = (body['messages'] as List).cast<Map>();
+      expect(messages.map((message) => message['role']).toList(), [
+        'user',
+        'assistant',
+        'user',
+        'assistant',
+        'user',
+      ]);
       final assistant = (messages[1]['content'] as List).cast<Map>();
       expect(assistant.first['type'], 'thinking');
-      expect(
-        assistant
-            .where((block) => block['type'] == 'text')
-            .map((block) => block['text'])
-            .join(),
-        '我查一下。查到了。',
-      );
+      // The turn's text, in the order the API wrote it and only once: the
+      // persisted message aggregates it, so it must fold into the turn rather
+      // than replay on top of it.
+      expect(_assistantText(messages), '我查一下。查到了。');
       // Both calls replay as client tools, each with its result.
       final calls = assistant
           .where((block) => block['type'] == 'tool_use')
@@ -2509,6 +2533,7 @@ data: {"type":"message_stop"}
           .toSet();
       expect(calls, {'srvtoolu_relay', 'toolu_client'});
       expect(_resultIds(messages[2]).toSet(), calls);
+      expect(_blockTypes(messages[3]), ['text']);
     });
 
     test('a deferred response that wrote nothing stays textless', () async {
