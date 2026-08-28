@@ -2295,6 +2295,263 @@ data: {"type":"message_stop"}
     );
 
     test(
+      'two hand-offs in a row keep each client result with its response',
+      () async {
+        // The client loop may run more than once: every response starts a hosted
+        // call and a client one, so each client result closes the response that
+        // declared it and the next opens with the hosted result.
+        const firstResponse = [
+          {'type': 'text', 'text': '我查一下。'},
+          {
+            'type': 'server_tool_use',
+            'id': 'srvtoolu_1',
+            'name': 'web_fetch',
+            'input': {'url': 'https://example.com/1'},
+          },
+          {
+            'type': 'tool_use',
+            'id': 'toolu_client_1',
+            'name': 'create_memory',
+            'input': {'content': 'one'},
+          },
+        ];
+        const secondResponse = [
+          {
+            'type': 'web_fetch_tool_result',
+            'tool_use_id': 'srvtoolu_1',
+            'content': {'type': 'web_fetch_result', 'url': 'https://e.com/1'},
+          },
+          {'type': 'text', 'text': '再查一下。'},
+          {
+            'type': 'server_tool_use',
+            'id': 'srvtoolu_2',
+            'name': 'web_fetch',
+            'input': {'url': 'https://example.com/2'},
+          },
+          {
+            'type': 'tool_use',
+            'id': 'toolu_client_2',
+            'name': 'create_memory',
+            'input': {'content': 'two'},
+          },
+        ];
+        const thirdResponse = [
+          {
+            'type': 'web_fetch_tool_result',
+            'tool_use_id': 'srvtoolu_2',
+            'content': {'type': 'web_fetch_result', 'url': 'https://e.com/2'},
+          },
+          {'type': 'text', 'text': '查到了。'},
+        ];
+        final body = await _captureClaudeRequestBody(
+          officialEndpoint: true,
+          modelId: 'claude-sonnet-4-6',
+          messages: const [
+            {'role': 'user', 'content': '看看这两个页面'},
+            {
+              'role': 'assistant',
+              'content': '我查一下。再查一下。查到了。',
+              'tool_calls': [
+                {
+                  'id': 'srvtoolu_1',
+                  'type': 'function',
+                  'function': {
+                    'name': 'web_fetch',
+                    'arguments': '{"url":"https://example.com/1"}',
+                  },
+                  'metadata': {
+                    'anthropic': {'assistant_blocks': secondResponse},
+                  },
+                },
+                {
+                  'id': 'toolu_client_1',
+                  'type': 'function',
+                  'function': {
+                    'name': 'create_memory',
+                    'arguments': '{"content":"one"}',
+                  },
+                  'metadata': {
+                    'anthropic': {'assistant_blocks': firstResponse},
+                  },
+                },
+                {
+                  'id': 'srvtoolu_2',
+                  'type': 'function',
+                  'function': {
+                    'name': 'web_fetch',
+                    'arguments': '{"url":"https://example.com/2"}',
+                  },
+                  'metadata': {
+                    'anthropic': {'assistant_blocks': thirdResponse},
+                  },
+                },
+                {
+                  'id': 'toolu_client_2',
+                  'type': 'function',
+                  'function': {
+                    'name': 'create_memory',
+                    'arguments': '{"content":"two"}',
+                  },
+                  'metadata': {
+                    'anthropic': {'assistant_blocks': secondResponse},
+                  },
+                },
+              ],
+            },
+            {
+              'role': 'tool',
+              'tool_call_id': 'toolu_client_1',
+              'name': 'create_memory',
+              'content': 'one',
+            },
+            {
+              'role': 'tool',
+              'tool_call_id': 'toolu_client_2',
+              'name': 'create_memory',
+              'content': 'two',
+            },
+            {'role': 'user', 'content': '再说说'},
+          ],
+        );
+
+        final messages = (body['messages'] as List).cast<Map>();
+        expect(messages.map((message) => message['role']).toList(), [
+          'user',
+          'assistant',
+          'user',
+          'assistant',
+          'user',
+          'assistant',
+          'user',
+        ]);
+        expect(
+          (messages[1]['content'] as List)
+              .cast<Map>()
+              .map((block) => block['type'])
+              .toList(),
+          ['text', 'server_tool_use', 'tool_use'],
+        );
+        expect(
+          (messages[2]['content'] as List).cast<Map>().single['tool_use_id'],
+          'toolu_client_1',
+        );
+        expect(
+          (messages[3]['content'] as List)
+              .cast<Map>()
+              .map((block) => block['type'])
+              .toList(),
+          ['web_fetch_tool_result', 'text', 'server_tool_use', 'tool_use'],
+        );
+        expect(
+          (messages[4]['content'] as List).cast<Map>().single['tool_use_id'],
+          'toolu_client_2',
+        );
+        expect(
+          (messages[5]['content'] as List)
+              .cast<Map>()
+              .map((block) => block['type'])
+              .toList(),
+          ['web_fetch_tool_result', 'text'],
+        );
+        expect(messages[6]['content'], '再说说');
+      },
+    );
+
+    test('a deferred response that wrote nothing stays textless', () async {
+      // The persisted message aggregates the text of the whole turn, so the
+      // first response's text must not be folded into a later one that only
+      // carries the hosted result.
+      const firstResponse = [
+        {'type': 'text', 'text': 'checking'},
+        {
+          'type': 'server_tool_use',
+          'id': 'srvtoolu_deferred',
+          'name': 'web_fetch',
+          'input': {'url': 'https://example.com'},
+        },
+        {
+          'type': 'tool_use',
+          'id': 'toolu_client',
+          'name': 'create_memory',
+          'input': {'content': 'test'},
+        },
+      ];
+      const secondResponse = [
+        {
+          'type': 'web_fetch_tool_result',
+          'tool_use_id': 'srvtoolu_deferred',
+          'content': {'type': 'web_fetch_result', 'url': 'https://e.com'},
+        },
+      ];
+      final body = await _captureClaudeRequestBody(
+        officialEndpoint: true,
+        modelId: 'claude-sonnet-4-6',
+        messages: const [
+          {'role': 'user', 'content': '看看这个页面'},
+          {
+            'role': 'assistant',
+            'content': 'checking',
+            'tool_calls': [
+              {
+                'id': 'srvtoolu_deferred',
+                'type': 'function',
+                'function': {
+                  'name': 'web_fetch',
+                  'arguments': '{"url":"https://example.com"}',
+                },
+                'metadata': {
+                  'anthropic': {'assistant_blocks': secondResponse},
+                },
+              },
+              {
+                'id': 'toolu_client',
+                'type': 'function',
+                'function': {
+                  'name': 'create_memory',
+                  'arguments': '{"content":"test"}',
+                },
+                'metadata': {
+                  'anthropic': {'assistant_blocks': firstResponse},
+                },
+              },
+            ],
+          },
+          {
+            'role': 'tool',
+            'tool_call_id': 'toolu_client',
+            'name': 'create_memory',
+            'content': 'test',
+          },
+          {'role': 'assistant', 'content': 'checking'},
+          {'role': 'user', 'content': '再说说'},
+        ],
+      );
+
+      final messages = (body['messages'] as List).cast<Map>();
+      expect(messages.map((message) => message['role']).toList(), [
+        'user',
+        'assistant',
+        'user',
+        'assistant',
+        'user',
+      ]);
+      expect(
+        (messages[1]['content'] as List)
+            .cast<Map>()
+            .map((block) => block['type'])
+            .toList(),
+        ['text', 'server_tool_use', 'tool_use'],
+      );
+      expect(
+        (messages[3]['content'] as List)
+            .cast<Map>()
+            .map((block) => block['type'])
+            .toList(),
+        ['web_fetch_tool_result'],
+      );
+    });
+
+    test(
       'a hand-off cut off at the client result drops the open hosted call',
       () async {
         // History truncated right after the client result: the second

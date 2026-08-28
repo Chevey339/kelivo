@@ -113,13 +113,23 @@ Stream<StreamChunk> sendClaudeStream(
   // Transform last user message to include images per Anthropic schema
   final initialMessages = <Map<String, dynamic>>[];
   final pendingToolResults = <Map<String, dynamic>>[];
-  void flushPendingToolResults() {
-    if (pendingToolResults.isEmpty) return;
-    initialMessages.add({
-      'role': 'user',
-      'content': List<Map<String, dynamic>>.from(pendingToolResults),
-    });
-    pendingToolResults.clear();
+
+  /// Emits the pending results as one `user` message, restricted to [only]
+  /// when given: each response of a turn is answered by the results of the
+  /// client calls it declared, so they cannot all be flushed at once.
+  /// Returns whether a message was emitted.
+  bool flushPendingToolResults({Set<String>? only}) {
+    final taken = only == null
+        ? List<Map<String, dynamic>>.from(pendingToolResults)
+        : [
+            for (final result in pendingToolResults)
+              if (only.contains((result['tool_use_id'] ?? '').toString()))
+                result,
+          ];
+    if (taken.isEmpty) return false;
+    pendingToolResults.removeWhere(taken.contains);
+    initialMessages.add({'role': 'user', 'content': taken});
+    return true;
   }
 
   Map<String, dynamic>? toolUseBlockFromToolCall(Map tc) {
@@ -139,15 +149,22 @@ Stream<StreamChunk> sendClaudeStream(
     };
   }
 
-  Set<String> toolUseIdsInBlocks(List<Map<String, dynamic>> blocks) {
+  Set<String> toolUseIdsInBlocks(
+    Iterable<Map<String, dynamic>> blocks, {
+    Set<String> types = const {'tool_use', 'server_tool_use'},
+  }) {
     return blocks
-        .where(
-          (block) =>
-              block['type'] == 'tool_use' || block['type'] == 'server_tool_use',
-        )
+        .where((block) => types.contains(block['type']))
         .map((block) => (block['id'] ?? '').toString())
         .where((id) => id.isNotEmpty)
         .toSet();
+  }
+
+  String joinedTextOfBlocks(Iterable<Map<String, dynamic>> blocks) {
+    return blocks
+        .where((block) => block['type'] == 'text')
+        .map((block) => (block['text'] ?? '').toString())
+        .join();
   }
 
   Map<String, dynamic>? assistantBlockForClaudeRequest(Map block) {
@@ -315,13 +332,16 @@ Stream<StreamChunk> sendClaudeStream(
   // The assistant message just replayed from its own blocks, if any. Those
   // blocks cover the whole turn, the text written after the tool included, so
   // the plain assistant message that follows repeats it — and with the `tool`
-  // message suppressed above there is nothing left to separate the two.
-  Map<String, dynamic>? replayedTurn;
+  // message suppressed above there is nothing left to separate the two. The
+  // text is the turn's, every response of it joined: the persisted message
+  // aggregates them all, so the message alone would not match it.
+  ({Map<String, dynamic> message, String text})? replayedTurn;
 
-  // The later responses of a replayed turn. They open with the result of a
-  // hosted call the first response left running, which the API only produced
-  // after the client `tool_result`, so they are emitted once that has been.
-  final deferredResponses = <List<Map<String, dynamic>>>[];
+  // The later responses of a replayed turn, each with the client calls that
+  // have to be answered before it: the API only produced the response once
+  // their `tool_result` had been sent, so it is emitted once that has been.
+  final deferredResponses =
+      <({List<Map<String, dynamic>> blocks, Set<String> awaitedClientIds})>[];
 
   for (int i = 0; i < nonSystemMessages.length; i++) {
     final m = nonSystemMessages[i];
@@ -353,31 +373,49 @@ Stream<StreamChunk> sendClaudeStream(
         );
     var turn = replayedTurn;
     replayedTurn = null;
-    final answeredClientTools = pendingToolResults.isNotEmpty;
-    flushPendingToolResults();
     if (deferredResponses.isNotEmpty) {
-      final blocks = [for (final response in deferredResponses) ...response];
-      deferredResponses.clear();
-      if (answeredClientTools || turn == null) {
-        // Roles alternate, so the responses after the client result form one
-        // assistant message between it and whatever comes next.
-        turn = <String, dynamic>{'role': 'assistant', 'content': blocks};
-        initialMessages.add(turn);
-      } else {
-        // No client result in between: the split was only ever in the cards.
-        (turn['content'] as List).addAll(blocks);
+      // A result no response claims — the cards lost which one declared it —
+      // still belongs before them all, so it goes out with the first group.
+      final claimed = <String>{
+        for (final deferred in deferredResponses) ...deferred.awaitedClientIds,
+      };
+      final unclaimed = {
+        for (final result in pendingToolResults)
+          if (!claimed.contains((result['tool_use_id'] ?? '').toString()))
+            (result['tool_use_id'] ?? '').toString(),
+      };
+      for (final deferred in deferredResponses) {
+        // Roles alternate, so each response that a client result deferred
+        // becomes its own assistant message just after those results.
+        final answered = flushPendingToolResults(
+          only: {...deferred.awaitedClientIds, ...unclaimed},
+        );
+        unclaimed.clear();
+        final text = (turn?.text ?? '') + joinedTextOfBlocks(deferred.blocks);
+        if (answered || turn == null) {
+          final message = <String, dynamic>{
+            'role': 'assistant',
+            'content': deferred.blocks,
+          };
+          initialMessages.add(message);
+          turn = (message: message, text: text);
+        } else {
+          // No client result in between: the split was only ever in the cards.
+          (turn.message['content'] as List).addAll(deferred.blocks);
+          turn = (message: turn.message, text: text);
+        }
       }
+      deferredResponses.clear();
     }
+    flushPendingToolResults();
 
     if (turn != null && foldsIntoReplayedTurn) {
-      final blocks = (turn['content'] as List).cast<Map<String, dynamic>>();
-      // The persisted message is every text block of the turn joined together,
-      // so compare against the join, not just the last block.
-      final joined = blocks
-          .where((b) => b['type'] == 'text')
-          .map((b) => (b['text'] ?? '').toString())
-          .join()
-          .trim();
+      final blocks = (turn.message['content'] as List)
+          .cast<Map<String, dynamic>>();
+      // The persisted message aggregates the text of every response of the
+      // turn, so compare against the turn's join — a response of it that wrote
+      // nothing did not write what an earlier one did.
+      final joined = turn.text.trim();
       final text = (m['content'] ?? '').toString().trim();
       if (joined.isEmpty) {
         // The turn wrote nothing around its tools, so the message carries all
@@ -425,7 +463,11 @@ Stream<StreamChunk> sendClaudeStream(
       final blocks = responses.isEmpty
           ? <Map<String, dynamic>>[]
           : responses.removeAt(0);
-      deferredResponses.addAll(responses);
+      var awaited = toolUseIdsInBlocks(blocks, types: const {'tool_use'});
+      for (final response in responses) {
+        deferredResponses.add((blocks: response, awaitedClientIds: awaited));
+        awaited = toolUseIdsInBlocks(response, types: const {'tool_use'});
+      }
       if (!hadReplayBlocks) {
         final text = (m['content'] ?? '').toString();
         if (text.trim().isNotEmpty && text.trim() != '\n\n') {
@@ -443,7 +485,9 @@ Stream<StreamChunk> sendClaudeStream(
           'content': blocks,
         };
         initialMessages.add(message);
-        if (hadReplayBlocks) replayedTurn = message;
+        if (hadReplayBlocks) {
+          replayedTurn = (message: message, text: joinedTextOfBlocks(blocks));
+        }
       }
       continue;
     }
@@ -570,20 +614,22 @@ Stream<StreamChunk> sendClaudeStream(
   // the model run the tool again.
   if (deferredResponses.isNotEmpty) {
     final deferredResults = <String>{
-      for (final block in deferredResponses.expand((response) => response))
-        if ((block['type'] ?? '').toString().endsWith('_tool_result'))
-          (block['tool_use_id'] ?? '').toString(),
+      for (final deferred in deferredResponses)
+        for (final block in deferred.blocks)
+          if ((block['type'] ?? '').toString().endsWith('_tool_result'))
+            (block['tool_use_id'] ?? '').toString(),
     };
     deferredResponses.clear();
     final turn = replayedTurn;
     if (turn != null) {
-      final blocks = (turn['content'] as List).cast<Map<String, dynamic>>();
+      final blocks = (turn.message['content'] as List)
+          .cast<Map<String, dynamic>>();
       blocks.removeWhere(
         (block) =>
             block['type'] == 'server_tool_use' &&
             deferredResults.contains((block['id'] ?? '').toString()),
       );
-      if (blocks.isEmpty) initialMessages.remove(turn);
+      if (blocks.isEmpty) initialMessages.remove(turn.message);
     }
   }
   flushPendingToolResults();
