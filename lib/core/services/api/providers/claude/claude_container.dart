@@ -55,9 +55,3 @@ bool isClaudeStaleContainerError(int statusCode, String errorBody) =>
     statusCode >= 400 &&
     statusCode < 500 &&
     errorBody.toLowerCase().contains('container');
-
-/// Removes the container key from a message about to be sent by a provider
-/// that copies messages whole.
-void stripClaudeContainerKey(Map<String, dynamic> message) {
-  message.remove(multimodalInternalClaudeContainerKey);
-}

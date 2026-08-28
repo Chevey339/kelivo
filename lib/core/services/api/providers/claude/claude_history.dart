@@ -5,17 +5,57 @@ import '../../../../../utils/sandbox_path_resolver.dart';
 import '../../chat_api_helpers.dart';
 import 'claude_container.dart';
 
-/// The replay metadata a tool card of a Claude turn carries: every response
-/// the API produced for the turn so far, the current one last. A turn that
-/// hands off between a hosted and a client tool, or resumes after
-/// `pause_turn`, spans several responses, and the protocol replays each as its
-/// own assistant message with the client results between them — so the
-/// boundary is recorded here rather than inferred from the blocks later.
-Map<String, dynamic> claudeReplayMetadata(
-  List<List<Map<String, dynamic>>> responses,
-) => <String, dynamic>{
-  'anthropic': <String, dynamic>{'responses': responses},
-};
+/// Provider artifact kind under which a Claude turn's responses are stored
+/// against the assistant message that made them: every response the API
+/// produced for the turn, in order, as block lists. A turn that hands off
+/// between a hosted and a client tool, or resumes after `pause_turn`, spans
+/// several responses, and the protocol replays each as its own assistant
+/// message with the client results between them — so the boundary is
+/// recorded here rather than inferred from the blocks later.
+///
+/// Written after every response once the turn has called a tool, so a turn
+/// cut short still replays up to the last response that completed. A turn
+/// without one replays from its text alone and stores nothing.
+const String claudeTurnArtifactKind = 'claude_turn';
+
+/// Internal key carrying the stored turn into the next request, on the
+/// assistant message that holds the turn's tool calls. Stripped before
+/// anything reaches the wire, like the other `_kelivo_` keys.
+const String multimodalInternalClaudeTurnKey = '_kelivo_claude_turn';
+
+String encodeClaudeTurn(List<List<Map<String, dynamic>>> responses) =>
+    jsonEncode(responses);
+
+List<List<Map<String, dynamic>>>? decodeClaudeTurn(Object? payload) {
+  if (payload is! String || payload.isEmpty) return null;
+  try {
+    return _responsesOf(jsonDecode(payload));
+  } catch (_) {
+    return null;
+  }
+}
+
+/// Block lists read off persisted JSON, empty ones dropped.
+List<List<Map<String, dynamic>>>? _responsesOf(Object? raw) {
+  if (raw is! List) return null;
+  final read = [
+    for (final blocks in raw)
+      if (blocks is List)
+        [
+          for (final block in blocks.whereType<Map>())
+            block.cast<String, dynamic>(),
+        ],
+  ]..removeWhere((blocks) => blocks.isEmpty);
+  return read.isEmpty ? null : read;
+}
+
+/// Removes the Claude keys from a message about to be sent by a provider that
+/// copies messages whole.
+void stripClaudeKeys(Map<String, dynamic> message) {
+  message
+    ..remove(multimodalInternalClaudeContainerKey)
+    ..remove(multimodalInternalClaudeTurnKey);
+}
 
 /// Anthropic rejects an empty text block, and dropping `content` altogether
 /// leaves the tool call unanswered, which reads to the model as a malformed
@@ -55,7 +95,7 @@ Set<String> toolResultIdsInBlocks(Iterable<Map> blocks) {
 /// A tool turn is persisted as one assistant message holding the cards, the
 /// `tool` message of each card, and the text of the whole turn as a plain
 /// assistant message after them. Replayed, it becomes the responses the API
-/// produced — see [claudeReplayMetadata] — each its own assistant message
+/// produced — see [claudeTurnArtifactKind] — each its own assistant message
 /// behind the client results it waited for, with the turn's text folded into
 /// them rather than sent again.
 class ClaudeHistory {
@@ -217,7 +257,7 @@ class ClaudeHistory {
 
       if (role == 'assistant' && m['tool_calls'] is List) {
         final toolCalls = m['tool_calls'] as List;
-        turn = _readTurn(toolCalls);
+        turn = _readTurn(m, toolCalls);
         if (turn != null) {
           if (turn.responses.isNotEmpty) emitResponse(turn);
         } else {
@@ -270,15 +310,18 @@ class ClaudeHistory {
     return out;
   }
 
-  /// The turn a persisted tool message records, read off the fullest of its
-  /// cards: each card holds the responses up to the one that last wrote it,
-  /// so the last one written holds them all. Null when none recorded any.
-  _ReplayedTurn? _readTurn(List toolCalls) {
-    List<List<Map<String, dynamic>>>? recorded;
-    for (final tc in toolCalls.whereType<Map>()) {
-      final responses = _recordedResponses(tc);
-      if (responses != null && responses.length > (recorded?.length ?? 0)) {
-        recorded = responses;
+  /// The turn a persisted tool message records: the stored turn artifact, or
+  /// for a message written before there was one, the fullest of its cards —
+  /// each held the responses up to the one that last wrote it, so the last
+  /// one written holds them all. Null when nothing recorded any.
+  _ReplayedTurn? _readTurn(Map<String, dynamic> m, List toolCalls) {
+    var recorded = decodeClaudeTurn(m[multimodalInternalClaudeTurnKey]);
+    if (recorded == null) {
+      for (final tc in toolCalls.whereType<Map>()) {
+        final responses = _recordedResponses(tc);
+        if (responses != null && responses.length > (recorded?.length ?? 0)) {
+          recorded = responses;
+        }
       }
     }
     if (recorded == null) return null;
@@ -311,11 +354,12 @@ class ClaudeHistory {
       }
       responses.add(blocks);
     }
-    // A call the recording lost belongs to the response that opened the turn.
+    // A call the recording stopped short of — the turn was cut in the response
+    // that made it — comes after everything that was recorded.
     for (final entry in cards.entries) {
       if (declared.contains(entry.key)) continue;
       final block = _toolUseBlockFromToolCall(entry.value);
-      if (block != null) responses.first.add(block);
+      if (block != null) responses.last.add(block);
     }
     // A turn left with nothing to send still owns its `tool` messages.
     responses.removeWhere((blocks) => blocks.isEmpty);
@@ -332,25 +376,17 @@ class ClaudeHistory {
     );
   }
 
-  /// The responses a card recorded. A card written by an earlier version of
-  /// the app carries its one response as `assistant_blocks`.
+  /// The responses a card written by an earlier version of the app recorded
+  /// in its metadata: the turn's responses up to its own under `responses`,
+  /// or before that its one response as `assistant_blocks`.
   static List<List<Map<String, dynamic>>>? _recordedResponses(Map tc) {
     final meta = tc['metadata'];
     if (meta is! Map) return null;
     final anthropic = meta['anthropic'];
     if (anthropic is! Map) return null;
-    List<Map<String, dynamic>> blocksOf(Object? raw) => [
-      if (raw is List)
-        for (final block in raw.whereType<Map>()) block.cast<String, dynamic>(),
-    ];
-    final responses = anthropic['responses'];
-    if (responses is List) {
-      final read = [for (final raw in responses) blocksOf(raw)]
-        ..removeWhere((blocks) => blocks.isEmpty);
-      return read.isEmpty ? null : read;
-    }
-    final blocks = blocksOf(anthropic['assistant_blocks']);
-    return blocks.isEmpty ? null : [blocks];
+    return _responsesOf(
+      anthropic['responses'] ?? [anthropic['assistant_blocks']],
+    );
   }
 
   static Map<String, dynamic>? _toolUseBlockFromToolCall(Map? tc) {

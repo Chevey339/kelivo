@@ -162,9 +162,11 @@ Map<String, dynamic> _clientCall(String id, String content) => {
   'input': {'content': content},
 };
 
-/// A card as the app persists it: it recorded the turn's responses up to the
-/// one that last wrote it, so a client call's card stops at the response that
-/// declared it and a hosted call's reaches the one carrying its result.
+/// A card as an earlier version of the app persisted it: it recorded the
+/// turn's responses up to the one that last wrote it, so a client call's card
+/// stops at the response that declared it and a hosted call's reaches the one
+/// carrying its result. The turn is now stored once, against the message — see
+/// [_storedTurn] — and these cards are read only for what was written before.
 Map<String, dynamic> _replayCall(
   String id,
   String name,
@@ -173,7 +175,27 @@ Map<String, dynamic> _replayCall(
   'id': id,
   'type': 'function',
   'function': {'name': name, 'arguments': '{}'},
-  'metadata': claudeReplayMetadata(responses),
+  'metadata': {
+    'anthropic': {'responses': responses},
+  },
+};
+
+/// The tool turn as the app now persists it: a message holding the cards,
+/// with the turn's responses stored once against it.
+Map<String, dynamic> _storedTurn(
+  List<List<Map<String, dynamic>>> responses,
+  List<Map<String, dynamic>> calls,
+) => {
+  'role': 'assistant',
+  'content': '\n\n',
+  'tool_calls': calls,
+  multimodalInternalClaudeTurnKey: encodeClaudeTurn(responses),
+};
+
+Map<String, dynamic> _card(String id, String name) => {
+  'id': id,
+  'type': 'function',
+  'function': {'name': name, 'arguments': '{}'},
 };
 
 Map<String, dynamic> _toolResult(String id, String name, String content) => {
@@ -257,11 +279,11 @@ const _webSearchHistory = <Map<String, dynamic>>[
 ];
 
 /// Both request bodies of a turn where Claude calls a server tool and a client
-/// tool at once: the API leaves the server tool's result in the first response,
-/// and the continuation round decides whether it travels back.
-Future<List<Map<String, dynamic>>> _captureClaudeServerToolRounds({
-  required bool officialEndpoint,
-}) async {
+/// tool at once, and every chunk it produced: the API leaves the server tool's
+/// result in the first response, and the continuation round decides whether
+/// it travels back.
+Future<({List<Map<String, dynamic>> bodies, List<StreamChunk> chunks})>
+_captureClaudeServerToolRounds({required bool officialEndpoint}) async {
   const round1 = [
     {
       'type': 'content_block_start',
@@ -373,15 +395,18 @@ Future<List<Map<String, dynamic>>> _captureClaudeServerToolRounds({
         : 'http://${server.address.address}:${server.port}',
   );
 
+  final chunks = <StreamChunk>[];
   Future<void> send() async {
-    final chunks = await ChatApiService.sendMessageStream(
-      config: config,
-      modelId: 'claude-sonnet-4-6',
-      messages: const [
-        {'role': 'user', 'content': 'kyoto'},
-      ],
-      onToolCall: (name, args, {toolCallId}) async => '{"result":"ok"}',
-    ).toList();
+    chunks.addAll(
+      await ChatApiService.sendMessageStream(
+        config: config,
+        modelId: 'claude-sonnet-4-6',
+        messages: const [
+          {'role': 'user', 'content': 'kyoto'},
+        ],
+        onToolCall: (name, args, {toolCallId}) async => '{"result":"ok"}',
+      ).toList(),
+    );
     expect(chunks.isGenerationDone, isTrue);
   }
 
@@ -396,7 +421,7 @@ Future<List<Map<String, dynamic>>> _captureClaudeServerToolRounds({
   }
 
   expect(requestBodies, hasLength(2));
-  return requestBodies;
+  return (bodies: requestBodies, chunks: chunks);
 }
 
 Future<Map<String, dynamic>> _captureClaudeRequestBody({
@@ -1291,13 +1316,9 @@ void main() {
         'type': 'web_fetch_result',
         'url': 'https://example.com',
       });
-      final responses =
-          ((tool['metadata'] as Map)['anthropic'] as Map)['responses'] as List;
-      expect(responses, hasLength(1));
-      expect(
-        (responses.single as List).cast<Map>().map((block) => block['type']),
-        ['server_tool_use', 'web_fetch_tool_result', 'text'],
-      );
+      // The turn's blocks are stored once, as the message's `claude_turn`
+      // artifact; the card carries none of them.
+      expect(tool['metadata'], isNull);
     });
 
     test(
@@ -1628,11 +1649,10 @@ void main() {
             stream: false,
           ).toList();
           expect(chunks.joinedContent, 'ok');
-          final artifacts = chunks.whereType<ProviderArtifact>().toList();
-          expect(artifacts.map((a) => a.kind).toList(), [
-            claudeContainerArtifactKind,
-          ]);
-          return artifacts.single.payload;
+          return chunks
+              .whereType<ProviderArtifact>()
+              .singleWhere((a) => a.kind == claudeContainerArtifactKind)
+              .payload;
         }
 
         await HttpOverrides.runZoned(
@@ -3446,6 +3466,51 @@ data: {"type":"message_stop"}
       expect(_assistantText(messages), '我查一下。查到了。');
     });
 
+    test('a stored turn replays as its responses', () async {
+      // The turn stored against the message is the whole recording; the cards
+      // only name the calls.
+      final firstResponse = [
+        {'type': 'text', 'text': '我查一下。'},
+        _hostedCall('srvtoolu_1', 'https://example.com'),
+        _clientCall('toolu_client_1', 'first'),
+      ];
+      final secondResponse = [
+        _hostedResult('srvtoolu_1', 'https://e.com'),
+        {'type': 'text', 'text': '查到了。'},
+      ];
+      final body = await _captureClaudeRequestBody(
+        officialEndpoint: true,
+        modelId: 'claude-sonnet-4-6',
+        messages: [
+          {'role': 'user', 'content': '看看这个页面'},
+          _storedTurn(
+            [firstResponse, secondResponse],
+            [
+              _card('srvtoolu_1', 'web_fetch'),
+              _card('toolu_client_1', 'create_memory'),
+            ],
+          ),
+          _toolResult('srvtoolu_1', 'web_fetch', '{"url":"https://e.com"}'),
+          _toolResult('toolu_client_1', 'create_memory', 'saved'),
+          {'role': 'assistant', 'content': '我查一下。查到了。'},
+          {'role': 'user', 'content': '再说说'},
+        ],
+      );
+
+      final messages = (body['messages'] as List).cast<Map>();
+      expect(messages.map((message) => message['role']).toList(), [
+        'user',
+        'assistant',
+        'user',
+        'assistant',
+        'user',
+      ]);
+      expect(_blockTypes(messages[1]), ['text', 'server_tool_use', 'tool_use']);
+      expect(_resultIds(messages[2]), ['toolu_client_1']);
+      expect(_blockTypes(messages[3]), ['web_fetch_tool_result', 'text']);
+      expect(_assistantText(messages), '我查一下。查到了。');
+    });
+
     test('every turn shape replays as one assistant message', () async {
       // How the persisted assistant text can relate to the turn's own text
       // blocks, and what the replayed turn has to end up saying.
@@ -3706,7 +3771,7 @@ data: {"type":"message_stop"}
     test(
       'the continuation round carries the server tool that just ran',
       () async {
-        final bodies = await _captureClaudeServerToolRounds(
+        final (:bodies, chunks: _) = await _captureClaudeServerToolRounds(
           officialEndpoint: true,
         );
 
@@ -3726,7 +3791,7 @@ data: {"type":"message_stop"}
     );
 
     test('anywhere else the continuation round leaves it behind', () async {
-      final bodies = await _captureClaudeServerToolRounds(
+      final (:bodies, chunks: _) = await _captureClaudeServerToolRounds(
         officialEndpoint: false,
       );
 
@@ -3740,6 +3805,34 @@ data: {"type":"message_stop"}
       // An account-pool relay rejects what it cannot decrypt, and that one
       // rejection ends the conversation.
       expect(jsonEncode(bodies[1]), isNot(contains('EqgfCioIARgBIiQ3')));
+    });
+
+    test('a turn is stored against its message once per response', () async {
+      // Each response adds itself to the one recording, so the message ends
+      // up with the whole turn and a turn cut short with what completed. The
+      // cards carry none of it.
+      final (bodies: _, :chunks) = await _captureClaudeServerToolRounds(
+        officialEndpoint: true,
+      );
+
+      final turns = chunks
+          .whereType<ProviderArtifact>()
+          .where((artifact) => artifact.kind == claudeTurnArtifactKind)
+          .map((artifact) => decodeClaudeTurn(artifact.payload)!)
+          .toList();
+      expect(turns.map((turn) => turn.length).toList(), [1, 2]);
+      expect(
+        turns.last.map((response) => response.map((b) => b['type']).toList()),
+        [
+          ['server_tool_use', 'web_search_tool_result', 'tool_use'],
+          ['text'],
+        ],
+      );
+      expect(turns.last.first, turns.first.single);
+      expect(
+        chunks.whereType<ToolCallStart>().map((chunk) => chunk.metadata),
+        everyElement(isNull),
+      );
     });
   });
 }

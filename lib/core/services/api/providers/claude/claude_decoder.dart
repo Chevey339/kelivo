@@ -8,7 +8,6 @@ import '../../stream/stream_chunk.dart';
 import 'claude_container.dart';
 import '../../stream/stream_chunk_decoder.dart';
 import '../../stream/stream_chunk_ids.dart';
-import 'claude_history.dart';
 
 /// Stateful Claude Messages SSE decoder. One instance per HTTP response.
 class ClaudeStreamDecoder implements StreamChunkDecoder {
@@ -16,7 +15,6 @@ class ClaudeStreamDecoder implements StreamChunkDecoder {
     this.skipRedactedThinkingBlocks = false,
     this.initialUsage,
     this.serverToolNames = const <String>{},
-    this.priorResponses = const <List<Map<String, dynamic>>>[],
     String sourceId = 'stream',
   }) : _ids = StreamChunkIds(sourceId);
 
@@ -25,9 +23,6 @@ class ClaudeStreamDecoder implements StreamChunkDecoder {
 
   /// Tool names this request declared as Anthropic-hosted server tools.
   final Set<String> serverToolNames;
-
-  /// The responses of this turn before the one being decoded.
-  final List<List<Map<String, dynamic>>> priorResponses;
   final StreamChunkIds _ids;
 
   final List<Map<String, dynamic>> assistantBlocks = <Map<String, dynamic>>[];
@@ -72,11 +67,6 @@ class ClaudeStreamDecoder implements StreamChunkDecoder {
   final List<Map<String, dynamic>> _citationItems = <Map<String, dynamic>>[];
   bool _closed = false;
 
-  /// [assistantBlocks] is handed out live: a card written mid-response sees
-  /// the blocks that arrive after it once the turn is re-encoded at its end.
-  Map<String, dynamic> get replayMetadata =>
-      claudeReplayMetadata([...priorResponses, assistantBlocks]);
-
   bool isClientTool(String id) => clientTools.containsKey(id);
 
   void recordToolResult(String id, String content) {
@@ -106,14 +96,7 @@ class ClaudeStreamDecoder implements StreamChunkDecoder {
         _serverArgs[id] = StringBuffer(jsonEncode(args));
         _serverToolNames[id] = display;
         if (_serverToolStarted.add(id)) {
-          chunks.add(
-            ServerToolStart(
-              id: id,
-              toolName: display,
-              input: args,
-              metadata: replayMetadata,
-            ),
-          );
+          chunks.add(ServerToolStart(id: id, toolName: display, input: args));
         }
         continue;
       }
@@ -242,9 +225,7 @@ class ClaudeStreamDecoder implements StreamChunkDecoder {
           'input': <String, dynamic>{},
         });
         if (idx != null) _clientIndexToId[idx] = id;
-        chunks.add(
-          ToolCallStart(id: id, toolName: name, metadata: replayMetadata),
-        );
+        chunks.add(ToolCallStart(id: id, toolName: name));
       }
     } else if (kind == 'server_tool_use') {
       _flushTextBlock();
@@ -274,9 +255,7 @@ class ClaudeStreamDecoder implements StreamChunkDecoder {
         _serverToolNames[id] = display;
         _serverToolStarted.add(id);
         chunks.add(ServerToolStart(id: id, toolName: display));
-        chunks.add(
-          ToolCallStart(id: id, toolName: display, metadata: replayMetadata),
-        );
+        chunks.add(ToolCallStart(id: id, toolName: display));
       }
     } else if (kind.endsWith('_tool_result')) {
       _flushTextBlock();
@@ -532,7 +511,6 @@ class ClaudeStreamDecoder implements StreamChunkDecoder {
         status: errorCode.isNotEmpty
             ? ServerToolStatus.failed
             : ServerToolStatus.completed,
-        metadata: replayMetadata,
       ),
     ];
   }
@@ -572,7 +550,6 @@ class ClaudeStreamDecoder implements StreamChunkDecoder {
           'items': items,
           if ((errorCode ?? '').isNotEmpty) 'error': errorCode,
         },
-        metadata: replayMetadata,
       ),
     ];
   }
@@ -597,7 +574,6 @@ class ClaudeStreamDecoder implements StreamChunkDecoder {
           input: _serverArgsFor(id),
           output: const <String, dynamic>{'items': <Map<String, dynamic>>[]},
           status: ServerToolStatus.failed,
-          metadata: replayMetadata,
         ),
       );
     }
@@ -638,7 +614,6 @@ class ClaudeStreamDecoder implements StreamChunkDecoder {
         id: id,
         input: args,
         output: <String, dynamic>{'items': items},
-        metadata: replayMetadata,
       ),
     ];
   }

@@ -234,9 +234,19 @@ Stream<StreamChunk> sendClaudeStream(
   var streamRound = 0;
   var pendingCalls = <EmitToolCall>[];
   var lastAssistantBlocks = <Map<String, dynamic>>[];
-  // Every response of this turn so far, recorded on each card so the turn
-  // replays as the responses it was.
+  // Every response of this turn so far, stored against the message after each
+  // so the turn replays as the responses it was. A turn without a tool call
+  // replays from its text alone and stores nothing.
   final turnResponses = <List<Map<String, dynamic>>>[];
+  Stream<StreamChunk> recordTurn(List<Map<String, dynamic>> response) async* {
+    turnResponses.add(response);
+    if (toolUseIdsInBlocks(turnResponses.expand((b) => b)).isEmpty) return;
+    yield ProviderArtifact(
+      kind: claudeTurnArtifactKind,
+      payload: encodeClaudeTurn(turnResponses),
+    );
+  }
+
   final downloadedFileIds = <String>{};
   var lastStreamResults = <Map<String, dynamic>>[];
   final nonStreamText = StringBuffer();
@@ -402,13 +412,12 @@ Stream<StreamChunk> sendClaudeStream(
           }
         }
         // The continuation round sends these, so they go through the same
-        // sanitising as replayed history; the metadata below stays whole.
+        // sanitising as replayed history; the stored copy stays whole.
         lastAssistantBlocks = history.sanitize(assistantBlocks);
         nonStreamText.write(joinedTextOfBlocks(assistantBlocks));
         final decoder = ClaudeStreamDecoder(
           skipRedactedThinkingBlocks: skipRedactedThinkingBlocks,
           serverToolNames: declaredServerToolNames,
-          priorResponses: turnResponses,
           sourceId: 'round-${streamRound++}',
         );
         for (final chunk in decoder.decodeCompleteServerTools(
@@ -416,7 +425,7 @@ Stream<StreamChunk> sendClaudeStream(
         )) {
           yield chunk;
         }
-        turnResponses.add(assistantBlocks);
+        yield* recordTurn(assistantBlocks);
         if (toolUses.isEmpty) {
           // A hosted tool that ran past the turn limit asks to be resumed,
           // with no client tool to answer first.
@@ -429,7 +438,6 @@ Stream<StreamChunk> sendClaudeStream(
                 id: e.key,
                 name: (e.value['name'] ?? '').toString(),
                 arguments: (e.value['args'] as Map<String, dynamic>),
-                metadata: claudeReplayMetadata([...turnResponses]),
               ),
           ];
         }
@@ -441,7 +449,6 @@ Stream<StreamChunk> sendClaudeStream(
         skipRedactedThinkingBlocks: skipRedactedThinkingBlocks,
         initialUsage: totalUsage,
         serverToolNames: declaredServerToolNames,
-        priorResponses: turnResponses,
         sourceId: 'round-${streamRound++}',
       );
       final executedToolIds = <String>{};
@@ -481,7 +488,6 @@ Stream<StreamChunk> sendClaudeStream(
               id: tool.id,
               name: tool.name,
               arguments: args,
-              metadata: decoder.replayMetadata,
             );
             await for (final resultChunk in executeClientTools(
               calls: [call],
@@ -518,10 +524,9 @@ Stream<StreamChunk> sendClaudeStream(
       container = decoder.container ?? container;
 
       // The continuation round sends these as they are, so they go through the
-      // same sanitising as replayed history — the persisted copy below stays
-      // whole either way.
+      // same sanitising as replayed history — the stored copy stays whole.
       lastAssistantBlocks = history.sanitize(assistantBlocks);
-      turnResponses.add(assistantBlocks);
+      yield* recordTurn(assistantBlocks);
       if (decoder.clientTools.isEmpty) {
         pauseTurn = (lastStopReason ?? '') == 'pause_turn';
         return;
@@ -533,7 +538,6 @@ Stream<StreamChunk> sendClaudeStream(
             id: tool.id,
             name: tool.name,
             arguments: tool.decodedArguments,
-            metadata: decoder.replayMetadata,
           ),
       ];
       for (final tool in decoder.clientTools.values) {

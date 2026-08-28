@@ -20,8 +20,8 @@ import '../stream/stream_chunk.dart';
 import '../stream/stream_chunk_emit.dart';
 import '../stream/stream_chunk_ids.dart';
 import 'claude/claude_decoder.dart';
+import 'claude/claude_history.dart';
 
-import 'claude_official.dart';
 import 'google_common.dart';
 
 Stream<StreamChunk> sendGoogleVertexStream(
@@ -243,6 +243,7 @@ Stream<StreamChunk> sendGoogleVertexClaudeStream({
       Map<String, dynamic>.from(m)
         ..remove(multimodalInternalRevisionIdKey)
         ..remove(multimodalInternalClaudeContainerKey)
+        ..remove(multimodalInternalClaudeTurnKey)
         ..['role'] = role.isEmpty ? 'user' : role,
     );
   }

@@ -19,6 +19,7 @@ import '../backup/backup_task_progress.dart';
 import '../../database/generation_run.dart';
 import '../../models/chat_message.dart';
 import '../api/providers/claude/claude_container.dart';
+import '../api/providers/claude/claude_history.dart';
 import '../../models/message_part.dart';
 import '../../models/conversation.dart';
 import '../../../utils/sandbox_path_resolver.dart';
@@ -120,6 +121,7 @@ class ChatService extends ChangeNotifier {
   /// message caches, so [_providerArtifactKinds] lists what is worth loading.
   static const Set<String> _providerArtifactKinds = {
     claudeContainerArtifactKind,
+    claudeTurnArtifactKind,
   };
   final Map<String, Map<String, String>> _providerArtifactsCache = {};
   final Map<String, Map<String, String>> _temporaryProviderArtifacts = {};
