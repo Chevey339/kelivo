@@ -215,7 +215,7 @@ class ClaudeHistory {
     }
 
     for (var i = 0; i < messages.length; i++) {
-      final m = messages[i];
+      var m = messages[i];
       final role = (m['role'] ?? 'user').toString();
       if (role == 'assistant') {
         final ref = ClaudeContainerRef.decode(
@@ -239,6 +239,11 @@ class ClaudeHistory {
       if (role == 'assistant' && m['tool_calls'] is! List && _hasMedia(m)) {
         final split = await _splitParts(m, includeUserPaths: false);
         carriedImages.addAll(split.images);
+        // What is left of the message once its images have moved on.
+        m = {
+          ...m,
+          'content': split.text.map((block) => block['text']).join('\n'),
+        };
       }
 
       if (turn != null) {

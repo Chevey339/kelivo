@@ -2875,6 +2875,40 @@ data: {"type":"message_stop"}
       },
     );
 
+    test('an assistant image in Markdown moves on without its link', () async {
+      final dir = await Directory.systemTemp.createTemp(
+        'kelivo_claude_assistant_md_',
+      );
+      addTearDown(() async {
+        if (await dir.exists()) {
+          await dir.delete(recursive: true);
+        }
+      });
+      final file = File('${dir.path}/chart.png');
+      await file.writeAsBytes(const [1, 2, 3, 4]);
+
+      final body = await _captureClaudeRequestBody(
+        officialEndpoint: true,
+        modelId: 'claude-sonnet-4-6',
+        messages: [
+          {'role': 'user', 'content': '画个图'},
+          {'role': 'assistant', 'content': '画好了 ![](${file.path}) 请看'},
+          {'role': 'user', 'content': '哪根柱子最高'},
+        ],
+      );
+
+      final messages = (body['messages'] as List).cast<Map>();
+      // The image is carried into the next user turn; the assistant keeps
+      // only its words, not a path the model cannot open.
+      expect(messages[1]['content'], '画好了  请看');
+      final followUp = (messages[2]['content'] as List).cast<Map>();
+      expect(followUp.map((part) => part['type']).toList(), [
+        'text',
+        'image',
+        'text',
+      ]);
+    });
+
     test(
       'interrupted server tool is dropped instead of replayed orphaned',
       () async {
