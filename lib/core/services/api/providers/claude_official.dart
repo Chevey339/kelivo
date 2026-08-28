@@ -20,10 +20,7 @@ import 'claude/claude_decoder.dart';
 
 /// One API response of a replayed turn: the blocks it produced, and the ones
 /// left after sanitising them for this endpoint.
-typedef _ReplayResponse = ({
-  List<Map<String, dynamic>> raw,
-  List<Map<String, dynamic>> blocks,
-});
+typedef _ReplayResponse = ({List<Map> raw, List<Map<String, dynamic>> blocks});
 
 int _defaultClaudeMaxOutputTokens(String modelId) {
   final lower = modelId.trim().toLowerCase();
@@ -126,15 +123,18 @@ Stream<StreamChunk> sendClaudeStream(
   /// client calls it declared, so they cannot all be flushed at once.
   /// Returns whether a message was emitted.
   bool flushPendingToolResults({Set<String>? only}) {
-    final taken = only == null
-        ? List<Map<String, dynamic>>.from(pendingToolResults)
-        : [
-            for (final result in pendingToolResults)
-              if (only.contains((result['tool_use_id'] ?? '').toString()))
-                result,
-          ];
+    final taken = [
+      for (final result in pendingToolResults)
+        if (only == null ||
+            only.contains((result['tool_use_id'] ?? '').toString()))
+          result,
+    ];
     if (taken.isEmpty) return false;
-    pendingToolResults.removeWhere(taken.contains);
+    pendingToolResults.removeWhere(
+      (result) =>
+          only == null ||
+          only.contains((result['tool_use_id'] ?? '').toString()),
+    );
     initialMessages.add({'role': 'user', 'content': taken});
     return true;
   }
@@ -158,11 +158,25 @@ Stream<StreamChunk> sendClaudeStream(
 
   Set<String> toolUseIdsInBlocks(
     Iterable<Map<String, dynamic>> blocks, {
-    Set<String> types = const {'tool_use', 'server_tool_use'},
+    bool clientOnly = false,
   }) {
     return blocks
-        .where((block) => types.contains(block['type']))
+        .where(
+          (block) =>
+              block['type'] == 'tool_use' ||
+              (!clientOnly && block['type'] == 'server_tool_use'),
+        )
         .map((block) => (block['id'] ?? '').toString())
+        .where((id) => id.isNotEmpty)
+        .toSet();
+  }
+
+  Set<String> toolResultIdsInBlocks(Iterable<Map<String, dynamic>> blocks) {
+    return blocks
+        .where(
+          (block) => (block['type'] ?? '').toString().endsWith('_tool_result'),
+        )
+        .map((block) => (block['tool_use_id'] ?? '').toString())
         .where((id) => id.isNotEmpty)
         .toSet();
   }
@@ -283,11 +297,7 @@ Stream<StreamChunk> sendClaudeStream(
       if (anthropic is! Map) continue;
       final blocks = anthropic['assistant_blocks'];
       if (blocks is! List || blocks.isEmpty) continue;
-      final raw = [
-        for (final block in blocks.whereType<Map>())
-          block.map((key, value) => MapEntry(key.toString(), value)),
-      ];
-      if (raw.isEmpty) continue;
+      final raw = blocks.whereType<Map>().toList();
       final candidate = assistantBlocksForClaudeRequest(raw);
       if (candidate.isEmpty) continue;
       if (!seenResponses.add(jsonEncode(candidate))) continue;
@@ -388,35 +398,36 @@ Stream<StreamChunk> sendClaudeStream(
     replayedTurn = null;
     if (deferredResponses.isNotEmpty) {
       // A result no response claims — the cards lost which one declared it —
-      // still belongs before them all, so it goes out with the first group.
+      // still belongs before them all, so the first group takes it on.
       final claimed = <String>{
         for (final deferred in deferredResponses) ...deferred.awaitedClientIds,
       };
-      final unclaimed = {
+      deferredResponses.first.awaitedClientIds.addAll({
         for (final result in pendingToolResults)
           if (!claimed.contains((result['tool_use_id'] ?? '').toString()))
             (result['tool_use_id'] ?? '').toString(),
-      };
+      });
       for (final deferred in deferredResponses) {
         // Roles alternate, so each response that a client result deferred
         // becomes its own assistant message just after those results.
         final answered = flushPendingToolResults(
-          only: {...deferred.awaitedClientIds, ...unclaimed},
+          only: deferred.awaitedClientIds,
         );
-        unclaimed.clear();
-        final text = (turn?.text ?? '') + joinedTextOfBlocks(deferred.blocks);
-        if (answered || turn == null) {
-          final message = <String, dynamic>{
+        var message = turn?.message;
+        if (answered || message == null) {
+          message = <String, dynamic>{
             'role': 'assistant',
             'content': deferred.blocks,
           };
           initialMessages.add(message);
-          turn = (message: message, text: text);
         } else {
           // No client result in between: the split was only ever in the cards.
-          (turn.message['content'] as List).addAll(deferred.blocks);
-          turn = (message: turn.message, text: text);
+          (message['content'] as List).addAll(deferred.blocks);
         }
+        turn = (
+          message: message,
+          text: (turn?.text ?? '') + joinedTextOfBlocks(deferred.blocks),
+        );
       }
       deferredResponses.clear();
     }
@@ -451,16 +462,14 @@ Stream<StreamChunk> sendClaudeStream(
           anthropicResponsesFromToolCallMetadata(toolCalls) ??
           <List<Map<String, dynamic>>>[];
       final hadReplayBlocks = responses.isNotEmpty;
-      final resolvedServerToolIds = <String>{};
-      for (final block in responses.expand((response) => response)) {
-        final type = (block['type'] ?? '').toString();
-        if (type == 'server_tool_use') {
-          final sid = (block['id'] ?? '').toString();
-          if (sid.isNotEmpty) replayedServerToolIds.add(sid);
-        } else if (type.endsWith('_tool_result')) {
-          resolvedServerToolIds.add((block['tool_use_id'] ?? '').toString());
-        }
-      }
+      final allBlocks = responses.expand((response) => response);
+      final resolvedServerToolIds = toolResultIdsInBlocks(allBlocks);
+      replayedServerToolIds.addAll(
+        allBlocks
+            .where((block) => block['type'] == 'server_tool_use')
+            .map((block) => (block['id'] ?? '').toString())
+            .where((id) => id.isNotEmpty),
+      );
       // A `server_tool_use` whose result block never arrived — the stream was
       // stopped or dropped between the two — would replay as a call with no
       // output, which the API rejects. Drop the call; its `tool` message is
@@ -476,10 +485,10 @@ Stream<StreamChunk> sendClaudeStream(
       final blocks = responses.isEmpty
           ? <Map<String, dynamic>>[]
           : responses.removeAt(0);
-      var awaited = toolUseIdsInBlocks(blocks, types: const {'tool_use'});
+      var awaited = toolUseIdsInBlocks(blocks, clientOnly: true);
       for (final response in responses) {
         deferredResponses.add((blocks: response, awaitedClientIds: awaited));
-        awaited = toolUseIdsInBlocks(response, types: const {'tool_use'});
+        awaited = toolUseIdsInBlocks(response, clientOnly: true);
       }
       if (!hadReplayBlocks) {
         final text = (m['content'] ?? '').toString();
@@ -626,12 +635,9 @@ Stream<StreamChunk> sendClaudeStream(
   // call whose result is only in them would be an open call. Drop both and let
   // the model run the tool again.
   if (deferredResponses.isNotEmpty) {
-    final deferredResults = <String>{
-      for (final deferred in deferredResponses)
-        for (final block in deferred.blocks)
-          if ((block['type'] ?? '').toString().endsWith('_tool_result'))
-            (block['tool_use_id'] ?? '').toString(),
-    };
+    final deferredResults = toolResultIdsInBlocks(
+      deferredResponses.expand((deferred) => deferred.blocks),
+    );
     deferredResponses.clear();
     final turn = replayedTurn;
     if (turn != null) {
@@ -875,7 +881,6 @@ Stream<StreamChunk> sendClaudeStream(
             <Map<String, dynamic>>[];
         final Map<String, Map<String, dynamic>> toolUses =
             <String, Map<String, dynamic>>{}; // id -> {name,args}
-        final buf = StringBuffer();
         for (final it in content) {
           if (it is! Map) continue;
           final type = (it['type'] ?? '').toString();
@@ -883,7 +888,6 @@ Stream<StreamChunk> sendClaudeStream(
             final t = (it['text'] ?? '').toString();
             if (t.isNotEmpty) {
               assistantBlocks.add({'type': 'text', 'text': t});
-              buf.write(t);
             }
           } else if (type == 'thinking' ||
               (type == 'redacted_thinking' && !skipRedactedThinkingBlocks)) {
@@ -924,7 +928,7 @@ Stream<StreamChunk> sendClaudeStream(
         // The continuation round sends these, so they go through the same
         // sanitising as replayed history; the metadata below stays whole.
         lastAssistantBlocks = assistantBlocksForClaudeRequest(assistantBlocks);
-        lastText = buf.toString();
+        lastText = joinedTextOfBlocks(assistantBlocks);
         if (toolUses.isEmpty) {
           // A hosted tool that ran past the turn limit asks to be resumed,
           // with no client tool to answer first.
