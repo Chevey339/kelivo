@@ -385,12 +385,9 @@ Stream<StreamChunk> sendClaudeStream(
       }
       continue;
     }
-    // Client tool results land between the two as a user message, so only a
-    // turn left adjacent can be folded — or the text of the responses those
-    // results deferred, which become the adjacent turn below. Media keeps the
-    // structured path below, so only a plain-text message folds.
-    final foldsIntoReplayedTurn =
-        (pendingToolResults.isEmpty || deferredResponses.isNotEmpty) &&
+    // Media keeps the structured path below, so only a plain-text message is
+    // read against the turn.
+    final followsReplayedTurn =
         role == 'assistant' &&
         m['tool_calls'] is! List &&
         parseInternalMediaRefs(m[multimodalInternalMediaPathsKey]).isEmpty &&
@@ -398,6 +395,11 @@ Stream<StreamChunk> sendClaudeStream(
           (m['content'] ?? '').toString(),
           skipImageParsing: skipImageParsing,
         );
+    // Client tool results land between the two as a user message, so text can
+    // only be folded into a turn left adjacent — or into the responses those
+    // results deferred, which become the adjacent turn below.
+    final replayedTurnIsAdjacent =
+        pendingToolResults.isEmpty || deferredResponses.isNotEmpty;
     var turn = replayedTurn;
     replayedTurn = null;
     if (deferredResponses.isNotEmpty) {
@@ -437,26 +439,31 @@ Stream<StreamChunk> sendClaudeStream(
     }
     flushPendingToolResults();
 
-    if (turn != null && foldsIntoReplayedTurn) {
-      final blocks = (turn.message['content'] as List)
-          .cast<Map<String, dynamic>>();
+    if (turn != null && followsReplayedTurn) {
       // The persisted message aggregates the text of every response of the
       // turn, so compare against the turn's join — a response of it that wrote
-      // nothing did not write what an earlier one did.
+      // nothing did not write what an earlier one did. A snapshot taken
+      // mid-stream can stop short of the finished text; on any other
+      // disagreement the turn is left as it is, since its blocks are what the
+      // API produced and the message on top would send the same turn twice —
+      // which is what the roles had to alternate for.
       final joined = turn.text.trim();
       final text = (m['content'] ?? '').toString().trim();
-      if (joined.isEmpty) {
-        // The turn wrote nothing around its tools, so the message carries all
-        // of its text.
-        if (text.isNotEmpty) blocks.add({'type': 'text', 'text': text});
-      } else if (text.startsWith(joined)) {
-        // A snapshot taken mid-stream can stop short of the finished text.
-        final rest = text.substring(joined.length).trim();
-        if (rest.isNotEmpty) blocks.add({'type': 'text', 'text': rest});
+      final rest = joined.isEmpty
+          ? text
+          : text.startsWith(joined)
+          ? text.substring(joined.length).trim()
+          : '';
+      // Nothing of it left to say. Dropping the message can leave the tool
+      // results next to the user message after them, which the API combines
+      // into the one turn they already were.
+      if (rest.isEmpty) continue;
+      if (replayedTurnIsAdjacent) {
+        (turn.message['content'] as List).add({'type': 'text', 'text': rest});
+      } else {
+        // The client results sit in between now, so the rest goes on its own.
+        initialMessages.add({'role': 'assistant', 'content': rest});
       }
-      // Any other disagreement leaves the blocks as they are: they are what
-      // the API itself produced, and appending the message on top would send
-      // the same turn twice — which is what the roles had to alternate for.
       continue;
     }
 

@@ -2536,6 +2536,63 @@ data: {"type":"message_stop"}
       expect(_blockTypes(messages[3]), ['text']);
     });
 
+    test(
+      'a relayed textless deferred response leaves no text behind',
+      () async {
+        // A response carrying only the hosted result has nothing left to send
+        // once those blocks are dropped, so on a relay the turn is the one
+        // assistant message and its results. The persisted message aggregates
+        // the text of the whole turn, which that message already holds, so
+        // sending it on top would replay the turn twice.
+        final firstResponse = [
+          {'type': 'text', 'text': 'checking'},
+          _hostedCall('srvtoolu_relay', 'https://example.com'),
+          _clientCall('toolu_client', 'test'),
+        ];
+        final secondResponse = [
+          _hostedResult('srvtoolu_relay', 'https://e.com'),
+        ];
+        final body = await _captureClaudeRequestBody(
+          modelId: 'claude-sonnet-4-6',
+          messages: [
+            {'role': 'user', 'content': '看看这个页面'},
+            {
+              'role': 'assistant',
+              'content': '\n\n',
+              'tool_calls': [
+                _replayCall('srvtoolu_relay', 'web_fetch', secondResponse),
+                _replayCall('toolu_client', 'create_memory', firstResponse),
+              ],
+            },
+            _toolResult(
+              'srvtoolu_relay',
+              'web_fetch',
+              '{"url":"https://e.com"}',
+            ),
+            _toolResult('toolu_client', 'create_memory', 'test'),
+            {'role': 'assistant', 'content': 'checking'},
+            {'role': 'user', 'content': '再说说'},
+          ],
+        );
+
+        final messages = (body['messages'] as List).cast<Map>();
+        expect(_assistantText(messages), 'checking');
+        // The results and the user message that follows them are consecutive
+        // user turns, which the API combines into the one turn they were.
+        expect(messages.map((message) => message['role']).toList(), [
+          'user',
+          'assistant',
+          'user',
+          'user',
+        ]);
+        expect(_blockTypes(messages[1]), ['text', 'tool_use', 'tool_use']);
+        expect(_resultIds(messages[2]).toSet(), {
+          'srvtoolu_relay',
+          'toolu_client',
+        });
+      },
+    );
+
     test('a deferred response that wrote nothing stays textless', () async {
       // The persisted message aggregates the text of the whole turn, so the
       // first response's text must not be folded into a later one that only
