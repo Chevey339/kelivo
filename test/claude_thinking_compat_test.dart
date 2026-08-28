@@ -1404,6 +1404,18 @@ void main() {
               stream: false,
             ).toList();
             expect(chunks.joinedContent, 'ok');
+            // The container is stored as soon as a response names it, so a
+            // turn stopped before its end still resumes in it next time.
+            final containerAt = chunks.indexWhere(
+              (chunk) =>
+                  chunk is ProviderArtifact &&
+                  chunk.kind == claudeContainerArtifactKind,
+            );
+            expect(containerAt, isNonNegative);
+            expect(
+              containerAt,
+              lessThan(chunks.indexWhere((c) => c is TextDelta)),
+            );
           },
           createHttpClient: (context) =>
               _ProxyHttpOverrides(server.port).createHttpClient(context),

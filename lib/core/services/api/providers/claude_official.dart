@@ -234,26 +234,36 @@ Stream<StreamChunk> sendClaudeStream(
   var streamRound = 0;
   var pendingCalls = <EmitToolCall>[];
   var lastAssistantBlocks = <Map<String, dynamic>>[];
+  // Carried through every round of this turn — after a client tool, after a
+  // pause — and stored after each so the next turn resumes in it too.
+  ClaudeContainerRef? container = history.storedContainer;
   // Every response of this turn so far, stored against the message after each
   // so the turn replays as the responses it was. A turn without a tool call
   // replays from its text alone and stores nothing.
   final turnResponses = <List<Map<String, dynamic>>>[];
   Stream<StreamChunk> recordTurn(List<Map<String, dynamic>> response) async* {
     turnResponses.add(response);
-    if (toolUseIdsInBlocks(turnResponses.expand((b) => b)).isEmpty) return;
-    yield ProviderArtifact(
-      kind: claudeTurnArtifactKind,
-      payload: encodeClaudeTurn(turnResponses),
-    );
+    if (toolUseIdsInBlocks(turnResponses.expand((b) => b)).isNotEmpty) {
+      yield ProviderArtifact(
+        kind: claudeTurnArtifactKind,
+        payload: encodeClaudeTurn(turnResponses),
+      );
+    }
+    // Stored against this turn's message so the next turn can resume in the
+    // same container — now rather than at the end, which a cancelled turn
+    // never reaches.
+    if (hasCodeExecution && container != null) {
+      yield ProviderArtifact(
+        kind: claudeContainerArtifactKind,
+        payload: container!.encode(),
+      );
+    }
   }
 
   final downloadedFileIds = <String>{};
   var lastStreamResults = <Map<String, dynamic>>[];
   final nonStreamText = StringBuffer();
   var pauseTurn = false;
-  // Carried through every round of this turn — after a client tool, after a
-  // pause — and handed back at the end so the next turn resumes in it too.
-  ClaudeContainerRef? container = history.storedContainer;
 
   yield* runProviderToolRounds(
     sendRound: () async* {
@@ -588,14 +598,6 @@ Stream<StreamChunk> sendClaudeStream(
       ];
     },
     finish: () async* {
-      // Stored against this turn's message so the next turn can resume in
-      // the same container.
-      if (hasCodeExecution && container != null) {
-        yield ProviderArtifact(
-          kind: claudeContainerArtifactKind,
-          payload: container!.encode(),
-        );
-      }
       yield* emitDone(
         ids: StreamChunkIds('finish'),
         content: nonStreamText.toString(),
