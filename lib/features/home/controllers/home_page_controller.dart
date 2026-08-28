@@ -402,7 +402,6 @@ class HomePageController extends ChangeNotifier {
     _chatController = ChatController(chatService: _chatService);
     _chatControllerReady = true;
     _streamController = stream_ctrl.StreamController(
-      chatService: _chatService,
       onStateChanged: () => notifyListeners(),
       getSettingsProvider: () => _context.read<SettingsProvider>(),
       getCurrentConversationId: () => currentConversation?.id,
@@ -2721,7 +2720,8 @@ class HomePageController extends ChangeNotifier {
 
         final cleanedParts = ChatMessage.partsWithRewrittenText(
           m.parts,
-          (text) => _streamController.captureGeminiThoughtSignature(text, m.id),
+          (text) =>
+              _chatService.migrateLegacyGeminiThoughtSignature(text, m.id),
         );
         if (!identical(cleanedParts, m.parts)) {
           final updated = m.copyWith(parts: cleanedParts);

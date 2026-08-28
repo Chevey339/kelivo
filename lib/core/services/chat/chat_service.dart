@@ -20,7 +20,7 @@ import '../../database/generation_run.dart';
 import '../../models/chat_message.dart';
 import '../api/providers/claude/claude_container.dart';
 import '../api/providers/claude/claude_history.dart';
-import '../api/providers/google/gemini_thought_signature.dart';
+import '../api/providers/google_gemini.dart';
 import '../../models/message_part.dart';
 import '../../models/conversation.dart';
 import '../../../utils/sandbox_path_resolver.dart';
@@ -3416,6 +3416,27 @@ class ChatService extends ChangeNotifier {
     geminiThoughtSignatureArtifactKind,
     signature,
   );
+
+  /// Moves the signature comment an earlier version left in a message's text
+  /// into the artifact store, returning the text without it.
+  String migrateLegacyGeminiThoughtSignature(String content, String messageId) {
+    if (content.isEmpty) return content;
+    final meta = extractGeminiThoughtMeta(content);
+    if (meta.cleanedText == content) return content;
+    if (meta.hasAny && getGeminiThoughtSignature(messageId) == null) {
+      unawaited(
+        setGeminiThoughtSignature(
+          messageId,
+          encodeGeminiThoughtSignature(
+            textKey: meta.textKey,
+            textValue: meta.textValue,
+            imageSigs: meta.images,
+          ),
+        ),
+      );
+    }
+    return meta.cleanedText;
+  }
 
   /// The provider artifact of [kind] stored against [assistantMessageId], or
   /// null. Served from the message caches, so it is synchronous.

@@ -7,10 +7,8 @@ import '../../../core/models/message_part.dart';
 import '../../../core/models/token_usage.dart';
 import '../../../core/providers/settings_provider.dart';
 import '../../../core/services/api/chat_api_service.dart';
-import '../../../core/services/api/providers/google_gemini.dart';
 import '../../../core/services/api/stream/stream_chunk.dart';
 import '../../../core/services/api/stream/stream_chunk_handler.dart';
-import '../../../core/services/chat/chat_service.dart';
 import '../../chat/widgets/chat_message_widget.dart';
 import '../../../utils/markdown_media_sanitizer.dart';
 import 'streaming_content_notifier.dart';
@@ -30,14 +28,11 @@ export 'streaming_content_notifier.dart';
 /// by the home page to handle streaming generation without cluttering the UI code.
 class StreamController {
   StreamController({
-    required this._chatService,
     required this.onStateChanged,
     required this.getSettingsProvider,
     required this.getCurrentConversationId,
     this.onStreamTick,
   });
-
-  final ChatService _chatService;
 
   /// Callback when state changes (trigger setState in the widget).
   /// NOTE: This should only be used for non-streaming state changes.
@@ -255,32 +250,6 @@ class StreamController {
     _restoredUiMessageIds.clear();
     _cancelAllTimers();
     streamingContentNotifier.clear();
-  }
-
-  // ============================================================================
-  // Gemini Thought Signature Handling
-  // ============================================================================
-
-  /// Moves a legacy signature comment out of a message's text into the
-  /// provider artifact store, returning the text without it.
-  String captureGeminiThoughtSignature(String content, String messageId) {
-    if (content.isEmpty) return content;
-    final meta = extractGeminiThoughtMeta(content);
-    if (meta.cleanedText == content) return content;
-    if (meta.hasAny &&
-        _chatService.getGeminiThoughtSignature(messageId) == null) {
-      unawaited(
-        _chatService.setGeminiThoughtSignature(
-          messageId,
-          encodeGeminiThoughtSignature(
-            textKey: meta.textKey,
-            textValue: meta.textValue,
-            imageSigs: meta.images,
-          ),
-        ),
-      );
-    }
-    return meta.cleanedText;
   }
 
   // ============================================================================

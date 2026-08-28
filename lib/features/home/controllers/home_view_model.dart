@@ -1375,8 +1375,7 @@ class HomeViewModel extends ChangeNotifier {
           getToolEventsFromDb: (id) => _chatService.getToolEvents(id),
         );
 
-        // Clean content from gemini thought signatures
-        final cleanedContent = _streamController.captureGeminiThoughtSignature(
+        final cleanedContent = _chatService.migrateLegacyGeminiThoughtSignature(
           m.content,
           m.id,
         );

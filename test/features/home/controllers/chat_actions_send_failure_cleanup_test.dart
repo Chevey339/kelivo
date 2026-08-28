@@ -61,7 +61,6 @@ void main() {
             builder: (context) {
               final chatController = ChatController(chatService: service);
               final streamController = StreamController(
-                chatService: service,
                 onStateChanged: () {},
                 getSettingsProvider: () => settings,
                 getCurrentConversationId: () => 'conversation-1',

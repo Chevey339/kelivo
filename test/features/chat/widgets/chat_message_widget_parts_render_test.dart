@@ -3,7 +3,6 @@ import 'package:Kelivo/core/models/chat_message.dart';
 import 'package:Kelivo/core/models/message_part.dart';
 import 'package:Kelivo/core/providers/settings_provider.dart';
 import 'package:Kelivo/core/providers/tts_provider.dart';
-import 'package:Kelivo/core/services/chat/chat_service.dart';
 import 'package:Kelivo/features/chat/pages/image_viewer_page.dart';
 import 'package:Kelivo/features/chat/widgets/chat_message_widget.dart';
 import 'package:Kelivo/features/chat/widgets/timeline_projection.dart';
@@ -555,7 +554,6 @@ void main() {
   ) async {
     final settings = SettingsProvider(createBusinessTestPreferences());
     final writer = StreamController(
-      chatService: ChatService(),
       onStateChanged: () {},
       getSettingsProvider: () => settings,
       getCurrentConversationId: () => 'c1',
@@ -581,7 +579,6 @@ void main() {
 
     for (final json in [persisted, staleEmptySplits]) {
       final reader = StreamController(
-        chatService: ChatService(),
         onStateChanged: () {},
         getSettingsProvider: () => settings,
         getCurrentConversationId: () => 'c1',
