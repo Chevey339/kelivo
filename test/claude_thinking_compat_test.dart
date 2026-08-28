@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:Kelivo/core/models/message_part.dart';
 import 'package:Kelivo/core/providers/settings_provider.dart';
 import 'package:Kelivo/core/services/api/builtin_tools.dart';
 import 'package:Kelivo/core/services/api/chat_api_service.dart';
@@ -1152,6 +1153,7 @@ void main() {
               'stop_reason': paused ? 'pause_turn' : 'end_turn',
               'content': paused
                   ? const [
+                      {'type': 'text', 'text': 'before '},
                       {
                         'type': 'server_tool_use',
                         'id': 'srvtoolu_paused',
@@ -1189,7 +1191,7 @@ void main() {
                 modelId: 'claude-opus-4-7',
                 prompt: 'hello',
               ),
-              'ok',
+              'before ok',
             );
           },
           createHttpClient: (context) =>
@@ -1201,11 +1203,80 @@ void main() {
         final assistant = (resumed.last['content'] as List).cast<Map>();
         // Dropping either half of the exchange makes the API reject the round.
         expect(assistant.map((block) => block['type']).toList(), [
+          'text',
           'server_tool_use',
           'web_search_tool_result',
         ]);
       },
     );
+
+    test('a non-streaming hosted tool is persisted as a card', () async {
+      final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+      addTearDown(() async {
+        await server.close(force: true);
+      });
+      server.listen((request) async {
+        await utf8.decoder.bind(request).join();
+        request.response.statusCode = HttpStatus.ok;
+        request.response.headers.contentType = ContentType.json;
+        request.response.write(
+          jsonEncode({
+            'id': 'msg_1',
+            'stop_reason': 'end_turn',
+            'content': const [
+              {
+                'type': 'server_tool_use',
+                'id': 'srvtoolu_fetch',
+                'name': 'web_fetch',
+                'input': {'url': 'https://example.com'},
+              },
+              {
+                'type': 'web_fetch_tool_result',
+                'tool_use_id': 'srvtoolu_fetch',
+                'content': {
+                  'type': 'web_fetch_result',
+                  'url': 'https://example.com',
+                },
+              },
+              {'type': 'text', 'text': 'ok'},
+            ],
+            'usage': {'input_tokens': 1, 'output_tokens': 1},
+          }),
+        );
+        await request.response.close();
+      });
+
+      final result = await HttpOverrides.runZoned(
+        () => ChatApiService.generateMessage(
+          config: _claudeConfig('http://api.anthropic.com'),
+          modelId: 'claude-opus-4-7',
+          messages: const [
+            {'role': 'user', 'content': 'fetch'},
+          ],
+        ),
+        createHttpClient: (context) =>
+            _ProxyHttpOverrides(server.port).createHttpClient(context),
+      );
+
+      expect(result.text, 'ok');
+      final tool =
+          jsonDecode(result.parts.whereType<ToolCallPart>().single.payloadJson)
+              as Map;
+      expect(tool['name'], 'web_fetch');
+      expect(tool['server'], isTrue);
+      expect(tool['arguments'], {'url': 'https://example.com'});
+      expect(tool['content'], {
+        'type': 'web_fetch_result',
+        'url': 'https://example.com',
+      });
+      final responses =
+          ((tool['metadata'] as Map)['anthropic'] as Map)['responses'] as List;
+      expect(responses, hasLength(1));
+      expect(
+        (responses.single as List).cast<Map>().map((block) => block['type']),
+        ['server_tool_use', 'web_fetch_tool_result', 'text'],
+      );
+    });
 
     test(
       'a utility call gets search only, never fetch or a container',

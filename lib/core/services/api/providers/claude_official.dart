@@ -234,7 +234,7 @@ Stream<StreamChunk> sendClaudeStream(
   // replays as the responses it was.
   final turnResponses = <List<Map<String, dynamic>>>[];
   var lastStreamResults = <Map<String, dynamic>>[];
-  var lastText = '';
+  final nonStreamText = StringBuffer();
   var pauseTurn = false;
 
   yield* runProviderToolRounds(
@@ -298,7 +298,6 @@ Stream<StreamChunk> sendClaudeStream(
 
       pendingCalls = [];
       lastStreamResults = [];
-      lastText = '';
       lastAssistantBlocks = [];
       pauseTurn = false;
 
@@ -367,7 +366,18 @@ Stream<StreamChunk> sendClaudeStream(
         // The continuation round sends these, so they go through the same
         // sanitising as replayed history; the metadata below stays whole.
         lastAssistantBlocks = history.sanitize(assistantBlocks);
-        lastText = joinedTextOfBlocks(assistantBlocks);
+        nonStreamText.write(joinedTextOfBlocks(assistantBlocks));
+        final decoder = ClaudeStreamDecoder(
+          skipRedactedThinkingBlocks: skipRedactedThinkingBlocks,
+          serverToolNames: declaredServerToolNames,
+          priorResponses: turnResponses,
+          sourceId: 'round-${streamRound++}',
+        );
+        for (final chunk in decoder.decodeCompleteServerTools(
+          assistantBlocks,
+        )) {
+          yield chunk;
+        }
         turnResponses.add(assistantBlocks);
         if (toolUses.isEmpty) {
           // A hosted tool that ran past the turn limit asks to be resumed,
@@ -512,7 +522,7 @@ Stream<StreamChunk> sendClaudeStream(
     },
     finish: () => emitDone(
       ids: StreamChunkIds('finish'),
-      content: lastText,
+      content: nonStreamText.toString(),
       usage: totalUsage,
       totalTokens: totalUsage?.totalTokens ?? 0,
     ),

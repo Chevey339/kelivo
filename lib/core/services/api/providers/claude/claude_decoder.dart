@@ -76,6 +76,51 @@ class ClaudeStreamDecoder implements StreamChunkDecoder {
     toolResults[id] = content;
   }
 
+  /// Surfaces hosted calls from a complete non-streaming response.
+  ///
+  /// The request path already parsed [blocks] for continuation. Keeping the
+  /// card mapping here makes streaming and non-streaming responses use the
+  /// same display names, output clipping, and error handling.
+  List<StreamChunk> decodeCompleteServerTools(
+    List<Map<String, dynamic>> blocks,
+  ) {
+    assistantBlocks.addAll(blocks);
+    final chunks = <StreamChunk>[];
+    for (final block in blocks) {
+      final type = (block['type'] ?? '').toString();
+      if (type == 'server_tool_use') {
+        final id = (block['id'] ?? '').toString();
+        final name = (block['name'] ?? '').toString();
+        final display = _serverToolDisplayName(name);
+        if (id.isEmpty || display == null) continue;
+        final args =
+            (block['input'] as Map?)?.cast<String, dynamic>() ??
+            const <String, dynamic>{};
+        _serverArgs[id] = StringBuffer(jsonEncode(args));
+        _serverToolNames[id] = display;
+        if (_serverToolStarted.add(id)) {
+          chunks.add(
+            ServerToolStart(
+              id: id,
+              toolName: display,
+              input: args,
+              metadata: replayMetadata,
+            ),
+          );
+        }
+        continue;
+      }
+      if (!type.endsWith('_tool_result')) continue;
+      final name = type.substring(0, type.length - '_tool_result'.length);
+      if (name == 'web_search') {
+        chunks.addAll(_webSearchResult(block));
+      } else if (_serverToolDisplayName(name) != null) {
+        chunks.addAll(_serverToolResult(block, name));
+      }
+    }
+    return chunks;
+  }
+
   @override
   DecodeResult accept(SseEvent event) {
     if (_closed || messageStopped) {
