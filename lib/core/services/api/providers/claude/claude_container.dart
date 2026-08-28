@@ -17,33 +17,24 @@ const String multimodalInternalClaudeContainerKey = '_kelivo_claude_container';
 /// The container a code execution turn ran in, as the API reported it.
 ///
 /// Files and REPL state live in the container, so the next turn sends the id
-/// back to pick up where the last one left off. The API expires containers,
-/// and says when, so an expired one is never offered.
+/// back to pick up where the last one left off. A container lives 30 days from
+/// creation and is checkpointed after a few minutes idle; the `expires_at` the
+/// API returns is only that short rolling window, not the lifetime, so it is
+/// not read — a container is offered until the API refuses it.
 class ClaudeContainerRef {
-  const ClaudeContainerRef({required this.id, this.expiresAt});
+  const ClaudeContainerRef({required this.id});
 
   final String id;
-  final DateTime? expiresAt;
-
-  bool get isExpired =>
-      expiresAt != null && !expiresAt!.isAfter(DateTime.now().toUtc());
 
   /// Reads the `container` object of a Messages API response.
   static ClaudeContainerRef? fromResponse(Object? container) {
     if (container is! Map) return null;
     final id = (container['id'] ?? '').toString();
     if (id.isEmpty) return null;
-    final raw = (container['expires_at'] ?? '').toString();
-    return ClaudeContainerRef(
-      id: id,
-      expiresAt: raw.isEmpty ? null : DateTime.tryParse(raw)?.toUtc(),
-    );
+    return ClaudeContainerRef(id: id);
   }
 
-  String encode() => jsonEncode({
-    'id': id,
-    if (expiresAt != null) 'expires_at': expiresAt!.toIso8601String(),
-  });
+  String encode() => jsonEncode({'id': id});
 
   static ClaudeContainerRef? decode(Object? payload) {
     if (payload is! String || payload.isEmpty) return null;

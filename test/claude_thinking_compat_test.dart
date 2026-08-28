@@ -1643,11 +1643,12 @@ void main() {
             expect(ClaudeContainerRef.decode(first)!.id, 'container_1');
             final second = await turn(storedContainer: first);
             expect(ClaudeContainerRef.decode(second)!.id, 'container_3');
-            // An expired container is never offered.
+            // A container lives 30 days, so a stored one is offered however
+            // long ago its turn was; only the API decides it is gone.
             await turn(
               storedContainer: const ClaudeContainerRef(
                 id: 'container_old',
-              ).encode().replaceFirst('}', ',"expires_at":"2000-01-01"}'),
+              ).encode(),
             );
           },
           createHttpClient: (context) =>
@@ -1658,7 +1659,7 @@ void main() {
           null, // nothing stored yet
           'container_1', // stored by the first turn, and told it expired
           null, // ...so the round retries fresh
-          null, // the stored one had expired on its own
+          'container_old', // stored long ago, still offered
         ]);
         // The internal key never reaches the wire.
         expect(jsonEncode(bodies), isNot(contains('_kelivo_')));
@@ -2632,6 +2633,110 @@ data: {"type":"message_stop"}
 
       expect(jsonEncode(body), isNot(contains('"image"')));
     });
+
+    test(
+      'a chart from a persisted code execution turn opens the next user turn',
+      () async {
+        final dir = await Directory.systemTemp.createTemp(
+          'kelivo_claude_assistant_img_',
+        );
+        addTearDown(() async {
+          if (await dir.exists()) {
+            await dir.delete(recursive: true);
+          }
+        });
+        final file = File('${dir.path}/chart.png');
+        await file.writeAsBytes(const [1, 2, 3, 4]);
+
+        // What MessageBuilder emits for a turn that ran code and drew a chart:
+        // the card message, the hosted result, then the text with the image.
+        const blocks = [
+          {'type': 'text', 'text': '我来画。'},
+          {
+            'type': 'server_tool_use',
+            'id': 'srvtoolu_plot',
+            'name': 'bash_code_execution',
+            'input': {'command': 'python plot.py'},
+          },
+          {
+            'type': 'bash_code_execution_tool_result',
+            'tool_use_id': 'srvtoolu_plot',
+            'content': {
+              'type': 'bash_code_execution_result',
+              'stdout': '',
+              'stderr': '',
+              'return_code': 0,
+              'content': [
+                {'type': 'code_execution_output', 'file_id': 'file_chart'},
+              ],
+            },
+          },
+          {'type': 'text', 'text': '画好了'},
+        ];
+        final body = await _captureClaudeRequestBody(
+          officialEndpoint: true,
+          modelId: 'claude-sonnet-4-6',
+          messages: [
+            {'role': 'user', 'content': '画个图'},
+            {
+              'role': 'assistant',
+              'content': '\n\n',
+              'tool_calls': [
+                {
+                  'id': 'srvtoolu_plot',
+                  'type': 'function',
+                  'function': {
+                    'name': 'code_execution',
+                    'arguments': '{"command":"python plot.py"}',
+                  },
+                  'metadata': {
+                    'anthropic': {'assistant_blocks': blocks},
+                  },
+                },
+              ],
+            },
+            {
+              'role': 'tool',
+              'tool_call_id': 'srvtoolu_plot',
+              'name': 'code_execution',
+              'content': '{"return_code":0}',
+            },
+            {
+              'role': 'assistant',
+              'content': '我来画。画好了',
+              multimodalInternalMediaPathsKey: [file.path],
+              multimodalInternalClaudeContainerKey: '{"id":"container_1"}',
+            },
+            {'role': 'user', 'content': '哪根柱子最高'},
+          ],
+        );
+
+        final messages = (body['messages'] as List).cast<Map>();
+        expect(messages.map((message) => message['role']).toList(), [
+          'user',
+          'assistant',
+          'user',
+        ]);
+        // The turn is replayed as the API produced it, image-free; the text
+        // message folds into it rather than repeating the text.
+        final turn = (messages[1]['content'] as List).cast<Map>();
+        expect(turn.map((block) => block['type']).toList(), [
+          'text',
+          'server_tool_use',
+          'bash_code_execution_tool_result',
+          'text',
+        ]);
+        expect(jsonEncode(turn), isNot(contains('"image"')));
+        final followUp = (messages[2]['content'] as List).cast<Map>();
+        expect(followUp.map((part) => part['type']).toList(), [
+          'text',
+          'image',
+          'text',
+        ]);
+        expect(followUp[1]['source']['data'], 'AQIDBA==');
+        expect(followUp.last['text'], '哪根柱子最高');
+      },
+    );
 
     test(
       'interrupted server tool is dropped instead of replayed orphaned',

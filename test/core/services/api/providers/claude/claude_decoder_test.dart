@@ -398,8 +398,10 @@ void main() {
         },
       }),
     );
+    // `expires_at` is the checkpoint window, not the lifetime, so only the id
+    // is kept.
     expect(decoder.container!.id, 'container_abc');
-    expect(decoder.container!.expiresAt, DateTime.utc(2026, 9, 26));
+    expect(decoder.container!.encode(), '{"id":"container_abc"}');
   });
 
   test(

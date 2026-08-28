@@ -75,8 +75,7 @@ class ClaudeHistory {
   final List<String>? userImagePaths;
 
   /// The container the conversation's last code execution ran in, stored
-  /// against that assistant message. The latest one wins; an expired one is
-  /// no better than none. Set by [build].
+  /// against that assistant message. The latest one wins. Set by [build].
   ClaudeContainerRef? storedContainer;
 
   /// The blocks of one response as this endpoint may be sent them.
@@ -182,7 +181,7 @@ class ClaudeHistory {
         final ref = ClaudeContainerRef.decode(
           m[multimodalInternalClaudeContainerKey],
         );
-        if (ref != null) storedContainer = ref.isExpired ? null : ref;
+        if (ref != null) storedContainer = ref;
       }
       if (role == 'tool') {
         final id = (m['tool_call_id'] ?? '').toString();
