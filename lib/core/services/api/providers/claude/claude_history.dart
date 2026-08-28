@@ -15,13 +15,10 @@ import 'claude_container.dart';
 ///
 /// Written after every response once the turn has called a tool, so a turn
 /// cut short still replays up to the last response that completed. A turn
-/// without one replays from its text alone and stores nothing.
+/// without one replays from its text alone and stores nothing. It travels
+/// into the next request under [multimodalInternalClaudeTurnKey], on the
+/// assistant message that holds the turn's tool calls.
 const String claudeTurnArtifactKind = 'claude_turn';
-
-/// Internal key carrying the stored turn into the next request, on the
-/// assistant message that holds the turn's tool calls. Stripped before
-/// anything reaches the wire, like the other `_kelivo_` keys.
-const String multimodalInternalClaudeTurnKey = '_kelivo_claude_turn';
 
 String encodeClaudeTurn(List<List<Map<String, dynamic>>> responses) =>
     jsonEncode(responses);
@@ -47,14 +44,6 @@ List<List<Map<String, dynamic>>>? _responsesOf(Object? raw) {
         ],
   ]..removeWhere((blocks) => blocks.isEmpty);
   return read.isEmpty ? null : read;
-}
-
-/// Removes the Claude keys from a message about to be sent by a provider that
-/// copies messages whole.
-void stripClaudeKeys(Map<String, dynamic> message) {
-  message
-    ..remove(multimodalInternalClaudeContainerKey)
-    ..remove(multimodalInternalClaudeTurnKey);
 }
 
 /// Anthropic rejects an empty text block, and dropping `content` altogether

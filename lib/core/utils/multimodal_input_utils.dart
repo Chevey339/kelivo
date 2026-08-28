@@ -71,6 +71,14 @@ List<InternalDocumentRef> parseInternalDocumentRefs(dynamic raw) {
   ];
 }
 
+/// Provider state stored against an assistant message and carried into the
+/// next request under an internal key, which every provider strips before
+/// anything reaches the wire.
+const String multimodalInternalClaudeContainerKey = '_kelivo_claude_container';
+const String multimodalInternalClaudeTurnKey = '_kelivo_claude_turn';
+const String multimodalInternalGeminiThoughtSignatureKey =
+    '_kelivo_gemini_thought_signature';
+
 bool isImageMime(String mime) => mime.toLowerCase().startsWith('image/');
 
 bool isAudioMime(String mime) => mime.toLowerCase().startsWith('audio/');

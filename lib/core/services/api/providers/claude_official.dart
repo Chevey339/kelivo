@@ -18,7 +18,6 @@ import '../stream/stream_chunk_emit.dart';
 import '../stream/stream_chunk_ids.dart';
 import 'claude/claude_container.dart';
 import 'claude/claude_decoder.dart';
-import 'google/gemini_thought_signature.dart';
 import 'claude/claude_files.dart';
 import 'claude/claude_history.dart';
 

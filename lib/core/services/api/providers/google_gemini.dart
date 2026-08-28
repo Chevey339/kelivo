@@ -11,9 +11,10 @@ import 'google_common.dart';
 
 export 'google/gemini_thought_signature.dart';
 
-/// Placeholder thought signature accepted by the Gemini API when the original
-/// signature is unavailable (e.g. legacy history persisted before signatures
-/// were captured). Same value used by Google's own Gemini CLI.
+/// Placeholder thought signature the Gemini API accepts when the original is
+/// unavailable (e.g. legacy history persisted before signatures were captured).
+/// Google once documented this value and its own Gemini CLI still sends it;
+/// the current docs no longer list it, but the API keeps accepting it.
 const String geminiDummyThoughtSignature =
     'context_engineering_is_the_way_to_go';
 final RegExp _geminiThoughtSigComment = RegExp(
