@@ -266,6 +266,16 @@ class MessageBuilderService {
               if (turn != null && turn.isNotEmpty) {
                 assistantToolMessage[multimodalInternalClaudeTurnKey] = turn;
               }
+              // Also here: a turn that ran code and then said nothing has no
+              // final message below to carry the container.
+              final container = providerArtifactLookup?.call(
+                m,
+                claudeContainerArtifactKind,
+              );
+              if (container != null && container.isNotEmpty) {
+                assistantToolMessage[multimodalInternalClaudeContainerKey] =
+                    container;
+              }
               if (assistantReasoningContent?.isNotEmpty == true) {
                 assistantToolMessage['reasoning_content'] =
                     assistantReasoningContent;

@@ -623,7 +623,7 @@ void main() {
     });
 
     test(
-      'a stored Claude turn rides on the tool message, the container after it',
+      'a stored Claude turn rides on the tool message, the container on both',
       () {
         final service = MessageBuilderService(
           chatService: _FakeChatService({
@@ -662,10 +662,55 @@ void main() {
           toolMessage[multimodalInternalClaudeTurnKey],
           '[[{"type":"text","text":"hi"}]]',
         );
-        expect(toolMessage[multimodalInternalClaudeContainerKey], isNull);
+        expect(
+          toolMessage[multimodalInternalClaudeContainerKey],
+          '{"id":"container_1"}',
+        );
         expect(finalMessage[multimodalInternalClaudeTurnKey], isNull);
         expect(
           finalMessage[multimodalInternalClaudeContainerKey],
+          '{"id":"container_1"}',
+        );
+      },
+    );
+
+    test(
+      'a turn that ran code and said nothing still carries its container',
+      () {
+        final service = MessageBuilderService(
+          chatService: _FakeChatService({
+            'a1': [
+              {
+                'id': 'srvtoolu_1',
+                'name': 'code_execution',
+                'arguments': {'code': 'print(1)'},
+                'content': '{"stdout":"1\\n"}',
+              },
+            ],
+          }),
+          contextProvider: _FakeBuildContext(),
+          providerArtifactLookup: (message, kind) =>
+              kind == claudeContainerArtifactKind
+              ? '{"id":"container_1"}'
+              : null,
+        );
+
+        final apiMessages = service.buildApiMessages(
+          messages: [
+            _message(id: 'u1', role: 'user', content: '跑一下'),
+            _message(id: 'a1', role: 'assistant', content: ''),
+          ],
+          versionSelections: const {},
+          currentConversation: Conversation(title: 'test'),
+          includeToolMessages: true,
+        );
+
+        expect(apiMessages.last['role'], 'tool');
+        final toolMessage = apiMessages.firstWhere(
+          (message) => message['tool_calls'] is List,
+        );
+        expect(
+          toolMessage[multimodalInternalClaudeContainerKey],
           '{"id":"container_1"}',
         );
       },
