@@ -439,7 +439,7 @@ class ClaudeStreamDecoder implements StreamChunkDecoder {
         _serverToolNames[id] ??
         _serverToolDisplayName(blockToolName) ??
         'server_tool';
-    final args = _serverArgsFor(id);
+    final args = _serverArgsOrNull(id);
     final content = block['content'];
     // Anthropic reports a server tool failure as a `*_tool_result_error`
     // content block. Without a failed card a throttled turn renders nothing at
@@ -493,7 +493,7 @@ class ClaudeStreamDecoder implements StreamChunkDecoder {
         (contentBlock['type'] == 'web_search_tool_result_error')) {
       errorCode = (contentBlock['error_code'] ?? '').toString();
     }
-    final args = _serverArgsFor(toolUseId);
+    final args = _serverArgsOrNull(toolUseId);
     final id = toolUseId.isEmpty ? _ids.search() : toolUseId;
     _serverToolEnded.add(id);
     return <StreamChunk>[
@@ -537,6 +537,12 @@ class ClaudeStreamDecoder implements StreamChunkDecoder {
     }
     return chunks;
   }
+
+  /// The streamed input of a call this response opened, or null when the call
+  /// opened in an earlier response of the turn: that decoder held the input,
+  /// and an empty map here would erase it from the card.
+  Map<String, dynamic>? _serverArgsOrNull(String id) =>
+      _serverArgs.containsKey(id) ? _serverArgsFor(id) : null;
 
   Map<String, dynamic> _serverArgsFor(String id) {
     final raw = _serverArgs[id]?.toString();

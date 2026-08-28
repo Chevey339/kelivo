@@ -10,6 +10,30 @@ SseEvent _event(String type, Map<String, dynamic> data) {
 }
 
 void main() {
+  test('a result for a call from an earlier response reports no input', () {
+    // A turn cut in two by a client tool opens the next response with the
+    // hosted result. This decoder never saw the call, so it has no input to
+    // report — and an empty one would erase what the card already shows.
+    final decoder = ClaudeStreamDecoder(serverToolNames: const {'web_fetch'});
+    final chunks = decoder
+        .accept(
+          _event('content_block_start', {
+            'type': 'content_block_start',
+            'index': 0,
+            'content_block': {
+              'type': 'web_fetch_tool_result',
+              'tool_use_id': 'srvtoolu_1',
+              'content': {'type': 'web_fetch_result', 'url': 'https://e.com'},
+            },
+          }),
+        )
+        .chunks;
+
+    final end = chunks.whereType<ServerToolEnd>().single;
+    expect(end.id, 'srvtoolu_1');
+    expect(end.input, isNull);
+  });
+
   test('streams text deltas and completes on message_stop without Finish', () {
     final decoder = ClaudeStreamDecoder();
     final chunks = <StreamChunk>[

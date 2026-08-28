@@ -10,6 +10,38 @@ import 'package:Kelivo/core/services/api/stream/stream_chunk_handler.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  test(
+    'a hosted card keeps its input when the result lands a response later',
+    () {
+      // A turn that starts a hosted tool alongside a client one is cut in two:
+      // the call streams its input in the first response and the result only
+      // arrives in the second, whose decoder never saw that input.
+      final handler = StreamChunkHandler();
+      handler.handle(const ToolCallStart(id: 'srvtoolu_1', toolName: 'web 获取'));
+      handler.handle(
+        const ServerToolStart(id: 'srvtoolu_1', toolName: 'web 获取'),
+      );
+      handler.handle(
+        const ToolCallDelta(
+          id: 'srvtoolu_1',
+          inputDelta: '{"url":"https://example.com"}',
+        ),
+      );
+      handler.handle(const ToolCallEnd('srvtoolu_1'));
+      handler.handle(
+        const ServerToolEnd(
+          id: 'srvtoolu_1',
+          output: <String, dynamic>{'content': 'ok'},
+        ),
+      );
+
+      final card = jsonDecode(
+        handler.parts.whereType<ToolCallPart>().single.payloadJson,
+      );
+      expect(card['arguments'], {'url': 'https://example.com'});
+    },
+  );
+
   test('creates a text part on Delta when Start was omitted', () {
     final handler = StreamChunkHandler();
     handler.handle(const TextDelta(id: 't', text: 'Hello'));
@@ -517,8 +549,9 @@ void main() {
       final payload =
           jsonDecode(handler.parts.whereType<ToolCallPart>().single.payloadJson)
               as Map;
-      final list = ((payload['metadata'] as Map)['anthropic']
-          as Map)['assistant_blocks'] as List;
+      final list =
+          ((payload['metadata'] as Map)['anthropic'] as Map)['assistant_blocks']
+              as List;
       return [for (final b in list) (b as Map)['type'].toString()];
     }
 
