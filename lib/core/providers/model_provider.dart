@@ -205,26 +205,53 @@ class OpenAIProvider extends BaseProvider {
 }
 
 class ZenMuxProvider extends BaseProvider {
+  static Uri modelsUriFor(ProviderConfig cfg) {
+    final baseUrl = cfg.baseUrl.trim();
+    if (baseUrl.isEmpty) {
+      throw const FormatException('ZenMux Base URL cannot be empty');
+    }
+    final base = baseUrl.endsWith('/')
+        ? baseUrl.substring(0, baseUrl.length - 1)
+        : baseUrl;
+    return Uri.parse('$base/models');
+  }
+
   @override
   Future<List<ModelInfo>> listModels(ProviderConfig cfg) async {
     final key = ProviderManager._effectiveApiKey(cfg);
     final client = _Http.clientFor(cfg);
     try {
       final headers = <String, String>{};
-      if (key.isNotEmpty) headers['Authorization'] = 'Bearer $key';
-      final res = await client.get(
-        Uri.parse('https://zenmux.ai/api/v1/models'),
-        headers: headers,
+      final kind = ProviderConfig.classify(
+        cfg.id,
+        explicitType: cfg.providerType,
       );
+      switch (kind) {
+        case ProviderKind.openai:
+          if (key.isNotEmpty) headers['Authorization'] = 'Bearer $key';
+          break;
+        case ProviderKind.claude:
+          headers['anthropic-version'] = ClaudeProvider.anthropicVersion;
+          if (key.isNotEmpty) headers['x-api-key'] = key;
+          break;
+        case ProviderKind.google:
+          if (key.isNotEmpty) headers['x-goog-api-key'] = key;
+          break;
+      }
+      final res = await client.get(modelsUriFor(cfg), headers: headers);
       if (res.statusCode < 200 || res.statusCode >= 300) {
         throw HttpException(
           'ZenMux model request failed (${res.statusCode}): ${res.body}',
         );
       }
-      final data = (jsonDecode(res.body)['data'] as List?) ?? const [];
+      final payload = jsonDecode(res.body) as Map<String, dynamic>;
+      final data =
+          (payload['data'] as List?) ??
+          (payload['models'] as List?) ??
+          const [];
       return [
         for (final entry in data)
-          if (entry is Map && entry['id'] is String)
+          if (entry is Map && _entryId(entry).isNotEmpty)
             _modelFromZenMuxEntry(entry),
       ];
     } finally {
@@ -232,8 +259,13 @@ class ZenMuxProvider extends BaseProvider {
     }
   }
 
+  static String _entryId(Map entry) {
+    final raw = (entry['id'] ?? entry['name'] ?? '').toString();
+    return raw.startsWith('models/') ? raw.substring('models/'.length) : raw;
+  }
+
   static ModelInfo _modelFromZenMuxEntry(Map entry) {
-    final upstreamId = entry['id'] as String;
+    final upstreamId = _entryId(entry);
     final input = _modalitiesFromZenMux(
       entry['input_modalities'],
       fallback: const <Modality>[Modality.text],
@@ -248,7 +280,10 @@ class ZenMuxProvider extends BaseProvider {
     return ModelRegistry.infer(
       ModelInfo(
         id: id,
-        displayName: (entry['display_name'] as String?) ?? upstreamId,
+        displayName:
+            (entry['display_name'] as String?) ??
+            (entry['displayName'] as String?) ??
+            upstreamId,
         input: input,
         output: output,
         supportsWebSearch:

@@ -58,6 +58,17 @@ void main() {
       );
     });
 
+    test('ZenMux model discovery uses the configured Base URL', () {
+      final config = ProviderConfig.defaultsFor('ZenMux').copyWith(
+        baseUrl: 'https://gateway.example.com/custom/v1/',
+      );
+
+      expect(
+        ZenMuxProvider.modelsUriFor(config).toString(),
+        'https://gateway.example.com/custom/v1/models',
+      );
+    });
+
     test('built-in provider order does not add Kimi preset', () async {
       final harness = await createBusinessTestHarness(
         initial: {
