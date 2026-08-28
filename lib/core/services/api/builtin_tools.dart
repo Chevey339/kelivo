@@ -847,6 +847,25 @@ abstract class BuiltInToolsHelper {
     ];
   }
 
+  /// Whether a turn for [modelId] on [cfg] hands the user's data files to a
+  /// code execution sandbox instead of reading them into the prompt.
+  ///
+  /// The message builder skips text extraction for those files on the
+  /// strength of this answer, so it has to agree exactly with the provider
+  /// that does the upload: today only the official Claude endpoint, whose
+  /// Files API feeds `container_upload`. Gemini shares the
+  /// `code_execution` tool name but takes no files from us yet, so
+  /// [BuiltInToolsState.codeExecutionActive] alone is the wrong test.
+  static bool sendsDataFilesToSandbox({
+    required ProviderConfig? cfg,
+    required String? modelId,
+  }) {
+    final upstreamModelId = _claudeUpstreamModelId(cfg: cfg, modelId: modelId);
+    if (upstreamModelId == null) return false;
+    if (!isClaudeCodeExecutionSupportedModel(upstreamModelId)) return false;
+    return getActiveTools(cfg: cfg, modelId: modelId).codeExecutionActive;
+  }
+
   static Map<String, dynamic> dashScopeSearchOptionsFromOverride(
     Object? rawOverride,
   ) {

@@ -294,6 +294,7 @@ Future<List<Map<String, dynamic>>> buildOpenAIChatCompletionMessages(
     );
     final outMsg = Map<String, dynamic>.from(m);
     outMsg.remove(multimodalInternalMediaPathsKey);
+    outMsg.remove(multimodalInternalDocumentPathsKey);
     outMsg.remove(multimodalInternalRevisionIdKey);
     stripClaudeKeys(outMsg);
     outMsg.remove('metadata');

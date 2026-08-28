@@ -6,6 +6,7 @@ import '../../../core/models/chat_message.dart';
 import '../../../core/models/message_part.dart';
 import '../../../core/models/conversation.dart';
 import '../../../core/providers/settings_provider.dart';
+import '../../../core/services/api/builtin_tools.dart';
 import '../../../core/services/api/chat_api_service.dart';
 import '../../../core/services/chat/chat_service.dart';
 import '../../../core/services/logging/context_logger.dart';
@@ -200,6 +201,10 @@ class MessageGenerationService {
     // and it only claims to be parsing files when the retained messages really
     // carry files to parse. A text-only send that is merely slow (frozen prompt
     // reads, memory injection, templating) must never show the bar.
+    final sandboxDataFiles = BuiltInToolsHelper.sendsDataFilesToSandbox(
+      cfg: cfg,
+      modelId: modelId,
+    );
     final indicatorMessageId =
         processingMessageId != null &&
             messageBuilderService.hasPendingAttachmentWork(
@@ -207,6 +212,7 @@ class MessageGenerationService {
               settings,
               conversation: currentConversation,
               sourceMessages: messages,
+              sandboxDataFiles: sandboxDataFiles,
             )
         ? processingMessageId
         : null;
@@ -222,6 +228,7 @@ class MessageGenerationService {
             assistant,
             conversation: currentConversation,
             sourceMessages: messages,
+            sandboxDataFiles: sandboxDataFiles,
           );
     } finally {
       if (indicatorMessageId != null) {

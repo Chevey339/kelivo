@@ -7,6 +7,71 @@ import '../../utils/sandbox_path_resolver.dart';
 const String multimodalInternalMediaPathsKey = '_kelivo_media_paths';
 const String multimodalInternalRevisionIdKey = '_kelivo_revision_id';
 
+/// Internal message key listing a user message's document attachments as
+/// `{uri, name, mime}` entries — the `FilePart`s that are not images, audio
+/// or video. They normally reach the model as extracted text; this key lets a
+/// provider that can hand a file to a sandbox take the file itself instead.
+/// Stripped before anything reaches the wire, like the other `_kelivo_` keys.
+const String multimodalInternalDocumentPathsKey = '_kelivo_document_paths';
+
+/// Extensions of files that are data to compute over rather than prose to
+/// read: a sandbox with pandas makes more of them than the context window
+/// does, where a spreadsheet arrives as flattened cells and a large CSV as
+/// a wall of tokens.
+const Set<String> _sandboxDataFileExtensions = <String>{
+  'csv',
+  'tsv',
+  'xls',
+  'xlsx',
+  'xlsm',
+  'json',
+  'jsonl',
+  'ndjson',
+  'xml',
+  'parquet',
+  'feather',
+  'arrow',
+  'avro',
+  'orc',
+  'sqlite',
+  'sqlite3',
+  'db',
+};
+
+/// Whether an attachment is a data file a code execution sandbox should
+/// receive whole, judged by its extension. Text extraction has nothing better
+/// to do with an `application/octet-stream` either, so an unknown binary
+/// counts too — the sandbox can at least inspect it.
+bool isSandboxDataFile({required String fileName, required String mime}) {
+  final dot = fileName.lastIndexOf('.');
+  final ext = dot < 0 ? '' : fileName.substring(dot + 1).toLowerCase();
+  if (_sandboxDataFileExtensions.contains(ext)) return true;
+  return ext.isEmpty && mime.trim().toLowerCase() == 'application/octet-stream';
+}
+
+/// One `_kelivo_document_paths` entry.
+typedef InternalDocumentRef = ({String uri, String name, String mime});
+
+Map<String, dynamic> encodeInternalDocumentRef(InternalDocumentRef ref) =>
+    <String, dynamic>{
+      'uri': ref.uri,
+      'name': ref.name,
+      if (ref.mime.isNotEmpty) 'mime': ref.mime,
+    };
+
+List<InternalDocumentRef> parseInternalDocumentRefs(dynamic raw) {
+  if (raw is! List) return const <InternalDocumentRef>[];
+  return <InternalDocumentRef>[
+    for (final entry in raw)
+      if (entry is Map && (entry['uri'] ?? '').toString().trim().isNotEmpty)
+        (
+          uri: entry['uri'].toString().trim(),
+          name: (entry['name'] ?? '').toString().trim(),
+          mime: (entry['mime'] ?? '').toString().trim(),
+        ),
+  ];
+}
+
 bool isImageMime(String mime) => mime.toLowerCase().startsWith('image/');
 
 bool isAudioMime(String mime) => mime.toLowerCase().startsWith('audio/');

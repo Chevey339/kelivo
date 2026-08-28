@@ -338,6 +338,12 @@ class MessageBuilderService {
       if (mediaRefs.isNotEmpty) {
         message[internalMediaPathsKey] = mediaRefs;
       }
+      if (role == 'user') {
+        final documentRefs = documentRefsFromParts(m);
+        if (documentRefs.isNotEmpty) {
+          message[multimodalInternalDocumentPathsKey] = documentRefs;
+        }
+      }
       if (assistantReasoningContent?.isNotEmpty == true) {
         message['reasoning_content'] = assistantReasoningContent;
       }
@@ -360,7 +366,8 @@ class MessageBuilderService {
   /// Collect structured `_kelivo_media_paths` entries from image/file parts.
   ///
   /// Skips unavailable parts. Document (non-media) FileParts are omitted — they
-  /// travel through document extraction, not media-path attachments.
+  /// travel through document extraction, or as [documentRefsFromParts] for a
+  /// provider that takes the file itself.
   static List<Map<String, dynamic>> mediaRefsFromParts(ChatMessage message) {
     final refs = <Map<String, dynamic>>[];
     for (final part in message.parts) {
@@ -392,6 +399,29 @@ class MessageBuilderService {
           ),
         );
       }
+    }
+    return refs;
+  }
+
+  /// Collect `_kelivo_document_paths` entries: the FileParts that
+  /// [mediaRefsFromParts] leaves out.
+  static List<Map<String, dynamic>> documentRefsFromParts(ChatMessage message) {
+    final refs = <Map<String, dynamic>>[];
+    for (final part in message.parts) {
+      if (part is! FilePart || part.unavailable) continue;
+      final uri = part.uri.trim();
+      if (uri.isEmpty) continue;
+      final mime = resolveMediaAttachmentMime(
+        explicitMime: part.mime ?? '',
+        fileName: part.name,
+        path: uri,
+      );
+      if (isImageMime(mime) || isAudioMime(mime) || isVideoMime(mime)) {
+        continue;
+      }
+      refs.add(
+        encodeInternalDocumentRef((uri: uri, name: part.name, mime: mime)),
+      );
     }
     return refs;
   }
@@ -621,6 +651,7 @@ class MessageBuilderService {
     SettingsProvider settings, {
     Conversation? conversation,
     List<ChatMessage>? sourceMessages,
+    bool sandboxDataFiles = false,
   }) {
     final bool ocrActive =
         settings.ocrEnabled &&
@@ -653,6 +684,10 @@ class MessageBuilderService {
           if (path.isNotEmpty) mediaPaths.add(path);
           continue;
         }
+        if (sandboxDataFiles &&
+            isSandboxDataFile(fileName: document.fileName, mime: mime)) {
+          continue;
+        }
         // A document that still needs text extraction.
         return true;
       }
@@ -670,6 +705,11 @@ class MessageBuilderService {
   /// Process user messages in apiMessages: prefer frozen `promptContent`, else
   /// assemble (docs/OCR → memory prefix → template → time) and freeze (§8).
   ///
+  /// With [sandboxDataFiles], data files (see [isSandboxDataFile]) are left
+  /// out of the prompt for the provider to hand to its sandbox, and a message
+  /// carrying one is not frozen: the frozen prompt is provider-neutral, and a
+  /// later regeneration on a provider without a sandbox needs the text back.
+  ///
   /// Returns the image paths from the last user message (for API call).
   Future<List<String>> processUserMessagesForApi(
     List<Map<String, dynamic>> apiMessages,
@@ -677,6 +717,7 @@ class MessageBuilderService {
     Assistant? assistant, {
     Conversation? conversation,
     List<ChatMessage>? sourceMessages,
+    bool sandboxDataFiles = false,
   }) async {
     final bool ocrActive =
         settings.ocrEnabled &&
@@ -949,9 +990,15 @@ class MessageBuilderService {
       final cleanedUser = replacedUserText.trim();
 
       final filePrompts = StringBuffer();
+      var leftToSandbox = false;
       for (final d in parsedUser.documents) {
         final effectiveMime = _effectiveAttachmentMime(d);
         if (isVideoMime(effectiveMime) || isAudioMime(effectiveMime)) {
+          continue;
+        }
+        if (sandboxDataFiles &&
+            isSandboxDataFile(fileName: d.fileName, mime: effectiveMime)) {
+          leftToSandbox = true;
           continue;
         }
         final text = await readDocument(d);
@@ -966,7 +1013,7 @@ class MessageBuilderService {
       }
 
       String merged = (filePrompts.toString() + cleanedUser).trim();
-      var canFreezePrompt = true;
+      var canFreezePrompt = !leftToSandbox;
 
       if (ocrActive && ocrHandler != null) {
         final ocrTargets = parsedUser.imagePaths
