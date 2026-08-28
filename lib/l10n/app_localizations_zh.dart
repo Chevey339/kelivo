@@ -3317,9 +3317,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get modelDetailSheetBuiltinToolsDescription => '内置工具取决于供应商和 API 模式。';
 
   @override
-  String get modelDetailSheetBuiltinToolsUnsupportedHint => '当前供应商不支持这些内置工具。';
-
-  @override
   String get modelDetailSheetSearchTool => '搜索';
 
   @override
@@ -3349,11 +3346,19 @@ class AppLocalizationsZh extends AppLocalizations {
       '需要启用 OpenAI Responses API。';
 
   @override
-  String get modelDetailSheetOpenrouterWebFetchTool => '网页抓取';
+  String get modelDetailSheetWebFetchTool => '网页抓取';
 
   @override
   String get modelDetailSheetOpenrouterWebFetchToolDescription =>
       '启用 OpenRouter 网页抓取服务端工具';
+
+  @override
+  String get modelDetailSheetClaudeWebFetchToolDescription =>
+      '允许 Claude 抓取对话中出现的网页与 PDF';
+
+  @override
+  String get modelDetailSheetClaudeCodeExecutionToolDescription =>
+      '允许 Claude 在 Anthropic 沙箱中运行 Python 与 Bash';
 
   @override
   String get modelDetailSheetOpenrouterShellTool => 'Shell';
@@ -4163,11 +4168,11 @@ class AppLocalizationsZh extends AppLocalizations {
   String get searchSettingsSheetBuiltinSearchDescription => '是否启用模型内置的搜索功能';
 
   @override
-  String get searchSettingsSheetClaudeDynamicSearchTitle => '模型内置搜索(新)';
+  String get searchSettingsSheetClaudeDynamicSearchTitle => '动态过滤';
 
   @override
   String get searchSettingsSheetClaudeDynamicSearchDescription =>
-      '在支持的 Claude 官方模型上使用 `web_search_20260209`，支持动态过滤能力。';
+      '筛选搜索结果，节省 token';
 
   @override
   String get searchSettingsSheetWebSearchTitle => '网络搜索';
@@ -11129,9 +11134,6 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get modelDetailSheetBuiltinToolsDescription => '内置工具取决于供应商和 API 模式。';
 
   @override
-  String get modelDetailSheetBuiltinToolsUnsupportedHint => '当前供应商不支持这些内置工具。';
-
-  @override
   String get modelDetailSheetSearchTool => '搜索';
 
   @override
@@ -11161,11 +11163,19 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
       '需要启用 OpenAI Responses API。';
 
   @override
-  String get modelDetailSheetOpenrouterWebFetchTool => '网页抓取';
+  String get modelDetailSheetWebFetchTool => '网页抓取';
 
   @override
   String get modelDetailSheetOpenrouterWebFetchToolDescription =>
       '启用 OpenRouter 网页抓取服务端工具';
+
+  @override
+  String get modelDetailSheetClaudeWebFetchToolDescription =>
+      '允许 Claude 抓取对话中出现的网页与 PDF';
+
+  @override
+  String get modelDetailSheetClaudeCodeExecutionToolDescription =>
+      '允许 Claude 在 Anthropic 沙箱中运行 Python 与 Bash';
 
   @override
   String get modelDetailSheetOpenrouterShellTool => 'Shell';
@@ -11975,11 +11985,11 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get searchSettingsSheetBuiltinSearchDescription => '是否启用模型内置的搜索功能';
 
   @override
-  String get searchSettingsSheetClaudeDynamicSearchTitle => '模型内置搜索(新)';
+  String get searchSettingsSheetClaudeDynamicSearchTitle => '动态过滤';
 
   @override
   String get searchSettingsSheetClaudeDynamicSearchDescription =>
-      '在支持的 Claude 官方模型上使用 `web_search_20260209`，支持动态过滤能力。';
+      '筛选搜索结果，节省 token';
 
   @override
   String get searchSettingsSheetWebSearchTitle => '网络搜索';
@@ -18866,9 +18876,6 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get modelDetailSheetBuiltinToolsDescription => '內建工具取決於供應商和 API 模式。';
 
   @override
-  String get modelDetailSheetBuiltinToolsUnsupportedHint => '目前供應商不支援這些內建工具。';
-
-  @override
   String get modelDetailSheetSearchTool => '搜尋';
 
   @override
@@ -18898,11 +18905,19 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
       '需要啟用 OpenAI Responses API。';
 
   @override
-  String get modelDetailSheetOpenrouterWebFetchTool => '網頁擷取';
+  String get modelDetailSheetWebFetchTool => '網頁擷取';
 
   @override
   String get modelDetailSheetOpenrouterWebFetchToolDescription =>
       '啟用 OpenRouter 網頁擷取伺服器工具';
+
+  @override
+  String get modelDetailSheetClaudeWebFetchToolDescription =>
+      '允許 Claude 擷取對話中出現的網頁與 PDF';
+
+  @override
+  String get modelDetailSheetClaudeCodeExecutionToolDescription =>
+      '允許 Claude 在 Anthropic 沙箱中執行 Python 與 Bash';
 
   @override
   String get modelDetailSheetOpenrouterShellTool => 'Shell';
@@ -19711,11 +19726,11 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get searchSettingsSheetBuiltinSearchDescription => '是否啟用模型內建的搜尋功能';
 
   @override
-  String get searchSettingsSheetClaudeDynamicSearchTitle => '模型內建搜尋(新)';
+  String get searchSettingsSheetClaudeDynamicSearchTitle => '動態過濾';
 
   @override
   String get searchSettingsSheetClaudeDynamicSearchDescription =>
-      '在支援的 Claude 官方模型上使用 `web_search_20260209`，支援動態過濾能力。';
+      '篩選搜尋結果，節省 token';
 
   @override
   String get searchSettingsSheetWebSearchTitle => '網路搜尋';

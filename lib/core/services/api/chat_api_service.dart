@@ -264,6 +264,7 @@ class ChatApiService {
           extraHeaders: extraHeaders,
           extraBody: extraBody,
           stream: stream,
+          builtInSearchOnly: builtInSearchOnly,
           skipImageParsing: skipImageParsing,
         );
       } else if (kind == ProviderKind.google) {

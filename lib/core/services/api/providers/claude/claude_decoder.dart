@@ -1,21 +1,32 @@
 import 'dart:convert';
 
+import '../../../../../utils/utf16_safe_cut.dart';
+
 import '../../../../models/token_usage.dart';
 import '../../stream/sse_event.dart';
 import '../../stream/stream_chunk.dart';
 import '../../stream/stream_chunk_decoder.dart';
 import '../../stream/stream_chunk_ids.dart';
+import 'claude_history.dart';
 
 /// Stateful Claude Messages SSE decoder. One instance per HTTP response.
 class ClaudeStreamDecoder implements StreamChunkDecoder {
   ClaudeStreamDecoder({
     this.skipRedactedThinkingBlocks = false,
     this.initialUsage,
+    this.serverToolNames = const <String>{},
+    this.priorResponses = const <List<Map<String, dynamic>>>[],
     String sourceId = 'stream',
   }) : _ids = StreamChunkIds(sourceId);
 
   final bool skipRedactedThinkingBlocks;
   final TokenUsage? initialUsage;
+
+  /// Tool names this request declared as Anthropic-hosted server tools.
+  final Set<String> serverToolNames;
+
+  /// The responses of this turn before the one being decoded.
+  final List<List<Map<String, dynamic>>> priorResponses;
   final StreamChunkIds _ids;
 
   final List<Map<String, dynamic>> assistantBlocks = <Map<String, dynamic>>[];
@@ -36,6 +47,12 @@ class ClaudeStreamDecoder implements StreamChunkDecoder {
   final Map<int, String> _clientIndexToId = <int, String>{};
   final Map<int, String> _serverIndexToId = <int, String>{};
   final Map<String, StringBuffer> _serverArgs = <String, StringBuffer>{};
+
+  /// Each `server_tool_use` block already appended to [assistantBlocks], so its
+  /// streamed input can be filled in once the block closes.
+  final Map<String, Map<String, dynamic>> _serverBlocks =
+      <String, Map<String, dynamic>>{};
+  final Map<String, String> _serverToolNames = <String, String>{};
   final Set<String> _serverToolStarted = <String>{};
   final Set<String> _serverToolEnded = <String>{};
   final Set<String> _clientToolEnded = <String>{};
@@ -48,9 +65,10 @@ class ClaudeStreamDecoder implements StreamChunkDecoder {
   final List<Map<String, dynamic>> _citationItems = <Map<String, dynamic>>[];
   bool _closed = false;
 
-  Map<String, dynamic> get _anthropicMetadata => <String, dynamic>{
-    'anthropic': <String, dynamic>{'assistant_blocks': assistantBlocks},
-  };
+  /// [assistantBlocks] is handed out live: a card written mid-response sees
+  /// the blocks that arrive after it once the turn is re-encoded at its end.
+  Map<String, dynamic> get replayMetadata =>
+      claudeReplayMetadata([...priorResponses, assistantBlocks]);
 
   bool isClientTool(String id) => clientTools.containsKey(id);
 
@@ -127,7 +145,14 @@ class ClaudeStreamDecoder implements StreamChunkDecoder {
     final cb = obj['content_block'];
     if (cb is! Map) return const <StreamChunk>[];
     final block = cb.cast<String, dynamic>();
-    final kind = (block['type'] ?? '').toString();
+    var kind = (block['type'] ?? '').toString();
+    // Some Claude-compatible relays run a declared server tool upstream but
+    // label its block `tool_use`. Executing that as a client tool answers with
+    // an empty result, so keep it on the server-tool path.
+    if (kind == 'tool_use' &&
+        serverToolNames.contains((block['name'] ?? '').toString())) {
+      kind = 'server_tool_use';
+    }
     final idx = _parseIndex(obj['index']);
     final chunks = <StreamChunk>[];
 
@@ -166,29 +191,53 @@ class ClaudeStreamDecoder implements StreamChunkDecoder {
         });
         if (idx != null) _clientIndexToId[idx] = id;
         chunks.add(
-          ToolCallStart(id: id, toolName: name, metadata: _anthropicMetadata),
+          ToolCallStart(id: id, toolName: name, metadata: replayMetadata),
         );
       }
     } else if (kind == 'server_tool_use') {
+      _flushTextBlock();
       final id = (block['id'] ?? '').toString();
       final name = (block['name'] ?? '').toString();
       if (id.isNotEmpty && idx != null) {
         _serverIndexToId[idx] = id;
         _serverArgs[id] = StringBuffer();
       }
-      if (id.isNotEmpty && name == 'web_search') {
+      if (id.isNotEmpty) {
+        // Server tools have to be replayed as the blocks the API sent, not as
+        // client tool calls: results only decrypt when their original block
+        // comes back intact, and an unrun one only runs if it comes back at
+        // all. Whether they may be sent is the request side's call.
+        final serverBlock = <String, dynamic>{
+          'type': 'server_tool_use',
+          'id': id,
+          'name': name,
+          'input': <String, dynamic>{},
+          if (block['caller'] != null) 'caller': block['caller'],
+        };
+        assistantBlocks.add(serverBlock);
+        _serverBlocks[id] = serverBlock;
+      }
+      final display = _serverToolDisplayName(name);
+      if (id.isNotEmpty && display != null) {
+        _serverToolNames[id] = display;
         _serverToolStarted.add(id);
-        chunks.add(ServerToolStart(id: id, toolName: 'search_web'));
+        chunks.add(ServerToolStart(id: id, toolName: display));
         chunks.add(
-          ToolCallStart(
-            id: id,
-            toolName: 'search_web',
-            metadata: _anthropicMetadata,
-          ),
+          ToolCallStart(id: id, toolName: display, metadata: replayMetadata),
         );
       }
-    } else if (kind == 'web_search_tool_result') {
-      chunks.addAll(_webSearchResult(block));
+    } else if (kind.endsWith('_tool_result')) {
+      _flushTextBlock();
+      assistantBlocks.add(Map<String, dynamic>.from(block));
+      // Result blocks are named `<tool>_tool_result`, so the display-name
+      // allowlist decides which ones we surface; web search keeps its own
+      // citation-aware mapping.
+      final name = kind.substring(0, kind.length - '_tool_result'.length);
+      if (name == 'web_search') {
+        chunks.addAll(_webSearchResult(block));
+      } else if (_serverToolDisplayName(name) != null) {
+        chunks.addAll(_serverToolResult(block, name));
+      }
     } else if (kind == 'text') {
       if (idx != null) {
         chunks.add(TextStart(_ids.indexed('text', idx)));
@@ -261,8 +310,13 @@ class ClaudeStreamDecoder implements StreamChunkDecoder {
       } else {
         final serverId = _serverIndexToId[idx];
         if (serverId != null) {
+          // The buffer feeds the replayed block, so it fills either way. The
+          // card chunks only go out for a tool that opened one: a nameless
+          // card is worse than none.
           _serverArgs.putIfAbsent(serverId, StringBuffer.new).write(part);
-          chunks.add(ToolCallDelta(id: serverId, inputDelta: part));
+          if (_serverToolStarted.contains(serverId)) {
+            chunks.add(ToolCallDelta(id: serverId, inputDelta: part));
+          }
         }
       }
     }
@@ -309,7 +363,8 @@ class ClaudeStreamDecoder implements StreamChunkDecoder {
 
     if (idx != null && _serverIndexToId.containsKey(idx)) {
       final sid = _serverIndexToId[idx]!;
-      chunks.add(ToolCallEnd(sid));
+      _serverBlocks[sid]?['input'] = _serverArgsFor(sid);
+      if (_serverToolStarted.contains(sid)) chunks.add(ToolCallEnd(sid));
     }
     return chunks;
   }
@@ -336,6 +391,88 @@ class ClaudeStreamDecoder implements StreamChunkDecoder {
     return chunks;
   }
 
+  /// Tool name shown in the UI, or null for a server tool we don't surface.
+  static String? _serverToolDisplayName(String name) {
+    switch (name) {
+      case 'web_search':
+        return 'search_web';
+      case 'web_fetch':
+      case 'code_execution':
+      case 'bash_code_execution':
+      case 'text_editor_code_execution':
+        return name;
+      default:
+        return null;
+    }
+  }
+
+  /// Fetched pages and container output can be megabytes; the card and the
+  /// persisted message only need a readable excerpt.
+  static const _serverToolOutputLimit = 4000;
+
+  static Object? _clipServerToolValue(Object? value) {
+    if (value is String) {
+      if (value.length <= _serverToolOutputLimit) return value;
+      return '${truncateHeadUtf16Safe(value, _serverToolOutputLimit)}…';
+    }
+    if (value is List) {
+      return value.map(_clipServerToolValue).toList();
+    }
+    if (value is Map) {
+      return <String, dynamic>{
+        for (final entry in value.entries)
+          entry.key.toString(): _clipServerToolValue(entry.value),
+      };
+    }
+    return value;
+  }
+
+  /// [blockToolName] is the tool the result block itself names, which is the
+  /// only name a turn that runs a server tool left over from an earlier one
+  /// carries: the API sends the result without repeating the request block.
+  List<StreamChunk> _serverToolResult(
+    Map<String, dynamic> block,
+    String blockToolName,
+  ) {
+    final toolUseId = (block['tool_use_id'] ?? '').toString();
+    final id = toolUseId.isEmpty ? _ids.next('server_tool') : toolUseId;
+    if (!_serverToolEnded.add(id)) return const <StreamChunk>[];
+    final toolName =
+        _serverToolNames[id] ??
+        _serverToolDisplayName(blockToolName) ??
+        'server_tool';
+    final args = _serverArgsOrNull(id);
+    final content = block['content'];
+    // Anthropic reports a server tool failure as a `*_tool_result_error`
+    // content block. Without a failed card a throttled turn renders nothing at
+    // all, which reads like the tool had never been enabled.
+    final errorCode =
+        content is Map && (content['type'] ?? '').toString().endsWith('_error')
+        ? (content['error_code'] ?? '').toString()
+        : '';
+    final clipped = _clipServerToolValue(content);
+    return <StreamChunk>[
+      if (_serverToolStarted.add(id))
+        ServerToolStart(id: id, toolName: toolName, input: args),
+      ServerToolEnd(
+        id: id,
+        input: args,
+        output: errorCode.isNotEmpty
+            ? <String, dynamic>{
+                'items': const <Map<String, dynamic>>[],
+                'error': errorCode,
+              }
+            : (clipped is Map<String, dynamic>
+                  ? clipped
+                  : <String, dynamic>{'content': clipped}),
+        status: errorCode.isNotEmpty
+            ? ServerToolStatus.failed
+            : ServerToolStatus.completed,
+        metadata: replayMetadata,
+      ),
+    ];
+  }
+
   List<StreamChunk> _webSearchResult(Map<String, dynamic> block) {
     final toolUseId = (block['tool_use_id'] ?? '').toString();
     final contentBlock = block['content'];
@@ -358,13 +495,7 @@ class ClaudeStreamDecoder implements StreamChunkDecoder {
         (contentBlock['type'] == 'web_search_tool_result_error')) {
       errorCode = (contentBlock['error_code'] ?? '').toString();
     }
-    Map<String, dynamic> args = const <String, dynamic>{};
-    final raw = _serverArgs[toolUseId]?.toString();
-    if (raw != null && raw.isNotEmpty) {
-      try {
-        args = (jsonDecode(raw) as Map).cast<String, dynamic>();
-      } catch (_) {}
-    }
+    final args = _serverArgsOrNull(toolUseId);
     final id = toolUseId.isEmpty ? _ids.search() : toolUseId;
     _serverToolEnded.add(id);
     return <StreamChunk>[
@@ -377,7 +508,7 @@ class ClaudeStreamDecoder implements StreamChunkDecoder {
           'items': items,
           if ((errorCode ?? '').isNotEmpty) 'error': errorCode,
         },
-        metadata: _anthropicMetadata,
+        metadata: replayMetadata,
       ),
     ];
   }
@@ -402,22 +533,21 @@ class ClaudeStreamDecoder implements StreamChunkDecoder {
           input: _serverArgsFor(id),
           output: const <String, dynamic>{'items': <Map<String, dynamic>>[]},
           status: ServerToolStatus.failed,
-          metadata: _anthropicMetadata,
+          metadata: replayMetadata,
         ),
       );
     }
     return chunks;
   }
 
-  Map<String, dynamic> _serverArgsFor(String id) {
-    final raw = _serverArgs[id]?.toString();
-    if (raw == null || raw.isEmpty) return const <String, dynamic>{};
-    try {
-      return (jsonDecode(raw) as Map).cast<String, dynamic>();
-    } catch (_) {
-      return const <String, dynamic>{};
-    }
-  }
+  /// The streamed input of a call this response opened, or null when the call
+  /// opened in an earlier response of the turn: that decoder held the input,
+  /// and an empty map here would erase it from the card.
+  Map<String, dynamic>? _serverArgsOrNull(String id) =>
+      _serverArgs.containsKey(id) ? decodeStreamedInput(_serverArgs[id]) : null;
+
+  Map<String, dynamic> _serverArgsFor(String id) =>
+      decodeStreamedInput(_serverArgs[id]);
 
   List<StreamChunk> _flushCitations() {
     if (_citationItems.isEmpty) return const <StreamChunk>[];
@@ -436,13 +566,7 @@ class ClaudeStreamDecoder implements StreamChunkDecoder {
     if (!_serverToolEnded.add(id)) {
       return const <StreamChunk>[];
     }
-    Map<String, dynamic> args = const <String, dynamic>{};
-    final raw = _serverArgs[id]?.toString();
-    if (raw != null && raw.isNotEmpty) {
-      try {
-        args = (jsonDecode(raw) as Map).cast<String, dynamic>();
-      } catch (_) {}
-    }
+    final args = _serverArgsFor(id);
     return <StreamChunk>[
       if (_serverToolStarted.add(id))
         ServerToolStart(id: id, toolName: 'search_web', input: args),
@@ -450,7 +574,7 @@ class ClaudeStreamDecoder implements StreamChunkDecoder {
         id: id,
         input: args,
         output: <String, dynamic>{'items': items},
-        metadata: _anthropicMetadata,
+        metadata: replayMetadata,
       ),
     ];
   }
@@ -485,6 +609,18 @@ class ClaudeStreamDecoder implements StreamChunkDecoder {
   }
 }
 
+/// A tool's streamed input arrives as partial JSON in a buffer, and an
+/// incomplete or absent one reads as no arguments at all.
+Map<String, dynamic> decodeStreamedInput(StringBuffer? buffer) {
+  final raw = buffer?.toString() ?? '';
+  if (raw.isEmpty) return const <String, dynamic>{};
+  try {
+    return (jsonDecode(raw) as Map).cast<String, dynamic>();
+  } catch (_) {
+    return const <String, dynamic>{};
+  }
+}
+
 class ClaudeClientTool {
   ClaudeClientTool({required this.id, this.name = ''});
 
@@ -492,14 +628,7 @@ class ClaudeClientTool {
   String name;
   final StringBuffer input = StringBuffer();
 
-  Map<String, dynamic> get decodedArguments {
-    try {
-      return (jsonDecode(input.isEmpty ? '{}' : input.toString()) as Map)
-          .cast<String, dynamic>();
-    } catch (_) {
-      return <String, dynamic>{};
-    }
-  }
+  Map<String, dynamic> get decodedArguments => decodeStreamedInput(input);
 }
 
 TokenUsage claudeUsageFromMap(Map<String, dynamic> usage) {

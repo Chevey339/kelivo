@@ -1,4 +1,7 @@
 import '../../../core/models/model_types.dart';
+import '../../../core/providers/settings_provider.dart';
+import '../../../core/services/api/builtin_tools.dart';
+import '../../../l10n/app_localizations.dart';
 
 class ModelTypeSwitchResult {
   const ModelTypeSwitchResult({
@@ -120,5 +123,115 @@ class ModelEditTypeSwitch {
       cachedChatAbilities: freezeNullableSet(nextCachedChatAbilities),
       cachedEmbeddingInput: freezeNullableSet(nextCachedEmbeddingInput),
     );
+  }
+}
+
+/// One built-in tool switch on a model's tools tab.
+class ModelBuiltInToolTile {
+  const ModelBuiltInToolTile({
+    required this.name,
+    required this.title,
+    required this.desc,
+    this.available = true,
+  });
+
+  final String name;
+  final String title;
+  final String desc;
+
+  /// False for a tool the provider's current API mode cannot run: the switch
+  /// stays visible but reads off and locked.
+  final bool available;
+}
+
+class ModelBuiltInToolTiles {
+  /// Switches for [cfg]'s tools tab, in display order. Kept in step with
+  /// [BuiltInToolsHelper.modelSettingsToolNames], which decides whether the tab
+  /// shows at all.
+  static List<ModelBuiltInToolTile> forConfig({
+    required ProviderConfig cfg,
+    required AppLocalizations l10n,
+  }) {
+    final kind = ProviderConfig.classify(cfg.id, explicitType: cfg.providerType);
+    final responses = cfg.useResponseApi == true;
+    switch (kind) {
+      case ProviderKind.google:
+        return <ModelBuiltInToolTile>[
+          ModelBuiltInToolTile(
+            name: BuiltInToolNames.urlContext,
+            title: l10n.modelDetailSheetUrlContextTool,
+            desc: l10n.modelDetailSheetUrlContextToolDescription,
+          ),
+          ModelBuiltInToolTile(
+            name: BuiltInToolNames.codeExecution,
+            title: l10n.modelDetailSheetCodeExecutionTool,
+            desc: l10n.modelDetailSheetCodeExecutionToolDescription,
+          ),
+          ModelBuiltInToolTile(
+            name: BuiltInToolNames.youtube,
+            title: l10n.modelDetailSheetYoutubeTool,
+            desc: l10n.modelDetailSheetYoutubeToolDescription,
+          ),
+        ];
+      case ProviderKind.claude:
+        // Anthropic hosts these tools itself, so only its own endpoint can run
+        // them; a Claude-compatible relay is offered the switch but locked out.
+        final official = BuiltInToolsHelper.isOfficialAnthropicEndpoint(cfg);
+        return <ModelBuiltInToolTile>[
+          ModelBuiltInToolTile(
+            name: BuiltInToolNames.webFetch,
+            title: l10n.modelDetailSheetWebFetchTool,
+            desc: l10n.modelDetailSheetClaudeWebFetchToolDescription,
+            available: official,
+          ),
+          ModelBuiltInToolTile(
+            name: BuiltInToolNames.codeExecution,
+            title: l10n.modelDetailSheetCodeExecutionTool,
+            desc: l10n.modelDetailSheetClaudeCodeExecutionToolDescription,
+            available: official,
+          ),
+        ];
+      case ProviderKind.openai:
+        if (BuiltInToolsHelper.isOpenRouterProvider(cfg)) {
+          return <ModelBuiltInToolTile>[
+            ModelBuiltInToolTile(
+              name: BuiltInToolNames.codeInterpreter,
+              title: l10n.modelDetailSheetOpenaiCodeInterpreterTool,
+              desc: l10n.modelDetailSheetOpenaiCodeInterpreterToolDescription,
+              available: responses,
+            ),
+            ModelBuiltInToolTile(
+              name: BuiltInToolNames.webFetch,
+              title: l10n.modelDetailSheetWebFetchTool,
+              desc: l10n.modelDetailSheetOpenrouterWebFetchToolDescription,
+            ),
+            ModelBuiltInToolTile(
+              name: BuiltInToolNames.imageGeneration,
+              title: l10n.modelDetailSheetOpenaiImageGenerationTool,
+              desc: l10n.modelDetailSheetOpenaiImageGenerationToolDescription,
+            ),
+            ModelBuiltInToolTile(
+              name: BuiltInToolNames.shell,
+              title: l10n.modelDetailSheetOpenrouterShellTool,
+              desc: l10n.modelDetailSheetOpenrouterShellToolDescription,
+              available: responses,
+            ),
+          ];
+        }
+        return <ModelBuiltInToolTile>[
+          ModelBuiltInToolTile(
+            name: BuiltInToolNames.codeInterpreter,
+            title: l10n.modelDetailSheetOpenaiCodeInterpreterTool,
+            desc: l10n.modelDetailSheetOpenaiCodeInterpreterToolDescription,
+            available: responses,
+          ),
+          ModelBuiltInToolTile(
+            name: BuiltInToolNames.imageGeneration,
+            title: l10n.modelDetailSheetOpenaiImageGenerationTool,
+            desc: l10n.modelDetailSheetOpenaiImageGenerationToolDescription,
+            available: responses,
+          ),
+        ];
+    }
   }
 }

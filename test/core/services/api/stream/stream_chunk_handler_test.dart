@@ -10,6 +10,66 @@ import 'package:Kelivo/core/services/api/stream/stream_chunk_handler.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  test(
+    'a hosted card keeps its input when the result lands a response later',
+    () {
+      // A turn that starts a hosted tool alongside a client one is cut in two:
+      // the call streams its input in the first response and the result only
+      // arrives in the second, whose decoder never saw that input.
+      final handler = StreamChunkHandler();
+      handler.handle(const ToolCallStart(id: 'srvtoolu_1', toolName: 'web 获取'));
+      handler.handle(
+        const ServerToolStart(id: 'srvtoolu_1', toolName: 'web 获取'),
+      );
+      handler.handle(
+        const ToolCallDelta(
+          id: 'srvtoolu_1',
+          inputDelta: '{"url":"https://example.com"}',
+        ),
+      );
+      handler.handle(const ToolCallEnd('srvtoolu_1'));
+      handler.handle(
+        const ServerToolEnd(
+          id: 'srvtoolu_1',
+          output: <String, dynamic>{'content': 'ok'},
+        ),
+      );
+
+      final card = jsonDecode(
+        handler.parts.whereType<ToolCallPart>().single.payloadJson,
+      );
+      expect(card['arguments'], {'url': 'https://example.com'});
+    },
+  );
+
+  test(
+    'an empty input reported for a card does not erase the streamed one',
+    () {
+      // Empty arguments are no news, whoever reports them: a decoder closing an
+      // unfinished call still knows less about its input than the deltas do.
+      final handler = StreamChunkHandler();
+      handler.handle(const ToolCallStart(id: 'srvtoolu_1', toolName: 'web 获取'));
+      handler.handle(
+        const ToolCallDelta(
+          id: 'srvtoolu_1',
+          inputDelta: '{"url":"https://example.com"}',
+        ),
+      );
+      handler.handle(
+        const ServerToolEnd(
+          id: 'srvtoolu_1',
+          input: <String, dynamic>{},
+          status: ServerToolStatus.failed,
+        ),
+      );
+
+      final card = jsonDecode(
+        handler.parts.whereType<ToolCallPart>().single.payloadJson,
+      );
+      expect(card['arguments'], {'url': 'https://example.com'});
+    },
+  );
+
   test('creates a text part on Delta when Start was omitted', () {
     final handler = StreamChunkHandler();
     handler.handle(const TextDelta(id: 't', text: 'Hello'));
@@ -498,6 +558,43 @@ void main() {
     },
   );
 
+  test('Finish re-encodes tool payloads so late blocks reach the metadata', () {
+    final handler = StreamChunkHandler();
+    // Providers hand out a live reference to the block list they keep
+    // appending to, so a payload encoded mid-turn misses everything that
+    // arrives after the tool chunk.
+    final blocks = <Map<String, dynamic>>[
+      {'type': 'server_tool_use', 'id': 's1', 'name': 'web_search'},
+    ];
+    final metadata = <String, dynamic>{
+      'anthropic': <String, dynamic>{'assistant_blocks': blocks},
+    };
+    handler.handle(
+      ToolCallStart(id: 's1', toolName: 'search_web', metadata: metadata),
+    );
+
+    List<String> replayedBlocks() {
+      final payload =
+          jsonDecode(handler.parts.whereType<ToolCallPart>().single.payloadJson)
+              as Map;
+      final list =
+          ((payload['metadata'] as Map)['anthropic'] as Map)['assistant_blocks']
+              as List;
+      return [for (final b in list) (b as Map)['type'].toString()];
+    }
+
+    expect(replayedBlocks(), ['server_tool_use']);
+
+    blocks.add({'type': 'web_search_tool_result', 'tool_use_id': 's1'});
+    blocks.add({'type': 'text', 'text': 'Kyoto has many temples.'});
+    handler.handle(const Finish(finishReason: 'end_turn'));
+
+    expect(replayedBlocks(), [
+      'server_tool_use',
+      'web_search_tool_result',
+      'text',
+    ]);
+  });
   test('handleResult keeps image URIs as-is and does not add data:', () {
     final handler = StreamChunkHandler();
     handler.handleResult(

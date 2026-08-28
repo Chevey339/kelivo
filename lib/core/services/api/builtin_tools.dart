@@ -182,38 +182,48 @@ abstract class BuiltInToolsHelper {
     return _normalizedModelId(modelId).contains('grok');
   }
 
-  static bool isClaudeBuiltInSearchSupportedModel(String? modelId) {
+  /// Claude model gating: internal builds always qualify, everything else has
+  /// to be listed explicitly because Anthropic ids carry no version ordering.
+  static bool _isClaudeModelIn(String? modelId, Set<String> supported) {
     final normalized = _normalizedModelId(modelId);
-    if (normalized.contains('mythos')) return true;
-    const supported = <String>{
-      'claude-fable-5',
-      'claude-opus-5',
-      'claude-opus-4-8',
-      'claude-opus-4-7',
-      'claude-opus-4-6',
-      'claude-sonnet-5',
+    return normalized.contains('mythos') || supported.contains(normalized);
+  }
+
+  /// Current-generation Claude ids, which support every server tool below.
+  static const _claudeCurrentModels = <String>{
+    'claude-fable-5',
+    'claude-opus-5',
+    'claude-opus-4-8',
+    'claude-opus-4-7',
+    'claude-opus-4-6',
+    'claude-sonnet-5',
+    'claude-sonnet-4-6',
+  };
+
+  static bool isClaudeBuiltInSearchSupportedModel(String? modelId) {
+    return _isClaudeModelIn(modelId, const <String>{
+      ..._claudeCurrentModels,
       'claude-sonnet-4-5-20250929',
       'claude-sonnet-4-20250514',
       'claude-3-7-sonnet-20250219',
       'claude-haiku-4-5-20251001',
       'claude-3-5-haiku-latest',
-      'claude-sonnet-4-6',
       'claude-opus-4-1-20250805',
       'claude-opus-4-20250514',
-    };
-    return supported.contains(normalized);
+    });
   }
 
   static bool isClaudeDynamicWebSearchSupportedModel(String? modelId) {
-    final normalized = _normalizedModelId(modelId);
-    return normalized.contains('mythos') ||
-        normalized == 'claude-fable-5' ||
-        normalized == 'claude-opus-5' ||
-        normalized == 'claude-opus-4-8' ||
-        normalized == 'claude-opus-4-7' ||
-        normalized == 'claude-opus-4-6' ||
-        normalized == 'claude-sonnet-5' ||
-        normalized == 'claude-sonnet-4-6';
+    return _isClaudeModelIn(modelId, _claudeCurrentModels);
+  }
+
+  static bool isClaudeCodeExecutionSupportedModel(String? modelId) {
+    return _isClaudeModelIn(modelId, const <String>{
+      ..._claudeCurrentModels,
+      'claude-opus-4-5-20251101',
+      'claude-sonnet-4-5-20250929',
+      'claude-haiku-4-5-20251001',
+    });
   }
 
   static bool isOpenAIResponsesBuiltInSearchSupportedModel(String? modelId) {
@@ -251,14 +261,19 @@ abstract class BuiltInToolsHelper {
     }
   }
 
-  static bool isDeepSeekProvider(ProviderConfig? cfg) {
+  static bool isDeepSeekProvider(ProviderConfig? cfg) =>
+      ProviderConfig.isDeepSeekConfig(cfg);
+
+  /// Whether [cfg] talks to Anthropic itself. The Anthropic-hosted server tools
+  /// only work there: a Claude-compatible relay either rejects the tool types
+  /// outright or answers from an account pool, and results from a pool cannot
+  /// be replayed because the next request decrypts them against a different
+  /// organisation. An empty base url is the official endpoint by default.
+  static bool isOfficialAnthropicEndpoint(ProviderConfig? cfg) {
     if (cfg == null) return false;
-    final host = Uri.tryParse(cfg.baseUrl)?.host.toLowerCase() ?? '';
-    final providerId = cfg.id.toLowerCase();
-    final providerName = cfg.name.toLowerCase();
-    return host.contains('deepseek.com') ||
-        providerId.contains('deepseek') ||
-        providerName.contains('deepseek');
+    final raw = cfg.baseUrl.trim();
+    if (raw.isEmpty) return true;
+    return (Uri.tryParse(raw)?.host.toLowerCase() ?? '') == 'api.anthropic.com';
   }
 
   static bool isDeepSeekResponsesBuiltInSearchSupportedModel(String? modelId) {
@@ -687,23 +702,52 @@ abstract class BuiltInToolsHelper {
     return supportsBuiltInSearchForModel(cfg: cfg, modelId: modelId);
   }
 
-  static bool supportsClaudeDynamicWebSearchForModel({
+  /// Upstream model id when [cfg] talks to the official Claude API, or null
+  /// for anything else — Vertex and Claude-compatible vendors reject the
+  /// Anthropic-hosted server tools.
+  static String? _claudeUpstreamModelId({
     required ProviderConfig? cfg,
     required String? modelId,
   }) {
-    if (cfg == null || (modelId ?? '').trim().isEmpty) return false;
+    if (cfg == null || (modelId ?? '').trim().isEmpty) return null;
     final kind = ProviderConfig.classify(
       cfg.id,
       explicitType: cfg.providerType,
     );
-    if (kind != ProviderKind.claude) return false;
-    final upstreamModelId = BuiltInToolNames.effectiveModelId(
-      cfg: cfg,
-      modelId: modelId,
-    );
-    return !isDeepSeekProvider(cfg) &&
+    if (kind != ProviderKind.claude || !isOfficialAnthropicEndpoint(cfg)) {
+      return null;
+    }
+    return BuiltInToolNames.effectiveModelId(cfg: cfg, modelId: modelId);
+  }
+
+  static bool supportsClaudeDynamicWebSearchForModel({
+    required ProviderConfig? cfg,
+    required String? modelId,
+  }) {
+    final upstreamModelId = _claudeUpstreamModelId(cfg: cfg, modelId: modelId);
+    return upstreamModelId != null &&
         isClaudeDynamicWebSearchSupportedModel(upstreamModelId);
   }
+
+  /// Persisted marker for the dynamic-filtering web search opt-in. Kept as a
+  /// tool type string for backward compatibility with settings written before
+  /// newer versions shipped; [claudeSearchToolTypeDynamic] is what gets sent.
+  static const claudeSearchToolVersionMarker = 'web_search_20260209';
+
+  static const claudeSearchToolTypeBasic = 'web_search_20250305';
+  static const claudeSearchToolTypeDynamic = 'web_search_20260318';
+  static const claudeFetchToolTypeBasic = 'web_fetch_20250910';
+  static const claudeFetchToolTypeDynamic = 'web_fetch_20260318';
+
+  /// Unbounded by default, and a large documentation page is worth ~25k
+  /// tokens. Bound it low enough that a couple of fetches in one turn still
+  /// leave room to answer. Text only: the API does not apply this to binary
+  /// content, so a fetched PDF still arrives whole.
+  static const claudeFetchMaxContentTokens = 30000;
+
+  /// Dynamic filtering runs inside code execution, which requires this version
+  /// or later; older types make the API inject a conflicting `code_execution`.
+  static const claudeCodeExecutionToolType = 'code_execution_20260521';
 
   static bool isClaudeDynamicWebSearchEnabled({
     required ProviderConfig? cfg,
@@ -720,8 +764,37 @@ abstract class BuiltInToolsHelper {
     final rawWs = ov?['webSearch'];
     if (rawWs is! Map) return false;
     final ws = rawWs.cast<String, dynamic>();
-    return ws['toolVersion'] == 'web_search_20260209' ||
-        ws['tool_version'] == 'web_search_20260209';
+    return ws['toolVersion'] == claudeSearchToolVersionMarker ||
+        ws['tool_version'] == claudeSearchToolVersionMarker;
+  }
+
+  /// [rawOverride] with the dynamic-filtering opt-in set to [enabled] — the
+  /// write side of [isClaudeDynamicWebSearchEnabled].
+  static Map<String, dynamic> withClaudeDynamicWebSearch(
+    Object? rawOverride,
+    bool enabled,
+  ) {
+    final mo = <String, dynamic>{
+      if (rawOverride is Map)
+        for (final e in rawOverride.entries) e.key.toString(): e.value,
+    };
+    final rawWs = mo['webSearch'];
+    final ws = <String, dynamic>{
+      if (rawWs is Map)
+        for (final e in rawWs.entries) e.key.toString(): e.value,
+    };
+    if (enabled) {
+      ws['toolVersion'] = claudeSearchToolVersionMarker;
+    } else {
+      ws.remove('toolVersion');
+      ws.remove('tool_version');
+    }
+    if (ws.isEmpty) {
+      mo.remove('webSearch');
+    } else {
+      mo['webSearch'] = ws;
+    }
+    return mo;
   }
 
   static String claudeBuiltInSearchToolType({
@@ -729,8 +802,49 @@ abstract class BuiltInToolsHelper {
     required String? modelId,
   }) {
     return isClaudeDynamicWebSearchEnabled(cfg: cfg, modelId: modelId)
-        ? 'web_search_20260209'
-        : 'web_search_20250305';
+        ? claudeSearchToolTypeDynamic
+        : claudeSearchToolTypeBasic;
+  }
+
+  /// Anthropic ships web fetch on the same models as built-in search, with one
+  /// documented hole: Opus 5 runs every other server tool but not this one, so
+  /// declaring it there is an error rather than an unused tool.
+  static bool isClaudeWebFetchSupportedModel(String? modelId) =>
+      _normalizedModelId(modelId) != 'claude-opus-5' &&
+      isClaudeBuiltInSearchSupportedModel(modelId);
+
+  /// Request entries for the Anthropic-hosted server tools beyond search, whose
+  /// entry is shaped by the per-model web search options instead. These run on
+  /// the official Claude API only; Claude-compatible vendors and Vertex reject
+  /// them.
+  static List<Map<String, dynamic>> claudeServerToolEntries({
+    required ProviderConfig? cfg,
+    required String? modelId,
+    required Set<String> enabled,
+  }) {
+    final upstreamModelId = _claudeUpstreamModelId(cfg: cfg, modelId: modelId);
+    if (upstreamModelId == null) return const <Map<String, dynamic>>[];
+    final dynamicFiltering = isClaudeDynamicWebSearchEnabled(
+      cfg: cfg,
+      modelId: modelId,
+    );
+    return <Map<String, dynamic>>[
+      if (enabled.contains(BuiltInToolNames.webFetch) &&
+          isClaudeWebFetchSupportedModel(upstreamModelId))
+        <String, dynamic>{
+          'type': dynamicFiltering
+              ? claudeFetchToolTypeDynamic
+              : claudeFetchToolTypeBasic,
+          'name': 'web_fetch',
+          'max_content_tokens': claudeFetchMaxContentTokens,
+        },
+      if (enabled.contains(BuiltInToolNames.codeExecution) &&
+          isClaudeCodeExecutionSupportedModel(upstreamModelId))
+        <String, dynamic>{
+          'type': claudeCodeExecutionToolType,
+          'name': 'code_execution',
+        },
+    ];
   }
 
   static Map<String, dynamic> dashScopeSearchOptionsFromOverride(
@@ -781,11 +895,6 @@ abstract class BuiltInToolsHelper {
     return out;
   }
 
-  /// Check if a provider supports built-in tools configuration.
-  static bool supportsBuiltInTools(ProviderKind kind) {
-    return kind == ProviderKind.google || kind == ProviderKind.openai;
-  }
-
   /// Tool names edited in a model's built-in tools tab. Search is excluded
   /// because it is controlled from the chat search switch.
   static Set<String> modelSettingsToolNames(ProviderConfig cfg) {
@@ -798,6 +907,13 @@ abstract class BuiltInToolsHelper {
         BuiltInToolNames.urlContext,
         BuiltInToolNames.codeExecution,
         BuiltInToolNames.youtube,
+      };
+    }
+    if (kind == ProviderKind.claude) {
+      if (isDeepSeekProvider(cfg)) return const <String>{};
+      return const <String>{
+        BuiltInToolNames.webFetch,
+        BuiltInToolNames.codeExecution,
       };
     }
     if (kind != ProviderKind.openai) return const <String>{};

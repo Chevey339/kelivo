@@ -573,7 +573,10 @@ class SettingsProvider extends ChangeNotifier {
         final rawOv = cfg.modelOverrides[modelId];
         final ov = rawOv is Map ? rawOv.cast<String, dynamic>() : null;
         final modelForCheck = resolveApiModelIdOverride(ov, modelId);
-        return !_isDeepSeekClaudeCompatible(cfg, modelForCheck) &&
+        return !ProviderConfig.isDeepSeekClaudeCompatible(
+              modelForCheck,
+              config: cfg,
+            ) &&
             _claudeSupportsXhighReasoning(modelForCheck);
       case ProviderKind.google:
         return false;
@@ -599,7 +602,10 @@ class SettingsProvider extends ChangeNotifier {
         final rawOv = cfg.modelOverrides[modelId];
         final ov = rawOv is Map ? rawOv.cast<String, dynamic>() : null;
         final modelForCheck = resolveApiModelIdOverride(ov, modelId);
-        return _isDeepSeekClaudeCompatible(cfg, modelForCheck) ||
+        return ProviderConfig.isDeepSeekClaudeCompatible(
+              modelForCheck,
+              config: cfg,
+            ) ||
             _claudeSupportsMaxReasoning(modelForCheck);
     }
   }
@@ -671,17 +677,6 @@ class SettingsProvider extends ChangeNotifier {
     }
     if (major == 4 && minor == 6) return true;
     return false;
-  }
-
-  bool _isDeepSeekClaudeCompatible(ProviderConfig cfg, String modelId) {
-    final lowerModelId = modelId.trim().toLowerCase();
-    if (lowerModelId.contains('deepseek')) return true;
-    final baseUrl = cfg.baseUrl.trim().toLowerCase();
-    final providerId = cfg.id.trim().toLowerCase();
-    final providerName = cfg.name.trim().toLowerCase();
-    return baseUrl.contains('api.deepseek.com') ||
-        providerId.contains('deepseek') ||
-        providerName.contains('deepseek');
   }
 
   // Explicitly ensure a provider config exists in memory (without persisting to storage).
@@ -5878,6 +5873,26 @@ class ProviderConfig {
   // Anthropic/OpenRouter Claude prompt caching for stable system prompts.
   final bool? claudePromptCachingEnabled;
   final String? claudePromptCachingTtl;
+
+  /// Whether this config points at DeepSeek, by endpoint host or by the user's
+  /// own naming of the provider.
+  static bool isDeepSeekConfig(ProviderConfig? config) {
+    if (config == null) return false;
+    final host = Uri.tryParse(config.baseUrl.trim())?.host.toLowerCase() ?? '';
+    return host.contains('deepseek.com') ||
+        config.id.trim().toLowerCase().contains('deepseek') ||
+        config.name.trim().toLowerCase().contains('deepseek');
+  }
+
+  /// Whether this config talks to DeepSeek's Claude-compatible endpoint,
+  /// which diverges from Anthropic on thinking/effort handling.
+  static bool isDeepSeekClaudeCompatible(
+    String modelId, {
+    ProviderConfig? config,
+  }) {
+    if (modelId.trim().toLowerCase().contains('deepseek')) return true;
+    return isDeepSeekConfig(config);
+  }
 
   static const String claudePromptCachingTtl5m = '5m';
   static const String claudePromptCachingTtl1h = '1h';

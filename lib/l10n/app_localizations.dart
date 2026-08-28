@@ -6361,12 +6361,6 @@ abstract class AppLocalizations {
   /// **'Built-in tools depend on the provider and API mode.'**
   String get modelDetailSheetBuiltinToolsDescription;
 
-  /// No description provided for @modelDetailSheetBuiltinToolsUnsupportedHint.
-  ///
-  /// In en, this message translates to:
-  /// **'Current provider does not support these built-in tools.'**
-  String get modelDetailSheetBuiltinToolsUnsupportedHint;
-
   /// No description provided for @modelDetailSheetSearchTool.
   ///
   /// In en, this message translates to:
@@ -6421,17 +6415,29 @@ abstract class AppLocalizations {
   /// **'Requires OpenAI Responses API.'**
   String get modelDetailSheetOpenaiBuiltinToolsResponsesOnlyHint;
 
-  /// No description provided for @modelDetailSheetOpenrouterWebFetchTool.
+  /// No description provided for @modelDetailSheetWebFetchTool.
   ///
   /// In en, this message translates to:
   /// **'Web Fetch'**
-  String get modelDetailSheetOpenrouterWebFetchTool;
+  String get modelDetailSheetWebFetchTool;
 
   /// No description provided for @modelDetailSheetOpenrouterWebFetchToolDescription.
   ///
   /// In en, this message translates to:
   /// **'Enable OpenRouter web fetch server tool'**
   String get modelDetailSheetOpenrouterWebFetchToolDescription;
+
+  /// No description provided for @modelDetailSheetClaudeWebFetchToolDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Let Claude fetch pages and PDFs from URLs in the conversation'**
+  String get modelDetailSheetClaudeWebFetchToolDescription;
+
+  /// No description provided for @modelDetailSheetClaudeCodeExecutionToolDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Let Claude run Python and Bash in Anthropic\'s sandbox'**
+  String get modelDetailSheetClaudeCodeExecutionToolDescription;
 
   /// No description provided for @modelDetailSheetOpenrouterShellTool.
   ///
@@ -7978,13 +7984,13 @@ abstract class AppLocalizations {
   /// No description provided for @searchSettingsSheetClaudeDynamicSearchTitle.
   ///
   /// In en, this message translates to:
-  /// **'Built-in Search (New)'**
+  /// **'Dynamic filtering'**
   String get searchSettingsSheetClaudeDynamicSearchTitle;
 
   /// No description provided for @searchSettingsSheetClaudeDynamicSearchDescription.
   ///
   /// In en, this message translates to:
-  /// **'Use `web_search_20260209` with dynamic filtering on supported official Claude models.'**
+  /// **'Filter results to save tokens'**
   String get searchSettingsSheetClaudeDynamicSearchDescription;
 
   /// No description provided for @searchSettingsSheetWebSearchTitle.

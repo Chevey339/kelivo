@@ -438,6 +438,16 @@ IconData _toolIconFor(String name, [Map<String, dynamic> args = const {}]) {
       return Lucide.Earth;
     case 'builtin_search':
       return Lucide.Search;
+    // Provider built-in server tools. These are the names the decoders emit,
+    // not the BuiltInToolNames settings keys, so they stay literals here.
+    case 'web_fetch':
+      return Lucide.Link;
+    case 'code_execution':
+    case 'code_interpreter':
+    case 'text_editor_code_execution':
+      return Lucide.Code;
+    case 'bash_code_execution':
+      return Lucide.Terminal;
     default:
       return Lucide.Wrench;
   }

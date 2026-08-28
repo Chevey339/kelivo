@@ -664,7 +664,7 @@ Stream<StreamChunk> sendGoogleVertexClaudeStream({
         lastStreamResults.add({
           'type': 'tool_result',
           'tool_use_id': tool.id,
-          if (res.isNotEmpty) 'content': res,
+          'content': claudeToolResultContent(res),
         });
       }
     },
@@ -688,7 +688,7 @@ Stream<StreamChunk> sendGoogleVertexClaudeStream({
                 <String, dynamic>{
                   'type': 'tool_result',
                   'tool_use_id': item.call.id,
-                  'content': item.content,
+                  'content': claudeToolResultContent(item.content),
                 },
             ];
       convo = [

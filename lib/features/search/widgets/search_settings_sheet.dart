@@ -89,30 +89,10 @@ class _SearchSettingsSheet extends StatelessWidget {
     required bool enabled,
   }) async {
     final overrides = Map<String, dynamic>.from(providerCfg.modelOverrides);
-    final rawMo = overrides[modelId];
-    final baseMo = rawMo is Map ? rawMo : null;
-    final mo = Map<String, dynamic>.from(
-      baseMo?.map((k, val) => MapEntry(k.toString(), val)) ??
-          const <String, dynamic>{},
+    overrides[modelId] = BuiltInToolsHelper.withClaudeDynamicWebSearch(
+      overrides[modelId],
+      enabled,
     );
-    final rawWs = mo['webSearch'];
-    final ws = Map<String, dynamic>.from(
-      rawWs is Map
-          ? rawWs.map((k, val) => MapEntry(k.toString(), val))
-          : const <String, dynamic>{},
-    );
-    if (enabled) {
-      ws['toolVersion'] = 'web_search_20260209';
-    } else {
-      ws.remove('toolVersion');
-      ws.remove('tool_version');
-    }
-    if (ws.isEmpty) {
-      mo.remove('webSearch');
-    } else {
-      mo['webSearch'] = ws;
-    }
-    overrides[modelId] = mo;
     await settings.setProviderConfig(
       providerKey,
       providerCfg.copyWith(modelOverrides: overrides),
@@ -281,7 +261,9 @@ class _SearchSettingsSheet extends StatelessWidget {
                     },
                   ),
                   const SizedBox(height: 14),
-                  if (supportsClaudeDynamicWebSearch)
+                  // Only meaningful under built-in search: the tool version is
+                  // picked when that tool is added, so on its own it is inert.
+                  if (supportsClaudeDynamicWebSearch && hasBuiltInSearch)
                     Builder(
                       builder: (context) {
                         final providerCfg = cfg;
