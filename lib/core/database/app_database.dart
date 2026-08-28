@@ -3,9 +3,10 @@ import 'dart:isolate';
 
 import 'package:drift/drift.dart';
 import 'package:drift/native.dart';
-import 'package:sqlite3/common.dart' show AllowedArgumentCount;
+import 'package:sqlite3/common.dart' show AllowedArgumentCount, CommonDatabase;
 
 import '../../utils/app_directories.dart';
+import 'schema_versions.dart';
 
 part 'app_database.g.dart';
 
@@ -60,6 +61,12 @@ class ConversationRows extends Table {
       // ignore: recursive_getters
       .check(lastMemoryExtractedOrder.isBiggerOrEqualValue(-1))
       .withDefault(const Constant(-1))();
+  // Per-conversation model override; null means inherit from the assistant,
+  // then from the global default. Declared last so ALTER TABLE ADD COLUMN on a
+  // migrated database yields the same column order as createAll on a fresh one
+  // — ChatDatabaseRepository validates column order exactly.
+  TextColumn get chatModelProvider => text().nullable()();
+  TextColumn get chatModelId => text().nullable()();
 
   @override
   Set<Column<Object>> get primaryKey => {id};
@@ -665,9 +672,23 @@ class AppDatabase extends _$AppDatabase {
 
   static const databaseFileName = 'kelivo.db';
 
-  // Schema 1 is the first published SQLite contract. Every other non-zero
-  // version belongs to an unpublished or future format and is rejected.
-  static const currentSchemaVersion = 1;
+  // Schema 1 is the first published SQLite contract; schema 2 adds the
+  // per-conversation model override. Every version outside
+  // [publishedSchemaVersions] belongs to an unpublished or future format and is
+  // rejected.
+  static const currentSchemaVersion = 2;
+
+  /// Every schema that has ever shipped. A file at any of these can be
+  /// upgraded by `SchemaMigrations`; anything else is rejected outright.
+  static const publishedSchemaVersions = <int>{1, 2};
+
+  /// Whether a live application connection may use a file as-is: either freshly
+  /// created (0) or already at the current schema.
+  ///
+  /// Upgrades never happen implicitly on an ordinary open — they are performed
+  /// only by `SchemaMigrations`, through [upgradeExecutor].
+  static bool acceptsLiveSchema(int userVersion) =>
+      userVersion == 0 || userVersion == currentSchemaVersion;
   // Keep SQLite's established 1000-page cadence explicit. At the usual 4 KiB
   // page size this starts a checkpoint around 4 MiB, but page size remains the
   // source of truth.
@@ -706,9 +727,7 @@ class AppDatabase extends _$AppDatabase {
     return NativeDatabase.createInBackground(
       file,
       setup: (database) {
-        final installedSchema = database.userVersion;
-        if (installedSchema != 0 &&
-            installedSchema != AppDatabase.currentSchemaVersion) {
+        if (!AppDatabase.acceptsLiveSchema(database.userVersion)) {
           throw StateError('database_schema_version');
         }
         // This callback is registered and invoked by SQLite on drift's worker
@@ -732,6 +751,32 @@ class AppDatabase extends _$AppDatabase {
         database.execute('PRAGMA journal_size_limit = $journalSizeLimitBytes;');
       },
     );
+  }
+
+  /// An executor that admits any published schema so drift's migrator can run.
+  ///
+  /// Only `SchemaMigrations` may use this. Every other connection goes through
+  /// [_openExecutor], which rejects a file that is not already current.
+  static QueryExecutor upgradeExecutor(File file) =>
+      NativeDatabase.createInBackground(file, setup: _migrationSetup);
+
+  /// Setup for [upgradeExecutor].
+  ///
+  /// Must stay a capture-free static tear-off: `createInBackground` sends this
+  /// closure to drift's worker isolate.
+  ///
+  /// Deliberately does not set `journal_mode = WAL`. A backup snapshot arrives
+  /// in DELETE mode and has to leave in DELETE mode, and `synchronous = FULL`
+  /// is the right trade for a one-shot structural rewrite.
+  static void _migrationSetup(CommonDatabase database) {
+    final installedSchema = database.userVersion;
+    if (installedSchema != 0 &&
+        !AppDatabase.publishedSchemaVersions.contains(installedSchema)) {
+      throw StateError('database_schema_version');
+    }
+    database.execute('PRAGMA foreign_keys = ON;');
+    database.execute('PRAGMA busy_timeout = $busyTimeoutMillis;');
+    database.execute('PRAGMA synchronous = FULL;');
   }
 
   /// Samples the isolate executing callbacks on the live SQLite connection.
@@ -775,9 +820,22 @@ FROM probe;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
-    onUpgrade: (_, _, _) async {
-      throw StateError('database_schema_version');
-    },
+    // Reachable only through [upgradeExecutor]; every other executor rejects a
+    // non-current file before drift's migrator runs. See SchemaMigrations for
+    // the procedure that adds a version. onDowngrade stays unset so drift's
+    // default (throw) applies.
+    onUpgrade: stepByStep(
+      from1To2: (m, schema) async {
+        await m.addColumn(
+          schema.conversationRows,
+          schema.conversationRows.chatModelProvider,
+        );
+        await m.addColumn(
+          schema.conversationRows,
+          schema.conversationRows.chatModelId,
+        );
+      },
+    ),
     beforeOpen: (details) async {
       await customStatement('PRAGMA foreign_keys = ON;');
       await customStatement('PRAGMA busy_timeout = 5000;');

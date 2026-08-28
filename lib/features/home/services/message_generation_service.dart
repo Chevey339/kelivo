@@ -18,6 +18,7 @@ import '../controllers/generation_controller.dart';
 import 'ask_user_interaction_service.dart';
 import 'message_builder_service.dart';
 import 'tool_approval_service.dart';
+import '../utils/model_display_helper.dart';
 
 /// Callback types for UI updates from MessageGenerationService
 typedef OnMessagesChanged = void Function();
@@ -526,17 +527,17 @@ class MessageGenerationService {
     );
   }
 
-  /// Get current model and provider from assistant or global settings.
+  /// Get the model this conversation sends with: the conversation's own
+  /// override, else the assistant's model, else the global default.
   ({String? providerKey, String? modelId}) getModelConfig(
     SettingsProvider settings,
-    Assistant? assistant,
-  ) {
-    return (
-      providerKey:
-          assistant?.chatModelProvider ?? settings.currentModelProvider,
-      modelId: assistant?.chatModelId ?? settings.currentModelId,
-    );
-  }
+    Assistant? assistant, {
+    Conversation? conversation,
+  }) => resolveChatModel(
+    settings,
+    conversation: conversation,
+    assistant: assistant,
+  );
 
   /// Calculate version info for regeneration.
   ({String? targetGroupId, int nextVersion, int lastKeep})

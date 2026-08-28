@@ -28,6 +28,7 @@ import '../../../shared/widgets/loading_dialog_card.dart';
 import '../../../core/services/backup/cherry_importer.dart';
 import '../../../core/services/backup/chatbox_importer.dart';
 import '../backup_restore_error_message.dart';
+import '../forward_compat_consent_dialog.dart';
 import '../backup_restart_dialog.dart';
 import '../widgets/backup_reminder_helpers.dart';
 import 'package:Kelivo/theme/app_semantic_colors.dart';
@@ -640,6 +641,10 @@ class _BackupPageState extends State<BackupPage> {
                                                   onProgress: handle.report,
                                                   cancelToken:
                                                       handle.cancelToken,
+                                                  onForwardCompatibility:
+                                                      forwardCompatibilityPrompt(
+                                                        context,
+                                                      ),
                                                 ),
                                               );
                                             } catch (e) {
@@ -710,6 +715,10 @@ class _BackupPageState extends State<BackupPage> {
                                           mode: mode,
                                           onProgress: handle.report,
                                           cancelToken: handle.cancelToken,
+                                          onForwardCompatibility:
+                                              forwardCompatibilityPrompt(
+                                                context,
+                                              ),
                                         ),
                                       );
                                     } catch (e) {
@@ -1062,14 +1071,19 @@ class _BackupPageState extends State<BackupPage> {
                                             try {
                                               await _runWithImportingOverlay(
                                                 context,
-                                                (handle) =>
-                                                    s3Vm.restoreFromItem(
-                                                      item,
-                                                      mode: mode,
-                                                      onProgress: handle.report,
-                                                      cancelToken:
-                                                          handle.cancelToken,
-                                                    ),
+                                                (
+                                                  handle,
+                                                ) => s3Vm.restoreFromItem(
+                                                  item,
+                                                  mode: mode,
+                                                  onProgress: handle.report,
+                                                  cancelToken:
+                                                      handle.cancelToken,
+                                                  onForwardCompatibility:
+                                                      forwardCompatibilityPrompt(
+                                                        context,
+                                                      ),
+                                                ),
                                               );
                                             } catch (e) {
                                               if (e
@@ -1138,6 +1152,10 @@ class _BackupPageState extends State<BackupPage> {
                                           mode: mode,
                                           onProgress: handle.report,
                                           cancelToken: handle.cancelToken,
+                                          onForwardCompatibility:
+                                              forwardCompatibilityPrompt(
+                                                context,
+                                              ),
                                         ),
                                       );
                                     } catch (e) {
@@ -1451,6 +1469,15 @@ class _BackupPageState extends State<BackupPage> {
     if (mode == null) return;
     if (!context.mounted) return;
 
+    // Settle the schema question before the progress dialog goes up.
+    final decision = await resolveForwardCompatibility(context, File(path));
+    if (!context.mounted) return;
+    if (decision == ForwardCompatDecision.cancelled) return;
+    if (decision == ForwardCompatDecision.unreadable) {
+      showAppSnackBar(context, message: l10n.backupPageSchemaTooNewMessage);
+      return;
+    }
+
     try {
       await _runWithImportingOverlay(
         context,
@@ -1459,6 +1486,8 @@ class _BackupPageState extends State<BackupPage> {
           mode: mode,
           onProgress: handle.report,
           cancelToken: handle.cancelToken,
+          allowUnverifiedForwardCompatible:
+              decision == ForwardCompatDecision.proceedUnverified,
         ),
       );
     } catch (error) {

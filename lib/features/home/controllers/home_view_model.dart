@@ -1075,6 +1075,26 @@ class HomeViewModel extends ChangeNotifier {
   }
 
   /// Clear context (toggle truncate at tail).
+  /// Sets or clears the current conversation's model override.
+  ///
+  /// Passing null for both makes the conversation follow the assistant again.
+  Future<void> setConversationModel({
+    String? providerKey,
+    String? modelId,
+  }) async {
+    final convo = currentConversation;
+    if (convo == null) return;
+    final updated = await _chatService.setConversationModel(
+      convo.id,
+      providerKey: providerKey,
+      modelId: modelId,
+    );
+    if (updated != null) {
+      _chatController.updateCurrentConversation(updated);
+      notifyListeners();
+    }
+  }
+
   Future<void> clearContext() async {
     final convo = currentConversation;
     if (convo == null) return;

@@ -237,6 +237,7 @@ class _DesktopProvidersBodyState extends State<_DesktopProvidersBody> {
           : () async {
               final l10n = AppLocalizations.of(context)!;
               final ap = context.read<AssistantProvider>();
+              final chatService = context.read<ChatService>();
               final ok = await showDialog<bool>(
                 context: context,
                 builder: (ctx) => AlertDialog(
@@ -268,6 +269,10 @@ class _DesktopProvidersBodyState extends State<_DesktopProvidersBody> {
                     );
                   }
                 }
+                // Conversations can pin a model too.
+                await chatService.clearConversationModelOverrides(
+                  providerKey: item.key,
+                );
               } catch (_) {}
               await settings.removeProviderConfig(item.key);
               if (!mounted) return;
@@ -1199,6 +1204,7 @@ class _DesktopProviderDetailPaneState
                   value: cfg.enabled,
                   onChanged: (v) async {
                     final ap = context.read<AssistantProvider>();
+                    final chatService = context.read<ChatService>();
                     final old = sp.getProviderConfig(
                       widget.providerKey,
                       defaultName: widget.displayName,
@@ -1218,6 +1224,10 @@ class _DesktopProviderDetailPaneState
                             );
                           }
                         }
+                        // Conversations can pin a model too.
+                        await chatService.clearConversationModelOverrides(
+                          providerKey: widget.providerKey,
+                        );
                       } catch (_) {}
                     }
                   },
@@ -4850,6 +4860,7 @@ class _DesktopProviderDetailPaneState
   Future<void> _clearAssistantSelectionsForModels(
     Set<String> modelIds,
     AssistantProvider assistantProvider,
+    ChatService chatService,
   ) async {
     if (modelIds.isEmpty) return;
     try {
@@ -4861,6 +4872,13 @@ class _DesktopProviderDetailPaneState
             assistant.copyWith(clearChatModel: true),
           );
         }
+      }
+      // Conversations can pin a model too.
+      for (final modelId in modelIds) {
+        await chatService.clearConversationModelOverrides(
+          providerKey: widget.providerKey,
+          modelId: modelId,
+        );
       }
     } catch (e, st) {
       FlutterLogger.log(
@@ -4999,11 +5017,16 @@ class _DesktopProviderDetailPaneState
 
     final sp = context.read<SettingsProvider>();
     final assistantProvider = context.read<AssistantProvider>();
+    final chatService = context.read<ChatService>();
     final deletedCount = await sp.deleteModels(
       widget.providerKey,
       modelsToDelete,
     );
-    await _clearAssistantSelectionsForModels(modelsToDelete, assistantProvider);
+    await _clearAssistantSelectionsForModels(
+      modelsToDelete,
+      assistantProvider,
+      chatService,
+    );
     if (!mounted) return;
     setState(() {
       _selectedModels.clear();
@@ -5117,8 +5140,13 @@ class _DesktopProviderDetailPaneState
     if (!mounted) return;
     final modelsToDelete = Set<String>.from(cfg.models);
     final assistantProvider = context.read<AssistantProvider>();
+    final chatService = context.read<ChatService>();
     await sp.deleteModels(widget.providerKey, modelsToDelete);
-    await _clearAssistantSelectionsForModels(modelsToDelete, assistantProvider);
+    await _clearAssistantSelectionsForModels(
+      modelsToDelete,
+      assistantProvider,
+      chatService,
+    );
     if (!mounted) return;
     setState(() {
       _selectedModels.clear();
@@ -7008,6 +7036,7 @@ class _ModelRow extends StatelessWidget {
                 onTap: () async {
                   final sp = context.read<SettingsProvider>();
                   final ap = context.read<AssistantProvider>();
+                  final chatService = context.read<ChatService>();
                   final old = sp.getProviderConfig(providerKey);
                   final list = List<String>.from(old.models)
                     ..removeWhere((e) => e == modelId);
@@ -7026,6 +7055,11 @@ class _ModelRow extends StatelessWidget {
                         );
                       }
                     }
+                    // Conversations can pin a model too.
+                    await chatService.clearConversationModelOverrides(
+                      providerKey: providerKey,
+                      modelId: modelId,
+                    );
                   } catch (_) {}
                 },
               ),

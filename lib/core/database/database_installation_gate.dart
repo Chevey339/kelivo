@@ -79,6 +79,14 @@ final class DatabaseInstallationGate {
     final databaseFile = File(
       p.join(appDataDirectory.path, AppDatabase.databaseFileName),
     );
+    // A crash during a schema upgrade -- or during the rollback from a failed
+    // one -- can leave the pre-migration copy behind. Resolve it before the
+    // migration below writes a fresh one; this may restore the database from
+    // that copy, so it has to run before we decide the database is missing.
+    await _sweepPreMigrationBackups(
+      appDataDirectory,
+      durability: resolvedDurability,
+    );
     final receipts = await _readReceipts(appDataDirectory);
     final databaseType = await FileSystemEntity.type(
       databaseFile.path,
@@ -102,7 +110,10 @@ final class DatabaseInstallationGate {
           await repository.close();
         }
       } else {
-        await ChatDatabaseRepository.migrateInstalledDatabase(databaseFile);
+        await ChatDatabaseRepository.migrateInstalledDatabase(
+          databaseFile,
+          durability: resolvedDurability,
+        );
       }
 
       info = ChatDatabaseRepository.inspectInstalledDatabase(databaseFile);
@@ -306,6 +317,60 @@ final class DatabaseInstallationGate {
       receipts.add((file: file, receipt: receipt));
     }
     return receipts;
+  }
+
+  /// Resolves any pre-migration copy left behind by a crashed schema upgrade.
+  ///
+  /// The copy is only ever deleted once the installed database is confirmed
+  /// usable. If it is not — a crash mid-rollback, when the database had been
+  /// removed but the copy not yet written back — the copy is the only
+  /// surviving good state and is restored instead. Deleting unconditionally
+  /// would turn a recoverable crash into permanent data loss.
+  static Future<void> _sweepPreMigrationBackups(
+    Directory appDataDirectory, {
+    required RestoreDurability durability,
+  }) async {
+    final prefix =
+        '${AppDatabase.databaseFileName}'
+        '${ChatDatabaseRepository.premigrationBackupPrefix}';
+    final backups = <File>[];
+    await for (final entity in appDataDirectory.list(followLinks: false)) {
+      if (entity is! File) continue;
+      if (!p.basename(entity.path).startsWith(prefix)) continue;
+      backups.add(entity);
+    }
+    if (backups.isEmpty) return;
+
+    final databaseFile = File(
+      p.join(appDataDirectory.path, AppDatabase.databaseFileName),
+    );
+    switch (ChatDatabaseRepository.classifyInstalledDatabase(databaseFile)) {
+      case InstalledDatabaseDisposition.usable:
+        for (final backup in backups) {
+          await backup.delete();
+        }
+        await durability.syncDirectory(appDataDirectory, fullBarrier: true);
+
+      case InstalledDatabaseDisposition.foreignSchema:
+        // A newer build migrated this database and left its copy behind, and
+        // we are the downgrade. The database on disk is strictly ahead of the
+        // copy, so touching either would destroy data; leave both and let the
+        // gate below ask the user to update.
+        return;
+
+      case InstalledDatabaseDisposition.unusable:
+        // More than one copy means we cannot tell which state to return to.
+        // Failing closed keeps every candidate on disk for the recovery UI
+        // rather than guessing and destroying the rest.
+        if (backups.length != 1) {
+          throw StateError('database_premigration_ambiguous');
+        }
+        await ChatDatabaseRepository.restorePreMigrationBackup(
+          backup: backups.single,
+          target: databaseFile,
+          durability: durability,
+        );
+    }
   }
 
   static Future<void> _removeStaleReceipts(

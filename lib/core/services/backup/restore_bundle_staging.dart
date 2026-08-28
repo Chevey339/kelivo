@@ -10,6 +10,7 @@ import 'package:flutter/foundation.dart';
 import 'package:path/path.dart' as p;
 
 import '../../database/app_database.dart';
+import '../../database/schema_migrations.dart';
 import '../../database/business_repository.dart';
 import '../../database/business_restore_service.dart';
 import '../../database/chat_database_repository.dart';
@@ -63,6 +64,11 @@ final class RestoreBundleStaging {
   static const workspaceRootName = RestoreWorkspaceLock.workspaceRootName;
   static const _backupFormat = 'kelivo-backup';
   static const _backupFormatVersion = 2;
+
+  /// Mirrors DataSync's constant of the same name. Duplicated rather than
+  /// imported, as _backupFormatVersion above already is, because DataSync
+  /// depends on this file.
+  static const _minimumReadableFormatKey = 'minimumReadableFormatVersion';
   static const _assetRoots = ['upload', 'images', 'avatars', 'fonts'];
   static const _databaseEntry = 'database/kelivo.db';
   static const _maximumManifestBytes = 16 * 1024 * 1024;
@@ -300,6 +306,11 @@ final class RestoreBundleStaging {
       manifest['includeFiles'] = includeFiles;
       manifest.remove('secretsIncluded');
       manifest.remove('businessEntityRowIds');
+      // A forward-compatibility declaration describes the SOURCE archive. The
+      // candidate is only ever read back by this same build, so it carries no
+      // declaration -- matching how the database block below is rebuilt rather
+      // than copied.
+      manifest.remove(_minimumReadableFormatKey);
       manifest['database'] = {
         'entry': _databaseEntry,
         'schemaVersion': databaseInfo.schemaVersion,
@@ -455,6 +466,7 @@ final class RestoreBundleStaging {
       manifest['database'],
       includeChats: true,
       payloadKind: 'sqlite',
+      requireCurrentSchema: true,
     );
 
     return ValidatedRestoreCandidate(
@@ -990,9 +1002,27 @@ final class RestoreBundleStaging {
       }
     }
     final databaseFile = File(args.databasePath);
+    // A backup authored by an older build carries an older schema. Bring the
+    // staged copy forward first: everything below — the snapshot validators,
+    // the business overwrite, the candidate manifest — only ever describes the
+    // current schema. The staged copy is disposable and the source archive is
+    // itself the backup, so no extra copy is taken.
+    final stagedSchemaVersion = SchemaMigrations.readSchemaVersion(
+      databaseFile,
+    );
+    if (SchemaMigrations.needsUpgrade(stagedSchemaVersion)) {
+      await SchemaMigrations.upgradeFileInPlace(databaseFile);
+      await ChatDatabaseRepository.normalizeSnapshotJournal(databaseFile);
+    }
     final sourceDatabaseInfo =
         await ChatDatabaseRepository.inspectPreparedSnapshot(databaseFile);
-    if (sourceDatabaseInfo != args.expectedDatabaseInfo) {
+    // The declared info records the schema the backup was AUTHORED at, which
+    // legitimately differs from the migrated one. Row counts are the invariant:
+    // a migration must never add or drop rows.
+    if (sourceDatabaseInfo.conversationCount !=
+            args.expectedDatabaseInfo.conversationCount ||
+        sourceDatabaseInfo.messageCount !=
+            args.expectedDatabaseInfo.messageCount) {
       throw const FormatException('restore_staging_database');
     }
     final database = AppDatabase.open(file: databaseFile);
@@ -1055,10 +1085,17 @@ final class RestoreBundleStaging {
     return Map<String, Object?>.unmodifiable(result);
   }
 
+  /// Parses a manifest's `database` block.
+  ///
+  /// [requireCurrentSchema] separates the two manifests this handles: a source
+  /// manifest records the schema the backup was AUTHORED at, which may be any
+  /// published version, while a staged candidate's manifest is written after
+  /// the snapshot was migrated and must record the current schema exactly.
   static ChatDatabaseSnapshotInfo? _parseDatabaseInfo(
     dynamic rawDatabase, {
     required bool includeChats,
     required String payloadKind,
+    bool requireCurrentSchema = false,
   }) {
     if (!includeChats) {
       if (payloadKind != 'settings-only' || rawDatabase != null) {
@@ -1081,11 +1118,20 @@ final class RestoreBundleStaging {
     final schemaVersion = database['schemaVersion'];
     final conversationCount = database['conversationCount'];
     final messageCount = database['messageCount'];
-    if (database.length != expectedKeys.length ||
-        !database.keys.toSet().containsAll(expectedKeys) ||
+    // A source manifest may also carry the forward-compatibility declaration;
+    // the staged candidate never needs it, because it is only ever read back
+    // by this same build.
+    const optionalKeys = {SchemaMigrations.minimumReadableManifestKey};
+    final presentKeys = database.keys.toSet();
+    if (!presentKeys.containsAll(expectedKeys) ||
+        !presentKeys.difference(expectedKeys).every(optionalKeys.contains) ||
         database['entry'] != _databaseEntry ||
         schemaVersion is! int ||
-        schemaVersion < 0 ||
+        // A source manifest can legitimately name a schema this build has
+        // never heard of; only the staged candidate must be current.
+        (requireCurrentSchema
+            ? schemaVersion != AppDatabase.currentSchemaVersion
+            : schemaVersion < 1) ||
         conversationCount is! int ||
         conversationCount < 0 ||
         messageCount is! int ||

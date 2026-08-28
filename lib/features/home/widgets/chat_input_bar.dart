@@ -92,6 +92,8 @@ class _ImageProcessingTask {
 class ChatInputBar extends StatefulWidget {
   const ChatInputBar({
     super.key,
+    this.chatModelProviderKey,
+    this.chatModelId,
     this.onSend,
     this.onStop,
     this.onSelectModel,
@@ -188,6 +190,11 @@ class ChatInputBar extends StatefulWidget {
   final bool ocrActive;
   final VoidCallback? onToggleOcr;
   final String? conversationId;
+
+  /// The model this conversation sends with, already resolved through
+  /// conversation override -> assistant -> global default.
+  final String? chatModelProviderKey;
+  final String? chatModelId;
   final String? sendButtonTooltip;
   final bool backgroundImageActive;
   final double inputBackgroundOpacityLight;
@@ -279,10 +286,8 @@ class _ChatInputBarState extends State<ChatInputBar>
 
   bool _supportsImagesApiRouting(BuildContext context) {
     final settings = context.watch<SettingsProvider>();
-    final ap = context.watch<AssistantProvider>();
-    final a = ap.currentAssistant;
-    final providerKey = a?.chatModelProvider ?? settings.currentModelProvider;
-    final modelId = a?.chatModelId ?? settings.currentModelId;
+    final providerKey = widget.chatModelProviderKey;
+    final modelId = widget.chatModelId;
     if (providerKey == null || modelId == null) {
       _imageModeModelKey = null;
       return false;
@@ -1777,10 +1782,8 @@ class _ChatInputBarState extends State<ChatInputBar>
         // Search button (stateful icon depending on provider config)
         final settings = context.watch<SettingsProvider>();
         final ap = context.watch<AssistantProvider>();
-        final a = ap.currentAssistant;
-        final currentProviderKey =
-            a?.chatModelProvider ?? settings.currentModelProvider;
-        final currentModelId = a?.chatModelId ?? settings.currentModelId;
+        final currentProviderKey = widget.chatModelProviderKey;
+        final currentModelId = widget.chatModelId;
         final cfg = (currentProviderKey != null)
             ? settings.getProviderConfig(currentProviderKey)
             : null;

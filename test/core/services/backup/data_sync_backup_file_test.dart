@@ -16,6 +16,7 @@ import 'package:Kelivo/core/database/business_preferences.dart';
 import 'package:Kelivo/core/database/business_repository.dart';
 import 'package:Kelivo/core/database/business_restore_service.dart';
 import 'package:Kelivo/core/database/chat_database_repository.dart';
+import 'package:Kelivo/core/database/schema_migrations.dart';
 import 'package:Kelivo/core/models/backup.dart';
 import 'package:Kelivo/core/models/chat_message.dart';
 import 'package:Kelivo/core/models/conversation.dart';
@@ -276,6 +277,13 @@ Future<File> _createSqliteBackupFixture({
   bool includeFiles = false,
   String? assetContent,
   Object? businessEntityRowIds,
+  int? schemaVersionOverride,
+  int? minimumReadableOverride,
+  Map<String, String> extraEntries = const {},
+  Map<String, Object> extraManifestFields = const {},
+  Map<String, Object> extraManifestDatabaseFields = const {},
+  int? formatVersionOverride,
+  int? minimumReadableFormatOverride,
 }) async {
   if (assetContent != null && !includeFiles) {
     throw ArgumentError.value(assetContent, 'assetContent');
@@ -337,11 +345,23 @@ Future<File> _createSqliteBackupFixture({
         'sha256': await _fileSha256(assetFile),
       },
   };
+  final extraFiles = <String, File>{};
+  for (final extra in extraEntries.entries) {
+    final file = File('${root.path}/${prefix}_extra_${extraFiles.length}.bin');
+    await file.writeAsString(extra.value, flush: true);
+    extraFiles[extra.key] = file;
+    entries[extra.key] = {
+      'bytes': await file.length(),
+      'sha256': await _fileSha256(file),
+    };
+  }
   final manifestFile = File('${root.path}/${prefix}_manifest.json');
   await manifestFile.writeAsString(
     jsonEncode({
       'format': 'kelivo-backup',
-      'formatVersion': 2,
+      'formatVersion': formatVersionOverride ?? 2,
+      if (minimumReadableFormatOverride != null)
+        'minimumReadableFormatVersion': minimumReadableFormatOverride,
       'payloadKind': 'sqlite',
       'createdAtUtc': '2026-07-09T00:00:00.000Z',
       'appVersion': '1.0.0-test+1',
@@ -350,9 +370,13 @@ Future<File> _createSqliteBackupFixture({
       'secretsIncluded': secretsIncluded,
       if (businessEntityRowIds != null)
         'businessEntityRowIds': businessEntityRowIds,
+      ...extraManifestFields,
       'database': {
+        ...extraManifestDatabaseFields,
         'entry': 'database/kelivo.db',
-        'schemaVersion': snapshotInfo.schemaVersion,
+        'schemaVersion': schemaVersionOverride ?? snapshotInfo.schemaVersion,
+        if (minimumReadableOverride != null)
+          SchemaMigrations.minimumReadableManifestKey: minimumReadableOverride,
         'conversationCount': snapshotInfo.conversationCount,
         'messageCount': snapshotInfo.messageCount,
       },
@@ -367,6 +391,9 @@ Future<File> _createSqliteBackupFixture({
   encoder.addFileSync(databaseFile, 'database/kelivo.db');
   if (assetFile != null) {
     encoder.addFileSync(assetFile, 'upload/fixture.txt');
+  }
+  for (final extra in extraFiles.entries) {
+    encoder.addFileSync(extra.value, extra.key);
   }
   encoder.closeSync();
   return zipFile;
@@ -1582,6 +1609,334 @@ void main() {
         chatService.getGeminiThoughtSignature('restored-message'),
         'signature',
       );
+    });
+
+    test('ignores unknown archive entries from a newer build', () async {
+      final zipFile = await _createSqliteBackupFixture(
+        root: root,
+        prefix: 'forward_extra_entry',
+        settings: const {},
+        schemaVersionOverride: AppDatabase.currentSchemaVersion + 1,
+        extraEntries: const {
+          'future/thing.bin': 'something this build knows nothing about',
+        },
+      );
+      final chatService = ChatService();
+
+      await DataSync(
+        businessRepository: businessRepository,
+        chatService: chatService,
+      ).restoreFromLocalFile(
+        zipFile,
+        const WebDavConfig(includeChats: true, includeFiles: false),
+        allowUnverifiedForwardCompatible: true,
+      );
+
+      // Dropped from the staged candidate rather than carried into app data:
+      // the archive-level counterpart of the unknown tables and columns the
+      // database normalizer strips.
+      final runDirectory = await _singleRestoreRunDirectory(root);
+      final candidateManifest =
+          jsonDecode(
+                await File(
+                  '${runDirectory.path}/candidate/manifest.json',
+                ).readAsString(),
+              )
+              as Map<String, dynamic>;
+      expect(
+        (candidateManifest['entries'] as Map).keys,
+        isNot(contains('future/thing.bin')),
+      );
+      expect(await Directory('${root.path}/future').exists(), isFalse);
+    });
+
+    test('rejects unknown archive entries from a same-version build', () async {
+      // Nothing vouches for these, and no newer build wrote them: the archive
+      // is simply malformed.
+      final zipFile = await _createSqliteBackupFixture(
+        root: root,
+        prefix: 'same_version_extra_entry',
+        settings: const {},
+        extraEntries: const {'future/thing.bin': 'unexpected'},
+      );
+
+      await expectLater(
+        DataSync(
+          businessRepository: businessRepository,
+          chatService: ChatService(),
+        ).restoreFromLocalFile(
+          zipFile,
+          const WebDavConfig(includeChats: true, includeFiles: false),
+        ),
+        throwsA(
+          isA<FormatException>().having(
+            (e) => e.message,
+            'message',
+            'manifest_entry_scope:future/thing.bin',
+          ),
+        ),
+      );
+    });
+
+    test('ignores unknown manifest fields from a newer build', () async {
+      // The archive-entry counterpart is covered above; this is the metadata
+      // one. Every validator downstream is single-version -- RestoreBundleStaging
+      // checks the manifest's root key set exactly -- so an unrecognised field
+      // has to be dropped in the preflight or the restore fails after the user
+      // already consented to it.
+      final zipFile = await _createSqliteBackupFixture(
+        root: root,
+        prefix: 'forward_extra_manifest_field',
+        settings: const {},
+        schemaVersionOverride: AppDatabase.currentSchemaVersion + 1,
+        extraManifestFields: const {'futureTopLevel': 'ignored'},
+        extraManifestDatabaseFields: const {'codecVersion': 2},
+      );
+      final chatService = ChatService();
+
+      await DataSync(
+        businessRepository: businessRepository,
+        chatService: chatService,
+      ).restoreFromLocalFile(
+        zipFile,
+        const WebDavConfig(includeChats: true, includeFiles: false),
+        allowUnverifiedForwardCompatible: true,
+      );
+
+      final runDirectory = await _singleRestoreRunDirectory(root);
+      final candidateManifest =
+          jsonDecode(
+                await File(
+                  '${runDirectory.path}/candidate/manifest.json',
+                ).readAsString(),
+              )
+              as Map<String, dynamic>;
+      expect(candidateManifest.keys, isNot(contains('futureTopLevel')));
+      expect(
+        (candidateManifest['database'] as Map).keys,
+        isNot(contains('codecVersion')),
+      );
+    });
+
+    test('rejects unknown manifest fields from a same-version build', () async {
+      final zipFile = await _createSqliteBackupFixture(
+        root: root,
+        prefix: 'same_version_extra_manifest_field',
+        settings: const {},
+        extraManifestDatabaseFields: const {'codecVersion': 2},
+      );
+
+      await expectLater(
+        DataSync(
+          businessRepository: businessRepository,
+          chatService: ChatService(),
+        ).restoreFromLocalFile(
+          zipFile,
+          const WebDavConfig(includeChats: true, includeFiles: false),
+        ),
+        throwsA(
+          isA<FormatException>().having(
+            (e) => e.message,
+            'message',
+            'restore_staging_database',
+          ),
+        ),
+      );
+    });
+
+    test('accepts a newer archive format that vouches for this build', () async {
+      // The archive format and the database schema move independently: a newer
+      // build can add an ignorable directory without touching the schema at
+      // all. Keying tolerance to the schema alone would reject this.
+      final zipFile = await _createSqliteBackupFixture(
+        root: root,
+        prefix: 'forward_format_only',
+        settings: const {},
+        formatVersionOverride: 3,
+        minimumReadableFormatOverride: 2,
+        extraEntries: const {'stickers/future.bin': 'ignorable'},
+        extraManifestFields: const {'futureTopLevel': 'ignored'},
+      );
+      final chatService = ChatService();
+
+      await DataSync(
+        businessRepository: businessRepository,
+        chatService: chatService,
+      ).restoreFromLocalFile(
+        zipFile,
+        const WebDavConfig(includeChats: true, includeFiles: false),
+      );
+
+      final runDirectory = await _singleRestoreRunDirectory(root);
+      final candidateManifest =
+          jsonDecode(
+                await File(
+                  '${runDirectory.path}/candidate/manifest.json',
+                ).readAsString(),
+              )
+              as Map<String, dynamic>;
+      // Reduced to this build's format, so the staged candidate is an ordinary
+      // one that the single-version validators accept unchanged.
+      expect(candidateManifest['formatVersion'], 2);
+      expect(candidateManifest.keys, isNot(contains('futureTopLevel')));
+      expect(
+        candidateManifest.keys,
+        isNot(contains('minimumReadableFormatVersion')),
+      );
+      expect(
+        (candidateManifest['entries'] as Map).keys,
+        isNot(contains('stickers/future.bin')),
+      );
+      expect(await Directory('${root.path}/stickers').exists(), isFalse);
+    });
+
+    test('refuses a newer archive format that vouches for nothing', () async {
+      final zipFile = await _createSqliteBackupFixture(
+        root: root,
+        prefix: 'forward_format_undeclared',
+        settings: const {},
+        formatVersionOverride: 3,
+      );
+
+      await expectLater(
+        DataSync(
+          businessRepository: businessRepository,
+          chatService: ChatService(),
+        ).restoreFromLocalFile(
+          zipFile,
+          const WebDavConfig(includeChats: true, includeFiles: false),
+        ),
+        throwsA(
+          isA<FormatException>().having(
+            (e) => e.message,
+            'message',
+            'manifest_version',
+          ),
+        ),
+      );
+    });
+
+    test('refuses a newer archive format that demands a newer build', () async {
+      final zipFile = await _createSqliteBackupFixture(
+        root: root,
+        prefix: 'forward_format_too_new',
+        settings: const {},
+        formatVersionOverride: 3,
+        minimumReadableFormatOverride: 3,
+      );
+
+      await expectLater(
+        DataSync(
+          businessRepository: businessRepository,
+          chatService: ChatService(),
+        ).restoreFromLocalFile(
+          zipFile,
+          const WebDavConfig(includeChats: true, includeFiles: false),
+        ),
+        throwsA(
+          isA<FormatException>().having(
+            (e) => e.message,
+            'message',
+            'manifest_version',
+          ),
+        ),
+      );
+    });
+
+    test('every backup this build writes declares its readers', () async {
+      // Without this the whole mechanism is inert: a future build has nothing
+      // to check against and must refuse today's archives.
+      final zipFile =
+          await DataSync(
+            businessRepository: businessRepository,
+            chatService: ChatService(),
+          ).exportToFile(
+            const WebDavConfig(includeChats: false, includeFiles: false),
+          );
+      final archive = ZipDecoder().decodeBytes(await zipFile.readAsBytes());
+      final manifest =
+          jsonDecode(
+                utf8.decode(
+                  archive.findFile('manifest.json')!.content as List<int>,
+                ),
+              )
+              as Map<String, dynamic>;
+
+      expect(manifest['formatVersion'], 2);
+      expect(manifest['minimumReadableFormatVersion'], 2);
+      expect(
+        manifest['minimumReadableFormatVersion'],
+        lessThanOrEqualTo(manifest['formatVersion'] as int),
+        reason:
+            'declaring a minimum above our own version tells every future '
+            'build we are unreadable',
+      );
+    });
+
+    test('accepts a newer settings-only backup with unknown entries', () async {
+      // A settings-only backup carries no database block at all, so a
+      // schema-version comparison can never recognise it as newer. Only the
+      // archive format can.
+      final settingsFile = File('${root.path}/future_settings_only.json');
+      await settingsFile.writeAsString(
+        jsonEncode({'preserved_setting': 'imported'}),
+        flush: true,
+      );
+      final extraFile = File('${root.path}/future_settings_only_extra.bin');
+      await extraFile.writeAsString('ignorable', flush: true);
+      final manifestFile = File('${root.path}/future_settings_only_man.json');
+      await manifestFile.writeAsString(
+        jsonEncode({
+          'format': 'kelivo-backup',
+          'formatVersion': 3,
+          'minimumReadableFormatVersion': 2,
+          'payloadKind': 'settings-only',
+          'createdAtUtc': '2026-07-09T00:00:00.000Z',
+          'appVersion': 'future',
+          'includeChats': false,
+          'includeFiles': false,
+          'secretsIncluded': true,
+          'entries': {
+            'settings.json': {
+              'bytes': await settingsFile.length(),
+              'sha256': await _fileSha256(settingsFile),
+            },
+            'stickers/future.bin': {
+              'bytes': await extraFile.length(),
+              'sha256': await _fileSha256(extraFile),
+            },
+          },
+        }),
+        flush: true,
+      );
+      final zipFile = File('${root.path}/future_settings_only.zip');
+      final encoder = ZipFileEncoder();
+      encoder.create(zipFile.path);
+      encoder.addFileSync(manifestFile, 'manifest.json');
+      encoder.addFileSync(settingsFile, 'settings.json');
+      encoder.addFileSync(extraFile, 'stickers/future.bin');
+      encoder.closeSync();
+
+      await BusinessRestoreService(
+        businessRepository,
+      ).overwrite({'preserved_setting': 'local'});
+      final chatService = ChatService();
+      await chatService.init();
+      addTearDown(chatService.close);
+
+      await DataSync(
+        businessRepository: businessRepository,
+        chatService: chatService,
+      ).restoreFromLocalFile(
+        zipFile,
+        const WebDavConfig(includeChats: false, includeFiles: false),
+      );
+
+      final restored = await BusinessRestoreService(
+        businessRepository,
+      ).exportSettings();
+      expect(restored['preserved_setting'], 'imported');
+      expect(await Directory('${root.path}/stickers').exists(), isFalse);
     });
 
     test('retains a prepared SQLite candidate under app data', () async {

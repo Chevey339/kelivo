@@ -2,6 +2,8 @@ import 'dart:io';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+
+import '../../features/backup/forward_compat_consent_dialog.dart';
 import 'package:provider/provider.dart';
 
 import '../../icons/lucide_adapter.dart' as lucide;
@@ -501,22 +503,22 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
                                             onProgress: handle.report,
                                             cancelToken: handle.cancelToken,
                                           ),
-                                      restoreFromItem:
-                                          (it, mode, handle) async {
-                                            await backupProvider
-                                                .restoreFromItem(
-                                                  it,
-                                                  mode: mode,
-                                                  onProgress: handle.report,
-                                                  cancelToken:
-                                                      handle.cancelToken,
-                                                );
-                                            final msg = backupProvider.message;
-                                            if (msg != null &&
-                                                msg != 'Restored') {
-                                              throw Exception(msg);
-                                            }
-                                          },
+                                      restoreFromItem: (it, mode, handle) async {
+                                        await backupProvider.restoreFromItem(
+                                          it,
+                                          mode: mode,
+                                          onProgress: handle.report,
+                                          cancelToken: handle.cancelToken,
+                                          onForwardCompatibility:
+                                              forwardCompatibilityPrompt(
+                                                context,
+                                              ),
+                                        );
+                                        final msg = backupProvider.message;
+                                        if (msg != null && msg != 'Restored') {
+                                          throw Exception(msg);
+                                        }
+                                      },
                                       skippedConversations: () =>
                                           backupProvider.skippedConversations,
                                       deleteAndReload:
@@ -790,23 +792,22 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
                                             onProgress: handle.report,
                                             cancelToken: handle.cancelToken,
                                           ),
-                                      restoreFromItem:
-                                          (it, mode, handle) async {
-                                            await s3BackupProvider
-                                                .restoreFromItem(
-                                                  it,
-                                                  mode: mode,
-                                                  onProgress: handle.report,
-                                                  cancelToken:
-                                                      handle.cancelToken,
-                                                );
-                                            final msg =
-                                                s3BackupProvider.message;
-                                            if (msg != null &&
-                                                msg != 'Restored') {
-                                              throw Exception(msg);
-                                            }
-                                          },
+                                      restoreFromItem: (it, mode, handle) async {
+                                        await s3BackupProvider.restoreFromItem(
+                                          it,
+                                          mode: mode,
+                                          onProgress: handle.report,
+                                          cancelToken: handle.cancelToken,
+                                          onForwardCompatibility:
+                                              forwardCompatibilityPrompt(
+                                                context,
+                                              ),
+                                        );
+                                        final msg = s3BackupProvider.message;
+                                        if (msg != null && msg != 'Restored') {
+                                          throw Exception(msg);
+                                        }
+                                      },
                                       skippedConversations: () =>
                                           s3BackupProvider.skippedConversations,
                                       deleteAndReload:
@@ -965,13 +966,31 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
                   );
                   final path = result?.files.single.path;
                   if (path == null) return;
+                  if (!context.mounted) return;
                   final f = File(path);
+                  // Settle the schema question before the progress dialog
+                  // goes up.
+                  final decision = await resolveForwardCompatibility(
+                    context,
+                    f,
+                  );
+                  if (!context.mounted) return;
+                  if (decision == ForwardCompatDecision.cancelled) return;
+                  if (decision == ForwardCompatDecision.unreadable) {
+                    showAppSnackBar(
+                      context,
+                      message: l10n.backupPageSchemaTooNewMessage,
+                    );
+                    return;
+                  }
                   await _chooseRestoreModeAndRun((mode, handle) async {
                     await backupProvider.restoreFromLocalFile(
                       f,
                       mode: mode,
                       onProgress: handle.report,
                       cancelToken: handle.cancelToken,
+                      allowUnverifiedForwardCompatible:
+                          decision == ForwardCompatDecision.proceedUnverified,
                     );
                   });
                 },

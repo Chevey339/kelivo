@@ -158,6 +158,29 @@ class $ConversationRowsTable extends ConversationRows
         requiredDuringInsert: false,
         defaultValue: const Constant(-1),
       );
+  static const VerificationMeta _chatModelProviderMeta = const VerificationMeta(
+    'chatModelProvider',
+  );
+  @override
+  late final GeneratedColumn<String> chatModelProvider =
+      GeneratedColumn<String>(
+        'chat_model_provider',
+        aliasedName,
+        true,
+        type: DriftSqlType.string,
+        requiredDuringInsert: false,
+      );
+  static const VerificationMeta _chatModelIdMeta = const VerificationMeta(
+    'chatModelId',
+  );
+  @override
+  late final GeneratedColumn<String> chatModelId = GeneratedColumn<String>(
+    'chat_model_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -173,6 +196,8 @@ class $ConversationRowsTable extends ConversationRows
     chatSuggestionsJson,
     injectedMemoryHash,
     lastMemoryExtractedOrder,
+    chatModelProvider,
+    chatModelId,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -274,6 +299,24 @@ class $ConversationRowsTable extends ConversationRows
         ),
       );
     }
+    if (data.containsKey('chat_model_provider')) {
+      context.handle(
+        _chatModelProviderMeta,
+        chatModelProvider.isAcceptableOrUnknown(
+          data['chat_model_provider']!,
+          _chatModelProviderMeta,
+        ),
+      );
+    }
+    if (data.containsKey('chat_model_id')) {
+      context.handle(
+        _chatModelIdMeta,
+        chatModelId.isAcceptableOrUnknown(
+          data['chat_model_id']!,
+          _chatModelIdMeta,
+        ),
+      );
+    }
     return context;
   }
 
@@ -339,6 +382,14 @@ class $ConversationRowsTable extends ConversationRows
         DriftSqlType.int,
         data['${effectivePrefix}last_memory_extracted_order'],
       )!,
+      chatModelProvider: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}chat_model_provider'],
+      ),
+      chatModelId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}chat_model_id'],
+      ),
     );
   }
 
@@ -367,6 +418,8 @@ class ConversationRow extends DataClass implements Insertable<ConversationRow> {
   final String chatSuggestionsJson;
   final String? injectedMemoryHash;
   final int lastMemoryExtractedOrder;
+  final String? chatModelProvider;
+  final String? chatModelId;
   const ConversationRow({
     required this.id,
     required this.title,
@@ -381,6 +434,8 @@ class ConversationRow extends DataClass implements Insertable<ConversationRow> {
     required this.chatSuggestionsJson,
     this.injectedMemoryHash,
     required this.lastMemoryExtractedOrder,
+    this.chatModelProvider,
+    this.chatModelId,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -416,6 +471,12 @@ class ConversationRow extends DataClass implements Insertable<ConversationRow> {
     map['last_memory_extracted_order'] = Variable<int>(
       lastMemoryExtractedOrder,
     );
+    if (!nullToAbsent || chatModelProvider != null) {
+      map['chat_model_provider'] = Variable<String>(chatModelProvider);
+    }
+    if (!nullToAbsent || chatModelId != null) {
+      map['chat_model_id'] = Variable<String>(chatModelId);
+    }
     return map;
   }
 
@@ -440,6 +501,12 @@ class ConversationRow extends DataClass implements Insertable<ConversationRow> {
           ? const Value.absent()
           : Value(injectedMemoryHash),
       lastMemoryExtractedOrder: Value(lastMemoryExtractedOrder),
+      chatModelProvider: chatModelProvider == null && nullToAbsent
+          ? const Value.absent()
+          : Value(chatModelProvider),
+      chatModelId: chatModelId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(chatModelId),
     );
   }
 
@@ -472,6 +539,10 @@ class ConversationRow extends DataClass implements Insertable<ConversationRow> {
       lastMemoryExtractedOrder: serializer.fromJson<int>(
         json['lastMemoryExtractedOrder'],
       ),
+      chatModelProvider: serializer.fromJson<String?>(
+        json['chatModelProvider'],
+      ),
+      chatModelId: serializer.fromJson<String?>(json['chatModelId']),
     );
   }
   @override
@@ -495,6 +566,8 @@ class ConversationRow extends DataClass implements Insertable<ConversationRow> {
       'lastMemoryExtractedOrder': serializer.toJson<int>(
         lastMemoryExtractedOrder,
       ),
+      'chatModelProvider': serializer.toJson<String?>(chatModelProvider),
+      'chatModelId': serializer.toJson<String?>(chatModelId),
     };
   }
 
@@ -512,6 +585,8 @@ class ConversationRow extends DataClass implements Insertable<ConversationRow> {
     String? chatSuggestionsJson,
     Value<String?> injectedMemoryHash = const Value.absent(),
     int? lastMemoryExtractedOrder,
+    Value<String?> chatModelProvider = const Value.absent(),
+    Value<String?> chatModelId = const Value.absent(),
   }) => ConversationRow(
     id: id ?? this.id,
     title: title ?? this.title,
@@ -530,6 +605,10 @@ class ConversationRow extends DataClass implements Insertable<ConversationRow> {
         : this.injectedMemoryHash,
     lastMemoryExtractedOrder:
         lastMemoryExtractedOrder ?? this.lastMemoryExtractedOrder,
+    chatModelProvider: chatModelProvider.present
+        ? chatModelProvider.value
+        : this.chatModelProvider,
+    chatModelId: chatModelId.present ? chatModelId.value : this.chatModelId,
   );
   ConversationRow copyWithCompanion(ConversationRowsCompanion data) {
     return ConversationRow(
@@ -560,6 +639,12 @@ class ConversationRow extends DataClass implements Insertable<ConversationRow> {
       lastMemoryExtractedOrder: data.lastMemoryExtractedOrder.present
           ? data.lastMemoryExtractedOrder.value
           : this.lastMemoryExtractedOrder,
+      chatModelProvider: data.chatModelProvider.present
+          ? data.chatModelProvider.value
+          : this.chatModelProvider,
+      chatModelId: data.chatModelId.present
+          ? data.chatModelId.value
+          : this.chatModelId,
     );
   }
 
@@ -578,7 +663,9 @@ class ConversationRow extends DataClass implements Insertable<ConversationRow> {
           ..write('lastSummarizedMessageCount: $lastSummarizedMessageCount, ')
           ..write('chatSuggestionsJson: $chatSuggestionsJson, ')
           ..write('injectedMemoryHash: $injectedMemoryHash, ')
-          ..write('lastMemoryExtractedOrder: $lastMemoryExtractedOrder')
+          ..write('lastMemoryExtractedOrder: $lastMemoryExtractedOrder, ')
+          ..write('chatModelProvider: $chatModelProvider, ')
+          ..write('chatModelId: $chatModelId')
           ..write(')'))
         .toString();
   }
@@ -598,6 +685,8 @@ class ConversationRow extends DataClass implements Insertable<ConversationRow> {
     chatSuggestionsJson,
     injectedMemoryHash,
     lastMemoryExtractedOrder,
+    chatModelProvider,
+    chatModelId,
   );
   @override
   bool operator ==(Object other) =>
@@ -615,7 +704,9 @@ class ConversationRow extends DataClass implements Insertable<ConversationRow> {
           other.lastSummarizedMessageCount == this.lastSummarizedMessageCount &&
           other.chatSuggestionsJson == this.chatSuggestionsJson &&
           other.injectedMemoryHash == this.injectedMemoryHash &&
-          other.lastMemoryExtractedOrder == this.lastMemoryExtractedOrder);
+          other.lastMemoryExtractedOrder == this.lastMemoryExtractedOrder &&
+          other.chatModelProvider == this.chatModelProvider &&
+          other.chatModelId == this.chatModelId);
 }
 
 class ConversationRowsCompanion extends UpdateCompanion<ConversationRow> {
@@ -632,6 +723,8 @@ class ConversationRowsCompanion extends UpdateCompanion<ConversationRow> {
   final Value<String> chatSuggestionsJson;
   final Value<String?> injectedMemoryHash;
   final Value<int> lastMemoryExtractedOrder;
+  final Value<String?> chatModelProvider;
+  final Value<String?> chatModelId;
   final Value<int> rowid;
   const ConversationRowsCompanion({
     this.id = const Value.absent(),
@@ -647,6 +740,8 @@ class ConversationRowsCompanion extends UpdateCompanion<ConversationRow> {
     this.chatSuggestionsJson = const Value.absent(),
     this.injectedMemoryHash = const Value.absent(),
     this.lastMemoryExtractedOrder = const Value.absent(),
+    this.chatModelProvider = const Value.absent(),
+    this.chatModelId = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   ConversationRowsCompanion.insert({
@@ -663,6 +758,8 @@ class ConversationRowsCompanion extends UpdateCompanion<ConversationRow> {
     this.chatSuggestionsJson = const Value.absent(),
     this.injectedMemoryHash = const Value.absent(),
     this.lastMemoryExtractedOrder = const Value.absent(),
+    this.chatModelProvider = const Value.absent(),
+    this.chatModelId = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : id = Value(id),
        title = Value(title),
@@ -682,6 +779,8 @@ class ConversationRowsCompanion extends UpdateCompanion<ConversationRow> {
     Expression<String>? chatSuggestionsJson,
     Expression<String>? injectedMemoryHash,
     Expression<int>? lastMemoryExtractedOrder,
+    Expression<String>? chatModelProvider,
+    Expression<String>? chatModelId,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -703,6 +802,8 @@ class ConversationRowsCompanion extends UpdateCompanion<ConversationRow> {
         'injected_memory_hash': injectedMemoryHash,
       if (lastMemoryExtractedOrder != null)
         'last_memory_extracted_order': lastMemoryExtractedOrder,
+      if (chatModelProvider != null) 'chat_model_provider': chatModelProvider,
+      if (chatModelId != null) 'chat_model_id': chatModelId,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -721,6 +822,8 @@ class ConversationRowsCompanion extends UpdateCompanion<ConversationRow> {
     Value<String>? chatSuggestionsJson,
     Value<String?>? injectedMemoryHash,
     Value<int>? lastMemoryExtractedOrder,
+    Value<String?>? chatModelProvider,
+    Value<String?>? chatModelId,
     Value<int>? rowid,
   }) {
     return ConversationRowsCompanion(
@@ -740,6 +843,8 @@ class ConversationRowsCompanion extends UpdateCompanion<ConversationRow> {
       injectedMemoryHash: injectedMemoryHash ?? this.injectedMemoryHash,
       lastMemoryExtractedOrder:
           lastMemoryExtractedOrder ?? this.lastMemoryExtractedOrder,
+      chatModelProvider: chatModelProvider ?? this.chatModelProvider,
+      chatModelId: chatModelId ?? this.chatModelId,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -798,6 +903,12 @@ class ConversationRowsCompanion extends UpdateCompanion<ConversationRow> {
         lastMemoryExtractedOrder.value,
       );
     }
+    if (chatModelProvider.present) {
+      map['chat_model_provider'] = Variable<String>(chatModelProvider.value);
+    }
+    if (chatModelId.present) {
+      map['chat_model_id'] = Variable<String>(chatModelId.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -820,6 +931,8 @@ class ConversationRowsCompanion extends UpdateCompanion<ConversationRow> {
           ..write('chatSuggestionsJson: $chatSuggestionsJson, ')
           ..write('injectedMemoryHash: $injectedMemoryHash, ')
           ..write('lastMemoryExtractedOrder: $lastMemoryExtractedOrder, ')
+          ..write('chatModelProvider: $chatModelProvider, ')
+          ..write('chatModelId: $chatModelId, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -11233,6 +11346,8 @@ typedef $$ConversationRowsTableCreateCompanionBuilder =
       Value<String> chatSuggestionsJson,
       Value<String?> injectedMemoryHash,
       Value<int> lastMemoryExtractedOrder,
+      Value<String?> chatModelProvider,
+      Value<String?> chatModelId,
       Value<int> rowid,
     });
 typedef $$ConversationRowsTableUpdateCompanionBuilder =
@@ -11250,6 +11365,8 @@ typedef $$ConversationRowsTableUpdateCompanionBuilder =
       Value<String> chatSuggestionsJson,
       Value<String?> injectedMemoryHash,
       Value<int> lastMemoryExtractedOrder,
+      Value<String?> chatModelProvider,
+      Value<String?> chatModelId,
       Value<int> rowid,
     });
 
@@ -11406,6 +11523,16 @@ class $$ConversationRowsTableFilterComposer
     builder: (column) => ColumnFilters(column),
   );
 
+  ColumnFilters<String> get chatModelProvider => $composableBuilder(
+    column: $table.chatModelProvider,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get chatModelId => $composableBuilder(
+    column: $table.chatModelId,
+    builder: (column) => ColumnFilters(column),
+  );
+
   Expression<bool> messageRowsRefs(
     Expression<bool> Function($$MessageRowsTableFilterComposer f) f,
   ) {
@@ -11557,6 +11684,16 @@ class $$ConversationRowsTableOrderingComposer
     column: $table.lastMemoryExtractedOrder,
     builder: (column) => ColumnOrderings(column),
   );
+
+  ColumnOrderings<String> get chatModelProvider => $composableBuilder(
+    column: $table.chatModelProvider,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get chatModelId => $composableBuilder(
+    column: $table.chatModelId,
+    builder: (column) => ColumnOrderings(column),
+  );
 }
 
 class $$ConversationRowsTableAnnotationComposer
@@ -11618,6 +11755,16 @@ class $$ConversationRowsTableAnnotationComposer
 
   GeneratedColumn<int> get lastMemoryExtractedOrder => $composableBuilder(
     column: $table.lastMemoryExtractedOrder,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get chatModelProvider => $composableBuilder(
+    column: $table.chatModelProvider,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get chatModelId => $composableBuilder(
+    column: $table.chatModelId,
     builder: (column) => column,
   );
 
@@ -11747,6 +11894,8 @@ class $$ConversationRowsTableTableManager
                 Value<String> chatSuggestionsJson = const Value.absent(),
                 Value<String?> injectedMemoryHash = const Value.absent(),
                 Value<int> lastMemoryExtractedOrder = const Value.absent(),
+                Value<String?> chatModelProvider = const Value.absent(),
+                Value<String?> chatModelId = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => ConversationRowsCompanion(
                 id: id,
@@ -11762,6 +11911,8 @@ class $$ConversationRowsTableTableManager
                 chatSuggestionsJson: chatSuggestionsJson,
                 injectedMemoryHash: injectedMemoryHash,
                 lastMemoryExtractedOrder: lastMemoryExtractedOrder,
+                chatModelProvider: chatModelProvider,
+                chatModelId: chatModelId,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -11779,6 +11930,8 @@ class $$ConversationRowsTableTableManager
                 Value<String> chatSuggestionsJson = const Value.absent(),
                 Value<String?> injectedMemoryHash = const Value.absent(),
                 Value<int> lastMemoryExtractedOrder = const Value.absent(),
+                Value<String?> chatModelProvider = const Value.absent(),
+                Value<String?> chatModelId = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => ConversationRowsCompanion.insert(
                 id: id,
@@ -11794,6 +11947,8 @@ class $$ConversationRowsTableTableManager
                 chatSuggestionsJson: chatSuggestionsJson,
                 injectedMemoryHash: injectedMemoryHash,
                 lastMemoryExtractedOrder: lastMemoryExtractedOrder,
+                chatModelProvider: chatModelProvider,
+                chatModelId: chatModelId,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0

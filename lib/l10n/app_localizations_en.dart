@@ -1795,6 +1795,24 @@ class AppLocalizationsEn extends AppLocalizations {
   String get backupPageRestore => 'Restore';
 
   @override
+  String get backupPageForwardCompatTitle => 'Backup is from a newer version';
+
+  @override
+  String backupPageForwardCompatBody(int backupVersion, int currentVersion) {
+    return 'This backup was created by a newer version of Kelivo (data format $backupVersion; this version supports $currentVersion), and it does not say whether older versions can read it.\n\nYou can continue: anything this version does not recognise will be skipped, and the backup file itself is not modified. But if the newer version changed how existing data is stored, some content may be imported incorrectly.\n\nUpdating Kelivo first is the safer choice.';
+  }
+
+  @override
+  String get backupPageForwardCompatContinue => 'Import anyway';
+
+  @override
+  String get backupPageForwardCompatCancel => 'Cancel';
+
+  @override
+  String get backupPageSchemaTooNewMessage =>
+      'This backup was created by a newer version of Kelivo and cannot be read by this version. Please update Kelivo and try again.';
+
+  @override
   String get backupPageBackupUploaded => 'Backup uploaded';
 
   @override
@@ -3510,6 +3528,9 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get modelSelectSheetFavoritesSection => 'Favorites';
+
+  @override
+  String get modelSelectSheetFollowAssistant => 'Follow assistant';
 
   @override
   String get modelSelectSheetFavoriteTooltip => 'Favorite';

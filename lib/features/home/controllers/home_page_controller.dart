@@ -663,7 +663,7 @@ class HomePageController extends ChangeNotifier {
           }
           break;
         case ChatAction.switchModel:
-          unawaited(showModelSelectSheet(ctx));
+          unawaited(showModelSelectSheet(ctx, controller: this));
           break;
         case ChatAction.enterGlobalSearch:
           enterGlobalSearchMode(preserveQuery: true);
@@ -1222,6 +1222,20 @@ class HomePageController extends ChangeNotifier {
 
   Future<void> clearContext() async {
     await _viewModel.clearContext();
+    notifyListeners();
+  }
+
+  /// Sets or clears the current conversation's model override.
+  ///
+  /// Passing null for both makes the conversation follow the assistant again.
+  Future<void> setConversationModel({
+    String? providerKey,
+    String? modelId,
+  }) async {
+    await _viewModel.setConversationModel(
+      providerKey: providerKey,
+      modelId: modelId,
+    );
     notifyListeners();
   }
 

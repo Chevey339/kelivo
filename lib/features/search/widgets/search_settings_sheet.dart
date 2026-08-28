@@ -16,7 +16,14 @@ import '../../../theme/app_font_weights.dart';
 import 'package:Kelivo/theme/app_semantic_colors.dart';
 import '../../../shared/widgets/section_card.dart';
 
-Future<void> showSearchSettingsSheet(BuildContext context) async {
+/// [chatModelProviderKey]/[chatModelId] carry the model the chat actually
+/// sends with, resolved by the caller (conversation override -> assistant ->
+/// global default), so built-in-search support is judged against it.
+Future<void> showSearchSettingsSheet(
+  BuildContext context, {
+  String? chatModelProviderKey,
+  String? chatModelId,
+}) async {
   await showModalBottomSheet(
     context: context,
     isScrollControlled: true,
@@ -24,12 +31,18 @@ Future<void> showSearchSettingsSheet(BuildContext context) async {
     shape: const RoundedRectangleBorder(
       borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
     ),
-    builder: (ctx) => const _SearchSettingsSheet(),
+    builder: (ctx) => _SearchSettingsSheet(
+      chatModelProviderKey: chatModelProviderKey,
+      chatModelId: chatModelId,
+    ),
   );
 }
 
 class _SearchSettingsSheet extends StatelessWidget {
-  const _SearchSettingsSheet();
+  const _SearchSettingsSheet({this.chatModelProviderKey, this.chatModelId});
+
+  final String? chatModelProviderKey;
+  final String? chatModelId;
 
   String _nameOf(BuildContext context, SearchServiceOptions s) {
     final svc = SearchService.getService(s);
@@ -123,8 +136,11 @@ class _SearchSettingsSheet extends StatelessWidget {
     final enabled = ap.currentSearchEnabled;
 
     // Determine if current selected model supports built-in search
-    final providerKey = a?.chatModelProvider ?? settings.currentModelProvider;
-    final modelId = a?.chatModelId ?? settings.currentModelId;
+    final providerKey =
+        chatModelProviderKey ??
+        a?.chatModelProvider ??
+        settings.currentModelProvider;
+    final modelId = chatModelId ?? a?.chatModelId ?? settings.currentModelId;
     final cfg = (providerKey != null)
         ? settings.getProviderConfig(providerKey)
         : null;

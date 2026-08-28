@@ -22,7 +22,9 @@ import 'business_repository.dart';
 import 'chat_database_observer.dart';
 import 'generation_run.dart';
 import 'generation_run_commands.dart';
+import 'schema_migrations.dart';
 import '../services/api/stream/stream_chunk_handler.dart';
+import '../services/backup/restore_durability.dart';
 
 typedef ChatDatabaseSnapshotInfo = ({
   int schemaVersion,
@@ -31,6 +33,29 @@ typedef ChatDatabaseSnapshotInfo = ({
 });
 
 typedef InstalledChatDatabaseInfo = ({int schemaVersion, String? databaseId});
+
+/// What crash recovery is allowed to do with the installed database.
+///
+/// The distinction that matters is between damage and a version this build
+/// simply does not know: a pre-migration copy may replace the former, but
+/// replacing the latter would let an older build silently overwrite everything
+/// a newer one wrote.
+enum InstalledDatabaseDisposition {
+  /// Opens cleanly at a schema this build knows. Any pre-migration copy beside
+  /// it is redundant and may be deleted.
+  usable,
+
+  /// Opens, but at a schema this build does not know — in practice, a
+  /// downgrade after a newer build migrated the database. Nothing may be
+  /// deleted or overwritten: the copy is older than what is on disk, and the
+  /// startup gate reports `database_schema_too_new` so the user updates
+  /// instead.
+  foreignSchema,
+
+  /// Missing, truncated, or failing `quick_check`. A pre-migration copy is the
+  /// better state.
+  unusable,
+}
 
 typedef ParsedChatImportBatch = ({
   Conversation conversation,
@@ -219,25 +244,204 @@ class ChatDatabaseRepository {
     );
   }
 
-  static Future<bool> migrateInstalledDatabase(File file) async {
-    final database = sqlite.sqlite3.open(
-      file.absolute.path,
-      mode: sqlite.OpenMode.readOnly,
-    );
-    late final int schemaVersion;
+  /// Strips a database written by a NEWER build down to the shape this build
+  /// knows, so a forward-compatible backup can still be restored.
+  ///
+  /// Drops tables this build does not know, drops unknown columns from tables
+  /// it does know, and stamps [AppDatabase.currentSchemaVersion]. Afterwards
+  /// the ordinary validators see an exact current-schema database, which is
+  /// what keeps them single-version.
+  ///
+  /// This only reconciles *structure*. It cannot detect a newer build changing
+  /// what an existing column MEANS — that is what the manifest's
+  /// `minimumReadableSchemaVersion` declaration is for. Callers must have
+  /// established permission to proceed before calling this.
+  ///
+  /// Operates on a staged copy; the archive itself is never touched, so the
+  /// data dropped here is still present if the same backup is later restored
+  /// into a build that understands it.
+  static Future<void> normalizeForwardCompatibleSnapshot(File file) async {
+    final database = sqlite.sqlite3.open(file.absolute.path);
     try {
-      schemaVersion = database.userVersion;
-      if (schemaVersion != AppDatabase.currentSchemaVersion) {
-        throw StateError('database_schema_version');
+      // Foreign keys stay off for the rewrite: dropping an unknown table can
+      // transiently orphan rows in another unknown table dropped later.
+      database.execute('PRAGMA foreign_keys = OFF;');
+      database.execute('BEGIN IMMEDIATE;');
+      try {
+        final presentTables = database
+            .select("SELECT name FROM sqlite_master WHERE type = 'table';")
+            .map((row) => row['name'])
+            .whereType<String>()
+            .where((name) => !name.startsWith('sqlite_'))
+            .toList(growable: false);
+
+        for (final table in presentTables) {
+          if (!currentSchemaColumns.containsKey(table)) {
+            database.execute('DROP TABLE IF EXISTS "$table";');
+          }
+        }
+
+        for (final entry in currentSchemaColumns.entries) {
+          if (!presentTables.contains(entry.key)) continue;
+          final known = entry.value.toSet();
+          final actual = database
+              .select('PRAGMA table_info("${entry.key}");')
+              .map((row) => row['name'])
+              .whereType<String>()
+              .toList(growable: false);
+          for (final column in actual) {
+            if (known.contains(column)) continue;
+            // Any index over the column has to go first; SQLite refuses to
+            // drop an indexed column.
+            final indexes = database
+                .select('PRAGMA index_list("${entry.key}");')
+                .map((row) => row['name'])
+                .whereType<String>()
+                .toList(growable: false);
+            for (final index in indexes) {
+              if (index.startsWith('sqlite_autoindex_')) continue;
+              final covers = database
+                  .select('PRAGMA index_info("$index");')
+                  .map((row) => row['name'])
+                  .whereType<String>()
+                  .contains(column);
+              if (covers) database.execute('DROP INDEX IF EXISTS "$index";');
+            }
+            database.execute(
+              'ALTER TABLE "${entry.key}" DROP COLUMN "$column";',
+            );
+          }
+        }
+
+        database.execute('COMMIT;');
+      } catch (_) {
+        database.execute('ROLLBACK;');
+        rethrow;
       }
-      _validateRawStructure(database);
+      // Only after the structure matches, so a crash mid-rewrite leaves a file
+      // still stamped with its original (rejected) version rather than a lie.
+      database.userVersion = AppDatabase.currentSchemaVersion;
+      database.execute('PRAGMA foreign_keys = ON;');
+      if (database.select('PRAGMA foreign_key_check;').isNotEmpty) {
+        throw StateError('database_forward_compat_foreign_keys');
+      }
     } on sqlite.SqliteException {
-      throw StateError('database_corrupt');
+      throw StateError('database_forward_compat_failed');
     } finally {
       database.close();
     }
+    await normalizeSnapshotJournal(file);
+  }
 
-    return false;
+  /// Suffix of the copy kept while an installed database is being upgraded.
+  ///
+  /// The version is part of the name so a sweep can recognise leftovers from a
+  /// crash without opening them.
+  static const premigrationBackupPrefix = '.premigrate-v';
+
+  /// Brings the installed database at [file] up to the current schema.
+  ///
+  /// A file already at [AppDatabase.currentSchemaVersion] is validated and left
+  /// untouched — this is the every-launch path and performs no writes. A file
+  /// at an older published schema is copied aside, upgraded through
+  /// [SchemaMigrations], re-validated, and the copy deleted; if any of that
+  /// fails the copy is restored and `StateError('database_migration_failed:N')`
+  /// is thrown. Anything newer or unpublished throws
+  /// `StateError('database_schema_version')`.
+  static Future<DatabaseUpgradeOutcome> migrateInstalledDatabase(
+    File file, {
+    RestoreDurability? durability,
+  }) async {
+    final int schemaVersion;
+    try {
+      schemaVersion = SchemaMigrations.readSchemaVersion(file);
+    } on sqlite.SqliteException {
+      throw StateError('database_corrupt');
+    }
+
+    if (schemaVersion == AppDatabase.currentSchemaVersion) {
+      final database = sqlite.sqlite3.open(
+        file.absolute.path,
+        mode: sqlite.OpenMode.readOnly,
+      );
+      try {
+        // Deliberately validated only at the current schema; see
+        // _validateRawStructure.
+        _validateRawStructure(database);
+      } on sqlite.SqliteException {
+        throw StateError('database_corrupt');
+      } finally {
+        database.close();
+      }
+      return (
+        fromVersion: schemaVersion,
+        toVersion: schemaVersion,
+        upgraded: false,
+      );
+    }
+
+    if (!SchemaMigrations.needsUpgrade(schemaVersion)) {
+      throw StateError('database_schema_version');
+    }
+
+    final resolvedDurability = durability ?? RestorePlatformDurability();
+    final parent = file.absolute.parent;
+    final backup = File(
+      '${file.absolute.path}$premigrationBackupPrefix$schemaVersion',
+    );
+
+    // Fold any WAL back in first so the copy is a self-contained database.
+    try {
+      final database = sqlite.sqlite3.open(file.absolute.path);
+      try {
+        database.execute('PRAGMA wal_checkpoint(TRUNCATE);');
+      } finally {
+        database.close();
+      }
+    } on sqlite.SqliteException {
+      throw StateError('database_corrupt');
+    }
+
+    if (await backup.exists()) await backup.delete();
+    await file.copy(backup.path);
+    await resolvedDurability.restrictFile(backup);
+    await resolvedDurability.syncFile(backup, fullBarrier: true);
+    await resolvedDurability.syncDirectory(parent, fullBarrier: true);
+
+    try {
+      await SchemaMigrations.upgradeFileInPlace(file);
+      final database = sqlite.sqlite3.open(
+        file.absolute.path,
+        mode: sqlite.OpenMode.readOnly,
+      );
+      try {
+        _validateRawStructure(database);
+      } finally {
+        database.close();
+      }
+    } catch (_) {
+      // The copy is deliberately LEFT BEHIND. Between deleting the database
+      // family and finishing the copy back there is no usable database on
+      // disk, so the copy is the only surviving good state and must outlive
+      // this process: DatabaseInstallationGate's sweep finishes the rollback
+      // on the next launch if we die here.
+      await restorePreMigrationBackup(
+        backup: backup,
+        target: file,
+        durability: resolvedDurability,
+      );
+      throw StateError('database_migration_failed:$schemaVersion');
+    }
+
+    await resolvedDurability.syncFile(file, fullBarrier: true);
+    await backup.delete();
+    await resolvedDurability.syncDirectory(parent, fullBarrier: true);
+
+    return (
+      fromVersion: schemaVersion,
+      toVersion: AppDatabase.currentSchemaVersion,
+      upgraded: true,
+    );
   }
 
   static InstalledChatDatabaseInfo inspectInstalledDatabase(
@@ -406,9 +610,17 @@ class ChatDatabaseRepository {
     }
   }
 
+  /// Prepares a snapshot for restore, bringing its schema to this build's.
+  ///
+  /// An older published schema is migrated forward. A NEWER schema is only
+  /// accepted when [allowForwardCompatible] is set — the caller establishes
+  /// that from the backup manifest's compatibility declaration, or from the
+  /// user's explicit consent — and is then stripped down to what this build
+  /// knows. See [normalizeForwardCompatibleSnapshot].
   static Future<ChatDatabaseSnapshotInfo> prepareSnapshotForRestore(
-    File snapshotFile,
-  ) async {
+    File snapshotFile, {
+    bool allowForwardCompatible = false,
+  }) async {
     if (!await snapshotFile.exists()) {
       throw FileSystemException(
         'Snapshot database does not exist',
@@ -416,10 +628,30 @@ class ChatDatabaseRepository {
       );
     }
 
+    // A snapshot authored by an older build carries an older schema; bring it
+    // forward before validating, because the validators only ever describe the
+    // current schema. Migrating first is also what keeps the DELETE-mode
+    // contract below intact: the upgrade may leave a WAL sidecar, and the tail
+    // of this method checkpoints, switches to DELETE and deletes sidecars.
+    final snapshotSchemaVersion = SchemaMigrations.readSchemaVersion(
+      snapshotFile,
+    );
+    if (SchemaMigrations.needsUpgrade(snapshotSchemaVersion)) {
+      await SchemaMigrations.upgradeFileInPlace(snapshotFile);
+    } else if (snapshotSchemaVersion > AppDatabase.currentSchemaVersion) {
+      if (!allowForwardCompatible) {
+        throw StateError('database_schema_too_new');
+      }
+      await normalizeForwardCompatibleSnapshot(snapshotFile);
+    } else if (snapshotSchemaVersion != AppDatabase.currentSchemaVersion) {
+      throw StateError('database_schema_version');
+    }
+
     final database = sqlite.sqlite3.open(snapshotFile.absolute.path);
     late final ChatDatabaseSnapshotInfo initialInfo;
     try {
       initialInfo = _validateRawSnapshot(database);
+      // Now a post-condition: the migration above guarantees it.
       if (initialInfo.schemaVersion != AppDatabase.currentSchemaVersion) {
         throw StateError('database_schema_version');
       }
@@ -540,6 +772,12 @@ class ChatDatabaseRepository {
     );
   }
 
+  /// Validates that [database] matches the CURRENT schema exactly.
+  ///
+  /// It never validates a historical schema: callers must upgrade to
+  /// [AppDatabase.currentSchemaVersion] first (see [SchemaMigrations]). Keeping
+  /// this rule is what lets future migrations ship without version-aware
+  /// validators.
   static void _validateRawStructure(sqlite.Database database) {
     if (database.userVersion != AppDatabase.currentSchemaVersion) {
       throw StateError('database_schema_version');
@@ -595,146 +833,148 @@ class ChatDatabaseRepository {
     _validateRawSchema(database);
   }
 
+  /// Every table this build knows, with its exact column order.
+  ///
+  /// This is the authoritative shape of [AppDatabase.currentSchemaVersion]:
+  /// [_validateRawSchema] asserts a database matches it exactly, and
+  /// [normalizeForwardCompatibleSnapshot] strips a newer database down to it.
+  /// Keep it in step with the table DSL — see SchemaMigrations for the
+  /// checklist that a schema bump has to follow.
+  static const currentSchemaColumns = <String, List<String>>{
+    'conversation_rows': [
+      'id',
+      'title',
+      'created_at',
+      'updated_at',
+      'is_pinned',
+      'assistant_id',
+      'truncate_index',
+      'version_selections_json',
+      'summary',
+      'last_summarized_message_count',
+      'chat_suggestions_json',
+      'injected_memory_hash',
+      'last_memory_extracted_order',
+      'chat_model_provider',
+      'chat_model_id',
+    ],
+    'conversation_mcp_server_rows': ['conversation_id', 'server_id', 'ordinal'],
+    'message_rows': [
+      'id',
+      'conversation_id',
+      'role',
+      'timestamp',
+      'model_id',
+      'provider_id',
+      'total_tokens',
+      'is_streaming',
+      'reasoning_start_at',
+      'reasoning_finished_at',
+      'translation',
+      'reasoning_segments_json',
+      'group_id',
+      'version',
+      'prompt_tokens',
+      'completion_tokens',
+      'cached_tokens',
+      'duration_ms',
+      'message_order',
+    ],
+    'chat_storage_meta_rows': ['key', 'value'],
+    'message_part_rows': [
+      'part_id',
+      'conversation_id',
+      'revision_id',
+      'ordinal',
+      'kind',
+      'payload',
+      'created_at',
+      'updated_at',
+    ],
+    'generation_run_rows': [
+      'id',
+      'conversation_id',
+      'target_revision_id',
+      'state',
+      'state_revision',
+      'checkpoint_seq',
+      'error_code',
+      'created_at',
+      'updated_at',
+      'terminal_at',
+    ],
+    'provider_artifact_rows': [
+      'conversation_id',
+      'revision_id',
+      'kind',
+      'payload',
+      'created_at',
+      'updated_at',
+    ],
+    'asset_rows': [
+      'id',
+      'content_hash',
+      'path',
+      'byte_size',
+      'width',
+      'height',
+      'thumbnail_path',
+      'created_at',
+      'last_referenced_at',
+    ],
+    'message_asset_rows': [
+      'conversation_id',
+      'revision_id',
+      'asset_id',
+      'kind',
+    ],
+    'asset_gc_rows': ['asset_id', 'not_before', 'attempts', 'generation'],
+    'gc_audit_rows': ['id', 'kind', 'entity_id', 'completed_at'],
+    'asset_reference_dirty_rows': ['revision_id'],
+    'assistant_rows': ['id', 'sort_order', 'payload', 'updated_at'],
+    'provider_rows': ['provider_key', 'sort_order', 'payload', 'updated_at'],
+    'provider_group_rows': ['id', 'sort_order', 'payload', 'updated_at'],
+    'mcp_server_rows': ['id', 'sort_order', 'payload', 'updated_at'],
+    'world_book_rows': ['id', 'sort_order', 'payload', 'updated_at'],
+    'assistant_memory_rows': [
+      'id',
+      'sort_order',
+      'assistant_id',
+      'payload',
+      'updated_at',
+    ],
+    'quick_phrase_rows': ['id', 'sort_order', 'payload', 'updated_at'],
+    'search_service_rows': ['id', 'sort_order', 'payload', 'updated_at'],
+    'tts_service_rows': ['id', 'sort_order', 'payload', 'updated_at'],
+    'instruction_injection_rows': ['id', 'sort_order', 'payload', 'updated_at'],
+    'assistant_tag_rows': ['id', 'sort_order', 'payload', 'updated_at'],
+    'preference_rows': ['key', 'value', 'updated_at'],
+    'memory_entry_rows': [
+      'id',
+      'sort_order',
+      'scope',
+      'assistant_id',
+      'type',
+      'status',
+      'content',
+      'content_normalized',
+      'entry_created_at',
+      'entry_updated_at',
+      'payload',
+      'updated_at',
+    ],
+    'user_profile_field_rows': ['id', 'sort_order', 'payload', 'updated_at'],
+    'message_prompt_rows': [
+      'revision_id',
+      'conversation_id',
+      'payload',
+      'carries_memory_snapshot',
+      'created_at',
+    ],
+  };
+
   static void _validateRawSchema(sqlite.Database database) {
-    const expectedColumns = <String, List<String>>{
-      'conversation_rows': [
-        'id',
-        'title',
-        'created_at',
-        'updated_at',
-        'is_pinned',
-        'assistant_id',
-        'truncate_index',
-        'version_selections_json',
-        'summary',
-        'last_summarized_message_count',
-        'chat_suggestions_json',
-        'injected_memory_hash',
-        'last_memory_extracted_order',
-      ],
-      'conversation_mcp_server_rows': [
-        'conversation_id',
-        'server_id',
-        'ordinal',
-      ],
-      'message_rows': [
-        'id',
-        'conversation_id',
-        'role',
-        'timestamp',
-        'model_id',
-        'provider_id',
-        'total_tokens',
-        'is_streaming',
-        'reasoning_start_at',
-        'reasoning_finished_at',
-        'translation',
-        'reasoning_segments_json',
-        'group_id',
-        'version',
-        'prompt_tokens',
-        'completion_tokens',
-        'cached_tokens',
-        'duration_ms',
-        'message_order',
-      ],
-      'chat_storage_meta_rows': ['key', 'value'],
-      'message_part_rows': [
-        'part_id',
-        'conversation_id',
-        'revision_id',
-        'ordinal',
-        'kind',
-        'payload',
-        'created_at',
-        'updated_at',
-      ],
-      'generation_run_rows': [
-        'id',
-        'conversation_id',
-        'target_revision_id',
-        'state',
-        'state_revision',
-        'checkpoint_seq',
-        'error_code',
-        'created_at',
-        'updated_at',
-        'terminal_at',
-      ],
-      'provider_artifact_rows': [
-        'conversation_id',
-        'revision_id',
-        'kind',
-        'payload',
-        'created_at',
-        'updated_at',
-      ],
-      'asset_rows': [
-        'id',
-        'content_hash',
-        'path',
-        'byte_size',
-        'width',
-        'height',
-        'thumbnail_path',
-        'created_at',
-        'last_referenced_at',
-      ],
-      'message_asset_rows': [
-        'conversation_id',
-        'revision_id',
-        'asset_id',
-        'kind',
-      ],
-      'asset_gc_rows': ['asset_id', 'not_before', 'attempts', 'generation'],
-      'gc_audit_rows': ['id', 'kind', 'entity_id', 'completed_at'],
-      'asset_reference_dirty_rows': ['revision_id'],
-      'assistant_rows': ['id', 'sort_order', 'payload', 'updated_at'],
-      'provider_rows': ['provider_key', 'sort_order', 'payload', 'updated_at'],
-      'provider_group_rows': ['id', 'sort_order', 'payload', 'updated_at'],
-      'mcp_server_rows': ['id', 'sort_order', 'payload', 'updated_at'],
-      'world_book_rows': ['id', 'sort_order', 'payload', 'updated_at'],
-      'assistant_memory_rows': [
-        'id',
-        'sort_order',
-        'assistant_id',
-        'payload',
-        'updated_at',
-      ],
-      'quick_phrase_rows': ['id', 'sort_order', 'payload', 'updated_at'],
-      'search_service_rows': ['id', 'sort_order', 'payload', 'updated_at'],
-      'tts_service_rows': ['id', 'sort_order', 'payload', 'updated_at'],
-      'instruction_injection_rows': [
-        'id',
-        'sort_order',
-        'payload',
-        'updated_at',
-      ],
-      'assistant_tag_rows': ['id', 'sort_order', 'payload', 'updated_at'],
-      'preference_rows': ['key', 'value', 'updated_at'],
-      'memory_entry_rows': [
-        'id',
-        'sort_order',
-        'scope',
-        'assistant_id',
-        'type',
-        'status',
-        'content',
-        'content_normalized',
-        'entry_created_at',
-        'entry_updated_at',
-        'payload',
-        'updated_at',
-      ],
-      'user_profile_field_rows': ['id', 'sort_order', 'payload', 'updated_at'],
-      'message_prompt_rows': [
-        'revision_id',
-        'conversation_id',
-        'payload',
-        'carries_memory_snapshot',
-        'created_at',
-      ],
-    };
+    const expectedColumns = currentSchemaColumns;
     for (final entry in expectedColumns.entries) {
       final tableInfo = database.select('PRAGMA table_info(${entry.key});');
       final actual = tableInfo
@@ -984,6 +1224,116 @@ class ChatDatabaseRepository {
         as int;
   }
 
+  /// Puts [backup] back at [target], leaving [backup] in place until the
+  /// restored database has been verified.
+  ///
+  /// Idempotent by construction, because the only step that destroys
+  /// information is the last one: a crash at any point leaves [backup] intact
+  /// and a re-run redoes the copy. This is what makes the pre-migration copy a
+  /// real safety net rather than a second thing to lose.
+  static Future<void> restorePreMigrationBackup({
+    required File backup,
+    required File target,
+    RestoreDurability? durability,
+  }) async {
+    final resolvedDurability = durability ?? RestorePlatformDurability();
+    final parent = target.absolute.parent;
+    await _deleteDatabaseFamily(target);
+    await backup.copy(target.absolute.path);
+    await resolvedDurability.syncFile(target, fullBarrier: true);
+    await resolvedDurability.syncDirectory(parent, fullBarrier: true);
+    if (classifyInstalledDatabase(target) !=
+        InstalledDatabaseDisposition.usable) {
+      throw StateError('database_rollback_failed');
+    }
+    await backup.delete();
+    await resolvedDurability.syncDirectory(parent, fullBarrier: true);
+  }
+
+  /// What a crash-recovery sweep may do with the installed database at [file].
+  ///
+  /// Deliberately total: throwing here would strand the user with a
+  /// pre-migration copy nobody dares act on, so every failure mode resolves to
+  /// a disposition.
+  static InstalledDatabaseDisposition classifyInstalledDatabase(File file) {
+    if (!file.existsSync()) return InstalledDatabaseDisposition.unusable;
+
+    // The schema version is read FIRST and read-only. A database written by a
+    // newer build must never be touched, and opening it read-write to find
+    // that out would be the very thing that damages it -- so a foreign version
+    // wins before any write is attempted.
+    final peeked = _peekSchemaVersion(file, writable: false);
+    if (peeked != null && _isForeignSchema(peeked)) {
+      return InstalledDatabaseDisposition.foreignSchema;
+    }
+
+    try {
+      final database = sqlite.sqlite3.open(file.absolute.path);
+      try {
+        // Folds in a hot WAL, so committed data is not mistaken for damage.
+        database.execute('PRAGMA wal_checkpoint(TRUNCATE);');
+        // Re-read after the checkpoint: the read-only peek above can fail
+        // outright on a hot WAL, and this is the first reliable reading.
+        final schemaVersion = database.userVersion;
+        if (_isForeignSchema(schemaVersion)) {
+          return InstalledDatabaseDisposition.foreignSchema;
+        }
+        // 0 is a file that was created but never given a schema -- a copy
+        // interrupted at the very start, not a version from elsewhere.
+        if (schemaVersion == 0) return InstalledDatabaseDisposition.unusable;
+        final check = database.select('PRAGMA quick_check;');
+        if (check.length != 1 || check.single.values.single != 'ok') {
+          return InstalledDatabaseDisposition.unusable;
+        }
+        // quick_check only proves the file is physically sound; it says
+        // nothing about missing tables, columns, or indexes. A migration that
+        // committed but left the schema incomplete would otherwise read as
+        // healthy here, and the pre-migration copy -- the only way back --
+        // would be deleted moments before migrateInstalledDatabase notices.
+        //
+        // Only meaningful at the current schema: _validateRawStructure asserts
+        // this build's exact column set, so an older published version has to
+        // wait until it has been migrated. Its copy is a duplicate of itself
+        // at that point, so nothing is lost by trusting it.
+        if (schemaVersion == AppDatabase.currentSchemaVersion) {
+          try {
+            _validateRawStructure(database);
+          } catch (_) {
+            return InstalledDatabaseDisposition.unusable;
+          }
+        }
+        return InstalledDatabaseDisposition.usable;
+      } finally {
+        database.close();
+      }
+    } catch (_) {
+      return InstalledDatabaseDisposition.unusable;
+    }
+  }
+
+  /// A version that belongs to some other build, as opposed to damage.
+  ///
+  /// 0 is excluded on purpose: it means no schema was ever written, which is
+  /// an interrupted copy rather than a foreign version.
+  static bool _isForeignSchema(int userVersion) =>
+      userVersion != 0 && !SchemaMigrations.isPublished(userVersion);
+
+  static int? _peekSchemaVersion(File file, {required bool writable}) {
+    try {
+      final database = sqlite.sqlite3.open(
+        file.absolute.path,
+        mode: writable ? sqlite.OpenMode.readWrite : sqlite.OpenMode.readOnly,
+      );
+      try {
+        return database.userVersion;
+      } finally {
+        database.close();
+      }
+    } catch (_) {
+      return null;
+    }
+  }
+
   static Future<void> _deleteDatabaseFamily(File databaseFile) async {
     for (final suffix in const ['', '-wal', '-shm', '-journal']) {
       final file = File('${databaseFile.path}$suffix');
@@ -991,6 +1341,22 @@ class ChatDatabaseRepository {
         await file.delete();
       }
     }
+  }
+
+  /// Returns [databaseFile] to the shape an archived snapshot must have:
+  /// journal folded in, DELETE journal mode, no sidecars.
+  ///
+  /// Opening a snapshot for anything — including a schema upgrade — can leave a
+  /// WAL behind, and [inspectPreparedSnapshot] rejects sidecars.
+  static Future<void> normalizeSnapshotJournal(File databaseFile) async {
+    final database = sqlite.sqlite3.open(databaseFile.absolute.path);
+    try {
+      database.execute('PRAGMA wal_checkpoint(TRUNCATE);');
+      database.select('PRAGMA journal_mode = DELETE;');
+    } finally {
+      database.close();
+    }
+    await _deleteDatabaseSidecars(databaseFile);
   }
 
   static Future<void> _deleteDatabaseSidecars(File databaseFile) async {
@@ -5163,12 +5529,14 @@ class ChatDatabaseRepository {
       '(id, title, created_at, updated_at, is_pinned, assistant_id, '
       'truncate_index, version_selections_json, summary, '
       'last_summarized_message_count, chat_suggestions_json, '
-      'injected_memory_hash, last_memory_extracted_order) '
+      'injected_memory_hash, last_memory_extracted_order, '
+      'chat_model_provider, chat_model_id) '
       'SELECT ?, title, created_at, updated_at, is_pinned, assistant_id, '
       'truncate_index, ?, summary, '
       'last_summarized_message_count, chat_suggestions_json, '
       'NULL, COALESCE((SELECT MAX(message_order) '
-      'FROM merge_source.message_rows WHERE conversation_id = ?), -1) '
+      'FROM merge_source.message_rows WHERE conversation_id = ?), -1), '
+      'chat_model_provider, chat_model_id '
       'FROM merge_source.conversation_rows WHERE id = ?;',
       [targetId, jsonEncode(targetSelections), sourceId, sourceId],
     );
@@ -6247,6 +6615,8 @@ class ChatDatabaseRepository {
       chatSuggestions: _decodeStringList(row.chatSuggestionsJson),
       injectedMemoryHash: row.injectedMemoryHash,
       lastMemoryExtractedOrder: row.lastMemoryExtractedOrder,
+      chatModelProvider: row.chatModelProvider,
+      chatModelId: row.chatModelId,
     );
   }
 
@@ -6271,6 +6641,8 @@ class ChatDatabaseRepository {
       injectedMemoryHash:
           injectedMemoryHash ?? Value(conversation.injectedMemoryHash),
       lastMemoryExtractedOrder: Value(conversation.lastMemoryExtractedOrder),
+      chatModelProvider: Value(conversation.chatModelProvider),
+      chatModelId: Value(conversation.chatModelId),
     );
   }
 
@@ -7079,6 +7451,31 @@ class ChatDatabaseRepository {
       _db.conversationRows,
     )..where((t) => t.id.equals(conversationId))).write(
       ConversationRowsCompanion(lastMemoryExtractedOrder: Value(order)),
+    );
+  }
+
+  /// Clears the per-conversation model override on every conversation pointing
+  /// at [providerKey] (optionally narrowed to a single [modelId]).
+  ///
+  /// Called when a provider or model is deleted, so the affected conversations
+  /// fall back to the assistant's model instead of pointing at something gone.
+  /// Returns the number of conversations changed.
+  Future<int> clearConversationModelOverrides({
+    required String providerKey,
+    String? modelId,
+  }) async {
+    final statement = _db.update(_db.conversationRows)
+      ..where(
+        (t) => modelId == null
+            ? t.chatModelProvider.equals(providerKey)
+            : t.chatModelProvider.equals(providerKey) &
+                  t.chatModelId.equals(modelId),
+      );
+    return statement.write(
+      const ConversationRowsCompanion(
+        chatModelProvider: Value(null),
+        chatModelId: Value(null),
+      ),
     );
   }
 

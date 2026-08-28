@@ -581,6 +581,17 @@
   "backupPageMergeMode": "合并",
   "backupPageMergeModeDescription": "保留本地数据并加入备份数据；相同会话会跳过，冲突会话会重新分配 ID。",
   "backupPageRestore": "恢复",
+  "backupPageForwardCompatTitle": "备份来自更新的版本",
+  "backupPageForwardCompatBody": "这份备份由更新版本的 Kelivo 创建（数据格式 {backupVersion}，当前版本支持 {currentVersion}），且未声明旧版本能否读取。\n\n你可以继续导入：当前版本不认识的内容会被跳过，备份文件本身不会被修改。但如果新版本改变了已有数据的存储方式，部分内容可能会被错误导入。\n\n更稳妥的做法是先升级 Kelivo。",
+  "@backupPageForwardCompatBody": {
+    "placeholders": {
+      "backupVersion": { "type": "int" },
+      "currentVersion": { "type": "int" }
+    }
+  },
+  "backupPageForwardCompatContinue": "仍然导入",
+  "backupPageForwardCompatCancel": "取消",
+  "backupPageSchemaTooNewMessage": "这份备份由更新版本的 Kelivo 创建，当前版本无法读取。请先升级 Kelivo 后重试。",
   "backupPageBackupUploaded": "已上传备份",
   "backupPageBackup": "立即备份",
   "backupPageExporting": "正在导出...",
@@ -1212,6 +1223,7 @@
   "modelDetailSheetBodyJsonHint": "Body JSON",
   "modelSelectSheetSearchHint": "搜索模型或服务商",
   "modelSelectSheetFavoritesSection": "收藏",
+  "modelSelectSheetFollowAssistant": "跟随助手",
   "modelSelectSheetFavoriteTooltip": "收藏",
   "modelSelectSheetChatType": "聊天",
   "modelSelectSheetEmbeddingType": "嵌入",

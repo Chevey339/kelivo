@@ -8,6 +8,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:flutter/gestures.dart';
 import 'package:provider/provider.dart';
 import '../../../core/providers/settings_provider.dart';
+import '../../../core/services/chat/chat_service.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../../icons/lucide_adapter.dart';
@@ -252,6 +253,7 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
                 size: 22,
                 onTap: () async {
                   final assistantProvider = context.read<AssistantProvider>();
+                  final chatService = context.read<ChatService>();
                   final settings = context.read<SettingsProvider>();
                   final confirm = await showDialog<bool>(
                     context: context,
@@ -287,6 +289,10 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
                           );
                         }
                       }
+                      // Conversations can pin a model too.
+                      await chatService.clearConversationModelOverrides(
+                        providerKey: widget.keyName,
+                      );
                     } catch (_) {}
 
                     // Remove provider config and related selections/pins
@@ -1584,6 +1590,7 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
                             final settings = context.read<SettingsProvider>();
                             final assistantProvider = context
                                 .read<AssistantProvider>();
+                            final chatService = context.read<ChatService>();
                             final ok = await showDialog<bool>(
                               context: context,
                               builder: (dctx) => AlertDialog(
@@ -1650,6 +1657,11 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
                                   );
                                 }
                               }
+                              // Conversations can pin a model too.
+                              await chatService.clearConversationModelOverrides(
+                                providerKey: widget.keyName,
+                                modelId: id,
+                              );
                             } catch (_) {}
 
                             if (!context.mounted) return;
@@ -2202,6 +2214,7 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
   Future<void> _save() async {
     final settings = context.read<SettingsProvider>();
     final assistantProvider = context.read<AssistantProvider>();
+    final chatService = context.read<ChatService>();
     final old = settings.getProviderConfig(
       widget.keyName,
       defaultName: widget.displayName,
@@ -2259,6 +2272,10 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
             );
           }
         }
+        // Conversations can pin a model too.
+        await chatService.clearConversationModelOverrides(
+          providerKey: widget.keyName,
+        );
       } catch (_) {}
     }
 
@@ -3066,6 +3083,7 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
   Future<void> _clearAssistantSelectionsForModels(
     Set<String> modelIds,
     AssistantProvider assistantProvider,
+    ChatService chatService,
   ) async {
     if (modelIds.isEmpty) return;
     try {
@@ -3077,6 +3095,13 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
             assistant.copyWith(clearChatModel: true),
           );
         }
+      }
+      // Conversations can pin a model too.
+      for (final modelId in modelIds) {
+        await chatService.clearConversationModelOverrides(
+          providerKey: widget.keyName,
+          modelId: modelId,
+        );
       }
     } catch (e, st) {
       FlutterLogger.log(
@@ -3153,11 +3178,16 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
 
     final settings = context.read<SettingsProvider>();
     final assistantProvider = context.read<AssistantProvider>();
+    final chatService = context.read<ChatService>();
     final deletedCount = await settings.deleteModels(
       widget.keyName,
       modelsToDelete,
     );
-    await _clearAssistantSelectionsForModels(modelsToDelete, assistantProvider);
+    await _clearAssistantSelectionsForModels(
+      modelsToDelete,
+      assistantProvider,
+      chatService,
+    );
     if (!mounted) return;
     setState(() {
       _selectedModels.clear();
@@ -3276,9 +3306,14 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
     if (ok != true) return;
     if (!mounted) return;
     final assistantProvider = context.read<AssistantProvider>();
+    final chatService = context.read<ChatService>();
     final modelsToDelete = Set<String>.from(cfg.models);
     await settings.deleteModels(widget.keyName, modelsToDelete);
-    await _clearAssistantSelectionsForModels(modelsToDelete, assistantProvider);
+    await _clearAssistantSelectionsForModels(
+      modelsToDelete,
+      assistantProvider,
+      chatService,
+    );
     if (!mounted) return;
     setState(() {
       _selectedModels.clear();

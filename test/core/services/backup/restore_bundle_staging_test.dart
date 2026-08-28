@@ -6,7 +6,10 @@ import 'dart:isolate';
 import 'package:crypto/crypto.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:path/path.dart' as p;
-import 'package:sqlite3/sqlite3.dart' show SqliteException;
+import 'package:drift/native.dart';
+import 'package:sqlite3/sqlite3.dart'
+    as sqlite
+    show sqlite3, OpenMode, SqliteException;
 
 import 'package:Kelivo/core/database/app_database.dart';
 import 'package:Kelivo/core/database/chat_database_repository.dart';
@@ -15,6 +18,8 @@ import 'package:Kelivo/core/services/backup/backup_task_progress.dart';
 import 'package:Kelivo/core/services/backup/backup_isolate_runner.dart';
 import 'package:Kelivo/core/services/backup/restore_bundle_staging.dart';
 import 'package:Kelivo/core/services/backup/restore_workspace_lock.dart';
+
+import '../../database/generated_schema/schema_v1.dart' as v1;
 
 Future<String> _manifestSha256(Directory extracted) async {
   return (await sha256
@@ -67,7 +72,8 @@ Future<Directory> _createExtractedBundle(
       if (includeDatabase)
         'database': {
           'entry': 'database/kelivo.db',
-          'schemaVersion': databaseInfo?.schemaVersion ?? 1,
+          'schemaVersion':
+              databaseInfo?.schemaVersion ?? AppDatabase.currentSchemaVersion,
           'conversationCount': databaseInfo?.conversationCount ?? 0,
           'messageCount': databaseInfo?.messageCount ?? 0,
         },
@@ -91,6 +97,84 @@ Future<Directory> _createExtractedBundle(
   return extracted;
 }
 
+/// Builds an extracted bundle whose payload is a real schema-1 database, the
+/// way a backup taken by an older build looks.
+Future<Directory> _createLegacyV1Bundle(
+  Directory root, {
+  String conversationId = 'legacy-conv',
+}) async {
+  final extracted = Directory(p.join(root.path, 'extracted'));
+  await extracted.create(recursive: true);
+  final settings = File(p.join(extracted.path, 'settings.json'));
+  await settings.writeAsString(jsonEncode({'theme': 'dark'}), flush: true);
+
+  final database = File(p.join(extracted.path, 'database', 'kelivo.db'));
+  await database.parent.create(recursive: true);
+  final legacy = v1.DatabaseAtV1(NativeDatabase(database));
+  try {
+    await legacy.customStatement('PRAGMA user_version = 1;');
+    await legacy.customStatement(
+      'INSERT INTO conversation_rows '
+      '(id, title, created_at, updated_at, is_pinned, truncate_index, '
+      'version_selections_json, last_summarized_message_count, '
+      'chat_suggestions_json, last_memory_extracted_order) '
+      "VALUES ('$conversationId', 'Legacy chat', 1, 2, 0, -1, '{}', 0, "
+      "'[]', -1);",
+    );
+    // A real archived snapshot has been through prepareSnapshotForRestore,
+    // which stamps this receipt.
+    await legacy.customStatement(
+      'INSERT INTO chat_storage_meta_rows (key, value) '
+      "VALUES ('hive_migration_complete_v1', 'true');",
+    );
+  } finally {
+    await legacy.close();
+  }
+  // An archived snapshot arrives without sidecars and in DELETE mode.
+  final raw = sqlite.sqlite3.open(database.path);
+  try {
+    raw.execute('PRAGMA wal_checkpoint(TRUNCATE);');
+    raw.select('PRAGMA journal_mode = DELETE;');
+  } finally {
+    raw.close();
+  }
+  for (final suffix in const ['-wal', '-shm']) {
+    final sidecar = File('${database.path}$suffix');
+    if (await sidecar.exists()) await sidecar.delete();
+  }
+
+  await File(p.join(extracted.path, 'manifest.json')).writeAsString(
+    jsonEncode({
+      'format': 'kelivo-backup',
+      'formatVersion': 2,
+      'payloadKind': 'sqlite',
+      'createdAtUtc': '2026-07-09T00:00:00.000Z',
+      'appVersion': 'test',
+      'includeChats': true,
+      'includeFiles': false,
+      'secretsIncluded': true,
+      'database': {
+        'entry': 'database/kelivo.db',
+        'schemaVersion': 1,
+        'conversationCount': 1,
+        'messageCount': 0,
+      },
+      'entries': {
+        'settings.json': {
+          'bytes': await settings.length(),
+          'sha256': (await sha256.bind(settings.openRead()).first).toString(),
+        },
+        'database/kelivo.db': {
+          'bytes': await database.length(),
+          'sha256': (await sha256.bind(database.openRead()).first).toString(),
+        },
+      },
+    }),
+    flush: true,
+  );
+  return extracted;
+}
+
 void main() {
   group('RestoreBundleStaging', () {
     late Directory root;
@@ -101,6 +185,118 @@ void main() {
 
     tearDown(() async {
       if (await root.exists()) await root.delete(recursive: true);
+    });
+
+    test('stages a schema 1 payload by migrating it forward', () async {
+      final extracted = await _createLegacyV1Bundle(root);
+
+      final staged = await RestoreBundleStaging.create(
+        appDataDirectory: root,
+        extractedDirectory: extracted,
+        includeChats: true,
+        includeFiles: false,
+        sourceManifestSha256: await _manifestSha256(extracted),
+      );
+
+      // The source manifest records the schema the backup was authored at; the
+      // candidate records the schema after migration.
+      final validated = await RestoreBundleStaging.validateExistingCandidate(
+        candidateDirectory: staged.payloadDirectory,
+        expectedManifestSha256: staged.candidateManifestSha256,
+      );
+      expect(
+        validated.databaseInfo?.schemaVersion,
+        AppDatabase.currentSchemaVersion,
+      );
+      // A migration must never add or drop rows.
+      expect(validated.databaseInfo?.conversationCount, 1);
+      expect(validated.databaseInfo?.messageCount, 0);
+
+      final staler = File(
+        p.join(staged.payloadDirectory.path, 'database', 'kelivo.db'),
+      );
+      final raw = sqlite.sqlite3.open(
+        staler.path,
+        mode: sqlite.OpenMode.readOnly,
+      );
+      try {
+        final rows = raw.select(
+          'SELECT id, chat_model_provider FROM conversation_rows;',
+        );
+        expect(rows, hasLength(1));
+        expect(rows.single['id'], 'legacy-conv');
+        expect(rows.single['chat_model_provider'], null);
+      } finally {
+        raw.close();
+      }
+    });
+
+    test('stages a forward-compatible payload by stripping it down', () async {
+      final extracted = await _createExtractedBundle(root);
+      // Make the staged source look like it came from a newer build: extra
+      // column, extra table, bumped user_version, and a manifest declaring
+      // that this build may still read it.
+      final database = File(p.join(extracted.path, 'database', 'kelivo.db'));
+      final raw = sqlite.sqlite3.open(database.path);
+      raw.execute('ALTER TABLE conversation_rows ADD COLUMN future_col TEXT;');
+      raw.execute('CREATE TABLE future_rows (id TEXT PRIMARY KEY);');
+      raw.userVersion = AppDatabase.currentSchemaVersion + 1;
+      raw.execute('PRAGMA wal_checkpoint(TRUNCATE);');
+      raw.select('PRAGMA journal_mode = DELETE;');
+      raw.close();
+
+      await ChatDatabaseRepository.normalizeForwardCompatibleSnapshot(database);
+      // The real pipeline rewrites the entry descriptor after preparing the
+      // snapshot, because preparing rewrites the file.
+      final manifestFile = File(p.join(extracted.path, 'manifest.json'));
+      final manifestJson =
+          jsonDecode(await manifestFile.readAsString()) as Map<String, dynamic>;
+      (manifestJson['entries'] as Map)['database/kelivo.db'] = {
+        'bytes': await database.length(),
+        'sha256': (await sha256.bind(database.openRead()).first).toString(),
+      };
+      await manifestFile.writeAsString(jsonEncode(manifestJson), flush: true);
+
+      final staged = await RestoreBundleStaging.create(
+        appDataDirectory: root,
+        extractedDirectory: extracted,
+        includeChats: true,
+        includeFiles: false,
+        sourceManifestSha256: await _manifestSha256(extracted),
+      );
+
+      final validated = await RestoreBundleStaging.validateExistingCandidate(
+        candidateDirectory: staged.payloadDirectory,
+        expectedManifestSha256: staged.candidateManifestSha256,
+      );
+      expect(
+        validated.databaseInfo?.schemaVersion,
+        AppDatabase.currentSchemaVersion,
+      );
+
+      final candidate = File(
+        p.join(staged.payloadDirectory.path, 'database', 'kelivo.db'),
+      );
+      final check = sqlite.sqlite3.open(
+        candidate.path,
+        mode: sqlite.OpenMode.readOnly,
+      );
+      try {
+        expect(
+          check
+              .select('PRAGMA table_info(conversation_rows);')
+              .map((r) => r['name']),
+          isNot(contains('future_col')),
+        );
+        expect(
+          check
+              .select("SELECT name FROM sqlite_master WHERE type = 'table';")
+              .map((r) => r['name']),
+          isNot(contains('future_rows')),
+        );
+      } finally {
+        check.close();
+      }
     });
 
     test('binds a normalized candidate to a strict run identity', () async {
@@ -570,7 +766,7 @@ void main() {
             includeFiles: false,
             sourceManifestSha256: await _manifestSha256(extracted),
           ),
-          throwsA(isA<SqliteException>()),
+          throwsA(isA<sqlite.SqliteException>()),
         );
       },
     );

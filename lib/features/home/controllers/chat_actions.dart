@@ -1119,6 +1119,7 @@ class ChatActions {
     final modelConfig = messageGenerationService.getModelConfig(
       settings,
       assistant,
+      conversation: conversation,
     );
 
     if (modelConfig.providerKey == null || modelConfig.modelId == null) {
@@ -1498,6 +1499,7 @@ class ChatActions {
     final modelConfig = messageGenerationService.getModelConfig(
       settings,
       assistant,
+      conversation: conversation,
     );
 
     if (modelConfig.providerKey == null || modelConfig.modelId == null) {
@@ -1729,6 +1731,7 @@ class ChatActions {
     final modelConfig = messageGenerationService.getModelConfig(
       settings,
       assistant,
+      conversation: conversation,
     );
     if (modelConfig.providerKey == null || modelConfig.modelId == null) {
       return ChatActionResult.noModel();

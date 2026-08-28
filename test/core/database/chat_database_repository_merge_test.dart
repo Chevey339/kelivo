@@ -41,6 +41,8 @@ void main() {
       required String title,
       required String messageId,
       required String content,
+      String? chatModelProvider,
+      String? chatModelId,
     }) {
       // Fixed instants: the fingerprint truncates timestamps to whole seconds,
       // so two DateTime.now() writes straddling a second boundary would stop
@@ -56,6 +58,8 @@ void main() {
             messageIds: [messageId],
             mcpServerIds: const ['server'],
             versionSelections: {messageId: 0},
+            chatModelProvider: chatModelProvider,
+            chatModelId: chatModelId,
           ),
         ],
         messages: [
@@ -245,6 +249,26 @@ void main() {
         await live.getGeminiThoughtSignature('source-message'),
         'sig-answer',
       );
+    });
+
+    test('会话级模型锁定随合并导入一并携带', () async {
+      await putConversation(
+        source,
+        conversationId: 'pinned-conversation',
+        title: 'Pinned',
+        messageId: 'pinned-message',
+        content: 'answer',
+        chatModelProvider: 'OpenAI',
+        chatModelId: 'gpt-5',
+      );
+      await source.close();
+      sourceClosed = true;
+
+      await live.mergeBackupSnapshot(sourceFile);
+
+      final conversation = await live.getConversation('pinned-conversation');
+      expect(conversation?.chatModelProvider, 'OpenAI');
+      expect(conversation?.chatModelId, 'gpt-5');
     });
 
     test('相同 ID 与内容按 hash 去重，重复导入保持幂等', () async {

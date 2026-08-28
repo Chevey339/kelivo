@@ -1733,6 +1733,24 @@ class AppLocalizationsZh extends AppLocalizations {
   String get backupPageRestore => '恢复';
 
   @override
+  String get backupPageForwardCompatTitle => '备份来自更新的版本';
+
+  @override
+  String backupPageForwardCompatBody(int backupVersion, int currentVersion) {
+    return '这份备份由更新版本的 Kelivo 创建（数据格式 $backupVersion，当前版本支持 $currentVersion），且未声明旧版本能否读取。\n\n你可以继续导入：当前版本不认识的内容会被跳过，备份文件本身不会被修改。但如果新版本改变了已有数据的存储方式，部分内容可能会被错误导入。\n\n更稳妥的做法是先升级 Kelivo。';
+  }
+
+  @override
+  String get backupPageForwardCompatContinue => '仍然导入';
+
+  @override
+  String get backupPageForwardCompatCancel => '取消';
+
+  @override
+  String get backupPageSchemaTooNewMessage =>
+      '这份备份由更新版本的 Kelivo 创建，当前版本无法读取。请先升级 Kelivo 后重试。';
+
+  @override
   String get backupPageBackupUploaded => '已上传备份';
 
   @override
@@ -3386,6 +3404,9 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get modelSelectSheetFavoritesSection => '收藏';
+
+  @override
+  String get modelSelectSheetFollowAssistant => '跟随助手';
 
   @override
   String get modelSelectSheetFavoriteTooltip => '收藏';
@@ -9521,6 +9542,24 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get backupPageRestore => '恢复';
 
   @override
+  String get backupPageForwardCompatTitle => '备份来自更新的版本';
+
+  @override
+  String backupPageForwardCompatBody(int backupVersion, int currentVersion) {
+    return '这份备份由更新版本的 Kelivo 创建（数据格式 $backupVersion，当前版本支持 $currentVersion），且未声明旧版本能否读取。\n\n你可以继续导入：当前版本不认识的内容会被跳过，备份文件本身不会被修改。但如果新版本改变了已有数据的存储方式，部分内容可能会被错误导入。\n\n更稳妥的做法是先升级 Kelivo。';
+  }
+
+  @override
+  String get backupPageForwardCompatContinue => '仍然导入';
+
+  @override
+  String get backupPageForwardCompatCancel => '取消';
+
+  @override
+  String get backupPageSchemaTooNewMessage =>
+      '这份备份由更新版本的 Kelivo 创建，当前版本无法读取。请先升级 Kelivo 后重试。';
+
+  @override
   String get backupPageBackupUploaded => '已上传备份';
 
   @override
@@ -11174,6 +11213,9 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get modelSelectSheetFavoritesSection => '收藏';
+
+  @override
+  String get modelSelectSheetFollowAssistant => '跟随助手';
 
   @override
   String get modelSelectSheetFavoriteTooltip => '收藏';
@@ -17235,6 +17277,24 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get backupPageRestore => '還原';
 
   @override
+  String get backupPageForwardCompatTitle => '備份來自更新的版本';
+
+  @override
+  String backupPageForwardCompatBody(int backupVersion, int currentVersion) {
+    return '這份備份由更新版本的 Kelivo 建立（資料格式 $backupVersion，目前版本支援 $currentVersion），且未聲明舊版本能否讀取。\n\n你可以繼續匯入：目前版本不認識的內容會被略過，備份檔案本身不會被修改。但如果新版本改變了既有資料的儲存方式，部分內容可能會被錯誤匯入。\n\n更穩妥的做法是先升級 Kelivo。';
+  }
+
+  @override
+  String get backupPageForwardCompatContinue => '仍然匯入';
+
+  @override
+  String get backupPageForwardCompatCancel => '取消';
+
+  @override
+  String get backupPageSchemaTooNewMessage =>
+      '這份備份由更新版本的 Kelivo 建立，目前版本無法讀取。請先升級 Kelivo 後重試。';
+
+  @override
   String get backupPageBackupUploaded => '已上傳備份';
 
   @override
@@ -18887,6 +18947,9 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get modelSelectSheetFavoritesSection => '收藏';
+
+  @override
+  String get modelSelectSheetFollowAssistant => '跟隨助手';
 
   @override
   String get modelSelectSheetFavoriteTooltip => '收藏';

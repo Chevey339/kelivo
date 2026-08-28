@@ -15,7 +15,9 @@ import '../../database/business_repository.dart';
 import '../../database/business_preferences.dart';
 import '../../database/business_restore_service.dart';
 import '../../database/business_settings_router.dart';
+import '../../database/app_database.dart';
 import '../../database/chat_database_repository.dart';
+import '../../database/schema_migrations.dart';
 import '../../models/backup.dart';
 import '../../models/chat_message.dart';
 import '../../models/message_part.dart';
@@ -41,6 +43,39 @@ typedef _ParsedChatBackup = ({
 });
 
 typedef _BackupEntryMetadata = ({int bytes, String sha256});
+
+/// What restoring a backup file would mean for this build, determined from its
+/// manifest alone.
+///
+/// A local file is inspected up front by [DataSync.inspectBackupCompatibility],
+/// so the question reaches the user before the restore starts at all. A remote
+/// backup only exists on disk after it has been downloaded, so those paths ask
+/// through a [ForwardCompatibilityPrompt] instead.
+typedef BackupCompatibility = ({
+  int schemaVersion,
+  BackupSchemaVerdict verdict,
+});
+
+/// How a caller answers [ForwardCompatibilityPrompt].
+enum ForwardCompatibilityAnswer {
+  /// Restore normally.
+  proceed,
+
+  /// The backup is newer than this build and made no compatibility promise,
+  /// and the user accepted the risk anyway.
+  proceedUnverified,
+
+  /// Do not restore. The caller is responsible for telling the user why.
+  refuse,
+}
+
+/// Asked once a backup is on disk and before anything is read out of it.
+///
+/// Exists for the WebDAV and S3 restores, which cannot inspect the archive
+/// before downloading it. Runs on the caller's isolate, so it may show UI.
+typedef ForwardCompatibilityPrompt =
+    Future<ForwardCompatibilityAnswer> Function(BackupCompatibility);
+
 typedef _VersionedBackupInfo = ({
   bool includeChats,
   bool includeFiles,
@@ -197,6 +232,25 @@ bool _attachmentExistsOnDisk(String path) {
 class DataSync {
   static const _backupFormat = 'kelivo-backup';
   static const _backupFormatVersion = 2;
+
+  /// Manifest key naming the oldest archive format that can still read a
+  /// backup this build writes.
+  static const backupMinimumReadableFormatKey = 'minimumReadableFormatVersion';
+
+  /// The archive-format counterpart of
+  /// [SchemaMigrations.minimumReadableSchemaVersion].
+  ///
+  /// [_backupFormatVersion] governs the archive -- entry names and manifest
+  /// fields -- while the database schema governs the SQLite payload; the two
+  /// move independently, so a build can add an ignorable directory without
+  /// touching the schema, or vice versa.
+  ///
+  /// Raise this in lockstep with [_backupFormatVersion] whenever an archive
+  /// change is NOT purely additive: a renamed or repurposed entry or manifest
+  /// field, anything an older build would MISREAD rather than merely fail to
+  /// recognise. Leaving it behind on a purely additive change is what lets
+  /// tomorrow's backups still restore into today's build.
+  static const _minimumReadableFormatVersion = 2;
   static const _manifestEntryName = 'manifest.json';
   static const _databaseEntryName = 'database/kelivo.db';
   // A 16 MiB metadata cap keeps manifest parsing and entry metadata bounded.
@@ -1178,7 +1232,7 @@ class DataSync {
     }
     final manifest = decoded.cast<String, dynamic>();
     if (manifest['format'] != _backupFormat ||
-        manifest['formatVersion'] != _backupFormatVersion) {
+        !_acceptsArchiveFormat(manifest)) {
       throw const FormatException('manifest_version');
     }
     final rawEntries = manifest['entries'];
@@ -1417,12 +1471,127 @@ class DataSync {
     return items;
   }
 
+  /// Whether this build may read an archive of the manifest's format version.
+  ///
+  /// An exact match, plus one relaxation: a NEWER archive that vouches for us
+  /// through [backupMinimumReadableFormatKey]. An undeclared newer archive is
+  /// refused -- unlike the database axis there are no undeclared newer
+  /// archives in the wild to serve, since every build that can write a newer
+  /// format also writes the declaration, so refusing costs nothing and keeps
+  /// the strict default.
+  static bool _acceptsArchiveFormat(Map<String, dynamic> manifest) {
+    final formatVersion = manifest['formatVersion'];
+    if (formatVersion is! int) return false;
+    if (formatVersion == _backupFormatVersion) return true;
+    // Older archive formats were never supported and still are not.
+    if (formatVersion < _backupFormatVersion) return false;
+    final declared = manifest[backupMinimumReadableFormatKey];
+    return declared is int && declared >= 1 && declared <= _backupFormatVersion;
+  }
+
+  /// Whether the manifest was written by a build newer than this one, on
+  /// either axis: a newer archive format, or a newer database schema.
+  ///
+  /// Gates what unrecognised content is tolerated. Both axes matter and they
+  /// move independently -- a newer build can add an ignorable directory
+  /// without touching the schema, and a settings-only backup has no schema at
+  /// all -- so keying tolerance to the database alone would reject official
+  /// backups this build could otherwise read.
+  ///
+  /// A newer format version reaching here has already passed
+  /// [_acceptsArchiveFormat], so it is one that vouched for us.
+  static bool _declaresNewerBuild(Map<String, dynamic> manifest) {
+    final formatVersion = manifest['formatVersion'];
+    if (formatVersion is int && formatVersion > _backupFormatVersion) {
+      return true;
+    }
+    final database = manifest['database'];
+    if (database is! Map) return false;
+    final schemaVersion = database['schemaVersion'];
+    return schemaVersion is int &&
+        schemaVersion > AppDatabase.currentSchemaVersion;
+  }
+
+  /// Manifest keys this build understands. Anything else is dropped from a
+  /// backup that declares a newer schema, and rejected in any other backup.
+  static const _knownManifestKeys = <String>{
+    'format',
+    'formatVersion',
+    'payloadKind',
+    'createdAtUtc',
+    'appVersion',
+    'includeChats',
+    'includeFiles',
+    'secretsIncluded',
+    'businessEntityRowIds',
+    'database',
+    'entries',
+  };
+
+  static const _knownManifestDatabaseKeys = <String>{
+    'entry',
+    'schemaVersion',
+    SchemaMigrations.minimumReadableManifestKey,
+    'conversationCount',
+    'messageCount',
+  };
+
+  /// Reduces a newer build's manifest to the fields this one knows.
+  ///
+  /// Every validator downstream is single-version by design, and
+  /// RestoreBundleStaging checks the root key set exactly, so an unrecognised
+  /// field would fail the restore long after the user consented to it.
+  /// Trimming here keeps that strictness intact instead of loosening it in
+  /// each validator. A same-or-older backup is left alone, so an unexpected
+  /// field there still fails.
+  static void _stripUnknownManifestKeys(Map<String, dynamic> manifest) {
+    if (!_declaresNewerBuild(manifest)) return;
+    manifest.removeWhere((key, _) => !_knownManifestKeys.contains(key));
+    final database = manifest['database'];
+    if (database is Map) {
+      database.removeWhere(
+        (key, _) => !_knownManifestDatabaseKeys.contains(key),
+      );
+    }
+    // Everything the newer format added has now been removed, so what is left
+    // really is an archive in this build's format. Saying otherwise would
+    // strand the staged candidate at RestoreBundleStaging's exact-match check.
+    manifest['formatVersion'] = _backupFormatVersion;
+  }
+
+  /// Resolves [prompt] against [file] and returns the effective value for
+  /// `allowUnverifiedForwardCompatible`.
+  ///
+  /// A refusal is reported as a cancellation: the prompt owns the explanation,
+  /// so there is nothing left for the restore to say.
+  static Future<bool> _askForwardCompatibility(
+    File file, {
+    required ForwardCompatibilityPrompt? prompt,
+    required bool allowUnverifiedForwardCompatible,
+  }) async {
+    if (prompt == null) return allowUnverifiedForwardCompatible;
+    final compatibility = await inspectBackupCompatibility(file);
+    // No manifest or no SQLite payload: nothing to ask about, and the restore
+    // itself will report any real problem.
+    if (compatibility == null) return allowUnverifiedForwardCompatible;
+    switch (await prompt(compatibility)) {
+      case ForwardCompatibilityAnswer.refuse:
+        throw const BackupCancelledException();
+      case ForwardCompatibilityAnswer.proceedUnverified:
+        return true;
+      case ForwardCompatibilityAnswer.proceed:
+        return allowUnverifiedForwardCompatible;
+    }
+  }
+
   Future<void> restoreFromWebDav(
     WebDavConfig cfg,
     BackupFileItem item, {
     RestoreMode mode = RestoreMode.overwrite,
     BackupProgressSink? onProgress,
     BackupCancelToken? cancelToken,
+    bool allowUnverifiedForwardCompatible = false,
+    ForwardCompatibilityPrompt? onForwardCompatibility,
   }) async {
     // Stream the download to a file instead of buffering in memory.
     final client = http.Client();
@@ -1464,12 +1633,20 @@ class DataSync {
         }
         rethrow;
       }
+      // Only now does the archive exist locally, so this is the earliest the
+      // question can be put to the user.
+      final allowUnverified = await _askForwardCompatibility(
+        file,
+        prompt: onForwardCompatibility,
+        allowUnverifiedForwardCompatible: allowUnverifiedForwardCompatible,
+      );
       await _restoreFromBackupFile(
         file,
         cfg,
         mode: mode,
         onProgress: onProgress,
         cancelToken: cancelToken,
+        allowUnverifiedForwardCompatible: allowUnverified,
       );
     } catch (error) {
       if (error is BackupCancelledException ||
@@ -1531,14 +1708,24 @@ class DataSync {
     RestoreMode mode = RestoreMode.overwrite,
     BackupProgressSink? onProgress,
     BackupCancelToken? cancelToken,
+    bool allowUnverifiedForwardCompatible = false,
+    ForwardCompatibilityPrompt? onForwardCompatibility,
   }) async {
     if (!await file.exists()) throw Exception('备份文件不存在');
+    // Usually already answered by the caller, which had the file all along;
+    // the prompt is here for S3, which downloads through this entry point.
+    final allowUnverified = await _askForwardCompatibility(
+      file,
+      prompt: onForwardCompatibility,
+      allowUnverifiedForwardCompatible: allowUnverifiedForwardCompatible,
+    );
     await _restoreFromBackupFile(
       file,
       cfg,
       mode: mode,
       onProgress: onProgress,
       cancelToken: cancelToken,
+      allowUnverifiedForwardCompatible: allowUnverified,
     );
   }
 
@@ -1627,6 +1814,7 @@ class DataSync {
     return jsonEncode({
       'format': _backupFormat,
       'formatVersion': _backupFormatVersion,
+      backupMinimumReadableFormatKey: _minimumReadableFormatVersion,
       'payloadKind': includeChats ? 'sqlite' : 'settings-only',
       'createdAtUtc': DateTime.now().toUtc().toIso8601String(),
       'appVersion': appVersion,
@@ -1638,6 +1826,10 @@ class DataSync {
         'database': {
           'entry': _databaseEntryName,
           'schemaVersion': snapshotInfo.schemaVersion,
+          // Lets an older build decide whether it may restore this backup by
+          // dropping what it does not know, instead of refusing outright.
+          SchemaMigrations.minimumReadableManifestKey:
+              SchemaMigrations.minimumReadableSchemaVersion,
           'conversationCount': snapshotInfo.conversationCount,
           'messageCount': snapshotInfo.messageCount,
         },
@@ -1656,12 +1848,14 @@ class DataSync {
   ) => _preflightVersionedBackup(
     manifestPath: args.manifestPath,
     extractDirPath: args.extractDirPath,
+    allowUnverifiedForwardCompatible: args.allowUnverifiedForwardCompatible,
     ctx: ctx,
   );
 
   static Future<_VersionedBackupInfo> _preflightVersionedBackup({
     required String manifestPath,
     required String extractDirPath,
+    bool allowUnverifiedForwardCompatible = false,
     BackupIsolateContext? ctx,
   }) async {
     final manifestFile = File(manifestPath);
@@ -1675,7 +1869,7 @@ class DataSync {
     }
     final manifest = decoded.cast<String, dynamic>();
     if (manifest['format'] != _backupFormat ||
-        manifest['formatVersion'] != _backupFormatVersion) {
+        !_acceptsArchiveFormat(manifest)) {
       throw const FormatException('manifest_version');
     }
     final payloadKind = manifest['payloadKind'];
@@ -1719,25 +1913,47 @@ class DataSync {
     if (!entries.containsKey('settings.json')) {
       throw const FormatException('settings.json');
     }
+    // Entries this build has no use for. Tolerated only when the backup comes
+    // from a NEWER build, where they are the archive-level counterpart of the
+    // unknown tables and columns the database normalizer drops; from a same-or
+    // older build they mean the archive is malformed. The verdict below still
+    // decides whether the backup may be restored at all -- this only decides
+    // whether an unrecognised entry is fatal on its own.
+    final unknownEntryNames = <String>[];
     for (final name in entries.keys) {
-      final knownEntry =
-          name == 'settings.json' ||
-          name == _databaseEntryName ||
+      final isFileEntry =
           name.startsWith('upload/') ||
           name.startsWith('avatars/') ||
           name.startsWith('images/') ||
           name.startsWith('fonts/');
+      final knownEntry =
+          name == 'settings.json' || name == _databaseEntryName || isFileEntry;
       if (!knownEntry) {
-        throw FormatException('manifest_entry_scope:$name');
+        unknownEntryNames.add(name);
+        continue;
       }
-      if (!includeFiles &&
-          (name.startsWith('upload/') ||
-              name.startsWith('avatars/') ||
-              name.startsWith('images/') ||
-              name.startsWith('fonts/'))) {
+      if (!includeFiles && isFileEntry) {
         throw FormatException('manifest_files:$name');
       }
     }
+    if (unknownEntryNames.isNotEmpty) {
+      if (!_declaresNewerBuild(manifest)) {
+        throw FormatException(
+          'manifest_entry_scope:${unknownEntryNames.first}',
+        );
+      }
+      for (final name in unknownEntryNames) {
+        entries.remove(name);
+        // Removed from disk too, so nothing downstream can pick them up: the
+        // rewritten manifest below no longer mentions them, and a staged
+        // candidate must contain only what its manifest declares.
+        final file = File(p.joinAll([extractDirPath, ...name.split('/')]));
+        if (file.existsSync()) file.deleteSync();
+      }
+    }
+    // Same idea one level up: a newer build may describe itself with manifest
+    // fields this one has never heard of.
+    _stripUnknownManifestKeys(manifest);
 
     final validateTotal = entries.values.fold<int>(
       0,
@@ -1778,23 +1994,56 @@ class DataSync {
       }
       final database = rawDatabase.cast<String, dynamic>();
       final schemaVersion = database['schemaVersion'];
+      final declaredMinimumReadable =
+          database[SchemaMigrations.minimumReadableManifestKey];
       final conversationCount = database['conversationCount'];
       final messageCount = database['messageCount'];
       if (database['entry'] != _databaseEntryName ||
           schemaVersion is! int ||
+          schemaVersion < 1 ||
+          (declaredMinimumReadable != null &&
+              (declaredMinimumReadable is! int ||
+                  declaredMinimumReadable < 1 ||
+                  declaredMinimumReadable > schemaVersion)) ||
           conversationCount is! int ||
           conversationCount < 0 ||
           messageCount is! int ||
           messageCount < 0) {
         throw const FormatException('manifest_database');
       }
+      final verdict = SchemaMigrations.classifyBackup(
+        schemaVersion: schemaVersion,
+        declaredMinimumReadable: declaredMinimumReadable as int?,
+      );
+      switch (verdict) {
+        case BackupSchemaVerdict.unreadable:
+          throw const FormatException('manifest_database_schema_too_new');
+        case BackupSchemaVerdict.forwardUndeclared:
+          // The caller must have obtained the user's informed consent; without
+          // it there is no way to know this backup is safe to read.
+          if (!allowUnverifiedForwardCompatible) {
+            throw const FormatException('manifest_database_schema_too_new');
+          }
+        case BackupSchemaVerdict.current:
+        case BackupSchemaVerdict.needsUpgrade:
+        case BackupSchemaVerdict.forwardCompatible:
+          break;
+      }
       final databaseFile = File(
         p.joinAll([extractDirPath, ..._databaseEntryName.split('/')]),
       );
       final databaseInfo =
-          await ChatDatabaseRepository.prepareSnapshotForRestore(databaseFile);
-      if (databaseInfo.schemaVersion != schemaVersion ||
-          databaseInfo.conversationCount != conversationCount ||
+          await ChatDatabaseRepository.prepareSnapshotForRestore(
+            databaseFile,
+            allowForwardCompatible:
+                verdict == BackupSchemaVerdict.forwardCompatible ||
+                verdict == BackupSchemaVerdict.forwardUndeclared,
+          );
+      // The manifest records the schema the backup was AUTHORED at; the info
+      // records the schema after prepareSnapshotForRestore migrated it, so the
+      // two legitimately differ for an older backup. Row counts are the
+      // invariant instead: a migration must never add or drop rows.
+      if (databaseInfo.conversationCount != conversationCount ||
           databaseInfo.messageCount != messageCount) {
         throw const FormatException('manifest_database_metadata');
       }
@@ -2476,12 +2725,56 @@ class DataSync {
     );
   }
 
+  /// Reads a backup file's manifest and reports what restoring it would mean.
+  ///
+  /// Only the manifest entry is decoded, so this stays cheap enough to run
+  /// before the restore begins. Returns null when the file carries no SQLite
+  /// payload or its manifest cannot be read — the restore itself reports those
+  /// properly.
+  static Future<BackupCompatibility?> inspectBackupCompatibility(
+    File file,
+  ) async {
+    try {
+      if (!await file.exists()) return null;
+      final inputStream = InputFileStream(file.path);
+      Map<String, dynamic>? manifest;
+      try {
+        final archive = ZipDecoder().decodeStream(inputStream);
+        for (final entry in archive.files) {
+          if (_zipEntryName(entry.name) != _manifestEntryName) continue;
+          if (!entry.isFile || entry.size > _maxManifestBytes) return null;
+          final decoded = jsonDecode(utf8.decode(entry.readBytes()!));
+          if (decoded is Map<String, dynamic>) manifest = decoded;
+          break;
+        }
+      } finally {
+        await inputStream.close();
+      }
+      if (manifest == null) return null;
+      final database = manifest['database'];
+      if (database is! Map) return null;
+      final schemaVersion = database['schemaVersion'];
+      if (schemaVersion is! int) return null;
+      final declared = database[SchemaMigrations.minimumReadableManifestKey];
+      return (
+        schemaVersion: schemaVersion,
+        verdict: SchemaMigrations.classifyBackup(
+          schemaVersion: schemaVersion,
+          declaredMinimumReadable: declared is int ? declared : null,
+        ),
+      );
+    } catch (_) {
+      return null;
+    }
+  }
+
   Future<void> _restoreFromBackupFile(
     File file,
     WebDavConfig cfg, {
     RestoreMode mode = RestoreMode.overwrite,
     BackupProgressSink? onProgress,
     BackupCancelToken? cancelToken,
+    bool allowUnverifiedForwardCompatible = false,
   }) async {
     _lastMergeReport = null;
     // Extract to temp using file-stream decoding to avoid loading the full ZIP
@@ -2527,6 +2820,8 @@ class DataSync {
               payload: _BackupPreflightArgs(
                 manifestPath: manifestFile.path,
                 extractDirPath: extractDir.path,
+                allowUnverifiedForwardCompatible:
+                    allowUnverifiedForwardCompatible,
               ),
               cancelToken: cancelToken,
               onProgress: onProgress,
@@ -3016,10 +3311,15 @@ class _BackupPreflightArgs {
   const _BackupPreflightArgs({
     required this.manifestPath,
     required this.extractDirPath,
+    this.allowUnverifiedForwardCompatible = false,
   });
 
   final String manifestPath;
   final String extractDirPath;
+
+  /// Set only after the user has been told the backup comes from a newer
+  /// version that made no compatibility promise, and chose to continue.
+  final bool allowUnverifiedForwardCompatible;
 }
 
 class _BackupPackArgs {

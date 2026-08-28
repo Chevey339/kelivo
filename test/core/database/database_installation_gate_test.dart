@@ -464,5 +464,210 @@ void main() {
         );
       });
     });
+
+    group('迁移前副本的清扫', () {
+      File backupFor(File database) => File(
+        '${database.path}${ChatDatabaseRepository.premigrationBackupPrefix}1',
+      );
+
+      test('数据库健康时删除副本', () async {
+        await DatabaseInstallationGate.ensureReady(appDataDirectory: directory);
+        final file = databaseFile(directory);
+        final backup = backupFor(file);
+        await file.copy(backup.path);
+
+        await DatabaseInstallationGate.ensureReady(appDataDirectory: directory);
+
+        expect(await backup.exists(), isFalse);
+      });
+
+      test('数据库缺失时用副本恢复，而不是把副本删掉', () async {
+        final receipt = await DatabaseInstallationGate.ensureReady(
+          appDataDirectory: directory,
+        );
+        final file = databaseFile(directory);
+        final backup = backupFor(file);
+        await file.copy(backup.path);
+        // A crash after the rollback removed the database but before it wrote
+        // the copy back: the copy is the only surviving good state.
+        await file.delete();
+
+        final recovered = await DatabaseInstallationGate.ensureReady(
+          appDataDirectory: directory,
+        );
+
+        expect(recovered.databaseId, receipt.databaseId);
+        expect(await backup.exists(), isFalse);
+        expect(
+          ChatDatabaseRepository.inspectInstalledDatabase(file).databaseId,
+          receipt.databaseId,
+        );
+      });
+
+      test('数据库损坏时同样用副本恢复', () async {
+        final receipt = await DatabaseInstallationGate.ensureReady(
+          appDataDirectory: directory,
+        );
+        final file = databaseFile(directory);
+        final backup = backupFor(file);
+        await file.copy(backup.path);
+        // A torn copy-back leaves a truncated file behind.
+        await file.writeAsBytes(
+          (await backup.readAsBytes()).sublist(0, 512),
+          flush: true,
+        );
+
+        await DatabaseInstallationGate.ensureReady(appDataDirectory: directory);
+
+        expect(await backup.exists(), isFalse);
+        expect(
+          ChatDatabaseRepository.inspectInstalledDatabase(file).databaseId,
+          receipt.databaseId,
+        );
+      });
+
+      test('结构缺失（quick_check 仍 ok）时不删副本，而是回滚', () async {
+        // A migration that commits but leaves the schema incomplete is
+        // physically sound, so quick_check passes. Deleting the copy here
+        // would throw away the only way back moments before
+        // migrateInstalledDatabase notices the structure is wrong.
+        final receipt = await DatabaseInstallationGate.ensureReady(
+          appDataDirectory: directory,
+        );
+        final file = databaseFile(directory);
+        final backup = backupFor(file);
+        await file.copy(backup.path);
+        final raw = sqlite.sqlite3.open(file.path);
+        try {
+          raw.execute('DROP TABLE preference_rows;');
+          raw.execute('PRAGMA wal_checkpoint(TRUNCATE);');
+          final check = raw.select('PRAGMA quick_check;');
+          expect(
+            check.single.values.single,
+            'ok',
+            reason: 'the premise: physical integrity says nothing about schema',
+          );
+          expect(raw.userVersion, AppDatabase.currentSchemaVersion);
+        } finally {
+          raw.close();
+        }
+
+        final recovered = await DatabaseInstallationGate.ensureReady(
+          appDataDirectory: directory,
+        );
+
+        expect(recovered.databaseId, receipt.databaseId);
+        expect(await backup.exists(), isFalse);
+        final after = sqlite.sqlite3.open(
+          file.path,
+          mode: sqlite.OpenMode.readOnly,
+        );
+        try {
+          expect(
+            after
+                .select("SELECT name FROM sqlite_master WHERE type = 'table';")
+                .map((row) => row['name']),
+            contains('preference_rows'),
+          );
+        } finally {
+          after.close();
+        }
+      });
+
+      test('空库（userVersion 0）算损坏而不是未知版本', () async {
+        final receipt = await DatabaseInstallationGate.ensureReady(
+          appDataDirectory: directory,
+        );
+        final file = databaseFile(directory);
+        final backup = backupFor(file);
+        await file.copy(backup.path);
+        // A copy interrupted at the very start: a valid, empty SQLite file.
+        await file.delete();
+        final empty = sqlite.sqlite3.open(file.path);
+        empty.close();
+
+        final recovered = await DatabaseInstallationGate.ensureReady(
+          appDataDirectory: directory,
+        );
+
+        expect(recovered.databaseId, receipt.databaseId);
+        expect(await backup.exists(), isFalse);
+      });
+
+      test('降级运行时不拿旧副本覆盖更高版本的数据库', () async {
+        // A newer build migrated the database and crashed before deleting its
+        // copy; this older build must not mistake "version I do not know" for
+        // "damaged" and roll the user back.
+        final receipt = await DatabaseInstallationGate.ensureReady(
+          appDataDirectory: directory,
+        );
+        final file = databaseFile(directory);
+        final backup = backupFor(file);
+        await file.copy(backup.path);
+        final raw = sqlite.sqlite3.open(file.path);
+        try {
+          raw.execute('CREATE TABLE future_rows (id TEXT PRIMARY KEY);');
+          raw.userVersion = AppDatabase.currentSchemaVersion + 1;
+        } finally {
+          raw.close();
+        }
+
+        await expectLater(
+          DatabaseInstallationGate.ensureReady(appDataDirectory: directory),
+          throwsA(
+            isA<StateError>().having(
+              (e) => e.message,
+              'message',
+              'database_schema_too_new',
+            ),
+          ),
+        );
+
+        // Both files survive: the newer database is strictly ahead of the copy.
+        expect(await backup.exists(), isTrue);
+        final after = sqlite.sqlite3.open(
+          file.path,
+          mode: sqlite.OpenMode.readOnly,
+        );
+        try {
+          expect(after.userVersion, AppDatabase.currentSchemaVersion + 1);
+          expect(
+            after
+                .select("SELECT name FROM sqlite_master WHERE type = 'table';")
+                .map((row) => row['name']),
+            contains('future_rows'),
+          );
+        } finally {
+          after.close();
+        }
+        expect(receipt.databaseId, isNotEmpty);
+      });
+
+      test('多个副本且数据库不可用时拒绝猜测', () async {
+        await DatabaseInstallationGate.ensureReady(appDataDirectory: directory);
+        final file = databaseFile(directory);
+        final first = backupFor(file);
+        final second = File(
+          '${file.path}${ChatDatabaseRepository.premigrationBackupPrefix}2',
+        );
+        await file.copy(first.path);
+        await file.copy(second.path);
+        await file.delete();
+
+        await expectLater(
+          DatabaseInstallationGate.ensureReady(appDataDirectory: directory),
+          throwsA(
+            isA<StateError>().having(
+              (e) => e.message,
+              'message',
+              'database_premigration_ambiguous',
+            ),
+          ),
+        );
+        // Nothing is destroyed while the state is ambiguous.
+        expect(await first.exists(), isTrue);
+        expect(await second.exists(), isTrue);
+      });
+    });
   });
 }

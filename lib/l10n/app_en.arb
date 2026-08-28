@@ -734,6 +734,17 @@
   "backupPageMergeMode": "Merge",
   "backupPageMergeModeDescription": "Keep local data and add backup data. Identical conversations are skipped and conflicting conversations receive new IDs.",
   "backupPageRestore": "Restore",
+  "backupPageForwardCompatTitle": "Backup is from a newer version",
+  "backupPageForwardCompatBody": "This backup was created by a newer version of Kelivo (data format {backupVersion}; this version supports {currentVersion}), and it does not say whether older versions can read it.\n\nYou can continue: anything this version does not recognise will be skipped, and the backup file itself is not modified. But if the newer version changed how existing data is stored, some content may be imported incorrectly.\n\nUpdating Kelivo first is the safer choice.",
+  "@backupPageForwardCompatBody": {
+    "placeholders": {
+      "backupVersion": { "type": "int" },
+      "currentVersion": { "type": "int" }
+    }
+  },
+  "backupPageForwardCompatContinue": "Import anyway",
+  "backupPageForwardCompatCancel": "Cancel",
+  "backupPageSchemaTooNewMessage": "This backup was created by a newer version of Kelivo and cannot be read by this version. Please update Kelivo and try again.",
   "backupPageBackupUploaded": "Backup uploaded",
   "backupPageBackup": "Backup",
   "backupPageExporting": "Exporting...",
@@ -1570,6 +1581,7 @@
   "modelDetailSheetBodyJsonHint": "Body JSON",
   "modelSelectSheetSearchHint": "Search models or providers",
   "modelSelectSheetFavoritesSection": "Favorites",
+  "modelSelectSheetFollowAssistant": "Follow assistant",
   "modelSelectSheetFavoriteTooltip": "Favorite",
   "modelSelectSheetChatType": "Chat",
   "modelSelectSheetEmbeddingType": "Embedding",

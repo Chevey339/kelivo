@@ -2336,6 +2336,10 @@ class ChatService extends ChangeNotifier {
       summary: conversation.summary,
       lastSummarizedMessageCount: conversation.lastSummarizedMessageCount,
       chatSuggestions: List<String>.of(conversation.chatSuggestions),
+      injectedMemoryHash: conversation.injectedMemoryHash,
+      lastMemoryExtractedOrder: conversation.lastMemoryExtractedOrder,
+      chatModelProvider: conversation.chatModelProvider,
+      chatModelId: conversation.chatModelId,
     );
     await _repo.putMigrationBatch(
       conversations: [restored],
@@ -3838,6 +3842,75 @@ class ChatService extends ChangeNotifier {
     _conversationsCache[conversationId] = conversation;
     _bumpConversationListRevision();
     notifyListeners();
+  }
+
+  /// Sets or clears this conversation's model override.
+  ///
+  /// Passing null for both clears it, so the conversation follows the
+  /// assistant's model again, then the global default. Returns the updated
+  /// conversation so the caller can push it into the UI's own copy.
+  Future<Conversation?> setConversationModel(
+    String conversationId, {
+    String? providerKey,
+    String? modelId,
+  }) async {
+    if (!_initialized) await init();
+    final resolvedProvider = (providerKey ?? '').isEmpty ? null : providerKey;
+    final resolvedModel = (modelId ?? '').isEmpty ? null : modelId;
+    // Half a pair would silently fall through to the assistant; keep the two
+    // columns in lockstep.
+    final provider = resolvedModel == null ? null : resolvedProvider;
+    final model = resolvedProvider == null ? null : resolvedModel;
+
+    final draft = _draftConversations[conversationId];
+    if (draft != null) {
+      draft.chatModelProvider = provider;
+      draft.chatModelId = model;
+      draft.updatedAt = DateTime.now();
+      notifyListeners();
+      return draft;
+    }
+
+    final conversation = _conversationsCache[conversationId];
+    if (conversation == null) return null;
+    if (conversation.chatModelProvider == provider &&
+        conversation.chatModelId == model) {
+      return conversation;
+    }
+    conversation.chatModelProvider = provider;
+    conversation.chatModelId = model;
+    await _saveConversation(conversation);
+    notifyListeners();
+    return conversation;
+  }
+
+  /// Clears the model override on every conversation pointing at a provider or
+  /// model that no longer exists.
+  Future<void> clearConversationModelOverrides({
+    required String providerKey,
+    String? modelId,
+  }) async {
+    if (!_initialized) await init();
+    final changed = await _repo.clearConversationModelOverrides(
+      providerKey: providerKey,
+      modelId: modelId,
+    );
+    var touchedCache = false;
+    for (final conversation in _conversationsCache.values) {
+      if (conversation.chatModelProvider != providerKey) continue;
+      if (modelId != null && conversation.chatModelId != modelId) continue;
+      conversation.chatModelProvider = null;
+      conversation.chatModelId = null;
+      touchedCache = true;
+    }
+    for (final draft in _draftConversations.values) {
+      if (draft.chatModelProvider != providerKey) continue;
+      if (modelId != null && draft.chatModelId != modelId) continue;
+      draft.chatModelProvider = null;
+      draft.chatModelId = null;
+      touchedCache = true;
+    }
+    if (changed > 0 || touchedCache) notifyListeners();
   }
 
   Future<Conversation?> toggleTruncateAtTail(

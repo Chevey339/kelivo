@@ -10,7 +10,6 @@ import '../../../core/providers/mcp_provider.dart';
 import '../../../core/providers/quick_phrase_provider.dart';
 import '../../../core/providers/instruction_injection_provider.dart';
 import '../../../core/providers/world_book_provider.dart';
-import '../utils/model_display_helper.dart';
 import 'chat_input_bar.dart';
 import 'model_icon.dart';
 
@@ -32,6 +31,9 @@ class ChatInputSection extends StatelessWidget {
   const ChatInputSection({
     super.key,
     required this.inputBarKey,
+    this.chatModelProviderKey,
+    this.chatModelId,
+    this.chatModelIsConversationOverride = false,
     required this.inputFocus,
     required this.inputController,
     required this.mediaController,
@@ -107,6 +109,21 @@ class ChatInputSection extends StatelessWidget {
   final VoidCallback? onClearContext;
   final VoidCallback? onCompressContext;
   final String? conversationId;
+
+  /// The model this conversation sends with, already resolved through
+  /// conversation override -> assistant -> global default. Resolved by the
+  /// caller because only it holds the Conversation; watching ChatService here
+  /// would rebuild the composer on every streaming notification.
+  final String? chatModelProviderKey;
+  final String? chatModelId;
+
+  /// Whether the resolved model above comes from this conversation's own
+  /// override rather than from the assistant.
+  ///
+  /// Gates the capability enforcement below, which writes to the ASSISTANT: a
+  /// model picked for one conversation must not wipe the MCP selection or the
+  /// thinking budget shared by every other conversation under that assistant.
+  final bool chatModelIsConversationOverride;
   final String? sendButtonTooltip;
   final bool backgroundImageActive;
 
@@ -118,13 +135,15 @@ class ChatInputSection extends StatelessWidget {
     final a = ap.currentAssistant;
     final assistantId = a?.id;
 
-    // Use unified helper to get model identifiers
-    final modelIds = getActiveModelIds(settings, assistant: a);
-    final pk = modelIds.providerKey;
-    final mid = modelIds.modelId;
+    final pk = chatModelProviderKey;
+    final mid = chatModelId;
 
-    // Enforce model capabilities: disable MCP selection if model doesn't support tools
-    _enforceModelCapabilities(context, settings, ap, a, pk, mid);
+    // Enforce model capabilities: disable MCP selection if model doesn't
+    // support tools. Skipped while the conversation overrides the model —
+    // these writes land on the assistant and would leak across conversations.
+    if (!chatModelIsConversationOverride) {
+      _enforceModelCapabilities(context, settings, ap, a, pk, mid);
+    }
 
     final isDesktop = _isDesktopPlatform(context);
     final hasWorldBooks =
@@ -132,6 +151,8 @@ class ChatInputSection extends StatelessWidget {
 
     return ChatInputBar(
       key: inputBarKey,
+      chatModelProviderKey: pk,
+      chatModelId: mid,
       onMore: onMore,
       onSelectModel: onSelectModel,
       onLongPressSelectModel: onLongPressSelectModel,
@@ -266,11 +287,9 @@ class ChatInputSection extends StatelessWidget {
     String? pk,
     String? mid,
   ) {
-    final pk2 = a?.chatModelProvider ?? settings.currentModelProvider;
-    final mid3 = a?.chatModelId ?? settings.currentModelId;
-    if (pk2 == null || mid3 == null) return false;
+    if (pk == null || mid == null) return false;
     final hasEnabledMcp = context.watch<McpProvider>().hasAnyEnabled;
-    return isToolModel(pk2, mid3) && hasEnabledMcp;
+    return isToolModel(pk, mid) && hasEnabledMcp;
   }
 
   bool _isMcpActive(BuildContext context, Assistant? a) {

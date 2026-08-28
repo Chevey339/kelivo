@@ -151,6 +151,7 @@ class S3BackupProvider extends ChangeNotifier {
     RestoreMode mode = RestoreMode.overwrite,
     BackupProgressSink? onProgress,
     BackupCancelToken? cancelToken,
+    ForwardCompatibilityPrompt? onForwardCompatibility,
   }) async {
     _busy = true;
     _message = null;
@@ -175,6 +176,7 @@ class S3BackupProvider extends ChangeNotifier {
         mode: mode,
         onProgress: onProgress,
         cancelToken: cancelToken,
+        onForwardCompatibility: onForwardCompatibility,
       );
       _message = 'Restored';
     } catch (e) {

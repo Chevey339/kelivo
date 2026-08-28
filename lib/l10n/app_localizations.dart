@@ -3406,6 +3406,36 @@ abstract class AppLocalizations {
   /// **'Restore'**
   String get backupPageRestore;
 
+  /// No description provided for @backupPageForwardCompatTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Backup is from a newer version'**
+  String get backupPageForwardCompatTitle;
+
+  /// No description provided for @backupPageForwardCompatBody.
+  ///
+  /// In en, this message translates to:
+  /// **'This backup was created by a newer version of Kelivo (data format {backupVersion}; this version supports {currentVersion}), and it does not say whether older versions can read it.\n\nYou can continue: anything this version does not recognise will be skipped, and the backup file itself is not modified. But if the newer version changed how existing data is stored, some content may be imported incorrectly.\n\nUpdating Kelivo first is the safer choice.'**
+  String backupPageForwardCompatBody(int backupVersion, int currentVersion);
+
+  /// No description provided for @backupPageForwardCompatContinue.
+  ///
+  /// In en, this message translates to:
+  /// **'Import anyway'**
+  String get backupPageForwardCompatContinue;
+
+  /// No description provided for @backupPageForwardCompatCancel.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel'**
+  String get backupPageForwardCompatCancel;
+
+  /// No description provided for @backupPageSchemaTooNewMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'This backup was created by a newer version of Kelivo and cannot be read by this version. Please update Kelivo and try again.'**
+  String get backupPageSchemaTooNewMessage;
+
   /// No description provided for @backupPageBackupUploaded.
   ///
   /// In en, this message translates to:
@@ -6498,6 +6528,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Favorites'**
   String get modelSelectSheetFavoritesSection;
+
+  /// No description provided for @modelSelectSheetFollowAssistant.
+  ///
+  /// In en, this message translates to:
+  /// **'Follow assistant'**
+  String get modelSelectSheetFollowAssistant;
 
   /// No description provided for @modelSelectSheetFavoriteTooltip.
   ///

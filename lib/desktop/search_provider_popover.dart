@@ -17,9 +17,14 @@ import '../theme/design_tokens.dart';
 /// Show a desktop-only floating popover for search provider selection.
 /// It appears above the chat input bar with blurred background, top rounded corners,
 /// slightly narrower than the input width, and slides down to dismiss.
+/// [chatModelProviderKey]/[chatModelId] carry the model the chat actually
+/// sends with, resolved by the caller (conversation override -> assistant ->
+/// global default).
 Future<void> showDesktopSearchProviderPopover(
   BuildContext context, {
   required GlobalKey anchorKey,
+  String? chatModelProviderKey,
+  String? chatModelId,
 }) async {
   final overlay = Overlay.of(context);
   final keyContext = anchorKey.currentContext;
@@ -41,6 +46,8 @@ Future<void> showDesktopSearchProviderPopover(
     builder: (ctx) => _SearchPopoverOverlay(
       anchorRect: anchorRect,
       anchorWidth: size.width,
+      chatModelProviderKey: chatModelProviderKey,
+      chatModelId: chatModelId,
       onClose: () {
         try {
           entry.remove();
@@ -56,11 +63,15 @@ class _SearchPopoverOverlay extends StatefulWidget {
     required this.anchorRect,
     required this.anchorWidth,
     required this.onClose,
+    this.chatModelProviderKey,
+    this.chatModelId,
   });
 
   final Rect anchorRect;
   final double anchorWidth;
   final VoidCallback onClose;
+  final String? chatModelProviderKey;
+  final String? chatModelId;
 
   @override
   State<_SearchPopoverOverlay> createState() => _SearchPopoverOverlayState();
@@ -153,7 +164,11 @@ class _SearchPopoverOverlayState extends State<_SearchPopoverOverlay>
                         borderRadius: const BorderRadius.vertical(
                           top: Radius.circular(14),
                         ),
-                        child: _SearchContent(onDone: _close),
+                        child: _SearchContent(
+                          onDone: _close,
+                          chatModelProviderKey: widget.chatModelProviderKey,
+                          chatModelId: widget.chatModelId,
+                        ),
                       ),
                     ),
                   ),
@@ -206,13 +221,22 @@ class _GlassPanel extends StatelessWidget {
 }
 
 class _SearchContent extends StatelessWidget {
-  const _SearchContent({required this.onDone});
+  const _SearchContent({
+    required this.onDone,
+    this.chatModelProviderKey,
+    this.chatModelId,
+  });
   final VoidCallback onDone;
+  final String? chatModelProviderKey;
+  final String? chatModelId;
 
   bool _supportsBuiltInSearch(SettingsProvider settings, AssistantProvider ap) {
     final a = ap.currentAssistant;
-    final providerKey = a?.chatModelProvider ?? settings.currentModelProvider;
-    final modelId = a?.chatModelId ?? settings.currentModelId;
+    final providerKey =
+        chatModelProviderKey ??
+        a?.chatModelProvider ??
+        settings.currentModelProvider;
+    final modelId = chatModelId ?? a?.chatModelId ?? settings.currentModelId;
     if (providerKey == null || (modelId ?? '').isEmpty) return false;
     final cfg = settings.getProviderConfig(providerKey);
     return BuiltInToolsHelper.supportsBuiltInSearchForModel(
@@ -226,8 +250,11 @@ class _SearchContent extends StatelessWidget {
     AssistantProvider ap,
   ) {
     final a = ap.currentAssistant;
-    final providerKey = a?.chatModelProvider ?? settings.currentModelProvider;
-    final modelId = a?.chatModelId ?? settings.currentModelId;
+    final providerKey =
+        chatModelProviderKey ??
+        a?.chatModelProvider ??
+        settings.currentModelProvider;
+    final modelId = chatModelId ?? a?.chatModelId ?? settings.currentModelId;
     if (providerKey == null || (modelId ?? '').isEmpty) return false;
     final cfg = settings.getProviderConfig(providerKey);
     return BuiltInToolsHelper.isBuiltInSearchEnabled(
@@ -241,8 +268,11 @@ class _SearchContent extends StatelessWidget {
     AssistantProvider ap,
   ) {
     final a = ap.currentAssistant;
-    final providerKey = a?.chatModelProvider ?? settings.currentModelProvider;
-    final modelId = a?.chatModelId ?? settings.currentModelId;
+    final providerKey =
+        chatModelProviderKey ??
+        a?.chatModelProvider ??
+        settings.currentModelProvider;
+    final modelId = chatModelId ?? a?.chatModelId ?? settings.currentModelId;
     if (providerKey == null || (modelId ?? '').isEmpty) return false;
     final cfg = settings.getProviderConfig(providerKey);
     return BuiltInToolsHelper.supportsClaudeDynamicWebSearchForModel(
@@ -256,8 +286,11 @@ class _SearchContent extends StatelessWidget {
     AssistantProvider ap,
   ) {
     final a = ap.currentAssistant;
-    final providerKey = a?.chatModelProvider ?? settings.currentModelProvider;
-    final modelId = a?.chatModelId ?? settings.currentModelId;
+    final providerKey =
+        chatModelProviderKey ??
+        a?.chatModelProvider ??
+        settings.currentModelProvider;
+    final modelId = chatModelId ?? a?.chatModelId ?? settings.currentModelId;
     if (providerKey == null || (modelId ?? '').isEmpty) return false;
     final cfg = settings.getProviderConfig(providerKey);
     return BuiltInToolsHelper.isClaudeDynamicWebSearchEnabled(
@@ -272,8 +305,9 @@ class _SearchContent extends StatelessWidget {
     bool useClaudeDynamicWebSearch = false,
   }) async {
     final a = ap.currentAssistant;
-    final providerKey = a?.chatModelProvider ?? sp.currentModelProvider;
-    final modelId = a?.chatModelId ?? sp.currentModelId;
+    final providerKey =
+        chatModelProviderKey ?? a?.chatModelProvider ?? sp.currentModelProvider;
+    final modelId = chatModelId ?? a?.chatModelId ?? sp.currentModelId;
     if (providerKey == null || (modelId ?? '').isEmpty) return;
     final cfg = sp.getProviderConfig(providerKey);
     final overrides = Map<String, dynamic>.from(cfg.modelOverrides);
@@ -317,8 +351,9 @@ class _SearchContent extends StatelessWidget {
     AssistantProvider ap,
   ) async {
     final a = ap.currentAssistant;
-    final providerKey = a?.chatModelProvider ?? sp.currentModelProvider;
-    final modelId = a?.chatModelId ?? sp.currentModelId;
+    final providerKey =
+        chatModelProviderKey ?? a?.chatModelProvider ?? sp.currentModelProvider;
+    final modelId = chatModelId ?? a?.chatModelId ?? sp.currentModelId;
     if (providerKey == null || (modelId ?? '').isEmpty) return;
     final cfg = sp.getProviderConfig(providerKey);
     final overrides = Map<String, dynamic>.from(cfg.modelOverrides);

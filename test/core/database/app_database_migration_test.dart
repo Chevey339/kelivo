@@ -30,7 +30,12 @@ void main() {
   test(
     'installation gate rejects every unpublished SQLite schema without mutation',
     () async {
-      for (final schemaVersion in <int>[2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 42]) {
+      const unpublished = <int>[3, 4, 5, 6, 7, 8, 9, 10, 11, 42];
+      for (final schemaVersion in unpublished) {
+        expect(
+          AppDatabase.publishedSchemaVersions,
+          isNot(contains(schemaVersion)),
+        );
         final directory = await Directory.systemTemp.createTemp(
           'kelivo_reject_schema_${schemaVersion}_',
         );
@@ -72,12 +77,23 @@ void main() {
         } finally {
           after.close();
         }
+        expect(
+          await directory
+              .list()
+              .where(
+                (e) => e.path.contains(
+                  ChatDatabaseRepository.premigrationBackupPrefix,
+                ),
+              )
+              .isEmpty,
+          isTrue,
+        );
       }
     },
   );
 
   test(
-    'installed schema 1 is rejected when a business table is missing',
+    'an installed database is rejected when a business table is missing',
     () async {
       final directory = await Directory.systemTemp.createTemp(
         'kelivo_missing_business_table_',

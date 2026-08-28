@@ -85,6 +85,8 @@ class BackupProvider extends ChangeNotifier {
     RestoreMode mode = RestoreMode.overwrite,
     BackupProgressSink? onProgress,
     BackupCancelToken? cancelToken,
+    bool allowUnverifiedForwardCompatible = false,
+    ForwardCompatibilityPrompt? onForwardCompatibility,
   }) async {
     _busy = true;
     _message = null;
@@ -96,6 +98,8 @@ class BackupProvider extends ChangeNotifier {
         mode: mode,
         onProgress: onProgress,
         cancelToken: cancelToken,
+        allowUnverifiedForwardCompatible: allowUnverifiedForwardCompatible,
+        onForwardCompatibility: onForwardCompatibility,
       );
       _message = 'Restored';
     } catch (e) {
@@ -137,11 +141,15 @@ class BackupProvider extends ChangeNotifier {
     RestoreMode mode = RestoreMode.overwrite,
     BackupProgressSink? onProgress,
     BackupCancelToken? cancelToken,
+    bool allowUnverifiedForwardCompatible = false,
+    ForwardCompatibilityPrompt? onForwardCompatibility,
   }) => _dataSync.restoreFromLocalFile(
     file,
     _cfg,
     mode: mode,
     onProgress: onProgress,
     cancelToken: cancelToken,
+    allowUnverifiedForwardCompatible: allowUnverifiedForwardCompatible,
+    onForwardCompatibility: onForwardCompatibility,
   );
 }
