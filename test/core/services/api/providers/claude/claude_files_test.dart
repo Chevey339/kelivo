@@ -52,6 +52,7 @@ Future<HttpServer> _filesServer({
 }
 
 void main() {
+  uploadTests();
   late Directory tempDir;
   late PathProviderPlatform previousPathProvider;
 
@@ -310,6 +311,172 @@ void main() {
         ),
         isNull,
       );
+    });
+  });
+}
+
+/// A Files API upload endpoint answering [statusCode] with [body], recording
+/// the content type and byte count it received.
+Future<HttpServer> _uploadServer({
+  required int statusCode,
+  required String body,
+  required List<({String path, String? contentType, int bytes})> received,
+}) async {
+  final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+  server.listen((request) async {
+    // A loopback port picked at random draws the odd probe from other
+    // software on the machine; only the upload counts.
+    if (request.method != 'POST') {
+      request.response.statusCode = HttpStatus.notFound;
+      await request.response.close();
+      return;
+    }
+    var bytes = 0;
+    await for (final chunk in request) {
+      bytes += chunk.length;
+    }
+    received.add((
+      path: request.uri.path,
+      contentType: request.headers.contentType?.toString(),
+      bytes: bytes,
+    ));
+    request.response.statusCode = statusCode;
+    request.response.headers.contentType = ContentType.json;
+    request.response.write(body);
+    await request.response.close();
+  });
+  return server;
+}
+
+void uploadTests() {
+  late Directory tempDir;
+
+  setUp(() async {
+    tempDir = await Directory.systemTemp.createTemp('kelivo_claude_upload');
+  });
+
+  tearDown(() async {
+    try {
+      await tempDir.delete(recursive: true);
+    } catch (_) {}
+  });
+
+  group('claudeUploadFileName', () {
+    test('keeps an ordinary name', () {
+      expect(claudeUploadFileName('sales 2026.csv'), 'sales 2026.csv');
+    });
+
+    test('drops directories and forbidden characters', () {
+      expect(claudeUploadFileName('/tmp/a:b?.csv'), 'a_b_.csv');
+      expect(claudeUploadFileName('C:\\data\\q1.xlsx'), 'q1.xlsx');
+    });
+
+    test('falls back when nothing usable is left', () {
+      expect(claudeUploadFileName('..'), 'upload');
+      expect(claudeUploadFileName('   '), 'upload');
+    });
+
+    test('trims to 255 characters keeping the extension', () {
+      final name = claudeUploadFileName('${'x' * 300}.parquet');
+      expect(name.length, 255);
+      expect(name, endsWith('.parquet'));
+    });
+  });
+
+  group('uploadClaudeFile', () {
+    test('posts the file as multipart and returns its id', () async {
+      final file = File('${tempDir.path}/sales.csv')
+        ..writeAsStringSync('a,b\n1,2\n');
+      final received = <({String path, String? contentType, int bytes})>[];
+      final server = await _uploadServer(
+        statusCode: 200,
+        body: '{"id":"file_up1","type":"file"}',
+        received: received,
+      );
+      addTearDown(() => server.close(force: true));
+      final client = http.Client();
+      addTearDown(client.close);
+
+      final id = await uploadClaudeFile(
+        client: client,
+        base: 'http://${server.address.address}:${server.port}/v1',
+        headers: const {
+          'x-api-key': 'sk-test',
+          'Content-Type': 'application/json',
+          'Accept': 'text/event-stream',
+        },
+        path: file.path,
+        name: 'sales.csv',
+        mime: 'text/csv',
+      );
+
+      expect(id, 'file_up1');
+      expect(received.single.path, '/v1/files');
+      expect(received.single.contentType, startsWith('multipart/form-data'));
+      expect(received.single.bytes, greaterThan(file.lengthSync()));
+    });
+
+    test('names the file when the API refuses it', () async {
+      final file = File('${tempDir.path}/sales.csv')..writeAsStringSync('a');
+      final received = <({String path, String? contentType, int bytes})>[];
+      final server = await _uploadServer(
+        statusCode: 400,
+        body:
+            '{"type":"error","error":{"type":"invalid_request_error",'
+            '"message":"Storage limit exceeded"}}',
+        received: received,
+      );
+      addTearDown(() => server.close(force: true));
+      final client = http.Client();
+      addTearDown(client.close);
+
+      await expectLater(
+        uploadClaudeFile(
+          client: client,
+          base: 'http://${server.address.address}:${server.port}/v1',
+          headers: const {'x-api-key': 'sk-test'},
+          path: file.path,
+          name: 'sales.csv',
+        ),
+        throwsA(
+          isA<ClaudeFileUploadException>().having(
+            (e) => e.toString(),
+            'message',
+            'Attachment "sales.csv" could not be uploaded: '
+                'HTTP 400: Storage limit exceeded',
+          ),
+        ),
+      );
+    });
+
+    test('a missing file fails before any request', () async {
+      final received = <({String path, String? contentType, int bytes})>[];
+      final server = await _uploadServer(
+        statusCode: 200,
+        body: '{"id":"never"}',
+        received: received,
+      );
+      addTearDown(() => server.close(force: true));
+      final client = http.Client();
+      addTearDown(client.close);
+
+      await expectLater(
+        uploadClaudeFile(
+          client: client,
+          base: 'http://${server.address.address}:${server.port}/v1',
+          headers: const {},
+          path: '${tempDir.path}/gone.csv',
+          name: 'gone.csv',
+        ),
+        throwsA(
+          isA<ClaudeFileUploadException>().having(
+            (e) => e.reason,
+            'reason',
+            'the file cannot be read',
+          ),
+        ),
+      );
+      expect(received, isEmpty);
     });
   });
 }

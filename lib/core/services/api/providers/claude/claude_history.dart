@@ -118,6 +118,14 @@ class ClaudeHistory {
   /// against that assistant message. The latest one wins. Set by [build].
   ClaudeContainerRef? storedContainer;
 
+  /// The data files the user attached, in conversation order, and those of
+  /// the last message alone — what a fresh container needs and what one the
+  /// conversation is still using needs. Only a user's own attachments count;
+  /// what the model produced lives on its messages and is the container's to
+  /// keep or lose. Set by [build].
+  final dataFiles = <InternalDocumentRef>[];
+  final turnDataFiles = <InternalDocumentRef>[];
+
   /// The blocks of one response as this endpoint may be sent them.
   List<Map<String, dynamic>> sanitize(Iterable<Map> blocks) {
     return [
@@ -222,6 +230,13 @@ class ClaudeHistory {
           m[multimodalInternalClaudeContainerKey],
         );
         if (ref != null) storedContainer = ref;
+      }
+      if (role == 'user') {
+        final files = parseInternalDocumentRefs(
+          m[multimodalInternalDocumentPathsKey],
+        ).where((doc) => isSandboxDataFile(fileName: doc.name, mime: doc.mime));
+        dataFiles.addAll(files);
+        if (i == messages.length - 1) turnDataFiles.addAll(files);
       }
       if (role == 'tool') {
         final id = (m['tool_call_id'] ?? '').toString();

@@ -212,6 +212,14 @@ Stream<StreamChunk> sendClaudeStream(
   }..remove('');
   // The `container` parameter is only accepted alongside the tool that uses it.
   final hasCodeExecution = declaredServerToolNames.contains('code_execution');
+  // The data files the message builder left out of the prompt, on the
+  // strength of the same predicate, go up to the container instead. The tool
+  // has to be in this request for a `container_upload` to be accepted: a
+  // utility call never declares it, and a client tool of the same name
+  // displaces it above.
+  final uploadsDataFiles =
+      hasCodeExecution &&
+      BuiltInToolsHelper.sendsDataFilesToSandbox(cfg: config, modelId: modelId);
 
   // Headers (constant across rounds)
   final baseHeaders = customHeaders(
@@ -264,6 +272,44 @@ Stream<StreamChunk> sendClaudeStream(
   var lastStreamResults = <Map<String, dynamic>>[];
   final nonStreamText = StringBuffer();
   var pauseTurn = false;
+
+  // A container the conversation goes on using already has the earlier
+  // turns' files, so only this turn's go up; a fresh one — none stored, or
+  // the stored one found expired — gets every file the user attached. Either
+  // way the uploads ride the last user message, and each file goes once.
+  final uploadedPaths = <String>{};
+  Future<void> uploadDataFiles() async {
+    if (!uploadsDataFiles) return;
+    final blocks = <Map<String, dynamic>>[];
+    for (final doc
+        in container == null ? history.dataFiles : history.turnDataFiles) {
+      if (!uploadedPaths.add(doc.uri)) continue;
+      final fileId = await uploadClaudeFile(
+        client: client,
+        base: base,
+        headers: baseHeaders,
+        path: doc.uri,
+        name: doc.name,
+        mime: doc.mime,
+      );
+      blocks.add({'type': 'container_upload', 'file_id': fileId});
+    }
+    if (blocks.isEmpty) return;
+    final last = convo.last;
+    final content = last['content'];
+    convo[convo.length - 1] = {
+      ...last,
+      'content': [
+        if (content is List)
+          ...content
+        else if ((content ?? '').toString().isNotEmpty)
+          {'type': 'text', 'text': content.toString()},
+        ...blocks,
+      ],
+    };
+  }
+
+  await uploadDataFiles();
 
   yield* runProviderToolRounds(
     sendRound: () async* {
@@ -335,6 +381,7 @@ Stream<StreamChunk> sendClaudeStream(
         }
         container = null;
         body.remove('container');
+        await uploadDataFiles();
         response = await client.send(buildRequest());
         if (response.statusCode < 200 || response.statusCode >= 300) {
           final retryBody = await response.stream.bytesToString();
