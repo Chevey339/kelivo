@@ -640,6 +640,10 @@ void main() {
       () {
         for (final modelId in const [
           'claude-opus-4-8',
+          'anthropic/claude-opus-4.8',
+          'anthropic/claude-sonnet-4.6',
+          'anthropic/claude-opus-4.5',
+          'anthropic/claude-haiku-4.5',
           'claude-fable-5',
           'claude-mythos-5',
           'claude-opus-5',
@@ -664,6 +668,13 @@ void main() {
         BuiltInToolsHelper.supportsClaudeDynamicWebSearchForModel(
           cfg: official,
           modelId: 'claude-opus-4-8',
+        ),
+        isTrue,
+      );
+      expect(
+        BuiltInToolsHelper.supportsClaudeDynamicWebSearchForModel(
+          cfg: official,
+          modelId: 'anthropic/claude-opus-4.8',
         ),
         isTrue,
       );

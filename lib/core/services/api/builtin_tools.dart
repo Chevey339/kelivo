@@ -140,6 +140,18 @@ abstract class BuiltInToolsHelper {
     return modelId?.trim().toLowerCase() ?? '';
   }
 
+  static String _normalizedClaudeModelId(String? modelId) {
+    var normalized = _normalizedModelId(modelId);
+    final slash = normalized.lastIndexOf('/');
+    if (slash >= 0) normalized = normalized.substring(slash + 1);
+    // Aggregators such as ZenMux use dotted aliases (`claude-opus-4.8`)
+    // while Anthropic's native aliases use hyphens (`claude-opus-4-8`).
+    return normalized.replaceAllMapped(
+      RegExp(r'(\d)\.(\d)'),
+      (match) => '${match.group(1)}-${match.group(2)}',
+    );
+  }
+
   static DateTime? _snapshotDate(String normalizedModelId) {
     final m = RegExp(r'-(\d{4}-\d{2}-\d{2})$').firstMatch(normalizedModelId);
     if (m == null) return null;
@@ -183,7 +195,7 @@ abstract class BuiltInToolsHelper {
   }
 
   static bool isClaudeBuiltInSearchSupportedModel(String? modelId) {
-    final normalized = _normalizedModelId(modelId);
+    final normalized = _normalizedClaudeModelId(modelId);
     if (normalized.contains('mythos')) return true;
     const supported = <String>{
       'claude-fable-5',
@@ -196,7 +208,10 @@ abstract class BuiltInToolsHelper {
       'claude-sonnet-4-20250514',
       'claude-3-7-sonnet-20250219',
       'claude-haiku-4-5-20251001',
+      'claude-haiku-4-5',
       'claude-3-5-haiku-latest',
+      'claude-opus-4-5',
+      'claude-sonnet-4-5',
       'claude-sonnet-4-6',
       'claude-opus-4-1-20250805',
       'claude-opus-4-20250514',
@@ -205,7 +220,7 @@ abstract class BuiltInToolsHelper {
   }
 
   static bool isClaudeDynamicWebSearchSupportedModel(String? modelId) {
-    final normalized = _normalizedModelId(modelId);
+    final normalized = _normalizedClaudeModelId(modelId);
     return normalized.contains('mythos') ||
         normalized == 'claude-fable-5' ||
         normalized == 'claude-opus-5' ||
@@ -231,6 +246,23 @@ abstract class BuiltInToolsHelper {
     final host = Uri.tryParse(cfg.baseUrl)?.host.toLowerCase() ?? '';
     final providerId = cfg.id.toLowerCase();
     return host.contains('openrouter.ai') || providerId.contains('openrouter');
+  }
+
+  static bool isZenMuxProvider(ProviderConfig? cfg) {
+    if (cfg == null) return false;
+    return ProviderConfig.isZenMux(
+      id: cfg.id,
+      name: cfg.name,
+      baseUrl: cfg.baseUrl,
+    );
+  }
+
+  static bool _zenMuxModelSupportsWebSearch(
+    ProviderConfig cfg,
+    String modelId,
+  ) {
+    final override = cfg.modelOverrides[modelId];
+    return override is Map && override['supportsWebSearch'] == true;
   }
 
   static Map<String, dynamic>? _openRouterServerTool(String toolName) {
@@ -450,11 +482,20 @@ abstract class BuiltInToolsHelper {
     );
     switch (kind) {
       case ProviderKind.google:
+        if (isZenMuxProvider(cfg)) {
+          return _zenMuxModelSupportsWebSearch(cfg, modelId!);
+        }
         return true;
       case ProviderKind.claude:
         if (isDeepSeekProvider(cfg)) return true;
+        if (isZenMuxProvider(cfg)) {
+          return _zenMuxModelSupportsWebSearch(cfg, modelId!);
+        }
         return isClaudeBuiltInSearchSupportedModel(upstreamModelId);
       case ProviderKind.openai:
+        if (isZenMuxProvider(cfg)) {
+          return _zenMuxModelSupportsWebSearch(cfg, modelId!);
+        }
         if (isOpenRouterProvider(cfg)) {
           return true;
         }
@@ -558,6 +599,8 @@ abstract class BuiltInToolsHelper {
 
     final supportsSearch =
         isOpenAIResponsesBuiltInSearchSupportedModel(upstreamModelId) ||
+        (isZenMuxProvider(cfg) &&
+            _zenMuxModelSupportsWebSearch(cfg, modelId)) ||
         (isDeepSeekProvider(cfg) &&
             isDeepSeekResponsesBuiltInSearchSupportedModel(upstreamModelId)) ||
         (isDashScopeProvider(cfg) &&
@@ -632,6 +675,14 @@ abstract class BuiltInToolsHelper {
             'mode': 'auto',
             'return_citations': true,
           },
+        },
+      );
+    }
+    if (isZenMuxProvider(cfg) &&
+        _zenMuxModelSupportsWebSearch(cfg, modelId)) {
+      return const BuiltInToolsRequestPayload(
+        body: <String, dynamic>{
+          'web_search_options': <String, dynamic>{},
         },
       );
     }

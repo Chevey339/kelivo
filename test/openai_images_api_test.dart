@@ -56,6 +56,26 @@ class _FakePathProviderPlatform extends PathProviderPlatform {
 
 void main() {
   group('OpenAI Images API', () {
+    test('routes ZenMux short image slugs from the default protocol', () {
+      final config = ProviderConfig.defaultsFor('ZenMux');
+
+      expect(config.providerType, ProviderKind.claude);
+      expect(
+        ChatApiService.supportsOpenAIImagesApiRouting(
+          config,
+          'gpt-image-2',
+        ),
+        isTrue,
+      );
+      expect(
+        ChatApiService.supportsOpenAIImagesApiRouting(
+          config,
+          'gpt-image-1.5',
+        ),
+        isTrue,
+      );
+    });
+
     test('routes image model without input images to generations', () async {
       late Uri requestUri;
       late Map<String, dynamic> requestBody;

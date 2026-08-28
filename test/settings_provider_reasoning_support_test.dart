@@ -36,6 +36,39 @@ void main() {
       expect(moonshot.modelOverrides, isEmpty);
     });
 
+    test('default ZenMux preset uses the Anthropic-compatible API', () {
+      final zenmux = ProviderConfig.defaultsFor('ZenMux');
+
+      expect(zenmux.baseUrl, 'https://zenmux.ai/api/anthropic/v1');
+      expect(zenmux.providerType, ProviderKind.claude);
+      expect(zenmux.chatPath, isNull);
+      expect(zenmux.useResponseApi, isNull);
+      expect(zenmux.enabled, isFalse);
+      expect(
+        ProviderConfig.zenMuxBaseUrlFor(ProviderKind.openai),
+        'https://zenmux.ai/api/v1',
+      );
+      expect(
+        ProviderConfig.zenMuxBaseUrlFor(ProviderKind.google),
+        'https://zenmux.ai/api/vertex-ai/v1/publishers/google',
+      );
+      expect(
+        ProviderConfig.zenMuxImageModelSlug('openai/gpt-image-2'),
+        'gpt-image-2',
+      );
+    });
+
+    test('ZenMux model discovery uses configured origin and catalog path', () {
+      final config = ProviderConfig.defaultsFor('ZenMux').copyWith(
+        baseUrl: 'https://gateway.example.com:8443/custom/v1/?tenant=a',
+      );
+
+      expect(
+        ZenMuxProvider.modelsUriFor(config).toString(),
+        'https://gateway.example.com:8443/api/v1/models',
+      );
+    });
+
     test('built-in provider order does not add Kimi preset', () async {
       final harness = await createBusinessTestHarness(
         initial: {

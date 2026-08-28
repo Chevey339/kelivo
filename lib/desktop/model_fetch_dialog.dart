@@ -104,6 +104,10 @@ class _ModelFetchDialogBodyState extends State<_ModelFetchDialogBody> {
         });
       } else {
         final list = await ProviderManager.listModels(cfg);
+        final enriched = ProviderManager.withFetchedCapabilities(cfg, list);
+        if (!identical(enriched, cfg)) {
+          await settings.setProviderConfig(widget.providerKey, enriched);
+        }
         if (!mounted) return;
         setState(() {
           _items = list;

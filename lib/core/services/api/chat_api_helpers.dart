@@ -47,7 +47,8 @@ const String _aihubmixAppCode = 'ZKRT3588';
 String apiModelId(ProviderConfig cfg, String modelId) {
   try {
     final ov = _modelOverride(cfg, modelId);
-    return resolveApiModelIdOverride(ov, modelId);
+    final resolved = resolveApiModelIdOverride(ov, modelId);
+    return resolved;
   } catch (_) {}
   return modelId;
 }

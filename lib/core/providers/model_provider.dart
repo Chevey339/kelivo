@@ -204,6 +204,110 @@ class OpenAIProvider extends BaseProvider {
   }
 }
 
+class ZenMuxProvider extends BaseProvider {
+  static Uri modelsUriFor(ProviderConfig cfg) {
+    final baseUrl = cfg.baseUrl.trim();
+    if (baseUrl.isEmpty) {
+      throw const FormatException('ZenMux Base URL cannot be empty');
+    }
+    final configured = Uri.parse(baseUrl);
+    if (!configured.hasScheme || configured.host.isEmpty) {
+      throw FormatException('Invalid ZenMux Base URL: $baseUrl');
+    }
+    // Model discovery is shared across ZenMux protocols. Keep the configured
+    // scheme, host, and port, but replace protocol-specific paths such as
+    // /api/anthropic/v1 or /api/vertex-ai with the public catalog endpoint.
+    return configured.replace(
+      path: '/api/v1/models',
+      query: null,
+      fragment: null,
+    );
+  }
+
+  @override
+  Future<List<ModelInfo>> listModels(ProviderConfig cfg) async {
+    final key = ProviderManager._effectiveApiKey(cfg);
+    final client = _Http.clientFor(cfg);
+    try {
+      final headers = <String, String>{};
+      if (key.isNotEmpty) headers['Authorization'] = 'Bearer $key';
+      final res = await client.get(modelsUriFor(cfg), headers: headers);
+      if (res.statusCode < 200 || res.statusCode >= 300) {
+        throw HttpException(
+          'ZenMux model request failed (${res.statusCode}): ${res.body}',
+        );
+      }
+      final payload = jsonDecode(res.body) as Map<String, dynamic>;
+      final data =
+          (payload['data'] as List?) ??
+          (payload['models'] as List?) ??
+          const [];
+      return [
+        for (final entry in data)
+          if (entry is Map && _entryId(entry).isNotEmpty)
+            _modelFromZenMuxEntry(entry),
+      ];
+    } finally {
+      client.close();
+    }
+  }
+
+  static String _entryId(Map entry) {
+    final raw = (entry['id'] ?? entry['name'] ?? '').toString();
+    return raw.startsWith('models/') ? raw.substring('models/'.length) : raw;
+  }
+
+  static ModelInfo _modelFromZenMuxEntry(Map entry) {
+    final upstreamId = _entryId(entry);
+    final input = _modalitiesFromZenMux(
+      entry['input_modalities'],
+      fallback: const <Modality>[Modality.text],
+    );
+    final output = _modalitiesFromZenMux(
+      entry['output_modalities'],
+      fallback: const <Modality>[Modality.text],
+    );
+    final id = output.contains(Modality.image)
+        ? ProviderConfig.zenMuxImageModelSlug(upstreamId)
+        : upstreamId;
+    return ModelRegistry.infer(
+      ModelInfo(
+        id: id,
+        displayName:
+            (entry['display_name'] as String?) ??
+            (entry['displayName'] as String?) ??
+            upstreamId,
+        input: input,
+        output: output,
+        supportsWebSearch:
+            entry['capabilities'] is Map &&
+                (entry['capabilities'] as Map)['web_search'] == true ||
+            entry['pricings'] is Map &&
+                (entry['pricings'] as Map).containsKey('web_search'),
+      ),
+    );
+  }
+
+  static List<Modality> _modalitiesFromZenMux(
+    Object? raw, {
+    required List<Modality> fallback,
+  }) {
+    if (raw is! List) return fallback;
+    final modalities = <Modality>[];
+    for (final value in raw) {
+      switch (value.toString().toLowerCase()) {
+        case 'text':
+          modalities.add(Modality.text);
+          break;
+        case 'image':
+          modalities.add(Modality.image);
+          break;
+      }
+    }
+    return modalities.isEmpty ? fallback : modalities;
+  }
+}
+
 class ClaudeProvider extends BaseProvider {
   static const String anthropicVersion = '2023-06-01';
   @override
@@ -418,7 +522,37 @@ class ProviderManager {
   }
 
   static Future<List<ModelInfo>> listModels(ProviderConfig cfg) {
+    if (ProviderConfig.isZenMux(
+      id: cfg.id,
+      name: cfg.name,
+      baseUrl: cfg.baseUrl,
+    )) {
+      return ZenMuxProvider().listModels(cfg);
+    }
     return forConfig(cfg).listModels(cfg);
+  }
+
+  static ProviderConfig withFetchedCapabilities(
+    ProviderConfig cfg,
+    Iterable<ModelInfo> models,
+  ) {
+    if (!ProviderConfig.isZenMux(
+      id: cfg.id,
+      name: cfg.name,
+      baseUrl: cfg.baseUrl,
+    )) {
+      return cfg;
+    }
+    final overrides = Map<String, dynamic>.from(cfg.modelOverrides);
+    for (final model in models) {
+      final current = overrides[model.id];
+      final next = current is Map
+          ? Map<String, dynamic>.from(current)
+          : <String, dynamic>{};
+      next['supportsWebSearch'] = model.supportsWebSearch;
+      overrides[model.id] = next;
+    }
+    return cfg.copyWith(modelOverrides: overrides);
   }
 
   static Future<void> testConnection(

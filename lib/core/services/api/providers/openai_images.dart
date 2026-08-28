@@ -21,7 +21,7 @@ bool shouldUseOpenAIImagesApi(ProviderConfig config, String modelId) {
 }
 
 bool _supportsOpenAIImageGenerations(String modelId) {
-  final normalized = modelId.toLowerCase();
+  final normalized = _unprefixedImageModelId(modelId);
   return normalized.startsWith('gpt-image-') ||
       normalized.startsWith('chatgpt-image-') ||
       normalized.startsWith('agnes-image-') ||
@@ -31,10 +31,16 @@ bool _supportsOpenAIImageGenerations(String modelId) {
 }
 
 bool _supportsOpenAIImageEdits(String modelId) {
-  final normalized = modelId.toLowerCase();
+  final normalized = _unprefixedImageModelId(modelId);
   return normalized.startsWith('gpt-image-') ||
       normalized.startsWith('chatgpt-image-') ||
       normalized == 'dall-e-2';
+}
+
+String _unprefixedImageModelId(String modelId) {
+  final normalized = modelId.toLowerCase().trim();
+  final slash = normalized.lastIndexOf('/');
+  return slash >= 0 ? normalized.substring(slash + 1) : normalized;
 }
 
 Uri _openAIImagesUrl(ProviderConfig config, String path) {

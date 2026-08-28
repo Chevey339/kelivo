@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
+import 'package:flutter/foundation.dart' show mapEquals;
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import '../../../utils/brand_assets.dart';
@@ -134,6 +135,7 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
       const fixed = {
         'KelivoIN',
         'OpenAI',
+        'ZenMux',
         'Gemini',
         'SiliconFlow',
         'OpenRouter',
@@ -2152,7 +2154,23 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
       },
     );
     if (selected != null) {
-      setState(() => _kind = selected);
+      setState(() {
+        _kind = selected;
+        if (ProviderConfig.isZenMux(
+          id: _cfg.id,
+          name: _nameCtrl.text,
+          baseUrl: _baseCtrl.text,
+        )) {
+          _baseCtrl.text = ProviderConfig.zenMuxBaseUrlFor(selected);
+          if (selected == ProviderKind.openai &&
+              _pathCtrl.text.trim().isEmpty) {
+            _pathCtrl.text = '/chat/completions';
+          }
+          if (selected == ProviderKind.google) {
+            _vertexAI = false;
+          }
+        }
+      });
       await _save();
     }
   }
@@ -3356,6 +3374,16 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
                   });
                 } else {
                   final list = await ProviderManager.listModels(cfg);
+                  final enriched = ProviderManager.withFetchedCapabilities(
+                    cfg,
+                    list,
+                  );
+                  if (!mapEquals(enriched.modelOverrides, cfg.modelOverrides)) {
+                    await settings.setProviderConfig(
+                      widget.keyName,
+                      enriched,
+                    );
+                  }
                   setLocal(() {
                     items = list;
                     loading = false;

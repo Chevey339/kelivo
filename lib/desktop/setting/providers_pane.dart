@@ -289,6 +289,7 @@ class _DesktopProvidersBodyState extends State<_DesktopProvidersBody> {
     // Base providers (same as mobile list)
     List<({String name, String key})> base() => [
       (name: 'OpenAI', key: 'OpenAI'),
+      (name: 'ZenMux', key: 'ZenMux'),
       (name: l10n.providersPageSiliconFlowName, key: 'SiliconFlow'),
       (name: 'Gemini', key: 'Gemini'),
       (name: 'OpenRouter', key: 'OpenRouter'),
@@ -2845,9 +2846,23 @@ class _DesktopProviderDetailPaneState
                                     widget.providerKey,
                                     defaultName: widget.displayName,
                                   );
+                                  final isZenMux = ProviderConfig.isZenMux(
+                                    id: old.id,
+                                    name: old.name,
+                                    baseUrl: old.baseUrl,
+                                  );
                                   await spWatch.setProviderConfig(
                                     widget.providerKey,
-                                    old.copyWith(providerType: k),
+                                    old.copyWith(
+                                      providerType: k,
+                                      baseUrl: isZenMux
+                                          ? ProviderConfig.zenMuxBaseUrlFor(k)
+                                          : old.baseUrl,
+                                      vertexAI: k == ProviderKind.google &&
+                                              isZenMux
+                                          ? false
+                                          : old.vertexAI,
+                                    ),
                                   );
                                 },
                               ),
