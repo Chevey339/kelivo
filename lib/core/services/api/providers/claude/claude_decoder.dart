@@ -7,6 +7,7 @@ import '../../stream/sse_event.dart';
 import '../../stream/stream_chunk.dart';
 import '../../stream/stream_chunk_decoder.dart';
 import '../../stream/stream_chunk_ids.dart';
+import 'claude_history.dart';
 
 /// Stateful Claude Messages SSE decoder. One instance per HTTP response.
 class ClaudeStreamDecoder implements StreamChunkDecoder {
@@ -14,6 +15,7 @@ class ClaudeStreamDecoder implements StreamChunkDecoder {
     this.skipRedactedThinkingBlocks = false,
     this.initialUsage,
     this.serverToolNames = const <String>{},
+    this.priorResponses = const <List<Map<String, dynamic>>>[],
     String sourceId = 'stream',
   }) : _ids = StreamChunkIds(sourceId);
 
@@ -22,6 +24,9 @@ class ClaudeStreamDecoder implements StreamChunkDecoder {
 
   /// Tool names this request declared as Anthropic-hosted server tools.
   final Set<String> serverToolNames;
+
+  /// The responses of this turn before the one being decoded.
+  final List<List<Map<String, dynamic>>> priorResponses;
   final StreamChunkIds _ids;
 
   final List<Map<String, dynamic>> assistantBlocks = <Map<String, dynamic>>[];
@@ -60,9 +65,10 @@ class ClaudeStreamDecoder implements StreamChunkDecoder {
   final List<Map<String, dynamic>> _citationItems = <Map<String, dynamic>>[];
   bool _closed = false;
 
-  Map<String, dynamic> get _anthropicMetadata => <String, dynamic>{
-    'anthropic': <String, dynamic>{'assistant_blocks': assistantBlocks},
-  };
+  /// [assistantBlocks] is handed out live: a card written mid-response sees
+  /// the blocks that arrive after it once the turn is re-encoded at its end.
+  Map<String, dynamic> get replayMetadata =>
+      claudeReplayMetadata([...priorResponses, assistantBlocks]);
 
   bool isClientTool(String id) => clientTools.containsKey(id);
 
@@ -185,7 +191,7 @@ class ClaudeStreamDecoder implements StreamChunkDecoder {
         });
         if (idx != null) _clientIndexToId[idx] = id;
         chunks.add(
-          ToolCallStart(id: id, toolName: name, metadata: _anthropicMetadata),
+          ToolCallStart(id: id, toolName: name, metadata: replayMetadata),
         );
       }
     } else if (kind == 'server_tool_use') {
@@ -217,11 +223,7 @@ class ClaudeStreamDecoder implements StreamChunkDecoder {
         _serverToolStarted.add(id);
         chunks.add(ServerToolStart(id: id, toolName: display));
         chunks.add(
-          ToolCallStart(
-            id: id,
-            toolName: display,
-            metadata: _anthropicMetadata,
-          ),
+          ToolCallStart(id: id, toolName: display, metadata: replayMetadata),
         );
       }
     } else if (kind.endsWith('_tool_result')) {
@@ -466,7 +468,7 @@ class ClaudeStreamDecoder implements StreamChunkDecoder {
         status: errorCode.isNotEmpty
             ? ServerToolStatus.failed
             : ServerToolStatus.completed,
-        metadata: _anthropicMetadata,
+        metadata: replayMetadata,
       ),
     ];
   }
@@ -506,7 +508,7 @@ class ClaudeStreamDecoder implements StreamChunkDecoder {
           'items': items,
           if ((errorCode ?? '').isNotEmpty) 'error': errorCode,
         },
-        metadata: _anthropicMetadata,
+        metadata: replayMetadata,
       ),
     ];
   }
@@ -531,7 +533,7 @@ class ClaudeStreamDecoder implements StreamChunkDecoder {
           input: _serverArgsFor(id),
           output: const <String, dynamic>{'items': <Map<String, dynamic>>[]},
           status: ServerToolStatus.failed,
-          metadata: _anthropicMetadata,
+          metadata: replayMetadata,
         ),
       );
     }
@@ -572,7 +574,7 @@ class ClaudeStreamDecoder implements StreamChunkDecoder {
         id: id,
         input: args,
         output: <String, dynamic>{'items': items},
-        metadata: _anthropicMetadata,
+        metadata: replayMetadata,
       ),
     ];
   }

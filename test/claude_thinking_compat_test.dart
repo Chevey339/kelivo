@@ -6,6 +6,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:Kelivo/core/providers/settings_provider.dart';
 import 'package:Kelivo/core/services/api/builtin_tools.dart';
 import 'package:Kelivo/core/services/api/chat_api_service.dart';
+import 'package:Kelivo/core/services/api/providers/claude/claude_history.dart';
 import 'package:Kelivo/core/services/api/stream/stream_chunk.dart';
 import 'package:Kelivo/core/utils/multimodal_input_utils.dart';
 import 'support/collect_generation.dart';
@@ -138,13 +139,18 @@ Map<String, dynamic> _clientCall(String id, String content) => {
   'input': {'content': content},
 };
 
-Map<String, dynamic> _replayCall(String id, String name, List blocks) => {
+/// A card as the app persists it: it recorded the turn's responses up to the
+/// one that last wrote it, so a client call's card stops at the response that
+/// declared it and a hosted call's reaches the one carrying its result.
+Map<String, dynamic> _replayCall(
+  String id,
+  String name,
+  List<List<Map<String, dynamic>>> responses,
+) => {
   'id': id,
   'type': 'function',
   'function': {'name': name, 'arguments': '{}'},
-  'metadata': {
-    'anthropic': {'assistant_blocks': blocks},
-  },
+  'metadata': claudeReplayMetadata(responses),
 };
 
 Map<String, dynamic> _toolResult(String id, String name, String content) => {
@@ -2171,7 +2177,7 @@ data: {"type":"message_stop"}
         // A turn that starts both kinds of tool at once is cut in two: the
         // first response ends with the hosted call still running so the client
         // one can be answered, and the second opens with the hosted result.
-        // Each card kept the blocks of its own response.
+        // Each card recorded the responses up to the one that last wrote it.
         const firstResponse = [
           {'type': 'text', 'text': '我查一下。'},
           {
@@ -2212,7 +2218,9 @@ data: {"type":"message_stop"}
                     'arguments': '{"url":"https://example.com"}',
                   },
                   'metadata': {
-                    'anthropic': {'assistant_blocks': secondResponse},
+                    'anthropic': {
+                      'responses': [firstResponse, secondResponse],
+                    },
                   },
                 },
                 {
@@ -2223,7 +2231,9 @@ data: {"type":"message_stop"}
                     'arguments': '{"content":"test"}',
                   },
                   'metadata': {
-                    'anthropic': {'assistant_blocks': firstResponse},
+                    'anthropic': {
+                      'responses': [firstResponse],
+                    },
                   },
                 },
               ],
@@ -2312,7 +2322,9 @@ data: {"type":"message_stop"}
                     'arguments': '{"url":"https://example.com"}',
                   },
                   'metadata': {
-                    'anthropic': {'assistant_blocks': secondResponse},
+                    'anthropic': {
+                      'responses': [firstResponse, secondResponse],
+                    },
                   },
                 },
                 {
@@ -2323,7 +2335,9 @@ data: {"type":"message_stop"}
                     'arguments': '{"content":"test"}',
                   },
                   'metadata': {
-                    'anthropic': {'assistant_blocks': firstResponse},
+                    'anthropic': {
+                      'responses': [firstResponse],
+                    },
                   },
                 },
               ],
@@ -2386,10 +2400,20 @@ data: {"type":"message_stop"}
               'role': 'assistant',
               'content': '我查一下。再查一下。查到了。',
               'tool_calls': [
-                _replayCall('srvtoolu_1', 'web_fetch', secondResponse),
-                _replayCall('toolu_client_1', 'create_memory', firstResponse),
-                _replayCall('srvtoolu_2', 'web_fetch', thirdResponse),
-                _replayCall('toolu_client_2', 'create_memory', secondResponse),
+                _replayCall('srvtoolu_1', 'web_fetch', [
+                  firstResponse,
+                  secondResponse,
+                ]),
+                _replayCall('toolu_client_1', 'create_memory', [firstResponse]),
+                _replayCall('srvtoolu_2', 'web_fetch', [
+                  firstResponse,
+                  secondResponse,
+                  thirdResponse,
+                ]),
+                _replayCall('toolu_client_2', 'create_memory', [
+                  firstResponse,
+                  secondResponse,
+                ]),
               ],
             },
             _toolResult('toolu_client_1', 'create_memory', 'one'),
@@ -2450,10 +2474,20 @@ data: {"type":"message_stop"}
             'role': 'assistant',
             'content': '我查一下。',
             'tool_calls': [
-              _replayCall('srvtoolu_1', 'web_fetch', secondResponse),
-              _replayCall('toolu_client_1', 'create_memory', firstResponse),
-              _replayCall('srvtoolu_2', 'web_fetch', thirdResponse),
-              _replayCall('toolu_client_2', 'create_memory', secondResponse),
+              _replayCall('srvtoolu_1', 'web_fetch', [
+                firstResponse,
+                secondResponse,
+              ]),
+              _replayCall('toolu_client_1', 'create_memory', [firstResponse]),
+              _replayCall('srvtoolu_2', 'web_fetch', [
+                firstResponse,
+                secondResponse,
+                thirdResponse,
+              ]),
+              _replayCall('toolu_client_2', 'create_memory', [
+                firstResponse,
+                secondResponse,
+              ]),
             ],
           },
           _toolResult('toolu_client_1', 'create_memory', 'one'),
@@ -2474,13 +2508,9 @@ data: {"type":"message_stop"}
 
     test('a relayed hand-off keeps the order the API produced', () async {
       // Everywhere but the official endpoint the hosted blocks are dropped and
-      // the calls replay as the client pair. Both what ordered the responses
-      // and what marks the hand-off between them go with those blocks, so each
-      // has to be read off the blocks as produced. Order read off the sent ones
-      // replays the turn with its text reversed and the thinking block, which
-      // Anthropic requires first, somewhere in the middle; a hand-off read off
-      // them merges the second response back into the first, and the persisted
-      // message then has no adjacent turn to fold into and repeats the turn.
+      // the calls replay as the client pair. The responses still come back in
+      // the order recorded, the thinking block first as Anthropic requires,
+      // and the persisted text folds into the turn instead of repeating it.
       final firstResponse = [
         {'type': 'thinking', 'thinking': '先查页面。', 'signature': 'sig-handoff'},
         {'type': 'text', 'text': '我查一下。'},
@@ -2501,8 +2531,11 @@ data: {"type":"message_stop"}
             'role': 'assistant',
             'content': '\n\n',
             'tool_calls': [
-              _replayCall('srvtoolu_relay', 'web_fetch', secondResponse),
-              _replayCall('toolu_client', 'create_memory', firstResponse),
+              _replayCall('srvtoolu_relay', 'web_fetch', [
+                firstResponse,
+                secondResponse,
+              ]),
+              _replayCall('toolu_client', 'create_memory', [firstResponse]),
             ],
           },
           _toolResult('srvtoolu_relay', 'web_fetch', '{"url":"https://e.com"}'),
@@ -2560,8 +2593,11 @@ data: {"type":"message_stop"}
               'role': 'assistant',
               'content': '\n\n',
               'tool_calls': [
-                _replayCall('srvtoolu_relay', 'web_fetch', secondResponse),
-                _replayCall('toolu_client', 'create_memory', firstResponse),
+                _replayCall('srvtoolu_relay', 'web_fetch', [
+                  firstResponse,
+                  secondResponse,
+                ]),
+                _replayCall('toolu_client', 'create_memory', [firstResponse]),
               ],
             },
             _toolResult(
@@ -2614,8 +2650,11 @@ data: {"type":"message_stop"}
             'role': 'assistant',
             'content': 'checking',
             'tool_calls': [
-              _replayCall('srvtoolu_deferred', 'web_fetch', secondResponse),
-              _replayCall('toolu_client', 'create_memory', firstResponse),
+              _replayCall('srvtoolu_deferred', 'web_fetch', [
+                firstResponse,
+                secondResponse,
+              ]),
+              _replayCall('toolu_client', 'create_memory', [firstResponse]),
             ],
           },
           _toolResult('toolu_client', 'create_memory', 'test'),
@@ -2680,7 +2719,9 @@ data: {"type":"message_stop"}
                     'arguments': '{"url":"https://example.com"}',
                   },
                   'metadata': {
-                    'anthropic': {'assistant_blocks': secondResponse},
+                    'anthropic': {
+                      'responses': [firstResponse, secondResponse],
+                    },
                   },
                 },
                 {
@@ -2691,7 +2732,9 @@ data: {"type":"message_stop"}
                     'arguments': '{"content":"test"}',
                   },
                   'metadata': {
-                    'anthropic': {'assistant_blocks': firstResponse},
+                    'anthropic': {
+                      'responses': [firstResponse],
+                    },
                   },
                 },
               ],
@@ -2717,6 +2760,61 @@ data: {"type":"message_stop"}
         expect(clientResult.single['tool_use_id'], 'toolu_client');
       },
     );
+
+    test('a turn resumed after pause_turn replays both responses', () async {
+      // A hosted tool that ran past the turn limit is resumed in a second
+      // response, with no client result in between. The one card of the turn
+      // was written by both responses; only the recording of the later one
+      // survives, so it has to carry the earlier response too or the call and
+      // the text before it would be lost.
+      final firstResponse = [
+        {'type': 'text', 'text': '我查一下。'},
+        _hostedCall('srvtoolu_paused', 'https://example.com'),
+      ];
+      final secondResponse = [
+        _hostedResult('srvtoolu_paused', 'https://e.com'),
+        {'type': 'text', 'text': '查到了。'},
+      ];
+      final body = await _captureClaudeRequestBody(
+        officialEndpoint: true,
+        modelId: 'claude-sonnet-4-6',
+        messages: [
+          {'role': 'user', 'content': '看看这个页面'},
+          {
+            'role': 'assistant',
+            'content': '\n\n',
+            'tool_calls': [
+              _replayCall('srvtoolu_paused', 'web_fetch', [
+                firstResponse,
+                secondResponse,
+              ]),
+            ],
+          },
+          _toolResult(
+            'srvtoolu_paused',
+            'web_fetch',
+            '{"url":"https://e.com"}',
+          ),
+          {'role': 'assistant', 'content': '我查一下。查到了。'},
+          {'role': 'user', 'content': '再说说'},
+        ],
+      );
+
+      final messages = (body['messages'] as List).cast<Map>();
+      // Nothing separates the two responses, so they are the one turn.
+      expect(messages.map((message) => message['role']).toList(), [
+        'user',
+        'assistant',
+        'user',
+      ]);
+      expect(_blockTypes(messages[1]), [
+        'text',
+        'server_tool_use',
+        'web_fetch_tool_result',
+        'text',
+      ]);
+      expect(_assistantText(messages), '我查一下。查到了。');
+    });
 
     test('every turn shape replays as one assistant message', () async {
       // How the persisted assistant text can relate to the turn's own text
