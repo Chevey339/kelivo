@@ -51,15 +51,30 @@ class ClaudeFileUploadException implements Exception {
   String toString() => 'Attachment "$fileName" could not be uploaded: $reason';
 }
 
-/// The name the Files API will accept for [raw]: 1–255 characters with none
-/// of `<>:"|?*\/` or control characters, falling back to [fallback].
-String claudeUploadFileName(String raw, {String fallback = 'upload'}) {
+/// Windows refuses these as a file's stem whatever the extension.
+final _windowsReservedStem = RegExp(
+  r'^(CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])$',
+  caseSensitive: false,
+);
+
+/// A file name both the Files API and every local filesystem accept for
+/// [raw], falling back to [fallback]: 1–255 characters, no directory, none
+/// of `<>:"|?*\/` or control characters, no trailing dot or space, and not a
+/// Windows device name. A name the container chose passes through here on
+/// the way to disk as much as one the user chose on the way up.
+String claudeFileName(String raw, {String fallback = 'upload'}) {
   final base = raw.split(RegExp(r'[\\/]')).last;
-  final cleaned = base.replaceAll(RegExp(r'[<>:"|?*\x00-\x1f]'), '_').trim();
-  if (cleaned.isEmpty || cleaned == '.' || cleaned == '..') return fallback;
+  var cleaned = base
+      .replaceAll(RegExp(r'[<>:"|?*\x00-\x1f]'), '_')
+      .trim()
+      .replaceAll(RegExp(r'[. ]+$'), '');
+  if (cleaned.isEmpty) return fallback;
+  final dot = cleaned.indexOf('.');
+  final stem = dot < 0 ? cleaned : cleaned.substring(0, dot);
+  if (_windowsReservedStem.hasMatch(stem)) cleaned = '_$cleaned';
   if (cleaned.length <= 255) return cleaned;
-  final dot = cleaned.lastIndexOf('.');
-  final ext = dot > 0 ? cleaned.substring(dot) : '';
+  final lastDot = cleaned.lastIndexOf('.');
+  final ext = lastDot > 0 ? cleaned.substring(lastDot) : '';
   return cleaned.substring(0, 255 - ext.length) + ext;
 }
 
@@ -100,7 +115,7 @@ Future<String> uploadClaudeFile({
         'file',
         file.openRead(),
         size,
-        filename: claudeUploadFileName(displayName),
+        filename: claudeFileName(displayName),
         contentType: _mediaTypeOrNull(mime),
       ),
     );
@@ -206,9 +221,11 @@ Future<GeneratedFile?> downloadClaudeGeneratedFile({
     if (declaredSize is int && declaredSize > claudeFileSizeLimit) {
       return null;
     }
-    final name = _generatedFileName(
+    // The container names the file, so it can name a path, a device, or
+    // nothing at all; the local filesystem has to take what is left.
+    final name = claudeFileName(
       (meta['filename'] ?? '').toString(),
-      fileId,
+      fallback: fileId,
     );
     final reported = (meta['mime_type'] ?? '').toString().trim().toLowerCase();
     // The container named the file, so its extension is the reliable half: a
@@ -319,11 +336,4 @@ Future<void> discardClaudeGeneratedFile(GeneratedFile file) async {
   final path = SandboxPathResolver.resolveForIo(file.uri);
   if (path == null || UploadDedupe.isShared(path)) return;
   await _discard(File(path));
-}
-
-/// The container names the file, so it can name a path or nothing at all.
-String _generatedFileName(String raw, String fileId) {
-  final base = raw.split(RegExp(r'[\\/]')).last.trim();
-  if (base.isEmpty || base == '.' || base == '..') return fileId;
-  return base;
 }

@@ -141,6 +141,35 @@ void main() {
       ]);
     });
 
+    test('a name the local filesystem would refuse is made safe', () async {
+      final server = await _filesServer(
+        meta: <String, dynamic>{
+          'id': 'file_1',
+          'filename': 'report:final?.csv',
+          'mime_type': 'text/csv',
+          'size_bytes': 4,
+          'downloadable': true,
+        },
+        bytes: const <int>[1, 2, 3, 4],
+      );
+      addTearDown(() => server.close(force: true));
+
+      final client = http.Client();
+      addTearDown(client.close);
+      final file = await downloadClaudeGeneratedFile(
+        client: client,
+        base: 'http://${server.address.address}:${server.port}/v1',
+        headers: const <String, String>{'x-api-key': 'sk-test'},
+        fileId: 'file_1',
+      );
+
+      expect(file!.name, 'report_final_.csv');
+      expect(
+        await File('${tempDir.path}/upload/report_final_.csv').exists(),
+        isTrue,
+      );
+    });
+
     test('a copy already stored is reused and the download dropped', () async {
       final server = await _filesServer(
         meta: <String, dynamic>{
@@ -402,23 +431,40 @@ void uploadTests() {
     } catch (_) {}
   });
 
-  group('claudeUploadFileName', () {
+  group('claudeFileName', () {
     test('keeps an ordinary name', () {
-      expect(claudeUploadFileName('sales 2026.csv'), 'sales 2026.csv');
+      expect(claudeFileName('sales 2026.csv'), 'sales 2026.csv');
     });
 
     test('drops directories and forbidden characters', () {
-      expect(claudeUploadFileName('/tmp/a:b?.csv'), 'a_b_.csv');
-      expect(claudeUploadFileName('C:\\data\\q1.xlsx'), 'q1.xlsx');
+      expect(claudeFileName('/tmp/a:b?.csv'), 'a_b_.csv');
+      expect(claudeFileName('C:\\data\\q1.xlsx'), 'q1.xlsx');
+      expect(claudeFileName('report:final?.csv'), 'report_final_.csv');
+      expect(claudeFileName('a\x00b\x1f.txt'), 'a_b_.txt');
+    });
+
+    test('drops the trailing dots and spaces Windows would', () {
+      expect(claudeFileName('notes. '), 'notes');
+      expect(claudeFileName('archive...'), 'archive');
+    });
+
+    test('sidesteps Windows device names in any case or extension', () {
+      expect(claudeFileName('CON'), '_CON');
+      expect(claudeFileName('nul.csv'), '_nul.csv');
+      expect(claudeFileName('Com1.tar.gz'), '_Com1.tar.gz');
+      expect(claudeFileName('LPT0.txt'), 'LPT0.txt');
+      expect(claudeFileName('console.log'), 'console.log');
     });
 
     test('falls back when nothing usable is left', () {
-      expect(claudeUploadFileName('..'), 'upload');
-      expect(claudeUploadFileName('   '), 'upload');
+      expect(claudeFileName('..'), 'upload');
+      expect(claudeFileName('   '), 'upload');
+      expect(claudeFileName('???', fallback: 'file_1'), '___');
+      expect(claudeFileName('', fallback: 'file_1'), 'file_1');
     });
 
     test('trims to 255 characters keeping the extension', () {
-      final name = claudeUploadFileName('${'x' * 300}.parquet');
+      final name = claudeFileName('${'x' * 300}.parquet');
       expect(name.length, 255);
       expect(name, endsWith('.parquet'));
     });
