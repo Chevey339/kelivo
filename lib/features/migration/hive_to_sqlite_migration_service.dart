@@ -16,6 +16,7 @@ import '../../core/models/conversation.dart';
 import '../../core/models/message_part.dart';
 import '../../core/services/backup/backup_settings_validator.dart';
 import '../../core/services/backup/restore_durability.dart';
+import '../../core/services/hive_migration_marker.dart';
 import '../../core/services/migration/legacy_message_content_decoder.dart';
 import '../../core/services/migration/legacy_record_sanitizer.dart';
 import '../../utils/app_directories.dart';
@@ -239,21 +240,18 @@ class HiveToSqliteMigrationService {
         hiveFiles: hiveFiles,
       );
     }
-    if (sqliteFile.existsSync()) {
-      final repo = ChatDatabaseRepository.open(file: sqliteFile);
-      try {
-        if (await repo.isMigrationComplete()) {
-          await _deleteSqliteFamilyStatic(File('${sqliteFile.path}.previous'));
-          return HiveToSqliteMigrationDecision(
-            needsMigration: false,
-            appDataDir: appDataDir,
-            sqliteFile: sqliteFile,
-            hiveFiles: hiveFiles,
-          );
-        }
-      } finally {
-        await repo.close();
-      }
+    // Read the receipt off the file rather than through a live connection:
+    // this runs before the installation gate upgrades the database, and a live
+    // connection refuses any schema that is not already current.
+    if (sqliteFile.existsSync() &&
+        HiveMigrationMarker.requireMigrationComplete(sqliteFile)) {
+      await _deleteSqliteFamilyStatic(File('${sqliteFile.path}.previous'));
+      return HiveToSqliteMigrationDecision(
+        needsMigration: false,
+        appDataDir: appDataDir,
+        sqliteFile: sqliteFile,
+        hiveFiles: hiveFiles,
+      );
     }
 
     return HiveToSqliteMigrationDecision(
