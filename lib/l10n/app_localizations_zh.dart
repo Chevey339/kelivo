@@ -1203,6 +1203,17 @@ class AppLocalizationsZh extends AppLocalizations {
   String get multiKeyPageDetect => '检测';
 
   @override
+  String get multiKeyPageQueryBalance => '查询余额';
+
+  @override
+  String get multiKeyPageBalanceDisabled => '请先在余额设置中开启余额查询';
+
+  @override
+  String multiKeyPageBalanceQueriedSnackbar(int n) {
+    return '已查询 $n 个 key 的余额';
+  }
+
+  @override
   String get multiKeyPageAdd => '添加';
 
   @override
@@ -9027,6 +9038,17 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get multiKeyPageDetect => '检测';
 
   @override
+  String get multiKeyPageQueryBalance => '查询余额';
+
+  @override
+  String get multiKeyPageBalanceDisabled => '请先在余额设置中开启余额查询';
+
+  @override
+  String multiKeyPageBalanceQueriedSnackbar(int n) {
+    return '已查询 $n 个 key 的余额';
+  }
+
+  @override
   String get multiKeyPageAdd => '添加';
 
   @override
@@ -16775,6 +16797,17 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get multiKeyPageDetect => '檢測';
+
+  @override
+  String get multiKeyPageQueryBalance => '查詢餘額';
+
+  @override
+  String get multiKeyPageBalanceDisabled => '請先在餘額設定中開啟餘額查詢';
+
+  @override
+  String multiKeyPageBalanceQueriedSnackbar(int n) {
+    return '已查詢 $n 個 key 的餘額';
+  }
 
   @override
   String get multiKeyPageAdd => '新增';
