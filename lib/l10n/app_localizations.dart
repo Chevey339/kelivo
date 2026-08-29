@@ -10267,6 +10267,18 @@ abstract class AppLocalizations {
   /// **'TinyFish Search API with region/language filters. Requires an API key. Fetch/Scrape is not supported here.'**
   String get searchProviderTinyFishDescription;
 
+  /// No description provided for @searchServiceNameAnySearch.
+  ///
+  /// In en, this message translates to:
+  /// **'AnySearch'**
+  String get searchServiceNameAnySearch;
+
+  /// No description provided for @searchProviderAnySearchDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Unified search for AI agents with automatic routing across web and specialist data sources. API key is optional.'**
+  String get searchProviderAnySearchDescription;
+
   /// No description provided for @searchServiceNameKelivo.
   ///
   /// In en, this message translates to:

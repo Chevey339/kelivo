@@ -408,6 +408,23 @@ void main() {
     expect((result!.service! as FirecrawlOptions).apiKey, isEmpty);
   });
 
+  testWidgets('saves AnySearch without an API key', (tester) async {
+    SearchServiceEditorResult? result;
+    await _pumpEditor(
+      tester,
+      initialService: AnySearchOptions(id: 'anysearch', apiKey: ''),
+      onResult: (value) => result = value,
+    );
+
+    expect(find.text(AnySearchOptions.defaultUrl), findsOneWidget);
+    await tester.tap(find.byIcon(Lucide.Check));
+    await tester.pumpAndSettle();
+
+    expect(result?.deleted, isFalse);
+    expect(result?.service, isA<AnySearchOptions>());
+    expect((result!.service! as AnySearchOptions).apiKey, isEmpty);
+  });
+
   testWidgets('returns a delete action after confirmation', (tester) async {
     SearchServiceEditorResult? result;
     await _pumpEditor(

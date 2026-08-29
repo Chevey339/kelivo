@@ -2370,6 +2370,8 @@
   "searchProviderFirecrawlDescription": "Firecrawl Search API v2. API key is optional. Scrape is not supported here.",
   "searchServiceNameTinyFish": "TinyFish",
   "searchProviderTinyFishDescription": "TinyFish Search API with region/language filters. Requires an API key. Fetch/Scrape is not supported here.",
+  "searchServiceNameAnySearch": "AnySearch",
+  "searchProviderAnySearchDescription": "Unified search for AI agents with automatic routing across web and specialist data sources. API key is optional.",
   "searchServiceNameKelivo": "Kelivo",
   "searchServicesDialogCountryOptional": "Country/region (optional)",
   "searchServicesDialogLanguageOptional": "Language (optional)",

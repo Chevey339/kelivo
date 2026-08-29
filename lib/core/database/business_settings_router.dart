@@ -995,6 +995,13 @@ final class BusinessSettingsRouter {
           },
           stringLists: const {'apiKeys'},
         );
+      case 'anysearch':
+        _validateKnownFields(
+          kind,
+          payload,
+          strings: const {'apiKey', 'url'},
+          stringLists: const {'apiKeys'},
+        );
     }
   }
 

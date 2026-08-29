@@ -5593,6 +5593,13 @@ class AppLocalizationsEn extends AppLocalizations {
       'TinyFish Search API with region/language filters. Requires an API key. Fetch/Scrape is not supported here.';
 
   @override
+  String get searchServiceNameAnySearch => 'AnySearch';
+
+  @override
+  String get searchProviderAnySearchDescription =>
+      'Unified search for AI agents with automatic routing across web and specialist data sources. API key is optional.';
+
+  @override
   String get searchServiceNameKelivo => 'Kelivo';
 
   @override

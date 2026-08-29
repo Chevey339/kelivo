@@ -77,6 +77,7 @@ class BrandAssets {
         MapEntry(RegExp(r'sora'), 'sora-color.svg'),
         MapEntry(RegExp(r'bing|必应'), 'bing-color.svg'),
         MapEntry(RegExp(r'tavily'), 'tavily-color.svg'),
+        MapEntry(RegExp(r'anysearch'), 'anysearch.svg'),
         MapEntry(RegExp(r'exa'), 'exa-color.svg'),
         MapEntry(RegExp(r'linkup'), 'linkup.svg'),
         MapEntry(RegExp(r'brave'), 'brave-color.svg'),
@@ -301,6 +302,11 @@ class BrandAssets {
       asset: 'assets/icons/tavily-color.svg',
     ),
     BrandIconOption(
+      id: 'anysearch',
+      label: 'AnySearch',
+      asset: 'assets/icons/anysearch.svg',
+    ),
+    BrandIconOption(
       id: 'exa',
       label: 'Exa',
       asset: 'assets/icons/exa-color.svg',
@@ -387,6 +393,7 @@ class BrandAssets {
     'firecrawl.svg',
     'stepfun.svg',
     'fish-audio.svg',
+    'anysearch.svg',
   };
 
   // Build the LobeHub static SVG CDN URL from an icon name (e.g. 'openai').

@@ -1942,6 +1942,8 @@
   "searchProviderFirecrawlDescription": "Firecrawl Search API v2。API Key 可选。此处不支持 Scrape。",
   "searchServiceNameTinyFish": "TinyFish",
   "searchProviderTinyFishDescription": "TinyFish Search API，支持地区与语言参数。需要 API Key。此处不支持 Fetch/Scrape。",
+  "searchServiceNameAnySearch": "AnySearch",
+  "searchProviderAnySearchDescription": "面向 AI 智能体的统一搜索服务，可在网页与专业数据源间自动路由。API Key 可选。",
   "searchServiceNameKelivo": "Kelivo",
   "searchServicesDialogCountryOptional": "国家/地区（可选）",
   "searchServicesDialogLanguageOptional": "语言（可选）",

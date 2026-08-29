@@ -1930,6 +1930,8 @@
   "searchProviderFirecrawlDescription": "Firecrawl Search API v2。API Key 可選。此處不支援 Scrape。",
   "searchServiceNameTinyFish": "TinyFish",
   "searchProviderTinyFishDescription": "TinyFish Search API，支援地區與語言參數。需要 API Key。此處不支援 Fetch/Scrape。",
+  "searchServiceNameAnySearch": "AnySearch",
+  "searchProviderAnySearchDescription": "面向 AI 智慧代理的統一搜尋服務，可在網頁與專業資料來源間自動路由。API Key 可選。",
   "searchServiceNameKelivo": "Kelivo",
   "searchServicesDialogCountryOptional": "國家/地區（可選）",
   "searchServicesDialogLanguageOptional": "語言（可選）",
