@@ -3328,6 +3328,198 @@ abstract class AppLocalizations {
   /// **'Cancel'**
   String get startupRecoveryResetDialogCancel;
 
+  /// No description provided for @startupRecoveryWhatFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'What failed'**
+  String get startupRecoveryWhatFailed;
+
+  /// No description provided for @startupRecoveryStageLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Stage'**
+  String get startupRecoveryStageLabel;
+
+  /// No description provided for @startupRecoveryStageRestore.
+  ///
+  /// In en, this message translates to:
+  /// **'Restore gate'**
+  String get startupRecoveryStageRestore;
+
+  /// No description provided for @startupRecoveryStageDatabase.
+  ///
+  /// In en, this message translates to:
+  /// **'Database startup'**
+  String get startupRecoveryStageDatabase;
+
+  /// No description provided for @startupRecoveryDiagnosticLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Diagnostic code'**
+  String get startupRecoveryDiagnosticLabel;
+
+  /// No description provided for @startupRecoverySchemaLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Database version'**
+  String get startupRecoverySchemaLabel;
+
+  /// No description provided for @startupRecoverySchemaValue.
+  ///
+  /// In en, this message translates to:
+  /// **'{installed} on disk · {expected} expected by this build'**
+  String startupRecoverySchemaValue(String installed, int expected);
+
+  /// No description provided for @startupRecoveryAppVersionLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'App'**
+  String get startupRecoveryAppVersionLabel;
+
+  /// No description provided for @startupRecoveryUnknownValue.
+  ///
+  /// In en, this message translates to:
+  /// **'unknown'**
+  String get startupRecoveryUnknownValue;
+
+  /// No description provided for @startupRecoveryCollecting.
+  ///
+  /// In en, this message translates to:
+  /// **'Collecting diagnostics…'**
+  String get startupRecoveryCollecting;
+
+  /// No description provided for @startupRecoveryShowDetails.
+  ///
+  /// In en, this message translates to:
+  /// **'Show technical details'**
+  String get startupRecoveryShowDetails;
+
+  /// No description provided for @startupRecoveryHideDetails.
+  ///
+  /// In en, this message translates to:
+  /// **'Hide technical details'**
+  String get startupRecoveryHideDetails;
+
+  /// No description provided for @startupRecoveryCopyReport.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy full report'**
+  String get startupRecoveryCopyReport;
+
+  /// No description provided for @startupRecoveryReportCopied.
+  ///
+  /// In en, this message translates to:
+  /// **'Full report copied'**
+  String get startupRecoveryReportCopied;
+
+  /// No description provided for @startupRecoveryShareReport.
+  ///
+  /// In en, this message translates to:
+  /// **'Export report'**
+  String get startupRecoveryShareReport;
+
+  /// No description provided for @startupRecoveryReportStored.
+  ///
+  /// In en, this message translates to:
+  /// **'A copy of this report was saved to {path}'**
+  String startupRecoveryReportStored(String path);
+
+  /// No description provided for @startupRecoveryReportSaved.
+  ///
+  /// In en, this message translates to:
+  /// **'Report saved to {path}'**
+  String startupRecoveryReportSaved(String path);
+
+  /// No description provided for @startupRecoveryReportShared.
+  ///
+  /// In en, this message translates to:
+  /// **'Report exported.'**
+  String get startupRecoveryReportShared;
+
+  /// No description provided for @startupRecoveryReportSaveFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not export the report.'**
+  String get startupRecoveryReportSaveFailed;
+
+  /// No description provided for @startupRecoverySectionDataTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Your data'**
+  String get startupRecoverySectionDataTitle;
+
+  /// No description provided for @startupRecoverySectionDataBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing has been deleted. Save a copy somewhere safe before trying anything below.'**
+  String get startupRecoverySectionDataBody;
+
+  /// No description provided for @startupRecoveryExportSavedTo.
+  ///
+  /// In en, this message translates to:
+  /// **'A copy of your data was saved to {path}'**
+  String startupRecoveryExportSavedTo(String path);
+
+  /// No description provided for @startupRecoverySectionRepairTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Diagnose and repair'**
+  String get startupRecoverySectionRepairTitle;
+
+  /// No description provided for @startupRecoverySectionRepairBody.
+  ///
+  /// In en, this message translates to:
+  /// **'The integrity check only reads the database. Repair clears leftover metadata from an interrupted update and retries startup; it never deletes chats.'**
+  String get startupRecoverySectionRepairBody;
+
+  /// No description provided for @startupRecoveryIntegrityButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Check database integrity'**
+  String get startupRecoveryIntegrityButton;
+
+  /// No description provided for @startupRecoveryIntegrityHealthy.
+  ///
+  /// In en, this message translates to:
+  /// **'SQLite found no damage in the database file.'**
+  String get startupRecoveryIntegrityHealthy;
+
+  /// No description provided for @startupRecoveryIntegrityDamaged.
+  ///
+  /// In en, this message translates to:
+  /// **'SQLite reported problems — {detail}'**
+  String startupRecoveryIntegrityDamaged(String detail);
+
+  /// No description provided for @startupRecoveryIntegrityMissing.
+  ///
+  /// In en, this message translates to:
+  /// **'No database file was found in the data folder.'**
+  String get startupRecoveryIntegrityMissing;
+
+  /// No description provided for @startupRecoveryIntegrityFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'The integrity check could not run.'**
+  String get startupRecoveryIntegrityFailed;
+
+  /// No description provided for @startupRecoveryDangerZone.
+  ///
+  /// In en, this message translates to:
+  /// **'Danger zone'**
+  String get startupRecoveryDangerZone;
+
+  /// No description provided for @startupRecoveryDangerBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Resetting permanently deletes Kelivo\'s database on this device. Export a copy of your data first — a reset also destroys the evidence needed to fix the underlying problem.'**
+  String get startupRecoveryDangerBody;
+
+  /// No description provided for @startupRecoveryResetAcknowledge.
+  ///
+  /// In en, this message translates to:
+  /// **'I exported a copy, or I do not need this data.'**
+  String get startupRecoveryResetAcknowledge;
+
   /// No description provided for @startupDatabaseUpdateRequiredTitle.
   ///
   /// In en, this message translates to:

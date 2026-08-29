@@ -112,7 +112,12 @@ Future<void> main() async {
         await _initRestoreFailureWindow();
         runApp(
           _RestoreFailureApp(
-            diagnosticCode: restoreFailureDiagnosticCode(error),
+            report: StartupFailureReport.capture(
+              stage: StartupFailureStage.restoreGate,
+              error: error,
+              step: 'recover_and_require_business_ready',
+              stackTrace: stackTrace,
+            ),
             appDataDirectory: appDataDirectory,
           ),
         );
@@ -143,8 +148,13 @@ Future<void> main() async {
       ChatDatabaseLease? processDatabaseLease;
       BusinessPreferences? businessPreferences;
       var recoveryAttempted = false;
+      // Every call below can fail through drift's worker isolate, which erases
+      // the distinction between them. Naming the current one is what lets the
+      // failure screen say where startup actually stopped.
+      var admissionStep = 'legacy_migration_check';
       while (true) {
         try {
+          admissionStep = 'legacy_migration_check';
           final migrationDecision = await HiveToSqliteMigrationService.check();
           if (migrationDecision.needsMigration) {
             runApp(
@@ -155,6 +165,7 @@ Future<void> main() async {
             );
             return;
           }
+          admissionStep = 'installation_gate';
           await DatabaseInstallationGate.ensureReady(
             appDataDirectory: appDataDirectory,
             allowDatabaseIdentityChange:
@@ -166,10 +177,12 @@ Future<void> main() async {
           final databaseFile = File(
             '${appDataDirectory.path}/${AppDatabase.databaseFileName}',
           );
+          admissionStep = 'gateway_open';
           final databaseLease = await ChatDatabaseGateway.instance.acquire(
             databaseFile,
           );
           try {
+            admissionStep = 'business_migration';
             final legacyPreferences =
                 await SharedPreferencesLegacyBusinessPreferences.open();
             final loadedBusinessPreferences =
@@ -210,7 +223,12 @@ Future<void> main() async {
           await _initRestoreFailureWindow();
           runApp(
             _RestoreFailureApp(
-              diagnosticCode: restoreFailureDiagnosticCode(error),
+              report: StartupFailureReport.capture(
+                stage: StartupFailureStage.databaseAdmission,
+                error: error,
+                step: admissionStep,
+                stackTrace: stackTrace,
+              ),
               appDataDirectory: appDataDirectory,
             ),
           );
@@ -330,12 +348,9 @@ Future<void> _initRestoreFailureWindow() async {
 }
 
 class _RestoreFailureApp extends StatelessWidget {
-  const _RestoreFailureApp({
-    required this.diagnosticCode,
-    this.appDataDirectory,
-  });
+  const _RestoreFailureApp({required this.report, this.appDataDirectory});
 
-  final String diagnosticCode;
+  final StartupFailureReport report;
   final Directory? appDataDirectory;
 
   @override
@@ -348,10 +363,10 @@ class _RestoreFailureApp extends StatelessWidget {
       localizationsDelegates: AppLocalizations.localizationsDelegates,
       theme: buildLightThemeForScheme(palette.light),
       darkTheme: buildDarkThemeForScheme(palette.dark),
-      home: diagnosticCode == 'database_schema_too_new'
-          ? _UpdateRequiredScreen(diagnosticCode: diagnosticCode)
+      home: report.diagnosticCode == 'database_schema_too_new'
+          ? _UpdateRequiredScreen(diagnosticCode: report.diagnosticCode)
           : RestoreFailureScreen(
-              diagnosticCode: diagnosticCode,
+              report: report,
               restart: PlatformUtils.restartApp,
               appDataDirectory: appDataDirectory,
             ),

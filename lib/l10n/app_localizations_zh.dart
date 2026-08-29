@@ -1687,6 +1687,115 @@ class AppLocalizationsZh extends AppLocalizations {
   String get startupRecoveryResetDialogCancel => '取消';
 
   @override
+  String get startupRecoveryWhatFailed => '失败原因';
+
+  @override
+  String get startupRecoveryStageLabel => '失败阶段';
+
+  @override
+  String get startupRecoveryStageRestore => '恢复关卡';
+
+  @override
+  String get startupRecoveryStageDatabase => '数据库启动';
+
+  @override
+  String get startupRecoveryDiagnosticLabel => '诊断码';
+
+  @override
+  String get startupRecoverySchemaLabel => '数据库版本';
+
+  @override
+  String startupRecoverySchemaValue(String installed, int expected) {
+    return '磁盘上为 $installed · 当前版本需要 $expected';
+  }
+
+  @override
+  String get startupRecoveryAppVersionLabel => '应用';
+
+  @override
+  String get startupRecoveryUnknownValue => '未知';
+
+  @override
+  String get startupRecoveryCollecting => '正在收集诊断信息…';
+
+  @override
+  String get startupRecoveryShowDetails => '展开技术细节';
+
+  @override
+  String get startupRecoveryHideDetails => '收起技术细节';
+
+  @override
+  String get startupRecoveryCopyReport => '复制完整报告';
+
+  @override
+  String get startupRecoveryReportCopied => '已复制完整报告';
+
+  @override
+  String get startupRecoveryShareReport => '导出报告';
+
+  @override
+  String startupRecoveryReportStored(String path) {
+    return '报告已保存到 $path';
+  }
+
+  @override
+  String startupRecoveryReportSaved(String path) {
+    return '报告已保存到 $path';
+  }
+
+  @override
+  String get startupRecoveryReportShared => '报告已导出。';
+
+  @override
+  String get startupRecoveryReportSaveFailed => '无法导出报告。';
+
+  @override
+  String get startupRecoverySectionDataTitle => '你的数据';
+
+  @override
+  String get startupRecoverySectionDataBody =>
+      '目前没有任何数据被删除。在尝试下面的操作前，先把副本保存到安全的地方。';
+
+  @override
+  String startupRecoveryExportSavedTo(String path) {
+    return '数据副本已保存到 $path';
+  }
+
+  @override
+  String get startupRecoverySectionRepairTitle => '诊断与修复';
+
+  @override
+  String get startupRecoverySectionRepairBody =>
+      '完整性检查只读取数据库。修复会清理上次更新中断留下的元数据并重新启动，不会删除聊天记录。';
+
+  @override
+  String get startupRecoveryIntegrityButton => '检查数据库完整性';
+
+  @override
+  String get startupRecoveryIntegrityHealthy => 'SQLite 未在数据库文件中发现损坏。';
+
+  @override
+  String startupRecoveryIntegrityDamaged(String detail) {
+    return 'SQLite 报告了问题 —— $detail';
+  }
+
+  @override
+  String get startupRecoveryIntegrityMissing => '数据目录中没有找到数据库文件。';
+
+  @override
+  String get startupRecoveryIntegrityFailed => '完整性检查无法运行。';
+
+  @override
+  String get startupRecoveryDangerZone => '危险操作';
+
+  @override
+  String get startupRecoveryDangerBody =>
+      '重置会永久删除本设备上 Kelivo 的数据库。请先导出数据副本——重置同时会销毁排查根本问题所需的证据。';
+
+  @override
+  String get startupRecoveryResetAcknowledge => '我已导出副本，或不需要这些数据。';
+
+  @override
   String get startupDatabaseUpdateRequiredTitle => '请更新 Kelivo 以继续';
 
   @override
@@ -9552,6 +9661,115 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get startupRecoveryResetDialogCancel => '取消';
 
   @override
+  String get startupRecoveryWhatFailed => '失败原因';
+
+  @override
+  String get startupRecoveryStageLabel => '失败阶段';
+
+  @override
+  String get startupRecoveryStageRestore => '恢复关卡';
+
+  @override
+  String get startupRecoveryStageDatabase => '数据库启动';
+
+  @override
+  String get startupRecoveryDiagnosticLabel => '诊断码';
+
+  @override
+  String get startupRecoverySchemaLabel => '数据库版本';
+
+  @override
+  String startupRecoverySchemaValue(String installed, int expected) {
+    return '磁盘上为 $installed · 当前版本需要 $expected';
+  }
+
+  @override
+  String get startupRecoveryAppVersionLabel => '应用';
+
+  @override
+  String get startupRecoveryUnknownValue => '未知';
+
+  @override
+  String get startupRecoveryCollecting => '正在收集诊断信息…';
+
+  @override
+  String get startupRecoveryShowDetails => '展开技术细节';
+
+  @override
+  String get startupRecoveryHideDetails => '收起技术细节';
+
+  @override
+  String get startupRecoveryCopyReport => '复制完整报告';
+
+  @override
+  String get startupRecoveryReportCopied => '已复制完整报告';
+
+  @override
+  String get startupRecoveryShareReport => '导出报告';
+
+  @override
+  String startupRecoveryReportStored(String path) {
+    return '报告已保存到 $path';
+  }
+
+  @override
+  String startupRecoveryReportSaved(String path) {
+    return '报告已保存到 $path';
+  }
+
+  @override
+  String get startupRecoveryReportShared => '报告已导出。';
+
+  @override
+  String get startupRecoveryReportSaveFailed => '无法导出报告。';
+
+  @override
+  String get startupRecoverySectionDataTitle => '你的数据';
+
+  @override
+  String get startupRecoverySectionDataBody =>
+      '目前没有任何数据被删除。在尝试下面的操作前，先把副本保存到安全的地方。';
+
+  @override
+  String startupRecoveryExportSavedTo(String path) {
+    return '数据副本已保存到 $path';
+  }
+
+  @override
+  String get startupRecoverySectionRepairTitle => '诊断与修复';
+
+  @override
+  String get startupRecoverySectionRepairBody =>
+      '完整性检查只读取数据库。修复会清理上次更新中断留下的元数据并重新启动，不会删除聊天记录。';
+
+  @override
+  String get startupRecoveryIntegrityButton => '检查数据库完整性';
+
+  @override
+  String get startupRecoveryIntegrityHealthy => 'SQLite 未在数据库文件中发现损坏。';
+
+  @override
+  String startupRecoveryIntegrityDamaged(String detail) {
+    return 'SQLite 报告了问题 —— $detail';
+  }
+
+  @override
+  String get startupRecoveryIntegrityMissing => '数据目录中没有找到数据库文件。';
+
+  @override
+  String get startupRecoveryIntegrityFailed => '完整性检查无法运行。';
+
+  @override
+  String get startupRecoveryDangerZone => '危险操作';
+
+  @override
+  String get startupRecoveryDangerBody =>
+      '重置会永久删除本设备上 Kelivo 的数据库。请先导出数据副本——重置同时会销毁排查根本问题所需的证据。';
+
+  @override
+  String get startupRecoveryResetAcknowledge => '我已导出副本，或不需要这些数据。';
+
+  @override
   String get startupDatabaseUpdateRequiredTitle => '请更新 Kelivo 以继续';
 
   @override
@@ -17341,6 +17559,115 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get startupRecoveryResetDialogCancel => '取消';
+
+  @override
+  String get startupRecoveryWhatFailed => '失敗原因';
+
+  @override
+  String get startupRecoveryStageLabel => '失敗階段';
+
+  @override
+  String get startupRecoveryStageRestore => '還原關卡';
+
+  @override
+  String get startupRecoveryStageDatabase => '資料庫啟動';
+
+  @override
+  String get startupRecoveryDiagnosticLabel => '診斷碼';
+
+  @override
+  String get startupRecoverySchemaLabel => '資料庫版本';
+
+  @override
+  String startupRecoverySchemaValue(String installed, int expected) {
+    return '磁碟上為 $installed · 目前版本需要 $expected';
+  }
+
+  @override
+  String get startupRecoveryAppVersionLabel => '應用程式';
+
+  @override
+  String get startupRecoveryUnknownValue => '未知';
+
+  @override
+  String get startupRecoveryCollecting => '正在收集診斷資訊…';
+
+  @override
+  String get startupRecoveryShowDetails => '展開技術細節';
+
+  @override
+  String get startupRecoveryHideDetails => '收合技術細節';
+
+  @override
+  String get startupRecoveryCopyReport => '複製完整報告';
+
+  @override
+  String get startupRecoveryReportCopied => '已複製完整報告';
+
+  @override
+  String get startupRecoveryShareReport => '匯出報告';
+
+  @override
+  String startupRecoveryReportStored(String path) {
+    return '報告已儲存至 $path';
+  }
+
+  @override
+  String startupRecoveryReportSaved(String path) {
+    return '報告已儲存至 $path';
+  }
+
+  @override
+  String get startupRecoveryReportShared => '報告已匯出。';
+
+  @override
+  String get startupRecoveryReportSaveFailed => '無法匯出報告。';
+
+  @override
+  String get startupRecoverySectionDataTitle => '你的資料';
+
+  @override
+  String get startupRecoverySectionDataBody =>
+      '目前沒有任何資料被刪除。在嘗試下方操作前，先把副本存到安全的地方。';
+
+  @override
+  String startupRecoveryExportSavedTo(String path) {
+    return '資料副本已儲存至 $path';
+  }
+
+  @override
+  String get startupRecoverySectionRepairTitle => '診斷與修復';
+
+  @override
+  String get startupRecoverySectionRepairBody =>
+      '完整性檢查只會讀取資料庫。修復會清除上次更新中斷留下的中繼資料並重新啟動，不會刪除聊天記錄。';
+
+  @override
+  String get startupRecoveryIntegrityButton => '檢查資料庫完整性';
+
+  @override
+  String get startupRecoveryIntegrityHealthy => 'SQLite 未在資料庫檔案中發現損壞。';
+
+  @override
+  String startupRecoveryIntegrityDamaged(String detail) {
+    return 'SQLite 回報了問題 —— $detail';
+  }
+
+  @override
+  String get startupRecoveryIntegrityMissing => '資料目錄中找不到資料庫檔案。';
+
+  @override
+  String get startupRecoveryIntegrityFailed => '完整性檢查無法執行。';
+
+  @override
+  String get startupRecoveryDangerZone => '危險操作';
+
+  @override
+  String get startupRecoveryDangerBody =>
+      '重設會永久刪除本裝置上 Kelivo 的資料庫。請先匯出資料副本——重設同時會銷毀排查根本問題所需的證據。';
+
+  @override
+  String get startupRecoveryResetAcknowledge => '我已匯出副本，或不需要這些資料。';
 
   @override
   String get startupDatabaseUpdateRequiredTitle => '請更新 Kelivo 以繼續';

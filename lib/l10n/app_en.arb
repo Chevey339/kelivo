@@ -707,6 +707,76 @@
   "startupRecoveryResetDialogContent": "This permanently deletes Kelivo's database on this device and starts fresh. If you might need this data, export a copy first. This cannot be undone.",
   "startupRecoveryResetDialogConfirm": "Reset and restart",
   "startupRecoveryResetDialogCancel": "Cancel",
+  "startupRecoveryWhatFailed": "What failed",
+  "startupRecoveryStageLabel": "Stage",
+  "startupRecoveryStageRestore": "Restore gate",
+  "startupRecoveryStageDatabase": "Database startup",
+  "startupRecoveryDiagnosticLabel": "Diagnostic code",
+  "startupRecoverySchemaLabel": "Database version",
+  "startupRecoverySchemaValue": "{installed} on disk · {expected} expected by this build",
+  "@startupRecoverySchemaValue": {
+    "placeholders": {
+      "installed": {
+        "type": "String"
+      },
+      "expected": {
+        "type": "int"
+      }
+    }
+  },
+  "startupRecoveryAppVersionLabel": "App",
+  "startupRecoveryUnknownValue": "unknown",
+  "startupRecoveryCollecting": "Collecting diagnostics…",
+  "startupRecoveryShowDetails": "Show technical details",
+  "startupRecoveryHideDetails": "Hide technical details",
+  "startupRecoveryCopyReport": "Copy full report",
+  "startupRecoveryReportCopied": "Full report copied",
+  "startupRecoveryShareReport": "Export report",
+  "startupRecoveryReportStored": "A copy of this report was saved to {path}",
+  "@startupRecoveryReportStored": {
+    "placeholders": {
+      "path": {
+        "type": "String"
+      }
+    }
+  },
+  "startupRecoveryReportSaved": "Report saved to {path}",
+  "@startupRecoveryReportSaved": {
+    "placeholders": {
+      "path": {
+        "type": "String"
+      }
+    }
+  },
+  "startupRecoveryReportShared": "Report exported.",
+  "startupRecoveryReportSaveFailed": "Could not export the report.",
+  "startupRecoverySectionDataTitle": "Your data",
+  "startupRecoverySectionDataBody": "Nothing has been deleted. Save a copy somewhere safe before trying anything below.",
+  "startupRecoveryExportSavedTo": "A copy of your data was saved to {path}",
+  "@startupRecoveryExportSavedTo": {
+    "placeholders": {
+      "path": {
+        "type": "String"
+      }
+    }
+  },
+  "startupRecoverySectionRepairTitle": "Diagnose and repair",
+  "startupRecoverySectionRepairBody": "The integrity check only reads the database. Repair clears leftover metadata from an interrupted update and retries startup; it never deletes chats.",
+  "startupRecoveryIntegrityButton": "Check database integrity",
+  "startupRecoveryIntegrityHealthy": "SQLite found no damage in the database file.",
+  "startupRecoveryIntegrityDamaged": "SQLite reported problems — {detail}",
+  "@startupRecoveryIntegrityDamaged": {
+    "placeholders": {
+      "detail": {
+        "type": "String"
+      }
+    }
+  },
+  "startupRecoveryIntegrityMissing": "No database file was found in the data folder.",
+  "startupRecoveryIntegrityFailed": "The integrity check could not run.",
+  "startupRecoveryDangerZone": "Danger zone",
+  "startupRecoveryDangerBody": "Resetting permanently deletes Kelivo's database on this device. Export a copy of your data first — a reset also destroys the evidence needed to fix the underlying problem.",
+  "startupRecoveryResetAcknowledge": "I exported a copy, or I do not need this data.",
   "startupDatabaseUpdateRequiredTitle": "Update Kelivo to continue",
   "startupDatabaseUpdateRequiredContent": "The chat database on this device was created by a newer version of Kelivo and cannot be opened by this version. Your data has not been changed. Install the latest version of Kelivo, then open it again.",
   "backupPageRestoreFailedMessage": "Restore failed: {error}",
