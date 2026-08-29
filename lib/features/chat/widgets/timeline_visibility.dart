@@ -9,6 +9,7 @@ import '../../../utils/mcp_structured_image.dart';
 import '../../home/services/ask_user_interaction_service.dart';
 import '../../home/services/local_tools_service.dart';
 import 'screen_time_tool_ui.dart';
+import 'weather_tool_ui.dart';
 
 /// Built-in search is cited elsewhere and must not create a timeline card.
 const String kBuiltinSearchToolName = 'builtin_search';
@@ -383,6 +384,12 @@ double estimateToolExtraHeight({
       return _estimateScreenTimeExtra(screenTime, fontScale);
     }
   }
+  if (toolName == LocalToolNames.weather) {
+    final weather = WeatherToolResult.tryParse(cleanText);
+    if (weather != null && !weather.isError) {
+      return _estimateWeatherExtra(weather, fontScale);
+    }
+  }
 
   var extra = 0.0;
   final summaryFontSize = 12.0 * fontScale;
@@ -600,6 +607,11 @@ double _estimateScreenTimeExtra(ScreenTimeResult result, double fontScale) {
   if (result.isNoPermission) return line;
   final apps = result.apps.length.clamp(0, 3);
   return line + apps * (line + 2);
+}
+
+double _estimateWeatherExtra(WeatherToolResult result, double fontScale) {
+  final line = 16.0 * fontScale;
+  return result.hasCurrent ? line * 2 + 4 : line;
 }
 
 double _estimatePendingApprovalExtra(

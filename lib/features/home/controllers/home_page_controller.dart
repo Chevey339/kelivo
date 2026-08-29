@@ -42,6 +42,7 @@ import 'scroll_controller.dart' as scroll_ctrl;
 import 'home_view_model.dart';
 import '../services/message_builder_service.dart';
 import '../services/message_generation_service.dart';
+import '../services/local_tools_service.dart';
 import '../services/ask_user_interaction_service.dart';
 import '../services/ocr_service.dart';
 import '../services/translation_service.dart';
@@ -615,6 +616,9 @@ class HomePageController extends ChangeNotifier {
     try {
       _mcpProvider = _context.read<McpProvider>();
       _mcpProvider!.addListener(_onMcpChanged);
+    } catch (_) {}
+    try {
+      unawaited(DeviceLocalTools.prefetchIosCapabilities());
     } catch (_) {}
   }
 

@@ -56,6 +56,7 @@ import 'citation_sources_sheet.dart';
 import 'chat_suggestion_bubbles.dart';
 import 'token_display_widget.dart';
 import 'screen_time_tool_ui.dart';
+import 'weather_tool_ui.dart';
 import 'tool_detail_text_section.dart';
 import '../../../theme/app_font_weights.dart';
 
@@ -469,6 +470,12 @@ IconData? _localToolIconFor(String name, Map<String, dynamic> args) {
     LocalToolNames.screenTime => Lucide.Smartphone,
     LocalToolNames.calendarQuery => Lucide.Calendar,
     LocalToolNames.calendarCreate => Lucide.CalendarPlus,
+    LocalToolNames.currentLocation => Lucide.MapPin,
+    LocalToolNames.weather => Lucide.CloudSun,
+    LocalToolNames.healthSummary => Lucide.HeartPulse,
+    LocalToolNames.remindersQuery => Lucide.ListTodo,
+    LocalToolNames.remindersCreate => Lucide.ListPlus,
+    LocalToolNames.remindersComplete => Lucide.CheckCircle,
     _ => null,
   };
 }
@@ -495,6 +502,15 @@ String? _localToolTitleFor(
       l10n.assistantEditLocalToolCalendarQueryTitle,
     LocalToolNames.calendarCreate =>
       l10n.assistantEditLocalToolCalendarCreateTitle,
+    LocalToolNames.currentLocation => l10n.assistantEditLocalToolLocationTitle,
+    LocalToolNames.weather => l10n.assistantEditLocalToolWeatherTitle,
+    LocalToolNames.healthSummary => l10n.assistantEditLocalToolHealthTitle,
+    LocalToolNames.remindersQuery =>
+      l10n.assistantEditLocalToolRemindersQueryTitle,
+    LocalToolNames.remindersCreate =>
+      l10n.assistantEditLocalToolRemindersCreateTitle,
+    LocalToolNames.remindersComplete =>
+      l10n.assistantEditLocalToolRemindersCompleteTitle,
     _ => null,
   };
 }
@@ -5282,6 +5298,9 @@ class _ChainOfThoughtToolStepState extends State<_ChainOfThoughtToolStep> {
     final screenTimeResult = widget.part.toolName == LocalToolNames.screenTime
         ? ScreenTimeResult.tryParse(cleanText)
         : null;
+    final weatherResult = widget.part.toolName == LocalToolNames.weather
+        ? WeatherToolResult.tryParse(cleanText)
+        : null;
     final String summaryText = approvalRequest != null
         ? _argsSummary(approvalRequest.arguments)
         : cleanText.isNotEmpty
@@ -5312,6 +5331,12 @@ class _ChainOfThoughtToolStepState extends State<_ChainOfThoughtToolStep> {
             textColor: fg.body,
             secondaryColor: fg.muted,
             errorColor: cs.error,
+          )
+        : weatherResult != null && !weatherResult.isError
+        ? WeatherToolSummary(
+            result: weatherResult,
+            textColor: fg.body,
+            secondaryColor: fg.muted,
           )
         : !shouldShowSummary || summaryText.trim().isEmpty
         ? null
@@ -5637,6 +5662,28 @@ class _ToolCallItemState extends State<_ToolCallItem> {
                 text: ttsText,
                 textColor: fg.body,
                 buttonColor: fg.accent,
+              ),
+            ],
+            if (!widget.part.loading &&
+                !isPendingApproval &&
+                widget.part.toolName == LocalToolNames.weather) ...[
+              Builder(
+                builder: (context) {
+                  final weather = WeatherToolResult.tryParse(
+                    widget.part.content,
+                  );
+                  if (weather == null || weather.isError) {
+                    return const SizedBox.shrink();
+                  }
+                  return Padding(
+                    padding: const EdgeInsets.only(top: 8),
+                    child: WeatherToolSummary(
+                      result: weather,
+                      textColor: fg.body,
+                      secondaryColor: fg.muted,
+                    ),
+                  );
+                },
               ),
             ],
             if (!widget.part.loading &&

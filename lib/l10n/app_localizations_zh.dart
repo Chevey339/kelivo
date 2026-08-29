@@ -5628,6 +5628,47 @@ class AppLocalizationsZh extends AppLocalizations {
       '在你确认后于本设备创建日历日程，需要授予日历权限。';
 
   @override
+  String get assistantEditLocalToolLocationTitle => '当前位置';
+
+  @override
+  String get assistantEditLocalToolLocationSubtitle => '读取本设备的一次性位置，需要授予定位权限。';
+
+  @override
+  String get assistantEditLocalToolWeatherTitle => '天气';
+
+  @override
+  String get assistantEditLocalToolWeatherSubtitle =>
+      '获取当前位置或指定地点的 Apple 天气，结果中会展示 WeatherKit 数据来源。';
+
+  @override
+  String get assistantEditLocalToolHealthTitle => '健康摘要';
+
+  @override
+  String get assistantEditLocalToolHealthSubtitle =>
+      '读取本设备的健康活动摘要，需要授予健康数据读取权限。';
+
+  @override
+  String get assistantEditLocalToolRemindersQueryTitle => '查询提醒';
+
+  @override
+  String get assistantEditLocalToolRemindersQuerySubtitle =>
+      '读取本设备上的提醒事项，需要授予提醒事项完整访问权限。';
+
+  @override
+  String get assistantEditLocalToolRemindersCreateTitle => '创建提醒';
+
+  @override
+  String get assistantEditLocalToolRemindersCreateSubtitle =>
+      '在你确认后于本设备创建提醒事项，需要授予提醒事项完整访问权限。';
+
+  @override
+  String get assistantEditLocalToolRemindersCompleteTitle => '完成提醒';
+
+  @override
+  String get assistantEditLocalToolRemindersCompleteSubtitle =>
+      '在你确认后将提醒事项标记为完成，需要授予提醒事项完整访问权限。';
+
+  @override
   String get assistantEditMemorySwitchDescription => '允许助手主动存储并在对话间引用用户相关信息';
 
   @override
@@ -13376,6 +13417,47 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   @override
   String get assistantEditLocalToolCalendarCreateSubtitle =>
       '在你确认后于本设备创建日历日程，需要授予日历权限。';
+
+  @override
+  String get assistantEditLocalToolLocationTitle => '当前位置';
+
+  @override
+  String get assistantEditLocalToolLocationSubtitle => '读取本设备的一次性位置，需要授予定位权限。';
+
+  @override
+  String get assistantEditLocalToolWeatherTitle => '天气';
+
+  @override
+  String get assistantEditLocalToolWeatherSubtitle =>
+      '获取当前位置或指定地点的 Apple 天气，结果中会展示 WeatherKit 数据来源。';
+
+  @override
+  String get assistantEditLocalToolHealthTitle => '健康摘要';
+
+  @override
+  String get assistantEditLocalToolHealthSubtitle =>
+      '读取本设备的健康活动摘要，需要授予健康数据读取权限。';
+
+  @override
+  String get assistantEditLocalToolRemindersQueryTitle => '查询提醒';
+
+  @override
+  String get assistantEditLocalToolRemindersQuerySubtitle =>
+      '读取本设备上的提醒事项，需要授予提醒事项完整访问权限。';
+
+  @override
+  String get assistantEditLocalToolRemindersCreateTitle => '创建提醒';
+
+  @override
+  String get assistantEditLocalToolRemindersCreateSubtitle =>
+      '在你确认后于本设备创建提醒事项，需要授予提醒事项完整访问权限。';
+
+  @override
+  String get assistantEditLocalToolRemindersCompleteTitle => '完成提醒';
+
+  @override
+  String get assistantEditLocalToolRemindersCompleteSubtitle =>
+      '在你确认后将提醒事项标记为完成，需要授予提醒事项完整访问权限。';
 
   @override
   String get assistantEditMemorySwitchDescription => '允许助手主动存储并在对话间引用用户相关信息';
@@ -21200,6 +21282,47 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   @override
   String get assistantEditLocalToolCalendarCreateSubtitle =>
       '在你確認後於本裝置建立日曆行程，需要授予日曆權限。';
+
+  @override
+  String get assistantEditLocalToolLocationTitle => '目前位置';
+
+  @override
+  String get assistantEditLocalToolLocationSubtitle => '讀取本裝置的一次性位置，需要授予定位權限。';
+
+  @override
+  String get assistantEditLocalToolWeatherTitle => '天氣';
+
+  @override
+  String get assistantEditLocalToolWeatherSubtitle =>
+      '取得目前位置或指定地點的 Apple 天氣，結果中會顯示 WeatherKit 資料來源。';
+
+  @override
+  String get assistantEditLocalToolHealthTitle => '健康摘要';
+
+  @override
+  String get assistantEditLocalToolHealthSubtitle =>
+      '讀取本裝置的健康活動摘要，需要授予健康資料讀取權限。';
+
+  @override
+  String get assistantEditLocalToolRemindersQueryTitle => '查詢提醒';
+
+  @override
+  String get assistantEditLocalToolRemindersQuerySubtitle =>
+      '讀取本裝置上的提醒事項，需要授予提醒事項完整存取權限。';
+
+  @override
+  String get assistantEditLocalToolRemindersCreateTitle => '建立提醒';
+
+  @override
+  String get assistantEditLocalToolRemindersCreateSubtitle =>
+      '在你確認後於本裝置建立提醒事項，需要授予提醒事項完整存取權限。';
+
+  @override
+  String get assistantEditLocalToolRemindersCompleteTitle => '完成提醒';
+
+  @override
+  String get assistantEditLocalToolRemindersCompleteSubtitle =>
+      '在你確認後將提醒事項標記為完成，需要授予提醒事項完整存取權限。';
 
   @override
   String get assistantEditMemorySwitchDescription => '允許助理主動儲存並在對話間引用使用者相關資訊';

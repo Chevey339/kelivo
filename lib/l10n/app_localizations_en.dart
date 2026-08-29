@@ -5855,6 +5855,49 @@ class AppLocalizationsEn extends AppLocalizations {
       'Create calendar events on this device with your confirmation, requires the calendar permission.';
 
   @override
+  String get assistantEditLocalToolLocationTitle => 'Current Location';
+
+  @override
+  String get assistantEditLocalToolLocationSubtitle =>
+      'Read a one-shot location from this device, requires the location permission.';
+
+  @override
+  String get assistantEditLocalToolWeatherTitle => 'Weather';
+
+  @override
+  String get assistantEditLocalToolWeatherSubtitle =>
+      'Get Apple Weather for the current or a specified location. WeatherKit attribution is shown in the result.';
+
+  @override
+  String get assistantEditLocalToolHealthTitle => 'Health Summary';
+
+  @override
+  String get assistantEditLocalToolHealthSubtitle =>
+      'Read a privacy-preserving activity summary from Apple Health, requires Health access.';
+
+  @override
+  String get assistantEditLocalToolRemindersQueryTitle => 'Query Reminders';
+
+  @override
+  String get assistantEditLocalToolRemindersQuerySubtitle =>
+      'Read reminders on this device, requires full reminders access.';
+
+  @override
+  String get assistantEditLocalToolRemindersCreateTitle => 'Create Reminder';
+
+  @override
+  String get assistantEditLocalToolRemindersCreateSubtitle =>
+      'Create a reminder on this device with your confirmation, requires full reminders access.';
+
+  @override
+  String get assistantEditLocalToolRemindersCompleteTitle =>
+      'Complete Reminder';
+
+  @override
+  String get assistantEditLocalToolRemindersCompleteSubtitle =>
+      'Mark a reminder as done with your confirmation, requires full reminders access.';
+
+  @override
   String get assistantEditMemorySwitchDescription =>
       'Allow the assistant to create and use memories across chats.';
 
