@@ -10489,6 +10489,36 @@ abstract class AppLocalizations {
   /// **'Search mode'**
   String get searchServicesDialogSearchMode;
 
+  /// No description provided for @searchServiceNameYou.
+  ///
+  /// In en, this message translates to:
+  /// **'You.com Search'**
+  String get searchServiceNameYou;
+
+  /// No description provided for @searchProviderYouDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'You.com Search API. Returns web and news results with highlights or snippets.'**
+  String get searchProviderYouDescription;
+
+  /// No description provided for @searchServicesDialogContentMode.
+  ///
+  /// In en, this message translates to:
+  /// **'Content mode'**
+  String get searchServicesDialogContentMode;
+
+  /// No description provided for @searchServicesDialogHighlights.
+  ///
+  /// In en, this message translates to:
+  /// **'Highlights'**
+  String get searchServicesDialogHighlights;
+
+  /// No description provided for @searchServicesDialogSnippets.
+  ///
+  /// In en, this message translates to:
+  /// **'Snippets'**
+  String get searchServicesDialogSnippets;
+
   /// No description provided for @searchServiceNameKelivo.
   ///
   /// In en, this message translates to:

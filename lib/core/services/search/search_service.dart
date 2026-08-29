@@ -27,6 +27,7 @@ import 'providers/anysearch_search_service.dart';
 import 'providers/doubao_search_service.dart';
 import 'providers/kelivo_search_service.dart';
 import 'providers/parallel_search_service.dart';
+import 'providers/you_search_service.dart';
 
 // Base interface for all search services
 abstract class SearchService<T extends SearchServiceOptions> {
@@ -107,6 +108,8 @@ abstract class SearchService<T extends SearchServiceOptions> {
         return KelivoSearchService() as SearchService;
       case ParallelOptions _:
         return ParallelSearchService() as SearchService;
+      case YouSearchOptions _:
+        return YouSearchService() as SearchService;
       default:
         return BingSearchService() as SearchService;
     }
@@ -263,6 +266,8 @@ abstract class SearchServiceOptions {
         return KelivoOptions.fromJson(json);
       case 'parallel':
         return ParallelOptions.fromJson(json);
+      case 'you':
+        return YouSearchOptions.fromJson(json);
       default:
         return BingLocalOptions(id: json['id']);
     }
@@ -1035,6 +1040,45 @@ class ParallelOptions extends SearchServiceOptions {
         id: json['id'],
         apiKey: json['apiKey'] ?? '',
         mode: normalizeMode(json['mode']),
+        extraApiKeys: SearchServiceOptions.parseExtraApiKeys(json),
+      );
+}
+
+class YouSearchOptions extends SearchServiceOptions {
+  static const String highlightsMode = 'highlights';
+  static const String snippetsMode = 'snippets';
+  static const String defaultContentMode = highlightsMode;
+  static const List<String> contentModes = [highlightsMode, snippetsMode];
+
+  final String apiKey;
+  final String contentMode;
+
+  YouSearchOptions({
+    required super.id,
+    required this.apiKey,
+    this.contentMode = defaultContentMode,
+    super.extraApiKeys,
+  });
+
+  static String normalizeContentMode(String? value) {
+    final mode = (value ?? '').trim();
+    return contentModes.contains(mode) ? mode : defaultContentMode;
+  }
+
+  @override
+  Map<String, dynamic> toJson() => {
+    'type': 'you',
+    'id': id,
+    'apiKey': apiKey,
+    'contentMode': contentMode,
+    if (extraApiKeys.isNotEmpty) 'apiKeys': extraApiKeys,
+  };
+
+  factory YouSearchOptions.fromJson(Map<String, dynamic> json) =>
+      YouSearchOptions(
+        id: json['id'],
+        apiKey: json['apiKey'] ?? '',
+        contentMode: normalizeContentMode(json['contentMode']),
         extraApiKeys: SearchServiceOptions.parseExtraApiKeys(json),
       );
 }

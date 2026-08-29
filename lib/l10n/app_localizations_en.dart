@@ -5723,6 +5723,22 @@ class AppLocalizationsEn extends AppLocalizations {
   String get searchServicesDialogSearchMode => 'Search mode';
 
   @override
+  String get searchServiceNameYou => 'You.com Search';
+
+  @override
+  String get searchProviderYouDescription =>
+      'You.com Search API. Returns web and news results with highlights or snippets.';
+
+  @override
+  String get searchServicesDialogContentMode => 'Content mode';
+
+  @override
+  String get searchServicesDialogHighlights => 'Highlights';
+
+  @override
+  String get searchServicesDialogSnippets => 'Snippets';
+
+  @override
   String get searchServiceNameKelivo => 'Kelivo';
 
   @override

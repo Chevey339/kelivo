@@ -432,6 +432,68 @@ void main() {
     expect(saved.mode, ParallelOptions.defaultMode);
   });
 
+  testWidgets('selects You.com from the add page and saves', (tester) async {
+    SearchServiceEditorResult? result;
+    await _pumpEditor(tester, onResult: (value) => result = value);
+
+    await tester.dragUntilVisible(
+      find.text('You.com Search'),
+      find.byType(ListView),
+      const Offset(0, -240),
+    );
+    await tester.tap(find.text('You.com Search'));
+    await tester.pumpAndSettle();
+
+    await tester.enterText(_apiKeyField(), 'you-key');
+    await tester.tap(find.byIcon(Lucide.Check));
+    await tester.pumpAndSettle();
+
+    expect(result?.service, isA<YouSearchOptions>());
+    final saved = result!.service! as YouSearchOptions;
+    expect(saved.apiKey, 'you-key');
+    expect(saved.contentMode, YouSearchOptions.defaultContentMode);
+  });
+
+  testWidgets('saves You.com content mode from the editor', (tester) async {
+    SearchServiceEditorResult? result;
+    await _pumpEditor(
+      tester,
+      initialService: YouSearchOptions(
+        id: 'you',
+        apiKey: 'you-key',
+        contentMode: YouSearchOptions.highlightsMode,
+      ),
+      onResult: (value) => result = value,
+    );
+
+    final modeField = find.byKey(
+      const ValueKey('search-service-field-contentMode'),
+    );
+    await tester.dragUntilVisible(
+      modeField,
+      find.byType(ListView),
+      const Offset(0, -240),
+    );
+    await tester.tap(
+      find.descendant(
+        of: modeField,
+        matching: find.byType(DropdownButton<String>),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Snippets').last);
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byIcon(Lucide.Check));
+    await tester.pumpAndSettle();
+
+    expect(result?.service, isA<YouSearchOptions>());
+    expect(
+      (result!.service! as YouSearchOptions).contentMode,
+      YouSearchOptions.snippetsMode,
+    );
+  });
+
   testWidgets('saves Parallel search mode from the editor', (tester) async {
     SearchServiceEditorResult? result;
     await _pumpEditor(

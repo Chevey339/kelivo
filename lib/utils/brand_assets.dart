@@ -79,6 +79,7 @@ class BrandAssets {
         MapEntry(RegExp(r'tavily'), 'tavily-color.svg'),
         MapEntry(RegExp(r'anysearch'), 'anysearch.svg'),
         MapEntry(RegExp(r'parallel'), 'parallel.svg'),
+        MapEntry(RegExp(r'^you(?:\.com)?$'), 'you.svg'),
         MapEntry(RegExp(r'exa'), 'exa-color.svg'),
         MapEntry(RegExp(r'linkup'), 'linkup.svg'),
         MapEntry(RegExp(r'brave'), 'brave-color.svg'),
@@ -311,6 +312,11 @@ class BrandAssets {
       id: 'parallel',
       label: 'Parallel',
       asset: 'assets/icons/parallel.svg',
+    ),
+    BrandIconOption(
+      id: 'you',
+      label: 'You.com',
+      asset: 'assets/icons/you.svg',
     ),
     BrandIconOption(
       id: 'exa',

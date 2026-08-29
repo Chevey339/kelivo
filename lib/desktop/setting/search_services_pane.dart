@@ -610,6 +610,7 @@ class _BrandBadge extends StatelessWidget {
     if (s is TinyFishOptions) return 'tinyfish';
     if (s is AnySearchOptions) return 'anysearch';
     if (s is ParallelOptions) return 'parallel';
+    if (s is YouSearchOptions) return 'you';
     if (s is KelivoOptions) return 'kelivo';
     return 'search';
   }
@@ -781,6 +782,9 @@ class _AddServiceDialogState extends State<_AddServiceDialog> {
     'includeDomains': TextEditingController(),
     'excludeDomains': TextEditingController(),
     'mode': TextEditingController(text: ParallelOptions.defaultMode),
+    'contentMode': TextEditingController(
+      text: YouSearchOptions.defaultContentMode,
+    ),
   };
 
   @override
@@ -834,6 +838,9 @@ class _AddServiceDialogState extends State<_AddServiceDialog> {
                         if (t == 'parallel') {
                           _controllers['mode']!.text =
                               ParallelOptions.defaultMode;
+                        } else if (t == 'you') {
+                          _controllers['contentMode']!.text =
+                              YouSearchOptions.defaultContentMode;
                         }
                       }),
                     ),
@@ -1160,6 +1167,34 @@ class _AddServiceDialogState extends State<_AddServiceDialog> {
             }),
           ),
         ];
+      case 'you':
+        return [
+          TextField(
+            controller: _controllers['apiKey'],
+            decoration: deco(l10n.searchServicesDialogApiKey),
+          ),
+          const SizedBox(height: 12),
+          _deskModeDropdown(
+            context: context,
+            label: l10n.searchServicesDialogContentMode,
+            value: YouSearchOptions.normalizeContentMode(
+              _controllers['contentMode']!.text,
+            ),
+            items: [
+              (
+                value: YouSearchOptions.highlightsMode,
+                label: l10n.searchServicesDialogHighlights,
+              ),
+              (
+                value: YouSearchOptions.snippetsMode,
+                label: l10n.searchServicesDialogSnippets,
+              ),
+            ],
+            onChanged: (value) => setState(() {
+              _controllers['contentMode']!.text = value;
+            }),
+          ),
+        ];
       case 'bing_local':
       default:
         return [];
@@ -1280,6 +1315,14 @@ class _AddServiceDialogState extends State<_AddServiceDialog> {
           apiKey: _controllers['apiKey']!.text,
           mode: ParallelOptions.normalizeMode(_controllers['mode']!.text),
         );
+      case 'you':
+        return YouSearchOptions(
+          id: id,
+          apiKey: _controllers['apiKey']!.text,
+          contentMode: YouSearchOptions.normalizeContentMode(
+            _controllers['contentMode']!.text,
+          ),
+        );
       case 'bing_local':
       default:
         return BingLocalOptions(id: id);
@@ -1399,6 +1442,9 @@ class _EditServiceDialogState extends State<_EditServiceDialog> {
     } else if (s is ParallelOptions) {
       _controllers['apiKey'] = TextEditingController(text: s.apiKey);
       _controllers['mode'] = TextEditingController(text: s.mode);
+    } else if (s is YouSearchOptions) {
+      _controllers['apiKey'] = TextEditingController(text: s.apiKey);
+      _controllers['contentMode'] = TextEditingController(text: s.contentMode);
     }
   }
 
@@ -1781,6 +1827,36 @@ class _EditServiceDialogState extends State<_EditServiceDialog> {
           }),
         ),
       ];
+    } else if (s is YouSearchOptions) {
+      return [
+        TextField(
+          controller: _controllers['apiKey'],
+          decoration: deco(l10n.searchServicesDialogApiKey),
+        ),
+        const SizedBox(height: 12),
+        _multiKeyTile(),
+        const SizedBox(height: 12),
+        _deskModeDropdown(
+          context: context,
+          label: l10n.searchServicesDialogContentMode,
+          value: YouSearchOptions.normalizeContentMode(
+            _controllers['contentMode']!.text,
+          ),
+          items: [
+            (
+              value: YouSearchOptions.highlightsMode,
+              label: l10n.searchServicesDialogHighlights,
+            ),
+            (
+              value: YouSearchOptions.snippetsMode,
+              label: l10n.searchServicesDialogSnippets,
+            ),
+          ],
+          onChanged: (value) => setState(() {
+            _controllers['contentMode']!.text = value;
+          }),
+        ),
+      ];
     }
     return [];
   }
@@ -2039,6 +2115,16 @@ class _EditServiceDialogState extends State<_EditServiceDialog> {
         id: s.id,
         apiKey: _controllers['apiKey']!.text,
         mode: ParallelOptions.normalizeMode(_controllers['mode']!.text),
+        extraApiKeys: _extraApiKeys,
+      );
+    }
+    if (s is YouSearchOptions) {
+      return YouSearchOptions(
+        id: s.id,
+        apiKey: _controllers['apiKey']!.text,
+        contentMode: YouSearchOptions.normalizeContentMode(
+          _controllers['contentMode']!.text,
+        ),
         extraApiKeys: _extraApiKeys,
       );
     }
@@ -2323,6 +2409,7 @@ class _ServiceTypeChipsState extends State<_ServiceTypeChips> {
     (type: 'tinyfish', brand: 'tinyfish'),
     (type: 'anysearch', brand: 'anysearch'),
     (type: 'parallel', brand: 'parallel'),
+    (type: 'you', brand: 'you'),
   ];
   @override
   Widget build(BuildContext context) {
@@ -2419,6 +2506,8 @@ String _serviceTypeName(BuildContext context, String type) {
       return l10n.searchServiceNameAnySearch;
     case 'parallel':
       return l10n.searchServiceNameParallel;
+    case 'you':
+      return l10n.searchServiceNameYou;
     case 'kelivo':
       return l10n.searchServiceNameKelivo;
     default:

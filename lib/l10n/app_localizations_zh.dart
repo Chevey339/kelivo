@@ -5500,6 +5500,22 @@ class AppLocalizationsZh extends AppLocalizations {
   String get searchServicesDialogSearchMode => '搜索模式';
 
   @override
+  String get searchServiceNameYou => 'You.com Search';
+
+  @override
+  String get searchProviderYouDescription =>
+      'You.com 搜索 API。返回网页与新闻结果，支持 Highlights 或 Snippets。';
+
+  @override
+  String get searchServicesDialogContentMode => '内容模式';
+
+  @override
+  String get searchServicesDialogHighlights => 'Highlights';
+
+  @override
+  String get searchServicesDialogSnippets => 'Snippets';
+
+  @override
   String get searchServiceNameKelivo => 'Kelivo';
 
   @override
@@ -13408,6 +13424,22 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get searchServicesDialogSearchMode => '搜索模式';
+
+  @override
+  String get searchServiceNameYou => 'You.com Search';
+
+  @override
+  String get searchProviderYouDescription =>
+      'You.com 搜索 API。返回网页与新闻结果，支持 Highlights 或 Snippets。';
+
+  @override
+  String get searchServicesDialogContentMode => '内容模式';
+
+  @override
+  String get searchServicesDialogHighlights => 'Highlights';
+
+  @override
+  String get searchServicesDialogSnippets => 'Snippets';
 
   @override
   String get searchServiceNameKelivo => 'Kelivo';
@@ -21391,6 +21423,22 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get searchServicesDialogSearchMode => '搜尋模式';
+
+  @override
+  String get searchServiceNameYou => 'You.com Search';
+
+  @override
+  String get searchProviderYouDescription =>
+      'You.com 搜尋 API。返回網頁與新聞結果，支援 Highlights 或 Snippets。';
+
+  @override
+  String get searchServicesDialogContentMode => '內容模式';
+
+  @override
+  String get searchServicesDialogHighlights => 'Highlights';
+
+  @override
+  String get searchServicesDialogSnippets => 'Snippets';
 
   @override
   String get searchServiceNameKelivo => 'Kelivo';

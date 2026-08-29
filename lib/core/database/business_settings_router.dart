@@ -1010,6 +1010,14 @@ final class BusinessSettingsRouter {
           strings: const {'mode'},
           stringLists: const {'apiKeys'},
         );
+      case 'you':
+        _validateKnownFields(
+          kind,
+          payload,
+          requiredStrings: const {'apiKey'},
+          strings: const {'contentMode'},
+          stringLists: const {'apiKeys'},
+        );
     }
   }
 

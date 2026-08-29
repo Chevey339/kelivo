@@ -612,6 +612,36 @@ class _SearchServiceEditorPageState extends State<SearchServiceEditorPage> {
         ),
       ];
     }
+    if (service is YouSearchOptions) {
+      return [
+        field(
+          key: 'apiKey',
+          label: l10n.searchServicesDialogApiKey,
+          obscure: true,
+          validator: requiredApiKey,
+        ),
+        _buildMultiKeyEntry(context),
+        _SearchEditorDropdown(
+          key: const ValueKey('search-service-field-contentMode'),
+          label: l10n.searchServicesDialogContentMode,
+          value: YouSearchOptions.normalizeContentMode(_text('contentMode')),
+          items: [
+            (
+              value: YouSearchOptions.highlightsMode,
+              label: l10n.searchServicesDialogHighlights,
+            ),
+            (
+              value: YouSearchOptions.snippetsMode,
+              label: l10n.searchServicesDialogSnippets,
+            ),
+          ],
+          onChanged: (value) {
+            _controller('contentMode').text = value;
+            _markDirty();
+          },
+        ),
+      ];
+    }
 
     return [
       field(
@@ -1150,6 +1180,9 @@ class _SearchServiceEditorPageState extends State<SearchServiceEditorPage> {
     } else if (service is ParallelOptions) {
       _putController('apiKey', service.apiKey);
       _putController('mode', service.mode);
+    } else if (service is YouSearchOptions) {
+      _putController('apiKey', service.apiKey);
+      _putController('contentMode', service.contentMode);
     }
   }
 
@@ -1340,6 +1373,15 @@ class _SearchServiceEditorPageState extends State<SearchServiceEditorPage> {
           apiKey: _text('apiKey'),
           extraApiKeys: _extraApiKeys,
           mode: ParallelOptions.normalizeMode(_text('mode')),
+        );
+      case 'you':
+        return YouSearchOptions(
+          id: _serviceId,
+          apiKey: _text('apiKey'),
+          extraApiKeys: _extraApiKeys,
+          contentMode: YouSearchOptions.normalizeContentMode(
+            _text('contentMode'),
+          ),
         );
       case 'kelivo':
         return KelivoOptions(id: _serviceId);
@@ -2223,6 +2265,7 @@ String _typeForService(SearchServiceOptions service) {
   if (service is TinyFishOptions) return 'tinyfish';
   if (service is AnySearchOptions) return 'anysearch';
   if (service is ParallelOptions) return 'parallel';
+  if (service is YouSearchOptions) return 'you';
   if (service is KelivoOptions) return 'kelivo';
   return 'bing_local';
 }
@@ -2278,6 +2321,8 @@ SearchServiceOptions _defaultService(String type, String id) {
       return AnySearchOptions(id: id, apiKey: '');
     case 'parallel':
       return ParallelOptions(id: id, apiKey: '');
+    case 'you':
+      return YouSearchOptions(id: id, apiKey: '');
     case 'kelivo':
       return KelivoOptions(id: id);
     default:
@@ -2332,6 +2377,8 @@ String _serviceTypeName(BuildContext context, String type) {
       return l10n.searchServiceNameAnySearch;
     case 'parallel':
       return l10n.searchServiceNameParallel;
+    case 'you':
+      return l10n.searchServiceNameYou;
     case 'kelivo':
       return l10n.searchServiceNameKelivo;
     default:
@@ -2362,6 +2409,7 @@ const _providerTypes = <({String type, String brand})>[
   (type: 'tinyfish', brand: 'tinyfish'),
   (type: 'anysearch', brand: 'anysearch'),
   (type: 'parallel', brand: 'parallel'),
+  (type: 'you', brand: 'you'),
 ];
 
 @Preview(
