@@ -46,12 +46,21 @@ void main() {
         baseUrl: 'https://api.anthropic.com',
         modelId: claudeModel,
       );
+      // The definitions arrive in the OpenAI shape the app assembles, with the
+      // name under `function`; a bare `name` at the top level is not one.
+      Map<String, dynamic> openAiTool(String name) => {
+        'type': 'function',
+        'function': {'name': name, 'parameters': {}},
+      };
       // The hosted tool gives way to the client's, and so does the upload.
       expect(
         BuiltInToolsHelper.sendsDataFilesToSandbox(
           cfg: cfg,
           modelId: claudeModel,
-          clientToolNames: ['get_weather', 'code_execution'],
+          clientTools: [
+            openAiTool('get_weather'),
+            openAiTool('code_execution'),
+          ],
         ),
         isFalse,
       );
@@ -59,7 +68,19 @@ void main() {
         BuiltInToolsHelper.sendsDataFilesToSandbox(
           cfg: cfg,
           modelId: claudeModel,
-          clientToolNames: ['get_weather'],
+          clientTools: [openAiTool('get_weather')],
+        ),
+        isTrue,
+      );
+      // A definition without `function` is not one the adapter sends, so it
+      // cannot displace the hosted tool either: both sides ignore it alike.
+      expect(
+        BuiltInToolsHelper.sendsDataFilesToSandbox(
+          cfg: cfg,
+          modelId: claudeModel,
+          clientTools: [
+            {'name': 'code_execution', 'input_schema': {}},
+          ],
         ),
         isTrue,
       );

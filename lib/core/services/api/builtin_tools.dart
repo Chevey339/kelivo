@@ -857,17 +857,31 @@ abstract class BuiltInToolsHelper {
   /// `code_execution` tool name but takes no files from us yet, so
   /// [BuiltInToolsState.codeExecutionActive] alone is the wrong test. A
   /// client tool of that name displaces the hosted one in the request, and
-  /// with it the upload, so [clientToolNames] are part of the answer too.
+  /// with it the upload, so the [clientTools] definitions are part of the
+  /// answer too.
   static bool sendsDataFilesToSandbox({
     required ProviderConfig? cfg,
     required String? modelId,
-    Iterable<String> clientToolNames = const [],
+    Iterable<Map<String, dynamic>> clientTools = const [],
   }) {
     final upstreamModelId = _claudeUpstreamModelId(cfg: cfg, modelId: modelId);
     if (upstreamModelId == null) return false;
     if (!isClaudeCodeExecutionSupportedModel(upstreamModelId)) return false;
-    if (clientToolNames.contains('code_execution')) return false;
+    if (clientTools.map(claimedToolName).contains('code_execution')) {
+      return false;
+    }
     return getActiveTools(cfg: cfg, modelId: modelId).codeExecutionActive;
+  }
+
+  /// The name a client tool definition claims, and takes from a hosted tool
+  /// of the same name: `function.name` in the OpenAI shape the app assembles,
+  /// empty for anything else, which the Claude adapter's conversion also
+  /// drops. Every reader of a tool name goes through here, so no caller can
+  /// look in the wrong place, and the predicate cannot count a definition the
+  /// request will not carry.
+  static String claimedToolName(Map<String, dynamic> tool) {
+    final fn = tool['function'];
+    return fn is Map ? (fn['name'] ?? '').toString() : '';
   }
 
   static Map<String, dynamic> dashScopeSearchOptionsFromOverride(

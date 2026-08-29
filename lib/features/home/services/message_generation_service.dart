@@ -217,7 +217,7 @@ class MessageGenerationService {
     final sandboxDataFiles = BuiltInToolsHelper.sendsDataFilesToSandbox(
       cfg: cfg,
       modelId: modelId,
-      clientToolNames: toolDefs.map((t) => (t['name'] ?? '').toString()),
+      clientTools: toolDefs,
     );
     final indicatorMessageId =
         processingMessageId != null &&

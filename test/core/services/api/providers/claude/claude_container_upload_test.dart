@@ -175,6 +175,38 @@ void main() {
     ]);
   });
 
+  test('a client tool named code_execution keeps the files out', () async {
+    final api = fakeApi();
+
+    // The definition comes in the OpenAI shape the app assembles: the name
+    // lives under `function`, which is where the predicate must look. The
+    // hosted tool gives way to the client's, and the upload goes with it.
+    await sendClaudeStream(
+      api.client,
+      _officialClaude(),
+      _model,
+      conversation(),
+      tools: [
+        {
+          'type': 'function',
+          'function': {
+            'name': 'code_execution',
+            'description': 'run code locally',
+            'parameters': {'type': 'object'},
+          },
+        },
+      ],
+      stream: false,
+    ).toList();
+
+    expect(api.requests.map((r) => r.url.path), ['/v1/messages']);
+    final body = jsonDecode(api.requests.single.body) as Map<String, dynamic>;
+    final tools = (body['tools'] as List).cast<Map<String, dynamic>>();
+    expect(tools.map((t) => t['name']), ['code_execution']);
+    expect(tools.single.containsKey('input_schema'), isTrue);
+    expect(api.requests.single.body, isNot(contains('container_upload')));
+  });
+
   test('a container still in use gets only this turn\'s files', () async {
     final api = fakeApi();
 

@@ -110,7 +110,7 @@ Stream<StreamChunk> sendClaudeStream(
     for (final t in tools) {
       final fn = (t['function'] as Map<String, dynamic>?);
       if (fn == null) continue;
-      final name = (fn['name'] ?? '').toString();
+      final name = BuiltInToolsHelper.claimedToolName(t);
       if (name.isEmpty) continue;
       final desc = (fn['description'] ?? '').toString();
       final params =
@@ -221,9 +221,7 @@ Stream<StreamChunk> sendClaudeStream(
       BuiltInToolsHelper.sendsDataFilesToSandbox(
         cfg: config,
         modelId: modelId,
-        clientToolNames: [
-          for (final t in tools ?? const []) (t['name'] ?? '').toString(),
-        ],
+        clientTools: tools ?? const [],
       );
 
   // Headers (constant across rounds)
