@@ -170,6 +170,36 @@ void main() {
       );
     });
 
+    test('an empty file is kept, as the API allows it', () async {
+      final server = await _filesServer(
+        meta: <String, dynamic>{
+          'id': 'file_1',
+          'filename': 'empty.csv',
+          'mime_type': 'text/csv',
+          'size_bytes': 0,
+          'downloadable': true,
+        },
+        bytes: const <int>[],
+      );
+      addTearDown(() => server.close(force: true));
+
+      final client = http.Client();
+      addTearDown(client.close);
+      Future<GeneratedFile?> download() => downloadClaudeGeneratedFile(
+        client: client,
+        base: 'http://${server.address.address}:${server.port}/v1',
+        headers: const <String, String>{'x-api-key': 'sk-test'},
+        fileId: 'file_1',
+      );
+
+      final first = await download();
+      expect(first!.name, 'empty.csv');
+      expect(await File('${tempDir.path}/upload/empty.csv').length(), 0);
+      // Two empty files are identical, so the second is deduped like any other.
+      final second = await download();
+      expect(second!.uri, first.uri);
+    });
+
     test('a copy already stored is reused and the download dropped', () async {
       final server = await _filesServer(
         meta: <String, dynamic>{

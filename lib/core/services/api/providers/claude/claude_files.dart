@@ -280,8 +280,9 @@ Future<GeneratedFile?> downloadClaudeGeneratedFile({
 }
 
 /// Streams the body at [uri] into [destination], returning its size and
-/// SHA-256, or null when the body cannot be used (a failed request, an empty
-/// body, or one past [claudeFileSizeLimit]).
+/// SHA-256, or null when the body cannot be used (a failed request or one
+/// past [claudeFileSizeLimit]). An empty body is a file: the Files API
+/// reports `size_bytes: 0` for an empty CSV or placeholder the code wrote.
 Future<({int size, List<int> bytes})?> _streamToFile({
   required http.Client client,
   required Uri uri,
@@ -307,7 +308,6 @@ Future<({int size, List<int> bytes})?> _streamToFile({
   } finally {
     await sink.close();
   }
-  if (size == 0) return null;
   hasher.close();
   return (size: size, bytes: hash.digest!.bytes);
 }
