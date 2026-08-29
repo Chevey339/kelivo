@@ -3460,9 +3460,25 @@ class ChatService extends ChangeNotifier {
       )[kind] = payload;
       return;
     }
-    await _repo.setProviderArtifact(assistantMessageId, kind, payload);
-    _providerArtifactsCache.putIfAbsent(assistantMessageId, () => {})[kind] =
-        payload;
+    // The cache is filled before the write so a reader that runs while the
+    // write is in flight (the legacy signature migration does not await it)
+    // already sees the artifact.
+    final artifacts = _providerArtifactsCache.putIfAbsent(
+      assistantMessageId,
+      () => {},
+    );
+    final previous = artifacts[kind];
+    artifacts[kind] = payload;
+    try {
+      await _repo.setProviderArtifact(assistantMessageId, kind, payload);
+    } catch (_) {
+      if (previous == null) {
+        artifacts.remove(kind);
+      } else {
+        artifacts[kind] = previous;
+      }
+      rethrow;
+    }
   }
 
   Future<Conversation> forkConversationAtRevision({

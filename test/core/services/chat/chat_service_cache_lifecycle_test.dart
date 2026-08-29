@@ -186,6 +186,34 @@ void main() {
       );
     });
 
+    test(
+      'a migrated legacy signature is readable before its write lands',
+      () async {
+        final service = createService();
+        await service.init();
+        final conversation = await service.createConversation(title: 'Chat');
+        final assistant = await service.addMessage(
+          conversationId: conversation.id,
+          role: 'assistant',
+          content: 'answer',
+        );
+        await service.loadMessages(conversation.id);
+
+        final cleaned = service.migrateLegacyGeminiThoughtSignature(
+          'answer\n<!-- gemini_thought_signatures:{"text":{"k":"ts","v":"sig"}} -->',
+          assistant.id,
+        );
+
+        expect(cleaned, 'answer');
+        expect(
+          service.getGeminiThoughtSignature(assistant.id),
+          '{"text":{"k":"ts","v":"sig"}}',
+        );
+        // Let the unawaited write finish before teardown closes the database.
+        await service.setToolEvents(assistant.id, const []);
+      },
+    );
+
     test('deleteMessages invalidates cached group indices', () async {
       final service = createService();
       await service.init();
