@@ -280,7 +280,6 @@ class _DesktopHomePageState extends State<DesktopHomePage> {
               // become a resize grip, matching native Windows behavior.
               child: DragToResizeArea(
                 resizeEdgeSize: 8,
-                resizeEdgeColor: Colors.transparent,
                 child: content,
               ),
             ),
