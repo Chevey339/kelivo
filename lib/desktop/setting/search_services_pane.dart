@@ -608,6 +608,7 @@ class _BrandBadge extends StatelessWidget {
     if (s is StepFunOptions) return 'stepfun';
     if (s is FirecrawlOptions) return 'firecrawl';
     if (s is TinyFishOptions) return 'tinyfish';
+    if (s is AnySearchOptions) return 'anysearch';
     if (s is KelivoOptions) return 'kelivo';
     return 'search';
   }
@@ -1116,6 +1117,21 @@ class _AddServiceDialogState extends State<_AddServiceDialog> {
             decoration: deco('Exclude domains'),
           ),
         ];
+      case 'anysearch':
+        return [
+          TextField(
+            controller: _controllers['apiKey'],
+            decoration: deco(l10n.searchServicesDialogApiKey),
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _controllers['url'],
+            decoration: _deskInputDecoration(context).copyWith(
+              labelText: l10n.searchServicesFieldCustomUrlOptional,
+              hintText: AnySearchOptions.defaultUrl,
+            ),
+          ),
+        ];
       case 'bing_local':
       default:
         return [];
@@ -1223,6 +1239,12 @@ class _AddServiceDialogState extends State<_AddServiceDialog> {
           language: (_controllers['language']?.text ?? '').trim(),
           includeDomains: (_controllers['includeDomains']?.text ?? '').trim(),
           excludeDomains: (_controllers['excludeDomains']?.text ?? '').trim(),
+        );
+      case 'anysearch':
+        return AnySearchOptions(
+          id: id,
+          apiKey: _controllers['apiKey']!.text,
+          url: (_controllers['url']?.text ?? '').trim(),
         );
       case 'bing_local':
       default:
@@ -1337,6 +1359,9 @@ class _EditServiceDialogState extends State<_EditServiceDialog> {
       _controllers['excludeDomains'] = TextEditingController(
         text: s.excludeDomains,
       );
+    } else if (s is AnySearchOptions) {
+      _controllers['apiKey'] = TextEditingController(text: s.apiKey);
+      _controllers['url'] = TextEditingController(text: s.url);
     }
   }
 
@@ -1680,6 +1705,23 @@ class _EditServiceDialogState extends State<_EditServiceDialog> {
           decoration: deco('Exclude domains'),
         ),
       ];
+    } else if (s is AnySearchOptions) {
+      return [
+        TextField(
+          controller: _controllers['apiKey'],
+          decoration: deco(l10n.searchServicesDialogApiKey),
+        ),
+        const SizedBox(height: 12),
+        _multiKeyTile(),
+        const SizedBox(height: 12),
+        TextField(
+          controller: _controllers['url'],
+          decoration: _deskInputDecoration(context).copyWith(
+            labelText: l10n.searchServicesFieldCustomUrlOptional,
+            hintText: AnySearchOptions.defaultUrl,
+          ),
+        ),
+      ];
     }
     return [];
   }
@@ -1922,6 +1964,14 @@ class _EditServiceDialogState extends State<_EditServiceDialog> {
         language: (_controllers['language']?.text ?? '').trim(),
         includeDomains: (_controllers['includeDomains']?.text ?? '').trim(),
         excludeDomains: (_controllers['excludeDomains']?.text ?? '').trim(),
+        extraApiKeys: _extraApiKeys,
+      );
+    }
+    if (s is AnySearchOptions) {
+      return AnySearchOptions(
+        id: s.id,
+        apiKey: _controllers['apiKey']!.text,
+        url: (_controllers['url']?.text ?? '').trim(),
         extraApiKeys: _extraApiKeys,
       );
     }
@@ -2204,6 +2254,7 @@ class _ServiceTypeChipsState extends State<_ServiceTypeChips> {
     (type: 'stepfun', brand: 'stepfun'),
     (type: 'firecrawl', brand: 'firecrawl'),
     (type: 'tinyfish', brand: 'tinyfish'),
+    (type: 'anysearch', brand: 'anysearch'),
   ];
   @override
   Widget build(BuildContext context) {
@@ -2296,6 +2347,8 @@ String _serviceTypeName(BuildContext context, String type) {
       return l10n.searchServiceNameFirecrawl;
     case 'tinyfish':
       return l10n.searchServiceNameTinyFish;
+    case 'anysearch':
+      return l10n.searchServiceNameAnySearch;
     case 'kelivo':
       return l10n.searchServiceNameKelivo;
     default:

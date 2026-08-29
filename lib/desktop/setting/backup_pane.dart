@@ -54,6 +54,7 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
   bool _includeChats = true;
   bool _includeFiles = true;
   bool _s3PathStyle = true;
+  bool _remoteBackupDialogActive = false;
 
   @override
   void initState() {
@@ -210,6 +211,20 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
     s3BackupProvider.updateConfig(cfg);
   }
 
+  Future<bool> _runRemoteBackupTask({
+    required String title,
+    required Future<void> Function(BackupTaskHandle handle) task,
+  }) async {
+    setState(() => _remoteBackupDialogActive = true);
+    try {
+      return await runBackupTask(context, title: title, task: task);
+    } finally {
+      if (mounted) {
+        setState(() => _remoteBackupDialogActive = false);
+      }
+    }
+  }
+
   Future<void> _chooseRestoreModeAndRun(
     Future<void> Function(RestoreMode, BackupTaskHandle) action,
   ) async {
@@ -241,6 +256,7 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
     final webdavVm = context.watch<BackupProvider>();
     final s3Vm = context.watch<S3BackupProvider>();
     final busy = webdavVm.busy || s3Vm.busy;
+    final showHeaderBusy = busy && !_remoteBackupDialogActive;
 
     return Container(
       alignment: Alignment.topCenter,
@@ -269,8 +285,8 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
                           ),
                         ),
                       ),
-                      if (busy) const SizedBox(width: 8),
-                      if (busy)
+                      if (showHeaderBusy) const SizedBox(width: 8),
+                      if (showHeaderBusy)
                         SizedBox(
                           width: 18,
                           height: 18,
@@ -539,8 +555,7 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
                                         .read<BackupReminderProvider>();
                                     await _saveConfig();
                                     if (!context.mounted) return;
-                                    final success = await runBackupTask(
-                                      context,
+                                    final success = await _runRemoteBackupTask(
                                       title: l10n.backupPageBackupNow,
                                       task: (handle) async {
                                         final ok = await backupProvider.backup(
@@ -828,8 +843,7 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
                                         .read<BackupReminderProvider>();
                                     await _saveS3Config();
                                     if (!context.mounted) return;
-                                    final success = await runBackupTask(
-                                      context,
+                                    final success = await _runRemoteBackupTask(
                                       title: l10n.backupPageBackupNow,
                                       task: (handle) async {
                                         final ok = await s3BackupProvider

@@ -524,11 +524,11 @@ class ToolHandlerService {
           return memoryResult;
         }
 
-        // Creating calendar events modifies user data, so it always requires
-        // explicit user approval before the local tool runs.
-        if (name == LocalToolNames.calendarCreate &&
+        // Creating calendar events or changing reminders modifies user data,
+        // so those tools always require explicit user approval first.
+        if (LocalToolNames.requiresUserApproval.contains(name) &&
             assistant != null &&
-            assistant.localToolIds.contains(LocalToolNames.calendarCreate) &&
+            assistant.localToolIds.contains(name) &&
             approvalService != null) {
           final approval = await approvalService.requestApproval(
             toolCallId: approvalIdFor(name, toolCallId),

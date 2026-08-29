@@ -23,6 +23,7 @@ import 'providers/querit_search_service.dart';
 import 'providers/stepfun_search_service.dart';
 import 'providers/firecrawl_search_service.dart';
 import 'providers/tinyfish_search_service.dart';
+import 'providers/anysearch_search_service.dart';
 import 'providers/doubao_search_service.dart';
 import 'providers/kelivo_search_service.dart';
 
@@ -97,6 +98,8 @@ abstract class SearchService<T extends SearchServiceOptions> {
         return FirecrawlSearchService() as SearchService;
       case TinyFishOptions _:
         return TinyFishSearchService() as SearchService;
+      case AnySearchOptions _:
+        return AnySearchSearchService() as SearchService;
       case DoubaoOptions _:
         return DoubaoSearchService() as SearchService;
       case KelivoOptions _:
@@ -249,6 +252,8 @@ abstract class SearchServiceOptions {
         return FirecrawlOptions.fromJson(json);
       case 'tinyfish':
         return TinyFishOptions.fromJson(json);
+      case 'anysearch':
+        return AnySearchOptions.fromJson(json);
       case 'doubao':
         return DoubaoOptions.fromJson(json);
       case 'kelivo':
@@ -906,6 +911,42 @@ class TinyFishOptions extends SearchServiceOptions {
         language: json['language'] ?? '',
         includeDomains: json['includeDomains'] ?? '',
         excludeDomains: json['excludeDomains'] ?? '',
+        extraApiKeys: SearchServiceOptions.parseExtraApiKeys(json),
+      );
+}
+
+class AnySearchOptions extends SearchServiceOptions {
+  static const String defaultUrl = 'https://api.anysearch.com/v1/search';
+
+  final String apiKey;
+  final String url;
+
+  AnySearchOptions({
+    required super.id,
+    required this.apiKey,
+    this.url = '',
+    super.extraApiKeys,
+  });
+
+  String get resolvedUrl {
+    final trimmed = url.trim();
+    return trimmed.isEmpty ? defaultUrl : trimmed;
+  }
+
+  @override
+  Map<String, dynamic> toJson() => {
+    'type': 'anysearch',
+    'id': id,
+    'apiKey': apiKey,
+    'url': url.trim(),
+    if (extraApiKeys.isNotEmpty) 'apiKeys': extraApiKeys,
+  };
+
+  factory AnySearchOptions.fromJson(Map<String, dynamic> json) =>
+      AnySearchOptions(
+        id: json['id'],
+        apiKey: json['apiKey'] ?? '',
+        url: json['url'] ?? '',
         extraApiKeys: SearchServiceOptions.parseExtraApiKeys(json),
       );
 }

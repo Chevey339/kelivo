@@ -33,6 +33,24 @@ class _LocalToolsTab extends StatelessWidget {
     final calendarCreateEnabled = assistant.localToolIds.contains(
       LocalToolNames.calendarCreate,
     );
+    final locationEnabled = assistant.localToolIds.contains(
+      LocalToolNames.currentLocation,
+    );
+    final weatherEnabled = assistant.localToolIds.contains(
+      LocalToolNames.weather,
+    );
+    final healthEnabled = assistant.localToolIds.contains(
+      LocalToolNames.healthSummary,
+    );
+    final remindersQueryEnabled = assistant.localToolIds.contains(
+      LocalToolNames.remindersQuery,
+    );
+    final remindersCreateEnabled = assistant.localToolIds.contains(
+      LocalToolNames.remindersCreate,
+    );
+    final remindersCompleteEnabled = assistant.localToolIds.contains(
+      LocalToolNames.remindersComplete,
+    );
 
     Future<void> updateTool(String toolId, bool value) {
       final ids = assistant.localToolIds.toSet();
@@ -80,6 +98,46 @@ class _LocalToolsTab extends StatelessWidget {
             // Do not enable until the user grants calendar access.
             return;
           }
+        }
+        await updateTool(toolId, true);
+        return;
+      }
+
+      if (toolId == LocalToolNames.currentLocation &&
+          DeviceLocalTools.locationSupported) {
+        final granted = await DeviceLocalTools.hasLocationPermission();
+        if (!granted) {
+          final requested = await DeviceLocalTools.requestLocationPermission();
+          if (!requested) {
+            return;
+          }
+        }
+        await updateTool(toolId, true);
+        return;
+      }
+
+      if ((toolId == LocalToolNames.remindersQuery ||
+              toolId == LocalToolNames.remindersCreate ||
+              toolId == LocalToolNames.remindersComplete) &&
+          DeviceLocalTools.remindersSupported) {
+        final granted = await DeviceLocalTools.hasRemindersPermission();
+        if (!granted) {
+          final requested = await DeviceLocalTools.requestRemindersPermission();
+          if (!requested) {
+            return;
+          }
+        }
+        await updateTool(toolId, true);
+        return;
+      }
+
+      if (toolId == LocalToolNames.healthSummary &&
+          DeviceLocalTools.healthSupported) {
+        final requested = await DeviceLocalTools.requestHealthPermission();
+        if (!requested) {
+          // HealthKit does not reveal per-type read grants; only skip
+          // enable when the request API itself failed.
+          return;
         }
         await updateTool(toolId, true);
         return;
@@ -164,6 +222,92 @@ class _LocalToolsTab extends StatelessWidget {
                     toggleTool(LocalToolNames.calendarCreate, value),
               ),
             ],
+            if (DeviceLocalTools.locationSupported) ...[
+              _iosDivider(context),
+              _LocalToolRow(
+                icon: Lucide.MapPin,
+                title: l10n.assistantEditLocalToolLocationTitle,
+                subtitle: l10n.assistantEditLocalToolLocationSubtitle,
+                enabled: locationEnabled,
+                onChanged: (value) =>
+                    toggleTool(LocalToolNames.currentLocation, value),
+              ),
+            ],
+            if (DeviceLocalTools.iosDeviceToolsSupported)
+              FutureBuilder<bool>(
+                future: DeviceLocalTools.prefetchIosCapabilities(),
+                builder: (context, snapshot) {
+                  if (!DeviceLocalTools.weatherSupported) {
+                    return const SizedBox.shrink();
+                  }
+                  return Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      _iosDivider(context),
+                      _LocalToolRow(
+                        icon: Lucide.CloudSun,
+                        title: l10n.assistantEditLocalToolWeatherTitle,
+                        subtitle: l10n.assistantEditLocalToolWeatherSubtitle,
+                        enabled: weatherEnabled,
+                        onChanged: (value) =>
+                            toggleTool(LocalToolNames.weather, value),
+                      ),
+                    ],
+                  );
+                },
+              ),
+            if (DeviceLocalTools.remindersSupported) ...[
+              _iosDivider(context),
+              _LocalToolRow(
+                icon: Lucide.ListTodo,
+                title: l10n.assistantEditLocalToolRemindersQueryTitle,
+                subtitle: l10n.assistantEditLocalToolRemindersQuerySubtitle,
+                enabled: remindersQueryEnabled,
+                onChanged: (value) =>
+                    toggleTool(LocalToolNames.remindersQuery, value),
+              ),
+              _iosDivider(context),
+              _LocalToolRow(
+                icon: Lucide.ListPlus,
+                title: l10n.assistantEditLocalToolRemindersCreateTitle,
+                subtitle: l10n.assistantEditLocalToolRemindersCreateSubtitle,
+                enabled: remindersCreateEnabled,
+                onChanged: (value) =>
+                    toggleTool(LocalToolNames.remindersCreate, value),
+              ),
+              _iosDivider(context),
+              _LocalToolRow(
+                icon: Lucide.CheckCircle,
+                title: l10n.assistantEditLocalToolRemindersCompleteTitle,
+                subtitle: l10n.assistantEditLocalToolRemindersCompleteSubtitle,
+                enabled: remindersCompleteEnabled,
+                onChanged: (value) =>
+                    toggleTool(LocalToolNames.remindersComplete, value),
+              ),
+            ],
+            if (DeviceLocalTools.iosDeviceToolsSupported)
+              FutureBuilder<bool>(
+                future: DeviceLocalTools.prefetchIosCapabilities(),
+                builder: (context, snapshot) {
+                  if (!DeviceLocalTools.healthSupported) {
+                    return const SizedBox.shrink();
+                  }
+                  return Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      _iosDivider(context),
+                      _LocalToolRow(
+                        icon: Lucide.HeartPulse,
+                        title: l10n.assistantEditLocalToolHealthTitle,
+                        subtitle: l10n.assistantEditLocalToolHealthSubtitle,
+                        enabled: healthEnabled,
+                        onChanged: (value) =>
+                            toggleTool(LocalToolNames.healthSummary, value),
+                      ),
+                    ],
+                  );
+                },
+              ),
           ],
         ),
       ],

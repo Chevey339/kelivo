@@ -10267,6 +10267,18 @@ abstract class AppLocalizations {
   /// **'TinyFish Search API with region/language filters. Requires an API key. Fetch/Scrape is not supported here.'**
   String get searchProviderTinyFishDescription;
 
+  /// No description provided for @searchServiceNameAnySearch.
+  ///
+  /// In en, this message translates to:
+  /// **'AnySearch'**
+  String get searchServiceNameAnySearch;
+
+  /// No description provided for @searchProviderAnySearchDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Unified search for AI agents with automatic routing across web and specialist data sources. API key is optional.'**
+  String get searchProviderAnySearchDescription;
+
   /// No description provided for @searchServiceNameKelivo.
   ///
   /// In en, this message translates to:
@@ -10740,6 +10752,78 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Create calendar events on this device with your confirmation, requires the calendar permission.'**
   String get assistantEditLocalToolCalendarCreateSubtitle;
+
+  /// No description provided for @assistantEditLocalToolLocationTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Current Location'**
+  String get assistantEditLocalToolLocationTitle;
+
+  /// No description provided for @assistantEditLocalToolLocationSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Read a one-shot location from this device, requires the location permission.'**
+  String get assistantEditLocalToolLocationSubtitle;
+
+  /// No description provided for @assistantEditLocalToolWeatherTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Weather'**
+  String get assistantEditLocalToolWeatherTitle;
+
+  /// No description provided for @assistantEditLocalToolWeatherSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Get Apple Weather for the current or a specified location. WeatherKit attribution is shown in the result.'**
+  String get assistantEditLocalToolWeatherSubtitle;
+
+  /// No description provided for @assistantEditLocalToolHealthTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Health Summary'**
+  String get assistantEditLocalToolHealthTitle;
+
+  /// No description provided for @assistantEditLocalToolHealthSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Read a privacy-preserving activity summary from Apple Health, requires Health access.'**
+  String get assistantEditLocalToolHealthSubtitle;
+
+  /// No description provided for @assistantEditLocalToolRemindersQueryTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Query Reminders'**
+  String get assistantEditLocalToolRemindersQueryTitle;
+
+  /// No description provided for @assistantEditLocalToolRemindersQuerySubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Read reminders on this device, requires full reminders access.'**
+  String get assistantEditLocalToolRemindersQuerySubtitle;
+
+  /// No description provided for @assistantEditLocalToolRemindersCreateTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Create Reminder'**
+  String get assistantEditLocalToolRemindersCreateTitle;
+
+  /// No description provided for @assistantEditLocalToolRemindersCreateSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Create a reminder on this device with your confirmation, requires full reminders access.'**
+  String get assistantEditLocalToolRemindersCreateSubtitle;
+
+  /// No description provided for @assistantEditLocalToolRemindersCompleteTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Complete Reminder'**
+  String get assistantEditLocalToolRemindersCompleteTitle;
+
+  /// No description provided for @assistantEditLocalToolRemindersCompleteSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Mark a reminder as done with your confirmation, requires full reminders access.'**
+  String get assistantEditLocalToolRemindersCompleteSubtitle;
 
   /// No description provided for @assistantEditMemorySwitchDescription.
   ///

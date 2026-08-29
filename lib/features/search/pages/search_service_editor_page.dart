@@ -572,6 +572,22 @@ class _SearchServiceEditorPageState extends State<SearchServiceEditorPage> {
         field(key: 'excludeDomains', label: 'Exclude domains'),
       ];
     }
+    if (service is AnySearchOptions) {
+      return [
+        field(
+          key: 'apiKey',
+          label: l10n.searchServicesDialogApiKey,
+          obscure: true,
+        ),
+        _buildMultiKeyEntry(context),
+        field(
+          key: 'url',
+          label: l10n.searchServicesFieldCustomUrlOptional,
+          hint: AnySearchOptions.defaultUrl,
+          keyboardType: TextInputType.url,
+        ),
+      ];
+    }
 
     return [
       field(
@@ -1104,6 +1120,9 @@ class _SearchServiceEditorPageState extends State<SearchServiceEditorPage> {
       _putController('language', service.language);
       _putController('includeDomains', service.includeDomains);
       _putController('excludeDomains', service.excludeDomains);
+    } else if (service is AnySearchOptions) {
+      _putController('apiKey', service.apiKey);
+      _putController('url', service.url);
     }
   }
 
@@ -1280,6 +1299,13 @@ class _SearchServiceEditorPageState extends State<SearchServiceEditorPage> {
           language: _text('language'),
           includeDomains: _text('includeDomains'),
           excludeDomains: _text('excludeDomains'),
+        );
+      case 'anysearch':
+        return AnySearchOptions(
+          id: _serviceId,
+          apiKey: _text('apiKey'),
+          extraApiKeys: _extraApiKeys,
+          url: _text('url'),
         );
       case 'kelivo':
         return KelivoOptions(id: _serviceId);
@@ -2103,6 +2129,7 @@ String _typeForService(SearchServiceOptions service) {
   if (service is StepFunOptions) return 'stepfun';
   if (service is FirecrawlOptions) return 'firecrawl';
   if (service is TinyFishOptions) return 'tinyfish';
+  if (service is AnySearchOptions) return 'anysearch';
   if (service is KelivoOptions) return 'kelivo';
   return 'bing_local';
 }
@@ -2154,6 +2181,8 @@ SearchServiceOptions _defaultService(String type, String id) {
       return FirecrawlOptions(id: id, apiKey: '');
     case 'tinyfish':
       return TinyFishOptions(id: id, apiKey: '');
+    case 'anysearch':
+      return AnySearchOptions(id: id, apiKey: '');
     case 'kelivo':
       return KelivoOptions(id: id);
     default:
@@ -2204,6 +2233,8 @@ String _serviceTypeName(BuildContext context, String type) {
       return l10n.searchServiceNameFirecrawl;
     case 'tinyfish':
       return l10n.searchServiceNameTinyFish;
+    case 'anysearch':
+      return l10n.searchServiceNameAnySearch;
     case 'kelivo':
       return l10n.searchServiceNameKelivo;
     default:
@@ -2232,6 +2263,7 @@ const _providerTypes = <({String type, String brand})>[
   (type: 'stepfun', brand: 'stepfun'),
   (type: 'firecrawl', brand: 'firecrawl'),
   (type: 'tinyfish', brand: 'tinyfish'),
+  (type: 'anysearch', brand: 'anysearch'),
 ];
 
 @Preview(
@@ -2257,6 +2289,36 @@ Widget searchServiceEditorPagePreview() {
     themeMode: ThemeMode.system,
     home: SearchServiceEditorPage(
       initialService: TavilyOptions(id: 'preview', apiKey: 'tvly-preview-key'),
+      commonOptions: const SearchCommonOptions(),
+      canDelete: true,
+      autoQueryUsage: false,
+    ),
+  );
+}
+
+@Preview(
+  name: 'AnySearch editor · Light',
+  group: 'Search services',
+  size: Size(390, 844),
+  brightness: Brightness.light,
+)
+@Preview(
+  name: 'AnySearch editor · Dark',
+  group: 'Search services',
+  size: Size(390, 844),
+  brightness: Brightness.dark,
+)
+Widget anySearchServiceEditorPagePreview() {
+  return MaterialApp(
+    debugShowCheckedModeBanner: false,
+    locale: const Locale.fromSubtags(languageCode: 'zh', scriptCode: 'Hans'),
+    localizationsDelegates: AppLocalizations.localizationsDelegates,
+    supportedLocales: AppLocalizations.supportedLocales,
+    theme: buildLightTheme(null),
+    darkTheme: buildDarkTheme(null),
+    themeMode: ThemeMode.system,
+    home: SearchServiceEditorPage(
+      initialService: AnySearchOptions(id: 'preview-anysearch', apiKey: ''),
       commonOptions: const SearchCommonOptions(),
       canDelete: true,
       autoQueryUsage: false,

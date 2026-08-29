@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
@@ -19,6 +20,12 @@ class LocalToolNames {
   static const String screenTime = 'get_screen_time';
   static const String calendarQuery = 'calendar_query';
   static const String calendarCreate = 'calendar_create';
+  static const String currentLocation = 'get_current_location';
+  static const String weather = 'get_weather';
+  static const String healthSummary = 'get_health_summary';
+  static const String remindersQuery = 'reminders_query';
+  static const String remindersCreate = 'reminders_create';
+  static const String remindersComplete = 'reminders_complete';
 
   static const List<String> all = [
     timeInfo,
@@ -29,6 +36,18 @@ class LocalToolNames {
     screenTime,
     calendarQuery,
     calendarCreate,
+    currentLocation,
+    weather,
+    healthSummary,
+    remindersQuery,
+    remindersCreate,
+    remindersComplete,
+  ];
+
+  static const List<String> requiresUserApproval = [
+    calendarCreate,
+    remindersCreate,
+    remindersComplete,
   ];
 }
 
@@ -46,6 +65,27 @@ class DeviceLocalTools {
       !kIsWeb &&
       (defaultTargetPlatform == TargetPlatform.android ||
           defaultTargetPlatform == TargetPlatform.iOS);
+
+  static bool get iosDeviceToolsSupported =>
+      !kIsWeb && defaultTargetPlatform == TargetPlatform.iOS;
+
+  static bool get locationSupported => iosDeviceToolsSupported;
+
+  /// WeatherKit is iOS 16+. Defaults false until [prefetchIosCapabilities].
+  static bool? _weatherKitAvailable;
+
+  /// HealthKit may be absent on older iPads. Defaults false until prefetch.
+  static bool? _healthDataAvailable;
+  static Future<bool>? _prefetchFuture;
+  static int _capabilityEpoch = 0;
+
+  static bool get weatherSupported =>
+      iosDeviceToolsSupported && (_weatherKitAvailable ?? false);
+
+  static bool get healthSupported =>
+      iosDeviceToolsSupported && (_healthDataAvailable ?? false);
+
+  static bool get remindersSupported => iosDeviceToolsSupported;
 
   /// Whether Android Usage Access (PACKAGE_USAGE_STATS) is granted.
   static Future<bool> hasUsageStatsPermission() async {
@@ -105,6 +145,143 @@ class DeviceLocalTools {
       return false;
     }
   }
+
+  static Future<bool> hasLocationPermission() async {
+    if (!locationSupported) return false;
+    try {
+      final result = await _channel.invokeMethod<bool>('hasLocationPermission');
+      return result == true;
+    } on MissingPluginException {
+      return false;
+    } on PlatformException {
+      return false;
+    }
+  }
+
+  static Future<bool> requestLocationPermission() async {
+    if (!locationSupported) return false;
+    try {
+      final result = await _channel.invokeMethod<bool>(
+        'requestLocationPermission',
+      );
+      return result == true;
+    } on MissingPluginException {
+      return false;
+    } on PlatformException {
+      return false;
+    }
+  }
+
+  static Future<bool> hasRemindersPermission() async {
+    if (!remindersSupported) return false;
+    try {
+      final result = await _channel.invokeMethod<bool>(
+        'hasRemindersPermission',
+      );
+      return result == true;
+    } on MissingPluginException {
+      return false;
+    } on PlatformException {
+      return false;
+    }
+  }
+
+  static Future<bool> requestRemindersPermission() async {
+    if (!remindersSupported) return false;
+    try {
+      final result = await _channel.invokeMethod<bool>(
+        'requestRemindersPermission',
+      );
+      return result == true;
+    } on MissingPluginException {
+      return false;
+    } on PlatformException {
+      return false;
+    }
+  }
+
+  /// Warms WeatherKit and HealthKit availability caches used by the sync
+  /// [weatherSupported] / [healthSupported] getters.
+  static Future<bool> prefetchIosCapabilities() {
+    final existing = _prefetchFuture;
+    if (existing != null) return existing;
+    final epoch = _capabilityEpoch;
+    final future = _queryIosCapabilities(epoch);
+    _prefetchFuture = future;
+    return future;
+  }
+
+  static Future<bool> _queryIosCapabilities(int epoch) async {
+    if (!iosDeviceToolsSupported) {
+      if (epoch == _capabilityEpoch) {
+        _weatherKitAvailable = false;
+        _healthDataAvailable = false;
+      }
+      return false;
+    }
+    final results = await Future.wait([
+      _invokeCapabilityFlag('isWeatherKitAvailable'),
+      _invokeCapabilityFlag('isHealthDataAvailable'),
+    ]);
+    final weatherAvailable = results[0];
+    final healthAvailable = results[1];
+    if (epoch == _capabilityEpoch) {
+      _weatherKitAvailable = weatherAvailable;
+      _healthDataAvailable = healthAvailable;
+    }
+    return _weatherKitAvailable ?? weatherAvailable;
+  }
+
+  static Future<bool> _invokeCapabilityFlag(String method) async {
+    try {
+      final result = await _channel.invokeMethod<bool>(method);
+      return result == true;
+    } on MissingPluginException {
+      return false;
+    } on PlatformException {
+      return false;
+    }
+  }
+
+  @visibleForTesting
+  static void debugResetIosCapabilities() {
+    _capabilityEpoch++;
+    _weatherKitAvailable = null;
+    _healthDataAvailable = null;
+    _prefetchFuture = null;
+  }
+
+  @visibleForTesting
+  static void debugSetWeatherKitAvailable(bool? value) {
+    _capabilityEpoch++;
+    _weatherKitAvailable = value;
+    _prefetchFuture = value == null ? null : Future<bool>.value(value);
+  }
+
+  @visibleForTesting
+  static void debugSetHealthDataAvailable(bool? value) {
+    _capabilityEpoch++;
+    _healthDataAvailable = value;
+    _prefetchFuture = value == null
+        ? null
+        : Future<bool>.value(_weatherKitAvailable ?? false);
+  }
+
+  /// Presents the HealthKit read sheet. The returned flag is only that the
+  /// request completed; iOS does not reveal per-type read grants.
+  static Future<bool> requestHealthPermission() async {
+    if (!healthSupported) return false;
+    try {
+      final result = await _channel.invokeMethod<bool>(
+        'requestHealthPermission',
+      );
+      return result == true;
+    } on MissingPluginException {
+      return false;
+    } on PlatformException {
+      return false;
+    }
+  }
 }
 
 class LocalToolsService {
@@ -116,6 +293,10 @@ class LocalToolsService {
   }) {
     if (!supportsTools || assistant == null) {
       return const <Map<String, dynamic>>[];
+    }
+
+    if (DeviceLocalTools.iosDeviceToolsSupported) {
+      unawaited(DeviceLocalTools.prefetchIosCapabilities());
     }
 
     final tools = <Map<String, dynamic>>[];
@@ -393,6 +574,188 @@ class LocalToolsService {
         },
       });
     }
+    if (DeviceLocalTools.locationSupported &&
+        assistant.localToolIds.contains(LocalToolNames.currentLocation)) {
+      tools.add({
+        'type': 'function',
+        'function': {
+          'name': LocalToolNames.currentLocation,
+          'description':
+              "Get the user's current location from the device (one-shot, When In Use). "
+              'Returns latitude, longitude, accuracy in meters, timestamp, and optional '
+              'city/region/country from reverse geocoding. Do not request this unless the '
+              'user asked for their location or it is needed for weather. '
+              "Requires the Location permission; if it is not granted, an error is returned.",
+          'parameters': {'type': 'object', 'properties': <String, dynamic>{}},
+        },
+      });
+    }
+    if (DeviceLocalTools.weatherSupported &&
+        assistant.localToolIds.contains(LocalToolNames.weather)) {
+      tools.add({
+        'type': 'function',
+        'function': {
+          'name': LocalToolNames.weather,
+          'description':
+              'Get current weather, hourly forecast, and daily forecast from Apple Weather. '
+              'Omit coordinates to use the current device location; or pass latitude and '
+              'longitude to query a specific place. '
+              'Returns temperature, apparent temperature, precipitation chance, and forecasts. '
+              'Always mention that weather data is from Apple Weather when presenting results. '
+              '${_deviceTimezoneHint()} '
+              'Requires Location permission when coordinates are omitted.',
+          'parameters': {
+            'type': 'object',
+            'properties': {
+              'latitude': {
+                'type': 'number',
+                'description':
+                    'Latitude in decimal degrees. Required together with longitude '
+                    'when querying a specific place.',
+              },
+              'longitude': {
+                'type': 'number',
+                'description':
+                    'Longitude in decimal degrees. Required together with latitude '
+                    'when querying a specific place.',
+              },
+            },
+          },
+        },
+      });
+    }
+    if (DeviceLocalTools.healthSupported &&
+        assistant.localToolIds.contains(LocalToolNames.healthSummary)) {
+      tools.add({
+        'type': 'function',
+        'function': {
+          'name': LocalToolNames.healthSummary,
+          'description':
+              "Get a privacy-preserving health activity summary from the device: today's "
+              'steps, active energy, walking/running distance, last-night sleep, latest '
+              'heart rate, and recent workouts. Each metric includes its time interval. '
+              'A metric with status "unavailable" means there is no authorized or recorded '
+              'data — never treat unavailable as 0. This tool does not return raw HealthKit '
+              'history. Requires Health access.',
+          'parameters': {'type': 'object', 'properties': <String, dynamic>{}},
+        },
+      });
+    }
+    if (DeviceLocalTools.remindersSupported &&
+        assistant.localToolIds.contains(LocalToolNames.remindersQuery)) {
+      tools.add({
+        'type': 'function',
+        'function': {
+          'name': LocalToolNames.remindersQuery,
+          'description':
+              "Query reminders on the user's device. Filter by date range, completion "
+              'status, and an optional keyword. Reminders without a due date are included '
+              'unless an explicit begin time is provided. '
+              '${_deviceTimezoneHint()} '
+              "Requires the Reminders permission; if it is not granted, an error is returned.",
+          'parameters': {
+            'type': 'object',
+            'properties': {
+              'begin': {
+                'type': 'string',
+                'description':
+                    "Start time (inclusive). Accepts an ISO-8601 date 'yyyy-MM-dd', a local "
+                    "date-time 'yyyy-MM-ddTHH:mm:ss', an offset date-time, or epoch milliseconds. "
+                    "When provided, 'range' is ignored.",
+              },
+              'end': {
+                'type': 'string',
+                'description': "End time (exclusive), same formats as 'begin'.",
+              },
+              'range': {
+                'type': 'string',
+                'enum': ['today', 'week', 'month'],
+                'description':
+                    "Convenience preset, used only when 'begin' is omitted: today, week, or month. Default today.",
+              },
+              'completed': {
+                'type': 'string',
+                'enum': ['all', 'true', 'false'],
+                'description':
+                    'Filter by completion: all, true (completed only), or false (incomplete only). Default all.',
+              },
+              'query': {
+                'type': 'string',
+                'description':
+                    'Optional keyword to filter reminders by title or notes (case-insensitive substring).',
+              },
+              'limit': {
+                'type': 'integer',
+                'description':
+                    'Maximum number of reminders to return. Default 20.',
+              },
+            },
+          },
+        },
+      });
+    }
+    if (DeviceLocalTools.remindersSupported &&
+        assistant.localToolIds.contains(LocalToolNames.remindersCreate)) {
+      tools.add({
+        'type': 'function',
+        'function': {
+          'name': LocalToolNames.remindersCreate,
+          'description':
+              "Create a reminder on the user's device. Requires a title. "
+              'The user will be asked to confirm before the reminder is created. '
+              '${_deviceTimezoneHint()} '
+              "Requires the Reminders permission; if it is not granted, an error is returned.",
+          'parameters': {
+            'type': 'object',
+            'properties': {
+              'title': {'type': 'string', 'description': 'Reminder title.'},
+              'notes': {
+                'type': 'string',
+                'description': 'Optional notes or description.',
+              },
+              'due': {
+                'type': 'string',
+                'description':
+                    "Optional due time. Accepts an ISO-8601 date 'yyyy-MM-dd', a local "
+                    "date-time 'yyyy-MM-ddTHH:mm:ss', an offset date-time, or epoch milliseconds.",
+              },
+              'priority': {
+                'type': 'string',
+                'description':
+                    'Optional priority: none, high, medium, low, or an EventKit integer 0-9 '
+                    '(0 none, 1 high, 5 medium, 9 low).',
+              },
+            },
+            'required': ['title'],
+          },
+        },
+      });
+    }
+    if (DeviceLocalTools.remindersSupported &&
+        assistant.localToolIds.contains(LocalToolNames.remindersComplete)) {
+      tools.add({
+        'type': 'function',
+        'function': {
+          'name': LocalToolNames.remindersComplete,
+          'description':
+              'Mark a reminder as completed. Requires the reminder id returned by '
+              'reminders_query or reminders_create. The user will be asked to confirm '
+              'before the reminder is updated. '
+              "Requires the Reminders permission; if it is not granted, an error is returned.",
+          'parameters': {
+            'type': 'object',
+            'properties': {
+              'id': {
+                'type': 'string',
+                'description':
+                    'Reminder id from reminders_query or reminders_create.',
+              },
+            },
+            'required': ['id'],
+          },
+        },
+      });
+    }
     return tools;
   }
 
@@ -428,6 +791,44 @@ class LocalToolsService {
     if (name == LocalToolNames.calendarCreate &&
         DeviceLocalTools.calendarSupported) {
       return _invokeDeviceTool('createCalendarEvent', args);
+    }
+    if (name == LocalToolNames.currentLocation &&
+        DeviceLocalTools.locationSupported) {
+      return _invokeDeviceTool('getCurrentLocation', args);
+    }
+    if (name == LocalToolNames.weather &&
+        DeviceLocalTools.iosDeviceToolsSupported) {
+      await DeviceLocalTools.prefetchIosCapabilities();
+      if (!DeviceLocalTools.weatherSupported) {
+        return jsonEncode({
+          'error': 'unsupported_os',
+          'message': 'Weather requires iOS 16 or later.',
+        });
+      }
+      return _invokeDeviceTool('getWeather', args);
+    }
+    if (name == LocalToolNames.healthSummary &&
+        DeviceLocalTools.iosDeviceToolsSupported) {
+      await DeviceLocalTools.prefetchIosCapabilities();
+      if (!DeviceLocalTools.healthSupported) {
+        return jsonEncode({
+          'error': 'unsupported_os',
+          'message': 'Health data is not available on this device.',
+        });
+      }
+      return _invokeDeviceTool('getHealthSummary', args);
+    }
+    if (name == LocalToolNames.remindersQuery &&
+        DeviceLocalTools.remindersSupported) {
+      return _invokeDeviceTool('queryReminders', args);
+    }
+    if (name == LocalToolNames.remindersCreate &&
+        DeviceLocalTools.remindersSupported) {
+      return _invokeDeviceTool('createReminder', args);
+    }
+    if (name == LocalToolNames.remindersComplete &&
+        DeviceLocalTools.remindersSupported) {
+      return _invokeDeviceTool('completeReminder', args);
     }
     return null;
   }
