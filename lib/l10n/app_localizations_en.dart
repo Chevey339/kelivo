@@ -5713,6 +5713,16 @@ class AppLocalizationsEn extends AppLocalizations {
       'Unified search for AI agents with automatic routing across web and specialist data sources. API key is optional.';
 
   @override
+  String get searchServiceNameParallel => 'Parallel Search';
+
+  @override
+  String get searchProviderParallelDescription =>
+      'Parallel Search API. Returns LLM-optimized web excerpts with turbo, fast, basic, and advanced modes.';
+
+  @override
+  String get searchServicesDialogSearchMode => 'Search mode';
+
+  @override
   String get searchServiceNameKelivo => 'Kelivo';
 
   @override

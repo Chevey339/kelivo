@@ -1002,6 +1002,14 @@ final class BusinessSettingsRouter {
           strings: const {'apiKey', 'url'},
           stringLists: const {'apiKeys'},
         );
+      case 'parallel':
+        _validateKnownFields(
+          kind,
+          payload,
+          requiredStrings: const {'apiKey'},
+          strings: const {'mode'},
+          stringLists: const {'apiKeys'},
+        );
     }
   }
 

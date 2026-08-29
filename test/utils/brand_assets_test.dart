@@ -15,18 +15,21 @@ void main() {
       final firecrawl = BrandAssets.assetForName('Firecrawl');
       final tinyFish = BrandAssets.assetForName('TinyFish');
       final anySearch = BrandAssets.assetForName('AnySearch');
+      final parallel = BrandAssets.assetForName('Parallel');
       final azure = BrandAssets.assetForName('Azure');
 
       expect(stepFun, 'assets/icons/stepfun.svg');
       expect(firecrawl, 'assets/icons/firecrawl-color.svg');
       expect(tinyFish, 'assets/icons/tinyfish-color.svg');
       expect(anySearch, 'assets/icons/anysearch.svg');
+      expect(parallel, 'assets/icons/parallel.svg');
       expect(azure, 'assets/icons/azure-speech.svg');
       expect(BrandAssets.assetForName('Azure AI Search'), isNull);
       expect(BrandAssets.selectableAssetOrNull(stepFun!), stepFun);
       expect(BrandAssets.selectableAssetOrNull(firecrawl!), firecrawl);
       expect(BrandAssets.selectableAssetOrNull(tinyFish!), tinyFish);
       expect(BrandAssets.selectableAssetOrNull(anySearch!), anySearch);
+      expect(BrandAssets.selectableAssetOrNull(parallel!), parallel);
     });
 
     test('distinguishes monochrome SVGs from colored brand assets', () {
@@ -52,6 +55,10 @@ void main() {
       );
       expect(
         BrandAssets.assetNeedsDarkInvert('assets/icons/anysearch.svg'),
+        isTrue,
+      );
+      expect(
+        BrandAssets.assetNeedsDarkInvert('assets/icons/parallel.svg'),
         isTrue,
       );
       expect(

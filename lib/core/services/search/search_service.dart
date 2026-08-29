@@ -26,6 +26,7 @@ import 'providers/tinyfish_search_service.dart';
 import 'providers/anysearch_search_service.dart';
 import 'providers/doubao_search_service.dart';
 import 'providers/kelivo_search_service.dart';
+import 'providers/parallel_search_service.dart';
 
 // Base interface for all search services
 abstract class SearchService<T extends SearchServiceOptions> {
@@ -104,6 +105,8 @@ abstract class SearchService<T extends SearchServiceOptions> {
         return DoubaoSearchService() as SearchService;
       case KelivoOptions _:
         return KelivoSearchService() as SearchService;
+      case ParallelOptions _:
+        return ParallelSearchService() as SearchService;
       default:
         return BingSearchService() as SearchService;
     }
@@ -258,6 +261,8 @@ abstract class SearchServiceOptions {
         return DoubaoOptions.fromJson(json);
       case 'kelivo':
         return KelivoOptions.fromJson(json);
+      case 'parallel':
+        return ParallelOptions.fromJson(json);
       default:
         return BingLocalOptions(id: json['id']);
     }
@@ -981,4 +986,55 @@ class KelivoOptions extends SearchServiceOptions {
 
   factory KelivoOptions.fromJson(Map<String, dynamic> json) =>
       KelivoOptions(id: json['id']);
+}
+
+class ParallelOptions extends SearchServiceOptions {
+  static const String defaultMode = 'advanced';
+  static const List<String> modes = ['advanced', 'basic', 'fast', 'turbo'];
+
+  final String apiKey;
+  final String mode;
+
+  ParallelOptions({
+    required super.id,
+    required this.apiKey,
+    this.mode = defaultMode,
+    super.extraApiKeys,
+  });
+
+  static String normalizeMode(String? value) {
+    final mode = (value ?? '').trim();
+    return modes.contains(mode) ? mode : defaultMode;
+  }
+
+  static String modeLabel(String mode) {
+    switch (mode) {
+      case 'turbo':
+        return 'Turbo';
+      case 'fast':
+        return 'Fast';
+      case 'basic':
+        return 'Basic';
+      case 'advanced':
+      default:
+        return 'Advanced';
+    }
+  }
+
+  @override
+  Map<String, dynamic> toJson() => {
+    'type': 'parallel',
+    'id': id,
+    'apiKey': apiKey,
+    'mode': mode,
+    if (extraApiKeys.isNotEmpty) 'apiKeys': extraApiKeys,
+  };
+
+  factory ParallelOptions.fromJson(Map<String, dynamic> json) =>
+      ParallelOptions(
+        id: json['id'],
+        apiKey: json['apiKey'] ?? '',
+        mode: normalizeMode(json['mode']),
+        extraApiKeys: SearchServiceOptions.parseExtraApiKeys(json),
+      );
 }

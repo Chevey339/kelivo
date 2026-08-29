@@ -588,6 +588,30 @@ class _SearchServiceEditorPageState extends State<SearchServiceEditorPage> {
         ),
       ];
     }
+    if (service is ParallelOptions) {
+      return [
+        field(
+          key: 'apiKey',
+          label: l10n.searchServicesDialogApiKey,
+          obscure: true,
+          validator: requiredApiKey,
+        ),
+        _buildMultiKeyEntry(context),
+        _SearchEditorDropdown(
+          key: const ValueKey('search-service-field-mode'),
+          label: l10n.searchServicesDialogSearchMode,
+          value: ParallelOptions.normalizeMode(_text('mode')),
+          items: [
+            for (final mode in ParallelOptions.modes)
+              (value: mode, label: ParallelOptions.modeLabel(mode)),
+          ],
+          onChanged: (value) {
+            _controller('mode').text = value;
+            _markDirty();
+          },
+        ),
+      ];
+    }
 
     return [
       field(
@@ -1123,6 +1147,9 @@ class _SearchServiceEditorPageState extends State<SearchServiceEditorPage> {
     } else if (service is AnySearchOptions) {
       _putController('apiKey', service.apiKey);
       _putController('url', service.url);
+    } else if (service is ParallelOptions) {
+      _putController('apiKey', service.apiKey);
+      _putController('mode', service.mode);
     }
   }
 
@@ -1306,6 +1333,13 @@ class _SearchServiceEditorPageState extends State<SearchServiceEditorPage> {
           apiKey: _text('apiKey'),
           extraApiKeys: _extraApiKeys,
           url: _text('url'),
+        );
+      case 'parallel':
+        return ParallelOptions(
+          id: _serviceId,
+          apiKey: _text('apiKey'),
+          extraApiKeys: _extraApiKeys,
+          mode: ParallelOptions.normalizeMode(_text('mode')),
         );
       case 'kelivo':
         return KelivoOptions(id: _serviceId);
@@ -1554,6 +1588,64 @@ String _formatUsageNumber(BuildContext context, num value) {
         ..minimumFractionDigits = 0
         ..maximumFractionDigits = 2;
   return format.format(value);
+}
+
+class _SearchEditorDropdown extends StatelessWidget {
+  const _SearchEditorDropdown({
+    super.key,
+    required this.label,
+    required this.value,
+    required this.items,
+    required this.onChanged,
+  });
+
+  final String label;
+  final String value;
+  final List<({String value, String label})> items;
+  final ValueChanged<String> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final effective = items.any((item) => item.value == value)
+        ? value
+        : items.first.value;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 13,
+            fontWeight: AppFontWeights.semibold,
+            color: cs.onSurface.withValues(alpha: 0.72),
+          ),
+        ),
+        const SizedBox(height: 7),
+        InputDecorator(
+          decoration: _inputDecoration(context),
+          child: DropdownButtonHideUnderline(
+            child: DropdownButton<String>(
+              value: effective,
+              isExpanded: true,
+              isDense: true,
+              borderRadius: BorderRadius.circular(12),
+              items: [
+                for (final item in items)
+                  DropdownMenuItem<String>(
+                    value: item.value,
+                    child: Text(item.label),
+                  ),
+              ],
+              onChanged: (next) {
+                if (next != null) onChanged(next);
+              },
+            ),
+          ),
+        ),
+      ],
+    );
+  }
 }
 
 class _SearchEditorTextField extends StatefulWidget {
@@ -2130,6 +2222,7 @@ String _typeForService(SearchServiceOptions service) {
   if (service is FirecrawlOptions) return 'firecrawl';
   if (service is TinyFishOptions) return 'tinyfish';
   if (service is AnySearchOptions) return 'anysearch';
+  if (service is ParallelOptions) return 'parallel';
   if (service is KelivoOptions) return 'kelivo';
   return 'bing_local';
 }
@@ -2183,6 +2276,8 @@ SearchServiceOptions _defaultService(String type, String id) {
       return TinyFishOptions(id: id, apiKey: '');
     case 'anysearch':
       return AnySearchOptions(id: id, apiKey: '');
+    case 'parallel':
+      return ParallelOptions(id: id, apiKey: '');
     case 'kelivo':
       return KelivoOptions(id: id);
     default:
@@ -2235,6 +2330,8 @@ String _serviceTypeName(BuildContext context, String type) {
       return l10n.searchServiceNameTinyFish;
     case 'anysearch':
       return l10n.searchServiceNameAnySearch;
+    case 'parallel':
+      return l10n.searchServiceNameParallel;
     case 'kelivo':
       return l10n.searchServiceNameKelivo;
     default:
@@ -2264,6 +2361,7 @@ const _providerTypes = <({String type, String brand})>[
   (type: 'firecrawl', brand: 'firecrawl'),
   (type: 'tinyfish', brand: 'tinyfish'),
   (type: 'anysearch', brand: 'anysearch'),
+  (type: 'parallel', brand: 'parallel'),
 ];
 
 @Preview(

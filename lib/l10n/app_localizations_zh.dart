@@ -5490,6 +5490,16 @@ class AppLocalizationsZh extends AppLocalizations {
       '面向 AI 智能体的统一搜索服务，可在网页与专业数据源间自动路由。API Key 可选。';
 
   @override
+  String get searchServiceNameParallel => 'Parallel Search';
+
+  @override
+  String get searchProviderParallelDescription =>
+      'Parallel 搜索 API。返回面向 LLM 优化的网页摘录，支持 turbo、fast、basic 和 advanced 模式。';
+
+  @override
+  String get searchServicesDialogSearchMode => '搜索模式';
+
+  @override
   String get searchServiceNameKelivo => 'Kelivo';
 
   @override
@@ -13388,6 +13398,16 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   @override
   String get searchProviderAnySearchDescription =>
       '面向 AI 智能体的统一搜索服务，可在网页与专业数据源间自动路由。API Key 可选。';
+
+  @override
+  String get searchServiceNameParallel => 'Parallel Search';
+
+  @override
+  String get searchProviderParallelDescription =>
+      'Parallel 搜索 API。返回面向 LLM 优化的网页摘录，支持 turbo、fast、basic 和 advanced 模式。';
+
+  @override
+  String get searchServicesDialogSearchMode => '搜索模式';
 
   @override
   String get searchServiceNameKelivo => 'Kelivo';
@@ -21361,6 +21381,16 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   @override
   String get searchProviderAnySearchDescription =>
       '面向 AI 智慧代理的統一搜尋服務，可在網頁與專業資料來源間自動路由。API Key 可選。';
+
+  @override
+  String get searchServiceNameParallel => 'Parallel Search';
+
+  @override
+  String get searchProviderParallelDescription =>
+      'Parallel 搜尋 API。返回面向 LLM 優化的網頁摘錄，支援 turbo、fast、basic 和 advanced 模式。';
+
+  @override
+  String get searchServicesDialogSearchMode => '搜尋模式';
 
   @override
   String get searchServiceNameKelivo => 'Kelivo';

@@ -10471,6 +10471,24 @@ abstract class AppLocalizations {
   /// **'Unified search for AI agents with automatic routing across web and specialist data sources. API key is optional.'**
   String get searchProviderAnySearchDescription;
 
+  /// No description provided for @searchServiceNameParallel.
+  ///
+  /// In en, this message translates to:
+  /// **'Parallel Search'**
+  String get searchServiceNameParallel;
+
+  /// No description provided for @searchProviderParallelDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Parallel Search API. Returns LLM-optimized web excerpts with turbo, fast, basic, and advanced modes.'**
+  String get searchProviderParallelDescription;
+
+  /// No description provided for @searchServicesDialogSearchMode.
+  ///
+  /// In en, this message translates to:
+  /// **'Search mode'**
+  String get searchServicesDialogSearchMode;
+
   /// No description provided for @searchServiceNameKelivo.
   ///
   /// In en, this message translates to:

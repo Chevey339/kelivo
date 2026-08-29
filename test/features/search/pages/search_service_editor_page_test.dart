@@ -408,6 +408,65 @@ void main() {
     expect((result!.service! as FirecrawlOptions).apiKey, isEmpty);
   });
 
+  testWidgets('selects Parallel from the add page and saves', (tester) async {
+    SearchServiceEditorResult? result;
+    await _pumpEditor(tester, onResult: (value) => result = value);
+
+    expect(find.text('Add Search Service'), findsOneWidget);
+    await tester.dragUntilVisible(
+      find.text('Parallel Search'),
+      find.byType(ListView),
+      const Offset(0, -240),
+    );
+    await tester.tap(find.text('Parallel Search'));
+    await tester.pumpAndSettle();
+
+    await tester.enterText(_apiKeyField(), 'parallel-key');
+    await tester.tap(find.byIcon(Lucide.Check));
+    await tester.pumpAndSettle();
+
+    expect(result?.deleted, isFalse);
+    expect(result?.service, isA<ParallelOptions>());
+    final saved = result!.service! as ParallelOptions;
+    expect(saved.apiKey, 'parallel-key');
+    expect(saved.mode, ParallelOptions.defaultMode);
+  });
+
+  testWidgets('saves Parallel search mode from the editor', (tester) async {
+    SearchServiceEditorResult? result;
+    await _pumpEditor(
+      tester,
+      initialService: ParallelOptions(
+        id: 'parallel',
+        apiKey: 'parallel-key',
+        mode: 'advanced',
+      ),
+      onResult: (value) => result = value,
+    );
+
+    final modeField = find.byKey(const ValueKey('search-service-field-mode'));
+    await tester.dragUntilVisible(
+      modeField,
+      find.byType(ListView),
+      const Offset(0, -240),
+    );
+    await tester.tap(
+      find.descendant(
+        of: modeField,
+        matching: find.byType(DropdownButton<String>),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Turbo').last);
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byIcon(Lucide.Check));
+    await tester.pumpAndSettle();
+
+    expect(result?.service, isA<ParallelOptions>());
+    expect((result!.service! as ParallelOptions).mode, 'turbo');
+  });
+
   testWidgets('saves AnySearch without an API key', (tester) async {
     SearchServiceEditorResult? result;
     await _pumpEditor(
@@ -602,7 +661,7 @@ Finder _testQueryField() {
 
 Future<void> _pumpEditor(
   WidgetTester tester, {
-  required SearchServiceOptions initialService,
+  SearchServiceOptions? initialService,
   required ValueChanged<SearchServiceEditorResult?> onResult,
   bool canDelete = false,
   bool autoQueryUsage = false,

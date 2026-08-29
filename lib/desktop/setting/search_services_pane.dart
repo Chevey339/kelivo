@@ -609,6 +609,7 @@ class _BrandBadge extends StatelessWidget {
     if (s is FirecrawlOptions) return 'firecrawl';
     if (s is TinyFishOptions) return 'tinyfish';
     if (s is AnySearchOptions) return 'anysearch';
+    if (s is ParallelOptions) return 'parallel';
     if (s is KelivoOptions) return 'kelivo';
     return 'search';
   }
@@ -779,6 +780,7 @@ class _AddServiceDialogState extends State<_AddServiceDialog> {
     'location': TextEditingController(),
     'includeDomains': TextEditingController(),
     'excludeDomains': TextEditingController(),
+    'mode': TextEditingController(text: ParallelOptions.defaultMode),
   };
 
   @override
@@ -827,7 +829,13 @@ class _AddServiceDialogState extends State<_AddServiceDialog> {
                   Center(
                     child: _ServiceTypeDropdown(
                       selectedType: _selectedType,
-                      onChanged: (t) => setState(() => _selectedType = t),
+                      onChanged: (t) => setState(() {
+                        _selectedType = t;
+                        if (t == 'parallel') {
+                          _controllers['mode']!.text =
+                              ParallelOptions.defaultMode;
+                        }
+                      }),
                     ),
                   ),
                   const SizedBox(height: 12),
@@ -1132,6 +1140,26 @@ class _AddServiceDialogState extends State<_AddServiceDialog> {
             ),
           ),
         ];
+      case 'parallel':
+        return [
+          TextField(
+            controller: _controllers['apiKey'],
+            decoration: deco(l10n.searchServicesDialogApiKey),
+          ),
+          const SizedBox(height: 12),
+          _deskModeDropdown(
+            context: context,
+            label: l10n.searchServicesDialogSearchMode,
+            value: ParallelOptions.normalizeMode(_controllers['mode']!.text),
+            items: [
+              for (final mode in ParallelOptions.modes)
+                (value: mode, label: ParallelOptions.modeLabel(mode)),
+            ],
+            onChanged: (value) => setState(() {
+              _controllers['mode']!.text = value;
+            }),
+          ),
+        ];
       case 'bing_local':
       default:
         return [];
@@ -1245,6 +1273,12 @@ class _AddServiceDialogState extends State<_AddServiceDialog> {
           id: id,
           apiKey: _controllers['apiKey']!.text,
           url: (_controllers['url']?.text ?? '').trim(),
+        );
+      case 'parallel':
+        return ParallelOptions(
+          id: id,
+          apiKey: _controllers['apiKey']!.text,
+          mode: ParallelOptions.normalizeMode(_controllers['mode']!.text),
         );
       case 'bing_local':
       default:
@@ -1362,6 +1396,9 @@ class _EditServiceDialogState extends State<_EditServiceDialog> {
     } else if (s is AnySearchOptions) {
       _controllers['apiKey'] = TextEditingController(text: s.apiKey);
       _controllers['url'] = TextEditingController(text: s.url);
+    } else if (s is ParallelOptions) {
+      _controllers['apiKey'] = TextEditingController(text: s.apiKey);
+      _controllers['mode'] = TextEditingController(text: s.mode);
     }
   }
 
@@ -1722,6 +1759,28 @@ class _EditServiceDialogState extends State<_EditServiceDialog> {
           ),
         ),
       ];
+    } else if (s is ParallelOptions) {
+      return [
+        TextField(
+          controller: _controllers['apiKey'],
+          decoration: deco(l10n.searchServicesDialogApiKey),
+        ),
+        const SizedBox(height: 12),
+        _multiKeyTile(),
+        const SizedBox(height: 12),
+        _deskModeDropdown(
+          context: context,
+          label: l10n.searchServicesDialogSearchMode,
+          value: ParallelOptions.normalizeMode(_controllers['mode']!.text),
+          items: [
+            for (final mode in ParallelOptions.modes)
+              (value: mode, label: ParallelOptions.modeLabel(mode)),
+          ],
+          onChanged: (value) => setState(() {
+            _controllers['mode']!.text = value;
+          }),
+        ),
+      ];
     }
     return [];
   }
@@ -1972,6 +2031,14 @@ class _EditServiceDialogState extends State<_EditServiceDialog> {
         id: s.id,
         apiKey: _controllers['apiKey']!.text,
         url: (_controllers['url']?.text ?? '').trim(),
+        extraApiKeys: _extraApiKeys,
+      );
+    }
+    if (s is ParallelOptions) {
+      return ParallelOptions(
+        id: s.id,
+        apiKey: _controllers['apiKey']!.text,
+        mode: ParallelOptions.normalizeMode(_controllers['mode']!.text),
         extraApiKeys: _extraApiKeys,
       );
     }
@@ -2255,6 +2322,7 @@ class _ServiceTypeChipsState extends State<_ServiceTypeChips> {
     (type: 'firecrawl', brand: 'firecrawl'),
     (type: 'tinyfish', brand: 'tinyfish'),
     (type: 'anysearch', brand: 'anysearch'),
+    (type: 'parallel', brand: 'parallel'),
   ];
   @override
   Widget build(BuildContext context) {
@@ -2349,6 +2417,8 @@ String _serviceTypeName(BuildContext context, String type) {
       return l10n.searchServiceNameTinyFish;
     case 'anysearch':
       return l10n.searchServiceNameAnySearch;
+    case 'parallel':
+      return l10n.searchServiceNameParallel;
     case 'kelivo':
       return l10n.searchServiceNameKelivo;
     default:
@@ -2691,6 +2761,39 @@ class _DeskIosButtonState extends State<_DeskIosButton> {
       ),
     );
   }
+}
+
+Widget _deskModeDropdown({
+  required BuildContext context,
+  required String label,
+  required String value,
+  required List<({String value, String label})> items,
+  required ValueChanged<String> onChanged,
+}) {
+  final effective = items.any((item) => item.value == value)
+      ? value
+      : items.first.value;
+  return InputDecorator(
+    decoration: _deskInputDecoration(context).copyWith(labelText: label),
+    child: DropdownButtonHideUnderline(
+      child: DropdownButton<String>(
+        value: effective,
+        isExpanded: true,
+        isDense: true,
+        borderRadius: BorderRadius.circular(12),
+        items: [
+          for (final item in items)
+            DropdownMenuItem<String>(
+              value: item.value,
+              child: Text(item.label),
+            ),
+        ],
+        onChanged: (next) {
+          if (next != null) onChanged(next);
+        },
+      ),
+    ),
+  );
 }
 
 InputDecoration _deskInputDecoration(BuildContext context) {
