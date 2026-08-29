@@ -173,7 +173,8 @@ final class HealthToolHandler {
       completion(Self.unavailable(start, end))
       return
     }
-    let predicate = HKQuery.predicateForSamples(withStart: start, end: end, options: .strictStartDate)
+    // Default options: samples that overlap the window, not only those that start in it.
+    let predicate = HKQuery.predicateForSamples(withStart: start, end: end)
     let query = HKSampleQuery(
       sampleType: sleepType,
       predicate: predicate,
@@ -181,7 +182,11 @@ final class HealthToolHandler {
       sortDescriptors: [NSSortDescriptor(key: HKSampleSortIdentifierEndDate, ascending: true)]
     ) { _, samples, _ in
       let categorySamples = samples as? [HKCategorySample] ?? []
-      guard let asleep = Self.mergedAsleepInterval(categorySamples) else {
+      guard let asleep = Self.mergedAsleepInterval(
+        categorySamples,
+        windowStart: start,
+        windowEnd: end
+      ) else {
         completion(Self.unavailable(start, end))
         return
       }
@@ -264,15 +269,19 @@ final class HealthToolHandler {
     store.execute(query)
   }
 
-  /// Unions overlapping asleep samples so Watch + third-party sources are
-  /// not double-counted.
+  /// Clips asleep samples to the query window, then unions overlaps so Watch
+  /// + third-party sources are not double-counted.
   private static func mergedAsleepInterval(
-    _ samples: [HKCategorySample]
+    _ samples: [HKCategorySample],
+    windowStart: Date,
+    windowEnd: Date
   ) -> (duration: TimeInterval, start: Date, end: Date)? {
     var intervals: [(start: Date, end: Date)] = []
     for sample in samples where isAsleep(sample) {
-      guard sample.endDate > sample.startDate else { continue }
-      intervals.append((sample.startDate, sample.endDate))
+      let clippedStart = max(sample.startDate, windowStart)
+      let clippedEnd = min(sample.endDate, windowEnd)
+      guard clippedStart < clippedEnd else { continue }
+      intervals.append((clippedStart, clippedEnd))
     }
     guard !intervals.isEmpty else { return nil }
     intervals.sort { $0.start < $1.start }

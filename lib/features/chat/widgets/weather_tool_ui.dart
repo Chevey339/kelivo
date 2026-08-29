@@ -123,49 +123,38 @@ class WeatherAttribution {
   }
 }
 
-/// Compact WeatherKit-compliant summary for the tool card.
+/// Compact weather summary for the timeline tool card.
+///
+/// WeatherKit attribution is not shown here; it belongs on the tool
+/// detail sheet via [WeatherAttributionLabel].
 class WeatherToolSummary extends StatelessWidget {
   const WeatherToolSummary({
     super.key,
     required this.result,
     this.textColor,
-    this.secondaryColor,
     this.errorColor,
   });
 
   final WeatherToolResult result;
   final Color? textColor;
-  final Color? secondaryColor;
   final Color? errorColor;
 
   @override
   Widget build(BuildContext context) {
+    if (!result.hasCurrent) return const SizedBox.shrink();
     final cs = Theme.of(context).colorScheme;
     final primary = textColor ?? cs.onPrimaryContainer;
-    final secondary = secondaryColor ?? primary.withValues(alpha: 0.8);
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        if (result.hasCurrent) ...[
-          Text(
-            _currentLine(result),
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(
-              fontSize: 12,
-              height: 1.3,
-              fontWeight: AppFontWeights.medium,
-              color: primary,
-            ),
-          ),
-          const SizedBox(height: 4),
-        ],
-        WeatherAttributionLabel(
-          attribution: result.attribution,
-          color: secondary,
-        ),
-      ],
+    return Text(
+      _currentLine(result),
+      maxLines: 2,
+      overflow: TextOverflow.ellipsis,
+      style: TextStyle(
+        fontSize: 12,
+        height: 1.3,
+        fontWeight: AppFontWeights.medium,
+        color: primary,
+      ),
     );
   }
 }
@@ -189,8 +178,8 @@ class WeatherAttributionLabel extends StatelessWidget {
     );
     return InkWell(
       onTap: () => _openLegalPage(attribution.legalPageUrl),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           if (markUrl != null) ...[
             Image.network(
@@ -201,16 +190,18 @@ class WeatherAttributionLabel extends StatelessWidget {
               filterQuality: FilterQuality.medium,
               errorBuilder: (_, __, ___) => const SizedBox.shrink(),
             ),
-            const SizedBox(height: 4),
+            const SizedBox(width: 8),
           ],
-          Text(
-            attribution.label,
-            style: TextStyle(
-              fontSize: 11,
-              height: 1.3,
-              color: textColor,
-              decoration: TextDecoration.underline,
-              decorationColor: textColor.withValues(alpha: 0.5),
+          Flexible(
+            child: Text(
+              attribution.label,
+              style: TextStyle(
+                fontSize: 11,
+                height: 1.3,
+                color: textColor,
+                decoration: TextDecoration.underline,
+                decorationColor: textColor.withValues(alpha: 0.5),
+              ),
             ),
           ),
         ],

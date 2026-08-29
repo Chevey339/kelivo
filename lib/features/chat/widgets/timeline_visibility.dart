@@ -610,8 +610,9 @@ double _estimateScreenTimeExtra(ScreenTimeResult result, double fontScale) {
 }
 
 double _estimateWeatherExtra(WeatherToolResult result, double fontScale) {
+  if (!result.hasCurrent) return 0;
   final line = 16.0 * fontScale;
-  return result.hasCurrent ? line * 2 + 4 : line;
+  return line * 2;
 }
 
 double _estimatePendingApprovalExtra(

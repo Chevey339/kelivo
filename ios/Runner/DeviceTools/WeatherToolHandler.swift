@@ -72,13 +72,14 @@ final class WeatherToolHandler {
   }
 
   /// WeatherKit daily `date` is midnight in the forecast location's timezone.
-  /// Fall back to the device timezone if reverse geocode fails.
-  private static func locationTimeZone(_ location: CLLocation) async -> TimeZone {
+  /// Returns nil when reverse geocode fails so callers do not invent a date
+  /// in the device timezone.
+  private static func locationTimeZone(_ location: CLLocation) async -> TimeZone? {
     await withCheckedContinuation { continuation in
       let geocoder = CLGeocoder()
       geocoder.reverseGeocodeLocation(location) { marks, _ in
         _ = geocoder
-        continuation.resume(returning: marks?.first?.timeZone ?? .current)
+        continuation.resume(returning: marks?.first?.timeZone)
       }
     }
   }
@@ -88,14 +89,12 @@ final class WeatherToolHandler {
     weather: Weather,
     attribution: WeatherAttribution,
     location: CLLocation,
-    timeZone: TimeZone
+    timeZone: TimeZone?
   ) -> [String: Any] {
     let current = weather.currentWeather
     let now = Date()
     let hourlyLimit = 12
     let dailyLimit = 7
-    var calendar = DeviceToolsSupport.isoCalendar()
-    calendar.timeZone = timeZone
 
     let hourly: [[String: Any]] = Array(weather.hourlyForecast)
       .filter { $0.date >= now.addingTimeInterval(-1800) }
@@ -114,13 +113,20 @@ final class WeatherToolHandler {
       .prefix(dailyLimit)
       .map { day in
         var item: [String: Any] = [
-          "date": DeviceToolsSupport.formatDateOnly(day.date, calendar: calendar),
           "condition": day.condition.description,
           "symbol_name": day.symbolName,
           "high_c": rounded(celsius(day.highTemperature)),
           "low_c": rounded(celsius(day.lowTemperature)),
           "precipitation_chance": rounded(day.precipitationChance),
         ]
+        if let timeZone {
+          var calendar = DeviceToolsSupport.isoCalendar()
+          calendar.timeZone = timeZone
+          item["date"] = DeviceToolsSupport.formatDateOnly(day.date, calendar: calendar)
+        } else {
+          item["date_timezone"] = "unknown"
+          item["date_fallback"] = true
+        }
         if let sunrise = day.sun.sunrise {
           item["sunrise"] = DeviceToolsSupport.formatDateTime(sunrise)
         }
@@ -144,7 +150,7 @@ final class WeatherToolHandler {
       currentPayload["precipitation_chance"] = chance
     }
 
-    return [
+    var payload: [String: Any] = [
       "latitude": location.coordinate.latitude,
       "longitude": location.coordinate.longitude,
       "updated_at": DeviceToolsSupport.formatDateTime(now),
@@ -160,6 +166,13 @@ final class WeatherToolHandler {
         "square_mark_url": attribution.squareMarkURL.absoluteString,
       ],
     ]
+    if let timeZone {
+      payload["location_timezone"] = timeZone.identifier
+    } else {
+      payload["location_timezone"] = NSNull()
+      payload["date_timezone_fallback"] = true
+    }
+    return payload
   }
 
   @available(iOS 16.0, *)

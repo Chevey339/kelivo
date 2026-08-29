@@ -92,4 +92,37 @@ void main() {
     expect(WeatherToolResult.tryParse('{"error":"NO_PERMISSION"}'), isNull);
     expect(WeatherToolResult.tryParse('not-json'), isNull);
   });
+
+  testWidgets('timeline card hides WeatherKit mark and legal link', (
+    tester,
+  ) async {
+    final result = WeatherToolResult.tryParse(
+      jsonEncode({
+        'latitude': 37.33,
+        'longitude': -122.03,
+        'current': {'condition': 'Clear', 'temperature_c': 21.5},
+        'attribution': {
+          'service_name': 'Apple Weather',
+          'legal_page_url':
+              'https://weatherkit.apple.com/legal-attribution.html',
+          'display_text': 'Weather data from Apple Weather',
+          'combined_mark_light_url':
+              'https://weatherkit.apple.com/mark-light.png',
+          'combined_mark_dark_url':
+              'https://weatherkit.apple.com/mark-dark.png',
+        },
+      }),
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(body: WeatherToolSummary(result: result!)),
+      ),
+    );
+
+    expect(find.textContaining('Clear'), findsOneWidget);
+    expect(find.byType(WeatherAttributionLabel), findsNothing);
+    expect(find.text('Weather data from Apple Weather'), findsNothing);
+    expect(find.byType(Image), findsNothing);
+  });
 }

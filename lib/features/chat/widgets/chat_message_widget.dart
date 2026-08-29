@@ -711,6 +711,12 @@ void _showToolDetail(BuildContext context, ToolUIPart part) {
       ? ScreenTimeResult.tryParse(cleanText)
       : null;
   final useScreenTimeDetail = screenTime != null && screenTime.hasApps;
+  final weather = part.toolName == LocalToolNames.weather
+      ? WeatherToolResult.tryParse(cleanText)
+      : null;
+  final weatherAttribution = weather != null && !weather.isError
+      ? weather.attribution
+      : null;
 
   if (PlatformUtils.isDesktopTarget) {
     unawaited(
@@ -727,6 +733,7 @@ void _showToolDetail(BuildContext context, ToolUIPart part) {
           resultLabel: l10n.chatMessageWidgetResult,
           imagesLabel: l10n.chatMessageWidgetImages,
           screenTimeResult: useScreenTimeDetail ? screenTime : null,
+          weatherAttribution: weatherAttribution,
         ),
       ),
     );
@@ -753,6 +760,7 @@ void _showToolDetail(BuildContext context, ToolUIPart part) {
           argumentsLabel: l10n.chatMessageWidgetArguments,
           resultLabel: l10n.chatMessageWidgetResult,
           imagesLabel: l10n.chatMessageWidgetImages,
+          weatherAttribution: weatherAttribution,
         );
       },
     ),
@@ -770,6 +778,7 @@ class _ToolDetailDesktopDialog extends StatefulWidget {
     required this.resultLabel,
     required this.imagesLabel,
     this.screenTimeResult,
+    this.weatherAttribution,
   });
 
   static const dialogKey = ValueKey('tool_detail_desktop_dialog');
@@ -784,6 +793,7 @@ class _ToolDetailDesktopDialog extends StatefulWidget {
   final String resultLabel;
   final String imagesLabel;
   final ScreenTimeResult? screenTimeResult;
+  final WeatherAttribution? weatherAttribution;
 
   @override
   State<_ToolDetailDesktopDialog> createState() =>
@@ -877,6 +887,7 @@ class _ToolDetailDesktopDialogState extends State<_ToolDetailDesktopDialog> {
                             resultLabel: widget.resultLabel,
                             imagesLabel: widget.imagesLabel,
                             padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
+                            weatherAttribution: widget.weatherAttribution,
                           ),
                   ),
                 ),
@@ -899,6 +910,7 @@ class _ToolDetailBody extends StatelessWidget {
     required this.resultLabel,
     required this.imagesLabel,
     this.padding = const EdgeInsets.fromLTRB(16, 8, 16, 24),
+    this.weatherAttribution,
   });
 
   final ScrollController scrollController;
@@ -909,6 +921,7 @@ class _ToolDetailBody extends StatelessWidget {
   final String resultLabel;
   final String imagesLabel;
   final EdgeInsets padding;
+  final WeatherAttribution? weatherAttribution;
 
   @override
   Widget build(BuildContext context) {
@@ -959,6 +972,14 @@ class _ToolDetailBody extends StatelessWidget {
                           );
                         },
                       ),
+                    ),
+                  ),
+                ],
+                if (weatherAttribution != null) ...[
+                  const SliverToBoxAdapter(child: SizedBox(height: 16)),
+                  SliverToBoxAdapter(
+                    child: WeatherAttributionLabel(
+                      attribution: weatherAttribution!,
                     ),
                   ),
                 ],
@@ -5333,11 +5354,7 @@ class _ChainOfThoughtToolStepState extends State<_ChainOfThoughtToolStep> {
             errorColor: cs.error,
           )
         : weatherResult != null && !weatherResult.isError
-        ? WeatherToolSummary(
-            result: weatherResult,
-            textColor: fg.body,
-            secondaryColor: fg.muted,
-          )
+        ? WeatherToolSummary(result: weatherResult, textColor: fg.body)
         : !shouldShowSummary || summaryText.trim().isEmpty
         ? null
         : Text(
@@ -5680,7 +5697,6 @@ class _ToolCallItemState extends State<_ToolCallItem> {
                     child: WeatherToolSummary(
                       result: weather,
                       textColor: fg.body,
-                      secondaryColor: fg.muted,
                     ),
                   );
                 },
