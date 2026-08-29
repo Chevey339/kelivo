@@ -313,11 +313,7 @@ class BrandAssets {
       label: 'Parallel',
       asset: 'assets/icons/parallel.svg',
     ),
-    BrandIconOption(
-      id: 'you',
-      label: 'You.com',
-      asset: 'assets/icons/you.svg',
-    ),
+    BrandIconOption(id: 'you', label: 'You.com', asset: 'assets/icons/you.svg'),
     BrandIconOption(
       id: 'exa',
       label: 'Exa',
