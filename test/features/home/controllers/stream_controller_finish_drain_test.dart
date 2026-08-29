@@ -2,7 +2,6 @@ import "../../../support/business_test_harness.dart";
 import 'dart:async';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:Kelivo/core/providers/settings_provider.dart';
-import 'package:Kelivo/core/services/chat/chat_service.dart';
 import 'package:Kelivo/features/home/controllers/stream_controller.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -14,7 +13,6 @@ void main() {
 
   StreamController buildController(SettingsProvider settings) {
     return StreamController(
-      chatService: ChatService(),
       onStateChanged: () {},
       getSettingsProvider: () => settings,
       getCurrentConversationId: () => 'conversation-1',

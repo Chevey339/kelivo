@@ -10,10 +10,6 @@ import 'dart:convert';
 /// carried.
 const String claudeContainerArtifactKind = 'claude_container';
 
-/// Internal message key carrying the stored container into the next request.
-/// Stripped before anything reaches the wire, like the other `_kelivo_` keys.
-const String multimodalInternalClaudeContainerKey = '_kelivo_claude_container';
-
 /// The container a code execution turn ran in, as the API reported it.
 ///
 /// Files and REPL state live in the container, so the next turn sends the id

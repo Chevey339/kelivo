@@ -5,7 +5,6 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:Kelivo/core/models/chat_message.dart';
 import 'package:Kelivo/core/providers/settings_provider.dart';
 import 'package:Kelivo/core/services/api/stream/stream_chunk.dart';
-import 'package:Kelivo/core/services/chat/chat_service.dart';
 import 'package:Kelivo/features/chat/widgets/chat_message_widget.dart'
     show ToolUIPart;
 import 'package:Kelivo/features/home/controllers/stream_controller.dart';
@@ -22,7 +21,6 @@ void main() {
     final settingsProvider =
         settings ?? SettingsProvider(createBusinessTestPreferences());
     return StreamController(
-      chatService: ChatService(),
       onStateChanged: () {},
       getSettingsProvider: () => settingsProvider,
       getCurrentConversationId: () => currentConversationId,
@@ -308,7 +306,6 @@ void main() {
           'content': null,
         },
       ],
-      getGeminiThoughtSigFromDb: (_) => null,
     );
 
     expect(controller.getContentSplitData(message.id), isNull);
@@ -353,7 +350,6 @@ void main() {
       reader.restoreMessageUiState(
         message,
         getToolEventsFromDb: (_) => const [],
-        getGeminiThoughtSigFromDb: (_) => null,
       );
 
       expect(reader.getContentSplitData(message.id), isNull);
@@ -670,7 +666,6 @@ void main() {
     var listUpdateCount = 0;
     var tickCount = 0;
     final smoothController = StreamController(
-      chatService: ChatService(),
       onStateChanged: () {},
       getSettingsProvider: () => settings,
       getCurrentConversationId: () => 'conversation-1',
@@ -715,7 +710,6 @@ void main() {
   ) async {
     final settings = SettingsProvider(createBusinessTestPreferences());
     final smoothController = StreamController(
-      chatService: ChatService(),
       onStateChanged: () {},
       getSettingsProvider: () => settings,
       getCurrentConversationId: () => 'conversation-1',
@@ -755,7 +749,6 @@ void main() {
   ) async {
     final settings = SettingsProvider(createBusinessTestPreferences());
     final smoothController = StreamController(
-      chatService: ChatService(),
       onStateChanged: () {},
       getSettingsProvider: () => settings,
       getCurrentConversationId: () => 'conversation-1',
@@ -794,7 +787,6 @@ void main() {
   ) async {
     final settings = SettingsProvider(createBusinessTestPreferences());
     final smoothController = StreamController(
-      chatService: ChatService(),
       onStateChanged: () {},
       getSettingsProvider: () => settings,
       getCurrentConversationId: () => 'conversation-1',
@@ -834,7 +826,6 @@ void main() {
   ) async {
     final settings = SettingsProvider(createBusinessTestPreferences());
     final smoothController = StreamController(
-      chatService: ChatService(),
       onStateChanged: () {},
       getSettingsProvider: () => settings,
       getCurrentConversationId: () => 'conversation-1',
@@ -877,7 +868,6 @@ void main() {
   ) async {
     final settings = SettingsProvider(createBusinessTestPreferences());
     final smoothController = StreamController(
-      chatService: ChatService(),
       onStateChanged: () {},
       getSettingsProvider: () => settings,
       getCurrentConversationId: () => 'conversation-1',

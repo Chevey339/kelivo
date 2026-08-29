@@ -403,7 +403,6 @@ class HomePageController extends ChangeNotifier {
     _chatController = ChatController(chatService: _chatService);
     _chatControllerReady = true;
     _streamController = stream_ctrl.StreamController(
-      chatService: _chatService,
       onStateChanged: () => notifyListeners(),
       getSettingsProvider: () => _context.read<SettingsProvider>(),
       getCurrentConversationId: () => currentConversation?.id,
@@ -449,7 +448,6 @@ class HomePageController extends ChangeNotifier {
             revisionIds: revisionIds,
             imagePaths: imagePaths,
           ),
-      geminiThoughtSignatureHandler: _appendGeminiThoughtSignatureForApi,
       providerArtifactLookup: (message, kind) =>
           _chatService.getProviderArtifact(message.id, kind),
     );
@@ -805,7 +803,6 @@ class HomePageController extends ChangeNotifier {
           // the skeleton instead of a blank list.
           notifyListeners();
           await Future.wait([restoreAssistant, loadWindow]);
-          _streamController.clearGeminiThoughtSigs();
           _restoreMessageUiState();
           _scrollCtrl.positionAtBottomOnNextLayout();
           notifyListeners();
@@ -2727,7 +2724,8 @@ class HomePageController extends ChangeNotifier {
 
         final cleanedParts = ChatMessage.partsWithRewrittenText(
           m.parts,
-          (text) => _streamController.captureGeminiThoughtSignature(text, m.id),
+          (text) =>
+              _chatService.migrateLegacyGeminiThoughtSignature(text, m.id),
         );
         if (!identical(cleanedParts, m.parts)) {
           final updated = m.copyWith(parts: cleanedParts);
@@ -2754,8 +2752,6 @@ class HomePageController extends ChangeNotifier {
     _streamController.restoreMessageUiState(
       message,
       getToolEventsFromDb: (id) => _chatService.getToolEvents(id),
-      getGeminiThoughtSigFromDb: (id) =>
-          _chatService.getGeminiThoughtSignature(id),
     );
   }
 
@@ -2801,16 +2797,6 @@ class HomePageController extends ChangeNotifier {
         messages[i] = messages[i].copyWith(parts: nextParts);
         notifyListeners();
       },
-    );
-  }
-
-  String _appendGeminiThoughtSignatureForApi(
-    ChatMessage message,
-    String content,
-  ) {
-    return _streamController.appendGeminiThoughtSignatureForApi(
-      message,
-      content,
     );
   }
 
