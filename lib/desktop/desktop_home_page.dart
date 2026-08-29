@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:Kelivo/theme/app_font_weights.dart';
 import 'package:flutter/foundation.dart'
     show defaultTargetPlatform, TargetPlatform;
-
 import 'desktop_nav_rail.dart';
 import 'desktop_chat_page.dart';
 import 'window_title_bar.dart';
@@ -10,11 +9,8 @@ import 'desktop_settings_page.dart';
 import 'desktop_translate_page.dart';
 import '../features/settings/pages/storage_space_page.dart';
 import '../l10n/app_localizations.dart';
-
 import 'package:window_manager/window_manager.dart';
-
 import 'dart:async';
-
 import 'hotkeys/hotkey_event_bus.dart';
 import 'hotkeys/chat_action_bus.dart';
 import 'desktop_settings_navigation_bus.dart';
