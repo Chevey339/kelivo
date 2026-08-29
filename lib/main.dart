@@ -27,6 +27,7 @@ import 'core/providers/asr_provider.dart';
 import 'core/providers/assistant_provider.dart';
 import 'core/providers/tag_provider.dart';
 import 'core/providers/update_provider.dart';
+import 'core/services/mimo_claw/provider.dart';
 import 'core/providers/quick_phrase_provider.dart';
 import 'core/providers/instruction_injection_provider.dart';
 import 'core/providers/instruction_injection_group_provider.dart';
@@ -585,6 +586,7 @@ class MyApp extends StatelessWidget {
               AsrProvider(settingsProvider: ctx.read<SettingsProvider>()),
         ),
         ChangeNotifierProvider(create: (_) => UpdateProvider()),
+        ChangeNotifierProvider(create: (_) => MiMoClawProvider()),
         ChangeNotifierProvider(
           create: (_) => QuickPhraseProvider(preferences: businessPreferences),
         ),

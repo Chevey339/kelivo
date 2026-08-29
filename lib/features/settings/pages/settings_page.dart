@@ -27,6 +27,8 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../../core/services/haptics.dart';
 import 'package:Kelivo/theme/app_font_weights.dart';
 import 'package:Kelivo/theme/app_semantic_colors.dart';
+import '../../../ui/screens/mimo_claw_settings_page.dart';
+import '../../../core/services/mimo_claw/provider.dart';
 
 class SettingsPage extends StatelessWidget {
   const SettingsPage({super.key});
@@ -249,6 +251,21 @@ class SettingsPage extends StatelessWidget {
                   Navigator.of(
                     context,
                   ).push(MaterialPageRoute(builder: (_) => const McpPage()));
+                },
+              ),
+              _iosDivider(context),
+              _iosNavRow(
+                context,
+                icon: Lucide.Bot,
+                label: 'MiMo Claw',
+                onTap: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => MiMoClawSettingsPage(
+                        provider: context.read<MiMoClawProvider>(),
+                      ),
+                    ),
+                  );
                 },
               ),
               _iosDivider(context),
