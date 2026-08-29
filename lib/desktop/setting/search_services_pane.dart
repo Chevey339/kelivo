@@ -785,6 +785,9 @@ class _AddServiceDialogState extends State<_AddServiceDialog> {
     'contentMode': TextEditingController(
       text: YouSearchOptions.defaultContentMode,
     ),
+    'maximumNumberOfTokens': TextEditingController(
+      text: '${BraveOptions.defaultMaximumNumberOfTokens}',
+    ),
   };
 
   @override
@@ -841,6 +844,10 @@ class _AddServiceDialogState extends State<_AddServiceDialog> {
                         } else if (t == 'you') {
                           _controllers['contentMode']!.text =
                               YouSearchOptions.defaultContentMode;
+                        } else if (t == 'brave') {
+                          _controllers['mode']!.text = BraveOptions.defaultMode;
+                          _controllers['maximumNumberOfTokens']!.text =
+                              '${BraveOptions.defaultMaximumNumberOfTokens}';
                         }
                       }),
                     ),
@@ -913,7 +920,6 @@ class _AddServiceDialogState extends State<_AddServiceDialog> {
         ];
       case 'zhipu':
       case 'linkup':
-      case 'brave':
       case 'metaso':
       case 'jina':
       case 'ollama':
@@ -925,6 +931,46 @@ class _AddServiceDialogState extends State<_AddServiceDialog> {
             controller: _controllers['apiKey'],
             decoration: deco('API Key'),
           ),
+        ];
+      case 'brave':
+        final braveMode = BraveOptions.normalizeMode(
+          _controllers['mode']!.text,
+        );
+        return [
+          TextField(
+            controller: _controllers['apiKey'],
+            decoration: deco(l10n.searchServicesDialogApiKey),
+          ),
+          const SizedBox(height: 12),
+          _deskModeDropdown(
+            context: context,
+            label: l10n.searchServicesDialogSearchMode,
+            value: braveMode,
+            items: [
+              (
+                value: BraveOptions.webMode,
+                label: l10n.searchServicesDialogWebSearch,
+              ),
+              (
+                value: BraveOptions.llmContextMode,
+                label: l10n.searchServicesDialogLlmContext,
+              ),
+            ],
+            onChanged: (value) => setState(() {
+              _controllers['mode']!.text = value;
+            }),
+          ),
+          if (braveMode == BraveOptions.llmContextMode) ...[
+            const SizedBox(height: 12),
+            TextField(
+              controller: _controllers['maximumNumberOfTokens'],
+              keyboardType: TextInputType.number,
+              decoration: _deskInputDecoration(context).copyWith(
+                labelText: l10n.searchServicesDialogMaximumTokens,
+                hintText: '${BraveOptions.defaultMaximumNumberOfTokens}',
+              ),
+            ),
+          ],
         ];
       case 'serper':
         return [
@@ -1236,7 +1282,14 @@ class _AddServiceDialogState extends State<_AddServiceDialog> {
       case 'linkup':
         return LinkUpOptions(id: id, apiKey: _controllers['apiKey']!.text);
       case 'brave':
-        return BraveOptions(id: id, apiKey: _controllers['apiKey']!.text);
+        return BraveOptions(
+          id: id,
+          apiKey: _controllers['apiKey']!.text,
+          mode: BraveOptions.normalizeMode(_controllers['mode']!.text),
+          maximumNumberOfTokens: BraveOptions.normalizeMaximumNumberOfTokens(
+            _controllers['maximumNumberOfTokens']!.text,
+          ),
+        );
       case 'metaso':
         return MetasoOptions(id: id, apiKey: _controllers['apiKey']!.text);
       case 'jina':
@@ -1375,6 +1428,10 @@ class _EditServiceDialogState extends State<_EditServiceDialog> {
       _controllers['apiKey'] = TextEditingController(text: s.apiKey);
     } else if (s is BraveOptions) {
       _controllers['apiKey'] = TextEditingController(text: s.apiKey);
+      _controllers['mode'] = TextEditingController(text: s.mode);
+      _controllers['maximumNumberOfTokens'] = TextEditingController(
+        text: '${s.maximumNumberOfTokens}',
+      );
     } else if (s is MetasoOptions) {
       _controllers['apiKey'] = TextEditingController(text: s.apiKey);
     } else if (s is OllamaOptions) {
@@ -1557,7 +1614,6 @@ class _EditServiceDialogState extends State<_EditServiceDialog> {
       ];
     } else if (s is ZhipuOptions ||
         s is LinkUpOptions ||
-        s is BraveOptions ||
         s is MetasoOptions ||
         s is JinaOptions ||
         s is OllamaOptions ||
@@ -1571,6 +1627,46 @@ class _EditServiceDialogState extends State<_EditServiceDialog> {
         ),
         const SizedBox(height: 12),
         _multiKeyTile(),
+      ];
+    } else if (s is BraveOptions) {
+      final braveMode = BraveOptions.normalizeMode(_controllers['mode']!.text);
+      return [
+        TextField(
+          controller: _controllers['apiKey'],
+          decoration: deco(l10n.searchServicesDialogApiKey),
+        ),
+        const SizedBox(height: 12),
+        _multiKeyTile(),
+        const SizedBox(height: 12),
+        _deskModeDropdown(
+          context: context,
+          label: l10n.searchServicesDialogSearchMode,
+          value: braveMode,
+          items: [
+            (
+              value: BraveOptions.webMode,
+              label: l10n.searchServicesDialogWebSearch,
+            ),
+            (
+              value: BraveOptions.llmContextMode,
+              label: l10n.searchServicesDialogLlmContext,
+            ),
+          ],
+          onChanged: (value) => setState(() {
+            _controllers['mode']!.text = value;
+          }),
+        ),
+        if (braveMode == BraveOptions.llmContextMode) ...[
+          const SizedBox(height: 12),
+          TextField(
+            controller: _controllers['maximumNumberOfTokens'],
+            keyboardType: TextInputType.number,
+            decoration: _deskInputDecoration(context).copyWith(
+              labelText: l10n.searchServicesDialogMaximumTokens,
+              hintText: '${BraveOptions.defaultMaximumNumberOfTokens}',
+            ),
+          ),
+        ],
       ];
     } else if (s is GrokOptions) {
       return [
@@ -1990,6 +2086,10 @@ class _EditServiceDialogState extends State<_EditServiceDialog> {
         id: s.id,
         apiKey: _controllers['apiKey']!.text,
         extraApiKeys: _extraApiKeys,
+        mode: BraveOptions.normalizeMode(_controllers['mode']!.text),
+        maximumNumberOfTokens: BraveOptions.normalizeMaximumNumberOfTokens(
+          _controllers['maximumNumberOfTokens']!.text,
+        ),
       );
     }
     if (s is MetasoOptions) {

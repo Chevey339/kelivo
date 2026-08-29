@@ -10519,6 +10519,30 @@ abstract class AppLocalizations {
   /// **'Snippets'**
   String get searchServicesDialogSnippets;
 
+  /// No description provided for @searchServicesDialogWebSearch.
+  ///
+  /// In en, this message translates to:
+  /// **'Web Search'**
+  String get searchServicesDialogWebSearch;
+
+  /// No description provided for @searchServicesDialogLlmContext.
+  ///
+  /// In en, this message translates to:
+  /// **'LLM Context'**
+  String get searchServicesDialogLlmContext;
+
+  /// No description provided for @searchServicesDialogMaximumTokens.
+  ///
+  /// In en, this message translates to:
+  /// **'Maximum tokens'**
+  String get searchServicesDialogMaximumTokens;
+
+  /// No description provided for @searchServicesDialogMaximumTokensInvalid.
+  ///
+  /// In en, this message translates to:
+  /// **'Maximum tokens must be between 1024 and 32768.'**
+  String get searchServicesDialogMaximumTokensInvalid;
+
   /// No description provided for @searchServiceNameKelivo.
   ///
   /// In en, this message translates to:

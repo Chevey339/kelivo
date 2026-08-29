@@ -5739,6 +5739,19 @@ class AppLocalizationsEn extends AppLocalizations {
   String get searchServicesDialogSnippets => 'Snippets';
 
   @override
+  String get searchServicesDialogWebSearch => 'Web Search';
+
+  @override
+  String get searchServicesDialogLlmContext => 'LLM Context';
+
+  @override
+  String get searchServicesDialogMaximumTokens => 'Maximum tokens';
+
+  @override
+  String get searchServicesDialogMaximumTokensInvalid =>
+      'Maximum tokens must be between 1024 and 32768.';
+
+  @override
   String get searchServiceNameKelivo => 'Kelivo';
 
   @override

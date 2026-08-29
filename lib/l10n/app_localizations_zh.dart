@@ -5516,6 +5516,19 @@ class AppLocalizationsZh extends AppLocalizations {
   String get searchServicesDialogSnippets => 'Snippets';
 
   @override
+  String get searchServicesDialogWebSearch => 'Web Search';
+
+  @override
+  String get searchServicesDialogLlmContext => 'LLM Context';
+
+  @override
+  String get searchServicesDialogMaximumTokens => '最大 token 数';
+
+  @override
+  String get searchServicesDialogMaximumTokensInvalid =>
+      '最大 token 数必须介于 1024 和 32768 之间。';
+
+  @override
   String get searchServiceNameKelivo => 'Kelivo';
 
   @override
@@ -13440,6 +13453,19 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get searchServicesDialogSnippets => 'Snippets';
+
+  @override
+  String get searchServicesDialogWebSearch => 'Web Search';
+
+  @override
+  String get searchServicesDialogLlmContext => 'LLM Context';
+
+  @override
+  String get searchServicesDialogMaximumTokens => '最大 token 数';
+
+  @override
+  String get searchServicesDialogMaximumTokensInvalid =>
+      '最大 token 数必须介于 1024 和 32768 之间。';
 
   @override
   String get searchServiceNameKelivo => 'Kelivo';
@@ -21439,6 +21465,19 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get searchServicesDialogSnippets => 'Snippets';
+
+  @override
+  String get searchServicesDialogWebSearch => 'Web Search';
+
+  @override
+  String get searchServicesDialogLlmContext => 'LLM Context';
+
+  @override
+  String get searchServicesDialogMaximumTokens => '最大 token 數';
+
+  @override
+  String get searchServicesDialogMaximumTokensInvalid =>
+      '最大 token 數必須介於 1024 和 32768 之間。';
 
   @override
   String get searchServiceNameKelivo => 'Kelivo';

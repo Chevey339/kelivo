@@ -642,6 +642,54 @@ class _SearchServiceEditorPageState extends State<SearchServiceEditorPage> {
         ),
       ];
     }
+    if (service is BraveOptions) {
+      final mode = BraveOptions.normalizeMode(_text('mode'));
+      return [
+        field(
+          key: 'apiKey',
+          label: l10n.searchServicesDialogApiKey,
+          obscure: true,
+          validator: requiredApiKey,
+        ),
+        _buildMultiKeyEntry(context),
+        _SearchEditorDropdown(
+          key: const ValueKey('search-service-field-mode'),
+          label: l10n.searchServicesDialogSearchMode,
+          value: mode,
+          items: [
+            (
+              value: BraveOptions.webMode,
+              label: l10n.searchServicesDialogWebSearch,
+            ),
+            (
+              value: BraveOptions.llmContextMode,
+              label: l10n.searchServicesDialogLlmContext,
+            ),
+          ],
+          onChanged: (value) {
+            _controller('mode').text = value;
+            _markDirty();
+          },
+        ),
+        if (mode == BraveOptions.llmContextMode)
+          field(
+            key: 'maximumNumberOfTokens',
+            label: l10n.searchServicesDialogMaximumTokens,
+            hint: '${BraveOptions.defaultMaximumNumberOfTokens}',
+            keyboardType: TextInputType.number,
+            validator: (value) {
+              final text = value?.trim() ?? '';
+              if (text.isEmpty) return null;
+              final tokens = int.tryParse(text);
+              return tokens == null ||
+                      tokens < BraveOptions.minMaximumNumberOfTokens ||
+                      tokens > BraveOptions.maxMaximumNumberOfTokens
+                  ? l10n.searchServicesDialogMaximumTokensInvalid
+                  : null;
+            },
+          ),
+      ];
+    }
 
     return [
       field(
@@ -1127,6 +1175,11 @@ class _SearchServiceEditorPageState extends State<SearchServiceEditorPage> {
       _putController('apiKey', service.apiKey);
     } else if (service is BraveOptions) {
       _putController('apiKey', service.apiKey);
+      _putController('mode', service.mode);
+      _putController(
+        'maximumNumberOfTokens',
+        '${service.maximumNumberOfTokens}',
+      );
     } else if (service is MetasoOptions) {
       _putController('apiKey', service.apiKey);
     } else if (service is OllamaOptions) {
@@ -1250,6 +1303,10 @@ class _SearchServiceEditorPageState extends State<SearchServiceEditorPage> {
           id: _serviceId,
           apiKey: _text('apiKey'),
           extraApiKeys: _extraApiKeys,
+          mode: BraveOptions.normalizeMode(_text('mode')),
+          maximumNumberOfTokens: BraveOptions.normalizeMaximumNumberOfTokens(
+            _text('maximumNumberOfTokens'),
+          ),
         );
       case 'metaso':
         return MetasoOptions(

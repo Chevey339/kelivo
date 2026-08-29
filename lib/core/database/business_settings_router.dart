@@ -926,7 +926,6 @@ final class BusinessSettingsRouter {
         );
       case 'zhipu':
       case 'linkup':
-      case 'brave':
       case 'metaso':
       case 'ollama':
       case 'jina':
@@ -935,6 +934,15 @@ final class BusinessSettingsRouter {
           kind,
           payload,
           requiredStrings: const {'apiKey'},
+          stringLists: const {'apiKeys'},
+        );
+      case 'brave':
+        _validateKnownFields(
+          kind,
+          payload,
+          requiredStrings: const {'apiKey'},
+          strings: const {'mode'},
+          integers: const {'maximumNumberOfTokens'},
           stringLists: const {'apiKeys'},
         );
       case 'searxng':

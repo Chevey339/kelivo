@@ -454,6 +454,80 @@ void main() {
     expect(saved.contentMode, YouSearchOptions.defaultContentMode);
   });
 
+  testWidgets('selects Brave from the add page and keeps web mode', (
+    tester,
+  ) async {
+    SearchServiceEditorResult? result;
+    await _pumpEditor(tester, onResult: (value) => result = value);
+
+    await tester.dragUntilVisible(
+      find.text('Brave Search'),
+      find.byType(ListView),
+      const Offset(0, -240),
+    );
+    await tester.tap(find.text('Brave Search'));
+    await tester.pumpAndSettle();
+
+    await tester.enterText(_apiKeyField(), 'brave-key');
+    await tester.tap(find.byIcon(Lucide.Check));
+    await tester.pumpAndSettle();
+
+    expect(result?.service, isA<BraveOptions>());
+    final saved = result!.service! as BraveOptions;
+    expect(saved.apiKey, 'brave-key');
+    expect(saved.mode, BraveOptions.webMode);
+    expect(
+      saved.maximumNumberOfTokens,
+      BraveOptions.defaultMaximumNumberOfTokens,
+    );
+  });
+
+  testWidgets('saves Brave LLM Context mode and token limit', (tester) async {
+    SearchServiceEditorResult? result;
+    await _pumpEditor(
+      tester,
+      initialService: BraveOptions(id: 'brave', apiKey: 'brave-key'),
+      onResult: (value) => result = value,
+    );
+
+    expect(find.text('Maximum tokens'), findsNothing);
+
+    final modeField = find.byKey(const ValueKey('search-service-field-mode'));
+    await tester.dragUntilVisible(
+      modeField,
+      find.byType(ListView),
+      const Offset(0, -240),
+    );
+    await tester.tap(
+      find.descendant(
+        of: modeField,
+        matching: find.byType(DropdownButton<String>),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('LLM Context').last);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Maximum tokens'), findsOneWidget);
+    await tester.enterText(
+      find.descendant(
+        of: find.byKey(
+          const ValueKey('search-service-field-maximumNumberOfTokens'),
+        ),
+        matching: find.byType(TextFormField),
+      ),
+      '2048',
+    );
+
+    await tester.tap(find.byIcon(Lucide.Check));
+    await tester.pumpAndSettle();
+
+    expect(result?.service, isA<BraveOptions>());
+    final saved = result!.service! as BraveOptions;
+    expect(saved.mode, BraveOptions.llmContextMode);
+    expect(saved.maximumNumberOfTokens, 2048);
+  });
+
   testWidgets('saves You.com content mode from the editor', (tester) async {
     SearchServiceEditorResult? result;
     await _pumpEditor(

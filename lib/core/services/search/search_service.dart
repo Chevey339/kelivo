@@ -446,21 +446,54 @@ class LinkUpOptions extends SearchServiceOptions {
 }
 
 class BraveOptions extends SearchServiceOptions {
-  final String apiKey;
+  static const String webMode = 'web';
+  static const String llmContextMode = 'llmContext';
+  static const String defaultMode = webMode;
+  static const List<String> modes = [webMode, llmContextMode];
+  static const int defaultMaximumNumberOfTokens = 8192;
+  static const int minMaximumNumberOfTokens = 1024;
+  static const int maxMaximumNumberOfTokens = 32768;
 
-  BraveOptions({required super.id, required this.apiKey, super.extraApiKeys});
+  final String apiKey;
+  final String mode;
+  final int maximumNumberOfTokens;
+
+  BraveOptions({
+    required super.id,
+    required this.apiKey,
+    this.mode = defaultMode,
+    this.maximumNumberOfTokens = defaultMaximumNumberOfTokens,
+    super.extraApiKeys,
+  });
+
+  static String normalizeMode(String? value) {
+    final mode = (value ?? '').trim();
+    return modes.contains(mode) ? mode : defaultMode;
+  }
+
+  static int normalizeMaximumNumberOfTokens(dynamic value) {
+    final parsed = value is int ? value : int.tryParse(value?.toString() ?? '');
+    if (parsed == null) return defaultMaximumNumberOfTokens;
+    return parsed.clamp(minMaximumNumberOfTokens, maxMaximumNumberOfTokens);
+  }
 
   @override
   Map<String, dynamic> toJson() => {
     'type': 'brave',
     'id': id,
     'apiKey': apiKey,
+    'mode': mode,
+    'maximumNumberOfTokens': maximumNumberOfTokens,
     if (extraApiKeys.isNotEmpty) 'apiKeys': extraApiKeys,
   };
 
   factory BraveOptions.fromJson(Map<String, dynamic> json) => BraveOptions(
     id: json['id'],
-    apiKey: json['apiKey'],
+    apiKey: json['apiKey'] ?? '',
+    mode: normalizeMode(json['mode']),
+    maximumNumberOfTokens: normalizeMaximumNumberOfTokens(
+      json['maximumNumberOfTokens'],
+    ),
     extraApiKeys: SearchServiceOptions.parseExtraApiKeys(json),
   );
 }
