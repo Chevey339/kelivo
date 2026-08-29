@@ -7,6 +7,7 @@ import 'package:http/http.dart' as http;
 import '../../../../models/token_usage.dart';
 import '../../../../providers/settings_provider.dart';
 import '../../../../utils/multimodal_input_utils.dart';
+import '../claude/claude_history.dart';
 import '../../../../../utils/sandbox_path_resolver.dart';
 import '../../chat_api_helpers.dart';
 import '../../generation/tool_loop_runner.dart';
@@ -293,7 +294,9 @@ Future<List<Map<String, dynamic>>> buildOpenAIChatCompletionMessages(
     );
     final outMsg = Map<String, dynamic>.from(m);
     outMsg.remove(multimodalInternalMediaPathsKey);
+    outMsg.remove(multimodalInternalDocumentPathsKey);
     outMsg.remove(multimodalInternalRevisionIdKey);
+    stripClaudeKeys(outMsg);
     outMsg.remove('metadata');
     outMsg['role'] = role;
 

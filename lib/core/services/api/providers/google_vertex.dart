@@ -11,6 +11,7 @@ import '../../../utils/multimodal_input_utils.dart';
 import '../../../../utils/mcp_structured_image.dart';
 import '../../../../utils/sandbox_path_resolver.dart';
 import '../builtin_tools.dart';
+import 'claude/claude_container.dart';
 import '../chat_api_helpers.dart';
 import '../generation/tool_loop_runner.dart';
 import '../google_service_account_auth.dart';
@@ -19,8 +20,8 @@ import '../stream/stream_chunk.dart';
 import '../stream/stream_chunk_emit.dart';
 import '../stream/stream_chunk_ids.dart';
 import 'claude/claude_decoder.dart';
+import 'claude/claude_history.dart';
 
-import 'claude_official.dart';
 import 'google_common.dart';
 
 Stream<StreamChunk> sendGoogleVertexStream(
@@ -241,6 +242,8 @@ Stream<StreamChunk> sendGoogleVertexClaudeStream({
     nonSystemMessages.add(
       Map<String, dynamic>.from(m)
         ..remove(multimodalInternalRevisionIdKey)
+        ..remove(multimodalInternalClaudeContainerKey)
+        ..remove(multimodalInternalClaudeTurnKey)
         ..['role'] = role.isEmpty ? 'user' : role,
     );
   }

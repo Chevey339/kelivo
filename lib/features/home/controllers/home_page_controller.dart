@@ -450,6 +450,8 @@ class HomePageController extends ChangeNotifier {
             imagePaths: imagePaths,
           ),
       geminiThoughtSignatureHandler: _appendGeminiThoughtSignatureForApi,
+      providerArtifactLookup: (message, kind) =>
+          _chatService.getProviderArtifact(message.id, kind),
     );
     _messageBuilderService.ocrTextWrapper = _ocrService.wrapOcrBlock;
     _generationController = GenerationController(

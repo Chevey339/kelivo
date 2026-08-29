@@ -3,18 +3,59 @@ import 'dart:convert';
 import '../../../../utils/multimodal_input_utils.dart';
 import '../../../../../utils/sandbox_path_resolver.dart';
 import '../../chat_api_helpers.dart';
+import 'claude_container.dart';
 
-/// The replay metadata a tool card of a Claude turn carries: every response
-/// the API produced for the turn so far, the current one last. A turn that
-/// hands off between a hosted and a client tool, or resumes after
-/// `pause_turn`, spans several responses, and the protocol replays each as its
-/// own assistant message with the client results between them — so the
-/// boundary is recorded here rather than inferred from the blocks later.
-Map<String, dynamic> claudeReplayMetadata(
-  List<List<Map<String, dynamic>>> responses,
-) => <String, dynamic>{
-  'anthropic': <String, dynamic>{'responses': responses},
-};
+/// Provider artifact kind under which a Claude turn's responses are stored
+/// against the assistant message that made them: every response the API
+/// produced for the turn, in order, as block lists. A turn that hands off
+/// between a hosted and a client tool, or resumes after `pause_turn`, spans
+/// several responses, and the protocol replays each as its own assistant
+/// message with the client results between them — so the boundary is
+/// recorded here rather than inferred from the blocks later.
+///
+/// Written after every response once the turn has called a tool, so a turn
+/// cut short still replays up to the last response that completed. A turn
+/// without one replays from its text alone and stores nothing.
+const String claudeTurnArtifactKind = 'claude_turn';
+
+/// Internal key carrying the stored turn into the next request, on the
+/// assistant message that holds the turn's tool calls. Stripped before
+/// anything reaches the wire, like the other `_kelivo_` keys.
+const String multimodalInternalClaudeTurnKey = '_kelivo_claude_turn';
+
+String encodeClaudeTurn(List<List<Map<String, dynamic>>> responses) =>
+    jsonEncode(responses);
+
+List<List<Map<String, dynamic>>>? decodeClaudeTurn(Object? payload) {
+  if (payload is! String || payload.isEmpty) return null;
+  try {
+    return _responsesOf(jsonDecode(payload));
+  } catch (_) {
+    return null;
+  }
+}
+
+/// Block lists read off persisted JSON, empty ones dropped.
+List<List<Map<String, dynamic>>>? _responsesOf(Object? raw) {
+  if (raw is! List) return null;
+  final read = [
+    for (final blocks in raw)
+      if (blocks is List)
+        [
+          for (final block in blocks.whereType<Map>())
+            block.cast<String, dynamic>(),
+        ],
+  ]..removeWhere((blocks) => blocks.isEmpty);
+  return read.isEmpty ? null : read;
+}
+
+/// Removes the Claude keys from a message about to be sent by a provider that
+/// copies messages whole.
+void stripClaudeKeys(Map<String, dynamic> message) {
+  message
+    ..remove(multimodalInternalClaudeContainerKey)
+    ..remove(multimodalInternalClaudeTurnKey);
+}
 
 /// Anthropic rejects an empty text block, and dropping `content` altogether
 /// leaves the tool call unanswered, which reads to the model as a malformed
@@ -54,7 +95,7 @@ Set<String> toolResultIdsInBlocks(Iterable<Map> blocks) {
 /// A tool turn is persisted as one assistant message holding the cards, the
 /// `tool` message of each card, and the text of the whole turn as a plain
 /// assistant message after them. Replayed, it becomes the responses the API
-/// produced — see [claudeReplayMetadata] — each its own assistant message
+/// produced — see [claudeTurnArtifactKind] — each its own assistant message
 /// behind the client results it waited for, with the turn's text folded into
 /// them rather than sent again.
 class ClaudeHistory {
@@ -72,6 +113,24 @@ class ClaudeHistory {
   final bool skipRedactedThinkingBlocks;
   final bool skipImageParsing;
   final List<String>? userImagePaths;
+
+  /// The container the conversation's last code execution ran in, stored
+  /// against that assistant message. The latest one wins. Set by [build].
+  ClaudeContainerRef? storedContainer;
+
+  /// The data files the user attached, in conversation order — what a fresh
+  /// container needs; [unseenDataFiles] are those attached after the message
+  /// that recorded [storedContainer] — what that container still lacks, all
+  /// of them when there is none. A deleted reply, a send that failed before
+  /// its request, a turn with the tool off: each leaves files between the
+  /// container and the last message, so "the last message's" is the wrong
+  /// rule. [turnDataFiles] names the last message's, the ones this turn is
+  /// about. Only a user's own attachments count; what the model produced
+  /// lives on its messages and is the container's to keep or lose. Set by
+  /// [build].
+  final dataFiles = <InternalDocumentRef>[];
+  final unseenDataFiles = <InternalDocumentRef>[];
+  final turnDataFiles = <InternalDocumentRef>[];
 
   /// The blocks of one response as this endpoint may be sent them.
   List<Map<String, dynamic>> sanitize(Iterable<Map> blocks) {
@@ -98,6 +157,10 @@ class ClaudeHistory {
     final out = <Map<String, dynamic>>[];
     final pendingResults = <Map<String, dynamic>>[];
     final replayedClientCalls = <String>{};
+    // The API refuses `image` blocks in an assistant turn, yet a chart the
+    // model drew is what the user's next question is about. Such images wait
+    // here and open the following user message, so the model still sees them.
+    final carriedImages = <Map<String, dynamic>>[];
     _ReplayedTurn? turn;
 
     /// A result is sent only once the call it answers has been: the API
@@ -166,8 +229,25 @@ class ClaudeHistory {
     }
 
     for (var i = 0; i < messages.length; i++) {
-      final m = messages[i];
+      var m = messages[i];
       final role = (m['role'] ?? 'user').toString();
+      if (role == 'assistant') {
+        final ref = ClaudeContainerRef.decode(
+          m[multimodalInternalClaudeContainerKey],
+        );
+        if (ref != null) {
+          storedContainer = ref;
+          unseenDataFiles.clear();
+        }
+      }
+      if (role == 'user') {
+        final files = parseInternalDocumentRefs(
+          m[multimodalInternalDocumentPathsKey],
+        ).where((doc) => isSandboxDataFile(fileName: doc.name, mime: doc.mime));
+        dataFiles.addAll(files);
+        unseenDataFiles.addAll(files);
+        if (i == messages.length - 1) turnDataFiles.addAll(files);
+      }
       if (role == 'tool') {
         final id = (m['tool_call_id'] ?? '').toString();
         // A server tool replayed as its own blocks already carries its result.
@@ -181,11 +261,22 @@ class ClaudeHistory {
         continue;
       }
 
+      if (role == 'assistant' && m['tool_calls'] is! List && _hasMedia(m)) {
+        final split = await _splitParts(m, includeUserPaths: false);
+        carriedImages.addAll(split.images);
+        // What is left of the message once its images have moved on.
+        m = {
+          ...m,
+          'content': split.text.map((block) => block['text']).join('\n'),
+        };
+      }
+
       if (turn != null) {
         while (turn.emitted < turn.responses.length) {
           emitResponse(turn);
         }
-        if (role == 'assistant' && _isPlainText(m)) {
+        // With its images carried forward, an assistant message is plain text.
+        if (role == 'assistant' && m['tool_calls'] is! List) {
           foldTurnText(turn, m);
           turn = null;
           continue;
@@ -196,7 +287,7 @@ class ClaudeHistory {
 
       if (role == 'assistant' && m['tool_calls'] is List) {
         final toolCalls = m['tool_calls'] as List;
-        turn = _readTurn(toolCalls);
+        turn = _readTurn(m, toolCalls);
         if (turn != null) {
           if (turn.responses.isNotEmpty) emitResponse(turn);
         } else {
@@ -218,7 +309,14 @@ class ClaudeHistory {
         continue;
       }
 
-      out.add(await _plainMessage(m, role, isLast: i == messages.length - 1));
+      out.add(
+        await _plainMessage(
+          m,
+          role,
+          isLast: i == messages.length - 1,
+          carriedImages: carriedImages,
+        ),
+      );
     }
 
     if (turn != null && turn.emitted < turn.responses.length) {
@@ -242,23 +340,18 @@ class ClaudeHistory {
     return out;
   }
 
-  bool _isPlainText(Map<String, dynamic> m) =>
-      m['tool_calls'] is! List &&
-      parseInternalMediaRefs(m[multimodalInternalMediaPathsKey]).isEmpty &&
-      !shouldParseMarkdownImages(
-        (m['content'] ?? '').toString(),
-        skipImageParsing: skipImageParsing,
-      );
-
-  /// The turn a persisted tool message records, read off the fullest of its
-  /// cards: each card holds the responses up to the one that last wrote it,
-  /// so the last one written holds them all. Null when none recorded any.
-  _ReplayedTurn? _readTurn(List toolCalls) {
-    List<List<Map<String, dynamic>>>? recorded;
-    for (final tc in toolCalls.whereType<Map>()) {
-      final responses = _recordedResponses(tc);
-      if (responses != null && responses.length > (recorded?.length ?? 0)) {
-        recorded = responses;
+  /// The turn a persisted tool message records: the stored turn artifact, or
+  /// for a message written before there was one, the fullest of its cards —
+  /// each held the responses up to the one that last wrote it, so the last
+  /// one written holds them all. Null when nothing recorded any.
+  _ReplayedTurn? _readTurn(Map<String, dynamic> m, List toolCalls) {
+    var recorded = decodeClaudeTurn(m[multimodalInternalClaudeTurnKey]);
+    if (recorded == null) {
+      for (final tc in toolCalls.whereType<Map>()) {
+        final responses = _recordedResponses(tc);
+        if (responses != null && responses.length > (recorded?.length ?? 0)) {
+          recorded = responses;
+        }
       }
     }
     if (recorded == null) return null;
@@ -291,11 +384,12 @@ class ClaudeHistory {
       }
       responses.add(blocks);
     }
-    // A call the recording lost belongs to the response that opened the turn.
+    // A call the recording stopped short of — the turn was cut in the response
+    // that made it — comes after everything that was recorded.
     for (final entry in cards.entries) {
       if (declared.contains(entry.key)) continue;
       final block = _toolUseBlockFromToolCall(entry.value);
-      if (block != null) responses.first.add(block);
+      if (block != null) responses.last.add(block);
     }
     // A turn left with nothing to send still owns its `tool` messages.
     responses.removeWhere((blocks) => blocks.isEmpty);
@@ -312,25 +406,17 @@ class ClaudeHistory {
     );
   }
 
-  /// The responses a card recorded. A card written by an earlier version of
-  /// the app carries its one response as `assistant_blocks`.
+  /// The responses a card written by an earlier version of the app recorded
+  /// in its metadata: the turn's responses up to its own under `responses`,
+  /// or before that its one response as `assistant_blocks`.
   static List<List<Map<String, dynamic>>>? _recordedResponses(Map tc) {
     final meta = tc['metadata'];
     if (meta is! Map) return null;
     final anthropic = meta['anthropic'];
     if (anthropic is! Map) return null;
-    List<Map<String, dynamic>> blocksOf(Object? raw) => [
-      if (raw is List)
-        for (final block in raw.whereType<Map>()) block.cast<String, dynamic>(),
-    ];
-    final responses = anthropic['responses'];
-    if (responses is List) {
-      final read = [for (final raw in responses) blocksOf(raw)]
-        ..removeWhere((blocks) => blocks.isEmpty);
-      return read.isEmpty ? null : read;
-    }
-    final blocks = blocksOf(anthropic['assistant_blocks']);
-    return blocks.isEmpty ? null : [blocks];
+    return _responsesOf(
+      anthropic['responses'] ?? [anthropic['assistant_blocks']],
+    );
   }
 
   static Map<String, dynamic>? _toolUseBlockFromToolCall(Map? tc) {
@@ -351,33 +437,52 @@ class ClaudeHistory {
     };
   }
 
+  /// Semantic media detection only - custom attachment markers are not
+  /// recognized. Attachments arrive via structured media-path keys /
+  /// userImagePaths, plus Markdown ![](...).
+  bool _hasMedia(Map<String, dynamic> m) =>
+      shouldParseMarkdownImages(
+        (m['content'] ?? '').toString(),
+        skipImageParsing: skipImageParsing,
+      ) ||
+      parseInternalMediaRefs(m[multimodalInternalMediaPathsKey]).isNotEmpty;
+
   Future<Map<String, dynamic>> _plainMessage(
     Map<String, dynamic> m,
     String role, {
     required bool isLast,
+    required List<Map<String, dynamic>> carriedImages,
   }) async {
     final raw = (m['content'] ?? '').toString();
-    // Semantic media detection only - custom attachment markers are not
-    // recognized. Attachments arrive via structured media-path keys /
-    // userImagePaths, plus Markdown ![](...).
-    final hasMarkdownImages = shouldParseMarkdownImages(
-      raw,
-      skipImageParsing: skipImageParsing,
-    );
-    final internalMediaRefs = parseInternalMediaRefs(
-      m[multimodalInternalMediaPathsKey],
-    );
-    // Consume injected media refs for user and assistant history turns.
-    final hasInternalMedia = internalMediaRefs.isNotEmpty;
     final hasAttachedImages =
         isLast && role == 'user' && (userImagePaths?.isNotEmpty == true);
-
-    if ((role != 'user' && role != 'assistant') ||
-        !(hasMarkdownImages || hasInternalMedia || hasAttachedImages)) {
+    if (role != 'user' ||
+        !(_hasMedia(m) || hasAttachedImages || carriedImages.isNotEmpty)) {
       return {'role': role, 'content': raw};
     }
 
-    final parts = <Map<String, dynamic>>[];
+    final split = await _splitParts(m, includeUserPaths: hasAttachedImages);
+    final parts = <Map<String, dynamic>>[
+      if (carriedImages.isNotEmpty) ...[
+        // Without the label the model takes its own chart for an upload.
+        {'type': 'text', 'text': 'Images from your previous reply:'},
+        ...carriedImages,
+      ],
+      ...split.text,
+      ...split.images,
+    ];
+    carriedImages.clear();
+    return {'role': role, 'content': parts.isEmpty ? raw : parts};
+  }
+
+  /// Splits a message into the text and image blocks Claude accepts: Markdown
+  /// images and internal media refs become image blocks, remote URLs and
+  /// unsupported media stay as text.
+  Future<({List<Map<String, dynamic>> text, List<Map<String, dynamic>> images})>
+  _splitParts(Map<String, dynamic> m, {required bool includeUserPaths}) async {
+    final raw = (m['content'] ?? '').toString();
+    final text = <Map<String, dynamic>>[];
+    final images = <Map<String, dynamic>>[];
     final seenSources = <String>{};
     String normalizeSrc(String src) {
       if (src.startsWith('http') || src.startsWith('data:')) return src;
@@ -393,7 +498,7 @@ class ClaudeHistory {
       if (!seenSources.add(normalized)) return;
       if (source.startsWith('http://') || source.startsWith('https://')) {
         // Preserve prior official-Claude behavior for remote URLs.
-        parts.add({'type': 'text', 'text': source});
+        text.add({'type': 'text', 'text': source});
         return;
       }
       if (source.startsWith('data:')) {
@@ -404,7 +509,7 @@ class ClaudeHistory {
         );
         final idx = source.indexOf('base64,');
         if (idx > 0) {
-          parts.add({
+          images.add({
             'type': 'image',
             'source': {
               'type': 'base64',
@@ -422,7 +527,7 @@ class ClaudeHistory {
       );
       final b64 = await tryEncodeBase64File(source, withPrefix: false);
       if (b64 == null) return;
-      parts.add({
+      images.add({
         'type': 'image',
         'source': {'type': 'base64', 'media_type': mime, 'data': b64},
       });
@@ -436,7 +541,7 @@ class ClaudeHistory {
       skipImageParsing: skipImageParsing,
     );
     if (parsed.text.isNotEmpty) {
-      parts.add({'type': 'text', 'text': parsed.text});
+      text.add({'type': 'text', 'text': parsed.text});
     }
     for (final ref in parsed.images) {
       if (ref.kind == 'data' || ref.kind == 'path' || ref.kind == 'url') {
@@ -446,7 +551,7 @@ class ClaudeHistory {
     final supplementalRefs = supplementalMediaRefs(
       internalRaw: m[multimodalInternalMediaPathsKey],
       userPaths: userImagePaths,
-      includeUserPaths: hasAttachedImages,
+      includeUserPaths: includeUserPaths,
     );
     for (final mediaRef in supplementalRefs) {
       final mime = mimeForInternalMediaRef(mediaRef);
@@ -461,14 +566,14 @@ class ClaudeHistory {
         if (isRemote) {
           final normalized = normalizeSrc(uri);
           if (seenSources.add(normalized)) {
-            parts.add({'type': 'text', 'text': uri});
+            text.add({'type': 'text', 'text': uri});
           }
         }
         continue;
       }
       await addClaudeImage(mediaRef.uri, explicitMime: mediaRef.mime);
     }
-    return {'role': role, 'content': parts.isEmpty ? raw : parts};
+    return (text: text, images: images);
   }
 }
 

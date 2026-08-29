@@ -211,6 +211,29 @@ final class ImageEnd extends StreamChunk {
   final String id;
 }
 
+/// A file a server tool produced, already written to a managed directory.
+///
+/// Unlike [ImageSnapshot] this carries no payload: providers whose tools hand
+/// back a reference rather than bytes have to fetch and store the file before
+/// the message can name it, so the chunk only reports where it landed.
+final class GeneratedFile extends StreamChunk {
+  const GeneratedFile({required this.uri, required this.name, this.mime});
+
+  final String uri;
+  final String name;
+  final String? mime;
+}
+
+/// A piece of provider-side state the next turn has to send back — a
+/// container id, a session token — stored against the assistant message it
+/// belongs to and never shown.
+final class ProviderArtifact extends StreamChunk {
+  const ProviderArtifact({required this.kind, required this.payload});
+
+  final String kind;
+  final String payload;
+}
+
 final class Annotations extends StreamChunk {
   const Annotations(this.annotations, {this.id = ''});
 

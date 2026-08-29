@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:Kelivo/core/services/api/providers/claude/claude_decoder.dart';
+import 'package:Kelivo/core/services/api/providers/claude/claude_files.dart';
 import 'package:Kelivo/core/services/api/stream/sse_event.dart';
 import 'package:Kelivo/core/services/api/stream/stream_chunk.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -379,6 +380,30 @@ void main() {
     expect(decoder.clientTools['call_1']!.input.toString(), '{"q":');
   });
 
+  test('remembers the container the message ran in', () {
+    final decoder = ClaudeStreamDecoder();
+    decoder.accept(
+      _event('message_start', {
+        'type': 'message_start',
+        'message': {
+          'id': 'msg_1',
+          'type': 'message',
+          'role': 'assistant',
+          'content': <dynamic>[],
+          'container': {
+            'id': 'container_abc',
+            'expires_at': '2026-09-26T00:00:00Z',
+          },
+          'usage': {'input_tokens': 1, 'output_tokens': 1},
+        },
+      }),
+    );
+    // `expires_at` is the checkpoint window, not the lifetime, so only the id
+    // is kept.
+    expect(decoder.container!.id, 'container_abc');
+    expect(decoder.container!.encode(), '{"id":"container_abc"}');
+  });
+
   test(
     'official stream folds message_start input into usage with message_delta output',
     () {
@@ -600,6 +625,46 @@ void main() {
     final end = chunks.whereType<ServerToolEnd>().single;
     expect(end.status, ServerToolStatus.completed);
     expect((end.output as Map)['stdout'], '42');
+  });
+
+  test('a bash run reports the files it left behind', () {
+    final decoder = ClaudeStreamDecoder();
+    decoder.accept(
+      _event('content_block_start', {
+        'type': 'content_block_start',
+        'index': 0,
+        'content_block': {
+          'type': 'server_tool_use',
+          'id': 'srvtoolu_5',
+          'name': 'bash_code_execution',
+        },
+      }),
+    );
+    final chunks = decoder
+        .accept(
+          _event('content_block_start', {
+            'type': 'content_block_start',
+            'index': 1,
+            'content_block': {
+              'type': 'bash_code_execution_tool_result',
+              'tool_use_id': 'srvtoolu_5',
+              'content': {
+                'type': 'bash_code_execution_result',
+                'stdout': 'chart.png\n',
+                'stderr': '',
+                'return_code': 0,
+                'content': [
+                  {'type': 'code_execution_output', 'file_id': 'file_abc'},
+                ],
+              },
+            },
+          }),
+        )
+        .chunks;
+
+    // The card only shows the id; the request side downloads the file from it.
+    final end = chunks.whereType<ServerToolEnd>().single;
+    expect(claudeGeneratedFileIds(end.output), <String>['file_abc']);
   });
 
   test('a fetched page reaches the card clipped', () {

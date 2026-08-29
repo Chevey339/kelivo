@@ -7,6 +7,8 @@ import 'package:Kelivo/core/models/chat_message.dart';
 import 'package:Kelivo/core/models/message_part.dart';
 import 'package:Kelivo/core/models/conversation.dart';
 import 'package:Kelivo/core/providers/settings_provider.dart';
+import 'package:Kelivo/core/services/api/providers/claude/claude_container.dart';
+import 'package:Kelivo/core/services/api/providers/claude/claude_history.dart';
 import 'package:Kelivo/core/services/chat/chat_service.dart';
 import 'package:Kelivo/core/utils/multimodal_input_utils.dart';
 import 'package:Kelivo/features/home/services/message_builder_service.dart';
@@ -619,6 +621,100 @@ void main() {
       expect(assistantToolMessage['reasoning_content'], '先判断日期，再查询天气。');
       expect(finalAssistantMessage['reasoning_content'], '先判断日期，再查询天气。');
     });
+
+    test(
+      'a stored Claude turn rides on the tool message, the container on both',
+      () {
+        final service = MessageBuilderService(
+          chatService: _FakeChatService({
+            'a1': [
+              {
+                'id': 'srvtoolu_1',
+                'name': 'web_fetch',
+                'arguments': {'url': 'https://example.com'},
+                'content': '{}',
+              },
+            ],
+          }),
+          contextProvider: _FakeBuildContext(),
+          providerArtifactLookup: (message, kind) => switch (kind) {
+            claudeTurnArtifactKind => '[[{"type":"text","text":"hi"}]]',
+            claudeContainerArtifactKind => '{"id":"container_1"}',
+            _ => null,
+          },
+        );
+
+        final apiMessages = service.buildApiMessages(
+          messages: [
+            _message(id: 'u1', role: 'user', content: '看看'),
+            _message(id: 'a1', role: 'assistant', content: 'hi'),
+          ],
+          versionSelections: const {},
+          currentConversation: Conversation(title: 'test'),
+          includeToolMessages: true,
+        );
+
+        final toolMessage = apiMessages.firstWhere(
+          (message) => message['tool_calls'] is List,
+        );
+        final finalMessage = apiMessages.last;
+        expect(
+          toolMessage[multimodalInternalClaudeTurnKey],
+          '[[{"type":"text","text":"hi"}]]',
+        );
+        expect(
+          toolMessage[multimodalInternalClaudeContainerKey],
+          '{"id":"container_1"}',
+        );
+        expect(finalMessage[multimodalInternalClaudeTurnKey], isNull);
+        expect(
+          finalMessage[multimodalInternalClaudeContainerKey],
+          '{"id":"container_1"}',
+        );
+      },
+    );
+
+    test(
+      'a turn that ran code and said nothing still carries its container',
+      () {
+        final service = MessageBuilderService(
+          chatService: _FakeChatService({
+            'a1': [
+              {
+                'id': 'srvtoolu_1',
+                'name': 'code_execution',
+                'arguments': {'code': 'print(1)'},
+                'content': '{"stdout":"1\\n"}',
+              },
+            ],
+          }),
+          contextProvider: _FakeBuildContext(),
+          providerArtifactLookup: (message, kind) =>
+              kind == claudeContainerArtifactKind
+              ? '{"id":"container_1"}'
+              : null,
+        );
+
+        final apiMessages = service.buildApiMessages(
+          messages: [
+            _message(id: 'u1', role: 'user', content: '跑一下'),
+            _message(id: 'a1', role: 'assistant', content: ''),
+          ],
+          versionSelections: const {},
+          currentConversation: Conversation(title: 'test'),
+          includeToolMessages: true,
+        );
+
+        expect(apiMessages.last['role'], 'tool');
+        final toolMessage = apiMessages.firstWhere(
+          (message) => message['tool_calls'] is List,
+        );
+        expect(
+          toolMessage[multimodalInternalClaudeContainerKey],
+          '{"id":"container_1"}',
+        );
+      },
+    );
 
     test('reasoningText 为空时不会伪造 reasoning_content', () {
       final service = MessageBuilderService(

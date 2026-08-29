@@ -16,7 +16,9 @@ import '../stream/sse_framing.dart';
 import '../stream/stream_chunk.dart';
 import '../stream/stream_chunk_emit.dart';
 import '../stream/stream_chunk_ids.dart';
+import 'claude/claude_container.dart';
 import 'claude/claude_decoder.dart';
+import 'claude/claude_files.dart';
 import 'claude/claude_history.dart';
 
 export 'claude/claude_history.dart'
@@ -108,7 +110,7 @@ Stream<StreamChunk> sendClaudeStream(
     for (final t in tools) {
       final fn = (t['function'] as Map<String, dynamic>?);
       if (fn == null) continue;
-      final name = (fn['name'] ?? '').toString();
+      final name = BuiltInToolsHelper.claimedToolName(t);
       if (name.isEmpty) continue;
       final desc = (fn['description'] ?? '').toString();
       final params =
@@ -208,6 +210,19 @@ Stream<StreamChunk> sendClaudeStream(
       if (t['input_schema'] == null && (t['type'] ?? '').toString().isNotEmpty)
         (t['name'] ?? '').toString(),
   }..remove('');
+  // The `container` parameter is only accepted alongside the tool that uses it.
+  final hasCodeExecution = declaredServerToolNames.contains('code_execution');
+  // The data files the message builder left out of the prompt, on the
+  // strength of the same predicate, go up to the container instead. The tool
+  // has to be in this request for a `container_upload` to be accepted, and a
+  // utility call never declares it.
+  final uploadsDataFiles =
+      hasCodeExecution &&
+      BuiltInToolsHelper.sendsDataFilesToSandbox(
+        cfg: config,
+        modelId: modelId,
+        clientTools: tools ?? const [],
+      );
 
   // Headers (constant across rounds)
   final baseHeaders = customHeaders(
@@ -230,12 +245,83 @@ Stream<StreamChunk> sendClaudeStream(
   var streamRound = 0;
   var pendingCalls = <EmitToolCall>[];
   var lastAssistantBlocks = <Map<String, dynamic>>[];
-  // Every response of this turn so far, recorded on each card so the turn
-  // replays as the responses it was.
+  // Carried through every round of this turn — after a client tool, after a
+  // pause — and stored after each so the next turn resumes in it too.
+  ClaudeContainerRef? container = history.storedContainer;
+  // Every response of this turn so far, stored against the message after each
+  // so the turn replays as the responses it was. A turn without a tool call
+  // replays from its text alone and stores nothing.
   final turnResponses = <List<Map<String, dynamic>>>[];
+  Stream<StreamChunk> recordTurn(List<Map<String, dynamic>> response) async* {
+    turnResponses.add(response);
+    if (toolUseIdsInBlocks(turnResponses.expand((b) => b)).isNotEmpty) {
+      yield ProviderArtifact(
+        kind: claudeTurnArtifactKind,
+        payload: encodeClaudeTurn(turnResponses),
+      );
+    }
+    // Stored against this turn's message so the next turn can resume in the
+    // same container — now rather than at the end, which a cancelled turn
+    // never reaches.
+    if (hasCodeExecution && container != null) {
+      yield ProviderArtifact(
+        kind: claudeContainerArtifactKind,
+        payload: container!.encode(),
+      );
+    }
+  }
+
+  final downloadedFileIds = <String>{};
   var lastStreamResults = <Map<String, dynamic>>[];
   final nonStreamText = StringBuffer();
   var pauseTurn = false;
+
+  // A container the conversation goes on using gets the files it has not
+  // seen; a fresh one — none stored, or the stored one found expired — gets
+  // every file the user attached. Either way the uploads ride the last user
+  // message, and each file goes once. A file this turn is about that cannot
+  // go up fails the turn before any request is made; an earlier turn's is
+  // reported in its place instead, so one lost attachment from long ago does
+  // not end the conversation.
+  final uploadedPaths = <String>{};
+  final turnFileUris = {for (final doc in history.turnDataFiles) doc.uri};
+  Future<void> uploadDataFiles() async {
+    if (!uploadsDataFiles) return;
+    final blocks = <Map<String, dynamic>>[];
+    for (final doc
+        in container == null ? history.dataFiles : history.unseenDataFiles) {
+      if (!uploadedPaths.add(doc.uri)) continue;
+      try {
+        final fileId = await uploadClaudeFile(
+          client: client,
+          base: base,
+          headers: baseHeaders,
+          path: doc.uri,
+          name: doc.name,
+          mime: doc.mime,
+        );
+        blocks.add({'type': 'container_upload', 'file_id': fileId});
+      } on ClaudeFileUploadException catch (e) {
+        if (turnFileUris.contains(doc.uri)) rethrow;
+        blocks.add({'type': 'text', 'text': e.toString()});
+      }
+    }
+    if (blocks.isEmpty) return;
+    final last = convo.last;
+    final content = last['content'];
+    convo[convo.length - 1] = {
+      ...last,
+      'content': [
+        if (content is List)
+          ...content
+        else if ((content ?? '').toString().isNotEmpty)
+          {'type': 'text', 'text': content.toString()},
+        ...blocks,
+      ],
+    };
+  }
+
+  await uploadDataFiles();
 
   yield* runProviderToolRounds(
     sendRound: () async* {
@@ -280,20 +366,39 @@ Stream<StreamChunk> sendClaudeStream(
         if (allTools.isNotEmpty) 'tool_choice': {'type': 'auto'},
         if (thinking != null) 'thinking': thinking,
         if (outputConfig != null) 'output_config': outputConfig,
+        if (hasCodeExecution && container != null) 'container': container!.id,
       };
       final extraClaude = customBody(config, modelId, assistantBody: extraBody);
       if (extraClaude.isNotEmpty) {
         body.addAll(extraClaude);
       }
 
-      final request = http.Request('POST', url);
-      request.headers.addAll(baseHeaders);
-      request.body = jsonEncode(body);
+      http.Request buildRequest() {
+        final request = http.Request('POST', url);
+        request.headers.addAll(baseHeaders);
+        request.body = jsonEncode(body);
+        return request;
+      }
 
-      final response = await client.send(request);
+      var response = await client.send(buildRequest());
       if (response.statusCode < 200 || response.statusCode >= 300) {
         final errorBody = await response.stream.bytesToString();
-        throw HttpException('HTTP ${response.statusCode}: $errorBody');
+        // A stored container can have expired since the last turn; forget
+        // it and let this round start a fresh one.
+        final staleContainer =
+            body.containsKey('container') &&
+            isClaudeStaleContainerError(response.statusCode, errorBody);
+        if (!staleContainer) {
+          throw HttpException('HTTP ${response.statusCode}: $errorBody');
+        }
+        container = null;
+        body.remove('container');
+        await uploadDataFiles();
+        response = await client.send(buildRequest());
+        if (response.statusCode < 200 || response.statusCode >= 300) {
+          final retryBody = await response.stream.bytesToString();
+          throw HttpException('HTTP ${response.statusCode}: $retryBody');
+        }
       }
 
       pendingCalls = [];
@@ -314,6 +419,8 @@ Stream<StreamChunk> sendClaudeStream(
             );
           }
         } catch (_) {}
+        container =
+            ClaudeContainerRef.fromResponse(obj['container']) ?? container;
         final content = (obj['content'] as List?) ?? const <dynamic>[];
         final List<Map<String, dynamic>> assistantBlocks =
             <Map<String, dynamic>>[];
@@ -361,16 +468,25 @@ Stream<StreamChunk> sendClaudeStream(
                 Map<String, dynamic>.from(it.cast<String, dynamic>()),
               );
             } catch (_) {}
+            for (final fileId in claudeGeneratedFileIds(it['content'])) {
+              if (!downloadedFileIds.add(fileId)) continue;
+              final file = await downloadClaudeGeneratedFile(
+                client: client,
+                base: base,
+                headers: baseHeaders,
+                fileId: fileId,
+              );
+              if (file != null) yield file;
+            }
           }
         }
         // The continuation round sends these, so they go through the same
-        // sanitising as replayed history; the metadata below stays whole.
+        // sanitising as replayed history; the stored copy stays whole.
         lastAssistantBlocks = history.sanitize(assistantBlocks);
         nonStreamText.write(joinedTextOfBlocks(assistantBlocks));
         final decoder = ClaudeStreamDecoder(
           skipRedactedThinkingBlocks: skipRedactedThinkingBlocks,
           serverToolNames: declaredServerToolNames,
-          priorResponses: turnResponses,
           sourceId: 'round-${streamRound++}',
         );
         for (final chunk in decoder.decodeCompleteServerTools(
@@ -378,7 +494,7 @@ Stream<StreamChunk> sendClaudeStream(
         )) {
           yield chunk;
         }
-        turnResponses.add(assistantBlocks);
+        yield* recordTurn(assistantBlocks);
         if (toolUses.isEmpty) {
           // A hosted tool that ran past the turn limit asks to be resumed,
           // with no client tool to answer first.
@@ -391,7 +507,6 @@ Stream<StreamChunk> sendClaudeStream(
                 id: e.key,
                 name: (e.value['name'] ?? '').toString(),
                 arguments: (e.value['args'] as Map<String, dynamic>),
-                metadata: claudeReplayMetadata([...turnResponses]),
               ),
           ];
         }
@@ -403,48 +518,84 @@ Stream<StreamChunk> sendClaudeStream(
         skipRedactedThinkingBlocks: skipRedactedThinkingBlocks,
         initialUsage: totalUsage,
         serverToolNames: declaredServerToolNames,
-        priorResponses: turnResponses,
         sourceId: 'round-${streamRound++}',
       );
       final executedToolIds = <String>{};
+      // Downloads run alongside the stream: awaiting one here would leave the
+      // SSE events unread, and the text after the tool frozen, for as long as
+      // the file takes.
+      final downloads = <Future<GeneratedFile?>>[];
+      var streamCompleted = false;
 
-      await for (final event in parseSseEventStrings(sse)) {
-        throwIfInBandStreamError(event.data);
-        final decoded = decoder.accept(event);
-        for (final chunk in decoded.chunks) {
-          yield chunk;
-          if (chunk is ToolCallEnd &&
-              decoder.isClientTool(chunk.id) &&
-              onToolCall != null &&
-              executedToolIds.add(chunk.id)) {
-            final tool = decoder.clientTools[chunk.id]!;
-            final args = tool.decodedArguments;
-            final call = emitToolCall(
-              id: tool.id,
-              name: tool.name,
-              arguments: args,
-              metadata: decoder.replayMetadata,
-            );
-            await for (final resultChunk in executeClientTools(
-              calls: [call],
-              onToolCall: onToolCall,
-              usage: decoder.usage,
-              totalTokens: decoder.usage?.totalTokens ?? 0,
-            )) {
-              if (resultChunk is ToolCallResult) {
-                decoder.recordToolResult(
-                  tool.id,
-                  (resultChunk.output ?? '').toString(),
+      try {
+        await for (final event in parseSseEventStrings(sse)) {
+          throwIfInBandStreamError(event.data);
+          final decoded = decoder.accept(event);
+          for (final chunk in decoded.chunks) {
+            yield chunk;
+            if (chunk is ServerToolEnd) {
+              // Code execution reports what it wrote as ids the card cannot do
+              // anything with, so the bytes are fetched here and the message
+              // carries the file itself.
+              for (final fileId in claudeGeneratedFileIds(chunk.output)) {
+                if (!downloadedFileIds.add(fileId)) continue;
+                downloads.add(
+                  downloadClaudeGeneratedFile(
+                    client: client,
+                    base: base,
+                    headers: baseHeaders,
+                    fileId: fileId,
+                  ),
                 );
               }
-              yield resultChunk;
+            }
+            if (chunk is ToolCallEnd &&
+                decoder.isClientTool(chunk.id) &&
+                onToolCall != null &&
+                executedToolIds.add(chunk.id)) {
+              final tool = decoder.clientTools[chunk.id]!;
+              final args = tool.decodedArguments;
+              final call = emitToolCall(
+                id: tool.id,
+                name: tool.name,
+                arguments: args,
+              );
+              await for (final resultChunk in executeClientTools(
+                calls: [call],
+                onToolCall: onToolCall,
+                usage: decoder.usage,
+                totalTokens: decoder.usage?.totalTokens ?? 0,
+              )) {
+                if (resultChunk is ToolCallResult) {
+                  decoder.recordToolResult(
+                    tool.id,
+                    (resultChunk.output ?? '').toString(),
+                  );
+                }
+                yield resultChunk;
+              }
             }
           }
+          if (decoded.completed) break;
         }
-        if (decoded.completed) break;
+        streamCompleted = true;
+      } finally {
+        // A turn that stops here — cancelled, or on an in-band error — still
+        // sees its downloads out rather than closing the client under them;
+        // what they wrote has no message to go to, so it is removed again.
+        final files = await Future.wait(downloads);
+        if (!streamCompleted) {
+          for (final file in files) {
+            if (file != null) await discardClaudeGeneratedFile(file);
+          }
+        }
       }
       for (final chunk in decoder.onClosed()) {
         yield chunk;
+      }
+      for (final download in downloads) {
+        final file = await download;
+        if (file != null) yield file;
       }
 
       final usage = decoder.usage;
@@ -453,12 +604,12 @@ Stream<StreamChunk> sendClaudeStream(
       final toolResultsContent = decoder.toolResults;
 
       totalUsage = usage ?? totalUsage;
+      container = decoder.container ?? container;
 
       // The continuation round sends these as they are, so they go through the
-      // same sanitising as replayed history — the persisted copy below stays
-      // whole either way.
+      // same sanitising as replayed history — the stored copy stays whole.
       lastAssistantBlocks = history.sanitize(assistantBlocks);
-      turnResponses.add(assistantBlocks);
+      yield* recordTurn(assistantBlocks);
       if (decoder.clientTools.isEmpty) {
         pauseTurn = (lastStopReason ?? '') == 'pause_turn';
         return;
@@ -470,7 +621,6 @@ Stream<StreamChunk> sendClaudeStream(
             id: tool.id,
             name: tool.name,
             arguments: tool.decodedArguments,
-            metadata: decoder.replayMetadata,
           ),
       ];
       for (final tool in decoder.clientTools.values) {
@@ -520,12 +670,14 @@ Stream<StreamChunk> sendClaudeStream(
         {'role': 'user', 'content': results},
       ];
     },
-    finish: () => emitDone(
-      ids: StreamChunkIds('finish'),
-      content: nonStreamText.toString(),
-      usage: totalUsage,
-      totalTokens: totalUsage?.totalTokens ?? 0,
-    ),
+    finish: () async* {
+      yield* emitDone(
+        ids: StreamChunkIds('finish'),
+        content: nonStreamText.toString(),
+        usage: totalUsage,
+        totalTokens: totalUsage?.totalTokens ?? 0,
+      );
+    },
     usageOf: () => totalUsage,
   );
 }
