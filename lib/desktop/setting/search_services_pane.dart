@@ -10,6 +10,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:uuid/uuid.dart';
 import '../../shared/widgets/ios_switch.dart';
 import '../../theme/app_font_weights.dart';
+import '../widgets/desktop_select_dropdown.dart';
 import 'package:Kelivo/theme/app_semantic_colors.dart';
 import 'package:Kelivo/shared/widgets/section_card.dart';
 
@@ -720,6 +721,17 @@ Widget _divider(BuildContext context) {
 
 // ===== Dialogs =====
 
+@visibleForTesting
+Future<SearchServiceOptions?> showDesktopAddSearchServiceDialog(
+  BuildContext context,
+) => _showAddServiceDialog(context);
+
+@visibleForTesting
+Future<SearchServiceOptions?> showDesktopEditSearchServiceDialog(
+  BuildContext context,
+  SearchServiceOptions service,
+) => _showEditServiceDialog(context, service);
+
 Future<SearchServiceOptions?> _showAddServiceDialog(
   BuildContext context,
 ) async {
@@ -749,6 +761,7 @@ class _AddServiceDialog extends StatefulWidget {
 
 class _AddServiceDialogState extends State<_AddServiceDialog> {
   String _selectedType = 'bing_local';
+  bool _maximumTokensInvalid = false;
   final Map<String, TextEditingController> _controllers = {
     'apiKey': TextEditingController(),
     'url': TextEditingController(),
@@ -865,6 +878,7 @@ class _AddServiceDialogState extends State<_AddServiceDialog> {
                 filled: true,
                 dense: true,
                 onTap: () {
+                  if (!_acceptBraveMaximumTokens()) return;
                   final created = _createService();
                   Navigator.of(context).pop(created);
                 },
@@ -962,13 +976,16 @@ class _AddServiceDialogState extends State<_AddServiceDialog> {
           ),
           if (braveMode == BraveOptions.llmContextMode) ...[
             const SizedBox(height: 12),
-            TextField(
-              controller: _controllers['maximumNumberOfTokens'],
-              keyboardType: TextInputType.number,
-              decoration: _deskInputDecoration(context).copyWith(
-                labelText: l10n.searchServicesDialogMaximumTokens,
-                hintText: '${BraveOptions.defaultMaximumNumberOfTokens}',
-              ),
+            _BraveMaximumTokensField(
+              controller: _controllers['maximumNumberOfTokens']!,
+              errorText: _maximumTokensInvalid
+                  ? l10n.searchServicesDialogMaximumTokensInvalid
+                  : null,
+              onChanged: (_) {
+                if (_maximumTokensInvalid) {
+                  setState(() => _maximumTokensInvalid = false);
+                }
+              },
             ),
           ],
         ];
@@ -1247,6 +1264,20 @@ class _AddServiceDialogState extends State<_AddServiceDialog> {
     }
   }
 
+  bool _acceptBraveMaximumTokens() {
+    final isLlmContext =
+        _selectedType == 'brave' &&
+        BraveOptions.normalizeMode(_controllers['mode']!.text) ==
+            BraveOptions.llmContextMode;
+    final valid =
+        !isLlmContext ||
+        BraveOptions.isValidMaximumNumberOfTokensInput(
+          _controllers['maximumNumberOfTokens']!.text,
+        );
+    setState(() => _maximumTokensInvalid = !valid);
+    return valid;
+  }
+
   SearchServiceOptions _createService() {
     final id = const Uuid().v4().substring(0, 8);
     switch (_selectedType) {
@@ -1393,6 +1424,7 @@ class _EditServiceDialog extends StatefulWidget {
 class _EditServiceDialogState extends State<_EditServiceDialog> {
   final Map<String, TextEditingController> _controllers = {};
   late List<String> _extraApiKeys;
+  bool _maximumTokensInvalid = false;
   @override
   void initState() {
     super.initState();
@@ -1562,6 +1594,7 @@ class _EditServiceDialogState extends State<_EditServiceDialog> {
                 filled: true,
                 dense: true,
                 onTap: () {
+                  if (!_acceptBraveMaximumTokens()) return;
                   final updated = _updateService();
                   Navigator.of(context).pop(updated);
                 },
@@ -1658,13 +1691,16 @@ class _EditServiceDialogState extends State<_EditServiceDialog> {
         ),
         if (braveMode == BraveOptions.llmContextMode) ...[
           const SizedBox(height: 12),
-          TextField(
-            controller: _controllers['maximumNumberOfTokens'],
-            keyboardType: TextInputType.number,
-            decoration: _deskInputDecoration(context).copyWith(
-              labelText: l10n.searchServicesDialogMaximumTokens,
-              hintText: '${BraveOptions.defaultMaximumNumberOfTokens}',
-            ),
+          _BraveMaximumTokensField(
+            controller: _controllers['maximumNumberOfTokens']!,
+            errorText: _maximumTokensInvalid
+                ? l10n.searchServicesDialogMaximumTokensInvalid
+                : null,
+            onChanged: (_) {
+              if (_maximumTokensInvalid) {
+                setState(() => _maximumTokensInvalid = false);
+              }
+            },
           ),
         ],
       ];
@@ -2030,6 +2066,20 @@ class _EditServiceDialogState extends State<_EditServiceDialog> {
             : List<String>.of(pool.sublist(1));
       });
     }
+  }
+
+  bool _acceptBraveMaximumTokens() {
+    final isLlmContext =
+        widget.service is BraveOptions &&
+        BraveOptions.normalizeMode(_controllers['mode']?.text) ==
+            BraveOptions.llmContextMode;
+    final valid =
+        !isLlmContext ||
+        BraveOptions.isValidMaximumNumberOfTokensInput(
+          _controllers['maximumNumberOfTokens']?.text,
+        );
+    setState(() => _maximumTokensInvalid = !valid);
+    return valid;
   }
 
   SearchServiceOptions _updateService() {
@@ -2964,25 +3014,52 @@ Widget _deskModeDropdown({
       : items.first.value;
   return InputDecorator(
     decoration: _deskInputDecoration(context).copyWith(labelText: label),
-    child: DropdownButtonHideUnderline(
-      child: DropdownButton<String>(
+    child: SizedBox(
+      width: double.infinity,
+      child: DesktopSelectDropdown<String>(
         value: effective,
-        isExpanded: true,
-        isDense: true,
-        borderRadius: BorderRadius.circular(12),
-        items: [
+        options: [
           for (final item in items)
-            DropdownMenuItem<String>(
-              value: item.value,
-              child: Text(item.label),
-            ),
+            DesktopSelectOption(value: item.value, label: item.label),
         ],
-        onChanged: (next) {
-          if (next != null) onChanged(next);
-        },
+        onSelected: onChanged,
+        embedded: true,
+        minWidth: 0,
+        minHeight: 24,
+        padding: EdgeInsets.zero,
+        borderRadius: 8,
+        maxLabelWidth: 360,
       ),
     ),
   );
+}
+
+class _BraveMaximumTokensField extends StatelessWidget {
+  const _BraveMaximumTokensField({
+    required this.controller,
+    required this.errorText,
+    this.onChanged,
+  });
+
+  final TextEditingController controller;
+  final String? errorText;
+  final ValueChanged<String>? onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    return TextField(
+      key: const ValueKey('desktop-search-service-field-maximumNumberOfTokens'),
+      controller: controller,
+      keyboardType: TextInputType.number,
+      onChanged: onChanged,
+      decoration: _deskInputDecoration(context).copyWith(
+        labelText: l10n.searchServicesDialogMaximumTokens,
+        hintText: '${BraveOptions.defaultMaximumNumberOfTokens}',
+        errorText: errorText,
+      ),
+    );
+  }
 }
 
 InputDecoration _deskInputDecoration(BuildContext context) {

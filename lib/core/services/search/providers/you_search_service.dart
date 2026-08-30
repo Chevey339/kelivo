@@ -11,7 +11,7 @@ class YouSearchService extends SearchService<YouSearchOptions> {
   static const String endpoint = 'https://ydc-index.io/v1/search';
 
   @override
-  String get name => 'You.com Search';
+  String get name => 'You.com';
 
   @override
   Widget description(BuildContext context) {

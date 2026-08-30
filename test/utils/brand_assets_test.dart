@@ -35,6 +35,18 @@ void main() {
       expect(BrandAssets.selectableAssetOrNull(you!), you);
     });
 
+    test('maps You.com Search without matching nearby names', () {
+      expect(
+        BrandAssets.assetForName('You.com Search'),
+        'assets/icons/you.svg',
+      );
+      expect(BrandAssets.assetForName('You.com'), 'assets/icons/you.svg');
+      expect(BrandAssets.assetForName('you'), 'assets/icons/you.svg');
+      expect(BrandAssets.assetForName('you.com'), 'assets/icons/you.svg');
+      expect(BrandAssets.assetForName('YouTube'), isNull);
+      expect(BrandAssets.assetForName('your search'), isNull);
+    });
+
     test('distinguishes monochrome SVGs from colored brand assets', () {
       expect(
         BrandAssets.assetNeedsDarkInvert('assets/icons/openai.svg'),

@@ -477,6 +477,16 @@ class BraveOptions extends SearchServiceOptions {
     return parsed.clamp(minMaximumNumberOfTokens, maxMaximumNumberOfTokens);
   }
 
+  /// Empty input is valid and later defaults; out-of-range values are not.
+  static bool isValidMaximumNumberOfTokensInput(String? value) {
+    final text = value?.trim() ?? '';
+    if (text.isEmpty) return true;
+    final tokens = int.tryParse(text);
+    return tokens != null &&
+        tokens >= minMaximumNumberOfTokens &&
+        tokens <= maxMaximumNumberOfTokens;
+  }
+
   @override
   Map<String, dynamic> toJson() => {
     'type': 'brave',

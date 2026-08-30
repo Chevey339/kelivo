@@ -5713,7 +5713,7 @@ class AppLocalizationsEn extends AppLocalizations {
       'Unified search for AI agents with automatic routing across web and specialist data sources. API key is optional.';
 
   @override
-  String get searchServiceNameParallel => 'Parallel Search';
+  String get searchServiceNameParallel => 'Parallel';
 
   @override
   String get searchProviderParallelDescription =>
@@ -5723,7 +5723,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get searchServicesDialogSearchMode => 'Search mode';
 
   @override
-  String get searchServiceNameYou => 'You.com Search';
+  String get searchServiceNameYou => 'You.com';
 
   @override
   String get searchProviderYouDescription =>

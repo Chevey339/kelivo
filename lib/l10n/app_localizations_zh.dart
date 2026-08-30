@@ -5490,7 +5490,7 @@ class AppLocalizationsZh extends AppLocalizations {
       '面向 AI 智能体的统一搜索服务，可在网页与专业数据源间自动路由。API Key 可选。';
 
   @override
-  String get searchServiceNameParallel => 'Parallel Search';
+  String get searchServiceNameParallel => 'Parallel';
 
   @override
   String get searchProviderParallelDescription =>
@@ -5500,7 +5500,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get searchServicesDialogSearchMode => '搜索模式';
 
   @override
-  String get searchServiceNameYou => 'You.com Search';
+  String get searchServiceNameYou => 'You.com';
 
   @override
   String get searchProviderYouDescription =>
@@ -13429,7 +13429,7 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
       '面向 AI 智能体的统一搜索服务，可在网页与专业数据源间自动路由。API Key 可选。';
 
   @override
-  String get searchServiceNameParallel => 'Parallel Search';
+  String get searchServiceNameParallel => 'Parallel';
 
   @override
   String get searchProviderParallelDescription =>
@@ -13439,7 +13439,7 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get searchServicesDialogSearchMode => '搜索模式';
 
   @override
-  String get searchServiceNameYou => 'You.com Search';
+  String get searchServiceNameYou => 'You.com';
 
   @override
   String get searchProviderYouDescription =>
@@ -21441,7 +21441,7 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
       '面向 AI 智慧代理的統一搜尋服務，可在網頁與專業資料來源間自動路由。API Key 可選。';
 
   @override
-  String get searchServiceNameParallel => 'Parallel Search';
+  String get searchServiceNameParallel => 'Parallel';
 
   @override
   String get searchProviderParallelDescription =>
@@ -21451,7 +21451,7 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get searchServicesDialogSearchMode => '搜尋模式';
 
   @override
-  String get searchServiceNameYou => 'You.com Search';
+  String get searchServiceNameYou => 'You.com';
 
   @override
   String get searchProviderYouDescription =>

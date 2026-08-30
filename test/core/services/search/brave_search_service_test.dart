@@ -32,6 +32,19 @@ void main() {
       expect(BrandAssets.assetForName('brave'), 'assets/icons/brave-color.svg');
     });
 
+    test('accepts empty or in-range token input and rejects the rest', () {
+      expect(BraveOptions.isValidMaximumNumberOfTokensInput(null), isTrue);
+      expect(BraveOptions.isValidMaximumNumberOfTokensInput(''), isTrue);
+      expect(BraveOptions.isValidMaximumNumberOfTokensInput('  '), isTrue);
+      expect(BraveOptions.isValidMaximumNumberOfTokensInput('1024'), isTrue);
+      expect(BraveOptions.isValidMaximumNumberOfTokensInput(' 2048 '), isTrue);
+      expect(BraveOptions.isValidMaximumNumberOfTokensInput('32768'), isTrue);
+      expect(BraveOptions.isValidMaximumNumberOfTokensInput('abc'), isFalse);
+      expect(BraveOptions.isValidMaximumNumberOfTokensInput('1000'), isFalse);
+      expect(BraveOptions.isValidMaximumNumberOfTokensInput('50000'), isFalse);
+      expect(BraveOptions.isValidMaximumNumberOfTokensInput('2048.5'), isFalse);
+    });
+
     test('defaults missing mode to web and keeps old configs unchanged', () {
       final restored = SearchServiceOptions.fromJson({
         'type': 'brave',

@@ -11,7 +11,7 @@ class ParallelSearchService extends SearchService<ParallelOptions> {
   static const String endpoint = 'https://api.parallel.ai/v1/search';
 
   @override
-  String get name => 'Parallel Search';
+  String get name => 'Parallel';
 
   @override
   Widget description(BuildContext context) {

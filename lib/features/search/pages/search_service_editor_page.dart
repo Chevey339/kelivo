@@ -15,6 +15,7 @@ import '../../../theme/theme_factory.dart';
 import '../../../utils/brand_assets.dart';
 import 'search_api_keys_page.dart';
 import 'package:Kelivo/theme/app_semantic_colors.dart';
+import 'package:Kelivo/shared/widgets/ios_tactile.dart';
 import 'package:Kelivo/shared/widgets/section_card.dart';
 
 class SearchServiceEditorResult {
@@ -678,14 +679,9 @@ class _SearchServiceEditorPageState extends State<SearchServiceEditorPage> {
             hint: '${BraveOptions.defaultMaximumNumberOfTokens}',
             keyboardType: TextInputType.number,
             validator: (value) {
-              final text = value?.trim() ?? '';
-              if (text.isEmpty) return null;
-              final tokens = int.tryParse(text);
-              return tokens == null ||
-                      tokens < BraveOptions.minMaximumNumberOfTokens ||
-                      tokens > BraveOptions.maxMaximumNumberOfTokens
-                  ? l10n.searchServicesDialogMaximumTokensInvalid
-                  : null;
+              return BraveOptions.isValidMaximumNumberOfTokensInput(value)
+                  ? null
+                  : l10n.searchServicesDialogMaximumTokensInvalid;
             },
           ),
       ];
@@ -1703,12 +1699,30 @@ class _SearchEditorDropdown extends StatelessWidget {
   final List<({String value, String label})> items;
   final ValueChanged<String> onChanged;
 
+  String get _effectiveValue {
+    return items.any((item) => item.value == value) ? value : items.first.value;
+  }
+
+  String get _effectiveLabel {
+    for (final item in items) {
+      if (item.value == _effectiveValue) return item.label;
+    }
+    return items.first.label;
+  }
+
+  Future<void> _openPicker(BuildContext context) async {
+    final selected = await _showSearchEditorOptionSheet(
+      context,
+      title: label,
+      value: _effectiveValue,
+      items: items,
+    );
+    if (selected != null) onChanged(selected);
+  }
+
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    final effective = items.any((item) => item.value == value)
-        ? value
-        : items.first.value;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -1721,30 +1735,153 @@ class _SearchEditorDropdown extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 7),
-        InputDecorator(
-          decoration: _inputDecoration(context),
-          child: DropdownButtonHideUnderline(
-            child: DropdownButton<String>(
-              value: effective,
-              isExpanded: true,
-              isDense: true,
-              borderRadius: BorderRadius.circular(12),
-              items: [
-                for (final item in items)
-                  DropdownMenuItem<String>(
-                    value: item.value,
-                    child: Text(item.label),
+        SizedBox(
+          width: double.infinity,
+          child: IosCardPress(
+            haptics: false,
+            baseColor: context.appColors.surfaceCardFill,
+            borderRadius: BorderRadius.circular(12),
+            onTap: () => _openPicker(context),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      _effectiveLabel,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: AppFontWeights.medium,
+                        color: cs.onSurface.withValues(alpha: 0.92),
+                      ),
+                    ),
                   ),
-              ],
-              onChanged: (next) {
-                if (next != null) onChanged(next);
-              },
+                  Icon(
+                    Lucide.ChevronDown,
+                    size: 18,
+                    color: cs.onSurface.withValues(alpha: 0.5),
+                  ),
+                ],
+              ),
             ),
           ),
         ),
       ],
     );
   }
+}
+
+Future<String?> _showSearchEditorOptionSheet(
+  BuildContext context, {
+  required String title,
+  required String value,
+  required List<({String value, String label})> items,
+}) {
+  return showModalBottomSheet<String>(
+    context: context,
+    backgroundColor: context.overlaySurface,
+    isScrollControlled: true,
+    shape: const RoundedRectangleBorder(
+      borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+    ),
+    builder: (ctx) {
+      final localCs = Theme.of(ctx).colorScheme;
+      return SafeArea(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(
+            maxHeight: MediaQuery.sizeOf(ctx).height * 0.7,
+          ),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 10, 16, 12),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Center(
+                  child: Container(
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: localCs.onSurface.withValues(alpha: 0.2),
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  title,
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: AppFontWeights.emphasis,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Flexible(
+                  child: SingleChildScrollView(
+                    child: SectionCard(
+                      children: [
+                        for (var i = 0; i < items.length; i++) ...[
+                          IosCardPress(
+                            haptics: false,
+                            baseColor: Colors.transparent,
+                            borderRadius: BorderRadius.zero,
+                            pressedBlendStrength: 0.08,
+                            pressedScale: 1.0,
+                            onTap: () => Navigator.of(ctx).pop(items[i].value),
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 14,
+                                vertical: 12,
+                              ),
+                              child: Row(
+                                children: [
+                                  Expanded(
+                                    child: Text(
+                                      items[i].label,
+                                      style: TextStyle(
+                                        fontSize: 15,
+                                        fontWeight: items[i].value == value
+                                            ? AppFontWeights.semibold
+                                            : AppFontWeights.regular,
+                                        color: localCs.onSurface.withValues(
+                                          alpha: 0.9,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                  if (items[i].value == value)
+                                    Icon(
+                                      Lucide.Check,
+                                      size: 18,
+                                      color: localCs.primary,
+                                    ),
+                                ],
+                              ),
+                            ),
+                          ),
+                          if (i != items.length - 1)
+                            Divider(
+                              height: 6,
+                              thickness: 0.6,
+                              indent: 12,
+                              endIndent: 12,
+                              color: localCs.outlineVariant.withValues(
+                                alpha: 0.18,
+                              ),
+                            ),
+                        ],
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    },
+  );
 }
 
 class _SearchEditorTextField extends StatefulWidget {

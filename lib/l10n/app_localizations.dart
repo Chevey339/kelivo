@@ -10474,7 +10474,7 @@ abstract class AppLocalizations {
   /// No description provided for @searchServiceNameParallel.
   ///
   /// In en, this message translates to:
-  /// **'Parallel Search'**
+  /// **'Parallel'**
   String get searchServiceNameParallel;
 
   /// No description provided for @searchProviderParallelDescription.
@@ -10492,7 +10492,7 @@ abstract class AppLocalizations {
   /// No description provided for @searchServiceNameYou.
   ///
   /// In en, this message translates to:
-  /// **'You.com Search'**
+  /// **'You.com'**
   String get searchServiceNameYou;
 
   /// No description provided for @searchProviderYouDescription.

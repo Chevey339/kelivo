@@ -36,6 +36,7 @@ class DesktopSelectDropdown<T> extends StatefulWidget {
     this.maxLabelWidth = 240,
     this.triggerFillColor,
     this.menuBackgroundColor,
+    this.embedded = false,
   });
 
   final T value;
@@ -49,6 +50,10 @@ class DesktopSelectDropdown<T> extends StatefulWidget {
   final double maxLabelWidth;
   final Color? triggerFillColor;
   final Color? menuBackgroundColor;
+
+  /// Hide the trigger chrome so a parent field (for example
+  /// [InputDecorator]) can supply the border and fill.
+  final bool embedded;
 
   @override
   State<DesktopSelectDropdown<T>> createState() =>
@@ -153,13 +158,17 @@ class _DesktopSelectDropdownState<T> extends State<DesktopSelectDropdown<T>> {
     final cs = Theme.of(context).colorScheme;
     final label = _labelForValue(widget.value);
 
-    final baseBorder = cs.outlineVariant.withValues(alpha: 0.18);
-    final hoverBorder = cs.primary;
+    final baseBorder = widget.embedded
+        ? Colors.transparent
+        : cs.outlineVariant.withValues(alpha: 0.18);
+    final hoverBorder = widget.embedded ? Colors.transparent : cs.primary;
     final borderColor = _open || _hover ? hoverBorder : baseBorder;
 
     final fillColor =
         widget.triggerFillColor ??
-        (Theme.of(context).colorScheme.surfaceContainerHigh);
+        (widget.embedded
+            ? Colors.transparent
+            : Theme.of(context).colorScheme.surfaceContainerHigh);
 
     return CompositedTransformTarget(
       link: _link,
@@ -182,7 +191,7 @@ class _DesktopSelectDropdownState<T> extends State<DesktopSelectDropdown<T>> {
               color: fillColor,
               borderRadius: BorderRadius.circular(widget.borderRadius),
               border: Border.all(color: borderColor, width: 1),
-              boxShadow: _open
+              boxShadow: !widget.embedded && _open
                   ? [
                       BoxShadow(
                         color: cs.primary.withValues(alpha: 0.10),

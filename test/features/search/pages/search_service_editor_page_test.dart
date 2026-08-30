@@ -414,11 +414,11 @@ void main() {
 
     expect(find.text('Add Search Service'), findsOneWidget);
     await tester.dragUntilVisible(
-      find.text('Parallel Search'),
+      find.text('Parallel'),
       find.byType(ListView),
       const Offset(0, -240),
     );
-    await tester.tap(find.text('Parallel Search'));
+    await tester.tap(find.text('Parallel'));
     await tester.pumpAndSettle();
 
     await tester.enterText(_apiKeyField(), 'parallel-key');
@@ -437,11 +437,11 @@ void main() {
     await _pumpEditor(tester, onResult: (value) => result = value);
 
     await tester.dragUntilVisible(
-      find.text('You.com Search'),
+      find.text('You.com'),
       find.byType(ListView),
       const Offset(0, -240),
     );
-    await tester.tap(find.text('You.com Search'));
+    await tester.tap(find.text('You.com'));
     await tester.pumpAndSettle();
 
     await tester.enterText(_apiKeyField(), 'you-key');
@@ -491,6 +491,7 @@ void main() {
     );
 
     expect(find.text('Maximum tokens'), findsNothing);
+    expect(find.byType(DropdownButton<String>), findsNothing);
 
     final modeField = find.byKey(const ValueKey('search-service-field-mode'));
     await tester.dragUntilVisible(
@@ -498,12 +499,7 @@ void main() {
       find.byType(ListView),
       const Offset(0, -240),
     );
-    await tester.tap(
-      find.descendant(
-        of: modeField,
-        matching: find.byType(DropdownButton<String>),
-      ),
-    );
+    await tester.tap(modeField);
     await tester.pumpAndSettle();
     await tester.tap(find.text('LLM Context').last);
     await tester.pumpAndSettle();
@@ -528,6 +524,47 @@ void main() {
     expect(saved.maximumNumberOfTokens, 2048);
   });
 
+  testWidgets('rejects invalid Brave maximum tokens without saving', (
+    tester,
+  ) async {
+    SearchServiceEditorResult? result;
+    await _pumpEditor(
+      tester,
+      initialService: BraveOptions(
+        id: 'brave',
+        apiKey: 'brave-key',
+        mode: BraveOptions.llmContextMode,
+        maximumNumberOfTokens: 2048,
+      ),
+      onResult: (value) => result = value,
+    );
+
+    final tokensField = find.descendant(
+      of: find.byKey(
+        const ValueKey('search-service-field-maximumNumberOfTokens'),
+      ),
+      matching: find.byType(TextFormField),
+    );
+    await tester.dragUntilVisible(
+      tokensField,
+      find.byType(ListView),
+      const Offset(0, -240),
+    );
+
+    for (final invalid in ['abc', '1000', '50000']) {
+      await tester.enterText(tokensField, invalid);
+      await tester.tap(find.byIcon(Lucide.Check));
+      await tester.pumpAndSettle();
+
+      expect(result, isNull);
+      expect(
+        find.text('Maximum tokens must be between 1024 and 32768.'),
+        findsOneWidget,
+      );
+      expect(find.byType(SearchServiceEditorPage), findsOneWidget);
+    }
+  });
+
   testWidgets('saves You.com content mode from the editor', (tester) async {
     SearchServiceEditorResult? result;
     await _pumpEditor(
@@ -548,12 +585,8 @@ void main() {
       find.byType(ListView),
       const Offset(0, -240),
     );
-    await tester.tap(
-      find.descendant(
-        of: modeField,
-        matching: find.byType(DropdownButton<String>),
-      ),
-    );
+    expect(find.byType(DropdownButton<String>), findsNothing);
+    await tester.tap(modeField);
     await tester.pumpAndSettle();
     await tester.tap(find.text('Snippets').last);
     await tester.pumpAndSettle();
@@ -586,12 +619,8 @@ void main() {
       find.byType(ListView),
       const Offset(0, -240),
     );
-    await tester.tap(
-      find.descendant(
-        of: modeField,
-        matching: find.byType(DropdownButton<String>),
-      ),
-    );
+    expect(find.byType(DropdownButton<String>), findsNothing);
+    await tester.tap(modeField);
     await tester.pumpAndSettle();
     await tester.tap(find.text('Turbo').last);
     await tester.pumpAndSettle();
