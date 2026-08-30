@@ -44,6 +44,13 @@ typedef _ParsedChatBackup = ({
 
 typedef _BackupEntryMetadata = ({int bytes, String sha256});
 
+/// A packed archive plus what the packer learned while writing it.
+typedef PreparedBackupArchive = ({
+  File file,
+  ChatDatabaseSnapshotInfo? info,
+  String appVersion,
+});
+
 /// What restoring a backup file would mean for this build, determined from its
 /// manifest alone.
 ///
@@ -228,6 +235,15 @@ bool _attachmentExistsOnDisk(String path) {
   // missing external path available when a same-named managed file exists.
   return SandboxPathResolver.localFileExists(path);
 }
+
+/// Supplies the business settings a backup archive carries.
+typedef _BackupSettingsSource =
+    Future<({String settingsJson, Map<String, List<String>> entityRowIds})>
+    Function();
+
+/// Writes a consistent copy of the database being backed up to [destination].
+typedef _BackupDatabaseSource =
+    Future<ChatDatabaseSnapshotInfo> Function(File destination);
 
 class DataSync {
   static const _backupFormat = 'kelivo-backup';
@@ -439,6 +455,53 @@ class DataSync {
     WebDavConfig cfg, {
     BackupProgressSink? onProgress,
     BackupCancelToken? cancelToken,
+  }) async => (await _prepareBackupArchive(
+    includeChats: cfg.includeChats,
+    includeFiles: cfg.includeFiles,
+    exportSettings: _exportBusinessSettings,
+    snapshotDatabase: (destination) => chatService.createBackupDatabaseSnapshot(
+      destination,
+      onProgress: onProgress,
+      cancelToken: cancelToken,
+    ),
+    onProgress: onProgress,
+    cancelToken: cancelToken,
+  )).file;
+
+  /// Packs the live database for the local copy store.
+  ///
+  /// Same archive as an ordinary backup minus the assets, and it hands back
+  /// the row counts the packer already computed so retention can reason about
+  /// how much data each copy holds without reopening it.
+  Future<PreparedBackupArchive> prepareLocalSnapshotArchive({
+    BackupProgressSink? onProgress,
+    BackupCancelToken? cancelToken,
+  }) => _prepareBackupArchive(
+    includeChats: true,
+    includeFiles: false,
+    exportSettings: _exportBusinessSettings,
+    snapshotDatabase: (destination) => chatService.createBackupDatabaseSnapshot(
+      destination,
+      onProgress: onProgress,
+      cancelToken: cancelToken,
+    ),
+    onProgress: onProgress,
+    cancelToken: cancelToken,
+  );
+
+  /// Packs a backup archive from whichever database and settings the caller
+  /// supplies.
+  ///
+  /// Split out of [prepareBackupFile] so a database that is not the live one
+  /// -- a copy set aside by crash recovery -- can be turned into an ordinary
+  /// backup rather than needing a restore path of its own.
+  Future<PreparedBackupArchive> _prepareBackupArchive({
+    required bool includeChats,
+    required bool includeFiles,
+    required _BackupSettingsSource exportSettings,
+    required _BackupDatabaseSource snapshotDatabase,
+    BackupProgressSink? onProgress,
+    BackupCancelToken? cancelToken,
   }) async {
     final tmp = await _ensureTempDir();
     await _cleanupPreviousBackupTempFiles(tmp);
@@ -466,9 +529,9 @@ class DataSync {
       if (cancelToken?.isCancelled == true) {
         throw const BackupCancelledException();
       }
-      // --- Step 1: Prepare temp files that need ChatService (main isolate) ---
+      // --- Step 1: Prepare temp files that need the main isolate ---
       // settings.json
-      final businessExport = await _exportBusinessSettings();
+      final businessExport = await exportSettings();
       final settingsFile = await _writeTempText(
         workDir,
         '_bk_settings.json',
@@ -477,7 +540,7 @@ class DataSync {
       settingsTmp = settingsFile;
 
       ChatDatabaseSnapshotInfo? snapshotInfo;
-      if (cfg.includeChats) {
+      if (includeChats) {
         final databaseFile = File(p.join(workDir.path, '_bk_kelivo.db'));
         databaseTmp = databaseFile;
         onProgress?.call(
@@ -487,11 +550,7 @@ class DataSync {
             cancellable: true,
           ),
         );
-        snapshotInfo = await chatService.createBackupDatabaseSnapshot(
-          databaseFile,
-          onProgress: onProgress,
-          cancelToken: cancelToken,
-        );
+        snapshotInfo = await snapshotDatabase(databaseFile);
       }
 
       final packageInfo = await PackageInfo.fromPlatform();
@@ -509,7 +568,6 @@ class DataSync {
       final manifestPath = manifestFile.path;
       final settingsPath = settingsFile.path;
       final databasePath = databaseTmp?.path;
-      final includeFiles = cfg.includeFiles;
 
       // --- Step 2: Run CPU-heavy ZIP packing in a separate isolate ---
       await runBackupIsolate<void, _BackupPackArgs>(
@@ -520,7 +578,7 @@ class DataSync {
           settingsPath: settingsPath,
           databasePath: databasePath,
           snapshotInfo: snapshotInfo,
-          includeChats: cfg.includeChats,
+          includeChats: includeChats,
           includeFiles: includeFiles,
           appVersion: appVersion,
           businessEntityRowIds: businessExport.entityRowIds,
@@ -533,7 +591,11 @@ class DataSync {
         onProgress: onProgress,
       );
 
-      return takePreparedBackupFile(outFile, cancelToken);
+      return (
+        file: takePreparedBackupFile(outFile, cancelToken),
+        info: snapshotInfo,
+        appVersion: appVersion,
+      );
     } catch (error) {
       if (shouldDeleteTempPathsAfterIsolateError(error)) {
         unregisterLiveTempPath(workDir.path);
@@ -552,6 +614,86 @@ class DataSync {
         await _deleteFileQuietly(databaseTmp);
         await _deleteFileQuietly(manifestTmp);
       }
+    }
+  }
+
+  /// Turns a database that is not the live one into an ordinary backup.
+  ///
+  /// The copies crash recovery sets aside are bare SQLite files, possibly on
+  /// an older schema and possibly still carrying an unreplayed journal. Rather
+  /// than teaching the restore pipeline a second input shape -- the one place
+  /// in this codebase where a second implementation is least welcome -- this
+  /// converts them into the archive that pipeline already accepts, so export
+  /// and restore both reduce to what already exists.
+  ///
+  /// Assets are deliberately excluded: they live beside the live database and
+  /// are shared with it, so copying them would multiply gigabytes without
+  /// protecting anything the copy does not already protect.
+  Future<File> prepareBackupFileFromDatabase(
+    File sourceDatabase, {
+    bool allowForwardCompatible = false,
+    BackupProgressSink? onProgress,
+    BackupCancelToken? cancelToken,
+  }) async {
+    if (!await sourceDatabase.exists()) {
+      throw FileSystemException(
+        'Database copy does not exist',
+        sourceDatabase.path,
+      );
+    }
+    final tmp = await _ensureTempDir();
+    final stagingDirectory = await Directory(
+      p.join(tmp.path, 'kelivo_adopt_${DateTime.now().microsecondsSinceEpoch}'),
+    ).create(recursive: true);
+    registerLiveTempPath(stagingDirectory.path);
+    try {
+      final working = File(
+        p.join(stagingDirectory.path, AppDatabase.databaseFileName),
+      );
+      // The whole family, not just the database: a copy taken while a write
+      // was in flight keeps its committed transactions in the journal, and
+      // opening the database without it silently discards them.
+      for (final suffix in const ['', '-wal', '-shm', '-journal']) {
+        final sidecar = File('${sourceDatabase.path}$suffix');
+        if (await FileSystemEntity.type(sidecar.path, followLinks: false) ==
+            FileSystemEntityType.file) {
+          await sidecar.copy('${working.path}$suffix');
+        }
+      }
+
+      // Replays the journal, brings an older schema forward, and validates
+      // what comes out -- the same preparation a restored backup goes through.
+      await ChatDatabaseRepository.prepareSnapshotForRestore(
+        working,
+        allowForwardCompatible: allowForwardCompatible,
+      );
+
+      final database = AppDatabase.open(file: working);
+      final ({String settingsJson, Map<String, List<String>> entityRowIds})
+      businessExport;
+      try {
+        businessExport = await exportBusinessSettingsFrom(
+          BusinessRepository(database),
+        );
+      } finally {
+        await database.close();
+      }
+
+      return (await _prepareBackupArchive(
+        includeChats: true,
+        includeFiles: false,
+        exportSettings: () async => businessExport,
+        snapshotDatabase: (destination) =>
+            ChatDatabaseRepository.createConsistentSnapshot(
+              sourceFile: working,
+              destinationFile: destination,
+            ),
+        onProgress: onProgress,
+        cancelToken: cancelToken,
+      )).file;
+    } finally {
+      unregisterLiveTempPath(stagingDirectory.path);
+      await _deleteDirectoryQuietly(stagingDirectory);
     }
   }
 
@@ -2712,9 +2854,13 @@ class DataSync {
   }
 
   Future<({String settingsJson, Map<String, List<String>> entityRowIds})>
-  _exportBusinessSettings() async {
+  _exportBusinessSettings() => exportBusinessSettingsFrom(businessRepository);
+
+  /// The settings half of a backup, read from whichever repository is given.
+  static Future<({String settingsJson, Map<String, List<String>> entityRowIds})>
+  exportBusinessSettingsFrom(BusinessRepository repository) async {
     final exported = BusinessSettingsRouter.exportSnapshotWithRowIds(
-      await businessRepository.readSnapshot(),
+      await repository.readSnapshot(),
     );
     final settings = Map<String, Object>.from(exported.settings);
     settings.removeWhere((key, _) => BackupSettingsValidator.shouldIgnore(key));

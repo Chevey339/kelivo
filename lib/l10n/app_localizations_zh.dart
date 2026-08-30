@@ -8036,6 +8036,231 @@ class AppLocalizationsZh extends AppLocalizations {
   @override
   String get messageStyleSettingsPageRoleAssistantHint =>
       '助手设定同时作用于思考、工具调用和翻译卡片。';
+
+  @override
+  String get localSnapshotSectionTitle => '本地副本';
+
+  @override
+  String get localSnapshotEnabledTitle => '保留本地副本';
+
+  @override
+  String get localSnapshotEnabledSubtitle => 'Kelivo 会定期在本机存一份数据库副本，让数据不只有一份。';
+
+  @override
+  String get localSnapshotIntervalTitle => '备份频率';
+
+  @override
+  String get localSnapshotIntervalAutomatic => '自动';
+
+  @override
+  String get localSnapshotIntervalAutomaticDetail => '每天一次，数据库越大间隔越长';
+
+  @override
+  String localSnapshotIntervalDays(int days) {
+    String _temp0 = intl.Intl.pluralLogic(
+      days,
+      locale: localeName,
+      other: '每 $days 天',
+      one: '每天',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get localSnapshotKeepTitle => '保留份数';
+
+  @override
+  String localSnapshotKeepValue(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count 份',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get localSnapshotKeepSubtitle => '另外各留一份上周和上个月的，万一问题过了很久才发现也还能找回来。';
+
+  @override
+  String get localSnapshotKeepWeekly => '保留一份上周的';
+
+  @override
+  String get localSnapshotKeepMonthly => '保留一份上个月的';
+
+  @override
+  String get localSnapshotKeepProtectedNote => '无论设成几份，最近一份仍有内容的副本都不会被自动清理。';
+
+  @override
+  String get localSnapshotMaximumTitle => '占用上限';
+
+  @override
+  String get localSnapshotMaximumUnlimited => '不限制';
+
+  @override
+  String get localSnapshotAnnounceTitle => '备份完成时提示';
+
+  @override
+  String get localSnapshotAnnounceSubtitle => '失败一定会告诉你。这里只是成功时多一句提示。';
+
+  @override
+  String get localSnapshotTakeNow => '立即备份一份';
+
+  @override
+  String get localSnapshotManageCopies => '管理副本';
+
+  @override
+  String localSnapshotUsage(int count, String size) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count 份',
+      zero: '暂无副本',
+    );
+    return '$_temp0 · $size';
+  }
+
+  @override
+  String get localSnapshotStatusNever => '还没有备份过';
+
+  @override
+  String localSnapshotStatusSuccess(String when) {
+    return '上次备份：$when';
+  }
+
+  @override
+  String localSnapshotStatusFailure(String when, String reason) {
+    return '上次备份失败（$when）：$reason';
+  }
+
+  @override
+  String get localSnapshotStatusSkippedSpace => '已跳过：本机剩余空间不足';
+
+  @override
+  String get localSnapshotStatusUnchanged => '距上次备份数据没有变化';
+
+  @override
+  String get localSnapshotCopiesTitle => '本地副本';
+
+  @override
+  String get localSnapshotCopiesEmpty => '还没有本地副本';
+
+  @override
+  String get localSnapshotCopiesEmptyHint => '数据有变化时会自动存一份，恢复数据前也一定会先存一份。';
+
+  @override
+  String get localSnapshotCopiesScopeNote =>
+      '本地副本只存在这台设备上。它防的是应用内数据被损坏或误删，防不了设备丢失或卸载应用——那要靠 WebDAV / S3 备份。';
+
+  @override
+  String get localSnapshotOriginAutomatic => '自动备份';
+
+  @override
+  String get localSnapshotOriginManual => '手动备份';
+
+  @override
+  String get localSnapshotOriginBeforeRestore => '恢复前备份';
+
+  @override
+  String get localSnapshotKindRecovered => '故障恢复时留下的';
+
+  @override
+  String localSnapshotCopyContents(int conversations, int messages) {
+    String _temp0 = intl.Intl.pluralLogic(
+      conversations,
+      locale: localeName,
+      other: '$conversations 个对话',
+    );
+    String _temp1 = intl.Intl.pluralLogic(
+      messages,
+      locale: localeName,
+      other: '$messages 条消息',
+    );
+    return '$_temp0 · $_temp1';
+  }
+
+  @override
+  String get localSnapshotCopyContentsUnknown => '内容需恢复后才能确认';
+
+  @override
+  String get localSnapshotCopyPinned => '已保留';
+
+  @override
+  String get localSnapshotActionRestore => '恢复';
+
+  @override
+  String get localSnapshotActionExport => '导出';
+
+  @override
+  String get localSnapshotActionDelete => '删除';
+
+  @override
+  String get localSnapshotActionPin => '保留这份';
+
+  @override
+  String get localSnapshotActionUnpin => '取消保留';
+
+  @override
+  String get localSnapshotRestoreTitle => '恢复这份副本？';
+
+  @override
+  String localSnapshotRestoreMessage(String when) {
+    return '当前的对话和设置会被 $when 的这份副本替换。系统会先把现在的数据存一份，所以这一步可以撤销。';
+  }
+
+  @override
+  String get localSnapshotRestorePreparing => '正在准备副本';
+
+  @override
+  String get localSnapshotDeleteTitle => '删除这份副本？';
+
+  @override
+  String get localSnapshotDeleteMessage =>
+      '这份副本会从设备上永久删除。它里面有、而当前数据库里没有的数据将无法找回。';
+
+  @override
+  String get localSnapshotDeleteLastWarning => '这是唯一一份还有内容的副本。';
+
+  @override
+  String get localSnapshotExportPreparing => '正在准备导出';
+
+  @override
+  String get localSnapshotExportDone => '副本已导出';
+
+  @override
+  String localSnapshotExportFailed(String reason) {
+    return '导出副本失败：$reason';
+  }
+
+  @override
+  String get localSnapshotTakeDone => '副本已保存';
+
+  @override
+  String localSnapshotTakeFailed(String reason) {
+    return '保存副本失败：$reason';
+  }
+
+  @override
+  String get localSnapshotDeleteDone => '副本已删除';
+
+  @override
+  String get localSnapshotBusyMessage => '已有备份任务在进行中';
+
+  @override
+  String get localSnapshotRunInBackground => '转到后台继续';
+
+  @override
+  String get localSnapshotRunningInBackground => '正在后台备份副本';
+
+  @override
+  String startupRecoveryLocalCopiesAvailable(int count, String when) {
+    return '本机还保留着 $count 份本地副本，最新一份是 $when 的。重置不会删除它们——重启后可以在 设置 › 备份 › 本地副本 里恢复。';
+  }
+
+  @override
+  String startupRecoveryRecoveredCopiesDeleted(int count) {
+    return '另外还有 $count 份故障恢复时留下的数据库副本，重置会把它们一并永久删除。想留住的话请先导出数据。';
+  }
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hans`).
@@ -15996,6 +16221,231 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   @override
   String get messageStyleSettingsPageRoleAssistantHint =>
       '助手设定同时作用于思考、工具调用和翻译卡片。';
+
+  @override
+  String get localSnapshotSectionTitle => '本地副本';
+
+  @override
+  String get localSnapshotEnabledTitle => '保留本地副本';
+
+  @override
+  String get localSnapshotEnabledSubtitle => 'Kelivo 会定期在本机存一份数据库副本，让数据不只有一份。';
+
+  @override
+  String get localSnapshotIntervalTitle => '备份频率';
+
+  @override
+  String get localSnapshotIntervalAutomatic => '自动';
+
+  @override
+  String get localSnapshotIntervalAutomaticDetail => '每天一次，数据库越大间隔越长';
+
+  @override
+  String localSnapshotIntervalDays(int days) {
+    String _temp0 = intl.Intl.pluralLogic(
+      days,
+      locale: localeName,
+      other: '每 $days 天',
+      one: '每天',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get localSnapshotKeepTitle => '保留份数';
+
+  @override
+  String localSnapshotKeepValue(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count 份',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get localSnapshotKeepSubtitle => '另外各留一份上周和上个月的，万一问题过了很久才发现也还能找回来。';
+
+  @override
+  String get localSnapshotKeepWeekly => '保留一份上周的';
+
+  @override
+  String get localSnapshotKeepMonthly => '保留一份上个月的';
+
+  @override
+  String get localSnapshotKeepProtectedNote => '无论设成几份，最近一份仍有内容的副本都不会被自动清理。';
+
+  @override
+  String get localSnapshotMaximumTitle => '占用上限';
+
+  @override
+  String get localSnapshotMaximumUnlimited => '不限制';
+
+  @override
+  String get localSnapshotAnnounceTitle => '备份完成时提示';
+
+  @override
+  String get localSnapshotAnnounceSubtitle => '失败一定会告诉你。这里只是成功时多一句提示。';
+
+  @override
+  String get localSnapshotTakeNow => '立即备份一份';
+
+  @override
+  String get localSnapshotManageCopies => '管理副本';
+
+  @override
+  String localSnapshotUsage(int count, String size) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count 份',
+      zero: '暂无副本',
+    );
+    return '$_temp0 · $size';
+  }
+
+  @override
+  String get localSnapshotStatusNever => '还没有备份过';
+
+  @override
+  String localSnapshotStatusSuccess(String when) {
+    return '上次备份：$when';
+  }
+
+  @override
+  String localSnapshotStatusFailure(String when, String reason) {
+    return '上次备份失败（$when）：$reason';
+  }
+
+  @override
+  String get localSnapshotStatusSkippedSpace => '已跳过：本机剩余空间不足';
+
+  @override
+  String get localSnapshotStatusUnchanged => '距上次备份数据没有变化';
+
+  @override
+  String get localSnapshotCopiesTitle => '本地副本';
+
+  @override
+  String get localSnapshotCopiesEmpty => '还没有本地副本';
+
+  @override
+  String get localSnapshotCopiesEmptyHint => '数据有变化时会自动存一份，恢复数据前也一定会先存一份。';
+
+  @override
+  String get localSnapshotCopiesScopeNote =>
+      '本地副本只存在这台设备上。它防的是应用内数据被损坏或误删，防不了设备丢失或卸载应用——那要靠 WebDAV / S3 备份。';
+
+  @override
+  String get localSnapshotOriginAutomatic => '自动备份';
+
+  @override
+  String get localSnapshotOriginManual => '手动备份';
+
+  @override
+  String get localSnapshotOriginBeforeRestore => '恢复前备份';
+
+  @override
+  String get localSnapshotKindRecovered => '故障恢复时留下的';
+
+  @override
+  String localSnapshotCopyContents(int conversations, int messages) {
+    String _temp0 = intl.Intl.pluralLogic(
+      conversations,
+      locale: localeName,
+      other: '$conversations 个对话',
+    );
+    String _temp1 = intl.Intl.pluralLogic(
+      messages,
+      locale: localeName,
+      other: '$messages 条消息',
+    );
+    return '$_temp0 · $_temp1';
+  }
+
+  @override
+  String get localSnapshotCopyContentsUnknown => '内容需恢复后才能确认';
+
+  @override
+  String get localSnapshotCopyPinned => '已保留';
+
+  @override
+  String get localSnapshotActionRestore => '恢复';
+
+  @override
+  String get localSnapshotActionExport => '导出';
+
+  @override
+  String get localSnapshotActionDelete => '删除';
+
+  @override
+  String get localSnapshotActionPin => '保留这份';
+
+  @override
+  String get localSnapshotActionUnpin => '取消保留';
+
+  @override
+  String get localSnapshotRestoreTitle => '恢复这份副本？';
+
+  @override
+  String localSnapshotRestoreMessage(String when) {
+    return '当前的对话和设置会被 $when 的这份副本替换。系统会先把现在的数据存一份，所以这一步可以撤销。';
+  }
+
+  @override
+  String get localSnapshotRestorePreparing => '正在准备副本';
+
+  @override
+  String get localSnapshotDeleteTitle => '删除这份副本？';
+
+  @override
+  String get localSnapshotDeleteMessage =>
+      '这份副本会从设备上永久删除。它里面有、而当前数据库里没有的数据将无法找回。';
+
+  @override
+  String get localSnapshotDeleteLastWarning => '这是唯一一份还有内容的副本。';
+
+  @override
+  String get localSnapshotExportPreparing => '正在准备导出';
+
+  @override
+  String get localSnapshotExportDone => '副本已导出';
+
+  @override
+  String localSnapshotExportFailed(String reason) {
+    return '导出副本失败：$reason';
+  }
+
+  @override
+  String get localSnapshotTakeDone => '副本已保存';
+
+  @override
+  String localSnapshotTakeFailed(String reason) {
+    return '保存副本失败：$reason';
+  }
+
+  @override
+  String get localSnapshotDeleteDone => '副本已删除';
+
+  @override
+  String get localSnapshotBusyMessage => '已有备份任务在进行中';
+
+  @override
+  String get localSnapshotRunInBackground => '转到后台继续';
+
+  @override
+  String get localSnapshotRunningInBackground => '正在后台备份副本';
+
+  @override
+  String startupRecoveryLocalCopiesAvailable(int count, String when) {
+    return '本机还保留着 $count 份本地副本，最新一份是 $when 的。重置不会删除它们——重启后可以在 设置 › 备份 › 本地副本 里恢复。';
+  }
+
+  @override
+  String startupRecoveryRecoveredCopiesDeleted(int count) {
+    return '另外还有 $count 份故障恢复时留下的数据库副本，重置会把它们一并永久删除。想留住的话请先导出数据。';
+  }
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hant`).
@@ -24030,4 +24480,229 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   @override
   String get messageStyleSettingsPageRoleAssistantHint =>
       '助手設定同時作用於思考、工具呼叫和翻譯卡片。';
+
+  @override
+  String get localSnapshotSectionTitle => '本機副本';
+
+  @override
+  String get localSnapshotEnabledTitle => '保留本機副本';
+
+  @override
+  String get localSnapshotEnabledSubtitle => 'Kelivo 會定期在本機存一份資料庫副本，讓資料不只有一份。';
+
+  @override
+  String get localSnapshotIntervalTitle => '備份頻率';
+
+  @override
+  String get localSnapshotIntervalAutomatic => '自動';
+
+  @override
+  String get localSnapshotIntervalAutomaticDetail => '每天一次，資料庫越大間隔越長';
+
+  @override
+  String localSnapshotIntervalDays(int days) {
+    String _temp0 = intl.Intl.pluralLogic(
+      days,
+      locale: localeName,
+      other: '每 $days 天',
+      one: '每天',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get localSnapshotKeepTitle => '保留份數';
+
+  @override
+  String localSnapshotKeepValue(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count 份',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get localSnapshotKeepSubtitle => '另外各留一份上週和上個月的，萬一問題過了很久才發現也還能找回來。';
+
+  @override
+  String get localSnapshotKeepWeekly => '保留一份上週的';
+
+  @override
+  String get localSnapshotKeepMonthly => '保留一份上個月的';
+
+  @override
+  String get localSnapshotKeepProtectedNote => '無論設成幾份，最近一份仍有內容的副本都不會被自動清理。';
+
+  @override
+  String get localSnapshotMaximumTitle => '佔用上限';
+
+  @override
+  String get localSnapshotMaximumUnlimited => '不限制';
+
+  @override
+  String get localSnapshotAnnounceTitle => '備份完成時提示';
+
+  @override
+  String get localSnapshotAnnounceSubtitle => '失敗一定會告訴你。這裡只是成功時多一句提示。';
+
+  @override
+  String get localSnapshotTakeNow => '立即備份一份';
+
+  @override
+  String get localSnapshotManageCopies => '管理副本';
+
+  @override
+  String localSnapshotUsage(int count, String size) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count 份',
+      zero: '暫無副本',
+    );
+    return '$_temp0 · $size';
+  }
+
+  @override
+  String get localSnapshotStatusNever => '還沒有備份過';
+
+  @override
+  String localSnapshotStatusSuccess(String when) {
+    return '上次備份：$when';
+  }
+
+  @override
+  String localSnapshotStatusFailure(String when, String reason) {
+    return '上次備份失敗（$when）：$reason';
+  }
+
+  @override
+  String get localSnapshotStatusSkippedSpace => '已跳過：本機剩餘空間不足';
+
+  @override
+  String get localSnapshotStatusUnchanged => '距上次備份資料沒有變化';
+
+  @override
+  String get localSnapshotCopiesTitle => '本機副本';
+
+  @override
+  String get localSnapshotCopiesEmpty => '還沒有本機副本';
+
+  @override
+  String get localSnapshotCopiesEmptyHint => '資料有變化時會自動存一份，還原資料前也一定會先存一份。';
+
+  @override
+  String get localSnapshotCopiesScopeNote =>
+      '本機副本只存在這台裝置上。它防的是應用內資料被損壞或誤刪，防不了裝置遺失或解除安裝應用——那要靠 WebDAV / S3 備份。';
+
+  @override
+  String get localSnapshotOriginAutomatic => '自動備份';
+
+  @override
+  String get localSnapshotOriginManual => '手動備份';
+
+  @override
+  String get localSnapshotOriginBeforeRestore => '還原前備份';
+
+  @override
+  String get localSnapshotKindRecovered => '故障還原時留下的';
+
+  @override
+  String localSnapshotCopyContents(int conversations, int messages) {
+    String _temp0 = intl.Intl.pluralLogic(
+      conversations,
+      locale: localeName,
+      other: '$conversations 個對話',
+    );
+    String _temp1 = intl.Intl.pluralLogic(
+      messages,
+      locale: localeName,
+      other: '$messages 則訊息',
+    );
+    return '$_temp0 · $_temp1';
+  }
+
+  @override
+  String get localSnapshotCopyContentsUnknown => '內容需還原後才能確認';
+
+  @override
+  String get localSnapshotCopyPinned => '已保留';
+
+  @override
+  String get localSnapshotActionRestore => '還原';
+
+  @override
+  String get localSnapshotActionExport => '匯出';
+
+  @override
+  String get localSnapshotActionDelete => '刪除';
+
+  @override
+  String get localSnapshotActionPin => '保留這份';
+
+  @override
+  String get localSnapshotActionUnpin => '取消保留';
+
+  @override
+  String get localSnapshotRestoreTitle => '還原這份副本？';
+
+  @override
+  String localSnapshotRestoreMessage(String when) {
+    return '目前的對話和設定會被 $when 的這份副本替換。系統會先把現在的資料存一份，所以這一步可以復原。';
+  }
+
+  @override
+  String get localSnapshotRestorePreparing => '正在準備副本';
+
+  @override
+  String get localSnapshotDeleteTitle => '刪除這份副本？';
+
+  @override
+  String get localSnapshotDeleteMessage =>
+      '這份副本會從裝置上永久刪除。它裡面有、而目前資料庫裡沒有的資料將無法找回。';
+
+  @override
+  String get localSnapshotDeleteLastWarning => '這是唯一一份還有內容的副本。';
+
+  @override
+  String get localSnapshotExportPreparing => '正在準備匯出';
+
+  @override
+  String get localSnapshotExportDone => '副本已匯出';
+
+  @override
+  String localSnapshotExportFailed(String reason) {
+    return '匯出副本失敗：$reason';
+  }
+
+  @override
+  String get localSnapshotTakeDone => '副本已儲存';
+
+  @override
+  String localSnapshotTakeFailed(String reason) {
+    return '儲存副本失敗：$reason';
+  }
+
+  @override
+  String get localSnapshotDeleteDone => '副本已刪除';
+
+  @override
+  String get localSnapshotBusyMessage => '已有備份任務在進行中';
+
+  @override
+  String get localSnapshotRunInBackground => '轉到背景繼續';
+
+  @override
+  String get localSnapshotRunningInBackground => '正在背景備份副本';
+
+  @override
+  String startupRecoveryLocalCopiesAvailable(int count, String when) {
+    return '本機還保留著 $count 份本機副本，最新一份是 $when 的。重設不會刪除它們——重新啟動後可以在 設定 › 備份 › 本機副本 裡還原。';
+  }
+
+  @override
+  String startupRecoveryRecoveredCopiesDeleted(int count) {
+    return '另外還有 $count 份故障還原時留下的資料庫副本，重設會把它們一併永久刪除。想留住的話請先匯出資料。';
+  }
 }

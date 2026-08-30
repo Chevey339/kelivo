@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:Kelivo/core/database/app_database.dart';
 import 'package:Kelivo/core/database/chat_database_repository.dart';
 import 'package:Kelivo/core/database/database_installation_gate.dart';
+import 'package:Kelivo/core/services/backup/local_snapshot_schedule.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:path/path.dart' as p;
 import 'package:sqlite3/sqlite3.dart' as sqlite;
@@ -409,7 +410,74 @@ void main() {
         expect(action, DatabaseRecoveryAction.rebuildAutomatically);
       });
 
-      test('无法读取 userVersion 的文件不自动重建', () async {
+      test('列出改名副本时按时间倒序并算上整个 family', () async {
+      await DatabaseInstallationGate.ensureReady(appDataDirectory: directory);
+      final base = databaseFile(directory);
+      await File('${base.path}-wal').writeAsBytes(List<int>.filled(32, 7));
+
+      for (final receipt in await directory.list().toList()) {
+        if (p.basename(receipt.path).startsWith('database_installation_')) {
+          await receipt.delete();
+        }
+      }
+      await DatabaseInstallationGate.rebuildFresh(appDataDirectory: directory);
+
+      final copies = await DatabaseInstallationGate.listDisplacedDatabases(
+        appDataDirectory: directory,
+      );
+
+      expect(copies, hasLength(1));
+      expect(copies.single.displacedAt, isNotNull);
+      expect(await copies.single.file.exists(), isTrue);
+      // -wal 也算进去，不然显示的大小会小于真正占的空间。
+      expect(copies.single.bytes, greaterThan(await copies.single.file.length()));
+    });
+
+    test('删除单份改名副本会连 sidecar 一起清掉', () async {
+      await DatabaseInstallationGate.ensureReady(appDataDirectory: directory);
+      final base = databaseFile(directory);
+      await File('${base.path}-wal').writeAsBytes(List<int>.filled(32, 7));
+      for (final receipt in await directory.list().toList()) {
+        if (p.basename(receipt.path).startsWith('database_installation_')) {
+          await receipt.delete();
+        }
+      }
+      await DatabaseInstallationGate.rebuildFresh(appDataDirectory: directory);
+      final copy = (await DatabaseInstallationGate.listDisplacedDatabases(
+        appDataDirectory: directory,
+      )).single;
+
+      await DatabaseInstallationGate.deleteDisplacedDatabase(
+        appDataDirectory: directory,
+        stamp: copy.stamp,
+      );
+
+      expect(
+        await DatabaseInstallationGate.listDisplacedDatabases(
+          appDataDirectory: directory,
+        ),
+        isEmpty,
+      );
+      expect(await File('${copy.file.path}-wal').exists(), isFalse);
+      expect(
+        await DatabaseInstallationGate.hasDisplacedDatabases(
+          appDataDirectory: directory,
+        ),
+        isFalse,
+      );
+    });
+
+    test('拒绝伪造的 stamp', () async {
+      await expectLater(
+        DatabaseInstallationGate.deleteDisplacedDatabase(
+          appDataDirectory: directory,
+          stamp: '../../etc',
+        ),
+        throwsA(isA<ArgumentError>()),
+      );
+    });
+
+    test('无法读取 userVersion 的文件不自动重建', () async {
         // "Unreadable right now" is also what a healthy database looks like
         // while the OS denies the read, so it may never authorise a delete.
         await databaseFile(directory).writeAsString('not a sqlite database');
@@ -445,6 +513,29 @@ void main() {
         final images = Directory(p.join(directory.path, 'images'));
         await images.create(recursive: true);
         await File(p.join(images.path, 'img_1.png')).writeAsBytes(const [1, 2]);
+
+        final action = await DatabaseInstallationGate.recoveryActionFor(
+          appDataDirectory: directory,
+          error: StateError('database_schema_version'),
+          legacyHiveDataPresent: false,
+        );
+
+        expect(action, DatabaseRecoveryAction.none);
+      });
+
+      test('存在本地副本时不自动重建', () async {
+        final raw = sqlite.sqlite3.open(databaseFile(directory).path);
+        raw.close();
+        final snapshots = Directory(
+          p.join(directory.path, LocalSnapshotPaths.directoryName),
+        );
+        await snapshots.create(recursive: true);
+        await File(
+          p.join(
+            snapshots.path,
+            LocalSnapshotPaths.fileNameFor(DateTime.utc(2026, 5, 1)),
+          ),
+        ).writeAsString('archive');
 
         final action = await DatabaseInstallationGate.recoveryActionFor(
           appDataDirectory: directory,

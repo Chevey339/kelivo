@@ -186,6 +186,17 @@ class ChatActions {
     );
   }
 
+  /// Whether any conversation is generating right now.
+  ///
+  /// Read by background maintenance that would rather wait than compete with
+  /// a reply for disk and CPU.
+  static bool get hasAnyActiveGeneration {
+    final actions = _current;
+    if (actions == null) return false;
+    return actions._conversationStreams.isNotEmpty ||
+        actions._activeAssistantMessages.isNotEmpty;
+  }
+
   /// Stop any in-flight generation for [conversationId] before its rows are
   /// deleted, so streaming checkpoints cannot write to removed messages.
   static Future<void> cancelActiveGenerationFor(String conversationId) async {

@@ -3605,5 +3605,152 @@
   "messageStyleSettingsPagePreviewThinking": "Thinking",
   "messageStyleSettingsPageRoleUser": "User",
   "messageStyleSettingsPageRoleAssistant": "Assistant",
-  "messageStyleSettingsPageRoleAssistantHint": "Assistant settings also apply to thinking, tool-call, and translation cards."
+  "messageStyleSettingsPageRoleAssistantHint": "Assistant settings also apply to thinking, tool-call, and translation cards.",
+  "localSnapshotSectionTitle": "Local Copies",
+  "localSnapshotEnabledTitle": "Keep local copies",
+  "localSnapshotEnabledSubtitle": "Kelivo periodically saves a copy of its database on this device, so it is never the only one.",
+  "localSnapshotIntervalTitle": "How often",
+  "localSnapshotIntervalAutomatic": "Automatic",
+  "localSnapshotIntervalAutomaticDetail": "Daily, less often as the database grows",
+  "localSnapshotIntervalDays": "{days, plural, =1{Every day} other{Every {days} days}}",
+  "@localSnapshotIntervalDays": {
+    "placeholders": {
+      "days": {
+        "type": "int"
+      }
+    }
+  },
+  "localSnapshotKeepTitle": "Copies to keep",
+  "localSnapshotKeepValue": "{count, plural, =1{1 copy} other{{count} copies}}",
+  "@localSnapshotKeepValue": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "localSnapshotKeepSubtitle": "Plus one from last week and one from last month, so a problem that went unnoticed is still recoverable.",
+  "localSnapshotKeepWeekly": "Keep one from last week",
+  "localSnapshotKeepMonthly": "Keep one from last month",
+  "localSnapshotKeepProtectedNote": "The most recent copy that still contains data is never removed automatically, whatever this is set to.",
+  "localSnapshotMaximumTitle": "Space limit",
+  "localSnapshotMaximumUnlimited": "No limit",
+  "localSnapshotAnnounceTitle": "Notify when a copy is saved",
+  "localSnapshotAnnounceSubtitle": "Failures are always reported. This only adds a brief message on success.",
+  "localSnapshotTakeNow": "Save a copy now",
+  "localSnapshotManageCopies": "Manage copies",
+  "localSnapshotUsage": "{count, plural, =0{No copies} =1{1 copy} other{{count} copies}} · {size}",
+  "@localSnapshotUsage": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "size": {
+        "type": "String"
+      }
+    }
+  },
+  "localSnapshotStatusNever": "No copy saved yet",
+  "localSnapshotStatusSuccess": "Last copy {when}",
+  "@localSnapshotStatusSuccess": {
+    "placeholders": {
+      "when": {
+        "type": "String"
+      }
+    }
+  },
+  "localSnapshotStatusFailure": "Last attempt failed {when}: {reason}",
+  "@localSnapshotStatusFailure": {
+    "placeholders": {
+      "when": {
+        "type": "String"
+      },
+      "reason": {
+        "type": "String"
+      }
+    }
+  },
+  "localSnapshotStatusSkippedSpace": "Skipped: not enough free space on this device",
+  "localSnapshotStatusUnchanged": "Nothing has changed since the last copy",
+  "localSnapshotCopiesTitle": "Local Copies",
+  "localSnapshotCopiesEmpty": "No local copies yet",
+  "localSnapshotCopiesEmptyHint": "A copy is saved automatically as your data changes, and one is always saved before a restore.",
+  "localSnapshotCopiesScopeNote": "Local copies live on this device only. They protect against damage to your data inside the app, not against losing the device or uninstalling Kelivo — use WebDAV or S3 backup for that.",
+  "localSnapshotOriginAutomatic": "Automatic",
+  "localSnapshotOriginManual": "Saved by you",
+  "localSnapshotOriginBeforeRestore": "Before a restore",
+  "localSnapshotKindRecovered": "Set aside by recovery",
+  "localSnapshotCopyContents": "{conversations, plural, =1{1 chat} other{{conversations} chats}} · {messages, plural, =1{1 message} other{{messages} messages}}",
+  "@localSnapshotCopyContents": {
+    "placeholders": {
+      "conversations": {
+        "type": "int"
+      },
+      "messages": {
+        "type": "int"
+      }
+    }
+  },
+  "localSnapshotCopyContentsUnknown": "Contents unknown until restored",
+  "localSnapshotCopyPinned": "Kept",
+  "localSnapshotActionRestore": "Restore",
+  "localSnapshotActionExport": "Export",
+  "localSnapshotActionDelete": "Delete",
+  "localSnapshotActionPin": "Keep this copy",
+  "localSnapshotActionUnpin": "Stop keeping",
+  "localSnapshotRestoreTitle": "Restore this copy?",
+  "localSnapshotRestoreMessage": "Your current chats and settings will be replaced by this copy from {when}. A copy of what you have now is saved first, so this can be undone.",
+  "@localSnapshotRestoreMessage": {
+    "placeholders": {
+      "when": {
+        "type": "String"
+      }
+    }
+  },
+  "localSnapshotRestorePreparing": "Preparing copy",
+  "localSnapshotDeleteTitle": "Delete this copy?",
+  "localSnapshotDeleteMessage": "This copy will be removed from the device permanently. Any data it holds that is not in your current database will be gone.",
+  "localSnapshotDeleteLastWarning": "This is the only copy that still contains data.",
+  "localSnapshotExportPreparing": "Preparing export",
+  "localSnapshotExportDone": "Copy exported",
+  "localSnapshotExportFailed": "Could not export the copy: {reason}",
+  "@localSnapshotExportFailed": {
+    "placeholders": {
+      "reason": {
+        "type": "String"
+      }
+    }
+  },
+  "localSnapshotTakeDone": "Copy saved",
+  "localSnapshotTakeFailed": "Could not save a copy: {reason}",
+  "@localSnapshotTakeFailed": {
+    "placeholders": {
+      "reason": {
+        "type": "String"
+      }
+    }
+  },
+  "localSnapshotDeleteDone": "Copy deleted",
+  "localSnapshotBusyMessage": "Another backup task is already running",
+  "localSnapshotRunInBackground": "Continue in background",
+  "localSnapshotRunningInBackground": "Saving a copy in the background",
+  "startupRecoveryLocalCopiesAvailable": "This device still holds {count, plural, =1{1 local copy} other{{count} local copies}}, the most recent from {when}. Resetting does not delete them — after restarting you can restore one from Settings › Backup › Local Copies.",
+  "@startupRecoveryLocalCopiesAvailable": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "when": {
+        "type": "String"
+      }
+    }
+  },
+  "startupRecoveryRecoveredCopiesDeleted": "It also holds {count, plural, =1{1 database copy} other{{count} database copies}} set aside by an earlier repair, and resetting DOES delete {count, plural, =1{it} other{those}} permanently. Export your data first if you want to keep {count, plural, =1{it} other{them}}.",
+  "@startupRecoveryRecoveredCopiesDeleted": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  }
 }

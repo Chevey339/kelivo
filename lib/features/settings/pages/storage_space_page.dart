@@ -14,6 +14,7 @@ import '../../../shared/widgets/ios_tactile.dart';
 import '../../../shared/widgets/ios_tile_button.dart';
 import '../../../shared/widgets/snackbar.dart';
 import '../../../utils/platform_utils.dart';
+import '../../backup/pages/local_snapshots_page.dart';
 import '../../chat/pages/image_viewer_page.dart';
 import 'log_viewer_page.dart';
 import '../../../theme/app_font_weights.dart';
@@ -88,6 +89,7 @@ class _StorageSpacePageState extends State<StorageSpacePage> {
       StorageUsageCategoryKey.legacyChatData,
       StorageUsageCategoryKey.restoreTraces,
       StorageUsageCategoryKey.displacedDatabases,
+      StorageUsageCategoryKey.localSnapshots,
       StorageUsageCategoryKey.assistantData,
       StorageUsageCategoryKey.cache,
       StorageUsageCategoryKey.logs,
@@ -110,6 +112,8 @@ class _StorageSpacePageState extends State<StorageSpacePage> {
         return Lucide.RotateCcw;
       case StorageUsageCategoryKey.displacedDatabases:
         return Lucide.Database;
+      case StorageUsageCategoryKey.localSnapshots:
+        return Lucide.Shield;
       case StorageUsageCategoryKey.assistantData:
         return Lucide.Bot;
       case StorageUsageCategoryKey.cache:
@@ -135,6 +139,8 @@ class _StorageSpacePageState extends State<StorageSpacePage> {
         return l10n.storageSpaceCategoryRestoreTraces;
       case StorageUsageCategoryKey.displacedDatabases:
         return l10n.storageSpaceCategoryDisplacedDatabases;
+      case StorageUsageCategoryKey.localSnapshots:
+        return l10n.localSnapshotSectionTitle;
       case StorageUsageCategoryKey.assistantData:
         return l10n.storageSpaceCategoryAssistantData;
       case StorageUsageCategoryKey.cache:
@@ -164,6 +170,8 @@ class _StorageSpacePageState extends State<StorageSpacePage> {
         return l10n.storageSpaceSubCompletedRestoreRuns;
       case 'displaced_databases':
         return l10n.storageSpaceSubDisplacedDatabases;
+      case 'local_snapshots':
+        return l10n.localSnapshotEnabledSubtitle;
       case 'fonts':
         return l10n.storageSpaceCategoryFonts;
       case 'local_models':
@@ -1458,6 +1466,17 @@ class _CategoryDetail extends StatelessWidget {
         backgroundColor: cs.error,
         enabled: !clearing && onClearDisplacedDatabases != null,
         onTap: () => onClearDisplacedDatabases?.call(),
+      );
+    } else if (category.key == StorageUsageCategoryKey.localSnapshots) {
+      // Managed rather than cleared: each of these is a restorable copy, and
+      // the screen that lists them can say what every one of them holds.
+      actions = IosTileButton(
+        label: l10n.localSnapshotManageCopies,
+        icon: Lucide.ChevronRight,
+        enabled: !clearing,
+        onTap: () => Navigator.of(context).push<void>(
+          MaterialPageRoute(builder: (_) => const LocalSnapshotsPage()),
+        ),
       );
     }
 

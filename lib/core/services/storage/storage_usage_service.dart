@@ -6,6 +6,7 @@ import '../../database/app_database.dart';
 import '../../database/database_installation_gate.dart';
 import '../hive_migration_marker.dart';
 import '../legacy_data_retirement_service.dart';
+import '../backup/local_snapshot_schedule.dart';
 import '../backup/restore_trace_service.dart';
 import '../../../utils/app_directories.dart';
 import '../../../utils/avatar_cache.dart';
@@ -19,6 +20,7 @@ enum StorageUsageCategoryKey {
   legacyChatData,
   restoreTraces,
   displacedDatabases,
+  localSnapshots,
   assistantData,
   cache,
   logs,
@@ -262,6 +264,9 @@ abstract final class StorageUsageService {
           continue;
         }
         switch (top) {
+          case LocalSnapshotPaths.directoryName:
+            byCat[StorageUsageCategoryKey.localSnapshots]!.add(bytes);
+            break;
           case 'upload':
             final name = parts.last;
             if (_isImageExt(name)) {
@@ -424,6 +429,18 @@ abstract final class StorageUsageService {
               stats: byCat[StorageUsageCategoryKey.displacedDatabases]!
                   .toStats(),
               path: root.path,
+            ),
+          ],
+        ),
+      if (byCat[StorageUsageCategoryKey.localSnapshots]!.fileCount > 0)
+        StorageUsageCategory(
+          key: StorageUsageCategoryKey.localSnapshots,
+          stats: byCat[StorageUsageCategoryKey.localSnapshots]!.toStats(),
+          subcategories: [
+            StorageUsageSubcategory(
+              id: 'local_snapshots',
+              stats: byCat[StorageUsageCategoryKey.localSnapshots]!.toStats(),
+              path: LocalSnapshotPaths.directoryIn(root).path,
             ),
           ],
         ),
@@ -784,6 +801,7 @@ const List<StorageUsageCategoryKey> _categoryOrder = <StorageUsageCategoryKey>[
   StorageUsageCategoryKey.legacyChatData,
   StorageUsageCategoryKey.restoreTraces,
   StorageUsageCategoryKey.displacedDatabases,
+  StorageUsageCategoryKey.localSnapshots,
   StorageUsageCategoryKey.assistantData,
   StorageUsageCategoryKey.cache,
   StorageUsageCategoryKey.logs,
@@ -795,6 +813,7 @@ bool _isAlwaysVisibleCategory(StorageUsageCategoryKey key) {
     case StorageUsageCategoryKey.legacyChatData:
     case StorageUsageCategoryKey.restoreTraces:
     case StorageUsageCategoryKey.displacedDatabases:
+    case StorageUsageCategoryKey.localSnapshots:
       return false;
     case StorageUsageCategoryKey.images:
     case StorageUsageCategoryKey.files:

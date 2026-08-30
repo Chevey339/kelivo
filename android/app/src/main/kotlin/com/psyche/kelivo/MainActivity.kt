@@ -5,6 +5,7 @@ import android.content.ActivityNotFoundException
 import android.net.Uri
 import android.content.Intent
 import android.os.ParcelFileDescriptor
+import android.os.StatFs
 import android.provider.DocumentsContract
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
@@ -28,8 +29,10 @@ class MainActivity : FlutterActivity() {
 
     private val processTextChannelName = "app.process_text"
     private val fileSaveChannelName = "app.file_save"
+    private val deviceStorageChannelName = "app.device_storage"
     private var processTextChannel: MethodChannel? = null
     private var fileSaveChannel: MethodChannel? = null
+    private var deviceStorageChannel: MethodChannel? = null
     private var pendingProcessText: String? = null
      private var pendingSaveResult: MethodChannel.Result? = null
      private var pendingSaveSourcePath: String? = null
@@ -68,7 +71,25 @@ class MainActivity : FlutterActivity() {
                 else -> result.notImplemented()
             }
         }
+        deviceStorageChannel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, deviceStorageChannelName)
+        deviceStorageChannel?.setMethodCallHandler { call, result ->
+            when (call.method) {
+                "freeBytes" -> result.success(usableBytesForAppData())
+                else -> result.notImplemented()
+            }
+        }
         pendingProcessText = extractProcessText(intent)
+    }
+
+    /**
+     * Space the app may still use on the volume holding its data, or null when
+     * it cannot be determined. Callers treat null as "unknown" and carry on.
+     */
+    private fun usableBytesForAppData(): Long? = try {
+        val target = filesDir ?: dataDir
+        StatFs(target.absolutePath).availableBytes.takeIf { it > 0 }
+    } catch (_: Exception) {
+        null
     }
 
     override fun onNewIntent(intent: Intent) {

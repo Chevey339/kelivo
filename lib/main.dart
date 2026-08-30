@@ -34,6 +34,8 @@ import 'core/providers/world_book_provider.dart';
 import 'core/providers/memory_provider.dart';
 import 'core/providers/memory_provider_v2.dart';
 import 'core/providers/backup_provider.dart';
+import 'core/providers/local_snapshot_provider.dart';
+import 'features/backup/local_snapshot_scheduler.dart';
 import 'core/services/memory/memory_pipeline.dart';
 import 'core/services/memory/memory_repository.dart';
 import 'core/providers/s3_backup_provider.dart';
@@ -47,6 +49,7 @@ import 'core/database/business_repository.dart';
 import 'core/database/business_startup_gate.dart';
 import 'core/database/chat_database_gateway.dart';
 import 'core/database/startup_failure_report.dart';
+import 'core/services/backup/local_snapshot_schedule.dart';
 import 'core/services/chat/chat_service.dart';
 import 'core/services/app_exit_flush.dart';
 import 'core/services/backup/restore_archive_pruner.dart';
@@ -249,6 +252,7 @@ Future<void> main() async {
         MyApp(
           databaseLease: processDatabaseLease,
           businessPreferences: businessPreferences,
+          appDataDirectory: appDataDirectory,
           restoreOutcome: restoreOutcome?.state,
         ),
       );
@@ -587,11 +591,13 @@ class MyApp extends StatelessWidget {
     super.key,
     required this.databaseLease,
     required this.businessPreferences,
+    required this.appDataDirectory,
     this.restoreOutcome,
   });
 
   final ChatDatabaseLease databaseLease;
   final BusinessPreferences businessPreferences;
+  final Directory appDataDirectory;
   final RestoreReceiptState? restoreOutcome;
 
   @override
@@ -698,6 +704,26 @@ class MyApp extends StatelessWidget {
             businessRepository: databaseLease.businessRepository,
             businessPreferences: businessPreferences,
             initialConfig: ctx.read<SettingsProvider>().s3Config,
+          ),
+        ),
+        ChangeNotifierProvider(
+          create: (ctx) => LocalSnapshotProvider(
+            appDataDirectory: appDataDirectory,
+            chatService: ctx.read<ChatService>(),
+            businessRepository: databaseLease.businessRepository,
+            businessPreferences: businessPreferences,
+            isBusy: () {
+              // Never compete with a reply the user is watching, nor with a
+              // backup or restore that is already holding the database.
+              if (ChatActions.hasAnyActiveGeneration) {
+                return LocalSnapshotSkipReason.generating;
+              }
+              if (ctx.read<BackupProvider>().busy ||
+                  ctx.read<S3BackupProvider>().busy) {
+                return LocalSnapshotSkipReason.busy;
+              }
+              return null;
+            },
           ),
         ),
       ],
@@ -993,7 +1019,11 @@ class MyApp extends StatelessWidget {
                             ),
                           )
                         : mq,
-                    child: AppOverlays(child: child ?? const SizedBox.shrink()),
+                    child: LocalSnapshotScheduler(
+                      child: AppOverlays(
+                        child: child ?? const SizedBox.shrink(),
+                      ),
+                    ),
                   );
                   // Enforce app font as a default across the tree for Texts without explicit family
                   return AnnotatedRegion<SystemUiOverlayStyle>(

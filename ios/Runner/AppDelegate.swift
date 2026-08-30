@@ -79,6 +79,57 @@ private let backgroundProcessingIdentifier = "psyche.kelivo.background-generatio
        deviceToolsChannel.setMethodCallHandler { [weak self] call, result in
          self?.deviceLocalToolsHandler.handle(call: call, result: result)
        }
+
+      // Free space on the volume holding the app's data. Uses the "important
+      // usage" capacity, which is what iOS will actually free up for data the
+      // app cannot regenerate -- the plain available-capacity value understates
+      // it and would make the app skip copies it could have made.
+      let storageChannel = FlutterMethodChannel(name: "app.device_storage", binaryMessenger: controller.binaryMessenger)
+      storageChannel.setMethodCallHandler { call, result in
+        switch call.method {
+        case "freeBytes":
+          guard let directory = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first else {
+            result(nil)
+            return
+          }
+          do {
+            let values = try directory.resourceValues(forKeys: [.volumeAvailableCapacityForImportantUsageKey])
+            if let capacity = values.volumeAvailableCapacityForImportantUsage {
+              result(NSNumber(value: capacity))
+              return
+            }
+          } catch {
+            // Fall through: the caller treats a missing answer as "unknown".
+          }
+          result(nil)
+
+        // Local database copies live under Documents, which iCloud backs up in
+        // full. They can reach gigabytes and are reproducible from the live
+        // database, so backing them up would bloat -- and can break -- the
+        // user's iCloud backup without protecting anything new.
+        case "excludeFromBackup":
+          guard
+            let arguments = call.arguments as? [String: Any],
+            let path = arguments["path"] as? String,
+            !path.isEmpty
+          else {
+            result(FlutterError(code: "invalid_args", message: "Missing path.", details: nil))
+            return
+          }
+          var url = URL(fileURLWithPath: path)
+          var values = URLResourceValues()
+          values.isExcludedFromBackup = true
+          do {
+            try url.setResourceValues(values)
+            result(true)
+          } catch {
+            result(FlutterError(code: "exclude_failed", message: error.localizedDescription, details: nil))
+          }
+
+        default:
+          result(FlutterMethodNotImplemented)
+        }
+      }
     }
     return super.application(application, didFinishLaunchingWithOptions: launchOptions)
   }

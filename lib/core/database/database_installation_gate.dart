@@ -5,6 +5,7 @@ import 'package:path/path.dart' as p;
 import 'package:sqlite3/sqlite3.dart' as sqlite;
 import 'package:uuid/uuid.dart';
 
+import '../services/backup/local_snapshot_schedule.dart';
 import '../services/backup/restore_durability.dart';
 import 'app_database.dart';
 import 'chat_database_repository.dart';
@@ -55,6 +56,29 @@ enum DatabaseRecoveryAction {
   promptUpgrade,
 }
 
+/// A database family that [DatabaseInstallationGate.rebuildFresh] moved aside
+/// instead of deleting.
+final class DisplacedDatabaseCopy {
+  const DisplacedDatabaseCopy({
+    required this.file,
+    required this.stamp,
+    required this.displacedAt,
+    required this.bytes,
+  });
+
+  /// The database itself; sidecars sit beside it with their own suffixes.
+  final File file;
+
+  /// Identifies the family. Sorts chronologically as text.
+  final String stamp;
+
+  /// Null when the stamp predates the current naming and cannot be read.
+  final DateTime? displacedAt;
+
+  /// The whole family, sidecars included.
+  final int bytes;
+}
+
 final class DatabaseInstallationGate {
   DatabaseInstallationGate._();
 
@@ -88,7 +112,12 @@ final class DatabaseInstallationGate {
 
   /// Directories whose contents outlive the database family and therefore
   /// prove a prior install even after the database and its receipt are gone.
+  ///
+  /// The snapshot directory is the strongest of these: a local copy only ever
+  /// exists because a database was there to copy, and unlike the asset
+  /// directories it is never written on first launch.
   static const _priorUseDirectoryNames = <String>[
+    LocalSnapshotPaths.directoryName,
     'images',
     'upload',
     'avatars',
@@ -392,6 +421,98 @@ final class DatabaseInstallationGate {
       }
     } catch (_) {}
     return false;
+  }
+
+  /// The database families set aside by [rebuildFresh], newest first.
+  ///
+  /// Each is a bare SQLite family, possibly on an older schema and possibly
+  /// still holding an unreplayed journal, so nothing here opens one: the
+  /// listing is for a screen that offers to export or restore it, and both of
+  /// those go through the backup pipeline rather than reading it directly.
+  static Future<List<DisplacedDatabaseCopy>> listDisplacedDatabases({
+    required Directory appDataDirectory,
+  }) async {
+    final prefix = '${AppDatabase.databaseFileName}$displacedDatabasePrefix';
+    final bytesByStamp = <String, int>{};
+    try {
+      await for (final entity in appDataDirectory.list(followLinks: false)) {
+        if (entity is! File) continue;
+        final name = p.basename(entity.path);
+        if (!name.startsWith(prefix)) continue;
+        var stamp = name.substring(prefix.length);
+        for (final suffix in _databaseFamilySuffixes) {
+          if (suffix.isEmpty) continue;
+          if (stamp.endsWith(suffix)) {
+            stamp = stamp.substring(0, stamp.length - suffix.length);
+            break;
+          }
+        }
+        if (stamp.isEmpty) continue;
+        try {
+          bytesByStamp[stamp] =
+              (bytesByStamp[stamp] ?? 0) + await entity.length();
+        } catch (_) {
+          bytesByStamp[stamp] ??= 0;
+        }
+      }
+    } catch (_) {
+      return const <DisplacedDatabaseCopy>[];
+    }
+
+    final copies = <DisplacedDatabaseCopy>[];
+    for (final entry in bytesByStamp.entries) {
+      final base = File(p.join(appDataDirectory.path, '$prefix${entry.key}'));
+      if (await FileSystemEntity.type(base.path, followLinks: false) !=
+          FileSystemEntityType.file) {
+        // The family exists but its database does not; there is nothing a
+        // restore could be built from, so do not offer it.
+        continue;
+      }
+      final micros = int.tryParse(entry.key);
+      copies.add(
+        DisplacedDatabaseCopy(
+          file: base,
+          stamp: entry.key,
+          displacedAt: micros == null
+              ? null
+              : DateTime.fromMicrosecondsSinceEpoch(micros, isUtc: true),
+          bytes: entry.value,
+        ),
+      );
+    }
+    copies.sort((a, b) => b.stamp.compareTo(a.stamp));
+    return copies;
+  }
+
+  /// Removes one displaced family. Throws if anything survives.
+  static Future<void> deleteDisplacedDatabase({
+    required Directory appDataDirectory,
+    required String stamp,
+  }) async {
+    if (stamp.isEmpty || !RegExp(r'^[0-9]+$').hasMatch(stamp)) {
+      throw ArgumentError.value(stamp, 'stamp');
+    }
+    final prefix = '${AppDatabase.databaseFileName}$displacedDatabasePrefix';
+    // Sidecars first, database last. [listDisplacedDatabases] only surfaces a
+    // family whose database still exists, so removing the database first would
+    // hide any sidecar that then failed to delete -- leaving debris the user
+    // can no longer reach, while `hasDisplacedDatabases` still reports it.
+    for (final suffix in _databaseFamilySuffixes.reversed) {
+      final file = File(p.join(appDataDirectory.path, '$prefix$stamp$suffix'));
+      try {
+        if (await FileSystemEntity.type(file.path, followLinks: false) ==
+            FileSystemEntityType.file) {
+          await file.delete();
+        }
+      } catch (_) {}
+    }
+    for (final suffix in _databaseFamilySuffixes) {
+      final file = File(p.join(appDataDirectory.path, '$prefix$stamp$suffix'));
+      if (await FileSystemEntity.type(file.path, followLinks: false) !=
+          FileSystemEntityType.notFound) {
+        throw StateError('displaced_databases_not_cleared');
+      }
+    }
   }
 
   /// Removes every displaced database copy.

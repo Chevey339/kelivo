@@ -8,6 +8,7 @@ import 'package:share_plus/share_plus.dart';
 
 import '../../core/database/startup_failure_report.dart';
 import '../../core/database/startup_recovery_service.dart';
+import '../../core/services/backup/local_copy_catalog.dart';
 import '../../icons/lucide_adapter.dart';
 import '../../l10n/app_localizations.dart';
 
@@ -68,6 +69,7 @@ class _RestoreFailureScreenState extends State<RestoreFailureScreen> {
   bool _recoveryMessageIsError = false;
   StartupIntegrityResult? _integrity;
   String? _integrityError;
+  List<LocalCopy> _localCopies = const <LocalCopy>[];
 
   bool get _isDesktop =>
       Platform.isWindows || Platform.isMacOS || Platform.isLinux;
@@ -109,10 +111,22 @@ class _RestoreFailureScreenState extends State<RestoreFailureScreen> {
           text: report.toText(),
         );
       }
+      // Listing only reads names and sizes; nothing here opens a database,
+      // which is exactly what this screen cannot assume is safe to do.
+      var copies = const <LocalCopy>[];
+      if (directory != null) {
+        try {
+          copies = await LocalCopyCatalog(appDataDirectory: directory).list();
+        } catch (_) {
+          // The reset warning is a courtesy; failing to build it must not
+          // take the recovery screen down with it.
+        }
+      }
       if (!mounted) return;
       setState(() {
         _report = report;
         _savedReport = saved;
+        _localCopies = copies;
         _collectingDiagnostics = false;
       });
     }();
@@ -449,6 +463,7 @@ class _RestoreFailureScreenState extends State<RestoreFailureScreen> {
                   _DangerZone(
                     expanded: _dangerExpanded,
                     busy: _busy,
+                    localCopies: _localCopies,
                     onToggle: () =>
                         setState(() => _dangerExpanded = !_dangerExpanded),
                     onReset: _resetAndRestart,
@@ -906,12 +921,28 @@ class _DangerZone extends StatelessWidget {
   const _DangerZone({
     required this.expanded,
     required this.busy,
+    required this.localCopies,
     required this.onToggle,
     required this.onReset,
   });
 
   final bool expanded;
   final bool busy;
+
+  /// Shown before the reset button so nobody discards data that is still
+  /// sitting on the device, recoverable, a restart away.
+  ///
+  /// Split by kind because reset treats them differently: snapshots survive
+  /// it, and database families set aside by an earlier repair do not. Telling
+  /// the user "your copies are safe" while the button is about to delete half
+  /// of them would be the same mistake this screen exists to prevent.
+  final List<LocalCopy> localCopies;
+
+  Iterable<LocalCopy> get _survivingCopies =>
+      localCopies.where((copy) => copy.kind == LocalCopyKind.snapshot);
+
+  Iterable<LocalCopy> get _copiesResetWillDelete =>
+      localCopies.where((copy) => copy.kind == LocalCopyKind.displaced);
   final VoidCallback onToggle;
   final Future<void> Function() onReset;
 
@@ -956,6 +987,33 @@ class _DangerZone extends StatelessWidget {
                     height: 1.45,
                   ),
                 ),
+                if (_survivingCopies.isNotEmpty) ...[
+                  const SizedBox(height: 10),
+                  Text(
+                    l10n.startupRecoveryLocalCopiesAvailable(
+                      _survivingCopies.length,
+                      _localCopyDate(_survivingCopies.first),
+                    ),
+                    style: textTheme.bodySmall?.copyWith(
+                      color: colors.onSurface,
+                      height: 1.45,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+                if (_copiesResetWillDelete.isNotEmpty) ...[
+                  const SizedBox(height: 10),
+                  Text(
+                    l10n.startupRecoveryRecoveredCopiesDeleted(
+                      _copiesResetWillDelete.length,
+                    ),
+                    style: textTheme.bodySmall?.copyWith(
+                      color: colors.error,
+                      height: 1.45,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
                 const SizedBox(height: 14),
                 SizedBox(
                   width: double.infinity,
@@ -979,6 +1037,14 @@ class _DangerZone extends StatelessWidget {
       ],
     );
   }
+}
+
+String _localCopyDate(LocalCopy copy) {
+  final at = copy.createdAt?.toLocal();
+  if (at == null) return '—';
+  String two(int value) => value.toString().padLeft(2, '0');
+  return '${at.year}-${two(at.month)}-${two(at.day)} '
+      '${two(at.hour)}:${two(at.minute)}';
 }
 
 class _ResetConfirmationDialog extends StatefulWidget {

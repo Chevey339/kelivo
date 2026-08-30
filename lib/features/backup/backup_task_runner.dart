@@ -11,14 +11,29 @@ Future<bool> runBackupTask(
   required Future<void> Function(BackupTaskHandle handle) task,
   String Function(Object error)? errorMessage,
   Future<void> Function()? onSuccess,
+  String? backgroundLabel,
+  String? backgroundedMessage,
 }) async {
   final l10n = AppLocalizations.of(context)!;
   final result = await showBackupProgressDialog<void>(
     context,
     title: title,
     task: task,
+    backgroundLabel: backgroundLabel,
   );
   if (!context.mounted) return false;
+  if (result.backgrounded) {
+    // The work continues; the caller stops here because it no longer has an
+    // outcome to act on.
+    if (backgroundedMessage != null) {
+      showAppSnackBar(
+        context,
+        message: backgroundedMessage,
+        type: NotificationType.info,
+      );
+    }
+    return false;
+  }
   if (result.cancelled) {
     showAppSnackBar(
       context,

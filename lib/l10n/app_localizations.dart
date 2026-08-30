@@ -15198,6 +15198,354 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Assistant settings also apply to thinking, tool-call, and translation cards.'**
   String get messageStyleSettingsPageRoleAssistantHint;
+
+  /// No description provided for @localSnapshotSectionTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Local Copies'**
+  String get localSnapshotSectionTitle;
+
+  /// No description provided for @localSnapshotEnabledTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Keep local copies'**
+  String get localSnapshotEnabledTitle;
+
+  /// No description provided for @localSnapshotEnabledSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Kelivo periodically saves a copy of its database on this device, so it is never the only one.'**
+  String get localSnapshotEnabledSubtitle;
+
+  /// No description provided for @localSnapshotIntervalTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'How often'**
+  String get localSnapshotIntervalTitle;
+
+  /// No description provided for @localSnapshotIntervalAutomatic.
+  ///
+  /// In en, this message translates to:
+  /// **'Automatic'**
+  String get localSnapshotIntervalAutomatic;
+
+  /// No description provided for @localSnapshotIntervalAutomaticDetail.
+  ///
+  /// In en, this message translates to:
+  /// **'Daily, less often as the database grows'**
+  String get localSnapshotIntervalAutomaticDetail;
+
+  /// No description provided for @localSnapshotIntervalDays.
+  ///
+  /// In en, this message translates to:
+  /// **'{days, plural, =1{Every day} other{Every {days} days}}'**
+  String localSnapshotIntervalDays(int days);
+
+  /// No description provided for @localSnapshotKeepTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Copies to keep'**
+  String get localSnapshotKeepTitle;
+
+  /// No description provided for @localSnapshotKeepValue.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 copy} other{{count} copies}}'**
+  String localSnapshotKeepValue(int count);
+
+  /// No description provided for @localSnapshotKeepSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Plus one from last week and one from last month, so a problem that went unnoticed is still recoverable.'**
+  String get localSnapshotKeepSubtitle;
+
+  /// No description provided for @localSnapshotKeepWeekly.
+  ///
+  /// In en, this message translates to:
+  /// **'Keep one from last week'**
+  String get localSnapshotKeepWeekly;
+
+  /// No description provided for @localSnapshotKeepMonthly.
+  ///
+  /// In en, this message translates to:
+  /// **'Keep one from last month'**
+  String get localSnapshotKeepMonthly;
+
+  /// No description provided for @localSnapshotKeepProtectedNote.
+  ///
+  /// In en, this message translates to:
+  /// **'The most recent copy that still contains data is never removed automatically, whatever this is set to.'**
+  String get localSnapshotKeepProtectedNote;
+
+  /// No description provided for @localSnapshotMaximumTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Space limit'**
+  String get localSnapshotMaximumTitle;
+
+  /// No description provided for @localSnapshotMaximumUnlimited.
+  ///
+  /// In en, this message translates to:
+  /// **'No limit'**
+  String get localSnapshotMaximumUnlimited;
+
+  /// No description provided for @localSnapshotAnnounceTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Notify when a copy is saved'**
+  String get localSnapshotAnnounceTitle;
+
+  /// No description provided for @localSnapshotAnnounceSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Failures are always reported. This only adds a brief message on success.'**
+  String get localSnapshotAnnounceSubtitle;
+
+  /// No description provided for @localSnapshotTakeNow.
+  ///
+  /// In en, this message translates to:
+  /// **'Save a copy now'**
+  String get localSnapshotTakeNow;
+
+  /// No description provided for @localSnapshotManageCopies.
+  ///
+  /// In en, this message translates to:
+  /// **'Manage copies'**
+  String get localSnapshotManageCopies;
+
+  /// No description provided for @localSnapshotUsage.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =0{No copies} =1{1 copy} other{{count} copies}} · {size}'**
+  String localSnapshotUsage(int count, String size);
+
+  /// No description provided for @localSnapshotStatusNever.
+  ///
+  /// In en, this message translates to:
+  /// **'No copy saved yet'**
+  String get localSnapshotStatusNever;
+
+  /// No description provided for @localSnapshotStatusSuccess.
+  ///
+  /// In en, this message translates to:
+  /// **'Last copy {when}'**
+  String localSnapshotStatusSuccess(String when);
+
+  /// No description provided for @localSnapshotStatusFailure.
+  ///
+  /// In en, this message translates to:
+  /// **'Last attempt failed {when}: {reason}'**
+  String localSnapshotStatusFailure(String when, String reason);
+
+  /// No description provided for @localSnapshotStatusSkippedSpace.
+  ///
+  /// In en, this message translates to:
+  /// **'Skipped: not enough free space on this device'**
+  String get localSnapshotStatusSkippedSpace;
+
+  /// No description provided for @localSnapshotStatusUnchanged.
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing has changed since the last copy'**
+  String get localSnapshotStatusUnchanged;
+
+  /// No description provided for @localSnapshotCopiesTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Local Copies'**
+  String get localSnapshotCopiesTitle;
+
+  /// No description provided for @localSnapshotCopiesEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No local copies yet'**
+  String get localSnapshotCopiesEmpty;
+
+  /// No description provided for @localSnapshotCopiesEmptyHint.
+  ///
+  /// In en, this message translates to:
+  /// **'A copy is saved automatically as your data changes, and one is always saved before a restore.'**
+  String get localSnapshotCopiesEmptyHint;
+
+  /// No description provided for @localSnapshotCopiesScopeNote.
+  ///
+  /// In en, this message translates to:
+  /// **'Local copies live on this device only. They protect against damage to your data inside the app, not against losing the device or uninstalling Kelivo — use WebDAV or S3 backup for that.'**
+  String get localSnapshotCopiesScopeNote;
+
+  /// No description provided for @localSnapshotOriginAutomatic.
+  ///
+  /// In en, this message translates to:
+  /// **'Automatic'**
+  String get localSnapshotOriginAutomatic;
+
+  /// No description provided for @localSnapshotOriginManual.
+  ///
+  /// In en, this message translates to:
+  /// **'Saved by you'**
+  String get localSnapshotOriginManual;
+
+  /// No description provided for @localSnapshotOriginBeforeRestore.
+  ///
+  /// In en, this message translates to:
+  /// **'Before a restore'**
+  String get localSnapshotOriginBeforeRestore;
+
+  /// No description provided for @localSnapshotKindRecovered.
+  ///
+  /// In en, this message translates to:
+  /// **'Set aside by recovery'**
+  String get localSnapshotKindRecovered;
+
+  /// No description provided for @localSnapshotCopyContents.
+  ///
+  /// In en, this message translates to:
+  /// **'{conversations, plural, =1{1 chat} other{{conversations} chats}} · {messages, plural, =1{1 message} other{{messages} messages}}'**
+  String localSnapshotCopyContents(int conversations, int messages);
+
+  /// No description provided for @localSnapshotCopyContentsUnknown.
+  ///
+  /// In en, this message translates to:
+  /// **'Contents unknown until restored'**
+  String get localSnapshotCopyContentsUnknown;
+
+  /// No description provided for @localSnapshotCopyPinned.
+  ///
+  /// In en, this message translates to:
+  /// **'Kept'**
+  String get localSnapshotCopyPinned;
+
+  /// No description provided for @localSnapshotActionRestore.
+  ///
+  /// In en, this message translates to:
+  /// **'Restore'**
+  String get localSnapshotActionRestore;
+
+  /// No description provided for @localSnapshotActionExport.
+  ///
+  /// In en, this message translates to:
+  /// **'Export'**
+  String get localSnapshotActionExport;
+
+  /// No description provided for @localSnapshotActionDelete.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete'**
+  String get localSnapshotActionDelete;
+
+  /// No description provided for @localSnapshotActionPin.
+  ///
+  /// In en, this message translates to:
+  /// **'Keep this copy'**
+  String get localSnapshotActionPin;
+
+  /// No description provided for @localSnapshotActionUnpin.
+  ///
+  /// In en, this message translates to:
+  /// **'Stop keeping'**
+  String get localSnapshotActionUnpin;
+
+  /// No description provided for @localSnapshotRestoreTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Restore this copy?'**
+  String get localSnapshotRestoreTitle;
+
+  /// No description provided for @localSnapshotRestoreMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Your current chats and settings will be replaced by this copy from {when}. A copy of what you have now is saved first, so this can be undone.'**
+  String localSnapshotRestoreMessage(String when);
+
+  /// No description provided for @localSnapshotRestorePreparing.
+  ///
+  /// In en, this message translates to:
+  /// **'Preparing copy'**
+  String get localSnapshotRestorePreparing;
+
+  /// No description provided for @localSnapshotDeleteTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete this copy?'**
+  String get localSnapshotDeleteTitle;
+
+  /// No description provided for @localSnapshotDeleteMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'This copy will be removed from the device permanently. Any data it holds that is not in your current database will be gone.'**
+  String get localSnapshotDeleteMessage;
+
+  /// No description provided for @localSnapshotDeleteLastWarning.
+  ///
+  /// In en, this message translates to:
+  /// **'This is the only copy that still contains data.'**
+  String get localSnapshotDeleteLastWarning;
+
+  /// No description provided for @localSnapshotExportPreparing.
+  ///
+  /// In en, this message translates to:
+  /// **'Preparing export'**
+  String get localSnapshotExportPreparing;
+
+  /// No description provided for @localSnapshotExportDone.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy exported'**
+  String get localSnapshotExportDone;
+
+  /// No description provided for @localSnapshotExportFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not export the copy: {reason}'**
+  String localSnapshotExportFailed(String reason);
+
+  /// No description provided for @localSnapshotTakeDone.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy saved'**
+  String get localSnapshotTakeDone;
+
+  /// No description provided for @localSnapshotTakeFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not save a copy: {reason}'**
+  String localSnapshotTakeFailed(String reason);
+
+  /// No description provided for @localSnapshotDeleteDone.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy deleted'**
+  String get localSnapshotDeleteDone;
+
+  /// No description provided for @localSnapshotBusyMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Another backup task is already running'**
+  String get localSnapshotBusyMessage;
+
+  /// No description provided for @localSnapshotRunInBackground.
+  ///
+  /// In en, this message translates to:
+  /// **'Continue in background'**
+  String get localSnapshotRunInBackground;
+
+  /// No description provided for @localSnapshotRunningInBackground.
+  ///
+  /// In en, this message translates to:
+  /// **'Saving a copy in the background'**
+  String get localSnapshotRunningInBackground;
+
+  /// No description provided for @startupRecoveryLocalCopiesAvailable.
+  ///
+  /// In en, this message translates to:
+  /// **'This device still holds {count, plural, =1{1 local copy} other{{count} local copies}}, the most recent from {when}. Resetting does not delete them — after restarting you can restore one from Settings › Backup › Local Copies.'**
+  String startupRecoveryLocalCopiesAvailable(int count, String when);
+
+  /// No description provided for @startupRecoveryRecoveredCopiesDeleted.
+  ///
+  /// In en, this message translates to:
+  /// **'It also holds {count, plural, =1{1 database copy} other{{count} database copies}} set aside by an earlier repair, and resetting DOES delete {count, plural, =1{it} other{those}} permanently. Export your data first if you want to keep {count, plural, =1{it} other{them}}.'**
+  String startupRecoveryRecoveredCopiesDeleted(int count);
 }
 
 class _AppLocalizationsDelegate

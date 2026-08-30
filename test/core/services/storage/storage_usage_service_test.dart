@@ -9,6 +9,7 @@ import 'package:sqlite3/sqlite3.dart';
 import 'package:Kelivo/core/database/app_database.dart';
 import 'package:Kelivo/core/database/chat_database_repository.dart';
 import 'package:Kelivo/core/database/database_installation_gate.dart';
+import 'package:Kelivo/core/services/backup/local_snapshot_schedule.dart';
 import 'package:Kelivo/core/services/backup/restore_workspace_lock.dart';
 import 'package:Kelivo/core/services/storage/storage_usage_service.dart';
 
@@ -270,6 +271,40 @@ void main() {
       );
     },
   );
+
+  test('local copies are accounted for on their own, not as "other"', () async {
+    final snapshots = Directory(
+      p.join(tempDir.path, LocalSnapshotPaths.directoryName),
+    );
+    await snapshots.create(recursive: true);
+    await _writeSizedFile(
+      snapshots,
+      LocalSnapshotPaths.fileNameFor(DateTime.utc(2026, 5, 1)),
+      512,
+    );
+    await _writeSizedFile(
+      snapshots,
+      '${LocalSnapshotPaths.fileNameFor(DateTime.utc(2026, 5, 1))}'
+      '${LocalSnapshotPaths.metadataSuffix}',
+      64,
+    );
+
+    final report = await StorageUsageService.computeReport();
+    final copies = report.categories.singleWhere(
+      (category) => category.key == StorageUsageCategoryKey.localSnapshots,
+    );
+
+    expect(copies.stats.bytes, 576);
+    expect(copies.stats.fileCount, 2);
+    expect(copies.subcategories.single.id, 'local_snapshots');
+    expect(copies.subcategories.single.path, snapshots.path);
+    // Restorable data is never offered up as space to reclaim.
+    expect(report.clearable.bytes, 0);
+    final other = report.categories.singleWhere(
+      (category) => category.key == StorageUsageCategoryKey.other,
+    );
+    expect(other.stats.bytes, 0);
+  });
 
   test('restore traces stay hidden while a restore run is active', () async {
     const runId = '0123456789abcdef0123456789abcdef';

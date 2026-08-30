@@ -12,6 +12,7 @@ import '../../core/database/business_repository.dart';
 import '../../core/models/backup.dart';
 import '../../core/providers/backup_provider.dart';
 import '../../core/providers/backup_reminder_provider.dart';
+import '../../core/providers/local_snapshot_provider.dart';
 import '../../core/providers/s3_backup_provider.dart';
 import '../../core/providers/settings_provider.dart';
 import '../../core/services/chat/chat_service.dart';
@@ -25,6 +26,8 @@ import '../../features/backup/backup_task_runner.dart';
 import '../../features/backup/widgets/backup_progress_dialog.dart';
 import '../../features/backup/backup_restart_dialog.dart';
 import '../../features/backup/widgets/backup_reminder_helpers.dart';
+import '../../features/backup/pages/local_snapshots_page.dart';
+import '../../core/database/startup_failure_report.dart' show formatBytes;
 import '../widgets/desktop_select_dropdown.dart';
 import '../../theme/app_font_weights.dart';
 import 'package:Kelivo/theme/app_semantic_colors.dart';
@@ -358,6 +361,8 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
               const SliverToBoxAdapter(child: SizedBox(height: 10)),
 
               SliverToBoxAdapter(child: _BackupReminderDesktopSection()),
+              const SliverToBoxAdapter(child: SizedBox(height: 12)),
+              const SliverToBoxAdapter(child: _LocalSnapshotDesktopSection()),
 
               const SliverToBoxAdapter(child: SizedBox(height: 10)),
 
@@ -1128,6 +1133,65 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
           ),
         ],
       ),
+    );
+  }
+}
+
+class _LocalSnapshotDesktopSection extends StatelessWidget {
+  const _LocalSnapshotDesktopSection();
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final l10n = AppLocalizations.of(context)!;
+    final vm = context.watch<LocalSnapshotProvider>();
+
+    return SectionCard(
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(bottom: 6),
+          child: Text(
+            l10n.localSnapshotSectionTitle,
+            style: TextStyle(fontSize: 15, fontWeight: AppFontWeights.semibold),
+          ),
+        ),
+        _ItemRow(
+          label: l10n.localSnapshotEnabledTitle,
+          vpad: 2,
+          trailing: IosSwitch(
+            value: vm.settings.enabled,
+            onChanged: (value) => context
+                .read<LocalSnapshotProvider>()
+                .updateSettings(vm.settings.copyWith(enabled: value)),
+          ),
+        ),
+        _rowDivider(context),
+        _ItemRow(
+          label: l10n.localSnapshotManageCopies,
+          trailing: _DeskIosButton(
+            label: l10n.localSnapshotUsage(
+              vm.copies.length,
+              formatBytes(vm.totalBytes),
+            ),
+            filled: false,
+            dense: true,
+            onTap: () => Navigator.of(context).push<void>(
+              MaterialPageRoute(builder: (_) => const LocalSnapshotsPage()),
+            ),
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.only(top: 8),
+          child: Text(
+            l10n.localSnapshotEnabledSubtitle,
+            style: TextStyle(
+              fontSize: 12,
+              height: 1.45,
+              color: cs.onSurface.withValues(alpha: 0.55),
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

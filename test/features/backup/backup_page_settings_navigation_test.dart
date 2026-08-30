@@ -1,5 +1,7 @@
 import '../../support/business_test_harness.dart';
 
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
@@ -8,6 +10,7 @@ import 'package:Kelivo/core/database/business_preferences.dart';
 import 'package:Kelivo/core/database/business_repository.dart';
 import 'package:Kelivo/core/providers/backup_provider.dart';
 import 'package:Kelivo/core/providers/backup_reminder_provider.dart';
+import 'package:Kelivo/core/providers/local_snapshot_provider.dart';
 import 'package:Kelivo/core/providers/s3_backup_provider.dart';
 import 'package:Kelivo/core/providers/settings_provider.dart';
 import 'package:Kelivo/core/services/chat/chat_service.dart';
@@ -39,6 +42,17 @@ Widget _buildHarness({
       ChangeNotifierProvider<SettingsProvider>.value(value: settings),
       ChangeNotifierProvider<ChatService>(create: (_) => ChatService()),
       ChangeNotifierProvider<BackupReminderProvider>.value(value: reminder),
+      ChangeNotifierProvider<LocalSnapshotProvider>(
+        create: (context) => LocalSnapshotProvider(
+          appDataDirectory: Directory.systemTemp.createTempSync(
+            'kelivo_backup_page_',
+          ),
+          chatService: context.read<ChatService>(),
+          businessRepository: businessRepository,
+          businessPreferences: businessPreferences,
+          autoLoad: false,
+        ),
+      ),
     ],
     child: MaterialApp(
       localizationsDelegates: AppLocalizations.localizationsDelegates,
@@ -63,6 +77,17 @@ Widget _buildDesktopHarness({
       ChangeNotifierProvider<SettingsProvider>.value(value: settings),
       ChangeNotifierProvider<ChatService>.value(value: chatService),
       ChangeNotifierProvider<BackupReminderProvider>.value(value: reminder),
+      ChangeNotifierProvider<LocalSnapshotProvider>(
+        create: (context) => LocalSnapshotProvider(
+          appDataDirectory: Directory.systemTemp.createTempSync(
+            'kelivo_backup_page_',
+          ),
+          chatService: context.read<ChatService>(),
+          businessRepository: businessRepository,
+          businessPreferences: businessPreferences,
+          autoLoad: false,
+        ),
+      ),
       ChangeNotifierProvider<BackupProvider>(
         create: (_) => BackupProvider(
           chatService: chatService,
