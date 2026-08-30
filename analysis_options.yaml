@@ -30,4 +30,5 @@ linter:
 # https://dart.dev/guides/language/analysis-options
 analyzer:
   exclude:
+    - dependencies/flutter_math_fork/**
     - dependencies/flutter_tts/**
