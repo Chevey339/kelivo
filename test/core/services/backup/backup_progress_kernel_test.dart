@@ -1,6 +1,8 @@
 import 'dart:async';
+import 'dart:ffi';
 import 'dart:io';
 
+import 'package:ffi/ffi.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:Kelivo/core/services/backup/backup_cancel_token.dart';
@@ -86,6 +88,15 @@ void main() {
   });
 
   group('runBackupIsolate', () {
+    test('debug native sleep restores the caller signal mask', () {
+      if (Platform.isWindows) return;
+
+      final before = _currentSignalMask();
+      debugNativeSleepIgnoringKill(0);
+
+      expect(_currentSignalMask(), before);
+    });
+
     test('processed is monotonic within a phase', () async {
       final events = <BackupProgress>[];
       await runBackupIsolate<int, int>(
@@ -457,6 +468,23 @@ void main() {
       },
     );
   });
+}
+
+List<int> _currentSignalMask() {
+  const signalSetSize = 256;
+  final current = calloc<Uint8>(signalSetSize);
+  try {
+    final pthreadSigmask = DynamicLibrary.process()
+        .lookupFunction<
+          Int32 Function(Int32, Pointer<Void>, Pointer<Void>),
+          int Function(int, Pointer<Void>, Pointer<Void>)
+        >('pthread_sigmask');
+    final sigBlock = Platform.isMacOS || Platform.isIOS ? 1 : 0;
+    expect(pthreadSigmask(sigBlock, nullptr, current.cast()), 0);
+    return List<int>.of(current.asTypedList(signalSetSize));
+  } finally {
+    calloc.free(current);
+  }
 }
 
 Future<void> _registerThenHang(BackupIsolateContext context, int handle) async {
