@@ -3733,6 +3733,7 @@ class _NullDigestOutputStream extends OutputStream {
     }
   }
 
+  @override
   void writeBackReference(int distance, int count) {
     var remaining = count;
     while (remaining > 0) {

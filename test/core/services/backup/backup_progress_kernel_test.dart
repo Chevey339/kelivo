@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:ffi';
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
@@ -600,17 +599,8 @@ String _nonCancellableThenCancelRace(
   return 'committed';
 }
 
-void _nativeSleepIgnoringKill(BackupIsolateContext context, int seconds) {
-  if (Platform.isWindows) {
-    DynamicLibrary.open('kernel32.dll')
-        .lookupFunction<Void Function(Uint32), void Function(int)>('Sleep')
-        .call(seconds * 1000);
-    return;
-  }
-  DynamicLibrary.process()
-      .lookupFunction<Int32 Function(Uint32), int Function(int)>('sleep')
-      .call(seconds);
-}
+void _nativeSleepIgnoringKill(BackupIsolateContext context, int seconds) =>
+    debugNativeSleepIgnoringKill(seconds);
 
 void _stuckHeartbeatLoop(BackupIsolateContext context, String path) {
   final file = File(path);

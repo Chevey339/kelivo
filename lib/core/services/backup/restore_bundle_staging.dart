@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:ffi';
 import 'dart:io';
 import 'dart:math';
 import 'dart:typed_data';
@@ -942,7 +941,7 @@ final class RestoreBundleStaging {
     );
     ctx.throwIfCancelled();
     if (args.hangSeconds > 0) {
-      _nativeSleepSeconds(args.hangSeconds);
+      debugNativeSleepIgnoringKill(args.hangSeconds);
     }
     if (args.stallMs > 0) {
       final until = DateTime.now().add(Duration(milliseconds: args.stallMs));
@@ -993,7 +992,7 @@ final class RestoreBundleStaging {
     );
     ctx.throwIfCancelled();
     if (args.hangSeconds > 0) {
-      _nativeSleepSeconds(args.hangSeconds);
+      debugNativeSleepIgnoringKill(args.hangSeconds);
     }
     if (args.stallMs > 0) {
       final until = DateTime.now().add(Duration(milliseconds: args.stallMs));
@@ -1050,18 +1049,6 @@ final class RestoreBundleStaging {
     }
     ctx.throwIfCancelled();
     return databaseInfo;
-  }
-
-  static void _nativeSleepSeconds(int seconds) {
-    if (Platform.isWindows) {
-      DynamicLibrary.open('kernel32.dll')
-          .lookupFunction<Void Function(Uint32), void Function(int)>('Sleep')
-          .call(seconds * 1000);
-      return;
-    }
-    DynamicLibrary.process()
-        .lookupFunction<Int32 Function(Uint32), int Function(int)>('sleep')
-        .call(seconds);
   }
 
   static Map<String, Object?>? _parseBusinessEntityRowIds(

@@ -1,6 +1,9 @@
 import 'dart:async';
+import 'dart:ffi';
+import 'dart:io';
 import 'dart:isolate';
 
+import 'package:ffi/ffi.dart';
 import 'package:flutter/foundation.dart';
 
 import '../../database/sqlite_interrupt.dart';
@@ -13,6 +16,46 @@ export '../../database/sqlite_interrupt.dart'
 /// Test-only: skip Isolate.kill to simulate a kill-resistant native call.
 @visibleForTesting
 bool debugSkipBackupIsolateKill = false;
+
+/// Test-only: blocks the calling thread in a native sleep that neither
+/// `Isolate.kill` nor a signal can cut short, simulating a kill-resistant
+/// native call.
+///
+/// libc's `sleep` returns early on any signal, and on Linux the Dart VM
+/// profiler samples threads with SIGPROF, so the thread's signals are blocked
+/// first; without that the "stuck" isolate finishes in a millisecond.
+void debugNativeSleepIgnoringKill(int seconds) {
+  if (Platform.isWindows) {
+    DynamicLibrary.open('kernel32.dll')
+        .lookupFunction<Void Function(Uint32), void Function(int)>('Sleep')
+        .call(seconds * 1000);
+    return;
+  }
+  final libc = DynamicLibrary.process();
+  // Larger than any platform's sigset_t (glibc: 128 bytes).
+  final set = calloc<Uint8>(256);
+  try {
+    libc
+        .lookupFunction<
+          Int32 Function(Pointer<Void>),
+          int Function(Pointer<Void>)
+        >('sigfillset')
+        .call(set.cast());
+    // SIG_BLOCK is 0 on Linux/Android and 1 on the BSD-derived Apple libc.
+    final sigBlock = Platform.isMacOS || Platform.isIOS ? 1 : 0;
+    libc
+        .lookupFunction<
+          Int32 Function(Int32, Pointer<Void>, Pointer<Void>),
+          int Function(int, Pointer<Void>, Pointer<Void>)
+        >('pthread_sigmask')
+        .call(sigBlock, set.cast(), nullptr);
+  } finally {
+    calloc.free(set);
+  }
+  libc
+      .lookupFunction<Int32 Function(Uint32), int Function(int)>('sleep')
+      .call(seconds);
+}
 
 final class BackupIsolateTimeoutException extends TimeoutException {
   BackupIsolateTimeoutException({
