@@ -127,6 +127,7 @@ class ChatInputBar extends StatefulWidget {
     this.onOpenWorldBook,
     this.onClearContext,
     this.onCompressContext,
+    this.onSetContextFloor,
     this.onLongPressLearning,
     this.learningModeActive = false,
     this.worldBookActive = false,
@@ -179,6 +180,7 @@ class ChatInputBar extends StatefulWidget {
   final VoidCallback? onOpenWorldBook;
   final VoidCallback? onClearContext;
   final VoidCallback? onCompressContext;
+  final VoidCallback? onSetContextFloor;
   final VoidCallback? onLongPressLearning;
   final bool learningModeActive;
   final bool worldBookActive;
@@ -2062,6 +2064,12 @@ class _ChatInputBarState extends State<ChatInputBar>
                     icon: Lucide.package2,
                     label: l10n.compressContext,
                     onTap: lockTap(widget.onCompressContext),
+                  ),
+                if (widget.onSetContextFloor != null)
+                  DesktopContextMenuItem(
+                    icon: Lucide.Layers,
+                    label: l10n.contextFloor,
+                    onTap: lockTap(widget.onSetContextFloor),
                   ),
                 DesktopContextMenuItem(
                   icon: Lucide.Eraser,

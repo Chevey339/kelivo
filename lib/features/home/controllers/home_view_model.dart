@@ -1110,6 +1110,23 @@ class HomeViewModel extends ChangeNotifier {
     }
   }
 
+  /// Set the conversation context floor: the 0-based message index at which
+  /// generation context starts. Messages before it are skipped so the prompt
+  /// prefix stays byte-stable and keeps hitting the provider prompt cache.
+  /// Pass -1 to clear the floor.
+  Future<void> setContextFloor(int startIndex) async {
+    final convo = currentConversation;
+    if (convo == null) return;
+    final updated = await _chatService.setContextFloor(convo.id, startIndex);
+    if (updated != null) {
+      _chatController.updateCurrentConversation(updated);
+      notifyListeners();
+    }
+  }
+
+  /// Clear the context floor (resume reading from message 1).
+  Future<void> resetContextFloor() => setContextFloor(-1);
+
   /// Compress context: summarize messages via LLM, create new conversation with summary.
   /// Returns null on success, or an error key string on failure.
   Future<String?> compressContext({

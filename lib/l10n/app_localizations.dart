@@ -4312,6 +4312,66 @@ abstract class AppLocalizations {
   /// **'Context Management'**
   String get contextManagement;
 
+  /// No description provided for @contextFloor.
+  ///
+  /// In en, this message translates to:
+  /// **'Context floor'**
+  String get contextFloor;
+
+  /// No description provided for @contextFloorDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Start reading the chat from a fixed message onward. Everything above it is skipped, so the prompt prefix stays byte-stable and keeps hitting the provider\'s prompt cache as the chat grows — draw the summarized head into your assistant\'s system prompt.'**
+  String get contextFloorDesc;
+
+  /// No description provided for @contextFloorDialogTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Set context floor'**
+  String get contextFloorDialogTitle;
+
+  /// No description provided for @contextFloorHint.
+  ///
+  /// In en, this message translates to:
+  /// **'This conversation has {count} messages.'**
+  String contextFloorHint(Object count);
+
+  /// No description provided for @contextFloorNone.
+  ///
+  /// In en, this message translates to:
+  /// **'Off'**
+  String get contextFloorNone;
+
+  /// No description provided for @contextFloorCurrent.
+  ///
+  /// In en, this message translates to:
+  /// **'From message {floor}'**
+  String contextFloorCurrent(Object floor);
+
+  /// No description provided for @contextFloorApply.
+  ///
+  /// In en, this message translates to:
+  /// **'Apply'**
+  String get contextFloorApply;
+
+  /// No description provided for @contextFloorReset.
+  ///
+  /// In en, this message translates to:
+  /// **'Reset to message 1'**
+  String get contextFloorReset;
+
+  /// No description provided for @contextFloorCancel.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel'**
+  String get contextFloorCancel;
+
+  /// No description provided for @contextFloorInvalid.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter a floor between 1 and {count}.'**
+  String contextFloorInvalid(Object count);
+
   /// No description provided for @compressingContext.
   ///
   /// In en, this message translates to:

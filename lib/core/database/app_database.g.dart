@@ -181,6 +181,19 @@ class $ConversationRowsTable extends ConversationRows
     type: DriftSqlType.string,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _contextFloorMeta = const VerificationMeta(
+    'contextFloor',
+  );
+  @override
+  late final GeneratedColumn<int> contextFloor = GeneratedColumn<int>(
+    'context_floor',
+    aliasedName,
+    false,
+    check: () => ComparableExpr(contextFloor).isBiggerOrEqualValue(-1),
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(-1),
+  );
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -198,6 +211,7 @@ class $ConversationRowsTable extends ConversationRows
     lastMemoryExtractedOrder,
     chatModelProvider,
     chatModelId,
+    contextFloor,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -317,6 +331,15 @@ class $ConversationRowsTable extends ConversationRows
         ),
       );
     }
+    if (data.containsKey('context_floor')) {
+      context.handle(
+        _contextFloorMeta,
+        contextFloor.isAcceptableOrUnknown(
+          data['context_floor']!,
+          _contextFloorMeta,
+        ),
+      );
+    }
     return context;
   }
 
@@ -390,6 +413,10 @@ class $ConversationRowsTable extends ConversationRows
         DriftSqlType.string,
         data['${effectivePrefix}chat_model_id'],
       ),
+      contextFloor: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}context_floor'],
+      )!,
     );
   }
 
@@ -420,6 +447,7 @@ class ConversationRow extends DataClass implements Insertable<ConversationRow> {
   final int lastMemoryExtractedOrder;
   final String? chatModelProvider;
   final String? chatModelId;
+  final int contextFloor;
   const ConversationRow({
     required this.id,
     required this.title,
@@ -436,6 +464,7 @@ class ConversationRow extends DataClass implements Insertable<ConversationRow> {
     required this.lastMemoryExtractedOrder,
     this.chatModelProvider,
     this.chatModelId,
+    required this.contextFloor,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -477,6 +506,7 @@ class ConversationRow extends DataClass implements Insertable<ConversationRow> {
     if (!nullToAbsent || chatModelId != null) {
       map['chat_model_id'] = Variable<String>(chatModelId);
     }
+    map['context_floor'] = Variable<int>(contextFloor);
     return map;
   }
 
@@ -507,6 +537,7 @@ class ConversationRow extends DataClass implements Insertable<ConversationRow> {
       chatModelId: chatModelId == null && nullToAbsent
           ? const Value.absent()
           : Value(chatModelId),
+      contextFloor: Value(contextFloor),
     );
   }
 
@@ -543,6 +574,7 @@ class ConversationRow extends DataClass implements Insertable<ConversationRow> {
         json['chatModelProvider'],
       ),
       chatModelId: serializer.fromJson<String?>(json['chatModelId']),
+      contextFloor: serializer.fromJson<int>(json['contextFloor']),
     );
   }
   @override
@@ -568,6 +600,7 @@ class ConversationRow extends DataClass implements Insertable<ConversationRow> {
       ),
       'chatModelProvider': serializer.toJson<String?>(chatModelProvider),
       'chatModelId': serializer.toJson<String?>(chatModelId),
+      'contextFloor': serializer.toJson<int>(contextFloor),
     };
   }
 
@@ -587,6 +620,7 @@ class ConversationRow extends DataClass implements Insertable<ConversationRow> {
     int? lastMemoryExtractedOrder,
     Value<String?> chatModelProvider = const Value.absent(),
     Value<String?> chatModelId = const Value.absent(),
+    int? contextFloor,
   }) => ConversationRow(
     id: id ?? this.id,
     title: title ?? this.title,
@@ -609,6 +643,7 @@ class ConversationRow extends DataClass implements Insertable<ConversationRow> {
         ? chatModelProvider.value
         : this.chatModelProvider,
     chatModelId: chatModelId.present ? chatModelId.value : this.chatModelId,
+    contextFloor: contextFloor ?? this.contextFloor,
   );
   ConversationRow copyWithCompanion(ConversationRowsCompanion data) {
     return ConversationRow(
@@ -645,6 +680,9 @@ class ConversationRow extends DataClass implements Insertable<ConversationRow> {
       chatModelId: data.chatModelId.present
           ? data.chatModelId.value
           : this.chatModelId,
+      contextFloor: data.contextFloor.present
+          ? data.contextFloor.value
+          : this.contextFloor,
     );
   }
 
@@ -665,7 +703,8 @@ class ConversationRow extends DataClass implements Insertable<ConversationRow> {
           ..write('injectedMemoryHash: $injectedMemoryHash, ')
           ..write('lastMemoryExtractedOrder: $lastMemoryExtractedOrder, ')
           ..write('chatModelProvider: $chatModelProvider, ')
-          ..write('chatModelId: $chatModelId')
+          ..write('chatModelId: $chatModelId, ')
+          ..write('contextFloor: $contextFloor')
           ..write(')'))
         .toString();
   }
@@ -687,6 +726,7 @@ class ConversationRow extends DataClass implements Insertable<ConversationRow> {
     lastMemoryExtractedOrder,
     chatModelProvider,
     chatModelId,
+    contextFloor,
   );
   @override
   bool operator ==(Object other) =>
@@ -706,7 +746,8 @@ class ConversationRow extends DataClass implements Insertable<ConversationRow> {
           other.injectedMemoryHash == this.injectedMemoryHash &&
           other.lastMemoryExtractedOrder == this.lastMemoryExtractedOrder &&
           other.chatModelProvider == this.chatModelProvider &&
-          other.chatModelId == this.chatModelId);
+          other.chatModelId == this.chatModelId &&
+          other.contextFloor == this.contextFloor);
 }
 
 class ConversationRowsCompanion extends UpdateCompanion<ConversationRow> {
@@ -725,6 +766,7 @@ class ConversationRowsCompanion extends UpdateCompanion<ConversationRow> {
   final Value<int> lastMemoryExtractedOrder;
   final Value<String?> chatModelProvider;
   final Value<String?> chatModelId;
+  final Value<int> contextFloor;
   final Value<int> rowid;
   const ConversationRowsCompanion({
     this.id = const Value.absent(),
@@ -742,6 +784,7 @@ class ConversationRowsCompanion extends UpdateCompanion<ConversationRow> {
     this.lastMemoryExtractedOrder = const Value.absent(),
     this.chatModelProvider = const Value.absent(),
     this.chatModelId = const Value.absent(),
+    this.contextFloor = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   ConversationRowsCompanion.insert({
@@ -760,6 +803,7 @@ class ConversationRowsCompanion extends UpdateCompanion<ConversationRow> {
     this.lastMemoryExtractedOrder = const Value.absent(),
     this.chatModelProvider = const Value.absent(),
     this.chatModelId = const Value.absent(),
+    this.contextFloor = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : id = Value(id),
        title = Value(title),
@@ -781,6 +825,7 @@ class ConversationRowsCompanion extends UpdateCompanion<ConversationRow> {
     Expression<int>? lastMemoryExtractedOrder,
     Expression<String>? chatModelProvider,
     Expression<String>? chatModelId,
+    Expression<int>? contextFloor,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -804,6 +849,7 @@ class ConversationRowsCompanion extends UpdateCompanion<ConversationRow> {
         'last_memory_extracted_order': lastMemoryExtractedOrder,
       if (chatModelProvider != null) 'chat_model_provider': chatModelProvider,
       if (chatModelId != null) 'chat_model_id': chatModelId,
+      if (contextFloor != null) 'context_floor': contextFloor,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -824,6 +870,7 @@ class ConversationRowsCompanion extends UpdateCompanion<ConversationRow> {
     Value<int>? lastMemoryExtractedOrder,
     Value<String?>? chatModelProvider,
     Value<String?>? chatModelId,
+    Value<int>? contextFloor,
     Value<int>? rowid,
   }) {
     return ConversationRowsCompanion(
@@ -845,6 +892,7 @@ class ConversationRowsCompanion extends UpdateCompanion<ConversationRow> {
           lastMemoryExtractedOrder ?? this.lastMemoryExtractedOrder,
       chatModelProvider: chatModelProvider ?? this.chatModelProvider,
       chatModelId: chatModelId ?? this.chatModelId,
+      contextFloor: contextFloor ?? this.contextFloor,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -909,6 +957,9 @@ class ConversationRowsCompanion extends UpdateCompanion<ConversationRow> {
     if (chatModelId.present) {
       map['chat_model_id'] = Variable<String>(chatModelId.value);
     }
+    if (contextFloor.present) {
+      map['context_floor'] = Variable<int>(contextFloor.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -933,6 +984,7 @@ class ConversationRowsCompanion extends UpdateCompanion<ConversationRow> {
           ..write('lastMemoryExtractedOrder: $lastMemoryExtractedOrder, ')
           ..write('chatModelProvider: $chatModelProvider, ')
           ..write('chatModelId: $chatModelId, ')
+          ..write('contextFloor: $contextFloor, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -11348,6 +11400,7 @@ typedef $$ConversationRowsTableCreateCompanionBuilder =
       Value<int> lastMemoryExtractedOrder,
       Value<String?> chatModelProvider,
       Value<String?> chatModelId,
+      Value<int> contextFloor,
       Value<int> rowid,
     });
 typedef $$ConversationRowsTableUpdateCompanionBuilder =
@@ -11367,6 +11420,7 @@ typedef $$ConversationRowsTableUpdateCompanionBuilder =
       Value<int> lastMemoryExtractedOrder,
       Value<String?> chatModelProvider,
       Value<String?> chatModelId,
+      Value<int> contextFloor,
       Value<int> rowid,
     });
 
@@ -11533,6 +11587,11 @@ class $$ConversationRowsTableFilterComposer
     builder: (column) => ColumnFilters(column),
   );
 
+  ColumnFilters<int> get contextFloor => $composableBuilder(
+    column: $table.contextFloor,
+    builder: (column) => ColumnFilters(column),
+  );
+
   Expression<bool> messageRowsRefs(
     Expression<bool> Function($$MessageRowsTableFilterComposer f) f,
   ) {
@@ -11694,6 +11753,11 @@ class $$ConversationRowsTableOrderingComposer
     column: $table.chatModelId,
     builder: (column) => ColumnOrderings(column),
   );
+
+  ColumnOrderings<int> get contextFloor => $composableBuilder(
+    column: $table.contextFloor,
+    builder: (column) => ColumnOrderings(column),
+  );
 }
 
 class $$ConversationRowsTableAnnotationComposer
@@ -11765,6 +11829,11 @@ class $$ConversationRowsTableAnnotationComposer
 
   GeneratedColumn<String> get chatModelId => $composableBuilder(
     column: $table.chatModelId,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get contextFloor => $composableBuilder(
+    column: $table.contextFloor,
     builder: (column) => column,
   );
 
@@ -11896,6 +11965,7 @@ class $$ConversationRowsTableTableManager
                 Value<int> lastMemoryExtractedOrder = const Value.absent(),
                 Value<String?> chatModelProvider = const Value.absent(),
                 Value<String?> chatModelId = const Value.absent(),
+                Value<int> contextFloor = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => ConversationRowsCompanion(
                 id: id,
@@ -11913,6 +11983,7 @@ class $$ConversationRowsTableTableManager
                 lastMemoryExtractedOrder: lastMemoryExtractedOrder,
                 chatModelProvider: chatModelProvider,
                 chatModelId: chatModelId,
+                contextFloor: contextFloor,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -11932,6 +12003,7 @@ class $$ConversationRowsTableTableManager
                 Value<int> lastMemoryExtractedOrder = const Value.absent(),
                 Value<String?> chatModelProvider = const Value.absent(),
                 Value<String?> chatModelId = const Value.absent(),
+                Value<int> contextFloor = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => ConversationRowsCompanion.insert(
                 id: id,
@@ -11949,6 +12021,7 @@ class $$ConversationRowsTableTableManager
                 lastMemoryExtractedOrder: lastMemoryExtractedOrder,
                 chatModelProvider: chatModelProvider,
                 chatModelId: chatModelId,
+                contextFloor: contextFloor,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0

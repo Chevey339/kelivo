@@ -2285,6 +2285,43 @@ class AppLocalizationsEn extends AppLocalizations {
   String get contextManagement => 'Context Management';
 
   @override
+  String get contextFloor => 'Context floor';
+
+  @override
+  String get contextFloorDesc =>
+      'Start reading the chat from a fixed message onward. Everything above it is skipped, so the prompt prefix stays byte-stable and keeps hitting the provider\'s prompt cache as the chat grows — draw the summarized head into your assistant\'s system prompt.';
+
+  @override
+  String get contextFloorDialogTitle => 'Set context floor';
+
+  @override
+  String contextFloorHint(Object count) {
+    return 'This conversation has $count messages.';
+  }
+
+  @override
+  String get contextFloorNone => 'Off';
+
+  @override
+  String contextFloorCurrent(Object floor) {
+    return 'From message $floor';
+  }
+
+  @override
+  String get contextFloorApply => 'Apply';
+
+  @override
+  String get contextFloorReset => 'Reset to message 1';
+
+  @override
+  String get contextFloorCancel => 'Cancel';
+
+  @override
+  String contextFloorInvalid(Object count) {
+    return 'Enter a floor between 1 and $count.';
+  }
+
+  @override
   String get compressingContext => 'Compressing context...';
 
   @override

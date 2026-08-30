@@ -2652,6 +2652,23 @@ class HomePageController extends ChangeNotifier {
     );
   }
 
+  /// Label for the context-floor row in the context management sheet.
+  String contextFloorLabel() {
+    final l10n = AppLocalizations.of(_context)!;
+    final floor = currentConversation?.contextFloor;
+    if (floor == null || floor < 0) return l10n.contextFloorNone;
+    return l10n.contextFloorCurrent(floor + 1);
+  }
+
+  /// Upper bound (inclusive) for a floor number: the current message count.
+  int contextFloorMax() => _chatController.totalMessageCount;
+
+  Future<void> setContextFloor(int startIndex) async {
+    await _viewModel.setContextFloor(startIndex);
+  }
+
+  Future<void> resetContextFloor() => _viewModel.resetContextFloor();
+
   String? currentStreamingMessageId() {
     for (int i = messages.length - 1; i >= 0; i--) {
       final m = messages[i];

@@ -66,6 +66,7 @@ class ChatInputSection extends StatelessWidget {
     this.onLongPressLearning,
     this.onClearContext,
     this.onCompressContext,
+    this.onSetContextFloor,
     this.conversationId,
     this.sendButtonTooltip,
     this.backgroundImageActive = false,
@@ -108,6 +109,7 @@ class ChatInputSection extends StatelessWidget {
   final VoidCallback? onLongPressLearning;
   final VoidCallback? onClearContext;
   final VoidCallback? onCompressContext;
+  final VoidCallback? onSetContextFloor;
   final String? conversationId;
 
   /// The model this conversation sends with, already resolved through
@@ -231,6 +233,7 @@ class ChatInputSection extends StatelessWidget {
       showMoreButton: !isTablet,
       onClearContext: isTablet ? onClearContext : null,
       onCompressContext: isTablet ? onCompressContext : null,
+      onSetContextFloor: isTablet ? onSetContextFloor : null,
       backgroundImageActive: backgroundImageActive,
       inputBackgroundOpacityLight: settings.chatInputBackgroundOpacityLight,
       inputBackgroundOpacityDark: settings.chatInputBackgroundOpacityDark,

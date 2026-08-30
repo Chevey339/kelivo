@@ -71,6 +71,17 @@ class Conversation extends HiveObject {
   @HiveField(16)
   String? chatModelId;
 
+  // Context "floor": the 0-based message index at which context reading starts.
+  // The generation prompt sends messages from here onward and drops everything
+  // above, so the prompt prefix stays byte-stable and keeps hitting the
+  // provider prompt cache as the conversation grows. -1 = disabled.
+  //
+  // NOTE: conversation.g.dart is intentionally stale (stops at field 12) and
+  // must not be regenerated; like fields 13-16 this one lives in the SQLite
+  // payload and Hive keeps its own copy indifferent to it.
+  @HiveField(17)
+  int contextFloor;
+
   Conversation({
     String? id,
     required this.title,
@@ -89,6 +100,7 @@ class Conversation extends HiveObject {
     int? lastMemoryExtractedOrder,
     this.chatModelProvider,
     this.chatModelId,
+    int? contextFloor,
   }) : id = id ?? const Uuid().v4(),
        createdAt = createdAt ?? DateTime.now(),
        updatedAt = updatedAt ?? DateTime.now(),
@@ -98,7 +110,8 @@ class Conversation extends HiveObject {
        versionSelections = versionSelections ?? <String, int>{},
        lastSummarizedMessageCount = lastSummarizedMessageCount ?? 0,
        chatSuggestions = chatSuggestions ?? [],
-       lastMemoryExtractedOrder = lastMemoryExtractedOrder ?? -1;
+       lastMemoryExtractedOrder = lastMemoryExtractedOrder ?? -1,
+       contextFloor = contextFloor ?? -1;
 
   Conversation copyWith({
     String? id,
@@ -118,6 +131,7 @@ class Conversation extends HiveObject {
     int? lastMemoryExtractedOrder,
     String? chatModelProvider,
     String? chatModelId,
+    int? contextFloor,
     bool clearSummary = false,
     bool clearInjectedMemoryHash = false,
     bool clearChatModel = false,
@@ -146,7 +160,18 @@ class Conversation extends HiveObject {
           ? null
           : (chatModelProvider ?? this.chatModelProvider),
       chatModelId: clearChatModel ? null : (chatModelId ?? this.chatModelId),
+      contextFloor: contextFloor ?? this.contextFloor,
     );
+  }
+
+  /// Effective 0-based index at which context reading starts: the stricter of
+  /// [truncateIndex] (清空上下文) and [contextFloor] (楼层), both of which mean
+  /// "skip the first N messages". Returns -1 when neither is set.
+  int get contextStartIndex {
+    final t = truncateIndex >= 0 ? truncateIndex : -1;
+    final f = contextFloor >= 0 ? contextFloor : -1;
+    if (t >= 0 && f >= 0) return t > f ? t : f;
+    return t >= 0 ? t : f;
   }
 
   Map<String, dynamic> toJson() {
@@ -168,6 +193,7 @@ class Conversation extends HiveObject {
       'lastMemoryExtractedOrder': lastMemoryExtractedOrder,
       'chatModelProvider': chatModelProvider,
       'chatModelId': chatModelId,
+      'contextFloor': contextFloor,
     };
   }
 
@@ -198,6 +224,7 @@ class Conversation extends HiveObject {
       lastMemoryExtractedOrder: json['lastMemoryExtractedOrder'] as int? ?? -1,
       chatModelProvider: json['chatModelProvider'] as String?,
       chatModelId: json['chatModelId'] as String?,
+      contextFloor: json['contextFloor'] as int? ?? -1,
     );
   }
 }

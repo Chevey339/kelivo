@@ -87,11 +87,12 @@ void main() {
     expect(outcome.fromVersion, 1);
     expect(outcome.toVersion, AppDatabase.currentSchemaVersion);
     expect(outcome.upgraded, isTrue);
-    expect(SchemaMigrations.readSchemaVersion(file), 2);
+    expect(SchemaMigrations.readSchemaVersion(file), AppDatabase.currentSchemaVersion);
     expect(columnsOf(file, 'conversation_rows'), [
       ...before,
       'chat_model_provider',
       'chat_model_id',
+      'context_floor',
     ]);
 
     final raw = sqlite.sqlite3.open(file.path, mode: sqlite.OpenMode.readOnly);
@@ -101,6 +102,7 @@ void main() {
       expect(rows.single['id'], 'conv-1');
       expect(rows.single['chat_model_provider'], isNull);
       expect(rows.single['chat_model_id'], isNull);
+      expect(rows.single['context_floor'], -1);
     } finally {
       raw.close();
     }

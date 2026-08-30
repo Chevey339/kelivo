@@ -67,6 +67,14 @@ class ConversationRows extends Table {
   // — ChatDatabaseRepository validates column order exactly.
   TextColumn get chatModelProvider => text().nullable()();
   TextColumn get chatModelId => text().nullable()();
+  // Context "floor": 0-based start index for generation context. Messages
+  // before this index are skipped when building the API messages, so the
+  // prompt prefix stays stable and keeps hitting the provider prompt cache.
+  // -1 = disabled. Declared last (see the chatModel comment above).
+  IntColumn get contextFloor => integer()
+      // ignore: recursive_getters
+      .check(contextFloor.isBiggerOrEqualValue(-1))
+      .withDefault(const Constant(-1))();
 
   @override
   Set<Column<Object>> get primaryKey => {id};
@@ -673,14 +681,14 @@ class AppDatabase extends _$AppDatabase {
   static const databaseFileName = 'kelivo.db';
 
   // Schema 1 is the first published SQLite contract; schema 2 adds the
-  // per-conversation model override. Every version outside
-  // [publishedSchemaVersions] belongs to an unpublished or future format and is
-  // rejected.
-  static const currentSchemaVersion = 2;
+  // per-conversation model override; schema 3 adds the per-conversation
+  // context floor. Every version outside [publishedSchemaVersions] belongs to
+  // an unpublished or future format and is rejected.
+  static const currentSchemaVersion = 3;
 
   /// Every schema that has ever shipped. A file at any of these can be
   /// upgraded by `SchemaMigrations`; anything else is rejected outright.
-  static const publishedSchemaVersions = <int>{1, 2};
+  static const publishedSchemaVersions = <int>{1, 2, 3};
 
   /// Whether a live application connection may use a file as-is: either freshly
   /// created (0) or already at the current schema.
@@ -833,6 +841,12 @@ FROM probe;
         await m.addColumn(
           schema.conversationRows,
           schema.conversationRows.chatModelId,
+        );
+      },
+      from2To3: (m, schema) async {
+        await m.addColumn(
+          schema.conversationRows,
+          schema.conversationRows.contextFloor,
         );
       },
     ),

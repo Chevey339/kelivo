@@ -927,7 +927,7 @@ class ChatService extends ChangeNotifier {
   }
 
   int getContextStartIndex(String conversationId) =>
-      _conversationsCache[conversationId]?.truncateIndex ?? -1;
+      _conversationsCache[conversationId]?.contextStartIndex ?? -1;
 
   Future<void> _cacheMessageArtifacts(Iterable<ChatMessage> messages) async {
     final ids = messages.map((message) => message.id).toSet();
@@ -2367,6 +2367,7 @@ class ChatService extends ChangeNotifier {
       lastMemoryExtractedOrder: conversation.lastMemoryExtractedOrder,
       chatModelProvider: conversation.chatModelProvider,
       chatModelId: conversation.chatModelId,
+      contextFloor: conversation.contextFloor,
     );
     await _repo.putMigrationBatch(
       conversations: [restored],
@@ -3992,6 +3993,37 @@ class ChatService extends ChangeNotifier {
       touchedCache = true;
     }
     if (changed > 0 || touchedCache) notifyListeners();
+  }
+
+  /// Set the context floor: the 0-based message index at which generation
+  /// context starts for [conversationId]. Messages before it are skipped when
+  /// building API messages, keeping the prompt prefix byte-stable so the
+  /// provider prompt cache keeps hitting as the conversation grows. Pass -1 to
+  /// clear the floor. Returns the updated conversation, or null if absent.
+  ///
+  /// Mirrors [toggleTruncateAtTail]'s persistence (mutate cached object +
+  /// [_saveConversation]); unlike that toggle, the floor never moves on its
+  /// own when new messages arrive.
+  Future<Conversation?> setContextFloor(
+    String conversationId,
+    int startIndex,
+  ) async {
+    if (!_initialized) await init();
+    if (_draftConversations.containsKey(conversationId)) {
+      final draft = _draftConversations[conversationId]!;
+      draft.contextFloor = startIndex;
+      draft.updatedAt = DateTime.now();
+      notifyListeners();
+      return draft;
+    }
+    final c = _conversationsCache[conversationId];
+    if (c == null) return null;
+    c.contextFloor = startIndex;
+    c.updatedAt = DateTime.now();
+    await _saveConversation(c);
+    _bumpConversationListRevision();
+    notifyListeners();
+    return c;
   }
 
   Future<Conversation?> toggleTruncateAtTail(

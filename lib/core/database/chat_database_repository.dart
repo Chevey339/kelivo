@@ -852,6 +852,7 @@ class ChatDatabaseRepository {
       'last_memory_extracted_order',
       'chat_model_provider',
       'chat_model_id',
+      'context_floor',
     ],
     'conversation_mcp_server_rows': ['conversation_id', 'server_id', 'ordinal'],
     'message_rows': [
@@ -5257,7 +5258,8 @@ class ChatDatabaseRepository {
         .customSelect(
           'SELECT title, created_at, updated_at, is_pinned, assistant_id, '
           'truncate_index, version_selections_json, summary, '
-          'last_summarized_message_count, chat_suggestions_json '
+          'last_summarized_message_count, chat_suggestions_json, '
+          'context_floor '
           'FROM $schema.conversation_rows WHERE id = ?;',
           variables: [Variable<String>(id)],
         )
@@ -5525,13 +5527,13 @@ class ChatDatabaseRepository {
       'truncate_index, version_selections_json, summary, '
       'last_summarized_message_count, chat_suggestions_json, '
       'injected_memory_hash, last_memory_extracted_order, '
-      'chat_model_provider, chat_model_id) '
+      'chat_model_provider, chat_model_id, context_floor) '
       'SELECT ?, title, created_at, updated_at, is_pinned, assistant_id, '
       'truncate_index, ?, summary, '
       'last_summarized_message_count, chat_suggestions_json, '
       'NULL, COALESCE((SELECT MAX(message_order) '
       'FROM merge_source.message_rows WHERE conversation_id = ?), -1), '
-      'chat_model_provider, chat_model_id '
+      'chat_model_provider, chat_model_id, context_floor '
       'FROM merge_source.conversation_rows WHERE id = ?;',
       [targetId, jsonEncode(targetSelections), sourceId, sourceId],
     );
@@ -6613,6 +6615,7 @@ class ChatDatabaseRepository {
       lastMemoryExtractedOrder: row.lastMemoryExtractedOrder,
       chatModelProvider: row.chatModelProvider,
       chatModelId: row.chatModelId,
+      contextFloor: row.contextFloor,
     );
   }
 
@@ -6639,6 +6642,7 @@ class ChatDatabaseRepository {
       lastMemoryExtractedOrder: Value(conversation.lastMemoryExtractedOrder),
       chatModelProvider: Value(conversation.chatModelProvider),
       chatModelId: Value(conversation.chatModelId),
+      contextFloor: Value(conversation.contextFloor),
     );
   }
 

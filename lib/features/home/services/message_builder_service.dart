@@ -184,7 +184,7 @@ class MessageBuilderService {
     required Conversation? currentConversation,
     bool includeToolMessages = false,
   }) {
-    final tIndex = currentConversation?.truncateIndex ?? -1;
+    final tIndex = currentConversation?.contextStartIndex ?? -1;
     final List<ChatMessage> sourceAll =
         (tIndex >= 0 && tIndex <= messages.length)
         ? messages.sublist(tIndex)
@@ -1947,10 +1947,16 @@ class MessageBuilderService {
   }
 
   /// Apply context message limit based on assistant settings.
+  ///
+  /// When a context floor is active ([floorIndex] >= 0) the floor owns the
+  /// head boundary of the prompt: trimming/dropping the head here would break
+  /// the byte-stable prefix the floor exists to maintain, so it is skipped.
   void applyContextLimit(
     List<Map<String, dynamic>> apiMessages,
-    Assistant? assistant,
-  ) {
+    Assistant? assistant, {
+    int? floorIndex,
+  }) {
+    if (floorIndex != null && floorIndex >= 0) return;
     if ((assistant?.limitContextMessages ?? false) &&
         (assistant?.contextMessageSize ?? 0) > 0) {
       final int keep = (assistant!.contextMessageSize).clamp(

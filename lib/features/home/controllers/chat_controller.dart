@@ -746,7 +746,7 @@ class ChatController extends ChangeNotifier {
   }) {
     return _chatService.loadSelectedContextMessages(
       conversation.id,
-      truncateIndex: conversation.truncateIndex,
+      truncateIndex: conversation.contextStartIndex,
       limit: maxMessages,
       throughRevisionId: throughRevisionId,
       includeFollowingAssistant: includeFollowingAssistant,

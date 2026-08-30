@@ -2213,6 +2213,43 @@ class AppLocalizationsZh extends AppLocalizations {
   String get contextManagement => '上下文管理';
 
   @override
+  String get contextFloor => '上下文楼层';
+
+  @override
+  String get contextFloorDesc =>
+      '从固定的某一层消息开始读取对话，它之前的内容不再进入上下文。前缀因此保持字节级不变，命中模型的提示词缓存来降本——把前面的总结放进助手的系统提示词即可';
+
+  @override
+  String get contextFloorDialogTitle => '设置上下文楼层';
+
+  @override
+  String contextFloorHint(Object count) {
+    return '当前会话共 $count 条消息。';
+  }
+
+  @override
+  String get contextFloorNone => '未设置';
+
+  @override
+  String contextFloorCurrent(Object floor) {
+    return '从第 $floor 条开始';
+  }
+
+  @override
+  String get contextFloorApply => '应用';
+
+  @override
+  String get contextFloorReset => '重置为从第 1 条开始';
+
+  @override
+  String get contextFloorCancel => '取消';
+
+  @override
+  String contextFloorInvalid(Object count) {
+    return '请输入 1 到 $count 之间的楼层号。';
+  }
+
+  @override
   String get compressingContext => '正在压缩上下文...';
 
   @override
@@ -10234,6 +10271,43 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get contextManagement => '上下文管理';
 
   @override
+  String get contextFloor => '上下文楼层';
+
+  @override
+  String get contextFloorDesc =>
+      '从固定的某一层消息开始读取对话，它之前的内容不再进入上下文。前缀因此保持字节级不变，命中模型的提示词缓存来降本——把前面的总结放进助手的系统提示词即可';
+
+  @override
+  String get contextFloorDialogTitle => '设置上下文楼层';
+
+  @override
+  String contextFloorHint(Object count) {
+    return '当前会话共 $count 条消息。';
+  }
+
+  @override
+  String get contextFloorNone => '未设置';
+
+  @override
+  String contextFloorCurrent(Object floor) {
+    return '从第 $floor 条开始';
+  }
+
+  @override
+  String get contextFloorApply => '应用';
+
+  @override
+  String get contextFloorReset => '重置为从第 1 条开始';
+
+  @override
+  String get contextFloorCancel => '取消';
+
+  @override
+  String contextFloorInvalid(Object count) {
+    return '请输入 1 到 $count 之间的楼层号。';
+  }
+
+  @override
   String get compressingContext => '正在压缩上下文...';
 
   @override
@@ -18178,6 +18252,43 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get contextManagement => '上下文管理';
+
+  @override
+  String get contextFloor => '上下文樓層';
+
+  @override
+  String get contextFloorDesc =>
+      '從固定的某一層訊息開始讀取對話，它之前的內容不再進入上下文。前綴因此保持位元組級不變，命中模型的提示詞快取來降本——把前面的總結放進助手的系統提示詞即可';
+
+  @override
+  String get contextFloorDialogTitle => '設定上下文樓層';
+
+  @override
+  String contextFloorHint(Object count) {
+    return '目前對話共 $count 則訊息。';
+  }
+
+  @override
+  String get contextFloorNone => '未設定';
+
+  @override
+  String contextFloorCurrent(Object floor) {
+    return '從第 $floor 則開始';
+  }
+
+  @override
+  String get contextFloorApply => '套用';
+
+  @override
+  String get contextFloorReset => '重設為從第 1 則開始';
+
+  @override
+  String get contextFloorCancel => '取消';
+
+  @override
+  String contextFloorInvalid(Object count) {
+    return '請輸入 1 到 $count 之間的樓層號。';
+  }
 
   @override
   String get compressingContext => '正在壓縮上下文...';

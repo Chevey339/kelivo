@@ -1466,6 +1466,7 @@ class _HomePageState extends State<HomePage>
       onLongPressLearning: _showLearningPromptSheet,
       onClearContext: _controller.clearContext,
       onCompressContext: _handleDesktopCompressContext,
+      onSetContextFloor: _showContextFloorDialog,
       backgroundImageActive: _assistantBackgroundActive(context),
     );
   }
@@ -1790,6 +1791,12 @@ class _HomePageState extends State<HomePage>
           top: false,
           child: ContextManagementSheet(
             clearLabel: _controller.clearContextLabel(),
+            floorLabel: _controller.contextFloorLabel(),
+            onSetFloor: () async {
+              await Navigator.of(ctx).maybePop();
+              if (!mounted) return;
+              await _showContextFloorDialog();
+            },
             onCompress: () async {
               await Navigator.of(ctx).maybePop();
               if (!mounted) return;
@@ -1807,6 +1814,27 @@ class _HomePageState extends State<HomePage>
 
   void _handleDesktopCompressContext() async {
     await _showCompressContextOptions();
+  }
+
+  /// Show the context-floor dialog: pick the first message ("floor") that the
+  /// conversation context includes, or reset to message 1.
+  Future<void> _showContextFloorDialog() async {
+    final convo = _controller.currentConversation;
+    if (convo == null) return;
+    final action = await showDialog<_ContextFloorAction>(
+      context: context,
+      barrierDismissible: true,
+      builder: (_) => _ContextFloorDialog(
+        currentFloor: convo.contextFloor >= 0 ? convo.contextFloor + 1 : null,
+        maxFloor: _controller.contextFloorMax(),
+      ),
+    );
+    if (action == null || !mounted) return;
+    if (action.reset) {
+      await _controller.resetContextFloor();
+      return;
+    }
+    await _controller.setContextFloor(action.floor - 1);
   }
 
   Future<void> _showCompressContextOptions() async {
@@ -2015,5 +2043,122 @@ class _HomePageState extends State<HomePage>
       );
     }
     return result;
+  }
+}
+
+/// Result of the context-floor dialog: either a 1-based floor number to apply,
+/// or a request to reset to message 1. Cancel is represented by null popping.
+class _ContextFloorAction {
+  const _ContextFloorAction.set(this.floor) : reset = false;
+
+  const _ContextFloorAction.reset()
+    : floor = 0,
+      reset = true;
+
+  /// 1-based floor number (first message read). Only meaningful when [reset]
+  /// is false.
+  final int floor;
+  final bool reset;
+}
+
+class _ContextFloorDialog extends StatefulWidget {
+  const _ContextFloorDialog({
+    required this.currentFloor,
+    required this.maxFloor,
+  });
+
+  /// 1-based floor currently set, or null when the floor is off.
+  final int? currentFloor;
+
+  /// Total messages in the conversation; bounds a valid floor number.
+  final int maxFloor;
+
+  @override
+  State<_ContextFloorDialog> createState() => _ContextFloorDialogState();
+}
+
+class _ContextFloorDialogState extends State<_ContextFloorDialog> {
+  late final TextEditingController _controller;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = TextEditingController(
+      text: widget.currentFloor?.toString() ?? '',
+    );
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  bool _submit() {
+    final l10n = AppLocalizations.of(context)!;
+    final raw = _controller.text.trim();
+    final parsed = int.tryParse(raw);
+    final maxFloor = widget.maxFloor;
+    if (parsed == null || parsed < 1 || (maxFloor > 0 && parsed > maxFloor)) {
+      setState(() => _error = l10n.contextFloorInvalid(maxFloor));
+      return false;
+    }
+    Navigator.of(context).pop(_ContextFloorAction.set(parsed));
+    return true;
+  }
+
+  void _reset() {
+    Navigator.of(context).pop(const _ContextFloorAction.reset());
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    final cs = Theme.of(context).colorScheme;
+    final canApply = widget.maxFloor > 0;
+    return AlertDialog(
+      title: Text(l10n.contextFloorDialogTitle),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            l10n.contextFloorHint(widget.maxFloor),
+            style: TextStyle(fontSize: 13, color: cs.onSurfaceVariant),
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _controller,
+            autofocus: true,
+            keyboardType: TextInputType.number,
+            enabled: canApply,
+            onSubmitted: (_) {
+              if (canApply) _submit();
+            },
+            decoration: InputDecoration(
+              hintText: widget.currentFloor?.toString() ?? '${widget.maxFloor}',
+              labelText: l10n.contextFloorDialogTitle,
+              errorText: _error,
+            ),
+          ),
+        ],
+      ),
+      actions: [
+        if (widget.currentFloor != null)
+          TextButton(
+            onPressed: _reset,
+            child: Text(l10n.contextFloorReset),
+          ),
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: Text(l10n.contextFloorCancel),
+        ),
+        FilledButton(
+          onPressed: canApply ? _submit : null,
+          child: Text(l10n.contextFloorApply),
+        ),
+      ],
+    );
   }
 }

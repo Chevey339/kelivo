@@ -8,16 +8,21 @@ import '../../../shared/widgets/ios_tactile.dart';
 import 'package:Kelivo/theme/app_semantic_colors.dart';
 import '../../../shared/widgets/section_card.dart';
 
-/// Bottom sheet for mobile: compress context or clear context.
+/// Bottom sheet for mobile: compress context, set the context floor, or clear
+/// context.
 class ContextManagementSheet extends StatelessWidget {
   const ContextManagementSheet({
     super.key,
     this.onCompress,
+    this.onSetFloor,
+    this.floorLabel,
     this.onClear,
     this.clearLabel,
   });
 
   final VoidCallback? onCompress;
+  final VoidCallback? onSetFloor;
+  final String? floorLabel;
   final VoidCallback? onClear;
   final String? clearLabel;
 
@@ -63,6 +68,16 @@ class ContextManagementSheet extends StatelessWidget {
             onTap: () {
               Haptics.light();
               onCompress?.call();
+            },
+          ),
+          const SizedBox(height: 8),
+          _OptionRow(
+            icon: Lucide.Layers,
+            label: l10n.contextFloor,
+            description: floorLabel ?? l10n.contextFloorDesc,
+            onTap: () {
+              Haptics.light();
+              onSetFloor?.call();
             },
           ),
           const SizedBox(height: 8),

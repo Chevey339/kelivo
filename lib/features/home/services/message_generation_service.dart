@@ -194,7 +194,11 @@ class MessageGenerationService {
     // Single final trim after WorldBook TOP/BOTTOM/AT_DEPTH injections. OCR and
     // document extraction must run only on this retained set so images that will
     // not be sent are never processed (#769).
-    messageBuilderService.applyContextLimit(apiMessages, assistant);
+    messageBuilderService.applyContextLimit(
+      apiMessages,
+      assistant,
+      floorIndex: currentConversation?.contextFloor,
+    );
 
     // Only this step does the actual attachment work (document extraction and
     // OCR), so the indicator must not cover the injection/trim passes above —
