@@ -278,10 +278,7 @@ class _DesktopHomePageState extends State<DesktopHomePage> {
               // native frame after the title bar was hidden). The title bar
               // keeps its DragToMoveArea for moving; only its top few pixels
               // become a resize grip, matching native Windows behavior.
-              child: DragToResizeArea(
-                resizeEdgeSize: 8,
-                child: content,
-              ),
+              child: DragToResizeArea(resizeEdgeSize: 8, child: content),
             ),
           ),
         );
