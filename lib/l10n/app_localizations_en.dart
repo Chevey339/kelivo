@@ -144,11 +144,26 @@ class AppLocalizationsEn extends AppLocalizations {
   String get storageSpaceCategoryRestoreTraces => 'Restore Traces';
 
   @override
+  String get storageSpaceCategoryDisplacedDatabases => 'Set-Aside Databases';
+
+  @override
+  String get storageSpaceSubDisplacedDatabases =>
+      'Kept before an automatic rebuild';
+
+  @override
+  String get storageSpaceClearDisplacedDatabasesConfirmMessage =>
+      'Delete these set-aside databases? Kelivo kept them when it rebuilt its database, and they may be the only surviving copy of those chats and settings. This cannot be undone.';
+
+  @override
   String get storageSpaceRestoreTracesHint =>
       'Previous data snapshots kept after completed restores. Clearing them does not affect the current app data.';
 
   @override
   String get storageSpaceClearRestoreTracesButton => 'Clear Restore Traces';
+
+  @override
+  String get storageSpaceClearDisplacedDatabasesButton =>
+      'Delete Set-Aside Databases';
 
   @override
   String get storageSpaceClearRestoreTracesConfirmMessage =>

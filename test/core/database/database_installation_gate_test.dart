@@ -409,7 +409,9 @@ void main() {
         expect(action, DatabaseRecoveryAction.rebuildAutomatically);
       });
 
-      test('首启垃圾文件（无法读取 userVersion）可自动重建', () async {
+      test('无法读取 userVersion 的文件不自动重建', () async {
+        // "Unreadable right now" is also what a healthy database looks like
+        // while the OS denies the read, so it may never authorise a delete.
         await databaseFile(directory).writeAsString('not a sqlite database');
 
         final action = await DatabaseInstallationGate.recoveryActionFor(
@@ -418,7 +420,72 @@ void main() {
           legacyHiveDataPresent: false,
         );
 
+        expect(action, DatabaseRecoveryAction.none);
+      });
+
+      test('存在非空 WAL 时不自动重建', () async {
+        final raw = sqlite.sqlite3.open(databaseFile(directory).path);
+        raw.close();
+        await File(
+          '${databaseFile(directory).path}-wal',
+        ).writeAsBytes(List<int>.filled(64, 0));
+
+        final action = await DatabaseInstallationGate.recoveryActionFor(
+          appDataDirectory: directory,
+          error: StateError('database_schema_version'),
+          legacyHiveDataPresent: false,
+        );
+
+        expect(action, DatabaseRecoveryAction.none);
+      });
+
+      test('存在用户文件时不自动重建', () async {
+        final raw = sqlite.sqlite3.open(databaseFile(directory).path);
+        raw.close();
+        final images = Directory(p.join(directory.path, 'images'));
+        await images.create(recursive: true);
+        await File(p.join(images.path, 'img_1.png')).writeAsBytes(const [1, 2]);
+
+        final action = await DatabaseInstallationGate.recoveryActionFor(
+          appDataDirectory: directory,
+          error: StateError('database_schema_version'),
+          legacyHiveDataPresent: false,
+        );
+
+        expect(action, DatabaseRecoveryAction.none);
+      });
+
+      test('空的用户目录不算使用痕迹', () async {
+        final raw = sqlite.sqlite3.open(databaseFile(directory).path);
+        raw.close();
+        await Directory(p.join(directory.path, 'images')).create();
+        await Directory(p.join(directory.path, 'upload')).create();
+
+        final action = await DatabaseInstallationGate.recoveryActionFor(
+          appDataDirectory: directory,
+          error: StateError('database_schema_version'),
+          legacyHiveDataPresent: false,
+        );
+
         expect(action, DatabaseRecoveryAction.rebuildAutomatically);
+      });
+
+      test('先前的 displaced 副本阻止再次自动重建', () async {
+        final raw = sqlite.sqlite3.open(databaseFile(directory).path);
+        raw.close();
+        await File(
+          '${databaseFile(directory).path}'
+          '${DatabaseInstallationGate.displacedDatabasePrefix}'
+          '0000000000000001',
+        ).writeAsString('older generation');
+
+        final action = await DatabaseInstallationGate.recoveryActionFor(
+          appDataDirectory: directory,
+          error: StateError('database_schema_version'),
+          legacyHiveDataPresent: false,
+        );
+
+        expect(action, DatabaseRecoveryAction.none);
       });
 
       test('已建 schema 的库即使无 receipt 也不自动重建', () async {
@@ -445,6 +512,19 @@ void main() {
     });
 
     group('rebuildFresh', () {
+      List<String> displacedNames(Directory root) =>
+          root
+              .listSync(followLinks: false)
+              .map((entity) => p.basename(entity.path))
+              .where(
+                (name) => name.startsWith(
+                  '${AppDatabase.databaseFileName}'
+                  '${DatabaseInstallationGate.displacedDatabasePrefix}',
+                ),
+              )
+              .toList()
+            ..sort();
+
       test('替换残缺库并签发新 receipt', () async {
         final file = databaseFile(directory);
         await file.writeAsString('not a sqlite database');
@@ -462,6 +542,82 @@ void main() {
           ))?.installationId,
           receipt.installationId,
         );
+      });
+
+      test('默认保留整套旧库而不是删除', () async {
+        final file = databaseFile(directory);
+        await file.writeAsString('not a sqlite database');
+        await File('${file.path}-wal').writeAsString('stale wal');
+        await File('${file.path}-shm').writeAsString('stale shm');
+
+        await DatabaseInstallationGate.rebuildFresh(
+          appDataDirectory: directory,
+        );
+
+        final names = displacedNames(directory);
+        expect(names, hasLength(3));
+        final base = names.firstWhere(
+          (name) => !name.endsWith('-wal') && !name.endsWith('-shm'),
+        );
+        expect(
+          await File(p.join(directory.path, base)).readAsString(),
+          'not a sqlite database',
+        );
+        expect(
+          await File(p.join(directory.path, '$base-wal')).readAsString(),
+          'stale wal',
+        );
+      });
+
+      test('preserveDisplacedCopy=false 不留副本并清掉旧副本', () async {
+        final file = databaseFile(directory);
+        await file.writeAsString('not a sqlite database');
+        await File(
+          '${file.path}${DatabaseInstallationGate.displacedDatabasePrefix}'
+          '0000000000000001',
+        ).writeAsString('older generation');
+
+        await DatabaseInstallationGate.rebuildFresh(
+          appDataDirectory: directory,
+          preserveDisplacedCopy: false,
+        );
+
+        expect(displacedNames(directory), isEmpty);
+      });
+
+      test('副本代数有上限，但最旧的那代永远保留', () async {
+        // The oldest generation holds what was on disk before anything started
+        // displacing; a retrying caller must not be able to walk it off the
+        // end of the window.
+        for (var generation = 0; generation < 5; generation++) {
+          // rebuildFresh is only ever reached with no receipt on disk (see
+          // recoveryActionFor and StartupRecoveryService.reset), so clear the
+          // one the previous round issued.
+          for (final entity in directory.listSync(followLinks: false)) {
+            if (p
+                .basename(entity.path)
+                .startsWith('database_installation_receipt_')) {
+              entity.deleteSync();
+            }
+          }
+          await databaseFile(directory).writeAsString('generation $generation');
+          await DatabaseInstallationGate.rebuildFresh(
+            appDataDirectory: directory,
+          );
+        }
+
+        final names = displacedNames(directory);
+        final bases = names
+            .where((name) => !name.endsWith('-wal') && !name.endsWith('-shm'))
+            .toList();
+        expect(bases, hasLength(3));
+        final contents = <String>[
+          for (final base in bases)
+            await File(p.join(directory.path, base)).readAsString(),
+        ];
+        expect(contents, contains('generation 0'));
+        expect(contents, contains('generation 4'));
+        expect(contents, isNot(contains('generation 1')));
       });
     });
 
@@ -641,6 +797,69 @@ void main() {
           after.close();
         }
         expect(receipt.databaseId, isNotEmpty);
+      });
+
+      test('回滚不删除被覆盖的库，而是留副本', () async {
+        // classifyInstalledDatabase reports "unusable" for a file it merely
+        // failed to open, so the rollback must stay reversible.
+        await DatabaseInstallationGate.ensureReady(appDataDirectory: directory);
+        final file = databaseFile(directory);
+        final backup = backupFor(file);
+        await file.copy(backup.path);
+        await file.writeAsString('not a sqlite database');
+
+        await DatabaseInstallationGate.ensureReady(appDataDirectory: directory);
+
+        final displaced = directory
+            .listSync(followLinks: false)
+            .map((entity) => p.basename(entity.path))
+            .where(
+              (name) => name.startsWith(
+                '${AppDatabase.databaseFileName}'
+                '${DatabaseInstallationGate.displacedDatabasePrefix}',
+              ),
+            )
+            .toList();
+        expect(displaced, isNotEmpty);
+        expect(
+          await File(
+            p.join(
+              directory.path,
+              displaced.firstWhere(
+                (name) => !name.endsWith('-wal') && !name.endsWith('-shm'),
+              ),
+            ),
+          ).readAsString(),
+          'not a sqlite database',
+        );
+      });
+
+      test('回滚反复失败也不会挤掉用户原始数据那一代', () async {
+        // A rollback whose backup is itself unusable throws before deleting
+        // the backup, so the sweep repeats on every launch and displaces
+        // again each time. Generation 1 is the user's only real copy.
+        final file = databaseFile(directory);
+        await file.writeAsString('ORIGINAL USER DATA');
+        await backupFor(file).writeAsString('BAD BACKUP');
+
+        for (var attempt = 0; attempt < 5; attempt++) {
+          await expectLater(
+            DatabaseInstallationGate.ensureReady(appDataDirectory: directory),
+            throwsA(isA<StateError>()),
+          );
+        }
+
+        final surviving = <String>[
+          for (final entity in directory.listSync(followLinks: false))
+            if (p
+                .basename(entity.path)
+                .startsWith(
+                  '${AppDatabase.databaseFileName}'
+                  '${DatabaseInstallationGate.displacedDatabasePrefix}',
+                ))
+              await File(entity.path).readAsString(),
+        ];
+        expect(surviving, contains('ORIGINAL USER DATA'));
       });
 
       test('多个副本且数据库不可用时拒绝猜测', () async {

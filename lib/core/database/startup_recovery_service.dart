@@ -114,9 +114,12 @@ final class StartupRecoveryService {
         await _deleteFileIfPresent(entity.path);
       }
     }
+    // The confirmation dialog promises the data is permanently gone, so this
+    // is the one caller that must not leave a displaced copy behind.
     await DatabaseInstallationGate.rebuildFresh(
       appDataDirectory: appDataDirectory,
       durability: durability,
+      preserveDisplacedCopy: false,
     );
   }
 

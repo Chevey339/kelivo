@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:path/path.dart' as p;
 
 import '../../database/app_database.dart';
+import '../../database/database_installation_gate.dart';
 import '../hive_migration_marker.dart';
 import '../legacy_data_retirement_service.dart';
 import '../backup/restore_trace_service.dart';
@@ -17,6 +18,7 @@ enum StorageUsageCategoryKey {
   chatData,
   legacyChatData,
   restoreTraces,
+  displacedDatabases,
   assistantData,
   cache,
   logs,
@@ -88,6 +90,11 @@ class StorageFileEntry {
   });
 }
 
+/// Name of the append-only record written before an unattended database
+/// rebuild. Lives in `logs/` so the in-app viewer can surface it, but is
+/// deliberately exempt from "clear logs".
+const String startupRecoveryLogFileName = 'startup-recovery.log';
+
 abstract final class StorageUsageService {
   StorageUsageService._();
 
@@ -116,6 +123,10 @@ abstract final class StorageUsageService {
         return null;
     }
   }
+
+  static const _displacedDatabasePrefix =
+      '${AppDatabase.databaseFileName}'
+      '${DatabaseInstallationGate.displacedDatabasePrefix}';
 
   static String _chatDatabaseFileName(String subcategoryId) {
     switch (subcategoryId) {
@@ -225,7 +236,9 @@ abstract final class StorageUsageService {
         if (parts.length == 1) {
           final name = parts.first;
           final chatSubId = _chatDatabaseSubcategoryId(name);
-          if (chatSubId != null) {
+          if (name.startsWith(_displacedDatabasePrefix)) {
+            byCat[StorageUsageCategoryKey.displacedDatabases]!.add(bytes);
+          } else if (chatSubId != null) {
             byCat[StorageUsageCategoryKey.chatData]!.add(bytes);
             chatSubs[chatSubId]!.add(bytes);
           } else if (migrationCompleted &&
@@ -335,6 +348,11 @@ abstract final class StorageUsageService {
       }
     } catch (_) {}
 
+    // Displaced database copies are deliberately absent here. This total is
+    // the "space you can reclaim" prompt, and a displaced copy can be the only
+    // surviving version of the user's data — inviting a one-tap sweep of it is
+    // the opposite of why it was kept. It stays clearable from its own row,
+    // where the confirmation says what it is.
     final clearable = StorageUsageStats(
       fileCount:
           byCat[StorageUsageCategoryKey.cache]!.fileCount +
@@ -393,6 +411,19 @@ abstract final class StorageUsageService {
               id: 'completed_restore_runs',
               stats: byCat[StorageUsageCategoryKey.restoreTraces]!.toStats(),
               path: p.join(root.path, '.kelivo_restore', 'completed'),
+            ),
+          ],
+        ),
+      if (byCat[StorageUsageCategoryKey.displacedDatabases]!.fileCount > 0)
+        StorageUsageCategory(
+          key: StorageUsageCategoryKey.displacedDatabases,
+          stats: byCat[StorageUsageCategoryKey.displacedDatabases]!.toStats(),
+          subcategories: [
+            StorageUsageSubcategory(
+              id: 'displaced_databases',
+              stats: byCat[StorageUsageCategoryKey.displacedDatabases]!
+                  .toStats(),
+              path: root.path,
             ),
           ],
         ),
@@ -558,7 +589,13 @@ abstract final class StorageUsageService {
     try {
       final root = await AppDirectories.getAppDataDirectory();
       final logsDir = Directory(p.join(root.path, 'logs'));
-      await _deleteDirectoryContents(logsDir);
+      // The startup-recovery record is the only trace of an unattended rebuild
+      // — the one startup outcome that destroys state without asking. Clearing
+      // logs must not erase the evidence of it along with the noise.
+      await _deleteDirectoryContents(
+        logsDir,
+        keepFileNames: const {startupRecoveryLogFileName},
+      );
     } finally {
       try {
         if (flutterOn) await FlutterLogger.setEnabled(true);
@@ -581,6 +618,13 @@ abstract final class StorageUsageService {
   static Future<void> clearRestoreTraces() async {
     final root = await AppDirectories.getAppDataDirectory();
     await RestoreTraceService(root).clear();
+  }
+
+  static Future<void> clearDisplacedDatabases() async {
+    final root = await AppDirectories.getAppDataDirectory();
+    await DatabaseInstallationGate.clearDisplacedDatabases(
+      appDataDirectory: root,
+    );
   }
 
   static Future<List<StorageFileEntry>> listUploadEntries({
@@ -676,12 +720,16 @@ abstract final class StorageUsageService {
     return deleted;
   }
 
-  static Future<void> _deleteDirectoryContents(Directory dir) async {
+  static Future<void> _deleteDirectoryContents(
+    Directory dir, {
+    Set<String> keepFileNames = const <String>{},
+  }) async {
     if (!await dir.exists()) return;
     try {
       await for (final ent in dir.list(recursive: true, followLinks: false)) {
         try {
           if (ent is File) {
+            if (keepFileNames.contains(p.basename(ent.path))) continue;
             try {
               await ent.delete();
             } catch (_) {
@@ -735,6 +783,7 @@ const List<StorageUsageCategoryKey> _categoryOrder = <StorageUsageCategoryKey>[
   StorageUsageCategoryKey.chatData,
   StorageUsageCategoryKey.legacyChatData,
   StorageUsageCategoryKey.restoreTraces,
+  StorageUsageCategoryKey.displacedDatabases,
   StorageUsageCategoryKey.assistantData,
   StorageUsageCategoryKey.cache,
   StorageUsageCategoryKey.logs,
@@ -745,6 +794,7 @@ bool _isAlwaysVisibleCategory(StorageUsageCategoryKey key) {
   switch (key) {
     case StorageUsageCategoryKey.legacyChatData:
     case StorageUsageCategoryKey.restoreTraces:
+    case StorageUsageCategoryKey.displacedDatabases:
       return false;
     case StorageUsageCategoryKey.images:
     case StorageUsageCategoryKey.files:

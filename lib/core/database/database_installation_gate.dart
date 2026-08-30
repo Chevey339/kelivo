@@ -69,6 +69,32 @@ final class DatabaseInstallationGate {
   static const _temporarySuffix = '.tmp';
   static const _maximumReceiptBytes = 4096;
 
+  /// Suffix marking a database family moved aside by [rebuildFresh] rather
+  /// than deleted. The stamp keeps generations distinct and sorts
+  /// chronologically; every sidecar keeps its suffix so the whole set stays
+  /// openable, uncheckpointed transactions included.
+  static const displacedDatabasePrefix = '.displaced-';
+  static const _maximumDisplacedGenerations = 3;
+
+  /// The database and every sidecar SQLite may leave beside it. Must stay in
+  /// step with ChatDatabaseRepository's own family handling: moving a database
+  /// without its journal strands the journal next to whatever takes its place.
+  static const _databaseFamilySuffixes = <String>[
+    '',
+    '-wal',
+    '-shm',
+    '-journal',
+  ];
+
+  /// Directories whose contents outlive the database family and therefore
+  /// prove a prior install even after the database and its receipt are gone.
+  static const _priorUseDirectoryNames = <String>[
+    'images',
+    'upload',
+    'avatars',
+    'fonts',
+  ];
+
   static Future<DatabaseInstallationReceipt> ensureReady({
     required Directory appDataDirectory,
     bool allowDatabaseIdentityChange = false,
@@ -184,9 +210,16 @@ final class DatabaseInstallationGate {
 
   /// Maps a startup admission failure to the strongest safe recovery route.
   ///
-  /// Automatic rebuild is only returned when no installation receipt and no
-  /// legacy Hive source exist and the installed file is half-created
-  /// (userVersion 0) or unreadable, so no reachable data can be lost.
+  /// Automatic rebuild is the only route that runs unattended, so it is the
+  /// only one that can destroy data without anybody agreeing to it first. It
+  /// is returned only when every one of these holds: no installation receipt,
+  /// no legacy Hive source, no trace of prior use ([_priorUseEvidence]), and
+  /// an installed file that reads back as half-created (userVersion 0).
+  ///
+  /// A file we merely failed to read is deliberately NOT enough. "Unreadable
+  /// right now" is what a perfectly healthy database looks like while the OS
+  /// denies the read, and treating that as "never finished being created"
+  /// turns a transient fault into a silent factory reset.
   static Future<DatabaseRecoveryAction> recoveryActionFor({
     required Directory appDataDirectory,
     required Object error,
@@ -226,37 +259,255 @@ final class DatabaseInstallationGate {
         FileSystemEntityType.file) {
       return DatabaseRecoveryAction.none;
     }
-    final userVersion = _tryReadUserVersion(databaseFile);
-    if (userVersion == null || userVersion == 0) {
-      return DatabaseRecoveryAction.rebuildAutomatically;
+    // Collected before anything opens the database: opening it -- even
+    // read-only -- lets SQLite checkpoint and remove the WAL, which would
+    // erase one of the signals being read here.
+    if (await _priorUseEvidence(appDataDirectory)) {
+      return DatabaseRecoveryAction.none;
     }
-    return DatabaseRecoveryAction.none;
+    // Anything other than a readable userVersion 0 -- including null, which
+    // only ever means "could not classify" -- leaves the file to the recovery
+    // screen rather than to an unattended delete.
+    if (_tryReadUserVersion(databaseFile) != 0) {
+      return DatabaseRecoveryAction.none;
+    }
+    return DatabaseRecoveryAction.rebuildAutomatically;
   }
 
-  /// Deletes the installed database family and repeats first-launch setup.
+  /// Whether anything in [appDataDirectory] proves the install has been used
+  /// before, independently of the database and its receipt.
+  ///
+  /// The receipt is the primary proof, but it is a 121-byte file living in the
+  /// same directory, on the same filesystem, exposed through the same
+  /// (file-sharing enabled) container as the database — so whatever takes one
+  /// can take the other, and the pair going missing together must not read as
+  /// a first launch. These signals outlive a rebuild, so they are checked
+  /// before one is allowed.
+  ///
+  /// Fails toward "used": a signal we cannot read is not a signal we may
+  /// ignore when the alternative is deleting the user's data.
+  static Future<bool> _priorUseEvidence(Directory appDataDirectory) async {
+    // The strongest one. SQLite only ever writes a WAL for a database that was
+    // opened and written to, and it survives the database being unreadable.
+    final wal = File(
+      p.join(appDataDirectory.path, '${AppDatabase.databaseFileName}-wal'),
+    );
+    try {
+      if (await FileSystemEntity.type(wal.path, followLinks: false) ==
+              FileSystemEntityType.file &&
+          await wal.length() > 0) {
+        return true;
+      }
+    } catch (_) {
+      return true;
+    }
+    try {
+      final displacedPrefix =
+          '${AppDatabase.databaseFileName}$displacedDatabasePrefix';
+      await for (final entity in appDataDirectory.list(followLinks: false)) {
+        final name = p.basename(entity.path);
+        if (name.startsWith(displacedPrefix)) return true;
+        if (name.startsWith(
+          '${AppDatabase.databaseFileName}'
+          '${ChatDatabaseRepository.premigrationBackupPrefix}',
+        )) {
+          return true;
+        }
+      }
+    } catch (_) {
+      return true;
+    }
+    for (final name in _priorUseDirectoryNames) {
+      final directory = Directory(p.join(appDataDirectory.path, name));
+      try {
+        if (await FileSystemEntity.type(directory.path, followLinks: false) !=
+            FileSystemEntityType.directory) {
+          continue;
+        }
+        await for (final _ in directory.list(followLinks: false)) {
+          return true;
+        }
+      } catch (_) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /// Clears the installed database family and repeats first-launch setup.
   /// Only safe where [recoveryActionFor] returned
-  /// [DatabaseRecoveryAction.rebuildAutomatically].
+  /// [DatabaseRecoveryAction.rebuildAutomatically], or where the user asked
+  /// for a reset.
+  ///
+  /// With [preserveDisplacedCopy] the old family is renamed aside instead of
+  /// deleted, so a rebuild that turns out to have been wrong is recoverable
+  /// and leaves the evidence needed to explain it. Unattended rebuilds must
+  /// keep the copy; a reset the user confirmed must not, because the dialog
+  /// promises the data is gone. At most [_maximumDisplacedGenerations] copies
+  /// are kept, oldest dropped first.
   static Future<DatabaseInstallationReceipt> rebuildFresh({
     required Directory appDataDirectory,
     RestoreDurability? durability,
+    bool preserveDisplacedCopy = true,
   }) async {
     final resolvedDurability = durability ?? RestorePlatformDurability();
     await appDataDirectory.create(recursive: true);
     final databaseFile = File(
       p.join(appDataDirectory.path, AppDatabase.databaseFileName),
     );
-    for (final suffix in const ['', '-wal', '-shm']) {
-      final target = File('${databaseFile.path}$suffix');
-      if (await FileSystemEntity.type(target.path, followLinks: false) ==
-          FileSystemEntityType.file) {
-        await target.delete();
+    if (preserveDisplacedCopy) {
+      await _displaceDatabaseFamily(
+        databaseFile,
+        durability: resolvedDurability,
+      );
+    } else {
+      for (final suffix in _databaseFamilySuffixes) {
+        final target = File('${databaseFile.path}$suffix');
+        if (await FileSystemEntity.type(target.path, followLinks: false) ==
+            FileSystemEntityType.file) {
+          await target.delete();
+        }
       }
+      await _pruneDisplacedGenerations(
+        appDataDirectory,
+        keep: 0,
+        durability: resolvedDurability,
+      );
     }
     await resolvedDurability.syncDirectory(appDataDirectory, fullBarrier: true);
     return ensureReady(
       appDataDirectory: appDataDirectory,
       durability: resolvedDurability,
     );
+  }
+
+  /// Whether [appDataDirectory] holds any displaced database copy.
+  static Future<bool> hasDisplacedDatabases({
+    required Directory appDataDirectory,
+  }) async {
+    final prefix = '${AppDatabase.databaseFileName}$displacedDatabasePrefix';
+    try {
+      await for (final entity in appDataDirectory.list(followLinks: false)) {
+        if (p.basename(entity.path).startsWith(prefix)) return true;
+      }
+    } catch (_) {}
+    return false;
+  }
+
+  /// Removes every displaced database copy.
+  ///
+  /// A copy can be the only surviving version of the user's data, so nothing
+  /// calls this on its own schedule — it exists for the storage screen, where
+  /// the user is told what they are discarding.
+  static Future<void> clearDisplacedDatabases({
+    required Directory appDataDirectory,
+    RestoreDurability? durability,
+  }) async {
+    await _pruneDisplacedGenerations(
+      appDataDirectory,
+      keep: 0,
+      durability: durability ?? RestorePlatformDurability(),
+    );
+    // Pruning swallows per-file errors so housekeeping can never fail a
+    // rebuild. This caller is a user pressing Delete, so it has to report
+    // that nothing happened rather than show a success it did not achieve.
+    if (await hasDisplacedDatabases(appDataDirectory: appDataDirectory)) {
+      throw StateError('displaced_databases_not_cleared');
+    }
+  }
+
+  /// Renames the database family aside. Returns the new base path, or null
+  /// when there was nothing to move.
+  static Future<String?> _displaceDatabaseFamily(
+    File databaseFile, {
+    required RestoreDurability durability,
+  }) async {
+    // Zero-padded so a lexical sort of the stamps is a chronological one.
+    final stamp = DateTime.now()
+        .toUtc()
+        .microsecondsSinceEpoch
+        .toString()
+        .padLeft(16, '0');
+    final base = '${databaseFile.path}$displacedDatabasePrefix$stamp';
+    String? displaced;
+    for (final suffix in _databaseFamilySuffixes) {
+      final source = File('${databaseFile.path}$suffix');
+      if (await FileSystemEntity.type(source.path, followLinks: false) !=
+          FileSystemEntityType.file) {
+        continue;
+      }
+      await durability.renameAndSync(
+        source: source,
+        targetPath: '$base$suffix',
+      );
+      displaced = base;
+    }
+    await _pruneDisplacedGenerations(
+      databaseFile.parent,
+      keep: _maximumDisplacedGenerations,
+      durability: durability,
+    );
+    return displaced;
+  }
+
+  /// Bounds the displaced generations, always keeping the oldest.
+  ///
+  /// The oldest generation is the irreplaceable one: it holds what was on disk
+  /// before anything started displacing, while later generations are usually
+  /// copies of a state we produced ourselves. A caller that retries -- a
+  /// pre-migration rollback that keeps failing re-displaces on every launch --
+  /// would otherwise walk the user's only real copy off the end of a
+  /// keep-the-newest window. So the first is kept outright and the window
+  /// covers the most recent [keep] - 1.
+  static Future<void> _pruneDisplacedGenerations(
+    Directory directory, {
+    required int keep,
+    required RestoreDurability durability,
+  }) async {
+    final prefix = '${AppDatabase.databaseFileName}$displacedDatabasePrefix';
+    final stamps = <String>{};
+    try {
+      await for (final entity in directory.list(followLinks: false)) {
+        final name = p.basename(entity.path);
+        if (!name.startsWith(prefix)) continue;
+        var stamp = name.substring(prefix.length);
+        for (final suffix in _databaseFamilySuffixes) {
+          if (suffix.isEmpty) continue;
+          if (stamp.endsWith(suffix)) {
+            stamp = stamp.substring(0, stamp.length - suffix.length);
+            break;
+          }
+        }
+        if (stamp.isNotEmpty) stamps.add(stamp);
+      }
+    } catch (_) {
+      // Pruning is housekeeping; failing it must never fail a rebuild.
+      return;
+    }
+    if (stamps.length <= keep) return;
+    final ordered = stamps.toList()..sort();
+    final retained = keep <= 0
+        ? const <String>{}
+        : <String>{ordered.first, ...ordered.reversed.take(keep - 1)};
+    final expiring = ordered.where((stamp) => !retained.contains(stamp));
+    var removed = false;
+    for (final stamp in expiring) {
+      for (final suffix in _databaseFamilySuffixes) {
+        final file = File(p.join(directory.path, '$prefix$stamp$suffix'));
+        try {
+          if (await FileSystemEntity.type(file.path, followLinks: false) ==
+              FileSystemEntityType.file) {
+            await file.delete();
+            removed = true;
+          }
+        } catch (_) {}
+      }
+    }
+    if (removed) {
+      try {
+        await durability.syncDirectory(directory, fullBarrier: true);
+      } catch (_) {}
+    }
   }
 
   static int? _tryReadUserVersion(File file) {
@@ -369,6 +620,13 @@ final class DatabaseInstallationGate {
           backup: backups.single,
           target: databaseFile,
           durability: durability,
+          // `unusable` also covers "could not be opened", which a healthy
+          // database looks like whenever the OS is denying the read. This
+          // rollback runs on every launch with nobody watching, so the file it
+          // rolls over is kept rather than deleted: if the guess was wrong,
+          // what it displaced is still there.
+          retireTarget: (file) =>
+              _displaceDatabaseFamily(file, durability: durability),
         );
     }
   }

@@ -1222,18 +1222,27 @@ class ChatDatabaseRepository {
   /// Puts [backup] back at [target], leaving [backup] in place until the
   /// restored database has been verified.
   ///
-  /// Idempotent by construction, because the only step that destroys
-  /// information is the last one: a crash at any point leaves [backup] intact
-  /// and a re-run redoes the copy. This is what makes the pre-migration copy a
-  /// real safety net rather than a second thing to lose.
+  /// A crash at any point leaves [backup] intact and a re-run redoes the copy.
+  /// This is what makes the pre-migration copy a real safety net rather than a
+  /// second thing to lose. Note that a re-run is only free of information loss
+  /// where [retireTarget] is: the default deletes, so a caller that can retry
+  /// must supply one that does not.
+  ///
+  /// [retireTarget] decides what happens to the database being rolled back
+  /// over. It defaults to deleting it, which is right when the caller made the
+  /// mess itself (a failed in-place migration, where [backup] is that same
+  /// database moments earlier). A caller acting on a *guess* about the target
+  /// — a crash sweep, which cannot tell an unreadable database from a
+  /// destroyed one — must pass something non-destructive instead.
   static Future<void> restorePreMigrationBackup({
     required File backup,
     required File target,
     RestoreDurability? durability,
+    Future<void> Function(File target)? retireTarget,
   }) async {
     final resolvedDurability = durability ?? RestorePlatformDurability();
     final parent = target.absolute.parent;
-    await _deleteDatabaseFamily(target);
+    await (retireTarget ?? _deleteDatabaseFamily)(target);
     await backup.copy(target.absolute.path);
     await resolvedDurability.syncFile(target, fullBarrier: true);
     await resolvedDurability.syncDirectory(parent, fullBarrier: true);

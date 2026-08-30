@@ -141,10 +141,23 @@ class AppLocalizationsZh extends AppLocalizations {
   String get storageSpaceCategoryRestoreTraces => '恢复痕迹';
 
   @override
+  String get storageSpaceCategoryDisplacedDatabases => '保留的旧数据库';
+
+  @override
+  String get storageSpaceSubDisplacedDatabases => '自动重建前保留的数据库';
+
+  @override
+  String get storageSpaceClearDisplacedDatabasesConfirmMessage =>
+      '确定删除这些保留的旧数据库吗？它们是 Kelivo 重建数据库时留下的，可能是那些聊天记录和设置仅存的一份。删除后无法恢复。';
+
+  @override
   String get storageSpaceRestoreTracesHint => '恢复完成后保留的旧数据快照。清理不会影响当前应用数据。';
 
   @override
   String get storageSpaceClearRestoreTracesButton => '清理恢复痕迹';
+
+  @override
+  String get storageSpaceClearDisplacedDatabasesButton => '删除保留的旧数据库';
 
   @override
   String get storageSpaceClearRestoreTracesConfirmMessage =>
@@ -8162,10 +8175,23 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get storageSpaceCategoryRestoreTraces => '恢复痕迹';
 
   @override
+  String get storageSpaceCategoryDisplacedDatabases => '保留的旧数据库';
+
+  @override
+  String get storageSpaceSubDisplacedDatabases => '自动重建前保留的数据库';
+
+  @override
+  String get storageSpaceClearDisplacedDatabasesConfirmMessage =>
+      '确定删除这些保留的旧数据库吗？它们是 Kelivo 重建数据库时留下的，可能是那些聊天记录和设置仅存的一份。删除后无法恢复。';
+
+  @override
   String get storageSpaceRestoreTracesHint => '恢复完成后保留的旧数据快照。清理不会影响当前应用数据。';
 
   @override
   String get storageSpaceClearRestoreTracesButton => '清理恢复痕迹';
+
+  @override
+  String get storageSpaceClearDisplacedDatabasesButton => '删除保留的旧数据库';
 
   @override
   String get storageSpaceClearRestoreTracesConfirmMessage =>
@@ -16109,10 +16135,23 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get storageSpaceCategoryRestoreTraces => '還原痕跡';
 
   @override
+  String get storageSpaceCategoryDisplacedDatabases => '保留的舊資料庫';
+
+  @override
+  String get storageSpaceSubDisplacedDatabases => '自動重建前保留的資料庫';
+
+  @override
+  String get storageSpaceClearDisplacedDatabasesConfirmMessage =>
+      '確定刪除這些保留的舊資料庫嗎？它們是 Kelivo 重建資料庫時留下的，可能是那些聊天記錄和設定僅存的一份。刪除後無法復原。';
+
+  @override
   String get storageSpaceRestoreTracesHint => '還原完成後保留的舊資料快照。清理不會影響目前的應用程式資料。';
 
   @override
   String get storageSpaceClearRestoreTracesButton => '清理還原痕跡';
+
+  @override
+  String get storageSpaceClearDisplacedDatabasesButton => '刪除保留的舊資料庫';
 
   @override
   String get storageSpaceClearRestoreTracesConfirmMessage =>

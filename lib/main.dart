@@ -46,6 +46,7 @@ import 'core/database/business_preferences.dart';
 import 'core/database/business_repository.dart';
 import 'core/database/business_startup_gate.dart';
 import 'core/database/chat_database_gateway.dart';
+import 'core/database/startup_failure_report.dart';
 import 'core/services/chat/chat_service.dart';
 import 'core/services/app_exit_flush.dart';
 import 'core/services/backup/restore_archive_pruner.dart';
@@ -54,6 +55,7 @@ import 'core/services/backup/restore_startup_gate.dart';
 import 'core/services/backup/restore_receipt.dart';
 import 'core/services/mcp/mcp_tool_service.dart';
 import 'core/services/logging/flutter_logger.dart';
+import 'core/services/storage/storage_usage_service.dart';
 import 'features/home/services/ask_user_interaction_service.dart';
 import 'features/home/services/tool_approval_service.dart';
 import 'utils/app_directories.dart';
@@ -68,6 +70,7 @@ import 'dart:io'
     show
         Directory,
         File,
+        FileMode,
         Platform,
         stderr; // kept for global override usage inside provider
 import 'core/services/android_background.dart';
@@ -285,6 +288,10 @@ Future<_AdmissionRecovery> _recoverFailedAdmission(
   switch (action) {
     case DatabaseRecoveryAction.rebuildAutomatically:
       try {
+        // The only route that destroys state without anyone confirming it, so
+        // it is the only one that has to leave a record of itself. A user who
+        // finds the app empty otherwise has nothing to report but the symptom.
+        await _recordAutomaticRebuild(appDataDirectory, error);
         await DatabaseInstallationGate.rebuildFresh(
           appDataDirectory: appDataDirectory,
         );
@@ -301,6 +308,40 @@ Future<_AdmissionRecovery> _recoverFailedAdmission(
     case DatabaseRecoveryAction.none:
       return _AdmissionRecovery.none;
   }
+}
+
+/// Appends a record of an unattended rebuild to `logs/`.
+///
+/// Deliberately independent of the Flutter log capture toggle, which is off by
+/// default: this is the one startup outcome that silently destroys state, and
+/// a user who finds the app empty has nothing else to report. The listing is
+/// taken before the rebuild, so it still describes the files it is about to
+/// clear. Best-effort throughout — a rebuild must not fail for want of a note.
+Future<void> _recordAutomaticRebuild(
+  Directory appDataDirectory,
+  Object error,
+) async {
+  try {
+    var report = StartupFailureReport.capture(
+      stage: StartupFailureStage.databaseAdmission,
+      error: error,
+      step: 'automatic_rebuild',
+    );
+    try {
+      report = report.withEnvironment(
+        await StartupFailureEnvironment.collect(
+          appDataDirectory: appDataDirectory,
+        ),
+      );
+    } catch (_) {}
+    final logs = Directory('${appDataDirectory.path}/logs');
+    await logs.create(recursive: true);
+    await File('${logs.path}/$startupRecoveryLogFileName').writeAsString(
+      '${report.toText()}\n\n',
+      mode: FileMode.append,
+      flush: true,
+    );
+  } catch (_) {}
 }
 
 HiveToSqliteMigrationDecision _legacyMigrationDecision(

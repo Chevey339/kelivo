@@ -352,6 +352,24 @@ abstract class AppLocalizations {
   /// **'Restore Traces'**
   String get storageSpaceCategoryRestoreTraces;
 
+  /// No description provided for @storageSpaceCategoryDisplacedDatabases.
+  ///
+  /// In en, this message translates to:
+  /// **'Set-Aside Databases'**
+  String get storageSpaceCategoryDisplacedDatabases;
+
+  /// No description provided for @storageSpaceSubDisplacedDatabases.
+  ///
+  /// In en, this message translates to:
+  /// **'Kept before an automatic rebuild'**
+  String get storageSpaceSubDisplacedDatabases;
+
+  /// No description provided for @storageSpaceClearDisplacedDatabasesConfirmMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete these set-aside databases? Kelivo kept them when it rebuilt its database, and they may be the only surviving copy of those chats and settings. This cannot be undone.'**
+  String get storageSpaceClearDisplacedDatabasesConfirmMessage;
+
   /// No description provided for @storageSpaceRestoreTracesHint.
   ///
   /// In en, this message translates to:
@@ -363,6 +381,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Clear Restore Traces'**
   String get storageSpaceClearRestoreTracesButton;
+
+  /// No description provided for @storageSpaceClearDisplacedDatabasesButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete Set-Aside Databases'**
+  String get storageSpaceClearDisplacedDatabasesButton;
 
   /// No description provided for @storageSpaceClearRestoreTracesConfirmMessage.
   ///
