@@ -85,16 +85,33 @@ class _LocalSnapshotSchedulerState extends State<LocalSnapshotScheduler>
     final provider = context.read<LocalSnapshotProvider>();
     final result = await provider.runIfDue();
     if (!mounted) return;
-    if (result is! LocalSnapshotCreated) return;
-    if (!provider.settings.announceResult) return;
-    try {
-      showAppSnackBar(
-        context,
-        message: AppLocalizations.of(context)!.localSnapshotTakeDone,
+
+    final l10n = AppLocalizations.of(context)!;
+    final String message;
+    final NotificationType type;
+    if (result is LocalSnapshotFailed) {
+      // Reported once per run of failures, not once per attempt: the backoff
+      // retries for as long as the cause persists, and a device that is simply
+      // full would otherwise nag every hour. Settings keeps the standing
+      // record either way.
+      if (provider.state.failureStreak != 1) return;
+      message = l10n.localSnapshotTakeFailed(
+        provider.state.lastFailureMessage ?? '',
       );
+      type = NotificationType.error;
+    } else if (result is LocalSnapshotCreated) {
+      if (!provider.settings.announceResult) return;
+      message = l10n.localSnapshotTakeDone;
+      type = NotificationType.info;
+    } else {
+      return;
+    }
+
+    try {
+      showAppSnackBar(context, message: message, type: type);
     } catch (_) {
       // This runs from a timer, above the Navigator. A missing overlay must
-      // not turn a successful copy into an unhandled error.
+      // not turn the copy's outcome into an unhandled error.
     }
   }
 

@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
+import '../../../core/services/backup/backup_activity.dart';
 import '../../../core/services/backup/backup_cancel_token.dart';
 import '../../../core/services/backup/backup_task_progress.dart';
 import '../../../icons/lucide_adapter.dart';
@@ -75,6 +76,9 @@ Future<BackupTaskResult<T>> showBackupProgressDialog<T>(
   // Held here rather than inside the dialog so a backgrounded task can outlive
   // the widget that started it.
   Future<T>? running;
+  // Claimed before the dialog and released only once the task settles, so a
+  // task the user sent to the background still counts as in flight.
+  BackupActivity.begin();
   try {
     final result = await showAppDialog<BackupTaskResult<T>>(
       context,
@@ -97,6 +101,7 @@ Future<BackupTaskResult<T>> showBackupProgressDialog<T>(
     void release() {
       token.dispose();
       progress.dispose();
+      BackupActivity.end();
     }
 
     if (pending == null) {

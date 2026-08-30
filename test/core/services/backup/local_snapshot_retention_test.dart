@@ -165,8 +165,18 @@ void main() {
 
     test('总量上限压不掉最后一份有内容的副本', () {
       final entries = [
-        entry('empty', age: const Duration(hours: 1), bytes: 900, messageCount: 0),
-        entry('real', age: const Duration(days: 1), bytes: 900, messageCount: 42),
+        entry(
+          'empty',
+          age: const Duration(hours: 1),
+          bytes: 900,
+          messageCount: 0,
+        ),
+        entry(
+          'real',
+          age: const Duration(days: 1),
+          bytes: 900,
+          messageCount: 42,
+        ),
       ];
 
       const policy = LocalSnapshotRetentionPolicy(

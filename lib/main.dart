@@ -49,6 +49,7 @@ import 'core/database/business_repository.dart';
 import 'core/database/business_startup_gate.dart';
 import 'core/database/chat_database_gateway.dart';
 import 'core/database/startup_failure_report.dart';
+import 'core/services/backup/backup_activity.dart';
 import 'core/services/backup/local_snapshot_schedule.dart';
 import 'core/services/chat/chat_service.dart';
 import 'core/services/app_exit_flush.dart';
@@ -714,11 +715,16 @@ class MyApp extends StatelessWidget {
             businessPreferences: businessPreferences,
             isBusy: () {
               // Never compete with a reply the user is watching, nor with a
-              // backup or restore that is already holding the database.
+              // backup, restore or import that is already holding the
+              // database. Asked of the process-wide tracker rather than of the
+              // providers here: the mobile backup screen builds its own
+              // instances, so these root ones stay idle throughout a mobile
+              // backup, and a local-file restore never marks them busy at all.
               if (ChatActions.hasAnyActiveGeneration) {
                 return LocalSnapshotSkipReason.generating;
               }
-              if (ctx.read<BackupProvider>().busy ||
+              if (BackupActivity.isActive ||
+                  ctx.read<BackupProvider>().busy ||
                   ctx.read<S3BackupProvider>().busy) {
                 return LocalSnapshotSkipReason.busy;
               }

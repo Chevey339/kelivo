@@ -29,6 +29,7 @@ class LocalSnapshotProvider extends ChangeNotifier {
     required BusinessPreferences businessPreferences,
     LocalSnapshotBusyCheck? isBusy,
     bool autoLoad = true,
+    @visibleForTesting LocalSnapshotArchiveBuilder? debugBuildArchive,
   }) : _dataSync = DataSync(
          chatService: chatService,
          businessRepository: businessRepository,
@@ -44,7 +45,7 @@ class LocalSnapshotProvider extends ChangeNotifier {
       appDataDirectory: appDataDirectory,
       preferences: _preferences,
       store: _store,
-      buildArchive: _dataSync.prepareLocalSnapshotArchive,
+      buildArchive: debugBuildArchive ?? _dataSync.prepareLocalSnapshotArchive,
       isBusy: isBusy,
     );
     _settings = _preferences.readSettings();
@@ -134,6 +135,19 @@ class LocalSnapshotProvider extends ChangeNotifier {
       );
       if (prune) await _service.pruneNow();
       return entry;
+    } on BackupCancelledException {
+      // The user stopped it; nothing failed.
+      rethrow;
+    } catch (error) {
+      // Recorded as well as rethrown. A copy the user sent to the background
+      // has no dialog left to fail into, so without this a manual copy could
+      // fail and leave no trace anywhere at all.
+      await _preferences.recordFailure(
+        at: DateTime.now().toUtc(),
+        message: error.toString(),
+        previousStreak: _preferences.readState().failureStreak,
+      );
+      rethrow;
     } finally {
       _working = false;
       await refresh();

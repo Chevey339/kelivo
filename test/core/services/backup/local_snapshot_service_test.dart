@@ -370,6 +370,21 @@ void main() {
       expect(packCount, 2);
     });
 
+    test('手动备份失败也要留下记录，否则转后台失败就无声无息', () async {
+      // 转到后台之后弹窗已经卸载，异步错误被消费掉只用于释放资源。
+      // 若这里不记，用户只会看到"正在后台备份"，然后再无下文。
+      packError = StateError('device is full');
+      final service = build();
+
+      await expectLater(
+        service.take(origin: LocalSnapshotOrigin.manual),
+        throwsA(isA<StateError>()),
+      );
+
+      // 服务层只负责抛；记录发生在 provider 层（见 local_snapshot_provider）。
+      expect(await service.store.list(), isEmpty);
+    });
+
     test('手动一份标成 manual，且不受周期限制', () async {
       final service = build();
       await service.runIfDue(now: DateTime.utc(2026, 5, 1));
