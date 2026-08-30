@@ -137,6 +137,22 @@ void main() {
     expect(find.text('Show Thinking Cards'), findsNothing);
     expect(find.text('Show Tool Cards'), findsNothing);
 
+    final keepCardsToggle = find.text(
+      'Keep thinking and tool cards when editing assistant',
+    );
+    await tester.scrollUntilVisible(
+      keepCardsToggle,
+      240,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.pumpAndSettle();
+    expect(keepCardsToggle, findsOneWidget);
+    expect(settings.keepThinkingAndToolCardsWhenEditingAssistant, isFalse);
+
+    await tester.tap(keepCardsToggle);
+    await tester.pumpAndSettle();
+    expect(settings.keepThinkingAndToolCardsWhenEditingAssistant, isTrue);
+
     final toggle = find.text('Paste long text as file');
     await tester.scrollUntilVisible(
       toggle,

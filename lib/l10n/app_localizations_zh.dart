@@ -4486,6 +4486,14 @@ class AppLocalizationsZh extends AppLocalizations {
   String get displaySettingsPageForkKeepMessageVersionsTitle => '创建分支时保留消息版本';
 
   @override
+  String get displaySettingsPageEditAssistantKeepThinkingToolCardsTitle =>
+      '编辑助手时保留思考与工具卡片';
+
+  @override
+  String get displaySettingsPageEditAssistantKeepThinkingToolCardsSubtitle =>
+      '关闭后，当前编辑版本只保留助手正文；切回上一版本仍可查看思考与工具卡片';
+
+  @override
   String chainOfThoughtExpandSteps(Object count) {
     return '展开更多 $count 步';
   }
@@ -12499,6 +12507,14 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get displaySettingsPageForkKeepMessageVersionsTitle => '创建分支时保留消息版本';
 
   @override
+  String get displaySettingsPageEditAssistantKeepThinkingToolCardsTitle =>
+      '编辑助手时保留思考与工具卡片';
+
+  @override
+  String get displaySettingsPageEditAssistantKeepThinkingToolCardsSubtitle =>
+      '关闭后，当前编辑版本只保留助手正文；切回上一版本仍可查看思考与工具卡片';
+
+  @override
   String chainOfThoughtExpandSteps(Object count) {
     return '展开更多 $count 步';
   }
@@ -20434,6 +20450,14 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get displaySettingsPageForkKeepMessageVersionsTitle => '建立分支時保留訊息版本';
+
+  @override
+  String get displaySettingsPageEditAssistantKeepThinkingToolCardsTitle =>
+      '編輯助手時保留思考與工具卡片';
+
+  @override
+  String get displaySettingsPageEditAssistantKeepThinkingToolCardsSubtitle =>
+      '關閉後，目前編輯版本只保留助手正文；切回上一版本仍可查看思考與工具卡片';
 
   @override
   String chainOfThoughtExpandSteps(Object count) {

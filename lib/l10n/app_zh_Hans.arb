@@ -1652,6 +1652,8 @@
   "displaySettingsPageRegenerateDeleteTrailingMessagesTitle": "重新生成时删除下面的消息",
   "displaySettingsPageShowRegenerateConfirmDialogTitle": "重新生成前弹出确认",
   "displaySettingsPageForkKeepMessageVersionsTitle": "创建分支时保留消息版本",
+  "displaySettingsPageEditAssistantKeepThinkingToolCardsTitle": "编辑助手时保留思考与工具卡片",
+  "displaySettingsPageEditAssistantKeepThinkingToolCardsSubtitle": "关闭后，当前编辑版本只保留助手正文；切回上一版本仍可查看思考与工具卡片",
   "chainOfThoughtExpandSteps": "展开更多 {count} 步",
   "@chainOfThoughtExpandSteps": {
     "placeholders": {

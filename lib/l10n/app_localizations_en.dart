@@ -4655,6 +4655,14 @@ class AppLocalizationsEn extends AppLocalizations {
       'Keep Message Versions When Forking';
 
   @override
+  String get displaySettingsPageEditAssistantKeepThinkingToolCardsTitle =>
+      'Keep thinking and tool cards when editing assistant';
+
+  @override
+  String get displaySettingsPageEditAssistantKeepThinkingToolCardsSubtitle =>
+      'When off, the edited version keeps only the assistant text. Switching back still shows previous thinking and tool cards.';
+
+  @override
   String chainOfThoughtExpandSteps(Object count) {
     return 'Show $count more steps';
   }

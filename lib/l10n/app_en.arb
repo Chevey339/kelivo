@@ -2054,6 +2054,8 @@
   "displaySettingsPageRegenerateDeleteTrailingMessagesTitle": "Delete messages below when regenerating",
   "displaySettingsPageShowRegenerateConfirmDialogTitle": "Confirm before regenerating",
   "displaySettingsPageForkKeepMessageVersionsTitle": "Keep Message Versions When Forking",
+  "displaySettingsPageEditAssistantKeepThinkingToolCardsTitle": "Keep thinking and tool cards when editing assistant",
+  "displaySettingsPageEditAssistantKeepThinkingToolCardsSubtitle": "When off, the edited version keeps only the assistant text. Switching back still shows previous thinking and tool cards.",
   "chainOfThoughtExpandSteps": "Show {count} more steps",
   "@chainOfThoughtExpandSteps": {
     "placeholders": {

@@ -8563,6 +8563,18 @@ abstract class AppLocalizations {
   /// **'Keep Message Versions When Forking'**
   String get displaySettingsPageForkKeepMessageVersionsTitle;
 
+  /// No description provided for @displaySettingsPageEditAssistantKeepThinkingToolCardsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Keep thinking and tool cards when editing assistant'**
+  String get displaySettingsPageEditAssistantKeepThinkingToolCardsTitle;
+
+  /// No description provided for @displaySettingsPageEditAssistantKeepThinkingToolCardsSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'When off, the edited version keeps only the assistant text. Switching back still shows previous thinking and tool cards.'**
+  String get displaySettingsPageEditAssistantKeepThinkingToolCardsSubtitle;
+
   /// No description provided for @chainOfThoughtExpandSteps.
   ///
   /// In en, this message translates to:

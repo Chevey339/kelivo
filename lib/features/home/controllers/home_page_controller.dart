@@ -1493,6 +1493,9 @@ class HomePageController extends ChangeNotifier {
 
     final ctx = _context;
     if (!ctx.mounted) return;
+    final keepThinkingAndToolCards = ctx
+        .read<SettingsProvider>()
+        .keepThinkingAndToolCardsWhenEditingAssistant;
     final isDesktop = isDesktopPlatform;
     final Future<MessageEditResult?> future = isDesktop
         ? showMessageEditDesktopDialog(ctx, message: message)
@@ -1510,6 +1513,12 @@ class HomePageController extends ChangeNotifier {
     final newMsg = await _chatService.appendMessageVersion(
       messageId: message.id,
       content: result.content,
+      parts: message.role == 'assistant' && !keepThinkingAndToolCards
+          ? ChatMessage.partsWithoutThinkingAndToolCards(
+              message.parts,
+              result.content,
+            )
+          : null,
     );
     if (newMsg == null) return;
 

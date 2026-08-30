@@ -203,6 +203,8 @@ class SettingsProvider extends ChangeNotifier {
       'display_show_regenerate_confirm_dialog_v1';
   static const String _chatForkKeepMessageVersionsKey =
       'chat_fork_keep_message_versions_v1';
+  static const String _chatEditAssistantKeepThinkingToolCardsKey =
+      'chat_edit_assistant_keep_thinking_tool_cards_v1';
   static const String _displayShowMessageNavKey = 'display_show_message_nav_v1';
   static const String _displayDesktopMessageNavButtonsModeKey =
       'display_desktop_message_nav_buttons_mode_v1';
@@ -1082,6 +1084,8 @@ class SettingsProvider extends ChangeNotifier {
         prefs.getBool(_displayShowRegenerateConfirmDialogKey) ?? true;
     _forkKeepMessageVersions =
         prefs.getBool(_chatForkKeepMessageVersionsKey) ?? false;
+    _keepThinkingAndToolCardsWhenEditingAssistant =
+        prefs.getBool(_chatEditAssistantKeepThinkingToolCardsKey) ?? false;
     _showMessageNavButtons = prefs.getBool(_displayShowMessageNavKey) ?? true;
     _mobileMessageNavButtonsMode = _parseMobileMessageNavButtonsMode(
       prefs.getString(_displayMobileMessageNavButtonsModeKey),
@@ -4578,6 +4582,16 @@ Requirements:
     await _preferences.setBool(_chatForkKeepMessageVersionsKey, v);
   }
 
+  bool _keepThinkingAndToolCardsWhenEditingAssistant = false;
+  bool get keepThinkingAndToolCardsWhenEditingAssistant =>
+      _keepThinkingAndToolCardsWhenEditingAssistant;
+  Future<void> setKeepThinkingAndToolCardsWhenEditingAssistant(bool v) async {
+    if (_keepThinkingAndToolCardsWhenEditingAssistant == v) return;
+    _keepThinkingAndToolCardsWhenEditingAssistant = v;
+    notifyListeners();
+    await _preferences.setBool(_chatEditAssistantKeepThinkingToolCardsKey, v);
+  }
+
   // Display: show message navigation button
   bool _showMessageNavButtons = true;
   bool get showMessageNavButtons => _showMessageNavButtons;
@@ -5540,6 +5554,8 @@ Requirements:
     copy._regenerateDeleteTrailingMessages = _regenerateDeleteTrailingMessages;
     copy._showRegenerateConfirmDialog = _showRegenerateConfirmDialog;
     copy._forkKeepMessageVersions = _forkKeepMessageVersions;
+    copy._keepThinkingAndToolCardsWhenEditingAssistant =
+        _keepThinkingAndToolCardsWhenEditingAssistant;
     copy._showMessageNavButtons = _showMessageNavButtons;
     copy._mobileMessageNavButtonsMode = _mobileMessageNavButtonsMode;
     copy._useNewAssistantAvatarUx = _useNewAssistantAvatarUx;

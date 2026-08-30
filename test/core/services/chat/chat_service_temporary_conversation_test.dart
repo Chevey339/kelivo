@@ -1169,6 +1169,64 @@ void main() {
         expect(edited.reasoningSegmentsJson, isNull);
       },
     );
+
+    test(
+      'temporary edit without thinking/tool cards leaves the prior version intact',
+      () async {
+        final service = createService();
+        await service.init();
+        const reasoningJson =
+            '{"segments":[{"text":"plan then check","expanded":false}]}';
+
+        final conversation = await service.createDraftConversation(
+          title: 'Temporary Chat',
+          temporary: true,
+        );
+        final original = await service.addMessage(
+          conversationId: conversation.id,
+          role: 'assistant',
+          parts: const [
+            ReasoningPart('plan then check'),
+            TextPart('hello '),
+            ToolCallPart('{"id":"call_1","name":"lookup"}'),
+            TextPart('world'),
+          ],
+          reasoningText: 'plan then check',
+          reasoningStartAt: DateTime.utc(2026, 8, 29, 20, 59),
+          reasoningFinishedAt: DateTime.utc(2026, 8, 29, 21),
+        );
+        await service.updateMessage(
+          original.id,
+          reasoningSegmentsJson: reasoningJson,
+        );
+
+        final edited = await service.appendMessageVersion(
+          messageId: original.id,
+          content: 'edited answer',
+          parts: ChatMessage.partsWithoutThinkingAndToolCards(
+            original.parts,
+            'edited answer',
+          ),
+        );
+
+        expect(edited!.content, 'edited answer');
+        expect(edited.parts.map((part) => part.kind), ['text']);
+        expect(edited.reasoningText, isNull);
+        expect(edited.reasoningSegmentsJson, isNull);
+
+        final prior = service
+            .getMessages(conversation.id)
+            .firstWhere((message) => message.id == original.id);
+        expect(prior.parts.map((part) => part.kind), [
+          'reasoning',
+          'text',
+          'tool_call',
+          'text',
+        ]);
+        expect(prior.reasoningText, 'plan then check');
+        expect(prior.reasoningSegmentsJson, reasoningJson);
+      },
+    );
   });
 
   group('ChatService fork conversations', () {
