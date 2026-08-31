@@ -11,11 +11,31 @@ import '../../core/models/auto_retry_options.dart';
 import '../../core/providers/settings_provider.dart';
 import '../../icons/lucide_adapter.dart';
 import '../../l10n/app_localizations.dart';
+import '../../features/settings/widgets/custom_theme_widgets.dart';
 import '../../shared/widgets/ios_switch.dart';
 import '../../shared/widgets/ios_tactile.dart';
 
+Future<void> showDesktopAutoRetryDialog(BuildContext context) {
+  final l10n = AppLocalizations.of(context)!;
+  return showAppDialog<void>(
+    context,
+    maxWidth: 560,
+    child: SizedBox(
+      height: MediaQuery.of(context).size.height * 0.82,
+      child: Column(
+        children: [
+          AppDialogHeader(title: l10n.settingsPageAutoRetry),
+          const Expanded(child: DesktopAutoRetryPane(showPageTitle: false)),
+        ],
+      ),
+    ),
+  );
+}
+
 class DesktopAutoRetryPane extends StatefulWidget {
-  const DesktopAutoRetryPane({super.key});
+  const DesktopAutoRetryPane({super.key, this.showPageTitle = true});
+
+  final bool showPageTitle;
 
   @override
   State<DesktopAutoRetryPane> createState() => _DesktopAutoRetryPaneState();
@@ -158,21 +178,23 @@ class _DesktopAutoRetryPaneState extends State<DesktopAutoRetryPane> {
           constraints: const BoxConstraints(maxWidth: 960),
           child: ListView(
             children: [
-              SizedBox(
-                height: 36,
-                child: Align(
-                  alignment: Alignment.centerLeft,
-                  child: Text(
-                    l10n.settingsPageAutoRetry,
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: AppFontWeights.regular,
-                      color: cs.onSurface.withValues(alpha: 0.9),
+              if (widget.showPageTitle) ...[
+                SizedBox(
+                  height: 36,
+                  child: Align(
+                    alignment: Alignment.centerLeft,
+                    child: Text(
+                      l10n.settingsPageAutoRetry,
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: AppFontWeights.regular,
+                        color: cs.onSurface.withValues(alpha: 0.9),
+                      ),
                     ),
                   ),
                 ),
-              ),
-              const SizedBox(height: 10),
+                const SizedBox(height: 10),
+              ],
               SectionCard(
                 children: [
                   _ItemRow(

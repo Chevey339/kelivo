@@ -21,7 +21,6 @@ import '../../instruction_injection/pages/instruction_injection_page.dart';
 import '../../world_book/pages/world_book_page.dart';
 import '../../../shared/widgets/section_card.dart';
 import 'network_proxy_page.dart';
-import 'auto_retry_page.dart';
 import 'storage_space_page.dart';
 import '../../stats/pages/stats_page.dart';
 import '../../../core/services/storage/storage_usage_service.dart';
@@ -309,17 +308,6 @@ class SettingsPage extends StatelessWidget {
                 onTap: () {
                   Navigator.of(context).push(
                     MaterialPageRoute(builder: (_) => const NetworkProxyPage()),
-                  );
-                },
-              ),
-              _iosDivider(context),
-              _iosNavRow(
-                context,
-                icon: Lucide.RefreshCw,
-                label: l10n.settingsPageAutoRetry,
-                onTap: () {
-                  Navigator.of(context).push(
-                    MaterialPageRoute(builder: (_) => const AutoRetryPage()),
                   );
                 },
               ),

@@ -31,6 +31,8 @@ class _DisplaySettingsBody extends StatelessWidget {
                   _RowDivider(),
                   _MessageStyleRow(),
                   _RowDivider(),
+                  _AutoRetryRow(),
+                  _RowDivider(),
                   _TopicPositionRow(),
                 ],
               ),
@@ -870,6 +872,24 @@ class _MessageStyleRow extends StatelessWidget {
       trailing: _DesktopFontDropdownButton(
         display: styleLabel,
         onTap: () => showMessageStyleSettingsDialog(context),
+      ),
+    );
+  }
+}
+
+class _AutoRetryRow extends StatelessWidget {
+  const _AutoRetryRow();
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    final enabled = context.watch<SettingsProvider>().autoRetryOptions.enabled;
+    return _LabeledRow(
+      label: l10n.settingsPageAutoRetry,
+      trailing: _DesktopFontDropdownButton(
+        display: enabled
+            ? l10n.iosBackgroundStatusOn
+            : l10n.iosBackgroundStatusOff,
+        onTap: () => showDesktopAutoRetryDialog(context),
       ),
     );
   }

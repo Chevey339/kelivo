@@ -49,6 +49,41 @@ void main() {
     expect(find.byType(SfSlider), findsNWidgets(2));
   });
 
+  testWidgets('auto retry sits between message style and haptics', (
+    tester,
+  ) async {
+    final settings = SettingsProvider(createBusinessTestPreferences());
+    addTearDown(settings.dispose);
+    await settings.loaded;
+
+    await tester.pumpWidget(
+      ChangeNotifierProvider<SettingsProvider>.value(
+        value: settings,
+        child: const MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: DisplaySettingsPage(),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final autoRetry = find.text('Auto Retry');
+    await tester.scrollUntilVisible(
+      autoRetry,
+      240,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.pumpAndSettle();
+    expect(autoRetry, findsOneWidget);
+    expect(find.text('Message Style'), findsOneWidget);
+    expect(find.text('Haptics'), findsOneWidget);
+
+    await tester.tap(autoRetry);
+    await tester.pumpAndSettle();
+    expect(find.text('Enable auto-retry'), findsOneWidget);
+  });
+
   testWidgets(
     'chat item display page shows thinking and tool card switches with tips',
     (tester) async {
