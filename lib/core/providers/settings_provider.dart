@@ -2881,8 +2881,9 @@ class SettingsProvider extends ChangeNotifier {
     );
   }
 
-  static const Duration toolSchemaOverridePersistDebounce =
-      Duration(milliseconds: 300);
+  static const Duration toolSchemaOverridePersistDebounce = Duration(
+    milliseconds: 300,
+  );
 
   Map<String, ToolSchemaOverride> _toolSchemaOverrides =
       const <String, ToolSchemaOverride>{};

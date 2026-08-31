@@ -411,73 +411,80 @@ void main() {
       });
 
       test('列出改名副本时按时间倒序并算上整个 family', () async {
-      await DatabaseInstallationGate.ensureReady(appDataDirectory: directory);
-      final base = databaseFile(directory);
-      await File('${base.path}-wal').writeAsBytes(List<int>.filled(32, 7));
+        await DatabaseInstallationGate.ensureReady(appDataDirectory: directory);
+        final base = databaseFile(directory);
+        await File('${base.path}-wal').writeAsBytes(List<int>.filled(32, 7));
 
-      for (final receipt in await directory.list().toList()) {
-        if (p.basename(receipt.path).startsWith('database_installation_')) {
-          await receipt.delete();
+        for (final receipt in await directory.list().toList()) {
+          if (p.basename(receipt.path).startsWith('database_installation_')) {
+            await receipt.delete();
+          }
         }
-      }
-      await DatabaseInstallationGate.rebuildFresh(appDataDirectory: directory);
+        await DatabaseInstallationGate.rebuildFresh(
+          appDataDirectory: directory,
+        );
 
-      final copies = await DatabaseInstallationGate.listDisplacedDatabases(
-        appDataDirectory: directory,
-      );
+        final copies = await DatabaseInstallationGate.listDisplacedDatabases(
+          appDataDirectory: directory,
+        );
 
-      expect(copies, hasLength(1));
-      expect(copies.single.displacedAt, isNotNull);
-      expect(await copies.single.file.exists(), isTrue);
-      // -wal 也算进去，不然显示的大小会小于真正占的空间。
-      expect(copies.single.bytes, greaterThan(await copies.single.file.length()));
-    });
+        expect(copies, hasLength(1));
+        expect(copies.single.displacedAt, isNotNull);
+        expect(await copies.single.file.exists(), isTrue);
+        // -wal 也算进去，不然显示的大小会小于真正占的空间。
+        expect(
+          copies.single.bytes,
+          greaterThan(await copies.single.file.length()),
+        );
+      });
 
-    test('删除单份改名副本会连 sidecar 一起清掉', () async {
-      await DatabaseInstallationGate.ensureReady(appDataDirectory: directory);
-      final base = databaseFile(directory);
-      await File('${base.path}-wal').writeAsBytes(List<int>.filled(32, 7));
-      for (final receipt in await directory.list().toList()) {
-        if (p.basename(receipt.path).startsWith('database_installation_')) {
-          await receipt.delete();
+      test('删除单份改名副本会连 sidecar 一起清掉', () async {
+        await DatabaseInstallationGate.ensureReady(appDataDirectory: directory);
+        final base = databaseFile(directory);
+        await File('${base.path}-wal').writeAsBytes(List<int>.filled(32, 7));
+        for (final receipt in await directory.list().toList()) {
+          if (p.basename(receipt.path).startsWith('database_installation_')) {
+            await receipt.delete();
+          }
         }
-      }
-      await DatabaseInstallationGate.rebuildFresh(appDataDirectory: directory);
-      final copy = (await DatabaseInstallationGate.listDisplacedDatabases(
-        appDataDirectory: directory,
-      )).single;
-
-      await DatabaseInstallationGate.deleteDisplacedDatabase(
-        appDataDirectory: directory,
-        stamp: copy.stamp,
-      );
-
-      expect(
-        await DatabaseInstallationGate.listDisplacedDatabases(
+        await DatabaseInstallationGate.rebuildFresh(
           appDataDirectory: directory,
-        ),
-        isEmpty,
-      );
-      expect(await File('${copy.file.path}-wal').exists(), isFalse);
-      expect(
-        await DatabaseInstallationGate.hasDisplacedDatabases(
+        );
+        final copy = (await DatabaseInstallationGate.listDisplacedDatabases(
           appDataDirectory: directory,
-        ),
-        isFalse,
-      );
-    });
+        )).single;
 
-    test('拒绝伪造的 stamp', () async {
-      await expectLater(
-        DatabaseInstallationGate.deleteDisplacedDatabase(
+        await DatabaseInstallationGate.deleteDisplacedDatabase(
           appDataDirectory: directory,
-          stamp: '../../etc',
-        ),
-        throwsA(isA<ArgumentError>()),
-      );
-    });
+          stamp: copy.stamp,
+        );
 
-    test('无法读取 userVersion 的文件不自动重建', () async {
+        expect(
+          await DatabaseInstallationGate.listDisplacedDatabases(
+            appDataDirectory: directory,
+          ),
+          isEmpty,
+        );
+        expect(await File('${copy.file.path}-wal').exists(), isFalse);
+        expect(
+          await DatabaseInstallationGate.hasDisplacedDatabases(
+            appDataDirectory: directory,
+          ),
+          isFalse,
+        );
+      });
+
+      test('拒绝伪造的 stamp', () async {
+        await expectLater(
+          DatabaseInstallationGate.deleteDisplacedDatabase(
+            appDataDirectory: directory,
+            stamp: '../../etc',
+          ),
+          throwsA(isA<ArgumentError>()),
+        );
+      });
+
+      test('无法读取 userVersion 的文件不自动重建', () async {
         // "Unreadable right now" is also what a healthy database looks like
         // while the OS denies the read, so it may never authorise a delete.
         await databaseFile(directory).writeAsString('not a sqlite database');

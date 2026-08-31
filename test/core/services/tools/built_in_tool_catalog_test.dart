@@ -14,27 +14,30 @@ void main() {
     debugDefaultTargetPlatformOverride = null;
   });
 
-  test('iOS weather and health stay out of the catalog until capabilities resolve', () {
-    debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
-    addTearDown(() => debugDefaultTargetPlatformOverride = null);
+  test(
+    'iOS weather and health stay out of the catalog until capabilities resolve',
+    () {
+      debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
+      addTearDown(() => debugDefaultTargetPlatformOverride = null);
 
-    final before = BuiltInToolCatalog.entries(
-      lang: MemoryPromptLang.en,
-      legacyMemoryMode: false,
-    ).map((e) => e.name);
+      final before = BuiltInToolCatalog.entries(
+        lang: MemoryPromptLang.en,
+        legacyMemoryMode: false,
+      ).map((e) => e.name);
 
-    expect(before, isNot(contains(LocalToolNames.weather)));
-    expect(before, isNot(contains(LocalToolNames.healthSummary)));
+      expect(before, isNot(contains(LocalToolNames.weather)));
+      expect(before, isNot(contains(LocalToolNames.healthSummary)));
 
-    DeviceLocalTools.debugSetWeatherKitAvailable(true);
-    DeviceLocalTools.debugSetHealthDataAvailable(true);
+      DeviceLocalTools.debugSetWeatherKitAvailable(true);
+      DeviceLocalTools.debugSetHealthDataAvailable(true);
 
-    final after = BuiltInToolCatalog.entries(
-      lang: MemoryPromptLang.en,
-      legacyMemoryMode: false,
-    ).map((e) => e.name);
+      final after = BuiltInToolCatalog.entries(
+        lang: MemoryPromptLang.en,
+        legacyMemoryMode: false,
+      ).map((e) => e.name);
 
-    expect(after, contains(LocalToolNames.weather));
-    expect(after, contains(LocalToolNames.healthSummary));
-  });
+      expect(after, contains(LocalToolNames.weather));
+      expect(after, contains(LocalToolNames.healthSummary));
+    },
+  );
 }

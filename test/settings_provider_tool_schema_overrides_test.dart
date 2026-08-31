@@ -71,36 +71,39 @@ void main() {
     expect(harness.preferences.getString('tool_schema_overrides_v1'), isNull);
   });
 
-  test('live edits update memory immediately and persist the final value once', () async {
-    final harness = await createBusinessTestHarness(initial: {});
-    final settings = SettingsProvider(harness.preferences);
-    addTearDown(settings.dispose);
-    await settings.loaded;
+  test(
+    'live edits update memory immediately and persist the final value once',
+    () async {
+      final harness = await createBusinessTestHarness(initial: {});
+      final settings = SettingsProvider(harness.preferences);
+      addTearDown(settings.dispose);
+      await settings.loaded;
 
-    settings.setToolSchemaOverrideLive(
-      'search_web',
-      const ToolSchemaOverride(description: 'a'),
-    );
-    settings.setToolSchemaOverrideLive(
-      'search_web',
-      const ToolSchemaOverride(description: 'ab'),
-    );
-    settings.setToolSchemaOverrideLive(
-      'search_web',
-      const ToolSchemaOverride(description: 'abc'),
-    );
+      settings.setToolSchemaOverrideLive(
+        'search_web',
+        const ToolSchemaOverride(description: 'a'),
+      );
+      settings.setToolSchemaOverrideLive(
+        'search_web',
+        const ToolSchemaOverride(description: 'ab'),
+      );
+      settings.setToolSchemaOverrideLive(
+        'search_web',
+        const ToolSchemaOverride(description: 'abc'),
+      );
 
-    expect(settings.toolSchemaOverrides['search_web']?.description, 'abc');
-    expect(harness.preferences.getString('tool_schema_overrides_v1'), isNull);
+      expect(settings.toolSchemaOverrides['search_web']?.description, 'abc');
+      expect(harness.preferences.getString('tool_schema_overrides_v1'), isNull);
 
-    await settings.flushPendingToolSchemaOverridePersist();
-    expect(
-      harness.preferences.getString('tool_schema_overrides_v1'),
-      jsonEncode({
-        'search_web': {'description': 'abc'},
-      }),
-    );
-  });
+      await settings.flushPendingToolSchemaOverridePersist();
+      expect(
+        harness.preferences.getString('tool_schema_overrides_v1'),
+        jsonEncode({
+          'search_web': {'description': 'abc'},
+        }),
+      );
+    },
+  );
 
   test('debounced persist writes after the quiet period', () async {
     final harness = await createBusinessTestHarness(initial: {});
@@ -114,7 +117,9 @@ void main() {
     );
     expect(harness.preferences.getString('tool_schema_overrides_v1'), isNull);
 
-    await Future<void>.delayed(SettingsProvider.toolSchemaOverridePersistDebounce);
+    await Future<void>.delayed(
+      SettingsProvider.toolSchemaOverridePersistDebounce,
+    );
     await Future<void>.delayed(const Duration(milliseconds: 50));
     expect(
       jsonDecode(harness.preferences.getString('tool_schema_overrides_v1')!),
