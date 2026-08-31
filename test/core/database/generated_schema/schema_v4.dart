@@ -1237,6 +1237,164 @@ class GenerationRunRows extends Table with TableInfo {
   bool get dontWriteConstraints => true;
 }
 
+class BridgeDeliveryRows extends Table with TableInfo {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  BridgeDeliveryRows(this.attachedDatabase, [this._alias]);
+  late final GeneratedColumn<String> originSystem = GeneratedColumn<String>(
+    'origin_system',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+    $customConstraints: 'NOT NULL CHECK (origin_system IS NOT \'\')',
+  );
+  late final GeneratedColumn<String> originInstanceId = GeneratedColumn<String>(
+    'origin_instance_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+    $customConstraints: 'NOT NULL CHECK (origin_instance_id IS NOT \'\')',
+  );
+  late final GeneratedColumn<String> idempotencyKey = GeneratedColumn<String>(
+    'idempotency_key',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+    $customConstraints: 'NOT NULL CHECK (idempotency_key IS NOT \'\')',
+  );
+  late final GeneratedColumn<String> requestFingerprint =
+      GeneratedColumn<String>(
+        'request_fingerprint',
+        aliasedName,
+        false,
+        type: DriftSqlType.string,
+        requiredDuringInsert: true,
+        $customConstraints: 'NOT NULL',
+      );
+  late final GeneratedColumn<String> roomEventId = GeneratedColumn<String>(
+    'room_event_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+    $customConstraints: 'NOT NULL CHECK (room_event_id IS NOT \'\')',
+  );
+  late final GeneratedColumn<String> roomId = GeneratedColumn<String>(
+    'room_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+    $customConstraints: 'NOT NULL CHECK (room_id IS NOT \'\')',
+  );
+  late final GeneratedColumn<String> conversationId = GeneratedColumn<String>(
+    'conversation_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+    $customConstraints:
+        'NOT NULL REFERENCES conversation_rows(id)ON DELETE CASCADE',
+  );
+  late final GeneratedColumn<String> userRevisionId = GeneratedColumn<String>(
+    'user_revision_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+    $customConstraints: 'NOT NULL REFERENCES message_rows(id)ON DELETE CASCADE',
+  );
+  late final GeneratedColumn<String> assistantRevisionId =
+      GeneratedColumn<String>(
+        'assistant_revision_id',
+        aliasedName,
+        false,
+        type: DriftSqlType.string,
+        requiredDuringInsert: true,
+        $customConstraints:
+            'NOT NULL REFERENCES message_rows(id)ON DELETE CASCADE',
+      );
+  late final GeneratedColumn<String> generationRunId = GeneratedColumn<String>(
+    'generation_run_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+    $customConstraints:
+        'NOT NULL REFERENCES generation_run_rows(id)ON DELETE CASCADE',
+  );
+  late final GeneratedColumn<String> state = GeneratedColumn<String>(
+    'state',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+    $customConstraints:
+        'NOT NULL CHECK (state IN (\'preparing\', \'requesting\', \'streaming\', \'waiting_tool\', \'completed\', \'failed\', \'cancelled\', \'interrupted\'))',
+  );
+  late final GeneratedColumn<int> createdAt = GeneratedColumn<int>(
+    'created_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+    $customConstraints: 'NOT NULL',
+  );
+  late final GeneratedColumn<int> updatedAt = GeneratedColumn<int>(
+    'updated_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+    $customConstraints: 'NOT NULL',
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    originSystem,
+    originInstanceId,
+    idempotencyKey,
+    requestFingerprint,
+    roomEventId,
+    roomId,
+    conversationId,
+    userRevisionId,
+    assistantRevisionId,
+    generationRunId,
+    state,
+    createdAt,
+    updatedAt,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'bridge_delivery_rows';
+  @override
+  Set<GeneratedColumn> get $primaryKey => {originInstanceId, idempotencyKey};
+  @override
+  Never map(Map<String, dynamic> data, {String? tablePrefix}) {
+    throw UnsupportedError('TableInfo.map in schema verification code');
+  }
+
+  @override
+  BridgeDeliveryRows createAlias(String alias) {
+    return BridgeDeliveryRows(attachedDatabase, alias);
+  }
+
+  @override
+  List<String> get customConstraints => const [
+    'PRIMARY KEY(origin_instance_id, idempotency_key)',
+    'CHECK(length(request_fingerprint) = 64)',
+    'CHECK(updated_at >= created_at)',
+  ];
+  @override
+  bool get dontWriteConstraints => true;
+}
+
 class AssistantRows extends Table with TableInfo {
   @override
   final GeneratedDatabase attachedDatabase;
@@ -2428,8 +2586,8 @@ class ExtensionEntityRows extends Table with TableInfo {
   bool get dontWriteConstraints => true;
 }
 
-class DatabaseAtV3 extends GeneratedDatabase {
-  DatabaseAtV3(QueryExecutor e) : super(e);
+class DatabaseAtV4 extends GeneratedDatabase {
+  DatabaseAtV4(QueryExecutor e) : super(e);
   late final ConversationRows conversationRows = ConversationRows(this);
   late final MessageRows messageRows = MessageRows(this);
   late final ConversationMcpServerRows conversationMcpServerRows =
@@ -2448,6 +2606,7 @@ class DatabaseAtV3 extends GeneratedDatabase {
   late final AssetReferenceDirtyRows assetReferenceDirtyRows =
       AssetReferenceDirtyRows(this);
   late final GenerationRunRows generationRunRows = GenerationRunRows(this);
+  late final BridgeDeliveryRows bridgeDeliveryRows = BridgeDeliveryRows(this);
   late final AssistantRows assistantRows = AssistantRows(this);
   late final ProviderRows providerRows = ProviderRows(this);
   late final ProviderGroupRows providerGroupRows = ProviderGroupRows(this);
@@ -2516,6 +2675,14 @@ class DatabaseAtV3 extends GeneratedDatabase {
     'idx_generation_runs_state_updated',
     'CREATE INDEX idx_generation_runs_state_updated ON generation_run_rows (state, updated_at, id)',
   );
+  late final Index idxBridgeDeliveriesRoomEvent = Index(
+    'idx_bridge_deliveries_room_event',
+    'CREATE INDEX idx_bridge_deliveries_room_event ON bridge_delivery_rows (origin_instance_id, room_event_id)',
+  );
+  late final Index idxBridgeDeliveriesConversationCreated = Index(
+    'idx_bridge_deliveries_conversation_created',
+    'CREATE INDEX idx_bridge_deliveries_conversation_created ON bridge_delivery_rows (conversation_id, created_at)',
+  );
   late final Index idxAssistantMemoriesAssistant = Index(
     'idx_assistant_memories_assistant',
     'CREATE INDEX idx_assistant_memories_assistant ON assistant_memory_rows (assistant_id, id)',
@@ -2557,6 +2724,7 @@ class DatabaseAtV3 extends GeneratedDatabase {
     gcAuditRows,
     assetReferenceDirtyRows,
     generationRunRows,
+    bridgeDeliveryRows,
     assistantRows,
     providerRows,
     providerGroupRows,
@@ -2585,6 +2753,8 @@ class DatabaseAtV3 extends GeneratedDatabase {
     idxMessageAssetsAsset,
     idxGenerationRunsActiveTarget,
     idxGenerationRunsStateUpdated,
+    idxBridgeDeliveriesRoomEvent,
+    idxBridgeDeliveriesConversationCreated,
     idxAssistantMemoriesAssistant,
     idxMemoryEntriesVisible,
     idxMemoryEntriesRecent,
@@ -2663,6 +2833,34 @@ class DatabaseAtV3 extends GeneratedDatabase {
     ),
     WritePropagation(
       on: TableUpdateQuery.onTableName(
+        'conversation_rows',
+        limitUpdateKind: UpdateKind.delete,
+      ),
+      result: [TableUpdate('bridge_delivery_rows', kind: UpdateKind.delete)],
+    ),
+    WritePropagation(
+      on: TableUpdateQuery.onTableName(
+        'message_rows',
+        limitUpdateKind: UpdateKind.delete,
+      ),
+      result: [TableUpdate('bridge_delivery_rows', kind: UpdateKind.delete)],
+    ),
+    WritePropagation(
+      on: TableUpdateQuery.onTableName(
+        'message_rows',
+        limitUpdateKind: UpdateKind.delete,
+      ),
+      result: [TableUpdate('bridge_delivery_rows', kind: UpdateKind.delete)],
+    ),
+    WritePropagation(
+      on: TableUpdateQuery.onTableName(
+        'generation_run_rows',
+        limitUpdateKind: UpdateKind.delete,
+      ),
+      result: [TableUpdate('bridge_delivery_rows', kind: UpdateKind.delete)],
+    ),
+    WritePropagation(
+      on: TableUpdateQuery.onTableName(
         'message_rows',
         limitUpdateKind: UpdateKind.delete,
       ),
@@ -2670,5 +2868,5 @@ class DatabaseAtV3 extends GeneratedDatabase {
     ),
   ]);
   @override
-  int get schemaVersion => 3;
+  int get schemaVersion => 4;
 }

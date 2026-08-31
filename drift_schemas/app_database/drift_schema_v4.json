@@ -1801,6 +1801,317 @@
     },
     {
       "id": 12,
+      "references": [
+        0,
+        1,
+        11
+      ],
+      "type": "table",
+      "data": {
+        "name": "bridge_delivery_rows",
+        "was_declared_in_moor": false,
+        "columns": [
+          {
+            "name": "origin_system",
+            "getter_name": "originSystem",
+            "moor_type": "string",
+            "nullable": false,
+            "customConstraints": null,
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": [
+              {
+                "check": {
+                  "dart_expression": {
+                    "elements": [
+                      {
+                        "lexeme": "originSystem",
+                        "tag": "originSystem"
+                      },
+                      ".isNotValue('')"
+                    ]
+                  }
+                }
+              }
+            ]
+          },
+          {
+            "name": "origin_instance_id",
+            "getter_name": "originInstanceId",
+            "moor_type": "string",
+            "nullable": false,
+            "customConstraints": null,
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": [
+              {
+                "check": {
+                  "dart_expression": {
+                    "elements": [
+                      {
+                        "lexeme": "originInstanceId",
+                        "tag": "originInstanceId"
+                      },
+                      ".isNotValue('')"
+                    ]
+                  }
+                }
+              }
+            ]
+          },
+          {
+            "name": "idempotency_key",
+            "getter_name": "idempotencyKey",
+            "moor_type": "string",
+            "nullable": false,
+            "customConstraints": null,
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": [
+              {
+                "check": {
+                  "dart_expression": {
+                    "elements": [
+                      {
+                        "lexeme": "idempotencyKey",
+                        "tag": "idempotencyKey"
+                      },
+                      ".isNotValue('')"
+                    ]
+                  }
+                }
+              }
+            ]
+          },
+          {
+            "name": "request_fingerprint",
+            "getter_name": "requestFingerprint",
+            "moor_type": "string",
+            "nullable": false,
+            "customConstraints": null,
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "room_event_id",
+            "getter_name": "roomEventId",
+            "moor_type": "string",
+            "nullable": false,
+            "customConstraints": null,
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": [
+              {
+                "check": {
+                  "dart_expression": {
+                    "elements": [
+                      {
+                        "lexeme": "roomEventId",
+                        "tag": "roomEventId"
+                      },
+                      ".isNotValue('')"
+                    ]
+                  }
+                }
+              }
+            ]
+          },
+          {
+            "name": "room_id",
+            "getter_name": "roomId",
+            "moor_type": "string",
+            "nullable": false,
+            "customConstraints": null,
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": [
+              {
+                "check": {
+                  "dart_expression": {
+                    "elements": [
+                      {
+                        "lexeme": "roomId",
+                        "tag": "roomId"
+                      },
+                      ".isNotValue('')"
+                    ]
+                  }
+                }
+              }
+            ]
+          },
+          {
+            "name": "conversation_id",
+            "getter_name": "conversationId",
+            "moor_type": "string",
+            "nullable": false,
+            "customConstraints": null,
+            "defaultConstraints": "REFERENCES conversation_rows (id) ON DELETE CASCADE",
+            "dialectAwareDefaultConstraints": {
+              "sqlite": "REFERENCES conversation_rows (id) ON DELETE CASCADE"
+            },
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": [
+              {
+                "foreign_key": {
+                  "to": {
+                    "table": "conversation_rows",
+                    "column": "id"
+                  },
+                  "initially_deferred": false,
+                  "on_update": null,
+                  "on_delete": "cascade"
+                }
+              }
+            ]
+          },
+          {
+            "name": "user_revision_id",
+            "getter_name": "userRevisionId",
+            "moor_type": "string",
+            "nullable": false,
+            "customConstraints": null,
+            "defaultConstraints": "REFERENCES message_rows (id) ON DELETE CASCADE",
+            "dialectAwareDefaultConstraints": {
+              "sqlite": "REFERENCES message_rows (id) ON DELETE CASCADE"
+            },
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": [
+              {
+                "foreign_key": {
+                  "to": {
+                    "table": "message_rows",
+                    "column": "id"
+                  },
+                  "initially_deferred": false,
+                  "on_update": null,
+                  "on_delete": "cascade"
+                }
+              }
+            ]
+          },
+          {
+            "name": "assistant_revision_id",
+            "getter_name": "assistantRevisionId",
+            "moor_type": "string",
+            "nullable": false,
+            "customConstraints": null,
+            "defaultConstraints": "REFERENCES message_rows (id) ON DELETE CASCADE",
+            "dialectAwareDefaultConstraints": {
+              "sqlite": "REFERENCES message_rows (id) ON DELETE CASCADE"
+            },
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": [
+              {
+                "foreign_key": {
+                  "to": {
+                    "table": "message_rows",
+                    "column": "id"
+                  },
+                  "initially_deferred": false,
+                  "on_update": null,
+                  "on_delete": "cascade"
+                }
+              }
+            ]
+          },
+          {
+            "name": "generation_run_id",
+            "getter_name": "generationRunId",
+            "moor_type": "string",
+            "nullable": false,
+            "customConstraints": null,
+            "defaultConstraints": "REFERENCES generation_run_rows (id) ON DELETE CASCADE",
+            "dialectAwareDefaultConstraints": {
+              "sqlite": "REFERENCES generation_run_rows (id) ON DELETE CASCADE"
+            },
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": [
+              {
+                "foreign_key": {
+                  "to": {
+                    "table": "generation_run_rows",
+                    "column": "id"
+                  },
+                  "initially_deferred": false,
+                  "on_update": null,
+                  "on_delete": "cascade"
+                }
+              }
+            ]
+          },
+          {
+            "name": "state",
+            "getter_name": "state",
+            "moor_type": "string",
+            "nullable": false,
+            "customConstraints": null,
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": [
+              {
+                "check": {
+                  "dart_expression": {
+                    "elements": [
+                      {
+                        "lexeme": "state",
+                        "tag": "state"
+                      },
+                      ".isIn(const ['preparing','requesting','streaming','waiting_tool','completed','failed','cancelled','interrupted'])"
+                    ]
+                  }
+                }
+              }
+            ]
+          },
+          {
+            "name": "created_at",
+            "getter_name": "createdAt",
+            "moor_type": "int",
+            "nullable": false,
+            "customConstraints": null,
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": [],
+            "type_converter": {
+              "dart_expr": "const MicrosecondDateTimeConverter()",
+              "dart_type_name": "DateTime"
+            }
+          },
+          {
+            "name": "updated_at",
+            "getter_name": "updatedAt",
+            "moor_type": "int",
+            "nullable": false,
+            "customConstraints": null,
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": [],
+            "type_converter": {
+              "dart_expr": "const MicrosecondDateTimeConverter()",
+              "dart_type_name": "DateTime"
+            }
+          }
+        ],
+        "is_virtual": false,
+        "without_rowid": false,
+        "constraints": [
+          "CHECK (length(request_fingerprint) = 64)",
+          "CHECK (updated_at >= created_at)"
+        ],
+        "explicit_pk": [
+          "origin_instance_id",
+          "idempotency_key"
+        ]
+      }
+    },
+    {
+      "id": 13,
       "references": [],
       "type": "table",
       "data": {
@@ -1880,7 +2191,7 @@
       }
     },
     {
-      "id": 13,
+      "id": 14,
       "references": [],
       "type": "table",
       "data": {
@@ -1960,7 +2271,7 @@
       }
     },
     {
-      "id": 14,
+      "id": 15,
       "references": [],
       "type": "table",
       "data": {
@@ -2040,7 +2351,7 @@
       }
     },
     {
-      "id": 15,
+      "id": 16,
       "references": [],
       "type": "table",
       "data": {
@@ -2120,7 +2431,7 @@
       }
     },
     {
-      "id": 16,
+      "id": 17,
       "references": [],
       "type": "table",
       "data": {
@@ -2200,7 +2511,7 @@
       }
     },
     {
-      "id": 17,
+      "id": 18,
       "references": [],
       "type": "table",
       "data": {
@@ -2290,7 +2601,7 @@
       }
     },
     {
-      "id": 18,
+      "id": 19,
       "references": [],
       "type": "table",
       "data": {
@@ -2370,7 +2681,7 @@
       }
     },
     {
-      "id": 19,
+      "id": 20,
       "references": [],
       "type": "table",
       "data": {
@@ -2450,7 +2761,7 @@
       }
     },
     {
-      "id": 20,
+      "id": 21,
       "references": [],
       "type": "table",
       "data": {
@@ -2530,7 +2841,7 @@
       }
     },
     {
-      "id": 21,
+      "id": 22,
       "references": [],
       "type": "table",
       "data": {
@@ -2610,7 +2921,7 @@
       }
     },
     {
-      "id": 22,
+      "id": 23,
       "references": [],
       "type": "table",
       "data": {
@@ -2690,7 +3001,7 @@
       }
     },
     {
-      "id": 23,
+      "id": 24,
       "references": [],
       "type": "table",
       "data": {
@@ -2741,7 +3052,7 @@
       }
     },
     {
-      "id": 24,
+      "id": 25,
       "references": [],
       "type": "table",
       "data": {
@@ -2954,7 +3265,7 @@
       }
     },
     {
-      "id": 25,
+      "id": 26,
       "references": [],
       "type": "table",
       "data": {
@@ -3034,7 +3345,7 @@
       }
     },
     {
-      "id": 26,
+      "id": 27,
       "references": [
         1
       ],
@@ -3113,7 +3424,7 @@
       }
     },
     {
-      "id": 27,
+      "id": 28,
       "references": [],
       "type": "table",
       "data": {
@@ -3203,7 +3514,7 @@
       }
     },
     {
-      "id": 28,
+      "id": 29,
       "references": [],
       "type": "table",
       "data": {
@@ -3318,7 +3629,7 @@
       }
     },
     {
-      "id": 29,
+      "id": 30,
       "references": [
         0
       ],
@@ -3341,7 +3652,7 @@
       }
     },
     {
-      "id": 30,
+      "id": 31,
       "references": [
         0
       ],
@@ -3360,7 +3671,7 @@
       }
     },
     {
-      "id": 31,
+      "id": 32,
       "references": [
         1
       ],
@@ -3387,7 +3698,7 @@
       }
     },
     {
-      "id": 32,
+      "id": 33,
       "references": [
         1
       ],
@@ -3414,7 +3725,7 @@
       }
     },
     {
-      "id": 33,
+      "id": 34,
       "references": [
         1
       ],
@@ -3445,7 +3756,7 @@
       }
     },
     {
-      "id": 34,
+      "id": 35,
       "references": [
         1
       ],
@@ -3459,7 +3770,7 @@
       }
     },
     {
-      "id": 35,
+      "id": 36,
       "references": [
         4
       ],
@@ -3486,7 +3797,7 @@
       }
     },
     {
-      "id": 36,
+      "id": 37,
       "references": [
         5
       ],
@@ -3513,7 +3824,7 @@
       }
     },
     {
-      "id": 37,
+      "id": 38,
       "references": [
         7
       ],
@@ -3536,7 +3847,7 @@
       }
     },
     {
-      "id": 38,
+      "id": 39,
       "references": [
         11
       ],
@@ -3550,7 +3861,7 @@
       }
     },
     {
-      "id": 39,
+      "id": 40,
       "references": [
         11
       ],
@@ -3577,13 +3888,59 @@
       }
     },
     {
-      "id": 40,
+      "id": 41,
       "references": [
-        17
+        12
       ],
       "type": "index",
       "data": {
-        "on": 17,
+        "on": 12,
+        "name": "idx_bridge_deliveries_room_event",
+        "sql": null,
+        "unique": false,
+        "columns": [
+          {
+            "column": "origin_instance_id",
+            "order_by": null
+          },
+          {
+            "column": "room_event_id",
+            "order_by": null
+          }
+        ]
+      }
+    },
+    {
+      "id": 42,
+      "references": [
+        12
+      ],
+      "type": "index",
+      "data": {
+        "on": 12,
+        "name": "idx_bridge_deliveries_conversation_created",
+        "sql": null,
+        "unique": false,
+        "columns": [
+          {
+            "column": "conversation_id",
+            "order_by": null
+          },
+          {
+            "column": "created_at",
+            "order_by": null
+          }
+        ]
+      }
+    },
+    {
+      "id": 43,
+      "references": [
+        18
+      ],
+      "type": "index",
+      "data": {
+        "on": 18,
         "name": "idx_assistant_memories_assistant",
         "sql": null,
         "unique": false,
@@ -3600,13 +3957,13 @@
       }
     },
     {
-      "id": 41,
+      "id": 44,
       "references": [
-        24
+        25
       ],
       "type": "index",
       "data": {
-        "on": 24,
+        "on": 25,
         "name": "idx_memory_entries_visible",
         "sql": null,
         "unique": false,
@@ -3631,13 +3988,13 @@
       }
     },
     {
-      "id": 42,
+      "id": 45,
       "references": [
-        24
+        25
       ],
       "type": "index",
       "data": {
-        "on": 24,
+        "on": 25,
         "name": "idx_memory_entries_recent",
         "sql": null,
         "unique": false,
@@ -3662,13 +4019,13 @@
       }
     },
     {
-      "id": 43,
+      "id": 46,
       "references": [
-        24
+        25
       ],
       "type": "index",
       "data": {
-        "on": 24,
+        "on": 25,
         "name": "idx_memory_entries_dedupe",
         "sql": null,
         "unique": false,
@@ -3693,13 +4050,13 @@
       }
     },
     {
-      "id": 44,
+      "id": 47,
       "references": [
-        26
+        27
       ],
       "type": "index",
       "data": {
-        "on": 26,
+        "on": 27,
         "name": "idx_message_prompts_conversation_snapshot",
         "sql": null,
         "unique": false,
@@ -3716,13 +4073,13 @@
       }
     },
     {
-      "id": 45,
+      "id": 48,
       "references": [
-        28
+        29
       ],
       "type": "index",
       "data": {
-        "on": 28,
+        "on": 29,
         "name": "idx_extension_entities_kind_order",
         "sql": null,
         "unique": false,
@@ -3845,6 +4202,15 @@
         {
           "dialect": "sqlite",
           "sql": "CREATE TABLE IF NOT EXISTS \"generation_run_rows\" (\"id\" TEXT NOT NULL, \"conversation_id\" TEXT NOT NULL REFERENCES conversation_rows (id) ON DELETE CASCADE, \"target_revision_id\" TEXT NOT NULL, \"state\" TEXT NOT NULL CHECK(\"state\" IN ('preparing', 'requesting', 'streaming', 'waiting_tool', 'completed', 'failed', 'cancelled', 'interrupted')), \"state_revision\" INTEGER NOT NULL DEFAULT 0 CHECK(\"state_revision\" >= 0), \"checkpoint_seq\" INTEGER NOT NULL DEFAULT 0 CHECK(\"checkpoint_seq\" >= 0), \"error_code\" TEXT NULL, \"created_at\" INTEGER NOT NULL, \"updated_at\" INTEGER NOT NULL, \"terminal_at\" INTEGER NULL, PRIMARY KEY (\"id\"), FOREIGN KEY (target_revision_id) REFERENCES message_rows (id) DEFERRABLE INITIALLY DEFERRED, CHECK (updated_at >= created_at), CHECK (terminal_at IS NULL OR terminal_at >= created_at), CHECK ((state IN ('preparing', 'requesting', 'streaming', 'waiting_tool') AND terminal_at IS NULL) OR (state IN ('completed', 'failed', 'cancelled', 'interrupted') AND terminal_at IS NOT NULL)), CHECK (error_code IS NULL OR (length(error_code) BETWEEN 1 AND 128 AND state IN ('failed', 'cancelled', 'interrupted'))));"
+        }
+      ]
+    },
+    {
+      "name": "bridge_delivery_rows",
+      "sql": [
+        {
+          "dialect": "sqlite",
+          "sql": "CREATE TABLE IF NOT EXISTS \"bridge_delivery_rows\" (\"origin_system\" TEXT NOT NULL CHECK(\"origin_system\" IS NOT ''), \"origin_instance_id\" TEXT NOT NULL CHECK(\"origin_instance_id\" IS NOT ''), \"idempotency_key\" TEXT NOT NULL CHECK(\"idempotency_key\" IS NOT ''), \"request_fingerprint\" TEXT NOT NULL, \"room_event_id\" TEXT NOT NULL CHECK(\"room_event_id\" IS NOT ''), \"room_id\" TEXT NOT NULL CHECK(\"room_id\" IS NOT ''), \"conversation_id\" TEXT NOT NULL REFERENCES conversation_rows (id) ON DELETE CASCADE, \"user_revision_id\" TEXT NOT NULL REFERENCES message_rows (id) ON DELETE CASCADE, \"assistant_revision_id\" TEXT NOT NULL REFERENCES message_rows (id) ON DELETE CASCADE, \"generation_run_id\" TEXT NOT NULL REFERENCES generation_run_rows (id) ON DELETE CASCADE, \"state\" TEXT NOT NULL CHECK(\"state\" IN ('preparing', 'requesting', 'streaming', 'waiting_tool', 'completed', 'failed', 'cancelled', 'interrupted')), \"created_at\" INTEGER NOT NULL, \"updated_at\" INTEGER NOT NULL, PRIMARY KEY (\"origin_instance_id\", \"idempotency_key\"), CHECK (length(request_fingerprint) = 64), CHECK (updated_at >= created_at));"
         }
       ]
     },
@@ -4097,6 +4463,24 @@
         {
           "dialect": "sqlite",
           "sql": "CREATE INDEX idx_generation_runs_state_updated ON generation_run_rows (state, updated_at, id)"
+        }
+      ]
+    },
+    {
+      "name": "idx_bridge_deliveries_room_event",
+      "sql": [
+        {
+          "dialect": "sqlite",
+          "sql": "CREATE INDEX idx_bridge_deliveries_room_event ON bridge_delivery_rows (origin_instance_id, room_event_id)"
+        }
+      ]
+    },
+    {
+      "name": "idx_bridge_deliveries_conversation_created",
+      "sql": [
+        {
+          "dialect": "sqlite",
+          "sql": "CREATE INDEX idx_bridge_deliveries_conversation_created ON bridge_delivery_rows (conversation_id, created_at)"
         }
       ]
     },
