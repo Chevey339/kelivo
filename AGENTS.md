@@ -24,6 +24,16 @@ flutter test                                # all unit tests green
 
 CI (`pr-check.yml`) enforces the same gates on every PR.
 
+## Benchmarks are not tests
+
+`test/perf/*_bench.dart` print timings and contain no `expect()`, so they cannot
+fail. They are named out of the default `_test.dart` glob and so are skipped by
+`flutter test`. Run one explicitly:
+
+```bash
+flutter test test/perf/timeline_scroll_bench.dart
+```
+
 ## UI guidelines
 
 - **Use app-defined widgets** from `lib/shared/widgets/` and `lib/shared/dialogs/` instead of raw Flutter/Material widgets wherever an equivalent exists (e.g. `SectionCard`, `CustomBottomSheet`, `IosFormTextField`, `IosCheckbox`, `InteractiveDrawer`).
