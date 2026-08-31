@@ -49,6 +49,7 @@ import '../../../utils/platform_utils.dart';
 import '../../home/services/ask_user_interaction_service.dart';
 import '../../home/services/local_tools_service.dart';
 import '../../home/services/tool_approval_service.dart';
+import '../utils/assistant_paragraph_splitter.dart';
 import '../utils/thinking_tag_parser.dart';
 import 'timeline_projection.dart';
 import 'timeline_visibility.dart';
@@ -56,8 +57,10 @@ import 'citation_sources_sheet.dart';
 import 'chat_suggestion_bubbles.dart';
 import 'token_display_widget.dart';
 import 'screen_time_tool_ui.dart';
+import 'weather_tool_ui.dart';
 import 'tool_detail_text_section.dart';
 import '../../../theme/app_font_weights.dart';
+import '../../home/controllers/streaming_content_notifier.dart';
 
 final RegExp _urlSchemeRe = RegExp(r'^[a-zA-Z][a-zA-Z0-9+.-]*:');
 
@@ -469,6 +472,12 @@ IconData? _localToolIconFor(String name, Map<String, dynamic> args) {
     LocalToolNames.screenTime => Lucide.Smartphone,
     LocalToolNames.calendarQuery => Lucide.Calendar,
     LocalToolNames.calendarCreate => Lucide.CalendarPlus,
+    LocalToolNames.currentLocation => Lucide.MapPin,
+    LocalToolNames.weather => Lucide.CloudSun,
+    LocalToolNames.healthSummary => Lucide.HeartPulse,
+    LocalToolNames.remindersQuery => Lucide.ListTodo,
+    LocalToolNames.remindersCreate => Lucide.ListPlus,
+    LocalToolNames.remindersComplete => Lucide.CheckCircle,
     _ => null,
   };
 }
@@ -495,6 +504,15 @@ String? _localToolTitleFor(
       l10n.assistantEditLocalToolCalendarQueryTitle,
     LocalToolNames.calendarCreate =>
       l10n.assistantEditLocalToolCalendarCreateTitle,
+    LocalToolNames.currentLocation => l10n.assistantEditLocalToolLocationTitle,
+    LocalToolNames.weather => l10n.assistantEditLocalToolWeatherTitle,
+    LocalToolNames.healthSummary => l10n.assistantEditLocalToolHealthTitle,
+    LocalToolNames.remindersQuery =>
+      l10n.assistantEditLocalToolRemindersQueryTitle,
+    LocalToolNames.remindersCreate =>
+      l10n.assistantEditLocalToolRemindersCreateTitle,
+    LocalToolNames.remindersComplete =>
+      l10n.assistantEditLocalToolRemindersCompleteTitle,
     _ => null,
   };
 }
@@ -695,6 +713,12 @@ void _showToolDetail(BuildContext context, ToolUIPart part) {
       ? ScreenTimeResult.tryParse(cleanText)
       : null;
   final useScreenTimeDetail = screenTime != null && screenTime.hasApps;
+  final weather = part.toolName == LocalToolNames.weather
+      ? WeatherToolResult.tryParse(cleanText)
+      : null;
+  final weatherAttribution = weather != null && !weather.isError
+      ? weather.attribution
+      : null;
 
   if (PlatformUtils.isDesktopTarget) {
     unawaited(
@@ -711,6 +735,7 @@ void _showToolDetail(BuildContext context, ToolUIPart part) {
           resultLabel: l10n.chatMessageWidgetResult,
           imagesLabel: l10n.chatMessageWidgetImages,
           screenTimeResult: useScreenTimeDetail ? screenTime : null,
+          weatherAttribution: weatherAttribution,
         ),
       ),
     );
@@ -737,6 +762,7 @@ void _showToolDetail(BuildContext context, ToolUIPart part) {
           argumentsLabel: l10n.chatMessageWidgetArguments,
           resultLabel: l10n.chatMessageWidgetResult,
           imagesLabel: l10n.chatMessageWidgetImages,
+          weatherAttribution: weatherAttribution,
         );
       },
     ),
@@ -754,6 +780,7 @@ class _ToolDetailDesktopDialog extends StatefulWidget {
     required this.resultLabel,
     required this.imagesLabel,
     this.screenTimeResult,
+    this.weatherAttribution,
   });
 
   static const dialogKey = ValueKey('tool_detail_desktop_dialog');
@@ -768,6 +795,7 @@ class _ToolDetailDesktopDialog extends StatefulWidget {
   final String resultLabel;
   final String imagesLabel;
   final ScreenTimeResult? screenTimeResult;
+  final WeatherAttribution? weatherAttribution;
 
   @override
   State<_ToolDetailDesktopDialog> createState() =>
@@ -861,6 +889,7 @@ class _ToolDetailDesktopDialogState extends State<_ToolDetailDesktopDialog> {
                             resultLabel: widget.resultLabel,
                             imagesLabel: widget.imagesLabel,
                             padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
+                            weatherAttribution: widget.weatherAttribution,
                           ),
                   ),
                 ),
@@ -883,6 +912,7 @@ class _ToolDetailBody extends StatelessWidget {
     required this.resultLabel,
     required this.imagesLabel,
     this.padding = const EdgeInsets.fromLTRB(16, 8, 16, 24),
+    this.weatherAttribution,
   });
 
   final ScrollController scrollController;
@@ -893,6 +923,7 @@ class _ToolDetailBody extends StatelessWidget {
   final String resultLabel;
   final String imagesLabel;
   final EdgeInsets padding;
+  final WeatherAttribution? weatherAttribution;
 
   @override
   Widget build(BuildContext context) {
@@ -943,6 +974,14 @@ class _ToolDetailBody extends StatelessWidget {
                           );
                         },
                       ),
+                    ),
+                  ),
+                ],
+                if (weatherAttribution != null) ...[
+                  const SliverToBoxAdapter(child: SizedBox(height: 16)),
+                  SliverToBoxAdapter(
+                    child: WeatherAttributionLabel(
+                      attribution: weatherAttribution!,
                     ),
                   ),
                 ],
@@ -1000,6 +1039,7 @@ class ChatMessageWidget extends StatefulWidget {
   final bool hideStreamingIndicator;
   // Whether files are currently being processed
   final bool isProcessingFiles;
+  final RetryStatus? retryStatus;
   final bool enableStreamingTextMotion;
   final List<String> suggestions;
   final ValueChanged<String>? onSuggestionTap;
@@ -1051,6 +1091,7 @@ class ChatMessageWidget extends StatefulWidget {
     this.toolCountAtSplit,
     this.hideStreamingIndicator = false,
     this.isProcessingFiles = false,
+    this.retryStatus,
     this.enableStreamingTextMotion = true,
     this.suggestions = const <String>[],
     this.onSuggestionTap,
@@ -2373,8 +2414,9 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
     BuildContext context,
     String visualContent,
     bool enableAssistantMarkdown,
-    Map<String, String> citationIndexLookup,
-  ) {
+    Map<String, String> citationIndexLookup, {
+    String contentKey = '',
+  }) {
     final bool isDesktop =
         defaultTargetPlatform == TargetPlatform.macOS ||
         defaultTargetPlatform == TargetPlatform.windows ||
@@ -2417,7 +2459,11 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
 
     return RepaintBoundary(
       child: SelectionArea(
-        key: ValueKey('assistant_${widget.message.id}'),
+        key: ValueKey(
+          contentKey.isEmpty
+              ? 'assistant_${widget.message.id}'
+              : 'assistant_${widget.message.id}_$contentKey',
+        ),
         child: DefaultTextStyle.merge(
           style: TextStyle(fontSize: baseAssistant, height: 1.5),
           child: assistantContent,
@@ -2437,12 +2483,50 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
     return Align(alignment: Alignment.centerLeft, child: child);
   }
 
+  /// Same 8pt gap [addVisible] applies between sibling assistant bubbles.
+  List<Widget> _interleaveAssistantBubbles(List<Widget> bubbles) {
+    return <Widget>[
+      for (var i = 0; i < bubbles.length; i++) ...[
+        if (i > 0) const SizedBox(height: 8),
+        bubbles[i],
+      ],
+    ];
+  }
+
+  /// One bubble per text block, or one per paragraph when the split option is
+  /// on. [blockKey] disambiguates the selection areas of sibling bubbles.
+  List<Widget> _buildAssistantTextBubbles(
+    BuildContext context,
+    String visualContent,
+    bool enableAssistantMarkdown,
+    Map<String, String> citationIndexLookup, {
+    required String blockKey,
+  }) {
+    final split = context.select<SettingsProvider, bool>(
+      (s) => s.assistantBubbleSplitParagraphs,
+    );
+    final parts = split
+        ? splitAssistantParagraphs(visualContent)
+        : <String>[visualContent];
+    return <Widget>[
+      for (var i = 0; i < parts.length; i++)
+        _buildAssistantTextBlock(
+          context,
+          parts[i],
+          enableAssistantMarkdown,
+          citationIndexLookup,
+          contentKey: parts.length == 1 ? '' : '$blockKey.$i',
+        ),
+    ];
+  }
+
   Widget _buildAssistantTextBlock(
     BuildContext context,
     String visualContent,
     bool enableAssistantMarkdown,
-    Map<String, String> citationIndexLookup,
-  ) {
+    Map<String, String> citationIndexLookup, {
+    String contentKey = '',
+  }) {
     return _assistantBlockWidth(
       context,
       child: _buildAssistantBubbleContainer(
@@ -2452,6 +2536,7 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
           visualContent,
           enableAssistantMarkdown,
           citationIndexLookup,
+          contentKey: contentKey,
         ),
       ),
     );
@@ -2812,10 +2897,27 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
                         // constraints (option off) Align ignores it.
                         widthFactor: 1,
                         child: Semantics(
-                          label: l10n.chatMessageWidgetThinking,
+                          label: widget.retryStatus == null
+                              ? l10n.chatMessageWidgetThinking
+                              : l10n.autoRetryCountdown(
+                                  _retrySecondsLeft(widget.retryStatus!),
+                                  widget.retryStatus!.attempt,
+                                  widget.retryStatus!.maxRetries,
+                                ),
                           child: widget.hideStreamingIndicator
                               ? const SizedBox(height: 16)
-                              : const LoadingIndicator(),
+                              : Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    const LoadingIndicator(),
+                                    if (widget.retryStatus != null) ...[
+                                      const SizedBox(width: 8),
+                                      _RetryCountdownHint(
+                                        status: widget.retryStatus!,
+                                      ),
+                                    ],
+                                  ],
+                                ),
                         ),
                       ),
                     ),
@@ -2827,11 +2929,14 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
               // bottom does not evict the last streaming bubble.
               if (visibleBlocks.isEmpty && visualContent.isNotEmpty) {
                 return <Widget>[
-                  _buildAssistantTextBlock(
-                    context,
-                    visualContent,
-                    enableAssistantMarkdown,
-                    citationIndexLookup,
+                  ..._interleaveAssistantBubbles(
+                    _buildAssistantTextBubbles(
+                      context,
+                      visualContent,
+                      enableAssistantMarkdown,
+                      citationIndexLookup,
+                      blockKey: 'body',
+                    ),
                   ),
                   if (widget.message.isStreaming && visualContent.isNotEmpty)
                     Padding(
@@ -2857,7 +2962,12 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
                     _resolveAttachmentImageUri(block.imageUri!),
               ];
 
-              for (final block in visibleBlocks) {
+              for (
+                var blockIndex = 0;
+                blockIndex < visibleBlocks.length;
+                blockIndex++
+              ) {
+                final block = visibleBlocks[blockIndex];
                 if (block.isImage) {
                   addVisible(
                     _buildAssistantImageBlock(
@@ -2872,14 +2982,15 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
                   continue;
                 }
                 if (block.isText) {
-                  addVisible(
-                    _buildAssistantTextBlock(
-                      context,
-                      block.text!,
-                      enableAssistantMarkdown,
-                      citationIndexLookup,
-                    ),
-                  );
+                  for (final bubble in _buildAssistantTextBubbles(
+                    context,
+                    block.text!,
+                    enableAssistantMarkdown,
+                    citationIndexLookup,
+                    blockKey: 'text$blockIndex',
+                  )) {
+                    addVisible(bubble);
+                  }
                   continue;
                 }
                 if (!block.isThinking) continue;
@@ -3942,6 +4053,50 @@ class _BranchSelector extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+int _retrySecondsLeft(RetryStatus status) {
+  final remaining = status.retryAt.difference(DateTime.now());
+  if (remaining.isNegative) return 0;
+  return remaining.inMilliseconds == 0
+      ? 0
+      : (remaining.inMilliseconds / 1000).ceil();
+}
+
+class _RetryCountdownHint extends StatelessWidget {
+  const _RetryCountdownHint({required this.status});
+
+  final RetryStatus status;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    final cs = Theme.of(context).colorScheme;
+    final remaining = status.retryAt.difference(DateTime.now());
+    final startSeconds = remaining.inMilliseconds / 1000.0;
+    final style = TextStyle(
+      fontSize: 12,
+      color: cs.onSurface.withValues(alpha: 0.55),
+    );
+    if (startSeconds <= 0) {
+      return Text(
+        l10n.autoRetryCountdown(0, status.attempt, status.maxRetries),
+        style: style,
+      );
+    }
+    return TweenAnimationBuilder<double>(
+      key: ValueKey(status.retryAt),
+      tween: Tween<double>(begin: startSeconds, end: 0),
+      duration: remaining,
+      builder: (context, value, _) {
+        final seconds = value <= 0 ? 0 : value.ceil();
+        return Text(
+          l10n.autoRetryCountdown(seconds, status.attempt, status.maxRetries),
+          style: style,
+        );
+      },
     );
   }
 }
@@ -5282,6 +5437,9 @@ class _ChainOfThoughtToolStepState extends State<_ChainOfThoughtToolStep> {
     final screenTimeResult = widget.part.toolName == LocalToolNames.screenTime
         ? ScreenTimeResult.tryParse(cleanText)
         : null;
+    final weatherResult = widget.part.toolName == LocalToolNames.weather
+        ? WeatherToolResult.tryParse(cleanText)
+        : null;
     final String summaryText = approvalRequest != null
         ? _argsSummary(approvalRequest.arguments)
         : cleanText.isNotEmpty
@@ -5313,6 +5471,8 @@ class _ChainOfThoughtToolStepState extends State<_ChainOfThoughtToolStep> {
             secondaryColor: fg.muted,
             errorColor: cs.error,
           )
+        : weatherResult != null && !weatherResult.isError
+        ? WeatherToolSummary(result: weatherResult, textColor: fg.body)
         : !shouldShowSummary || summaryText.trim().isEmpty
         ? null
         : Text(
@@ -5637,6 +5797,27 @@ class _ToolCallItemState extends State<_ToolCallItem> {
                 text: ttsText,
                 textColor: fg.body,
                 buttonColor: fg.accent,
+              ),
+            ],
+            if (!widget.part.loading &&
+                !isPendingApproval &&
+                widget.part.toolName == LocalToolNames.weather) ...[
+              Builder(
+                builder: (context) {
+                  final weather = WeatherToolResult.tryParse(
+                    widget.part.content,
+                  );
+                  if (weather == null || weather.isError) {
+                    return const SizedBox.shrink();
+                  }
+                  return Padding(
+                    padding: const EdgeInsets.only(top: 8),
+                    child: WeatherToolSummary(
+                      result: weather,
+                      textColor: fg.body,
+                    ),
+                  );
+                },
               ),
             ],
             if (!widget.part.loading &&

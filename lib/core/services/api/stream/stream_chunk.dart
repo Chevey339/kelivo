@@ -211,6 +211,29 @@ final class ImageEnd extends StreamChunk {
   final String id;
 }
 
+/// A file a server tool produced, already written to a managed directory.
+///
+/// Unlike [ImageSnapshot] this carries no payload: providers whose tools hand
+/// back a reference rather than bytes have to fetch and store the file before
+/// the message can name it, so the chunk only reports where it landed.
+final class GeneratedFile extends StreamChunk {
+  const GeneratedFile({required this.uri, required this.name, this.mime});
+
+  final String uri;
+  final String name;
+  final String? mime;
+}
+
+/// A piece of provider-side state the next turn has to send back — a
+/// container id, a session token — stored against the assistant message it
+/// belongs to and never shown.
+final class ProviderArtifact extends StreamChunk {
+  const ProviderArtifact({required this.kind, required this.payload});
+
+  final String kind;
+  final String payload;
+}
+
 final class Annotations extends StreamChunk {
   const Annotations(this.annotations, {this.id = ''});
 
@@ -232,6 +255,41 @@ final class Finish extends StreamChunk {
   final String? finishReason;
   final String? responseId;
   final String? model;
+}
+
+/// Emitted between attempts while auto-retry is waiting to try again.
+///
+/// Not message content — consumers should not fold this into parts.
+final class RetryPending extends StreamChunk {
+  const RetryPending({
+    required this.attempt,
+    required this.maxRetries,
+    required this.delay,
+    this.errorText = '',
+    this.retryAt,
+  });
+
+  /// 1-based extra-attempt index, matching "retry (2/3)" in the UI.
+  final int attempt;
+  final int maxRetries;
+  final Duration delay;
+  final String errorText;
+
+  /// Absolute time when backoff ends, stamped when sleep starts.
+  ///
+  /// UI countdown must use this instead of `DateTime.now() + delay` after a
+  /// delayed consumer (e.g. persistence) applies the event.
+  final DateTime? retryAt;
+
+  DateTime deadlineAt([DateTime? now]) =>
+      retryAt ?? (now ?? DateTime.now()).add(delay);
+}
+
+/// Emitted when backoff has finished and the next attempt is starting.
+///
+/// Not message content — consumers should clear retry countdown UI.
+final class RetryAttemptStart extends StreamChunk {
+  const RetryAttemptStart();
 }
 
 /// True when [data] is already a renderable URI, not raw base64.

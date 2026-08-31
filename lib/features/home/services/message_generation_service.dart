@@ -6,6 +6,7 @@ import '../../../core/models/chat_message.dart';
 import '../../../core/models/message_part.dart';
 import '../../../core/models/conversation.dart';
 import '../../../core/providers/settings_provider.dart';
+import '../../../core/services/api/builtin_tools.dart';
 import '../../../core/services/api/chat_api_service.dart';
 import '../../../core/services/chat/chat_service.dart';
 import '../../../core/services/logging/context_logger.dart';
@@ -200,6 +201,24 @@ class MessageGenerationService {
     // and it only claims to be parsing files when the retained messages really
     // carry files to parse. A text-only send that is merely slow (frozen prompt
     // reads, memory injection, templating) must never show the bar.
+    // Tools are assembled first: whether a data file is read into the prompt
+    // or left for the sandbox depends on which tools go with it.
+    final mcpRouteSnapshot = generationController.captureMcpToolRoutes(
+      assistant,
+    );
+    final toolDefs = generationController.buildToolDefinitions(
+      settings,
+      assistant,
+      providerKey,
+      modelId,
+      hasBuiltInSearch,
+      mcpRouteSnapshot: mcpRouteSnapshot,
+    );
+    final sandboxDataFiles = BuiltInToolsHelper.sendsDataFilesToSandbox(
+      cfg: cfg,
+      modelId: modelId,
+      clientTools: toolDefs,
+    );
     final indicatorMessageId =
         processingMessageId != null &&
             messageBuilderService.hasPendingAttachmentWork(
@@ -207,6 +226,7 @@ class MessageGenerationService {
               settings,
               conversation: currentConversation,
               sourceMessages: messages,
+              sandboxDataFiles: sandboxDataFiles,
             )
         ? processingMessageId
         : null;
@@ -222,6 +242,7 @@ class MessageGenerationService {
             assistant,
             conversation: currentConversation,
             sourceMessages: messages,
+            sandboxDataFiles: sandboxDataFiles,
           );
     } finally {
       if (indicatorMessageId != null) {
@@ -242,18 +263,6 @@ class MessageGenerationService {
     }
     messageBuilderService.stripInternalRevisionIds(apiMessages);
 
-    // Prepare tools
-    final mcpRouteSnapshot = generationController.captureMcpToolRoutes(
-      assistant,
-    );
-    final toolDefs = generationController.buildToolDefinitions(
-      settings,
-      assistant,
-      providerKey,
-      modelId,
-      hasBuiltInSearch,
-      mcpRouteSnapshot: mcpRouteSnapshot,
-    );
     final onToolCall = toolDefs.isNotEmpty
         ? generationController.buildToolCallHandler(
             settings,

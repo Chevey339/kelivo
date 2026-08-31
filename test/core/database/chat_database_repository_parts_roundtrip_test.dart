@@ -612,6 +612,92 @@ void main() {
   );
 
   test(
+    'appendMessageVersion without thinking/tool cards leaves the prior version intact',
+    () async {
+      final now = DateTime.utc(2026, 8, 29, 21);
+      const conversationId = 'conversation-append-strip-cards';
+      const messageId = 'message-append-strip-cards';
+      const reasoningJson =
+          '{"v":2,"segments":[{"text":"plan then check","expanded":false,'
+          '"toolStartIndex":0}]}';
+      await repository.putMigrationBatch(
+        conversations: [
+          Conversation(
+            id: conversationId,
+            title: 'Strip cards on edit',
+            createdAt: now,
+            updatedAt: now,
+            messageIds: const [messageId],
+          ),
+        ],
+        messages: [
+          (
+            message: ChatMessage(
+              id: messageId,
+              role: 'assistant',
+              conversationId: conversationId,
+              timestamp: now,
+              groupId: messageId,
+              version: 0,
+              reasoningText: 'plan then check',
+              reasoningStartAt: DateTime.utc(2026, 8, 29, 20, 59),
+              reasoningFinishedAt: now,
+              reasoningSegmentsJson: reasoningJson,
+              parts: const [
+                ReasoningPart('plan then check'),
+                TextPart('hello '),
+                ToolCallPart('{"id":"call_1","name":"lookup"}'),
+                TextPart('world'),
+              ],
+            ),
+            messageOrder: 0,
+          ),
+        ],
+        toolEventsByMessageId: const {},
+        geminiSignaturesByMessageId: const {},
+      );
+
+      final originalParts = const [
+        ReasoningPart('plan then check'),
+        TextPart('hello '),
+        ToolCallPart('{"id":"call_1","name":"lookup"}'),
+        TextPart('world'),
+      ];
+      final result = await repository.appendMessageVersion(
+        messageId: messageId,
+        content: 'edited answer',
+        parts: ChatMessage.partsWithoutThinkingAndToolCards(
+          originalParts,
+          'edited answer',
+        ),
+      );
+      expect(result, isNotNull);
+      expect(result!.message.content, 'edited answer');
+      expect(result.message.parts.map((part) => part.kind), ['text']);
+      expect(result.message.reasoningText, isNull);
+      expect(result.message.reasoningStartAt, isNull);
+      expect(result.message.reasoningFinishedAt, isNull);
+      expect(result.message.reasoningSegmentsJson, isNull);
+      expect(result.conversation.versionSelections[messageId], 1);
+
+      final original = await repository.getMessage(messageId);
+      expect(original!.parts.map((part) => part.kind), [
+        'reasoning',
+        'text',
+        'tool_call',
+        'text',
+      ]);
+      expect(original.reasoningText, 'plan then check');
+      expect(original.reasoningSegmentsJson, reasoningJson);
+
+      final persisted = await repository.getMessage(result.message.id);
+      expect(persisted!.parts.map((part) => part.kind), ['text']);
+      expect(persisted.content, 'edited answer');
+      expect(persisted.reasoningText, isNull);
+    },
+  );
+
+  test(
     'unknown future_widget part persists and writes back unchanged',
     () async {
       final now = DateTime.utc(2026, 8, 9, 14);

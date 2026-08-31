@@ -152,7 +152,10 @@ class ModelBuiltInToolTiles {
     required ProviderConfig cfg,
     required AppLocalizations l10n,
   }) {
-    final kind = ProviderConfig.classify(cfg.id, explicitType: cfg.providerType);
+    final kind = ProviderConfig.classify(
+      cfg.id,
+      explicitType: cfg.providerType,
+    );
     final responses = cfg.useResponseApi == true;
     switch (kind) {
       case ProviderKind.google:

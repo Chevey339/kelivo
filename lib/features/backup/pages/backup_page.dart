@@ -14,6 +14,7 @@ import '../../../core/database/business_preferences.dart';
 import '../../../core/database/business_repository.dart';
 import '../../../core/models/backup.dart';
 import '../../../core/providers/backup_provider.dart';
+import '../../../core/providers/local_snapshot_provider.dart';
 import '../../../core/providers/backup_reminder_provider.dart';
 import '../../../core/providers/s3_backup_provider.dart';
 import '../../../core/providers/settings_provider.dart';
@@ -21,6 +22,7 @@ import '../../../core/services/chat/chat_service.dart';
 import '../../../core/services/backup/backup_cancel_token.dart';
 import '../../../core/services/backup/data_sync.dart';
 import '../backup_task_runner.dart';
+import 'local_snapshots_page.dart';
 import '../widgets/backup_progress_dialog.dart';
 import '../../../core/services/native_file_save.dart';
 import '../../../shared/widgets/ios_switch.dart';
@@ -33,6 +35,7 @@ import '../backup_restart_dialog.dart';
 import '../widgets/backup_reminder_helpers.dart';
 import 'package:Kelivo/theme/app_semantic_colors.dart';
 import 'package:Kelivo/shared/widgets/section_card.dart';
+import '../../../core/database/startup_failure_report.dart' show formatBytes;
 
 // File size formatter (B, KB, MB, GB)
 String _fmtBytes(int bytes) {
@@ -337,6 +340,9 @@ class _BackupPageState extends State<BackupPage> {
 
                 header(l10n.backupReminderSectionTitle),
                 const _BackupReminderMobileSection(),
+
+                header(l10n.localSnapshotSectionTitle),
+                const _LocalSnapshotMobileSection(),
 
                 // Section 2: 本地备份
                 ..._buildMobileLocalBackupSection(context, l10n, vm, header),
@@ -1533,6 +1539,62 @@ class _BackupPageState extends State<BackupPage> {
       MaterialPageRoute(
         builder: (_) => _S3SettingsPage(settings: settings, vm: vm, cfg: cfg),
       ),
+    );
+  }
+}
+
+class _LocalSnapshotMobileSection extends StatelessWidget {
+  const _LocalSnapshotMobileSection();
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final l10n = AppLocalizations.of(context)!;
+    final vm = context.watch<LocalSnapshotProvider>();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        SectionCard(
+          children: [
+            _iosSwitchRow(
+              context,
+              icon: Lucide.Shield,
+              label: l10n.localSnapshotEnabledTitle,
+              value: vm.settings.enabled,
+              onChanged: (value) => context
+                  .read<LocalSnapshotProvider>()
+                  .updateSettings(vm.settings.copyWith(enabled: value)),
+            ),
+            _iosDivider(context),
+            _iosNavRow(
+              context,
+              icon: Lucide.Database,
+              label: l10n.localSnapshotManageCopies,
+              detailText: l10n.localSnapshotUsage(
+                vm.copies.length,
+                formatBytes(vm.totalBytes),
+              ),
+              onTap: () => Navigator.of(context).push<void>(
+                MaterialPageRoute(builder: (_) => const LocalSnapshotsPage()),
+              ),
+            ),
+          ],
+        ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
+          child: Text(
+            vm.settings.enabled
+                ? l10n.localSnapshotEnabledSubtitle
+                : l10n.localSnapshotCopiesScopeNote,
+            style: TextStyle(
+              fontSize: 12,
+              height: 1.45,
+              color: cs.onSurface.withValues(alpha: 0.55),
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

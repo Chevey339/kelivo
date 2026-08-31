@@ -34,6 +34,8 @@ import 'core/providers/world_book_provider.dart';
 import 'core/providers/memory_provider.dart';
 import 'core/providers/memory_provider_v2.dart';
 import 'core/providers/backup_provider.dart';
+import 'core/providers/local_snapshot_provider.dart';
+import 'features/backup/local_snapshot_scheduler.dart';
 import 'core/services/memory/memory_pipeline.dart';
 import 'core/services/memory/memory_repository.dart';
 import 'core/providers/s3_backup_provider.dart';
@@ -46,6 +48,9 @@ import 'core/database/business_preferences.dart';
 import 'core/database/business_repository.dart';
 import 'core/database/business_startup_gate.dart';
 import 'core/database/chat_database_gateway.dart';
+import 'core/database/startup_failure_report.dart';
+import 'core/services/backup/backup_activity.dart';
+import 'core/services/backup/local_snapshot_schedule.dart';
 import 'core/services/chat/chat_service.dart';
 import 'core/services/app_exit_flush.dart';
 import 'core/services/backup/restore_archive_pruner.dart';
@@ -54,6 +59,7 @@ import 'core/services/backup/restore_startup_gate.dart';
 import 'core/services/backup/restore_receipt.dart';
 import 'core/services/mcp/mcp_tool_service.dart';
 import 'core/services/logging/flutter_logger.dart';
+import 'core/services/storage/storage_usage_service.dart';
 import 'features/home/services/ask_user_interaction_service.dart';
 import 'features/home/services/tool_approval_service.dart';
 import 'utils/app_directories.dart';
@@ -63,11 +69,13 @@ import 'shared/widgets/app_overlays.dart';
 import 'shared/widgets/snackbar.dart';
 import 'shared/widgets/restore_failure_screen.dart';
 import 'shared/widgets/restore_outcome_notice.dart';
+import 'shared/widgets/update_required_screen.dart';
 import 'package:system_fonts/system_fonts.dart';
 import 'dart:io'
     show
         Directory,
         File,
+        FileMode,
         Platform,
         stderr; // kept for global override usage inside provider
 import 'core/services/android_background.dart';
@@ -114,7 +122,12 @@ Future<void> main() async {
         await _initRestoreFailureWindow();
         runApp(
           _RestoreFailureApp(
-            diagnosticCode: restoreFailureDiagnosticCode(error),
+            report: StartupFailureReport.capture(
+              stage: StartupFailureStage.restoreGate,
+              error: error,
+              step: 'recover_and_require_business_ready',
+              stackTrace: stackTrace,
+            ),
             appDataDirectory: appDataDirectory,
           ),
         );
@@ -145,8 +158,13 @@ Future<void> main() async {
       ChatDatabaseLease? processDatabaseLease;
       BusinessPreferences? businessPreferences;
       var recoveryAttempted = false;
+      // Every call below can fail through drift's worker isolate, which erases
+      // the distinction between them. Naming the current one is what lets the
+      // failure screen say where startup actually stopped.
+      var admissionStep = 'legacy_migration_check';
       while (true) {
         try {
+          admissionStep = 'legacy_migration_check';
           final migrationDecision = await HiveToSqliteMigrationService.check();
           if (migrationDecision.needsMigration) {
             runApp(
@@ -157,6 +175,7 @@ Future<void> main() async {
             );
             return;
           }
+          admissionStep = 'installation_gate';
           await DatabaseInstallationGate.ensureReady(
             appDataDirectory: appDataDirectory,
             allowDatabaseIdentityChange:
@@ -168,10 +187,12 @@ Future<void> main() async {
           final databaseFile = File(
             '${appDataDirectory.path}/${AppDatabase.databaseFileName}',
           );
+          admissionStep = 'gateway_open';
           final databaseLease = await ChatDatabaseGateway.instance.acquire(
             databaseFile,
           );
           try {
+            admissionStep = 'business_migration';
             final legacyPreferences =
                 await SharedPreferencesLegacyBusinessPreferences.open();
             final loadedBusinessPreferences =
@@ -212,7 +233,12 @@ Future<void> main() async {
           await _initRestoreFailureWindow();
           runApp(
             _RestoreFailureApp(
-              diagnosticCode: restoreFailureDiagnosticCode(error),
+              report: StartupFailureReport.capture(
+                stage: StartupFailureStage.databaseAdmission,
+                error: error,
+                step: admissionStep,
+                stackTrace: stackTrace,
+              ),
               appDataDirectory: appDataDirectory,
             ),
           );
@@ -230,6 +256,7 @@ Future<void> main() async {
         MyApp(
           databaseLease: processDatabaseLease,
           businessPreferences: businessPreferences,
+          appDataDirectory: appDataDirectory,
           restoreOutcome: restoreOutcome?.state,
         ),
       );
@@ -269,6 +296,10 @@ Future<_AdmissionRecovery> _recoverFailedAdmission(
   switch (action) {
     case DatabaseRecoveryAction.rebuildAutomatically:
       try {
+        // The only route that destroys state without anyone confirming it, so
+        // it is the only one that has to leave a record of itself. A user who
+        // finds the app empty otherwise has nothing to report but the symptom.
+        await _recordAutomaticRebuild(appDataDirectory, error);
         await DatabaseInstallationGate.rebuildFresh(
           appDataDirectory: appDataDirectory,
         );
@@ -285,6 +316,40 @@ Future<_AdmissionRecovery> _recoverFailedAdmission(
     case DatabaseRecoveryAction.none:
       return _AdmissionRecovery.none;
   }
+}
+
+/// Appends a record of an unattended rebuild to `logs/`.
+///
+/// Deliberately independent of the Flutter log capture toggle, which is off by
+/// default: this is the one startup outcome that silently destroys state, and
+/// a user who finds the app empty has nothing else to report. The listing is
+/// taken before the rebuild, so it still describes the files it is about to
+/// clear. Best-effort throughout — a rebuild must not fail for want of a note.
+Future<void> _recordAutomaticRebuild(
+  Directory appDataDirectory,
+  Object error,
+) async {
+  try {
+    var report = StartupFailureReport.capture(
+      stage: StartupFailureStage.databaseAdmission,
+      error: error,
+      step: 'automatic_rebuild',
+    );
+    try {
+      report = report.withEnvironment(
+        await StartupFailureEnvironment.collect(
+          appDataDirectory: appDataDirectory,
+        ),
+      );
+    } catch (_) {}
+    final logs = Directory('${appDataDirectory.path}/logs');
+    await logs.create(recursive: true);
+    await File('${logs.path}/$startupRecoveryLogFileName').writeAsString(
+      '${report.toText()}\n\n',
+      mode: FileMode.append,
+      flush: true,
+    );
+  } catch (_) {}
 }
 
 HiveToSqliteMigrationDecision _legacyMigrationDecision(
@@ -332,12 +397,9 @@ Future<void> _initRestoreFailureWindow() async {
 }
 
 class _RestoreFailureApp extends StatelessWidget {
-  const _RestoreFailureApp({
-    required this.diagnosticCode,
-    this.appDataDirectory,
-  });
+  const _RestoreFailureApp({required this.report, this.appDataDirectory});
 
-  final String diagnosticCode;
+  final StartupFailureReport report;
   final Directory? appDataDirectory;
 
   @override
@@ -350,97 +412,13 @@ class _RestoreFailureApp extends StatelessWidget {
       localizationsDelegates: AppLocalizations.localizationsDelegates,
       theme: buildLightThemeForScheme(palette.light),
       darkTheme: buildDarkThemeForScheme(palette.dark),
-      home: diagnosticCode == 'database_schema_too_new'
-          ? _UpdateRequiredScreen(diagnosticCode: diagnosticCode)
+      home: report.diagnosticCode == 'database_schema_too_new'
+          ? UpdateRequiredScreen(diagnosticCode: report.diagnosticCode)
           : RestoreFailureScreen(
-              diagnosticCode: diagnosticCode,
+              report: report,
               restart: PlatformUtils.restartApp,
               appDataDirectory: appDataDirectory,
             ),
-    );
-  }
-}
-
-/// Shown when the installed database was written by a newer app version;
-/// restarting cannot help, so the only action is updating Kelivo.
-class _UpdateRequiredScreen extends StatelessWidget {
-  const _UpdateRequiredScreen({required this.diagnosticCode});
-
-  final String diagnosticCode;
-
-  @override
-  Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context)!;
-    final colors = Theme.of(context).colorScheme;
-    final textTheme = Theme.of(context).textTheme;
-    return Scaffold(
-      body: SafeArea(
-        child: Center(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(24),
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 560),
-              child: Material(
-                color: colors.surfaceContainerLow,
-                borderRadius: BorderRadius.circular(20),
-                child: Padding(
-                  padding: const EdgeInsets.all(28),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Container(
-                        width: 56,
-                        height: 56,
-                        decoration: BoxDecoration(
-                          color: colors.primaryContainer,
-                          borderRadius: BorderRadius.circular(16),
-                        ),
-                        child: Icon(
-                          Icons.system_update_alt_rounded,
-                          size: 30,
-                          color: colors.onPrimaryContainer,
-                        ),
-                      ),
-                      const SizedBox(height: 20),
-                      Text(
-                        l10n.startupDatabaseUpdateRequiredTitle,
-                        style: textTheme.headlineSmall?.copyWith(
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                      const SizedBox(height: 10),
-                      Text(
-                        l10n.startupDatabaseUpdateRequiredContent,
-                        style: textTheme.bodyLarge?.copyWith(
-                          color: colors.onSurfaceVariant,
-                          height: 1.45,
-                        ),
-                      ),
-                      const SizedBox(height: 20),
-                      Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.all(16),
-                        decoration: BoxDecoration(
-                          color: colors.surfaceContainerHighest,
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: SelectableText(
-                          l10n.backupRestoreFailureDiagnostic(diagnosticCode),
-                          style: textTheme.bodySmall?.copyWith(
-                            color: colors.onSurfaceVariant,
-                            fontFamily: 'monospace',
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ),
-      ),
     );
   }
 }
@@ -533,11 +511,13 @@ class MyApp extends StatelessWidget {
     super.key,
     required this.databaseLease,
     required this.businessPreferences,
+    required this.appDataDirectory,
     this.restoreOutcome,
   });
 
   final ChatDatabaseLease databaseLease;
   final BusinessPreferences businessPreferences;
+  final Directory appDataDirectory;
   final RestoreReceiptState? restoreOutcome;
 
   @override
@@ -644,6 +624,31 @@ class MyApp extends StatelessWidget {
             businessRepository: databaseLease.businessRepository,
             businessPreferences: businessPreferences,
             initialConfig: ctx.read<SettingsProvider>().s3Config,
+          ),
+        ),
+        ChangeNotifierProvider(
+          create: (ctx) => LocalSnapshotProvider(
+            appDataDirectory: appDataDirectory,
+            chatService: ctx.read<ChatService>(),
+            businessRepository: databaseLease.businessRepository,
+            businessPreferences: businessPreferences,
+            isBusy: () {
+              // Never compete with a reply the user is watching, nor with a
+              // backup, restore or import that is already holding the
+              // database. Asked of the process-wide tracker rather than of the
+              // providers here: the mobile backup screen builds its own
+              // instances, so these root ones stay idle throughout a mobile
+              // backup, and a local-file restore never marks them busy at all.
+              if (ChatActions.hasAnyActiveGeneration) {
+                return LocalSnapshotSkipReason.generating;
+              }
+              if (BackupActivity.isActive ||
+                  ctx.read<BackupProvider>().busy ||
+                  ctx.read<S3BackupProvider>().busy) {
+                return LocalSnapshotSkipReason.busy;
+              }
+              return null;
+            },
           ),
         ),
       ],
@@ -952,7 +957,11 @@ class MyApp extends StatelessWidget {
                             ),
                           )
                         : mq,
-                    child: AppOverlays(child: child ?? const SizedBox.shrink()),
+                    child: LocalSnapshotScheduler(
+                      child: AppOverlays(
+                        child: child ?? const SizedBox.shrink(),
+                      ),
+                    ),
                   );
                   // Enforce app font as a default across the tree for Texts without explicit family
                   return AnnotatedRegion<SystemUiOverlayStyle>(

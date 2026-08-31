@@ -31,6 +31,8 @@ class _DisplaySettingsBody extends StatelessWidget {
                   _RowDivider(),
                   _MessageStyleRow(),
                   _RowDivider(),
+                  _AutoRetryRow(),
+                  _RowDivider(),
                   _TopicPositionRow(),
                 ],
               ),
@@ -125,6 +127,8 @@ class _DisplaySettingsBody extends StatelessWidget {
                   _ToggleRowShowRegenerateConfirmDialog(),
                   _RowDivider(),
                   _ToggleRowForkKeepMessageVersions(),
+                  _RowDivider(),
+                  _ToggleRowEditAssistantKeepThinkingToolCards(),
                   _RowDivider(),
                   _ToggleRowShowUpdates(),
                   _RowDivider(),
@@ -868,6 +872,24 @@ class _MessageStyleRow extends StatelessWidget {
       trailing: _DesktopFontDropdownButton(
         display: styleLabel,
         onTap: () => showMessageStyleSettingsDialog(context),
+      ),
+    );
+  }
+}
+
+class _AutoRetryRow extends StatelessWidget {
+  const _AutoRetryRow();
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    final enabled = context.watch<SettingsProvider>().autoRetryOptions.enabled;
+    return _LabeledRow(
+      label: l10n.settingsPageAutoRetry,
+      trailing: _DesktopFontDropdownButton(
+        display: enabled
+            ? l10n.iosBackgroundStatusOn
+            : l10n.iosBackgroundStatusOff,
+        onTap: () => showDesktopAutoRetryDialog(context),
       ),
     );
   }
@@ -2629,6 +2651,23 @@ class _ToggleRowForkKeepMessageVersions extends StatelessWidget {
       value: sp.forkKeepMessageVersions,
       onChanged: (v) =>
           context.read<SettingsProvider>().setForkKeepMessageVersions(v),
+    );
+  }
+}
+
+class _ToggleRowEditAssistantKeepThinkingToolCards extends StatelessWidget {
+  const _ToggleRowEditAssistantKeepThinkingToolCards();
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    final sp = context.watch<SettingsProvider>();
+    return _ToggleRow(
+      label: l10n.displaySettingsPageEditAssistantKeepThinkingToolCardsTitle,
+      tip: l10n.displaySettingsPageEditAssistantKeepThinkingToolCardsSubtitle,
+      value: sp.keepThinkingAndToolCardsWhenEditingAssistant,
+      onChanged: (v) => context
+          .read<SettingsProvider>()
+          .setKeepThinkingAndToolCardsWhenEditingAssistant(v),
     );
   }
 }

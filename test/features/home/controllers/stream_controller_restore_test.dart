@@ -2,7 +2,6 @@ import "../../../support/business_test_harness.dart";
 import 'package:flutter_test/flutter_test.dart';
 import 'package:Kelivo/core/models/chat_message.dart';
 import 'package:Kelivo/core/providers/settings_provider.dart';
-import 'package:Kelivo/core/services/chat/chat_service.dart';
 import 'package:Kelivo/features/home/controllers/stream_controller.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -12,7 +11,6 @@ void main() {
 
   StreamController buildController() {
     return StreamController(
-      chatService: ChatService(),
       onStateChanged: () {},
       getSettingsProvider: () =>
           SettingsProvider(createBusinessTestPreferences()),
@@ -69,7 +67,6 @@ void main() {
           'content': 'result body',
         },
       ],
-      getGeminiThoughtSigFromDb: (id) => 'stored-sig',
     );
   }
 
@@ -108,8 +105,6 @@ void main() {
     );
 
     restore(controller, message);
-
-    expect(controller.geminiThoughtSigs[message.id], 'stored-sig');
 
     final reasoning = controller.getReasoningData(message.id);
     expect(reasoning, isNotNull);
@@ -208,5 +203,59 @@ void main() {
     restore(controller, message);
     expect(controller.getReasoningSegments(message.id), isNotNull);
     expect(controller.reasoningPayloadDecodeCount, 2);
+  });
+
+  test(
+    'retry status survives clearAllState when restored from StreamingState',
+    () {
+      final controller = buildController();
+      final status = RetryStatus(
+        attempt: 2,
+        maxRetries: 3,
+        retryAt: DateTime(2026, 8, 30, 21),
+      );
+      controller.streamingContentNotifier.updateRetryStatus(
+        'assistant-1',
+        status,
+      );
+      expect(
+        controller.streamingContentNotifier
+            .getNotifier('assistant-1')
+            .value
+            .retryStatus,
+        status,
+      );
+
+      controller.clearAllState();
+      expect(
+        controller.streamingContentNotifier.hasNotifier('assistant-1'),
+        isFalse,
+      );
+
+      controller.markStreamingStarted('assistant-1');
+      controller.restoreRetryStatus('assistant-1', status);
+      expect(
+        controller.streamingContentNotifier
+            .getNotifier('assistant-1')
+            .value
+            .retryStatus,
+        status,
+      );
+    },
+  );
+
+  test('restoreRetryStatus does not revive a finished message', () {
+    final controller = buildController();
+    final status = RetryStatus(
+      attempt: 2,
+      maxRetries: 3,
+      retryAt: DateTime(2026, 8, 30, 21),
+    );
+    controller.restoreRetryStatus('assistant-1', status);
+    expect(controller.isAnyMessageStreaming, isFalse);
+    expect(
+      controller.streamingContentNotifier.hasNotifier('assistant-1'),
+      isFalse,
+    );
   });
 }

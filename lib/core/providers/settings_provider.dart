@@ -20,8 +20,10 @@ import '../services/learning_mode_store.dart';
 import '../models/api_keys.dart';
 import '../models/backup.dart';
 import '../models/compress_context_options.dart';
+import '../models/auto_retry_options.dart';
 import '../models/provider_group.dart';
 import '../services/haptics.dart';
+import '../services/api/retry_policy.dart';
 import '../services/screen_wakelock.dart';
 import '../../utils/app_directories.dart';
 import '../../utils/sandbox_path_resolver.dart';
@@ -36,6 +38,8 @@ import '../services/memory/memory_trace.dart';
 import '../../theme/palettes.dart';
 import '../../theme/custom_theme.dart';
 import '../../theme/chat_bubble_style.dart';
+import '../models/tool_schema_override.dart';
+import '../services/app_exit_flush.dart';
 
 // Desktop: topic list position
 enum DesktopTopicPosition { left, right }
@@ -203,6 +207,8 @@ class SettingsProvider extends ChangeNotifier {
       'display_show_regenerate_confirm_dialog_v1';
   static const String _chatForkKeepMessageVersionsKey =
       'chat_fork_keep_message_versions_v1';
+  static const String _chatEditAssistantKeepThinkingToolCardsKey =
+      'chat_edit_assistant_keep_thinking_tool_cards_v1';
   static const String _displayShowMessageNavKey = 'display_show_message_nav_v1';
   static const String _displayDesktopMessageNavButtonsModeKey =
       'display_desktop_message_nav_buttons_mode_v1';
@@ -297,12 +303,15 @@ class SettingsProvider extends ChangeNotifier {
       'display_use_layered_sheet_tiles_v1';
   static const String _displayAssistantBubbleFitContentKey =
       'display_assistant_bubble_fit_content_v1';
+  static const String _displayAssistantBubbleSplitParagraphsKey =
+      'display_assistant_bubble_split_paragraphs_v1';
   static const String _displayChatMessageBackgroundStyleKey =
       'display_chat_message_background_style_v1';
   static const String _chatBubbleStyleOverridesKey =
       'chat_bubble_style_overrides_v1';
   static const String _userChatBubbleStyleOverridesKey =
       'chat_bubble_style_overrides_user_v1';
+  static const String _toolSchemaOverridesKey = 'tool_schema_overrides_v1';
   static const String _mobileAssistantEditTabOrderKey =
       'mobile_assistant_edit_tab_order_v1';
   static const String _mobileAssistantEditTabHiddenKey =
@@ -379,6 +388,7 @@ class SettingsProvider extends ChangeNotifier {
   static const String _globalProxyBypassKey = 'global_proxy_bypass_v1';
   static const String _defaultGlobalProxyBypassRules =
       'localhost,127.0.0.1,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16,::1';
+  static const String _autoRetryOptionsKey = 'auto_retry_options';
   // TTS services (network)
   static const String _ttsServicesKey = 'tts_services_v1';
   static const String _ttsSelectedServiceIdKey = 'tts_selected_service_id_v1';
@@ -513,6 +523,10 @@ class SettingsProvider extends ChangeNotifier {
   // When on, assistant bubbles hug their text instead of spanning the row.
   bool _assistantBubbleFitContent = false;
   bool get assistantBubbleFitContent => _assistantBubbleFitContent;
+
+  // When on, blank lines split assistant text into one bubble per paragraph.
+  bool _assistantBubbleSplitParagraphs = false;
+  bool get assistantBubbleSplitParagraphs => _assistantBubbleSplitParagraphs;
 
   // Desktop UI persisted state
   double _desktopSidebarWidth = 240;
@@ -725,6 +739,9 @@ class SettingsProvider extends ChangeNotifier {
   String get globalProxyPassword => _globalProxyPassword;
   String get globalProxyBypass => _globalProxyBypass;
 
+  AutoRetryOptions _autoRetry = const AutoRetryOptions.defaults();
+  AutoRetryOptions get autoRetryOptions => _autoRetry;
+
   int _appLaunchCount = 0;
   int get appLaunchCount => _appLaunchCount;
 
@@ -838,8 +855,7 @@ class SettingsProvider extends ChangeNotifier {
         _titleModelId = parts.sublist(1).join('::');
       }
     }
-    _titleGenerationEnabled =
-        prefs.getBool(_titleGenerationEnabledKey) ?? true;
+    _titleGenerationEnabled = prefs.getBool(_titleGenerationEnabledKey) ?? true;
     // load title prompt
     final tp = prefs.getString(_titlePromptKey);
     _titlePrompt = (tp == null || tp.trim().isEmpty) ? defaultTitlePrompt : tp;
@@ -1082,6 +1098,8 @@ class SettingsProvider extends ChangeNotifier {
         prefs.getBool(_displayShowRegenerateConfirmDialogKey) ?? true;
     _forkKeepMessageVersions =
         prefs.getBool(_chatForkKeepMessageVersionsKey) ?? false;
+    _keepThinkingAndToolCardsWhenEditingAssistant =
+        prefs.getBool(_chatEditAssistantKeepThinkingToolCardsKey) ?? false;
     _showMessageNavButtons = prefs.getBool(_displayShowMessageNavKey) ?? true;
     _mobileMessageNavButtonsMode = _parseMobileMessageNavButtonsMode(
       prefs.getString(_displayMobileMessageNavButtonsModeKey),
@@ -1193,6 +1211,8 @@ class SettingsProvider extends ChangeNotifier {
         prefs.getBool(_displayUseLayeredSheetTilesKey) ?? false;
     _assistantBubbleFitContent =
         prefs.getBool(_displayAssistantBubbleFitContentKey) ?? false;
+    _assistantBubbleSplitParagraphs =
+        prefs.getBool(_displayAssistantBubbleSplitParagraphsKey) ?? false;
     // display: markdown/math rendering
     _enableDollarLatex = prefs.getBool(_displayEnableDollarLatexKey) ?? true;
     _enableMathRendering =
@@ -1316,6 +1336,9 @@ class SettingsProvider extends ChangeNotifier {
         // Keep null so a corrupt user key still follows assistant.
       }
     }
+    _toolSchemaOverrides = _decodeToolSchemaOverrides(
+      prefs.getString(_toolSchemaOverridesKey),
+    );
     _mobileAssistantEditTabOrder = List.unmodifiable(
       prefs.getStringList(_mobileAssistantEditTabOrderKey) ?? const <String>[],
     );
@@ -1408,6 +1431,17 @@ class SettingsProvider extends ChangeNotifier {
     } else {
       _globalProxyBypass = bypass;
     }
+
+    _autoRetry = const AutoRetryOptions.defaults();
+    final autoRetryStr = prefs.getString(_autoRetryOptionsKey);
+    if (autoRetryStr != null && autoRetryStr.isNotEmpty) {
+      try {
+        _autoRetry = AutoRetryOptions.fromJson(
+          jsonDecode(autoRetryStr) as Map<String, dynamic>,
+        );
+      } catch (_) {}
+    }
+    AutoRetryConfig.current = _autoRetry;
 
     // load network TTS services
     try {
@@ -1603,6 +1637,13 @@ class SettingsProvider extends ChangeNotifier {
     notifyListeners();
     final prefs = _preferences;
     await prefs.setString(_globalProxyBypassKey, _globalProxyBypass);
+  }
+
+  Future<void> setAutoRetryOptions(AutoRetryOptions v) async {
+    _autoRetry = v;
+    AutoRetryConfig.current = v;
+    notifyListeners();
+    await _preferences.setString(_autoRetryOptionsKey, jsonEncode(v.toJson()));
   }
 
   // Apply global proxy to Dart IO layer; provider-level proxies take precedence at call sites.
@@ -2629,6 +2670,13 @@ class SettingsProvider extends ChangeNotifier {
     await _preferences.setBool(_displayAssistantBubbleFitContentKey, v);
   }
 
+  Future<void> setAssistantBubbleSplitParagraphs(bool v) async {
+    if (_assistantBubbleSplitParagraphs == v) return;
+    _assistantBubbleSplitParagraphs = v;
+    notifyListeners();
+    await _preferences.setBool(_displayAssistantBubbleSplitParagraphsKey, v);
+  }
+
   Future<void> setUseLayeredSheetTiles(bool v) async {
     if (_useLayeredSheetTiles == v) return;
     _useLayeredSheetTiles = v;
@@ -2846,6 +2894,154 @@ class SettingsProvider extends ChangeNotifier {
       _chatBubbleStyleOverridesKey,
       jsonEncode(value.toJson()),
     );
+  }
+
+  static const Duration toolSchemaOverridePersistDebounce = Duration(
+    milliseconds: 300,
+  );
+
+  Map<String, ToolSchemaOverride> _toolSchemaOverrides =
+      const <String, ToolSchemaOverride>{};
+  Map<String, ToolSchemaOverride> get toolSchemaOverrides =>
+      Map<String, ToolSchemaOverride>.unmodifiable(_toolSchemaOverrides);
+
+  Timer? _toolSchemaOverridePersistTimer;
+  bool _toolSchemaOverridePersistDirty = false;
+  Future<void> Function()? _toolSchemaOverrideExitFlushHandler;
+
+  bool _applyToolSchemaOverrideInMemory(
+    String toolName,
+    ToolSchemaOverride value,
+  ) {
+    if (toolName.isEmpty) return false;
+    final next = Map<String, ToolSchemaOverride>.from(_toolSchemaOverrides);
+    if (value.isEmpty) {
+      if (!next.containsKey(toolName)) return false;
+      next.remove(toolName);
+    } else {
+      if (next[toolName] == value) return false;
+      next[toolName] = value;
+    }
+    _toolSchemaOverrides = next;
+    notifyListeners();
+    return true;
+  }
+
+  Future<void> setToolSchemaOverride(
+    String toolName,
+    ToolSchemaOverride value,
+  ) async {
+    if (!_applyToolSchemaOverrideInMemory(toolName, value)) return;
+    await _persistToolSchemaOverridesNow();
+  }
+
+  /// In-memory write used by live editors. SQLite persist is debounced and
+  /// must be flushed on blur, tool switch, pane close, or process exit.
+  void setToolSchemaOverrideLive(String toolName, ToolSchemaOverride value) {
+    if (!_applyToolSchemaOverrideInMemory(toolName, value)) return;
+    _scheduleDebouncedToolSchemaOverridePersist();
+  }
+
+  Future<void> flushPendingToolSchemaOverridePersist() async {
+    _toolSchemaOverridePersistTimer?.cancel();
+    _toolSchemaOverridePersistTimer = null;
+    if (!_toolSchemaOverridePersistDirty) return;
+    await _persistToolSchemaOverrides();
+  }
+
+  Future<void> resetToolSchemaOverride(String toolName) async {
+    await setToolSchemaOverride(toolName, const ToolSchemaOverride());
+  }
+
+  Future<void> resetAllToolSchemaOverrides() async {
+    _cancelDebouncedToolSchemaOverridePersist();
+    if (_toolSchemaOverrides.isEmpty) return;
+    _toolSchemaOverrides = const <String, ToolSchemaOverride>{};
+    notifyListeners();
+    await _preferences.remove(_toolSchemaOverridesKey);
+  }
+
+  void _scheduleDebouncedToolSchemaOverridePersist() {
+    _toolSchemaOverridePersistDirty = true;
+    _ensureToolSchemaOverrideExitFlushRegistered();
+    _toolSchemaOverridePersistTimer?.cancel();
+    _toolSchemaOverridePersistTimer = Timer(
+      toolSchemaOverridePersistDebounce,
+      () {
+        unawaited(_persistToolSchemaOverrides());
+      },
+    );
+  }
+
+  void _cancelDebouncedToolSchemaOverridePersist() {
+    _toolSchemaOverridePersistTimer?.cancel();
+    _toolSchemaOverridePersistTimer = null;
+    _toolSchemaOverridePersistDirty = false;
+  }
+
+  Future<void> _persistToolSchemaOverridesNow() async {
+    _toolSchemaOverridePersistTimer?.cancel();
+    _toolSchemaOverridePersistTimer = null;
+    await _persistToolSchemaOverrides();
+  }
+
+  void _ensureToolSchemaOverrideExitFlushRegistered() {
+    if (_toolSchemaOverrideExitFlushHandler != null) return;
+    _toolSchemaOverrideExitFlushHandler = flushPendingToolSchemaOverridePersist;
+    AppExitFlush.register(_toolSchemaOverrideExitFlushHandler!);
+  }
+
+  Future<void> _persistToolSchemaOverrides() async {
+    _toolSchemaOverridePersistDirty = false;
+    if (_toolSchemaOverrides.isEmpty) {
+      await _preferences.remove(_toolSchemaOverridesKey);
+      return;
+    }
+    await _preferences.setString(
+      _toolSchemaOverridesKey,
+      jsonEncode({
+        for (final e in _toolSchemaOverrides.entries) e.key: e.value.toJson(),
+      }),
+    );
+  }
+
+  @override
+  void dispose() {
+    _toolSchemaOverridePersistTimer?.cancel();
+    _toolSchemaOverridePersistTimer = null;
+    if (_toolSchemaOverridePersistDirty) {
+      unawaited(_persistToolSchemaOverrides());
+    }
+    final handler = _toolSchemaOverrideExitFlushHandler;
+    if (handler != null) {
+      AppExitFlush.unregister(handler);
+      _toolSchemaOverrideExitFlushHandler = null;
+    }
+    super.dispose();
+  }
+
+  static Map<String, ToolSchemaOverride> _decodeToolSchemaOverrides(
+    String? raw,
+  ) {
+    if (raw == null || raw.isEmpty) return const <String, ToolSchemaOverride>{};
+    try {
+      final decoded = jsonDecode(raw);
+      if (decoded is! Map) return const <String, ToolSchemaOverride>{};
+      final out = <String, ToolSchemaOverride>{};
+      for (final entry in decoded.entries) {
+        final value = entry.value;
+        if (value is! Map) continue;
+        final override = ToolSchemaOverride.fromJson(
+          Map<String, dynamic>.from(value),
+        );
+        if (!override.isEmpty) {
+          out['${entry.key}'] = override;
+        }
+      }
+      return out;
+    } catch (_) {
+      return const <String, ToolSchemaOverride>{};
+    }
   }
 
   List<String> _mobileAssistantEditTabOrder = const <String>[];
@@ -4578,6 +4774,16 @@ Requirements:
     await _preferences.setBool(_chatForkKeepMessageVersionsKey, v);
   }
 
+  bool _keepThinkingAndToolCardsWhenEditingAssistant = false;
+  bool get keepThinkingAndToolCardsWhenEditingAssistant =>
+      _keepThinkingAndToolCardsWhenEditingAssistant;
+  Future<void> setKeepThinkingAndToolCardsWhenEditingAssistant(bool v) async {
+    if (_keepThinkingAndToolCardsWhenEditingAssistant == v) return;
+    _keepThinkingAndToolCardsWhenEditingAssistant = v;
+    notifyListeners();
+    await _preferences.setBool(_chatEditAssistantKeepThinkingToolCardsKey, v);
+  }
+
   // Display: show message navigation button
   bool _showMessageNavButtons = true;
   bool get showMessageNavButtons => _showMessageNavButtons;
@@ -5540,6 +5746,8 @@ Requirements:
     copy._regenerateDeleteTrailingMessages = _regenerateDeleteTrailingMessages;
     copy._showRegenerateConfirmDialog = _showRegenerateConfirmDialog;
     copy._forkKeepMessageVersions = _forkKeepMessageVersions;
+    copy._keepThinkingAndToolCardsWhenEditingAssistant =
+        _keepThinkingAndToolCardsWhenEditingAssistant;
     copy._showMessageNavButtons = _showMessageNavButtons;
     copy._mobileMessageNavButtonsMode = _mobileMessageNavButtonsMode;
     copy._useNewAssistantAvatarUx = _useNewAssistantAvatarUx;
@@ -5595,9 +5803,13 @@ Requirements:
     copy._useLayeredSurfaces = _useLayeredSurfaces;
     copy._useLayeredSheetTiles = _useLayeredSheetTiles;
     copy._assistantBubbleFitContent = _assistantBubbleFitContent;
+    copy._assistantBubbleSplitParagraphs = _assistantBubbleSplitParagraphs;
     copy._chatMessageBackgroundStyle = _chatMessageBackgroundStyle;
     copy._chatBubbleStyleOverrides = _chatBubbleStyleOverrides;
     copy._userChatBubbleStyleOverrides = _userChatBubbleStyleOverrides;
+    copy._toolSchemaOverrides = Map<String, ToolSchemaOverride>.from(
+      _toolSchemaOverrides,
+    );
     copy._mobileAssistantEditTabOrder = _mobileAssistantEditTabOrder;
     copy._hiddenMobileAssistantEditTabs = _hiddenMobileAssistantEditTabs;
     copy._mobileAssistantDetailOutlineEnabled =

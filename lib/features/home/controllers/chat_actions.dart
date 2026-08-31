@@ -14,6 +14,7 @@ import '../../../core/models/token_usage.dart';
 import '../../../core/providers/assistant_provider.dart';
 import '../../../core/providers/settings_provider.dart';
 import '../../../core/services/api/chat_api_service.dart';
+import '../../../core/services/api/retry_policy.dart';
 import '../../../core/services/api/stream/stream_chunk.dart';
 import '../../../core/services/chat/chat_service.dart';
 import '../../../core/services/ios_background_generation.dart';
@@ -184,6 +185,17 @@ class ChatActions {
     await actions.flushConversationProgress(
       actions.chatController.currentConversation,
     );
+  }
+
+  /// Whether any conversation is generating right now.
+  ///
+  /// Read by background maintenance that would rather wait than compete with
+  /// a reply for disk and CPU.
+  static bool get hasAnyActiveGeneration {
+    final actions = _current;
+    if (actions == null) return false;
+    return actions._conversationStreams.isNotEmpty ||
+        actions._activeAssistantMessages.isNotEmpty;
   }
 
   /// Stop any in-flight generation for [conversationId] before its rows are
@@ -405,6 +417,39 @@ class ChatActions {
   String? activeStreamingMessageId(String conversationId) =>
       _activeAssistantMessages[conversationId]?.id;
 
+  /// Rebuild retry countdown UI from surviving [StreamingState] after the
+  /// streaming notifier was wiped (new/temporary conversation).
+  void restoreRetryUi(String conversationId) {
+    for (final state in _streamingStates.values) {
+      if (state.conversationId != conversationId) continue;
+      streamController.restoreRetryStatus(state.messageId, state.retryStatus);
+    }
+  }
+
+  void _setRetryStatus(
+    stream_ctrl.StreamingState state,
+    RetryPending? pending,
+  ) {
+    if (pending == null) {
+      state.retryStatus = null;
+      streamController.streamingContentNotifier.updateRetryStatus(
+        state.messageId,
+        null,
+      );
+      return;
+    }
+    final status = stream_ctrl.RetryStatus(
+      attempt: pending.attempt,
+      maxRetries: pending.maxRetries,
+      retryAt: pending.deadlineAt(),
+    );
+    state.retryStatus = status;
+    streamController.streamingContentNotifier.updateRetryStatus(
+      state.messageId,
+      status,
+    );
+  }
+
   static const Duration _streamCancelTimeout = Duration(seconds: 3);
 
   /// A barrier cancel only completes once the generator leaves its current
@@ -568,10 +613,32 @@ class ChatActions {
     _activeAssistantMessages.removeIfMatches(message);
   }
 
-  Future<void> _finishPreparingMessage(
+  Future<void> _finishPrepareError(
     String conversationId,
     ChatMessage fallback,
+    PrepareErrorAction action,
   ) async {
+    switch (action) {
+      case PrepareErrorAction.skip:
+        return;
+      case PrepareErrorAction.cancelled:
+        await _finishPreparingMessage(
+          conversationId,
+          fallback,
+          terminalState: GenerationRunState.cancelled,
+          errorCode: null,
+        );
+      case PrepareErrorAction.failed:
+        await _finishPreparingMessage(conversationId, fallback);
+    }
+  }
+
+  Future<void> _finishPreparingMessage(
+    String conversationId,
+    ChatMessage fallback, {
+    GenerationRunState terminalState = GenerationRunState.failed,
+    String? errorCode = 'preparation_failed',
+  }) async {
     final active = _activeAssistantMessages[conversationId];
     final message = _messageWithCurrentReasoning(
       active?.id == fallback.id ? active! : fallback,
@@ -582,8 +649,8 @@ class ChatActions {
     try {
       await _finalizeStreamingCheckpoint(
         message,
-        terminalState: GenerationRunState.failed,
-        errorCode: 'preparation_failed',
+        terminalState: terminalState,
+        errorCode: errorCode,
       );
     } finally {
       _clearGenerationRuntimeState(message);
@@ -1335,8 +1402,12 @@ class ChatActions {
   }) async {
     // Ensure file processing indicator is cleared on error
     onFileProcessingFinished?.call(assistantMessage.id);
+    final action = prepareErrorAction(
+      error,
+      requestCancelled: isStopping(conversationId),
+    );
     try {
-      await _finishPreparingMessage(conversationId, assistantMessage);
+      await _finishPrepareError(conversationId, assistantMessage, action);
     } catch (cleanupError, stackTrace) {
       FlutterLogger.log(
         '[ChatActions] finishPreparingMessage failed after send error: '
@@ -1344,6 +1415,7 @@ class ChatActions {
         tag: 'ChatActions',
       );
     }
+    if (action != PrepareErrorAction.failed) return;
     onStreamError?.call(error.toString());
   }
 
@@ -1679,7 +1751,14 @@ class ChatActions {
       await _executeGeneration(ctx);
       return ChatActionResult.success(assistantMessage);
     } catch (e) {
-      await _finishPreparingMessage(conversation.id, assistantMessage);
+      final action = prepareErrorAction(
+        e,
+        requestCancelled: isStopping(conversation.id),
+      );
+      await _finishPrepareError(conversation.id, assistantMessage, action);
+      if (action != PrepareErrorAction.failed) {
+        return ChatActionResult.success(assistantMessage);
+      }
       return ChatActionResult.error(e.toString());
     }
   }
@@ -1802,7 +1881,14 @@ class ChatActions {
       await _executeGeneration(ctx);
       return ChatActionResult.success(streamingMessage);
     } catch (e) {
-      await _finishPreparingMessage(conversation.id, streamingMessage);
+      final action = prepareErrorAction(
+        e,
+        requestCancelled: isStopping(conversation.id),
+      );
+      await _finishPrepareError(conversation.id, streamingMessage, action);
+      if (action != PrepareErrorAction.failed) {
+        return ChatActionResult.success(streamingMessage);
+      }
       return ChatActionResult.error(e.toString());
     }
   }
@@ -1881,6 +1967,8 @@ class ChatActions {
     if (visibleStreaming != null) {
       streamController.markStreamingEnded(visibleStreaming.id);
       streamController.cleanupTimers(visibleStreaming.id);
+      final cancelState = _streamingStates[visibleStreaming.id];
+      if (cancelState != null) _setRetryStatus(cancelState, null);
       final index = _messages.indexWhere((m) => m.id == visibleStreaming.id);
       final visibleMessage = index == -1 ? visibleStreaming : _messages[index];
       if (chatController.publishTerminalMessage(visibleMessage)) {
@@ -2037,7 +2125,9 @@ class ChatActions {
             requestId: conversationId,
             allowImagesApiRouting: ctx.allowImagesApiRouting,
             ocrActive: ctx.ocrActive,
+            onRetry: (pending) => _setRetryStatus(state, pending),
           );
+          _setRetryStatus(state, null);
           state.streamStartedAt ??= DateTime.now();
           await _markGenerationStreaming(state);
           state.partsHandler.handleResult(result);
@@ -2058,6 +2148,13 @@ class ChatActions {
           }
           await _handleStreamFinish(state);
         } catch (e) {
+          _setRetryStatus(state, null);
+          if (isCancelledGenerationError(
+            e,
+            requestCancelled: isStopping(conversationId),
+          )) {
+            return;
+          }
           await _handleStreamError(e, state);
         }
         return;
@@ -2103,17 +2200,20 @@ class ChatActions {
     StreamChunk chunk,
     stream_ctrl.StreamingState state,
   ) async {
-    await _markGenerationStreaming(state);
+    if (chunk is RetryPending) {
+      _setRetryStatus(state, chunk);
+    } else {
+      _setRetryStatus(state, null);
+    }
+    if (chunk is! RetryPending && chunk is! RetryAttemptStart) {
+      await _markGenerationStreaming(state);
+    }
     state.partsHandler.handle(chunk);
     switch (chunk) {
+      case RetryPending() || RetryAttemptStart():
+        break;
       case TextDelta(:final text):
-        final cleaned = text.isNotEmpty
-            ? streamController.captureGeminiThoughtSignature(
-                text,
-                state.messageId,
-              )
-            : '';
-        await _handleContentChunk(state, cleaned);
+        await _handleContentChunk(state, text);
         _scheduleStreamingCheckpoint(state);
       case ReasoningDelta(:final text, :final details):
         if (details != null) {
@@ -2144,9 +2244,15 @@ class ChatActions {
         _scheduleStreamingCheckpoint(state);
       case Usage(:final usage):
         _applyUsage(state, usage);
+      case ProviderArtifact(:final kind, :final payload):
+        await chatService.setProviderArtifact(state.messageId, kind, payload);
       case Finish():
         await _handleStreamFinish(state);
-      case ImageStart() || ImageDelta() || ImageSnapshot() || ImageEnd():
+      case ImageStart() ||
+          ImageDelta() ||
+          ImageSnapshot() ||
+          ImageEnd() ||
+          GeneratedFile():
         _publishAssistantParts(state);
         _scheduleStreamingCheckpoint(state);
       case TextStart() ||
@@ -2483,9 +2589,16 @@ class ChatActions {
     stream_ctrl.StreamingState state,
   ) async {
     if (state.terminalPersisted) return;
-    state.finishHandled = true;
+    _setRetryStatus(state, null);
     final messageId = state.messageId;
     final conversationId = state.conversationId;
+    if (isCancelledGenerationError(
+      e,
+      requestCancelled: isStopping(conversationId),
+    )) {
+      return;
+    }
+    state.finishHandled = true;
     final errorText = e.toString();
 
     // Reset file processing state on error, scoped to this message so a

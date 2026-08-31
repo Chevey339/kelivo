@@ -9,6 +9,9 @@ class ActiveStreamingMessageStore {
     return _messagesByConversation[conversationId];
   }
 
+  /// Whether any conversation currently has an in-flight assistant message.
+  bool get isNotEmpty => _messagesByConversation.isNotEmpty;
+
   void put(ChatMessage message) {
     _messagesByConversation[message.conversationId] = message;
   }

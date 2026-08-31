@@ -3,10 +3,13 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:mcp_client/mcp_client.dart' as mcp;
 import 'package:provider/provider.dart';
 
+import 'package:Kelivo/core/models/assistant.dart';
+import 'package:Kelivo/core/models/tool_schema_override.dart';
 import 'package:Kelivo/core/providers/assistant_provider.dart';
 import 'package:Kelivo/core/providers/mcp_provider.dart';
 import 'package:Kelivo/core/providers/settings_provider.dart';
 import 'package:Kelivo/core/services/mcp/mcp_tool_service.dart';
+import 'package:Kelivo/core/services/search/search_tool_service.dart';
 import 'package:Kelivo/utils/mcp_structured_image.dart';
 import 'package:Kelivo/features/home/services/tool_approval_service.dart';
 import 'package:Kelivo/features/home/services/tool_handler_service.dart';
@@ -415,6 +418,83 @@ void main() {
       expect(mcpProvider.calls, [(serverId: 'srv-id', toolName: 'echo')]);
     });
   });
+
+  group('ToolHandlerService schema overrides', () {
+    testWidgets(
+      'applies search_web description override and leaves MCP tools unchanged',
+      (tester) async {
+        final assistants = AssistantProvider(
+          preferences: createBusinessTestPreferences(),
+        );
+        final mcpProvider = McpProvider(
+          preferences: createBusinessTestPreferences(),
+        );
+        final settings = SettingsProvider(createBusinessTestPreferences());
+        addTearDown(assistants.dispose);
+        addTearDown(mcpProvider.dispose);
+        addTearDown(settings.dispose);
+
+        await settings.loaded;
+        await settings.setToolSchemaOverride(
+          SearchToolService.toolName,
+          const ToolSchemaOverride(
+            description: 'Be conservative about search.',
+          ),
+        );
+
+        await tester.pumpWidget(
+          MultiProvider(
+            providers: [
+              ChangeNotifierProvider<AssistantProvider>.value(
+                value: assistants,
+              ),
+              ChangeNotifierProvider<McpProvider>.value(value: mcpProvider),
+              ChangeNotifierProvider<McpToolService>.value(
+                value: _StubMcpToolService([
+                  McpToolConfig(
+                    enabled: true,
+                    name: 'echo',
+                    description: 'MCP echo',
+                  ),
+                ]),
+              ),
+            ],
+            child: const SizedBox.shrink(),
+          ),
+        );
+
+        final service = ToolHandlerService(
+          contextProvider: tester.element(find.byType(SizedBox)),
+        );
+        const assistant = Assistant(
+          id: 'a1',
+          name: 'Assistant',
+          searchEnabled: true,
+        );
+        final defs = service.buildToolDefinitions(
+          settings,
+          assistant,
+          'openai',
+          'gpt',
+          false,
+          isToolModel: (_, __) => true,
+        );
+
+        String nameOf(Map<String, dynamic> d) =>
+            (d['function'] as Map)['name'] as String;
+        String? descOf(Map<String, dynamic> d) =>
+            (d['function'] as Map)['description'] as String?;
+
+        final search = defs.firstWhere(
+          (d) => nameOf(d) == SearchToolService.toolName,
+        );
+        expect(descOf(search), 'Be conservative about search.');
+
+        final echo = defs.firstWhere((d) => nameOf(d) == 'echo');
+        expect(descOf(echo), 'MCP echo');
+      },
+    );
+  });
 }
 
 class _RecordingMcpProvider extends McpProvider {
@@ -438,5 +518,22 @@ class _RecordingMcpProvider extends McpProvider {
   ) async {
     calls.add((serverId: serverId, toolName: toolName));
     return mcp.CallToolResult([mcp.TextContent(text: '$serverId:$toolName')]);
+  }
+}
+
+class _StubMcpToolService extends McpToolService {
+  _StubMcpToolService(this._tools);
+
+  final List<McpToolConfig> _tools;
+
+  @override
+  List<McpToolConfig> listAvailableToolsForAssistant(
+    McpProvider mcpProvider,
+    AssistantProvider assistants,
+    String? assistantId, {
+    McpToolRouteSnapshot? routeSnapshot,
+    Set<String> reservedNames = const {},
+  }) {
+    return _tools;
   }
 }

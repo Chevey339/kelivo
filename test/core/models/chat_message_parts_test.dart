@@ -203,6 +203,37 @@ void main() {
       },
     );
 
+    test(
+      'partsWithoutThinkingAndToolCards keeps only edited text and attachments',
+      () {
+        final next = ChatMessage.partsWithoutThinkingAndToolCards(const [
+          ReasoningPart('plan'),
+          TextPart('hello '),
+          ToolCallPart('{"id":"call_1","name":"lookup"}'),
+          TextPart('world'),
+          ReasoningPart('check'),
+          ImagePart(uri: '/tmp/out.png', mime: 'image/png'),
+        ], 'edited answer');
+
+        expect(next.map((part) => part.kind), ['text', 'image']);
+        expect((next[0] as TextPart).text, 'edited answer');
+        expect((next[1] as ImagePart).uri, '/tmp/out.png');
+      },
+    );
+
+    test(
+      'partsWithoutThinkingAndToolCards prepends text when no TextPart remains',
+      () {
+        final next = ChatMessage.partsWithoutThinkingAndToolCards(const [
+          ReasoningPart('plan'),
+          ToolCallPart('{"id":"call_1","name":"lookup"}'),
+        ], 'only text');
+
+        expect(next, hasLength(1));
+        expect((next.single as TextPart).text, 'only text');
+      },
+    );
+
     test('copyWith without content/parts keeps existing parts', () {
       final original = ChatMessage(
         role: 'user',

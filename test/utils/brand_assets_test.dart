@@ -15,18 +15,36 @@ void main() {
       final firecrawl = BrandAssets.assetForName('Firecrawl');
       final tinyFish = BrandAssets.assetForName('TinyFish');
       final anySearch = BrandAssets.assetForName('AnySearch');
+      final parallel = BrandAssets.assetForName('Parallel');
+      final you = BrandAssets.assetForName('You.com');
       final azure = BrandAssets.assetForName('Azure');
 
       expect(stepFun, 'assets/icons/stepfun.svg');
       expect(firecrawl, 'assets/icons/firecrawl-color.svg');
       expect(tinyFish, 'assets/icons/tinyfish-color.svg');
       expect(anySearch, 'assets/icons/anysearch.svg');
+      expect(parallel, 'assets/icons/parallel.svg');
+      expect(you, 'assets/icons/you.svg');
       expect(azure, 'assets/icons/azure-speech.svg');
       expect(BrandAssets.assetForName('Azure AI Search'), isNull);
       expect(BrandAssets.selectableAssetOrNull(stepFun!), stepFun);
       expect(BrandAssets.selectableAssetOrNull(firecrawl!), firecrawl);
       expect(BrandAssets.selectableAssetOrNull(tinyFish!), tinyFish);
       expect(BrandAssets.selectableAssetOrNull(anySearch!), anySearch);
+      expect(BrandAssets.selectableAssetOrNull(parallel!), parallel);
+      expect(BrandAssets.selectableAssetOrNull(you!), you);
+    });
+
+    test('maps You.com Search without matching nearby names', () {
+      expect(
+        BrandAssets.assetForName('You.com Search'),
+        'assets/icons/you.svg',
+      );
+      expect(BrandAssets.assetForName('You.com'), 'assets/icons/you.svg');
+      expect(BrandAssets.assetForName('you'), 'assets/icons/you.svg');
+      expect(BrandAssets.assetForName('you.com'), 'assets/icons/you.svg');
+      expect(BrandAssets.assetForName('YouTube'), isNull);
+      expect(BrandAssets.assetForName('your search'), isNull);
     });
 
     test('distinguishes monochrome SVGs from colored brand assets', () {
@@ -54,6 +72,11 @@ void main() {
         BrandAssets.assetNeedsDarkInvert('assets/icons/anysearch.svg'),
         isTrue,
       );
+      expect(
+        BrandAssets.assetNeedsDarkInvert('assets/icons/parallel.svg'),
+        isTrue,
+      );
+      expect(BrandAssets.assetNeedsDarkInvert('assets/icons/you.svg'), isFalse);
       expect(
         BrandAssets.assetNeedsDarkInvert('assets/icons/serper.svg'),
         isFalse,

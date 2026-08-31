@@ -408,6 +408,230 @@ void main() {
     expect((result!.service! as FirecrawlOptions).apiKey, isEmpty);
   });
 
+  testWidgets('selects Parallel from the add page and saves', (tester) async {
+    SearchServiceEditorResult? result;
+    await _pumpEditor(tester, onResult: (value) => result = value);
+
+    expect(find.text('Add Search Service'), findsOneWidget);
+    await tester.dragUntilVisible(
+      find.text('Parallel'),
+      find.byType(ListView),
+      const Offset(0, -240),
+    );
+    await tester.tap(find.text('Parallel'));
+    await tester.pumpAndSettle();
+
+    await tester.enterText(_apiKeyField(), 'parallel-key');
+    await tester.tap(find.byIcon(Lucide.Check));
+    await tester.pumpAndSettle();
+
+    expect(result?.deleted, isFalse);
+    expect(result?.service, isA<ParallelOptions>());
+    final saved = result!.service! as ParallelOptions;
+    expect(saved.apiKey, 'parallel-key');
+    expect(saved.mode, ParallelOptions.defaultMode);
+  });
+
+  testWidgets('selects You.com from the add page and saves', (tester) async {
+    SearchServiceEditorResult? result;
+    await _pumpEditor(tester, onResult: (value) => result = value);
+
+    await tester.dragUntilVisible(
+      find.text('You.com'),
+      find.byType(ListView),
+      const Offset(0, -240),
+    );
+    await tester.tap(find.text('You.com'));
+    await tester.pumpAndSettle();
+
+    await tester.enterText(_apiKeyField(), 'you-key');
+    await tester.tap(find.byIcon(Lucide.Check));
+    await tester.pumpAndSettle();
+
+    expect(result?.service, isA<YouSearchOptions>());
+    final saved = result!.service! as YouSearchOptions;
+    expect(saved.apiKey, 'you-key');
+    expect(saved.contentMode, YouSearchOptions.defaultContentMode);
+  });
+
+  testWidgets('selects Brave from the add page and keeps web mode', (
+    tester,
+  ) async {
+    SearchServiceEditorResult? result;
+    await _pumpEditor(tester, onResult: (value) => result = value);
+
+    await tester.dragUntilVisible(
+      find.text('Brave Search'),
+      find.byType(ListView),
+      const Offset(0, -240),
+    );
+    await tester.tap(find.text('Brave Search'));
+    await tester.pumpAndSettle();
+
+    await tester.enterText(_apiKeyField(), 'brave-key');
+    await tester.tap(find.byIcon(Lucide.Check));
+    await tester.pumpAndSettle();
+
+    expect(result?.service, isA<BraveOptions>());
+    final saved = result!.service! as BraveOptions;
+    expect(saved.apiKey, 'brave-key');
+    expect(saved.mode, BraveOptions.webMode);
+    expect(
+      saved.maximumNumberOfTokens,
+      BraveOptions.defaultMaximumNumberOfTokens,
+    );
+  });
+
+  testWidgets('saves Brave LLM Context mode and token limit', (tester) async {
+    SearchServiceEditorResult? result;
+    await _pumpEditor(
+      tester,
+      initialService: BraveOptions(id: 'brave', apiKey: 'brave-key'),
+      onResult: (value) => result = value,
+    );
+
+    expect(find.text('Maximum tokens'), findsNothing);
+    expect(find.byType(DropdownButton<String>), findsNothing);
+
+    final modeField = find.byKey(const ValueKey('search-service-field-mode'));
+    await tester.dragUntilVisible(
+      modeField,
+      find.byType(ListView),
+      const Offset(0, -240),
+    );
+    await tester.tap(modeField);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('LLM Context').last);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Maximum tokens'), findsOneWidget);
+    await tester.enterText(
+      find.descendant(
+        of: find.byKey(
+          const ValueKey('search-service-field-maximumNumberOfTokens'),
+        ),
+        matching: find.byType(TextFormField),
+      ),
+      '2048',
+    );
+
+    await tester.tap(find.byIcon(Lucide.Check));
+    await tester.pumpAndSettle();
+
+    expect(result?.service, isA<BraveOptions>());
+    final saved = result!.service! as BraveOptions;
+    expect(saved.mode, BraveOptions.llmContextMode);
+    expect(saved.maximumNumberOfTokens, 2048);
+  });
+
+  testWidgets('rejects invalid Brave maximum tokens without saving', (
+    tester,
+  ) async {
+    SearchServiceEditorResult? result;
+    await _pumpEditor(
+      tester,
+      initialService: BraveOptions(
+        id: 'brave',
+        apiKey: 'brave-key',
+        mode: BraveOptions.llmContextMode,
+        maximumNumberOfTokens: 2048,
+      ),
+      onResult: (value) => result = value,
+    );
+
+    final tokensField = find.descendant(
+      of: find.byKey(
+        const ValueKey('search-service-field-maximumNumberOfTokens'),
+      ),
+      matching: find.byType(TextFormField),
+    );
+    await tester.dragUntilVisible(
+      tokensField,
+      find.byType(ListView),
+      const Offset(0, -240),
+    );
+
+    for (final invalid in ['abc', '1000', '50000']) {
+      await tester.enterText(tokensField, invalid);
+      await tester.tap(find.byIcon(Lucide.Check));
+      await tester.pumpAndSettle();
+
+      expect(result, isNull);
+      expect(
+        find.text('Maximum tokens must be between 1024 and 32768.'),
+        findsOneWidget,
+      );
+      expect(find.byType(SearchServiceEditorPage), findsOneWidget);
+    }
+  });
+
+  testWidgets('saves You.com content mode from the editor', (tester) async {
+    SearchServiceEditorResult? result;
+    await _pumpEditor(
+      tester,
+      initialService: YouSearchOptions(
+        id: 'you',
+        apiKey: 'you-key',
+        contentMode: YouSearchOptions.highlightsMode,
+      ),
+      onResult: (value) => result = value,
+    );
+
+    final modeField = find.byKey(
+      const ValueKey('search-service-field-contentMode'),
+    );
+    await tester.dragUntilVisible(
+      modeField,
+      find.byType(ListView),
+      const Offset(0, -240),
+    );
+    expect(find.byType(DropdownButton<String>), findsNothing);
+    await tester.tap(modeField);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Snippets').last);
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byIcon(Lucide.Check));
+    await tester.pumpAndSettle();
+
+    expect(result?.service, isA<YouSearchOptions>());
+    expect(
+      (result!.service! as YouSearchOptions).contentMode,
+      YouSearchOptions.snippetsMode,
+    );
+  });
+
+  testWidgets('saves Parallel search mode from the editor', (tester) async {
+    SearchServiceEditorResult? result;
+    await _pumpEditor(
+      tester,
+      initialService: ParallelOptions(
+        id: 'parallel',
+        apiKey: 'parallel-key',
+        mode: 'advanced',
+      ),
+      onResult: (value) => result = value,
+    );
+
+    final modeField = find.byKey(const ValueKey('search-service-field-mode'));
+    await tester.dragUntilVisible(
+      modeField,
+      find.byType(ListView),
+      const Offset(0, -240),
+    );
+    expect(find.byType(DropdownButton<String>), findsNothing);
+    await tester.tap(modeField);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Turbo').last);
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byIcon(Lucide.Check));
+    await tester.pumpAndSettle();
+
+    expect(result?.service, isA<ParallelOptions>());
+    expect((result!.service! as ParallelOptions).mode, 'turbo');
+  });
+
   testWidgets('saves AnySearch without an API key', (tester) async {
     SearchServiceEditorResult? result;
     await _pumpEditor(
@@ -602,7 +826,7 @@ Finder _testQueryField() {
 
 Future<void> _pumpEditor(
   WidgetTester tester, {
-  required SearchServiceOptions initialService,
+  SearchServiceOptions? initialService,
   required ValueChanged<SearchServiceEditorResult?> onResult,
   bool canDelete = false,
   bool autoQueryUsage = false,

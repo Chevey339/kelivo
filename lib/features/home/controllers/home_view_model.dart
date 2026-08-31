@@ -889,10 +889,10 @@ class HomeViewModel extends ChangeNotifier {
         _chatController.setCurrentConversationAndLoad(convo),
         if (assistantSwitch != null) assistantSwitch,
       ]);
-      _streamController.clearGeminiThoughtSigs();
       // Arm the new list's initial position before listeners can paint it with
       // the previous conversation's scroll offset.
       onConversationSwitched?.call();
+      restoreRetryUiFromStreamingState();
       notifyListeners();
       unawaited(_drainQueuedInputIfReady(id));
     }
@@ -939,10 +939,10 @@ class HomeViewModel extends ChangeNotifier {
       prepared.conversation.assistantId,
     );
     if (assistantSwitch != null) unawaited(assistantSwitch);
-    _streamController.clearGeminiThoughtSigs();
     // Arm the new list's initial position before listeners can paint it with
     // the previous conversation's scroll offset.
     onConversationSwitched?.call();
+    restoreRetryUiFromStreamingState();
     notifyListeners();
     unawaited(_drainQueuedInputIfReady(id));
   }
@@ -1368,6 +1368,12 @@ class HomeViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Re-apply auto-retry countdown from still-running background streams.
+  void restoreRetryUiFromStreamingState() {
+    final cid = currentConversation?.id;
+    if (cid != null) _chatActions.restoreRetryUi(cid);
+  }
+
   void _restoreMessageUiState() {
     for (int i = 0; i < messages.length; i++) {
       final m = messages[i];
@@ -1375,12 +1381,9 @@ class HomeViewModel extends ChangeNotifier {
         _streamController.restoreMessageUiState(
           m,
           getToolEventsFromDb: (id) => _chatService.getToolEvents(id),
-          getGeminiThoughtSigFromDb: (id) =>
-              _chatService.getGeminiThoughtSignature(id),
         );
 
-        // Clean content from gemini thought signatures
-        final cleanedContent = _streamController.captureGeminiThoughtSignature(
+        final cleanedContent = _chatService.migrateLegacyGeminiThoughtSignature(
           m.content,
           m.id,
         );
@@ -1398,6 +1401,7 @@ class HomeViewModel extends ChangeNotifier {
         );
       }
     }
+    restoreRetryUiFromStreamingState();
   }
 
   /// Serialize reasoning segments to JSON string.

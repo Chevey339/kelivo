@@ -9,11 +9,12 @@ import '../stream/stream_chunk.dart';
 
 import 'google_common.dart';
 
-const String _geminiThoughtSigTag = 'gemini_thought_signatures';
+export 'google/gemini_thought_signature.dart';
 
-/// Placeholder thought signature accepted by the Gemini API when the original
-/// signature is unavailable (e.g. legacy history persisted before signatures
-/// were captured). Same value used by Google's own Gemini CLI.
+/// Placeholder thought signature the Gemini API accepts when the original is
+/// unavailable (e.g. legacy history persisted before signatures were captured).
+/// Google once documented this value and its own Gemini CLI still sends it;
+/// the current docs no longer list it, but the API keeps accepting it.
 const String geminiDummyThoughtSignature =
     'context_engineering_is_the_way_to_go';
 final RegExp _geminiThoughtSigComment = RegExp(
@@ -43,49 +44,14 @@ List<String> extractYouTubeUrls(String text) {
   return out;
 }
 
-GeminiSignatureMeta extractGeminiThoughtMeta(String raw) {
-  try {
-    final m = _geminiThoughtSigComment.firstMatch(raw);
-    if (m == null) return GeminiSignatureMeta(cleanedText: raw);
-    final payloadRaw = (m.group(1) ?? '').trim();
-    Map<String, dynamic> data = const <String, dynamic>{};
-    try {
-      data = (jsonDecode(payloadRaw) as Map).cast<String, dynamic>();
-    } catch (_) {}
-    String? textKey;
-    dynamic textVal;
-    final text = data['text'];
-    if (text is Map) {
-      textKey = (text['k'] ?? text['key'])?.toString();
-      textVal = text['v'] ?? text['val'];
-      if (textKey != null && textKey.trim().isEmpty) {
-        textKey = null;
-      }
-    }
-    final images = <Map<String, dynamic>>[];
-    final imgList = data['images'];
-    if (imgList is List) {
-      for (final e in imgList) {
-        if (e is! Map) continue;
-        final k = (e['k'] ?? e['key'])?.toString() ?? '';
-        final v = e['v'] ?? e['val'];
-        if (k.isEmpty || v == null) continue;
-        images.add({'k': k, 'v': v});
-      }
-    }
-    final cleaned = raw.replaceRange(m.start, m.end, '').trimRight();
-    return GeminiSignatureMeta(
-      cleanedText: cleaned,
-      textKey: textKey,
-      textValue: textVal,
-      images: images,
-    );
-  } catch (_) {
-    return GeminiSignatureMeta(cleanedText: raw);
-  }
-}
-
-String buildGeminiThoughtSigComment({
+/// Encodes a turn's thought signatures as the artifact payload: a bare JSON
+/// object `{"text": {"k", "v"}, "images": [{"k", "v"}]}`. Returns '' when
+/// there is nothing to keep.
+///
+/// Payloads written before the artifact existed wrapped the same JSON in an
+/// HTML comment that travelled inside the message text;
+/// [decodeGeminiThoughtSignature] still reads those.
+String encodeGeminiThoughtSignature({
   String? textKey,
   dynamic textValue,
   List<Map<String, dynamic>> imageSigs = const <Map<String, dynamic>>[],
@@ -98,7 +64,75 @@ String buildGeminiThoughtSigComment({
   final payload = <String, dynamic>{};
   if (hasText) payload['text'] = {'k': textKey, 'v': textValue};
   if (imgs.isNotEmpty) payload['images'] = imgs;
-  return '\n<!-- $_geminiThoughtSigTag:${jsonEncode(payload)} -->';
+  return jsonEncode(payload);
+}
+
+/// Decodes an artifact payload written by [encodeGeminiThoughtSignature] or
+/// by the legacy comment format, paired with [cleanedText]. Null when
+/// [payload] holds no signature.
+GeminiSignatureMeta? decodeGeminiThoughtSignature(
+  Object? payload, {
+  String cleanedText = '',
+}) {
+  if (payload is! String) return null;
+  final trimmed = payload.trim();
+  if (trimmed.isEmpty) return null;
+  String json = trimmed;
+  if (!trimmed.startsWith('{')) {
+    final legacy = _geminiThoughtSigComment.firstMatch(trimmed);
+    if (legacy == null) return null;
+    json = (legacy.group(1) ?? '').trim();
+  }
+  final meta = _geminiMetaFromJson(json, cleanedText: cleanedText);
+  return meta.hasAny ? meta : null;
+}
+
+/// Splits a legacy message text that still carries the signature comment
+/// into the clean text and the signatures.
+GeminiSignatureMeta extractGeminiThoughtMeta(String raw) {
+  final m = _geminiThoughtSigComment.firstMatch(raw);
+  if (m == null) return GeminiSignatureMeta(cleanedText: raw);
+  final cleaned = raw.replaceRange(m.start, m.end, '').trimRight();
+  return _geminiMetaFromJson((m.group(1) ?? '').trim(), cleanedText: cleaned);
+}
+
+GeminiSignatureMeta _geminiMetaFromJson(
+  String json, {
+  required String cleanedText,
+}) {
+  Map<String, dynamic> data = const <String, dynamic>{};
+  try {
+    data = (jsonDecode(json) as Map).cast<String, dynamic>();
+  } catch (_) {
+    return GeminiSignatureMeta(cleanedText: cleanedText);
+  }
+  String? textKey;
+  dynamic textVal;
+  final text = data['text'];
+  if (text is Map) {
+    textKey = (text['k'] ?? text['key'])?.toString();
+    textVal = text['v'] ?? text['val'];
+    if (textKey != null && textKey.trim().isEmpty) {
+      textKey = null;
+    }
+  }
+  final images = <Map<String, dynamic>>[];
+  final imgList = data['images'];
+  if (imgList is List) {
+    for (final e in imgList) {
+      if (e is! Map) continue;
+      final k = (e['k'] ?? e['key'])?.toString() ?? '';
+      final v = e['v'] ?? e['val'];
+      if (k.isEmpty || v == null) continue;
+      images.add({'k': k, 'v': v});
+    }
+  }
+  return GeminiSignatureMeta(
+    cleanedText: cleanedText,
+    textKey: textKey,
+    textValue: textVal,
+    images: images,
+  );
 }
 
 void applyGeminiThoughtSignatures(
@@ -158,7 +192,8 @@ void applyGeminiThoughtSignatures(
   }
 }
 
-String collectThoughtSigCommentFromParts(List<dynamic> parts) {
+/// The artifact payload for the signatures found on [parts], or ''.
+String collectGeminiThoughtSignatureFromParts(List<dynamic> parts) {
   String? textKey;
   dynamic textVal;
   final images = <Map<String, dynamic>>[];
@@ -173,13 +208,15 @@ String collectThoughtSigCommentFromParts(List<dynamic> parts) {
       sigKey = 'thought_signature';
       sigVal = p['thought_signature'];
     }
-    final hasText = ((p['text'] ?? '') as String? ?? '').isNotEmpty;
     final hasInline =
         p['inlineData'] is Map ||
         p['inline_data'] is Map ||
         p['fileData'] is Map ||
         p['file_data'] is Map;
-    if (hasText && sigKey != null && textKey == null) {
+    final isText =
+        !hasInline && p['thought'] != true && p['functionCall'] is! Map;
+    // The first signed text part is the turn's, as in the streaming decoder.
+    if (isText && sigKey != null && sigVal != null && textKey == null) {
       textKey = sigKey;
       textVal = sigVal;
     }
@@ -187,7 +224,7 @@ String collectThoughtSigCommentFromParts(List<dynamic> parts) {
       images.add({'k': sigKey, 'v': sigVal});
     }
   }
-  return buildGeminiThoughtSigComment(
+  return encodeGeminiThoughtSignature(
     textKey: textKey,
     textValue: textVal,
     imageSigs: images,

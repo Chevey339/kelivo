@@ -17,6 +17,10 @@ final class AppExitFlush {
     _handlers.add(handler);
   }
 
+  static void unregister(Future<void> Function() handler) {
+    _handlers.remove(handler);
+  }
+
   static Future<void> flushAll() async {
     for (final handler in List<Future<void> Function()>.of(_handlers)) {
       try {

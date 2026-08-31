@@ -141,10 +141,23 @@ class AppLocalizationsZh extends AppLocalizations {
   String get storageSpaceCategoryRestoreTraces => '恢复痕迹';
 
   @override
+  String get storageSpaceCategoryDisplacedDatabases => '保留的旧数据库';
+
+  @override
+  String get storageSpaceSubDisplacedDatabases => '自动重建前保留的数据库';
+
+  @override
+  String get storageSpaceClearDisplacedDatabasesConfirmMessage =>
+      '确定删除这些保留的旧数据库吗？它们是 Kelivo 重建数据库时留下的，可能是那些聊天记录和设置仅存的一份。删除后无法恢复。';
+
+  @override
   String get storageSpaceRestoreTracesHint => '恢复完成后保留的旧数据快照。清理不会影响当前应用数据。';
 
   @override
   String get storageSpaceClearRestoreTracesButton => '清理恢复痕迹';
+
+  @override
+  String get storageSpaceClearDisplacedDatabasesButton => '删除保留的旧数据库';
 
   @override
   String get storageSpaceClearRestoreTracesConfirmMessage =>
@@ -1687,11 +1700,143 @@ class AppLocalizationsZh extends AppLocalizations {
   String get startupRecoveryResetDialogCancel => '取消';
 
   @override
+  String get startupRecoveryWhatFailed => '失败原因';
+
+  @override
+  String get startupRecoveryStageLabel => '失败阶段';
+
+  @override
+  String get startupRecoveryStageRestore => '恢复关卡';
+
+  @override
+  String get startupRecoveryStageDatabase => '数据库启动';
+
+  @override
+  String get startupRecoveryDiagnosticLabel => '诊断码';
+
+  @override
+  String get startupRecoverySchemaLabel => '数据库版本';
+
+  @override
+  String startupRecoverySchemaValue(String installed, int expected) {
+    return '磁盘上为 $installed · 当前版本需要 $expected';
+  }
+
+  @override
+  String get startupRecoveryAppVersionLabel => '应用';
+
+  @override
+  String get startupRecoveryUnknownValue => '未知';
+
+  @override
+  String get startupRecoveryCollecting => '正在收集诊断信息…';
+
+  @override
+  String get startupRecoveryShowDetails => '展开技术细节';
+
+  @override
+  String get startupRecoveryHideDetails => '收起技术细节';
+
+  @override
+  String get startupRecoveryCopyReport => '复制完整报告';
+
+  @override
+  String get startupRecoveryReportCopied => '已复制完整报告';
+
+  @override
+  String get startupRecoveryShareReport => '导出报告';
+
+  @override
+  String startupRecoveryReportStored(String path) {
+    return '报告已保存到 $path';
+  }
+
+  @override
+  String startupRecoveryReportSaved(String path) {
+    return '报告已保存到 $path';
+  }
+
+  @override
+  String get startupRecoveryReportShared => '报告已导出。';
+
+  @override
+  String get startupRecoveryReportSaveFailed => '无法导出报告。';
+
+  @override
+  String get startupRecoverySectionDataTitle => '你的数据';
+
+  @override
+  String get startupRecoverySectionDataBody =>
+      '目前没有任何数据被删除。在尝试下面的操作前，先把副本保存到安全的地方。';
+
+  @override
+  String startupRecoveryExportSavedTo(String path) {
+    return '数据副本已保存到 $path';
+  }
+
+  @override
+  String get startupRecoverySectionRepairTitle => '诊断与修复';
+
+  @override
+  String get startupRecoverySectionRepairBody =>
+      '完整性检查只读取数据库。修复会清理上次更新中断留下的元数据并重新启动，不会删除聊天记录。';
+
+  @override
+  String get startupRecoveryIntegrityButton => '检查数据库完整性';
+
+  @override
+  String get startupRecoveryIntegrityHealthy => 'SQLite 未在数据库文件中发现损坏。';
+
+  @override
+  String startupRecoveryIntegrityDamaged(String detail) {
+    return 'SQLite 报告了问题 —— $detail';
+  }
+
+  @override
+  String get startupRecoveryIntegrityMissing => '数据目录中没有找到数据库文件。';
+
+  @override
+  String get startupRecoveryIntegrityFailed => '完整性检查无法运行。';
+
+  @override
+  String get startupRecoveryDangerZone => '危险操作';
+
+  @override
+  String get startupRecoveryDangerBody =>
+      '重置会永久删除本设备上 Kelivo 的数据库。请先导出数据副本——重置同时会销毁排查根本问题所需的证据。';
+
+  @override
+  String get startupRecoveryResetAcknowledge => '我已导出副本，或不需要这些数据。';
+
+  @override
   String get startupDatabaseUpdateRequiredTitle => '请更新 Kelivo 以继续';
 
   @override
   String get startupDatabaseUpdateRequiredContent =>
       '本设备上的聊天数据库由更新版本的 Kelivo 创建，当前版本无法打开。数据未被改动。请安装最新版 Kelivo 后重新打开。';
+
+  @override
+  String get startupDatabaseUpdateRequiredDowngradeTitle => '若要改用旧版';
+
+  @override
+  String get startupDatabaseUpdateRequiredDowngradeIntro =>
+      '当前版本打不开本机这份数据库。若你必须留在旧版，请按下面的步骤处理；在备份完成之前，不要删除或覆盖这里的数据。';
+
+  @override
+  String get startupDatabaseUpdateRequiredDowngradeStep1 =>
+      '先安装并打开最新版 Kelivo，在「设置 → 数据备份」导出一份备份文件。';
+
+  @override
+  String startupDatabaseUpdateRequiredDowngradeStep2(String url) {
+    return '打开 $url，把备份转换成你打算使用的旧版格式。';
+  }
+
+  @override
+  String get startupDatabaseUpdateRequiredDowngradeStep3 =>
+      '确认本机数据已经另外备份好之后，再安装旧版，并导入转换后的备份。';
+
+  @override
+  String get startupDatabaseUpdateRequiredOpenTool => '打开转换工具';
 
   @override
   String backupPageRestoreFailedMessage(String error) {
@@ -4377,6 +4522,14 @@ class AppLocalizationsZh extends AppLocalizations {
   String get displaySettingsPageForkKeepMessageVersionsTitle => '创建分支时保留消息版本';
 
   @override
+  String get displaySettingsPageEditAssistantKeepThinkingToolCardsTitle =>
+      '编辑助手时保留思考与工具卡片';
+
+  @override
+  String get displaySettingsPageEditAssistantKeepThinkingToolCardsSubtitle =>
+      '关闭后，当前编辑版本只保留助手正文；切回上一版本仍可查看思考与工具卡片';
+
+  @override
   String chainOfThoughtExpandSteps(Object count) {
     return '展开更多 $count 步';
   }
@@ -5381,6 +5534,45 @@ class AppLocalizationsZh extends AppLocalizations {
       '面向 AI 智能体的统一搜索服务，可在网页与专业数据源间自动路由。API Key 可选。';
 
   @override
+  String get searchServiceNameParallel => 'Parallel';
+
+  @override
+  String get searchProviderParallelDescription =>
+      'Parallel 搜索 API。返回面向 LLM 优化的网页摘录，支持 turbo、fast、basic 和 advanced 模式。';
+
+  @override
+  String get searchServicesDialogSearchMode => '搜索模式';
+
+  @override
+  String get searchServiceNameYou => 'You.com';
+
+  @override
+  String get searchProviderYouDescription =>
+      'You.com 搜索 API。返回网页与新闻结果，支持 Highlights 或 Snippets。';
+
+  @override
+  String get searchServicesDialogContentMode => '内容模式';
+
+  @override
+  String get searchServicesDialogHighlights => 'Highlights';
+
+  @override
+  String get searchServicesDialogSnippets => 'Snippets';
+
+  @override
+  String get searchServicesDialogWebSearch => 'Web Search';
+
+  @override
+  String get searchServicesDialogLlmContext => 'LLM Context';
+
+  @override
+  String get searchServicesDialogMaximumTokens => '最大 token 数';
+
+  @override
+  String get searchServicesDialogMaximumTokensInvalid =>
+      '最大 token 数必须介于 1024 和 32768 之间。';
+
+  @override
   String get searchServiceNameKelivo => 'Kelivo';
 
   @override
@@ -5628,6 +5820,193 @@ class AppLocalizationsZh extends AppLocalizations {
       '在你确认后于本设备创建日历日程，需要授予日历权限。';
 
   @override
+  String get assistantEditLocalToolLocationTitle => '当前位置';
+
+  @override
+  String get assistantEditLocalToolLocationSubtitle => '读取本设备的一次性位置，需要授予定位权限。';
+
+  @override
+  String get assistantEditLocalToolWeatherTitle => '天气';
+
+  @override
+  String get assistantEditLocalToolWeatherSubtitle =>
+      '获取当前位置或指定地点的 Apple 天气，结果中会展示 WeatherKit 数据来源。';
+
+  @override
+  String get assistantEditLocalToolHealthTitle => '健康摘要';
+
+  @override
+  String get assistantEditLocalToolHealthSubtitle =>
+      '读取本设备的健康活动摘要，需要授予健康数据读取权限。';
+
+  @override
+  String assistantEditLocalToolHealthSelectedCount(int selected, int total) {
+    return '已选择 $selected/$total 项';
+  }
+
+  @override
+  String get healthDataSettingsTitle => '健康数据';
+
+  @override
+  String get healthDataSettingsDescription =>
+      '当前助手在日常对话中可使用的 HealthKit 信号。开关表示 Kelivo 可以尝试读取该范围，实际授权仍由 iOS 管理。';
+
+  @override
+  String healthDataSettingsBadge(int selected, int total) {
+    return '$selected/$total 开启';
+  }
+
+  @override
+  String get healthDataSettingsIosReadTitle => 'iOS 健康读取';
+
+  @override
+  String get healthDataSettingsIosReadSubtitle => '设备可用，读取范围由 iOS 管理';
+
+  @override
+  String get healthDataSettingsOpenSystemSettings => '打开系统设置';
+
+  @override
+  String get healthDataSettingsEnableAll => '全部开启';
+
+  @override
+  String get healthDataSettingsDisableAll => '全部关闭';
+
+  @override
+  String get healthDataSettingsCategoryActivity => '活动';
+
+  @override
+  String get healthDataSettingsCategoryRest => '休息';
+
+  @override
+  String get healthDataSettingsCategoryHeart => '心率';
+
+  @override
+  String get healthDataSettingsCategoryBody => '身体';
+
+  @override
+  String get healthDataSettingsTypeStepsTitle => '步数';
+
+  @override
+  String get healthDataSettingsTypeStepsSubtitle => '行走步数摘要';
+
+  @override
+  String get healthDataSettingsTypeDaylightTitle => '日照';
+
+  @override
+  String get healthDataSettingsTypeDaylightSubtitle => '户外日光时间';
+
+  @override
+  String get healthDataSettingsTypeActiveEnergyTitle => '能量';
+
+  @override
+  String get healthDataSettingsTypeActiveEnergySubtitle => '活动能量消耗';
+
+  @override
+  String get healthDataSettingsTypeExerciseMinutesTitle => '锻炼';
+
+  @override
+  String get healthDataSettingsTypeExerciseMinutesSubtitle => 'Apple 锻炼分钟数';
+
+  @override
+  String get healthDataSettingsTypeStandTimeTitle => '站立';
+
+  @override
+  String get healthDataSettingsTypeStandTimeSubtitle => '站立时间';
+
+  @override
+  String get healthDataSettingsTypeDistanceTitle => '距离';
+
+  @override
+  String get healthDataSettingsTypeDistanceSubtitle => '步行和跑步距离';
+
+  @override
+  String get healthDataSettingsTypeWorkoutsTitle => '健身训练';
+
+  @override
+  String get healthDataSettingsTypeWorkoutsSubtitle => '训练记录：类型、时长、距离与消耗';
+
+  @override
+  String get healthDataSettingsTypeSleepTitle => '睡眠';
+
+  @override
+  String get healthDataSettingsTypeSleepSubtitle => '睡眠时长';
+
+  @override
+  String get healthDataSettingsTypeMindfulnessTitle => '静息';
+
+  @override
+  String get healthDataSettingsTypeMindfulnessSubtitle => '正念或静息时段';
+
+  @override
+  String get healthDataSettingsTypeHeartRateTitle => '心率';
+
+  @override
+  String get healthDataSettingsTypeHeartRateSubtitle => '最近心率样本';
+
+  @override
+  String get healthDataSettingsTypeRestingHeartRateTitle => '静息心率';
+
+  @override
+  String get healthDataSettingsTypeRestingHeartRateSubtitle => '静息状态心率';
+
+  @override
+  String get healthDataSettingsTypeBloodOxygenTitle => '血氧';
+
+  @override
+  String get healthDataSettingsTypeBloodOxygenSubtitle => '血氧饱和度';
+
+  @override
+  String get healthDataSettingsTypeDietaryEnergyTitle => '摄入能量';
+
+  @override
+  String get healthDataSettingsTypeDietaryEnergySubtitle => '饮食热量记录';
+
+  @override
+  String get healthDataSettingsTypeWaterTitle => '饮水';
+
+  @override
+  String get healthDataSettingsTypeWaterSubtitle => '饮水量记录';
+
+  @override
+  String get healthDataSettingsTypeWeightTitle => '体重';
+
+  @override
+  String get healthDataSettingsTypeWeightSubtitle => '体重样本';
+
+  @override
+  String get healthDataSettingsTypeBmiTitle => 'BMI';
+
+  @override
+  String get healthDataSettingsTypeBmiSubtitle => '身体质量指数';
+
+  @override
+  String get healthDataSettingsTypeBloodGlucoseTitle => '血糖';
+
+  @override
+  String get healthDataSettingsTypeBloodGlucoseSubtitle => '血糖样本';
+
+  @override
+  String get assistantEditLocalToolRemindersQueryTitle => '查询提醒';
+
+  @override
+  String get assistantEditLocalToolRemindersQuerySubtitle =>
+      '读取本设备上的提醒事项，需要授予提醒事项完整访问权限。';
+
+  @override
+  String get assistantEditLocalToolRemindersCreateTitle => '创建提醒';
+
+  @override
+  String get assistantEditLocalToolRemindersCreateSubtitle =>
+      '在你确认后于本设备创建提醒事项，需要授予提醒事项完整访问权限。';
+
+  @override
+  String get assistantEditLocalToolRemindersCompleteTitle => '完成提醒';
+
+  @override
+  String get assistantEditLocalToolRemindersCompleteSubtitle =>
+      '在你确认后将提醒事项标记为完成，需要授予提醒事项完整访问权限。';
+
+  @override
   String get assistantEditMemorySwitchDescription => '允许助手主动存储并在对话间引用用户相关信息';
 
   @override
@@ -5821,6 +6200,56 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get networkProxyPriorityNote => '当同时开启全局代理与供应商代理时，将优先使用供应商代理。';
+
+  @override
+  String get settingsPageAutoRetry => '自动重试';
+
+  @override
+  String get autoRetryEnableLabel => '开启自动重试';
+
+  @override
+  String get autoRetryMaxRetries => '最大重试次数';
+
+  @override
+  String get autoRetryInitialDelay => '首次延迟（毫秒）';
+
+  @override
+  String get autoRetryMultiplier => '退避倍率';
+
+  @override
+  String get autoRetryMaxDelay => '最大延迟（毫秒）';
+
+  @override
+  String get autoRetryJitter => '抖动';
+
+  @override
+  String get autoRetryJitterSubtitle => '每次等待随机 ±20%';
+
+  @override
+  String get autoRetryOnNetworkError => '网络错误时重试';
+
+  @override
+  String get autoRetryStatusCodes => '可重试状态码';
+
+  @override
+  String get autoRetryKeywords => '重试关键字';
+
+  @override
+  String get autoRetryStopKeywords => '停止重试关键字';
+
+  @override
+  String get autoRetryAddHint => '添加';
+
+  @override
+  String get autoRetryRestoreDefaults => '恢复默认';
+
+  @override
+  String get autoRetryFooter => '仅在本次请求尚未产生任何输出时才会自动重试。';
+
+  @override
+  String autoRetryCountdown(int seconds, int attempt, int maxRetries) {
+    return '$seconds 秒后重试 ($attempt/$maxRetries)';
+  }
 
   @override
   String get desktopShowProviderInModelCapsule => '模型胶囊显示供应商';
@@ -7776,6 +8205,13 @@ class AppLocalizationsZh extends AppLocalizations {
       '助手气泡按文字宽度收缩，不再占满整行';
 
   @override
+  String get messageStyleSettingsPageAssistantSplitParagraphs => '分段显示为多个气泡';
+
+  @override
+  String get messageStyleSettingsPageAssistantSplitParagraphsSubtitle =>
+      '助手回复遇到空行时拆分，每段单独一个气泡';
+
+  @override
   String get messageStyleSettingsPageStyleFrostedSubtitle => '半透明毛玻璃';
 
   @override
@@ -7826,6 +8262,283 @@ class AppLocalizationsZh extends AppLocalizations {
   @override
   String get messageStyleSettingsPageRoleAssistantHint =>
       '助手设定同时作用于思考、工具调用和翻译卡片。';
+
+  @override
+  String get localSnapshotSectionTitle => '本地副本';
+
+  @override
+  String get localSnapshotEnabledTitle => '保留本地副本';
+
+  @override
+  String get localSnapshotEnabledSubtitle => 'Kelivo 会定期在本机存一份数据库副本，让数据不只有一份。';
+
+  @override
+  String get localSnapshotIntervalTitle => '备份频率';
+
+  @override
+  String get localSnapshotIntervalAutomatic => '自动';
+
+  @override
+  String get localSnapshotIntervalAutomaticDetail => '每天一次，数据库越大间隔越长';
+
+  @override
+  String localSnapshotIntervalDays(int days) {
+    String _temp0 = intl.Intl.pluralLogic(
+      days,
+      locale: localeName,
+      other: '每 $days 天',
+      one: '每天',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get localSnapshotKeepTitle => '保留份数';
+
+  @override
+  String localSnapshotKeepValue(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count 份',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get localSnapshotKeepSubtitle => '另外各留一份上周和上个月的，万一问题过了很久才发现也还能找回来。';
+
+  @override
+  String get localSnapshotKeepWeekly => '保留一份上周的';
+
+  @override
+  String get localSnapshotKeepMonthly => '保留一份上个月的';
+
+  @override
+  String get localSnapshotKeepProtectedNote => '无论设成几份，最近一份仍有内容的副本都不会被自动清理。';
+
+  @override
+  String get localSnapshotMaximumTitle => '占用上限';
+
+  @override
+  String get localSnapshotMaximumUnlimited => '不限制';
+
+  @override
+  String get localSnapshotAnnounceTitle => '备份完成时提示';
+
+  @override
+  String get localSnapshotAnnounceSubtitle => '失败一定会告诉你。这里只是成功时多一句提示。';
+
+  @override
+  String get localSnapshotTakeNow => '立即备份一份';
+
+  @override
+  String get localSnapshotManageCopies => '管理副本';
+
+  @override
+  String localSnapshotUsage(int count, String size) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count 份',
+      zero: '暂无副本',
+    );
+    return '$_temp0 · $size';
+  }
+
+  @override
+  String get localSnapshotStatusNever => '还没有备份过';
+
+  @override
+  String localSnapshotStatusSuccess(String when) {
+    return '上次备份：$when';
+  }
+
+  @override
+  String localSnapshotStatusFailure(String when, String reason) {
+    return '上次备份失败（$when）：$reason';
+  }
+
+  @override
+  String get localSnapshotStatusSkippedSpace => '已跳过：本机剩余空间不足';
+
+  @override
+  String get localSnapshotStatusUnchanged => '距上次备份数据没有变化';
+
+  @override
+  String get localSnapshotCopiesTitle => '本地副本';
+
+  @override
+  String get localSnapshotCopiesEmpty => '还没有本地副本';
+
+  @override
+  String get localSnapshotCopiesEmptyHint => '数据有变化时会自动存一份，恢复数据前也一定会先存一份。';
+
+  @override
+  String get localSnapshotCopiesScopeNote =>
+      '本地副本只存在这台设备上。它防的是应用内数据被损坏或误删，防不了设备丢失或卸载应用——那要靠 WebDAV / S3 备份。';
+
+  @override
+  String get localSnapshotOriginAutomatic => '自动备份';
+
+  @override
+  String get localSnapshotOriginManual => '手动备份';
+
+  @override
+  String get localSnapshotOriginBeforeRestore => '恢复前备份';
+
+  @override
+  String get localSnapshotKindRecovered => '故障恢复时留下的';
+
+  @override
+  String localSnapshotCopyContents(int conversations, int messages) {
+    String _temp0 = intl.Intl.pluralLogic(
+      conversations,
+      locale: localeName,
+      other: '$conversations 个对话',
+    );
+    String _temp1 = intl.Intl.pluralLogic(
+      messages,
+      locale: localeName,
+      other: '$messages 条消息',
+    );
+    return '$_temp0 · $_temp1';
+  }
+
+  @override
+  String get localSnapshotCopyContentsUnknown => '内容需恢复后才能确认';
+
+  @override
+  String get localSnapshotCopyPinned => '已保留';
+
+  @override
+  String get localSnapshotActionRestore => '恢复';
+
+  @override
+  String get localSnapshotActionExport => '导出';
+
+  @override
+  String get localSnapshotActionDelete => '删除';
+
+  @override
+  String get localSnapshotActionPin => '保留这份';
+
+  @override
+  String get localSnapshotActionUnpin => '取消保留';
+
+  @override
+  String get localSnapshotRestoreTitle => '恢复这份副本？';
+
+  @override
+  String localSnapshotRestoreMessage(String when) {
+    return '当前的对话和设置会被 $when 的这份副本替换。系统会先把现在的数据存一份，所以这一步可以撤销。';
+  }
+
+  @override
+  String get localSnapshotRestorePreparing => '正在准备副本';
+
+  @override
+  String get localSnapshotDeleteTitle => '删除这份副本？';
+
+  @override
+  String get localSnapshotDeleteMessage =>
+      '这份副本会从设备上永久删除。它里面有、而当前数据库里没有的数据将无法找回。';
+
+  @override
+  String get localSnapshotDeleteLastWarning => '这是唯一一份还有内容的副本。';
+
+  @override
+  String get localSnapshotExportPreparing => '正在准备导出';
+
+  @override
+  String get localSnapshotExportDone => '副本已导出';
+
+  @override
+  String localSnapshotExportFailed(String reason) {
+    return '导出副本失败：$reason';
+  }
+
+  @override
+  String get localSnapshotTakeDone => '副本已保存';
+
+  @override
+  String localSnapshotTakeFailed(String reason) {
+    return '保存副本失败：$reason';
+  }
+
+  @override
+  String get localSnapshotDeleteDone => '副本已删除';
+
+  @override
+  String get localSnapshotBusyMessage => '已有备份任务在进行中';
+
+  @override
+  String get localSnapshotRunInBackground => '转到后台继续';
+
+  @override
+  String get localSnapshotRunningInBackground => '正在后台备份副本';
+
+  @override
+  String startupRecoveryLocalCopiesAvailable(int count, String when) {
+    return '本机还保留着 $count 份本地副本，最新一份是 $when 的。重置不会删除它们——重启后可以在 设置 › 备份 › 本地副本 里恢复。';
+  }
+
+  @override
+  String startupRecoveryRecoveredCopiesDeleted(int count) {
+    return '另外还有 $count 份故障恢复时留下的数据库副本，重置会把它们一并永久删除。想留住的话请先导出数据。';
+  }
+
+  @override
+  String get toolSchemaSettingsPageTitle => '工具描述';
+
+  @override
+  String get toolSchemaSettingsGroupSearch => '搜索';
+
+  @override
+  String get toolSchemaSettingsGroupMemory => '记忆';
+
+  @override
+  String get toolSchemaSettingsGroupLocal => '本地工具';
+
+  @override
+  String get toolSchemaSettingsModified => '已修改';
+
+  @override
+  String get toolSchemaSettingsResetDefault => '恢复默认';
+
+  @override
+  String get toolSchemaSettingsResetAll => '全部恢复默认';
+
+  @override
+  String get toolSchemaSettingsResetAllTitle => '全部恢复默认？';
+
+  @override
+  String get toolSchemaSettingsResetAllMessage =>
+      '将把所有内置工具的描述恢复为应用默认文案，自定义措辞会丢失。';
+
+  @override
+  String get toolSchemaSettingsResetAllConfirm => '恢复';
+
+  @override
+  String toolSchemaSettingsParamDescriptions(int count) {
+    return '参数描述 ($count)';
+  }
+
+  @override
+  String get toolSchemaSettingsMemoryLangNote =>
+      '记忆工具的默认描述会随记忆提示语言在中/英之间切换。自定义描述按工具名只存一份，切换语言后不会跟着变。';
+
+  @override
+  String get toolSchemaSettingsDescriptionLabel => '描述';
+
+  @override
+  String get toolSchemaSettingsToolName => '工具名';
+
+  @override
+  String get toolSchemaEditorPageTitle => '编辑描述';
+
+  @override
+  String get toolSchemaSettingsCancel => '取消';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hans`).
@@ -7965,10 +8678,23 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get storageSpaceCategoryRestoreTraces => '恢复痕迹';
 
   @override
+  String get storageSpaceCategoryDisplacedDatabases => '保留的旧数据库';
+
+  @override
+  String get storageSpaceSubDisplacedDatabases => '自动重建前保留的数据库';
+
+  @override
+  String get storageSpaceClearDisplacedDatabasesConfirmMessage =>
+      '确定删除这些保留的旧数据库吗？它们是 Kelivo 重建数据库时留下的，可能是那些聊天记录和设置仅存的一份。删除后无法恢复。';
+
+  @override
   String get storageSpaceRestoreTracesHint => '恢复完成后保留的旧数据快照。清理不会影响当前应用数据。';
 
   @override
   String get storageSpaceClearRestoreTracesButton => '清理恢复痕迹';
+
+  @override
+  String get storageSpaceClearDisplacedDatabasesButton => '删除保留的旧数据库';
 
   @override
   String get storageSpaceClearRestoreTracesConfirmMessage =>
@@ -9511,11 +10237,143 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get startupRecoveryResetDialogCancel => '取消';
 
   @override
+  String get startupRecoveryWhatFailed => '失败原因';
+
+  @override
+  String get startupRecoveryStageLabel => '失败阶段';
+
+  @override
+  String get startupRecoveryStageRestore => '恢复关卡';
+
+  @override
+  String get startupRecoveryStageDatabase => '数据库启动';
+
+  @override
+  String get startupRecoveryDiagnosticLabel => '诊断码';
+
+  @override
+  String get startupRecoverySchemaLabel => '数据库版本';
+
+  @override
+  String startupRecoverySchemaValue(String installed, int expected) {
+    return '磁盘上为 $installed · 当前版本需要 $expected';
+  }
+
+  @override
+  String get startupRecoveryAppVersionLabel => '应用';
+
+  @override
+  String get startupRecoveryUnknownValue => '未知';
+
+  @override
+  String get startupRecoveryCollecting => '正在收集诊断信息…';
+
+  @override
+  String get startupRecoveryShowDetails => '展开技术细节';
+
+  @override
+  String get startupRecoveryHideDetails => '收起技术细节';
+
+  @override
+  String get startupRecoveryCopyReport => '复制完整报告';
+
+  @override
+  String get startupRecoveryReportCopied => '已复制完整报告';
+
+  @override
+  String get startupRecoveryShareReport => '导出报告';
+
+  @override
+  String startupRecoveryReportStored(String path) {
+    return '报告已保存到 $path';
+  }
+
+  @override
+  String startupRecoveryReportSaved(String path) {
+    return '报告已保存到 $path';
+  }
+
+  @override
+  String get startupRecoveryReportShared => '报告已导出。';
+
+  @override
+  String get startupRecoveryReportSaveFailed => '无法导出报告。';
+
+  @override
+  String get startupRecoverySectionDataTitle => '你的数据';
+
+  @override
+  String get startupRecoverySectionDataBody =>
+      '目前没有任何数据被删除。在尝试下面的操作前，先把副本保存到安全的地方。';
+
+  @override
+  String startupRecoveryExportSavedTo(String path) {
+    return '数据副本已保存到 $path';
+  }
+
+  @override
+  String get startupRecoverySectionRepairTitle => '诊断与修复';
+
+  @override
+  String get startupRecoverySectionRepairBody =>
+      '完整性检查只读取数据库。修复会清理上次更新中断留下的元数据并重新启动，不会删除聊天记录。';
+
+  @override
+  String get startupRecoveryIntegrityButton => '检查数据库完整性';
+
+  @override
+  String get startupRecoveryIntegrityHealthy => 'SQLite 未在数据库文件中发现损坏。';
+
+  @override
+  String startupRecoveryIntegrityDamaged(String detail) {
+    return 'SQLite 报告了问题 —— $detail';
+  }
+
+  @override
+  String get startupRecoveryIntegrityMissing => '数据目录中没有找到数据库文件。';
+
+  @override
+  String get startupRecoveryIntegrityFailed => '完整性检查无法运行。';
+
+  @override
+  String get startupRecoveryDangerZone => '危险操作';
+
+  @override
+  String get startupRecoveryDangerBody =>
+      '重置会永久删除本设备上 Kelivo 的数据库。请先导出数据副本——重置同时会销毁排查根本问题所需的证据。';
+
+  @override
+  String get startupRecoveryResetAcknowledge => '我已导出副本，或不需要这些数据。';
+
+  @override
   String get startupDatabaseUpdateRequiredTitle => '请更新 Kelivo 以继续';
 
   @override
   String get startupDatabaseUpdateRequiredContent =>
       '本设备上的聊天数据库由更新版本的 Kelivo 创建，当前版本无法打开。数据未被改动。请安装最新版 Kelivo 后重新打开。';
+
+  @override
+  String get startupDatabaseUpdateRequiredDowngradeTitle => '若要改用旧版';
+
+  @override
+  String get startupDatabaseUpdateRequiredDowngradeIntro =>
+      '当前版本打不开本机这份数据库。若你必须留在旧版，请按下面的步骤处理；在备份完成之前，不要删除或覆盖这里的数据。';
+
+  @override
+  String get startupDatabaseUpdateRequiredDowngradeStep1 =>
+      '先安装并打开最新版 Kelivo，在「设置 → 数据备份」导出一份备份文件。';
+
+  @override
+  String startupDatabaseUpdateRequiredDowngradeStep2(String url) {
+    return '打开 $url，把备份转换成你打算使用的旧版格式。';
+  }
+
+  @override
+  String get startupDatabaseUpdateRequiredDowngradeStep3 =>
+      '确认本机数据已经另外备份好之后，再安装旧版，并导入转换后的备份。';
+
+  @override
+  String get startupDatabaseUpdateRequiredOpenTool => '打开转换工具';
 
   @override
   String backupPageRestoreFailedMessage(String error) {
@@ -12201,6 +13059,14 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get displaySettingsPageForkKeepMessageVersionsTitle => '创建分支时保留消息版本';
 
   @override
+  String get displaySettingsPageEditAssistantKeepThinkingToolCardsTitle =>
+      '编辑助手时保留思考与工具卡片';
+
+  @override
+  String get displaySettingsPageEditAssistantKeepThinkingToolCardsSubtitle =>
+      '关闭后，当前编辑版本只保留助手正文；切回上一版本仍可查看思考与工具卡片';
+
+  @override
   String chainOfThoughtExpandSteps(Object count) {
     return '展开更多 $count 步';
   }
@@ -13131,6 +13997,45 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
       '面向 AI 智能体的统一搜索服务，可在网页与专业数据源间自动路由。API Key 可选。';
 
   @override
+  String get searchServiceNameParallel => 'Parallel';
+
+  @override
+  String get searchProviderParallelDescription =>
+      'Parallel 搜索 API。返回面向 LLM 优化的网页摘录，支持 turbo、fast、basic 和 advanced 模式。';
+
+  @override
+  String get searchServicesDialogSearchMode => '搜索模式';
+
+  @override
+  String get searchServiceNameYou => 'You.com';
+
+  @override
+  String get searchProviderYouDescription =>
+      'You.com 搜索 API。返回网页与新闻结果，支持 Highlights 或 Snippets。';
+
+  @override
+  String get searchServicesDialogContentMode => '内容模式';
+
+  @override
+  String get searchServicesDialogHighlights => 'Highlights';
+
+  @override
+  String get searchServicesDialogSnippets => 'Snippets';
+
+  @override
+  String get searchServicesDialogWebSearch => 'Web Search';
+
+  @override
+  String get searchServicesDialogLlmContext => 'LLM Context';
+
+  @override
+  String get searchServicesDialogMaximumTokens => '最大 token 数';
+
+  @override
+  String get searchServicesDialogMaximumTokensInvalid =>
+      '最大 token 数必须介于 1024 和 32768 之间。';
+
+  @override
   String get searchServiceNameKelivo => 'Kelivo';
 
   @override
@@ -13378,6 +14283,193 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
       '在你确认后于本设备创建日历日程，需要授予日历权限。';
 
   @override
+  String get assistantEditLocalToolLocationTitle => '当前位置';
+
+  @override
+  String get assistantEditLocalToolLocationSubtitle => '读取本设备的一次性位置，需要授予定位权限。';
+
+  @override
+  String get assistantEditLocalToolWeatherTitle => '天气';
+
+  @override
+  String get assistantEditLocalToolWeatherSubtitle =>
+      '获取当前位置或指定地点的 Apple 天气，结果中会展示 WeatherKit 数据来源。';
+
+  @override
+  String get assistantEditLocalToolHealthTitle => '健康摘要';
+
+  @override
+  String get assistantEditLocalToolHealthSubtitle =>
+      '读取本设备的健康活动摘要，需要授予健康数据读取权限。';
+
+  @override
+  String assistantEditLocalToolHealthSelectedCount(int selected, int total) {
+    return '已选择 $selected/$total 项';
+  }
+
+  @override
+  String get healthDataSettingsTitle => '健康数据';
+
+  @override
+  String get healthDataSettingsDescription =>
+      '当前助手在日常对话中可使用的 HealthKit 信号。开关表示 Kelivo 可以尝试读取该范围，实际授权仍由 iOS 管理。';
+
+  @override
+  String healthDataSettingsBadge(int selected, int total) {
+    return '$selected/$total 开启';
+  }
+
+  @override
+  String get healthDataSettingsIosReadTitle => 'iOS 健康读取';
+
+  @override
+  String get healthDataSettingsIosReadSubtitle => '设备可用，读取范围由 iOS 管理';
+
+  @override
+  String get healthDataSettingsOpenSystemSettings => '打开系统设置';
+
+  @override
+  String get healthDataSettingsEnableAll => '全部开启';
+
+  @override
+  String get healthDataSettingsDisableAll => '全部关闭';
+
+  @override
+  String get healthDataSettingsCategoryActivity => '活动';
+
+  @override
+  String get healthDataSettingsCategoryRest => '休息';
+
+  @override
+  String get healthDataSettingsCategoryHeart => '心率';
+
+  @override
+  String get healthDataSettingsCategoryBody => '身体';
+
+  @override
+  String get healthDataSettingsTypeStepsTitle => '步数';
+
+  @override
+  String get healthDataSettingsTypeStepsSubtitle => '行走步数摘要';
+
+  @override
+  String get healthDataSettingsTypeDaylightTitle => '日照';
+
+  @override
+  String get healthDataSettingsTypeDaylightSubtitle => '户外日光时间';
+
+  @override
+  String get healthDataSettingsTypeActiveEnergyTitle => '能量';
+
+  @override
+  String get healthDataSettingsTypeActiveEnergySubtitle => '活动能量消耗';
+
+  @override
+  String get healthDataSettingsTypeExerciseMinutesTitle => '锻炼';
+
+  @override
+  String get healthDataSettingsTypeExerciseMinutesSubtitle => 'Apple 锻炼分钟数';
+
+  @override
+  String get healthDataSettingsTypeStandTimeTitle => '站立';
+
+  @override
+  String get healthDataSettingsTypeStandTimeSubtitle => '站立时间';
+
+  @override
+  String get healthDataSettingsTypeDistanceTitle => '距离';
+
+  @override
+  String get healthDataSettingsTypeDistanceSubtitle => '步行和跑步距离';
+
+  @override
+  String get healthDataSettingsTypeWorkoutsTitle => '健身训练';
+
+  @override
+  String get healthDataSettingsTypeWorkoutsSubtitle => '训练记录：类型、时长、距离与消耗';
+
+  @override
+  String get healthDataSettingsTypeSleepTitle => '睡眠';
+
+  @override
+  String get healthDataSettingsTypeSleepSubtitle => '睡眠时长';
+
+  @override
+  String get healthDataSettingsTypeMindfulnessTitle => '静息';
+
+  @override
+  String get healthDataSettingsTypeMindfulnessSubtitle => '正念或静息时段';
+
+  @override
+  String get healthDataSettingsTypeHeartRateTitle => '心率';
+
+  @override
+  String get healthDataSettingsTypeHeartRateSubtitle => '最近心率样本';
+
+  @override
+  String get healthDataSettingsTypeRestingHeartRateTitle => '静息心率';
+
+  @override
+  String get healthDataSettingsTypeRestingHeartRateSubtitle => '静息状态心率';
+
+  @override
+  String get healthDataSettingsTypeBloodOxygenTitle => '血氧';
+
+  @override
+  String get healthDataSettingsTypeBloodOxygenSubtitle => '血氧饱和度';
+
+  @override
+  String get healthDataSettingsTypeDietaryEnergyTitle => '摄入能量';
+
+  @override
+  String get healthDataSettingsTypeDietaryEnergySubtitle => '饮食热量记录';
+
+  @override
+  String get healthDataSettingsTypeWaterTitle => '饮水';
+
+  @override
+  String get healthDataSettingsTypeWaterSubtitle => '饮水量记录';
+
+  @override
+  String get healthDataSettingsTypeWeightTitle => '体重';
+
+  @override
+  String get healthDataSettingsTypeWeightSubtitle => '体重样本';
+
+  @override
+  String get healthDataSettingsTypeBmiTitle => 'BMI';
+
+  @override
+  String get healthDataSettingsTypeBmiSubtitle => '身体质量指数';
+
+  @override
+  String get healthDataSettingsTypeBloodGlucoseTitle => '血糖';
+
+  @override
+  String get healthDataSettingsTypeBloodGlucoseSubtitle => '血糖样本';
+
+  @override
+  String get assistantEditLocalToolRemindersQueryTitle => '查询提醒';
+
+  @override
+  String get assistantEditLocalToolRemindersQuerySubtitle =>
+      '读取本设备上的提醒事项，需要授予提醒事项完整访问权限。';
+
+  @override
+  String get assistantEditLocalToolRemindersCreateTitle => '创建提醒';
+
+  @override
+  String get assistantEditLocalToolRemindersCreateSubtitle =>
+      '在你确认后于本设备创建提醒事项，需要授予提醒事项完整访问权限。';
+
+  @override
+  String get assistantEditLocalToolRemindersCompleteTitle => '完成提醒';
+
+  @override
+  String get assistantEditLocalToolRemindersCompleteSubtitle =>
+      '在你确认后将提醒事项标记为完成，需要授予提醒事项完整访问权限。';
+
+  @override
   String get assistantEditMemorySwitchDescription => '允许助手主动存储并在对话间引用用户相关信息';
 
   @override
@@ -13571,6 +14663,56 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get networkProxyPriorityNote => '当同时开启全局代理与供应商代理时，将优先使用供应商代理。';
+
+  @override
+  String get settingsPageAutoRetry => '自动重试';
+
+  @override
+  String get autoRetryEnableLabel => '开启自动重试';
+
+  @override
+  String get autoRetryMaxRetries => '最大重试次数';
+
+  @override
+  String get autoRetryInitialDelay => '首次延迟（毫秒）';
+
+  @override
+  String get autoRetryMultiplier => '退避倍率';
+
+  @override
+  String get autoRetryMaxDelay => '最大延迟（毫秒）';
+
+  @override
+  String get autoRetryJitter => '抖动';
+
+  @override
+  String get autoRetryJitterSubtitle => '每次等待随机 ±20%';
+
+  @override
+  String get autoRetryOnNetworkError => '网络错误时重试';
+
+  @override
+  String get autoRetryStatusCodes => '可重试状态码';
+
+  @override
+  String get autoRetryKeywords => '重试关键字';
+
+  @override
+  String get autoRetryStopKeywords => '停止重试关键字';
+
+  @override
+  String get autoRetryAddHint => '添加';
+
+  @override
+  String get autoRetryRestoreDefaults => '恢复默认';
+
+  @override
+  String get autoRetryFooter => '仅在本次请求尚未产生任何输出时才会自动重试。';
+
+  @override
+  String autoRetryCountdown(int seconds, int attempt, int maxRetries) {
+    return '$seconds 秒后重试 ($attempt/$maxRetries)';
+  }
 
   @override
   String get desktopShowProviderInModelCapsule => '模型胶囊显示供应商';
@@ -15526,6 +16668,13 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
       '助手气泡按文字宽度收缩，不再占满整行';
 
   @override
+  String get messageStyleSettingsPageAssistantSplitParagraphs => '分段显示为多个气泡';
+
+  @override
+  String get messageStyleSettingsPageAssistantSplitParagraphsSubtitle =>
+      '助手回复遇到空行时拆分，每段单独一个气泡';
+
+  @override
   String get messageStyleSettingsPageStyleFrostedSubtitle => '半透明毛玻璃';
 
   @override
@@ -15576,6 +16725,283 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   @override
   String get messageStyleSettingsPageRoleAssistantHint =>
       '助手设定同时作用于思考、工具调用和翻译卡片。';
+
+  @override
+  String get localSnapshotSectionTitle => '本地副本';
+
+  @override
+  String get localSnapshotEnabledTitle => '保留本地副本';
+
+  @override
+  String get localSnapshotEnabledSubtitle => 'Kelivo 会定期在本机存一份数据库副本，让数据不只有一份。';
+
+  @override
+  String get localSnapshotIntervalTitle => '备份频率';
+
+  @override
+  String get localSnapshotIntervalAutomatic => '自动';
+
+  @override
+  String get localSnapshotIntervalAutomaticDetail => '每天一次，数据库越大间隔越长';
+
+  @override
+  String localSnapshotIntervalDays(int days) {
+    String _temp0 = intl.Intl.pluralLogic(
+      days,
+      locale: localeName,
+      other: '每 $days 天',
+      one: '每天',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get localSnapshotKeepTitle => '保留份数';
+
+  @override
+  String localSnapshotKeepValue(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count 份',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get localSnapshotKeepSubtitle => '另外各留一份上周和上个月的，万一问题过了很久才发现也还能找回来。';
+
+  @override
+  String get localSnapshotKeepWeekly => '保留一份上周的';
+
+  @override
+  String get localSnapshotKeepMonthly => '保留一份上个月的';
+
+  @override
+  String get localSnapshotKeepProtectedNote => '无论设成几份，最近一份仍有内容的副本都不会被自动清理。';
+
+  @override
+  String get localSnapshotMaximumTitle => '占用上限';
+
+  @override
+  String get localSnapshotMaximumUnlimited => '不限制';
+
+  @override
+  String get localSnapshotAnnounceTitle => '备份完成时提示';
+
+  @override
+  String get localSnapshotAnnounceSubtitle => '失败一定会告诉你。这里只是成功时多一句提示。';
+
+  @override
+  String get localSnapshotTakeNow => '立即备份一份';
+
+  @override
+  String get localSnapshotManageCopies => '管理副本';
+
+  @override
+  String localSnapshotUsage(int count, String size) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count 份',
+      zero: '暂无副本',
+    );
+    return '$_temp0 · $size';
+  }
+
+  @override
+  String get localSnapshotStatusNever => '还没有备份过';
+
+  @override
+  String localSnapshotStatusSuccess(String when) {
+    return '上次备份：$when';
+  }
+
+  @override
+  String localSnapshotStatusFailure(String when, String reason) {
+    return '上次备份失败（$when）：$reason';
+  }
+
+  @override
+  String get localSnapshotStatusSkippedSpace => '已跳过：本机剩余空间不足';
+
+  @override
+  String get localSnapshotStatusUnchanged => '距上次备份数据没有变化';
+
+  @override
+  String get localSnapshotCopiesTitle => '本地副本';
+
+  @override
+  String get localSnapshotCopiesEmpty => '还没有本地副本';
+
+  @override
+  String get localSnapshotCopiesEmptyHint => '数据有变化时会自动存一份，恢复数据前也一定会先存一份。';
+
+  @override
+  String get localSnapshotCopiesScopeNote =>
+      '本地副本只存在这台设备上。它防的是应用内数据被损坏或误删，防不了设备丢失或卸载应用——那要靠 WebDAV / S3 备份。';
+
+  @override
+  String get localSnapshotOriginAutomatic => '自动备份';
+
+  @override
+  String get localSnapshotOriginManual => '手动备份';
+
+  @override
+  String get localSnapshotOriginBeforeRestore => '恢复前备份';
+
+  @override
+  String get localSnapshotKindRecovered => '故障恢复时留下的';
+
+  @override
+  String localSnapshotCopyContents(int conversations, int messages) {
+    String _temp0 = intl.Intl.pluralLogic(
+      conversations,
+      locale: localeName,
+      other: '$conversations 个对话',
+    );
+    String _temp1 = intl.Intl.pluralLogic(
+      messages,
+      locale: localeName,
+      other: '$messages 条消息',
+    );
+    return '$_temp0 · $_temp1';
+  }
+
+  @override
+  String get localSnapshotCopyContentsUnknown => '内容需恢复后才能确认';
+
+  @override
+  String get localSnapshotCopyPinned => '已保留';
+
+  @override
+  String get localSnapshotActionRestore => '恢复';
+
+  @override
+  String get localSnapshotActionExport => '导出';
+
+  @override
+  String get localSnapshotActionDelete => '删除';
+
+  @override
+  String get localSnapshotActionPin => '保留这份';
+
+  @override
+  String get localSnapshotActionUnpin => '取消保留';
+
+  @override
+  String get localSnapshotRestoreTitle => '恢复这份副本？';
+
+  @override
+  String localSnapshotRestoreMessage(String when) {
+    return '当前的对话和设置会被 $when 的这份副本替换。系统会先把现在的数据存一份，所以这一步可以撤销。';
+  }
+
+  @override
+  String get localSnapshotRestorePreparing => '正在准备副本';
+
+  @override
+  String get localSnapshotDeleteTitle => '删除这份副本？';
+
+  @override
+  String get localSnapshotDeleteMessage =>
+      '这份副本会从设备上永久删除。它里面有、而当前数据库里没有的数据将无法找回。';
+
+  @override
+  String get localSnapshotDeleteLastWarning => '这是唯一一份还有内容的副本。';
+
+  @override
+  String get localSnapshotExportPreparing => '正在准备导出';
+
+  @override
+  String get localSnapshotExportDone => '副本已导出';
+
+  @override
+  String localSnapshotExportFailed(String reason) {
+    return '导出副本失败：$reason';
+  }
+
+  @override
+  String get localSnapshotTakeDone => '副本已保存';
+
+  @override
+  String localSnapshotTakeFailed(String reason) {
+    return '保存副本失败：$reason';
+  }
+
+  @override
+  String get localSnapshotDeleteDone => '副本已删除';
+
+  @override
+  String get localSnapshotBusyMessage => '已有备份任务在进行中';
+
+  @override
+  String get localSnapshotRunInBackground => '转到后台继续';
+
+  @override
+  String get localSnapshotRunningInBackground => '正在后台备份副本';
+
+  @override
+  String startupRecoveryLocalCopiesAvailable(int count, String when) {
+    return '本机还保留着 $count 份本地副本，最新一份是 $when 的。重置不会删除它们——重启后可以在 设置 › 备份 › 本地副本 里恢复。';
+  }
+
+  @override
+  String startupRecoveryRecoveredCopiesDeleted(int count) {
+    return '另外还有 $count 份故障恢复时留下的数据库副本，重置会把它们一并永久删除。想留住的话请先导出数据。';
+  }
+
+  @override
+  String get toolSchemaSettingsPageTitle => '工具描述';
+
+  @override
+  String get toolSchemaSettingsGroupSearch => '搜索';
+
+  @override
+  String get toolSchemaSettingsGroupMemory => '记忆';
+
+  @override
+  String get toolSchemaSettingsGroupLocal => '本地工具';
+
+  @override
+  String get toolSchemaSettingsModified => '已修改';
+
+  @override
+  String get toolSchemaSettingsResetDefault => '恢复默认';
+
+  @override
+  String get toolSchemaSettingsResetAll => '全部恢复默认';
+
+  @override
+  String get toolSchemaSettingsResetAllTitle => '全部恢复默认？';
+
+  @override
+  String get toolSchemaSettingsResetAllMessage =>
+      '将把所有内置工具的描述恢复为应用默认文案，自定义措辞会丢失。';
+
+  @override
+  String get toolSchemaSettingsResetAllConfirm => '恢复';
+
+  @override
+  String toolSchemaSettingsParamDescriptions(int count) {
+    return '参数描述 ($count)';
+  }
+
+  @override
+  String get toolSchemaSettingsMemoryLangNote =>
+      '记忆工具的默认描述会随记忆提示语言在中/英之间切换。自定义描述按工具名只存一份，切换语言后不会跟着变。';
+
+  @override
+  String get toolSchemaSettingsDescriptionLabel => '描述';
+
+  @override
+  String get toolSchemaSettingsToolName => '工具名';
+
+  @override
+  String get toolSchemaEditorPageTitle => '编辑描述';
+
+  @override
+  String get toolSchemaSettingsCancel => '取消';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hant`).
@@ -15715,10 +17141,23 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get storageSpaceCategoryRestoreTraces => '還原痕跡';
 
   @override
+  String get storageSpaceCategoryDisplacedDatabases => '保留的舊資料庫';
+
+  @override
+  String get storageSpaceSubDisplacedDatabases => '自動重建前保留的資料庫';
+
+  @override
+  String get storageSpaceClearDisplacedDatabasesConfirmMessage =>
+      '確定刪除這些保留的舊資料庫嗎？它們是 Kelivo 重建資料庫時留下的，可能是那些聊天記錄和設定僅存的一份。刪除後無法復原。';
+
+  @override
   String get storageSpaceRestoreTracesHint => '還原完成後保留的舊資料快照。清理不會影響目前的應用程式資料。';
 
   @override
   String get storageSpaceClearRestoreTracesButton => '清理還原痕跡';
+
+  @override
+  String get storageSpaceClearDisplacedDatabasesButton => '刪除保留的舊資料庫';
 
   @override
   String get storageSpaceClearRestoreTracesConfirmMessage =>
@@ -17261,11 +18700,143 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get startupRecoveryResetDialogCancel => '取消';
 
   @override
+  String get startupRecoveryWhatFailed => '失敗原因';
+
+  @override
+  String get startupRecoveryStageLabel => '失敗階段';
+
+  @override
+  String get startupRecoveryStageRestore => '還原關卡';
+
+  @override
+  String get startupRecoveryStageDatabase => '資料庫啟動';
+
+  @override
+  String get startupRecoveryDiagnosticLabel => '診斷碼';
+
+  @override
+  String get startupRecoverySchemaLabel => '資料庫版本';
+
+  @override
+  String startupRecoverySchemaValue(String installed, int expected) {
+    return '磁碟上為 $installed · 目前版本需要 $expected';
+  }
+
+  @override
+  String get startupRecoveryAppVersionLabel => '應用程式';
+
+  @override
+  String get startupRecoveryUnknownValue => '未知';
+
+  @override
+  String get startupRecoveryCollecting => '正在收集診斷資訊…';
+
+  @override
+  String get startupRecoveryShowDetails => '展開技術細節';
+
+  @override
+  String get startupRecoveryHideDetails => '收合技術細節';
+
+  @override
+  String get startupRecoveryCopyReport => '複製完整報告';
+
+  @override
+  String get startupRecoveryReportCopied => '已複製完整報告';
+
+  @override
+  String get startupRecoveryShareReport => '匯出報告';
+
+  @override
+  String startupRecoveryReportStored(String path) {
+    return '報告已儲存至 $path';
+  }
+
+  @override
+  String startupRecoveryReportSaved(String path) {
+    return '報告已儲存至 $path';
+  }
+
+  @override
+  String get startupRecoveryReportShared => '報告已匯出。';
+
+  @override
+  String get startupRecoveryReportSaveFailed => '無法匯出報告。';
+
+  @override
+  String get startupRecoverySectionDataTitle => '你的資料';
+
+  @override
+  String get startupRecoverySectionDataBody =>
+      '目前沒有任何資料被刪除。在嘗試下方操作前，先把副本存到安全的地方。';
+
+  @override
+  String startupRecoveryExportSavedTo(String path) {
+    return '資料副本已儲存至 $path';
+  }
+
+  @override
+  String get startupRecoverySectionRepairTitle => '診斷與修復';
+
+  @override
+  String get startupRecoverySectionRepairBody =>
+      '完整性檢查只會讀取資料庫。修復會清除上次更新中斷留下的中繼資料並重新啟動，不會刪除聊天記錄。';
+
+  @override
+  String get startupRecoveryIntegrityButton => '檢查資料庫完整性';
+
+  @override
+  String get startupRecoveryIntegrityHealthy => 'SQLite 未在資料庫檔案中發現損壞。';
+
+  @override
+  String startupRecoveryIntegrityDamaged(String detail) {
+    return 'SQLite 回報了問題 —— $detail';
+  }
+
+  @override
+  String get startupRecoveryIntegrityMissing => '資料目錄中找不到資料庫檔案。';
+
+  @override
+  String get startupRecoveryIntegrityFailed => '完整性檢查無法執行。';
+
+  @override
+  String get startupRecoveryDangerZone => '危險操作';
+
+  @override
+  String get startupRecoveryDangerBody =>
+      '重設會永久刪除本裝置上 Kelivo 的資料庫。請先匯出資料副本——重設同時會銷毀排查根本問題所需的證據。';
+
+  @override
+  String get startupRecoveryResetAcknowledge => '我已匯出副本，或不需要這些資料。';
+
+  @override
   String get startupDatabaseUpdateRequiredTitle => '請更新 Kelivo 以繼續';
 
   @override
   String get startupDatabaseUpdateRequiredContent =>
       '本裝置上的聊天資料庫由更新版本的 Kelivo 建立，目前版本無法開啟。資料未被改動。請安裝最新版 Kelivo 後重新開啟。';
+
+  @override
+  String get startupDatabaseUpdateRequiredDowngradeTitle => '若要改用舊版';
+
+  @override
+  String get startupDatabaseUpdateRequiredDowngradeIntro =>
+      '目前版本無法開啟本機這份資料庫。若你必須留在舊版，請依下列步驟處理；在備份完成之前，不要刪除或覆蓋這裡的資料。';
+
+  @override
+  String get startupDatabaseUpdateRequiredDowngradeStep1 =>
+      '先安裝並開啟最新版 Kelivo，在「設定 → 資料備份」匯出一份備份檔。';
+
+  @override
+  String startupDatabaseUpdateRequiredDowngradeStep2(String url) {
+    return '打開 $url，把備份轉換成你打算使用的舊版格式。';
+  }
+
+  @override
+  String get startupDatabaseUpdateRequiredDowngradeStep3 =>
+      '確認本機資料已經另外備份好之後，再安裝舊版，並匯入轉換後的備份。';
+
+  @override
+  String get startupDatabaseUpdateRequiredOpenTool => '打開轉換工具';
 
   @override
   String backupPageRestoreFailedMessage(String error) {
@@ -19949,6 +21520,14 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get displaySettingsPageForkKeepMessageVersionsTitle => '建立分支時保留訊息版本';
 
   @override
+  String get displaySettingsPageEditAssistantKeepThinkingToolCardsTitle =>
+      '編輯助手時保留思考與工具卡片';
+
+  @override
+  String get displaySettingsPageEditAssistantKeepThinkingToolCardsSubtitle =>
+      '關閉後，目前編輯版本只保留助手正文；切回上一版本仍可查看思考與工具卡片';
+
+  @override
   String chainOfThoughtExpandSteps(Object count) {
     return '展開更多 $count 步';
   }
@@ -20954,6 +22533,45 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
       '面向 AI 智慧代理的統一搜尋服務，可在網頁與專業資料來源間自動路由。API Key 可選。';
 
   @override
+  String get searchServiceNameParallel => 'Parallel';
+
+  @override
+  String get searchProviderParallelDescription =>
+      'Parallel 搜尋 API。返回面向 LLM 優化的網頁摘錄，支援 turbo、fast、basic 和 advanced 模式。';
+
+  @override
+  String get searchServicesDialogSearchMode => '搜尋模式';
+
+  @override
+  String get searchServiceNameYou => 'You.com';
+
+  @override
+  String get searchProviderYouDescription =>
+      'You.com 搜尋 API。返回網頁與新聞結果，支援 Highlights 或 Snippets。';
+
+  @override
+  String get searchServicesDialogContentMode => '內容模式';
+
+  @override
+  String get searchServicesDialogHighlights => 'Highlights';
+
+  @override
+  String get searchServicesDialogSnippets => 'Snippets';
+
+  @override
+  String get searchServicesDialogWebSearch => 'Web Search';
+
+  @override
+  String get searchServicesDialogLlmContext => 'LLM Context';
+
+  @override
+  String get searchServicesDialogMaximumTokens => '最大 token 數';
+
+  @override
+  String get searchServicesDialogMaximumTokensInvalid =>
+      '最大 token 數必須介於 1024 和 32768 之間。';
+
+  @override
   String get searchServiceNameKelivo => 'Kelivo';
 
   @override
@@ -21202,6 +22820,193 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
       '在你確認後於本裝置建立日曆行程，需要授予日曆權限。';
 
   @override
+  String get assistantEditLocalToolLocationTitle => '目前位置';
+
+  @override
+  String get assistantEditLocalToolLocationSubtitle => '讀取本裝置的一次性位置，需要授予定位權限。';
+
+  @override
+  String get assistantEditLocalToolWeatherTitle => '天氣';
+
+  @override
+  String get assistantEditLocalToolWeatherSubtitle =>
+      '取得目前位置或指定地點的 Apple 天氣，結果中會顯示 WeatherKit 資料來源。';
+
+  @override
+  String get assistantEditLocalToolHealthTitle => '健康摘要';
+
+  @override
+  String get assistantEditLocalToolHealthSubtitle =>
+      '讀取本裝置的健康活動摘要，需要授予健康資料讀取權限。';
+
+  @override
+  String assistantEditLocalToolHealthSelectedCount(int selected, int total) {
+    return '已選擇 $selected/$total 項';
+  }
+
+  @override
+  String get healthDataSettingsTitle => '健康資料';
+
+  @override
+  String get healthDataSettingsDescription =>
+      '目前助手在日常對話中可使用的 HealthKit 訊號。開關表示 Kelivo 可以嘗試讀取該範圍，實際授權仍由 iOS 管理。';
+
+  @override
+  String healthDataSettingsBadge(int selected, int total) {
+    return '$selected/$total 開啟';
+  }
+
+  @override
+  String get healthDataSettingsIosReadTitle => 'iOS 健康讀取';
+
+  @override
+  String get healthDataSettingsIosReadSubtitle => '裝置可用，讀取範圍由 iOS 管理';
+
+  @override
+  String get healthDataSettingsOpenSystemSettings => '開啟系統設定';
+
+  @override
+  String get healthDataSettingsEnableAll => '全部開啟';
+
+  @override
+  String get healthDataSettingsDisableAll => '全部關閉';
+
+  @override
+  String get healthDataSettingsCategoryActivity => '活動';
+
+  @override
+  String get healthDataSettingsCategoryRest => '休息';
+
+  @override
+  String get healthDataSettingsCategoryHeart => '心率';
+
+  @override
+  String get healthDataSettingsCategoryBody => '身體';
+
+  @override
+  String get healthDataSettingsTypeStepsTitle => '步數';
+
+  @override
+  String get healthDataSettingsTypeStepsSubtitle => '行走步數摘要';
+
+  @override
+  String get healthDataSettingsTypeDaylightTitle => '日照';
+
+  @override
+  String get healthDataSettingsTypeDaylightSubtitle => '戶外日光時間';
+
+  @override
+  String get healthDataSettingsTypeActiveEnergyTitle => '能量';
+
+  @override
+  String get healthDataSettingsTypeActiveEnergySubtitle => '活動能量消耗';
+
+  @override
+  String get healthDataSettingsTypeExerciseMinutesTitle => '鍛鍊';
+
+  @override
+  String get healthDataSettingsTypeExerciseMinutesSubtitle => 'Apple 鍛鍊分鐘數';
+
+  @override
+  String get healthDataSettingsTypeStandTimeTitle => '站立';
+
+  @override
+  String get healthDataSettingsTypeStandTimeSubtitle => '站立時間';
+
+  @override
+  String get healthDataSettingsTypeDistanceTitle => '距離';
+
+  @override
+  String get healthDataSettingsTypeDistanceSubtitle => '步行和跑步距離';
+
+  @override
+  String get healthDataSettingsTypeWorkoutsTitle => '健身訓練';
+
+  @override
+  String get healthDataSettingsTypeWorkoutsSubtitle => '訓練紀錄：類型、時長、距離與消耗';
+
+  @override
+  String get healthDataSettingsTypeSleepTitle => '睡眠';
+
+  @override
+  String get healthDataSettingsTypeSleepSubtitle => '睡眠時長';
+
+  @override
+  String get healthDataSettingsTypeMindfulnessTitle => '靜息';
+
+  @override
+  String get healthDataSettingsTypeMindfulnessSubtitle => '正念或靜息時段';
+
+  @override
+  String get healthDataSettingsTypeHeartRateTitle => '心率';
+
+  @override
+  String get healthDataSettingsTypeHeartRateSubtitle => '最近心率樣本';
+
+  @override
+  String get healthDataSettingsTypeRestingHeartRateTitle => '靜息心率';
+
+  @override
+  String get healthDataSettingsTypeRestingHeartRateSubtitle => '靜息狀態心率';
+
+  @override
+  String get healthDataSettingsTypeBloodOxygenTitle => '血氧';
+
+  @override
+  String get healthDataSettingsTypeBloodOxygenSubtitle => '血氧飽和度';
+
+  @override
+  String get healthDataSettingsTypeDietaryEnergyTitle => '攝入能量';
+
+  @override
+  String get healthDataSettingsTypeDietaryEnergySubtitle => '飲食熱量紀錄';
+
+  @override
+  String get healthDataSettingsTypeWaterTitle => '飲水';
+
+  @override
+  String get healthDataSettingsTypeWaterSubtitle => '飲水量紀錄';
+
+  @override
+  String get healthDataSettingsTypeWeightTitle => '體重';
+
+  @override
+  String get healthDataSettingsTypeWeightSubtitle => '體重樣本';
+
+  @override
+  String get healthDataSettingsTypeBmiTitle => 'BMI';
+
+  @override
+  String get healthDataSettingsTypeBmiSubtitle => '身體質量指數';
+
+  @override
+  String get healthDataSettingsTypeBloodGlucoseTitle => '血糖';
+
+  @override
+  String get healthDataSettingsTypeBloodGlucoseSubtitle => '血糖樣本';
+
+  @override
+  String get assistantEditLocalToolRemindersQueryTitle => '查詢提醒';
+
+  @override
+  String get assistantEditLocalToolRemindersQuerySubtitle =>
+      '讀取本裝置上的提醒事項，需要授予提醒事項完整存取權限。';
+
+  @override
+  String get assistantEditLocalToolRemindersCreateTitle => '建立提醒';
+
+  @override
+  String get assistantEditLocalToolRemindersCreateSubtitle =>
+      '在你確認後於本裝置建立提醒事項，需要授予提醒事項完整存取權限。';
+
+  @override
+  String get assistantEditLocalToolRemindersCompleteTitle => '完成提醒';
+
+  @override
+  String get assistantEditLocalToolRemindersCompleteSubtitle =>
+      '在你確認後將提醒事項標記為完成，需要授予提醒事項完整存取權限。';
+
+  @override
   String get assistantEditMemorySwitchDescription => '允許助理主動儲存並在對話間引用使用者相關資訊';
 
   @override
@@ -21395,6 +23200,56 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get networkProxyPriorityNote => '同時啟用全域代理與供應商代理時，將優先使用供應商代理。';
+
+  @override
+  String get settingsPageAutoRetry => '自動重試';
+
+  @override
+  String get autoRetryEnableLabel => '開啟自動重試';
+
+  @override
+  String get autoRetryMaxRetries => '最大重試次數';
+
+  @override
+  String get autoRetryInitialDelay => '首次延遲（毫秒）';
+
+  @override
+  String get autoRetryMultiplier => '退避倍率';
+
+  @override
+  String get autoRetryMaxDelay => '最大延遲（毫秒）';
+
+  @override
+  String get autoRetryJitter => '抖動';
+
+  @override
+  String get autoRetryJitterSubtitle => '每次等待隨機 ±20%';
+
+  @override
+  String get autoRetryOnNetworkError => '網路錯誤時重試';
+
+  @override
+  String get autoRetryStatusCodes => '可重試狀態碼';
+
+  @override
+  String get autoRetryKeywords => '重試關鍵字';
+
+  @override
+  String get autoRetryStopKeywords => '停止重試關鍵字';
+
+  @override
+  String get autoRetryAddHint => '新增';
+
+  @override
+  String get autoRetryRestoreDefaults => '恢復預設';
+
+  @override
+  String get autoRetryFooter => '僅在本次請求尚未產生任何輸出時才會自動重試。';
+
+  @override
+  String autoRetryCountdown(int seconds, int attempt, int maxRetries) {
+    return '$seconds 秒後重試 ($attempt/$maxRetries)';
+  }
 
   @override
   String get desktopShowProviderInModelCapsule => '模型膠囊顯示供應商';
@@ -23350,6 +25205,13 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
       '助手氣泡按文字寬度收縮，不再佔滿整行';
 
   @override
+  String get messageStyleSettingsPageAssistantSplitParagraphs => '分段顯示為多個氣泡';
+
+  @override
+  String get messageStyleSettingsPageAssistantSplitParagraphsSubtitle =>
+      '助手回覆遇到空行時拆分，每段單獨一個氣泡';
+
+  @override
   String get messageStyleSettingsPageStyleFrostedSubtitle => '半透明毛玻璃';
 
   @override
@@ -23400,4 +25262,281 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   @override
   String get messageStyleSettingsPageRoleAssistantHint =>
       '助手設定同時作用於思考、工具呼叫和翻譯卡片。';
+
+  @override
+  String get localSnapshotSectionTitle => '本機副本';
+
+  @override
+  String get localSnapshotEnabledTitle => '保留本機副本';
+
+  @override
+  String get localSnapshotEnabledSubtitle => 'Kelivo 會定期在本機存一份資料庫副本，讓資料不只有一份。';
+
+  @override
+  String get localSnapshotIntervalTitle => '備份頻率';
+
+  @override
+  String get localSnapshotIntervalAutomatic => '自動';
+
+  @override
+  String get localSnapshotIntervalAutomaticDetail => '每天一次，資料庫越大間隔越長';
+
+  @override
+  String localSnapshotIntervalDays(int days) {
+    String _temp0 = intl.Intl.pluralLogic(
+      days,
+      locale: localeName,
+      other: '每 $days 天',
+      one: '每天',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get localSnapshotKeepTitle => '保留份數';
+
+  @override
+  String localSnapshotKeepValue(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count 份',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get localSnapshotKeepSubtitle => '另外各留一份上週和上個月的，萬一問題過了很久才發現也還能找回來。';
+
+  @override
+  String get localSnapshotKeepWeekly => '保留一份上週的';
+
+  @override
+  String get localSnapshotKeepMonthly => '保留一份上個月的';
+
+  @override
+  String get localSnapshotKeepProtectedNote => '無論設成幾份，最近一份仍有內容的副本都不會被自動清理。';
+
+  @override
+  String get localSnapshotMaximumTitle => '佔用上限';
+
+  @override
+  String get localSnapshotMaximumUnlimited => '不限制';
+
+  @override
+  String get localSnapshotAnnounceTitle => '備份完成時提示';
+
+  @override
+  String get localSnapshotAnnounceSubtitle => '失敗一定會告訴你。這裡只是成功時多一句提示。';
+
+  @override
+  String get localSnapshotTakeNow => '立即備份一份';
+
+  @override
+  String get localSnapshotManageCopies => '管理副本';
+
+  @override
+  String localSnapshotUsage(int count, String size) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count 份',
+      zero: '暫無副本',
+    );
+    return '$_temp0 · $size';
+  }
+
+  @override
+  String get localSnapshotStatusNever => '還沒有備份過';
+
+  @override
+  String localSnapshotStatusSuccess(String when) {
+    return '上次備份：$when';
+  }
+
+  @override
+  String localSnapshotStatusFailure(String when, String reason) {
+    return '上次備份失敗（$when）：$reason';
+  }
+
+  @override
+  String get localSnapshotStatusSkippedSpace => '已跳過：本機剩餘空間不足';
+
+  @override
+  String get localSnapshotStatusUnchanged => '距上次備份資料沒有變化';
+
+  @override
+  String get localSnapshotCopiesTitle => '本機副本';
+
+  @override
+  String get localSnapshotCopiesEmpty => '還沒有本機副本';
+
+  @override
+  String get localSnapshotCopiesEmptyHint => '資料有變化時會自動存一份，還原資料前也一定會先存一份。';
+
+  @override
+  String get localSnapshotCopiesScopeNote =>
+      '本機副本只存在這台裝置上。它防的是應用內資料被損壞或誤刪，防不了裝置遺失或解除安裝應用——那要靠 WebDAV / S3 備份。';
+
+  @override
+  String get localSnapshotOriginAutomatic => '自動備份';
+
+  @override
+  String get localSnapshotOriginManual => '手動備份';
+
+  @override
+  String get localSnapshotOriginBeforeRestore => '還原前備份';
+
+  @override
+  String get localSnapshotKindRecovered => '故障還原時留下的';
+
+  @override
+  String localSnapshotCopyContents(int conversations, int messages) {
+    String _temp0 = intl.Intl.pluralLogic(
+      conversations,
+      locale: localeName,
+      other: '$conversations 個對話',
+    );
+    String _temp1 = intl.Intl.pluralLogic(
+      messages,
+      locale: localeName,
+      other: '$messages 則訊息',
+    );
+    return '$_temp0 · $_temp1';
+  }
+
+  @override
+  String get localSnapshotCopyContentsUnknown => '內容需還原後才能確認';
+
+  @override
+  String get localSnapshotCopyPinned => '已保留';
+
+  @override
+  String get localSnapshotActionRestore => '還原';
+
+  @override
+  String get localSnapshotActionExport => '匯出';
+
+  @override
+  String get localSnapshotActionDelete => '刪除';
+
+  @override
+  String get localSnapshotActionPin => '保留這份';
+
+  @override
+  String get localSnapshotActionUnpin => '取消保留';
+
+  @override
+  String get localSnapshotRestoreTitle => '還原這份副本？';
+
+  @override
+  String localSnapshotRestoreMessage(String when) {
+    return '目前的對話和設定會被 $when 的這份副本替換。系統會先把現在的資料存一份，所以這一步可以復原。';
+  }
+
+  @override
+  String get localSnapshotRestorePreparing => '正在準備副本';
+
+  @override
+  String get localSnapshotDeleteTitle => '刪除這份副本？';
+
+  @override
+  String get localSnapshotDeleteMessage =>
+      '這份副本會從裝置上永久刪除。它裡面有、而目前資料庫裡沒有的資料將無法找回。';
+
+  @override
+  String get localSnapshotDeleteLastWarning => '這是唯一一份還有內容的副本。';
+
+  @override
+  String get localSnapshotExportPreparing => '正在準備匯出';
+
+  @override
+  String get localSnapshotExportDone => '副本已匯出';
+
+  @override
+  String localSnapshotExportFailed(String reason) {
+    return '匯出副本失敗：$reason';
+  }
+
+  @override
+  String get localSnapshotTakeDone => '副本已儲存';
+
+  @override
+  String localSnapshotTakeFailed(String reason) {
+    return '儲存副本失敗：$reason';
+  }
+
+  @override
+  String get localSnapshotDeleteDone => '副本已刪除';
+
+  @override
+  String get localSnapshotBusyMessage => '已有備份任務在進行中';
+
+  @override
+  String get localSnapshotRunInBackground => '轉到背景繼續';
+
+  @override
+  String get localSnapshotRunningInBackground => '正在背景備份副本';
+
+  @override
+  String startupRecoveryLocalCopiesAvailable(int count, String when) {
+    return '本機還保留著 $count 份本機副本，最新一份是 $when 的。重設不會刪除它們——重新啟動後可以在 設定 › 備份 › 本機副本 裡還原。';
+  }
+
+  @override
+  String startupRecoveryRecoveredCopiesDeleted(int count) {
+    return '另外還有 $count 份故障還原時留下的資料庫副本，重設會把它們一併永久刪除。想留住的話請先匯出資料。';
+  }
+
+  @override
+  String get toolSchemaSettingsPageTitle => '工具描述';
+
+  @override
+  String get toolSchemaSettingsGroupSearch => '搜尋';
+
+  @override
+  String get toolSchemaSettingsGroupMemory => '記憶';
+
+  @override
+  String get toolSchemaSettingsGroupLocal => '本機工具';
+
+  @override
+  String get toolSchemaSettingsModified => '已修改';
+
+  @override
+  String get toolSchemaSettingsResetDefault => '還原預設';
+
+  @override
+  String get toolSchemaSettingsResetAll => '全部還原預設';
+
+  @override
+  String get toolSchemaSettingsResetAllTitle => '全部還原預設？';
+
+  @override
+  String get toolSchemaSettingsResetAllMessage =>
+      '將把所有內建工具的描述還原為應用預設文案，自訂措辭會遺失。';
+
+  @override
+  String get toolSchemaSettingsResetAllConfirm => '還原';
+
+  @override
+  String toolSchemaSettingsParamDescriptions(int count) {
+    return '參數描述 ($count)';
+  }
+
+  @override
+  String get toolSchemaSettingsMemoryLangNote =>
+      '記憶工具的預設描述會隨記憶提示語言在中/英之間切換。自訂描述依工具名只存一份，切換語言後不會跟著變。';
+
+  @override
+  String get toolSchemaSettingsDescriptionLabel => '描述';
+
+  @override
+  String get toolSchemaSettingsToolName => '工具名';
+
+  @override
+  String get toolSchemaEditorPageTitle => '編輯描述';
+
+  @override
+  String get toolSchemaSettingsCancel => '取消';
 }

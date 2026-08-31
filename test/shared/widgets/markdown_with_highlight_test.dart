@@ -2272,6 +2272,34 @@ A-->B
     },
   );
 
+  testWidgets(
+    'MarkdownWithCodeHighlight forwards Windows CJK fonts to math fallbacks',
+    (tester) async {
+      debugDefaultTargetPlatformOverride = TargetPlatform.windows;
+      try {
+        await tester.pumpWidget(
+          _markdownHarness(
+            r'出现 \(0 = \text{非零常数的矛盾}\)',
+            theme: buildLightThemeForScheme(ThemePalettes.defaultPalette.light),
+          ),
+        );
+        await tester.pump();
+
+        final cjkGlyph = tester
+            .widgetList<RichText>(find.byType(RichText))
+            .firstWhere((widget) => widget.text.toPlainText() == '非');
+
+        expect(cjkGlyph.text.style?.fontFamily, contains('KaTeX_Main'));
+        expect(
+          cjkGlyph.text.style?.fontFamilyFallback,
+          containsAllInOrder(kWindowsFontFamilyFallback),
+        );
+      } finally {
+        debugDefaultTargetPlatformOverride = null;
+      }
+    },
+  );
+
   testWidgets('MarkdownWithCodeHighlight baseline-aligns inline math', (
     tester,
   ) async {

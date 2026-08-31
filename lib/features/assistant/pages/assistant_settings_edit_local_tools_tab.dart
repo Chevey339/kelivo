@@ -33,6 +33,24 @@ class _LocalToolsTab extends StatelessWidget {
     final calendarCreateEnabled = assistant.localToolIds.contains(
       LocalToolNames.calendarCreate,
     );
+    final locationEnabled = assistant.localToolIds.contains(
+      LocalToolNames.currentLocation,
+    );
+    final weatherEnabled = assistant.localToolIds.contains(
+      LocalToolNames.weather,
+    );
+    final healthEnabled = assistant.localToolIds.contains(
+      LocalToolNames.healthSummary,
+    );
+    final remindersQueryEnabled = assistant.localToolIds.contains(
+      LocalToolNames.remindersQuery,
+    );
+    final remindersCreateEnabled = assistant.localToolIds.contains(
+      LocalToolNames.remindersCreate,
+    );
+    final remindersCompleteEnabled = assistant.localToolIds.contains(
+      LocalToolNames.remindersComplete,
+    );
 
     Future<void> updateTool(String toolId, bool value) {
       final ids = assistant.localToolIds.toSet();
@@ -82,6 +100,58 @@ class _LocalToolsTab extends StatelessWidget {
           }
         }
         await updateTool(toolId, true);
+        return;
+      }
+
+      if (toolId == LocalToolNames.currentLocation &&
+          DeviceLocalTools.locationSupported) {
+        final granted = await DeviceLocalTools.hasLocationPermission();
+        if (!granted) {
+          final requested = await DeviceLocalTools.requestLocationPermission();
+          if (!requested) {
+            return;
+          }
+        }
+        await updateTool(toolId, true);
+        return;
+      }
+
+      if ((toolId == LocalToolNames.remindersQuery ||
+              toolId == LocalToolNames.remindersCreate ||
+              toolId == LocalToolNames.remindersComplete) &&
+          DeviceLocalTools.remindersSupported) {
+        final granted = await DeviceLocalTools.hasRemindersPermission();
+        if (!granted) {
+          final requested = await DeviceLocalTools.requestRemindersPermission();
+          if (!requested) {
+            return;
+          }
+        }
+        await updateTool(toolId, true);
+        return;
+      }
+
+      if (toolId == LocalToolNames.healthSummary &&
+          DeviceLocalTools.healthSupported) {
+        if (!value) {
+          await updateTool(toolId, false);
+          return;
+        }
+        var next = HealthDataSelection.setMasterEnabled(
+          assistant,
+          enabled: true,
+          availableIds: DeviceLocalTools.availableHealthTypeIds,
+        );
+        final types = HealthDataSelection.queryTypes(
+          next,
+          availableIds: DeviceLocalTools.availableHealthTypeIds,
+        );
+        final requested = await DeviceLocalTools.requestHealthPermission(
+          types: types,
+        );
+        if (!requested) return;
+        if (!context.mounted) return;
+        await context.read<AssistantProvider>().updateAssistant(next);
         return;
       }
 
@@ -164,6 +234,101 @@ class _LocalToolsTab extends StatelessWidget {
                     toggleTool(LocalToolNames.calendarCreate, value),
               ),
             ],
+            if (DeviceLocalTools.locationSupported) ...[
+              _iosDivider(context),
+              _LocalToolRow(
+                icon: Lucide.MapPin,
+                title: l10n.assistantEditLocalToolLocationTitle,
+                subtitle: l10n.assistantEditLocalToolLocationSubtitle,
+                enabled: locationEnabled,
+                onChanged: (value) =>
+                    toggleTool(LocalToolNames.currentLocation, value),
+              ),
+            ],
+            if (DeviceLocalTools.iosDeviceToolsSupported)
+              FutureBuilder<bool>(
+                future: DeviceLocalTools.prefetchIosCapabilities(),
+                builder: (context, snapshot) {
+                  if (!DeviceLocalTools.weatherSupported) {
+                    return const SizedBox.shrink();
+                  }
+                  return Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      _iosDivider(context),
+                      _LocalToolRow(
+                        icon: Lucide.CloudSun,
+                        title: l10n.assistantEditLocalToolWeatherTitle,
+                        subtitle: l10n.assistantEditLocalToolWeatherSubtitle,
+                        enabled: weatherEnabled,
+                        onChanged: (value) =>
+                            toggleTool(LocalToolNames.weather, value),
+                      ),
+                    ],
+                  );
+                },
+              ),
+            if (DeviceLocalTools.remindersSupported) ...[
+              _iosDivider(context),
+              _LocalToolRow(
+                icon: Lucide.ListTodo,
+                title: l10n.assistantEditLocalToolRemindersQueryTitle,
+                subtitle: l10n.assistantEditLocalToolRemindersQuerySubtitle,
+                enabled: remindersQueryEnabled,
+                onChanged: (value) =>
+                    toggleTool(LocalToolNames.remindersQuery, value),
+              ),
+              _iosDivider(context),
+              _LocalToolRow(
+                icon: Lucide.ListPlus,
+                title: l10n.assistantEditLocalToolRemindersCreateTitle,
+                subtitle: l10n.assistantEditLocalToolRemindersCreateSubtitle,
+                enabled: remindersCreateEnabled,
+                onChanged: (value) =>
+                    toggleTool(LocalToolNames.remindersCreate, value),
+              ),
+              _iosDivider(context),
+              _LocalToolRow(
+                icon: Lucide.CheckCircle,
+                title: l10n.assistantEditLocalToolRemindersCompleteTitle,
+                subtitle: l10n.assistantEditLocalToolRemindersCompleteSubtitle,
+                enabled: remindersCompleteEnabled,
+                onChanged: (value) =>
+                    toggleTool(LocalToolNames.remindersComplete, value),
+              ),
+            ],
+            if (DeviceLocalTools.iosDeviceToolsSupported)
+              FutureBuilder<bool>(
+                future: DeviceLocalTools.prefetchIosCapabilities(),
+                builder: (context, snapshot) {
+                  if (!DeviceLocalTools.healthSupported) {
+                    return const SizedBox.shrink();
+                  }
+                  return Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      _iosDivider(context),
+                      _HealthToolRow(
+                        title: l10n.assistantEditLocalToolHealthTitle,
+                        subtitle: l10n.assistantEditLocalToolHealthSubtitle,
+                        selectedSummary: l10n
+                            .assistantEditLocalToolHealthSelectedCount(
+                              HealthDataTypeIds.intersectAvailable(
+                                assistant.healthDataTypeIds,
+                                DeviceLocalTools.availableHealthTypeIds,
+                              ).length,
+                              DeviceLocalTools.availableHealthTypeIds.length,
+                            ),
+                        enabled: healthEnabled,
+                        onChanged: (value) =>
+                            toggleTool(LocalToolNames.healthSummary, value),
+                        onOpenSettings: () =>
+                            HealthDataSettingsPage.open(context, assistantId),
+                      ),
+                    ],
+                  );
+                },
+              ),
           ],
         ),
       ],
@@ -247,6 +412,111 @@ class _LocalToolRow extends StatelessWidget {
           },
         );
       },
+    );
+  }
+}
+
+class _HealthToolRow extends StatelessWidget {
+  const _HealthToolRow({
+    required this.title,
+    required this.subtitle,
+    required this.selectedSummary,
+    required this.enabled,
+    required this.onChanged,
+    required this.onOpenSettings,
+  });
+
+  final String title;
+  final String subtitle;
+  final String selectedSummary;
+  final bool enabled;
+  final ValueChanged<bool> onChanged;
+  final VoidCallback onOpenSettings;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          Expanded(
+            child: _TactileRow(
+              onTap: onOpenSettings,
+              builder: (pressed) {
+                final baseColor = cs.onSurface.withValues(alpha: 0.9);
+                return _AnimatedPressColor(
+                  pressed: pressed,
+                  base: baseColor,
+                  builder: (color) {
+                    return Row(
+                      children: [
+                        SizedBox(
+                          width: 36,
+                          child: Icon(
+                            Lucide.HeartPulse,
+                            size: 20,
+                            color: enabled ? cs.primary : color,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                title,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  fontSize: 15,
+                                  color: color,
+                                  fontWeight: AppFontWeights.semibold,
+                                ),
+                              ),
+                              const SizedBox(height: 3),
+                              Text(
+                                subtitle,
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  height: 1.25,
+                                  color: cs.onSurface.withValues(alpha: 0.62),
+                                ),
+                              ),
+                              const SizedBox(height: 3),
+                              Text(
+                                selectedSummary,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  height: 1.25,
+                                  color: cs.primary.withValues(alpha: 0.85),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Icon(
+                          Lucide.ChevronRight,
+                          size: 16,
+                          color: cs.onSurface.withValues(alpha: 0.35),
+                        ),
+                      ],
+                    );
+                  },
+                );
+              },
+            ),
+          ),
+          const SizedBox(width: 8),
+          IosSwitch(value: enabled, onChanged: onChanged),
+        ],
+      ),
     );
   }
 }

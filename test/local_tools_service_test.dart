@@ -1,9 +1,12 @@
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:Kelivo/core/models/assistant.dart';
+import 'package:Kelivo/core/models/health_data_type.dart';
+import 'package:Kelivo/features/home/services/health_data_selection.dart';
 import 'package:Kelivo/features/home/services/local_tools_service.dart';
 
 void main() {
@@ -24,11 +27,13 @@ void main() {
     setUp(() {
       TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
           .setMockMethodCallHandler(SystemChannels.platform, null);
+      DeviceLocalTools.debugResetIosCapabilities();
     });
 
     tearDown(() {
       TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
           .setMockMethodCallHandler(SystemChannels.platform, null);
+      DeviceLocalTools.debugResetIosCapabilities();
     });
 
     test('assistant defaults to no local tools', () {
@@ -260,6 +265,301 @@ void main() {
         throwsA(isA<ArgumentError>()),
       );
     });
+
+    test('iOS device tools are defined only on iOS', () {
+      const iosAssistant = Assistant(
+        id: 'a1',
+        name: 'Assistant',
+        localToolIds: [
+          LocalToolNames.currentLocation,
+          LocalToolNames.weather,
+          LocalToolNames.healthSummary,
+          LocalToolNames.remindersQuery,
+          LocalToolNames.remindersCreate,
+          LocalToolNames.remindersComplete,
+        ],
+      );
+
+      debugDefaultTargetPlatformOverride = TargetPlatform.android;
+      addTearDown(() => debugDefaultTargetPlatformOverride = null);
+      expect(
+        LocalToolsService.buildToolDefinitions(
+          assistant: iosAssistant,
+          supportsTools: true,
+        ),
+        isEmpty,
+      );
+
+      debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
+      DeviceLocalTools.debugSetWeatherKitAvailable(true);
+      DeviceLocalTools.debugSetHealthDataAvailable(true);
+      final enabled = LocalToolsService.buildToolDefinitions(
+        assistant: iosAssistant,
+        supportsTools: true,
+      );
+      expect(enabled.map((tool) => tool['function']['name']), [
+        LocalToolNames.currentLocation,
+        LocalToolNames.weather,
+        LocalToolNames.healthSummary,
+        LocalToolNames.remindersQuery,
+        LocalToolNames.remindersCreate,
+        LocalToolNames.remindersComplete,
+      ]);
+    });
+
+    test('weather tool is hidden until WeatherKit is available', () {
+      const iosAssistant = Assistant(
+        id: 'a1',
+        name: 'Assistant',
+        localToolIds: [LocalToolNames.weather],
+      );
+
+      debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
+      addTearDown(() => debugDefaultTargetPlatformOverride = null);
+
+      expect(DeviceLocalTools.weatherSupported, isFalse);
+      expect(
+        LocalToolsService.buildToolDefinitions(
+          assistant: iosAssistant,
+          supportsTools: true,
+        ),
+        isEmpty,
+      );
+
+      DeviceLocalTools.debugSetWeatherKitAvailable(false);
+      expect(DeviceLocalTools.weatherSupported, isFalse);
+      expect(
+        LocalToolsService.buildToolDefinitions(
+          assistant: iosAssistant,
+          supportsTools: true,
+        ),
+        isEmpty,
+      );
+
+      DeviceLocalTools.debugSetWeatherKitAvailable(true);
+      expect(DeviceLocalTools.weatherSupported, isTrue);
+      expect(
+        LocalToolsService.buildToolDefinitions(
+          assistant: iosAssistant,
+          supportsTools: true,
+        ).map((tool) => tool['function']['name']),
+        [LocalToolNames.weather],
+      );
+    });
+
+    test('health tool is hidden until HealthKit is available', () {
+      const iosAssistant = Assistant(
+        id: 'a1',
+        name: 'Assistant',
+        localToolIds: [LocalToolNames.healthSummary],
+      );
+
+      debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
+      addTearDown(() => debugDefaultTargetPlatformOverride = null);
+
+      expect(DeviceLocalTools.healthSupported, isFalse);
+      expect(
+        LocalToolsService.buildToolDefinitions(
+          assistant: iosAssistant,
+          supportsTools: true,
+        ),
+        isEmpty,
+      );
+
+      DeviceLocalTools.debugSetHealthDataAvailable(false);
+      expect(DeviceLocalTools.healthSupported, isFalse);
+      expect(
+        LocalToolsService.buildToolDefinitions(
+          assistant: iosAssistant,
+          supportsTools: true,
+        ),
+        isEmpty,
+      );
+
+      DeviceLocalTools.debugSetHealthDataAvailable(true);
+      expect(DeviceLocalTools.healthSupported, isTrue);
+      expect(
+        LocalToolsService.buildToolDefinitions(
+          assistant: iosAssistant,
+          supportsTools: true,
+        ).map((tool) => tool['function']['name']),
+        [LocalToolNames.healthSummary],
+      );
+    });
+
+    test(
+      'prefetchIosCapabilities caches WeatherKit and HealthKit availability',
+      () async {
+        debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
+        addTearDown(() => debugDefaultTargetPlatformOverride = null);
+
+        const channel = MethodChannel('app.device_tools');
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+            .setMockMethodCallHandler(channel, (call) async {
+              if (call.method == 'isWeatherKitAvailable') return true;
+              if (call.method == 'isHealthDataAvailable') return true;
+              return null;
+            });
+        addTearDown(() {
+          TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+              .setMockMethodCallHandler(channel, null);
+        });
+
+        expect(DeviceLocalTools.weatherSupported, isFalse);
+        expect(DeviceLocalTools.healthSupported, isFalse);
+        expect(await DeviceLocalTools.prefetchIosCapabilities(), isTrue);
+        expect(DeviceLocalTools.weatherSupported, isTrue);
+        expect(DeviceLocalTools.healthSupported, isTrue);
+        expect(await DeviceLocalTools.prefetchIosCapabilities(), isTrue);
+      },
+    );
+
+    test(
+      'health tool call returns error when HealthKit is unavailable',
+      () async {
+        debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
+        addTearDown(() => debugDefaultTargetPlatformOverride = null);
+        DeviceLocalTools.debugSetHealthDataAvailable(false);
+
+        final result = await LocalToolsService.tryHandleToolCall(
+          LocalToolNames.healthSummary,
+          const {},
+          const Assistant(
+            id: 'a1',
+            name: 'Assistant',
+            localToolIds: [LocalToolNames.healthSummary],
+          ),
+        );
+
+        expect(result, isNotNull);
+        expect(jsonDecode(result!) as Map<String, dynamic>, {
+          'error': 'unsupported_os',
+          'message': 'Health data is not available on this device.',
+        });
+      },
+    );
+
+    test('health tool description lists only selected metrics', () {
+      debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
+      addTearDown(() => debugDefaultTargetPlatformOverride = null);
+      DeviceLocalTools.debugSetHealthDataAvailable(true);
+
+      final tools = LocalToolsService.buildToolDefinitions(
+        assistant: const Assistant(
+          id: 'a1',
+          name: 'Assistant',
+          localToolIds: [LocalToolNames.healthSummary],
+          healthDataTypeIds: [HealthDataTypeIds.steps, HealthDataTypeIds.sleep],
+        ),
+        supportsTools: true,
+      );
+
+      expect(tools, hasLength(1));
+      final description = tools.first['function']['description'] as String;
+      expect(description, contains('steps'));
+      expect(description, contains('last-night sleep'));
+      expect(description, isNot(contains('blood glucose')));
+      expect(description, isNot(contains('body weight')));
+    });
+
+    test(
+      'health tool call sends configured types and ignores model args',
+      () async {
+        debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
+        addTearDown(() => debugDefaultTargetPlatformOverride = null);
+        DeviceLocalTools.debugSetHealthDataAvailable(true);
+
+        const channel = MethodChannel('app.device_tools');
+        String? capturedArgs;
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+            .setMockMethodCallHandler(channel, (call) async {
+              if (call.method == 'getHealthSummary') {
+                capturedArgs = call.arguments as String?;
+                return jsonEncode({'updated_at': 'now'});
+              }
+              return null;
+            });
+        addTearDown(() {
+          TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+              .setMockMethodCallHandler(channel, null);
+        });
+
+        final result = await LocalToolsService.tryHandleToolCall(
+          LocalToolNames.healthSummary,
+          const {
+            'types': [HealthDataTypeIds.bloodGlucose],
+          },
+          const Assistant(
+            id: 'a1',
+            name: 'Assistant',
+            localToolIds: [LocalToolNames.healthSummary],
+            healthDataTypeIds: [
+              HealthDataTypeIds.steps,
+              HealthDataTypeIds.sleep,
+            ],
+          ),
+        );
+
+        expect(jsonDecode(result!) as Map<String, dynamic>, {
+          'updated_at': 'now',
+        });
+        expect(capturedArgs, isNotNull);
+        final payload = jsonDecode(capturedArgs!) as Map<String, dynamic>;
+        expect(payload['types'], [
+          HealthDataTypeIds.steps,
+          HealthDataTypeIds.sleep,
+        ]);
+        expect(
+          payload['types'],
+          isNot(contains(HealthDataTypeIds.bloodGlucose)),
+        );
+      },
+    );
+
+    test(
+      'enableAll requests HealthKit once for every available type',
+      () async {
+        debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
+        addTearDown(() => debugDefaultTargetPlatformOverride = null);
+        DeviceLocalTools.debugSetHealthDataAvailable(true);
+
+        const channel = MethodChannel('app.device_tools');
+        final calls = <MethodCall>[];
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+            .setMockMethodCallHandler(channel, (call) async {
+              calls.add(call);
+              if (call.method == 'requestHealthPermission') return true;
+              return null;
+            });
+        addTearDown(() {
+          TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+              .setMockMethodCallHandler(channel, null);
+        });
+
+        const before = Assistant(id: 'a1', name: 'Assistant');
+        final next = HealthDataSelection.enableAll(
+          before,
+          availableIds: DeviceLocalTools.availableHealthTypeIds,
+        );
+        final types = HealthDataSelection.queryTypes(
+          next,
+          availableIds: DeviceLocalTools.availableHealthTypeIds,
+        );
+        expect(types, HealthDataTypeIds.all);
+        expect(HealthDataSelection.isMasterEnabled(next), isTrue);
+
+        await DeviceLocalTools.requestHealthPermission(types: types);
+
+        final permissionCalls = calls
+            .where((call) => call.method == 'requestHealthPermission')
+            .toList();
+        expect(permissionCalls, hasLength(1));
+        final payload =
+            jsonDecode(permissionCalls.single.arguments as String)
+                as Map<String, dynamic>;
+        expect(payload['types'], HealthDataTypeIds.all);
+      },
+    );
 
     test('disabled or unknown local tool calls are not handled', () async {
       expect(

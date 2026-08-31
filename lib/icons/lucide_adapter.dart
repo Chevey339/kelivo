@@ -129,6 +129,10 @@ class Lucide {
   static const IconData Paperclip = lucide.LucideIcons.paperclip;
   static const IconData ChevronUp = lucide.LucideIcons.chevronUp;
   static const IconData Map = lucide.LucideIcons.map;
+  static const IconData MapPin = lucide.LucideIcons.mapPin;
+  static const IconData CloudSun = lucide.LucideIcons.cloudSun;
+  static const IconData ListTodo = lucide.LucideIcons.listTodo;
+  static const IconData ListPlus = lucide.LucideIcons.listPlus;
   static const IconData SquarePen = lucide.LucideIcons.squarePen;
   static const IconData info = lucide.LucideIcons.info;
   static const IconData Zap = lucide.LucideIcons.zap;
@@ -198,4 +202,15 @@ class Lucide {
   static const IconData clock = lucide.LucideIcons.clock;
   static const IconData Wallet = lucide.LucideIcons.walletMinimal;
   static const IconData Coins = lucide.LucideIcons.coins;
+  static const IconData Footprints = lucide.LucideIcons.footprints;
+  static const IconData Flame = lucide.LucideIcons.flame;
+  static const IconData PersonStanding = lucide.LucideIcons.personStanding;
+  static const IconData Dumbbell = lucide.LucideIcons.dumbbell;
+  static const IconData Bed = lucide.LucideIcons.bed;
+  static const IconData Droplets = lucide.LucideIcons.droplets;
+  static const IconData Weight = lucide.LucideIcons.weight;
+  static const IconData Utensils = lucide.LucideIcons.utensils;
+  static const IconData Wind = lucide.LucideIcons.wind;
+  static const IconData Syringe = lucide.LucideIcons.syringe;
+  static const IconData Route = lucide.LucideIcons.route;
 }

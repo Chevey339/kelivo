@@ -1,5 +1,7 @@
 import 'dart:async';
 
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
@@ -9,6 +11,7 @@ import 'package:Kelivo/core/database/business_repository.dart';
 import 'package:Kelivo/core/models/backup.dart';
 import 'package:Kelivo/core/providers/backup_provider.dart';
 import 'package:Kelivo/core/providers/backup_reminder_provider.dart';
+import 'package:Kelivo/core/providers/local_snapshot_provider.dart';
 import 'package:Kelivo/core/providers/s3_backup_provider.dart';
 import 'package:Kelivo/core/providers/settings_provider.dart';
 import 'package:Kelivo/core/services/backup/backup_cancel_token.dart';
@@ -141,6 +144,17 @@ Future<void> _expectNoSetStateAfterDispose(
         ChangeNotifierProvider<SettingsProvider>.value(value: settings),
         ChangeNotifierProvider<ChatService>.value(value: chatService),
         ChangeNotifierProvider<BackupReminderProvider>.value(value: reminder),
+        ChangeNotifierProvider<LocalSnapshotProvider>(
+          create: (_) => LocalSnapshotProvider(
+            appDataDirectory: Directory.systemTemp.createTempSync(
+              'kelivo_backup_page_',
+            ),
+            chatService: chatService,
+            businessRepository: business.repository,
+            businessPreferences: business.preferences,
+            autoLoad: false,
+          ),
+        ),
       ],
       child: BackupPage(debugBackupProvider: webDav, debugS3BackupProvider: s3),
     ),

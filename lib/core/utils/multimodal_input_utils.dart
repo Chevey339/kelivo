@@ -7,6 +7,78 @@ import '../../utils/sandbox_path_resolver.dart';
 const String multimodalInternalMediaPathsKey = '_kelivo_media_paths';
 const String multimodalInternalRevisionIdKey = '_kelivo_revision_id';
 
+/// Internal message key listing a user message's document attachments as
+/// `{uri, name, mime}` entries — the `FilePart`s that are not images, audio
+/// or video. They normally reach the model as extracted text; this key lets a
+/// provider that can hand a file to a sandbox take the file itself instead.
+/// Stripped before anything reaches the wire, like the other `_kelivo_` keys.
+const String multimodalInternalDocumentPathsKey = '_kelivo_document_paths';
+
+/// Extensions of files that are data to compute over rather than prose to
+/// read: a sandbox with pandas makes more of them than the context window
+/// does, where a spreadsheet arrives as flattened cells and a large CSV as
+/// a wall of tokens.
+const Set<String> _sandboxDataFileExtensions = <String>{
+  'csv',
+  'tsv',
+  'xls',
+  'xlsx',
+  'xlsm',
+  'json',
+  'jsonl',
+  'ndjson',
+  'xml',
+  'parquet',
+  'feather',
+  'arrow',
+  'avro',
+  'orc',
+  'sqlite',
+  'sqlite3',
+  'db',
+};
+
+/// Whether an attachment is a data file a code execution sandbox should
+/// receive whole, judged by its extension alone: pickers report a
+/// `Dockerfile` or `LICENSE` as an octet stream too, and those read fine as
+/// text.
+bool isSandboxDataFile({required String fileName, required String mime}) {
+  final dot = fileName.lastIndexOf('.');
+  final ext = dot < 0 ? '' : fileName.substring(dot + 1).toLowerCase();
+  return _sandboxDataFileExtensions.contains(ext);
+}
+
+/// One `_kelivo_document_paths` entry.
+typedef InternalDocumentRef = ({String uri, String name, String mime});
+
+Map<String, dynamic> encodeInternalDocumentRef(InternalDocumentRef ref) =>
+    <String, dynamic>{
+      'uri': ref.uri,
+      'name': ref.name,
+      if (ref.mime.isNotEmpty) 'mime': ref.mime,
+    };
+
+List<InternalDocumentRef> parseInternalDocumentRefs(dynamic raw) {
+  if (raw is! List) return const <InternalDocumentRef>[];
+  return <InternalDocumentRef>[
+    for (final entry in raw)
+      if (entry is Map && (entry['uri'] ?? '').toString().trim().isNotEmpty)
+        (
+          uri: entry['uri'].toString().trim(),
+          name: (entry['name'] ?? '').toString().trim(),
+          mime: (entry['mime'] ?? '').toString().trim(),
+        ),
+  ];
+}
+
+/// Provider state stored against an assistant message and carried into the
+/// next request under an internal key, which every provider strips before
+/// anything reaches the wire.
+const String multimodalInternalClaudeContainerKey = '_kelivo_claude_container';
+const String multimodalInternalClaudeTurnKey = '_kelivo_claude_turn';
+const String multimodalInternalGeminiThoughtSignatureKey =
+    '_kelivo_gemini_thought_signature';
+
 bool isImageMime(String mime) => mime.toLowerCase().startsWith('image/');
 
 bool isAudioMime(String mime) => mime.toLowerCase().startsWith('audio/');

@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'assistant_regex.dart';
+import 'health_data_type.dart';
 import 'preset_message.dart';
 
 enum MemorySmartAddMode { batched, perItem }
@@ -49,6 +50,9 @@ class Assistant {
   final bool searchEnabled; // per-assistant external web search switch
   final List<String> mcpServerIds; // bound MCP server IDs
   final List<String> localToolIds; // enabled local tool IDs
+  /// HealthKit metric IDs this collaborator may read. Kept when the health
+  /// master toggle is off so turning it back on restores the selection.
+  final List<String> healthDataTypeIds;
   final String? background; // chat background (color/image ref)
   // Custom request overrides (per assistant)
   final List<Map<String, String>>
@@ -90,6 +94,7 @@ class Assistant {
     this.searchEnabled = false,
     this.mcpServerIds = const <String>[],
     this.localToolIds = const <String>[],
+    this.healthDataTypeIds = HealthDataTypeIds.defaultSelected,
     this.background,
     this.customHeaders = const <Map<String, String>>[],
     this.customBody = const <Map<String, String>>[],
@@ -126,6 +131,7 @@ class Assistant {
     bool? searchEnabled,
     List<String>? mcpServerIds,
     List<String>? localToolIds,
+    List<String>? healthDataTypeIds,
     String? background,
     List<Map<String, String>>? customHeaders,
     List<Map<String, String>>? customBody,
@@ -172,6 +178,7 @@ class Assistant {
       searchEnabled: searchEnabled ?? this.searchEnabled,
       mcpServerIds: mcpServerIds ?? this.mcpServerIds,
       localToolIds: localToolIds ?? this.localToolIds,
+      healthDataTypeIds: healthDataTypeIds ?? this.healthDataTypeIds,
       background: clearBackground ? null : (background ?? this.background),
       customHeaders: customHeaders ?? this.customHeaders,
       customBody: customBody ?? this.customBody,
@@ -214,6 +221,7 @@ class Assistant {
     'searchEnabled': searchEnabled,
     'mcpServerIds': mcpServerIds,
     'localToolIds': localToolIds,
+    'healthDataTypeIds': healthDataTypeIds,
     'background': background,
     'customHeaders': customHeaders,
     'customBody': customBody,
@@ -252,6 +260,9 @@ class Assistant {
         (json['mcpServerIds'] as List?)?.cast<String>() ?? const <String>[],
     localToolIds:
         (json['localToolIds'] as List?)?.cast<String>() ?? const <String>[],
+    healthDataTypeIds: HealthDataTypeIds.parseStoredIds(
+      json['healthDataTypeIds'],
+    ),
     background: json['background'] as String?,
     customHeaders: (() {
       final raw = json['customHeaders'];

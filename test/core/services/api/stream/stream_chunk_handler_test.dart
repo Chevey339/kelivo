@@ -70,6 +70,35 @@ void main() {
     },
   );
 
+  test('a generated file becomes an image part only when it is one', () {
+    final handler = StreamChunkHandler();
+    handler.handle(
+      const GeneratedFile(
+        uri: 'kelivo-file:///upload/chart.png',
+        name: 'chart.png',
+        mime: 'image/png',
+      ),
+    );
+    handler.handle(
+      const GeneratedFile(
+        uri: 'kelivo-file:///upload/data.csv',
+        name: 'data.csv',
+        mime: 'text/csv',
+      ),
+    );
+    handler.handle(
+      const GeneratedFile(uri: '', name: 'nothing.txt', mime: 'text/plain'),
+    );
+
+    expect(handler.parts, hasLength(2));
+    final image = handler.parts[0] as ImagePart;
+    expect(image.uri, 'kelivo-file:///upload/chart.png');
+    expect(image.mime, 'image/png');
+    final file = handler.parts[1] as FilePart;
+    expect(file.uri, 'kelivo-file:///upload/data.csv');
+    expect(file.name, 'data.csv');
+  });
+
   test('creates a text part on Delta when Start was omitted', () {
     final handler = StreamChunkHandler();
     handler.handle(const TextDelta(id: 't', text: 'Hello'));
@@ -617,5 +646,51 @@ void main() {
       'kelivo-file:///images/a.png',
     ]);
     expect(handler.parts.whereType<TextPart>().single.text, 'done');
+  });
+
+  test('RetryPending is forwarded to onRetry and not folded into parts', () {
+    final seen = <RetryPending>[];
+    final handler = StreamChunkHandler(onRetry: seen.add);
+    handler.handle(
+      const RetryPending(
+        attempt: 1,
+        maxRetries: 3,
+        delay: Duration(seconds: 2),
+        errorText: 'HTTP 429',
+      ),
+    );
+    handler.handle(const TextDelta(id: 't', text: 'hello'));
+    expect(seen, hasLength(1));
+    expect(seen.single.attempt, 1);
+    expect(seen.single.maxRetries, 3);
+    expect(handler.parts.whereType<TextPart>().single.text, 'hello');
+  });
+
+  test('RetryAttemptStart is not folded into parts', () {
+    final handler = StreamChunkHandler();
+    handler.handle(const RetryAttemptStart());
+    handler.handle(const TextDelta(id: 't', text: 'hello'));
+    expect(handler.parts.whereType<TextPart>().single.text, 'hello');
+  });
+
+  test('RetryPending.deadlineAt uses the stamped retryAt', () {
+    final retryAt = DateTime(2026, 8, 31, 12);
+    final pending = RetryPending(
+      attempt: 1,
+      maxRetries: 3,
+      delay: const Duration(seconds: 5),
+      retryAt: retryAt,
+    );
+    expect(pending.deadlineAt(DateTime(2026, 8, 31, 12, 0, 4)), retryAt);
+  });
+
+  test('RetryPending.deadlineAt falls back to now plus delay', () {
+    const pending = RetryPending(
+      attempt: 1,
+      maxRetries: 3,
+      delay: Duration(seconds: 5),
+    );
+    final now = DateTime(2026, 8, 31, 12);
+    expect(pending.deadlineAt(now), now.add(const Duration(seconds: 5)));
   });
 }

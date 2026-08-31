@@ -597,6 +597,8 @@ class _BrandBadge extends StatelessWidget {
     if (s is FirecrawlOptions) return 'firecrawl';
     if (s is TinyFishOptions) return 'tinyfish';
     if (s is AnySearchOptions) return 'anysearch';
+    if (s is ParallelOptions) return 'parallel';
+    if (s is YouSearchOptions) return 'you';
     if (s is KelivoOptions) return 'kelivo';
     return 'search';
   }

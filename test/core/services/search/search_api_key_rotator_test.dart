@@ -113,6 +113,8 @@ void main() {
         'serper',
         'grok',
         'querit',
+        'parallel',
+        'you',
       ];
       for (final type in types) {
         final decoded = SearchServiceOptions.fromJson({

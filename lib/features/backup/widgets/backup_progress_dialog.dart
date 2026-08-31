@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
+import '../../../core/services/backup/backup_activity.dart';
 import '../../../core/services/backup/backup_cancel_token.dart';
 import '../../../core/services/backup/backup_task_progress.dart';
 import '../../../icons/lucide_adapter.dart';
@@ -28,7 +29,12 @@ final class BackupTaskHandle {
 }
 
 final class BackupTaskResult<T> {
-  const BackupTaskResult._({this.value, this.error, required this.cancelled});
+  const BackupTaskResult._({
+    this.value,
+    this.error,
+    required this.cancelled,
+    this.backgrounded = false,
+  });
 
   factory BackupTaskResult.success(T value) =>
       BackupTaskResult._(value: value, cancelled: false);
@@ -36,14 +42,19 @@ final class BackupTaskResult<T> {
   factory BackupTaskResult.cancelled() =>
       const BackupTaskResult._(cancelled: true);
 
+  /// The user dismissed the dialog; the task is still running.
+  factory BackupTaskResult.backgrounded() =>
+      const BackupTaskResult._(cancelled: false, backgrounded: true);
+
   factory BackupTaskResult.failure(Object error) =>
       BackupTaskResult._(error: error, cancelled: false);
 
   final T? value;
   final Object? error;
   final bool cancelled;
+  final bool backgrounded;
 
-  bool get isSuccess => !cancelled && error == null;
+  bool get isSuccess => !cancelled && !backgrounded && error == null;
 }
 
 Future<BackupTaskResult<T>> showBackupProgressDialog<T>(
@@ -51,6 +62,7 @@ Future<BackupTaskResult<T>> showBackupProgressDialog<T>(
   required String title,
   required Future<T> Function(BackupTaskHandle handle) task,
   bool cancellable = true,
+  String? backgroundLabel,
 }) async {
   final token = BackupCancelToken();
   final progress = ValueNotifier(
@@ -61,6 +73,12 @@ Future<BackupTaskResult<T>> showBackupProgressDialog<T>(
     ),
   );
   final handle = BackupTaskHandle(cancelToken: token, progress: progress);
+  // Held here rather than inside the dialog so a backgrounded task can outlive
+  // the widget that started it.
+  Future<T>? running;
+  // Claimed before the dialog and released only once the task settles, so a
+  // task the user sent to the background still counts as in flight.
+  BackupActivity.begin();
   try {
     final result = await showAppDialog<BackupTaskResult<T>>(
       context,
@@ -70,12 +88,27 @@ Future<BackupTaskResult<T>> showBackupProgressDialog<T>(
         handle: handle,
         task: task,
         initiallyCancellable: cancellable,
+        backgroundLabel: backgroundLabel,
+        onStarted: (future) => running = future,
       ),
     );
     return result ?? BackupTaskResult.cancelled();
   } finally {
-    token.dispose();
-    progress.dispose();
+    // A task that is still running keeps reporting progress into these, so
+    // they can only be released once it has settled -- but waiting for that
+    // here would be the opposite of backgrounding it.
+    final pending = running;
+    void release() {
+      token.dispose();
+      progress.dispose();
+      BackupActivity.end();
+    }
+
+    if (pending == null) {
+      release();
+    } else {
+      unawaited(pending.then((_) {}, onError: (_) {}).whenComplete(release));
+    }
   }
 }
 
@@ -85,12 +118,16 @@ class _BackupProgressDialogHost<T> extends StatefulWidget {
     required this.handle,
     required this.task,
     required this.initiallyCancellable,
+    required this.onStarted,
+    this.backgroundLabel,
   });
 
   final String title;
   final BackupTaskHandle handle;
   final Future<T> Function(BackupTaskHandle handle) task;
   final bool initiallyCancellable;
+  final String? backgroundLabel;
+  final void Function(Future<T> running) onStarted;
 
   @override
   State<_BackupProgressDialogHost<T>> createState() =>
@@ -113,7 +150,9 @@ class _BackupProgressDialogHostState<T>
 
   Future<void> _run() async {
     try {
-      final value = await widget.task(widget.handle);
+      final running = widget.task(widget.handle);
+      widget.onStarted(running);
+      final value = await running;
       if (!mounted) return;
       setState(() => _outcome = TaskProgressOutcome.success);
       await Future<void>.delayed(const Duration(milliseconds: 600));
@@ -143,6 +182,10 @@ class _BackupProgressDialogHostState<T>
     widget.handle.cancelToken.cancel();
   }
 
+  void _background() {
+    Navigator.of(context).pop(BackupTaskResult<T>.backgrounded());
+  }
+
   void _acknowledgeFailure() {
     Navigator.of(context).pop(
       BackupTaskResult<T>.failure(_error ?? StateError('backup_task_failed')),
@@ -169,6 +212,8 @@ class _BackupProgressDialogHostState<T>
           onAcknowledge: failure ? _acknowledgeFailure : null,
           cancelLabel: l10n.backupProgressCancel,
           acknowledgeLabel: l10n.backupPageOK,
+          onBackground: widget.backgroundLabel == null ? null : _background,
+          backgroundLabel: widget.backgroundLabel,
           outcome: _outcome,
         );
       },

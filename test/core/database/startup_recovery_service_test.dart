@@ -223,5 +223,24 @@ void main() {
       expect(receipt.databaseId, isNot(originalId));
       expect(receiptFiles(directory), hasLength(1));
     });
+
+    test('leaves no displaced copy behind', () async {
+      // The confirmation dialog promises the data is permanently gone, so
+      // unlike an unattended rebuild this must not stash a copy.
+      await DatabaseInstallationGate.ensureReady(appDataDirectory: directory);
+
+      await StartupRecoveryService.reset(appDataDirectory: directory);
+
+      final displaced = directory
+          .listSync(followLinks: false)
+          .map((entity) => p.basename(entity.path))
+          .where(
+            (name) => name.startsWith(
+              '${AppDatabase.databaseFileName}'
+              '${DatabaseInstallationGate.displacedDatabasePrefix}',
+            ),
+          );
+      expect(displaced, isEmpty);
+    });
   });
 }

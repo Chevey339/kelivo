@@ -27,6 +27,9 @@ import '../../../core/services/search/search_tool_service.dart';
 import '../../../core/providers/instruction_injection_provider.dart';
 import '../../../core/providers/world_book_provider.dart';
 import '../../../core/services/api/builtin_tools.dart';
+import '../../../core/services/api/providers/claude/claude_container.dart';
+import '../../../core/services/api/providers/claude/claude_history.dart';
+import '../../../core/services/api/providers/google/gemini_thought_signature.dart';
 import '../../../core/models/assistant_regex.dart';
 import '../../../core/utils/multimodal_input_utils.dart';
 import '../../../utils/assistant_regex.dart';
@@ -85,7 +88,7 @@ class MessageBuilderService {
     this.chatRepository,
     this.ocrHandler,
     this.ocrPrefetch,
-    this.geminiThoughtSignatureHandler,
+    this.providerArtifactLookup,
   });
 
   final ChatService chatService;
@@ -105,6 +108,7 @@ class MessageBuilderService {
     List<String> imagePaths, {
     String? revisionId,
     OcrPrepareSession? session,
+    String? requestId,
   })?
   ocrHandler;
 
@@ -118,9 +122,11 @@ class MessageBuilderService {
   /// OCR text wrapper function
   String Function(String ocrText)? ocrTextWrapper;
 
-  /// Handler to append Gemini thought signatures for API calls
-  final String Function(ChatMessage message, String content)?
-  geminiThoughtSignatureHandler;
+  /// Provider state stored against an assistant message (a container id, a
+  /// Gemini thought signature), by kind. It rides along under an internal key
+  /// the provider strips.
+  final String? Function(ChatMessage message, String kind)?
+  providerArtifactLookup;
 
   /// Cache for document text extraction to avoid re-reading files on every message
   /// Keyed by path, validated with (modified + size) to avoid stale reuse.
@@ -251,6 +257,23 @@ class MessageBuilderService {
                 'content': '\n\n',
                 'tool_calls': calls,
               };
+              final turn = providerArtifactLookup?.call(
+                m,
+                claudeTurnArtifactKind,
+              );
+              if (turn != null && turn.isNotEmpty) {
+                assistantToolMessage[multimodalInternalClaudeTurnKey] = turn;
+              }
+              // Also here: a turn that ran code and then said nothing has no
+              // final message below to carry the container.
+              final container = providerArtifactLookup?.call(
+                m,
+                claudeContainerArtifactKind,
+              );
+              if (container != null && container.isNotEmpty) {
+                assistantToolMessage[multimodalInternalClaudeContainerKey] =
+                    container;
+              }
               if (assistantReasoningContent?.isNotEmpty == true) {
                 assistantToolMessage['reasoning_content'] =
                     assistantReasoningContent;
@@ -283,10 +306,7 @@ class MessageBuilderService {
         }
       }
 
-      var content = m.content;
-      if (m.role == 'assistant' && geminiThoughtSignatureHandler != null) {
-        content = geminiThoughtSignatureHandler!(m, content);
-      }
+      final content = m.content;
       final mediaRefs = mediaRefsFromParts(m);
       // Pure-attachment turns have empty text content but still must be sent.
       // Document FileParts are omitted from mediaRefs (they travel via
@@ -301,9 +321,30 @@ class MessageBuilderService {
       final message = <String, dynamic>{'role': role, 'content': content};
       if (role == 'user') {
         message[internalRevisionIdKey] = m.id;
+      } else {
+        final container = providerArtifactLookup?.call(
+          m,
+          claudeContainerArtifactKind,
+        );
+        if (container != null && container.isNotEmpty) {
+          message[multimodalInternalClaudeContainerKey] = container;
+        }
+        final signature = providerArtifactLookup?.call(
+          m,
+          geminiThoughtSignatureArtifactKind,
+        );
+        if (signature != null && signature.isNotEmpty) {
+          message[multimodalInternalGeminiThoughtSignatureKey] = signature;
+        }
       }
       if (mediaRefs.isNotEmpty) {
         message[internalMediaPathsKey] = mediaRefs;
+      }
+      if (role == 'user') {
+        final documentRefs = documentRefsFromParts(m);
+        if (documentRefs.isNotEmpty) {
+          message[multimodalInternalDocumentPathsKey] = documentRefs;
+        }
       }
       if (assistantReasoningContent?.isNotEmpty == true) {
         message['reasoning_content'] = assistantReasoningContent;
@@ -327,7 +368,8 @@ class MessageBuilderService {
   /// Collect structured `_kelivo_media_paths` entries from image/file parts.
   ///
   /// Skips unavailable parts. Document (non-media) FileParts are omitted — they
-  /// travel through document extraction, not media-path attachments.
+  /// travel through document extraction, or as [documentRefsFromParts] for a
+  /// provider that takes the file itself.
   static List<Map<String, dynamic>> mediaRefsFromParts(ChatMessage message) {
     final refs = <Map<String, dynamic>>[];
     for (final part in message.parts) {
@@ -359,6 +401,29 @@ class MessageBuilderService {
           ),
         );
       }
+    }
+    return refs;
+  }
+
+  /// Collect `_kelivo_document_paths` entries: the FileParts that
+  /// [mediaRefsFromParts] leaves out.
+  static List<Map<String, dynamic>> documentRefsFromParts(ChatMessage message) {
+    final refs = <Map<String, dynamic>>[];
+    for (final part in message.parts) {
+      if (part is! FilePart || part.unavailable) continue;
+      final uri = part.uri.trim();
+      if (uri.isEmpty) continue;
+      final mime = resolveMediaAttachmentMime(
+        explicitMime: part.mime ?? '',
+        fileName: part.name,
+        path: uri,
+      );
+      if (isImageMime(mime) || isAudioMime(mime) || isVideoMime(mime)) {
+        continue;
+      }
+      refs.add(
+        encodeInternalDocumentRef((uri: uri, name: part.name, mime: mime)),
+      );
     }
     return refs;
   }
@@ -588,6 +653,7 @@ class MessageBuilderService {
     SettingsProvider settings, {
     Conversation? conversation,
     List<ChatMessage>? sourceMessages,
+    bool sandboxDataFiles = false,
   }) {
     final bool ocrActive =
         settings.ocrEnabled &&
@@ -620,6 +686,10 @@ class MessageBuilderService {
           if (path.isNotEmpty) mediaPaths.add(path);
           continue;
         }
+        if (sandboxDataFiles &&
+            isSandboxDataFile(fileName: document.fileName, mime: mime)) {
+          continue;
+        }
         // A document that still needs text extraction.
         return true;
       }
@@ -637,6 +707,11 @@ class MessageBuilderService {
   /// Process user messages in apiMessages: prefer frozen `promptContent`, else
   /// assemble (docs/OCR → memory prefix → template → time) and freeze (§8).
   ///
+  /// With [sandboxDataFiles], data files (see [isSandboxDataFile]) are left
+  /// out of the prompt for the provider to hand to its sandbox, and a message
+  /// carrying one is not frozen: the frozen prompt is provider-neutral, and a
+  /// later regeneration on a provider without a sandbox needs the text back.
+  ///
   /// Returns the image paths from the last user message (for API call).
   Future<List<String>> processUserMessagesForApi(
     List<Map<String, dynamic>> apiMessages,
@@ -644,6 +719,7 @@ class MessageBuilderService {
     Assistant? assistant, {
     Conversation? conversation,
     List<ChatMessage>? sourceMessages,
+    bool sandboxDataFiles = false,
   }) async {
     final bool ocrActive =
         settings.ocrEnabled &&
@@ -916,9 +992,15 @@ class MessageBuilderService {
       final cleanedUser = replacedUserText.trim();
 
       final filePrompts = StringBuffer();
+      var leftToSandbox = false;
       for (final d in parsedUser.documents) {
         final effectiveMime = _effectiveAttachmentMime(d);
         if (isVideoMime(effectiveMime) || isAudioMime(effectiveMime)) {
+          continue;
+        }
+        if (sandboxDataFiles &&
+            isSandboxDataFile(fileName: d.fileName, mime: effectiveMime)) {
+          leftToSandbox = true;
           continue;
         }
         final text = await readDocument(d);
@@ -933,7 +1015,7 @@ class MessageBuilderService {
       }
 
       String merged = (filePrompts.toString() + cleanedUser).trim();
-      var canFreezePrompt = true;
+      var canFreezePrompt = !leftToSandbox;
 
       if (ocrActive && ocrHandler != null) {
         final ocrTargets = parsedUser.imagePaths
@@ -951,6 +1033,7 @@ class MessageBuilderService {
             ocrTargets,
             revisionId: revisionId.isEmpty ? null : revisionId,
             session: ocrSession,
+            requestId: conversation?.id,
           );
           if (ocrText == null) {
             canFreezePrompt = false;

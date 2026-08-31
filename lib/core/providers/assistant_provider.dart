@@ -348,6 +348,7 @@ class AssistantProvider extends ChangeNotifier {
       background: backgroundCopy,
       mcpServerIds: List<String>.of(source.mcpServerIds),
       localToolIds: List<String>.of(source.localToolIds),
+      healthDataTypeIds: List<String>.of(source.healthDataTypeIds),
       customHeaders: source.customHeaders
           .map((e) => Map<String, String>.from(e))
           .toList(),

@@ -1,7 +1,9 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:archive/archive_io.dart';
 import 'package:path/path.dart' as p;
+import 'package:sqlite3/sqlite3.dart' as sqlite;
 
 import '../services/backup/restore_durability.dart';
 import 'app_database.dart';
@@ -112,9 +114,12 @@ final class StartupRecoveryService {
         await _deleteFileIfPresent(entity.path);
       }
     }
+    // The confirmation dialog promises the data is permanently gone, so this
+    // is the one caller that must not leave a displaced copy behind.
     await DatabaseInstallationGate.rebuildFresh(
       appDataDirectory: appDataDirectory,
       durability: durability,
+      preserveDisplacedCopy: false,
     );
   }
 
@@ -197,4 +202,191 @@ final class StartupRecoveryService {
   /// The installed database file name, exposed so the failure screen can note
   /// what a reset will remove.
   static String get databaseFileName => AppDatabase.databaseFileName;
+}
+
+/// File-level diagnostics helpers for the pre-initialization failure screen.
+///
+/// Separate from [StartupRecoveryService] because nothing here changes app
+/// state: these only read the data directory, or write into a log folder the
+/// app never reads back during startup.
+final class StartupDiagnosticsService {
+  StartupDiagnosticsService._();
+
+  static const _logDirectoryName = 'logs';
+  static const _reportPrefix = 'startup_failure_';
+  // .txt so the in-app log viewer, which lists that extension, picks these up
+  // once the app starts successfully again.
+  static const _reportSuffix = '.txt';
+
+  /// How many failure reports to keep. Enough to compare a repeat failure
+  /// against the first one, few enough to never matter for disk use.
+  static const retainedReports = 5;
+
+  /// Persists [text] so the failure survives the restart that follows it, and
+  /// can be read later from the in-app log viewer or a file manager.
+  ///
+  /// Best effort by design: a report that cannot be written must never make a
+  /// failing startup worse, so the caller gets null instead of an exception.
+  static Future<File?> writeFailureReport({
+    required Directory appDataDirectory,
+    required String text,
+    DateTime Function()? clock,
+  }) async {
+    try {
+      final directory = Directory(
+        p.join(appDataDirectory.path, _logDirectoryName),
+      );
+      await directory.create(recursive: true);
+      final stamp = (clock?.call() ?? DateTime.now())
+          .toUtc()
+          .toIso8601String()
+          .replaceAll(RegExp(r'[:.]'), '-');
+      final file = File(
+        p.join(directory.path, '$_reportPrefix$stamp$_reportSuffix'),
+      );
+      await file.writeAsString(text, flush: true);
+      await _pruneReports(directory);
+      return file;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  static Future<void> _pruneReports(Directory directory) async {
+    try {
+      final reports = <File>[];
+      await for (final entity in directory.list(followLinks: false)) {
+        if (entity is! File) continue;
+        final name = p.basename(entity.path);
+        if (name.startsWith(_reportPrefix) && name.endsWith(_reportSuffix)) {
+          reports.add(entity);
+        }
+      }
+      if (reports.length <= retainedReports) return;
+      reports.sort((a, b) => p.basename(a.path).compareTo(p.basename(b.path)));
+      for (final stale in reports.take(reports.length - retainedReports)) {
+        try {
+          await stale.delete();
+        } catch (_) {
+          // A report we cannot delete is harmless; it only costs disk space.
+        }
+      }
+    } catch (_) {
+      // Pruning is housekeeping, never a reason to lose the report we wrote.
+    }
+  }
+
+  /// Zips the whole app data directory into [workingDirectory] and returns the
+  /// archive, so mobile platforms — which cannot be handed a destination
+  /// folder — can still salvage everything through a share sheet.
+  ///
+  /// [workingDirectory] must live outside [appDataDirectory]; otherwise the
+  /// archive would try to contain itself.
+  static Future<File> createDataArchive({
+    required Directory appDataDirectory,
+    required Directory workingDirectory,
+    DateTime Function()? clock,
+  }) async {
+    if (!await appDataDirectory.exists()) {
+      throw StateError('startup_recovery_source_missing');
+    }
+    final sourcePath = p.normalize(appDataDirectory.absolute.path);
+    final workingPath = p.normalize(workingDirectory.absolute.path);
+    if (workingPath == sourcePath || p.isWithin(sourcePath, workingPath)) {
+      throw StateError('startup_recovery_export_inside_source');
+    }
+    await workingDirectory.create(recursive: true);
+    final stamp = (clock?.call() ?? DateTime.now())
+        .toUtc()
+        .toIso8601String()
+        .replaceAll(RegExp(r'[:.]'), '-');
+    final archive = File(
+      p.join(workingDirectory.path, 'kelivo-data-$stamp.zip'),
+    );
+    if (await archive.exists()) {
+      throw StateError('startup_recovery_export_collision');
+    }
+    final encoder = ZipFileEncoder();
+    await encoder.zipDirectory(
+      appDataDirectory,
+      filename: archive.path,
+      followLinks: false,
+    );
+    return archive;
+  }
+
+  /// Runs SQLite's own consistency checks against the installed database.
+  ///
+  /// This is the one probe expensive enough to be user-initiated: both
+  /// pragmas scan the whole file. It answers the question the failure screen
+  /// otherwise cannot — whether the data is intact and the fault is in the
+  /// admission logic, or the file itself is damaged.
+  static Future<StartupIntegrityResult> checkIntegrity({
+    required Directory appDataDirectory,
+  }) async {
+    final file = File(
+      p.join(appDataDirectory.path, AppDatabase.databaseFileName),
+    );
+    if (!await file.exists()) {
+      return const StartupIntegrityResult(
+        databasePresent: false,
+        quickCheck: null,
+        foreignKeyViolations: null,
+      );
+    }
+    final database = sqlite.sqlite3.open(
+      file.absolute.path,
+      mode: sqlite.OpenMode.readOnly,
+    );
+    try {
+      final quickCheck = database
+          .select('PRAGMA quick_check;')
+          .map((row) => row.values.first?.toString() ?? '')
+          .where((line) => line.isNotEmpty)
+          .toList(growable: false);
+      final foreignKeys = database.select('PRAGMA foreign_key_check;').length;
+      return StartupIntegrityResult(
+        databasePresent: true,
+        quickCheck: quickCheck,
+        foreignKeyViolations: foreignKeys,
+      );
+    } finally {
+      database.close();
+    }
+  }
+}
+
+/// Outcome of [StartupDiagnosticsService.checkIntegrity].
+final class StartupIntegrityResult {
+  const StartupIntegrityResult({
+    required this.databasePresent,
+    required this.quickCheck,
+    required this.foreignKeyViolations,
+  });
+
+  final bool databasePresent;
+
+  /// SQLite's `quick_check` output; a single `ok` means no damage was found.
+  final List<String>? quickCheck;
+  final int? foreignKeyViolations;
+
+  bool get isHealthy =>
+      databasePresent &&
+      quickCheck != null &&
+      quickCheck!.length == 1 &&
+      quickCheck!.single == 'ok' &&
+      foreignKeyViolations == 0;
+
+  String describe() {
+    if (!databasePresent) return 'database file missing';
+    final checks = quickCheck ?? const <String>[];
+    final buffer = StringBuffer()
+      ..write(
+        'quick_check: ${checks.isEmpty ? 'no output' : checks.join('; ')}',
+      )
+      ..write(
+        ' · foreign_key_check: ${foreignKeyViolations ?? '?'} violation(s)',
+      );
+    return buffer.toString();
+  }
 }

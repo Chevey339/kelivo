@@ -357,6 +357,104 @@ void main() {
       expect(requests.single.containsKey('reasoning_effort'), isFalse);
     });
 
+    test(
+      'tool-only model echoes empty reasoning_content for tool continuation',
+      () async {
+        final requests = <Map<String, dynamic>>[];
+
+        final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+        addTearDown(() async {
+          await server.close(force: true);
+        });
+
+        server.listen((request) async {
+          requests.add(await _readJsonBody(request));
+          request.response.statusCode = HttpStatus.ok;
+          request.response.headers.contentType = ContentType(
+            'text',
+            'event-stream',
+            charset: 'utf-8',
+          );
+          if (requests.length == 1) {
+            request.response.write(
+              'data: ${jsonEncode({
+                'choices': [
+                  {
+                    'delta': {
+                      'role': 'assistant',
+                      'content': '',
+                      'tool_calls': [
+                        {
+                          'index': 0,
+                          'id': 'call_date',
+                          'type': 'function',
+                          'function': {'name': 'date', 'arguments': '{}'},
+                        },
+                      ],
+                    },
+                    'finish_reason': 'tool_calls',
+                  },
+                ],
+              })}\n\n',
+            );
+          } else {
+            request.response.write(
+              'data: ${jsonEncode({
+                'choices': [
+                  {
+                    'delta': {'role': 'assistant', 'content': '2026-08-29'},
+                    'finish_reason': 'stop',
+                  },
+                ],
+              })}\n\n',
+            );
+          }
+          request.response.write('data: [DONE]\n\n');
+          await request.response.close();
+        });
+
+        final baseUrl = 'http://${server.address.address}:${server.port}/v1';
+        final chunks = await ChatApiService.sendMessageStream(
+          config: _deepSeekConfig(
+            baseUrl,
+            modelOverrides: const {
+              'deepseek-v4-flash': {
+                'abilities': ['tool'],
+              },
+            },
+          ),
+          modelId: 'deepseek-v4-flash',
+          messages: const [
+            {'role': 'user', 'content': 'What is the date?'},
+          ],
+          tools: const [
+            {
+              'type': 'function',
+              'function': {
+                'name': 'date',
+                'description': 'Get the current date',
+                'parameters': {
+                  'type': 'object',
+                  'properties': <String, dynamic>{},
+                },
+              },
+            },
+          ],
+          onToolCall: (_, __, {toolCallId}) async => '2026-08-29',
+        ).toList();
+
+        expect(chunks.isGenerationDone, isTrue);
+        expect(requests, hasLength(2));
+        expect(requests[1].containsKey('thinking'), isFalse);
+        final messages = (requests[1]['messages'] as List).cast<Map>();
+        final assistantToolMessage = messages.firstWhere(
+          (message) =>
+              message['role'] == 'assistant' && message['tool_calls'] is List,
+        );
+        expect(assistantToolMessage['reasoning_content'], '');
+      },
+    );
+
     test('ordinary history strips reasoning_content', () async {
       late Map<String, dynamic> requestBody;
       final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);

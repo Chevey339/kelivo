@@ -31,6 +31,12 @@ void main() {
       LocalToolNames.screenTime,
       LocalToolNames.calendarQuery,
       LocalToolNames.calendarCreate,
+      LocalToolNames.currentLocation,
+      LocalToolNames.weather,
+      LocalToolNames.healthSummary,
+      LocalToolNames.remindersQuery,
+      LocalToolNames.remindersCreate,
+      LocalToolNames.remindersComplete,
     ]);
   });
 }

@@ -8,6 +8,7 @@ import 'package:hive/hive.dart';
 import 'package:path_provider_platform_interface/path_provider_platform_interface.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'package:Kelivo/core/database/app_database.dart';
 import 'package:Kelivo/core/database/chat_database_repository.dart';
 import 'package:Kelivo/core/models/chat_message.dart';
 import 'package:Kelivo/core/models/conversation.dart';
@@ -1899,6 +1900,115 @@ void main() {
       );
     },
   );
+
+  group('legacy check runs before database admission', () {
+    // Regression: check() used to open a live drift connection to read the
+    // receipt. A live connection rejects any schema that is not already
+    // current, so every device that came from Hive and was still a schema
+    // behind failed startup closed with an opaque DriftRemoteException — on
+    // the release that introduced the new schema, i.e. on every upgrade.
+    Future<void> seedMigratedDatabaseAt(int userVersion) async {
+      await _seedHiveChat(
+        tempDir: tempDir,
+        conversationId: 'conversation-schema',
+        messageId: 'message-schema',
+        content: 'already migrated',
+      );
+      final file = File('${tempDir.path}/kelivo.db');
+      final repository = ChatDatabaseRepository.open(file: file);
+      try {
+        await repository.ensureReady();
+      } finally {
+        await repository.close();
+      }
+      final raw = sqlite.sqlite3.open(file.absolute.path);
+      try {
+        raw.execute(
+          'INSERT OR REPLACE INTO chat_storage_meta_rows (key, value) '
+          'VALUES (?, ?);',
+          [ChatStorageMetaKeys.hiveMigrationComplete, 'true'],
+        );
+        raw.execute('PRAGMA wal_checkpoint(TRUNCATE);');
+        raw.userVersion = userVersion;
+      } finally {
+        raw.close();
+      }
+    }
+
+    for (final schemaVersion in AppDatabase.publishedSchemaVersions) {
+      test('sees a completed migration at schema $schemaVersion', () async {
+        await seedMigratedDatabaseAt(schemaVersion);
+
+        final decision = await HiveToSqliteMigrationService.check();
+
+        expect(decision.needsMigration, isFalse);
+        expect(decision.hiveFiles, isNotEmpty);
+      });
+    }
+
+    test('still asks to migrate when the receipt is absent', () async {
+      await _seedHiveChat(
+        tempDir: tempDir,
+        conversationId: 'conversation-unmigrated',
+        messageId: 'message-unmigrated',
+        content: 'not migrated yet',
+      );
+      final file = File('${tempDir.path}/kelivo.db');
+      final repository = ChatDatabaseRepository.open(file: file);
+      try {
+        await repository.ensureReady();
+      } finally {
+        await repository.close();
+      }
+
+      expect(
+        (await HiveToSqliteMigrationService.check()).needsMigration,
+        isTrue,
+      );
+    });
+
+    test('treats a half-created database as unmigrated', () async {
+      await _seedHiveChat(
+        tempDir: tempDir,
+        conversationId: 'conversation-halfway',
+        messageId: 'message-halfway',
+        content: 'crashed first launch',
+      );
+      final file = File('${tempDir.path}/kelivo.db');
+      final raw = sqlite.sqlite3.open(file.absolute.path);
+      raw.close();
+
+      expect(
+        (await HiveToSqliteMigrationService.check()).needsMigration,
+        isTrue,
+      );
+    });
+
+    test('refuses to re-migrate over a database it cannot read', () async {
+      // Re-migrating replaces the installed database, so "cannot tell" must
+      // never be answered as "never migrated".
+      await _seedHiveChat(
+        tempDir: tempDir,
+        conversationId: 'conversation-corrupt',
+        messageId: 'message-corrupt',
+        content: 'unreadable',
+      );
+      File(
+        '${tempDir.path}/kelivo.db',
+      ).writeAsBytesSync(List<int>.filled(4096, 0x7f));
+
+      await expectLater(
+        HiveToSqliteMigrationService.check(),
+        throwsA(
+          isA<StateError>().having(
+            (error) => error.message,
+            'message',
+            'database_corrupt',
+          ),
+        ),
+      );
+    });
+  });
 
   test(
     'failed validation can be retried idempotently with Hive retained',

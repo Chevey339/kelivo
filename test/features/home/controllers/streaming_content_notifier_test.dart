@@ -119,4 +119,20 @@ void main() {
     await Future<void>.delayed(Duration.zero);
     expect(seen, hasLength(1));
   });
+
+  test('updateRetryStatus is restored onto a new notifier after clear', () {
+    final notifier = StreamingContentNotifier();
+    addTearDown(notifier.dispose);
+    final status = RetryStatus(
+      attempt: 1,
+      maxRetries: 3,
+      retryAt: DateTime(2026, 8, 30, 21),
+    );
+    notifier.updateRetryStatus('m1', status);
+    expect(notifier.getNotifier('m1').value.retryStatus, status);
+    notifier.clear();
+    expect(notifier.hasNotifier('m1'), isFalse);
+    notifier.updateRetryStatus('m1', status);
+    expect(notifier.getNotifier('m1').value.retryStatus, status);
+  });
 }

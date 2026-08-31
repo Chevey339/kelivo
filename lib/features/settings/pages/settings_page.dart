@@ -11,6 +11,7 @@ import '../../assistant/pages/assistant_settings_page.dart';
 import 'about_page.dart';
 import 'memory_settings_page.dart';
 import 'tts_services_page.dart';
+import 'tool_schema_settings_page.dart';
 import 'sponsor_page.dart';
 import 'log_viewer_page.dart';
 import '../../search/pages/search_services_page.dart';
@@ -394,6 +395,19 @@ class SettingsPage extends StatelessWidget {
                   },
                 ),
               ],
+              _iosDivider(context),
+              _iosNavRow(
+                context,
+                icon: Lucide.Wrench,
+                label: l10n.toolSchemaSettingsPageTitle,
+                onTap: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => const ToolSchemaSettingsPage(),
+                    ),
+                  );
+                },
+              ),
               _iosDivider(context),
               _iosNavRow(
                 context,

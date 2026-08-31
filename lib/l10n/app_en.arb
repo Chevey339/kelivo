@@ -65,8 +65,12 @@
   "storageSpaceCategoryChatData": "Chat Records",
   "storageSpaceCategoryLegacyChatData": "Chat Records (Old)",
   "storageSpaceCategoryRestoreTraces": "Restore Traces",
+  "storageSpaceCategoryDisplacedDatabases": "Set-Aside Databases",
+  "storageSpaceSubDisplacedDatabases": "Kept before an automatic rebuild",
+  "storageSpaceClearDisplacedDatabasesConfirmMessage": "Delete these set-aside databases? Kelivo kept them when it rebuilt its database, and they may be the only surviving copy of those chats and settings. This cannot be undone.",
   "storageSpaceRestoreTracesHint": "Previous data snapshots kept after completed restores. Clearing them does not affect the current app data.",
   "storageSpaceClearRestoreTracesButton": "Clear Restore Traces",
+  "storageSpaceClearDisplacedDatabasesButton": "Delete Set-Aside Databases",
   "storageSpaceClearRestoreTracesConfirmMessage": "Clear completed restore snapshots? Your current database, settings, and files will not be affected.",
   "storageSpaceSubCompletedRestoreRuns": "Completed restore snapshots",
   "storageSpaceCategoryAssistantData": "Assistants",
@@ -707,8 +711,91 @@
   "startupRecoveryResetDialogContent": "This permanently deletes Kelivo's database on this device and starts fresh. If you might need this data, export a copy first. This cannot be undone.",
   "startupRecoveryResetDialogConfirm": "Reset and restart",
   "startupRecoveryResetDialogCancel": "Cancel",
+  "startupRecoveryWhatFailed": "What failed",
+  "startupRecoveryStageLabel": "Stage",
+  "startupRecoveryStageRestore": "Restore gate",
+  "startupRecoveryStageDatabase": "Database startup",
+  "startupRecoveryDiagnosticLabel": "Diagnostic code",
+  "startupRecoverySchemaLabel": "Database version",
+  "startupRecoverySchemaValue": "{installed} on disk · {expected} expected by this build",
+  "@startupRecoverySchemaValue": {
+    "placeholders": {
+      "installed": {
+        "type": "String"
+      },
+      "expected": {
+        "type": "int"
+      }
+    }
+  },
+  "startupRecoveryAppVersionLabel": "App",
+  "startupRecoveryUnknownValue": "unknown",
+  "startupRecoveryCollecting": "Collecting diagnostics…",
+  "startupRecoveryShowDetails": "Show technical details",
+  "startupRecoveryHideDetails": "Hide technical details",
+  "startupRecoveryCopyReport": "Copy full report",
+  "startupRecoveryReportCopied": "Full report copied",
+  "startupRecoveryShareReport": "Export report",
+  "startupRecoveryReportStored": "A copy of this report was saved to {path}",
+  "@startupRecoveryReportStored": {
+    "placeholders": {
+      "path": {
+        "type": "String"
+      }
+    }
+  },
+  "startupRecoveryReportSaved": "Report saved to {path}",
+  "@startupRecoveryReportSaved": {
+    "placeholders": {
+      "path": {
+        "type": "String"
+      }
+    }
+  },
+  "startupRecoveryReportShared": "Report exported.",
+  "startupRecoveryReportSaveFailed": "Could not export the report.",
+  "startupRecoverySectionDataTitle": "Your data",
+  "startupRecoverySectionDataBody": "Nothing has been deleted. Save a copy somewhere safe before trying anything below.",
+  "startupRecoveryExportSavedTo": "A copy of your data was saved to {path}",
+  "@startupRecoveryExportSavedTo": {
+    "placeholders": {
+      "path": {
+        "type": "String"
+      }
+    }
+  },
+  "startupRecoverySectionRepairTitle": "Diagnose and repair",
+  "startupRecoverySectionRepairBody": "The integrity check only reads the database. Repair clears leftover metadata from an interrupted update and retries startup; it never deletes chats.",
+  "startupRecoveryIntegrityButton": "Check database integrity",
+  "startupRecoveryIntegrityHealthy": "SQLite found no damage in the database file.",
+  "startupRecoveryIntegrityDamaged": "SQLite reported problems — {detail}",
+  "@startupRecoveryIntegrityDamaged": {
+    "placeholders": {
+      "detail": {
+        "type": "String"
+      }
+    }
+  },
+  "startupRecoveryIntegrityMissing": "No database file was found in the data folder.",
+  "startupRecoveryIntegrityFailed": "The integrity check could not run.",
+  "startupRecoveryDangerZone": "Danger zone",
+  "startupRecoveryDangerBody": "Resetting permanently deletes Kelivo's database on this device. Export a copy of your data first — a reset also destroys the evidence needed to fix the underlying problem.",
+  "startupRecoveryResetAcknowledge": "I exported a copy, or I do not need this data.",
   "startupDatabaseUpdateRequiredTitle": "Update Kelivo to continue",
   "startupDatabaseUpdateRequiredContent": "The chat database on this device was created by a newer version of Kelivo and cannot be opened by this version. Your data has not been changed. Install the latest version of Kelivo, then open it again.",
+  "startupDatabaseUpdateRequiredDowngradeTitle": "If you need an older version",
+  "startupDatabaseUpdateRequiredDowngradeIntro": "This version cannot open the database on this device. If you must keep using an older version, follow the steps below. Do not delete or overwrite the data here until you have a backup.",
+  "startupDatabaseUpdateRequiredDowngradeStep1": "Install and open the latest Kelivo, then export a backup from Settings → Backup.",
+  "startupDatabaseUpdateRequiredDowngradeStep2": "Open {url} and convert that backup to the older version you want to use.",
+  "@startupDatabaseUpdateRequiredDowngradeStep2": {
+    "placeholders": {
+      "url": {
+        "type": "String"
+      }
+    }
+  },
+  "startupDatabaseUpdateRequiredDowngradeStep3": "After you have confirmed the data on this device is backed up, install the older version and import the converted backup.",
+  "startupDatabaseUpdateRequiredOpenTool": "Open conversion tool",
   "backupPageRestoreFailedMessage": "Restore failed: {error}",
   "@backupPageRestoreFailedMessage": {
     "placeholders": {
@@ -1984,6 +2071,8 @@
   "displaySettingsPageRegenerateDeleteTrailingMessagesTitle": "Delete messages below when regenerating",
   "displaySettingsPageShowRegenerateConfirmDialogTitle": "Confirm before regenerating",
   "displaySettingsPageForkKeepMessageVersionsTitle": "Keep Message Versions When Forking",
+  "displaySettingsPageEditAssistantKeepThinkingToolCardsTitle": "Keep thinking and tool cards when editing assistant",
+  "displaySettingsPageEditAssistantKeepThinkingToolCardsSubtitle": "When off, the edited version keeps only the assistant text. Switching back still shows previous thinking and tool cards.",
   "chainOfThoughtExpandSteps": "Show {count} more steps",
   "@chainOfThoughtExpandSteps": {
     "placeholders": {
@@ -2372,6 +2461,18 @@
   "searchProviderTinyFishDescription": "TinyFish Search API with region/language filters. Requires an API key. Fetch/Scrape is not supported here.",
   "searchServiceNameAnySearch": "AnySearch",
   "searchProviderAnySearchDescription": "Unified search for AI agents with automatic routing across web and specialist data sources. API key is optional.",
+  "searchServiceNameParallel": "Parallel",
+  "searchProviderParallelDescription": "Parallel Search API. Returns LLM-optimized web excerpts with turbo, fast, basic, and advanced modes.",
+  "searchServicesDialogSearchMode": "Search mode",
+  "searchServiceNameYou": "You.com",
+  "searchProviderYouDescription": "You.com Search API. Returns web and news results with highlights or snippets.",
+  "searchServicesDialogContentMode": "Content mode",
+  "searchServicesDialogHighlights": "Highlights",
+  "searchServicesDialogSnippets": "Snippets",
+  "searchServicesDialogWebSearch": "Web Search",
+  "searchServicesDialogLlmContext": "LLM Context",
+  "searchServicesDialogMaximumTokens": "Maximum tokens",
+  "searchServicesDialogMaximumTokensInvalid": "Maximum tokens must be between 1024 and 32768.",
   "searchServiceNameKelivo": "Kelivo",
   "searchServicesDialogCountryOptional": "Country/region (optional)",
   "searchServicesDialogLanguageOptional": "Language (optional)",
@@ -2458,6 +2559,77 @@
    "assistantEditLocalToolCalendarQuerySubtitle": "Read calendar events on this device, requires the calendar permission.",
    "assistantEditLocalToolCalendarCreateTitle": "Create Event",
    "assistantEditLocalToolCalendarCreateSubtitle": "Create calendar events on this device with your confirmation, requires the calendar permission.",
+  "assistantEditLocalToolLocationTitle": "Current Location",
+  "assistantEditLocalToolLocationSubtitle": "Read a one-shot location from this device, requires the location permission.",
+  "assistantEditLocalToolWeatherTitle": "Weather",
+  "assistantEditLocalToolWeatherSubtitle": "Get Apple Weather for the current or a specified location. WeatherKit attribution is shown in the result.",
+  "assistantEditLocalToolHealthTitle": "Health Summary",
+  "assistantEditLocalToolHealthSubtitle": "Read a privacy-preserving activity summary from Apple Health, requires Health access.",
+  "assistantEditLocalToolHealthSelectedCount": "{selected}/{total} selected",
+  "@assistantEditLocalToolHealthSelectedCount": {
+    "placeholders": {
+      "selected": { "type": "int" },
+      "total": { "type": "int" }
+    }
+  },
+  "healthDataSettingsTitle": "Health Data",
+  "healthDataSettingsDescription": "HealthKit signals available to the current assistant in daily conversation. Switches control what Kelivo may try to read; iOS still manages actual Health access.",
+  "healthDataSettingsBadge": "{selected}/{total} on",
+  "@healthDataSettingsBadge": {
+    "placeholders": {
+      "selected": { "type": "int" },
+      "total": { "type": "int" }
+    }
+  },
+  "healthDataSettingsIosReadTitle": "iOS Health Read",
+  "healthDataSettingsIosReadSubtitle": "Device available, read range managed by iOS",
+  "healthDataSettingsOpenSystemSettings": "Open system settings",
+  "healthDataSettingsEnableAll": "Enable all",
+  "healthDataSettingsDisableAll": "Disable all",
+  "healthDataSettingsCategoryActivity": "Activity",
+  "healthDataSettingsCategoryRest": "Rest",
+  "healthDataSettingsCategoryHeart": "Heart",
+  "healthDataSettingsCategoryBody": "Body",
+  "healthDataSettingsTypeStepsTitle": "Steps",
+  "healthDataSettingsTypeStepsSubtitle": "Walking steps summary",
+  "healthDataSettingsTypeDaylightTitle": "Sunlight",
+  "healthDataSettingsTypeDaylightSubtitle": "Outdoor daylight time",
+  "healthDataSettingsTypeActiveEnergyTitle": "Energy",
+  "healthDataSettingsTypeActiveEnergySubtitle": "Active energy burned",
+  "healthDataSettingsTypeExerciseMinutesTitle": "Exercise",
+  "healthDataSettingsTypeExerciseMinutesSubtitle": "Apple exercise minutes",
+  "healthDataSettingsTypeStandTimeTitle": "Stand",
+  "healthDataSettingsTypeStandTimeSubtitle": "Stand time",
+  "healthDataSettingsTypeDistanceTitle": "Distance",
+  "healthDataSettingsTypeDistanceSubtitle": "Walking and running distance",
+  "healthDataSettingsTypeWorkoutsTitle": "Workouts",
+  "healthDataSettingsTypeWorkoutsSubtitle": "Workout records: type, duration, distance, and energy",
+  "healthDataSettingsTypeSleepTitle": "Sleep",
+  "healthDataSettingsTypeSleepSubtitle": "Sleep duration last night",
+  "healthDataSettingsTypeMindfulnessTitle": "Resting",
+  "healthDataSettingsTypeMindfulnessSubtitle": "Mindfulness or resting periods",
+  "healthDataSettingsTypeHeartRateTitle": "Heart Rate",
+  "healthDataSettingsTypeHeartRateSubtitle": "Latest heart rate sample",
+  "healthDataSettingsTypeRestingHeartRateTitle": "Resting Heart Rate",
+  "healthDataSettingsTypeRestingHeartRateSubtitle": "Resting heart rate sample",
+  "healthDataSettingsTypeBloodOxygenTitle": "Blood Oxygen",
+  "healthDataSettingsTypeBloodOxygenSubtitle": "Blood oxygen saturation",
+  "healthDataSettingsTypeDietaryEnergyTitle": "Dietary Energy",
+  "healthDataSettingsTypeDietaryEnergySubtitle": "Dietary calorie record",
+  "healthDataSettingsTypeWaterTitle": "Water",
+  "healthDataSettingsTypeWaterSubtitle": "Water intake record",
+  "healthDataSettingsTypeWeightTitle": "Weight",
+  "healthDataSettingsTypeWeightSubtitle": "Body weight sample",
+  "healthDataSettingsTypeBmiTitle": "BMI",
+  "healthDataSettingsTypeBmiSubtitle": "Body mass index",
+  "healthDataSettingsTypeBloodGlucoseTitle": "Blood Glucose",
+  "healthDataSettingsTypeBloodGlucoseSubtitle": "Blood glucose sample",
+  "assistantEditLocalToolRemindersQueryTitle": "Query Reminders",
+  "assistantEditLocalToolRemindersQuerySubtitle": "Read reminders on this device, requires full reminders access.",
+  "assistantEditLocalToolRemindersCreateTitle": "Create Reminder",
+  "assistantEditLocalToolRemindersCreateSubtitle": "Create a reminder on this device with your confirmation, requires full reminders access.",
+  "assistantEditLocalToolRemindersCompleteTitle": "Complete Reminder",
+  "assistantEditLocalToolRemindersCompleteSubtitle": "Mark a reminder as done with your confirmation, requires full reminders access.",
   "assistantEditMemorySwitchDescription": "Allow the assistant to create and use memories across chats.",
   "assistantEditRecentChatsSwitchTitle": "Recent Chats Reference",
   "assistantEditRecentChatsSwitchDescription": "Include recent conversation titles to help with context.",
@@ -2541,6 +2713,35 @@
   },
   "networkProxyNoUrl": "Please enter a URL",
   "networkProxyPriorityNote": "When both global and provider proxies are enabled, provider-level proxy takes priority.",
+  "settingsPageAutoRetry": "Auto Retry",
+  "autoRetryEnableLabel": "Enable auto-retry",
+  "autoRetryMaxRetries": "Max retries",
+  "autoRetryInitialDelay": "Initial delay (ms)",
+  "autoRetryMultiplier": "Backoff multiplier",
+  "autoRetryMaxDelay": "Max delay (ms)",
+  "autoRetryJitter": "Jitter",
+  "autoRetryJitterSubtitle": "Randomize each wait by ±20%",
+  "autoRetryOnNetworkError": "Retry on network errors",
+  "autoRetryStatusCodes": "Retry status codes",
+  "autoRetryKeywords": "Retry keywords",
+  "autoRetryStopKeywords": "Stop keywords",
+  "autoRetryAddHint": "Add",
+  "autoRetryRestoreDefaults": "Restore defaults",
+  "autoRetryFooter": "Auto-retry only runs if this request has not produced any output yet.",
+  "autoRetryCountdown": "{seconds}s until retry ({attempt}/{maxRetries})",
+  "@autoRetryCountdown": {
+    "placeholders": {
+      "seconds": {
+        "type": "int"
+      },
+      "attempt": {
+        "type": "int"
+      },
+      "maxRetries": {
+        "type": "int"
+      }
+    }
+  },
   "desktopShowProviderInModelCapsule": "Show provider in model capsule",
   "messageWebViewOpenInBrowser": "Open in Browser",
   "messageWebViewConsoleLogs": "Console Logs",
@@ -3489,6 +3690,8 @@
   "messageStyleSettingsPageStyleDefaultSubtitle": "Follows the theme; not customizable",
   "messageStyleSettingsPageAssistantFitContent": "Fit assistant bubble to content",
   "messageStyleSettingsPageAssistantFitContentSubtitle": "Assistant bubbles hug their text instead of filling the row",
+  "messageStyleSettingsPageAssistantSplitParagraphs": "Split paragraphs into bubbles",
+  "messageStyleSettingsPageAssistantSplitParagraphsSubtitle": "Blank lines break an assistant reply into one bubble per paragraph",
   "messageStyleSettingsPageStyleFrostedSubtitle": "Translucent frosted glass",
   "messageStyleSettingsPageStyleSolidSubtitle": "Opaque solid fill",
   "messageStyleSettingsPageBlur": "Blur",
@@ -3505,5 +3708,175 @@
   "messageStyleSettingsPagePreviewThinking": "Thinking",
   "messageStyleSettingsPageRoleUser": "User",
   "messageStyleSettingsPageRoleAssistant": "Assistant",
-  "messageStyleSettingsPageRoleAssistantHint": "Assistant settings also apply to thinking, tool-call, and translation cards."
+  "messageStyleSettingsPageRoleAssistantHint": "Assistant settings also apply to thinking, tool-call, and translation cards.",
+  "localSnapshotSectionTitle": "Local Copies",
+  "localSnapshotEnabledTitle": "Keep local copies",
+  "localSnapshotEnabledSubtitle": "Kelivo periodically saves a copy of its database on this device, so it is never the only one.",
+  "localSnapshotIntervalTitle": "How often",
+  "localSnapshotIntervalAutomatic": "Automatic",
+  "localSnapshotIntervalAutomaticDetail": "Daily, less often as the database grows",
+  "localSnapshotIntervalDays": "{days, plural, =1{Every day} other{Every {days} days}}",
+  "@localSnapshotIntervalDays": {
+    "placeholders": {
+      "days": {
+        "type": "int"
+      }
+    }
+  },
+  "localSnapshotKeepTitle": "Copies to keep",
+  "localSnapshotKeepValue": "{count, plural, =1{1 copy} other{{count} copies}}",
+  "@localSnapshotKeepValue": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "localSnapshotKeepSubtitle": "Plus one from last week and one from last month, so a problem that went unnoticed is still recoverable.",
+  "localSnapshotKeepWeekly": "Keep one from last week",
+  "localSnapshotKeepMonthly": "Keep one from last month",
+  "localSnapshotKeepProtectedNote": "The most recent copy that still contains data is never removed automatically, whatever this is set to.",
+  "localSnapshotMaximumTitle": "Space limit",
+  "localSnapshotMaximumUnlimited": "No limit",
+  "localSnapshotAnnounceTitle": "Notify when a copy is saved",
+  "localSnapshotAnnounceSubtitle": "Failures are always reported. This only adds a brief message on success.",
+  "localSnapshotTakeNow": "Save a copy now",
+  "localSnapshotManageCopies": "Manage copies",
+  "localSnapshotUsage": "{count, plural, =0{No copies} =1{1 copy} other{{count} copies}} · {size}",
+  "@localSnapshotUsage": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "size": {
+        "type": "String"
+      }
+    }
+  },
+  "localSnapshotStatusNever": "No copy saved yet",
+  "localSnapshotStatusSuccess": "Last copy {when}",
+  "@localSnapshotStatusSuccess": {
+    "placeholders": {
+      "when": {
+        "type": "String"
+      }
+    }
+  },
+  "localSnapshotStatusFailure": "Last attempt failed {when}: {reason}",
+  "@localSnapshotStatusFailure": {
+    "placeholders": {
+      "when": {
+        "type": "String"
+      },
+      "reason": {
+        "type": "String"
+      }
+    }
+  },
+  "localSnapshotStatusSkippedSpace": "Skipped: not enough free space on this device",
+  "localSnapshotStatusUnchanged": "Nothing has changed since the last copy",
+  "localSnapshotCopiesTitle": "Local Copies",
+  "localSnapshotCopiesEmpty": "No local copies yet",
+  "localSnapshotCopiesEmptyHint": "A copy is saved automatically as your data changes, and one is always saved before a restore.",
+  "localSnapshotCopiesScopeNote": "Local copies live on this device only. They protect against damage to your data inside the app, not against losing the device or uninstalling Kelivo — use WebDAV or S3 backup for that.",
+  "localSnapshotOriginAutomatic": "Automatic",
+  "localSnapshotOriginManual": "Saved by you",
+  "localSnapshotOriginBeforeRestore": "Before a restore",
+  "localSnapshotKindRecovered": "Set aside by recovery",
+  "localSnapshotCopyContents": "{conversations, plural, =1{1 chat} other{{conversations} chats}} · {messages, plural, =1{1 message} other{{messages} messages}}",
+  "@localSnapshotCopyContents": {
+    "placeholders": {
+      "conversations": {
+        "type": "int"
+      },
+      "messages": {
+        "type": "int"
+      }
+    }
+  },
+  "localSnapshotCopyContentsUnknown": "Contents unknown until restored",
+  "localSnapshotCopyPinned": "Kept",
+  "localSnapshotActionRestore": "Restore",
+  "localSnapshotActionExport": "Export",
+  "localSnapshotActionDelete": "Delete",
+  "localSnapshotActionPin": "Keep this copy",
+  "localSnapshotActionUnpin": "Stop keeping",
+  "localSnapshotRestoreTitle": "Restore this copy?",
+  "localSnapshotRestoreMessage": "Your current chats and settings will be replaced by this copy from {when}. A copy of what you have now is saved first, so this can be undone.",
+  "@localSnapshotRestoreMessage": {
+    "placeholders": {
+      "when": {
+        "type": "String"
+      }
+    }
+  },
+  "localSnapshotRestorePreparing": "Preparing copy",
+  "localSnapshotDeleteTitle": "Delete this copy?",
+  "localSnapshotDeleteMessage": "This copy will be removed from the device permanently. Any data it holds that is not in your current database will be gone.",
+  "localSnapshotDeleteLastWarning": "This is the only copy that still contains data.",
+  "localSnapshotExportPreparing": "Preparing export",
+  "localSnapshotExportDone": "Copy exported",
+  "localSnapshotExportFailed": "Could not export the copy: {reason}",
+  "@localSnapshotExportFailed": {
+    "placeholders": {
+      "reason": {
+        "type": "String"
+      }
+    }
+  },
+  "localSnapshotTakeDone": "Copy saved",
+  "localSnapshotTakeFailed": "Could not save a copy: {reason}",
+  "@localSnapshotTakeFailed": {
+    "placeholders": {
+      "reason": {
+        "type": "String"
+      }
+    }
+  },
+  "localSnapshotDeleteDone": "Copy deleted",
+  "localSnapshotBusyMessage": "Another backup task is already running",
+  "localSnapshotRunInBackground": "Continue in background",
+  "localSnapshotRunningInBackground": "Saving a copy in the background",
+  "startupRecoveryLocalCopiesAvailable": "This device still holds {count, plural, =1{1 local copy} other{{count} local copies}}, the most recent from {when}. Resetting does not delete them — after restarting you can restore one from Settings › Backup › Local Copies.",
+  "@startupRecoveryLocalCopiesAvailable": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "when": {
+        "type": "String"
+      }
+    }
+  },
+  "startupRecoveryRecoveredCopiesDeleted": "It also holds {count, plural, =1{1 database copy} other{{count} database copies}} set aside by an earlier repair, and resetting DOES delete {count, plural, =1{it} other{those}} permanently. Export your data first if you want to keep {count, plural, =1{it} other{them}}.",
+  "@startupRecoveryRecoveredCopiesDeleted": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "toolSchemaSettingsPageTitle": "Tool Descriptions",
+  "toolSchemaSettingsGroupSearch": "Search",
+  "toolSchemaSettingsGroupMemory": "Memory",
+  "toolSchemaSettingsGroupLocal": "Device tools",
+  "toolSchemaSettingsModified": "Modified",
+  "toolSchemaSettingsResetDefault": "Restore default",
+  "toolSchemaSettingsResetAll": "Restore all defaults",
+  "toolSchemaSettingsResetAllTitle": "Restore all defaults?",
+  "toolSchemaSettingsResetAllMessage": "This restores every built-in tool description to the app default. Your custom wording will be lost.",
+  "toolSchemaSettingsResetAllConfirm": "Restore",
+  "toolSchemaSettingsParamDescriptions": "Parameter descriptions ({count})",
+  "@toolSchemaSettingsParamDescriptions": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "toolSchemaSettingsMemoryLangNote": "Memory tool defaults follow the memory prompt language. A custom description is stored once per tool and will not switch when you change that language.",
+  "toolSchemaSettingsDescriptionLabel": "Description",
+  "toolSchemaSettingsToolName": "Tool name",
+  "toolSchemaEditorPageTitle": "Edit description",
+  "toolSchemaSettingsCancel": "Cancel"
 }

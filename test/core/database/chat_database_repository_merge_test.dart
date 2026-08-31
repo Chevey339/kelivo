@@ -292,6 +292,76 @@ void main() {
       expect(await live.getAllConversations(), hasLength(1));
     });
 
+    test('仅 sender_id 不同不会被误判为重复', () async {
+      for (final repository in [live, source]) {
+        await putConversation(
+          repository,
+          conversationId: 'sender-conv',
+          title: 'Same body',
+          messageId: 'sender-msg',
+          content: 'same body',
+        );
+      }
+      await source.close();
+      sourceClosed = true;
+      final raw = sqlite.sqlite3.open(sourceFile.path);
+      try {
+        raw.execute(
+          "UPDATE message_rows SET sender_id = 'assistant-b' "
+          "WHERE id = 'sender-msg';",
+        );
+      } finally {
+        raw.close();
+      }
+
+      final report = await live.mergeBackupSnapshot(sourceFile);
+
+      expect(report.deduplicatedConversations, 0);
+      expect(report.importedConversations, 1);
+      final remappedId = report.remappedConversationIds['sender-conv'];
+      expect(remappedId, isNotNull);
+      // The imported copy keeps the snapshot's authoring identity.
+      final liveRaw = sqlite.sqlite3.open('${directory.path}/live.sqlite');
+      try {
+        final row = liveRaw.select(
+          'SELECT sender_id FROM message_rows WHERE conversation_id = ?;',
+          [remappedId],
+        ).single;
+        expect(row['sender_id'], 'assistant-b');
+      } finally {
+        liveRaw.close();
+      }
+    });
+
+    test('仅消息 extras_json 不同不会被误判为重复', () async {
+      for (final repository in [live, source]) {
+        await putConversation(
+          repository,
+          conversationId: 'extras-conv',
+          title: 'Same body',
+          messageId: 'extras-msg',
+          content: 'same body',
+        );
+      }
+      await source.close();
+      sourceClosed = true;
+      final raw = sqlite.sqlite3.open(sourceFile.path);
+      try {
+        raw.execute('UPDATE message_rows SET extras_json = ? WHERE id = ?;', [
+          '{"game":"card-1"}',
+          'extras-msg',
+        ]);
+      } finally {
+        raw.close();
+      }
+
+      final report = await live.mergeBackupSnapshot(sourceFile);
+
+      expect(report.deduplicatedConversations, 0);
+      expect(report.importedConversations, 1);
+      expect(report.remappedConversationIds['extras-conv'], isNotNull);
+    });
+
     test('多消息会话 parts 按 revision 分组后指纹一致，重复导入去重', () async {
       for (final repository in [live, source]) {
         await putTwoMessageConversation(

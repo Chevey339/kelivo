@@ -847,6 +847,43 @@ abstract class BuiltInToolsHelper {
     ];
   }
 
+  /// Whether a turn for [modelId] on [cfg] hands the user's data files to a
+  /// code execution sandbox instead of reading them into the prompt.
+  ///
+  /// The message builder skips text extraction for those files on the
+  /// strength of this answer, so it has to agree exactly with the provider
+  /// that does the upload: today only the official Claude endpoint, whose
+  /// Files API feeds `container_upload`. Gemini shares the
+  /// `code_execution` tool name but takes no files from us yet, so
+  /// [BuiltInToolsState.codeExecutionActive] alone is the wrong test. A
+  /// client tool of that name displaces the hosted one in the request, and
+  /// with it the upload, so the [clientTools] definitions are part of the
+  /// answer too.
+  static bool sendsDataFilesToSandbox({
+    required ProviderConfig? cfg,
+    required String? modelId,
+    Iterable<Map<String, dynamic>> clientTools = const [],
+  }) {
+    final upstreamModelId = _claudeUpstreamModelId(cfg: cfg, modelId: modelId);
+    if (upstreamModelId == null) return false;
+    if (!isClaudeCodeExecutionSupportedModel(upstreamModelId)) return false;
+    if (clientTools.map(claimedToolName).contains('code_execution')) {
+      return false;
+    }
+    return getActiveTools(cfg: cfg, modelId: modelId).codeExecutionActive;
+  }
+
+  /// The name a client tool definition claims, and takes from a hosted tool
+  /// of the same name: `function.name` in the OpenAI shape the app assembles,
+  /// empty for anything else, which the Claude adapter's conversion also
+  /// drops. Every reader of a tool name goes through here, so no caller can
+  /// look in the wrong place, and the predicate cannot count a definition the
+  /// request will not carry.
+  static String claimedToolName(Map<String, dynamic> tool) {
+    final fn = tool['function'];
+    return fn is Map ? (fn['name'] ?? '').toString() : '';
+  }
+
   static Map<String, dynamic> dashScopeSearchOptionsFromOverride(
     Object? rawOverride,
   ) {

@@ -14,6 +14,7 @@ import '../../../shared/widgets/ios_tactile.dart';
 import '../../../shared/widgets/ios_tile_button.dart';
 import '../../../shared/widgets/snackbar.dart';
 import '../../../utils/platform_utils.dart';
+import '../../backup/pages/local_snapshots_page.dart';
 import '../../chat/pages/image_viewer_page.dart';
 import 'log_viewer_page.dart';
 import '../../../theme/app_font_weights.dart';
@@ -87,6 +88,8 @@ class _StorageSpacePageState extends State<StorageSpacePage> {
       StorageUsageCategoryKey.chatData,
       StorageUsageCategoryKey.legacyChatData,
       StorageUsageCategoryKey.restoreTraces,
+      StorageUsageCategoryKey.displacedDatabases,
+      StorageUsageCategoryKey.localSnapshots,
       StorageUsageCategoryKey.assistantData,
       StorageUsageCategoryKey.cache,
       StorageUsageCategoryKey.logs,
@@ -107,6 +110,10 @@ class _StorageSpacePageState extends State<StorageSpacePage> {
         return Lucide.History;
       case StorageUsageCategoryKey.restoreTraces:
         return Lucide.RotateCcw;
+      case StorageUsageCategoryKey.displacedDatabases:
+        return Lucide.Database;
+      case StorageUsageCategoryKey.localSnapshots:
+        return Lucide.Shield;
       case StorageUsageCategoryKey.assistantData:
         return Lucide.Bot;
       case StorageUsageCategoryKey.cache:
@@ -130,6 +137,10 @@ class _StorageSpacePageState extends State<StorageSpacePage> {
         return l10n.storageSpaceCategoryLegacyChatData;
       case StorageUsageCategoryKey.restoreTraces:
         return l10n.storageSpaceCategoryRestoreTraces;
+      case StorageUsageCategoryKey.displacedDatabases:
+        return l10n.storageSpaceCategoryDisplacedDatabases;
+      case StorageUsageCategoryKey.localSnapshots:
+        return l10n.localSnapshotSectionTitle;
       case StorageUsageCategoryKey.assistantData:
         return l10n.storageSpaceCategoryAssistantData;
       case StorageUsageCategoryKey.cache:
@@ -157,6 +168,10 @@ class _StorageSpacePageState extends State<StorageSpacePage> {
         return l10n.storageSpaceSubChatSharedMemory;
       case 'completed_restore_runs':
         return l10n.storageSpaceSubCompletedRestoreRuns;
+      case 'displaced_databases':
+        return l10n.storageSpaceSubDisplacedDatabases;
+      case 'local_snapshots':
+        return l10n.localSnapshotEnabledSubtitle;
       case 'fonts':
         return l10n.storageSpaceCategoryFonts;
       case 'local_models':
@@ -421,6 +436,40 @@ class _StorageSpacePageState extends State<StorageSpacePage> {
     }
   }
 
+  Future<void> _doClearDisplacedDatabases() async {
+    if (_clearing) return;
+    final l10n = AppLocalizations.of(context)!;
+    final targetName = l10n.storageSpaceCategoryDisplacedDatabases;
+    final ok = await _confirmAction(
+      context,
+      title: l10n.storageSpaceClearConfirmTitle,
+      message: l10n.storageSpaceClearDisplacedDatabasesConfirmMessage,
+      actionLabel: l10n.storageSpaceClearButton,
+    );
+    if (!ok) return;
+
+    setState(() => _clearing = true);
+    try {
+      await StorageUsageService.clearDisplacedDatabases();
+      if (!mounted) return;
+      showAppSnackBar(
+        context,
+        message: l10n.storageSpaceClearDone(targetName),
+        type: NotificationType.success,
+      );
+      await _refreshReport();
+    } catch (e) {
+      if (!mounted) return;
+      showAppSnackBar(
+        context,
+        message: l10n.storageSpaceClearFailed(e.toString()),
+        type: NotificationType.error,
+      );
+    } finally {
+      if (mounted) setState(() => _clearing = false);
+    }
+  }
+
   Future<void> _openCategoryDetail(StorageUsageCategoryKey key) async {
     final report = _report;
     if (report == null) return;
@@ -614,6 +663,9 @@ class _StorageSpacePageState extends State<StorageSpacePage> {
                         onClearRestoreTraces: _clearing
                             ? null
                             : _doClearRestoreTraces,
+                        onClearDisplacedDatabases: _clearing
+                            ? null
+                            : _doClearDisplacedDatabases,
                         refreshReport: _refreshReport,
                       ),
                     ),
@@ -964,6 +1016,46 @@ class _StorageCategoryPageState extends State<_StorageCategoryPage> {
     }
   }
 
+  Future<void> _clearDisplacedDatabases() async {
+    if (_clearing) return;
+    final l10n = AppLocalizations.of(context)!;
+    final targetName = l10n.storageSpaceCategoryDisplacedDatabases;
+    final ok = await _confirmAction(
+      title: l10n.storageSpaceClearConfirmTitle,
+      message: l10n.storageSpaceClearDisplacedDatabasesConfirmMessage,
+      actionLabel: l10n.storageSpaceClearButton,
+    );
+    if (!ok) return;
+
+    setState(() => _clearing = true);
+    try {
+      await StorageUsageService.clearDisplacedDatabases();
+      final next = await widget.refreshReport();
+      if (!mounted) return;
+      showAppSnackBar(
+        context,
+        message: l10n.storageSpaceClearDone(targetName),
+        type: NotificationType.success,
+      );
+      if (next != null &&
+          !next.categories.any(
+            (category) =>
+                category.key == StorageUsageCategoryKey.displacedDatabases,
+          )) {
+        Navigator.of(context).pop();
+      }
+    } catch (e) {
+      if (!mounted) return;
+      showAppSnackBar(
+        context,
+        message: l10n.storageSpaceClearFailed(e.toString()),
+        type: NotificationType.error,
+      );
+    } finally {
+      if (mounted) setState(() => _clearing = false);
+    }
+  }
+
   Future<void> _clearRestoreTraces() async {
     if (_clearing) return;
     final l10n = AppLocalizations.of(context)!;
@@ -1058,6 +1150,10 @@ class _StorageCategoryPageState extends State<_StorageCategoryPage> {
           onClearRestoreTraces:
               (category.key == StorageUsageCategoryKey.restoreTraces)
               ? _clearRestoreTraces
+              : null,
+          onClearDisplacedDatabases:
+              (category.key == StorageUsageCategoryKey.displacedDatabases)
+              ? _clearDisplacedDatabases
               : null,
           refreshReport: _refresh,
         ),
@@ -1259,6 +1355,7 @@ class _CategoryDetail extends StatelessWidget {
     required this.onClearLogs,
     required this.onClearLegacyChatData,
     required this.onClearRestoreTraces,
+    required this.onClearDisplacedDatabases,
     required this.refreshReport,
   });
 
@@ -1273,6 +1370,7 @@ class _CategoryDetail extends StatelessWidget {
   final Future<void> Function()? onClearLogs;
   final Future<void> Function()? onClearLegacyChatData;
   final Future<void> Function()? onClearRestoreTraces;
+  final Future<void> Function()? onClearDisplacedDatabases;
   final Future<void> Function() refreshReport;
 
   @override
@@ -1360,6 +1458,25 @@ class _CategoryDetail extends StatelessWidget {
         backgroundColor: cs.primary,
         enabled: !clearing && onClearRestoreTraces != null,
         onTap: () => onClearRestoreTraces?.call(),
+      );
+    } else if (category.key == StorageUsageCategoryKey.displacedDatabases) {
+      actions = IosTileButton(
+        label: l10n.storageSpaceClearDisplacedDatabasesButton,
+        icon: Lucide.Trash2,
+        backgroundColor: cs.error,
+        enabled: !clearing && onClearDisplacedDatabases != null,
+        onTap: () => onClearDisplacedDatabases?.call(),
+      );
+    } else if (category.key == StorageUsageCategoryKey.localSnapshots) {
+      // Managed rather than cleared: each of these is a restorable copy, and
+      // the screen that lists them can say what every one of them holds.
+      actions = IosTileButton(
+        label: l10n.localSnapshotManageCopies,
+        icon: Lucide.ChevronRight,
+        enabled: !clearing,
+        onTap: () => Navigator.of(context).push<void>(
+          MaterialPageRoute(builder: (_) => const LocalSnapshotsPage()),
+        ),
       );
     }
 

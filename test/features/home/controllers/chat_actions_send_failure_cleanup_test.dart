@@ -11,6 +11,7 @@ import 'package:Kelivo/features/home/services/message_generation_service.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:http/http.dart' as http;
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -20,6 +21,7 @@ import '../../../support/business_test_harness.dart';
 /// send-failure handler throw.
 class _ThrowingFinalizeChatService extends ChatService {
   final terminalStates = <GenerationRunState>[];
+  final errorCodes = <String?>[];
 
   @override
   Future<GenerationRun?> finalizeGenerationRunSilent({
@@ -33,6 +35,7 @@ class _ThrowingFinalizeChatService extends ChatService {
     String? errorCode,
   }) async {
     terminalStates.add(terminalState);
+    errorCodes.add(errorCode);
     throw StateError('cleanup write failed');
   }
 }
@@ -61,7 +64,6 @@ void main() {
             builder: (context) {
               final chatController = ChatController(chatService: service);
               final streamController = StreamController(
-                chatService: service,
                 onStateChanged: () {},
                 getSettingsProvider: () => settings,
                 getCurrentConversationId: () => 'conversation-1',
@@ -123,8 +125,174 @@ void main() {
     );
 
     expect(service.terminalStates, [GenerationRunState.failed]);
+    expect(service.errorCodes, ['preparation_failed']);
     expect(streamErrors, ['Bad state: generation failed']);
     // The indicator is released for this message only, never globally.
     expect(clearedIndicatorIds, ['assistant-1']);
+  });
+
+  testWidgets('cancelled prepare does not notify onStreamError', (
+    tester,
+  ) async {
+    final service = _ThrowingFinalizeChatService();
+    final settings = SettingsProvider(createBusinessTestPreferences());
+    final streamErrors = <String>[];
+    late HomeViewModel viewModel;
+
+    await tester.pumpWidget(
+      MultiProvider(
+        providers: [
+          ChangeNotifierProvider<SettingsProvider>.value(value: settings),
+          ChangeNotifierProvider<ChatService>.value(value: service),
+        ],
+        child: MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: Builder(
+            builder: (context) {
+              final chatController = ChatController(chatService: service);
+              final streamController = StreamController(
+                onStateChanged: () {},
+                getSettingsProvider: () => settings,
+                getCurrentConversationId: () => 'conversation-1',
+              );
+              final messageBuilder = MessageBuilderService(
+                chatService: service,
+                contextProvider: context,
+              );
+              final generationController = GenerationController(
+                chatService: service,
+                chatController: chatController,
+                streamController: streamController,
+                messageBuilderService: messageBuilder,
+                contextProvider: context,
+                onStateChanged: () {},
+                getTitleForLocale: (_) => 'title',
+              );
+              final messageGeneration = MessageGenerationService(
+                chatService: service,
+                messageBuilderService: messageBuilder,
+                generationController: generationController,
+                streamController: streamController,
+                contextProvider: context,
+              );
+              viewModel = HomeViewModel(
+                chatService: service,
+                messageBuilderService: messageBuilder,
+                messageGenerationService: messageGeneration,
+                generationController: generationController,
+                streamController: streamController,
+                chatController: chatController,
+                contextProvider: context,
+                getTitleForLocale: (_) => 'title',
+              );
+              viewModel.debugChatActions.onStreamError = streamErrors.add;
+              return const SizedBox.shrink();
+            },
+          ),
+        ),
+      ),
+    );
+
+    await viewModel.debugChatActions.handleSendGenerationFailure(
+      error: http.ClientException('cancelled'),
+      conversationId: 'conversation-1',
+      assistantMessage: ChatMessage(
+        id: 'assistant-1',
+        role: 'assistant',
+        content: '',
+        conversationId: 'conversation-1',
+        isStreaming: true,
+      ),
+    );
+
+    expect(streamErrors, isEmpty);
+    expect(service.terminalStates, [GenerationRunState.cancelled]);
+    expect(service.errorCodes, [null]);
+  });
+
+  testWidgets('user stop during prepare does not persist failed', (
+    tester,
+  ) async {
+    final service = _ThrowingFinalizeChatService();
+    final settings = SettingsProvider(createBusinessTestPreferences());
+    final streamErrors = <String>[];
+    late HomeViewModel viewModel;
+
+    await tester.pumpWidget(
+      MultiProvider(
+        providers: [
+          ChangeNotifierProvider<SettingsProvider>.value(value: settings),
+          ChangeNotifierProvider<ChatService>.value(value: service),
+        ],
+        child: MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: Builder(
+            builder: (context) {
+              final chatController = ChatController(chatService: service);
+              final streamController = StreamController(
+                onStateChanged: () {},
+                getSettingsProvider: () => settings,
+                getCurrentConversationId: () => 'conversation-1',
+              );
+              final messageBuilder = MessageBuilderService(
+                chatService: service,
+                contextProvider: context,
+              );
+              final generationController = GenerationController(
+                chatService: service,
+                chatController: chatController,
+                streamController: streamController,
+                messageBuilderService: messageBuilder,
+                contextProvider: context,
+                onStateChanged: () {},
+                getTitleForLocale: (_) => 'title',
+              );
+              final messageGeneration = MessageGenerationService(
+                chatService: service,
+                messageBuilderService: messageBuilder,
+                generationController: generationController,
+                streamController: streamController,
+                contextProvider: context,
+              );
+              viewModel = HomeViewModel(
+                chatService: service,
+                messageBuilderService: messageBuilder,
+                messageGenerationService: messageGeneration,
+                generationController: generationController,
+                streamController: streamController,
+                chatController: chatController,
+                contextProvider: context,
+                getTitleForLocale: (_) => 'title',
+              );
+              viewModel.debugChatActions.onStreamError = streamErrors.add;
+              return const SizedBox.shrink();
+            },
+          ),
+        ),
+      ),
+    );
+
+    final assistantMessage = ChatMessage(
+      id: 'assistant-1',
+      role: 'assistant',
+      content: '',
+      conversationId: 'conversation-1',
+      isStreaming: true,
+    );
+    final cancel = viewModel.debugChatActions.cancelStreamingById(
+      'conversation-1',
+    );
+    await viewModel.debugChatActions.handleSendGenerationFailure(
+      error: http.ClientException('cancelled'),
+      conversationId: 'conversation-1',
+      assistantMessage: assistantMessage,
+    );
+    await cancel;
+
+    expect(streamErrors, isEmpty);
+    expect(service.terminalStates, isNot(contains(GenerationRunState.failed)));
+    expect(service.errorCodes, isNot(contains('preparation_failed')));
   });
 }

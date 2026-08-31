@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:http/http.dart' as http;
 
 import 'package:Kelivo/features/home/services/ocr_service.dart';
 
@@ -324,5 +325,46 @@ void main() {
         {'role': 'user', 'content': OcrService.defaultOcrUserPrompt},
       ]);
     });
+  });
+
+  testWidgets('cancelled OCR does not continue later images', (tester) async {
+    var calls = 0;
+    final service = OcrService(
+      ocrExecutor: (paths) async {
+        calls += 1;
+        throw http.ClientException('cancelled');
+      },
+    );
+
+    await tester.pumpWidget(const SizedBox.shrink());
+    final context = tester.element(find.byType(SizedBox));
+
+    await expectLater(
+      service.getOcrTextForImages(const ['/a.png', '/b.png'], context),
+      throwsA(isA<http.ClientException>()),
+    );
+    expect(calls, 1);
+  });
+
+  testWidgets('cancelled OCR after a completed image is not partial success', (
+    tester,
+  ) async {
+    var calls = 0;
+    final service = OcrService(
+      ocrExecutor: (paths) async {
+        calls += 1;
+        if (paths.single == '/a.png') return 'text-a';
+        throw http.ClientException('cancelled');
+      },
+    );
+
+    await tester.pumpWidget(const SizedBox.shrink());
+    final context = tester.element(find.byType(SizedBox));
+
+    await expectLater(
+      service.getOcrTextForImages(const ['/a.png', '/b.png'], context),
+      throwsA(isA<http.ClientException>()),
+    );
+    expect(calls, 2);
   });
 }

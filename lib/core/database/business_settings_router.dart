@@ -168,6 +168,7 @@ final class BusinessKeyRegistry {
     'memory_migration_batch_size_v1',
     'chat_bubble_style_overrides_v1',
     'chat_bubble_style_overrides_user_v1',
+    'tool_schema_overrides_v1',
   };
 
   static BusinessKeyDisposition classify(String key) {
@@ -515,7 +516,11 @@ final class BusinessSettingsRouter {
             'presetMessages',
             'regexRules',
           },
-          stringLists: const {'mcpServerIds', 'localToolIds'},
+          stringLists: const {
+            'mcpServerIds',
+            'localToolIds',
+            'healthDataTypeIds',
+          },
         );
         _validateAssistantChildren(kind, payload);
         return;
@@ -926,7 +931,6 @@ final class BusinessSettingsRouter {
         );
       case 'zhipu':
       case 'linkup':
-      case 'brave':
       case 'metaso':
       case 'ollama':
       case 'jina':
@@ -935,6 +939,15 @@ final class BusinessSettingsRouter {
           kind,
           payload,
           requiredStrings: const {'apiKey'},
+          stringLists: const {'apiKeys'},
+        );
+      case 'brave':
+        _validateKnownFields(
+          kind,
+          payload,
+          requiredStrings: const {'apiKey'},
+          strings: const {'mode'},
+          integers: const {'maximumNumberOfTokens'},
           stringLists: const {'apiKeys'},
         );
       case 'searxng':
@@ -1000,6 +1013,22 @@ final class BusinessSettingsRouter {
           kind,
           payload,
           strings: const {'apiKey', 'url'},
+          stringLists: const {'apiKeys'},
+        );
+      case 'parallel':
+        _validateKnownFields(
+          kind,
+          payload,
+          requiredStrings: const {'apiKey'},
+          strings: const {'mode'},
+          stringLists: const {'apiKeys'},
+        );
+      case 'you':
+        _validateKnownFields(
+          kind,
+          payload,
+          requiredStrings: const {'apiKey'},
+          strings: const {'contentMode'},
           stringLists: const {'apiKeys'},
         );
     }
