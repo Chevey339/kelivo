@@ -6202,6 +6202,56 @@ class AppLocalizationsZh extends AppLocalizations {
   String get networkProxyPriorityNote => '当同时开启全局代理与供应商代理时，将优先使用供应商代理。';
 
   @override
+  String get settingsPageAutoRetry => '自动重试';
+
+  @override
+  String get autoRetryEnableLabel => '开启自动重试';
+
+  @override
+  String get autoRetryMaxRetries => '最大重试次数';
+
+  @override
+  String get autoRetryInitialDelay => '首次延迟（毫秒）';
+
+  @override
+  String get autoRetryMultiplier => '退避倍率';
+
+  @override
+  String get autoRetryMaxDelay => '最大延迟（毫秒）';
+
+  @override
+  String get autoRetryJitter => '抖动';
+
+  @override
+  String get autoRetryJitterSubtitle => '每次等待随机 ±20%';
+
+  @override
+  String get autoRetryOnNetworkError => '网络错误时重试';
+
+  @override
+  String get autoRetryStatusCodes => '可重试状态码';
+
+  @override
+  String get autoRetryKeywords => '重试关键字';
+
+  @override
+  String get autoRetryStopKeywords => '停止重试关键字';
+
+  @override
+  String get autoRetryAddHint => '添加';
+
+  @override
+  String get autoRetryRestoreDefaults => '恢复默认';
+
+  @override
+  String get autoRetryFooter => '仅在本次请求尚未产生任何输出时才会自动重试。';
+
+  @override
+  String autoRetryCountdown(int seconds, int attempt, int maxRetries) {
+    return '$seconds 秒后重试 ($attempt/$maxRetries)';
+  }
+
+  @override
   String get desktopShowProviderInModelCapsule => '模型胶囊显示供应商';
 
   @override
@@ -14606,6 +14656,56 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get networkProxyPriorityNote => '当同时开启全局代理与供应商代理时，将优先使用供应商代理。';
+
+  @override
+  String get settingsPageAutoRetry => '自动重试';
+
+  @override
+  String get autoRetryEnableLabel => '开启自动重试';
+
+  @override
+  String get autoRetryMaxRetries => '最大重试次数';
+
+  @override
+  String get autoRetryInitialDelay => '首次延迟（毫秒）';
+
+  @override
+  String get autoRetryMultiplier => '退避倍率';
+
+  @override
+  String get autoRetryMaxDelay => '最大延迟（毫秒）';
+
+  @override
+  String get autoRetryJitter => '抖动';
+
+  @override
+  String get autoRetryJitterSubtitle => '每次等待随机 ±20%';
+
+  @override
+  String get autoRetryOnNetworkError => '网络错误时重试';
+
+  @override
+  String get autoRetryStatusCodes => '可重试状态码';
+
+  @override
+  String get autoRetryKeywords => '重试关键字';
+
+  @override
+  String get autoRetryStopKeywords => '停止重试关键字';
+
+  @override
+  String get autoRetryAddHint => '添加';
+
+  @override
+  String get autoRetryRestoreDefaults => '恢复默认';
+
+  @override
+  String get autoRetryFooter => '仅在本次请求尚未产生任何输出时才会自动重试。';
+
+  @override
+  String autoRetryCountdown(int seconds, int attempt, int maxRetries) {
+    return '$seconds 秒后重试 ($attempt/$maxRetries)';
+  }
 
   @override
   String get desktopShowProviderInModelCapsule => '模型胶囊显示供应商';
@@ -23086,6 +23186,56 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get networkProxyPriorityNote => '同時啟用全域代理與供應商代理時，將優先使用供應商代理。';
+
+  @override
+  String get settingsPageAutoRetry => '自動重試';
+
+  @override
+  String get autoRetryEnableLabel => '開啟自動重試';
+
+  @override
+  String get autoRetryMaxRetries => '最大重試次數';
+
+  @override
+  String get autoRetryInitialDelay => '首次延遲（毫秒）';
+
+  @override
+  String get autoRetryMultiplier => '退避倍率';
+
+  @override
+  String get autoRetryMaxDelay => '最大延遲（毫秒）';
+
+  @override
+  String get autoRetryJitter => '抖動';
+
+  @override
+  String get autoRetryJitterSubtitle => '每次等待隨機 ±20%';
+
+  @override
+  String get autoRetryOnNetworkError => '網路錯誤時重試';
+
+  @override
+  String get autoRetryStatusCodes => '可重試狀態碼';
+
+  @override
+  String get autoRetryKeywords => '重試關鍵字';
+
+  @override
+  String get autoRetryStopKeywords => '停止重試關鍵字';
+
+  @override
+  String get autoRetryAddHint => '新增';
+
+  @override
+  String get autoRetryRestoreDefaults => '恢復預設';
+
+  @override
+  String get autoRetryFooter => '僅在本次請求尚未產生任何輸出時才會自動重試。';
+
+  @override
+  String autoRetryCountdown(int seconds, int attempt, int maxRetries) {
+    return '$seconds 秒後重試 ($attempt/$maxRetries)';
+  }
 
   @override
   String get desktopShowProviderInModelCapsule => '模型膠囊顯示供應商';

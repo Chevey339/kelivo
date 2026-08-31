@@ -252,6 +252,17 @@ class StreamController {
     streamingContentNotifier.clear();
   }
 
+  /// Re-apply in-bubble retry UI after [clearAllState] / conversation switch.
+  ///
+  /// [RetryStatus] on a still-alive [StreamingState] is the source of truth;
+  /// the notifier is wiped when creating a new/temporary chat.
+  /// Finished messages must not be re-marked streaming.
+  void restoreRetryStatus(String messageId, RetryStatus? status) {
+    if (status == null) return;
+    if (!_activeStreamingIds.contains(messageId)) return;
+    streamingContentNotifier.updateRetryStatus(messageId, status);
+  }
+
   // ============================================================================
   // Reasoning Serialization
   // ============================================================================
@@ -1579,6 +1590,7 @@ class StreamingState {
   List<int> reasoningCountAtSplit = <int>[];
   List<int> toolCountAtSplit = <int>[];
   final StreamChunkHandler partsHandler;
+  RetryStatus? retryStatus;
 
   String get messageId => ctx.assistantMessage.id;
   String get conversationId => ctx.assistantMessage.conversationId;

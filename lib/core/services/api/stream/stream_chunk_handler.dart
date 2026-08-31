@@ -11,12 +11,18 @@ import 'stream_chunk.dart';
 /// arrivals do not clobber the last part. Tool calls are located by tool id.
 /// One instance per response stream; do not reuse after [Finish].
 class StreamChunkHandler {
-  StreamChunkHandler({Iterable<MessagePart> seed = const <MessagePart>[]}) {
+  StreamChunkHandler({
+    Iterable<MessagePart> seed = const <MessagePart>[],
+    this.onRetry,
+  }) {
     for (final part in seed) {
       if (_isBlankPart(part)) continue;
       _seedPart(part);
     }
   }
+
+  /// Control events that are not folded into [parts].
+  final void Function(RetryPending pending)? onRetry;
 
   final List<MessagePart> _parts = <MessagePart>[];
   final Map<String, int> _textIndex = <String, int>{};
@@ -246,6 +252,10 @@ class StreamChunkHandler {
         );
       case Usage(:final usage):
         this.usage = (this.usage ?? const TokenUsage()).merge(usage);
+      case final RetryPending pending:
+        onRetry?.call(pending);
+      case RetryAttemptStart():
+        break;
       case Finish(:final finishReason):
         this.finishReason = finishReason;
         finished = true;

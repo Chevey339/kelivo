@@ -2713,6 +2713,35 @@
   },
   "networkProxyNoUrl": "Please enter a URL",
   "networkProxyPriorityNote": "When both global and provider proxies are enabled, provider-level proxy takes priority.",
+  "settingsPageAutoRetry": "Auto Retry",
+  "autoRetryEnableLabel": "Enable auto-retry",
+  "autoRetryMaxRetries": "Max retries",
+  "autoRetryInitialDelay": "Initial delay (ms)",
+  "autoRetryMultiplier": "Backoff multiplier",
+  "autoRetryMaxDelay": "Max delay (ms)",
+  "autoRetryJitter": "Jitter",
+  "autoRetryJitterSubtitle": "Randomize each wait by ±20%",
+  "autoRetryOnNetworkError": "Retry on network errors",
+  "autoRetryStatusCodes": "Retry status codes",
+  "autoRetryKeywords": "Retry keywords",
+  "autoRetryStopKeywords": "Stop keywords",
+  "autoRetryAddHint": "Add",
+  "autoRetryRestoreDefaults": "Restore defaults",
+  "autoRetryFooter": "Auto-retry only runs if this request has not produced any output yet.",
+  "autoRetryCountdown": "{seconds}s until retry ({attempt}/{maxRetries})",
+  "@autoRetryCountdown": {
+    "placeholders": {
+      "seconds": {
+        "type": "int"
+      },
+      "attempt": {
+        "type": "int"
+      },
+      "maxRetries": {
+        "type": "int"
+      }
+    }
+  },
   "desktopShowProviderInModelCapsule": "Show provider in model capsule",
   "messageWebViewOpenInBrowser": "Open in Browser",
   "messageWebViewConsoleLogs": "Console Logs",

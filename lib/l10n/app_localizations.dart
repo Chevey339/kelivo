@@ -11815,6 +11815,102 @@ abstract class AppLocalizations {
   /// **'When both global and provider proxies are enabled, provider-level proxy takes priority.'**
   String get networkProxyPriorityNote;
 
+  /// No description provided for @settingsPageAutoRetry.
+  ///
+  /// In en, this message translates to:
+  /// **'Auto Retry'**
+  String get settingsPageAutoRetry;
+
+  /// No description provided for @autoRetryEnableLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Enable auto-retry'**
+  String get autoRetryEnableLabel;
+
+  /// No description provided for @autoRetryMaxRetries.
+  ///
+  /// In en, this message translates to:
+  /// **'Max retries'**
+  String get autoRetryMaxRetries;
+
+  /// No description provided for @autoRetryInitialDelay.
+  ///
+  /// In en, this message translates to:
+  /// **'Initial delay (ms)'**
+  String get autoRetryInitialDelay;
+
+  /// No description provided for @autoRetryMultiplier.
+  ///
+  /// In en, this message translates to:
+  /// **'Backoff multiplier'**
+  String get autoRetryMultiplier;
+
+  /// No description provided for @autoRetryMaxDelay.
+  ///
+  /// In en, this message translates to:
+  /// **'Max delay (ms)'**
+  String get autoRetryMaxDelay;
+
+  /// No description provided for @autoRetryJitter.
+  ///
+  /// In en, this message translates to:
+  /// **'Jitter'**
+  String get autoRetryJitter;
+
+  /// No description provided for @autoRetryJitterSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Randomize each wait by ±20%'**
+  String get autoRetryJitterSubtitle;
+
+  /// No description provided for @autoRetryOnNetworkError.
+  ///
+  /// In en, this message translates to:
+  /// **'Retry on network errors'**
+  String get autoRetryOnNetworkError;
+
+  /// No description provided for @autoRetryStatusCodes.
+  ///
+  /// In en, this message translates to:
+  /// **'Retry status codes'**
+  String get autoRetryStatusCodes;
+
+  /// No description provided for @autoRetryKeywords.
+  ///
+  /// In en, this message translates to:
+  /// **'Retry keywords'**
+  String get autoRetryKeywords;
+
+  /// No description provided for @autoRetryStopKeywords.
+  ///
+  /// In en, this message translates to:
+  /// **'Stop keywords'**
+  String get autoRetryStopKeywords;
+
+  /// No description provided for @autoRetryAddHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Add'**
+  String get autoRetryAddHint;
+
+  /// No description provided for @autoRetryRestoreDefaults.
+  ///
+  /// In en, this message translates to:
+  /// **'Restore defaults'**
+  String get autoRetryRestoreDefaults;
+
+  /// No description provided for @autoRetryFooter.
+  ///
+  /// In en, this message translates to:
+  /// **'Auto-retry only runs if this request has not produced any output yet.'**
+  String get autoRetryFooter;
+
+  /// No description provided for @autoRetryCountdown.
+  ///
+  /// In en, this message translates to:
+  /// **'{seconds}s until retry ({attempt}/{maxRetries})'**
+  String autoRetryCountdown(int seconds, int attempt, int maxRetries);
+
   /// No description provided for @desktopShowProviderInModelCapsule.
   ///
   /// In en, this message translates to:

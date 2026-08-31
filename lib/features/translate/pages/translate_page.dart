@@ -34,6 +34,7 @@ class _TranslatePageState extends State<TranslatePage> {
   String? _modelId;
   StreamSubscription? _sub;
   bool _loading = false;
+  late final String _requestId = 'translate-page-${identityHashCode(this)}';
 
   @override
   void initState() {
@@ -43,6 +44,7 @@ class _TranslatePageState extends State<TranslatePage> {
 
   @override
   void dispose() {
+    ChatApiService.cancelRequest(_requestId);
     _sub?.cancel();
     _src.dispose();
     _dst.dispose();
@@ -141,6 +143,7 @@ class _TranslatePageState extends State<TranslatePage> {
         thinkingBudget: settings.translateGenerationThinkingBudgetFor(
           context.read<AssistantProvider>().currentAssistant?.thinkingBudget,
         ),
+        requestId: _requestId,
       );
       _sub = stream.listen(
         (chunk) {
@@ -180,6 +183,7 @@ class _TranslatePageState extends State<TranslatePage> {
   }
 
   Future<void> _stop() async {
+    ChatApiService.cancelRequest(_requestId);
     try {
       await _sub?.cancel();
     } catch (_) {}

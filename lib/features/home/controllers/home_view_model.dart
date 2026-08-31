@@ -892,6 +892,7 @@ class HomeViewModel extends ChangeNotifier {
       // Arm the new list's initial position before listeners can paint it with
       // the previous conversation's scroll offset.
       onConversationSwitched?.call();
+      restoreRetryUiFromStreamingState();
       notifyListeners();
       unawaited(_drainQueuedInputIfReady(id));
     }
@@ -941,6 +942,7 @@ class HomeViewModel extends ChangeNotifier {
     // Arm the new list's initial position before listeners can paint it with
     // the previous conversation's scroll offset.
     onConversationSwitched?.call();
+    restoreRetryUiFromStreamingState();
     notifyListeners();
     unawaited(_drainQueuedInputIfReady(id));
   }
@@ -1366,6 +1368,12 @@ class HomeViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Re-apply auto-retry countdown from still-running background streams.
+  void restoreRetryUiFromStreamingState() {
+    final cid = currentConversation?.id;
+    if (cid != null) _chatActions.restoreRetryUi(cid);
+  }
+
   void _restoreMessageUiState() {
     for (int i = 0; i < messages.length; i++) {
       final m = messages[i];
@@ -1393,6 +1401,7 @@ class HomeViewModel extends ChangeNotifier {
         );
       }
     }
+    restoreRetryUiFromStreamingState();
   }
 
   /// Serialize reasoning segments to JSON string.

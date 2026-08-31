@@ -58,6 +58,7 @@ import 'setting/world_book_pane.dart';
 import 'setting/backup_pane.dart';
 import 'setting/hotkeys_pane.dart';
 import 'setting/network_proxy_pane.dart';
+import 'setting/auto_retry_pane.dart';
 import 'setting/about_pane.dart';
 import 'setting/stats_pane.dart';
 import 'package:system_fonts/system_fonts.dart';
@@ -108,6 +109,7 @@ enum _SettingsMenuItem {
   memory,
   tts,
   networkProxy,
+  autoRetry,
   backup,
   hotkeys,
   stats,
@@ -225,6 +227,10 @@ class _DesktopSettingsPageState extends State<DesktopSettingsPage> {
                           return const DesktopNetworkProxyPane(
                             key: ValueKey('networkProxy'),
                           );
+                        case _SettingsMenuItem.autoRetry:
+                          return const DesktopAutoRetryPane(
+                            key: ValueKey('autoRetry'),
+                          );
                         case _SettingsMenuItem.backup:
                           return const DesktopBackupPane(
                             key: ValueKey('backup'),
@@ -327,6 +333,11 @@ class _SettingsMenu extends StatelessWidget {
         _SettingsMenuItem.networkProxy,
         lucide.Lucide.EthernetPort,
         l10n.settingsPageNetworkProxy,
+      ),
+      (
+        _SettingsMenuItem.autoRetry,
+        lucide.Lucide.RefreshCw,
+        l10n.settingsPageAutoRetry,
       ),
       (
         _SettingsMenuItem.backup,

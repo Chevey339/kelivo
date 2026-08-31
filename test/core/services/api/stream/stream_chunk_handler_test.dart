@@ -647,4 +647,50 @@ void main() {
     ]);
     expect(handler.parts.whereType<TextPart>().single.text, 'done');
   });
+
+  test('RetryPending is forwarded to onRetry and not folded into parts', () {
+    final seen = <RetryPending>[];
+    final handler = StreamChunkHandler(onRetry: seen.add);
+    handler.handle(
+      const RetryPending(
+        attempt: 1,
+        maxRetries: 3,
+        delay: Duration(seconds: 2),
+        errorText: 'HTTP 429',
+      ),
+    );
+    handler.handle(const TextDelta(id: 't', text: 'hello'));
+    expect(seen, hasLength(1));
+    expect(seen.single.attempt, 1);
+    expect(seen.single.maxRetries, 3);
+    expect(handler.parts.whereType<TextPart>().single.text, 'hello');
+  });
+
+  test('RetryAttemptStart is not folded into parts', () {
+    final handler = StreamChunkHandler();
+    handler.handle(const RetryAttemptStart());
+    handler.handle(const TextDelta(id: 't', text: 'hello'));
+    expect(handler.parts.whereType<TextPart>().single.text, 'hello');
+  });
+
+  test('RetryPending.deadlineAt uses the stamped retryAt', () {
+    final retryAt = DateTime(2026, 8, 31, 12);
+    final pending = RetryPending(
+      attempt: 1,
+      maxRetries: 3,
+      delay: const Duration(seconds: 5),
+      retryAt: retryAt,
+    );
+    expect(pending.deadlineAt(DateTime(2026, 8, 31, 12, 0, 4)), retryAt);
+  });
+
+  test('RetryPending.deadlineAt falls back to now plus delay', () {
+    const pending = RetryPending(
+      attempt: 1,
+      maxRetries: 3,
+      delay: Duration(seconds: 5),
+    );
+    final now = DateTime(2026, 8, 31, 12);
+    expect(pending.deadlineAt(now), now.add(const Duration(seconds: 5)));
+  });
 }

@@ -107,4 +107,16 @@ void main() {
     expect((state.partsHandler.parts.first as TextPart).text, 'before');
     expect((state.partsHandler.parts.last as TextPart).text, 'after');
   });
+
+  test('StreamingState keeps retryStatus independently of the notifier', () {
+    final state = buildState(const [TextPart('hello')]);
+    final status = RetryStatus(
+      attempt: 1,
+      maxRetries: 3,
+      retryAt: DateTime(2026, 8, 30, 21, 1),
+    );
+    state.retryStatus = status;
+    expect(state.retryStatus, status);
+    expect(state.retryStatus!.attempt, 1);
+  });
 }

@@ -204,4 +204,58 @@ void main() {
     expect(controller.getReasoningSegments(message.id), isNotNull);
     expect(controller.reasoningPayloadDecodeCount, 2);
   });
+
+  test(
+    'retry status survives clearAllState when restored from StreamingState',
+    () {
+      final controller = buildController();
+      final status = RetryStatus(
+        attempt: 2,
+        maxRetries: 3,
+        retryAt: DateTime(2026, 8, 30, 21),
+      );
+      controller.streamingContentNotifier.updateRetryStatus(
+        'assistant-1',
+        status,
+      );
+      expect(
+        controller.streamingContentNotifier
+            .getNotifier('assistant-1')
+            .value
+            .retryStatus,
+        status,
+      );
+
+      controller.clearAllState();
+      expect(
+        controller.streamingContentNotifier.hasNotifier('assistant-1'),
+        isFalse,
+      );
+
+      controller.markStreamingStarted('assistant-1');
+      controller.restoreRetryStatus('assistant-1', status);
+      expect(
+        controller.streamingContentNotifier
+            .getNotifier('assistant-1')
+            .value
+            .retryStatus,
+        status,
+      );
+    },
+  );
+
+  test('restoreRetryStatus does not revive a finished message', () {
+    final controller = buildController();
+    final status = RetryStatus(
+      attempt: 2,
+      maxRetries: 3,
+      retryAt: DateTime(2026, 8, 30, 21),
+    );
+    controller.restoreRetryStatus('assistant-1', status);
+    expect(controller.isAnyMessageStreaming, isFalse);
+    expect(
+      controller.streamingContentNotifier.hasNotifier('assistant-1'),
+      isFalse,
+    );
+  });
 }

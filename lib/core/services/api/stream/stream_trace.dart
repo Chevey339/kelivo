@@ -231,6 +231,14 @@ Map<String, dynamic> _chunkSnapshot(StreamChunk chunk) {
       'type': 'finish',
       if (finishReason != null) 'finishReason': finishReason,
     },
+    RetryPending(:final attempt, :final maxRetries, :final delay) =>
+      <String, dynamic>{
+        'type': 'retry_pending',
+        'attempt': attempt,
+        'maxRetries': maxRetries,
+        'delayMs': delay.inMilliseconds,
+      },
+    RetryAttemptStart() => <String, dynamic>{'type': 'retry_attempt_start'},
   };
 }
 

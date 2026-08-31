@@ -36,6 +36,7 @@ class _DesktopTranslatePageState extends State<DesktopTranslatePage> {
 
   StreamSubscription? _subscription;
   bool _translating = false;
+  late final String _requestId = 'desktop-translate-${identityHashCode(this)}';
 
   @override
   void initState() {
@@ -46,6 +47,7 @@ class _DesktopTranslatePageState extends State<DesktopTranslatePage> {
 
   @override
   void dispose() {
+    ChatApiService.cancelRequest(_requestId);
     _subscription?.cancel();
     _source.dispose();
     _output.dispose();
@@ -179,6 +181,7 @@ class _DesktopTranslatePageState extends State<DesktopTranslatePage> {
         thinkingBudget: settings.translateGenerationThinkingBudgetFor(
           context.read<AssistantProvider>().currentAssistant?.thinkingBudget,
         ),
+        requestId: _requestId,
       );
 
       _subscription = stream.listen(
@@ -218,6 +221,7 @@ class _DesktopTranslatePageState extends State<DesktopTranslatePage> {
   }
 
   Future<void> _stopTranslate() async {
+    ChatApiService.cancelRequest(_requestId);
     try {
       await _subscription?.cancel();
     } catch (_) {}

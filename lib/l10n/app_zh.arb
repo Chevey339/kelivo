@@ -2267,6 +2267,35 @@
   },
   "networkProxyNoUrl": "请输入测试地址",
   "networkProxyPriorityNote": "当同时开启全局代理与供应商代理时，将优先使用供应商代理。",
+  "settingsPageAutoRetry": "自动重试",
+  "autoRetryEnableLabel": "开启自动重试",
+  "autoRetryMaxRetries": "最大重试次数",
+  "autoRetryInitialDelay": "首次延迟（毫秒）",
+  "autoRetryMultiplier": "退避倍率",
+  "autoRetryMaxDelay": "最大延迟（毫秒）",
+  "autoRetryJitter": "抖动",
+  "autoRetryJitterSubtitle": "每次等待随机 ±20%",
+  "autoRetryOnNetworkError": "网络错误时重试",
+  "autoRetryStatusCodes": "可重试状态码",
+  "autoRetryKeywords": "重试关键字",
+  "autoRetryStopKeywords": "停止重试关键字",
+  "autoRetryAddHint": "添加",
+  "autoRetryRestoreDefaults": "恢复默认",
+  "autoRetryFooter": "仅在本次请求尚未产生任何输出时才会自动重试。",
+  "autoRetryCountdown": "{seconds} 秒后重试 ({attempt}/{maxRetries})",
+  "@autoRetryCountdown": {
+    "placeholders": {
+      "seconds": {
+        "type": "int"
+      },
+      "attempt": {
+        "type": "int"
+      },
+      "maxRetries": {
+        "type": "int"
+      }
+    }
+  },
   "desktopShowProviderInModelCapsule": "模型胶囊显示供应商",
   "messageWebViewOpenInBrowser": "在浏览器中打开",
   "messageWebViewConsoleLogs": "控制台日志",

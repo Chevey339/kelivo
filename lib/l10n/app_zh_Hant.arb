@@ -2266,6 +2266,35 @@
   },
   "networkProxyNoUrl": "請輸入測試地址",
   "networkProxyPriorityNote": "同時啟用全域代理與供應商代理時，將優先使用供應商代理。",
+  "settingsPageAutoRetry": "自動重試",
+  "autoRetryEnableLabel": "開啟自動重試",
+  "autoRetryMaxRetries": "最大重試次數",
+  "autoRetryInitialDelay": "首次延遲（毫秒）",
+  "autoRetryMultiplier": "退避倍率",
+  "autoRetryMaxDelay": "最大延遲（毫秒）",
+  "autoRetryJitter": "抖動",
+  "autoRetryJitterSubtitle": "每次等待隨機 ±20%",
+  "autoRetryOnNetworkError": "網路錯誤時重試",
+  "autoRetryStatusCodes": "可重試狀態碼",
+  "autoRetryKeywords": "重試關鍵字",
+  "autoRetryStopKeywords": "停止重試關鍵字",
+  "autoRetryAddHint": "新增",
+  "autoRetryRestoreDefaults": "恢復預設",
+  "autoRetryFooter": "僅在本次請求尚未產生任何輸出時才會自動重試。",
+  "autoRetryCountdown": "{seconds} 秒後重試 ({attempt}/{maxRetries})",
+  "@autoRetryCountdown": {
+    "placeholders": {
+      "seconds": {
+        "type": "int"
+      },
+      "attempt": {
+        "type": "int"
+      },
+      "maxRetries": {
+        "type": "int"
+      }
+    }
+  },
   "desktopShowProviderInModelCapsule": "模型膠囊顯示供應商",
   "messageWebViewOpenInBrowser": "在瀏覽器中開啟",
   "messageWebViewConsoleLogs": "控制台日誌",

@@ -108,6 +108,7 @@ class MessageBuilderService {
     List<String> imagePaths, {
     String? revisionId,
     OcrPrepareSession? session,
+    String? requestId,
   })?
   ocrHandler;
 
@@ -1032,6 +1033,7 @@ class MessageBuilderService {
             ocrTargets,
             revisionId: revisionId.isEmpty ? null : revisionId,
             session: ocrSession,
+            requestId: conversation?.id,
           );
           if (ocrText == null) {
             canFreezePrompt = false;

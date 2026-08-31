@@ -59,6 +59,7 @@ import 'screen_time_tool_ui.dart';
 import 'weather_tool_ui.dart';
 import 'tool_detail_text_section.dart';
 import '../../../theme/app_font_weights.dart';
+import '../../home/controllers/streaming_content_notifier.dart';
 
 final RegExp _urlSchemeRe = RegExp(r'^[a-zA-Z][a-zA-Z0-9+.-]*:');
 
@@ -1037,6 +1038,7 @@ class ChatMessageWidget extends StatefulWidget {
   final bool hideStreamingIndicator;
   // Whether files are currently being processed
   final bool isProcessingFiles;
+  final RetryStatus? retryStatus;
   final bool enableStreamingTextMotion;
   final List<String> suggestions;
   final ValueChanged<String>? onSuggestionTap;
@@ -1088,6 +1090,7 @@ class ChatMessageWidget extends StatefulWidget {
     this.toolCountAtSplit,
     this.hideStreamingIndicator = false,
     this.isProcessingFiles = false,
+    this.retryStatus,
     this.enableStreamingTextMotion = true,
     this.suggestions = const <String>[],
     this.onSuggestionTap,
@@ -2849,10 +2852,27 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
                         // constraints (option off) Align ignores it.
                         widthFactor: 1,
                         child: Semantics(
-                          label: l10n.chatMessageWidgetThinking,
+                          label: widget.retryStatus == null
+                              ? l10n.chatMessageWidgetThinking
+                              : l10n.autoRetryCountdown(
+                                  _retrySecondsLeft(widget.retryStatus!),
+                                  widget.retryStatus!.attempt,
+                                  widget.retryStatus!.maxRetries,
+                                ),
                           child: widget.hideStreamingIndicator
                               ? const SizedBox(height: 16)
-                              : const LoadingIndicator(),
+                              : Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    const LoadingIndicator(),
+                                    if (widget.retryStatus != null) ...[
+                                      const SizedBox(width: 8),
+                                      _RetryCountdownHint(
+                                        status: widget.retryStatus!,
+                                      ),
+                                    ],
+                                  ],
+                                ),
                         ),
                       ),
                     ),
@@ -3979,6 +3999,50 @@ class _BranchSelector extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+int _retrySecondsLeft(RetryStatus status) {
+  final remaining = status.retryAt.difference(DateTime.now());
+  if (remaining.isNegative) return 0;
+  return remaining.inMilliseconds == 0
+      ? 0
+      : (remaining.inMilliseconds / 1000).ceil();
+}
+
+class _RetryCountdownHint extends StatelessWidget {
+  const _RetryCountdownHint({required this.status});
+
+  final RetryStatus status;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    final cs = Theme.of(context).colorScheme;
+    final remaining = status.retryAt.difference(DateTime.now());
+    final startSeconds = remaining.inMilliseconds / 1000.0;
+    final style = TextStyle(
+      fontSize: 12,
+      color: cs.onSurface.withValues(alpha: 0.55),
+    );
+    if (startSeconds <= 0) {
+      return Text(
+        l10n.autoRetryCountdown(0, status.attempt, status.maxRetries),
+        style: style,
+      );
+    }
+    return TweenAnimationBuilder<double>(
+      key: ValueKey(status.retryAt),
+      tween: Tween<double>(begin: startSeconds, end: 0),
+      duration: remaining,
+      builder: (context, value, _) {
+        final seconds = value <= 0 ? 0 : value.ceil();
+        return Text(
+          l10n.autoRetryCountdown(seconds, status.attempt, status.maxRetries),
+          style: style,
+        );
+      },
     );
   }
 }

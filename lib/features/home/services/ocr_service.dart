@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 
 import '../../../core/providers/settings_provider.dart';
 import '../../../core/services/api/chat_api_service.dart';
+import '../../../core/services/api/retry_policy.dart';
 
 /// OCR 缓存条目
 class OcrCacheEntry {
@@ -101,16 +102,24 @@ class OcrService {
   ///
   /// [imagePaths] 图片路径列表
   /// [context] BuildContext 用于获取 SettingsProvider
+  /// [requestId] conversation send id; Stop cancels this OCR request too
   ///
   /// 返回识别的文本内容，失败时返回 null
   Future<String?> runOcrForImages(
     List<String> imagePaths,
-    BuildContext context,
-  ) async {
+    BuildContext context, {
+    String? requestId,
+  }) async {
     if (imagePaths.isEmpty) return null;
     if (ocrExecutor != null) {
-      final out = (await ocrExecutor!(imagePaths))?.trim();
-      return (out == null || out.isEmpty) ? null : out;
+      try {
+        final out = (await ocrExecutor!(imagePaths))?.trim();
+        return (out == null || out.isEmpty) ? null : out;
+      } catch (e) {
+        if (isUserCancelError(e)) rethrow;
+        onError?.call(e);
+        return null;
+      }
     }
 
     final settings = context.read<SettingsProvider>();
@@ -131,9 +140,11 @@ class OcrService {
         userImagePaths: imagePaths,
         thinkingBudget: settings.ocrGenerationThinkingBudgetFor(null),
         ocrActive: true,
+        requestId: requestId,
       );
       out = result.text;
     } catch (e) {
+      if (isUserCancelError(e)) rethrow;
       onError?.call(e);
       return null;
     }
@@ -264,6 +275,7 @@ class OcrService {
   /// [context] BuildContext 用于获取 SettingsProvider
   /// [revisionId] 带图 user 消息 revision，用于 SQLite 持久化
   /// [session] optional per-prepare snapshot from [prefetchPersistedOcr]
+  /// [requestId] conversation send id so chat Stop also cancels OCR backoff
   ///
   /// 返回合并后的 OCR 文本，失败时返回 null
   Future<String?> getOcrTextForImages(
@@ -271,6 +283,7 @@ class OcrService {
     BuildContext context, {
     String? revisionId,
     OcrPrepareSession? session,
+    String? requestId,
   }) async {
     if (imagePaths.isEmpty) return null;
 
@@ -368,7 +381,7 @@ class OcrService {
       }
 
       if (!context.mounted) break;
-      final text = await runOcrForImages([path], context);
+      final text = await runOcrForImages([path], context, requestId: requestId);
       if (text != null && text.trim().isNotEmpty) {
         final t = text.trim();
         if (hash != null && hash.isNotEmpty) {

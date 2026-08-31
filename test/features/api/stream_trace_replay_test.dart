@@ -15,6 +15,23 @@ import 'package:flutter_test/flutter_test.dart';
 const _updateEnv = 'UPDATE_STREAM_TRACES';
 
 void main() {
+  test('RetryAttemptStart and RetryPending snapshot without throwing', () {
+    final snapshot = streamTraceSnapshot(
+      chunks: [
+        const RetryPending(
+          attempt: 1,
+          maxRetries: 3,
+          delay: Duration(seconds: 2),
+        ),
+        const RetryAttemptStart(),
+      ],
+    );
+    expect(snapshot['chunks'], [
+      {'type': 'retry_pending', 'attempt': 1, 'maxRetries': 3, 'delayMs': 2000},
+      {'type': 'retry_attempt_start'},
+    ]);
+  });
+
   test('replay Claude thinking + parallel tools + web_search', () {
     final decoder = ClaudeStreamDecoder();
     final replayed = _replay('claude/thinking-tools-search', decoder);

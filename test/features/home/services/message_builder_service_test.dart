@@ -1449,7 +1449,7 @@ void main() {
     MessageBuilderService serviceWithOcr() => MessageBuilderService(
       chatService: _FakeChatService({}),
       contextProvider: _FakeBuildContext(),
-      ocrHandler: (imagePaths, {revisionId, session}) async => 'ocr',
+      ocrHandler: (imagePaths, {revisionId, session, requestId}) async => 'ocr',
     );
 
     List<Map<String, dynamic>> apiMessagesFor(ChatMessage message) => [
@@ -1583,7 +1583,7 @@ void main() {
       final service = MessageBuilderService(
         chatService: _FakeChatService({}),
         contextProvider: _FakeBuildContext(),
-        ocrHandler: (imagePaths, {revisionId, session}) async {
+        ocrHandler: (imagePaths, {revisionId, session, requestId}) async {
           ocrCalls.add(List<String>.of(imagePaths));
           return 'ocr-should-not-run';
         },
@@ -1668,7 +1668,8 @@ void main() {
       final service = MessageBuilderService(
         chatService: _FakeChatService({}),
         contextProvider: _FakeBuildContext(),
-        ocrHandler: (imagePaths, {revisionId, session}) async => 'ocr',
+        ocrHandler: (imagePaths, {revisionId, session, requestId}) async =>
+            'ocr',
       );
 
       final realUser = ChatMessage(

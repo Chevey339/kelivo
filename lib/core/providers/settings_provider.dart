@@ -20,8 +20,10 @@ import '../services/learning_mode_store.dart';
 import '../models/api_keys.dart';
 import '../models/backup.dart';
 import '../models/compress_context_options.dart';
+import '../models/auto_retry_options.dart';
 import '../models/provider_group.dart';
 import '../services/haptics.dart';
+import '../services/api/retry_policy.dart';
 import '../services/screen_wakelock.dart';
 import '../../utils/app_directories.dart';
 import '../../utils/sandbox_path_resolver.dart';
@@ -384,6 +386,7 @@ class SettingsProvider extends ChangeNotifier {
   static const String _globalProxyBypassKey = 'global_proxy_bypass_v1';
   static const String _defaultGlobalProxyBypassRules =
       'localhost,127.0.0.1,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16,::1';
+  static const String _autoRetryOptionsKey = 'auto_retry_options';
   // TTS services (network)
   static const String _ttsServicesKey = 'tts_services_v1';
   static const String _ttsSelectedServiceIdKey = 'tts_selected_service_id_v1';
@@ -729,6 +732,9 @@ class SettingsProvider extends ChangeNotifier {
   String get globalProxyUsername => _globalProxyUsername;
   String get globalProxyPassword => _globalProxyPassword;
   String get globalProxyBypass => _globalProxyBypass;
+
+  AutoRetryOptions _autoRetry = const AutoRetryOptions.defaults();
+  AutoRetryOptions get autoRetryOptions => _autoRetry;
 
   int _appLaunchCount = 0;
   int get appLaunchCount => _appLaunchCount;
@@ -1418,6 +1424,17 @@ class SettingsProvider extends ChangeNotifier {
       _globalProxyBypass = bypass;
     }
 
+    _autoRetry = const AutoRetryOptions.defaults();
+    final autoRetryStr = prefs.getString(_autoRetryOptionsKey);
+    if (autoRetryStr != null && autoRetryStr.isNotEmpty) {
+      try {
+        _autoRetry = AutoRetryOptions.fromJson(
+          jsonDecode(autoRetryStr) as Map<String, dynamic>,
+        );
+      } catch (_) {}
+    }
+    AutoRetryConfig.current = _autoRetry;
+
     // load network TTS services
     try {
       final ttsStr = prefs.getString(_ttsServicesKey) ?? '';
@@ -1612,6 +1629,13 @@ class SettingsProvider extends ChangeNotifier {
     notifyListeners();
     final prefs = _preferences;
     await prefs.setString(_globalProxyBypassKey, _globalProxyBypass);
+  }
+
+  Future<void> setAutoRetryOptions(AutoRetryOptions v) async {
+    _autoRetry = v;
+    AutoRetryConfig.current = v;
+    notifyListeners();
+    await _preferences.setString(_autoRetryOptionsKey, jsonEncode(v.toJson()));
   }
 
   // Apply global proxy to Dart IO layer; provider-level proxies take precedence at call sites.

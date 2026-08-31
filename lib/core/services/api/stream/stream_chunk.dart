@@ -257,6 +257,41 @@ final class Finish extends StreamChunk {
   final String? model;
 }
 
+/// Emitted between attempts while auto-retry is waiting to try again.
+///
+/// Not message content — consumers should not fold this into parts.
+final class RetryPending extends StreamChunk {
+  const RetryPending({
+    required this.attempt,
+    required this.maxRetries,
+    required this.delay,
+    this.errorText = '',
+    this.retryAt,
+  });
+
+  /// 1-based extra-attempt index, matching "retry (2/3)" in the UI.
+  final int attempt;
+  final int maxRetries;
+  final Duration delay;
+  final String errorText;
+
+  /// Absolute time when backoff ends, stamped when sleep starts.
+  ///
+  /// UI countdown must use this instead of `DateTime.now() + delay` after a
+  /// delayed consumer (e.g. persistence) applies the event.
+  final DateTime? retryAt;
+
+  DateTime deadlineAt([DateTime? now]) =>
+      retryAt ?? (now ?? DateTime.now()).add(delay);
+}
+
+/// Emitted when backoff has finished and the next attempt is starting.
+///
+/// Not message content — consumers should clear retry countdown UI.
+final class RetryAttemptStart extends StreamChunk {
+  const RetryAttemptStart();
+}
+
 /// True when [data] is already a renderable URI, not raw base64.
 ///
 /// Image events from Gemini / Responses still carry raw base64. Chat

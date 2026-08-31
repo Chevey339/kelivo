@@ -22,6 +22,7 @@ import 'package:drift/drift.dart' show driftRuntimeOptions;
 import 'package:drift/native.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
 class _FakeBuildContext implements BuildContext {
@@ -177,6 +178,7 @@ void main() {
       List<String> imagePaths, {
       String? revisionId,
       OcrPrepareSession? session,
+      String? requestId,
     })?
     ocrHandler,
     Future<OcrPrepareSession> Function({
@@ -810,7 +812,7 @@ void main() {
         var ocrCalls = 0;
         final service = buildService(
           messages: [message],
-          ocrHandler: (imagePaths, {revisionId, session}) async {
+          ocrHandler: (imagePaths, {revisionId, session, requestId}) async {
             ocrCalls++;
             return ocrCalls == 1 ? null : 'recognized image';
           },
@@ -849,6 +851,70 @@ void main() {
           (await chatRepository.getMessagePrompt(message.id))?.payload,
           retry.single['content'],
         );
+      },
+    );
+
+    test(
+      'cancelled OCR does not freeze the prompt or continue later messages',
+      () async {
+        await seedAssistant('assistant-1');
+        final conversation = await seedConversation('conv-ocr-cancel');
+        final first = await seedUserMessage(
+          id: 'u1',
+          conversationId: conversation.id,
+          parts: const [
+            TextPart('first'),
+            ImagePart(uri: '/tmp/first.png', mime: 'image/png'),
+          ],
+        );
+        final second = await seedUserMessage(
+          id: 'u2',
+          conversationId: conversation.id,
+          parts: const [
+            TextPart('second'),
+            ImagePart(uri: '/tmp/second.png', mime: 'image/png'),
+          ],
+          messageOrder: 1,
+        );
+        await settings.setOcrModel('ocr-provider', 'ocr-model');
+        await settings.setOcrEnabled(true);
+
+        final ocrCalls = <String?>[];
+        final service = buildService(
+          messages: [first, second],
+          ocrHandler: (imagePaths, {revisionId, session, requestId}) async {
+            ocrCalls.add(revisionId);
+            if (revisionId == first.id) return 'ocr-first';
+            throw http.ClientException('cancelled');
+          },
+        );
+
+        final apiMessages = <Map<String, dynamic>>[
+          {
+            'role': 'user',
+            'content': first.content,
+            MessageBuilderService.internalRevisionIdKey: first.id,
+          },
+          {
+            'role': 'user',
+            'content': second.content,
+            MessageBuilderService.internalRevisionIdKey: second.id,
+          },
+        ];
+
+        await expectLater(
+          service.processUserMessagesForApi(
+            apiMessages,
+            settings,
+            assistant,
+            conversation: conversation,
+            sourceMessages: [first, second],
+          ),
+          throwsA(isA<http.ClientException>()),
+        );
+
+        expect(ocrCalls, [first.id, second.id]);
+        expect(await chatRepository.getMessagePrompt(second.id), isNull);
       },
     );
 

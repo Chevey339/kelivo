@@ -436,12 +436,13 @@ class HomePageController extends ChangeNotifier {
     _messageBuilderService = MessageBuilderService(
       chatService: _chatService,
       contextProvider: _context,
-      ocrHandler: (imagePaths, {revisionId, session}) =>
+      ocrHandler: (imagePaths, {revisionId, session, requestId}) =>
           _ocrService.getOcrTextForImages(
             imagePaths,
             _context,
             revisionId: revisionId,
             session: session,
+            requestId: requestId,
           ),
       ocrPrefetch: ({required revisionIds, required imagePaths}) =>
           _ocrService.prefetchPersistedOcr(
@@ -2755,6 +2756,7 @@ class HomePageController extends ChangeNotifier {
         _translations[m.id] = td;
       }
     }
+    _viewModel.restoreRetryUiFromStreamingState();
   }
 
   void _restoreAssistantMessageUiState(ChatMessage message) {
