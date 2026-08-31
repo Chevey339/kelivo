@@ -1,5 +1,7 @@
 import 'dart:async';
 import 'package:flutter/widgets.dart';
+import '../../../core/database/bridge_delivery.dart';
+import '../../../core/database/chat_database_repository.dart';
 import '../../../core/models/assistant.dart';
 import '../../../core/models/chat_input_data.dart';
 import '../../../core/models/chat_message.dart';
@@ -341,6 +343,30 @@ class MessageGenerationService {
       userMessage: result.userMessage!,
       assistantMessage: result.assistantMessage,
       runId: result.run.id,
+    );
+  }
+
+  Future<BridgeGenerationBeginResult> beginBridgeSendGeneration({
+    required String conversationId,
+    required ChatInputData input,
+    required Assistant? assistant,
+    required String modelId,
+    required String providerKey,
+    required BridgeDeliveryClaim deliveryClaim,
+  }) async {
+    if (chatService.isTemporaryConversation(conversationId)) {
+      throw StateError('temporary_generation_is_not_persisted');
+    }
+    final userParts = await buildPersistedUserMessageParts(
+      input,
+      assistant: assistant,
+    );
+    return chatService.beginBridgeSendGeneration(
+      conversationId: conversationId,
+      userParts: userParts,
+      modelId: modelId,
+      providerId: providerKey,
+      deliveryClaim: deliveryClaim,
     );
   }
 

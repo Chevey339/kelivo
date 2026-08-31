@@ -19,6 +19,7 @@ import '../../../core/providers/quick_phrase_provider.dart';
 import '../../../core/providers/instruction_injection_provider.dart';
 import '../../../core/providers/memory_provider.dart';
 import '../../../core/services/chat/chat_service.dart';
+import '../../../core/services/logging/flutter_logger.dart';
 import '../../../core/services/tts/tts_text_selection.dart';
 import '../../../core/services/haptics.dart';
 import '../../../core/services/notification_service.dart';
@@ -50,6 +51,9 @@ import '../services/file_upload_service.dart';
 import '../utils/chat_layout_constants.dart';
 import '../widgets/chat_input_bar.dart';
 import '../../model/widgets/model_select_sheet.dart';
+import '../bridge/kelivo_bridge_facade.dart';
+import '../bridge/loopback_bridge_server.dart';
+import '../bridge/native_bridge_config.dart';
 
 enum ChatSelectionMode { share, delete }
 
@@ -152,6 +156,7 @@ class HomePageController extends ChangeNotifier {
   late TranslationService _translationService;
   late FileUploadService _fileUploadService;
   late scroll_ctrl.ChatScrollController _scrollCtrl;
+  LoopbackBridgeServer? _loopbackBridgeServer;
 
   McpProvider? _mcpProvider;
   StreamSubscription<ChatAction>? _chatActionSub;
@@ -367,6 +372,7 @@ class HomePageController extends ChangeNotifier {
     _initializeScrollController();
     _initializeServices();
     _initializeViewModel();
+    _initializeNativeBridge();
     _wireViewModelCallbacks();
     _initializeProviders();
     _setupKeyboardListeners();
@@ -483,6 +489,44 @@ class HomePageController extends ChangeNotifier {
     );
     _viewModel.onBackgroundTaskError = _showBackgroundTaskFailure;
     _viewModel.addListener(notifyListeners);
+  }
+
+  void _initializeNativeBridge() {
+    final config = NativeBridgeConfig.fromEnvironment();
+    if (config == null) return;
+    final server = LoopbackBridgeServer(
+      facade: KelivoBridgeFacade(
+        chatActions: _viewModel.bridgeChatActions,
+        chatController: _chatController,
+        chatService: _chatService,
+        diagnostics: (event, fields) {
+          FlutterLogger.log(
+            '[NativeBridge] $event $fields',
+            tag: 'NativeBridge',
+          );
+        },
+      ),
+      secret: config.secret,
+      port: config.port,
+      maxBodyBytes: config.maxBodyBytes,
+    );
+    _loopbackBridgeServer = server;
+    unawaited(
+      server.start().then<void>(
+        (port) {
+          FlutterLogger.log(
+            '[NativeBridge] listening on 127.0.0.1:$port',
+            tag: 'NativeBridge',
+          );
+        },
+        onError: (Object error, StackTrace stackTrace) {
+          FlutterLogger.log(
+            '[NativeBridge] start failed: $error\n$stackTrace',
+            tag: 'NativeBridge',
+          );
+        },
+      ),
+    );
   }
 
   void _showBackgroundTaskFailure(BackgroundTaskKind task, Object error) {
@@ -2819,6 +2863,8 @@ class HomePageController extends ChangeNotifier {
 
   @override
   void dispose() {
+    unawaited(_loopbackBridgeServer?.stop());
+    _loopbackBridgeServer = null;
     _viewModel.resetFileProcessingIndicator();
     _viewModel.onBackgroundTaskError = null;
     _ocrService.onError = null;

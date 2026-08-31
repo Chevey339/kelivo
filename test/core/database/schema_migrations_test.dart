@@ -87,7 +87,10 @@ void main() {
     expect(outcome.fromVersion, 1);
     expect(outcome.toVersion, AppDatabase.currentSchemaVersion);
     expect(outcome.upgraded, isTrue);
-    expect(SchemaMigrations.readSchemaVersion(file), 2);
+    expect(
+      SchemaMigrations.readSchemaVersion(file),
+      AppDatabase.currentSchemaVersion,
+    );
     expect(columnsOf(file, 'conversation_rows'), [
       ...before,
       'chat_model_provider',
@@ -101,6 +104,27 @@ void main() {
       expect(rows.single['id'], 'conv-1');
       expect(rows.single['chat_model_provider'], isNull);
       expect(rows.single['chat_model_id'], isNull);
+      expect(
+        raw
+            .select(
+              "SELECT name FROM sqlite_master WHERE type = 'table' "
+              "AND name = 'bridge_delivery_rows';",
+            )
+            .single['name'],
+        'bridge_delivery_rows',
+      );
+      expect(
+        raw
+            .select(
+              "SELECT name FROM sqlite_master WHERE type = 'index' "
+              "AND name LIKE 'idx_bridge_deliveries_%' ORDER BY name;",
+            )
+            .map((row) => row['name']),
+        [
+          'idx_bridge_deliveries_conversation_created',
+          'idx_bridge_deliveries_room_event',
+        ],
+      );
     } finally {
       raw.close();
     }

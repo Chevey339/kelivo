@@ -149,6 +149,7 @@ class HomeViewModel extends ChangeNotifier {
 
   @visibleForTesting
   ChatActions get debugChatActions => _chatActions;
+  ChatActions get bridgeChatActions => _chatActions;
   QueuedChatInput? _queuedInput;
   bool _isDrainingQueuedInput = false;
 

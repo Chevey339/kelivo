@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:collection';
 import 'package:flutter/widgets.dart';
 import 'package:provider/provider.dart';
+import '../../../core/database/bridge_delivery.dart';
 import '../../../core/database/generation_run.dart';
 import '../../../core/models/assistant.dart';
 import '../../../core/models/chat_input_data.dart';
@@ -24,6 +25,7 @@ import '../../../core/models/assistant_regex.dart';
 import '../services/ask_user_interaction_service.dart';
 import '../services/message_generation_service.dart';
 import '../services/tool_approval_service.dart';
+import '../bridge/native_turn.dart';
 import 'active_streaming_message_store.dart';
 import 'chat_controller.dart';
 import 'generation_controller.dart';
@@ -125,6 +127,25 @@ class ChatActionResult {
       ChatActionResult(success: false, errorMessage: 'in_flight');
 }
 
+final class _ClaimedSendResult {
+  const _ClaimedSendResult({required this.action, this.externalStart});
+
+  final ChatActionResult action;
+  final NativeTurnStartResult? externalStart;
+}
+
+final class _ExternalTurnAwaiter {
+  const _ExternalTurnAwaiter({
+    required this.userMessageId,
+    required this.generationRunId,
+    required this.completer,
+  });
+
+  final String userMessageId;
+  final String generationRunId;
+  final Completer<NativeTurnTerminalResult> completer;
+}
+
 /// Actions class for chat operations (send, regenerate, cancel, streaming).
 ///
 /// This class contains ONLY business logic, NO UI operations.
@@ -137,7 +158,7 @@ class ChatActionResult {
 /// - Cancel streaming
 /// - Handle stream chunks (reasoning, tools, content)
 /// - Manage streaming state
-class ChatActions {
+class ChatActions implements NativeTurnActions {
   static bool shouldPhysicallyRemoveRegenerationTail({
     required bool deleteTrailingEnabled,
     required bool isTemporaryConversation,
@@ -383,6 +404,8 @@ class ChatActions {
       <String, stream_ctrl.StreamingState>{};
   final Map<String, Future<void>> _cancelStreamingFutures =
       <String, Future<void>>{};
+  final Map<String, _ExternalTurnAwaiter> _externalTurnAwaiters =
+      <String, _ExternalTurnAwaiter>{};
 
   /// Per-conversation send/regenerate claim, taken synchronously before the
   /// first await so a re-entrant call loses before persisting anything. The
@@ -567,9 +590,40 @@ class ChatActions {
         await writer.finalize(writeFinal);
       }
       committed = true;
+      _completeExternalTurn(
+        message,
+        state: terminalState,
+        errorCode: errorCode,
+      );
+    } catch (_) {
+      _completeExternalTurn(
+        message,
+        state: GenerationRunState.failed,
+        errorCode: 'terminal_persist_failed',
+      );
+      rethrow;
     } finally {
       if (committed) _clearGenerationRuntimeState(message);
     }
+  }
+
+  void _completeExternalTurn(
+    ChatMessage message, {
+    required GenerationRunState state,
+    String? errorCode,
+  }) {
+    final awaiter = _externalTurnAwaiters.remove(message.id);
+    if (awaiter == null || awaiter.completer.isCompleted) return;
+    awaiter.completer.complete(
+      NativeTurnTerminalResult(
+        state: state,
+        userMessageId: awaiter.userMessageId,
+        assistantMessageId: message.id,
+        generationRunId: awaiter.generationRunId,
+        assistantMessage: message,
+        errorCode: errorCode,
+      ),
+    );
   }
 
   void _clearGenerationRuntimeState(ChatMessage message) {
@@ -1087,10 +1141,11 @@ class ChatActions {
     }
     _sendInFlightClaims[conversation.id] = claimToken;
     try {
-      return await _sendMessageClaimed(
+      final result = await _sendMessageClaimed(
         input: input,
         conversation: conversation,
       );
+      return result.action;
     } finally {
       if (_sendInFlightClaims[conversation.id] == claimToken) {
         _sendInFlightClaims.remove(conversation.id);
@@ -1098,15 +1153,129 @@ class ChatActions {
     }
   }
 
-  Future<ChatActionResult> _sendMessageClaimed({
+  /// Starts an external room turn on the same live native send path as the UI.
+  ///
+  /// Unlike [sendMessage], the returned handle exposes the durable terminal
+  /// completion. New work is never queued: an occupied conversation returns
+  /// [NativeTurnStartStatus.busy] without persisting the room event.
+  @override
+  Future<NativeTurnStartResult> sendExternalTurn({
     required ChatInputData input,
     required Conversation conversation,
+    required BridgeDeliveryClaim deliveryClaim,
+  }) async {
+    try {
+      final existing = await chatService.getBridgeTurnSnapshot(
+        originInstanceId: deliveryClaim.originInstanceId,
+        idempotencyKey: deliveryClaim.idempotencyKey,
+      );
+      if (existing != null) {
+        if (existing.delivery.requestFingerprint !=
+            deliveryClaim.requestFingerprint) {
+          return const NativeTurnStartResult(
+            status: NativeTurnStartStatus.idempotencyConflict,
+            errorCode: 'IDEMPOTENCY_CONFLICT',
+          );
+        }
+        return NativeTurnStartResult(
+          status: NativeTurnStartStatus.accepted,
+          handle: _handleForPersistedBridgeTurn(
+            delivery: existing.delivery,
+            assistantMessage: existing.assistantMessage,
+            run: existing.run,
+          ),
+        );
+      }
+    } catch (error) {
+      return NativeTurnStartResult(
+        status: NativeTurnStartStatus.rejected,
+        errorCode: error.toString(),
+      );
+    }
+
+    if (chatController.currentConversation?.id != conversation.id) {
+      return const NativeTurnStartResult(
+        status: NativeTurnStartStatus.rejected,
+        errorCode: 'NOT_ACTIVE_CONVERSATION',
+      );
+    }
+    if (chatService.isTemporaryConversation(conversation.id) ||
+        !chatService.isPersistedConversation(conversation.id)) {
+      return const NativeTurnStartResult(
+        status: NativeTurnStartStatus.rejected,
+        errorCode: 'UNSUPPORTED_TEMPORARY_CONVERSATION',
+      );
+    }
+    if (_loadingConversationIds.contains(conversation.id) ||
+        _hasActiveGeneration(conversation.id) ||
+        isSendInFlight(conversation.id)) {
+      return const NativeTurnStartResult(
+        status: NativeTurnStartStatus.busy,
+        errorCode: 'GENERATION_BUSY',
+      );
+    }
+
+    final claimToken = ++_sendInFlightClaimSerial;
+    _sendInFlightClaims[conversation.id] = claimToken;
+    try {
+      final result = await _sendMessageClaimed(
+        input: input,
+        conversation: conversation,
+        deliveryClaim: deliveryClaim,
+      );
+      return result.externalStart ??
+          NativeTurnStartResult(
+            status: NativeTurnStartStatus.rejected,
+            errorCode: result.action.errorMessage ?? 'NATIVE_SEND_REJECTED',
+          );
+    } finally {
+      if (_sendInFlightClaims[conversation.id] == claimToken) {
+        _sendInFlightClaims.remove(conversation.id);
+      }
+    }
+  }
+
+  NativeTurnHandle _handleForPersistedBridgeTurn({
+    required BridgeDelivery delivery,
+    required ChatMessage assistantMessage,
+    required GenerationRun run,
+  }) {
+    final live = _externalTurnAwaiters[assistantMessage.id];
+    final completion =
+        live?.completer.future ??
+        Future<NativeTurnTerminalResult>.value(
+          NativeTurnTerminalResult(
+            state: run.state.isTerminal
+                ? run.state
+                : GenerationRunState.interrupted,
+            userMessageId: delivery.userRevisionId,
+            assistantMessageId: delivery.assistantRevisionId,
+            generationRunId: delivery.generationRunId,
+            assistantMessage: assistantMessage,
+            errorCode: run.state.isTerminal
+                ? run.errorCode
+                : 'RECOVERY_REQUIRED',
+          ),
+        );
+    return NativeTurnHandle(
+      userMessageId: delivery.userRevisionId,
+      assistantMessageId: delivery.assistantRevisionId,
+      generationRunId: delivery.generationRunId,
+      deduplicated: true,
+      completion: completion,
+    );
+  }
+
+  Future<_ClaimedSendResult> _sendMessageClaimed({
+    required ChatInputData input,
+    required Conversation conversation,
+    BridgeDeliveryClaim? deliveryClaim,
   }) async {
     final content = input.text.trim();
     if (content.isEmpty &&
         input.imagePaths.isEmpty &&
         input.documents.isEmpty) {
-      return ChatActionResult.error('empty_input');
+      return _ClaimedSendResult(action: ChatActionResult.error('empty_input'));
     }
 
     final settings = contextProvider.read<SettingsProvider>();
@@ -1123,7 +1292,7 @@ class ChatActions {
     try {
       await assistantProvider.loaded;
     } catch (e) {
-      return ChatActionResult.error(e.toString());
+      return _ClaimedSendResult(action: ChatActionResult.error(e.toString()));
     }
     final assistant = assistantProvider.currentAssistant;
     final assistantId = assistant?.id;
@@ -1134,7 +1303,7 @@ class ChatActions {
     );
 
     if (modelConfig.providerKey == null || modelConfig.modelId == null) {
-      return ChatActionResult.noModel();
+      return _ClaimedSendResult(action: ChatActionResult.noModel());
     }
     final providerKey = modelConfig.providerKey!;
     final modelId = modelConfig.modelId!;
@@ -1156,26 +1325,87 @@ class ChatActions {
           modelId: modelId,
         ) &&
         messageGenerationService.inputContainsAudioAttachments(input)) {
-      return ChatActionResult.error('audio_attachment_unsupported');
+      return _ClaimedSendResult(
+        action: ChatActionResult.error('audio_attachment_unsupported'),
+      );
     }
 
     late final ChatMessage userMessage;
     late final ChatMessage assistantMessage;
     String? generationRunId;
+    NativeTurnHandle? externalHandle;
     try {
-      final begin = await messageGenerationService.beginSendGeneration(
-        conversationId: conversation.id,
-        input: input,
-        assistant: assistant,
-        modelId: modelId,
-        providerKey: providerKey,
-      );
-      userMessage = begin.userMessage;
-      assistantMessage = begin.assistantMessage;
-      generationRunId = begin.runId;
+      if (deliveryClaim == null) {
+        final begin = await messageGenerationService.beginSendGeneration(
+          conversationId: conversation.id,
+          input: input,
+          assistant: assistant,
+          modelId: modelId,
+          providerKey: providerKey,
+        );
+        userMessage = begin.userMessage;
+        assistantMessage = begin.assistantMessage;
+        generationRunId = begin.runId;
+      } else {
+        final begin = await messageGenerationService.beginBridgeSendGeneration(
+          conversationId: conversation.id,
+          input: input,
+          assistant: assistant,
+          modelId: modelId,
+          providerKey: providerKey,
+          deliveryClaim: deliveryClaim,
+        );
+        if (begin.disposition == BridgeGenerationBeginDisposition.conflict) {
+          return _ClaimedSendResult(
+            action: ChatActionResult.error('idempotency_conflict'),
+            externalStart: const NativeTurnStartResult(
+              status: NativeTurnStartStatus.idempotencyConflict,
+              errorCode: 'IDEMPOTENCY_CONFLICT',
+            ),
+          );
+        }
+        if (begin.disposition == BridgeGenerationBeginDisposition.duplicate) {
+          final snapshot = await chatService.getBridgeTurnSnapshot(
+            originInstanceId: deliveryClaim.originInstanceId,
+            idempotencyKey: deliveryClaim.idempotencyKey,
+          );
+          if (snapshot == null) {
+            throw StateError('bridge_delivery_mapping_missing');
+          }
+          final handle = _handleForPersistedBridgeTurn(
+            delivery: snapshot.delivery,
+            assistantMessage: snapshot.assistantMessage,
+            run: snapshot.run,
+          );
+          return _ClaimedSendResult(
+            action: ChatActionResult.success(snapshot.assistantMessage),
+            externalStart: NativeTurnStartResult(
+              status: NativeTurnStartStatus.accepted,
+              handle: handle,
+            ),
+          );
+        }
+        final generation = begin.generation!;
+        userMessage = generation.userMessage!;
+        assistantMessage = generation.assistantMessage;
+        generationRunId = generation.run.id;
+        final completer = Completer<NativeTurnTerminalResult>();
+        _externalTurnAwaiters[assistantMessage.id] = _ExternalTurnAwaiter(
+          userMessageId: userMessage.id,
+          generationRunId: generationRunId,
+          completer: completer,
+        );
+        externalHandle = NativeTurnHandle(
+          userMessageId: userMessage.id,
+          assistantMessageId: assistantMessage.id,
+          generationRunId: generationRunId,
+          deduplicated: false,
+          completion: completer.future,
+        );
+      }
       _registerGenerationRun(assistantMessage.id, generationRunId);
     } catch (e) {
-      return ChatActionResult.error(e.toString());
+      return _ClaimedSendResult(action: ChatActionResult.error(e.toString()));
     }
     _activeAssistantMessages.put(assistantMessage);
     _setConversationLoading(conversation.id, true);
@@ -1215,7 +1445,15 @@ class ChatActions {
         askUserService: askUserService,
       ),
     );
-    return ChatActionResult.success(assistantMessage);
+    return _ClaimedSendResult(
+      action: ChatActionResult.success(assistantMessage),
+      externalStart: externalHandle == null
+          ? null
+          : NativeTurnStartResult(
+              status: NativeTurnStartStatus.accepted,
+              handle: externalHandle,
+            ),
+    );
   }
 
   Future<void> _runSendGeneration({

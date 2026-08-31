@@ -17,6 +17,7 @@ import '../../utils/kelivo_file_uri.dart';
 import '../models/memory_entry.dart';
 import '../models/user_profile_field.dart';
 import 'app_database.dart';
+import 'bridge_delivery.dart';
 import 'business_data.dart';
 import 'business_repository.dart';
 import 'chat_database_observer.dart';
@@ -107,6 +108,19 @@ typedef GenerationBeginResult = ({
   GenerationRun run,
 });
 
+typedef BridgeGenerationBeginResult = ({
+  BridgeGenerationBeginDisposition disposition,
+  BridgeDelivery delivery,
+  GenerationBeginResult? generation,
+});
+
+typedef BridgeTurnSnapshot = ({
+  BridgeDelivery delivery,
+  ChatMessage userMessage,
+  ChatMessage assistantMessage,
+  GenerationRun run,
+});
+
 class BackupMergeReport {
   const BackupMergeReport({
     required this.importedConversations,
@@ -184,14 +198,18 @@ class ChatDatabaseRepository {
     required GenerationRunState nextState,
     required DateTime updatedAt,
     String? errorCode,
-  }) => GenerationRunCommands(_db).transition(
-    id: id,
-    expectedState: expectedState,
-    expectedStateRevision: expectedStateRevision,
-    nextState: nextState,
-    updatedAt: updatedAt,
-    errorCode: errorCode,
-  );
+  }) => _db.transaction(() async {
+    final run = await GenerationRunCommands(_db).transition(
+      id: id,
+      expectedState: expectedState,
+      expectedStateRevision: expectedStateRevision,
+      nextState: nextState,
+      updatedAt: updatedAt,
+      errorCode: errorCode,
+    );
+    await _updateBridgeDeliveryState(run);
+    return run;
+  });
 
   Future<GenerationRun> checkpointGenerationRun({
     required String id,
@@ -227,7 +245,7 @@ class ChatDatabaseRepository {
           generationRunId: checkpointSeq == null ? null : generationRunId,
           checkpointSeq: checkpointSeq,
         );
-        return GenerationRunCommands(_db).transition(
+        final run = await GenerationRunCommands(_db).transition(
           id: generationRunId,
           expectedState: expectedState,
           expectedStateRevision: expectedStateRevision,
@@ -235,6 +253,8 @@ class ChatDatabaseRepository {
           updatedAt: DateTime.now().toUtc(),
           errorCode: errorCode,
         );
+        await _updateBridgeDeliveryState(run);
+        return run;
       }),
     );
   }
@@ -785,6 +805,7 @@ class ChatDatabaseRepository {
       'chat_storage_meta_rows',
       'message_part_rows',
       'generation_run_rows',
+      'bridge_delivery_rows',
       'provider_artifact_rows',
       'asset_rows',
       'message_asset_rows',
@@ -898,6 +919,21 @@ class ChatDatabaseRepository {
       'updated_at',
       'terminal_at',
     ],
+    'bridge_delivery_rows': [
+      'origin_system',
+      'origin_instance_id',
+      'idempotency_key',
+      'request_fingerprint',
+      'room_event_id',
+      'room_id',
+      'conversation_id',
+      'user_revision_id',
+      'assistant_revision_id',
+      'generation_run_id',
+      'state',
+      'created_at',
+      'updated_at',
+    ],
     'provider_artifact_rows': [
       'conversation_id',
       'revision_id',
@@ -987,6 +1023,7 @@ class ChatDatabaseRepository {
       'asset_gc_rows': ['asset_id'],
       'gc_audit_rows': ['id'],
       'asset_reference_dirty_rows': ['revision_id'],
+      'bridge_delivery_rows': ['origin_instance_id', 'idempotency_key'],
       'assistant_rows': ['id'],
       'provider_rows': ['provider_key'],
       'provider_group_rows': ['id'],
@@ -1110,6 +1147,16 @@ class ChatDatabaseRepository {
       table: 'message_prompt_rows',
       name: 'idx_message_prompts_conversation_snapshot',
       columns: const ['conversation_id', 'carries_memory_snapshot'],
+    );
+    requireIndex(
+      table: 'bridge_delivery_rows',
+      name: 'idx_bridge_deliveries_room_event',
+      columns: const ['origin_instance_id', 'room_event_id'],
+    );
+    requireIndex(
+      table: 'bridge_delivery_rows',
+      name: 'idx_bridge_deliveries_conversation_created',
+      columns: const ['conversation_id', 'created_at'],
     );
 
     const assetIndexName = 'idx_message_assets_asset';
@@ -4485,6 +4532,146 @@ class ChatDatabaseRepository {
     );
   }
 
+  Future<BridgeGenerationBeginResult> beginBridgeSendGeneration({
+    required Conversation conversation,
+    required ChatMessage userMessage,
+    required ChatMessage assistantMessage,
+    required String runId,
+    required BridgeDeliveryClaim deliveryClaim,
+  }) {
+    _validateGenerationBeginMessages(
+      conversation: conversation,
+      userMessage: userMessage,
+      assistantMessage: assistantMessage,
+    );
+    _validateBridgeDeliveryClaim(deliveryClaim);
+    return _observer.measure(
+      ChatDatabaseOperation.commandAppendMessage,
+      () => _db.transaction(() async {
+        final existingRow =
+            await (_db.select(_db.bridgeDeliveryRows)..where(
+                  (row) =>
+                      row.originInstanceId.equals(
+                        deliveryClaim.originInstanceId,
+                      ) &
+                      row.idempotencyKey.equals(deliveryClaim.idempotencyKey),
+                ))
+                .getSingleOrNull();
+        if (existingRow != null) {
+          final existing = _bridgeDeliveryFromRow(existingRow);
+          return (
+            disposition:
+                existing.requestFingerprint == deliveryClaim.requestFingerprint
+                ? BridgeGenerationBeginDisposition.duplicate
+                : BridgeGenerationBeginDisposition.conflict,
+            delivery: existing,
+            generation: null,
+          );
+        }
+
+        final afterUser = await _appendLinearMessageToConversation(
+          conversation: conversation,
+          message: userMessage,
+          selectVersion: false,
+          touchUpdatedAt: true,
+        );
+        final persisted = await _appendLinearMessageToConversation(
+          conversation: afterUser,
+          message: assistantMessage,
+          selectVersion: false,
+          touchUpdatedAt: true,
+        );
+        final run = await GenerationRunCommands(_db).create(
+          id: runId,
+          conversationId: conversation.id,
+          targetRevisionId: assistantMessage.id,
+          createdAt: assistantMessage.timestamp,
+        );
+        final delivery = BridgeDelivery(
+          originSystem: deliveryClaim.originSystem,
+          originInstanceId: deliveryClaim.originInstanceId,
+          idempotencyKey: deliveryClaim.idempotencyKey,
+          requestFingerprint: deliveryClaim.requestFingerprint,
+          roomEventId: deliveryClaim.roomEventId,
+          roomId: deliveryClaim.roomId,
+          conversationId: conversation.id,
+          userRevisionId: userMessage.id,
+          assistantRevisionId: assistantMessage.id,
+          generationRunId: run.id,
+          state: run.state,
+          createdAt: run.createdAt,
+          updatedAt: run.updatedAt,
+        );
+        await _db
+            .into(_db.bridgeDeliveryRows)
+            .insert(
+              BridgeDeliveryRowsCompanion.insert(
+                originSystem: delivery.originSystem,
+                originInstanceId: delivery.originInstanceId,
+                idempotencyKey: delivery.idempotencyKey,
+                requestFingerprint: delivery.requestFingerprint,
+                roomEventId: delivery.roomEventId,
+                roomId: delivery.roomId,
+                conversationId: delivery.conversationId,
+                userRevisionId: delivery.userRevisionId,
+                assistantRevisionId: delivery.assistantRevisionId,
+                generationRunId: delivery.generationRunId,
+                state: delivery.state.databaseValue,
+                createdAt: delivery.createdAt,
+                updatedAt: delivery.updatedAt,
+              ),
+            );
+        return (
+          disposition: BridgeGenerationBeginDisposition.created,
+          delivery: delivery,
+          generation: (
+            conversation: persisted,
+            userMessage: userMessage,
+            assistantMessage: assistantMessage,
+            run: run,
+          ),
+        );
+      }),
+    );
+  }
+
+  Future<BridgeDelivery?> getBridgeDelivery({
+    required String originInstanceId,
+    required String idempotencyKey,
+  }) async {
+    final row =
+        await (_db.select(_db.bridgeDeliveryRows)..where(
+              (candidate) =>
+                  candidate.originInstanceId.equals(originInstanceId) &
+                  candidate.idempotencyKey.equals(idempotencyKey),
+            ))
+            .getSingleOrNull();
+    return row == null ? null : _bridgeDeliveryFromRow(row);
+  }
+
+  Future<BridgeTurnSnapshot?> getBridgeTurnSnapshot({
+    required String originInstanceId,
+    required String idempotencyKey,
+  }) async {
+    final delivery = await getBridgeDelivery(
+      originInstanceId: originInstanceId,
+      idempotencyKey: idempotencyKey,
+    );
+    if (delivery == null) return null;
+    final userMessage = await getMessage(delivery.userRevisionId);
+    final assistantMessage = await getMessage(delivery.assistantRevisionId);
+    final run = await getGenerationRun(delivery.generationRunId);
+    if (userMessage == null || assistantMessage == null || run == null) {
+      throw StateError('bridge_delivery_mapping_incomplete');
+    }
+    return (
+      delivery: delivery,
+      userMessage: userMessage,
+      assistantMessage: assistantMessage,
+      run: run,
+    );
+  }
+
   Future<GenerationBeginResult> beginRegeneration({
     required Conversation conversation,
     required ChatMessage assistantMessage,
@@ -4633,6 +4820,48 @@ class ChatDatabaseRepository {
         !assistantMessage.isStreaming) {
       throw ArgumentError.value(assistantMessage, 'assistantMessage');
     }
+  }
+
+  static void _validateBridgeDeliveryClaim(BridgeDeliveryClaim claim) {
+    final requiredValues = <String>[
+      claim.originSystem,
+      claim.originInstanceId,
+      claim.idempotencyKey,
+      claim.roomEventId,
+      claim.roomId,
+    ];
+    if (requiredValues.any((value) => value.trim().isEmpty) ||
+        !RegExp(r'^[0-9a-f]{64}$').hasMatch(claim.requestFingerprint)) {
+      throw ArgumentError.value(claim, 'deliveryClaim');
+    }
+  }
+
+  static BridgeDelivery _bridgeDeliveryFromRow(BridgeDeliveryRow row) =>
+      BridgeDelivery(
+        originSystem: row.originSystem,
+        originInstanceId: row.originInstanceId,
+        idempotencyKey: row.idempotencyKey,
+        requestFingerprint: row.requestFingerprint,
+        roomEventId: row.roomEventId,
+        roomId: row.roomId,
+        conversationId: row.conversationId,
+        userRevisionId: row.userRevisionId,
+        assistantRevisionId: row.assistantRevisionId,
+        generationRunId: row.generationRunId,
+        state: GenerationRunState.fromDatabase(row.state),
+        createdAt: row.createdAt,
+        updatedAt: row.updatedAt,
+      );
+
+  Future<void> _updateBridgeDeliveryState(GenerationRun run) async {
+    await (_db.update(
+      _db.bridgeDeliveryRows,
+    )..where((row) => row.generationRunId.equals(run.id))).write(
+      BridgeDeliveryRowsCompanion(
+        state: Value(run.state.databaseValue),
+        updatedAt: Value(run.updatedAt),
+      ),
+    );
   }
 
   Future<Conversation> _appendLinearMessageToConversation({
@@ -6409,6 +6638,15 @@ class ChatDatabaseRepository {
           "WHERE state = 'interrupted' AND terminal_at = ?;",
           variables: [Variable.withInt(now.microsecondsSinceEpoch)],
           updates: {_db.generationRunRows},
+        );
+        final interruptedRunIds = runs.map((run) => run.id).toList();
+        await (_db.update(
+          _db.bridgeDeliveryRows,
+        )..where((row) => row.generationRunId.isIn(interruptedRunIds))).write(
+          BridgeDeliveryRowsCompanion(
+            state: const Value('interrupted'),
+            updatedAt: Value(now),
+          ),
         );
       }
       // Clearing is_streaming fires message_search_fts_finalize, which indexes
