@@ -169,6 +169,70 @@ void main() {
       },
     );
 
+    test('copies sender_id and extras_json onto duplicated messages', () async {
+      final createdAt = DateTime.utc(2026, 8, 1);
+      await repository.putMigrationBatch(
+        conversations: [
+          Conversation(
+            id: 'identity-source',
+            title: 'Identity',
+            createdAt: createdAt,
+            updatedAt: createdAt,
+            messageIds: const ['identity-msg'],
+          ),
+        ],
+        messages: [
+          (
+            message: ChatMessage(
+              id: 'identity-msg',
+              role: 'assistant',
+              content: 'who said it',
+              conversationId: 'identity-source',
+              groupId: 'identity-msg',
+              version: 0,
+              timestamp: createdAt,
+            ),
+            messageOrder: 0,
+          ),
+        ],
+        toolEventsByMessageId: const {},
+        geminiSignaturesByMessageId: const {},
+      );
+      final databasePath = '${directory.path}/chat.sqlite';
+      final raw = sqlite.sqlite3.open(databasePath);
+      try {
+        raw.execute('PRAGMA busy_timeout = 5000;');
+        raw.execute(
+          'UPDATE message_rows SET sender_id = ?, extras_json = ? '
+          'WHERE id = ?;',
+          ['assistant-b', '{"subagent":true}', 'identity-msg'],
+        );
+      } finally {
+        raw.close();
+      }
+
+      final duplicate = await repository.duplicateConversation(
+        'identity-source',
+      );
+
+      expect(duplicate, isNotNull);
+      final verify = sqlite.sqlite3.open(databasePath);
+      try {
+        final row = verify.select(
+          'SELECT sender_id, extras_json, updated_at FROM message_rows '
+          'WHERE conversation_id = ?;',
+          [duplicate!.id],
+        ).single;
+        expect(row['sender_id'], 'assistant-b');
+        expect(row['extras_json'], '{"subagent":true}');
+        // A copy is a fresh row: its effective updated_at falls back to its
+        // (copied) timestamp, so the column stays null.
+        expect(row['updated_at'], isNull);
+      } finally {
+        verify.close();
+      }
+    });
+
     test('returns null when the source topic does not exist', () async {
       expect(await repository.duplicateConversation('missing'), isNull);
     });

@@ -653,8 +653,14 @@ class ChatDatabaseRepository {
       database.execute('BEGIN IMMEDIATE;');
       try {
         database.execute(
-          'UPDATE message_rows SET is_streaming = 0 '
+          // Terminating an abandoned stream is a real state change; stamp
+          // updated_at in the same statement so LWW/sync consumers see the
+          // termination instead of the stale pre-crash value. Merge
+          // fingerprints are unaffected: they exclude updated_at and
+          // normalize is_streaming.
+          'UPDATE message_rows SET is_streaming = 0, updated_at = ? '
           'WHERE is_streaming != 0;',
+          [DateTime.now().toUtc().microsecondsSinceEpoch],
         );
         database.execute('DELETE FROM chat_storage_meta_rows WHERE key = ?;', [
           ChatStorageMetaKeys.activeStreamingIds,
@@ -806,6 +812,8 @@ class ChatDatabaseRepository {
       'memory_entry_rows',
       'user_profile_field_rows',
       'message_prompt_rows',
+      'tombstone_rows',
+      'extension_entity_rows',
     };
     final tableRows = database.select(
       "SELECT name FROM sqlite_master WHERE type = 'table';",
@@ -852,6 +860,7 @@ class ChatDatabaseRepository {
       'last_memory_extracted_order',
       'chat_model_provider',
       'chat_model_id',
+      'extras_json',
     ],
     'conversation_mcp_server_rows': ['conversation_id', 'server_id', 'ordinal'],
     'message_rows': [
@@ -874,6 +883,9 @@ class ChatDatabaseRepository {
       'cached_tokens',
       'duration_ms',
       'message_order',
+      'updated_at',
+      'sender_id',
+      'extras_json',
     ],
     'chat_storage_meta_rows': ['key', 'value'],
     'message_part_rows': [
@@ -916,6 +928,7 @@ class ChatDatabaseRepository {
       'thumbnail_path',
       'created_at',
       'last_referenced_at',
+      'extras_json',
     ],
     'message_asset_rows': [
       'conversation_id',
@@ -966,6 +979,15 @@ class ChatDatabaseRepository {
       'carries_memory_snapshot',
       'created_at',
     ],
+    'tombstone_rows': ['scope', 'entity_id', 'deleted_at', 'payload'],
+    'extension_entity_rows': [
+      'kind',
+      'id',
+      'sort_order',
+      'owner_id',
+      'payload',
+      'updated_at',
+    ],
   };
 
   static void _validateRawSchema(sqlite.Database database) {
@@ -1002,6 +1024,8 @@ class ChatDatabaseRepository {
       'memory_entry_rows': ['id'],
       'user_profile_field_rows': ['id'],
       'message_prompt_rows': ['revision_id'],
+      'tombstone_rows': ['scope', 'entity_id'],
+      'extension_entity_rows': ['kind', 'id'],
     };
     const sortOrderTables = {
       'assistant_rows',
@@ -1017,6 +1041,7 @@ class ChatDatabaseRepository {
       'assistant_tag_rows',
       'memory_entry_rows',
       'user_profile_field_rows',
+      'extension_entity_rows',
     };
     for (final entry in expectedPrimaryKeys.entries) {
       final primaryRows =
@@ -1111,6 +1136,11 @@ class ChatDatabaseRepository {
       name: 'idx_message_prompts_conversation_snapshot',
       columns: const ['conversation_id', 'carries_memory_snapshot'],
     );
+    requireIndex(
+      table: 'extension_entity_rows',
+      name: 'idx_extension_entities_kind_order',
+      columns: const ['kind', 'sort_order'],
+    );
 
     const assetIndexName = 'idx_message_assets_asset';
     final assetIndexRows = database.select(
@@ -1187,6 +1217,8 @@ class ChatDatabaseRepository {
       'memory_entry_rows': <String>{},
       'user_profile_field_rows': <String>{},
       'message_prompt_rows': {'revision_id->message_rows.id:CASCADE'},
+      'tombstone_rows': <String>{},
+      'extension_entity_rows': <String>{},
     };
     for (final entry in expectedForeignKeys.entries) {
       final actual = database
@@ -4232,6 +4264,11 @@ class ChatDatabaseRepository {
               cachedTokens: Value(message.cachedTokens),
               durationMs: Value(message.durationMs),
               messageOrder: message.messageOrder,
+              // Authoring identity and extras are content and travel with the
+              // copy. updatedAt deliberately stays null: the copy is a fresh
+              // row, so its effective updated_at is its (copied) timestamp.
+              senderId: Value(message.senderId),
+              extrasJson: Value(message.extrasJson),
             ),
           );
       await _db.customStatement(
@@ -4419,9 +4456,16 @@ class ChatDatabaseRepository {
     final order =
         messageOrder ?? await _nextMessageOrder(message.conversationId);
     await _db.transaction(() async {
+      // An upsert may be an update in disguise, so it bumps updated_at; a
+      // fresh insert getting "updated_at = now ≈ timestamp" is harmless.
       await _db
           .into(_db.messageRows)
-          .insertOnConflictUpdate(_messageCompanion(message, order));
+          .insertOnConflictUpdate(
+            _messageCompanion(
+              message,
+              order,
+            ).copyWith(updatedAt: Value(DateTime.now().toUtc())),
+          );
       await _replaceMessageParts(message);
     });
   }
@@ -5279,13 +5323,21 @@ class ChatDatabaseRepository {
           variables: [Variable<String>(id)],
         )
         .get();
+    // Message rows fingerprint everything semantic, including sender_id and
+    // extras_json — a backup that differs only in who authored a message must
+    // not be judged a duplicate. updated_at is deliberately excluded
+    // (bookkeeping; equal content must hash equally across devices), and
+    // conversation-level extras_json follows the chat_model_provider/-id
+    // precedent: preserved verbatim on import, but not fingerprinted, so a
+    // device-local binding difference alone never duplicates a conversation.
     final messageRows = await _db
         .customSelect(
           'SELECT id, role, timestamp, model_id, provider_id, '
           'total_tokens, is_streaming, reasoning_start_at, '
           'reasoning_finished_at, translation, reasoning_segments_json, group_id, '
           'version, prompt_tokens, completion_tokens, cached_tokens, duration_ms, '
-          'message_order FROM $schema.message_rows WHERE conversation_id = ? '
+          'message_order, sender_id, extras_json '
+          'FROM $schema.message_rows WHERE conversation_id = ? '
           'ORDER BY message_order, id;',
           variables: [Variable<String>(id)],
         )
@@ -5534,13 +5586,13 @@ class ChatDatabaseRepository {
       'truncate_index, version_selections_json, summary, '
       'last_summarized_message_count, chat_suggestions_json, '
       'injected_memory_hash, last_memory_extracted_order, '
-      'chat_model_provider, chat_model_id) '
+      'chat_model_provider, chat_model_id, extras_json) '
       'SELECT ?, title, created_at, updated_at, is_pinned, assistant_id, '
       'truncate_index, ?, summary, '
       'last_summarized_message_count, chat_suggestions_json, '
       'NULL, COALESCE((SELECT MAX(message_order) '
       'FROM merge_source.message_rows WHERE conversation_id = ?), -1), '
-      'chat_model_provider, chat_model_id '
+      'chat_model_provider, chat_model_id, extras_json '
       'FROM merge_source.conversation_rows WHERE id = ?;',
       [targetId, jsonEncode(targetSelections), sourceId, sourceId],
     );
@@ -5567,15 +5619,17 @@ class ChatDatabaseRepository {
         'total_tokens, is_streaming, reasoning_start_at, '
         'reasoning_finished_at, translation, reasoning_segments_json, group_id, '
         'version, prompt_tokens, completion_tokens, cached_tokens, duration_ms, '
-        'message_order) '
+        'message_order, updated_at, sender_id, extras_json) '
         'SELECT ?, ?, role, timestamp, model_id, provider_id, '
         'total_tokens, 0, reasoning_start_at, '
         'reasoning_finished_at, translation, reasoning_segments_json, '
         '?, version, '
         'prompt_tokens, completion_tokens, cached_tokens, duration_ms, '
         // message_order is part of the conversation fingerprint. Preserve it
-        // verbatim so sparse snapshots remain idempotent across repeated merges.
-        'message_order FROM merge_source.message_rows WHERE id = ?;',
+        // verbatim so sparse snapshots remain idempotent across repeated
+        // merges; updated_at/sender_id/extras_json likewise travel verbatim.
+        'message_order, updated_at, sender_id, extras_json '
+        'FROM merge_source.message_rows WHERE id = ?;',
         [entry.value, targetId, targetGroupId, entry.key],
       );
       await _db.customStatement(
@@ -5704,6 +5758,7 @@ class ChatDatabaseRepository {
     int? durationMs,
   }) {
     final companion = MessageRowsCompanion(
+      updatedAt: Value(DateTime.now().toUtc()),
       totalTokens: totalTokens != null
           ? Value(totalTokens)
           : const Value.absent(),
@@ -5841,10 +5896,54 @@ class ChatDatabaseRepository {
     });
   }
 
+  /// Tombstone scope recorded by [deleteConversation].
+  static const tombstoneScopeConversation = 'conversation';
+
+  /// How long deletion tombstones are kept before being pruned. Pruning
+  /// happens opportunistically inside [deleteConversation]'s transaction.
+  static const tombstoneRetention = Duration(days: 90);
+
+  /// Deletes [id] and records a tombstone in the same transaction so a future
+  /// sync can propagate the deletion to other devices.
+  ///
+  /// Bulk resets (overwrite restore, importer wipes) go through
+  /// [clearAllData], which clears tombstones instead of writing them:
+  /// replacing the whole local state is not a cross-device deletion intent.
+  /// Draft conversations never reach this method (they are not persisted), so
+  /// no tombstone is written for them.
   Future<void> deleteConversation(String id) async {
-    await (_db.delete(
-      _db.conversationRows,
-    )..where((t) => t.id.equals(id))).go();
+    await _db.transaction(() async {
+      final deleted = await (_db.delete(
+        _db.conversationRows,
+      )..where((t) => t.id.equals(id))).go();
+      if (deleted == 0) return;
+      final now = DateTime.now().toUtc();
+      await _db
+          .into(_db.tombstoneRows)
+          .insertOnConflictUpdate(
+            TombstoneRowsCompanion.insert(
+              scope: tombstoneScopeConversation,
+              entityId: id,
+              deletedAt: now,
+            ),
+          );
+      await (_db.delete(_db.tombstoneRows)..where(
+            (t) => t.deletedAt.isSmallerThanValue(
+              now.subtract(tombstoneRetention).microsecondsSinceEpoch,
+            ),
+          ))
+          .go();
+    });
+  }
+
+  /// Reads deletion tombstones, newest first, optionally filtered by [scope].
+  Future<List<TombstoneRow>> readTombstones({String? scope}) {
+    final query = _db.select(_db.tombstoneRows)
+      ..orderBy([(t) => OrderingTerm.desc(t.deletedAt)]);
+    if (scope != null) {
+      query.where((t) => t.scope.equals(scope));
+    }
+    return query.get();
   }
 
   Future<void> deleteMessage(String messageId) async {
@@ -5961,9 +6060,14 @@ class ChatDatabaseRepository {
         _db.messageRows,
       )..where((row) => row.id.isIn(deletedIds))).go();
       for (final rewrite in anchorRewrites.entries) {
-        await (_db.update(_db.messageRows)
-              ..where((row) => row.id.equals(rewrite.key)))
-            .write(MessageRowsCompanion(messageOrder: Value(rewrite.value)));
+        await (_db.update(
+          _db.messageRows,
+        )..where((row) => row.id.equals(rewrite.key))).write(
+          MessageRowsCompanion(
+            messageOrder: Value(rewrite.value),
+            updatedAt: Value(DateTime.now().toUtc()),
+          ),
+        );
       }
       final currentConversation = await _conversationFromRow(
         conversationRow,
@@ -6039,6 +6143,9 @@ class ChatDatabaseRepository {
     await _db.delete(_db.conversationMcpServerRows).go();
     await _db.delete(_db.messageRows).go();
     await _db.delete(_db.conversationRows).go();
+    // A bulk reset replaces the whole local state; stale tombstones would
+    // otherwise mark freshly imported conversations as deleted elsewhere.
+    await _db.delete(_db.tombstoneRows).go();
     await (_db.delete(
       _db.chatStorageMetaRows,
     )..where((t) => t.key.equals(ChatStorageMetaKeys.activeStreamingIds))).go();
@@ -6413,9 +6520,14 @@ class ChatDatabaseRepository {
       }
       // Clearing is_streaming fires message_search_fts_finalize, which indexes
       // the checkpointed text parts left by the abandoned stream.
-      await (_db.update(_db.messageRows)
-            ..where((row) => row.isStreaming.equals(true)))
-          .write(const MessageRowsCompanion(isStreaming: Value(false)));
+      await (_db.update(
+        _db.messageRows,
+      )..where((row) => row.isStreaming.equals(true))).write(
+        MessageRowsCompanion(
+          isStreaming: const Value(false),
+          updatedAt: Value(DateTime.now().toUtc()),
+        ),
+      );
       await clearActiveStreamingIds();
       return runs.length;
     });
@@ -6509,11 +6621,15 @@ class ChatDatabaseRepository {
       ],
       updates: {_db.messageRows},
     );
+    // updated_at is bumped only here: the first statement's rows are exactly
+    // the rows this one finalizes.
     await _db.customUpdate(
-      'UPDATE message_rows SET message_order = message_order - ? + 1 '
+      'UPDATE message_rows SET message_order = message_order - ? + 1, '
+      'updated_at = ? '
       'WHERE conversation_id = ? AND message_order > ?;',
       variables: [
         Variable.withInt(temporaryOffset),
+        Variable.withInt(DateTime.now().toUtc().microsecondsSinceEpoch),
         Variable.withString(conversationId),
         Variable.withInt(currentMaxOrder),
       ],
@@ -6579,7 +6695,12 @@ class ChatDatabaseRepository {
                 t.conversationId.equals(conversationId) &
                 t.id.equals(messageIds[i]),
           ))
-          .write(MessageRowsCompanion(messageOrder: Value(i)));
+          .write(
+            MessageRowsCompanion(
+              messageOrder: Value(i),
+              updatedAt: Value(DateTime.now().toUtc()),
+            ),
+          );
     }
   }
 
@@ -6968,6 +7089,10 @@ class ChatDatabaseRepository {
 
   MessageRowsCompanion _messageUpdate(ChatMessage message) {
     return MessageRowsCompanion(
+      // Every message UPDATE bumps updated_at so sync/LWW can see the change;
+      // inserts leave it null (effective value = COALESCE(updated_at,
+      // timestamp)).
+      updatedAt: Value(DateTime.now().toUtc()),
       totalTokens: Value(message.totalTokens),
       isStreaming: Value(message.isStreaming),
       reasoningStartAt: Value(message.reasoningStartAt),
