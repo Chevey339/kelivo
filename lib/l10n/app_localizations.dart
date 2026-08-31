@@ -3556,6 +3556,42 @@ abstract class AppLocalizations {
   /// **'The chat database on this device was created by a newer version of Kelivo and cannot be opened by this version. Your data has not been changed. Install the latest version of Kelivo, then open it again.'**
   String get startupDatabaseUpdateRequiredContent;
 
+  /// No description provided for @startupDatabaseUpdateRequiredDowngradeTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'If you need an older version'**
+  String get startupDatabaseUpdateRequiredDowngradeTitle;
+
+  /// No description provided for @startupDatabaseUpdateRequiredDowngradeIntro.
+  ///
+  /// In en, this message translates to:
+  /// **'This version cannot open the database on this device. If you must keep using an older version, follow the steps below. Do not delete or overwrite the data here until you have a backup.'**
+  String get startupDatabaseUpdateRequiredDowngradeIntro;
+
+  /// No description provided for @startupDatabaseUpdateRequiredDowngradeStep1.
+  ///
+  /// In en, this message translates to:
+  /// **'Install and open the latest Kelivo, then export a backup from Settings → Backup.'**
+  String get startupDatabaseUpdateRequiredDowngradeStep1;
+
+  /// No description provided for @startupDatabaseUpdateRequiredDowngradeStep2.
+  ///
+  /// In en, this message translates to:
+  /// **'Open {url} and convert that backup to the older version you want to use.'**
+  String startupDatabaseUpdateRequiredDowngradeStep2(String url);
+
+  /// No description provided for @startupDatabaseUpdateRequiredDowngradeStep3.
+  ///
+  /// In en, this message translates to:
+  /// **'After you have confirmed the data on this device is backed up, install the older version and import the converted backup.'**
+  String get startupDatabaseUpdateRequiredDowngradeStep3;
+
+  /// No description provided for @startupDatabaseUpdateRequiredOpenTool.
+  ///
+  /// In en, this message translates to:
+  /// **'Open conversion tool'**
+  String get startupDatabaseUpdateRequiredOpenTool;
+
   /// No description provided for @backupPageRestoreFailedMessage.
   ///
   /// In en, this message translates to:

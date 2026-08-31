@@ -648,6 +648,19 @@
   "startupRecoveryResetAcknowledge": "我已导出副本，或不需要这些数据。",
   "startupDatabaseUpdateRequiredTitle": "请更新 Kelivo 以继续",
   "startupDatabaseUpdateRequiredContent": "本设备上的聊天数据库由更新版本的 Kelivo 创建，当前版本无法打开。数据未被改动。请安装最新版 Kelivo 后重新打开。",
+  "startupDatabaseUpdateRequiredDowngradeTitle": "若要改用旧版",
+  "startupDatabaseUpdateRequiredDowngradeIntro": "当前版本打不开本机这份数据库。若你必须留在旧版，请按下面的步骤处理；在备份完成之前，不要删除或覆盖这里的数据。",
+  "startupDatabaseUpdateRequiredDowngradeStep1": "先安装并打开最新版 Kelivo，在「设置 → 数据备份」导出一份备份文件。",
+  "startupDatabaseUpdateRequiredDowngradeStep2": "打开 {url}，把备份转换成你打算使用的旧版格式。",
+  "@startupDatabaseUpdateRequiredDowngradeStep2": {
+    "placeholders": {
+      "url": {
+        "type": "String"
+      }
+    }
+  },
+  "startupDatabaseUpdateRequiredDowngradeStep3": "确认本机数据已经另外备份好之后，再安装旧版，并导入转换后的备份。",
+  "startupDatabaseUpdateRequiredOpenTool": "打开转换工具",
   "backupPageRestoreFailedMessage": "恢复失败：{error}",
   "backupPageExportFailedMessage": "导出失败：{error}",
   "backupPageOK": "好的",

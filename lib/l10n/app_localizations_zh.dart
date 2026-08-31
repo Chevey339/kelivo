@@ -1816,6 +1816,29 @@ class AppLocalizationsZh extends AppLocalizations {
       '本设备上的聊天数据库由更新版本的 Kelivo 创建，当前版本无法打开。数据未被改动。请安装最新版 Kelivo 后重新打开。';
 
   @override
+  String get startupDatabaseUpdateRequiredDowngradeTitle => '若要改用旧版';
+
+  @override
+  String get startupDatabaseUpdateRequiredDowngradeIntro =>
+      '当前版本打不开本机这份数据库。若你必须留在旧版，请按下面的步骤处理；在备份完成之前，不要删除或覆盖这里的数据。';
+
+  @override
+  String get startupDatabaseUpdateRequiredDowngradeStep1 =>
+      '先安装并打开最新版 Kelivo，在「设置 → 数据备份」导出一份备份文件。';
+
+  @override
+  String startupDatabaseUpdateRequiredDowngradeStep2(String url) {
+    return '打开 $url，把备份转换成你打算使用的旧版格式。';
+  }
+
+  @override
+  String get startupDatabaseUpdateRequiredDowngradeStep3 =>
+      '确认本机数据已经另外备份好之后，再安装旧版，并导入转换后的备份。';
+
+  @override
+  String get startupDatabaseUpdateRequiredOpenTool => '打开转换工具';
+
+  @override
   String backupPageRestoreFailedMessage(String error) {
     return '恢复失败：$error';
   }
@@ -10075,6 +10098,29 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
       '本设备上的聊天数据库由更新版本的 Kelivo 创建，当前版本无法打开。数据未被改动。请安装最新版 Kelivo 后重新打开。';
 
   @override
+  String get startupDatabaseUpdateRequiredDowngradeTitle => '若要改用旧版';
+
+  @override
+  String get startupDatabaseUpdateRequiredDowngradeIntro =>
+      '当前版本打不开本机这份数据库。若你必须留在旧版，请按下面的步骤处理；在备份完成之前，不要删除或覆盖这里的数据。';
+
+  @override
+  String get startupDatabaseUpdateRequiredDowngradeStep1 =>
+      '先安装并打开最新版 Kelivo，在「设置 → 数据备份」导出一份备份文件。';
+
+  @override
+  String startupDatabaseUpdateRequiredDowngradeStep2(String url) {
+    return '打开 $url，把备份转换成你打算使用的旧版格式。';
+  }
+
+  @override
+  String get startupDatabaseUpdateRequiredDowngradeStep3 =>
+      '确认本机数据已经另外备份好之后，再安装旧版，并导入转换后的备份。';
+
+  @override
+  String get startupDatabaseUpdateRequiredOpenTool => '打开转换工具';
+
+  @override
   String backupPageRestoreFailedMessage(String error) {
     return '恢复失败：$error';
   }
@@ -18258,6 +18304,29 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   @override
   String get startupDatabaseUpdateRequiredContent =>
       '本裝置上的聊天資料庫由更新版本的 Kelivo 建立，目前版本無法開啟。資料未被改動。請安裝最新版 Kelivo 後重新開啟。';
+
+  @override
+  String get startupDatabaseUpdateRequiredDowngradeTitle => '若要改用舊版';
+
+  @override
+  String get startupDatabaseUpdateRequiredDowngradeIntro =>
+      '目前版本無法開啟本機這份資料庫。若你必須留在舊版，請依下列步驟處理；在備份完成之前，不要刪除或覆蓋這裡的資料。';
+
+  @override
+  String get startupDatabaseUpdateRequiredDowngradeStep1 =>
+      '先安裝並開啟最新版 Kelivo，在「設定 → 資料備份」匯出一份備份檔。';
+
+  @override
+  String startupDatabaseUpdateRequiredDowngradeStep2(String url) {
+    return '打開 $url，把備份轉換成你打算使用的舊版格式。';
+  }
+
+  @override
+  String get startupDatabaseUpdateRequiredDowngradeStep3 =>
+      '確認本機資料已經另外備份好之後，再安裝舊版，並匯入轉換後的備份。';
+
+  @override
+  String get startupDatabaseUpdateRequiredOpenTool => '打開轉換工具';
 
   @override
   String backupPageRestoreFailedMessage(String error) {

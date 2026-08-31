@@ -69,6 +69,7 @@ import 'shared/widgets/app_overlays.dart';
 import 'shared/widgets/snackbar.dart';
 import 'shared/widgets/restore_failure_screen.dart';
 import 'shared/widgets/restore_outcome_notice.dart';
+import 'shared/widgets/update_required_screen.dart';
 import 'package:system_fonts/system_fonts.dart';
 import 'dart:io'
     show
@@ -410,96 +411,12 @@ class _RestoreFailureApp extends StatelessWidget {
       theme: buildLightThemeForScheme(palette.light),
       darkTheme: buildDarkThemeForScheme(palette.dark),
       home: report.diagnosticCode == 'database_schema_too_new'
-          ? _UpdateRequiredScreen(diagnosticCode: report.diagnosticCode)
+          ? UpdateRequiredScreen(diagnosticCode: report.diagnosticCode)
           : RestoreFailureScreen(
               report: report,
               restart: PlatformUtils.restartApp,
               appDataDirectory: appDataDirectory,
             ),
-    );
-  }
-}
-
-/// Shown when the installed database was written by a newer app version;
-/// restarting cannot help, so the only action is updating Kelivo.
-class _UpdateRequiredScreen extends StatelessWidget {
-  const _UpdateRequiredScreen({required this.diagnosticCode});
-
-  final String diagnosticCode;
-
-  @override
-  Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context)!;
-    final colors = Theme.of(context).colorScheme;
-    final textTheme = Theme.of(context).textTheme;
-    return Scaffold(
-      body: SafeArea(
-        child: Center(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(24),
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 560),
-              child: Material(
-                color: colors.surfaceContainerLow,
-                borderRadius: BorderRadius.circular(20),
-                child: Padding(
-                  padding: const EdgeInsets.all(28),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Container(
-                        width: 56,
-                        height: 56,
-                        decoration: BoxDecoration(
-                          color: colors.primaryContainer,
-                          borderRadius: BorderRadius.circular(16),
-                        ),
-                        child: Icon(
-                          Icons.system_update_alt_rounded,
-                          size: 30,
-                          color: colors.onPrimaryContainer,
-                        ),
-                      ),
-                      const SizedBox(height: 20),
-                      Text(
-                        l10n.startupDatabaseUpdateRequiredTitle,
-                        style: textTheme.headlineSmall?.copyWith(
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                      const SizedBox(height: 10),
-                      Text(
-                        l10n.startupDatabaseUpdateRequiredContent,
-                        style: textTheme.bodyLarge?.copyWith(
-                          color: colors.onSurfaceVariant,
-                          height: 1.45,
-                        ),
-                      ),
-                      const SizedBox(height: 20),
-                      Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.all(16),
-                        decoration: BoxDecoration(
-                          color: colors.surfaceContainerHighest,
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: SelectableText(
-                          l10n.backupRestoreFailureDiagnostic(diagnosticCode),
-                          style: textTheme.bodySmall?.copyWith(
-                            color: colors.onSurfaceVariant,
-                            fontFamily: 'monospace',
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ),
-      ),
     );
   }
 }

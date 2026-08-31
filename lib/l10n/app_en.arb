@@ -783,6 +783,19 @@
   "startupRecoveryResetAcknowledge": "I exported a copy, or I do not need this data.",
   "startupDatabaseUpdateRequiredTitle": "Update Kelivo to continue",
   "startupDatabaseUpdateRequiredContent": "The chat database on this device was created by a newer version of Kelivo and cannot be opened by this version. Your data has not been changed. Install the latest version of Kelivo, then open it again.",
+  "startupDatabaseUpdateRequiredDowngradeTitle": "If you need an older version",
+  "startupDatabaseUpdateRequiredDowngradeIntro": "This version cannot open the database on this device. If you must keep using an older version, follow the steps below. Do not delete or overwrite the data here until you have a backup.",
+  "startupDatabaseUpdateRequiredDowngradeStep1": "Install and open the latest Kelivo, then export a backup from Settings → Backup.",
+  "startupDatabaseUpdateRequiredDowngradeStep2": "Open {url} and convert that backup to the older version you want to use.",
+  "@startupDatabaseUpdateRequiredDowngradeStep2": {
+    "placeholders": {
+      "url": {
+        "type": "String"
+      }
+    }
+  },
+  "startupDatabaseUpdateRequiredDowngradeStep3": "After you have confirmed the data on this device is backed up, install the older version and import the converted backup.",
+  "startupDatabaseUpdateRequiredOpenTool": "Open conversion tool",
   "backupPageRestoreFailedMessage": "Restore failed: {error}",
   "@backupPageRestoreFailedMessage": {
     "placeholders": {
