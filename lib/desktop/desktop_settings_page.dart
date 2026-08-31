@@ -48,6 +48,7 @@ import 'desktop_settings_navigation_bus.dart';
 import '../shared/widgets/snackbar.dart';
 import 'setting/default_model_pane.dart';
 import 'setting/search_services_pane.dart';
+import 'setting/tool_schemas_pane.dart';
 import 'setting/mcp_pane.dart';
 import 'setting/tts_services_pane.dart';
 import 'setting/memory_settings_pane.dart';
@@ -99,6 +100,7 @@ enum _SettingsMenuItem {
   providers,
   defaultModel,
   search,
+  toolSchemas,
   mcp,
   quickPhrases,
   instructionInjection,
@@ -213,6 +215,10 @@ class _DesktopSettingsPageState extends State<DesktopSettingsPage> {
                           return const DesktopSearchServicesPane(
                             key: ValueKey('search'),
                           );
+                        case _SettingsMenuItem.toolSchemas:
+                          return const DesktopToolSchemasPane(
+                            key: ValueKey('toolSchemas'),
+                          );
                         case _SettingsMenuItem.mcp:
                           return const DesktopMcpPane(key: ValueKey('mcp'));
                         case _SettingsMenuItem.networkProxy:
@@ -299,6 +305,11 @@ class _SettingsMenu extends StatelessWidget {
         l10n.settingsPageDefaultModel,
       ),
       (_SettingsMenuItem.search, lucide.Lucide.Earth, l10n.settingsPageSearch),
+      (
+        _SettingsMenuItem.toolSchemas,
+        lucide.Lucide.FileText,
+        l10n.toolSchemaSettingsPageTitle,
+      ),
       (_SettingsMenuItem.mcp, lucide.Lucide.Terminal, l10n.settingsPageMcp),
       (
         _SettingsMenuItem.quickPhrases,

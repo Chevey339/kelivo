@@ -36,6 +36,8 @@ import '../services/memory/memory_trace.dart';
 import '../../theme/palettes.dart';
 import '../../theme/custom_theme.dart';
 import '../../theme/chat_bubble_style.dart';
+import '../models/tool_schema_override.dart';
+import '../services/app_exit_flush.dart';
 
 // Desktop: topic list position
 enum DesktopTopicPosition { left, right }
@@ -305,6 +307,7 @@ class SettingsProvider extends ChangeNotifier {
       'chat_bubble_style_overrides_v1';
   static const String _userChatBubbleStyleOverridesKey =
       'chat_bubble_style_overrides_user_v1';
+  static const String _toolSchemaOverridesKey = 'tool_schema_overrides_v1';
   static const String _mobileAssistantEditTabOrderKey =
       'mobile_assistant_edit_tab_order_v1';
   static const String _mobileAssistantEditTabHiddenKey =
@@ -840,8 +843,7 @@ class SettingsProvider extends ChangeNotifier {
         _titleModelId = parts.sublist(1).join('::');
       }
     }
-    _titleGenerationEnabled =
-        prefs.getBool(_titleGenerationEnabledKey) ?? true;
+    _titleGenerationEnabled = prefs.getBool(_titleGenerationEnabledKey) ?? true;
     // load title prompt
     final tp = prefs.getString(_titlePromptKey);
     _titlePrompt = (tp == null || tp.trim().isEmpty) ? defaultTitlePrompt : tp;
@@ -1320,6 +1322,9 @@ class SettingsProvider extends ChangeNotifier {
         // Keep null so a corrupt user key still follows assistant.
       }
     }
+    _toolSchemaOverrides = _decodeToolSchemaOverrides(
+      prefs.getString(_toolSchemaOverridesKey),
+    );
     _mobileAssistantEditTabOrder = List.unmodifiable(
       prefs.getStringList(_mobileAssistantEditTabOrderKey) ?? const <String>[],
     );
@@ -2850,6 +2855,153 @@ class SettingsProvider extends ChangeNotifier {
       _chatBubbleStyleOverridesKey,
       jsonEncode(value.toJson()),
     );
+  }
+
+  static const Duration toolSchemaOverridePersistDebounce =
+      Duration(milliseconds: 300);
+
+  Map<String, ToolSchemaOverride> _toolSchemaOverrides =
+      const <String, ToolSchemaOverride>{};
+  Map<String, ToolSchemaOverride> get toolSchemaOverrides =>
+      Map<String, ToolSchemaOverride>.unmodifiable(_toolSchemaOverrides);
+
+  Timer? _toolSchemaOverridePersistTimer;
+  bool _toolSchemaOverridePersistDirty = false;
+  Future<void> Function()? _toolSchemaOverrideExitFlushHandler;
+
+  bool _applyToolSchemaOverrideInMemory(
+    String toolName,
+    ToolSchemaOverride value,
+  ) {
+    if (toolName.isEmpty) return false;
+    final next = Map<String, ToolSchemaOverride>.from(_toolSchemaOverrides);
+    if (value.isEmpty) {
+      if (!next.containsKey(toolName)) return false;
+      next.remove(toolName);
+    } else {
+      if (next[toolName] == value) return false;
+      next[toolName] = value;
+    }
+    _toolSchemaOverrides = next;
+    notifyListeners();
+    return true;
+  }
+
+  Future<void> setToolSchemaOverride(
+    String toolName,
+    ToolSchemaOverride value,
+  ) async {
+    if (!_applyToolSchemaOverrideInMemory(toolName, value)) return;
+    await _persistToolSchemaOverridesNow();
+  }
+
+  /// In-memory write used by live editors. SQLite persist is debounced and
+  /// must be flushed on blur, tool switch, pane close, or process exit.
+  void setToolSchemaOverrideLive(String toolName, ToolSchemaOverride value) {
+    if (!_applyToolSchemaOverrideInMemory(toolName, value)) return;
+    _scheduleDebouncedToolSchemaOverridePersist();
+  }
+
+  Future<void> flushPendingToolSchemaOverridePersist() async {
+    _toolSchemaOverridePersistTimer?.cancel();
+    _toolSchemaOverridePersistTimer = null;
+    if (!_toolSchemaOverridePersistDirty) return;
+    await _persistToolSchemaOverrides();
+  }
+
+  Future<void> resetToolSchemaOverride(String toolName) async {
+    await setToolSchemaOverride(toolName, const ToolSchemaOverride());
+  }
+
+  Future<void> resetAllToolSchemaOverrides() async {
+    _cancelDebouncedToolSchemaOverridePersist();
+    if (_toolSchemaOverrides.isEmpty) return;
+    _toolSchemaOverrides = const <String, ToolSchemaOverride>{};
+    notifyListeners();
+    await _preferences.remove(_toolSchemaOverridesKey);
+  }
+
+  void _scheduleDebouncedToolSchemaOverridePersist() {
+    _toolSchemaOverridePersistDirty = true;
+    _ensureToolSchemaOverrideExitFlushRegistered();
+    _toolSchemaOverridePersistTimer?.cancel();
+    _toolSchemaOverridePersistTimer = Timer(
+      toolSchemaOverridePersistDebounce,
+      () {
+        unawaited(_persistToolSchemaOverrides());
+      },
+    );
+  }
+
+  void _cancelDebouncedToolSchemaOverridePersist() {
+    _toolSchemaOverridePersistTimer?.cancel();
+    _toolSchemaOverridePersistTimer = null;
+    _toolSchemaOverridePersistDirty = false;
+  }
+
+  Future<void> _persistToolSchemaOverridesNow() async {
+    _toolSchemaOverridePersistTimer?.cancel();
+    _toolSchemaOverridePersistTimer = null;
+    await _persistToolSchemaOverrides();
+  }
+
+  void _ensureToolSchemaOverrideExitFlushRegistered() {
+    if (_toolSchemaOverrideExitFlushHandler != null) return;
+    _toolSchemaOverrideExitFlushHandler = flushPendingToolSchemaOverridePersist;
+    AppExitFlush.register(_toolSchemaOverrideExitFlushHandler!);
+  }
+
+  Future<void> _persistToolSchemaOverrides() async {
+    _toolSchemaOverridePersistDirty = false;
+    if (_toolSchemaOverrides.isEmpty) {
+      await _preferences.remove(_toolSchemaOverridesKey);
+      return;
+    }
+    await _preferences.setString(
+      _toolSchemaOverridesKey,
+      jsonEncode({
+        for (final e in _toolSchemaOverrides.entries) e.key: e.value.toJson(),
+      }),
+    );
+  }
+
+  @override
+  void dispose() {
+    _toolSchemaOverridePersistTimer?.cancel();
+    _toolSchemaOverridePersistTimer = null;
+    if (_toolSchemaOverridePersistDirty) {
+      unawaited(_persistToolSchemaOverrides());
+    }
+    final handler = _toolSchemaOverrideExitFlushHandler;
+    if (handler != null) {
+      AppExitFlush.unregister(handler);
+      _toolSchemaOverrideExitFlushHandler = null;
+    }
+    super.dispose();
+  }
+
+  static Map<String, ToolSchemaOverride> _decodeToolSchemaOverrides(
+    String? raw,
+  ) {
+    if (raw == null || raw.isEmpty) return const <String, ToolSchemaOverride>{};
+    try {
+      final decoded = jsonDecode(raw);
+      if (decoded is! Map) return const <String, ToolSchemaOverride>{};
+      final out = <String, ToolSchemaOverride>{};
+      for (final entry in decoded.entries) {
+        final value = entry.value;
+        if (value is! Map) continue;
+        final override = ToolSchemaOverride.fromJson(
+          Map<String, dynamic>.from(value),
+        );
+        if (!override.isEmpty) {
+          out['${entry.key}'] = override;
+        }
+      }
+      return out;
+    } catch (_) {
+      return const <String, ToolSchemaOverride>{};
+    }
   }
 
   List<String> _mobileAssistantEditTabOrder = const <String>[];
@@ -5614,6 +5766,9 @@ Requirements:
     copy._chatMessageBackgroundStyle = _chatMessageBackgroundStyle;
     copy._chatBubbleStyleOverrides = _chatBubbleStyleOverrides;
     copy._userChatBubbleStyleOverrides = _userChatBubbleStyleOverrides;
+    copy._toolSchemaOverrides = Map<String, ToolSchemaOverride>.from(
+      _toolSchemaOverrides,
+    );
     copy._mobileAssistantEditTabOrder = _mobileAssistantEditTabOrder;
     copy._hiddenMobileAssistantEditTabs = _hiddenMobileAssistantEditTabs;
     copy._mobileAssistantDetailOutlineEnabled =

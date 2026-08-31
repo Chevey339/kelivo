@@ -8284,6 +8284,58 @@ class AppLocalizationsZh extends AppLocalizations {
   String startupRecoveryRecoveredCopiesDeleted(int count) {
     return '另外还有 $count 份故障恢复时留下的数据库副本，重置会把它们一并永久删除。想留住的话请先导出数据。';
   }
+
+  @override
+  String get toolSchemaSettingsPageTitle => '工具描述';
+
+  @override
+  String get toolSchemaSettingsGroupSearch => '搜索';
+
+  @override
+  String get toolSchemaSettingsGroupMemory => '记忆';
+
+  @override
+  String get toolSchemaSettingsGroupLocal => '本地工具';
+
+  @override
+  String get toolSchemaSettingsModified => '已修改';
+
+  @override
+  String get toolSchemaSettingsResetDefault => '恢复默认';
+
+  @override
+  String get toolSchemaSettingsResetAll => '全部恢复默认';
+
+  @override
+  String get toolSchemaSettingsResetAllTitle => '全部恢复默认？';
+
+  @override
+  String get toolSchemaSettingsResetAllMessage =>
+      '将把所有内置工具的描述恢复为应用默认文案，自定义措辞会丢失。';
+
+  @override
+  String get toolSchemaSettingsResetAllConfirm => '恢复';
+
+  @override
+  String toolSchemaSettingsParamDescriptions(int count) {
+    return '参数描述 ($count)';
+  }
+
+  @override
+  String get toolSchemaSettingsMemoryLangNote =>
+      '记忆工具的默认描述会随记忆提示语言在中/英之间切换。自定义描述按工具名只存一份，切换语言后不会跟着变。';
+
+  @override
+  String get toolSchemaSettingsDescriptionLabel => '描述';
+
+  @override
+  String get toolSchemaSettingsToolName => '工具名';
+
+  @override
+  String get toolSchemaEditorPageTitle => '编辑描述';
+
+  @override
+  String get toolSchemaSettingsCancel => '取消';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hans`).
@@ -16492,6 +16544,58 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String startupRecoveryRecoveredCopiesDeleted(int count) {
     return '另外还有 $count 份故障恢复时留下的数据库副本，重置会把它们一并永久删除。想留住的话请先导出数据。';
   }
+
+  @override
+  String get toolSchemaSettingsPageTitle => '工具描述';
+
+  @override
+  String get toolSchemaSettingsGroupSearch => '搜索';
+
+  @override
+  String get toolSchemaSettingsGroupMemory => '记忆';
+
+  @override
+  String get toolSchemaSettingsGroupLocal => '本地工具';
+
+  @override
+  String get toolSchemaSettingsModified => '已修改';
+
+  @override
+  String get toolSchemaSettingsResetDefault => '恢复默认';
+
+  @override
+  String get toolSchemaSettingsResetAll => '全部恢复默认';
+
+  @override
+  String get toolSchemaSettingsResetAllTitle => '全部恢复默认？';
+
+  @override
+  String get toolSchemaSettingsResetAllMessage =>
+      '将把所有内置工具的描述恢复为应用默认文案，自定义措辞会丢失。';
+
+  @override
+  String get toolSchemaSettingsResetAllConfirm => '恢复';
+
+  @override
+  String toolSchemaSettingsParamDescriptions(int count) {
+    return '参数描述 ($count)';
+  }
+
+  @override
+  String get toolSchemaSettingsMemoryLangNote =>
+      '记忆工具的默认描述会随记忆提示语言在中/英之间切换。自定义描述按工具名只存一份，切换语言后不会跟着变。';
+
+  @override
+  String get toolSchemaSettingsDescriptionLabel => '描述';
+
+  @override
+  String get toolSchemaSettingsToolName => '工具名';
+
+  @override
+  String get toolSchemaEditorPageTitle => '编辑描述';
+
+  @override
+  String get toolSchemaSettingsCancel => '取消';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hant`).
@@ -24774,4 +24878,56 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String startupRecoveryRecoveredCopiesDeleted(int count) {
     return '另外還有 $count 份故障還原時留下的資料庫副本，重設會把它們一併永久刪除。想留住的話請先匯出資料。';
   }
+
+  @override
+  String get toolSchemaSettingsPageTitle => '工具描述';
+
+  @override
+  String get toolSchemaSettingsGroupSearch => '搜尋';
+
+  @override
+  String get toolSchemaSettingsGroupMemory => '記憶';
+
+  @override
+  String get toolSchemaSettingsGroupLocal => '本機工具';
+
+  @override
+  String get toolSchemaSettingsModified => '已修改';
+
+  @override
+  String get toolSchemaSettingsResetDefault => '還原預設';
+
+  @override
+  String get toolSchemaSettingsResetAll => '全部還原預設';
+
+  @override
+  String get toolSchemaSettingsResetAllTitle => '全部還原預設？';
+
+  @override
+  String get toolSchemaSettingsResetAllMessage =>
+      '將把所有內建工具的描述還原為應用預設文案，自訂措辭會遺失。';
+
+  @override
+  String get toolSchemaSettingsResetAllConfirm => '還原';
+
+  @override
+  String toolSchemaSettingsParamDescriptions(int count) {
+    return '參數描述 ($count)';
+  }
+
+  @override
+  String get toolSchemaSettingsMemoryLangNote =>
+      '記憶工具的預設描述會隨記憶提示語言在中/英之間切換。自訂描述依工具名只存一份，切換語言後不會跟著變。';
+
+  @override
+  String get toolSchemaSettingsDescriptionLabel => '描述';
+
+  @override
+  String get toolSchemaSettingsToolName => '工具名';
+
+  @override
+  String get toolSchemaEditorPageTitle => '編輯描述';
+
+  @override
+  String get toolSchemaSettingsCancel => '取消';
 }

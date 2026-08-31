@@ -3110,5 +3110,21 @@
   "localSnapshotRunInBackground": "轉到背景繼續",
   "localSnapshotRunningInBackground": "正在背景備份副本",
   "startupRecoveryLocalCopiesAvailable": "本機還保留著 {count} 份本機副本，最新一份是 {when} 的。重設不會刪除它們——重新啟動後可以在 設定 › 備份 › 本機副本 裡還原。",
-  "startupRecoveryRecoveredCopiesDeleted": "另外還有 {count} 份故障還原時留下的資料庫副本，重設會把它們一併永久刪除。想留住的話請先匯出資料。"
+  "startupRecoveryRecoveredCopiesDeleted": "另外還有 {count} 份故障還原時留下的資料庫副本，重設會把它們一併永久刪除。想留住的話請先匯出資料。",
+  "toolSchemaSettingsPageTitle": "工具描述",
+  "toolSchemaSettingsGroupSearch": "搜尋",
+  "toolSchemaSettingsGroupMemory": "記憶",
+  "toolSchemaSettingsGroupLocal": "本機工具",
+  "toolSchemaSettingsModified": "已修改",
+  "toolSchemaSettingsResetDefault": "還原預設",
+  "toolSchemaSettingsResetAll": "全部還原預設",
+  "toolSchemaSettingsResetAllTitle": "全部還原預設？",
+  "toolSchemaSettingsResetAllMessage": "將把所有內建工具的描述還原為應用預設文案，自訂措辭會遺失。",
+  "toolSchemaSettingsResetAllConfirm": "還原",
+  "toolSchemaSettingsParamDescriptions": "參數描述 ({count})",
+  "toolSchemaSettingsMemoryLangNote": "記憶工具的預設描述會隨記憶提示語言在中/英之間切換。自訂描述依工具名只存一份，切換語言後不會跟著變。",
+  "toolSchemaSettingsDescriptionLabel": "描述",
+  "toolSchemaSettingsToolName": "工具名",
+  "toolSchemaEditorPageTitle": "編輯描述",
+  "toolSchemaSettingsCancel": "取消"
 }

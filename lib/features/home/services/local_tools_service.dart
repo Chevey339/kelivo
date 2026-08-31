@@ -287,6 +287,71 @@ class DeviceLocalTools {
 class LocalToolsService {
   const LocalToolsService._();
 
+  /// Whether this local tool is offered on the current platform, matching the
+  /// assistant "Local tools" tab.
+  static bool isAvailableOnThisPlatform(String name) {
+    switch (name) {
+      case LocalToolNames.screenTime:
+        return DeviceLocalTools.screenTimeSupported;
+      case LocalToolNames.calendarQuery:
+      case LocalToolNames.calendarCreate:
+        return DeviceLocalTools.calendarSupported;
+      case LocalToolNames.currentLocation:
+        return DeviceLocalTools.locationSupported;
+      case LocalToolNames.weather:
+        return DeviceLocalTools.weatherSupported;
+      case LocalToolNames.healthSummary:
+        return DeviceLocalTools.healthSupported;
+      case LocalToolNames.remindersQuery:
+      case LocalToolNames.remindersCreate:
+      case LocalToolNames.remindersComplete:
+        return DeviceLocalTools.remindersSupported;
+      default:
+        return true;
+    }
+  }
+
+  /// Default schemas keyed by tool name. Timezone-dependent descriptions are
+  /// rebuilt on each read so they stay current.
+  static Map<String, Map<String, dynamic>> get definitions => {
+    for (final name in LocalToolNames.all) name: definitionFor(name),
+  };
+
+  static Map<String, dynamic> definitionFor(String name) {
+    switch (name) {
+      case LocalToolNames.timeInfo:
+        return _timeInfoDefinition;
+      case LocalToolNames.clipboard:
+        return _clipboardDefinition;
+      case LocalToolNames.textToSpeech:
+        return _textToSpeechDefinition;
+      case LocalToolNames.askUser:
+        return _askUserDefinition;
+      case LocalToolNames.calculate:
+        return _calculateDefinition;
+      case LocalToolNames.screenTime:
+        return _screenTimeDefinition();
+      case LocalToolNames.calendarQuery:
+        return _calendarQueryDefinition();
+      case LocalToolNames.calendarCreate:
+        return _calendarCreateDefinition();
+      case LocalToolNames.currentLocation:
+        return _currentLocationDefinition;
+      case LocalToolNames.weather:
+        return _weatherDefinition();
+      case LocalToolNames.healthSummary:
+        return _healthSummaryDefinition;
+      case LocalToolNames.remindersQuery:
+        return _remindersQueryDefinition();
+      case LocalToolNames.remindersCreate:
+        return _remindersCreateDefinition();
+      case LocalToolNames.remindersComplete:
+        return _remindersCompleteDefinition;
+      default:
+        throw ArgumentError.value(name, 'name', 'Unknown local tool');
+    }
+  }
+
   static List<Map<String, dynamic>> buildToolDefinitions({
     required Assistant? assistant,
     required bool supportsTools,
@@ -300,461 +365,10 @@ class LocalToolsService {
     }
 
     final tools = <Map<String, dynamic>>[];
-    if (assistant.localToolIds.contains(LocalToolNames.timeInfo)) {
-      tools.add(const {
-        'type': 'function',
-        'function': {
-          'name': LocalToolNames.timeInfo,
-          'description':
-              'Get the current local date and time info from the device. Returns year, month, day, weekday, ISO date and time strings, timezone, UTC offset, and timestamp.',
-          'parameters': {'type': 'object', 'properties': <String, dynamic>{}},
-        },
-      });
-    }
-    if (assistant.localToolIds.contains(LocalToolNames.clipboard)) {
-      tools.add(const {
-        'type': 'function',
-        'function': {
-          'name': LocalToolNames.clipboard,
-          'description':
-              'Read or write plain text from the device clipboard. Use action: read or write. For write, provide text. Do NOT write to the clipboard unless the user has explicitly requested it.',
-          'parameters': {
-            'type': 'object',
-            'properties': {
-              'action': {
-                'type': 'string',
-                'enum': ['read', 'write'],
-                'description': 'Operation to perform: read or write',
-              },
-              'text': {
-                'type': 'string',
-                'description':
-                    'Text to write to the clipboard. Required for write.',
-              },
-            },
-            'required': ['action'],
-          },
-        },
-      });
-    }
-    if (assistant.localToolIds.contains(LocalToolNames.textToSpeech)) {
-      tools.add(const {
-        'type': 'function',
-        'function': {
-          'name': LocalToolNames.textToSpeech,
-          'description':
-              'Speak text aloud to the user using the configured text-to-speech playback. Use this when the user asks you to read something aloud, or when audio output is appropriate. The tool returns after playback has been requested; audio may continue in the background. Provide natural, readable text without markdown formatting.',
-          'parameters': {
-            'type': 'object',
-            'properties': {
-              'text': {
-                'type': 'string',
-                'description': 'The text to speak aloud.',
-              },
-            },
-            'required': ['text'],
-          },
-        },
-      });
-    }
-    if (assistant.localToolIds.contains(LocalToolNames.askUser)) {
-      tools.add(const {
-        'type': 'function',
-        'function': {
-          'name': LocalToolNames.askUser,
-          'description':
-              'Ask the user one or more short choice questions when you need clarification, additional information, or a decision before continuing. Supports single-choice and multi-choice questions. The UI will provide Other and Skip options automatically, so do not include those options yourself.',
-          'parameters': {
-            'type': 'object',
-            'properties': {
-              'questions': {
-                'type': 'array',
-                'description': 'One to four questions to ask the user.',
-                'items': {
-                  'type': 'object',
-                  'properties': {
-                    'id': {
-                      'type': 'string',
-                      'description':
-                          'Unique stable identifier for this question.',
-                    },
-                    'question': {
-                      'type': 'string',
-                      'description':
-                          'The full question text shown to the user.',
-                    },
-                    'type': {
-                      'type': 'string',
-                      'enum': ['single', 'multi'],
-                      'description':
-                          'Answer type: single choice or multi choice.',
-                    },
-                    'options': {
-                      'type': 'array',
-                      'description':
-                          'Suggested options for the user to choose from.',
-                      'items': {'type': 'string'},
-                    },
-                  },
-                  'required': ['id', 'question'],
-                },
-              },
-            },
-            'required': ['questions'],
-          },
-        },
-      });
-    }
-    if (assistant.localToolIds.contains(LocalToolNames.calculate)) {
-      tools.add(const {
-        'type': 'function',
-        'function': {
-          'name': LocalToolNames.calculate,
-          'description':
-              'Evaluate a mathematical expression. Supports: + - * / ^ % !, sin() cos() tan() sqrt() ln() abs() floor() ceil() sgn(), log(base, value), constants pi e. Example: "5!", "sin(pi/4)", "log(2, 8)", "floor(3.7)"',
-          'parameters': {
-            'type': 'object',
-            'properties': {
-              'expression': {
-                'type': 'string',
-                'description':
-                    'A mathematical expression in standard notation, e.g. "(15 + 3) * 2", "2^10", "sqrt(144)"',
-              },
-            },
-            'required': ['expression'],
-          },
-        },
-      });
-    }
-    if (DeviceLocalTools.screenTimeSupported &&
-        assistant.localToolIds.contains(LocalToolNames.screenTime)) {
-      tools.add({
-        'type': 'function',
-        'function': {
-          'name': LocalToolNames.screenTime,
-          'description':
-              "Get the user's app screen usage (screen time) over a time range. "
-              "Specify a custom interval with 'begin'/'end', or use the 'range' preset (today/week). "
-              'Returns the total foreground time and a per-app breakdown sorted by usage time (descending). '
-              '${_deviceTimezoneHint()} '
-              "Requires the 'Usage access' special permission; if it is not granted, the device's usage "
-              'access settings page is opened automatically and an error is returned.',
-          'parameters': {
-            'type': 'object',
-            'properties': {
-              'begin': {
-                'type': 'string',
-                'description':
-                    "Start time (inclusive). Accepts an ISO-8601 date 'yyyy-MM-dd', a local "
-                    "date-time 'yyyy-MM-ddTHH:mm:ss', an offset date-time, or epoch milliseconds. "
-                    "When provided, 'range' is ignored.",
-              },
-              'end': {
-                'type': 'string',
-                'description':
-                    "End time (exclusive), same formats as 'begin'. Defaults to now.",
-              },
-              'range': {
-                'type': 'string',
-                'enum': ['today', 'week'],
-                'description':
-                    "Convenience preset, used only when 'begin' is omitted: today or week. Default today.",
-              },
-              'top': {
-                'type': 'integer',
-                'description':
-                    'Maximum number of top apps to return, sorted by usage time. Default 10.',
-              },
-            },
-          },
-        },
-      });
-    }
-    if (DeviceLocalTools.calendarSupported &&
-        assistant.localToolIds.contains(LocalToolNames.calendarQuery)) {
-      tools.add({
-        'type': 'function',
-        'function': {
-          'name': LocalToolNames.calendarQuery,
-          'description':
-              "Query calendar events on the user's device within a time range. "
-              "Specify a custom interval with 'begin'/'end', or use the 'range' preset (today/week/month). "
-              'Returns a list of events with title, description, location, start/end times, and calendar info. '
-              '${_deviceTimezoneHint()} '
-              "Requires the 'Calendar' permission; if it is not granted, an error is returned.",
-          'parameters': {
-            'type': 'object',
-            'properties': {
-              'begin': {
-                'type': 'string',
-                'description':
-                    "Start time (inclusive). Accepts an ISO-8601 date 'yyyy-MM-dd', a local "
-                    "date-time 'yyyy-MM-ddTHH:mm:ss', an offset date-time, or epoch milliseconds. "
-                    "When provided, 'range' is ignored.",
-              },
-              'end': {
-                'type': 'string',
-                'description': "End time (exclusive), same formats as 'begin'.",
-              },
-              'range': {
-                'type': 'string',
-                'enum': ['today', 'week', 'month'],
-                'description':
-                    "Convenience preset, used only when 'begin' is omitted: today, week, or month. Default today.",
-              },
-              'query': {
-                'type': 'string',
-                'description':
-                    'Optional keyword to filter events by title (case-insensitive substring match).',
-              },
-              'limit': {
-                'type': 'integer',
-                'description':
-                    'Maximum number of events to return. Default 20.',
-              },
-            },
-          },
-        },
-      });
-    }
-    if (DeviceLocalTools.calendarSupported &&
-        assistant.localToolIds.contains(LocalToolNames.calendarCreate)) {
-      tools.add({
-        'type': 'function',
-        'function': {
-          'name': LocalToolNames.calendarCreate,
-          'description':
-              "Create a new calendar event on the user's device. "
-              'Requires title and start time at minimum. End time defaults to 1 hour after start. '
-              "Use 'reminders' to attach notification alerts ahead of the event. "
-              'The user will be asked to confirm before the event is created. '
-              '${_deviceTimezoneHint()} '
-              "Requires the 'Calendar' permission; if it is not granted, an error is returned.",
-          'parameters': {
-            'type': 'object',
-            'properties': {
-              'title': {'type': 'string', 'description': 'Event title.'},
-              'description': {
-                'type': 'string',
-                'description': 'Event description or notes.',
-              },
-              'location': {'type': 'string', 'description': 'Event location.'},
-              'start': {
-                'type': 'string',
-                'description':
-                    "Start time. Accepts an ISO-8601 date 'yyyy-MM-dd', a local "
-                    "date-time 'yyyy-MM-ddTHH:mm:ss', an offset date-time, or epoch milliseconds.",
-              },
-              'end': {
-                'type': 'string',
-                'description':
-                    "End time, same formats as 'start'. Defaults to 1 hour after start.",
-              },
-              'all_day': {
-                'type': 'boolean',
-                'description':
-                    'Whether this is an all-day event. Default false.',
-              },
-              'reminders': {
-                'type': 'array',
-                'items': {'type': 'integer'},
-                'description':
-                    'Optional notification reminders, as minutes before the event start '
-                    '(e.g. [10] for 10 minutes before, [0] for exactly at the start time, '
-                    '[30, 1440] for 30 minutes and 1 day before). For all-day events the '
-                    'offset counts back from the start of the day. No reminder is attached '
-                    'unless you pass this, so include one whenever the user expects to be '
-                    'notified. At most 5 reminders; values are clamped to 0-40320 minutes '
-                    '(4 weeks) and de-duplicated, and the result reports what was actually '
-                    'saved.',
-              },
-            },
-            'required': ['title', 'start'],
-          },
-        },
-      });
-    }
-    if (DeviceLocalTools.locationSupported &&
-        assistant.localToolIds.contains(LocalToolNames.currentLocation)) {
-      tools.add({
-        'type': 'function',
-        'function': {
-          'name': LocalToolNames.currentLocation,
-          'description':
-              "Get the user's current location from the device (one-shot, When In Use). "
-              'Returns latitude, longitude, accuracy in meters, timestamp, and optional '
-              'city/region/country from reverse geocoding. Do not request this unless the '
-              'user asked for their location or it is needed for weather. '
-              "Requires the Location permission; if it is not granted, an error is returned.",
-          'parameters': {'type': 'object', 'properties': <String, dynamic>{}},
-        },
-      });
-    }
-    if (DeviceLocalTools.weatherSupported &&
-        assistant.localToolIds.contains(LocalToolNames.weather)) {
-      tools.add({
-        'type': 'function',
-        'function': {
-          'name': LocalToolNames.weather,
-          'description':
-              'Get current weather, hourly forecast, and daily forecast from Apple Weather. '
-              'Omit coordinates to use the current device location; or pass latitude and '
-              'longitude to query a specific place. '
-              'Returns temperature, apparent temperature, precipitation chance, and forecasts. '
-              'Always mention that weather data is from Apple Weather when presenting results. '
-              '${_deviceTimezoneHint()} '
-              'Requires Location permission when coordinates are omitted.',
-          'parameters': {
-            'type': 'object',
-            'properties': {
-              'latitude': {
-                'type': 'number',
-                'description':
-                    'Latitude in decimal degrees. Required together with longitude '
-                    'when querying a specific place.',
-              },
-              'longitude': {
-                'type': 'number',
-                'description':
-                    'Longitude in decimal degrees. Required together with latitude '
-                    'when querying a specific place.',
-              },
-            },
-          },
-        },
-      });
-    }
-    if (DeviceLocalTools.healthSupported &&
-        assistant.localToolIds.contains(LocalToolNames.healthSummary)) {
-      tools.add({
-        'type': 'function',
-        'function': {
-          'name': LocalToolNames.healthSummary,
-          'description':
-              "Get a privacy-preserving health activity summary from the device: today's "
-              'steps, active energy, walking/running distance, last-night sleep, latest '
-              'heart rate, and recent workouts. Each metric includes its time interval. '
-              'A metric with status "unavailable" means there is no authorized or recorded '
-              'data — never treat unavailable as 0. This tool does not return raw HealthKit '
-              'history. Requires Health access.',
-          'parameters': {'type': 'object', 'properties': <String, dynamic>{}},
-        },
-      });
-    }
-    if (DeviceLocalTools.remindersSupported &&
-        assistant.localToolIds.contains(LocalToolNames.remindersQuery)) {
-      tools.add({
-        'type': 'function',
-        'function': {
-          'name': LocalToolNames.remindersQuery,
-          'description':
-              "Query reminders on the user's device. Filter by date range, completion "
-              'status, and an optional keyword. Reminders without a due date are included '
-              'unless an explicit begin time is provided. '
-              '${_deviceTimezoneHint()} '
-              "Requires the Reminders permission; if it is not granted, an error is returned.",
-          'parameters': {
-            'type': 'object',
-            'properties': {
-              'begin': {
-                'type': 'string',
-                'description':
-                    "Start time (inclusive). Accepts an ISO-8601 date 'yyyy-MM-dd', a local "
-                    "date-time 'yyyy-MM-ddTHH:mm:ss', an offset date-time, or epoch milliseconds. "
-                    "When provided, 'range' is ignored.",
-              },
-              'end': {
-                'type': 'string',
-                'description': "End time (exclusive), same formats as 'begin'.",
-              },
-              'range': {
-                'type': 'string',
-                'enum': ['today', 'week', 'month'],
-                'description':
-                    "Convenience preset, used only when 'begin' is omitted: today, week, or month. Default today.",
-              },
-              'completed': {
-                'type': 'string',
-                'enum': ['all', 'true', 'false'],
-                'description':
-                    'Filter by completion: all, true (completed only), or false (incomplete only). Default all.',
-              },
-              'query': {
-                'type': 'string',
-                'description':
-                    'Optional keyword to filter reminders by title or notes (case-insensitive substring).',
-              },
-              'limit': {
-                'type': 'integer',
-                'description':
-                    'Maximum number of reminders to return. Default 20.',
-              },
-            },
-          },
-        },
-      });
-    }
-    if (DeviceLocalTools.remindersSupported &&
-        assistant.localToolIds.contains(LocalToolNames.remindersCreate)) {
-      tools.add({
-        'type': 'function',
-        'function': {
-          'name': LocalToolNames.remindersCreate,
-          'description':
-              "Create a reminder on the user's device. Requires a title. "
-              'The user will be asked to confirm before the reminder is created. '
-              '${_deviceTimezoneHint()} '
-              "Requires the Reminders permission; if it is not granted, an error is returned.",
-          'parameters': {
-            'type': 'object',
-            'properties': {
-              'title': {'type': 'string', 'description': 'Reminder title.'},
-              'notes': {
-                'type': 'string',
-                'description': 'Optional notes or description.',
-              },
-              'due': {
-                'type': 'string',
-                'description':
-                    "Optional due time. Accepts an ISO-8601 date 'yyyy-MM-dd', a local "
-                    "date-time 'yyyy-MM-ddTHH:mm:ss', an offset date-time, or epoch milliseconds.",
-              },
-              'priority': {
-                'type': 'string',
-                'description':
-                    'Optional priority: none, high, medium, low, or an EventKit integer 0-9 '
-                    '(0 none, 1 high, 5 medium, 9 low).',
-              },
-            },
-            'required': ['title'],
-          },
-        },
-      });
-    }
-    if (DeviceLocalTools.remindersSupported &&
-        assistant.localToolIds.contains(LocalToolNames.remindersComplete)) {
-      tools.add({
-        'type': 'function',
-        'function': {
-          'name': LocalToolNames.remindersComplete,
-          'description':
-              'Mark a reminder as completed. Requires the reminder id returned by '
-              'reminders_query or reminders_create. The user will be asked to confirm '
-              'before the reminder is updated. '
-              "Requires the Reminders permission; if it is not granted, an error is returned.",
-          'parameters': {
-            'type': 'object',
-            'properties': {
-              'id': {
-                'type': 'string',
-                'description':
-                    'Reminder id from reminders_query or reminders_create.',
-              },
-            },
-            'required': ['id'],
-          },
-        },
-      });
+    for (final id in LocalToolNames.all) {
+      if (!assistant.localToolIds.contains(id)) continue;
+      if (!isAvailableOnThisPlatform(id)) continue;
+      tools.add(definitionFor(id));
     }
     return tools;
   }
@@ -834,6 +448,430 @@ class LocalToolsService {
   }
 
   static const MethodChannel _deviceToolsChannel = DeviceLocalTools._channel;
+
+  static const Map<String, dynamic> _timeInfoDefinition = {
+    'type': 'function',
+    'function': {
+      'name': LocalToolNames.timeInfo,
+      'description':
+          'Get the current local date and time info from the device. Returns year, month, day, weekday, ISO date and time strings, timezone, UTC offset, and timestamp.',
+      'parameters': {'type': 'object', 'properties': <String, dynamic>{}},
+    },
+  };
+
+  static const Map<String, dynamic> _clipboardDefinition = {
+    'type': 'function',
+    'function': {
+      'name': LocalToolNames.clipboard,
+      'description':
+          'Read or write plain text from the device clipboard. Use action: read or write. For write, provide text. Do NOT write to the clipboard unless the user has explicitly requested it.',
+      'parameters': {
+        'type': 'object',
+        'properties': {
+          'action': {
+            'type': 'string',
+            'enum': ['read', 'write'],
+            'description': 'Operation to perform: read or write',
+          },
+          'text': {
+            'type': 'string',
+            'description':
+                'Text to write to the clipboard. Required for write.',
+          },
+        },
+        'required': ['action'],
+      },
+    },
+  };
+
+  static const Map<String, dynamic> _textToSpeechDefinition = {
+    'type': 'function',
+    'function': {
+      'name': LocalToolNames.textToSpeech,
+      'description':
+          'Speak text aloud to the user using the configured text-to-speech playback. Use this when the user asks you to read something aloud, or when audio output is appropriate. The tool returns after playback has been requested; audio may continue in the background. Provide natural, readable text without markdown formatting.',
+      'parameters': {
+        'type': 'object',
+        'properties': {
+          'text': {'type': 'string', 'description': 'The text to speak aloud.'},
+        },
+        'required': ['text'],
+      },
+    },
+  };
+
+  static const Map<String, dynamic> _askUserDefinition = {
+    'type': 'function',
+    'function': {
+      'name': LocalToolNames.askUser,
+      'description':
+          'Ask the user one or more short choice questions when you need clarification, additional information, or a decision before continuing. Supports single-choice and multi-choice questions. The UI will provide Other and Skip options automatically, so do not include those options yourself.',
+      'parameters': {
+        'type': 'object',
+        'properties': {
+          'questions': {
+            'type': 'array',
+            'description': 'One to four questions to ask the user.',
+            'items': {
+              'type': 'object',
+              'properties': {
+                'id': {
+                  'type': 'string',
+                  'description': 'Unique stable identifier for this question.',
+                },
+                'question': {
+                  'type': 'string',
+                  'description': 'The full question text shown to the user.',
+                },
+                'type': {
+                  'type': 'string',
+                  'enum': ['single', 'multi'],
+                  'description': 'Answer type: single choice or multi choice.',
+                },
+                'options': {
+                  'type': 'array',
+                  'description':
+                      'Suggested options for the user to choose from.',
+                  'items': {'type': 'string'},
+                },
+              },
+              'required': ['id', 'question'],
+            },
+          },
+        },
+        'required': ['questions'],
+      },
+    },
+  };
+
+  static const Map<String, dynamic> _calculateDefinition = {
+    'type': 'function',
+    'function': {
+      'name': LocalToolNames.calculate,
+      'description':
+          'Evaluate a mathematical expression. Supports: + - * / ^ % !, sin() cos() tan() sqrt() ln() abs() floor() ceil() sgn(), log(base, value), constants pi e. Example: "5!", "sin(pi/4)", "log(2, 8)", "floor(3.7)"',
+      'parameters': {
+        'type': 'object',
+        'properties': {
+          'expression': {
+            'type': 'string',
+            'description':
+                'A mathematical expression in standard notation, e.g. "(15 + 3) * 2", "2^10", "sqrt(144)"',
+          },
+        },
+        'required': ['expression'],
+      },
+    },
+  };
+
+  static const Map<String, dynamic> _currentLocationDefinition = {
+    'type': 'function',
+    'function': {
+      'name': LocalToolNames.currentLocation,
+      'description':
+          "Get the user's current location from the device (one-shot, When In Use). "
+          'Returns latitude, longitude, accuracy in meters, timestamp, and optional '
+          'city/region/country from reverse geocoding. Do not request this unless the '
+          'user asked for their location or it is needed for weather. '
+          'Requires the Location permission; if it is not granted, an error is returned.',
+      'parameters': {'type': 'object', 'properties': <String, dynamic>{}},
+    },
+  };
+
+  static const Map<String, dynamic> _healthSummaryDefinition = {
+    'type': 'function',
+    'function': {
+      'name': LocalToolNames.healthSummary,
+      'description':
+          "Get a privacy-preserving health activity summary from the device: today's "
+          'steps, active energy, walking/running distance, last-night sleep, latest '
+          'heart rate, and recent workouts. Each metric includes its time interval. '
+          'A metric with status "unavailable" means there is no authorized or recorded '
+          'data — never treat unavailable as 0. This tool does not return raw HealthKit '
+          'history. Requires Health access.',
+      'parameters': {'type': 'object', 'properties': <String, dynamic>{}},
+    },
+  };
+
+  static const Map<String, dynamic> _remindersCompleteDefinition = {
+    'type': 'function',
+    'function': {
+      'name': LocalToolNames.remindersComplete,
+      'description':
+          'Mark a reminder as completed. Requires the reminder id returned by '
+          'reminders_query or reminders_create. The user will be asked to confirm '
+          'before the reminder is updated. '
+          'Requires the Reminders permission; if it is not granted, an error is returned.',
+      'parameters': {
+        'type': 'object',
+        'properties': {
+          'id': {
+            'type': 'string',
+            'description':
+                'Reminder id from reminders_query or reminders_create.',
+          },
+        },
+        'required': ['id'],
+      },
+    },
+  };
+
+  static Map<String, dynamic> _screenTimeDefinition() => {
+    'type': 'function',
+    'function': {
+      'name': LocalToolNames.screenTime,
+      'description':
+          "Get the user's app screen usage (screen time) over a time range. "
+          "Specify a custom interval with 'begin'/'end', or use the 'range' preset (today/week). "
+          'Returns the total foreground time and a per-app breakdown sorted by usage time (descending). '
+          '${_deviceTimezoneHint()} '
+          "Requires the 'Usage access' special permission; if it is not granted, the device's usage "
+          'access settings page is opened automatically and an error is returned.',
+      'parameters': {
+        'type': 'object',
+        'properties': {
+          'begin': {
+            'type': 'string',
+            'description':
+                "Start time (inclusive). Accepts an ISO-8601 date 'yyyy-MM-dd', a local "
+                "date-time 'yyyy-MM-ddTHH:mm:ss', an offset date-time, or epoch milliseconds. "
+                "When provided, 'range' is ignored.",
+          },
+          'end': {
+            'type': 'string',
+            'description':
+                "End time (exclusive), same formats as 'begin'. Defaults to now.",
+          },
+          'range': {
+            'type': 'string',
+            'enum': ['today', 'week'],
+            'description':
+                "Convenience preset, used only when 'begin' is omitted: today or week. Default today.",
+          },
+          'top': {
+            'type': 'integer',
+            'description':
+                'Maximum number of top apps to return, sorted by usage time. Default 10.',
+          },
+        },
+      },
+    },
+  };
+
+  static Map<String, dynamic> _calendarQueryDefinition() => {
+    'type': 'function',
+    'function': {
+      'name': LocalToolNames.calendarQuery,
+      'description':
+          "Query calendar events on the user's device within a time range. "
+          "Specify a custom interval with 'begin'/'end', or use the 'range' preset (today/week/month). "
+          'Returns a list of events with title, description, location, start/end times, and calendar info. '
+          '${_deviceTimezoneHint()} '
+          "Requires the 'Calendar' permission; if it is not granted, an error is returned.",
+      'parameters': {
+        'type': 'object',
+        'properties': {
+          'begin': {
+            'type': 'string',
+            'description':
+                "Start time (inclusive). Accepts an ISO-8601 date 'yyyy-MM-dd', a local "
+                "date-time 'yyyy-MM-ddTHH:mm:ss', an offset date-time, or epoch milliseconds. "
+                "When provided, 'range' is ignored.",
+          },
+          'end': {
+            'type': 'string',
+            'description': "End time (exclusive), same formats as 'begin'.",
+          },
+          'range': {
+            'type': 'string',
+            'enum': ['today', 'week', 'month'],
+            'description':
+                "Convenience preset, used only when 'begin' is omitted: today, week, or month. Default today.",
+          },
+          'query': {
+            'type': 'string',
+            'description':
+                'Optional keyword to filter events by title (case-insensitive substring match).',
+          },
+          'limit': {
+            'type': 'integer',
+            'description': 'Maximum number of events to return. Default 20.',
+          },
+        },
+      },
+    },
+  };
+
+  static Map<String, dynamic> _calendarCreateDefinition() => {
+    'type': 'function',
+    'function': {
+      'name': LocalToolNames.calendarCreate,
+      'description':
+          "Create a new calendar event on the user's device. "
+          'Requires title and start time at minimum. End time defaults to 1 hour after start. '
+          "Use 'reminders' to attach notification alerts ahead of the event. "
+          'The user will be asked to confirm before the event is created. '
+          '${_deviceTimezoneHint()} '
+          "Requires the 'Calendar' permission; if it is not granted, an error is returned.",
+      'parameters': {
+        'type': 'object',
+        'properties': {
+          'title': {'type': 'string', 'description': 'Event title.'},
+          'description': {
+            'type': 'string',
+            'description': 'Event description or notes.',
+          },
+          'location': {'type': 'string', 'description': 'Event location.'},
+          'start': {
+            'type': 'string',
+            'description':
+                "Start time. Accepts an ISO-8601 date 'yyyy-MM-dd', a local "
+                "date-time 'yyyy-MM-ddTHH:mm:ss', an offset date-time, or epoch milliseconds.",
+          },
+          'end': {
+            'type': 'string',
+            'description':
+                "End time, same formats as 'start'. Defaults to 1 hour after start.",
+          },
+          'all_day': {
+            'type': 'boolean',
+            'description': 'Whether this is an all-day event. Default false.',
+          },
+          'reminders': {
+            'type': 'array',
+            'items': {'type': 'integer'},
+            'description':
+                'Optional notification reminders, as minutes before the event start '
+                '(e.g. [10] for 10 minutes before, [0] for exactly at the start time, '
+                '[30, 1440] for 30 minutes and 1 day before). For all-day events the '
+                'offset counts back from the start of the day. No reminder is attached '
+                'unless you pass this, so include one whenever the user expects to be '
+                'notified. At most 5 reminders; values are clamped to 0-40320 minutes '
+                '(4 weeks) and de-duplicated, and the result reports what was actually '
+                'saved.',
+          },
+        },
+        'required': ['title', 'start'],
+      },
+    },
+  };
+
+  static Map<String, dynamic> _weatherDefinition() => {
+    'type': 'function',
+    'function': {
+      'name': LocalToolNames.weather,
+      'description':
+          'Get current weather, hourly forecast, and daily forecast from Apple Weather. '
+          'Omit coordinates to use the current device location; or pass latitude and '
+          'longitude to query a specific place. '
+          'Returns temperature, apparent temperature, precipitation chance, and forecasts. '
+          'Always mention that weather data is from Apple Weather when presenting results. '
+          '${_deviceTimezoneHint()} '
+          'Requires Location permission when coordinates are omitted.',
+      'parameters': {
+        'type': 'object',
+        'properties': {
+          'latitude': {
+            'type': 'number',
+            'description':
+                'Latitude in decimal degrees. Required together with longitude '
+                'when querying a specific place.',
+          },
+          'longitude': {
+            'type': 'number',
+            'description':
+                'Longitude in decimal degrees. Required together with latitude '
+                'when querying a specific place.',
+          },
+        },
+      },
+    },
+  };
+
+  static Map<String, dynamic> _remindersQueryDefinition() => {
+    'type': 'function',
+    'function': {
+      'name': LocalToolNames.remindersQuery,
+      'description':
+          "Query reminders on the user's device. Filter by date range, completion "
+          'status, and an optional keyword. Reminders without a due date are included '
+          'unless an explicit begin time is provided. '
+          '${_deviceTimezoneHint()} '
+          'Requires the Reminders permission; if it is not granted, an error is returned.',
+      'parameters': {
+        'type': 'object',
+        'properties': {
+          'begin': {
+            'type': 'string',
+            'description':
+                "Start time (inclusive). Accepts an ISO-8601 date 'yyyy-MM-dd', a local "
+                "date-time 'yyyy-MM-ddTHH:mm:ss', an offset date-time, or epoch milliseconds. "
+                "When provided, 'range' is ignored.",
+          },
+          'end': {
+            'type': 'string',
+            'description': "End time (exclusive), same formats as 'begin'.",
+          },
+          'range': {
+            'type': 'string',
+            'enum': ['today', 'week', 'month'],
+            'description':
+                "Convenience preset, used only when 'begin' is omitted: today, week, or month. Default today.",
+          },
+          'completed': {
+            'type': 'string',
+            'enum': ['all', 'true', 'false'],
+            'description':
+                'Filter by completion: all, true (completed only), or false (incomplete only). Default all.',
+          },
+          'query': {
+            'type': 'string',
+            'description':
+                'Optional keyword to filter reminders by title or notes (case-insensitive substring).',
+          },
+          'limit': {
+            'type': 'integer',
+            'description': 'Maximum number of reminders to return. Default 20.',
+          },
+        },
+      },
+    },
+  };
+
+  static Map<String, dynamic> _remindersCreateDefinition() => {
+    'type': 'function',
+    'function': {
+      'name': LocalToolNames.remindersCreate,
+      'description':
+          "Create a reminder on the user's device. Requires a title. "
+          'The user will be asked to confirm before the reminder is created. '
+          '${_deviceTimezoneHint()} '
+          'Requires the Reminders permission; if it is not granted, an error is returned.',
+      'parameters': {
+        'type': 'object',
+        'properties': {
+          'title': {'type': 'string', 'description': 'Reminder title.'},
+          'notes': {
+            'type': 'string',
+            'description': 'Optional notes or description.',
+          },
+          'due': {
+            'type': 'string',
+            'description':
+                "Optional due time. Accepts an ISO-8601 date 'yyyy-MM-dd', a local "
+                "date-time 'yyyy-MM-ddTHH:mm:ss', an offset date-time, or epoch milliseconds.",
+          },
+          'priority': {
+            'type': 'string',
+            'description':
+                'Optional priority: none, high, medium, low, or an EventKit integer 0-9 '
+                '(0 none, 1 high, 5 medium, 9 low).',
+          },
+        },
+        'required': ['title'],
+      },
+    },
+  };
 
   static String _deviceTimezoneHint() {
     final now = DateTime.now();

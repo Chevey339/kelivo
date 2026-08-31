@@ -15582,6 +15582,102 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'It also holds {count, plural, =1{1 database copy} other{{count} database copies}} set aside by an earlier repair, and resetting DOES delete {count, plural, =1{it} other{those}} permanently. Export your data first if you want to keep {count, plural, =1{it} other{them}}.'**
   String startupRecoveryRecoveredCopiesDeleted(int count);
+
+  /// No description provided for @toolSchemaSettingsPageTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Tool Descriptions'**
+  String get toolSchemaSettingsPageTitle;
+
+  /// No description provided for @toolSchemaSettingsGroupSearch.
+  ///
+  /// In en, this message translates to:
+  /// **'Search'**
+  String get toolSchemaSettingsGroupSearch;
+
+  /// No description provided for @toolSchemaSettingsGroupMemory.
+  ///
+  /// In en, this message translates to:
+  /// **'Memory'**
+  String get toolSchemaSettingsGroupMemory;
+
+  /// No description provided for @toolSchemaSettingsGroupLocal.
+  ///
+  /// In en, this message translates to:
+  /// **'Device tools'**
+  String get toolSchemaSettingsGroupLocal;
+
+  /// No description provided for @toolSchemaSettingsModified.
+  ///
+  /// In en, this message translates to:
+  /// **'Modified'**
+  String get toolSchemaSettingsModified;
+
+  /// No description provided for @toolSchemaSettingsResetDefault.
+  ///
+  /// In en, this message translates to:
+  /// **'Restore default'**
+  String get toolSchemaSettingsResetDefault;
+
+  /// No description provided for @toolSchemaSettingsResetAll.
+  ///
+  /// In en, this message translates to:
+  /// **'Restore all defaults'**
+  String get toolSchemaSettingsResetAll;
+
+  /// No description provided for @toolSchemaSettingsResetAllTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Restore all defaults?'**
+  String get toolSchemaSettingsResetAllTitle;
+
+  /// No description provided for @toolSchemaSettingsResetAllMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'This restores every built-in tool description to the app default. Your custom wording will be lost.'**
+  String get toolSchemaSettingsResetAllMessage;
+
+  /// No description provided for @toolSchemaSettingsResetAllConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Restore'**
+  String get toolSchemaSettingsResetAllConfirm;
+
+  /// No description provided for @toolSchemaSettingsParamDescriptions.
+  ///
+  /// In en, this message translates to:
+  /// **'Parameter descriptions ({count})'**
+  String toolSchemaSettingsParamDescriptions(int count);
+
+  /// No description provided for @toolSchemaSettingsMemoryLangNote.
+  ///
+  /// In en, this message translates to:
+  /// **'Memory tool defaults follow the memory prompt language. A custom description is stored once per tool and will not switch when you change that language.'**
+  String get toolSchemaSettingsMemoryLangNote;
+
+  /// No description provided for @toolSchemaSettingsDescriptionLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Description'**
+  String get toolSchemaSettingsDescriptionLabel;
+
+  /// No description provided for @toolSchemaSettingsToolName.
+  ///
+  /// In en, this message translates to:
+  /// **'Tool name'**
+  String get toolSchemaSettingsToolName;
+
+  /// No description provided for @toolSchemaEditorPageTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit description'**
+  String get toolSchemaEditorPageTitle;
+
+  /// No description provided for @toolSchemaSettingsCancel.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel'**
+  String get toolSchemaSettingsCancel;
 }
 
 class _AppLocalizationsDelegate

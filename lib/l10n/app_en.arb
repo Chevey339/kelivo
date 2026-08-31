@@ -3765,5 +3765,28 @@
         "type": "int"
       }
     }
-  }
+  },
+  "toolSchemaSettingsPageTitle": "Tool Descriptions",
+  "toolSchemaSettingsGroupSearch": "Search",
+  "toolSchemaSettingsGroupMemory": "Memory",
+  "toolSchemaSettingsGroupLocal": "Device tools",
+  "toolSchemaSettingsModified": "Modified",
+  "toolSchemaSettingsResetDefault": "Restore default",
+  "toolSchemaSettingsResetAll": "Restore all defaults",
+  "toolSchemaSettingsResetAllTitle": "Restore all defaults?",
+  "toolSchemaSettingsResetAllMessage": "This restores every built-in tool description to the app default. Your custom wording will be lost.",
+  "toolSchemaSettingsResetAllConfirm": "Restore",
+  "toolSchemaSettingsParamDescriptions": "Parameter descriptions ({count})",
+  "@toolSchemaSettingsParamDescriptions": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "toolSchemaSettingsMemoryLangNote": "Memory tool defaults follow the memory prompt language. A custom description is stored once per tool and will not switch when you change that language.",
+  "toolSchemaSettingsDescriptionLabel": "Description",
+  "toolSchemaSettingsToolName": "Tool name",
+  "toolSchemaEditorPageTitle": "Edit description",
+  "toolSchemaSettingsCancel": "Cancel"
 }
