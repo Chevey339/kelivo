@@ -273,7 +273,12 @@ class _DesktopHomePageState extends State<DesktopHomePage> {
             child: SizedBox(
               width: needsWidthPad ? minWidth : w,
               height: needsHeightPad ? minHeight : h,
-              child: content,
+              // Provide a reliably thick, grabbable resize border on all
+              // edges (including the top, which otherwise only had the thin
+              // native frame after the title bar was hidden). The title bar
+              // keeps its DragToMoveArea for moving; only its top few pixels
+              // become a resize grip, matching native Windows behavior.
+              child: DragToResizeArea(resizeEdgeSize: 8, child: content),
             ),
           ),
         );

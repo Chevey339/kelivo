@@ -87,6 +87,8 @@ final RouteObserver<ModalRoute<dynamic>> routeObserver =
     RouteObserver<ModalRoute<dynamic>>();
 bool _didCheckUpdates = false; // one-time update check flag
 bool _didEnsureAssistants = false; // ensure defaults after l10n ready
+Color?
+_lastWindowBg; // last window native background, to avoid resize black flash
 
 Future<void> main() async {
   await runZoned(
@@ -860,6 +862,19 @@ class MyApp extends StatelessWidget {
                 ),
                 builder: (ctx, child) {
                   final bright = Theme.of(ctx).brightness;
+                  // Keep the native window background in sync with the app
+                  // surface color so that resizing (driven by window_manager's
+                  // DragToResizeArea) doesn't flash a black region while the
+                  // Flutter canvas catches up. Matches v2rayN's solid border.
+                  final surface = Theme.of(ctx).colorScheme.surface;
+                  if (_lastWindowBg?.toARGB32() != surface.toARGB32()) {
+                    try {
+                      windowManager.setBackgroundColor(surface);
+                      _lastWindowBg = surface;
+                    } catch (_) {
+                      // Not ready yet; retry on next rebuild.
+                    }
+                  }
                   final overlay = bright == Brightness.dark
                       ? const SystemUiOverlayStyle(
                           statusBarColor: Colors.transparent,
