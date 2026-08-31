@@ -3112,6 +3112,8 @@
   "messageStyleSettingsPageStyleDefaultSubtitle": "跟隨主題，不可調節",
   "messageStyleSettingsPageAssistantFitContent": "助手氣泡貼合內容",
   "messageStyleSettingsPageAssistantFitContentSubtitle": "助手氣泡按文字寬度收縮，不再佔滿整行",
+  "messageStyleSettingsPageAssistantSplitParagraphs": "分段顯示為多個氣泡",
+  "messageStyleSettingsPageAssistantSplitParagraphsSubtitle": "助手回覆遇到空行時拆分，每段單獨一個氣泡",
   "messageStyleSettingsPageStyleFrostedSubtitle": "半透明毛玻璃",
   "messageStyleSettingsPageStyleSolidSubtitle": "不透明純色底",
   "messageStyleSettingsPageBlur": "模糊強度",

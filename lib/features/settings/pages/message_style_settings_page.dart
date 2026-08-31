@@ -183,6 +183,14 @@ class _MessageStyleSettingsBodyState extends State<MessageStyleSettingsBody> {
           value: settings.assistantBubbleFitContent,
           onChanged: settings.setAssistantBubbleFitContent,
         ),
+        _iosDivider(context),
+        _SwitchRow(
+          label: l10n.messageStyleSettingsPageAssistantSplitParagraphs,
+          subtitle:
+              l10n.messageStyleSettingsPageAssistantSplitParagraphsSubtitle,
+          value: settings.assistantBubbleSplitParagraphs,
+          onChanged: settings.setAssistantBubbleSplitParagraphs,
+        ),
       ],
     );
 

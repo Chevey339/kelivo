@@ -15511,6 +15511,18 @@ abstract class AppLocalizations {
   /// **'Assistant bubbles hug their text instead of filling the row'**
   String get messageStyleSettingsPageAssistantFitContentSubtitle;
 
+  /// No description provided for @messageStyleSettingsPageAssistantSplitParagraphs.
+  ///
+  /// In en, this message translates to:
+  /// **'Split paragraphs into bubbles'**
+  String get messageStyleSettingsPageAssistantSplitParagraphs;
+
+  /// No description provided for @messageStyleSettingsPageAssistantSplitParagraphsSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Blank lines break an assistant reply into one bubble per paragraph'**
+  String get messageStyleSettingsPageAssistantSplitParagraphsSubtitle;
+
   /// No description provided for @messageStyleSettingsPageStyleFrostedSubtitle.
   ///
   /// In en, this message translates to:

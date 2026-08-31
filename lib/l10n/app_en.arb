@@ -3690,6 +3690,8 @@
   "messageStyleSettingsPageStyleDefaultSubtitle": "Follows the theme; not customizable",
   "messageStyleSettingsPageAssistantFitContent": "Fit assistant bubble to content",
   "messageStyleSettingsPageAssistantFitContentSubtitle": "Assistant bubbles hug their text instead of filling the row",
+  "messageStyleSettingsPageAssistantSplitParagraphs": "Split paragraphs into bubbles",
+  "messageStyleSettingsPageAssistantSplitParagraphsSubtitle": "Blank lines break an assistant reply into one bubble per paragraph",
   "messageStyleSettingsPageStyleFrostedSubtitle": "Translucent frosted glass",
   "messageStyleSettingsPageStyleSolidSubtitle": "Opaque solid fill",
   "messageStyleSettingsPageBlur": "Blur",

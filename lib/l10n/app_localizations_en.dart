@@ -8556,6 +8556,14 @@ class AppLocalizationsEn extends AppLocalizations {
       'Assistant bubbles hug their text instead of filling the row';
 
   @override
+  String get messageStyleSettingsPageAssistantSplitParagraphs =>
+      'Split paragraphs into bubbles';
+
+  @override
+  String get messageStyleSettingsPageAssistantSplitParagraphsSubtitle =>
+      'Blank lines break an assistant reply into one bubble per paragraph';
+
+  @override
   String get messageStyleSettingsPageStyleFrostedSubtitle =>
       'Translucent frosted glass';
 

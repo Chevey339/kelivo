@@ -303,6 +303,8 @@ class SettingsProvider extends ChangeNotifier {
       'display_use_layered_sheet_tiles_v1';
   static const String _displayAssistantBubbleFitContentKey =
       'display_assistant_bubble_fit_content_v1';
+  static const String _displayAssistantBubbleSplitParagraphsKey =
+      'display_assistant_bubble_split_paragraphs_v1';
   static const String _displayChatMessageBackgroundStyleKey =
       'display_chat_message_background_style_v1';
   static const String _chatBubbleStyleOverridesKey =
@@ -521,6 +523,10 @@ class SettingsProvider extends ChangeNotifier {
   // When on, assistant bubbles hug their text instead of spanning the row.
   bool _assistantBubbleFitContent = false;
   bool get assistantBubbleFitContent => _assistantBubbleFitContent;
+
+  // When on, blank lines split assistant text into one bubble per paragraph.
+  bool _assistantBubbleSplitParagraphs = false;
+  bool get assistantBubbleSplitParagraphs => _assistantBubbleSplitParagraphs;
 
   // Desktop UI persisted state
   double _desktopSidebarWidth = 240;
@@ -1205,6 +1211,8 @@ class SettingsProvider extends ChangeNotifier {
         prefs.getBool(_displayUseLayeredSheetTilesKey) ?? false;
     _assistantBubbleFitContent =
         prefs.getBool(_displayAssistantBubbleFitContentKey) ?? false;
+    _assistantBubbleSplitParagraphs =
+        prefs.getBool(_displayAssistantBubbleSplitParagraphsKey) ?? false;
     // display: markdown/math rendering
     _enableDollarLatex = prefs.getBool(_displayEnableDollarLatexKey) ?? true;
     _enableMathRendering =
@@ -2660,6 +2668,13 @@ class SettingsProvider extends ChangeNotifier {
     _assistantBubbleFitContent = v;
     notifyListeners();
     await _preferences.setBool(_displayAssistantBubbleFitContentKey, v);
+  }
+
+  Future<void> setAssistantBubbleSplitParagraphs(bool v) async {
+    if (_assistantBubbleSplitParagraphs == v) return;
+    _assistantBubbleSplitParagraphs = v;
+    notifyListeners();
+    await _preferences.setBool(_displayAssistantBubbleSplitParagraphsKey, v);
   }
 
   Future<void> setUseLayeredSheetTiles(bool v) async {
@@ -5788,6 +5803,7 @@ Requirements:
     copy._useLayeredSurfaces = _useLayeredSurfaces;
     copy._useLayeredSheetTiles = _useLayeredSheetTiles;
     copy._assistantBubbleFitContent = _assistantBubbleFitContent;
+    copy._assistantBubbleSplitParagraphs = _assistantBubbleSplitParagraphs;
     copy._chatMessageBackgroundStyle = _chatMessageBackgroundStyle;
     copy._chatBubbleStyleOverrides = _chatBubbleStyleOverrides;
     copy._userChatBubbleStyleOverrides = _userChatBubbleStyleOverrides;

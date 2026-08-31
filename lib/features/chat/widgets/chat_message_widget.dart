@@ -49,6 +49,7 @@ import '../../../utils/platform_utils.dart';
 import '../../home/services/ask_user_interaction_service.dart';
 import '../../home/services/local_tools_service.dart';
 import '../../home/services/tool_approval_service.dart';
+import '../utils/assistant_paragraph_splitter.dart';
 import '../utils/thinking_tag_parser.dart';
 import 'timeline_projection.dart';
 import 'timeline_visibility.dart';
@@ -2413,8 +2414,9 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
     BuildContext context,
     String visualContent,
     bool enableAssistantMarkdown,
-    Map<String, String> citationIndexLookup,
-  ) {
+    Map<String, String> citationIndexLookup, {
+    String contentKey = '',
+  }) {
     final bool isDesktop =
         defaultTargetPlatform == TargetPlatform.macOS ||
         defaultTargetPlatform == TargetPlatform.windows ||
@@ -2457,7 +2459,11 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
 
     return RepaintBoundary(
       child: SelectionArea(
-        key: ValueKey('assistant_${widget.message.id}'),
+        key: ValueKey(
+          contentKey.isEmpty
+              ? 'assistant_${widget.message.id}'
+              : 'assistant_${widget.message.id}_$contentKey',
+        ),
         child: DefaultTextStyle.merge(
           style: TextStyle(fontSize: baseAssistant, height: 1.5),
           child: assistantContent,
@@ -2477,12 +2483,50 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
     return Align(alignment: Alignment.centerLeft, child: child);
   }
 
+  /// Same 8pt gap [addVisible] applies between sibling assistant bubbles.
+  List<Widget> _interleaveAssistantBubbles(List<Widget> bubbles) {
+    return <Widget>[
+      for (var i = 0; i < bubbles.length; i++) ...[
+        if (i > 0) const SizedBox(height: 8),
+        bubbles[i],
+      ],
+    ];
+  }
+
+  /// One bubble per text block, or one per paragraph when the split option is
+  /// on. [blockKey] disambiguates the selection areas of sibling bubbles.
+  List<Widget> _buildAssistantTextBubbles(
+    BuildContext context,
+    String visualContent,
+    bool enableAssistantMarkdown,
+    Map<String, String> citationIndexLookup, {
+    required String blockKey,
+  }) {
+    final split = context.select<SettingsProvider, bool>(
+      (s) => s.assistantBubbleSplitParagraphs,
+    );
+    final parts = split
+        ? splitAssistantParagraphs(visualContent)
+        : <String>[visualContent];
+    return <Widget>[
+      for (var i = 0; i < parts.length; i++)
+        _buildAssistantTextBlock(
+          context,
+          parts[i],
+          enableAssistantMarkdown,
+          citationIndexLookup,
+          contentKey: parts.length == 1 ? '' : '$blockKey.$i',
+        ),
+    ];
+  }
+
   Widget _buildAssistantTextBlock(
     BuildContext context,
     String visualContent,
     bool enableAssistantMarkdown,
-    Map<String, String> citationIndexLookup,
-  ) {
+    Map<String, String> citationIndexLookup, {
+    String contentKey = '',
+  }) {
     return _assistantBlockWidth(
       context,
       child: _buildAssistantBubbleContainer(
@@ -2492,6 +2536,7 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
           visualContent,
           enableAssistantMarkdown,
           citationIndexLookup,
+          contentKey: contentKey,
         ),
       ),
     );
@@ -2884,11 +2929,14 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
               // bottom does not evict the last streaming bubble.
               if (visibleBlocks.isEmpty && visualContent.isNotEmpty) {
                 return <Widget>[
-                  _buildAssistantTextBlock(
-                    context,
-                    visualContent,
-                    enableAssistantMarkdown,
-                    citationIndexLookup,
+                  ..._interleaveAssistantBubbles(
+                    _buildAssistantTextBubbles(
+                      context,
+                      visualContent,
+                      enableAssistantMarkdown,
+                      citationIndexLookup,
+                      blockKey: 'body',
+                    ),
                   ),
                   if (widget.message.isStreaming && visualContent.isNotEmpty)
                     Padding(
@@ -2914,7 +2962,12 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
                     _resolveAttachmentImageUri(block.imageUri!),
               ];
 
-              for (final block in visibleBlocks) {
+              for (
+                var blockIndex = 0;
+                blockIndex < visibleBlocks.length;
+                blockIndex++
+              ) {
+                final block = visibleBlocks[blockIndex];
                 if (block.isImage) {
                   addVisible(
                     _buildAssistantImageBlock(
@@ -2929,14 +2982,15 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
                   continue;
                 }
                 if (block.isText) {
-                  addVisible(
-                    _buildAssistantTextBlock(
-                      context,
-                      block.text!,
-                      enableAssistantMarkdown,
-                      citationIndexLookup,
-                    ),
-                  );
+                  for (final bubble in _buildAssistantTextBubbles(
+                    context,
+                    block.text!,
+                    enableAssistantMarkdown,
+                    citationIndexLookup,
+                    blockKey: 'text$blockIndex',
+                  )) {
+                    addVisible(bubble);
+                  }
                   continue;
                 }
                 if (!block.isThinking) continue;

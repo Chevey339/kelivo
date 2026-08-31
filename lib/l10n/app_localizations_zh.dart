@@ -8205,6 +8205,13 @@ class AppLocalizationsZh extends AppLocalizations {
       '助手气泡按文字宽度收缩，不再占满整行';
 
   @override
+  String get messageStyleSettingsPageAssistantSplitParagraphs => '分段显示为多个气泡';
+
+  @override
+  String get messageStyleSettingsPageAssistantSplitParagraphsSubtitle =>
+      '助手回复遇到空行时拆分，每段单独一个气泡';
+
+  @override
   String get messageStyleSettingsPageStyleFrostedSubtitle => '半透明毛玻璃';
 
   @override
@@ -16659,6 +16666,13 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   @override
   String get messageStyleSettingsPageAssistantFitContentSubtitle =>
       '助手气泡按文字宽度收缩，不再占满整行';
+
+  @override
+  String get messageStyleSettingsPageAssistantSplitParagraphs => '分段显示为多个气泡';
+
+  @override
+  String get messageStyleSettingsPageAssistantSplitParagraphsSubtitle =>
+      '助手回复遇到空行时拆分，每段单独一个气泡';
 
   @override
   String get messageStyleSettingsPageStyleFrostedSubtitle => '半透明毛玻璃';
@@ -25189,6 +25203,13 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   @override
   String get messageStyleSettingsPageAssistantFitContentSubtitle =>
       '助手氣泡按文字寬度收縮，不再佔滿整行';
+
+  @override
+  String get messageStyleSettingsPageAssistantSplitParagraphs => '分段顯示為多個氣泡';
+
+  @override
+  String get messageStyleSettingsPageAssistantSplitParagraphsSubtitle =>
+      '助手回覆遇到空行時拆分，每段單獨一個氣泡';
 
   @override
   String get messageStyleSettingsPageStyleFrostedSubtitle => '半透明毛玻璃';
