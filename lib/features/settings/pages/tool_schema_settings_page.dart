@@ -10,6 +10,7 @@ import '../../../l10n/app_localizations.dart';
 import '../../../shared/widgets/ios_tactile.dart';
 import '../../../shared/widgets/section_card.dart';
 import '../../../theme/app_font_weights.dart';
+import '../widgets/tool_schema_ui.dart';
 import 'tool_schema_editor_page.dart';
 
 class ToolSchemaSettingsPage extends StatefulWidget {
@@ -28,6 +29,12 @@ class _ToolSchemaSettingsPageState extends State<ToolSchemaSettingsPage> {
     });
   }
 
+  Future<void> _confirmResetAll() async {
+    final confirmed = await confirmResetAllToolSchemas(context);
+    if (!confirmed || !mounted) return;
+    await context.read<SettingsProvider>().resetAllToolSchemaOverrides();
+  }
+
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
@@ -37,30 +44,6 @@ class _ToolSchemaSettingsPageState extends State<ToolSchemaSettingsPage> {
       lang: settings.resolvedMemoryPromptLang,
       legacyMemoryMode: settings.legacyMemoryMode,
     );
-
-    Future<void> confirmResetAll() async {
-      final confirmed = await showDialog<bool>(
-        context: context,
-        builder: (dialogContext) => AlertDialog(
-          title: Text(l10n.toolSchemaSettingsResetAllTitle),
-          content: Text(l10n.toolSchemaSettingsResetAllMessage),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(dialogContext).pop(false),
-              child: Text(l10n.toolSchemaSettingsCancel),
-            ),
-            TextButton(
-              onPressed: () => Navigator.of(dialogContext).pop(true),
-              style: TextButton.styleFrom(foregroundColor: cs.error),
-              child: Text(l10n.toolSchemaSettingsResetAllConfirm),
-            ),
-          ],
-        ),
-      );
-      if (confirmed == true && context.mounted) {
-        await context.read<SettingsProvider>().resetAllToolSchemaOverrides();
-      }
-    }
 
     return Scaffold(
       backgroundColor: cs.surface,
@@ -78,18 +61,18 @@ class _ToolSchemaSettingsPageState extends State<ToolSchemaSettingsPage> {
         ),
         title: Text(l10n.toolSchemaSettingsPageTitle),
         actions: [
-          PopupMenuButton<String>(
-            icon: Icon(Lucide.MoreVertical, color: cs.onSurface),
-            onSelected: (value) {
-              if (value == 'resetAll') confirmResetAll();
-            },
-            itemBuilder: (ctx) => [
-              PopupMenuItem<String>(
-                value: 'resetAll',
-                child: Text(l10n.toolSchemaSettingsResetAll),
-              ),
-            ],
+          Tooltip(
+            message: l10n.toolSchemaSettingsResetAll,
+            child: IosIconButton(
+              icon: Lucide.RotateCcw,
+              color: cs.onSurface,
+              size: 20,
+              minSize: 44,
+              semanticLabel: l10n.toolSchemaSettingsResetAll,
+              onTap: _confirmResetAll,
+            ),
           ),
+          const SizedBox(width: 4),
         ],
       ),
       body: ListView(
@@ -123,19 +106,19 @@ class _ToolSchemaSettingsPageState extends State<ToolSchemaSettingsPage> {
     };
     return [
       Padding(
-        padding: const EdgeInsets.fromLTRB(4, 8, 4, 8),
+        padding: const EdgeInsets.fromLTRB(12, 0, 12, 6),
         child: Text(
           title,
           style: TextStyle(
             fontSize: 13,
             fontWeight: AppFontWeights.semibold,
-            color: cs.onSurface.withValues(alpha: 0.6),
+            color: cs.onSurface.withValues(alpha: 0.8),
           ),
         ),
       ),
       if (group == BuiltInToolGroup.memory)
         Padding(
-          padding: const EdgeInsets.fromLTRB(4, 0, 4, 8),
+          padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
           child: Text(
             l10n.toolSchemaSettingsMemoryLangNote,
             style: TextStyle(
@@ -146,137 +129,38 @@ class _ToolSchemaSettingsPageState extends State<ToolSchemaSettingsPage> {
           ),
         ),
       SectionCard(
+        padding: EdgeInsets.zero,
         children: [
-          for (var i = 0; i < entries.length; i++) ...[
-            if (i > 0)
-              Divider(
-                height: 1,
-                thickness: 0.6,
-                color: cs.outlineVariant.withValues(alpha: 0.18),
-              ),
-            _ToolRow(
-              entry: entries[i],
-              schemaOverride: overrides[entries[i].name],
+          for (final entry in entries)
+            ToolSchemaToolRow(
+              entry: entry,
+              schemaOverride: overrides[entry.name],
+              onTap: () => _openEditor(context, entry, overrides[entry.name]),
             ),
-          ],
         ],
       ),
-      const SizedBox(height: 12),
+      const SizedBox(height: 18),
     ];
   }
-}
 
-class _ToolRow extends StatelessWidget {
-  const _ToolRow({required this.entry, this.schemaOverride});
-
-  final BuiltInToolCatalogEntry entry;
-  final ToolSchemaOverride? schemaOverride;
-
-  @override
-  Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context)!;
-    final cs = Theme.of(context).colorScheme;
-    final modified = schemaOverride != null && !schemaOverride!.isEmpty;
-    final effective = modified
-        ? (schemaOverride!.description?.trim().isNotEmpty == true
-              ? schemaOverride!.description!
-              : entry.defaultDescription ?? '')
-        : (entry.defaultDescription ?? '');
-    final summary = _firstLine(effective);
-
-    return IosCardPress(
-      borderRadius: BorderRadius.zero,
-      onTap: () async {
-        final result = await Navigator.of(context).push<ToolSchemaOverride?>(
-          MaterialPageRoute(
-            builder: (_) => ToolSchemaEditorPage(
-              toolName: entry.name,
-              defaultDefinition: entry.defaultDefinition,
-              initialOverride: schemaOverride,
-            ),
-          ),
-        );
-        if (result == null || !context.mounted) return;
-        await context.read<SettingsProvider>().setToolSchemaOverride(
-          entry.name,
-          result,
-        );
-      },
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
-        child: Row(
-          children: [
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          entry.name,
-                          style: TextStyle(
-                            fontSize: 15,
-                            fontFamily: 'monospace',
-                            fontWeight: AppFontWeights.medium,
-                            color: cs.onSurface,
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                      if (modified) ...[
-                        const SizedBox(width: 8),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 8,
-                            vertical: 2,
-                          ),
-                          decoration: BoxDecoration(
-                            color: cs.primary.withValues(alpha: 0.12),
-                            borderRadius: BorderRadius.circular(999),
-                          ),
-                          child: Text(
-                            l10n.toolSchemaSettingsModified,
-                            style: TextStyle(
-                              fontSize: 11,
-                              fontWeight: AppFontWeights.medium,
-                              color: cs.primary,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ],
-                  ),
-                  if (summary.isNotEmpty) ...[
-                    const SizedBox(height: 4),
-                    Text(
-                      summary,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontSize: 13,
-                        color: cs.onSurface.withValues(alpha: 0.55),
-                      ),
-                    ),
-                  ],
-                ],
-              ),
-            ),
-            Icon(
-              Lucide.ChevronRight,
-              size: 16,
-              color: cs.onSurface.withValues(alpha: 0.45),
-            ),
-          ],
+  Future<void> _openEditor(
+    BuildContext context,
+    BuiltInToolCatalogEntry entry,
+    ToolSchemaOverride? schemaOverride,
+  ) async {
+    final result = await Navigator.of(context).push<ToolSchemaOverride?>(
+      MaterialPageRoute(
+        builder: (_) => ToolSchemaEditorPage(
+          toolName: entry.name,
+          defaultDefinition: entry.defaultDefinition,
+          initialOverride: schemaOverride,
         ),
       ),
     );
+    if (result == null || !context.mounted) return;
+    await context.read<SettingsProvider>().setToolSchemaOverride(
+      entry.name,
+      result,
+    );
   }
-}
-
-String _firstLine(String text) {
-  final trimmed = text.trim();
-  if (trimmed.isEmpty) return '';
-  return trimmed.split(RegExp(r'\r?\n')).first;
 }

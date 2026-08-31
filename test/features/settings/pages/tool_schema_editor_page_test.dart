@@ -26,6 +26,9 @@ void main() {
     );
     await tester.pump();
 
+    expect(find.byType(ExpansionTile), findsNothing);
+    expect(find.byKey(const ValueKey('tool-schema-param-query')), findsNothing);
+
     await tester.tap(find.text('Parameter descriptions (1)'));
     await tester.pumpAndSettle();
     expect(

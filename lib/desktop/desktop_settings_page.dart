@@ -305,11 +305,6 @@ class _SettingsMenu extends StatelessWidget {
         l10n.settingsPageDefaultModel,
       ),
       (_SettingsMenuItem.search, lucide.Lucide.Earth, l10n.settingsPageSearch),
-      (
-        _SettingsMenuItem.toolSchemas,
-        lucide.Lucide.FileText,
-        l10n.toolSchemaSettingsPageTitle,
-      ),
       (_SettingsMenuItem.mcp, lucide.Lucide.Terminal, l10n.settingsPageMcp),
       (
         _SettingsMenuItem.quickPhrases,
@@ -347,6 +342,11 @@ class _SettingsMenu extends StatelessWidget {
         _SettingsMenuItem.stats,
         lucide.Lucide.ChartColumnBig,
         l10n.settingsPageStatistics,
+      ),
+      (
+        _SettingsMenuItem.toolSchemas,
+        lucide.Lucide.Wrench,
+        l10n.toolSchemaSettingsPageTitle,
       ),
       (
         _SettingsMenuItem.about,

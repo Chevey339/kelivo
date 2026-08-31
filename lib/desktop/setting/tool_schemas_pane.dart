@@ -8,7 +8,10 @@ import '../../core/providers/settings_provider.dart';
 import '../../core/services/tools/built_in_tool_catalog.dart';
 import '../../features/home/services/local_tools_service.dart';
 import '../../features/settings/widgets/tool_schema_editor_form.dart';
+import '../../features/settings/widgets/tool_schema_ui.dart';
+import '../../icons/lucide_adapter.dart';
 import '../../l10n/app_localizations.dart';
+import '../../shared/widgets/ios_tile_button.dart';
 import '../../theme/app_font_weights.dart';
 
 class DesktopToolSchemasPane extends StatefulWidget {
@@ -44,30 +47,11 @@ class _DesktopToolSchemasPaneState extends State<DesktopToolSchemasPane> {
   }
 
   Future<void> _confirmResetAll(BuildContext context) async {
-    final l10n = AppLocalizations.of(context)!;
-    final cs = Theme.of(context).colorScheme;
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: Text(l10n.toolSchemaSettingsResetAllTitle),
-        content: Text(l10n.toolSchemaSettingsResetAllMessage),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(dialogContext).pop(false),
-            child: Text(l10n.toolSchemaSettingsCancel),
-          ),
-          TextButton(
-            onPressed: () => Navigator.of(dialogContext).pop(true),
-            style: TextButton.styleFrom(foregroundColor: cs.error),
-            child: Text(l10n.toolSchemaSettingsResetAllConfirm),
-          ),
-        ],
-      ),
-    );
-    if (confirmed == true && context.mounted) {
-      await context.read<SettingsProvider>().resetAllToolSchemaOverrides();
-      if (mounted) setState(() => _formEpoch++);
-    }
+    final confirmed = await confirmResetAllToolSchemas(context);
+    if (!confirmed || !context.mounted) return;
+    await context.read<SettingsProvider>().resetAllToolSchemaOverrides();
+    if (!mounted) return;
+    setState(() => _formEpoch++);
   }
 
   @override
@@ -93,7 +77,7 @@ class _DesktopToolSchemasPaneState extends State<DesktopToolSchemasPane> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           SizedBox(
-            height: 36,
+            height: 40,
             child: Row(
               children: [
                 Expanded(
@@ -106,9 +90,15 @@ class _DesktopToolSchemasPaneState extends State<DesktopToolSchemasPane> {
                     ),
                   ),
                 ),
-                TextButton(
-                  onPressed: () => _confirmResetAll(context),
-                  child: Text(l10n.toolSchemaSettingsResetAll),
+                IosTileButton(
+                  icon: Lucide.RotateCcw,
+                  label: l10n.toolSchemaSettingsResetAll,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 6,
+                  ),
+                  fontSize: 13,
+                  onTap: () => _confirmResetAll(context),
                 ),
               ],
             ),
@@ -120,34 +110,26 @@ class _DesktopToolSchemasPaneState extends State<DesktopToolSchemasPane> {
               children: [
                 SizedBox(
                   width: 280,
-                  child: DecoratedBox(
-                    decoration: BoxDecoration(
-                      border: Border(
-                        right: BorderSide(
-                          color: cs.outlineVariant.withValues(alpha: 0.18),
+                  child: ListView(
+                    padding: const EdgeInsets.only(right: 8),
+                    children: [
+                      for (final group in BuiltInToolGroup.values)
+                        ..._groupTiles(
+                          context,
+                          group: group,
+                          entries: catalog
+                              .where((e) => e.group == group)
+                              .toList(),
+                          selectedName: selectedName,
+                          overrides: settings.toolSchemaOverrides,
                         ),
-                      ),
-                    ),
-                    child: ListView(
-                      padding: const EdgeInsets.only(right: 12),
-                      children: [
-                        for (final group in BuiltInToolGroup.values)
-                          ..._groupTiles(
-                            context,
-                            group: group,
-                            entries: catalog
-                                .where((e) => e.group == group)
-                                .toList(),
-                            selectedName: selectedName,
-                            overrides: settings.toolSchemaOverrides,
-                          ),
-                      ],
-                    ),
+                    ],
                   ),
                 ),
+                const SizedBox(width: 16),
                 Expanded(
                   child: SingleChildScrollView(
-                    padding: const EdgeInsets.fromLTRB(20, 0, 8, 16),
+                    padding: const EdgeInsets.fromLTRB(4, 0, 8, 16),
                     child: ToolSchemaEditorForm(
                       key: ValueKey('${selected.name}:$_formEpoch'),
                       defaultDefinition: selected.defaultDefinition,
@@ -187,7 +169,7 @@ class _DesktopToolSchemasPaneState extends State<DesktopToolSchemasPane> {
     };
     return [
       Padding(
-        padding: const EdgeInsets.fromLTRB(8, 12, 8, 6),
+        padding: const EdgeInsets.fromLTRB(10, 12, 10, 6),
         child: Text(
           title,
           style: TextStyle(
@@ -199,7 +181,7 @@ class _DesktopToolSchemasPaneState extends State<DesktopToolSchemasPane> {
       ),
       if (group == BuiltInToolGroup.memory)
         Padding(
-          padding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
+          padding: const EdgeInsets.fromLTRB(10, 0, 10, 8),
           child: Text(
             l10n.toolSchemaSettingsMemoryLangNote,
             style: TextStyle(
@@ -210,82 +192,20 @@ class _DesktopToolSchemasPaneState extends State<DesktopToolSchemasPane> {
           ),
         ),
       for (final entry in entries)
-        _ToolTile(
-          entry: entry,
-          selected: entry.name == selectedName,
-          modified:
-              overrides[entry.name] != null && !overrides[entry.name]!.isEmpty,
-          onTap: () {
-            unawaited(_settings?.flushPendingToolSchemaOverridePersist());
-            setState(() => _selectedName = entry.name);
-          },
-        ),
-    ];
-  }
-}
-
-class _ToolTile extends StatelessWidget {
-  const _ToolTile({
-    required this.entry,
-    required this.selected,
-    required this.modified,
-    required this.onTap,
-  });
-
-  final BuiltInToolCatalogEntry entry;
-  final bool selected;
-  final bool modified;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 2),
-      child: Material(
-        color: selected
-            ? cs.primary.withValues(alpha: 0.10)
-            : Colors.transparent,
-        borderRadius: BorderRadius.circular(10),
-        child: InkWell(
-          borderRadius: BorderRadius.circular(10),
-          onTap: onTap,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-            child: Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    entry.name,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      fontSize: 13,
-                      fontFamily: 'monospace',
-                      fontWeight: selected
-                          ? AppFontWeights.semibold
-                          : AppFontWeights.medium,
-                      color: cs.onSurface,
-                    ),
-                  ),
-                ),
-                if (modified)
-                  Padding(
-                    padding: const EdgeInsets.only(left: 6),
-                    child: Container(
-                      width: 7,
-                      height: 7,
-                      decoration: BoxDecoration(
-                        color: cs.primary,
-                        shape: BoxShape.circle,
-                      ),
-                    ),
-                  ),
-              ],
-            ),
+        Padding(
+          padding: const EdgeInsets.only(bottom: 4),
+          child: ToolSchemaToolRow(
+            entry: entry,
+            schemaOverride: overrides[entry.name],
+            selected: entry.name == selectedName,
+            showChevron: false,
+            compact: true,
+            onTap: () {
+              unawaited(_settings?.flushPendingToolSchemaOverridePersist());
+              setState(() => _selectedName = entry.name);
+            },
           ),
         ),
-      ),
-    );
+    ];
   }
 }

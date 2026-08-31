@@ -2,10 +2,15 @@ import 'package:flutter/material.dart';
 
 import '../../../core/models/tool_schema_override.dart';
 import '../../../core/services/tools/tool_schema_overrides.dart';
+import '../../../icons/lucide_adapter.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../shared/widgets/ios_form_text_field.dart';
+import '../../../shared/widgets/ios_tactile.dart';
+import '../../../shared/widgets/ios_tile_button.dart';
+import '../../../shared/widgets/section_card.dart';
 import '../../../theme/app_font_weights.dart';
 import 'package:Kelivo/theme/app_semantic_colors.dart';
+import 'tool_schema_ui.dart';
 
 class ToolSchemaEditorForm extends StatefulWidget {
   const ToolSchemaEditorForm({
@@ -29,6 +34,7 @@ class _ToolSchemaEditorFormState extends State<ToolSchemaEditorForm> {
   late final Map<String, TextEditingController> _paramControllers;
   late final String _toolName;
   late final String _defaultDescription;
+  bool _paramsExpanded = false;
 
   @override
   void initState() {
@@ -92,8 +98,7 @@ class _ToolSchemaEditorFormState extends State<ToolSchemaEditorForm> {
   }
 
   bool get _hasParamOverrides {
-    final initial = _currentOverride();
-    return initial.paramDescriptions.isNotEmpty;
+    return _currentOverride().paramDescriptions.isNotEmpty;
   }
 
   @override
@@ -104,25 +109,47 @@ class _ToolSchemaEditorFormState extends State<ToolSchemaEditorForm> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Text(
-          l10n.toolSchemaSettingsToolName,
-          style: TextStyle(
-            fontSize: 13,
-            fontWeight: AppFontWeights.semibold,
-            color: cs.onSurface.withValues(alpha: 0.7),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(12, 0, 12, 6),
+          child: Text(
+            l10n.toolSchemaSettingsToolName,
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: AppFontWeights.semibold,
+              color: cs.onSurface.withValues(alpha: 0.8),
+            ),
           ),
         ),
-        const SizedBox(height: 6),
-        SelectableText(
-          _toolName,
-          style: TextStyle(
-            fontSize: 15,
-            fontFamily: 'monospace',
-            fontWeight: AppFontWeights.medium,
-            color: cs.onSurface,
+        SectionCard(
+          padding: EdgeInsets.zero,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(12, 11, 12, 11),
+            child: Row(
+              children: [
+                SizedBox(
+                  width: 36,
+                  child: Icon(
+                    toolSchemaIconFor(_toolName),
+                    size: 20,
+                    color: cs.onSurface.withValues(alpha: 0.9),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: SelectableText(
+                    _toolName,
+                    style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: AppFontWeights.medium,
+                      color: cs.onSurface,
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: 18),
         IosFormTextField(
           key: const ValueKey('tool-schema-desc'),
           label: l10n.toolSchemaSettingsDescriptionLabel,
@@ -132,38 +159,61 @@ class _ToolSchemaEditorFormState extends State<ToolSchemaEditorForm> {
           inlineLabel: false,
           keyboardType: TextInputType.multiline,
           textInputAction: TextInputAction.newline,
+          outerPadding: EdgeInsets.zero,
         ),
         if (_params.isNotEmpty) ...[
-          const SizedBox(height: 8),
-          ExpansionTile(
-            initiallyExpanded: false,
-            tilePadding: EdgeInsets.zero,
-            childrenPadding: EdgeInsets.zero,
-            title: Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    l10n.toolSchemaSettingsParamDescriptions(_params.length),
-                    style: TextStyle(
-                      fontSize: 15,
-                      fontWeight: AppFontWeights.medium,
-                      color: cs.onSurface,
+          const SizedBox(height: 18),
+          IosCardPress(
+            haptics: false,
+            baseColor: Colors.transparent,
+            borderRadius: BorderRadius.circular(12),
+            padding: EdgeInsets.zero,
+            onTap: () => setState(() => _paramsExpanded = !_paramsExpanded),
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(4, 8, 4, 8),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      l10n.toolSchemaSettingsParamDescriptions(_params.length),
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: AppFontWeights.medium,
+                        color: cs.onSurface.withValues(alpha: 0.9),
+                      ),
                     ),
                   ),
-                ),
-                if (_hasParamOverrides)
-                  _ModifiedBadge(label: l10n.toolSchemaSettingsModified),
-              ],
+                  if (_hasParamOverrides)
+                    Padding(
+                      padding: const EdgeInsets.only(right: 8),
+                      child: ToolSchemaModifiedBadge(
+                        label: l10n.toolSchemaSettingsModified,
+                      ),
+                    ),
+                  Icon(
+                    _paramsExpanded ? Lucide.ChevronDown : Lucide.ChevronRight,
+                    size: 16,
+                    color: cs.onSurface.withValues(alpha: 0.35),
+                  ),
+                ],
+              ),
             ),
-            children: [for (final p in _params) _paramEditor(context, p)],
           ),
+          if (_paramsExpanded)
+            Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: Column(
+                children: [for (final p in _params) _paramEditor(context, p)],
+              ),
+            ),
         ],
-        const SizedBox(height: 8),
+        const SizedBox(height: 16),
         Align(
           alignment: Alignment.centerLeft,
-          child: TextButton(
-            onPressed: _restoreDefaults,
-            child: Text(l10n.toolSchemaSettingsResetDefault),
+          child: IosTileButton(
+            icon: Lucide.RotateCcw,
+            label: l10n.toolSchemaSettingsResetDefault,
+            onTap: _restoreDefaults,
           ),
         ),
       ],
@@ -191,7 +241,6 @@ class _ToolSchemaEditorFormState extends State<ToolSchemaEditorForm> {
                 param.path,
                 style: TextStyle(
                   fontSize: 13,
-                  fontFamily: 'monospace',
                   fontWeight: AppFontWeights.medium,
                   color: cs.onSurface,
                 ),
@@ -228,32 +277,6 @@ class _ToolSchemaEditorFormState extends State<ToolSchemaEditorForm> {
             outerPadding: const EdgeInsets.fromLTRB(0, 8, 0, 0),
           ),
         ],
-      ),
-    );
-  }
-}
-
-class _ModifiedBadge extends StatelessWidget {
-  const _ModifiedBadge({required this.label});
-
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-      decoration: BoxDecoration(
-        color: cs.primary.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(999),
-      ),
-      child: Text(
-        label,
-        style: TextStyle(
-          fontSize: 11,
-          fontWeight: AppFontWeights.medium,
-          color: cs.primary,
-        ),
       ),
     );
   }

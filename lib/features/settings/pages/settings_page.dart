@@ -233,19 +233,6 @@ class SettingsPage extends StatelessWidget {
               _iosDivider(context),
               _iosNavRow(
                 context,
-                icon: Lucide.FileText,
-                label: l10n.toolSchemaSettingsPageTitle,
-                onTap: () {
-                  Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (_) => const ToolSchemaSettingsPage(),
-                    ),
-                  );
-                },
-              ),
-              _iosDivider(context),
-              _iosNavRow(
-                context,
                 icon: Lucide.Volume2,
                 label: l10n.settingsPageTts,
                 onTap: () {
@@ -408,6 +395,19 @@ class SettingsPage extends StatelessWidget {
                   },
                 ),
               ],
+              _iosDivider(context),
+              _iosNavRow(
+                context,
+                icon: Lucide.Wrench,
+                label: l10n.toolSchemaSettingsPageTitle,
+                onTap: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => const ToolSchemaSettingsPage(),
+                    ),
+                  );
+                },
+              ),
               _iosDivider(context),
               _iosNavRow(
                 context,

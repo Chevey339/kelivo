@@ -31,6 +31,9 @@ void main() {
     await _pumpPane(tester, settings);
 
     expect(find.text(SearchToolService.toolName), findsWidgets);
+    expect(find.byType(Divider), findsNothing);
+    expect(find.byType(ListTile), findsNothing);
+    expect(find.byType(InkWell), findsNothing);
 
     await tester.enterText(_descriptionField, 'Be conservative about search.');
     await tester.pump();
@@ -63,7 +66,10 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(settings.toolSchemaOverrides, isEmpty);
-      expect(_descriptionController(tester).text, SearchToolService.toolDescription);
+      expect(
+        _descriptionController(tester).text,
+        SearchToolService.toolDescription,
+      );
 
       await tester.enterText(_descriptionField, 'After restore');
       await tester.pump();
@@ -76,37 +82,38 @@ void main() {
     },
   );
 
-  testWidgets('typing updates memory immediately but persists once at the end', (
-    tester,
-  ) async {
-    final harness = await createBusinessTestHarness();
-    final settings = SettingsProvider(harness.preferences);
-    addTearDown(settings.dispose);
-    await settings.loaded;
+  testWidgets(
+    'typing updates memory immediately but persists once at the end',
+    (tester) async {
+      final harness = await createBusinessTestHarness();
+      final settings = SettingsProvider(harness.preferences);
+      addTearDown(settings.dispose);
+      await settings.loaded;
 
-    await _pumpPane(tester, settings);
+      await _pumpPane(tester, settings);
 
-    await tester.enterText(_descriptionField, 'H');
-    await tester.pump();
-    await tester.enterText(_descriptionField, 'Hi');
-    await tester.pump();
-    await tester.enterText(_descriptionField, 'Hi there');
-    await tester.pump();
+      await tester.enterText(_descriptionField, 'H');
+      await tester.pump();
+      await tester.enterText(_descriptionField, 'Hi');
+      await tester.pump();
+      await tester.enterText(_descriptionField, 'Hi there');
+      await tester.pump();
 
-    expect(
-      settings.toolSchemaOverrides[SearchToolService.toolName]?.description,
-      'Hi there',
-    );
-    expect(harness.preferences.getString('tool_schema_overrides_v1'), isNull);
+      expect(
+        settings.toolSchemaOverrides[SearchToolService.toolName]?.description,
+        'Hi there',
+      );
+      expect(harness.preferences.getString('tool_schema_overrides_v1'), isNull);
 
-    await settings.flushPendingToolSchemaOverridePersist();
-    expect(
-      jsonDecode(harness.preferences.getString('tool_schema_overrides_v1')!),
-      {
-        SearchToolService.toolName: {'description': 'Hi there'},
-      },
-    );
-  });
+      await settings.flushPendingToolSchemaOverridePersist();
+      expect(
+        jsonDecode(harness.preferences.getString('tool_schema_overrides_v1')!),
+        {
+          SearchToolService.toolName: {'description': 'Hi there'},
+        },
+      );
+    },
+  );
 }
 
 Finder get _descriptionField => find.descendant(
