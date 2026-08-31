@@ -14,6 +14,17 @@ enum DeviceToolsSupport {
     return parsed
   }
 
+  static func stringListArg(_ value: Any?) -> [String] {
+    guard let list = value as? [Any] else { return [] }
+    return list.compactMap { item in
+      if let text = item as? String {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? nil : trimmed
+      }
+      return nil
+    }
+  }
+
   static func intArg(_ value: Any?) -> Int? {
     if let number = value as? Int { return number }
     if let number = value as? Double { return Int(number) }

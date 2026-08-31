@@ -516,7 +516,11 @@ final class BusinessSettingsRouter {
             'presetMessages',
             'regexRules',
           },
-          stringLists: const {'mcpServerIds', 'localToolIds'},
+          stringLists: const {
+            'mcpServerIds',
+            'localToolIds',
+            'healthDataTypeIds',
+          },
         );
         _validateAssistantChildren(kind, payload);
         return;

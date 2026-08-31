@@ -5840,6 +5840,152 @@ class AppLocalizationsZh extends AppLocalizations {
       '读取本设备的健康活动摘要，需要授予健康数据读取权限。';
 
   @override
+  String assistantEditLocalToolHealthSelectedCount(int selected, int total) {
+    return '已选择 $selected/$total 项';
+  }
+
+  @override
+  String get healthDataSettingsTitle => '健康数据';
+
+  @override
+  String get healthDataSettingsDescription =>
+      '当前助手在日常对话中可使用的 HealthKit 信号。开关表示 Kelivo 可以尝试读取该范围，实际授权仍由 iOS 管理。';
+
+  @override
+  String healthDataSettingsBadge(int selected, int total) {
+    return '$selected/$total 开启';
+  }
+
+  @override
+  String get healthDataSettingsIosReadTitle => 'iOS 健康读取';
+
+  @override
+  String get healthDataSettingsIosReadSubtitle => '设备可用，读取范围由 iOS 管理';
+
+  @override
+  String get healthDataSettingsOpenSystemSettings => '打开系统设置';
+
+  @override
+  String get healthDataSettingsEnableAll => '全部开启';
+
+  @override
+  String get healthDataSettingsDisableAll => '全部关闭';
+
+  @override
+  String get healthDataSettingsCategoryActivity => '活动';
+
+  @override
+  String get healthDataSettingsCategoryRest => '休息';
+
+  @override
+  String get healthDataSettingsCategoryHeart => '心率';
+
+  @override
+  String get healthDataSettingsCategoryBody => '身体';
+
+  @override
+  String get healthDataSettingsTypeStepsTitle => '步数';
+
+  @override
+  String get healthDataSettingsTypeStepsSubtitle => '行走步数摘要';
+
+  @override
+  String get healthDataSettingsTypeDaylightTitle => '日照';
+
+  @override
+  String get healthDataSettingsTypeDaylightSubtitle => '户外日光时间';
+
+  @override
+  String get healthDataSettingsTypeActiveEnergyTitle => '能量';
+
+  @override
+  String get healthDataSettingsTypeActiveEnergySubtitle => '活动能量消耗';
+
+  @override
+  String get healthDataSettingsTypeExerciseMinutesTitle => '锻炼';
+
+  @override
+  String get healthDataSettingsTypeExerciseMinutesSubtitle => 'Apple 锻炼分钟数';
+
+  @override
+  String get healthDataSettingsTypeStandTimeTitle => '站立';
+
+  @override
+  String get healthDataSettingsTypeStandTimeSubtitle => '站立时间';
+
+  @override
+  String get healthDataSettingsTypeDistanceTitle => '距离';
+
+  @override
+  String get healthDataSettingsTypeDistanceSubtitle => '步行和跑步距离';
+
+  @override
+  String get healthDataSettingsTypeWorkoutsTitle => '健身训练';
+
+  @override
+  String get healthDataSettingsTypeWorkoutsSubtitle => '训练记录：类型、时长、距离与消耗';
+
+  @override
+  String get healthDataSettingsTypeSleepTitle => '睡眠';
+
+  @override
+  String get healthDataSettingsTypeSleepSubtitle => '睡眠时长';
+
+  @override
+  String get healthDataSettingsTypeMindfulnessTitle => '静息';
+
+  @override
+  String get healthDataSettingsTypeMindfulnessSubtitle => '正念或静息时段';
+
+  @override
+  String get healthDataSettingsTypeHeartRateTitle => '心率';
+
+  @override
+  String get healthDataSettingsTypeHeartRateSubtitle => '最近心率样本';
+
+  @override
+  String get healthDataSettingsTypeRestingHeartRateTitle => '静息心率';
+
+  @override
+  String get healthDataSettingsTypeRestingHeartRateSubtitle => '静息状态心率';
+
+  @override
+  String get healthDataSettingsTypeBloodOxygenTitle => '血氧';
+
+  @override
+  String get healthDataSettingsTypeBloodOxygenSubtitle => '血氧饱和度';
+
+  @override
+  String get healthDataSettingsTypeDietaryEnergyTitle => '摄入能量';
+
+  @override
+  String get healthDataSettingsTypeDietaryEnergySubtitle => '饮食热量记录';
+
+  @override
+  String get healthDataSettingsTypeWaterTitle => '饮水';
+
+  @override
+  String get healthDataSettingsTypeWaterSubtitle => '饮水量记录';
+
+  @override
+  String get healthDataSettingsTypeWeightTitle => '体重';
+
+  @override
+  String get healthDataSettingsTypeWeightSubtitle => '体重样本';
+
+  @override
+  String get healthDataSettingsTypeBmiTitle => 'BMI';
+
+  @override
+  String get healthDataSettingsTypeBmiSubtitle => '身体质量指数';
+
+  @override
+  String get healthDataSettingsTypeBloodGlucoseTitle => '血糖';
+
+  @override
+  String get healthDataSettingsTypeBloodGlucoseSubtitle => '血糖样本';
+
+  @override
   String get assistantEditLocalToolRemindersQueryTitle => '查询提醒';
 
   @override
@@ -14098,6 +14244,152 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   @override
   String get assistantEditLocalToolHealthSubtitle =>
       '读取本设备的健康活动摘要，需要授予健康数据读取权限。';
+
+  @override
+  String assistantEditLocalToolHealthSelectedCount(int selected, int total) {
+    return '已选择 $selected/$total 项';
+  }
+
+  @override
+  String get healthDataSettingsTitle => '健康数据';
+
+  @override
+  String get healthDataSettingsDescription =>
+      '当前助手在日常对话中可使用的 HealthKit 信号。开关表示 Kelivo 可以尝试读取该范围，实际授权仍由 iOS 管理。';
+
+  @override
+  String healthDataSettingsBadge(int selected, int total) {
+    return '$selected/$total 开启';
+  }
+
+  @override
+  String get healthDataSettingsIosReadTitle => 'iOS 健康读取';
+
+  @override
+  String get healthDataSettingsIosReadSubtitle => '设备可用，读取范围由 iOS 管理';
+
+  @override
+  String get healthDataSettingsOpenSystemSettings => '打开系统设置';
+
+  @override
+  String get healthDataSettingsEnableAll => '全部开启';
+
+  @override
+  String get healthDataSettingsDisableAll => '全部关闭';
+
+  @override
+  String get healthDataSettingsCategoryActivity => '活动';
+
+  @override
+  String get healthDataSettingsCategoryRest => '休息';
+
+  @override
+  String get healthDataSettingsCategoryHeart => '心率';
+
+  @override
+  String get healthDataSettingsCategoryBody => '身体';
+
+  @override
+  String get healthDataSettingsTypeStepsTitle => '步数';
+
+  @override
+  String get healthDataSettingsTypeStepsSubtitle => '行走步数摘要';
+
+  @override
+  String get healthDataSettingsTypeDaylightTitle => '日照';
+
+  @override
+  String get healthDataSettingsTypeDaylightSubtitle => '户外日光时间';
+
+  @override
+  String get healthDataSettingsTypeActiveEnergyTitle => '能量';
+
+  @override
+  String get healthDataSettingsTypeActiveEnergySubtitle => '活动能量消耗';
+
+  @override
+  String get healthDataSettingsTypeExerciseMinutesTitle => '锻炼';
+
+  @override
+  String get healthDataSettingsTypeExerciseMinutesSubtitle => 'Apple 锻炼分钟数';
+
+  @override
+  String get healthDataSettingsTypeStandTimeTitle => '站立';
+
+  @override
+  String get healthDataSettingsTypeStandTimeSubtitle => '站立时间';
+
+  @override
+  String get healthDataSettingsTypeDistanceTitle => '距离';
+
+  @override
+  String get healthDataSettingsTypeDistanceSubtitle => '步行和跑步距离';
+
+  @override
+  String get healthDataSettingsTypeWorkoutsTitle => '健身训练';
+
+  @override
+  String get healthDataSettingsTypeWorkoutsSubtitle => '训练记录：类型、时长、距离与消耗';
+
+  @override
+  String get healthDataSettingsTypeSleepTitle => '睡眠';
+
+  @override
+  String get healthDataSettingsTypeSleepSubtitle => '睡眠时长';
+
+  @override
+  String get healthDataSettingsTypeMindfulnessTitle => '静息';
+
+  @override
+  String get healthDataSettingsTypeMindfulnessSubtitle => '正念或静息时段';
+
+  @override
+  String get healthDataSettingsTypeHeartRateTitle => '心率';
+
+  @override
+  String get healthDataSettingsTypeHeartRateSubtitle => '最近心率样本';
+
+  @override
+  String get healthDataSettingsTypeRestingHeartRateTitle => '静息心率';
+
+  @override
+  String get healthDataSettingsTypeRestingHeartRateSubtitle => '静息状态心率';
+
+  @override
+  String get healthDataSettingsTypeBloodOxygenTitle => '血氧';
+
+  @override
+  String get healthDataSettingsTypeBloodOxygenSubtitle => '血氧饱和度';
+
+  @override
+  String get healthDataSettingsTypeDietaryEnergyTitle => '摄入能量';
+
+  @override
+  String get healthDataSettingsTypeDietaryEnergySubtitle => '饮食热量记录';
+
+  @override
+  String get healthDataSettingsTypeWaterTitle => '饮水';
+
+  @override
+  String get healthDataSettingsTypeWaterSubtitle => '饮水量记录';
+
+  @override
+  String get healthDataSettingsTypeWeightTitle => '体重';
+
+  @override
+  String get healthDataSettingsTypeWeightSubtitle => '体重样本';
+
+  @override
+  String get healthDataSettingsTypeBmiTitle => 'BMI';
+
+  @override
+  String get healthDataSettingsTypeBmiSubtitle => '身体质量指数';
+
+  @override
+  String get healthDataSettingsTypeBloodGlucoseTitle => '血糖';
+
+  @override
+  String get healthDataSettingsTypeBloodGlucoseSubtitle => '血糖样本';
 
   @override
   String get assistantEditLocalToolRemindersQueryTitle => '查询提醒';
@@ -22432,6 +22724,152 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   @override
   String get assistantEditLocalToolHealthSubtitle =>
       '讀取本裝置的健康活動摘要，需要授予健康資料讀取權限。';
+
+  @override
+  String assistantEditLocalToolHealthSelectedCount(int selected, int total) {
+    return '已選擇 $selected/$total 項';
+  }
+
+  @override
+  String get healthDataSettingsTitle => '健康資料';
+
+  @override
+  String get healthDataSettingsDescription =>
+      '目前助手在日常對話中可使用的 HealthKit 訊號。開關表示 Kelivo 可以嘗試讀取該範圍，實際授權仍由 iOS 管理。';
+
+  @override
+  String healthDataSettingsBadge(int selected, int total) {
+    return '$selected/$total 開啟';
+  }
+
+  @override
+  String get healthDataSettingsIosReadTitle => 'iOS 健康讀取';
+
+  @override
+  String get healthDataSettingsIosReadSubtitle => '裝置可用，讀取範圍由 iOS 管理';
+
+  @override
+  String get healthDataSettingsOpenSystemSettings => '開啟系統設定';
+
+  @override
+  String get healthDataSettingsEnableAll => '全部開啟';
+
+  @override
+  String get healthDataSettingsDisableAll => '全部關閉';
+
+  @override
+  String get healthDataSettingsCategoryActivity => '活動';
+
+  @override
+  String get healthDataSettingsCategoryRest => '休息';
+
+  @override
+  String get healthDataSettingsCategoryHeart => '心率';
+
+  @override
+  String get healthDataSettingsCategoryBody => '身體';
+
+  @override
+  String get healthDataSettingsTypeStepsTitle => '步數';
+
+  @override
+  String get healthDataSettingsTypeStepsSubtitle => '行走步數摘要';
+
+  @override
+  String get healthDataSettingsTypeDaylightTitle => '日照';
+
+  @override
+  String get healthDataSettingsTypeDaylightSubtitle => '戶外日光時間';
+
+  @override
+  String get healthDataSettingsTypeActiveEnergyTitle => '能量';
+
+  @override
+  String get healthDataSettingsTypeActiveEnergySubtitle => '活動能量消耗';
+
+  @override
+  String get healthDataSettingsTypeExerciseMinutesTitle => '鍛鍊';
+
+  @override
+  String get healthDataSettingsTypeExerciseMinutesSubtitle => 'Apple 鍛鍊分鐘數';
+
+  @override
+  String get healthDataSettingsTypeStandTimeTitle => '站立';
+
+  @override
+  String get healthDataSettingsTypeStandTimeSubtitle => '站立時間';
+
+  @override
+  String get healthDataSettingsTypeDistanceTitle => '距離';
+
+  @override
+  String get healthDataSettingsTypeDistanceSubtitle => '步行和跑步距離';
+
+  @override
+  String get healthDataSettingsTypeWorkoutsTitle => '健身訓練';
+
+  @override
+  String get healthDataSettingsTypeWorkoutsSubtitle => '訓練紀錄：類型、時長、距離與消耗';
+
+  @override
+  String get healthDataSettingsTypeSleepTitle => '睡眠';
+
+  @override
+  String get healthDataSettingsTypeSleepSubtitle => '睡眠時長';
+
+  @override
+  String get healthDataSettingsTypeMindfulnessTitle => '靜息';
+
+  @override
+  String get healthDataSettingsTypeMindfulnessSubtitle => '正念或靜息時段';
+
+  @override
+  String get healthDataSettingsTypeHeartRateTitle => '心率';
+
+  @override
+  String get healthDataSettingsTypeHeartRateSubtitle => '最近心率樣本';
+
+  @override
+  String get healthDataSettingsTypeRestingHeartRateTitle => '靜息心率';
+
+  @override
+  String get healthDataSettingsTypeRestingHeartRateSubtitle => '靜息狀態心率';
+
+  @override
+  String get healthDataSettingsTypeBloodOxygenTitle => '血氧';
+
+  @override
+  String get healthDataSettingsTypeBloodOxygenSubtitle => '血氧飽和度';
+
+  @override
+  String get healthDataSettingsTypeDietaryEnergyTitle => '攝入能量';
+
+  @override
+  String get healthDataSettingsTypeDietaryEnergySubtitle => '飲食熱量紀錄';
+
+  @override
+  String get healthDataSettingsTypeWaterTitle => '飲水';
+
+  @override
+  String get healthDataSettingsTypeWaterSubtitle => '飲水量紀錄';
+
+  @override
+  String get healthDataSettingsTypeWeightTitle => '體重';
+
+  @override
+  String get healthDataSettingsTypeWeightSubtitle => '體重樣本';
+
+  @override
+  String get healthDataSettingsTypeBmiTitle => 'BMI';
+
+  @override
+  String get healthDataSettingsTypeBmiSubtitle => '身體質量指數';
+
+  @override
+  String get healthDataSettingsTypeBloodGlucoseTitle => '血糖';
+
+  @override
+  String get healthDataSettingsTypeBloodGlucoseSubtitle => '血糖樣本';
 
   @override
   String get assistantEditLocalToolRemindersQueryTitle => '查詢提醒';

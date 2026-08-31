@@ -133,13 +133,25 @@ class _LocalToolsTab extends StatelessWidget {
 
       if (toolId == LocalToolNames.healthSummary &&
           DeviceLocalTools.healthSupported) {
-        final requested = await DeviceLocalTools.requestHealthPermission();
-        if (!requested) {
-          // HealthKit does not reveal per-type read grants; only skip
-          // enable when the request API itself failed.
+        if (!value) {
+          await updateTool(toolId, false);
           return;
         }
-        await updateTool(toolId, true);
+        var next = HealthDataSelection.setMasterEnabled(
+          assistant,
+          enabled: true,
+          availableIds: DeviceLocalTools.availableHealthTypeIds,
+        );
+        final types = HealthDataSelection.queryTypes(
+          next,
+          availableIds: DeviceLocalTools.availableHealthTypeIds,
+        );
+        final requested = await DeviceLocalTools.requestHealthPermission(
+          types: types,
+        );
+        if (!requested) return;
+        if (!context.mounted) return;
+        await context.read<AssistantProvider>().updateAssistant(next);
         return;
       }
 
@@ -296,13 +308,22 @@ class _LocalToolsTab extends StatelessWidget {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       _iosDivider(context),
-                      _LocalToolRow(
-                        icon: Lucide.HeartPulse,
+                      _HealthToolRow(
                         title: l10n.assistantEditLocalToolHealthTitle,
                         subtitle: l10n.assistantEditLocalToolHealthSubtitle,
+                        selectedSummary: l10n
+                            .assistantEditLocalToolHealthSelectedCount(
+                              HealthDataTypeIds.intersectAvailable(
+                                assistant.healthDataTypeIds,
+                                DeviceLocalTools.availableHealthTypeIds,
+                              ).length,
+                              DeviceLocalTools.availableHealthTypeIds.length,
+                            ),
                         enabled: healthEnabled,
                         onChanged: (value) =>
                             toggleTool(LocalToolNames.healthSummary, value),
+                        onOpenSettings: () =>
+                            HealthDataSettingsPage.open(context, assistantId),
                       ),
                     ],
                   );
@@ -391,6 +412,111 @@ class _LocalToolRow extends StatelessWidget {
           },
         );
       },
+    );
+  }
+}
+
+class _HealthToolRow extends StatelessWidget {
+  const _HealthToolRow({
+    required this.title,
+    required this.subtitle,
+    required this.selectedSummary,
+    required this.enabled,
+    required this.onChanged,
+    required this.onOpenSettings,
+  });
+
+  final String title;
+  final String subtitle;
+  final String selectedSummary;
+  final bool enabled;
+  final ValueChanged<bool> onChanged;
+  final VoidCallback onOpenSettings;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          Expanded(
+            child: _TactileRow(
+              onTap: onOpenSettings,
+              builder: (pressed) {
+                final baseColor = cs.onSurface.withValues(alpha: 0.9);
+                return _AnimatedPressColor(
+                  pressed: pressed,
+                  base: baseColor,
+                  builder: (color) {
+                    return Row(
+                      children: [
+                        SizedBox(
+                          width: 36,
+                          child: Icon(
+                            Lucide.HeartPulse,
+                            size: 20,
+                            color: enabled ? cs.primary : color,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                title,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  fontSize: 15,
+                                  color: color,
+                                  fontWeight: AppFontWeights.semibold,
+                                ),
+                              ),
+                              const SizedBox(height: 3),
+                              Text(
+                                subtitle,
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  height: 1.25,
+                                  color: cs.onSurface.withValues(alpha: 0.62),
+                                ),
+                              ),
+                              const SizedBox(height: 3),
+                              Text(
+                                selectedSummary,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  height: 1.25,
+                                  color: cs.primary.withValues(alpha: 0.85),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Icon(
+                          Lucide.ChevronRight,
+                          size: 16,
+                          color: cs.onSurface.withValues(alpha: 0.35),
+                        ),
+                      ],
+                    );
+                  },
+                );
+              },
+            ),
+          ),
+          const SizedBox(width: 8),
+          IosSwitch(value: enabled, onChanged: onChanged),
+        ],
+      ),
     );
   }
 }

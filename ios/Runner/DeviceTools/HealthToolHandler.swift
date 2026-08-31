@@ -5,6 +5,7 @@ import HealthKit
 ///
 /// Read authorization cannot be distinguished from "no samples" on iOS, so
 /// missing metrics are returned as `{ "status": "unavailable" }` rather than 0.
+/// Only collaborator-selected type IDs are authorized and queried.
 final class HealthToolHandler {
   private let store = HKHealthStore()
 
@@ -12,9 +13,16 @@ final class HealthToolHandler {
     HKHealthStore.isHealthDataAvailable()
   }
 
-  /// Settings toggle: presents the Health read sheet. The completion flag is
-  /// only "the sheet finished"; iOS does not reveal per-type read grants.
-  func requestPermission(completion: @escaping (Bool) -> Void) {
+  func availableTypeIds() -> [String] {
+    HealthMetric.allCases.compactMap { metric in
+      metric.objectType == nil ? nil : metric.rawValue
+    }
+  }
+
+  /// Settings toggle: presents the Health read sheet for [types] only.
+  /// The completion flag is only "the sheet finished"; iOS does not reveal
+  /// per-type read grants.
+  func requestPermission(types: [String], completion: @escaping (Bool) -> Void) {
     DeviceToolsSupport.finishOnMain { [weak self] in
       guard let self else {
         completion(false)
@@ -24,7 +32,12 @@ final class HealthToolHandler {
         completion(false)
         return
       }
-      self.store.requestAuthorization(toShare: [], read: self.readTypes) { success, _ in
+      let readTypes = self.objectTypes(for: types)
+      guard !readTypes.isEmpty else {
+        completion(true)
+        return
+      }
+      self.store.requestAuthorization(toShare: [], read: readTypes) { success, _ in
         DeviceToolsSupport.finishOnMain { completion(success) }
       }
     }
@@ -41,34 +54,33 @@ final class HealthToolHandler {
       return
     }
 
-    store.requestAuthorization(toShare: [], read: readTypes) { [weak self] _, _ in
+    let ids = DeviceToolsSupport.stringListArg(args["types"]).filter { objectType(for: $0) != nil }
+    guard !ids.isEmpty else {
+      completion(
+        DeviceToolsSupport.errorPayload(
+          "NO_TYPES",
+          "No health data types are enabled for this assistant."
+        )
+      )
+      return
+    }
+
+    store.requestAuthorization(toShare: [], read: objectTypes(for: ids)) { [weak self] _, _ in
       guard let self else { return }
-      self.buildSummary(completion: completion)
+      self.buildSummary(ids: ids, completion: completion)
     }
   }
 
-  private var readTypes: Set<HKObjectType> {
-    var types = Set<HKObjectType>()
-    if let steps = HKObjectType.quantityType(forIdentifier: .stepCount) {
-      types.insert(steps)
-    }
-    if let energy = HKObjectType.quantityType(forIdentifier: .activeEnergyBurned) {
-      types.insert(energy)
-    }
-    if let distance = HKObjectType.quantityType(forIdentifier: .distanceWalkingRunning) {
-      types.insert(distance)
-    }
-    if let heart = HKObjectType.quantityType(forIdentifier: .heartRate) {
-      types.insert(heart)
-    }
-    if let sleep = HKObjectType.categoryType(forIdentifier: .sleepAnalysis) {
-      types.insert(sleep)
-    }
-    types.insert(HKObjectType.workoutType())
-    return types
+  private func objectTypes(for ids: [String]) -> Set<HKObjectType> {
+    Set(ids.compactMap { objectType(for: $0) })
   }
 
-  private func buildSummary(completion: @escaping (String) -> Void) {
+  private func objectType(for id: String) -> HKObjectType? {
+    guard let metric = HealthMetric(rawValue: id) else { return nil }
+    return metric.objectType
+  }
+
+  private func buildSummary(ids: [String], completion: @escaping (String) -> Void) {
     let calendar = DeviceToolsSupport.isoCalendar()
     let now = Date()
     let startOfToday = calendar.startOfDay(for: now)
@@ -77,66 +89,185 @@ final class HealthToolHandler {
     let lastNightEnd = calendar.date(byAdding: .hour, value: 12, to: startOfToday) ?? now
     let workoutLookback = calendar.date(byAdding: .day, value: -14, to: now) ?? now
     let updatedAt = DeviceToolsSupport.formatDateTime(now)
+    let selected = Set(ids)
 
     let group = DispatchGroup()
-    var steps: [String: Any] = Self.unavailable(startOfToday, now)
-    var energy: [String: Any] = Self.unavailable(startOfToday, now)
-    var distance: [String: Any] = Self.unavailable(startOfToday, now)
-    var sleep: [String: Any] = Self.unavailable(lastNightStart, lastNightEnd)
-    var heartRate: [String: Any] = ["status": "unavailable"]
-    var workouts: [String: Any] = ["status": "unavailable"]
+    var metrics: [String: Any] = [:]
+    let lock = NSLock()
 
-    if let type = HKQuantityType.quantityType(forIdentifier: .stepCount) {
+    func put(_ key: String, _ value: [String: Any]) {
+      lock.lock()
+      metrics[key] = value
+      lock.unlock()
+    }
+
+    if selected.contains(HealthMetric.steps.rawValue),
+       let type = HKQuantityType.quantityType(forIdentifier: .stepCount) {
       group.enter()
       querySum(type: type, unit: .count(), start: startOfToday, end: now) { metric in
-        steps = metric
+        put("steps", metric)
         group.leave()
       }
     }
-    if let type = HKQuantityType.quantityType(forIdentifier: .activeEnergyBurned) {
+    if selected.contains(HealthMetric.daylight.rawValue) {
+      group.enter()
+      queryDaylight(start: startOfToday, end: now) { metric in
+        put("time_in_daylight_minutes", metric)
+        group.leave()
+      }
+    }
+    if selected.contains(HealthMetric.activeEnergy.rawValue),
+       let type = HKQuantityType.quantityType(forIdentifier: .activeEnergyBurned) {
       group.enter()
       querySum(type: type, unit: .kilocalorie(), start: startOfToday, end: now) { metric in
-        energy = metric
+        put("active_energy_kcal", metric)
         group.leave()
       }
     }
-    if let type = HKQuantityType.quantityType(forIdentifier: .distanceWalkingRunning) {
+    if selected.contains(HealthMetric.exerciseMinutes.rawValue),
+       let type = HKQuantityType.quantityType(forIdentifier: .appleExerciseTime) {
+      group.enter()
+      querySum(type: type, unit: .minute(), start: startOfToday, end: now) { metric in
+        put("exercise_minutes", metric)
+        group.leave()
+      }
+    }
+    if selected.contains(HealthMetric.standTime.rawValue),
+       let type = HKQuantityType.quantityType(forIdentifier: .appleStandTime) {
+      group.enter()
+      querySum(type: type, unit: .minute(), start: startOfToday, end: now) { metric in
+        put("stand_minutes", metric)
+        group.leave()
+      }
+    }
+    if selected.contains(HealthMetric.distance.rawValue),
+       let type = HKQuantityType.quantityType(forIdentifier: .distanceWalkingRunning) {
       group.enter()
       querySum(type: type, unit: .meter(), start: startOfToday, end: now) { metric in
-        distance = metric
+        put("walking_running_distance_m", metric)
         group.leave()
       }
     }
-    group.enter()
-    querySleep(start: lastNightStart, end: lastNightEnd) { metric in
-      sleep = metric
-      group.leave()
+    if selected.contains(HealthMetric.workouts.rawValue) {
+      group.enter()
+      queryWorkouts(start: workoutLookback, end: now, limit: 5) { metric in
+        put("workouts", metric)
+        group.leave()
+      }
     }
-    group.enter()
-    queryLatestHeartRate { metric in
-      heartRate = metric
-      group.leave()
+    if selected.contains(HealthMetric.sleep.rawValue) {
+      group.enter()
+      querySleep(start: lastNightStart, end: lastNightEnd) { metric in
+        put("sleep_last_night", metric)
+        group.leave()
+      }
     }
-    group.enter()
-    queryWorkouts(start: workoutLookback, end: now, limit: 5) { metric in
-      workouts = metric
-      group.leave()
+    if selected.contains(HealthMetric.mindfulness.rawValue) {
+      group.enter()
+      queryMindfulness(start: startOfToday, end: now) { metric in
+        put("mindfulness", metric)
+        group.leave()
+      }
+    }
+    if selected.contains(HealthMetric.heartRate.rawValue) {
+      group.enter()
+      queryLatestHeartRate { metric in
+        put("heart_rate", metric)
+        group.leave()
+      }
+    }
+    if selected.contains(HealthMetric.restingHeartRate.rawValue) {
+      group.enter()
+      queryLatestQuantity(
+        identifier: .restingHeartRate,
+        unit: HKUnit.count().unitDivided(by: .minute()),
+        valueKey: "bpm"
+      ) { metric in
+        put("resting_heart_rate", metric)
+        group.leave()
+      }
+    }
+    if selected.contains(HealthMetric.bloodOxygen.rawValue) {
+      group.enter()
+      queryLatestQuantity(
+        identifier: .oxygenSaturation,
+        unit: .percent(),
+        valueKey: "percent",
+        scale: 100
+      ) { metric in
+        put("blood_oxygen", metric)
+        group.leave()
+      }
+    }
+    if selected.contains(HealthMetric.dietaryEnergy.rawValue),
+       let type = HKQuantityType.quantityType(forIdentifier: .dietaryEnergyConsumed) {
+      group.enter()
+      querySum(type: type, unit: .kilocalorie(), start: startOfToday, end: now) { metric in
+        put("dietary_energy_kcal", metric)
+        group.leave()
+      }
+    }
+    if selected.contains(HealthMetric.water.rawValue),
+       let type = HKQuantityType.quantityType(forIdentifier: .dietaryWater) {
+      group.enter()
+      querySum(
+        type: type,
+        unit: HKUnit.literUnit(with: .milli),
+        start: startOfToday,
+        end: now
+      ) { metric in
+        put("water_ml", metric)
+        group.leave()
+      }
+    }
+    if selected.contains(HealthMetric.weight.rawValue) {
+      group.enter()
+      queryLatestQuantity(
+        identifier: .bodyMass,
+        unit: .gramUnit(with: .kilo),
+        valueKey: "kg"
+      ) { metric in
+        put("body_weight_kg", metric)
+        group.leave()
+      }
+    }
+    if selected.contains(HealthMetric.bmi.rawValue) {
+      group.enter()
+      queryLatestQuantity(
+        identifier: .bodyMassIndex,
+        unit: .count(),
+        valueKey: "value"
+      ) { metric in
+        put("bmi", metric)
+        group.leave()
+      }
+    }
+    if selected.contains(HealthMetric.bloodGlucose.rawValue) {
+      group.enter()
+      queryLatestQuantity(
+        identifier: .bloodGlucose,
+        unit: HKUnit.gramUnit(with: .milli).unitDivided(by: HKUnit.literUnit(with: .deci)),
+        valueKey: "mg_dl"
+      ) { metric in
+        put("blood_glucose_mg_dl", metric)
+        group.leave()
+      }
     }
 
     group.notify(queue: .global(qos: .userInitiated)) {
-      let payload: [String: Any] = [
+      lock.lock()
+      let snapshot = metrics
+      lock.unlock()
+      var payload: [String: Any] = [
         "updated_at": updatedAt,
         "interval": [
           "start": DeviceToolsSupport.formatDateTime(startOfToday),
           "end": DeviceToolsSupport.formatDateTime(now),
         ],
-        "steps": steps,
-        "active_energy_kcal": energy,
-        "walking_running_distance_m": distance,
-        "sleep_last_night": sleep,
-        "heart_rate": heartRate,
-        "workouts": workouts,
       ]
+      for (key, value) in snapshot {
+        payload[key] = value
+      }
       DeviceToolsSupport.finishOnMain {
         completion(DeviceToolsSupport.jsonString(payload))
       }
@@ -166,6 +297,18 @@ final class HealthToolHandler {
       completion(metric)
     }
     store.execute(query)
+  }
+
+  private func queryDaylight(start: Date, end: Date, completion: @escaping ([String: Any]) -> Void) {
+    if #available(iOS 17.0, *) {
+      guard let type = HKQuantityType.quantityType(forIdentifier: .timeInDaylight) else {
+        completion(Self.unavailable(start, end))
+        return
+      }
+      querySum(type: type, unit: .minute(), start: start, end: end, completion: completion)
+      return
+    }
+    completion(Self.unavailable(start, end))
   }
 
   private func querySleep(start: Date, end: Date, completion: @escaping ([String: Any]) -> Void) {
@@ -200,8 +343,54 @@ final class HealthToolHandler {
     store.execute(query)
   }
 
+  private func queryMindfulness(start: Date, end: Date, completion: @escaping ([String: Any]) -> Void) {
+    guard let type = HKObjectType.categoryType(forIdentifier: .mindfulSession) else {
+      completion(Self.unavailable(start, end))
+      return
+    }
+    let predicate = HKQuery.predicateForSamples(withStart: start, end: end)
+    let query = HKSampleQuery(
+      sampleType: type,
+      predicate: predicate,
+      limit: HKObjectQueryNoLimit,
+      sortDescriptors: nil
+    ) { _, samples, _ in
+      let categorySamples = samples as? [HKCategorySample] ?? []
+      let duration = categorySamples.reduce(0.0) { partial, sample in
+        let clippedStart = max(sample.startDate, start)
+        let clippedEnd = min(sample.endDate, end)
+        guard clippedStart < clippedEnd else { return partial }
+        return partial + clippedEnd.timeIntervalSince(clippedStart)
+      }
+      guard duration > 0 else {
+        completion(Self.unavailable(start, end))
+        return
+      }
+      var metric = Self.interval(start, end)
+      metric["status"] = "ok"
+      metric["duration_minutes"] = Int((duration / 60).rounded())
+      completion(metric)
+    }
+    store.execute(query)
+  }
+
   private func queryLatestHeartRate(completion: @escaping ([String: Any]) -> Void) {
-    guard let type = HKQuantityType.quantityType(forIdentifier: .heartRate) else {
+    queryLatestQuantity(
+      identifier: .heartRate,
+      unit: HKUnit.count().unitDivided(by: .minute()),
+      valueKey: "bpm",
+      completion: completion
+    )
+  }
+
+  private func queryLatestQuantity(
+    identifier: HKQuantityTypeIdentifier,
+    unit: HKUnit,
+    valueKey: String,
+    scale: Double = 1,
+    completion: @escaping ([String: Any]) -> Void
+  ) {
+    guard let type = HKQuantityType.quantityType(forIdentifier: identifier) else {
       completion(["status": "unavailable"])
       return
     }
@@ -215,10 +404,10 @@ final class HealthToolHandler {
         completion(["status": "unavailable"])
         return
       }
-      let bpm = sample.quantity.doubleValue(for: HKUnit.count().unitDivided(by: .minute()))
+      let raw = sample.quantity.doubleValue(for: unit) * scale
       completion([
         "status": "ok",
-        "bpm": (bpm * 10).rounded() / 10,
+        valueKey: (raw * 10).rounded() / 10,
         "measured_at": DeviceToolsSupport.formatDateTime(sample.endDate),
       ])
     }
@@ -351,4 +540,66 @@ final class HealthToolHandler {
     }
     return "other"
   }
+}
+
+private enum HealthMetric: String, CaseIterable {
+  case steps = "steps"
+  case daylight = "daylight"
+  case activeEnergy = "active_energy"
+  case exerciseMinutes = "exercise_minutes"
+  case standTime = "stand_time"
+  case distance = "distance"
+  case workouts = "workouts"
+  case sleep = "sleep"
+  case mindfulness = "mindfulness"
+  case heartRate = "heart_rate"
+  case restingHeartRate = "resting_heart_rate"
+  case bloodOxygen = "blood_oxygen"
+  case dietaryEnergy = "dietary_energy"
+  case water = "water"
+  case weight = "weight"
+  case bmi = "bmi"
+  case bloodGlucose = "blood_glucose"
+
+  var objectType: HKObjectType? {
+    switch self {
+    case .steps:
+      return HKObjectType.quantityType(forIdentifier: .stepCount)
+    case .daylight:
+      if #available(iOS 17.0, *) {
+        return HKObjectType.quantityType(forIdentifier: .timeInDaylight)
+      }
+      return nil
+    case .activeEnergy:
+      return HKObjectType.quantityType(forIdentifier: .activeEnergyBurned)
+    case .exerciseMinutes:
+      return HKObjectType.quantityType(forIdentifier: .appleExerciseTime)
+    case .standTime:
+      return HKObjectType.quantityType(forIdentifier: .appleStandTime)
+    case .distance:
+      return HKObjectType.quantityType(forIdentifier: .distanceWalkingRunning)
+    case .workouts:
+      return HKObjectType.workoutType()
+    case .sleep:
+      return HKObjectType.categoryType(forIdentifier: .sleepAnalysis)
+    case .mindfulness:
+      return HKObjectType.categoryType(forIdentifier: .mindfulSession)
+    case .heartRate:
+      return HKObjectType.quantityType(forIdentifier: .heartRate)
+    case .restingHeartRate:
+      return HKObjectType.quantityType(forIdentifier: .restingHeartRate)
+    case .bloodOxygen:
+      return HKObjectType.quantityType(forIdentifier: .oxygenSaturation)
+    case .dietaryEnergy:
+      return HKObjectType.quantityType(forIdentifier: .dietaryEnergyConsumed)
+    case .water:
+      return HKObjectType.quantityType(forIdentifier: .dietaryWater)
+    case .weight:
+      return HKObjectType.quantityType(forIdentifier: .bodyMass)
+    case .bmi:
+      return HKObjectType.quantityType(forIdentifier: .bodyMassIndex)
+    case .bloodGlucose:
+      return HKObjectType.quantityType(forIdentifier: .bloodGlucose)
+    }
+    }
 }

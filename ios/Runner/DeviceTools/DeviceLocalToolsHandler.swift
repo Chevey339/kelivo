@@ -107,10 +107,17 @@ final class DeviceLocalToolsHandler {
       }
     case "isHealthDataAvailable":
       result(healthHandler.isAvailable())
+    case "availableHealthTypes":
+      result(healthHandler.availableTypeIds())
     case "requestHealthPermission":
-      healthHandler.requestPermission { granted in result(granted) }
+      healthHandler.requestPermission(
+        types: DeviceToolsSupport.stringListArg(args["types"])
+      ) { granted in result(granted) }
     case "getHealthSummary":
       healthHandler.getHealthSummary(args: args) { payload in result(payload) }
+    case "openAppSettings":
+      DeviceToolsSupport.openAppSettings()
+      result(nil)
     default:
       result(FlutterMethodNotImplemented)
     }

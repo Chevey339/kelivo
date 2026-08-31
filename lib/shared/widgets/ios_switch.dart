@@ -172,8 +172,13 @@ class _IosSwitchState extends State<IosSwitch> {
   void _handleTap() {
     // Only vibrate if both widget-level and settings-level toggles allow,
     // global master switch is enforced within Haptics.* methods.
-    final sp = context.read<SettingsProvider>();
-    if (widget.enableHaptics && sp.hapticsIosSwitch) Haptics.soft();
+    if (widget.enableHaptics) {
+      var hapticsOn = false;
+      try {
+        hapticsOn = context.read<SettingsProvider>().hapticsIosSwitch;
+      } catch (_) {}
+      if (hapticsOn) Haptics.soft();
+    }
     widget.onChanged?.call(!widget.value);
   }
 }

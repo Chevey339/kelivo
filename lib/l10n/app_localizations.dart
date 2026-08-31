@@ -11125,6 +11125,288 @@ abstract class AppLocalizations {
   /// **'Read a privacy-preserving activity summary from Apple Health, requires Health access.'**
   String get assistantEditLocalToolHealthSubtitle;
 
+  /// No description provided for @assistantEditLocalToolHealthSelectedCount.
+  ///
+  /// In en, this message translates to:
+  /// **'{selected}/{total} selected'**
+  String assistantEditLocalToolHealthSelectedCount(int selected, int total);
+
+  /// No description provided for @healthDataSettingsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Health Data'**
+  String get healthDataSettingsTitle;
+
+  /// No description provided for @healthDataSettingsDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'HealthKit signals available to the current assistant in daily conversation. Switches control what Kelivo may try to read; iOS still manages actual Health access.'**
+  String get healthDataSettingsDescription;
+
+  /// No description provided for @healthDataSettingsBadge.
+  ///
+  /// In en, this message translates to:
+  /// **'{selected}/{total} on'**
+  String healthDataSettingsBadge(int selected, int total);
+
+  /// No description provided for @healthDataSettingsIosReadTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'iOS Health Read'**
+  String get healthDataSettingsIosReadTitle;
+
+  /// No description provided for @healthDataSettingsIosReadSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Device available, read range managed by iOS'**
+  String get healthDataSettingsIosReadSubtitle;
+
+  /// No description provided for @healthDataSettingsOpenSystemSettings.
+  ///
+  /// In en, this message translates to:
+  /// **'Open system settings'**
+  String get healthDataSettingsOpenSystemSettings;
+
+  /// No description provided for @healthDataSettingsEnableAll.
+  ///
+  /// In en, this message translates to:
+  /// **'Enable all'**
+  String get healthDataSettingsEnableAll;
+
+  /// No description provided for @healthDataSettingsDisableAll.
+  ///
+  /// In en, this message translates to:
+  /// **'Disable all'**
+  String get healthDataSettingsDisableAll;
+
+  /// No description provided for @healthDataSettingsCategoryActivity.
+  ///
+  /// In en, this message translates to:
+  /// **'Activity'**
+  String get healthDataSettingsCategoryActivity;
+
+  /// No description provided for @healthDataSettingsCategoryRest.
+  ///
+  /// In en, this message translates to:
+  /// **'Rest'**
+  String get healthDataSettingsCategoryRest;
+
+  /// No description provided for @healthDataSettingsCategoryHeart.
+  ///
+  /// In en, this message translates to:
+  /// **'Heart'**
+  String get healthDataSettingsCategoryHeart;
+
+  /// No description provided for @healthDataSettingsCategoryBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Body'**
+  String get healthDataSettingsCategoryBody;
+
+  /// No description provided for @healthDataSettingsTypeStepsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Steps'**
+  String get healthDataSettingsTypeStepsTitle;
+
+  /// No description provided for @healthDataSettingsTypeStepsSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Walking steps summary'**
+  String get healthDataSettingsTypeStepsSubtitle;
+
+  /// No description provided for @healthDataSettingsTypeDaylightTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Sunlight'**
+  String get healthDataSettingsTypeDaylightTitle;
+
+  /// No description provided for @healthDataSettingsTypeDaylightSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Outdoor daylight time'**
+  String get healthDataSettingsTypeDaylightSubtitle;
+
+  /// No description provided for @healthDataSettingsTypeActiveEnergyTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Energy'**
+  String get healthDataSettingsTypeActiveEnergyTitle;
+
+  /// No description provided for @healthDataSettingsTypeActiveEnergySubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Active energy burned'**
+  String get healthDataSettingsTypeActiveEnergySubtitle;
+
+  /// No description provided for @healthDataSettingsTypeExerciseMinutesTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Exercise'**
+  String get healthDataSettingsTypeExerciseMinutesTitle;
+
+  /// No description provided for @healthDataSettingsTypeExerciseMinutesSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Apple exercise minutes'**
+  String get healthDataSettingsTypeExerciseMinutesSubtitle;
+
+  /// No description provided for @healthDataSettingsTypeStandTimeTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Stand'**
+  String get healthDataSettingsTypeStandTimeTitle;
+
+  /// No description provided for @healthDataSettingsTypeStandTimeSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Stand time'**
+  String get healthDataSettingsTypeStandTimeSubtitle;
+
+  /// No description provided for @healthDataSettingsTypeDistanceTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Distance'**
+  String get healthDataSettingsTypeDistanceTitle;
+
+  /// No description provided for @healthDataSettingsTypeDistanceSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Walking and running distance'**
+  String get healthDataSettingsTypeDistanceSubtitle;
+
+  /// No description provided for @healthDataSettingsTypeWorkoutsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Workouts'**
+  String get healthDataSettingsTypeWorkoutsTitle;
+
+  /// No description provided for @healthDataSettingsTypeWorkoutsSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Workout records: type, duration, distance, and energy'**
+  String get healthDataSettingsTypeWorkoutsSubtitle;
+
+  /// No description provided for @healthDataSettingsTypeSleepTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Sleep'**
+  String get healthDataSettingsTypeSleepTitle;
+
+  /// No description provided for @healthDataSettingsTypeSleepSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Sleep duration last night'**
+  String get healthDataSettingsTypeSleepSubtitle;
+
+  /// No description provided for @healthDataSettingsTypeMindfulnessTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Resting'**
+  String get healthDataSettingsTypeMindfulnessTitle;
+
+  /// No description provided for @healthDataSettingsTypeMindfulnessSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Mindfulness or resting periods'**
+  String get healthDataSettingsTypeMindfulnessSubtitle;
+
+  /// No description provided for @healthDataSettingsTypeHeartRateTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Heart Rate'**
+  String get healthDataSettingsTypeHeartRateTitle;
+
+  /// No description provided for @healthDataSettingsTypeHeartRateSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Latest heart rate sample'**
+  String get healthDataSettingsTypeHeartRateSubtitle;
+
+  /// No description provided for @healthDataSettingsTypeRestingHeartRateTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Resting Heart Rate'**
+  String get healthDataSettingsTypeRestingHeartRateTitle;
+
+  /// No description provided for @healthDataSettingsTypeRestingHeartRateSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Resting heart rate sample'**
+  String get healthDataSettingsTypeRestingHeartRateSubtitle;
+
+  /// No description provided for @healthDataSettingsTypeBloodOxygenTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Blood Oxygen'**
+  String get healthDataSettingsTypeBloodOxygenTitle;
+
+  /// No description provided for @healthDataSettingsTypeBloodOxygenSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Blood oxygen saturation'**
+  String get healthDataSettingsTypeBloodOxygenSubtitle;
+
+  /// No description provided for @healthDataSettingsTypeDietaryEnergyTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Dietary Energy'**
+  String get healthDataSettingsTypeDietaryEnergyTitle;
+
+  /// No description provided for @healthDataSettingsTypeDietaryEnergySubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Dietary calorie record'**
+  String get healthDataSettingsTypeDietaryEnergySubtitle;
+
+  /// No description provided for @healthDataSettingsTypeWaterTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Water'**
+  String get healthDataSettingsTypeWaterTitle;
+
+  /// No description provided for @healthDataSettingsTypeWaterSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Water intake record'**
+  String get healthDataSettingsTypeWaterSubtitle;
+
+  /// No description provided for @healthDataSettingsTypeWeightTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Weight'**
+  String get healthDataSettingsTypeWeightTitle;
+
+  /// No description provided for @healthDataSettingsTypeWeightSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Body weight sample'**
+  String get healthDataSettingsTypeWeightSubtitle;
+
+  /// No description provided for @healthDataSettingsTypeBmiTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'BMI'**
+  String get healthDataSettingsTypeBmiTitle;
+
+  /// No description provided for @healthDataSettingsTypeBmiSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Body mass index'**
+  String get healthDataSettingsTypeBmiSubtitle;
+
+  /// No description provided for @healthDataSettingsTypeBloodGlucoseTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Blood Glucose'**
+  String get healthDataSettingsTypeBloodGlucoseTitle;
+
+  /// No description provided for @healthDataSettingsTypeBloodGlucoseSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Blood glucose sample'**
+  String get healthDataSettingsTypeBloodGlucoseSubtitle;
+
   /// No description provided for @assistantEditLocalToolRemindersQueryTitle.
   ///
   /// In en, this message translates to:

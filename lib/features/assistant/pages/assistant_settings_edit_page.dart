@@ -44,7 +44,9 @@ import '../../../core/services/haptics.dart';
 import '../../../desktop/desktop_context_menu.dart';
 import '../../../desktop/setting/memory_dialogs.dart';
 import '../../../desktop/widgets/desktop_select_dropdown.dart';
+import '../../home/services/health_data_selection.dart';
 import '../../home/services/local_tools_service.dart';
+import '../../../core/models/health_data_type.dart';
 import '../../../icons/lucide_adapter.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../shared/widgets/emoji_picker_dialog.dart';
@@ -61,6 +63,7 @@ import '../../../utils/platform_utils.dart';
 import '../../../utils/sandbox_path_resolver.dart';
 import '../utils/assistant_edit_tab_layout.dart';
 import 'assistant_regex_tab.dart';
+import 'health_data_settings_page.dart';
 import 'package:Kelivo/theme/app_semantic_colors.dart';
 import 'package:Kelivo/shared/widgets/section_card.dart';
 

@@ -6075,6 +6075,164 @@ class AppLocalizationsEn extends AppLocalizations {
       'Read a privacy-preserving activity summary from Apple Health, requires Health access.';
 
   @override
+  String assistantEditLocalToolHealthSelectedCount(int selected, int total) {
+    return '$selected/$total selected';
+  }
+
+  @override
+  String get healthDataSettingsTitle => 'Health Data';
+
+  @override
+  String get healthDataSettingsDescription =>
+      'HealthKit signals available to the current assistant in daily conversation. Switches control what Kelivo may try to read; iOS still manages actual Health access.';
+
+  @override
+  String healthDataSettingsBadge(int selected, int total) {
+    return '$selected/$total on';
+  }
+
+  @override
+  String get healthDataSettingsIosReadTitle => 'iOS Health Read';
+
+  @override
+  String get healthDataSettingsIosReadSubtitle =>
+      'Device available, read range managed by iOS';
+
+  @override
+  String get healthDataSettingsOpenSystemSettings => 'Open system settings';
+
+  @override
+  String get healthDataSettingsEnableAll => 'Enable all';
+
+  @override
+  String get healthDataSettingsDisableAll => 'Disable all';
+
+  @override
+  String get healthDataSettingsCategoryActivity => 'Activity';
+
+  @override
+  String get healthDataSettingsCategoryRest => 'Rest';
+
+  @override
+  String get healthDataSettingsCategoryHeart => 'Heart';
+
+  @override
+  String get healthDataSettingsCategoryBody => 'Body';
+
+  @override
+  String get healthDataSettingsTypeStepsTitle => 'Steps';
+
+  @override
+  String get healthDataSettingsTypeStepsSubtitle => 'Walking steps summary';
+
+  @override
+  String get healthDataSettingsTypeDaylightTitle => 'Sunlight';
+
+  @override
+  String get healthDataSettingsTypeDaylightSubtitle => 'Outdoor daylight time';
+
+  @override
+  String get healthDataSettingsTypeActiveEnergyTitle => 'Energy';
+
+  @override
+  String get healthDataSettingsTypeActiveEnergySubtitle =>
+      'Active energy burned';
+
+  @override
+  String get healthDataSettingsTypeExerciseMinutesTitle => 'Exercise';
+
+  @override
+  String get healthDataSettingsTypeExerciseMinutesSubtitle =>
+      'Apple exercise minutes';
+
+  @override
+  String get healthDataSettingsTypeStandTimeTitle => 'Stand';
+
+  @override
+  String get healthDataSettingsTypeStandTimeSubtitle => 'Stand time';
+
+  @override
+  String get healthDataSettingsTypeDistanceTitle => 'Distance';
+
+  @override
+  String get healthDataSettingsTypeDistanceSubtitle =>
+      'Walking and running distance';
+
+  @override
+  String get healthDataSettingsTypeWorkoutsTitle => 'Workouts';
+
+  @override
+  String get healthDataSettingsTypeWorkoutsSubtitle =>
+      'Workout records: type, duration, distance, and energy';
+
+  @override
+  String get healthDataSettingsTypeSleepTitle => 'Sleep';
+
+  @override
+  String get healthDataSettingsTypeSleepSubtitle => 'Sleep duration last night';
+
+  @override
+  String get healthDataSettingsTypeMindfulnessTitle => 'Resting';
+
+  @override
+  String get healthDataSettingsTypeMindfulnessSubtitle =>
+      'Mindfulness or resting periods';
+
+  @override
+  String get healthDataSettingsTypeHeartRateTitle => 'Heart Rate';
+
+  @override
+  String get healthDataSettingsTypeHeartRateSubtitle =>
+      'Latest heart rate sample';
+
+  @override
+  String get healthDataSettingsTypeRestingHeartRateTitle =>
+      'Resting Heart Rate';
+
+  @override
+  String get healthDataSettingsTypeRestingHeartRateSubtitle =>
+      'Resting heart rate sample';
+
+  @override
+  String get healthDataSettingsTypeBloodOxygenTitle => 'Blood Oxygen';
+
+  @override
+  String get healthDataSettingsTypeBloodOxygenSubtitle =>
+      'Blood oxygen saturation';
+
+  @override
+  String get healthDataSettingsTypeDietaryEnergyTitle => 'Dietary Energy';
+
+  @override
+  String get healthDataSettingsTypeDietaryEnergySubtitle =>
+      'Dietary calorie record';
+
+  @override
+  String get healthDataSettingsTypeWaterTitle => 'Water';
+
+  @override
+  String get healthDataSettingsTypeWaterSubtitle => 'Water intake record';
+
+  @override
+  String get healthDataSettingsTypeWeightTitle => 'Weight';
+
+  @override
+  String get healthDataSettingsTypeWeightSubtitle => 'Body weight sample';
+
+  @override
+  String get healthDataSettingsTypeBmiTitle => 'BMI';
+
+  @override
+  String get healthDataSettingsTypeBmiSubtitle => 'Body mass index';
+
+  @override
+  String get healthDataSettingsTypeBloodGlucoseTitle => 'Blood Glucose';
+
+  @override
+  String get healthDataSettingsTypeBloodGlucoseSubtitle =>
+      'Blood glucose sample';
+
+  @override
   String get assistantEditLocalToolRemindersQueryTitle => 'Query Reminders';
 
   @override

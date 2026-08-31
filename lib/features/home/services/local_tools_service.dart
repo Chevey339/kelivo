@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:math_expressions/math_expressions.dart';
 
 import '../../../core/models/assistant.dart';
+import '../../../core/models/health_data_type.dart';
 
 typedef TextToSpeechStarter = Future<void> Function(String text);
 
@@ -76,6 +77,7 @@ class DeviceLocalTools {
 
   /// HealthKit may be absent on older iPads. Defaults false until prefetch.
   static bool? _healthDataAvailable;
+  static List<String>? _availableHealthTypeIds;
   static Future<bool>? _prefetchFuture;
   static int _capabilityEpoch = 0;
 
@@ -84,6 +86,15 @@ class DeviceLocalTools {
 
   static bool get healthSupported =>
       iosDeviceToolsSupported && (_healthDataAvailable ?? false);
+
+  /// HealthKit type IDs the current OS can query. Until prefetch finishes,
+  /// version-gated types (daylight) are omitted.
+  static List<String> get availableHealthTypeIds {
+    if (!iosDeviceToolsSupported) return const [];
+    return List<String>.unmodifiable(
+      _availableHealthTypeIds ?? HealthDataTypeIds.withoutOsVersionGate,
+    );
+  }
 
   static bool get remindersSupported => iosDeviceToolsSupported;
 
@@ -216,6 +227,7 @@ class DeviceLocalTools {
       if (epoch == _capabilityEpoch) {
         _weatherKitAvailable = false;
         _healthDataAvailable = false;
+        _availableHealthTypeIds = const [];
       }
       return false;
     }
@@ -225,9 +237,13 @@ class DeviceLocalTools {
     ]);
     final weatherAvailable = results[0];
     final healthAvailable = results[1];
+    final typeIds = healthAvailable
+        ? await _invokeHealthTypeIds()
+        : const <String>[];
     if (epoch == _capabilityEpoch) {
       _weatherKitAvailable = weatherAvailable;
       _healthDataAvailable = healthAvailable;
+      _availableHealthTypeIds = typeIds;
     }
     return _weatherKitAvailable ?? weatherAvailable;
   }
@@ -243,11 +259,28 @@ class DeviceLocalTools {
     }
   }
 
+  static Future<List<String>> _invokeHealthTypeIds() async {
+    try {
+      final result = await _channel.invokeMethod<List<dynamic>>(
+        'availableHealthTypes',
+      );
+      if (result == null) {
+        return List<String>.from(HealthDataTypeIds.withoutOsVersionGate);
+      }
+      return HealthDataTypeIds.knownOnly(result.whereType<String>());
+    } on MissingPluginException {
+      return List<String>.from(HealthDataTypeIds.withoutOsVersionGate);
+    } on PlatformException {
+      return List<String>.from(HealthDataTypeIds.withoutOsVersionGate);
+    }
+  }
+
   @visibleForTesting
   static void debugResetIosCapabilities() {
     _capabilityEpoch++;
     _weatherKitAvailable = null;
     _healthDataAvailable = null;
+    _availableHealthTypeIds = null;
     _prefetchFuture = null;
   }
 
@@ -262,24 +295,55 @@ class DeviceLocalTools {
   static void debugSetHealthDataAvailable(bool? value) {
     _capabilityEpoch++;
     _healthDataAvailable = value;
+    _availableHealthTypeIds = value == true
+        ? List<String>.from(HealthDataTypeIds.all)
+        : (value == false ? const <String>[] : null);
     _prefetchFuture = value == null
         ? null
         : Future<bool>.value(_weatherKitAvailable ?? false);
   }
 
-  /// Presents the HealthKit read sheet. The returned flag is only that the
-  /// request completed; iOS does not reveal per-type read grants.
-  static Future<bool> requestHealthPermission() async {
+  @visibleForTesting
+  static void debugSetAvailableHealthTypeIds(List<String>? ids) {
+    _availableHealthTypeIds = ids == null
+        ? null
+        : HealthDataTypeIds.knownOnly(ids);
+  }
+
+  /// Presents the HealthKit read sheet for [types] only. The returned flag is
+  /// only that the request completed; iOS does not reveal per-type read grants.
+  static Future<bool> requestHealthPermission({
+    List<String> types = const [],
+  }) async {
     if (!healthSupported) return false;
+    final filtered = HealthDataTypeIds.intersectAvailable(
+      types,
+      availableHealthTypeIds,
+    );
+    if (filtered.isEmpty) return true;
     try {
       final result = await _channel.invokeMethod<bool>(
         'requestHealthPermission',
+        jsonEncode({'types': filtered}),
       );
       return result == true;
     } on MissingPluginException {
       return false;
     } on PlatformException {
       return false;
+    }
+  }
+
+  /// Opens the iOS Settings page for this app (Health read access is managed
+  /// there / in the Health app).
+  static Future<void> openAppSettings() async {
+    if (!iosDeviceToolsSupported) return;
+    try {
+      await _channel.invokeMethod<void>('openAppSettings');
+    } on MissingPluginException {
+      // Unsupported host.
+    } on PlatformException {
+      // Settings unavailable.
     }
   }
 }
@@ -340,7 +404,7 @@ class LocalToolsService {
       case LocalToolNames.weather:
         return _weatherDefinition();
       case LocalToolNames.healthSummary:
-        return _healthSummaryDefinition;
+        return _healthSummaryDefinition();
       case LocalToolNames.remindersQuery:
         return _remindersQueryDefinition();
       case LocalToolNames.remindersCreate:
@@ -368,7 +432,18 @@ class LocalToolsService {
     for (final id in LocalToolNames.all) {
       if (!assistant.localToolIds.contains(id)) continue;
       if (!isAvailableOnThisPlatform(id)) continue;
-      tools.add(definitionFor(id));
+      if (id == LocalToolNames.healthSummary) {
+        tools.add(
+          _healthSummaryDefinition(
+            HealthDataTypeIds.intersectAvailable(
+              assistant.healthDataTypeIds,
+              DeviceLocalTools.availableHealthTypeIds,
+            ),
+          ),
+        );
+      } else {
+        tools.add(definitionFor(id));
+      }
     }
     return tools;
   }
@@ -430,7 +505,13 @@ class LocalToolsService {
           'message': 'Health data is not available on this device.',
         });
       }
-      return _invokeDeviceTool('getHealthSummary', args);
+      // Always send the collaborator's configured types. Ignore any `types`
+      // the model may have passed so unselected metrics cannot be queried.
+      final types = HealthDataTypeIds.intersectAvailable(
+        assistant.healthDataTypeIds,
+        DeviceLocalTools.availableHealthTypeIds,
+      );
+      return _invokeDeviceTool('getHealthSummary', {'types': types});
     }
     if (name == LocalToolNames.remindersQuery &&
         DeviceLocalTools.remindersSupported) {
@@ -578,20 +659,35 @@ class LocalToolsService {
     },
   };
 
-  static const Map<String, dynamic> _healthSummaryDefinition = {
-    'type': 'function',
-    'function': {
-      'name': LocalToolNames.healthSummary,
-      'description':
-          "Get a privacy-preserving health activity summary from the device: today's "
-          'steps, active energy, walking/running distance, last-night sleep, latest '
-          'heart rate, and recent workouts. Each metric includes its time interval. '
-          'A metric with status "unavailable" means there is no authorized or recorded '
-          'data — never treat unavailable as 0. This tool does not return raw HealthKit '
-          'history. Requires Health access.',
-      'parameters': {'type': 'object', 'properties': <String, dynamic>{}},
-    },
-  };
+  static Map<String, dynamic> _healthSummaryDefinition([
+    List<String>? typeIds,
+  ]) {
+    final ids =
+        typeIds ??
+        HealthDataTypeIds.intersectAvailable(
+          HealthDataTypeIds.defaultSelected,
+          DeviceLocalTools.availableHealthTypeIds.isEmpty
+              ? HealthDataTypeIds.defaultSelected
+              : DeviceLocalTools.availableHealthTypeIds,
+        );
+    final labels = [for (final id in ids) HealthDataTypeIds.toolLabel(id)];
+    final listed = labels.isEmpty ? 'none' : labels.join(', ');
+    return {
+      'type': 'function',
+      'function': {
+        'name': LocalToolNames.healthSummary,
+        'description':
+            'Get a privacy-preserving health activity summary from the device. '
+            'Currently enabled metrics: $listed. '
+            'Each metric includes its time interval. '
+            'A metric with status "unavailable" means there is no authorized or recorded '
+            'data — never treat unavailable as 0. Do not request metrics that are not in '
+            'the enabled list. This tool does not return raw HealthKit history. '
+            'Requires Health access.',
+        'parameters': {'type': 'object', 'properties': <String, dynamic>{}},
+      },
+    };
+  }
 
   static const Map<String, dynamic> _remindersCompleteDefinition = {
     'type': 'function',
