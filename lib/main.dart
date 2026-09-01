@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart'
-    show kIsWeb, defaultTargetPlatform, TargetPlatform;
+    show debugPrint, kIsWeb, defaultTargetPlatform, TargetPlatform;
 import 'dart:async';
 import 'dart:ui' show AppExitResponse;
 import 'l10n/app_localizations.dart';
@@ -19,6 +19,7 @@ import 'theme/palettes.dart';
 import 'theme/custom_theme.dart';
 import 'package:provider/provider.dart';
 import 'package:dynamic_color/dynamic_color.dart';
+import 'package:flutter_displaymode/flutter_displaymode.dart';
 import 'core/providers/user_provider.dart';
 import 'core/providers/settings_provider.dart';
 import 'core/providers/mcp_provider.dart';
@@ -87,6 +88,8 @@ final RouteObserver<ModalRoute<dynamic>> routeObserver =
     RouteObserver<ModalRoute<dynamic>>();
 bool _didCheckUpdates = false; // one-time update check flag
 bool _didEnsureAssistants = false; // ensure defaults after l10n ready
+AppLifecycleListener? _displayModeLifecycleListener;
+const MethodChannel _displayModeChannel = MethodChannel('app.display_mode');
 
 Future<void> main() async {
   await runZoned(
@@ -102,6 +105,7 @@ Future<void> main() async {
         } catch (_) {}
       }
       FlutterLogger.installGlobalHandlers();
+      _initializeAndroidDisplayMode();
       final appDataDirectory = await AppDirectories.getAppDataDirectory();
       final RestoreReceipt? restoreOutcome;
       try {
@@ -266,6 +270,35 @@ Future<void> main() async {
       },
     ),
   );
+}
+
+void _initializeAndroidDisplayMode() {
+  if (!Platform.isAndroid || _displayModeLifecycleListener != null) return;
+
+  // Some Android variants clear refresh-rate requests in background.
+  _displayModeLifecycleListener = AppLifecycleListener(
+    onResume: _requestHighRefreshRate,
+  );
+  _requestHighRefreshRate();
+}
+
+void _requestHighRefreshRate() {
+  unawaited(_applyAndroidHighRefreshRate());
+}
+
+Future<void> _applyAndroidHighRefreshRate() async {
+  try {
+    final handledNatively =
+        await _displayModeChannel.invokeMethod<bool>(
+          'requestHighRefreshRate',
+        ) ??
+        false;
+    if (!handledNatively) {
+      await FlutterDisplayMode.setHighRefreshRate();
+    }
+  } catch (error) {
+    debugPrint('[DisplayMode] High refresh rate request failed: $error');
+  }
 }
 
 enum _AdmissionRecovery { none, rebuilt, remigrate }
