@@ -18,7 +18,7 @@ import 'package:Kelivo/core/services/memory/memory_block_builder.dart';
 import 'package:Kelivo/core/services/memory/memory_prompts.dart';
 import 'package:Kelivo/features/home/services/message_builder_service.dart';
 import 'package:Kelivo/features/home/services/ocr_service.dart';
-import 'package:drift/drift.dart' show driftRuntimeOptions;
+import 'package:drift/drift.dart' show Value, driftRuntimeOptions;
 import 'package:drift/native.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -115,6 +115,8 @@ void main() {
     required String id,
     required String content,
     MemoryType type = MemoryType.identity,
+    MemoryScope scope = MemoryScope.global,
+    String? assistantId,
   }) {
     final created = DateTime.utc(2026, 8, 1).microsecondsSinceEpoch;
     return businessRepository.upsertEntity(
@@ -124,8 +126,8 @@ void main() {
         sortOrder: 0,
         payload: jsonEncode({
           'id': id,
-          'scope': 'global',
-          'assistantId': null,
+          'scope': MemoryEntry.scopeToString(scope),
+          'assistantId': assistantId,
           'type': MemoryEntry.typeToString(type),
           'status': 'active',
           'content': content,
@@ -322,7 +324,7 @@ void main() {
         conversationId: 'conv-1',
         payload: 'frozen',
         carriesMemorySnapshot: true,
-        injectedMemoryHash: hash,
+        injectedMemoryHash: Value(hash),
       );
 
       final service = buildService();
@@ -351,7 +353,7 @@ void main() {
       expect(result.hash, isNull);
     });
 
-    test('has snapshot + different hash → update block', () async {
+    test('has snapshot + different hash → full snapshot', () async {
       await seedAssistant('assistant-1');
       await putEntry(id: 'mem_01', content: 'User likes Flutter.');
       final conversation = await seedConversation(
@@ -370,7 +372,7 @@ void main() {
         conversationId: 'conv-1',
         payload: 'frozen-old',
         carriesMemorySnapshot: true,
-        injectedMemoryHash: 'oldhash012345678',
+        injectedMemoryHash: Value('oldhash012345678'),
       );
 
       final service = buildService();
@@ -395,13 +397,14 @@ void main() {
         lang: MemoryPromptLang.zh,
       );
 
-      expect(result.prefix, contains(MemoryPrompts.introUpdateZh));
-      expect(result.prefix, contains('<user_memory_update>'));
+      expect(result.prefix, contains(MemoryPrompts.introFullZh));
+      expect(result.prefix, isNot(contains('<user_memory_update>')));
+      expect(result.persistHash, isTrue);
       expect(result.hash, isNotNull);
       expect(result.hash, isNot('oldhash012345678'));
     });
 
-    test('deleting the last memory emits an empty update snapshot', () async {
+    test('deleting the last memory clears the hash, injects nothing', () async {
       await seedAssistant('assistant-1');
       await putEntry(id: 'mem_01', content: 'User likes Flutter.');
       final conversation = await seedConversation('conv-1');
@@ -431,7 +434,7 @@ void main() {
         conversationId: 'conv-1',
         payload: '${first.prefix}hi',
         carriesMemorySnapshot: true,
-        injectedMemoryHash: first.hash,
+        injectedMemoryHash: Value(first.hash),
       );
 
       await businessRepository.deleteEntity(
@@ -457,11 +460,17 @@ void main() {
         lang: MemoryPromptLang.zh,
       );
 
-      expect(cleared.prefix, contains('<user_memory_update>'));
-      expect(cleared.prefix, contains('<user_profile/>'));
-      expect(cleared.prefix, contains('<user_memory type="identity"/>'));
-      expect(cleared.hash, isNotNull);
-      expect(cleared.hash, isNot(first.hash));
+      // The stale snapshot on u1 is dropped at send time instead of being
+      // corrected by an empty update block, so nothing is injected here — but
+      // the conversation must record that its context now carries none.
+      expect(cleared.prefix, isEmpty);
+      expect(cleared.persistHash, isTrue);
+      expect(cleared.hash, isNull);
+      expect(
+        await chatRepository.getConversationInjectedMemoryHash('conv-1'),
+        isNotNull,
+        reason: 'the first turn recorded its snapshot',
+      );
     });
 
     test(
@@ -506,7 +515,7 @@ void main() {
           conversationId: 'conv-1',
           payload: 'frozen',
           carriesMemorySnapshot: true,
-          injectedMemoryHash: hash,
+          injectedMemoryHash: Value(hash),
         );
 
         // The model still carries the pre-freeze value.
@@ -598,7 +607,7 @@ void main() {
 
   group('hash ordering regression (appendix item 6)', () {
     test(
-      'compares prior hash before writing — update is not silently empty',
+      'compares prior hash before writing — the change is not swallowed',
       () async {
         await seedAssistant('assistant-1');
         await putEntry(id: 'mem_01', content: 'Original content.');
@@ -638,7 +647,7 @@ void main() {
           conversationId: 'conv-1',
           payload: 'snap',
           carriesMemorySnapshot: true,
-          injectedMemoryHash: oldHash,
+          injectedMemoryHash: Value(oldHash),
         );
 
         // Change memory so currentHash != oldHash.
@@ -662,7 +671,7 @@ void main() {
         ];
 
         // If someone writes conversation.injectedMemoryHash = currentHash BEFORE
-        // comparing, this returns '' and the model never sees the update.
+        // comparing, this returns '' and the model never sees the change.
         final result = await service.resolveMemoryPrefix(
           conversation: conversation,
           assistant: assistant,
@@ -673,11 +682,12 @@ void main() {
 
         expect(
           result.prefix,
-          contains('<user_memory_update>'),
+          contains(MemoryPrompts.introFullZh),
           reason:
-              'Writing injectedMemoryHash before comparing makes the update '
+              'Writing injectedMemoryHash before comparing makes the change '
               'branch unreachable (appendix item 6).',
         );
+        expect(result.prefix, contains('Changed content that alters hash.'));
         expect(result.hash, isNot(oldHash));
       },
     );
@@ -1013,31 +1023,41 @@ void main() {
       'frozen carriesMemorySnapshot splits prefix from the user turn',
       () async {
         await seedAssistant('assistant-1');
+        await putEntry(id: 'mem_01', content: 'User likes Flutter.');
         final conversation = await seedConversation('conv-frozen-tag');
         final message = await seedUserMessage(
           id: 'u1',
           conversationId: 'conv-frozen-tag',
           content: 'hello',
         );
+        final profileBlock = MemoryBlockBuilder.buildProfileBlock(
+          fields: await chatRepository.readProfileFields(),
+          lang: MemoryPromptLang.zh,
+        );
+        final memoryBlock = MemoryBlockBuilder.buildMemoryBlock(
+          visible: await chatRepository.queryVisibleMemories(
+            assistantId: 'assistant-1',
+          ),
+          totalByType: await chatRepository.countVisibleMemoriesByType(
+            assistantId: 'assistant-1',
+          ),
+          lang: MemoryPromptLang.zh,
+          maxItems: 10,
+        );
         final prefix = MemoryBlockBuilder.buildFullSnapshotPrefix(
-          MemoryBlockBuilder.buildProfileBlock(
-            fields: const [],
-            lang: MemoryPromptLang.zh,
-          ),
-          MemoryBlockBuilder.buildMemoryBlock(
-            visible: const [],
-            totalByType: const {},
-            lang: MemoryPromptLang.zh,
-            maxItems: 10,
-          ),
+          profileBlock,
+          memoryBlock,
           MemoryPromptLang.zh,
         );
         final payload = '${prefix}hello';
-        await chatRepository.putMessagePrompt(
+        await chatRepository.freezeMessagePrompt(
           revisionId: 'u1',
           conversationId: 'conv-frozen-tag',
           payload: payload,
           carriesMemorySnapshot: true,
+          injectedMemoryHash: Value(
+            MemoryBlockBuilder.hashBlocks(profileBlock, memoryBlock),
+          ),
         );
 
         await ContextLogger.setEnabled(true);
@@ -1069,6 +1089,496 @@ void main() {
         expect(tags[1]['length'], 'hello'.length);
       },
     );
+  });
+
+  group('superseded snapshots are stripped from history', () {
+    test(
+      'memories moved to another assistant stop replaying in this one',
+      () async {
+        // The reported bug: memories were global when this conversation took
+        // its snapshot, the user then scoped them to a different assistant, and
+        // the frozen snapshot kept handing them back on every later turn.
+        await seedAssistant('assistant-1');
+        await seedAssistant('assistant-2');
+        await putEntry(id: 'mem_01', content: 'User likes Flutter.');
+
+        final conversation = await seedConversation('conv-2');
+        final u1 = await seedUserMessage(id: 'u1', conversationId: 'conv-2');
+        final assistant2 = assistant.copyWith(id: 'assistant-2');
+        final firstTurn = <Map<String, dynamic>>[
+          {
+            'role': 'user',
+            'content': 'hi',
+            MessageBuilderService.internalRevisionIdKey: 'u1',
+          },
+        ];
+        await buildService(messages: [u1]).processUserMessagesForApi(
+          firstTurn,
+          settings,
+          assistant2,
+          conversation: conversation,
+          sourceMessages: [u1],
+        );
+        expect(firstTurn.single['content'], contains('User likes Flutter.'));
+
+        // Scope the memory to assistant-1 only.
+        await putEntry(
+          id: 'mem_01',
+          content: 'User likes Flutter.',
+          scope: MemoryScope.assistant,
+          assistantId: 'assistant-1',
+        );
+
+        final u2 = await seedUserMessage(
+          id: 'u2',
+          conversationId: 'conv-2',
+          content: 'next',
+          messageOrder: 1,
+        );
+        final secondTurn = <Map<String, dynamic>>[
+          {
+            'role': 'user',
+            'content': 'hi',
+            MessageBuilderService.internalRevisionIdKey: 'u1',
+          },
+          {'role': 'assistant', 'content': 'hello'},
+          {
+            'role': 'user',
+            'content': 'next',
+            MessageBuilderService.internalRevisionIdKey: 'u2',
+          },
+        ];
+        await buildService(messages: [u1, u2]).processUserMessagesForApi(
+          secondTurn,
+          settings,
+          assistant2,
+          conversation: conversation,
+          sourceMessages: [u1, u2],
+        );
+
+        final sent = secondTurn.map((m) => m['content'].toString()).join('\n');
+        expect(sent, isNot(contains('User likes Flutter.')));
+        expect(sent, isNot(contains('<user_profile/>')));
+        expect(sent, isNot(contains(MemoryPrompts.introFullZh)));
+        expect(secondTurn.first['content'], 'hi');
+        expect(
+          await chatRepository.getConversationInjectedMemoryHash('conv-2'),
+          isNull,
+          reason: 'the context no longer carries a snapshot',
+        );
+
+        // The freeze row still records what was actually sent that turn.
+        final frozen = await chatRepository.getMessagePrompt('u1');
+        expect(frozen?.payload, contains('User likes Flutter.'));
+        expect(frozen?.carriesMemorySnapshot, isTrue);
+      },
+    );
+
+    test('only the newest snapshot survives into the request', () async {
+      await seedAssistant('assistant-1');
+      await putEntry(id: 'mem_01', content: 'User likes Flutter.');
+
+      final conversation = await seedConversation('conv-1');
+      final u1 = await seedUserMessage(id: 'u1', conversationId: 'conv-1');
+      final u2 = await seedUserMessage(
+        id: 'u2',
+        conversationId: 'conv-1',
+        content: 'again',
+        messageOrder: 1,
+      );
+      final u3 = await seedUserMessage(
+        id: 'u3',
+        conversationId: 'conv-1',
+        content: 'third',
+        messageOrder: 2,
+      );
+
+      final profileBlock = MemoryBlockBuilder.buildProfileBlock(
+        fields: await chatRepository.readProfileFields(),
+        lang: MemoryPromptLang.zh,
+      );
+      final memoryBlock = MemoryBlockBuilder.buildMemoryBlock(
+        visible: await chatRepository.queryVisibleMemories(
+          assistantId: 'assistant-1',
+        ),
+        totalByType: await chatRepository.countVisibleMemoriesByType(
+          assistantId: 'assistant-1',
+        ),
+        lang: MemoryPromptLang.zh,
+        maxItems: 10,
+      );
+      // u2 carries the snapshot the conversation's hash names; u1 carries an
+      // older one that a previous version left frozen in history.
+      final stale = MemoryBlockBuilder.buildFullSnapshotPrefix(
+        profileBlock,
+        '<user_memory type="identity">\n'
+        '- [2026-08-01] stale entry\n'
+        '</user_memory>\n'
+        '<user_memory type="workflow"/>\n'
+        '<user_memory type="voice"/>\n'
+        '<user_memory type="instruction"/>\n',
+        MemoryPromptLang.zh,
+      );
+      await chatRepository.freezeMessagePrompt(
+        revisionId: 'u1',
+        conversationId: 'conv-1',
+        payload: '${stale}hi',
+        carriesMemorySnapshot: true,
+        injectedMemoryHash: const Value('stalehash0000001'),
+      );
+      await chatRepository.freezeMessagePrompt(
+        revisionId: 'u2',
+        conversationId: 'conv-1',
+        payload:
+            '${MemoryBlockBuilder.buildFullSnapshotPrefix(profileBlock, memoryBlock, MemoryPromptLang.zh)}again',
+        carriesMemorySnapshot: true,
+        injectedMemoryHash: Value(
+          MemoryBlockBuilder.hashBlocks(profileBlock, memoryBlock),
+        ),
+      );
+
+      final apiMessages = <Map<String, dynamic>>[
+        {
+          'role': 'user',
+          'content': 'hi',
+          MessageBuilderService.internalRevisionIdKey: 'u1',
+        },
+        {
+          'role': 'user',
+          'content': 'again',
+          MessageBuilderService.internalRevisionIdKey: 'u2',
+        },
+        {
+          'role': 'user',
+          'content': 'third',
+          MessageBuilderService.internalRevisionIdKey: 'u3',
+        },
+      ];
+      await buildService(messages: [u1, u2, u3]).processUserMessagesForApi(
+        apiMessages,
+        settings,
+        assistant,
+        conversation: conversation,
+        sourceMessages: [u1, u2, u3],
+      );
+
+      expect(apiMessages[0]['content'], 'hi');
+      expect(apiMessages[1]['content'], contains('User likes Flutter.'));
+      expect(apiMessages[2]['content'], 'third');
+      final sent = apiMessages.map((m) => m['content'].toString()).join('\n');
+      expect(sent, isNot(contains('stale entry')));
+    });
+  });
+
+  group('regeneration and forged snapshots', () {
+    // Snapshot + hash for whatever [assistantId] can currently see.
+    Future<({String prefix, String hash})> currentSnapshot(
+      String assistantId,
+    ) async {
+      final profileBlock = MemoryBlockBuilder.buildProfileBlock(
+        fields: await chatRepository.readProfileFields(),
+        lang: MemoryPromptLang.zh,
+      );
+      final memoryBlock = MemoryBlockBuilder.buildMemoryBlock(
+        visible: await chatRepository.queryVisibleMemories(
+          assistantId: assistantId,
+        ),
+        totalByType: await chatRepository.countVisibleMemoriesByType(
+          assistantId: assistantId,
+        ),
+        lang: MemoryPromptLang.zh,
+        maxItems: 10,
+      );
+      return (
+        prefix: MemoryBlockBuilder.buildFullSnapshotPrefix(
+          profileBlock,
+          memoryBlock,
+          MemoryPromptLang.zh,
+        ),
+        hash: MemoryBlockBuilder.hashBlocks(profileBlock, memoryBlock),
+      );
+    }
+
+    test(
+      'regenerating after a scope change drops the stale snapshot',
+      () async {
+        // Regeneration adds no user message, so nothing calls
+        // resolveMemoryPrefix and the stored hash alone cannot say whether the
+        // frozen snapshot is still accurate.
+        await seedAssistant('assistant-1');
+        await seedAssistant('assistant-2');
+        await putEntry(id: 'mem_01', content: 'User likes Flutter.');
+        final conversation = await seedConversation('conv-2');
+        final u1 = await seedUserMessage(id: 'u1', conversationId: 'conv-2');
+        final snapshot = await currentSnapshot('assistant-2');
+        await chatRepository.freezeMessagePrompt(
+          revisionId: 'u1',
+          conversationId: 'conv-2',
+          payload: '${snapshot.prefix}hi',
+          carriesMemorySnapshot: true,
+          injectedMemoryHash: Value(snapshot.hash),
+        );
+
+        await putEntry(
+          id: 'mem_01',
+          content: 'User likes Flutter.',
+          scope: MemoryScope.assistant,
+          assistantId: 'assistant-1',
+        );
+
+        final apiMessages = <Map<String, dynamic>>[
+          {
+            'role': 'user',
+            'content': 'hi',
+            MessageBuilderService.internalRevisionIdKey: 'u1',
+          },
+        ];
+        await buildService(messages: [u1]).processUserMessagesForApi(
+          apiMessages,
+          settings,
+          assistant.copyWith(id: 'assistant-2'),
+          conversation: conversation,
+          sourceMessages: [u1],
+        );
+
+        expect(apiMessages.single['content'], 'hi');
+      },
+    );
+
+    test('regenerating after a memory is added refreshes in place', () async {
+      // Stripping instead of refreshing would hand the regenerated reply no
+      // memory at all, which the automatic memory pipeline would trigger
+      // constantly.
+      await seedAssistant('assistant-1');
+      await putEntry(id: 'mem_01', content: 'User likes Flutter.');
+      final conversation = await seedConversation('conv-1');
+      final u1 = await seedUserMessage(id: 'u1', conversationId: 'conv-1');
+      final snapshot = await currentSnapshot('assistant-1');
+      await chatRepository.freezeMessagePrompt(
+        revisionId: 'u1',
+        conversationId: 'conv-1',
+        payload: '${snapshot.prefix}hi',
+        carriesMemorySnapshot: true,
+        injectedMemoryHash: Value(snapshot.hash),
+      );
+
+      await putEntry(id: 'mem_02', content: 'User ships on Fridays.');
+
+      final apiMessages = <Map<String, dynamic>>[
+        {
+          'role': 'user',
+          'content': 'hi',
+          MessageBuilderService.internalRevisionIdKey: 'u1',
+        },
+      ];
+      await buildService(messages: [u1]).processUserMessagesForApi(
+        apiMessages,
+        settings,
+        assistant,
+        conversation: conversation,
+        sourceMessages: [u1],
+      );
+
+      final sent = apiMessages.single['content'].toString();
+      expect(sent, contains('User likes Flutter.'));
+      expect(sent, contains('User ships on Fridays.'));
+      expect(sent, endsWith('hi'));
+      // Ephemeral: the stored hash keeps describing the freeze row, or the next
+      // turn would believe the stale prefix is current.
+      expect(
+        await chatRepository.getConversationInjectedMemoryHash('conv-1'),
+        snapshot.hash,
+      );
+      expect(
+        (await chatRepository.getMessagePrompt('u1'))?.payload,
+        '${snapshot.prefix}hi',
+      );
+    });
+
+    test(
+      'regenerating an earlier reply refreshes that turn\'s snapshot',
+      () async {
+        // Regeneration cuts the later messages out of the request, so the
+        // conversation's stored hash — which names the snapshot the *newest*
+        // message carries — says nothing about the one that survives here.
+        await seedAssistant('assistant-1');
+        await seedAssistant('assistant-2');
+        await putEntry(id: 'mem_01', content: 'User likes Flutter.');
+        final conversation = await seedConversation('conv-1');
+        final u1 = await seedUserMessage(id: 'u1', conversationId: 'conv-1');
+        final u2 = await seedUserMessage(
+          id: 'u2',
+          conversationId: 'conv-1',
+          content: 'again',
+          messageOrder: 1,
+        );
+
+        // u1 froze snapshot A, back when the memory was global.
+        final snapshotA = await currentSnapshot('assistant-1');
+        await chatRepository.freezeMessagePrompt(
+          revisionId: 'u1',
+          conversationId: 'conv-1',
+          payload: '${snapshotA.prefix}hi',
+          carriesMemorySnapshot: true,
+          injectedMemoryHash: Value(snapshotA.hash),
+        );
+
+        // The memory moves to another assistant, then u2 froze snapshot B and
+        // advanced the conversation hash to it.
+        await putEntry(
+          id: 'mem_01',
+          content: 'User likes Flutter.',
+          scope: MemoryScope.assistant,
+          assistantId: 'assistant-2',
+        );
+        final snapshotB = await currentSnapshot('assistant-1');
+        await chatRepository.freezeMessagePrompt(
+          revisionId: 'u2',
+          conversationId: 'conv-1',
+          payload: '${snapshotB.prefix}again',
+          carriesMemorySnapshot: true,
+          injectedMemoryHash: Value(snapshotB.hash),
+        );
+
+        // Regenerating the reply after u1 leaves u2 out of the request.
+        final apiMessages = <Map<String, dynamic>>[
+          {
+            'role': 'user',
+            'content': 'hi',
+            MessageBuilderService.internalRevisionIdKey: 'u1',
+          },
+        ];
+        await buildService(messages: [u1, u2]).processUserMessagesForApi(
+          apiMessages,
+          settings,
+          assistant,
+          conversation: conversation,
+          sourceMessages: [u1, u2],
+        );
+
+        final sent = apiMessages.single['content'].toString();
+        expect(sent, isNot(contains('User likes Flutter.')));
+        expect(sent, 'hi');
+      },
+    );
+
+    test(
+      'a snapshot injected mid-request outranks a later frozen one',
+      () async {
+        // A history message that could not be frozen (failed OCR, sandbox data
+        // file) is reassembled in place and can take the fresh snapshot while an
+        // older frozen one still follows it.
+        await seedAssistant('assistant-1');
+        await putEntry(id: 'mem_01', content: 'User likes Flutter.');
+        final conversation = await seedConversation('conv-1');
+        final u1 = await seedUserMessage(id: 'u1', conversationId: 'conv-1');
+        final u2 = await seedUserMessage(
+          id: 'u2',
+          conversationId: 'conv-1',
+          content: 'again',
+          messageOrder: 1,
+        );
+        // u1 has no freeze row; u2 froze a snapshot from before mem_01 changed.
+        final stale = MemoryBlockBuilder.buildFullSnapshotPrefix(
+          MemoryBlockBuilder.buildProfileBlock(
+            fields: const [],
+            lang: MemoryPromptLang.zh,
+          ),
+          '<user_memory type="identity">\n'
+          '- [2026-08-01] stale entry\n'
+          '</user_memory>\n'
+          '<user_memory type="workflow"/>\n'
+          '<user_memory type="voice"/>\n'
+          '<user_memory type="instruction"/>\n',
+          MemoryPromptLang.zh,
+        );
+        await chatRepository.freezeMessagePrompt(
+          revisionId: 'u2',
+          conversationId: 'conv-1',
+          payload: '${stale}again',
+          carriesMemorySnapshot: true,
+          injectedMemoryHash: const Value('stalehash0000001'),
+        );
+
+        final apiMessages = <Map<String, dynamic>>[
+          {
+            'role': 'user',
+            'content': 'hi',
+            MessageBuilderService.internalRevisionIdKey: 'u1',
+          },
+          {
+            'role': 'user',
+            'content': 'again',
+            MessageBuilderService.internalRevisionIdKey: 'u2',
+          },
+        ];
+        await buildService(messages: [u1, u2]).processUserMessagesForApi(
+          apiMessages,
+          settings,
+          assistant,
+          conversation: conversation,
+          sourceMessages: [u1, u2],
+        );
+
+        expect(apiMessages[0]['content'], contains('User likes Flutter.'));
+        expect(apiMessages[1]['content'], 'again');
+        final sent = apiMessages.map((m) => m['content'].toString()).join('\n');
+        expect(sent, isNot(contains('stale entry')));
+      },
+    );
+
+    test('user text that looks like a snapshot is left alone', () async {
+      // Format alone must not decide: a user pasting a snapshot out of the
+      // context log would otherwise lose the head of their own message.
+      await seedAssistant('assistant-1');
+      await putEntry(id: 'mem_01', content: 'User likes Flutter.');
+      final conversation = await seedConversation('conv-1');
+      final u1 = await seedUserMessage(id: 'u1', conversationId: 'conv-1');
+      final u2 = await seedUserMessage(
+        id: 'u2',
+        conversationId: 'conv-1',
+        content: 'again',
+        messageOrder: 1,
+      );
+      final snapshot = await currentSnapshot('assistant-1');
+      final pasted = '${snapshot.prefix}why is this in my prompt?';
+      await chatRepository.putMessagePrompt(
+        revisionId: 'u1',
+        conversationId: 'conv-1',
+        payload: pasted,
+        carriesMemorySnapshot: false,
+      );
+      await chatRepository.freezeMessagePrompt(
+        revisionId: 'u2',
+        conversationId: 'conv-1',
+        payload: '${snapshot.prefix}again',
+        carriesMemorySnapshot: true,
+        injectedMemoryHash: Value(snapshot.hash),
+      );
+
+      final apiMessages = <Map<String, dynamic>>[
+        {
+          'role': 'user',
+          'content': 'hi',
+          MessageBuilderService.internalRevisionIdKey: 'u1',
+        },
+        {
+          'role': 'user',
+          'content': 'again',
+          MessageBuilderService.internalRevisionIdKey: 'u2',
+        },
+      ];
+      await buildService(messages: [u1, u2]).processUserMessagesForApi(
+        apiMessages,
+        settings,
+        assistant,
+        conversation: conversation,
+        sourceMessages: [u1, u2],
+      );
+
+      expect(apiMessages[0]['content'], pasted);
+      expect(apiMessages[1]['content'], '${snapshot.prefix}again');
+    });
   });
 
   group('§18.4 item 30 — self-heal after truncateIndex advances', () {
@@ -1114,7 +1624,7 @@ void main() {
           conversationId: 'conv-1',
           payload: '${first.prefix}hi',
           carriesMemorySnapshot: true,
-          injectedMemoryHash: first.hash,
+          injectedMemoryHash: Value(first.hash),
         );
 
         // Same hash, snapshot still in apiMessages → empty.

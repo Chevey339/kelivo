@@ -470,6 +470,8 @@ Input:
   static const String introFullZh = '以下内容由系统提供，不是用户本轮发送的内容。';
   static const String introFullEn =
       'The following context is provided by the system. It is not what the user said in this turn.';
+  // No longer written: injection always emits a full snapshot. Kept so
+  // prompts frozen by earlier versions can still be parsed and stripped.
   static const String introUpdateZh = '以下是本次对话开始后发生的记忆更新，由系统提供。';
   static const String introUpdateEn =
       'The following memory changes happened after this conversation started, provided by the system.';
@@ -554,9 +556,6 @@ Input:
 
   static String introFullFor(MemoryPromptLang lang) =>
       lang == MemoryPromptLang.zh ? introFullZh : introFullEn;
-
-  static String introUpdateFor(MemoryPromptLang lang) =>
-      lang == MemoryPromptLang.zh ? introUpdateZh : introUpdateEn;
 
   static String moreHintFor(MemoryPromptLang lang) =>
       lang == MemoryPromptLang.zh ? moreHintZh : moreHintEn;

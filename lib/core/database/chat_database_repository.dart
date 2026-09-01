@@ -7498,19 +7498,27 @@ class ChatDatabaseRepository {
         );
   }
 
-  /// Freezes a message's final prompt string and, when a snapshot was
-  /// injected, advances the conversation's injected-memory hash in the same
+  /// Freezes a message's final prompt string and, when [injectedMemoryHash] is
+  /// present, advances the conversation's injected-memory hash in the same
   /// transaction.
   ///
   /// The two writes must not be split: a crash between them leaves a hash that
   /// claims a snapshot was delivered while no message carries one, costing an
   /// extra full re-injection once self-healing notices (§8.3).
+  ///
+  /// [injectedMemoryHash] is a three-state value on purpose. `Value.absent()`
+  /// leaves the stored hash alone, `Value(hash)` records a freshly injected
+  /// snapshot, and `Value(null)` records that the context now carries no
+  /// snapshot at all — the state a turn reaches when every visible memory is
+  /// gone and the stale snapshots in history are stripped at send time.
+  /// Without that third state a later re-add of identical content would hash
+  /// equal to the cleared snapshot and never be injected again.
   Future<void> freezeMessagePrompt({
     required String revisionId,
     required String conversationId,
     required String payload,
     required bool carriesMemorySnapshot,
-    String? injectedMemoryHash,
+    Value<String?> injectedMemoryHash = const Value.absent(),
   }) {
     return _db.transaction(() async {
       await putMessagePrompt(
@@ -7519,10 +7527,10 @@ class ChatDatabaseRepository {
         payload: payload,
         carriesMemorySnapshot: carriesMemorySnapshot,
       );
-      if (carriesMemorySnapshot) {
+      if (injectedMemoryHash.present) {
         await setConversationInjectedMemoryHash(
           conversationId,
-          injectedMemoryHash,
+          injectedMemoryHash.value,
         );
       }
     });

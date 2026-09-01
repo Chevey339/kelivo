@@ -1,6 +1,7 @@
 import 'package:Kelivo/core/models/message_part.dart';
 import 'dart:io';
 
+import 'package:drift/drift.dart' show Value;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 // ignore: depend_on_referenced_packages
@@ -156,7 +157,7 @@ void main() {
         conversationId: conversation.id,
         payload: 'assistant A memory',
         carriesMemorySnapshot: true,
-        injectedMemoryHash: 'assistant-a-hash',
+        injectedMemoryHash: const Value('assistant-a-hash'),
       );
       await repository.putMessagePrompt(
         revisionId: plainMessage.id,

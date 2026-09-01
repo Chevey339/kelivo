@@ -439,7 +439,7 @@ void main() {
   });
 
   group('MemoryBlockBuilder injection prefixes', () {
-    test('full and update prefix shapes match §7.5', () {
+    test('full prefix shape matches §7.5', () {
       const profile = '<user_profile/>\n';
       const memory =
           '<user_memory type="identity"/>\n'
@@ -454,18 +454,6 @@ void main() {
           MemoryPromptLang.zh,
         ),
         '${MemoryPrompts.introFullZh}\n$profile$memory\n',
-      );
-      expect(
-        MemoryBlockBuilder.buildUpdatePrefix(
-          profile,
-          memory,
-          MemoryPromptLang.en,
-        ),
-        '${MemoryPrompts.introUpdateEn}\n'
-        '<user_memory_update>\n'
-        '$profile$memory'
-        '</user_memory_update>\n'
-        '\n',
       );
     });
   });
@@ -492,20 +480,19 @@ void main() {
       expect(split.rest, '你好');
     });
 
-    test('splits an update snapshot from the user turn', () {
-      final prefix = MemoryBlockBuilder.buildUpdatePrefix(
-        MemoryBlockBuilder.buildProfileBlock(
-          fields: const [],
-          lang: MemoryPromptLang.en,
-        ),
-        MemoryBlockBuilder.buildMemoryBlock(
-          visible: const [],
-          totalByType: const {},
-          lang: MemoryPromptLang.en,
-          maxItems: 10,
-        ),
-        MemoryPromptLang.en,
-      );
+    test('splits a legacy update snapshot from the user turn', () {
+      // Update blocks are no longer written, but conversations frozen by
+      // earlier versions still replay them and must stay strippable.
+      final prefix =
+          '${MemoryPrompts.introUpdateEn}\n'
+          '<user_memory_update>\n'
+          '<user_profile/>\n'
+          '<user_memory type="identity"/>\n'
+          '<user_memory type="workflow"/>\n'
+          '<user_memory type="voice"/>\n'
+          '<user_memory type="instruction"/>\n'
+          '</user_memory_update>\n'
+          '\n';
       final split = MemoryBlockBuilder.splitInjectedPrefix('${prefix}hello');
       expect(split, isNotNull);
       expect(split!.kind, 'update');

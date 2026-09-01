@@ -126,19 +126,11 @@ abstract final class MemoryBlockBuilder {
         '$profileBlock$memoryBlock\n';
   }
 
-  static String buildUpdatePrefix(
-    String profileBlock,
-    String memoryBlock,
-    MemoryPromptLang lang,
-  ) {
-    return '${MemoryPrompts.introUpdateFor(lang)}\n'
-        '<user_memory_update>\n'
-        '$profileBlock$memoryBlock'
-        '</user_memory_update>\n'
-        '\n';
-  }
-
   /// Exclusive end index of a §7.6 prefix at the start of [payload], or null.
+  ///
+  /// Injection only ever writes full snapshots, but conversations frozen by
+  /// earlier versions carry `<user_memory_update>` blocks that still have to be
+  /// recognized so they can be stripped once superseded.
   static int? endOfInjectedPrefix(String payload) {
     if (payload.isEmpty) return null;
     return _endOfUpdatePrefix(payload) ?? _endOfFullPrefix(payload);
