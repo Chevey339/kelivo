@@ -1569,80 +1569,88 @@ class _CategoryDetail extends StatelessWidget {
                           color: cs.onSurface.withValues(alpha: 0.08),
                         ),
                       ),
-                      child: Row(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  subTitleFor(s.id),
-                                  style: TextStyle(
-                                    fontSize: 13,
-                                    fontWeight: AppFontWeights.semibold,
-                                  ),
-                                ),
-                                const SizedBox(height: 2),
-                                Text(
-                                  '${fmtBytes(s.stats.bytes)} · ${l10n.storageSpaceFilesCount(s.stats.fileCount)}',
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    color: cs.onSurface.withValues(alpha: 0.65),
-                                  ),
-                                ),
-                                if (s.path != null && s.path!.isNotEmpty) ...[
-                                  const SizedBox(height: 2),
-                                  Text(
-                                    s.path!,
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: TextStyle(
-                                      fontSize: 11.5,
-                                      color: cs.onSurface.withValues(
-                                        alpha: 0.55,
+                          Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      subTitleFor(s.id),
+                                      style: TextStyle(
+                                        fontSize: 13,
+                                        fontWeight: AppFontWeights.semibold,
                                       ),
                                     ),
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      '${fmtBytes(s.stats.bytes)} · ${l10n.storageSpaceFilesCount(s.stats.fileCount)}',
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        color: cs.onSurface.withValues(
+                                          alpha: 0.65,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              if (category.key ==
+                                      StorageUsageCategoryKey.cache &&
+                                  s.id == 'avatar_cache')
+                                _MiniActionButton(
+                                  label: l10n.storageSpaceClearButton,
+                                  enabled: !clearing,
+                                  onTap: () =>
+                                      onClearCache?.call(avatarsOnly: true),
+                                ),
+                              if (category.key ==
+                                      StorageUsageCategoryKey.cache &&
+                                  s.id == 'other_cache')
+                                _MiniActionButton(
+                                  label: l10n.storageSpaceClearButton,
+                                  enabled: !clearing,
+                                  onTap: () => onClearOtherCache?.call(),
+                                ),
+                              if (category.key ==
+                                      StorageUsageCategoryKey.cache &&
+                                  s.id == 'system_cache')
+                                _MiniActionButton(
+                                  label: l10n.storageSpaceClearButton,
+                                  enabled: !clearing,
+                                  onTap: () => onClearSystemCache?.call(),
+                                ),
+                              if (category.key ==
+                                      StorageUsageCategoryKey.legacyChatData &&
+                                  s.path != null &&
+                                  s.path!.isNotEmpty)
+                                _MiniActionButton(
+                                  label: l10n
+                                      .storageSpaceExportLegacyChatFileButton,
+                                  enabled: true,
+                                  onTap: () => _exportLegacyHiveFile(
+                                    context,
+                                    sourcePath: s.path!,
+                                    fileName: s.id,
                                   ),
-                                ],
-                              ],
-                            ),
+                                ),
+                            ],
                           ),
-                          if (category.key == StorageUsageCategoryKey.cache &&
-                              s.id == 'avatar_cache')
-                            _MiniActionButton(
-                              label: l10n.storageSpaceClearButton,
-                              enabled: !clearing,
-                              onTap: () =>
-                                  onClearCache?.call(avatarsOnly: true),
-                            ),
-                          if (category.key == StorageUsageCategoryKey.cache &&
-                              s.id == 'other_cache')
-                            _MiniActionButton(
-                              label: l10n.storageSpaceClearButton,
-                              enabled: !clearing,
-                              onTap: () => onClearOtherCache?.call(),
-                            ),
-                          if (category.key == StorageUsageCategoryKey.cache &&
-                              s.id == 'system_cache')
-                            _MiniActionButton(
-                              label: l10n.storageSpaceClearButton,
-                              enabled: !clearing,
-                              onTap: () => onClearSystemCache?.call(),
-                            ),
-                          if (category.key ==
-                                  StorageUsageCategoryKey.legacyChatData &&
-                              s.path != null &&
-                              s.path!.isNotEmpty)
-                            _MiniActionButton(
-                              label:
-                                  l10n.storageSpaceExportLegacyChatFileButton,
-                              enabled: true,
-                              onTap: () => _exportLegacyHiveFile(
-                                context,
-                                sourcePath: s.path!,
-                                fileName: s.id,
+                          if (s.path != null && s.path!.isNotEmpty) ...[
+                            const SizedBox(height: 6),
+                            Text(
+                              _wrapableFilePath(s.path!),
+                              style: TextStyle(
+                                fontSize: 11.5,
+                                height: 1.35,
+                                color: cs.onSurface.withValues(alpha: 0.55),
                               ),
                             ),
+                          ],
                         ],
                       ),
                     ),
@@ -2496,6 +2504,10 @@ class _TactileIconButtonState extends State<_TactileIconButton> {
       ),
     );
   }
+}
+
+String _wrapableFilePath(String path) {
+  return path.replaceAllMapped(RegExp(r'[/\\]'), (m) => '${m[0]}\u200B');
 }
 
 Widget _iosDivider(BuildContext context) {
