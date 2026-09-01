@@ -1,7 +1,7 @@
 name: PR Checks
 
 env:
-  FLUTTER_VERSION: '3.44.6'
+  FLUTTER_VERSION: '3.44.9'
 
 on:
   pull_request:
