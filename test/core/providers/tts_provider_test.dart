@@ -169,6 +169,30 @@ void main() {
     },
   );
 
+  test('system TTS strips supported Markdown code ranges', () async {
+    final provider = TtsProvider(preferences: session.preferences);
+    addTearDown(provider.dispose);
+
+    await _waitUntil(() => provider.isAvailable);
+
+    unawaited(
+      provider.speakSystem(
+        '保留\n'
+        '``print("行内代码")``\n'
+        '~~~dart\n'
+        'print("波浪线围栏");\n'
+        '~~~\n'
+        '```dart\n'
+        'print("未闭合围栏");',
+      ),
+    );
+    await _waitUntil(
+      () => provider.playbackState.status == TtsPlaybackStatus.playing,
+    );
+
+    expect(spokenTexts.last, '保留');
+  });
+
   test('network replay uses cached audio only when enabled', () async {
     final originalPathProvider = PathProviderPlatform.instance;
     final tempDirectory = await Directory.systemTemp.createTemp(

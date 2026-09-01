@@ -23,6 +23,56 @@ void main() {
       );
     });
 
+    test('ignores quoted text inside fenced and inline code', () {
+      expect(
+        TtsTextSelection.apply(
+          '旁白 “保留”\n'
+          '```dart\n'
+          'print("代码块");\n'
+          '```\n'
+          '以及 `print("行内代码")`。',
+          mode: TtsTextSelectionMode.quotedOnly,
+        ),
+        '保留',
+      );
+    });
+
+    test('ignores quoted text inside all supported fence forms', () {
+      for (final source in const [
+        '旁白 “保留”\n~~~dart\nprint("波浪线");\n~~~',
+        '旁白 “保留”\n````markdown\n```\nprint("变长围栏");\n````',
+        '旁白 “保留”\n```dart\n``` not-a-closer\nprint("伪关闭");\n```',
+        '旁白 “保留”\n> ```dart\n> print("引用围栏");\n> ```',
+        '旁白 “保留”\n```dart\nprint("未闭合");',
+      ]) {
+        expect(
+          TtsTextSelection.apply(source, mode: TtsTextSelectionMode.quotedOnly),
+          '保留',
+          reason: source,
+        );
+      }
+    });
+
+    test('ignores quoted text inside multi-backtick inline code', () {
+      expect(
+        TtsTextSelection.apply(
+          '旁白 “保留”以及 ``print("行内代码")``。',
+          mode: TtsTextSelectionMode.quotedOnly,
+        ),
+        '保留',
+      );
+    });
+
+    test('does not pair unmatched backticks across lines', () {
+      expect(
+        TtsTextSelection.apply(
+          '`第一行\n旁白 “应朗读”\n第三行`',
+          mode: TtsTextSelectionMode.quotedOnly,
+        ),
+        '应朗读',
+      );
+    });
+
     test(
       'extracts half-width quotes next to CJK text but skips apostrophes',
       () {
@@ -66,6 +116,20 @@ void main() {
       );
     });
 
+    test('ignores italic text inside fenced and inline code', () {
+      expect(
+        TtsTextSelection.apply(
+          '旁白 *保留*\n'
+          '```dart\n'
+          'final value = "*代码块*";\n'
+          '```\n'
+          '以及 `_行内代码_`。',
+          mode: TtsTextSelectionMode.italicOnly,
+        ),
+        '保留',
+      );
+    });
+
     test('removes markdown and html italic text for non-italic mode', () {
       expect(
         TtsTextSelection.apply(
@@ -83,6 +147,19 @@ void main() {
           mode: TtsTextSelectionMode.quotedOnly,
         ),
         '没有引号的内容',
+      );
+    });
+
+    test('fallback excludes code when no selected content remains', () {
+      expect(
+        TtsTextSelection.apply(
+          '普通旁白\n'
+          '```dart\n'
+          'print("不应朗读");\n'
+          '```',
+          mode: TtsTextSelectionMode.quotedOnly,
+        ),
+        '普通旁白',
       );
     });
   });

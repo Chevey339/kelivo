@@ -1,3 +1,5 @@
+import '../../../shared/widgets/markdown_line_lexer.dart';
+
 enum TtsTextSelectionMode {
   fullText,
   quotedOnly,
@@ -27,17 +29,21 @@ class TtsTextSelection {
   }) {
     final original = input.trim();
     if (original.isEmpty) return '';
+    final source = mode == TtsTextSelectionMode.fullText
+        ? original
+        : markdownRemoveCode(original).trim();
+    if (source.isEmpty) return '';
 
     final selected = switch (mode) {
-      TtsTextSelectionMode.fullText => original,
-      TtsTextSelectionMode.quotedOnly => _quotedText(original),
-      TtsTextSelectionMode.outsideParentheses => _outsideParentheses(original),
-      TtsTextSelectionMode.italicOnly => _italicText(original),
-      TtsTextSelectionMode.nonItalic => _nonItalicText(original),
+      TtsTextSelectionMode.fullText => source,
+      TtsTextSelectionMode.quotedOnly => _quotedText(source),
+      TtsTextSelectionMode.outsideParentheses => _outsideParentheses(source),
+      TtsTextSelectionMode.italicOnly => _italicText(source),
+      TtsTextSelectionMode.nonItalic => _nonItalicText(source),
     };
     final normalized = _normalizeSelectedText(selected);
     if (normalized.isNotEmpty || !fallbackToOriginal) return normalized;
-    return original;
+    return source;
   }
 
   static String _quotedText(String input) {
