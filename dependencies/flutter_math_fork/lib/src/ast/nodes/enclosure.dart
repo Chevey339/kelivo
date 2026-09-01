@@ -24,6 +24,9 @@ class EnclosureNode extends SlotableNode<EquationRowNode> {
   /// Background color.
   final Color? backgroundcolor;
 
+  /// Border corner radius.
+  final Measurement borderRadius;
+
   /// Special styles for this enclosure.
   ///
   /// Including `'updiagonalstrike'`, `'downdiagnoalstrike'`,
@@ -41,6 +44,7 @@ class EnclosureNode extends SlotableNode<EquationRowNode> {
     required this.hasBorder,
     this.bordercolor,
     this.backgroundcolor,
+    this.borderRadius = Measurement.zero,
     this.notation = const [],
     this.horizontalPadding = Measurement.zero,
     this.verticalPadding = Measurement.zero,
@@ -55,16 +59,20 @@ class EnclosureNode extends SlotableNode<EquationRowNode> {
     Widget widget = Stack(
       children: <Widget>[
         Container(
-          // color: backgroundcolor,
-          decoration: hasBorder
+          decoration: hasBorder || backgroundcolor != null
               ? BoxDecoration(
                   color: backgroundcolor,
-                  border: Border.all(
-                    // TODO minRuleThickness
-                    width:
-                        options.fontMetrics.fboxrule.cssEm.toLpUnder(options),
-                    color: bordercolor ?? options.color,
-                  ),
+                  border: hasBorder
+                      ? Border.all(
+                          // TODO minRuleThickness
+                          width: options.fontMetrics.fboxrule.cssEm
+                              .toLpUnder(options),
+                          color: bordercolor ?? options.color,
+                        )
+                      : null,
+                  borderRadius: borderRadius.value == 0
+                      ? null
+                      : BorderRadius.circular(borderRadius.toLpUnder(options)),
                 )
               : null,
           child: Padding(
@@ -162,6 +170,7 @@ class EnclosureNode extends SlotableNode<EquationRowNode> {
         hasBorder: hasBorder,
         bordercolor: bordercolor,
         backgroundcolor: backgroundcolor,
+        borderRadius: borderRadius,
         notation: notation,
         horizontalPadding: horizontalPadding,
         verticalPadding: verticalPadding,
@@ -174,6 +183,8 @@ class EnclosureNode extends SlotableNode<EquationRowNode> {
       'hasBorder': hasBorder,
       if (bordercolor != null) 'bordercolor': bordercolor,
       if (backgroundcolor != null) 'backgroundcolor': backgroundcolor,
+      if (borderRadius != Measurement.zero)
+        'borderRadius': borderRadius.toString(),
       if (notation.isNotEmpty) 'notation': notation,
       if (horizontalPadding != Measurement.zero)
         'horizontalPadding': horizontalPadding.toString(),

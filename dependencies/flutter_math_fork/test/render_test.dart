@@ -1,3 +1,4 @@
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'helper.dart';
@@ -109,6 +110,27 @@ void main() {
     'Enclosure renderer',
     r'\fcolorbox{blue}{yellow}{a b}\colorbox{red}{a b}\cancel{x}\bcancel{x}\xcancel{x}\sout{x}\fbox{a}',
     location: 'golden/enclosure.png',
+  );
+
+  testTexToRender(
+    'Nested colored ovalbox renderer',
+    r'\textbf{\small\colorbox{white}{\textcolor{#AEC6CF}{\ovalbox{\textcolor{#AEC6CF}{\textbf{示例文字}}}}}}',
+    (tester) async {
+      final decorations = tester
+          .widgetList<Container>(find.byType(Container))
+          .map((container) => container.decoration)
+          .whereType<BoxDecoration>();
+
+      expect(decorations.any((decoration) => decoration.color == Colors.white),
+          isTrue);
+      expect(
+        decorations.any(
+          (decoration) =>
+              decoration.border != null && decoration.borderRadius != null,
+        ),
+        isTrue,
+      );
+    },
   );
 
   testTexToMatchGoldenFile(

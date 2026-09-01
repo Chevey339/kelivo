@@ -36,6 +36,8 @@ const _encloseEntries = {
       handler: _fcolorboxHandler),
   ['\\fbox']:
       FunctionSpec(numArgs: 1, allowedInText: true, handler: _fboxHandler),
+  ['\\ovalbox']:
+      FunctionSpec(numArgs: 1, allowedInText: true, handler: _ovalboxHandler),
   ['\\cancel', '\\bcancel', '\\xcancel', '\\sout']:
       FunctionSpec(numArgs: 1, handler: _cancelHandler),
 };
@@ -75,6 +77,19 @@ GreenNode _fboxHandler(TexParser parser, FunctionContext context) {
   return EnclosureNode(
     hasBorder: true,
     base: body.wrapWithEquationRow(),
+    // FontMetrics.fboxsep
+    verticalPadding: 0.3.cssEm,
+    // katex.less/.boxpad
+    horizontalPadding: 0.3.cssEm,
+  );
+}
+
+GreenNode _ovalboxHandler(TexParser parser, FunctionContext context) {
+  final body = parser.parseArgHbox(optional: false);
+  return EnclosureNode(
+    hasBorder: true,
+    base: body.wrapWithEquationRow(),
+    borderRadius: 0.5.cssEm,
     // FontMetrics.fboxsep
     verticalPadding: 0.3.cssEm,
     // katex.less/.boxpad

@@ -2128,6 +2128,13 @@ void main() {
     // });
   });
 
+  group("An ovalbox", () {
+    test("should parse and build text content", () {
+      expect(r'\ovalbox{example}', toParse());
+      expect(r'\ovalbox{\textcolor{#AEC6CF}{\textbf{示例文字}}}', toBuild);
+    });
+  });
+
   group("An fcolorbox parser", () {
     test("should not fail, given a text argument", () {
       expect(r'\fcolorbox{blue}{yellow}{a b}', toParse());
@@ -2457,6 +2464,9 @@ void main() {
       expect("\\operatorname*{x*Π∑\\Pi\\sum\\frac a b}", toBuild);
       expect("\\operatorname*{x*Π∑\\Pi\\sum\\frac a b}_y x", toBuild);
       expect("\\operatorname*{x*Π∑\\Pi\\sum\\frac a b}\\limits_y x", toBuild);
+      expect(r'\operatorname{Function}\left(x\right)', toBuild);
+      expect(r'\operatorname{Var}_{\theta}\left(X\right)', toBuild);
+      expect(r'\operatorname*{arg\,min}_{x}\left(f(x)\right)', toBuild);
     });
   });
 

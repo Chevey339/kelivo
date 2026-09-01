@@ -2616,6 +2616,28 @@ A-->B
   );
 
   testWidgets(
+    r'MarkdownWithCodeHighlight renders nested ovalbox and operatorname expressions',
+    (tester) async {
+      await tester.pumpWidget(
+        _markdownHarness(r'''
+标签\(\textbf{\small\colorbox{white}{\textcolor{#AEC6CF}{\ovalbox{\textcolor{#AEC6CF}{\textbf{示例文字}}}}}}\)。
+函数\(\operatorname{Function}\left(x\right)\)&#x20;
+'''),
+      );
+      await tester.pump();
+
+      final mathWidgets = _mathWidgets(tester);
+      expect(mathWidgets, hasLength(2));
+      expect(
+        mathWidgets.map((widget) => widget.parseError),
+        everyElement(isNull),
+      );
+      expect(find.textContaining(r'\ovalbox'), findsNothing);
+      expect(find.textContaining(r'\operatorname'), findsNothing);
+    },
+  );
+
+  testWidgets(
     'MarkdownWithCodeHighlight keeps literal double dollars from spanning prose',
     (tester) async {
       await tester.pumpWidget(
