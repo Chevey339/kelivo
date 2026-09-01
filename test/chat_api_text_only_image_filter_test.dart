@@ -132,6 +132,45 @@ void main() {
       expect(messages.last['content'], 'next');
     });
 
+    test(
+      'keeps remote markdown image links as text, drops data URLs',
+      () async {
+        final body = await _captureJsonRequest(
+          (baseUrl) {
+            return ChatApiService.sendMessageStream(
+              config: _openAiConfig(baseUrl),
+              modelId: 'mimo-v2.5-pro',
+              messages: [
+                {
+                  'role': 'user',
+                  'content':
+                      'doc ![pic](https://example.invalid/pic.jpg) and '
+                      '![inline](data:image/png;base64,QUJD) end',
+                },
+              ],
+              stream: false,
+            ).toList();
+          },
+          responseBody: const <String, dynamic>{
+            'choices': [
+              {
+                'message': {'content': 'ok'},
+              },
+            ],
+          },
+        );
+
+        final encoded = jsonEncode(body);
+        expect(encoded, isNot(contains('image_url')));
+        expect(encoded, isNot(contains('base64')));
+        final messages = (body['messages'] as List).cast<Map>();
+        expect(
+          messages.single['content'],
+          'doc ![pic](https://example.invalid/pic.jpg) and  end',
+        );
+      },
+    );
+
     test('removes Claude image blocks when OCR is inactive', () async {
       final file = await _tempPng('kelivo_claude_text_only_filter_');
       final body = await _captureJsonRequest(

@@ -2125,6 +2125,8 @@ class ChatActions {
             requestId: conversationId,
             allowImagesApiRouting: ctx.allowImagesApiRouting,
             ocrActive: ctx.ocrActive,
+            parseMarkdownImageLinks:
+                ctx.settings.sendMarkdownImageLinksAsImages,
             onRetry: (pending) => _setRetryStatus(state, pending),
           );
           _setRetryStatus(state, null);
@@ -2177,6 +2179,7 @@ class ChatActions {
         requestId: conversationId,
         allowImagesApiRouting: ctx.allowImagesApiRouting,
         ocrActive: ctx.ocrActive,
+        parseMarkdownImageLinks: ctx.settings.sendMarkdownImageLinksAsImages,
       );
 
       final sub = listenSequentiallyToStream<StreamChunk>(

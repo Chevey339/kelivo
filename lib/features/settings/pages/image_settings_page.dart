@@ -84,6 +84,20 @@ class ImageSettingsPage extends StatelessWidget {
           ),
           const SizedBox(height: 18),
           _SettingsSection(
+            title: l10n.imageSettingsPageSendSectionTitle,
+            children: [
+              _ToggleRow(
+                title: l10n.imageSettingsPageMarkdownImageLinksTitle,
+                subtitle: l10n.imageSettingsPageMarkdownImageLinksSubtitle,
+                value: settings.sendMarkdownImageLinksAsImages,
+                onChanged: (value) => context
+                    .read<SettingsProvider>()
+                    .setSendMarkdownImageLinksAsImages(value),
+              ),
+            ],
+          ),
+          const SizedBox(height: 18),
+          _SettingsSection(
             title: l10n.imageSettingsPageQualitySectionTitle,
             footer: l10n.imageSettingsPageFooter,
             children: qualityRows,

@@ -283,6 +283,8 @@ class SettingsProvider extends ChangeNotifier {
       'image_compress_custom_quality_v1';
   static const String _imageCompressTransparentEnabledKey =
       'image_compress_transparent_enabled_v1';
+  static const String _sendMarkdownImageLinksAsImagesKey =
+      'send_markdown_image_links_as_images_v1';
   static const String _displayMobileCodeBlockWrapKey =
       'display_mobile_code_block_wrap_v1';
   static const String _displayAutoCollapseCodeBlockKey =
@@ -1235,6 +1237,8 @@ class SettingsProvider extends ChangeNotifier {
         (prefs.getInt(_imageCompressCustomQualityKey) ?? 85).clamp(10, 100);
     _imageCompressTransparentEnabled =
         prefs.getBool(_imageCompressTransparentEnabledKey) ?? false;
+    _sendMarkdownImageLinksAsImages =
+        prefs.getBool(_sendMarkdownImageLinksAsImagesKey) ?? false;
     _mobileCodeBlockWrap =
         prefs.getBool(_displayMobileCodeBlockWrapKey) ?? false;
     _autoCollapseCodeBlock =
@@ -5228,6 +5232,18 @@ Requirements:
     _imageCompressTransparentEnabled = value;
     notifyListeners();
     await _preferences.setBool(_imageCompressTransparentEnabledKey, value);
+  }
+
+  // When off, `![alt](url)` in message text stays literal text instead of
+  // being turned into a multimodal image part. Explicit attachments are
+  // unaffected: they travel as media paths, not Markdown.
+  bool _sendMarkdownImageLinksAsImages = false;
+  bool get sendMarkdownImageLinksAsImages => _sendMarkdownImageLinksAsImages;
+  Future<void> setSendMarkdownImageLinksAsImages(bool value) async {
+    if (_sendMarkdownImageLinksAsImages == value) return;
+    _sendMarkdownImageLinksAsImages = value;
+    notifyListeners();
+    await _preferences.setBool(_sendMarkdownImageLinksAsImagesKey, value);
   }
 
   ImageCompressConfig resolveImageCompressConfig() {

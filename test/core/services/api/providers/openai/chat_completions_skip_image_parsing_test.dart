@@ -40,4 +40,22 @@ void main() {
       isNot(contains(contains('!['))),
     );
   });
+
+  test(
+    'skipImageParsing keeps remote markdown images out of image_url parts',
+    () async {
+      const raw = 'doc ![pic](https://example.invalid/pic.jpg) end';
+      final messages = await buildOpenAIChatCompletionMessages(
+        [
+          <String, dynamic>{'role': 'user', 'content': raw},
+        ],
+        canImageInput: true,
+        allowRemoteImages: true,
+        reasoningContentReplayPolicy: ReasoningContentReplayPolicy.none,
+        skipImageParsing: true,
+      );
+
+      expect(messages.single['content'], raw);
+    },
+  );
 }

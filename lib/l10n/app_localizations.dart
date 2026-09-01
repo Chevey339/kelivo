@@ -15019,6 +15019,24 @@ abstract class AppLocalizations {
   /// **'Compression happens when images are added. Previously saved or sent images are not affected. Compressed images are sent as JPEG files.'**
   String get imageSettingsPageFooter;
 
+  /// No description provided for @imageSettingsPageSendSectionTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Sending'**
+  String get imageSettingsPageSendSectionTitle;
+
+  /// No description provided for @imageSettingsPageMarkdownImageLinksTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Send Markdown image links as images'**
+  String get imageSettingsPageMarkdownImageLinksTitle;
+
+  /// No description provided for @imageSettingsPageMarkdownImageLinksSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'When enabled, an ![alt](url) link in your message text is sent to vision models as an image. When off it stays plain text. Images you attach yourself are always sent as images.'**
+  String get imageSettingsPageMarkdownImageLinksSubtitle;
+
   /// No description provided for @memoryTraceSettingsTitle.
   ///
   /// In en, this message translates to:

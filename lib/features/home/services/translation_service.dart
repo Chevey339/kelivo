@@ -159,6 +159,7 @@ class TranslationService {
           assistant?.thinkingBudget,
         ),
         requestId: translationRequestId(message.id),
+        parseMarkdownImageLinks: settings.sendMarkdownImageLinksAsImages,
       );
 
       final buffer = StringBuffer();

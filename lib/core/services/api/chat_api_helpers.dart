@@ -206,7 +206,12 @@ Future<ParsedTextAndImages> parseTextAndImages(
   required bool allowRemoteImages,
   required bool allowLocalImages,
   bool allowDataImages = true,
+  // Whether `![alt](http…)` keeps its Markdown text — both when the image is
+  // extracted and when [allowRemoteImages] is false. A remote link carries no
+  // payload, so dropping it would silently delete part of the user's text.
   bool keepRemoteMarkdownText = true,
+  // Whether disallowed data: URLs and local paths keep their Markdown text.
+  // Those carry a payload a text-only request has no use for.
   bool keepDisallowedImageText = true,
   bool skipImageParsing = false,
 }) async {
@@ -305,7 +310,7 @@ Future<ParsedTextAndImages> parseTextAndImages(
         }
         if (url.startsWith('http://') || url.startsWith('https://')) {
           if (!allowRemoteImages) {
-            if (keepDisallowedImageText) buf.write(full);
+            if (keepRemoteMarkdownText) buf.write(full);
             i = m1.end;
             continue;
           }

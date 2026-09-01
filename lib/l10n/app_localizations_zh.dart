@@ -7950,6 +7950,17 @@ class AppLocalizationsZh extends AppLocalizations {
       '压缩在添加图片时进行，已保存或已发送的图片不受影响；压缩后图片以 JPEG 格式随消息发送。';
 
   @override
+  String get imageSettingsPageSendSectionTitle => '发送';
+
+  @override
+  String get imageSettingsPageMarkdownImageLinksTitle =>
+      '将 Markdown 图片链接作为图片发送';
+
+  @override
+  String get imageSettingsPageMarkdownImageLinksSubtitle =>
+      '开启后，消息文本中的 ![alt](url) 会作为图片发送给视觉模型；关闭后仅作为普通文本发送。手动添加的图片附件不受影响。';
+
+  @override
   String get memoryTraceSettingsTitle => '流程追踪';
 
   @override
@@ -16411,6 +16422,17 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   @override
   String get imageSettingsPageFooter =>
       '压缩在添加图片时进行，已保存或已发送的图片不受影响；压缩后图片以 JPEG 格式随消息发送。';
+
+  @override
+  String get imageSettingsPageSendSectionTitle => '发送';
+
+  @override
+  String get imageSettingsPageMarkdownImageLinksTitle =>
+      '将 Markdown 图片链接作为图片发送';
+
+  @override
+  String get imageSettingsPageMarkdownImageLinksSubtitle =>
+      '开启后，消息文本中的 ![alt](url) 会作为图片发送给视觉模型；关闭后仅作为普通文本发送。手动添加的图片附件不受影响。';
 
   @override
   String get memoryTraceSettingsTitle => '流程追踪';
@@ -24948,6 +24970,17 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   @override
   String get imageSettingsPageFooter =>
       '壓縮會在加入圖片時進行，已儲存或已傳送的圖片不受影響；壓縮後圖片會以 JPEG 格式隨訊息傳送。';
+
+  @override
+  String get imageSettingsPageSendSectionTitle => '傳送';
+
+  @override
+  String get imageSettingsPageMarkdownImageLinksTitle =>
+      '將 Markdown 圖片連結作為圖片傳送';
+
+  @override
+  String get imageSettingsPageMarkdownImageLinksSubtitle =>
+      '開啟後，訊息文字中的 ![alt](url) 會作為圖片傳送給視覺模型；關閉後僅以純文字傳送。手動加入的圖片附件不受影響。';
 
   @override
   String get memoryTraceSettingsTitle => '流程追蹤';

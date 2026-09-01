@@ -77,7 +77,9 @@ class ChatApiService {
       allowRemoteImages: false,
       allowLocalImages: false,
       allowDataImages: false,
-      keepRemoteMarkdownText: false,
+      // Remote links are plain text to a text-only model; only the
+      // payload-carrying data:/local forms are dropped.
+      keepRemoteMarkdownText: true,
       keepDisallowedImageText: false,
     );
     return parsed.text;
@@ -157,6 +159,7 @@ class ChatApiService {
     bool ocrActive = false,
     bool builtInSearchOnly = false,
     bool skipImageParsing = false,
+    bool parseMarkdownImageLinks = true,
     AutoRetryOptions? retryOverride,
   }) async* {
     final options = retryOverride ?? AutoRetryConfig.current;
@@ -234,7 +237,7 @@ class ChatApiService {
           extraBody: extraBody,
           stream: stream,
           builtInSearchOnly: builtInSearchOnly,
-          skipImageParsing: skipImageParsing,
+          skipImageParsing: skipImageParsing || !parseMarkdownImageLinks,
           kind: kind,
           useOpenAIImagesApi: useOpenAIImagesApi,
           useZhipuLayoutParsing: useZhipuLayoutParsing,
@@ -474,6 +477,7 @@ class ChatApiService {
     bool ocrActive = false,
     bool builtInSearchOnly = false,
     bool skipImageParsing = false,
+    bool parseMarkdownImageLinks = true,
     AutoRetryOptions? retryOverride,
     void Function(RetryPending? pending)? onRetry,
   }) async {
@@ -499,6 +503,7 @@ class ChatApiService {
       ocrActive: ocrActive,
       builtInSearchOnly: builtInSearchOnly,
       skipImageParsing: skipImageParsing,
+      parseMarkdownImageLinks: parseMarkdownImageLinks,
       retryOverride: retryOverride,
     )) {
       if (chunk is RetryAttemptStart) {
