@@ -10,18 +10,39 @@ import 'restore_previous_store.dart';
 import 'restore_receipt.dart';
 import 'restore_workspace_lock.dart';
 
+/// Coarse phases the startup gate reports while it converges a restore.
+///
+/// The gate runs before `runApp`, so on a large bundle a launch that says
+/// nothing is indistinguishable from a hang. These are what a pre-business
+/// progress screen can show without touching any business data.
+enum RestoreStartupStage {
+  checkingBackup,
+  preservingCurrentData,
+  installingBackup,
+  verifying,
+  rollingBack,
+  finishing,
+}
+
+typedef RestoreStartupStageSink = void Function(RestoreStartupStage stage);
+
 final class PendingRestoreRun {
   const PendingRestoreRun({
     required this.runId,
     required this.markerFileName,
     required this.receipt,
     required this.runInCompletedDirectory,
+    this.validatedCandidate,
   });
 
   final String runId;
   final String markerFileName;
   final RestoreReceipt receipt;
   final bool runInCompletedDirectory;
+
+  /// Set only for a `prepared` run, whose candidate this inspection validated
+  /// in full while holding the same workspace lock the cutover runs under.
+  final ValidatedRestoreCandidate? validatedCandidate;
 }
 
 /// Recovers restore state before any business persistence is opened.
@@ -39,6 +60,38 @@ final class RestoreStartupGate {
     RestoreWorkspaceLock.discardingRunFileName,
     RestoreWorkspaceLock.archivingRunFileName,
   };
+
+  /// Reports whether this launch has restore work waiting, cheaply.
+  ///
+  /// Lists the workspace root and nothing else: no lock, no receipts, no
+  /// hashing. Only a progress screen depends on the answer, so a false
+  /// positive costs one frame and a false negative costs a progress screen --
+  /// neither changes what the gate then does.
+  static Future<bool> hasPendingWork({
+    required Directory appDataDirectory,
+  }) async {
+    final workspaceRoot = RestoreWorkspaceLock(
+      appDataDirectory: appDataDirectory,
+    ).workspaceRoot;
+    if (await FileSystemEntity.type(workspaceRoot.path, followLinks: false) !=
+        FileSystemEntityType.directory) {
+      return false;
+    }
+    try {
+      await for (final entity in workspaceRoot.list(followLinks: false)) {
+        final name = p.basename(entity.path);
+        if (_markerFileNames.contains(name) ||
+            RegExp(_runPattern).hasMatch(name)) {
+          return true;
+        }
+      }
+    } on FileSystemException {
+      // An unreadable workspace is the gate's problem to report, not this
+      // probe's: fall through and let it open the workspace properly.
+      return true;
+    }
+    return false;
+  }
 
   static Future<PendingRestoreRun?> inspect({
     required Directory appDataDirectory,
@@ -65,6 +118,7 @@ final class RestoreStartupGate {
   static Future<PendingRestoreRun?> _inspectLocked({
     required Directory appDataDirectory,
     required RestoreWorkspaceLock workspaceLock,
+    RestoreStartupStageSink? onStage,
   }) async {
     final workspaceRoot = workspaceLock.workspaceRoot;
     final rootType = await FileSystemEntity.type(
@@ -200,8 +254,10 @@ final class RestoreStartupGate {
       runDirectory: runDirectory,
       receipt: receipt,
     );
+    ValidatedRestoreCandidate? validatedCandidate;
     if (receipt.state == RestoreReceiptState.prepared) {
-      await _validatePreparedCandidate(
+      onStage?.call(RestoreStartupStage.checkingBackup);
+      validatedCandidate = await _validatePreparedCandidate(
         runDirectory: runDirectory,
         receipt: receipt,
       );
@@ -211,6 +267,7 @@ final class RestoreStartupGate {
       markerFileName: markerFileName,
       receipt: receipt,
       runInCompletedDirectory: false,
+      validatedCandidate: validatedCandidate,
     );
   }
 
@@ -218,6 +275,7 @@ final class RestoreStartupGate {
     required Directory appDataDirectory,
     RestoreBusinessLease? businessLease,
     RestoreDurability? durability,
+    RestoreStartupStageSink? onStage,
   }) async {
     final resolvedDurability = durability ?? RestorePlatformDurability();
     final ownedBusinessLease = businessLease == null
@@ -270,6 +328,7 @@ final class RestoreStartupGate {
         final pending = await _inspectLocked(
           appDataDirectory: appDataDirectory,
           workspaceLock: workspaceLock,
+          onStage: onStage,
         );
         if (pending == null) return null;
         final executor = RestoreCutoverExecutor(
@@ -278,11 +337,14 @@ final class RestoreStartupGate {
           workspaceLock: workspaceLock,
           durability: resolvedDurability,
           archived: pending.runInCompletedDirectory,
+          validatedCandidate: pending.validatedCandidate,
+          onStage: onStage,
         );
         if (pending.receipt.state == RestoreReceiptState.committed ||
             pending.receipt.state == RestoreReceiptState.rolledBack) {
           final terminal = await executor
               .revalidateTerminalWhileWorkspaceLocked(pending.receipt);
+          onStage?.call(RestoreStartupStage.finishing);
           await workspaceLock.archiveTerminalRunWhileWorkspaceLocked(
             runId: pending.runId,
             observedMarkerFileName: pending.markerFileName,
@@ -299,6 +361,7 @@ final class RestoreStartupGate {
         final terminal = await executor.revalidateTerminalWhileWorkspaceLocked(
           result,
         );
+        onStage?.call(RestoreStartupStage.finishing);
         await workspaceLock.archiveTerminalRunWhileWorkspaceLocked(
           runId: pending.runId,
           observedMarkerFileName: RestoreWorkspaceLock.publishingRunFileName,
@@ -372,7 +435,7 @@ final class RestoreStartupGate {
     }
   }
 
-  static Future<void> _validatePreparedCandidate({
+  static Future<ValidatedRestoreCandidate> _validatePreparedCandidate({
     required Directory runDirectory,
     required RestoreReceipt receipt,
   }) async {
@@ -386,5 +449,6 @@ final class RestoreStartupGate {
             candidate.includeFiles) {
       throw StateError('restore_startup_candidate_selection');
     }
+    return candidate;
   }
 }

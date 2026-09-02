@@ -3250,6 +3250,54 @@ abstract class AppLocalizations {
   /// **'Kelivo\'s data is still in use by another app process. Close any other Kelivo window, then restart. Your chat data has not been opened by this process.'**
   String get backupRestoreBusinessLeaseUnavailableContent;
 
+  /// No description provided for @restoreProgressTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Restoring your backup'**
+  String get restoreProgressTitle;
+
+  /// No description provided for @restoreProgressWarning.
+  ///
+  /// In en, this message translates to:
+  /// **'Keep Kelivo open until this finishes. If you close it now, the next launch starts this over.'**
+  String get restoreProgressWarning;
+
+  /// No description provided for @restoreProgressStageCheckingBackup.
+  ///
+  /// In en, this message translates to:
+  /// **'Checking the backup'**
+  String get restoreProgressStageCheckingBackup;
+
+  /// No description provided for @restoreProgressStagePreservingCurrentData.
+  ///
+  /// In en, this message translates to:
+  /// **'Preserving your current data'**
+  String get restoreProgressStagePreservingCurrentData;
+
+  /// No description provided for @restoreProgressStageInstallingBackup.
+  ///
+  /// In en, this message translates to:
+  /// **'Installing the backup'**
+  String get restoreProgressStageInstallingBackup;
+
+  /// No description provided for @restoreProgressStageVerifying.
+  ///
+  /// In en, this message translates to:
+  /// **'Verifying'**
+  String get restoreProgressStageVerifying;
+
+  /// No description provided for @restoreProgressStageRollingBack.
+  ///
+  /// In en, this message translates to:
+  /// **'Restoring your previous data'**
+  String get restoreProgressStageRollingBack;
+
+  /// No description provided for @restoreProgressStageFinishing.
+  ///
+  /// In en, this message translates to:
+  /// **'Finishing up'**
+  String get restoreProgressStageFinishing;
+
   /// No description provided for @backupRestoreFailureRestartButton.
   ///
   /// In en, this message translates to:

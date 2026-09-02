@@ -27,6 +27,11 @@ final class RestoreBundleMover {
   final RestorePreviousStore previousStore;
   final RestoreDurability durability;
 
+  /// Moves the selected live objects into the pending previous bundle.
+  ///
+  /// Every move verifies its own result. Proving the whole pending payload is
+  /// [RestorePreviousStore.promotePending]'s job, which the caller must reach
+  /// before the bundle counts as preserved.
   Future<void> moveLiveToPending(PersistedRestorePrevious previous) async {
     if (p.normalize(previous.directory.absolute.path) !=
         p.normalize(previousStore.pendingDirectory.absolute.path)) {
@@ -37,7 +42,6 @@ final class RestoreBundleMover {
       await _movePreviousAssets(plan.assets!);
     }
     await _movePreviousDatabase(plan.database);
-    await previousStore.validateComplete(previous);
   }
 
   Future<void> installCandidate({
@@ -74,6 +78,10 @@ final class RestoreBundleMover {
     }
   }
 
+  /// Proves the candidate bundle is installed and out of the candidate tree.
+  ///
+  /// [previous] only binds the run identity here; the caller must already have
+  /// proven that bundle complete, which is what keeps rollback available.
   Future<void> validateInstalled({
     required RestoreReceipt receipt,
     required ValidatedRestoreCandidate candidate,
@@ -128,7 +136,6 @@ final class RestoreBundleMover {
         }
       }
     }
-    await previousStore.validateComplete(previous);
   }
 
   Future<void> validateRollbackStart({

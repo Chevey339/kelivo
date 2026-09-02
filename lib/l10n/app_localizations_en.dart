@@ -1706,6 +1706,32 @@ class AppLocalizationsEn extends AppLocalizations {
       'Kelivo\'s data is still in use by another app process. Close any other Kelivo window, then restart. Your chat data has not been opened by this process.';
 
   @override
+  String get restoreProgressTitle => 'Restoring your backup';
+
+  @override
+  String get restoreProgressWarning =>
+      'Keep Kelivo open until this finishes. If you close it now, the next launch starts this over.';
+
+  @override
+  String get restoreProgressStageCheckingBackup => 'Checking the backup';
+
+  @override
+  String get restoreProgressStagePreservingCurrentData =>
+      'Preserving your current data';
+
+  @override
+  String get restoreProgressStageInstallingBackup => 'Installing the backup';
+
+  @override
+  String get restoreProgressStageVerifying => 'Verifying';
+
+  @override
+  String get restoreProgressStageRollingBack => 'Restoring your previous data';
+
+  @override
+  String get restoreProgressStageFinishing => 'Finishing up';
+
+  @override
   String get backupRestoreFailureRestartButton => 'Restart Kelivo';
 
   @override

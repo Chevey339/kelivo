@@ -69,6 +69,7 @@ import 'utils/sandbox_path_resolver.dart';
 import 'shared/widgets/app_overlays.dart';
 import 'shared/widgets/snackbar.dart';
 import 'shared/widgets/restore_failure_screen.dart';
+import 'shared/widgets/restore_progress_screen.dart';
 import 'shared/widgets/restore_outcome_notice.dart';
 import 'shared/widgets/update_required_screen.dart';
 import 'package:system_fonts/system_fonts.dart';
@@ -108,6 +109,19 @@ Future<void> main() async {
       _initializeAndroidDisplayMode();
       final appDataDirectory = await AppDirectories.getAppDataDirectory();
       final RestoreReceipt? restoreOutcome;
+      // A restore large enough to take seconds would otherwise spend all of
+      // them before the first frame, which is indistinguishable from a hang.
+      // Only paint when there is actually work waiting: an ordinary launch
+      // must not pay for a frame it immediately replaces.
+      final restoreStage =
+          await RestoreStartupGate.hasPendingWork(
+            appDataDirectory: appDataDirectory,
+          )
+          ? ValueNotifier(RestoreStartupStage.checkingBackup)
+          : null;
+      if (restoreStage != null) {
+        runApp(_RestoreProgressApp(stage: restoreStage));
+      }
       try {
         // The lease remains process-owned through its internal registry until
         // process exit, preventing another instance from racing business I/O.
@@ -118,6 +132,9 @@ Future<void> main() async {
             await RestoreStartupGate.recoverAndRequireBusinessReady(
               appDataDirectory: appDataDirectory,
               businessLease: businessLease,
+              onStage: restoreStage == null
+                  ? null
+                  : (stage) => restoreStage.value = stage,
             );
       } catch (error, stackTrace) {
         stderr.writeln('[RestoreStartupGate] $error\n$stackTrace');
@@ -424,6 +441,30 @@ Future<void> _initRestoreFailureWindow() async {
     );
   } catch (error) {
     stderr.writeln('[RestoreFailureWindow] $error');
+  }
+}
+
+/// Persistence-free shell for [RestoreProgressScreen].
+///
+/// Deliberately built from defaults: the user's theme and locale live in the
+/// settings this restore may be replacing, and nothing here may open them.
+class _RestoreProgressApp extends StatelessWidget {
+  const _RestoreProgressApp({required this.stage});
+
+  final ValueNotifier<RestoreStartupStage> stage;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = ThemePalettes.defaultPalette;
+    return MaterialApp(
+      debugShowCheckedModeBanner: false,
+      title: 'Kelivo',
+      supportedLocales: AppLocalizations.supportedLocales,
+      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      theme: buildLightThemeForScheme(palette.light),
+      darkTheme: buildDarkThemeForScheme(palette.dark),
+      home: RestoreProgressScreen(stage: stage),
+    );
   }
 }
 

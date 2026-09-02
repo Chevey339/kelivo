@@ -118,6 +118,43 @@ void main() {
       );
     });
 
+    test('reports every cutover stage in order for a pending run', () async {
+      final liveDatabase = File(p.join(appData.path, 'kelivo.db'));
+      await _createDatabase(liveDatabase, conversationId: 'old');
+      final oldUpload = File(p.join(appData.path, 'upload', 'old.txt'));
+      await oldUpload.parent.create();
+      await oldUpload.writeAsString('old asset', flush: true);
+      await _prepareBundle(
+        root: root,
+        appData: appData,
+        directoryName: 'stage_source',
+        includeFiles: true,
+      );
+      expect(
+        await RestoreStartupGate.hasPendingWork(appDataDirectory: appData),
+        isTrue,
+      );
+
+      final stages = <RestoreStartupStage>[];
+      final terminal = await RestoreStartupGate.recoverAndRequireBusinessReady(
+        appDataDirectory: appData,
+        onStage: stages.add,
+      );
+
+      expect(terminal?.state, RestoreReceiptState.committed);
+      expect(stages, [
+        RestoreStartupStage.checkingBackup,
+        RestoreStartupStage.preservingCurrentData,
+        RestoreStartupStage.installingBackup,
+        RestoreStartupStage.verifying,
+        RestoreStartupStage.finishing,
+      ]);
+      expect(
+        await RestoreStartupGate.hasPendingWork(appDataDirectory: appData),
+        isFalse,
+      );
+    });
+
     test('rolls back and archives in the same startup pass', () async {
       final liveDatabase = File(p.join(appData.path, 'kelivo.db'));
       await _createDatabase(liveDatabase, conversationId: 'old');
@@ -135,12 +172,27 @@ void main() {
         delegate: RestorePlatformDurability(),
       );
 
+      final stages = <RestoreStartupStage>[];
       final terminal = await RestoreStartupGate.recoverAndRequireBusinessReady(
         appDataDirectory: appData,
         durability: durability,
+        onStage: stages.add,
       );
 
       expect(terminal?.state, RestoreReceiptState.rolledBack);
+      // Rollback re-derives the whole bundle from disk and outlasts the
+      // forward path, so it must not leave the screen on 'installingBackup'.
+      // It is reported twice because the compensating rollback and the
+      // terminal re-convergence each enter the phase; a listener holding the
+      // latest value sees one uninterrupted stage.
+      expect(stages, [
+        RestoreStartupStage.checkingBackup,
+        RestoreStartupStage.preservingCurrentData,
+        RestoreStartupStage.installingBackup,
+        RestoreStartupStage.rollingBack,
+        RestoreStartupStage.rollingBack,
+        RestoreStartupStage.finishing,
+      ]);
       expect(await _conversationIds(liveDatabase), ['old']);
       expect(await oldUpload.readAsString(), 'old asset');
       final archivedCandidate = File(

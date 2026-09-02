@@ -11,6 +11,7 @@ import 'restore_live_database.dart';
 import 'restore_previous_builder.dart';
 import 'restore_previous_store.dart';
 import 'restore_receipt.dart';
+import 'restore_startup_gate.dart';
 import 'restore_workspace_lock.dart';
 
 typedef _PreviousState = ({
@@ -52,6 +53,8 @@ final class RestoreCutoverExecutor {
     required RestoreWorkspaceLock workspaceLock,
     RestoreDurability? durability,
     bool archived = false,
+    ValidatedRestoreCandidate? validatedCandidate,
+    RestoreStartupStageSink? onStage,
   }) {
     final resolvedDurability = durability ?? RestorePlatformDurability();
     return RestoreCutoverExecutor._(
@@ -60,6 +63,8 @@ final class RestoreCutoverExecutor {
       workspaceLock: workspaceLock,
       durability: resolvedDurability,
       archived: archived,
+      validatedCandidate: validatedCandidate,
+      onStage: onStage,
     );
   }
 
@@ -69,7 +74,13 @@ final class RestoreCutoverExecutor {
     required this.workspaceLock,
     required this.durability,
     required bool archived,
-  }) : receiptStore = RestoreReceiptStore(
+    required ValidatedRestoreCandidate? validatedCandidate,
+    required this.onStage,
+  }) : _provenCandidate = validatedCandidate,
+       _proofHold = validatedCandidate == null
+           ? null
+           : workspaceLock.currentHold,
+       receiptStore = RestoreReceiptStore(
          appDataDirectory: appDataDirectory,
          runId: runId,
          durability: durability,
@@ -91,9 +102,22 @@ final class RestoreCutoverExecutor {
   final String runId;
   final RestoreWorkspaceLock workspaceLock;
   final RestoreDurability durability;
+  final RestoreStartupStageSink? onStage;
   final RestoreReceiptStore receiptStore;
   late final RestorePreviousStore previousStore;
   late final RestoreBundleMover mover;
+
+  // What this executor has already proven, and the workspace hold it proved
+  // them under. Within one hold, business persistence is closed and the lock
+  // keeps every other process out, so the only thing that can invalidate a
+  // proof is a move this executor itself performs -- rollback, which clears all
+  // three. The moment the hold changes or ends, every proof is dropped: a new
+  // process, or the same one after releasing the lock, re-derives the whole
+  // bundle from disk.
+  Object? _proofHold;
+  ValidatedRestoreCandidate? _provenCandidate;
+  PersistedRestorePrevious? _provenPrevious;
+  RestoreReceipt? _provenInstall;
 
   Directory get candidateDirectory =>
       Directory(p.join(receiptStore.runDirectory.path, 'candidate'));
@@ -107,6 +131,7 @@ final class RestoreCutoverExecutor {
       throw StateError('restore_cutover_receipt_history');
     }
     final preparedReceipt = history.first;
+    _dropProofsFromEarlierHolds();
     await workspaceLock.claimCutoverRunWhileWorkspaceLocked(
       runId: runId,
       observedMarkerFileName: observedMarkerFileName,
@@ -121,11 +146,16 @@ final class RestoreCutoverExecutor {
       final latest = history.last;
       switch (latest.state) {
         case RestoreReceiptState.prepared:
-          final candidate =
-              await RestoreBundleStaging.validateExistingCandidate(
-                candidateDirectory: candidateDirectory,
-                expectedManifestSha256: preparedReceipt.candidateManifestSha256,
-              );
+          var candidate = _memoizedCandidate(preparedReceipt);
+          if (candidate == null) {
+            onStage?.call(RestoreStartupStage.checkingBackup);
+            candidate = await RestoreBundleStaging.validateExistingCandidate(
+              candidateDirectory: candidateDirectory,
+              expectedManifestSha256: preparedReceipt.candidateManifestSha256,
+            );
+            _provenCandidate = candidate;
+          }
+          onStage?.call(RestoreStartupStage.preservingCurrentData);
           final previous = await _completePrevious(
             preparedReceipt: preparedReceipt,
             candidate: candidate,
@@ -138,6 +168,7 @@ final class RestoreCutoverExecutor {
           );
           continue;
         case RestoreReceiptState.oldRenamed:
+          onStage?.call(RestoreStartupStage.installingBackup);
           try {
             final state = await _loadPreviousState(preparedReceipt);
             await mover.installCandidate(
@@ -158,11 +189,9 @@ final class RestoreCutoverExecutor {
           continue;
         case RestoreReceiptState.newInstalled:
           try {
-            final state = await _loadPreviousState(preparedReceipt);
-            await mover.validateInstalled(
-              receipt: latest,
-              candidate: state.candidate,
-              previous: state.previous,
+            await _requireInstalled(
+              latest: latest,
+              preparedReceipt: preparedReceipt,
             );
           } catch (error, stackTrace) {
             return _rollbackAfterCutoverFailure(
@@ -178,11 +207,9 @@ final class RestoreCutoverExecutor {
           continue;
         case RestoreReceiptState.verified:
           try {
-            final state = await _loadPreviousState(preparedReceipt);
-            await mover.validateInstalled(
-              receipt: latest,
-              candidate: state.candidate,
-              previous: state.previous,
+            await _requireInstalled(
+              latest: latest,
+              preparedReceipt: preparedReceipt,
             );
           } catch (error, stackTrace) {
             return _rollbackAfterCutoverFailure(
@@ -198,6 +225,8 @@ final class RestoreCutoverExecutor {
         case RestoreReceiptState.committed:
           return revalidateTerminalWhileWorkspaceLocked(latest);
         case RestoreReceiptState.rollingBack:
+          _discardProofs();
+          onStage?.call(RestoreStartupStage.rollingBack);
           return _completeRollback(
             rollingBack: latest,
             preparedReceipt: preparedReceipt,
@@ -215,6 +244,7 @@ final class RestoreCutoverExecutor {
   Future<RestoreReceipt> revalidateTerminalWhileWorkspaceLocked(
     RestoreReceipt terminalReceipt,
   ) async {
+    _dropProofsFromEarlierHolds();
     final history = await receiptStore.readHistoryWhileWorkspaceLocked();
     if (history.isEmpty ||
         history.first.state != RestoreReceiptState.prepared ||
@@ -224,14 +254,13 @@ final class RestoreCutoverExecutor {
     final preparedReceipt = history.first;
     switch (terminalReceipt.state) {
       case RestoreReceiptState.committed:
-        final state = await _loadPreviousState(preparedReceipt);
-        await mover.validateInstalled(
-          receipt: terminalReceipt,
-          candidate: state.candidate,
-          previous: state.previous,
+        await _requireInstalled(
+          latest: terminalReceipt,
+          preparedReceipt: preparedReceipt,
         );
         return terminalReceipt;
       case RestoreReceiptState.rolledBack:
+        onStage?.call(RestoreStartupStage.rollingBack);
         final state = await _loadRollbackState(preparedReceipt);
         await mover.rollbackToPrevious(
           receipt: terminalReceipt,
@@ -284,6 +313,8 @@ final class RestoreCutoverExecutor {
       error: cutoverError,
       stackTrace: cutoverStackTrace,
     );
+    _discardProofs();
+    onStage?.call(RestoreStartupStage.rollingBack);
     try {
       return await _beginRollback(
         latest: latest,
@@ -354,15 +385,11 @@ final class RestoreCutoverExecutor {
       throw StateError('restore_cutover_previous_collision');
     }
     if (previousType == FileSystemEntityType.directory) {
-      final previous = await previousStore.readPrevious(
-        preparedReceipt: preparedReceipt,
-      );
-      await previousStore.validateComplete(previous);
+      final previous = await _readAndProvePrevious(preparedReceipt);
       return (previous: previous, candidate: candidate);
     }
 
     PersistedRestorePrevious pending;
-    var validateWholeLiveBeforeMove = false;
     final manifestType = await FileSystemEntity.type(
       p.join(previousStore.pendingDirectory.path, 'manifest.json'),
       followLinks: false,
@@ -390,18 +417,15 @@ final class RestoreCutoverExecutor {
         bundle: bundle,
         preparedReceipt: preparedReceipt,
       );
-      validateWholeLiveBeforeMove = true;
     }
-    if (validateWholeLiveBeforeMove) {
-      await RestorePreviousBuilder.validateLive(
-        appDataDirectory: appDataDirectory,
-        expected: pending.plan,
-      );
-    }
+    // No separate whole-tree re-scan before the move: every object the mover
+    // touches is matched against its planned descriptor as it moves, so live
+    // drift since the plan was built still fails closed.
     await mover.moveLiveToPending(pending);
     final previous = await previousStore.promotePending(
       preparedReceipt: preparedReceipt,
     );
+    _provenPrevious = previous;
     return (previous: previous, candidate: candidate);
   }
 
@@ -415,12 +439,70 @@ final class RestoreCutoverExecutor {
         FileSystemEntityType.notFound) {
       throw StateError('restore_cutover_pending_after_old_renamed');
     }
+    final previous =
+        _provenPrevious ?? await _readAndProvePrevious(preparedReceipt);
+    final candidate =
+        _memoizedCandidate(preparedReceipt) ??
+        await _readCandidateManifest(preparedReceipt);
+    _provenCandidate = candidate;
+    return (previous: previous, candidate: candidate);
+  }
+
+  /// Proves the installed bundle once per uninterrupted execution.
+  ///
+  /// `newInstalled`, `verified` and the terminal barrier all assert the same
+  /// filesystem state, and only receipt files are written between them, so the
+  /// first proof stands for all three. A later process re-proves from disk.
+  Future<void> _requireInstalled({
+    required RestoreReceipt latest,
+    required RestoreReceipt preparedReceipt,
+  }) async {
+    if (_provenInstall != null) return;
+    onStage?.call(RestoreStartupStage.verifying);
+    final state = await _loadPreviousState(preparedReceipt);
+    await mover.validateInstalled(
+      receipt: latest,
+      candidate: state.candidate,
+      previous: state.previous,
+    );
+    _provenInstall = latest;
+  }
+
+  Future<PersistedRestorePrevious> _readAndProvePrevious(
+    RestoreReceipt preparedReceipt,
+  ) async {
     final previous = await previousStore.readPrevious(
       preparedReceipt: preparedReceipt,
     );
     await previousStore.validateComplete(previous);
-    final candidate = await _readCandidateManifest(preparedReceipt);
-    return (previous: previous, candidate: candidate);
+    _provenPrevious = previous;
+    return previous;
+  }
+
+  ValidatedRestoreCandidate? _memoizedCandidate(
+    RestoreReceipt preparedReceipt,
+  ) {
+    final candidate = _provenCandidate;
+    return candidate != null &&
+            candidate.manifestSha256 == preparedReceipt.candidateManifestSha256
+        ? candidate
+        : null;
+  }
+
+  /// Drops every proof not made under the hold this call runs in.
+  ///
+  /// The lock having been released in between is enough to invalidate them,
+  /// whether or not anything actually changed.
+  void _dropProofsFromEarlierHolds() {
+    final hold = workspaceLock.currentHold;
+    if (hold == null || !identical(hold, _proofHold)) _discardProofs();
+    _proofHold = hold;
+  }
+
+  void _discardProofs() {
+    _provenCandidate = null;
+    _provenPrevious = null;
+    _provenInstall = null;
   }
 
   Future<_PreviousState> _loadRollbackState(

@@ -1646,6 +1646,30 @@ class AppLocalizationsZh extends AppLocalizations {
       'Kelivo 的数据仍被另一个应用进程占用。请关闭其他 Kelivo 窗口后重新启动；当前进程尚未打开聊天数据。';
 
   @override
+  String get restoreProgressTitle => '正在恢复备份';
+
+  @override
+  String get restoreProgressWarning => '请保持 Kelivo 开启直到完成。此时关闭应用，下次启动会从头再来一次。';
+
+  @override
+  String get restoreProgressStageCheckingBackup => '正在校验备份';
+
+  @override
+  String get restoreProgressStagePreservingCurrentData => '正在保留当前数据';
+
+  @override
+  String get restoreProgressStageInstallingBackup => '正在写入备份';
+
+  @override
+  String get restoreProgressStageVerifying => '正在验证';
+
+  @override
+  String get restoreProgressStageRollingBack => '正在恢复原有数据';
+
+  @override
+  String get restoreProgressStageFinishing => '即将完成';
+
+  @override
   String get backupRestoreFailureRestartButton => '重启 Kelivo';
 
   @override
@@ -10194,6 +10218,30 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
       'Kelivo 的数据仍被另一个应用进程占用。请关闭其他 Kelivo 窗口后重新启动；当前进程尚未打开聊天数据。';
 
   @override
+  String get restoreProgressTitle => '正在恢复备份';
+
+  @override
+  String get restoreProgressWarning => '请保持 Kelivo 开启直到完成。此时关闭应用，下次启动会从头再来一次。';
+
+  @override
+  String get restoreProgressStageCheckingBackup => '正在校验备份';
+
+  @override
+  String get restoreProgressStagePreservingCurrentData => '正在保留当前数据';
+
+  @override
+  String get restoreProgressStageInstallingBackup => '正在写入备份';
+
+  @override
+  String get restoreProgressStageVerifying => '正在验证';
+
+  @override
+  String get restoreProgressStageRollingBack => '正在恢复原有数据';
+
+  @override
+  String get restoreProgressStageFinishing => '即将完成';
+
+  @override
   String get backupRestoreFailureRestartButton => '重启 Kelivo';
 
   @override
@@ -18666,6 +18714,31 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   @override
   String get backupRestoreBusinessLeaseUnavailableContent =>
       'Kelivo 的資料仍由另一個應用程式程序使用。請關閉其他 Kelivo 視窗後重新啟動；目前程序尚未開啟聊天資料。';
+
+  @override
+  String get restoreProgressTitle => '正在還原備份';
+
+  @override
+  String get restoreProgressWarning =>
+      '請保持 Kelivo 開啟直到完成。此時關閉應用程式，下次啟動會從頭再來一次。';
+
+  @override
+  String get restoreProgressStageCheckingBackup => '正在驗證備份';
+
+  @override
+  String get restoreProgressStagePreservingCurrentData => '正在保留目前資料';
+
+  @override
+  String get restoreProgressStageInstallingBackup => '正在寫入備份';
+
+  @override
+  String get restoreProgressStageVerifying => '正在驗證';
+
+  @override
+  String get restoreProgressStageRollingBack => '正在還原原有資料';
+
+  @override
+  String get restoreProgressStageFinishing => '即將完成';
 
   @override
   String get backupRestoreFailureRestartButton => '重新啟動 Kelivo';

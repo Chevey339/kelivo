@@ -156,7 +156,10 @@ final class RestorePreviousStore {
         previous.plan.checksum != pending.plan.checksum) {
       throw StateError('restore_previous_promotion_identity');
     }
-    await validateComplete(previous);
+    // The payload was hashed in full one rename ago and a directory rename
+    // cannot alter file contents, so only the topology is re-checked here.
+    // Re-entry from another process still hashes everything, above.
+    await _requireCompleteTopLevel(previous.directory, previous.plan);
     return previous;
   }
 

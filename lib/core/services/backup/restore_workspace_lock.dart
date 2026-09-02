@@ -39,6 +39,7 @@ final class RestoreWorkspaceLock {
     r'^receipt_[0-9]{16}\.json\.[0-9]+_[0-9]+\.tmp$',
   );
   static final _localTails = <String, Future<void>>{};
+  static final _localHolds = <String, Object>{};
 
   final Directory appDataDirectory;
   final RestoreDurability? _durabilityOverride;
@@ -94,6 +95,15 @@ final class RestoreWorkspaceLock {
     });
   }
 
+  /// Identifies the uninterrupted hold this process currently has on the
+  /// workspace, or null when it holds nothing.
+  ///
+  /// Callers that carry a conclusion from one lock-held step to the next must
+  /// check the hold has not changed in between: releasing the lock, however
+  /// briefly, readmits every other process to the workspace.
+  Object? get currentHold =>
+      _localHolds[p.normalize(p.absolute(workspaceRoot.path))];
+
   Future<T> synchronized<T>(Future<T> Function() action) async {
     final lockKey = p.normalize(p.absolute(workspaceRoot.path));
     final previousTail = _localTails[lockKey] ?? Future<void>.value();
@@ -102,8 +112,18 @@ final class RestoreWorkspaceLock {
     _localTails[lockKey] = currentTail;
 
     await previousTail;
+    final hold = Object();
     try {
-      return await _withFileLock(action);
+      return await _withFileLock(() async {
+        _localHolds[lockKey] = hold;
+        try {
+          return await action();
+        } finally {
+          if (identical(_localHolds[lockKey], hold)) {
+            _localHolds.remove(lockKey);
+          }
+        }
+      });
     } finally {
       release.complete();
       if (identical(_localTails[lockKey], currentTail)) {
