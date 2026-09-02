@@ -6137,6 +6137,840 @@ class GenerationRunRowsCompanion extends UpdateCompanion<GenerationRunRow> {
   }
 }
 
+class $BridgeDeliveryRowsTable extends BridgeDeliveryRows
+    with TableInfo<$BridgeDeliveryRowsTable, BridgeDeliveryRow> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $BridgeDeliveryRowsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _originSystemMeta = const VerificationMeta(
+    'originSystem',
+  );
+  @override
+  late final GeneratedColumn<String> originSystem = GeneratedColumn<String>(
+    'origin_system',
+    aliasedName,
+    false,
+    check: () => originSystem.isNotValue(''),
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _originInstanceIdMeta = const VerificationMeta(
+    'originInstanceId',
+  );
+  @override
+  late final GeneratedColumn<String> originInstanceId = GeneratedColumn<String>(
+    'origin_instance_id',
+    aliasedName,
+    false,
+    check: () => originInstanceId.isNotValue(''),
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _idempotencyKeyMeta = const VerificationMeta(
+    'idempotencyKey',
+  );
+  @override
+  late final GeneratedColumn<String> idempotencyKey = GeneratedColumn<String>(
+    'idempotency_key',
+    aliasedName,
+    false,
+    check: () => idempotencyKey.isNotValue(''),
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _requestFingerprintMeta =
+      const VerificationMeta('requestFingerprint');
+  @override
+  late final GeneratedColumn<String> requestFingerprint =
+      GeneratedColumn<String>(
+        'request_fingerprint',
+        aliasedName,
+        false,
+        type: DriftSqlType.string,
+        requiredDuringInsert: true,
+      );
+  static const VerificationMeta _roomEventIdMeta = const VerificationMeta(
+    'roomEventId',
+  );
+  @override
+  late final GeneratedColumn<String> roomEventId = GeneratedColumn<String>(
+    'room_event_id',
+    aliasedName,
+    false,
+    check: () => roomEventId.isNotValue(''),
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _roomIdMeta = const VerificationMeta('roomId');
+  @override
+  late final GeneratedColumn<String> roomId = GeneratedColumn<String>(
+    'room_id',
+    aliasedName,
+    false,
+    check: () => roomId.isNotValue(''),
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _conversationIdMeta = const VerificationMeta(
+    'conversationId',
+  );
+  @override
+  late final GeneratedColumn<String> conversationId = GeneratedColumn<String>(
+    'conversation_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'REFERENCES conversation_rows (id) ON DELETE CASCADE',
+    ),
+  );
+  static const VerificationMeta _userRevisionIdMeta = const VerificationMeta(
+    'userRevisionId',
+  );
+  @override
+  late final GeneratedColumn<String> userRevisionId = GeneratedColumn<String>(
+    'user_revision_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'REFERENCES message_rows (id) ON DELETE CASCADE',
+    ),
+  );
+  static const VerificationMeta _assistantRevisionIdMeta =
+      const VerificationMeta('assistantRevisionId');
+  @override
+  late final GeneratedColumn<String> assistantRevisionId =
+      GeneratedColumn<String>(
+        'assistant_revision_id',
+        aliasedName,
+        false,
+        type: DriftSqlType.string,
+        requiredDuringInsert: true,
+        defaultConstraints: GeneratedColumn.constraintIsAlways(
+          'REFERENCES message_rows (id) ON DELETE CASCADE',
+        ),
+      );
+  static const VerificationMeta _generationRunIdMeta = const VerificationMeta(
+    'generationRunId',
+  );
+  @override
+  late final GeneratedColumn<String> generationRunId = GeneratedColumn<String>(
+    'generation_run_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'REFERENCES generation_run_rows (id) ON DELETE CASCADE',
+    ),
+  );
+  static const VerificationMeta _stateMeta = const VerificationMeta('state');
+  @override
+  late final GeneratedColumn<String> state = GeneratedColumn<String>(
+    'state',
+    aliasedName,
+    false,
+    check: () => state.isIn(const [
+      'preparing',
+      'requesting',
+      'streaming',
+      'waiting_tool',
+      'completed',
+      'failed',
+      'cancelled',
+      'interrupted',
+    ]),
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  @override
+  late final GeneratedColumnWithTypeConverter<DateTime, int> createdAt =
+      GeneratedColumn<int>(
+        'created_at',
+        aliasedName,
+        false,
+        type: DriftSqlType.int,
+        requiredDuringInsert: true,
+      ).withConverter<DateTime>($BridgeDeliveryRowsTable.$convertercreatedAt);
+  @override
+  late final GeneratedColumnWithTypeConverter<DateTime, int> updatedAt =
+      GeneratedColumn<int>(
+        'updated_at',
+        aliasedName,
+        false,
+        type: DriftSqlType.int,
+        requiredDuringInsert: true,
+      ).withConverter<DateTime>($BridgeDeliveryRowsTable.$converterupdatedAt);
+  @override
+  List<GeneratedColumn> get $columns => [
+    originSystem,
+    originInstanceId,
+    idempotencyKey,
+    requestFingerprint,
+    roomEventId,
+    roomId,
+    conversationId,
+    userRevisionId,
+    assistantRevisionId,
+    generationRunId,
+    state,
+    createdAt,
+    updatedAt,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'bridge_delivery_rows';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<BridgeDeliveryRow> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('origin_system')) {
+      context.handle(
+        _originSystemMeta,
+        originSystem.isAcceptableOrUnknown(
+          data['origin_system']!,
+          _originSystemMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_originSystemMeta);
+    }
+    if (data.containsKey('origin_instance_id')) {
+      context.handle(
+        _originInstanceIdMeta,
+        originInstanceId.isAcceptableOrUnknown(
+          data['origin_instance_id']!,
+          _originInstanceIdMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_originInstanceIdMeta);
+    }
+    if (data.containsKey('idempotency_key')) {
+      context.handle(
+        _idempotencyKeyMeta,
+        idempotencyKey.isAcceptableOrUnknown(
+          data['idempotency_key']!,
+          _idempotencyKeyMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_idempotencyKeyMeta);
+    }
+    if (data.containsKey('request_fingerprint')) {
+      context.handle(
+        _requestFingerprintMeta,
+        requestFingerprint.isAcceptableOrUnknown(
+          data['request_fingerprint']!,
+          _requestFingerprintMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_requestFingerprintMeta);
+    }
+    if (data.containsKey('room_event_id')) {
+      context.handle(
+        _roomEventIdMeta,
+        roomEventId.isAcceptableOrUnknown(
+          data['room_event_id']!,
+          _roomEventIdMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_roomEventIdMeta);
+    }
+    if (data.containsKey('room_id')) {
+      context.handle(
+        _roomIdMeta,
+        roomId.isAcceptableOrUnknown(data['room_id']!, _roomIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_roomIdMeta);
+    }
+    if (data.containsKey('conversation_id')) {
+      context.handle(
+        _conversationIdMeta,
+        conversationId.isAcceptableOrUnknown(
+          data['conversation_id']!,
+          _conversationIdMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_conversationIdMeta);
+    }
+    if (data.containsKey('user_revision_id')) {
+      context.handle(
+        _userRevisionIdMeta,
+        userRevisionId.isAcceptableOrUnknown(
+          data['user_revision_id']!,
+          _userRevisionIdMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_userRevisionIdMeta);
+    }
+    if (data.containsKey('assistant_revision_id')) {
+      context.handle(
+        _assistantRevisionIdMeta,
+        assistantRevisionId.isAcceptableOrUnknown(
+          data['assistant_revision_id']!,
+          _assistantRevisionIdMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_assistantRevisionIdMeta);
+    }
+    if (data.containsKey('generation_run_id')) {
+      context.handle(
+        _generationRunIdMeta,
+        generationRunId.isAcceptableOrUnknown(
+          data['generation_run_id']!,
+          _generationRunIdMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_generationRunIdMeta);
+    }
+    if (data.containsKey('state')) {
+      context.handle(
+        _stateMeta,
+        state.isAcceptableOrUnknown(data['state']!, _stateMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_stateMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {originInstanceId, idempotencyKey};
+  @override
+  BridgeDeliveryRow map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return BridgeDeliveryRow(
+      originSystem: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}origin_system'],
+      )!,
+      originInstanceId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}origin_instance_id'],
+      )!,
+      idempotencyKey: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}idempotency_key'],
+      )!,
+      requestFingerprint: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}request_fingerprint'],
+      )!,
+      roomEventId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}room_event_id'],
+      )!,
+      roomId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}room_id'],
+      )!,
+      conversationId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}conversation_id'],
+      )!,
+      userRevisionId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}user_revision_id'],
+      )!,
+      assistantRevisionId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}assistant_revision_id'],
+      )!,
+      generationRunId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}generation_run_id'],
+      )!,
+      state: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}state'],
+      )!,
+      createdAt: $BridgeDeliveryRowsTable.$convertercreatedAt.fromSql(
+        attachedDatabase.typeMapping.read(
+          DriftSqlType.int,
+          data['${effectivePrefix}created_at'],
+        )!,
+      ),
+      updatedAt: $BridgeDeliveryRowsTable.$converterupdatedAt.fromSql(
+        attachedDatabase.typeMapping.read(
+          DriftSqlType.int,
+          data['${effectivePrefix}updated_at'],
+        )!,
+      ),
+    );
+  }
+
+  @override
+  $BridgeDeliveryRowsTable createAlias(String alias) {
+    return $BridgeDeliveryRowsTable(attachedDatabase, alias);
+  }
+
+  static TypeConverter<DateTime, int> $convertercreatedAt =
+      const MicrosecondDateTimeConverter();
+  static TypeConverter<DateTime, int> $converterupdatedAt =
+      const MicrosecondDateTimeConverter();
+}
+
+class BridgeDeliveryRow extends DataClass
+    implements Insertable<BridgeDeliveryRow> {
+  final String originSystem;
+  final String originInstanceId;
+  final String idempotencyKey;
+  final String requestFingerprint;
+  final String roomEventId;
+  final String roomId;
+  final String conversationId;
+  final String userRevisionId;
+  final String assistantRevisionId;
+  final String generationRunId;
+  final String state;
+  final DateTime createdAt;
+  final DateTime updatedAt;
+  const BridgeDeliveryRow({
+    required this.originSystem,
+    required this.originInstanceId,
+    required this.idempotencyKey,
+    required this.requestFingerprint,
+    required this.roomEventId,
+    required this.roomId,
+    required this.conversationId,
+    required this.userRevisionId,
+    required this.assistantRevisionId,
+    required this.generationRunId,
+    required this.state,
+    required this.createdAt,
+    required this.updatedAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['origin_system'] = Variable<String>(originSystem);
+    map['origin_instance_id'] = Variable<String>(originInstanceId);
+    map['idempotency_key'] = Variable<String>(idempotencyKey);
+    map['request_fingerprint'] = Variable<String>(requestFingerprint);
+    map['room_event_id'] = Variable<String>(roomEventId);
+    map['room_id'] = Variable<String>(roomId);
+    map['conversation_id'] = Variable<String>(conversationId);
+    map['user_revision_id'] = Variable<String>(userRevisionId);
+    map['assistant_revision_id'] = Variable<String>(assistantRevisionId);
+    map['generation_run_id'] = Variable<String>(generationRunId);
+    map['state'] = Variable<String>(state);
+    {
+      map['created_at'] = Variable<int>(
+        $BridgeDeliveryRowsTable.$convertercreatedAt.toSql(createdAt),
+      );
+    }
+    {
+      map['updated_at'] = Variable<int>(
+        $BridgeDeliveryRowsTable.$converterupdatedAt.toSql(updatedAt),
+      );
+    }
+    return map;
+  }
+
+  BridgeDeliveryRowsCompanion toCompanion(bool nullToAbsent) {
+    return BridgeDeliveryRowsCompanion(
+      originSystem: Value(originSystem),
+      originInstanceId: Value(originInstanceId),
+      idempotencyKey: Value(idempotencyKey),
+      requestFingerprint: Value(requestFingerprint),
+      roomEventId: Value(roomEventId),
+      roomId: Value(roomId),
+      conversationId: Value(conversationId),
+      userRevisionId: Value(userRevisionId),
+      assistantRevisionId: Value(assistantRevisionId),
+      generationRunId: Value(generationRunId),
+      state: Value(state),
+      createdAt: Value(createdAt),
+      updatedAt: Value(updatedAt),
+    );
+  }
+
+  factory BridgeDeliveryRow.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return BridgeDeliveryRow(
+      originSystem: serializer.fromJson<String>(json['originSystem']),
+      originInstanceId: serializer.fromJson<String>(json['originInstanceId']),
+      idempotencyKey: serializer.fromJson<String>(json['idempotencyKey']),
+      requestFingerprint: serializer.fromJson<String>(
+        json['requestFingerprint'],
+      ),
+      roomEventId: serializer.fromJson<String>(json['roomEventId']),
+      roomId: serializer.fromJson<String>(json['roomId']),
+      conversationId: serializer.fromJson<String>(json['conversationId']),
+      userRevisionId: serializer.fromJson<String>(json['userRevisionId']),
+      assistantRevisionId: serializer.fromJson<String>(
+        json['assistantRevisionId'],
+      ),
+      generationRunId: serializer.fromJson<String>(json['generationRunId']),
+      state: serializer.fromJson<String>(json['state']),
+      createdAt: serializer.fromJson<DateTime>(json['createdAt']),
+      updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'originSystem': serializer.toJson<String>(originSystem),
+      'originInstanceId': serializer.toJson<String>(originInstanceId),
+      'idempotencyKey': serializer.toJson<String>(idempotencyKey),
+      'requestFingerprint': serializer.toJson<String>(requestFingerprint),
+      'roomEventId': serializer.toJson<String>(roomEventId),
+      'roomId': serializer.toJson<String>(roomId),
+      'conversationId': serializer.toJson<String>(conversationId),
+      'userRevisionId': serializer.toJson<String>(userRevisionId),
+      'assistantRevisionId': serializer.toJson<String>(assistantRevisionId),
+      'generationRunId': serializer.toJson<String>(generationRunId),
+      'state': serializer.toJson<String>(state),
+      'createdAt': serializer.toJson<DateTime>(createdAt),
+      'updatedAt': serializer.toJson<DateTime>(updatedAt),
+    };
+  }
+
+  BridgeDeliveryRow copyWith({
+    String? originSystem,
+    String? originInstanceId,
+    String? idempotencyKey,
+    String? requestFingerprint,
+    String? roomEventId,
+    String? roomId,
+    String? conversationId,
+    String? userRevisionId,
+    String? assistantRevisionId,
+    String? generationRunId,
+    String? state,
+    DateTime? createdAt,
+    DateTime? updatedAt,
+  }) => BridgeDeliveryRow(
+    originSystem: originSystem ?? this.originSystem,
+    originInstanceId: originInstanceId ?? this.originInstanceId,
+    idempotencyKey: idempotencyKey ?? this.idempotencyKey,
+    requestFingerprint: requestFingerprint ?? this.requestFingerprint,
+    roomEventId: roomEventId ?? this.roomEventId,
+    roomId: roomId ?? this.roomId,
+    conversationId: conversationId ?? this.conversationId,
+    userRevisionId: userRevisionId ?? this.userRevisionId,
+    assistantRevisionId: assistantRevisionId ?? this.assistantRevisionId,
+    generationRunId: generationRunId ?? this.generationRunId,
+    state: state ?? this.state,
+    createdAt: createdAt ?? this.createdAt,
+    updatedAt: updatedAt ?? this.updatedAt,
+  );
+  BridgeDeliveryRow copyWithCompanion(BridgeDeliveryRowsCompanion data) {
+    return BridgeDeliveryRow(
+      originSystem: data.originSystem.present
+          ? data.originSystem.value
+          : this.originSystem,
+      originInstanceId: data.originInstanceId.present
+          ? data.originInstanceId.value
+          : this.originInstanceId,
+      idempotencyKey: data.idempotencyKey.present
+          ? data.idempotencyKey.value
+          : this.idempotencyKey,
+      requestFingerprint: data.requestFingerprint.present
+          ? data.requestFingerprint.value
+          : this.requestFingerprint,
+      roomEventId: data.roomEventId.present
+          ? data.roomEventId.value
+          : this.roomEventId,
+      roomId: data.roomId.present ? data.roomId.value : this.roomId,
+      conversationId: data.conversationId.present
+          ? data.conversationId.value
+          : this.conversationId,
+      userRevisionId: data.userRevisionId.present
+          ? data.userRevisionId.value
+          : this.userRevisionId,
+      assistantRevisionId: data.assistantRevisionId.present
+          ? data.assistantRevisionId.value
+          : this.assistantRevisionId,
+      generationRunId: data.generationRunId.present
+          ? data.generationRunId.value
+          : this.generationRunId,
+      state: data.state.present ? data.state.value : this.state,
+      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('BridgeDeliveryRow(')
+          ..write('originSystem: $originSystem, ')
+          ..write('originInstanceId: $originInstanceId, ')
+          ..write('idempotencyKey: $idempotencyKey, ')
+          ..write('requestFingerprint: $requestFingerprint, ')
+          ..write('roomEventId: $roomEventId, ')
+          ..write('roomId: $roomId, ')
+          ..write('conversationId: $conversationId, ')
+          ..write('userRevisionId: $userRevisionId, ')
+          ..write('assistantRevisionId: $assistantRevisionId, ')
+          ..write('generationRunId: $generationRunId, ')
+          ..write('state: $state, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('updatedAt: $updatedAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    originSystem,
+    originInstanceId,
+    idempotencyKey,
+    requestFingerprint,
+    roomEventId,
+    roomId,
+    conversationId,
+    userRevisionId,
+    assistantRevisionId,
+    generationRunId,
+    state,
+    createdAt,
+    updatedAt,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is BridgeDeliveryRow &&
+          other.originSystem == this.originSystem &&
+          other.originInstanceId == this.originInstanceId &&
+          other.idempotencyKey == this.idempotencyKey &&
+          other.requestFingerprint == this.requestFingerprint &&
+          other.roomEventId == this.roomEventId &&
+          other.roomId == this.roomId &&
+          other.conversationId == this.conversationId &&
+          other.userRevisionId == this.userRevisionId &&
+          other.assistantRevisionId == this.assistantRevisionId &&
+          other.generationRunId == this.generationRunId &&
+          other.state == this.state &&
+          other.createdAt == this.createdAt &&
+          other.updatedAt == this.updatedAt);
+}
+
+class BridgeDeliveryRowsCompanion extends UpdateCompanion<BridgeDeliveryRow> {
+  final Value<String> originSystem;
+  final Value<String> originInstanceId;
+  final Value<String> idempotencyKey;
+  final Value<String> requestFingerprint;
+  final Value<String> roomEventId;
+  final Value<String> roomId;
+  final Value<String> conversationId;
+  final Value<String> userRevisionId;
+  final Value<String> assistantRevisionId;
+  final Value<String> generationRunId;
+  final Value<String> state;
+  final Value<DateTime> createdAt;
+  final Value<DateTime> updatedAt;
+  final Value<int> rowid;
+  const BridgeDeliveryRowsCompanion({
+    this.originSystem = const Value.absent(),
+    this.originInstanceId = const Value.absent(),
+    this.idempotencyKey = const Value.absent(),
+    this.requestFingerprint = const Value.absent(),
+    this.roomEventId = const Value.absent(),
+    this.roomId = const Value.absent(),
+    this.conversationId = const Value.absent(),
+    this.userRevisionId = const Value.absent(),
+    this.assistantRevisionId = const Value.absent(),
+    this.generationRunId = const Value.absent(),
+    this.state = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  BridgeDeliveryRowsCompanion.insert({
+    required String originSystem,
+    required String originInstanceId,
+    required String idempotencyKey,
+    required String requestFingerprint,
+    required String roomEventId,
+    required String roomId,
+    required String conversationId,
+    required String userRevisionId,
+    required String assistantRevisionId,
+    required String generationRunId,
+    required String state,
+    required DateTime createdAt,
+    required DateTime updatedAt,
+    this.rowid = const Value.absent(),
+  }) : originSystem = Value(originSystem),
+       originInstanceId = Value(originInstanceId),
+       idempotencyKey = Value(idempotencyKey),
+       requestFingerprint = Value(requestFingerprint),
+       roomEventId = Value(roomEventId),
+       roomId = Value(roomId),
+       conversationId = Value(conversationId),
+       userRevisionId = Value(userRevisionId),
+       assistantRevisionId = Value(assistantRevisionId),
+       generationRunId = Value(generationRunId),
+       state = Value(state),
+       createdAt = Value(createdAt),
+       updatedAt = Value(updatedAt);
+  static Insertable<BridgeDeliveryRow> custom({
+    Expression<String>? originSystem,
+    Expression<String>? originInstanceId,
+    Expression<String>? idempotencyKey,
+    Expression<String>? requestFingerprint,
+    Expression<String>? roomEventId,
+    Expression<String>? roomId,
+    Expression<String>? conversationId,
+    Expression<String>? userRevisionId,
+    Expression<String>? assistantRevisionId,
+    Expression<String>? generationRunId,
+    Expression<String>? state,
+    Expression<int>? createdAt,
+    Expression<int>? updatedAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (originSystem != null) 'origin_system': originSystem,
+      if (originInstanceId != null) 'origin_instance_id': originInstanceId,
+      if (idempotencyKey != null) 'idempotency_key': idempotencyKey,
+      if (requestFingerprint != null) 'request_fingerprint': requestFingerprint,
+      if (roomEventId != null) 'room_event_id': roomEventId,
+      if (roomId != null) 'room_id': roomId,
+      if (conversationId != null) 'conversation_id': conversationId,
+      if (userRevisionId != null) 'user_revision_id': userRevisionId,
+      if (assistantRevisionId != null)
+        'assistant_revision_id': assistantRevisionId,
+      if (generationRunId != null) 'generation_run_id': generationRunId,
+      if (state != null) 'state': state,
+      if (createdAt != null) 'created_at': createdAt,
+      if (updatedAt != null) 'updated_at': updatedAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  BridgeDeliveryRowsCompanion copyWith({
+    Value<String>? originSystem,
+    Value<String>? originInstanceId,
+    Value<String>? idempotencyKey,
+    Value<String>? requestFingerprint,
+    Value<String>? roomEventId,
+    Value<String>? roomId,
+    Value<String>? conversationId,
+    Value<String>? userRevisionId,
+    Value<String>? assistantRevisionId,
+    Value<String>? generationRunId,
+    Value<String>? state,
+    Value<DateTime>? createdAt,
+    Value<DateTime>? updatedAt,
+    Value<int>? rowid,
+  }) {
+    return BridgeDeliveryRowsCompanion(
+      originSystem: originSystem ?? this.originSystem,
+      originInstanceId: originInstanceId ?? this.originInstanceId,
+      idempotencyKey: idempotencyKey ?? this.idempotencyKey,
+      requestFingerprint: requestFingerprint ?? this.requestFingerprint,
+      roomEventId: roomEventId ?? this.roomEventId,
+      roomId: roomId ?? this.roomId,
+      conversationId: conversationId ?? this.conversationId,
+      userRevisionId: userRevisionId ?? this.userRevisionId,
+      assistantRevisionId: assistantRevisionId ?? this.assistantRevisionId,
+      generationRunId: generationRunId ?? this.generationRunId,
+      state: state ?? this.state,
+      createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (originSystem.present) {
+      map['origin_system'] = Variable<String>(originSystem.value);
+    }
+    if (originInstanceId.present) {
+      map['origin_instance_id'] = Variable<String>(originInstanceId.value);
+    }
+    if (idempotencyKey.present) {
+      map['idempotency_key'] = Variable<String>(idempotencyKey.value);
+    }
+    if (requestFingerprint.present) {
+      map['request_fingerprint'] = Variable<String>(requestFingerprint.value);
+    }
+    if (roomEventId.present) {
+      map['room_event_id'] = Variable<String>(roomEventId.value);
+    }
+    if (roomId.present) {
+      map['room_id'] = Variable<String>(roomId.value);
+    }
+    if (conversationId.present) {
+      map['conversation_id'] = Variable<String>(conversationId.value);
+    }
+    if (userRevisionId.present) {
+      map['user_revision_id'] = Variable<String>(userRevisionId.value);
+    }
+    if (assistantRevisionId.present) {
+      map['assistant_revision_id'] = Variable<String>(
+        assistantRevisionId.value,
+      );
+    }
+    if (generationRunId.present) {
+      map['generation_run_id'] = Variable<String>(generationRunId.value);
+    }
+    if (state.present) {
+      map['state'] = Variable<String>(state.value);
+    }
+    if (createdAt.present) {
+      map['created_at'] = Variable<int>(
+        $BridgeDeliveryRowsTable.$convertercreatedAt.toSql(createdAt.value),
+      );
+    }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<int>(
+        $BridgeDeliveryRowsTable.$converterupdatedAt.toSql(updatedAt.value),
+      );
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('BridgeDeliveryRowsCompanion(')
+          ..write('originSystem: $originSystem, ')
+          ..write('originInstanceId: $originInstanceId, ')
+          ..write('idempotencyKey: $idempotencyKey, ')
+          ..write('requestFingerprint: $requestFingerprint, ')
+          ..write('roomEventId: $roomEventId, ')
+          ..write('roomId: $roomId, ')
+          ..write('conversationId: $conversationId, ')
+          ..write('userRevisionId: $userRevisionId, ')
+          ..write('assistantRevisionId: $assistantRevisionId, ')
+          ..write('generationRunId: $generationRunId, ')
+          ..write('state: $state, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 class $AssistantRowsTable extends AssistantRows
     with TableInfo<$AssistantRowsTable, AssistantRow> {
   @override
@@ -12104,6 +12938,8 @@ abstract class _$AppDatabase extends GeneratedDatabase {
       $AssetReferenceDirtyRowsTable(this);
   late final $GenerationRunRowsTable generationRunRows =
       $GenerationRunRowsTable(this);
+  late final $BridgeDeliveryRowsTable bridgeDeliveryRows =
+      $BridgeDeliveryRowsTable(this);
   late final $AssistantRowsTable assistantRows = $AssistantRowsTable(this);
   late final $ProviderRowsTable providerRows = $ProviderRowsTable(this);
   late final $ProviderGroupRowsTable providerGroupRows =
@@ -12178,6 +13014,14 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     'idx_generation_runs_state_updated',
     'CREATE INDEX idx_generation_runs_state_updated ON generation_run_rows (state, updated_at, id)',
   );
+  late final Index idxBridgeDeliveriesRoomEvent = Index(
+    'idx_bridge_deliveries_room_event',
+    'CREATE INDEX idx_bridge_deliveries_room_event ON bridge_delivery_rows (origin_instance_id, room_event_id)',
+  );
+  late final Index idxBridgeDeliveriesConversationCreated = Index(
+    'idx_bridge_deliveries_conversation_created',
+    'CREATE INDEX idx_bridge_deliveries_conversation_created ON bridge_delivery_rows (conversation_id, created_at)',
+  );
   late final Index idxAssistantMemoriesAssistant = Index(
     'idx_assistant_memories_assistant',
     'CREATE INDEX idx_assistant_memories_assistant ON assistant_memory_rows (assistant_id, id)',
@@ -12219,6 +13063,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     gcAuditRows,
     assetReferenceDirtyRows,
     generationRunRows,
+    bridgeDeliveryRows,
     assistantRows,
     providerRows,
     providerGroupRows,
@@ -12247,6 +13092,8 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     idxMessageAssetsAsset,
     idxGenerationRunsActiveTarget,
     idxGenerationRunsStateUpdated,
+    idxBridgeDeliveriesRoomEvent,
+    idxBridgeDeliveriesConversationCreated,
     idxAssistantMemoriesAssistant,
     idxMemoryEntriesVisible,
     idxMemoryEntriesRecent,
@@ -12308,6 +13155,34 @@ abstract class _$AppDatabase extends GeneratedDatabase {
         limitUpdateKind: UpdateKind.delete,
       ),
       result: [TableUpdate('generation_run_rows', kind: UpdateKind.delete)],
+    ),
+    WritePropagation(
+      on: TableUpdateQuery.onTableName(
+        'conversation_rows',
+        limitUpdateKind: UpdateKind.delete,
+      ),
+      result: [TableUpdate('bridge_delivery_rows', kind: UpdateKind.delete)],
+    ),
+    WritePropagation(
+      on: TableUpdateQuery.onTableName(
+        'message_rows',
+        limitUpdateKind: UpdateKind.delete,
+      ),
+      result: [TableUpdate('bridge_delivery_rows', kind: UpdateKind.delete)],
+    ),
+    WritePropagation(
+      on: TableUpdateQuery.onTableName(
+        'message_rows',
+        limitUpdateKind: UpdateKind.delete,
+      ),
+      result: [TableUpdate('bridge_delivery_rows', kind: UpdateKind.delete)],
+    ),
+    WritePropagation(
+      on: TableUpdateQuery.onTableName(
+        'generation_run_rows',
+        limitUpdateKind: UpdateKind.delete,
+      ),
+      result: [TableUpdate('bridge_delivery_rows', kind: UpdateKind.delete)],
     ),
   ]);
 }
@@ -12423,6 +13298,28 @@ final class $$ConversationRowsTableReferences
 
     final cache = $_typedResult.readTableOrNull(
       _generationRunRowsRefsTable($_db),
+    );
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: cache),
+    );
+  }
+
+  static MultiTypedResultKey<$BridgeDeliveryRowsTable, List<BridgeDeliveryRow>>
+  _bridgeDeliveryRowsRefsTable(_$AppDatabase db) =>
+      MultiTypedResultKey.fromTable(
+        db.bridgeDeliveryRows,
+        aliasName:
+            'conversation_rows__id__bridge_delivery_rows__conversation_id',
+      );
+
+  $$BridgeDeliveryRowsTableProcessedTableManager get bridgeDeliveryRowsRefs {
+    final manager = $$BridgeDeliveryRowsTableTableManager(
+      $_db,
+      $_db.bridgeDeliveryRows,
+    ).filter((f) => f.conversationId.id.sqlEquals($_itemColumn<String>('id')!));
+
+    final cache = $_typedResult.readTableOrNull(
+      _bridgeDeliveryRowsRefsTable($_db),
     );
     return ProcessedTableManager(
       manager.$state.copyWith(prefetchedData: cache),
@@ -12589,6 +13486,31 @@ class $$ConversationRowsTableFilterComposer
           }) => $$GenerationRunRowsTableFilterComposer(
             $db: $db,
             $table: $db.generationRunRows,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
+
+  Expression<bool> bridgeDeliveryRowsRefs(
+    Expression<bool> Function($$BridgeDeliveryRowsTableFilterComposer f) f,
+  ) {
+    final $$BridgeDeliveryRowsTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.bridgeDeliveryRows,
+      getReferencedColumn: (t) => t.conversationId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$BridgeDeliveryRowsTableFilterComposer(
+            $db: $db,
+            $table: $db.bridgeDeliveryRows,
             $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
             joinBuilder: joinBuilder,
             $removeJoinBuilderFromRootComposer:
@@ -12843,6 +13765,32 @@ class $$ConversationRowsTableAnnotationComposer
         );
     return f(composer);
   }
+
+  Expression<T> bridgeDeliveryRowsRefs<T extends Object>(
+    Expression<T> Function($$BridgeDeliveryRowsTableAnnotationComposer a) f,
+  ) {
+    final $$BridgeDeliveryRowsTableAnnotationComposer composer =
+        $composerBuilder(
+          composer: this,
+          getCurrentColumn: (t) => t.id,
+          referencedTable: $db.bridgeDeliveryRows,
+          getReferencedColumn: (t) => t.conversationId,
+          builder:
+              (
+                joinBuilder, {
+                $addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer,
+              }) => $$BridgeDeliveryRowsTableAnnotationComposer(
+                $db: $db,
+                $table: $db.bridgeDeliveryRows,
+                $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+                joinBuilder: joinBuilder,
+                $removeJoinBuilderFromRootComposer:
+                    $removeJoinBuilderFromRootComposer,
+              ),
+        );
+    return f(composer);
+  }
 }
 
 class $$ConversationRowsTableTableManager
@@ -12862,6 +13810,7 @@ class $$ConversationRowsTableTableManager
             bool messageRowsRefs,
             bool conversationMcpServerRowsRefs,
             bool generationRunRowsRefs,
+            bool bridgeDeliveryRowsRefs,
           })
         > {
   $$ConversationRowsTableTableManager(
@@ -12966,6 +13915,7 @@ class $$ConversationRowsTableTableManager
                 messageRowsRefs = false,
                 conversationMcpServerRowsRefs = false,
                 generationRunRowsRefs = false,
+                bridgeDeliveryRowsRefs = false,
               }) {
                 return PrefetchHooks(
                   db: db,
@@ -12974,6 +13924,7 @@ class $$ConversationRowsTableTableManager
                     if (conversationMcpServerRowsRefs)
                       db.conversationMcpServerRows,
                     if (generationRunRowsRefs) db.generationRunRows,
+                    if (bridgeDeliveryRowsRefs) db.bridgeDeliveryRows,
                   ],
                   addJoins: null,
                   getPrefetchedDataCallback: (items) async {
@@ -13041,6 +13992,27 @@ class $$ConversationRowsTableTableManager
                               ),
                           typedResults: items,
                         ),
+                      if (bridgeDeliveryRowsRefs)
+                        await $_getPrefetchedData<
+                          ConversationRow,
+                          $ConversationRowsTable,
+                          BridgeDeliveryRow
+                        >(
+                          currentTable: table,
+                          referencedTable: $$ConversationRowsTableReferences
+                              ._bridgeDeliveryRowsRefsTable(db),
+                          managerFromTypedResult: (p0) =>
+                              $$ConversationRowsTableReferences(
+                                db,
+                                table,
+                                p0,
+                              ).bridgeDeliveryRowsRefs,
+                          referencedItemsForCurrentItem:
+                              (item, referencedItems) => referencedItems.where(
+                                (e) => e.conversationId == item.id,
+                              ),
+                          typedResults: items,
+                        ),
                     ];
                   },
                 );
@@ -13065,6 +14037,7 @@ typedef $$ConversationRowsTableProcessedTableManager =
         bool messageRowsRefs,
         bool conversationMcpServerRowsRefs,
         bool generationRunRowsRefs,
+        bool bridgeDeliveryRowsRefs,
       })
     >;
 typedef $$MessageRowsTableCreateCompanionBuilder =
@@ -13181,6 +14154,52 @@ final class $$MessageRowsTableReferences
 
     final cache = $_typedResult.readTableOrNull(
       _assetReferenceDirtyRowsRefsTable($_db),
+    );
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: cache),
+    );
+  }
+
+  static MultiTypedResultKey<$BridgeDeliveryRowsTable, List<BridgeDeliveryRow>>
+  _bridgeUserDeliveriesTable(_$AppDatabase db) => MultiTypedResultKey.fromTable(
+    db.bridgeDeliveryRows,
+    aliasName: 'message_rows__id__bridge_delivery_rows__user_revision_id',
+  );
+
+  $$BridgeDeliveryRowsTableProcessedTableManager get bridgeUserDeliveries {
+    final manager = $$BridgeDeliveryRowsTableTableManager(
+      $_db,
+      $_db.bridgeDeliveryRows,
+    ).filter((f) => f.userRevisionId.id.sqlEquals($_itemColumn<String>('id')!));
+
+    final cache = $_typedResult.readTableOrNull(
+      _bridgeUserDeliveriesTable($_db),
+    );
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: cache),
+    );
+  }
+
+  static MultiTypedResultKey<$BridgeDeliveryRowsTable, List<BridgeDeliveryRow>>
+  _bridgeAssistantDeliveriesTable(_$AppDatabase db) =>
+      MultiTypedResultKey.fromTable(
+        db.bridgeDeliveryRows,
+        aliasName:
+            'message_rows__id__bridge_delivery_rows__assistant_revision_id',
+      );
+
+  $$BridgeDeliveryRowsTableProcessedTableManager get bridgeAssistantDeliveries {
+    final manager =
+        $$BridgeDeliveryRowsTableTableManager(
+          $_db,
+          $_db.bridgeDeliveryRows,
+        ).filter(
+          (f) =>
+              f.assistantRevisionId.id.sqlEquals($_itemColumn<String>('id')!),
+        );
+
+    final cache = $_typedResult.readTableOrNull(
+      _bridgeAssistantDeliveriesTable($_db),
     );
     return ProcessedTableManager(
       manager.$state.copyWith(prefetchedData: cache),
@@ -13377,6 +14396,56 @@ class $$MessageRowsTableFilterComposer
                     $removeJoinBuilderFromRootComposer,
               ),
         );
+    return f(composer);
+  }
+
+  Expression<bool> bridgeUserDeliveries(
+    Expression<bool> Function($$BridgeDeliveryRowsTableFilterComposer f) f,
+  ) {
+    final $$BridgeDeliveryRowsTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.bridgeDeliveryRows,
+      getReferencedColumn: (t) => t.userRevisionId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$BridgeDeliveryRowsTableFilterComposer(
+            $db: $db,
+            $table: $db.bridgeDeliveryRows,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
+
+  Expression<bool> bridgeAssistantDeliveries(
+    Expression<bool> Function($$BridgeDeliveryRowsTableFilterComposer f) f,
+  ) {
+    final $$BridgeDeliveryRowsTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.bridgeDeliveryRows,
+      getReferencedColumn: (t) => t.assistantRevisionId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$BridgeDeliveryRowsTableFilterComposer(
+            $db: $db,
+            $table: $db.bridgeDeliveryRows,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
     return f(composer);
   }
 }
@@ -13693,6 +14762,58 @@ class $$MessageRowsTableAnnotationComposer
         );
     return f(composer);
   }
+
+  Expression<T> bridgeUserDeliveries<T extends Object>(
+    Expression<T> Function($$BridgeDeliveryRowsTableAnnotationComposer a) f,
+  ) {
+    final $$BridgeDeliveryRowsTableAnnotationComposer composer =
+        $composerBuilder(
+          composer: this,
+          getCurrentColumn: (t) => t.id,
+          referencedTable: $db.bridgeDeliveryRows,
+          getReferencedColumn: (t) => t.userRevisionId,
+          builder:
+              (
+                joinBuilder, {
+                $addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer,
+              }) => $$BridgeDeliveryRowsTableAnnotationComposer(
+                $db: $db,
+                $table: $db.bridgeDeliveryRows,
+                $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+                joinBuilder: joinBuilder,
+                $removeJoinBuilderFromRootComposer:
+                    $removeJoinBuilderFromRootComposer,
+              ),
+        );
+    return f(composer);
+  }
+
+  Expression<T> bridgeAssistantDeliveries<T extends Object>(
+    Expression<T> Function($$BridgeDeliveryRowsTableAnnotationComposer a) f,
+  ) {
+    final $$BridgeDeliveryRowsTableAnnotationComposer composer =
+        $composerBuilder(
+          composer: this,
+          getCurrentColumn: (t) => t.id,
+          referencedTable: $db.bridgeDeliveryRows,
+          getReferencedColumn: (t) => t.assistantRevisionId,
+          builder:
+              (
+                joinBuilder, {
+                $addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer,
+              }) => $$BridgeDeliveryRowsTableAnnotationComposer(
+                $db: $db,
+                $table: $db.bridgeDeliveryRows,
+                $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+                joinBuilder: joinBuilder,
+                $removeJoinBuilderFromRootComposer:
+                    $removeJoinBuilderFromRootComposer,
+              ),
+        );
+    return f(composer);
+  }
 }
 
 class $$MessageRowsTableTableManager
@@ -13712,6 +14833,8 @@ class $$MessageRowsTableTableManager
             bool conversationId,
             bool messageAssetRowsRefs,
             bool assetReferenceDirtyRowsRefs,
+            bool bridgeUserDeliveries,
+            bool bridgeAssistantDeliveries,
           })
         > {
   $$MessageRowsTableTableManager(_$AppDatabase db, $MessageRowsTable table)
@@ -13838,12 +14961,16 @@ class $$MessageRowsTableTableManager
                 conversationId = false,
                 messageAssetRowsRefs = false,
                 assetReferenceDirtyRowsRefs = false,
+                bridgeUserDeliveries = false,
+                bridgeAssistantDeliveries = false,
               }) {
                 return PrefetchHooks(
                   db: db,
                   explicitlyWatchedTables: [
                     if (messageAssetRowsRefs) db.messageAssetRows,
                     if (assetReferenceDirtyRowsRefs) db.assetReferenceDirtyRows,
+                    if (bridgeUserDeliveries) db.bridgeDeliveryRows,
+                    if (bridgeAssistantDeliveries) db.bridgeDeliveryRows,
                   ],
                   addJoins:
                       <
@@ -13923,6 +15050,48 @@ class $$MessageRowsTableTableManager
                               ),
                           typedResults: items,
                         ),
+                      if (bridgeUserDeliveries)
+                        await $_getPrefetchedData<
+                          MessageRow,
+                          $MessageRowsTable,
+                          BridgeDeliveryRow
+                        >(
+                          currentTable: table,
+                          referencedTable: $$MessageRowsTableReferences
+                              ._bridgeUserDeliveriesTable(db),
+                          managerFromTypedResult: (p0) =>
+                              $$MessageRowsTableReferences(
+                                db,
+                                table,
+                                p0,
+                              ).bridgeUserDeliveries,
+                          referencedItemsForCurrentItem:
+                              (item, referencedItems) => referencedItems.where(
+                                (e) => e.userRevisionId == item.id,
+                              ),
+                          typedResults: items,
+                        ),
+                      if (bridgeAssistantDeliveries)
+                        await $_getPrefetchedData<
+                          MessageRow,
+                          $MessageRowsTable,
+                          BridgeDeliveryRow
+                        >(
+                          currentTable: table,
+                          referencedTable: $$MessageRowsTableReferences
+                              ._bridgeAssistantDeliveriesTable(db),
+                          managerFromTypedResult: (p0) =>
+                              $$MessageRowsTableReferences(
+                                db,
+                                table,
+                                p0,
+                              ).bridgeAssistantDeliveries,
+                          referencedItemsForCurrentItem:
+                              (item, referencedItems) => referencedItems.where(
+                                (e) => e.assistantRevisionId == item.id,
+                              ),
+                          typedResults: items,
+                        ),
                     ];
                   },
                 );
@@ -13947,6 +15116,8 @@ typedef $$MessageRowsTableProcessedTableManager =
         bool conversationId,
         bool messageAssetRowsRefs,
         bool assetReferenceDirtyRowsRefs,
+        bool bridgeUserDeliveries,
+        bool bridgeAssistantDeliveries,
       })
     >;
 typedef $$ConversationMcpServerRowsTableCreateCompanionBuilder =
@@ -16625,6 +17796,31 @@ final class $$GenerationRunRowsTableReferences
       manager.$state.copyWith(prefetchedData: [item]),
     );
   }
+
+  static MultiTypedResultKey<$BridgeDeliveryRowsTable, List<BridgeDeliveryRow>>
+  _bridgeDeliveryRowsRefsTable(_$AppDatabase db) =>
+      MultiTypedResultKey.fromTable(
+        db.bridgeDeliveryRows,
+        aliasName:
+            'generation_run_rows__id__bridge_delivery_rows__generation_run_id',
+      );
+
+  $$BridgeDeliveryRowsTableProcessedTableManager get bridgeDeliveryRowsRefs {
+    final manager =
+        $$BridgeDeliveryRowsTableTableManager(
+          $_db,
+          $_db.bridgeDeliveryRows,
+        ).filter(
+          (f) => f.generationRunId.id.sqlEquals($_itemColumn<String>('id')!),
+        );
+
+    final cache = $_typedResult.readTableOrNull(
+      _bridgeDeliveryRowsRefsTable($_db),
+    );
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: cache),
+    );
+  }
 }
 
 class $$GenerationRunRowsTableFilterComposer
@@ -16705,6 +17901,31 @@ class $$GenerationRunRowsTableFilterComposer
           ),
     );
     return composer;
+  }
+
+  Expression<bool> bridgeDeliveryRowsRefs(
+    Expression<bool> Function($$BridgeDeliveryRowsTableFilterComposer f) f,
+  ) {
+    final $$BridgeDeliveryRowsTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.bridgeDeliveryRows,
+      getReferencedColumn: (t) => t.generationRunId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$BridgeDeliveryRowsTableFilterComposer(
+            $db: $db,
+            $table: $db.bridgeDeliveryRows,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
   }
 }
 
@@ -16853,6 +18074,32 @@ class $$GenerationRunRowsTableAnnotationComposer
     );
     return composer;
   }
+
+  Expression<T> bridgeDeliveryRowsRefs<T extends Object>(
+    Expression<T> Function($$BridgeDeliveryRowsTableAnnotationComposer a) f,
+  ) {
+    final $$BridgeDeliveryRowsTableAnnotationComposer composer =
+        $composerBuilder(
+          composer: this,
+          getCurrentColumn: (t) => t.id,
+          referencedTable: $db.bridgeDeliveryRows,
+          getReferencedColumn: (t) => t.generationRunId,
+          builder:
+              (
+                joinBuilder, {
+                $addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer,
+              }) => $$BridgeDeliveryRowsTableAnnotationComposer(
+                $db: $db,
+                $table: $db.bridgeDeliveryRows,
+                $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+                joinBuilder: joinBuilder,
+                $removeJoinBuilderFromRootComposer:
+                    $removeJoinBuilderFromRootComposer,
+              ),
+        );
+    return f(composer);
+  }
 }
 
 class $$GenerationRunRowsTableTableManager
@@ -16868,7 +18115,10 @@ class $$GenerationRunRowsTableTableManager
           $$GenerationRunRowsTableUpdateCompanionBuilder,
           (GenerationRunRow, $$GenerationRunRowsTableReferences),
           GenerationRunRow,
-          PrefetchHooks Function({bool conversationId})
+          PrefetchHooks Function({
+            bool conversationId,
+            bool bridgeDeliveryRowsRefs,
+          })
         > {
   $$GenerationRunRowsTableTableManager(
     _$AppDatabase db,
@@ -16946,49 +18196,74 @@ class $$GenerationRunRowsTableTableManager
                 ),
               )
               .toList(),
-          prefetchHooksCallback: ({conversationId = false}) {
-            return PrefetchHooks(
-              db: db,
-              explicitlyWatchedTables: [],
-              addJoins:
-                  <
-                    T extends TableManagerState<
-                      dynamic,
-                      dynamic,
-                      dynamic,
-                      dynamic,
-                      dynamic,
-                      dynamic,
-                      dynamic,
-                      dynamic,
-                      dynamic,
-                      dynamic,
-                      dynamic
-                    >
-                  >(state) {
-                    if (conversationId) {
-                      state =
-                          state.withJoin(
-                                currentTable: table,
-                                currentColumn: table.conversationId,
-                                referencedTable:
-                                    $$GenerationRunRowsTableReferences
-                                        ._conversationIdTable(db),
-                                referencedColumn:
-                                    $$GenerationRunRowsTableReferences
-                                        ._conversationIdTable(db)
-                                        .id,
-                              )
-                              as T;
-                    }
+          prefetchHooksCallback:
+              ({conversationId = false, bridgeDeliveryRowsRefs = false}) {
+                return PrefetchHooks(
+                  db: db,
+                  explicitlyWatchedTables: [
+                    if (bridgeDeliveryRowsRefs) db.bridgeDeliveryRows,
+                  ],
+                  addJoins:
+                      <
+                        T extends TableManagerState<
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic
+                        >
+                      >(state) {
+                        if (conversationId) {
+                          state =
+                              state.withJoin(
+                                    currentTable: table,
+                                    currentColumn: table.conversationId,
+                                    referencedTable:
+                                        $$GenerationRunRowsTableReferences
+                                            ._conversationIdTable(db),
+                                    referencedColumn:
+                                        $$GenerationRunRowsTableReferences
+                                            ._conversationIdTable(db)
+                                            .id,
+                                  )
+                                  as T;
+                        }
 
-                    return state;
+                        return state;
+                      },
+                  getPrefetchedDataCallback: (items) async {
+                    return [
+                      if (bridgeDeliveryRowsRefs)
+                        await $_getPrefetchedData<
+                          GenerationRunRow,
+                          $GenerationRunRowsTable,
+                          BridgeDeliveryRow
+                        >(
+                          currentTable: table,
+                          referencedTable: $$GenerationRunRowsTableReferences
+                              ._bridgeDeliveryRowsRefsTable(db),
+                          managerFromTypedResult: (p0) =>
+                              $$GenerationRunRowsTableReferences(
+                                db,
+                                table,
+                                p0,
+                              ).bridgeDeliveryRowsRefs,
+                          referencedItemsForCurrentItem:
+                              (item, referencedItems) => referencedItems.where(
+                                (e) => e.generationRunId == item.id,
+                              ),
+                          typedResults: items,
+                        ),
+                    ];
                   },
-              getPrefetchedDataCallback: (items) async {
-                return [];
+                );
               },
-            );
-          },
         ),
       );
 }
@@ -17005,7 +18280,792 @@ typedef $$GenerationRunRowsTableProcessedTableManager =
       $$GenerationRunRowsTableUpdateCompanionBuilder,
       (GenerationRunRow, $$GenerationRunRowsTableReferences),
       GenerationRunRow,
-      PrefetchHooks Function({bool conversationId})
+      PrefetchHooks Function({bool conversationId, bool bridgeDeliveryRowsRefs})
+    >;
+typedef $$BridgeDeliveryRowsTableCreateCompanionBuilder =
+    BridgeDeliveryRowsCompanion Function({
+      required String originSystem,
+      required String originInstanceId,
+      required String idempotencyKey,
+      required String requestFingerprint,
+      required String roomEventId,
+      required String roomId,
+      required String conversationId,
+      required String userRevisionId,
+      required String assistantRevisionId,
+      required String generationRunId,
+      required String state,
+      required DateTime createdAt,
+      required DateTime updatedAt,
+      Value<int> rowid,
+    });
+typedef $$BridgeDeliveryRowsTableUpdateCompanionBuilder =
+    BridgeDeliveryRowsCompanion Function({
+      Value<String> originSystem,
+      Value<String> originInstanceId,
+      Value<String> idempotencyKey,
+      Value<String> requestFingerprint,
+      Value<String> roomEventId,
+      Value<String> roomId,
+      Value<String> conversationId,
+      Value<String> userRevisionId,
+      Value<String> assistantRevisionId,
+      Value<String> generationRunId,
+      Value<String> state,
+      Value<DateTime> createdAt,
+      Value<DateTime> updatedAt,
+      Value<int> rowid,
+    });
+
+final class $$BridgeDeliveryRowsTableReferences
+    extends
+        BaseReferences<
+          _$AppDatabase,
+          $BridgeDeliveryRowsTable,
+          BridgeDeliveryRow
+        > {
+  $$BridgeDeliveryRowsTableReferences(
+    super.$_db,
+    super.$_table,
+    super.$_typedResult,
+  );
+
+  static $ConversationRowsTable _conversationIdTable(_$AppDatabase db) =>
+      db.conversationRows.createAlias(
+        'bridge_delivery_rows__conversation_id__conversation_rows__id',
+      );
+
+  $$ConversationRowsTableProcessedTableManager get conversationId {
+    final $_column = $_itemColumn<String>('conversation_id')!;
+
+    final manager = $$ConversationRowsTableTableManager(
+      $_db,
+      $_db.conversationRows,
+    ).filter((f) => f.id.sqlEquals($_column));
+    final item = $_typedResult.readTableOrNull(_conversationIdTable($_db));
+    if (item == null) return manager;
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: [item]),
+    );
+  }
+
+  static $MessageRowsTable _userRevisionIdTable(_$AppDatabase db) => db
+      .messageRows
+      .createAlias('bridge_delivery_rows__user_revision_id__message_rows__id');
+
+  $$MessageRowsTableProcessedTableManager get userRevisionId {
+    final $_column = $_itemColumn<String>('user_revision_id')!;
+
+    final manager = $$MessageRowsTableTableManager(
+      $_db,
+      $_db.messageRows,
+    ).filter((f) => f.id.sqlEquals($_column));
+    final item = $_typedResult.readTableOrNull(_userRevisionIdTable($_db));
+    if (item == null) return manager;
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: [item]),
+    );
+  }
+
+  static $MessageRowsTable _assistantRevisionIdTable(_$AppDatabase db) =>
+      db.messageRows.createAlias(
+        'bridge_delivery_rows__assistant_revision_id__message_rows__id',
+      );
+
+  $$MessageRowsTableProcessedTableManager get assistantRevisionId {
+    final $_column = $_itemColumn<String>('assistant_revision_id')!;
+
+    final manager = $$MessageRowsTableTableManager(
+      $_db,
+      $_db.messageRows,
+    ).filter((f) => f.id.sqlEquals($_column));
+    final item = $_typedResult.readTableOrNull(_assistantRevisionIdTable($_db));
+    if (item == null) return manager;
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: [item]),
+    );
+  }
+
+  static $GenerationRunRowsTable _generationRunIdTable(_$AppDatabase db) =>
+      db.generationRunRows.createAlias(
+        'bridge_delivery_rows__generation_run_id__generation_run_rows__id',
+      );
+
+  $$GenerationRunRowsTableProcessedTableManager get generationRunId {
+    final $_column = $_itemColumn<String>('generation_run_id')!;
+
+    final manager = $$GenerationRunRowsTableTableManager(
+      $_db,
+      $_db.generationRunRows,
+    ).filter((f) => f.id.sqlEquals($_column));
+    final item = $_typedResult.readTableOrNull(_generationRunIdTable($_db));
+    if (item == null) return manager;
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: [item]),
+    );
+  }
+}
+
+class $$BridgeDeliveryRowsTableFilterComposer
+    extends Composer<_$AppDatabase, $BridgeDeliveryRowsTable> {
+  $$BridgeDeliveryRowsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get originSystem => $composableBuilder(
+    column: $table.originSystem,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get originInstanceId => $composableBuilder(
+    column: $table.originInstanceId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get idempotencyKey => $composableBuilder(
+    column: $table.idempotencyKey,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get requestFingerprint => $composableBuilder(
+    column: $table.requestFingerprint,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get roomEventId => $composableBuilder(
+    column: $table.roomEventId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get roomId => $composableBuilder(
+    column: $table.roomId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get state => $composableBuilder(
+    column: $table.state,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnWithTypeConverterFilters<DateTime, DateTime, int> get createdAt =>
+      $composableBuilder(
+        column: $table.createdAt,
+        builder: (column) => ColumnWithTypeConverterFilters(column),
+      );
+
+  ColumnWithTypeConverterFilters<DateTime, DateTime, int> get updatedAt =>
+      $composableBuilder(
+        column: $table.updatedAt,
+        builder: (column) => ColumnWithTypeConverterFilters(column),
+      );
+
+  $$ConversationRowsTableFilterComposer get conversationId {
+    final $$ConversationRowsTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.conversationId,
+      referencedTable: $db.conversationRows,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$ConversationRowsTableFilterComposer(
+            $db: $db,
+            $table: $db.conversationRows,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+
+  $$MessageRowsTableFilterComposer get userRevisionId {
+    final $$MessageRowsTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.userRevisionId,
+      referencedTable: $db.messageRows,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$MessageRowsTableFilterComposer(
+            $db: $db,
+            $table: $db.messageRows,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+
+  $$MessageRowsTableFilterComposer get assistantRevisionId {
+    final $$MessageRowsTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.assistantRevisionId,
+      referencedTable: $db.messageRows,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$MessageRowsTableFilterComposer(
+            $db: $db,
+            $table: $db.messageRows,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+
+  $$GenerationRunRowsTableFilterComposer get generationRunId {
+    final $$GenerationRunRowsTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.generationRunId,
+      referencedTable: $db.generationRunRows,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$GenerationRunRowsTableFilterComposer(
+            $db: $db,
+            $table: $db.generationRunRows,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$BridgeDeliveryRowsTableOrderingComposer
+    extends Composer<_$AppDatabase, $BridgeDeliveryRowsTable> {
+  $$BridgeDeliveryRowsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get originSystem => $composableBuilder(
+    column: $table.originSystem,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get originInstanceId => $composableBuilder(
+    column: $table.originInstanceId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get idempotencyKey => $composableBuilder(
+    column: $table.idempotencyKey,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get requestFingerprint => $composableBuilder(
+    column: $table.requestFingerprint,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get roomEventId => $composableBuilder(
+    column: $table.roomEventId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get roomId => $composableBuilder(
+    column: $table.roomId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get state => $composableBuilder(
+    column: $table.state,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  $$ConversationRowsTableOrderingComposer get conversationId {
+    final $$ConversationRowsTableOrderingComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.conversationId,
+      referencedTable: $db.conversationRows,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$ConversationRowsTableOrderingComposer(
+            $db: $db,
+            $table: $db.conversationRows,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+
+  $$MessageRowsTableOrderingComposer get userRevisionId {
+    final $$MessageRowsTableOrderingComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.userRevisionId,
+      referencedTable: $db.messageRows,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$MessageRowsTableOrderingComposer(
+            $db: $db,
+            $table: $db.messageRows,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+
+  $$MessageRowsTableOrderingComposer get assistantRevisionId {
+    final $$MessageRowsTableOrderingComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.assistantRevisionId,
+      referencedTable: $db.messageRows,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$MessageRowsTableOrderingComposer(
+            $db: $db,
+            $table: $db.messageRows,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+
+  $$GenerationRunRowsTableOrderingComposer get generationRunId {
+    final $$GenerationRunRowsTableOrderingComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.generationRunId,
+      referencedTable: $db.generationRunRows,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$GenerationRunRowsTableOrderingComposer(
+            $db: $db,
+            $table: $db.generationRunRows,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$BridgeDeliveryRowsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $BridgeDeliveryRowsTable> {
+  $$BridgeDeliveryRowsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get originSystem => $composableBuilder(
+    column: $table.originSystem,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get originInstanceId => $composableBuilder(
+    column: $table.originInstanceId,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get idempotencyKey => $composableBuilder(
+    column: $table.idempotencyKey,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get requestFingerprint => $composableBuilder(
+    column: $table.requestFingerprint,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get roomEventId => $composableBuilder(
+    column: $table.roomEventId,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get roomId =>
+      $composableBuilder(column: $table.roomId, builder: (column) => column);
+
+  GeneratedColumn<String> get state =>
+      $composableBuilder(column: $table.state, builder: (column) => column);
+
+  GeneratedColumnWithTypeConverter<DateTime, int> get createdAt =>
+      $composableBuilder(column: $table.createdAt, builder: (column) => column);
+
+  GeneratedColumnWithTypeConverter<DateTime, int> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+
+  $$ConversationRowsTableAnnotationComposer get conversationId {
+    final $$ConversationRowsTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.conversationId,
+      referencedTable: $db.conversationRows,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$ConversationRowsTableAnnotationComposer(
+            $db: $db,
+            $table: $db.conversationRows,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+
+  $$MessageRowsTableAnnotationComposer get userRevisionId {
+    final $$MessageRowsTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.userRevisionId,
+      referencedTable: $db.messageRows,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$MessageRowsTableAnnotationComposer(
+            $db: $db,
+            $table: $db.messageRows,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+
+  $$MessageRowsTableAnnotationComposer get assistantRevisionId {
+    final $$MessageRowsTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.assistantRevisionId,
+      referencedTable: $db.messageRows,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$MessageRowsTableAnnotationComposer(
+            $db: $db,
+            $table: $db.messageRows,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+
+  $$GenerationRunRowsTableAnnotationComposer get generationRunId {
+    final $$GenerationRunRowsTableAnnotationComposer composer =
+        $composerBuilder(
+          composer: this,
+          getCurrentColumn: (t) => t.generationRunId,
+          referencedTable: $db.generationRunRows,
+          getReferencedColumn: (t) => t.id,
+          builder:
+              (
+                joinBuilder, {
+                $addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer,
+              }) => $$GenerationRunRowsTableAnnotationComposer(
+                $db: $db,
+                $table: $db.generationRunRows,
+                $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+                joinBuilder: joinBuilder,
+                $removeJoinBuilderFromRootComposer:
+                    $removeJoinBuilderFromRootComposer,
+              ),
+        );
+    return composer;
+  }
+}
+
+class $$BridgeDeliveryRowsTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $BridgeDeliveryRowsTable,
+          BridgeDeliveryRow,
+          $$BridgeDeliveryRowsTableFilterComposer,
+          $$BridgeDeliveryRowsTableOrderingComposer,
+          $$BridgeDeliveryRowsTableAnnotationComposer,
+          $$BridgeDeliveryRowsTableCreateCompanionBuilder,
+          $$BridgeDeliveryRowsTableUpdateCompanionBuilder,
+          (BridgeDeliveryRow, $$BridgeDeliveryRowsTableReferences),
+          BridgeDeliveryRow,
+          PrefetchHooks Function({
+            bool conversationId,
+            bool userRevisionId,
+            bool assistantRevisionId,
+            bool generationRunId,
+          })
+        > {
+  $$BridgeDeliveryRowsTableTableManager(
+    _$AppDatabase db,
+    $BridgeDeliveryRowsTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$BridgeDeliveryRowsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$BridgeDeliveryRowsTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$BridgeDeliveryRowsTableAnnotationComposer(
+                $db: db,
+                $table: table,
+              ),
+          updateCompanionCallback:
+              ({
+                Value<String> originSystem = const Value.absent(),
+                Value<String> originInstanceId = const Value.absent(),
+                Value<String> idempotencyKey = const Value.absent(),
+                Value<String> requestFingerprint = const Value.absent(),
+                Value<String> roomEventId = const Value.absent(),
+                Value<String> roomId = const Value.absent(),
+                Value<String> conversationId = const Value.absent(),
+                Value<String> userRevisionId = const Value.absent(),
+                Value<String> assistantRevisionId = const Value.absent(),
+                Value<String> generationRunId = const Value.absent(),
+                Value<String> state = const Value.absent(),
+                Value<DateTime> createdAt = const Value.absent(),
+                Value<DateTime> updatedAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => BridgeDeliveryRowsCompanion(
+                originSystem: originSystem,
+                originInstanceId: originInstanceId,
+                idempotencyKey: idempotencyKey,
+                requestFingerprint: requestFingerprint,
+                roomEventId: roomEventId,
+                roomId: roomId,
+                conversationId: conversationId,
+                userRevisionId: userRevisionId,
+                assistantRevisionId: assistantRevisionId,
+                generationRunId: generationRunId,
+                state: state,
+                createdAt: createdAt,
+                updatedAt: updatedAt,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String originSystem,
+                required String originInstanceId,
+                required String idempotencyKey,
+                required String requestFingerprint,
+                required String roomEventId,
+                required String roomId,
+                required String conversationId,
+                required String userRevisionId,
+                required String assistantRevisionId,
+                required String generationRunId,
+                required String state,
+                required DateTime createdAt,
+                required DateTime updatedAt,
+                Value<int> rowid = const Value.absent(),
+              }) => BridgeDeliveryRowsCompanion.insert(
+                originSystem: originSystem,
+                originInstanceId: originInstanceId,
+                idempotencyKey: idempotencyKey,
+                requestFingerprint: requestFingerprint,
+                roomEventId: roomEventId,
+                roomId: roomId,
+                conversationId: conversationId,
+                userRevisionId: userRevisionId,
+                assistantRevisionId: assistantRevisionId,
+                generationRunId: generationRunId,
+                state: state,
+                createdAt: createdAt,
+                updatedAt: updatedAt,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable(table),
+                  $$BridgeDeliveryRowsTableReferences(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback:
+              ({
+                conversationId = false,
+                userRevisionId = false,
+                assistantRevisionId = false,
+                generationRunId = false,
+              }) {
+                return PrefetchHooks(
+                  db: db,
+                  explicitlyWatchedTables: [],
+                  addJoins:
+                      <
+                        T extends TableManagerState<
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic
+                        >
+                      >(state) {
+                        if (conversationId) {
+                          state =
+                              state.withJoin(
+                                    currentTable: table,
+                                    currentColumn: table.conversationId,
+                                    referencedTable:
+                                        $$BridgeDeliveryRowsTableReferences
+                                            ._conversationIdTable(db),
+                                    referencedColumn:
+                                        $$BridgeDeliveryRowsTableReferences
+                                            ._conversationIdTable(db)
+                                            .id,
+                                  )
+                                  as T;
+                        }
+                        if (userRevisionId) {
+                          state =
+                              state.withJoin(
+                                    currentTable: table,
+                                    currentColumn: table.userRevisionId,
+                                    referencedTable:
+                                        $$BridgeDeliveryRowsTableReferences
+                                            ._userRevisionIdTable(db),
+                                    referencedColumn:
+                                        $$BridgeDeliveryRowsTableReferences
+                                            ._userRevisionIdTable(db)
+                                            .id,
+                                  )
+                                  as T;
+                        }
+                        if (assistantRevisionId) {
+                          state =
+                              state.withJoin(
+                                    currentTable: table,
+                                    currentColumn: table.assistantRevisionId,
+                                    referencedTable:
+                                        $$BridgeDeliveryRowsTableReferences
+                                            ._assistantRevisionIdTable(db),
+                                    referencedColumn:
+                                        $$BridgeDeliveryRowsTableReferences
+                                            ._assistantRevisionIdTable(db)
+                                            .id,
+                                  )
+                                  as T;
+                        }
+                        if (generationRunId) {
+                          state =
+                              state.withJoin(
+                                    currentTable: table,
+                                    currentColumn: table.generationRunId,
+                                    referencedTable:
+                                        $$BridgeDeliveryRowsTableReferences
+                                            ._generationRunIdTable(db),
+                                    referencedColumn:
+                                        $$BridgeDeliveryRowsTableReferences
+                                            ._generationRunIdTable(db)
+                                            .id,
+                                  )
+                                  as T;
+                        }
+
+                        return state;
+                      },
+                  getPrefetchedDataCallback: (items) async {
+                    return [];
+                  },
+                );
+              },
+        ),
+      );
+}
+
+typedef $$BridgeDeliveryRowsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $BridgeDeliveryRowsTable,
+      BridgeDeliveryRow,
+      $$BridgeDeliveryRowsTableFilterComposer,
+      $$BridgeDeliveryRowsTableOrderingComposer,
+      $$BridgeDeliveryRowsTableAnnotationComposer,
+      $$BridgeDeliveryRowsTableCreateCompanionBuilder,
+      $$BridgeDeliveryRowsTableUpdateCompanionBuilder,
+      (BridgeDeliveryRow, $$BridgeDeliveryRowsTableReferences),
+      BridgeDeliveryRow,
+      PrefetchHooks Function({
+        bool conversationId,
+        bool userRevisionId,
+        bool assistantRevisionId,
+        bool generationRunId,
+      })
     >;
 typedef $$AssistantRowsTableCreateCompanionBuilder =
     AssistantRowsCompanion Function({
@@ -20494,6 +22554,8 @@ class $AppDatabaseManager {
       );
   $$GenerationRunRowsTableTableManager get generationRunRows =>
       $$GenerationRunRowsTableTableManager(_db, _db.generationRunRows);
+  $$BridgeDeliveryRowsTableTableManager get bridgeDeliveryRows =>
+      $$BridgeDeliveryRowsTableTableManager(_db, _db.bridgeDeliveryRows);
   $$AssistantRowsTableTableManager get assistantRows =>
       $$AssistantRowsTableTableManager(_db, _db.assistantRows);
   $$ProviderRowsTableTableManager get providerRows =>

@@ -13,6 +13,7 @@ import 'package:Kelivo/core/database/schema_migrations.dart';
 import 'generated_schema/schema.dart';
 import 'generated_schema/schema_v1.dart' as v1;
 import 'generated_schema/schema_v2.dart' as v2;
+import 'generated_schema/schema_v3.dart' as v3;
 
 void main() {
   driftRuntimeOptions.dontWarnAboutMultipleDatabases = true;
@@ -107,6 +108,27 @@ void main() {
       expect(rows.single['chat_model_provider'], isNull);
       expect(rows.single['chat_model_id'], isNull);
       expect(rows.single['extras_json'], '{}');
+      expect(
+        raw
+            .select(
+              "SELECT name FROM sqlite_master WHERE type = 'table' "
+              "AND name = 'bridge_delivery_rows';",
+            )
+            .single['name'],
+        'bridge_delivery_rows',
+      );
+      expect(
+        raw
+            .select(
+              "SELECT name FROM sqlite_master WHERE type = 'index' "
+              "AND name LIKE 'idx_bridge_deliveries_%' ORDER BY name;",
+            )
+            .map((row) => row['name']),
+        [
+          'idx_bridge_deliveries_conversation_created',
+          'idx_bridge_deliveries_room_event',
+        ],
+      );
     } finally {
       raw.close();
     }
@@ -174,6 +196,69 @@ void main() {
           ['idx_extension_entities_kind_order'],
         ),
         hasLength(1),
+      );
+      expect(
+        raw.select(
+          "SELECT name FROM sqlite_master WHERE type = 'table' AND name = ?;",
+          ['bridge_delivery_rows'],
+        ),
+        hasLength(1),
+      );
+    } finally {
+      raw.close();
+    }
+  });
+
+  test('upgrades a schema 3 file without losing extension data', () async {
+    final file = databasePath();
+    final database = v3.DatabaseAtV3(NativeDatabase(file));
+    try {
+      await database.customStatement('PRAGMA user_version = 3;');
+      await database.customStatement(
+        'INSERT INTO extension_entity_rows '
+        '(kind, id, sort_order, owner_id, payload, updated_at) '
+        "VALUES ('test.kind', 'entity-1', 7, NULL, '{\"ok\":true}', 9);",
+      );
+    } finally {
+      await database.close();
+    }
+    final checkpoint = sqlite.sqlite3.open(file.path);
+    try {
+      checkpoint.execute('PRAGMA wal_checkpoint(TRUNCATE);');
+      checkpoint.select('PRAGMA journal_mode = DELETE;');
+    } finally {
+      checkpoint.close();
+    }
+
+    final outcome = await SchemaMigrations.upgradeFileInPlace(file);
+
+    expect(outcome.fromVersion, 3);
+    expect(outcome.toVersion, 4);
+    expect(outcome.upgraded, isTrue);
+    final raw = sqlite.sqlite3.open(file.path, mode: sqlite.OpenMode.readOnly);
+    try {
+      final extension = raw.select('SELECT * FROM extension_entity_rows;');
+      expect(extension, hasLength(1));
+      expect(extension.single['id'], 'entity-1');
+      expect(extension.single['payload'], '{"ok":true}');
+      expect(
+        raw.select(
+          "SELECT name FROM sqlite_master WHERE type = 'table' AND name = ?;",
+          ['bridge_delivery_rows'],
+        ),
+        hasLength(1),
+      );
+      expect(
+        raw
+            .select(
+              "SELECT name FROM sqlite_master WHERE type = 'index' "
+              "AND name LIKE 'idx_bridge_deliveries_%' ORDER BY name;",
+            )
+            .map((row) => row['name']),
+        [
+          'idx_bridge_deliveries_conversation_created',
+          'idx_bridge_deliveries_room_event',
+        ],
       );
     } finally {
       raw.close();

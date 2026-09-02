@@ -30,7 +30,15 @@ void main() {
   test(
     'installation gate rejects every unpublished SQLite schema without mutation',
     () async {
-      const unpublished = <int>[4, 5, 6, 7, 8, 9, 10, 11, 42];
+      final unpublished = <int>{
+        for (
+          var version = AppDatabase.currentSchemaVersion + 1;
+          version <= 11;
+          version++
+        )
+          version,
+        42,
+      };
       for (final schemaVersion in unpublished) {
         expect(
           AppDatabase.publishedSchemaVersions,

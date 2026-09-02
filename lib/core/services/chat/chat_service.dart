@@ -11,6 +11,7 @@ import 'package:uuid/uuid.dart';
 import '../../database/app_database.dart';
 import '../../database/business_data.dart';
 import '../../database/business_repository.dart';
+import '../../database/bridge_delivery.dart';
 import '../../database/chat_database_gateway.dart';
 import '../../database/chat_database_repository.dart';
 import '../backup/backup_cancel_token.dart';
@@ -233,6 +234,9 @@ class ChatService extends ChangeNotifier {
         (_temporaryConversationIds.contains(id) ||
             _discardedTemporaryConversationIds.contains(id));
   }
+
+  bool isPersistedConversation(String? id) =>
+      id != null && _initialized && _conversationsCache.containsKey(id);
 
   Future<void> init() {
     if (_initialized) return Future<void>.value();
@@ -2917,6 +2921,72 @@ class ChatService extends ChangeNotifier {
     required String modelId,
     required String providerId,
   }) async {
+    final prepared = await _prepareSendGeneration(
+      conversationId: conversationId,
+      userParts: userParts,
+      modelId: modelId,
+      providerId: providerId,
+    );
+    final result = await _repo.beginSendGeneration(
+      conversation: prepared.conversation,
+      userMessage: prepared.userMessage,
+      assistantMessage: prepared.assistantMessage,
+      runId: const Uuid().v4(),
+    );
+    await _publishGenerationBegin(result);
+    return result;
+  }
+
+  Future<BridgeGenerationBeginResult> beginBridgeSendGeneration({
+    required String conversationId,
+    required List<MessagePart> userParts,
+    required String modelId,
+    required String providerId,
+    required BridgeDeliveryClaim deliveryClaim,
+  }) async {
+    final prepared = await _prepareSendGeneration(
+      conversationId: conversationId,
+      userParts: userParts,
+      modelId: modelId,
+      providerId: providerId,
+    );
+    final result = await _repo.beginBridgeSendGeneration(
+      conversation: prepared.conversation,
+      userMessage: prepared.userMessage,
+      assistantMessage: prepared.assistantMessage,
+      runId: const Uuid().v4(),
+      deliveryClaim: deliveryClaim,
+    );
+    if (result.generation case final generation?) {
+      await _publishGenerationBegin(generation);
+    }
+    return result;
+  }
+
+  Future<BridgeTurnSnapshot?> getBridgeTurnSnapshot({
+    required String originInstanceId,
+    required String idempotencyKey,
+  }) async {
+    if (!_initialized) await init();
+    return _repo.getBridgeTurnSnapshot(
+      originInstanceId: originInstanceId,
+      idempotencyKey: idempotencyKey,
+    );
+  }
+
+  Future<
+    ({
+      Conversation conversation,
+      ChatMessage userMessage,
+      ChatMessage assistantMessage,
+    })
+  >
+  _prepareSendGeneration({
+    required String conversationId,
+    required List<MessagePart> userParts,
+    required String modelId,
+    required String providerId,
+  }) async {
     if (!_initialized) await init();
     if (isTemporaryConversation(conversationId)) {
       throw StateError('temporary_generation_is_not_persisted');
@@ -2928,27 +2998,22 @@ class ChatService extends ChangeNotifier {
     if (_conversationsCache.containsKey(conversationId)) {
       await _loadMessageOrder(conversationId);
     }
-    final userMessage = ChatMessage(
-      role: 'user',
-      parts: userParts,
-      conversationId: conversationId,
-    );
-    final assistantMessage = ChatMessage(
-      role: 'assistant',
-      content: '',
-      conversationId: conversationId,
-      modelId: modelId,
-      providerId: providerId,
-      isStreaming: true,
-    );
-    final result = await _repo.beginSendGeneration(
+    return (
       conversation: conversation,
-      userMessage: userMessage,
-      assistantMessage: assistantMessage,
-      runId: const Uuid().v4(),
+      userMessage: ChatMessage(
+        role: 'user',
+        parts: userParts,
+        conversationId: conversationId,
+      ),
+      assistantMessage: ChatMessage(
+        role: 'assistant',
+        content: '',
+        conversationId: conversationId,
+        modelId: modelId,
+        providerId: providerId,
+        isStreaming: true,
+      ),
     );
-    await _publishGenerationBegin(result);
-    return result;
   }
 
   Future<GenerationBeginResult> beginRegeneration({

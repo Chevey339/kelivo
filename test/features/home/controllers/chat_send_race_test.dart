@@ -10,7 +10,9 @@ import 'package:path_provider_platform_interface/path_provider_platform_interfac
 import 'package:provider/provider.dart';
 
 import '../../../support/business_test_harness.dart';
+import 'package:Kelivo/core/database/bridge_delivery.dart';
 import 'package:Kelivo/core/database/chat_database_repository.dart';
+import 'package:Kelivo/core/database/generation_run.dart';
 import 'package:Kelivo/core/models/chat_input_data.dart';
 import 'package:Kelivo/core/models/chat_message.dart';
 import 'package:Kelivo/core/models/conversation.dart';
@@ -18,11 +20,15 @@ import 'package:Kelivo/core/providers/assistant_provider.dart';
 import 'package:Kelivo/core/providers/mcp_provider.dart';
 import 'package:Kelivo/core/providers/settings_provider.dart';
 import 'package:Kelivo/core/services/chat/chat_service.dart';
+import 'package:Kelivo/core/services/logging/flutter_logger.dart';
+import 'package:Kelivo/core/services/logging/context_logger.dart';
 import 'package:Kelivo/core/services/mcp/mcp_tool_service.dart';
+import 'package:Kelivo/core/services/network/request_logger.dart';
 import 'package:Kelivo/features/chat/widgets/chat_message_widget.dart'
     show ToolUIPart;
 import 'package:Kelivo/features/home/controllers/home_page_controller.dart';
 import 'package:Kelivo/features/home/controllers/scroll_controller.dart';
+import 'package:Kelivo/features/home/bridge/native_turn.dart';
 import 'package:Kelivo/features/home/services/ask_user_interaction_service.dart';
 import 'package:Kelivo/features/home/widgets/chat_input_bar.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
@@ -57,6 +63,7 @@ void main() {
   late SettingsProvider settings;
   late AssistantProvider assistantProvider;
   var streamRequestCount = 0;
+  final streamRequestBodies = <Map<String, dynamic>>[];
   Completer<void>? streamHold;
 
   Future<void> handleApiRequest(HttpRequest request) async {
@@ -65,8 +72,13 @@ void main() {
             as Map<String, dynamic>;
     if (body['stream'] == true) {
       streamRequestCount++;
+      streamRequestBodies.add(body);
       final hold = streamHold;
       if (hold != null) await hold.future;
+      final serializedBody = jsonEncode(body);
+      final replyContent = serializedBody.contains('nonce-bridge-7f9c')
+          ? 'nonce-bridge-7f9c'
+          : 'reply-$streamRequestCount';
       request.response.statusCode = HttpStatus.ok;
       request.response.headers.contentType = ContentType(
         'text',
@@ -82,7 +94,7 @@ void main() {
           'choices': [
             {
               'index': 0,
-              'delta': {'role': 'assistant', 'content': 'ok'},
+              'delta': {'role': 'assistant', 'content': replyContent},
               'finish_reason': 'stop',
             },
           ],
@@ -107,6 +119,9 @@ void main() {
   }
 
   setUp(() async {
+    // These tests redirect the application directory per case. Keep the global
+    // file logger from retaining a Windows handle to the first case's folder.
+    await FlutterLogger.setEnabled(false);
     directory = await Directory.systemTemp.createTemp('kelivo_send_race_');
     previousPathProvider = PathProviderPlatform.instance;
     PathProviderPlatform.instance = _FakePathProviderPlatform(directory.path);
@@ -120,6 +135,7 @@ void main() {
     service = ChatService(existingRepository: repository);
     await service.init();
     streamRequestCount = 0;
+    streamRequestBodies.clear();
     streamHold = null;
     server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
     server.listen(handleApiRequest);
@@ -136,6 +152,9 @@ void main() {
     try {
       await repository.close().timeout(const Duration(seconds: 10));
     } catch (_) {}
+    await RequestLogger.setEnabled(false);
+    await ContextLogger.setEnabled(false);
+    await FlutterLogger.setEnabled(false);
     if (await directory.exists()) await directory.delete(recursive: true);
   });
 
@@ -256,6 +275,228 @@ void main() {
         controller.chatController.isConversationLoading(convo.id),
         isFalse,
       );
+    });
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets(
+    'native bridge send shares single-flight, durable dedup and terminal path',
+    (tester) async {
+      final controller = await pumpHarness(tester);
+      await tester.runAsync(() async {
+        final conversation = await openConversation(controller);
+        final actions = controller.debugViewModel.bridgeChatActions;
+        final firstClaim = BridgeDeliveryClaim(
+          originSystem: 'room-test',
+          originInstanceId: 'room-instance',
+          idempotencyKey: 'event-1',
+          requestFingerprint:
+              'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+          roomEventId: 'event-1',
+          roomId: 'room-1',
+        );
+        streamHold = Completer<void>();
+
+        final first = await actions.sendExternalTurn(
+          input: const ChatInputData(text: 'external nonce-bridge-7f9c'),
+          conversation: conversation,
+          deliveryClaim: firstClaim,
+        );
+        expect(first.status, NativeTurnStartStatus.accepted);
+        expect(first.handle?.deduplicated, isFalse);
+        await waitFor(() => streamRequestCount == 1, 'bridge stream to fire');
+
+        final duplicate = await actions.sendExternalTurn(
+          input: const ChatInputData(text: 'external nonce-bridge-7f9c'),
+          conversation: conversation,
+          deliveryClaim: firstClaim,
+        );
+        expect(duplicate.status, NativeTurnStartStatus.accepted);
+        expect(duplicate.handle?.deduplicated, isTrue);
+        expect(duplicate.handle?.userMessageId, first.handle?.userMessageId);
+        expect(
+          duplicate.handle?.assistantMessageId,
+          first.handle?.assistantMessageId,
+        );
+
+        final conflict = await actions.sendExternalTurn(
+          input: const ChatInputData(text: 'changed external hello'),
+          conversation: conversation,
+          deliveryClaim: const BridgeDeliveryClaim(
+            originSystem: 'room-test',
+            originInstanceId: 'room-instance',
+            idempotencyKey: 'event-1',
+            requestFingerprint:
+                'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
+            roomEventId: 'event-1',
+            roomId: 'room-1',
+          ),
+        );
+        expect(conflict.status, NativeTurnStartStatus.idempotencyConflict);
+
+        final busy = await actions.sendExternalTurn(
+          input: const ChatInputData(text: 'must defer'),
+          conversation: conversation,
+          deliveryClaim: const BridgeDeliveryClaim(
+            originSystem: 'room-test',
+            originInstanceId: 'room-instance',
+            idempotencyKey: 'event-2',
+            requestFingerprint:
+                'cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc',
+            roomEventId: 'event-2',
+            roomId: 'room-1',
+          ),
+        );
+        expect(busy.status, NativeTurnStartStatus.busy);
+        expect(
+          await service.getBridgeTurnSnapshot(
+            originInstanceId: 'room-instance',
+            idempotencyKey: 'event-2',
+          ),
+          isNull,
+        );
+
+        streamHold!.complete();
+        final terminal = await first.handle!.completion.timeout(
+          const Duration(seconds: 10),
+        );
+        final duplicateTerminal = await duplicate.handle!.completion.timeout(
+          const Duration(seconds: 10),
+        );
+        expect(terminal.state, GenerationRunState.completed);
+        expect(terminal.assistantMessage.isStreaming, isFalse);
+        expect(terminal.assistantMessage.content, 'nonce-bridge-7f9c');
+        expect(
+          duplicateTerminal.assistantMessageId,
+          terminal.assistantMessageId,
+        );
+        expect(
+          controller.messages.map((message) => message.id),
+          containsAll(<String>[
+            terminal.userMessageId,
+            terminal.assistantMessageId,
+          ]),
+        );
+        expect(
+          controller.messages
+              .singleWhere(
+                (message) => message.id == terminal.assistantMessageId,
+              )
+              .content,
+          'nonce-bridge-7f9c',
+        );
+
+        final afterTerminal = await actions.sendExternalTurn(
+          input: const ChatInputData(text: 'external nonce-bridge-7f9c'),
+          conversation: conversation,
+          deliveryClaim: firstClaim,
+        );
+        expect(afterTerminal.status, NativeTurnStartStatus.accepted);
+        expect(afterTerminal.handle?.deduplicated, isTrue);
+        expect(
+          (await afterTerminal.handle!.completion).state,
+          GenerationRunState.completed,
+        );
+        expect(streamRequestCount, 1);
+      });
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets('UI generation makes a new bridge delivery defer without writes', (
+    tester,
+  ) async {
+    final controller = await pumpHarness(tester);
+    await tester.runAsync(() async {
+      final conversation = await openConversation(controller);
+      streamHold = Completer<void>();
+      await controller.sendMessage(const ChatInputData(text: 'UI owns flight'));
+      await waitFor(() => streamRequestCount == 1, 'UI stream to fire');
+
+      final result = await controller.debugViewModel.bridgeChatActions
+          .sendExternalTurn(
+            input: const ChatInputData(text: 'deferred room event'),
+            conversation: conversation,
+            deliveryClaim: const BridgeDeliveryClaim(
+              originSystem: 'room-test',
+              originInstanceId: 'room-instance',
+              idempotencyKey: 'ui-busy-event',
+              requestFingerprint:
+                  'dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd',
+              roomEventId: 'ui-busy-event',
+              roomId: 'room-1',
+            ),
+          );
+
+      expect(result.status, NativeTurnStartStatus.busy);
+      expect(
+        await service.getBridgeTurnSnapshot(
+          originInstanceId: 'room-instance',
+          idempotencyKey: 'ui-busy-event',
+        ),
+        isNull,
+      );
+      streamHold!.complete();
+      await waitFor(
+        () => !controller.chatController.isConversationLoading(conversation.id),
+        'UI stream to finish',
+      );
+    });
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('native bridge generation uses the active selected branch', (
+    tester,
+  ) async {
+    final controller = await pumpHarness(tester);
+    await tester.runAsync(() async {
+      final conversation = await openConversation(controller);
+      await controller.sendMessage(const ChatInputData(text: 'branch seed'));
+      await waitFor(
+        () => !controller.chatController.isConversationLoading(conversation.id),
+        'initial branch stream to finish',
+      );
+      final original = (await service.loadMessages(
+        conversation.id,
+      )).singleWhere((message) => message.role == 'assistant');
+      await controller.regenerateAtMessage(original);
+      await waitFor(
+        () => !controller.chatController.isConversationLoading(conversation.id),
+        'regenerated branch stream to finish',
+      );
+      final variants = (await service.loadMessages(conversation.id))
+          .where((message) => message.role == 'assistant')
+          .toList(growable: false);
+      expect(variants.map((message) => message.content), [
+        'reply-1',
+        'reply-2',
+      ]);
+      final groupId = original.groupId ?? original.id;
+      await controller.setSelectedVersion(groupId, 0);
+
+      final start = await controller.debugViewModel.bridgeChatActions
+          .sendExternalTurn(
+            input: const ChatInputData(text: 'branch bridge event'),
+            conversation: conversation,
+            deliveryClaim: const BridgeDeliveryClaim(
+              originSystem: 'room-test',
+              originInstanceId: 'room-instance',
+              idempotencyKey: 'branch-event',
+              requestFingerprint:
+                  'eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee',
+              roomEventId: 'branch-event',
+              roomId: 'room-1',
+            ),
+          );
+      expect(start.status, NativeTurnStartStatus.accepted);
+      expect(
+        (await start.handle!.completion).state,
+        GenerationRunState.completed,
+      );
+
+      final bridgeRequest = jsonEncode(streamRequestBodies.last);
+      expect(bridgeRequest, contains('reply-1'));
+      expect(bridgeRequest, isNot(contains('reply-2')));
     });
     expect(tester.takeException(), isNull);
   });

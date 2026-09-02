@@ -405,6 +405,74 @@ class GenerationRunRows extends Table {
   ];
 }
 
+@TableIndex(
+  name: 'idx_bridge_deliveries_room_event',
+  columns: {#originInstanceId, #roomEventId},
+)
+@TableIndex(
+  name: 'idx_bridge_deliveries_conversation_created',
+  columns: {#conversationId, #createdAt},
+)
+class BridgeDeliveryRows extends Table {
+  TextColumn get originSystem =>
+      text()
+      // ignore: recursive_getters
+      .check(originSystem.isNotValue(''))();
+  TextColumn get originInstanceId =>
+      text()
+      // ignore: recursive_getters
+      .check(originInstanceId.isNotValue(''))();
+  TextColumn get idempotencyKey =>
+      text()
+      // ignore: recursive_getters
+      .check(idempotencyKey.isNotValue(''))();
+  TextColumn get requestFingerprint => text()();
+  TextColumn get roomEventId =>
+      text()
+      // ignore: recursive_getters
+      .check(roomEventId.isNotValue(''))();
+  TextColumn get roomId =>
+      text()
+      // ignore: recursive_getters
+      .check(roomId.isNotValue(''))();
+  TextColumn get conversationId =>
+      text().references(ConversationRows, #id, onDelete: KeyAction.cascade)();
+  @ReferenceName('bridgeUserDeliveries')
+  TextColumn get userRevisionId =>
+      text().references(MessageRows, #id, onDelete: KeyAction.cascade)();
+  @ReferenceName('bridgeAssistantDeliveries')
+  TextColumn get assistantRevisionId =>
+      text().references(MessageRows, #id, onDelete: KeyAction.cascade)();
+  TextColumn get generationRunId =>
+      text().references(GenerationRunRows, #id, onDelete: KeyAction.cascade)();
+  TextColumn get state => text().check(
+    // ignore: recursive_getters
+    state.isIn(const [
+      'preparing',
+      'requesting',
+      'streaming',
+      'waiting_tool',
+      'completed',
+      'failed',
+      'cancelled',
+      'interrupted',
+    ]),
+  )();
+  IntColumn get createdAt =>
+      integer().map(const MicrosecondDateTimeConverter())();
+  IntColumn get updatedAt =>
+      integer().map(const MicrosecondDateTimeConverter())();
+
+  @override
+  Set<Column<Object>> get primaryKey => {originInstanceId, idempotencyKey};
+
+  @override
+  List<String> get customConstraints => [
+    'CHECK (length(request_fingerprint) = 64)',
+    'CHECK (updated_at >= created_at)',
+  ];
+}
+
 class AssistantRows extends Table {
   TextColumn get id => text()();
   IntColumn get sortOrder =>
@@ -736,6 +804,7 @@ class ExtensionEntityRows extends Table {
     GcAuditRows,
     AssetReferenceDirtyRows,
     GenerationRunRows,
+    BridgeDeliveryRows,
     AssistantRows,
     ProviderRows,
     ProviderGroupRows,
@@ -763,14 +832,14 @@ class AppDatabase extends _$AppDatabase {
   // Schema 1 is the first published SQLite contract; schema 2 adds the
   // per-conversation model override; schema 3 lays the extension groundwork
   // (extras_json columns, message updated_at/sender_id, tombstone_rows,
-  // extension_entity_rows) so later features can ship without further
-  // migrations. Every version outside [publishedSchemaVersions] belongs to an
+  // extension_entity_rows); schema 4 adds durable native-bridge delivery
+  // mappings. Every version outside [publishedSchemaVersions] belongs to an
   // unpublished or future format and is rejected.
-  static const currentSchemaVersion = 3;
+  static const currentSchemaVersion = 4;
 
   /// Every schema that has ever shipped. A file at any of these can be
   /// upgraded by `SchemaMigrations`; anything else is rejected outright.
-  static const publishedSchemaVersions = <int>{1, 2, 3};
+  static const publishedSchemaVersions = <int>{1, 2, 3, 4};
 
   /// Whether a live application connection may use a file as-is: either freshly
   /// created (0) or already at the current schema.
@@ -940,6 +1009,12 @@ FROM probe;
         await m.createTable(schema.extensionEntityRows);
         // stepByStep does not create new indexes automatically.
         await m.create(schema.idxExtensionEntitiesKindOrder);
+      },
+      from3To4: (m, schema) async {
+        await m.createTable(schema.bridgeDeliveryRows);
+        // stepByStep does not create new indexes automatically.
+        await m.create(schema.idxBridgeDeliveriesRoomEvent);
+        await m.create(schema.idxBridgeDeliveriesConversationCreated);
       },
     ),
     beforeOpen: (details) async {
