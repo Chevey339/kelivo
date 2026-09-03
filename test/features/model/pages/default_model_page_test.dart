@@ -100,6 +100,7 @@ void main() {
       try {
         final settings = SettingsProvider(createBusinessTestPreferences());
         await settings.loaded;
+        await settings.setPerChatModelEnabled(true);
         for (final model in const {
           'global-provider': 'global-model',
           'assistant-provider': 'assistant-model',

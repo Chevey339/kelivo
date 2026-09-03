@@ -14,6 +14,7 @@ void main() {
 
   setUp(() async {
     settings = SettingsProvider(createBusinessTestPreferences());
+    await settings.loaded;
     await settings.setCurrentModel('GlobalProvider', 'global-model');
   });
 
@@ -31,6 +32,10 @@ void main() {
         chatModelProvider: providerKey,
         chatModelId: modelId,
       );
+
+  test('per-chat models default to off', () {
+    expect(settings.perChatModelEnabled, isFalse);
+  });
 
   test('falls back to the global default when nothing overrides it', () {
     final resolved = resolveChatModel(
@@ -57,7 +62,9 @@ void main() {
     expect(resolved.modelId, 'assistant-model');
   });
 
-  test('the conversation outranks the assistant', () {
+  test('the conversation outranks the assistant when enabled', () async {
+    await settings.setPerChatModelEnabled(true);
+
     final resolved = resolveChatModel(
       settings,
       conversation: conversationWithModel(
@@ -145,7 +152,9 @@ void main() {
     expect(resolved.modelId, 'conversation-model');
   });
 
-  test('getActiveModelIds and getModelDisplayInfo agree with it', () {
+  test('getActiveModelIds and getModelDisplayInfo agree with it', () async {
+    await settings.setPerChatModelEnabled(true);
+
     final conversation = conversationWithModel(
       providerKey: 'ConversationProvider',
       modelId: 'conversation-model',

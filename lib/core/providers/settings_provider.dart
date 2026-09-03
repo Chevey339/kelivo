@@ -858,7 +858,7 @@ class SettingsProvider extends ChangeNotifier {
         _titleModelId = parts.sublist(1).join('::');
       }
     }
-    _perChatModelEnabled = prefs.getBool(_perChatModelEnabledKey) ?? true;
+    _perChatModelEnabled = prefs.getBool(_perChatModelEnabledKey) ?? false;
     _titleGenerationEnabled = prefs.getBool(_titleGenerationEnabledKey) ?? true;
     // load title prompt
     final tp = prefs.getString(_titlePromptKey);
@@ -3618,7 +3618,7 @@ class SettingsProvider extends ChangeNotifier {
   // When off, the pick rewrites the current assistant's model, so every chat
   // under that assistant follows it. Conversation pins are kept either way and
   // simply ignored while this is off, so toggling back restores them.
-  bool _perChatModelEnabled = true;
+  bool _perChatModelEnabled = false;
   bool get perChatModelEnabled => _perChatModelEnabled;
 
   Future<void> setPerChatModelEnabled(bool value) async {
