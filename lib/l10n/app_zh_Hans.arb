@@ -2264,7 +2264,7 @@
   "autoRetryStopKeywords": "停止重试关键字",
   "autoRetryAddHint": "添加",
   "autoRetryRestoreDefaults": "恢复默认",
-  "autoRetryFooter": "仅在本次请求尚未产生任何输出时才会自动重试。",
+  "autoRetryFooter": "仅在当前这轮模型响应尚未产生任何输出时才会自动重试。",
   "autoRetryCountdown": "{seconds} 秒后重试 ({attempt}/{maxRetries})",
   "@autoRetryCountdown": {
     "placeholders": {

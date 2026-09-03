@@ -6524,7 +6524,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get autoRetryFooter =>
-      'Auto-retry only runs if this request has not produced any output yet.';
+      'Auto-retry only runs if the current model response has not produced any output yet.';
 
   @override
   String autoRetryCountdown(int seconds, int attempt, int maxRetries) {

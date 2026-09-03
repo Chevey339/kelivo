@@ -204,6 +204,7 @@ Stream<StreamChunk> runOpenAIResponsesToolFollowUps({
   required int streamRound,
   required int approxPromptTokens,
   required int approxCompletionChars,
+  StreamRoundRunner? retryRound,
 }) async* {
   var usage = initialUsage;
   var chars = approxCompletionChars;
@@ -342,6 +343,7 @@ Stream<StreamChunk> runOpenAIResponsesToolFollowUps({
         totalTokens: usage?.totalTokens ?? approxTotal,
       );
     },
+    retryRound: retryRound,
     usageOf: () => usage,
   );
 }

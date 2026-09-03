@@ -2735,7 +2735,7 @@
   "autoRetryStopKeywords": "Stop keywords",
   "autoRetryAddHint": "Add",
   "autoRetryRestoreDefaults": "Restore defaults",
-  "autoRetryFooter": "Auto-retry only runs if this request has not produced any output yet.",
+  "autoRetryFooter": "Auto-retry only runs if the current model response has not produced any output yet.",
   "autoRetryCountdown": "{seconds}s until retry ({attempt}/{maxRetries})",
   "@autoRetryCountdown": {
     "placeholders": {

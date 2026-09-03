@@ -4,6 +4,9 @@ import '../chat_api_helpers.dart';
 import '../stream/stream_chunk.dart';
 import '../stream/stream_chunk_emit.dart';
 
+typedef StreamRoundRunner =
+    Stream<StreamChunk> Function(Stream<StreamChunk> Function() sendRound);
+
 final class ExecutedClientTool {
   const ExecutedClientTool({
     required this.call,
@@ -70,6 +73,7 @@ Stream<StreamChunk> runClientToolFollowUps({
   required Stream<StreamChunk> Function() sendFollowUp,
   required List<EmitToolCall> Function() takeCallsAfterRound,
   required Stream<StreamChunk> Function() finish,
+  StreamRoundRunner? retryRound,
   bool emitCalls = false,
   TokenUsage? Function()? usageOf,
 }) async* {
@@ -93,7 +97,7 @@ Stream<StreamChunk> runClientToolFollowUps({
       totalTokens: totalTokens,
     );
     append(executed);
-    yield* sendFollowUp();
+    yield* retryRound?.call(sendFollowUp) ?? sendFollowUp();
     calls = takeCallsAfterRound();
   }
   yield* finish();
@@ -111,10 +115,11 @@ Stream<StreamChunk> runProviderToolRounds({
   ToolCallHandler? onToolCall,
   bool emitCalls = false,
   bool executeAfterRound = true,
+  StreamRoundRunner? retryRound,
   TokenUsage? Function()? usageOf,
 }) async* {
   while (true) {
-    yield* sendRound();
+    yield* retryRound?.call(sendRound) ?? sendRound();
     final calls = takeCalls();
     if (calls.isEmpty && !continueWithoutCalls()) {
       yield* finish();

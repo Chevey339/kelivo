@@ -11950,7 +11950,7 @@ abstract class AppLocalizations {
   /// No description provided for @autoRetryFooter.
   ///
   /// In en, this message translates to:
-  /// **'Auto-retry only runs if this request has not produced any output yet.'**
+  /// **'Auto-retry only runs if the current model response has not produced any output yet.'**
   String get autoRetryFooter;
 
   /// No description provided for @autoRetryCountdown.

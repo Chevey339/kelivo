@@ -753,6 +753,7 @@ Stream<StreamChunk> runOpenAIChatCompletionsToolFollowUps({
   required int approxPromptTokens,
   required int approxCompletionChars,
   required bool includeReasoningDetailsOnDone,
+  StreamRoundRunner? retryRound,
 }) async* {
   var usage = initialUsage;
   var chars = approxCompletionChars;
@@ -908,6 +909,7 @@ Stream<StreamChunk> runOpenAIChatCompletionsToolFollowUps({
         totalTokens: usage?.totalTokens ?? approxTotal,
       );
     },
+    retryRound: retryRound,
     usageOf: () => usage,
   );
 }
@@ -932,6 +934,7 @@ Stream<StreamChunk> runOpenAIChatCompletionsNonStreamToolFollowUps({
   required bool needsReasoningEcho,
   required Map<String, String>? extraHeaders,
   required TokenUsage? initialUsage,
+  StreamRoundRunner? retryRound,
 }) async* {
   var usage = initialUsage;
   var lastObj = firstObj;
@@ -1033,6 +1036,7 @@ Stream<StreamChunk> runOpenAIChatCompletionsNonStreamToolFollowUps({
             : choice['finish_reason'].toString(),
       );
     },
+    retryRound: retryRound,
     usageOf: () => usage,
   );
 }

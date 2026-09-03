@@ -2288,7 +2288,7 @@
   "autoRetryStopKeywords": "停止重試關鍵字",
   "autoRetryAddHint": "新增",
   "autoRetryRestoreDefaults": "恢復預設",
-  "autoRetryFooter": "僅在本次請求尚未產生任何輸出時才會自動重試。",
+  "autoRetryFooter": "僅在目前這輪模型回應尚未產生任何輸出時才會自動重試。",
   "autoRetryCountdown": "{seconds} 秒後重試 ({attempt}/{maxRetries})",
   "@autoRetryCountdown": {
     "placeholders": {

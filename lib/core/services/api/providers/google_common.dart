@@ -436,6 +436,7 @@ Stream<StreamChunk> sendGoogleStream(
   Map<String, dynamic>? extraBody,
   bool stream = true,
   bool skipImageParsing = false,
+  StreamRoundRunner? retryRound,
 }) async* {
   // Check for Vertex AI Claude models (prefix "claude-")
   // If it's a Claude model on Vertex, route to special handling
@@ -457,6 +458,7 @@ Stream<StreamChunk> sendGoogleStream(
       extraBody: extraBody,
       stream: stream,
       skipImageParsing: skipImageParsing,
+      retryRound: retryRound,
     );
     return;
   }
@@ -747,6 +749,7 @@ Stream<StreamChunk> sendGoogleStream(
     var lastText = '';
 
     yield* runProviderToolRounds(
+      retryRound: retryRound,
       sendRound: () async* {
         pendingCalls = [];
         lastParts = [];
@@ -1184,6 +1187,7 @@ Stream<StreamChunk> sendGoogleStream(
   var retryMalformed = false;
 
   yield* runProviderToolRounds(
+    retryRound: retryRound,
     sendRound: () async* {
       pendingCalls = [];
       lastRoundCalls = [];

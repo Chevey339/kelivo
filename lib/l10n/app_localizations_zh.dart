@@ -6268,7 +6268,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get autoRetryRestoreDefaults => '恢复默认';
 
   @override
-  String get autoRetryFooter => '仅在本次请求尚未产生任何输出时才会自动重试。';
+  String get autoRetryFooter => '仅在当前这轮模型响应尚未产生任何输出时才会自动重试。';
 
   @override
   String autoRetryCountdown(int seconds, int attempt, int maxRetries) {
@@ -14766,7 +14766,7 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get autoRetryRestoreDefaults => '恢复默认';
 
   @override
-  String get autoRetryFooter => '仅在本次请求尚未产生任何输出时才会自动重试。';
+  String get autoRetryFooter => '仅在当前这轮模型响应尚未产生任何输出时才会自动重试。';
 
   @override
   String autoRetryCountdown(int seconds, int attempt, int maxRetries) {
@@ -23339,7 +23339,7 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get autoRetryRestoreDefaults => '恢復預設';
 
   @override
-  String get autoRetryFooter => '僅在本次請求尚未產生任何輸出時才會自動重試。';
+  String get autoRetryFooter => '僅在目前這輪模型回應尚未產生任何輸出時才會自動重試。';
 
   @override
   String autoRetryCountdown(int seconds, int attempt, int maxRetries) {

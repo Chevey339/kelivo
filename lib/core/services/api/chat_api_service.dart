@@ -9,6 +9,7 @@ import '../../../utils/unicode_sanitizer.dart';
 import '../logging/context_log_models.dart';
 import '../../utils/multimodal_input_utils.dart';
 import 'generation/text_generation_result.dart';
+import 'generation/tool_loop_runner.dart';
 import 'stream/stream_chunk.dart';
 import 'stream/stream_chunk_handler.dart';
 
@@ -202,8 +203,8 @@ class ChatApiService {
     final retryNetworkErrors =
         !useOpenAIImagesApi && !useZhipuLayoutParsing && !imageOutput;
     final emitRetryUi = options.enabled && options.maxRetries > 0;
-    try {
-      yield* retryingStream<StreamChunk>(
+    Stream<StreamChunk> retryRound(Stream<StreamChunk> Function() sendRound) {
+      return retryingStream<StreamChunk>(
         options: options,
         isCancelled: () => sessionToken.isCancelled,
         cancelled: _whenCancelled(sessionToken),
@@ -222,7 +223,13 @@ class ChatApiService {
               )
             : null,
         attemptStartEvent: emitRetryUi ? () => const RetryAttemptStart() : null,
-        attempt: (_) => _sendOnce(
+        attempt: (_) => sendRound(),
+      );
+    }
+
+    try {
+      yield* retryRound(
+        () => _sendOnce(
           config: config,
           modelId: modelId,
           messages: safeMessages,
@@ -242,6 +249,7 @@ class ChatApiService {
           useOpenAIImagesApi: useOpenAIImagesApi,
           useZhipuLayoutParsing: useZhipuLayoutParsing,
           sessionToken: sessionToken,
+          retryRound: retryRound,
         ),
       );
     } finally {
@@ -307,6 +315,7 @@ class ChatApiService {
     required bool useOpenAIImagesApi,
     required bool useZhipuLayoutParsing,
     required CancelToken sessionToken,
+    required StreamRoundRunner retryRound,
   }) async* {
     if (sessionToken.isCancelled) {
       throw http.ClientException('cancelled');
@@ -353,6 +362,7 @@ class ChatApiService {
             stream: stream,
             builtInSearchOnly: builtInSearchOnly,
             skipImageParsing: skipImageParsing,
+            retryRound: retryRound,
           );
         } else {
           yield* sendOpenAIChatCompletionsStream(
@@ -372,6 +382,7 @@ class ChatApiService {
             stream: stream,
             builtInSearchOnly: builtInSearchOnly,
             skipImageParsing: skipImageParsing,
+            retryRound: retryRound,
           );
         }
       } else if (kind == ProviderKind.claude) {
@@ -392,6 +403,7 @@ class ChatApiService {
           stream: stream,
           builtInSearchOnly: builtInSearchOnly,
           skipImageParsing: skipImageParsing,
+          retryRound: retryRound,
         );
       } else if (kind == ProviderKind.google) {
         final isVertex = config.vertexAI == true;
@@ -414,6 +426,7 @@ class ChatApiService {
             extraBody: extraBody,
             stream: stream,
             skipImageParsing: skipImageParsing,
+            retryRound: retryRound,
           );
         } else if (isVertex) {
           yield* sendGoogleVertexStream(
@@ -432,6 +445,7 @@ class ChatApiService {
             extraBody: extraBody,
             stream: stream,
             skipImageParsing: skipImageParsing,
+            retryRound: retryRound,
           );
         } else {
           yield* sendGoogleGeminiStream(
@@ -450,6 +464,7 @@ class ChatApiService {
             extraBody: extraBody,
             stream: stream,
             skipImageParsing: skipImageParsing,
+            retryRound: retryRound,
           );
         }
       }

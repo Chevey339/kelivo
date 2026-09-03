@@ -39,6 +39,7 @@ Stream<StreamChunk> sendGoogleVertexStream(
   Map<String, dynamic>? extraBody,
   bool stream = true,
   bool skipImageParsing = false,
+  StreamRoundRunner? retryRound,
 }) {
   final cfg = config.copyWith(vertexAI: true);
   return sendGoogleStream(
@@ -57,6 +58,7 @@ Stream<StreamChunk> sendGoogleVertexStream(
     extraBody: extraBody,
     stream: stream,
     skipImageParsing: skipImageParsing,
+    retryRound: retryRound,
   );
 }
 
@@ -177,6 +179,7 @@ Stream<StreamChunk> sendGoogleVertexClaudeStream({
   Map<String, dynamic>? extraBody,
   bool stream = true,
   bool skipImageParsing = false,
+  StreamRoundRunner? retryRound,
 }) async* {
   final upstreamId = apiModelId(config, modelId);
   final loc = (config.location ?? 'us-central1').trim();
@@ -469,6 +472,7 @@ Stream<StreamChunk> sendGoogleVertexClaudeStream({
   var pauseTurn = false;
 
   yield* runProviderToolRounds(
+    retryRound: retryRound,
     sendRound: () async* {
       pendingCalls = [];
       lastStreamResults = [];

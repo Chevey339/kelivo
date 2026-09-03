@@ -5,6 +5,7 @@ import 'package:http/http.dart' as http;
 
 import '../../../providers/settings_provider.dart';
 import '../chat_api_helpers.dart';
+import '../generation/tool_loop_runner.dart';
 import '../stream/stream_chunk.dart';
 
 import 'google_common.dart';
@@ -247,6 +248,7 @@ Stream<StreamChunk> sendGoogleGeminiStream(
   Map<String, dynamic>? extraBody,
   bool stream = true,
   bool skipImageParsing = false,
+  StreamRoundRunner? retryRound,
 }) {
   final cfg = config.copyWith(vertexAI: false);
   return sendGoogleStream(
@@ -265,6 +267,7 @@ Stream<StreamChunk> sendGoogleGeminiStream(
     extraBody: extraBody,
     stream: stream,
     skipImageParsing: skipImageParsing,
+    retryRound: retryRound,
   );
 }
 
