@@ -297,7 +297,16 @@ ImageRef? _lastAssistantImageBefore(
 ) {
   for (int i = beforeIndex - 1; i >= 0; i--) {
     if ((messages[i]['role'] ?? '').toString() != 'assistant') continue;
-    final images = _extractOpenAIImageRefs(messages[i]['content']);
+    final message = messages[i];
+    final internalMediaRefs = parseInternalMediaRefs(
+      message[multimodalInternalMediaPathsKey],
+    );
+    for (int j = internalMediaRefs.length - 1; j >= 0; j--) {
+      final mediaRef = internalMediaRefs[j];
+      if (!isImageMime(mimeForInternalMediaRef(mediaRef))) continue;
+      return _imageRefFromSource(mediaRef.uri, mime: mediaRef.mime);
+    }
+    final images = _extractOpenAIImageRefs(message['content']);
     if (images.isNotEmpty) return images.last;
   }
   return null;

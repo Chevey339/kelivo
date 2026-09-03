@@ -862,6 +862,73 @@ void main() {
     );
 
     test(
+      'uses structured assistant image as edit input for follow-up turns',
+      () async {
+        late Uri requestUri;
+        late String contentType;
+        late String requestBody;
+        final tempDir = await Directory.systemTemp.createTemp(
+          'kelivo_openai_assistant_image_edit_',
+        );
+        addTearDown(() async {
+          if (await tempDir.exists()) {
+            await tempDir.delete(recursive: true);
+          }
+        });
+        final generatedImage = File('${tempDir.path}/generated.png');
+        await generatedImage.writeAsBytes(const [1, 2, 3, 4]);
+
+        final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+        addTearDown(() async {
+          await server.close(force: true);
+        });
+
+        server.listen((request) async {
+          requestUri = request.uri;
+          contentType = request.headers.contentType?.mimeType ?? '';
+          requestBody = latin1.decode(await _readBytes(request));
+          request.response.statusCode = HttpStatus.ok;
+          request.response.headers.contentType = ContentType.json;
+          request.response.write(
+            jsonEncode({
+              'data': [
+                {'url': 'https://example.com/follow-up-edit.png'},
+              ],
+            }),
+          );
+          await request.response.close();
+        });
+
+        final chunks = await ChatApiService.sendMessageStream(
+          config: _openAiConfig(_baseUrl(server)),
+          modelId: 'gpt-image-2',
+          messages: [
+            const {'role': 'user', 'content': 'draw a landscape'},
+            {
+              'role': 'assistant',
+              'content': '',
+              multimodalInternalMediaPathsKey: [
+                encodeInternalMediaRef(
+                  uri: generatedImage.path,
+                  mime: 'image/png',
+                ),
+              ],
+            },
+            const {'role': 'user', 'content': 'add a dragon'},
+          ],
+          stream: false,
+        ).toList();
+
+        expect(requestUri.path, '/v1/images/edits');
+        expect(contentType, 'multipart/form-data');
+        expect(requestBody, contains('name="image[]"'));
+        expect(requestBody, contains('filename="generated.png"'));
+        expect(requestBody, contains('add a dragon'));
+        expect(chunks.firstImageUri, 'https://example.com/follow-up-edit.png');
+      },
+    );
+
+    test(
       'uses the latest assistant image as edit input for follow-up turns',
       () async {
         late Uri requestUri;
