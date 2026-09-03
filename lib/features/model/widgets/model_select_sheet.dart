@@ -276,15 +276,24 @@ Future<ModelSelection?> showModelSelector(
 /// assistant -> global default again. It is an action, never an option: the
 /// checkmark always stays on the model actually in use, so opening the sheet
 /// answers "what am I talking to right now?" before anything else.
+///
+/// With [SettingsProvider.perChatModelEnabled] off the pick lands on the
+/// current assistant instead, so every chat under it follows the last model
+/// chosen. There is no pin to undo then, so the "follow assistant" action is
+/// hidden.
 Future<void> showModelSelectSheet(
   BuildContext context, {
   required HomePageController controller,
 }) async {
+  final settings = context.read<SettingsProvider>();
+  final assistantProvider = context.read<AssistantProvider>();
+  final assistant = assistantProvider.currentAssistant;
+  final perChat = settings.perChatModelEnabled;
   final conversation = controller.currentConversation;
   final resolved = resolveChatModel(
-    context.read<SettingsProvider>(),
+    settings,
     conversation: conversation,
-    assistant: context.read<AssistantProvider>().currentAssistant,
+    assistant: assistant,
   );
 
   final sel = await showModelSelector(
@@ -294,10 +303,22 @@ Future<void> showModelSelectSheet(
     initialModelId: resolved.modelId,
     // Nothing to undo when the conversation is already following.
     allowInherit:
+        perChat &&
         conversation?.chatModelProvider != null &&
         conversation?.chatModelId != null,
   );
   if (sel == null) return;
+
+  if (!perChat) {
+    if (assistant == null) return;
+    await assistantProvider.updateAssistant(
+      assistant.copyWith(
+        chatModelProvider: sel.providerKey,
+        chatModelId: sel.modelId,
+      ),
+    );
+    return;
+  }
 
   await controller.setConversationModel(
     providerKey: sel.isInherit ? null : sel.providerKey,

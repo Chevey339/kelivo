@@ -1504,6 +1504,8 @@
   "defaultModelPageTitle": "Default Model",
   "defaultModelPageChatModelTitle": "Chat Model",
   "defaultModelPageChatModelSubtitle": "Global default chat model",
+  "defaultModelPagePerChatModelTitle": "Per-Chat Model",
+  "defaultModelPagePerChatModelSubtitle": "On: picking a model in a chat applies to that chat only. Off: it becomes the current assistant's model, so every chat using that assistant follows it.",
   "defaultModelPageTitleModelTitle": "Title Summary Model",
   "defaultModelPageTitleModelSubtitle": "Summarizes conversation titles using the current chat model by default, or a selected model.",
   "titleModelThinkingTitle": "Enable Thinking",

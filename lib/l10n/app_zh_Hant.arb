@@ -1160,6 +1160,8 @@
   "defaultModelPageTitle": "預設模型",
   "defaultModelPageChatModelTitle": "聊天模型",
   "defaultModelPageChatModelSubtitle": "全域預設的聊天模型",
+  "defaultModelPagePerChatModelTitle": "每個對話獨立模型",
+  "defaultModelPagePerChatModelSubtitle": "開啟後，在對話中切換模型只影響目前對話；關閉後會直接修改目前助手的模型，使用該助手的所有對話都會跟隨。",
   "defaultModelPageTitleModelTitle": "標題總結模型",
   "defaultModelPageTitleModelSubtitle": "用於總結對話標題，預設跟隨目前對話模型，也可指定其他模型。",
   "titleModelThinkingTitle": "是否開啟思考",

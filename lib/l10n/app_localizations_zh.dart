@@ -3236,6 +3236,13 @@ class AppLocalizationsZh extends AppLocalizations {
   String get defaultModelPageChatModelSubtitle => '全局默认的聊天模型';
 
   @override
+  String get defaultModelPagePerChatModelTitle => '每个对话独立模型';
+
+  @override
+  String get defaultModelPagePerChatModelSubtitle =>
+      '开启后，在对话中切换模型只影响当前对话；关闭后会直接修改当前助手的模型，使用该助手的所有对话都会跟随。';
+
+  @override
   String get defaultModelPageTitleModelTitle => '标题总结模型';
 
   @override
@@ -11808,6 +11815,13 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get defaultModelPageChatModelSubtitle => '全局默认的聊天模型';
 
   @override
+  String get defaultModelPagePerChatModelTitle => '每个对话独立模型';
+
+  @override
+  String get defaultModelPagePerChatModelSubtitle =>
+      '开启后，在对话中切换模型只影响当前对话；关闭后会直接修改当前助手的模型，使用该助手的所有对话都会跟随。';
+
+  @override
   String get defaultModelPageTitleModelTitle => '标题总结模型';
 
   @override
@@ -20304,6 +20318,13 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get defaultModelPageChatModelSubtitle => '全域預設的聊天模型';
+
+  @override
+  String get defaultModelPagePerChatModelTitle => '每個對話獨立模型';
+
+  @override
+  String get defaultModelPagePerChatModelSubtitle =>
+      '開啟後，在對話中切換模型只影響目前對話；關閉後會直接修改目前助手的模型，使用該助手的所有對話都會跟隨。';
 
   @override
   String get defaultModelPageTitleModelTitle => '標題總結模型';

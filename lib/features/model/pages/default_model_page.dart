@@ -71,6 +71,11 @@ class DefaultModelPage extends StatelessWidget {
             },
           ),
           const SizedBox(height: 16),
+          _PerChatModelCard(
+            value: settings.perChatModelEnabled,
+            onChanged: settings.setPerChatModelEnabled,
+          ),
+          const SizedBox(height: 16),
           _ModelCard(
             icon: Lucide.NotebookTabs,
             title: l10n.defaultModelPageTitleModelTitle,
@@ -1073,6 +1078,70 @@ class _BrandAvatar extends StatelessWidget {
       ),
       alignment: Alignment.center,
       child: inner,
+    );
+  }
+}
+
+/// Toggles whether the chat model picker writes to the conversation or to the
+/// current assistant. Conversation pins survive being switched off, so the
+/// wording promises a scope change, not a reset.
+class _PerChatModelCard extends StatelessWidget {
+  const _PerChatModelCard({required this.value, required this.onChanged});
+
+  final bool value;
+  final ValueChanged<bool> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final l10n = AppLocalizations.of(context)!;
+    return Container(
+      decoration: BoxDecoration(
+        color: context.appColors.surfaceCard,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: context.appColors.hairline, width: 0.6),
+      ),
+      child: _TactileRow(
+        onTap: () => onChanged(!value),
+        builder: (_) => Padding(
+          padding: const EdgeInsets.all(14),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(Lucide.MessagesSquare, size: 18, color: cs.onSurface),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      l10n.defaultModelPagePerChatModelTitle,
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: AppFontWeights.semibold,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      l10n.defaultModelPagePerChatModelSubtitle,
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: cs.onSurface.withValues(alpha: 0.6),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 16),
+              IosSwitch(
+                value: value,
+                semanticLabel: l10n.defaultModelPagePerChatModelTitle,
+                onChanged: onChanged,
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

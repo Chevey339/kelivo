@@ -3348,6 +3348,13 @@ class AppLocalizationsEn extends AppLocalizations {
   String get defaultModelPageChatModelSubtitle => 'Global default chat model';
 
   @override
+  String get defaultModelPagePerChatModelTitle => 'Per-Chat Model';
+
+  @override
+  String get defaultModelPagePerChatModelSubtitle =>
+      'On: picking a model in a chat applies to that chat only. Off: it becomes the current assistant\'s model, so every chat using that assistant follows it.';
+
+  @override
   String get defaultModelPageTitleModelTitle => 'Title Summary Model';
 
   @override

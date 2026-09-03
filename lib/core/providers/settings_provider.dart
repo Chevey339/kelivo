@@ -96,6 +96,7 @@ class SettingsProvider extends ChangeNotifier {
   static const String _providerConfigsKey = 'provider_configs_v1';
   static const String _pinnedModelsKey = 'pinned_models_v1';
   static const String _selectedModelKey = 'selected_model_v1';
+  static const String _perChatModelEnabledKey = 'per_chat_model_enabled_v1';
   static const String _titleModelKey = 'title_model_v1';
   static const String _titleGenerationEnabledKey =
       'title_generation_enabled_v1';
@@ -857,6 +858,7 @@ class SettingsProvider extends ChangeNotifier {
         _titleModelId = parts.sublist(1).join('::');
       }
     }
+    _perChatModelEnabled = prefs.getBool(_perChatModelEnabledKey) ?? true;
     _titleGenerationEnabled = prefs.getBool(_titleGenerationEnabledKey) ?? true;
     // load title prompt
     final tp = prefs.getString(_titlePromptKey);
@@ -3612,6 +3614,21 @@ class SettingsProvider extends ChangeNotifier {
     await prefs.remove(_selectedModelKey);
   }
 
+  // When on, picking a model in the chat pins it to that conversation only.
+  // When off, the pick rewrites the current assistant's model, so every chat
+  // under that assistant follows it. Conversation pins are kept either way and
+  // simply ignored while this is off, so toggling back restores them.
+  bool _perChatModelEnabled = true;
+  bool get perChatModelEnabled => _perChatModelEnabled;
+
+  Future<void> setPerChatModelEnabled(bool value) async {
+    if (_perChatModelEnabled == value) return;
+    _perChatModelEnabled = value;
+    notifyListeners();
+    final prefs = _preferences;
+    await prefs.setBool(_perChatModelEnabledKey, value);
+  }
+
   // Title model and prompt
   String? _titleModelProvider;
   String? _titleModelId;
@@ -5683,6 +5700,7 @@ Requirements:
     copy._pinnedModels.addAll(_pinnedModels);
     copy._currentModelProvider = _currentModelProvider;
     copy._currentModelId = _currentModelId;
+    copy._perChatModelEnabled = _perChatModelEnabled;
     copy._titleModelProvider = _titleModelProvider;
     copy._titleModelId = _titleModelId;
     copy._titleGenerationEnabled = _titleGenerationEnabled;

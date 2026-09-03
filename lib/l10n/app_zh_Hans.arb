@@ -1198,6 +1198,8 @@
   "defaultModelPageTitle": "默认模型",
   "defaultModelPageChatModelTitle": "聊天模型",
   "defaultModelPageChatModelSubtitle": "全局默认的聊天模型",
+  "defaultModelPagePerChatModelTitle": "每个对话独立模型",
+  "defaultModelPagePerChatModelSubtitle": "开启后，在对话中切换模型只影响当前对话；关闭后会直接修改当前助手的模型，使用该助手的所有对话都会跟随。",
   "defaultModelPageTitleModelTitle": "标题总结模型",
   "defaultModelPageTitleModelSubtitle": "用于总结对话标题，默认跟随当前对话模型，也可指定其他模型。",
   "titleModelThinkingTitle": "是否开启思考",

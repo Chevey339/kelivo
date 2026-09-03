@@ -100,6 +100,51 @@ void main() {
     expect(resolved.modelId, 'assistant-model');
   });
 
+  test(
+    'the conversation layer is skipped when per-chat models are off',
+    () async {
+      await settings.setPerChatModelEnabled(false);
+
+      final resolved = resolveChatModel(
+        settings,
+        conversation: conversationWithModel(
+          providerKey: 'ConversationProvider',
+          modelId: 'conversation-model',
+        ),
+        assistant: assistantWithModel(
+          providerKey: 'AssistantProvider',
+          modelId: 'assistant-model',
+        ),
+      );
+
+      expect(resolved.providerKey, 'AssistantProvider');
+      expect(resolved.modelId, 'assistant-model');
+    },
+  );
+
+  test('turning per-chat models back on restores the pin', () async {
+    final conversation = conversationWithModel(
+      providerKey: 'ConversationProvider',
+      modelId: 'conversation-model',
+    );
+    final assistant = assistantWithModel(
+      providerKey: 'AssistantProvider',
+      modelId: 'assistant-model',
+    );
+
+    await settings.setPerChatModelEnabled(false);
+    await settings.setPerChatModelEnabled(true);
+
+    final resolved = resolveChatModel(
+      settings,
+      conversation: conversation,
+      assistant: assistant,
+    );
+
+    expect(resolved.providerKey, 'ConversationProvider');
+    expect(resolved.modelId, 'conversation-model');
+  });
+
   test('getActiveModelIds and getModelDisplayInfo agree with it', () {
     final conversation = conversationWithModel(
       providerKey: 'ConversationProvider',
