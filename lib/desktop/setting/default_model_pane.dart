@@ -114,10 +114,12 @@ class DesktopDefaultModelPane extends StatelessWidget {
                         : null,
                     onPick: () async {
                       final settingsProvider = context.read<SettingsProvider>();
-                      final sel = await pickConfiguredModel(
-                        settings.titleModelProvider,
-                        settings.titleModelId,
-                      );
+                      final sel =
+                          await showModelSelectorWithCurrentChatFallback(
+                            context,
+                            initialProviderKey: settings.titleModelProvider,
+                            initialModelId: settings.titleModelId,
+                          );
                       if (sel != null) {
                         await settingsProvider.setTitleModel(
                           sel.providerKey,
@@ -187,10 +189,13 @@ class DesktopDefaultModelPane extends StatelessWidget {
                         : null,
                     onPick: () async {
                       final settingsProvider = context.read<SettingsProvider>();
-                      final sel = await pickConfiguredModel(
-                        settings.suggestionModelProvider,
-                        settings.suggestionModelId,
-                      );
+                      final sel =
+                          await showModelSelectorWithCurrentChatFallback(
+                            context,
+                            initialProviderKey:
+                                settings.suggestionModelProvider,
+                            initialModelId: settings.suggestionModelId,
+                          );
                       if (sel != null) {
                         await settingsProvider.setSuggestionModel(
                           sel.providerKey,

@@ -7,6 +7,7 @@ import 'package:scrollable_positioned_list/scrollable_positioned_list.dart';
 import '../../../core/providers/settings_provider.dart';
 import '../../../core/providers/model_provider.dart';
 import '../../../core/providers/assistant_provider.dart';
+import '../../../core/services/chat/chat_service.dart';
 import '../../../icons/lucide_adapter.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'model_detail_sheet.dart';
@@ -260,6 +261,44 @@ Future<ModelSelection?> showModelSelector(
   } finally {
     _modelSelectorOpen = false;
   }
+}
+
+/// Opens a configured background model, or the model the current chat actually
+/// uses when that background task is set to follow the chat.
+Future<ModelSelection?> showModelSelectorWithCurrentChatFallback(
+  BuildContext context, {
+  String? initialProviderKey,
+  String? initialModelId,
+}) {
+  if (initialProviderKey != null && initialModelId != null) {
+    return showModelSelector(
+      context,
+      initialProviderKey: initialProviderKey,
+      initialModelId: initialModelId,
+    );
+  }
+
+  final settings = context.read<SettingsProvider>();
+  final chats = context.read<ChatService>();
+  final conversationId = chats.currentConversationId;
+  final conversation = conversationId == null
+      ? null
+      : chats.getConversation(conversationId);
+  final assistants = context.read<AssistantProvider>();
+  final assistantId = conversation?.assistantId;
+  final assistant = assistantId != null
+      ? assistants.getById(assistantId)
+      : assistants.currentAssistant;
+  final current = resolveChatModel(
+    settings,
+    conversation: conversation,
+    assistant: assistant,
+  );
+  return showModelSelector(
+    context,
+    initialProviderKey: current.providerKey,
+    initialModelId: current.modelId,
+  );
 }
 
 /// Opens the model picker from the chat UI and pins the choice to the current
