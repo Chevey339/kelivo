@@ -1097,6 +1097,7 @@
   "chatInputBarOnlineSearchTooltip": "联网搜索",
   "chatInputBarReasoningStrengthTooltip": "思维链强度",
   "chatInputBarMcpServersTooltip": "MCP服务器",
+  "chatInputBarToolsTooltip": "工具",
   "chatInputBarMoreTooltip": "更多",
   "chatInputBarVoiceInputTooltip": "语音输入",
   "chatInputBarVoiceCancelTooltip": "取消录音",

@@ -252,13 +252,17 @@ void main() {
     final l10n = await pumpSection(tester, chat: chat);
     expect(find.byKey(WorkspaceSection.nameKey), findsOneWidget);
     expect(find.text('Alpha'), findsOneWidget);
-    expect(find.byKey(WorkspaceSection.moreKey), findsOneWidget);
+    expect(find.byKey(WorkspaceSection.filesKey), findsOneWidget);
     expect(find.byKey(WorkspaceSection.changeKey), findsOneWidget);
     expect(find.byKey(WorkspaceSection.unbindKey), findsOneWidget);
     expect(find.text(l10n.workspaceEntryChange), findsNothing);
     expect(find.text(l10n.workspaceEntryUnbind), findsNothing);
     expect(find.text(l10n.workspaceEntryAllowAll), findsOneWidget);
     expect(find.text(l10n.workspaceEntryAllowAllSubtitle), findsOneWidget);
+    // Files rides on the name row as an icon button, and session skills live
+    // in the ＋ sheet now.
+    expect(find.text(l10n.workspaceEntryFiles), findsNothing);
+    expect(find.text(l10n.workspaceEntrySessionSkills), findsNothing);
   });
 
   testWidgets('toolsUsed still opens the menu and confirms before unbind', (
@@ -281,8 +285,8 @@ void main() {
       ),
     );
     final l10n = await pumpSection(tester, chat: chat);
-    await tester.ensureVisible(find.byKey(WorkspaceSection.moreKey));
-    await tester.tap(find.byKey(WorkspaceSection.moreKey));
+    await tester.ensureVisible(find.byKey(WorkspaceSection.nameKey));
+    await tester.tap(find.byKey(WorkspaceSection.nameKey));
     await tester.pumpAndSettle();
     expect(find.text(l10n.workspaceEntryChange), findsOneWidget);
     expect(find.text(l10n.workspaceEntryUnbind), findsOneWidget);
@@ -299,7 +303,7 @@ void main() {
       isTrue,
     );
 
-    await tester.tap(find.byKey(WorkspaceSection.moreKey));
+    await tester.tap(find.byKey(WorkspaceSection.nameKey));
     await tester.pumpAndSettle();
     await tester.tap(find.text(l10n.workspaceEntryUnbind));
     await tester.pumpAndSettle();
@@ -416,7 +420,7 @@ void main() {
     );
   });
 
-  testWidgets('ellipsis menu offers change and destructive unbind', (
+  testWidgets('tapping the bound row offers change and destructive unbind', (
     tester,
   ) async {
     debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
@@ -434,7 +438,7 @@ void main() {
     );
     final l10n = await pumpSection(tester, chat: chat);
 
-    await tester.tap(find.byKey(WorkspaceSection.moreKey));
+    await tester.tap(find.byKey(WorkspaceSection.nameKey));
     await tester.pumpAndSettle();
 
     expect(
@@ -472,7 +476,7 @@ void main() {
     );
     final l10n = await pumpSection(tester, chat: chat);
 
-    await tester.tap(find.byKey(WorkspaceSection.moreKey));
+    await tester.tap(find.byKey(WorkspaceSection.nameKey));
     await tester.pumpAndSettle();
     await tester.tap(find.text(l10n.workspaceEntryUnbind));
     await tester.pump();

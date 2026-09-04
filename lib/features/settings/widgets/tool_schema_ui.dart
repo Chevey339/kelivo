@@ -4,7 +4,7 @@ import '../../../core/models/tool_schema_override.dart';
 import '../../../core/services/memory/memory_tools.dart';
 import '../../../core/services/search/search_tool_service.dart';
 import '../../../core/services/tools/built_in_tool_catalog.dart';
-import '../../../features/home/services/local_tools_service.dart';
+import '../../../features/home/services/local_tool_labels.dart';
 import '../../../icons/lucide_adapter.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../shared/widgets/ios_tactile.dart';
@@ -29,36 +29,8 @@ IconData toolSchemaIconFor(String name) {
       return Lucide.bookDashed;
     case MemoryTools.chatSearch:
       return Lucide.Search;
-    case LocalToolNames.timeInfo:
-      return Lucide.clock;
-    case LocalToolNames.clipboard:
-      return Lucide.Clipboard;
-    case LocalToolNames.textToSpeech:
-      return Lucide.Volume2;
-    case LocalToolNames.askUser:
-      return Lucide.MessageCircleQuestionMark;
-    case LocalToolNames.calculate:
-      return Lucide.Calculator;
-    case LocalToolNames.screenTime:
-      return Lucide.Smartphone;
-    case LocalToolNames.calendarQuery:
-      return Lucide.Calendar;
-    case LocalToolNames.calendarCreate:
-      return Lucide.CalendarPlus;
-    case LocalToolNames.currentLocation:
-      return Lucide.MapPin;
-    case LocalToolNames.weather:
-      return Lucide.CloudSun;
-    case LocalToolNames.healthSummary:
-      return Lucide.HeartPulse;
-    case LocalToolNames.remindersQuery:
-      return Lucide.ListTodo;
-    case LocalToolNames.remindersCreate:
-      return Lucide.ListPlus;
-    case LocalToolNames.remindersComplete:
-      return Lucide.CheckCircle;
     default:
-      return Lucide.Wrench;
+      return localToolIcon(name);
   }
 }
 

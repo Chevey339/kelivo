@@ -3,10 +3,8 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
-import 'package:Kelivo/core/models/assistant.dart';
 import 'package:Kelivo/core/models/workspace.dart';
 import 'package:Kelivo/core/models/workspace_binding.dart';
-import 'package:Kelivo/core/providers/assistant_provider.dart';
 import 'package:Kelivo/core/providers/environment_provider.dart';
 import 'package:Kelivo/core/providers/workspace_provider.dart';
 import 'package:Kelivo/core/services/chat/chat_service.dart';
@@ -14,13 +12,14 @@ import 'package:Kelivo/core/services/haptics.dart';
 import 'package:Kelivo/core/services/sandbox/environment_manager.dart';
 import 'package:Kelivo/core/services/workspace/workspace_binding_actions.dart';
 import 'package:Kelivo/core/services/workspace/workspace_runtime.dart';
+import 'package:Kelivo/features/chat/utils/ensure_conversation.dart';
+import 'package:Kelivo/features/chat/utils/sheet_navigation.dart';
 import 'package:Kelivo/features/chat/widgets/tools_sheet_row.dart';
 import 'package:Kelivo/features/workspace/terminal/open_terminal.dart';
 import 'package:Kelivo/features/workspace/widgets/environment/environment_labels.dart';
 import 'package:Kelivo/features/workspace/widgets/files/conversation_files_panel.dart';
 import 'package:Kelivo/features/workspace/widgets/files/file_browser_ops.dart';
 import 'package:Kelivo/features/workspace/widgets/files/workspace_prompts.dart';
-import 'package:Kelivo/features/workspace/widgets/skills/conversation_skills_sheet.dart';
 import 'package:Kelivo/features/workspace/widgets/workspace_picker.dart';
 import 'package:Kelivo/features/workspace/workspace_navigation.dart';
 import 'package:Kelivo/icons/lucide_adapter.dart';
@@ -48,7 +47,6 @@ class WorkspaceSection extends StatefulWidget {
   static const Key bindKey = ValueKey<String>('workspace-section-bind');
   static const Key changeKey = ValueKey<String>('workspace-section-change');
   static const Key unbindKey = ValueKey<String>('workspace-section-unbind');
-  static const Key moreKey = ValueKey<String>('workspace-section-more');
   static const Key cwdKey = ValueKey<String>('workspace-section-cwd');
   static const Key cwdErrorKey = ValueKey<String>(
     'workspace-section-cwd-error',
@@ -60,7 +58,6 @@ class WorkspaceSection extends StatefulWidget {
   static const Key filesKey = ValueKey<String>('workspace-section-files');
   static const Key terminalKey = ValueKey<String>('workspace-section-terminal');
   static const Key revealKey = ValueKey<String>('workspace-section-reveal');
-  static const Key skillsKey = ValueKey<String>('workspace-section-skills');
   static const Key environmentKey = ValueKey<String>(
     'workspace-section-environment',
   );
@@ -91,23 +88,13 @@ class _WorkspaceSectionState extends State<WorkspaceSection> {
   Future<String?> _ensureConversationId() async {
     final existing = _conversationId;
     if (existing != null && existing.isNotEmpty) return existing;
-    final chat = context.read<ChatService>();
-    String? assistantId = widget.assistantId;
-    if (assistantId == null) {
-      try {
-        assistantId = context.read<AssistantProvider>().currentAssistantId;
-      } catch (_) {}
-    }
-    try {
-      final draft = await chat.createDraftConversation(
-        assistantId: assistantId,
-      );
-      if (!mounted) return draft.id;
-      setState(() => _localConversationId = draft.id);
-      return draft.id;
-    } catch (_) {
-      return null;
-    }
+    final created = await ensureConversationId(
+      context,
+      assistantId: widget.assistantId,
+    );
+    if (created == null || !mounted) return created;
+    setState(() => _localConversationId = created);
+    return created;
   }
 
   Future<void> _writeBinding(WorkspaceBinding binding) async {
@@ -120,22 +107,7 @@ class _WorkspaceSectionState extends State<WorkspaceSection> {
   }
 
   void _afterClose(void Function(BuildContext ctx) action) {
-    // Pop the tools sheet first and wait until its route is gone. Pushing the
-    // files (or skills) dialog in a microtask races `maybePop`: the delayed
-    // `pop()` can remove the new dialog instead, leaving its transparent
-    // `ModalBarrier` on screen so the home UI looks fine but ignores taps.
-    final navigator = Navigator.of(context);
-    final route = ModalRoute.of(context);
-    final waitForPopup = route is PopupRoute ? route.completed : null;
-    widget.onClose?.call();
-    unawaited(() async {
-      if (waitForPopup != null) {
-        await waitForPopup;
-      }
-      await WidgetsBinding.instance.endOfFrame;
-      if (!navigator.mounted) return;
-      action(navigator.context);
-    }());
+    afterSheetClose(context, onClose: widget.onClose, action: action);
   }
 
   Future<void> _bind(Workspace workspace) async {
@@ -219,17 +191,6 @@ class _WorkspaceSectionState extends State<WorkspaceSection> {
         allowAll: value,
       ),
     );
-  }
-
-  Assistant? _assistant() {
-    try {
-      final ap = context.read<AssistantProvider>();
-      final id = widget.assistantId;
-      if (id != null) return ap.getById(id);
-      return ap.currentAssistant;
-    } catch (_) {
-      return null;
-    }
   }
 
   EnvironmentManager? _resolvedEnvManager() {
@@ -348,7 +309,7 @@ class _WorkspaceSectionState extends State<WorkspaceSection> {
         ),
       );
     } else {
-      rows.add(_boundHeader(l10n, workspace, binding, envStatus));
+      rows.add(_boundRow(l10n, workspace, binding, runtime));
       rows.add(
         ToolsSheetRow(
           key: WorkspaceSection.cwdKey,
@@ -359,51 +320,6 @@ class _WorkspaceSectionState extends State<WorkspaceSection> {
           trailing: chevron,
         ),
       );
-      rows.add(
-        ToolsSheetRow(
-          key: WorkspaceSection.filesKey,
-          icon: Lucide.FolderOpen,
-          label: l10n.workspaceEntryFiles,
-          onTap: () {
-            Haptics.light();
-            final id = conversationId;
-            if (id == null) return;
-            _afterClose((ctx) {
-              unawaited(
-                showConversationFilesPanel(
-                  ctx,
-                  conversationId: id,
-                  initialTab: ConversationFilesTab.workspace,
-                ),
-              );
-            });
-          },
-          trailing: chevron,
-        ),
-      );
-      if (conversationId != null) {
-        rows.add(
-          ToolsSheetRow(
-            key: WorkspaceSection.skillsKey,
-            icon: Lucide.Sparkles,
-            label: l10n.workspaceEntrySessionSkills,
-            onTap: () {
-              Haptics.light();
-              final assistant = _assistant();
-              _afterClose((ctx) {
-                unawaited(
-                  showConversationSkillsSheet(
-                    ctx,
-                    conversationId: conversationId,
-                    assistant: assistant,
-                  ),
-                );
-              });
-            },
-            trailing: chevron,
-          ),
-        );
-      }
       if (showEnvironment) {
         rows.add(
           ToolsSheetRow(
@@ -419,9 +335,6 @@ class _WorkspaceSectionState extends State<WorkspaceSection> {
           ),
         );
       }
-      if (runtime != null) {
-        rows.addAll(_terminalRows(l10n, runtime, workspace, binding, chevron));
-      }
       rows.add(_allowAllRow(l10n, binding));
     }
 
@@ -436,96 +349,109 @@ class _WorkspaceSectionState extends State<WorkspaceSection> {
     );
   }
 
-  Widget _boundHeader(
+  /// The bound workspace itself. Tapping the row switches or unbinds it, and
+  /// the shortcuts that only exist while something is bound — files, terminal,
+  /// reveal — ride along as icon buttons instead of costing a row each.
+  Widget _boundRow(
     AppLocalizations l10n,
     Workspace workspace,
     WorkspaceBinding binding,
-    String envStatus,
+    WorkspaceRuntime? runtime,
   ) {
     final cs = Theme.of(context).colorScheme;
+    final tint = cs.onSurface.withValues(alpha: 0.7);
 
-    return ToolsSheetRow(
-      key: WorkspaceSection.nameKey,
-      icon: Lucide.FolderCode,
-      label: workspace.name,
-      subtitle: envStatus,
-      trailing: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const SizedBox.shrink(key: WorkspaceSection.unbindKey),
-          Builder(
-            builder: (buttonContext) {
-              return IosIconButton(
-                key: WorkspaceSection.moreKey,
-                icon: Lucide.Ellipsis,
-                size: 18,
-                padding: const EdgeInsets.all(6),
-                color: cs.onSurface.withValues(alpha: 0.7),
-                semanticLabel: l10n.workspaceFilesMore,
-                tooltip: l10n.workspaceFilesMore,
-                onTap: () => _openBoundMenu(buttonContext, workspace, binding),
-              );
-            },
+    Widget action({
+      required Key key,
+      required IconData icon,
+      required String label,
+      required VoidCallback onTap,
+    }) {
+      return IosIconButton(
+        key: key,
+        icon: icon,
+        size: 18,
+        padding: const EdgeInsets.all(6),
+        color: tint,
+        semanticLabel: label,
+        tooltip: label,
+        onTap: onTap,
+      );
+    }
+
+    return Builder(
+      builder: (rowContext) => ToolsSheetRow(
+        key: WorkspaceSection.nameKey,
+        icon: Lucide.FolderCode,
+        label: workspace.name,
+        onTap: () => _openBoundMenu(rowContext, workspace, binding),
+        // Shift out the last button's own tap padding so the icons end on the
+        // same edge as the switches and chevrons on the rows below.
+        trailing: Transform.translate(
+          offset: const Offset(6, 0),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const SizedBox.shrink(key: WorkspaceSection.unbindKey),
+              const SizedBox.shrink(key: WorkspaceSection.changeKey),
+              action(
+                key: WorkspaceSection.filesKey,
+                icon: Lucide.FolderOpen,
+                label: l10n.workspaceEntryFiles,
+                onTap: _openFiles,
+              ),
+              if (runtime != null && runtime.supportsPty)
+                action(
+                  key: WorkspaceSection.terminalKey,
+                  icon: Lucide.Terminal,
+                  label: l10n.workspaceEntryTerminal,
+                  onTap: _openTerminal,
+                )
+              else if (runtime != null && runtime.supportsSystemTerminal)
+                action(
+                  key: WorkspaceSection.terminalKey,
+                  icon: Lucide.Terminal,
+                  label: l10n.workspaceEntryOpenSystemTerminal,
+                  onTap: () => unawaited(
+                    _openSystemThenClose(runtime, workspace, binding),
+                  ),
+                ),
+              if (runtime != null && ResponsiveHelper.isDesktop(context))
+                action(
+                  key: WorkspaceSection.revealKey,
+                  icon: Lucide.ExternalLink,
+                  label: l10n.workspaceEntryReveal,
+                  onTap: () =>
+                      unawaited(_revealThenClose(runtime, workspace, binding)),
+                ),
+            ],
           ),
-          const SizedBox.shrink(key: WorkspaceSection.changeKey),
-        ],
+        ),
       ),
     );
   }
 
-  List<Widget> _terminalRows(
-    AppLocalizations l10n,
-    WorkspaceRuntime runtime,
-    Workspace workspace,
-    WorkspaceBinding binding,
-    Widget chevron,
-  ) {
-    final rows = <Widget>[];
-    if (runtime.supportsPty) {
-      rows.add(
-        ToolsSheetRow(
-          key: WorkspaceSection.terminalKey,
-          icon: Lucide.Terminal,
-          label: l10n.workspaceEntryTerminal,
-          onTap: () {
-            Haptics.light();
-            final id = _conversationId;
-            _afterClose((ctx) {
-              unawaited(openTerminal(ctx, conversationId: id));
-            });
-          },
-          trailing: chevron,
+  void _openFiles() {
+    Haptics.light();
+    final id = _conversationId;
+    if (id == null) return;
+    _afterClose((ctx) {
+      unawaited(
+        showConversationFilesPanel(
+          ctx,
+          conversationId: id,
+          initialTab: ConversationFilesTab.workspace,
         ),
       );
-    } else if (runtime.supportsSystemTerminal) {
-      rows.add(
-        ToolsSheetRow(
-          key: WorkspaceSection.terminalKey,
-          icon: Lucide.Terminal,
-          label: l10n.workspaceEntryOpenSystemTerminal,
-          onTap: () {
-            Haptics.light();
-            unawaited(_openSystemThenClose(runtime, workspace, binding));
-          },
-          trailing: chevron,
-        ),
-      );
-    }
-    if (ResponsiveHelper.isDesktop(context)) {
-      rows.add(
-        ToolsSheetRow(
-          key: WorkspaceSection.revealKey,
-          icon: Lucide.FolderOpen,
-          label: l10n.workspaceEntryReveal,
-          onTap: () {
-            Haptics.light();
-            unawaited(_revealThenClose(runtime, workspace, binding));
-          },
-          trailing: chevron,
-        ),
-      );
-    }
-    return rows;
+    });
+  }
+
+  void _openTerminal() {
+    Haptics.light();
+    final id = _conversationId;
+    _afterClose((ctx) {
+      unawaited(openTerminal(ctx, conversationId: id));
+    });
   }
 
   Future<String> _hostCwd(Workspace workspace, WorkspaceBinding binding) async {

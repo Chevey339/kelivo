@@ -1090,6 +1090,7 @@
   "chatInputBarOnlineSearchTooltip": "聯網搜尋",
   "chatInputBarReasoningStrengthTooltip": "思維鏈強度",
   "chatInputBarMcpServersTooltip": "MCP伺服器",
+  "chatInputBarToolsTooltip": "工具",
   "chatInputBarMoreTooltip": "更多",
   "chatInputBarVoiceInputTooltip": "語音輸入",
   "chatInputBarVoiceCancelTooltip": "取消錄音",

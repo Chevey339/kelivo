@@ -3022,6 +3022,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatInputBarMcpServersTooltip => 'MCP服务器';
 
   @override
+  String get chatInputBarToolsTooltip => '工具';
+
+  @override
   String get chatInputBarMoreTooltip => '更多';
 
   @override
@@ -13071,6 +13074,9 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get chatInputBarMcpServersTooltip => 'MCP服务器';
 
   @override
+  String get chatInputBarToolsTooltip => '工具';
+
+  @override
   String get chatInputBarMoreTooltip => '更多';
 
   @override
@@ -23044,6 +23050,9 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get chatInputBarMcpServersTooltip => 'MCP伺服器';
+
+  @override
+  String get chatInputBarToolsTooltip => '工具';
 
   @override
   String get chatInputBarMoreTooltip => '更多';

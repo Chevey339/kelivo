@@ -47,7 +47,7 @@ import '../../../core/services/haptics.dart';
 import '../../../desktop/desktop_context_menu.dart';
 import '../../../desktop/setting/memory_dialogs.dart';
 import '../../../desktop/widgets/desktop_select_dropdown.dart';
-import '../../home/services/health_data_selection.dart';
+import '../../home/services/local_tool_toggle.dart';
 import '../../home/services/local_tools_service.dart';
 import '../../../core/models/health_data_type.dart';
 import '../../../icons/lucide_adapter.dart';

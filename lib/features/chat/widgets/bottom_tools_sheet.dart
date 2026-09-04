@@ -1,6 +1,10 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../../core/models/assistant.dart';
+import '../../../core/providers/assistant_provider.dart';
 import '../../../core/services/haptics.dart';
 import '../../../icons/lucide_adapter.dart';
 import '../../../core/providers/settings_provider.dart';
@@ -12,10 +16,17 @@ import '../../home/widgets/world_book_sheet.dart';
 import '../../instruction_injection/pages/instruction_injection_page.dart';
 import '../../world_book/pages/world_book_page.dart';
 import '../../model/widgets/ocr_prompt_sheet.dart';
-import '../../workspace/widgets/workspace_section.dart';
+import '../../workspace/pages/skills_page.dart';
+import '../../workspace/widgets/skills/conversation_skills_sheet.dart';
+import '../utils/ensure_conversation.dart';
+import '../utils/sheet_navigation.dart';
 import 'package:Kelivo/theme/app_semantic_colors.dart';
 import '../../../shared/widgets/section_card.dart';
 import 'tools_sheet_row.dart';
+
+/// Row that opens the session skills picker, and pushes the skills library on
+/// a long press.
+const Key sessionSkillsKey = ValueKey<String>('bottom-tools-session-skills');
 
 class BottomToolsSheet extends StatelessWidget {
   const BottomToolsSheet({
@@ -145,17 +156,12 @@ class BottomToolsSheet extends StatelessWidget {
                       ],
                     ),
                     const SizedBox(height: 12),
-                    WorkspaceSection(
-                      key: ValueKey<String?>(conversationId),
-                      conversationId: conversationId,
-                      assistantId: assistantId,
-                      onClose: onClose,
-                    ),
-                    const SizedBox(height: 12),
                     _LearningAndClearSection(
                       clearLabel: clearLabel,
                       onClear: onClear,
                       assistantId: assistantId,
+                      conversationId: conversationId,
+                      onClose: onClose,
                     ),
                   ],
                 ),
@@ -173,10 +179,14 @@ class _LearningAndClearSection extends StatefulWidget {
     this.onClear,
     this.clearLabel,
     this.assistantId,
+    this.conversationId,
+    this.onClose,
   });
   final VoidCallback? onClear;
   final String? clearLabel;
   final String? assistantId;
+  final String? conversationId;
+  final VoidCallback? onClose;
 
   @override
   State<_LearningAndClearSection> createState() =>
@@ -193,6 +203,39 @@ class _LearningAndClearSectionState extends State<_LearningAndClearSection> {
     });
   }
 
+  Assistant? _assistant() {
+    try {
+      final provider = context.read<AssistantProvider>();
+      final id = widget.assistantId;
+      if (id != null) return provider.getById(id);
+      return provider.currentAssistant;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<void> _openSessionSkills() async {
+    Haptics.light();
+    final id = await ensureConversationId(
+      context,
+      conversationId: widget.conversationId,
+      assistantId: widget.assistantId,
+    );
+    if (id == null || !mounted) return;
+    final assistant = _assistant();
+    afterSheetClose(
+      context,
+      onClose: widget.onClose,
+      action: (ctx) => unawaited(
+        showConversationSkillsSheet(
+          ctx,
+          conversationId: id,
+          assistant: assistant,
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
@@ -205,6 +248,23 @@ class _LearningAndClearSectionState extends State<_LearningAndClearSection> {
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
+        ToolsSheetRow(
+          key: sessionSkillsKey,
+          icon: Lucide.Sparkles,
+          label: l10n.workspaceEntrySessionSkills,
+          onTap: () => unawaited(_openSessionSkills()),
+          onLongPress: () {
+            Haptics.light();
+            final rootNav = Navigator.of(context, rootNavigator: true);
+            Navigator.of(context).maybePop();
+            Future.microtask(() {
+              if (!rootNav.mounted) return;
+              unawaited(openSkillsPage(rootNav.context));
+            });
+          },
+          trailing: chevron,
+        ),
+        const SizedBox(height: 8),
         ToolsSheetRow(
           icon: Lucide.Layers,
           label: l10n.instructionInjectionTitle,

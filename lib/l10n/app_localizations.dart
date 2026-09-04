@@ -5794,6 +5794,12 @@ abstract class AppLocalizations {
   /// **'MCP Servers'**
   String get chatInputBarMcpServersTooltip;
 
+  /// No description provided for @chatInputBarToolsTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Tools'**
+  String get chatInputBarToolsTooltip;
+
   /// No description provided for @chatInputBarMoreTooltip.
   ///
   /// In en, this message translates to:

@@ -27,7 +27,7 @@ import '../../../core/services/logging/flutter_logger.dart';
 import '../../../utils/platform_utils.dart';
 import '../../../desktop/search_provider_popover.dart';
 import '../../../desktop/reasoning_budget_popover.dart';
-import '../../../desktop/mcp_servers_popover.dart';
+import '../../../desktop/tools_popover.dart';
 import '../../../desktop/workspace_popover.dart';
 import '../../../desktop/mini_map_popover.dart';
 import '../../../desktop/quick_phrase_popover.dart';
@@ -35,6 +35,7 @@ import '../../../desktop/instruction_injection_popover.dart';
 import '../../../desktop/world_book_popover.dart';
 import '../../../icons/lucide_adapter.dart';
 import '../../chat/widgets/bottom_tools_sheet.dart';
+import '../../chat/widgets/chat_tools_sheet.dart';
 import '../../chat/widgets/context_management_sheet.dart';
 import '../../chat/widgets/reasoning_budget_sheet.dart';
 import '../../search/widgets/search_settings_sheet.dart';
@@ -43,7 +44,6 @@ import '../../chat/widgets/chat_assistant_background.dart';
 import '../../model/widgets/model_select_sheet.dart';
 import '../../mcp/pages/mcp_page.dart';
 import '../../provider/pages/providers_page.dart';
-import '../../assistant/widgets/mcp_assistant_sheet.dart';
 import '../../quick_phrase/pages/quick_phrases_page.dart';
 import '../../quick_phrase/widgets/quick_phrase_menu.dart';
 import '../widgets/chat_input_bar.dart';
@@ -1413,21 +1413,25 @@ class _HomePageState extends State<HomePage>
           _toggleTools();
         }
       },
-      onOpenMcp: () {
+      onOpenTools: () {
         final a = context.read<AssistantProvider>().currentAssistant;
-        if (a != null) {
-          if (PlatformUtils.isDesktop) {
-            showDesktopMcpServersPopover(
-              context,
-              anchorKey: _inputBarKey,
-              assistantId: a.id,
-            );
-          } else {
-            showAssistantMcpSheet(context, assistantId: a.id);
-          }
+        if (a == null) return;
+        if (PlatformUtils.isDesktop) {
+          showDesktopToolsPopover(
+            context,
+            anchorKey: _inputBarKey,
+            assistantId: a.id,
+          );
+        } else {
+          _controller.dismissKeyboard();
+          showChatToolsSheet(
+            context,
+            assistantId: a.id,
+            conversationId: _controller.currentConversation?.id,
+          );
         }
       },
-      onLongPressMcp: () {
+      onLongPressTools: () {
         Navigator.of(
           context,
         ).push(MaterialPageRoute(builder: (_) => const McpPage()));

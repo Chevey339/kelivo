@@ -3132,6 +3132,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get chatInputBarMcpServersTooltip => 'MCP Servers';
 
   @override
+  String get chatInputBarToolsTooltip => 'Tools';
+
+  @override
   String get chatInputBarMoreTooltip => 'Add';
 
   @override

@@ -7,10 +7,12 @@ import '../icons/lucide_adapter.dart';
 import '../l10n/app_localizations.dart';
 import '../core/providers/mcp_provider.dart';
 import '../core/providers/assistant_provider.dart';
+import '../features/home/services/local_tool_labels.dart';
+import '../features/home/services/local_tool_toggle.dart';
 import 'package:Kelivo/theme/app_font_weights.dart';
 import '../theme/design_tokens.dart';
 
-Future<void> showDesktopMcpServersPopover(
+Future<void> showDesktopToolsPopover(
   BuildContext context, {
   required GlobalKey anchorKey,
   required String assistantId,
@@ -33,7 +35,7 @@ Future<void> showDesktopMcpServersPopover(
 
   late OverlayEntry entry;
   entry = OverlayEntry(
-    builder: (ctx) => _McpServersPopover(
+    builder: (ctx) => _ToolsPopover(
       anchorRect: anchorRect,
       anchorWidth: size.width,
       assistantId: assistantId,
@@ -47,8 +49,8 @@ Future<void> showDesktopMcpServersPopover(
   overlay.insert(entry);
 }
 
-class _McpServersPopover extends StatefulWidget {
-  const _McpServersPopover({
+class _ToolsPopover extends StatefulWidget {
+  const _ToolsPopover({
     required this.anchorRect,
     required this.anchorWidth,
     required this.assistantId,
@@ -61,10 +63,10 @@ class _McpServersPopover extends StatefulWidget {
   final VoidCallback onClose;
 
   @override
-  State<_McpServersPopover> createState() => _McpServersPopoverState();
+  State<_ToolsPopover> createState() => _ToolsPopoverState();
 }
 
-class _McpServersPopoverState extends State<_McpServersPopover>
+class _ToolsPopoverState extends State<_ToolsPopover>
     with SingleTickerProviderStateMixin {
   late final AnimationController _controller;
   late final Animation<double> _fadeIn;
@@ -145,7 +147,7 @@ class _McpServersPopoverState extends State<_McpServersPopover>
                         borderRadius: const BorderRadius.vertical(
                           top: Radius.circular(14),
                         ),
-                        child: _McpServersContent(
+                        child: _ToolsContent(
                           assistantId: widget.assistantId,
                           onDone: _close,
                         ),
@@ -200,8 +202,8 @@ class _GlassPanel extends StatelessWidget {
   }
 }
 
-class _McpServersContent extends StatelessWidget {
-  const _McpServersContent({required this.assistantId, required this.onDone});
+class _ToolsContent extends StatelessWidget {
+  const _ToolsContent({required this.assistantId, required this.onDone});
   final String assistantId;
   final VoidCallback onDone;
 
@@ -217,21 +219,53 @@ class _McpServersContent extends StatelessWidget {
         .where((s) => mcp.statusFor(s.id) == McpStatus.connected)
         .toList();
 
+    final localToolIds = availableLocalToolIds();
+    final enabledLocalTools = a.localToolIds.toSet();
+
     final rows = <Widget>[];
-    // Top clear row
-    rows.add(
-      _RowItem(
-        leading: Icon(Lucide.CircleX, size: 16, color: cs.onSurface),
-        label: l10n.assistantEditClearButton, // '清除'
-        selected: false,
-        onTap: () async {
-          await context.read<AssistantProvider>().updateAssistant(
-            a.copyWith(mcpServerIds: const <String>[]),
-          );
-          onDone();
-        },
-      ),
-    );
+    if (localToolIds.isNotEmpty) {
+      rows.add(_SectionLabel(text: l10n.assistantEditPageLocalToolsTab));
+      for (final id in localToolIds) {
+        final isEnabled = enabledLocalTools.contains(id);
+        rows.add(
+          _RowItem(
+            leading: Icon(
+              localToolIcon(id),
+              size: 16,
+              color: isEnabled ? cs.primary : cs.onSurface,
+            ),
+            label: localToolTitle(l10n, id),
+            selected: isEnabled,
+            onTap: () async {
+              await setLocalToolEnabled(
+                context,
+                assistant: a,
+                toolId: id,
+                value: !isEnabled,
+              );
+              // Do not close; allow multi-select
+            },
+          ),
+        );
+      }
+    }
+
+    if (servers.isNotEmpty) {
+      rows.add(_SectionLabel(text: l10n.mcpAssistantSheetTitle));
+      rows.add(
+        _RowItem(
+          leading: Icon(Lucide.CircleX, size: 16, color: cs.onSurface),
+          label: l10n.mcpAssistantSheetClearAll,
+          selected: false,
+          onTap: () async {
+            await context.read<AssistantProvider>().updateAssistant(
+              a.copyWith(mcpServerIds: const <String>[]),
+            );
+            onDone();
+          },
+        ),
+      );
+    }
 
     for (final s in servers) {
       final isSelected = selected.contains(s.id);
@@ -277,6 +311,29 @@ class _McpServersContent extends StatelessWidget {
               ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+}
+
+class _SectionLabel extends StatelessWidget {
+  const _SectionLabel({required this.text});
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(8, 8, 8, 4),
+      child: Text(
+        text,
+        style: TextStyle(
+          fontSize: 11,
+          fontWeight: AppFontWeights.semibold,
+          decoration: TextDecoration.none,
+          color: cs.onSurface.withValues(alpha: 0.5),
         ),
       ),
     );

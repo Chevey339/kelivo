@@ -1414,6 +1414,7 @@
   "chatInputBarOnlineSearchTooltip": "Online Search",
   "chatInputBarReasoningStrengthTooltip": "Reasoning Strength",
   "chatInputBarMcpServersTooltip": "MCP Servers",
+  "chatInputBarToolsTooltip": "Tools",
   "chatInputBarMoreTooltip": "Add",
   "chatInputBarVoiceInputTooltip": "Voice input",
   "chatInputBarVoiceCancelTooltip": "Discard recording",
