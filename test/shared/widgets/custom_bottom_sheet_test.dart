@@ -371,4 +371,54 @@ void main() {
       expect(dismissed, isTrue);
     },
   );
+
+  testWidgets('horizontal content drag does not pull the sheet down', (
+    tester,
+  ) async {
+    setTallTestWindow(tester);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: CustomBottomSheet(
+            title: '差异',
+            closeSemanticLabel: '关闭',
+            onDismiss: () {},
+            builder: (context, controller) {
+              return ListView(
+                controller: controller,
+                children: const [
+                  SizedBox(
+                    height: 160,
+                    child: SingleChildScrollView(
+                      key: ValueKey<String>('sheet-horizontal-diff'),
+                      scrollDirection: Axis.horizontal,
+                      child: SizedBox(width: 800, child: Text('diff line')),
+                    ),
+                  ),
+                ],
+              );
+            },
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final panel = find.byKey(CustomBottomSheet.panelKey);
+    final partialTop = tester.getTopLeft(panel).dy;
+
+    final gesture = await tester.startGesture(
+      tester.getCenter(
+        find.byKey(const ValueKey<String>('sheet-horizontal-diff')),
+      ),
+    );
+    await gesture.moveBy(const Offset(-96, 20));
+    await tester.pump();
+    expect(tester.getTopLeft(panel).dy, partialTop);
+
+    await gesture.up();
+    await tester.pumpAndSettle();
+    expect(tester.getTopLeft(panel).dy, partialTop);
+  });
 }

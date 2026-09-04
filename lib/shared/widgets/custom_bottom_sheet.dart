@@ -88,7 +88,9 @@ class _CustomBottomSheetState extends State<CustomBottomSheet>
   double _handleDragStartTop = 0;
   double _contentDragStartTop = 0;
   int? _contentPointer;
+  Offset? _contentPointerStart;
   double? _lastContentPointerY;
+  bool? _contentDragIsVertical;
   VelocityTracker? _contentVelocityTracker;
   bool _contentDragChangedSheetTop = false;
   bool _dismissScheduled = false;
@@ -321,7 +323,9 @@ class _CustomBottomSheetState extends State<CustomBottomSheet>
   void _startContentDrag(PointerDownEvent event, {required double partialTop}) {
     if (_contentPointer != null) return;
     _contentPointer = event.pointer;
+    _contentPointerStart = event.position;
     _lastContentPointerY = event.position.dy;
+    _contentDragIsVertical = null;
     _contentVelocityTracker = VelocityTracker.withKind(event.kind)
       ..addPosition(event.timeStamp, event.position);
     _contentDragStartTop = _currentTop(partialTop);
@@ -341,6 +345,16 @@ class _CustomBottomSheetState extends State<CustomBottomSheet>
     final positionY = event.position.dy;
     final deltaY = positionY - lastY;
     _lastContentPointerY = positionY;
+    if (_contentDragIsVertical == false) return;
+    if (_contentDragIsVertical == null) {
+      final start = _contentPointerStart;
+      if (start == null) return;
+      final dx = event.position.dx - start.dx;
+      final dy = event.position.dy - start.dy;
+      if (dx.abs() < kTouchSlop && dy.abs() < kTouchSlop) return;
+      _contentDragIsVertical = dy.abs() >= dx.abs();
+      if (_contentDragIsVertical == false) return;
+    }
     if (deltaY == 0) return;
 
     final currentTop = _currentTop(partialTop);
@@ -364,7 +378,9 @@ class _CustomBottomSheetState extends State<CustomBottomSheet>
     final velocityY =
         _contentVelocityTracker?.getVelocity().pixelsPerSecond.dy ?? 0;
     _contentPointer = null;
+    _contentPointerStart = null;
     _lastContentPointerY = null;
+    _contentDragIsVertical = null;
     _contentVelocityTracker = null;
     if (!_contentDragChangedSheetTop) return;
     _contentDragChangedSheetTop = false;
@@ -381,7 +397,9 @@ class _CustomBottomSheetState extends State<CustomBottomSheet>
   void _cancelContentDrag(int pointer, {required double partialTop}) {
     if (_contentPointer != pointer) return;
     _contentPointer = null;
+    _contentPointerStart = null;
     _lastContentPointerY = null;
+    _contentDragIsVertical = null;
     _contentVelocityTracker = null;
     _contentDragChangedSheetTop = false;
     _animateToTop(partialTop);
