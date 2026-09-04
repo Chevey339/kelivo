@@ -10,16 +10,16 @@ const String assistantEditTabCustom = 'custom';
 const String assistantEditTabRegex = 'regex';
 
 const List<String> defaultAssistantEditTabIds = [
-  assistantEditTabWorkspace,
   assistantEditTabBasic,
   assistantEditTabPrompts,
   assistantEditTabMemory,
-  assistantEditTabQuickPhrase,
-  assistantEditTabCustom,
-  assistantEditTabRegex,
   assistantEditTabLocalTools,
   assistantEditTabSkills,
   assistantEditTabMcp,
+  assistantEditTabQuickPhrase,
+  assistantEditTabCustom,
+  assistantEditTabRegex,
+  assistantEditTabWorkspace,
 ];
 
 List<String> orderAssistantEditTabIds({

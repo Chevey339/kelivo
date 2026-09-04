@@ -250,7 +250,7 @@ class _LearningAndClearSectionState extends State<_LearningAndClearSection> {
       children: [
         ToolsSheetRow(
           key: sessionSkillsKey,
-          icon: Lucide.Sparkles,
+          icon: Lucide.WandSparkles,
           label: l10n.workspaceEntrySessionSkills,
           onTap: () => unawaited(_openSessionSkills()),
           onLongPress: () {

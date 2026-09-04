@@ -148,7 +148,7 @@ class _StorageSpacePageState extends State<StorageSpacePage> {
       case StorageUsageCategoryKey.sandboxEnvironment:
         return Lucide.Box;
       case StorageUsageCategoryKey.skills:
-        return Lucide.Sparkles;
+        return Lucide.WandSparkles;
       case StorageUsageCategoryKey.sessionFiles:
         return Lucide.Paperclip;
     }

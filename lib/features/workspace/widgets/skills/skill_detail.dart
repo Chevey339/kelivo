@@ -356,7 +356,7 @@ class _SkillDetailBody extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Icon(
-                Lucide.Sparkles,
+                Lucide.WandSparkles,
                 size: 22,
                 color: cs.onSurface.withValues(alpha: 0.9),
               ),

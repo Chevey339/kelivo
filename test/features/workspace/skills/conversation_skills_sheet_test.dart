@@ -131,7 +131,7 @@ void main() {
     expect(assistants.getById(_assistantId)!.skillIds, isNull);
   });
 
-  testWidgets('follow-assistant skill toggle writes assistant.skillIds', (
+  testWidgets('follow-assistant + use-all toggles global skill enabled', (
     tester,
   ) async {
     final enabled = createTempSkill(
@@ -162,10 +162,58 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 250));
 
-    expect(assistants.getById(_assistantId)!.skillIds, ['alpha']);
+    expect(skills.enabledCalls, [('beta', false)]);
+    expect(assistants.getById(_assistantId)!.skillIds, isNull);
     expect(
       chat.getConversation('c1')!.extras.containsKey(SkillsBinding.keyIds),
       isFalse,
     );
   });
+
+  testWidgets(
+    'follow-assistant with an explicit list writes assistant.skillIds',
+    (tester) async {
+      final enabled = createTempSkill(
+        id: 'alpha',
+        name: 'Alpha',
+        description: 'First',
+        parent: tempDir,
+      );
+      final extra = createTempSkill(
+        id: 'beta',
+        name: 'Beta',
+        description: 'Second',
+        parent: tempDir,
+      );
+      final skills = FakeSkillsService(
+        skills: [enabled, extra],
+        skillsDirectory: tempDir,
+      );
+      final chat = FakeChatService(
+        conversation: Conversation(id: 'c1', title: 'Chat'),
+      );
+      final assistants = await loadAssistant(
+        tester,
+        skillIds: ['alpha', 'beta'],
+      );
+
+      await pumpPanel(
+        tester,
+        skills: skills,
+        chat: chat,
+        assistants: assistants,
+      );
+
+      await tester.tap(find.byKey(ConversationSkillsPanel.skillKey('beta')));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 250));
+
+      expect(assistants.getById(_assistantId)!.skillIds, ['alpha']);
+      expect(skills.enabledCalls, isEmpty);
+      expect(
+        chat.getConversation('c1')!.extras.containsKey(SkillsBinding.keyIds),
+        isFalse,
+      );
+    },
+  );
 }

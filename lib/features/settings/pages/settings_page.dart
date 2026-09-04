@@ -270,7 +270,7 @@ class SettingsPage extends StatelessWidget {
               _iosDivider(context),
               _iosNavRow(
                 context,
-                icon: Lucide.Sparkles,
+                icon: Lucide.WandSparkles,
                 label: l10n.settingsPageSkills,
                 onTap: () {
                   Navigator.of(

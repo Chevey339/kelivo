@@ -102,12 +102,6 @@ List<_AssistantEditTabSpec> _assistantEditTabSpecs(
   final l10n = AppLocalizations.of(context)!;
   return [
     _AssistantEditTabSpec(
-      id: assistantEditTabWorkspace,
-      label: l10n.assistantEditPageWorkspaceTab,
-      icon: Lucide.FolderCode,
-      child: AssistantSettingsEditWorkspaceTab(assistantId: assistantId),
-    ),
-    _AssistantEditTabSpec(
       id: assistantEditTabBasic,
       label: l10n.assistantEditPageBasicTab,
       icon: Lucide.Settings2,
@@ -134,7 +128,7 @@ List<_AssistantEditTabSpec> _assistantEditTabSpecs(
     _AssistantEditTabSpec(
       id: assistantEditTabSkills,
       label: l10n.skillsTab,
-      icon: Lucide.Sparkles,
+      icon: Lucide.WandSparkles,
       child: AssistantSettingsEditSkillsTab(assistantId: assistantId),
     ),
     _AssistantEditTabSpec(
@@ -160,6 +154,12 @@ List<_AssistantEditTabSpec> _assistantEditTabSpecs(
       label: l10n.assistantEditPageRegexTab,
       icon: Lucide.CaseSensitive,
       child: AssistantRegexTab(assistantId: assistantId),
+    ),
+    _AssistantEditTabSpec(
+      id: assistantEditTabWorkspace,
+      label: l10n.assistantEditPageWorkspaceTab,
+      icon: Lucide.FolderCode,
+      child: AssistantSettingsEditWorkspaceTab(assistantId: assistantId),
     ),
   ];
 }
@@ -861,10 +861,46 @@ class _AssistantTabLayoutTile extends StatelessWidget {
   }
 }
 
-class _SegTabBar extends StatelessWidget {
+class _SegTabBar extends StatefulWidget {
   const _SegTabBar({required this.controller, required this.tabs});
   final TabController controller;
   final List<String> tabs;
+
+  @override
+  State<_SegTabBar> createState() => _SegTabBarState();
+}
+
+class _SegTabBarState extends State<_SegTabBar> {
+  final ScrollController _scroll = ScrollController();
+  bool _showStartFade = false;
+  bool _showEndFade = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _scroll.addListener(_syncFades);
+    WidgetsBinding.instance.addPostFrameCallback((_) => _syncFades());
+  }
+
+  @override
+  void dispose() {
+    _scroll.removeListener(_syncFades);
+    _scroll.dispose();
+    super.dispose();
+  }
+
+  void _syncFades() {
+    if (!_scroll.hasClients) return;
+    final pos = _scroll.position;
+    final overflow = pos.maxScrollExtent > 0.5;
+    final showStart = overflow && pos.pixels > 0.5;
+    final showEnd = overflow && pos.pixels < pos.maxScrollExtent - 0.5;
+    if (showStart == _showStartFade && showEnd == _showEndFade) return;
+    setState(() {
+      _showStartFade = showStart;
+      _showEndFade = showEnd;
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -883,13 +919,14 @@ class _SegTabBar extends StatelessWidget {
     )).toDouble();
 
     return AnimatedBuilder(
-      animation: controller.animation ?? controller,
+      animation: widget.controller.animation ?? widget.controller,
       builder: (context, _) {
         final rawIndex =
-            controller.animation?.value ?? controller.index.toDouble();
+            widget.controller.animation?.value ??
+            widget.controller.index.toDouble();
         final selectedIndex = visualAssistantEditTabIndex(
           animationValue: rawIndex,
-          tabCount: tabs.length,
+          tabCount: widget.tabs.length,
         );
 
         return LayoutBuilder(
@@ -898,22 +935,23 @@ class _SegTabBar extends StatelessWidget {
             final double innerAvailWidth = availWidth - innerPadding * 2;
             final double segWidth = math.max(
               minSegWidth,
-              (innerAvailWidth - gap * (tabs.length - 1)) / tabs.length,
+              (innerAvailWidth - gap * (widget.tabs.length - 1)) /
+                  widget.tabs.length,
             );
             final double rowWidth =
-                segWidth * tabs.length + gap * (tabs.length - 1);
+                segWidth * widget.tabs.length + gap * (widget.tabs.length - 1);
 
             final Color shellBg = context.appColors.surfaceCard; // 白底胶囊，无边框阴影
 
             List<Widget> children = [];
-            for (int index = 0; index < tabs.length; index++) {
+            for (int index = 0; index < widget.tabs.length; index++) {
               final bool selected = selectedIndex == index;
               children.add(
                 SizedBox(
                   width: segWidth,
                   height: double.infinity,
                   child: _TactileRow(
-                    onTap: () => controller.animateTo(index),
+                    onTap: () => widget.controller.animateTo(index),
                     builder: (pressed) {
                       // 背景不随按压变化：仅选中时有浅主题底色，未选中透明
                       final Color baseBg = selected
@@ -953,7 +991,7 @@ class _SegTabBar extends StatelessWidget {
                             curve: Curves.easeOutCubic,
                             builder: (context, color, _) {
                               return Text(
-                                tabs[index],
+                                widget.tabs[index],
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                                 style: TextStyle(
@@ -969,7 +1007,7 @@ class _SegTabBar extends StatelessWidget {
                   ),
                 ),
               );
-              if (index != tabs.length - 1) {
+              if (index != widget.tabs.length - 1) {
                 children.add(const SizedBox(width: gap));
               }
             }
@@ -983,15 +1021,66 @@ class _SegTabBar extends StatelessWidget {
               clipBehavior: Clip.hardEdge,
               child: Padding(
                 padding: const EdgeInsets.all(innerPadding),
-                child: SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  physics: const BouncingScrollPhysics(),
-                  child: ConstrainedBox(
-                    constraints: BoxConstraints(minWidth: innerAvailWidth),
-                    child: SizedBox(
-                      width: rowWidth,
-                      child: Row(children: children),
-                    ),
+                child: NotificationListener<ScrollMetricsNotification>(
+                  onNotification: (_) {
+                    _syncFades();
+                    return false;
+                  },
+                  child: Stack(
+                    children: [
+                      SingleChildScrollView(
+                        controller: _scroll,
+                        scrollDirection: Axis.horizontal,
+                        physics: const BouncingScrollPhysics(),
+                        child: ConstrainedBox(
+                          constraints: BoxConstraints(
+                            minWidth: innerAvailWidth,
+                          ),
+                          child: SizedBox(
+                            width: rowWidth,
+                            child: Row(children: children),
+                          ),
+                        ),
+                      ),
+                      if (_showStartFade)
+                        Positioned(
+                          left: 0,
+                          top: 0,
+                          bottom: 0,
+                          width: 80,
+                          child: IgnorePointer(
+                            child: DecoratedBox(
+                              decoration: BoxDecoration(
+                                gradient: LinearGradient(
+                                  colors: [
+                                    shellBg,
+                                    shellBg.withValues(alpha: 0),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      if (_showEndFade)
+                        Positioned(
+                          right: 0,
+                          top: 0,
+                          bottom: 0,
+                          width: 80,
+                          child: IgnorePointer(
+                            child: DecoratedBox(
+                              decoration: BoxDecoration(
+                                gradient: LinearGradient(
+                                  colors: [
+                                    shellBg.withValues(alpha: 0),
+                                    shellBg,
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                    ],
                   ),
                 ),
               ),
@@ -1588,7 +1677,7 @@ class _DesktopAssistantDialogShell extends StatefulWidget {
 
 class _DesktopAssistantDialogShellState
     extends State<_DesktopAssistantDialogShell> {
-  _AssistantDesktopMenu _menu = _AssistantDesktopMenu.workspace;
+  _AssistantDesktopMenu _menu = _AssistantDesktopMenu.basic;
 
   @override
   Widget build(BuildContext context) {
@@ -1710,7 +1799,6 @@ class _DesktopAssistantMenuState extends State<_DesktopAssistantMenu> {
     final cs = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final items = <(_AssistantDesktopMenu, String)>[
-      (_AssistantDesktopMenu.workspace, l10n.assistantEditPageWorkspaceTab),
       (_AssistantDesktopMenu.basic, l10n.assistantEditPageBasicTab),
       (_AssistantDesktopMenu.prompts, l10n.assistantEditPagePromptsTab),
       (_AssistantDesktopMenu.memory, l10n.assistantEditPageMemoryTab),
@@ -1720,6 +1808,7 @@ class _DesktopAssistantMenuState extends State<_DesktopAssistantMenu> {
       (_AssistantDesktopMenu.quick, l10n.assistantEditPageQuickPhraseTab),
       (_AssistantDesktopMenu.custom, l10n.assistantEditPageCustomTab),
       (_AssistantDesktopMenu.regex, l10n.assistantEditPageRegexTab),
+      (_AssistantDesktopMenu.workspace, l10n.assistantEditPageWorkspaceTab),
     ];
     return SizedBox(
       width: 220,

@@ -126,4 +126,60 @@ void main() {
     await tester.pump(const Duration(milliseconds: 300));
     expect(ap.getById(_assistantId)!.skillIds, isNull);
   });
+
+  testWidgets('use-all skill toggle writes global enabled', (tester) async {
+    final keep = createTempSkill(
+      id: 'keep',
+      name: 'Keep',
+      description: 'Enabled skill',
+      parent: tempDir,
+    );
+    final skills = FakeSkillsService(skills: [keep], skillsDirectory: tempDir);
+    final harness = await createBusinessTestHarness(
+      initial: {
+        'assistants_v1': Assistant.encodeList([
+          Assistant(id: _assistantId, name: 'Skills Assistant'),
+        ]),
+      },
+    );
+    final ap = AssistantProvider(preferences: harness.preferences);
+    await tester.runAsync(() => ap.loaded);
+
+    tester.view.physicalSize = const Size(400, 900);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await tester.pumpWidget(
+      MultiProvider(
+        providers: [
+          ChangeNotifierProvider(
+            create: (_) => SettingsProvider(createBusinessTestPreferences()),
+          ),
+          ChangeNotifierProvider.value(value: ap),
+          ChangeNotifierProvider<SkillsService>.value(value: skills),
+        ],
+        child: MaterialApp(
+          locale: const Locale('en'),
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: const Scaffold(
+            body: AssistantSettingsEditSkillsTab(assistantId: _assistantId),
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 250));
+
+    expect(ap.getById(_assistantId)!.skillIds, isNull);
+    await tester.tap(
+      find.byKey(AssistantSettingsEditSkillsTab.skillKey('keep')),
+    );
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 250));
+
+    expect(skills.enabledCalls, [('keep', false)]);
+    expect(ap.getById(_assistantId)!.skillIds, isNull);
+  });
 }

@@ -326,7 +326,7 @@ class _SettingsMenu extends StatelessWidget {
       ),
       (
         _SettingsMenuItem.skills,
-        lucide.Lucide.Sparkles,
+        lucide.Lucide.WandSparkles,
         l10n.workspaceDeskMenuSkills,
       ),
       (

@@ -78,7 +78,7 @@ class SkillsPaneState extends State<SkillsPane> {
             mainAxisSize: MainAxisSize.min,
             children: [
               Icon(
-                Lucide.Sparkles,
+                Lucide.WandSparkles,
                 size: 44,
                 color: cs.onSurface.withValues(alpha: 0.26),
               ),
@@ -300,7 +300,7 @@ class _SkillTile extends StatelessWidget {
     final description = skill.description.trim();
     return IosNavRow(
       key: SkillsPane.itemKey(skill.record.id),
-      icon: Lucide.Sparkles,
+      icon: Lucide.WandSparkles,
       label: skill.name,
       labelWeight: AppFontWeights.medium,
       subtitle: description.isEmpty ? null : description,

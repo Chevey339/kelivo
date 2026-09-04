@@ -1086,7 +1086,6 @@ class WorkspaceToolCardBody extends StatelessWidget {
         return _ShellTail(part: part, meta: meta, run: liveRun);
       case 'write_file':
       case 'read_file':
-      case 'list_dir':
       case 'glob':
       case 'grep':
         return _TouchedPathChips(

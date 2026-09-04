@@ -92,6 +92,10 @@ class ConversationSkillsPanel extends StatelessWidget {
     return ap.updateAssistant(current.copyWith(skillIds: skillIds));
   }
 
+  Future<void> _writeGlobal(BuildContext context, String id, bool enabled) {
+    return context.read<SkillsService>().setEnabled(id, enabled);
+  }
+
   Assistant? _liveAssistant(BuildContext context) {
     final id = assistant?.id;
     if (id == null) return assistant;
@@ -107,10 +111,13 @@ class ConversationSkillsPanel extends StatelessWidget {
     final live = _liveAssistant(context);
     final binding = _binding(chat);
     final inherit = binding.skillIds == null;
-    final enabled = [
-      for (final skill in skillsService.skills)
-        if (skill.record.enabled) skill,
-    ];
+    final followGlobal = inherit && live?.skillIds == null;
+    final listed = followGlobal
+        ? skillsService.skills
+        : [
+            for (final skill in skillsService.skills)
+              if (skill.record.enabled) skill,
+          ];
     final active = skillsService.resolveForAssistant(
       live,
       conversationOverride: binding.skillIds,
@@ -142,13 +149,13 @@ class ConversationSkillsPanel extends StatelessWidget {
           ],
         ),
         const SizedBox(height: 12),
-        if (enabled.isEmpty)
+        if (listed.isEmpty)
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 24),
             child: Column(
               children: [
                 Icon(
-                  Lucide.Sparkles,
+                  Lucide.WandSparkles,
                   size: 36,
                   color: cs.onSurface.withValues(alpha: 0.26),
                 ),
@@ -168,19 +175,25 @@ class ConversationSkillsPanel extends StatelessWidget {
         else
           SectionCard(
             children: [
-              for (var i = 0; i < enabled.length; i++) ...[
+              for (var i = 0; i < listed.length; i++) ...[
                 if (i > 0) const IosRowDivider(),
                 IosSwitchRow(
-                  key: ConversationSkillsPanel.skillKey(enabled[i].record.id),
-                  icon: Lucide.Sparkles,
-                  label: enabled[i].name,
-                  value: inherit
-                      ? activeIds.contains(enabled[i].record.id)
+                  key: ConversationSkillsPanel.skillKey(listed[i].record.id),
+                  icon: Lucide.WandSparkles,
+                  label: listed[i].name,
+                  value: followGlobal
+                      ? listed[i].record.enabled
+                      : inherit
+                      ? activeIds.contains(listed[i].record.id)
                       : (binding.skillIds ?? const <String>[]).contains(
-                          enabled[i].record.id,
+                          listed[i].record.id,
                         ),
                   onChanged: (checked) {
-                    final skillId = enabled[i].record.id;
+                    final skillId = listed[i].record.id;
+                    if (followGlobal) {
+                      unawaited(_writeGlobal(context, skillId, checked));
+                      return;
+                    }
                     if (inherit) {
                       final ids = {
                         for (final skill in skillsService.resolveForAssistant(

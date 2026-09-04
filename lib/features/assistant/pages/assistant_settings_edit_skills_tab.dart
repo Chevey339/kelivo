@@ -122,24 +122,37 @@ class AssistantSettingsEditSkillsTab extends StatelessWidget {
                 _AssistantSkillRow(
                   name: skill.name,
                   description: skill.description,
-                  enabled: skill.record.enabled,
+                  enabled: useAll || skill.record.enabled,
                   selected: useAll
                       ? skill.record.enabled
                       : selected.contains(skill.record.id),
                   disabledHint: l10n.skillsDisabledHint,
-                  onChanged: useAll || !skill.record.enabled
-                      ? null
-                      : (checked) {
-                          final next = {...selected};
-                          if (checked) {
-                            next.add(skill.record.id);
-                          } else {
-                            next.remove(skill.record.id);
-                          }
+                  showDisabledHint: !useAll && !skill.record.enabled,
+                  onChanged: useAll
+                      ? (checked) {
                           unawaited(
-                            _persist(context: context, skillIds: next.toList()),
+                            context.read<SkillsService>().setEnabled(
+                              skill.record.id,
+                              checked,
+                            ),
                           );
-                        },
+                        }
+                      : (!skill.record.enabled
+                            ? null
+                            : (checked) {
+                                final next = {...selected};
+                                if (checked) {
+                                  next.add(skill.record.id);
+                                } else {
+                                  next.remove(skill.record.id);
+                                }
+                                unawaited(
+                                  _persist(
+                                    context: context,
+                                    skillIds: next.toList(),
+                                  ),
+                                );
+                              }),
                   rowKey: skillKey(skill.record.id),
                 ),
             ],
@@ -147,7 +160,7 @@ class AssistantSettingsEditSkillsTab extends StatelessWidget {
         const SizedBox(height: 16),
         IosTileButton(
           key: openPageKey,
-          icon: Lucide.Sparkles,
+          icon: Lucide.WandSparkles,
           label: l10n.skillsOpenPage,
           onTap: () => unawaited(openSkillsPage(context)),
         ),
@@ -163,6 +176,7 @@ class _AssistantSkillRow extends StatelessWidget {
     required this.enabled,
     required this.selected,
     required this.disabledHint,
+    required this.showDisabledHint,
     required this.onChanged,
     required this.rowKey,
   });
@@ -172,6 +186,7 @@ class _AssistantSkillRow extends StatelessWidget {
   final bool enabled;
   final bool selected;
   final String disabledHint;
+  final bool showDisabledHint;
   final ValueChanged<bool>? onChanged;
   final Key rowKey;
 
@@ -220,7 +235,7 @@ class _AssistantSkillRow extends StatelessWidget {
                     ),
                   ),
                 ],
-                if (dim) ...[
+                if (showDisabledHint) ...[
                   const SizedBox(height: 3),
                   Text(
                     disabledHint,

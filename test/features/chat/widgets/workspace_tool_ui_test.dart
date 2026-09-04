@@ -361,7 +361,9 @@ void main() {
     expect(find.textContaining('--- a/src/app.dart'), findsNothing);
   });
 
-  testWidgets('write_file / read_file / list_dir chips', (tester) async {
+  testWidgets('write_file / read_file chips; list_dir is path and count', (
+    tester,
+  ) async {
     await tester.pumpWidget(
       _harness(
         toolParts: [
@@ -393,12 +395,14 @@ void main() {
             id: 'tc-3',
             tool: 'list_dir',
             arguments: const {'path': 'src'},
+            content: 'empty.md\nattachments/\noutputs/\n',
             meta: const WorkspaceToolMetadata(
               tool: 'list_dir',
               status: 'ok',
               path: 'src',
               count: 8,
               truncated: true,
+              changedFiles: <String>['src/empty.md', 'src/attachments'],
             ),
           ),
         ],
@@ -408,9 +412,12 @@ void main() {
 
     expect(find.text('hello.txt'), findsWidgets);
     expect(find.text('plot.png'), findsWidgets);
-    expect(find.text('src'), findsWidgets);
+    expect(find.textContaining('src'), findsWidgets);
     expect(find.textContaining('3 lines'), findsOneWidget);
     expect(find.textContaining('8 items'), findsOneWidget);
+    expect(find.text('empty.md'), findsNothing);
+    expect(find.text('attachments'), findsNothing);
+    expect(find.text('outputs'), findsNothing);
   });
 
   testWidgets('live tail updates from an injected ToolRun', (tester) async {
