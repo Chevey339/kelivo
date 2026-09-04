@@ -17,6 +17,7 @@ import 'package:Kelivo/features/workspace/widgets/workspace_picker.dart';
 import 'package:Kelivo/features/workspace/widgets/workspace_section.dart';
 import 'package:Kelivo/icons/lucide_adapter.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
+import 'package:Kelivo/shared/widgets/custom_bottom_sheet.dart';
 import 'package:Kelivo/shared/widgets/snackbar.dart';
 import 'package:drift/native.dart';
 import 'package:flutter/foundation.dart';
@@ -549,6 +550,119 @@ void main() {
     expect(find.byKey(WorkspaceSection.bindKey), findsNothing);
     expect(find.text('Inherited'), findsOneWidget);
   });
+
+  testWidgets(
+    'closing files opened from a more sheet does not leave a blocking barrier',
+    (tester) async {
+      debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
+      addTearDown(() => debugDefaultTargetPlatformOverride = null);
+
+      final workspace = await tester.runAsync(
+        () => workspaces.create(name: 'Files'),
+      );
+      if (workspace == null) fail('workspace create failed');
+      final chat = _FakeChatService(
+        Conversation(
+          title: 'Chat',
+          extras: WorkspaceBinding(workspaceId: workspace.id).applyTo({}),
+        ),
+      );
+      var homeTaps = 0;
+      tester.view.physicalSize = const Size(800, 1600);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      await tester.pumpWidget(
+        MultiProvider(
+          providers: [
+            ChangeNotifierProvider<SettingsProvider>.value(value: settings),
+            ChangeNotifierProvider<WorkspaceProvider>.value(value: workspaces),
+            ChangeNotifierProvider<ChatService>.value(value: chat),
+            ChangeNotifierProvider<WorkspaceRuntimeProvider>(
+              create: (_) => WorkspaceRuntimeProvider(),
+            ),
+            ChangeNotifierProvider<EnvironmentProvider>.value(
+              value: environment,
+            ),
+            ChangeNotifierProvider(
+              create: (_) => AssistantProvider(
+                preferences: createBusinessTestPreferences(),
+              ),
+            ),
+            Provider<EnvironmentManager?>.value(value: null),
+          ],
+          child: MaterialApp(
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
+            home: Builder(
+              builder: (context) {
+                return Scaffold(
+                  body: Column(
+                    children: [
+                      TextButton(
+                        onPressed: () => homeTaps++,
+                        child: const Text('home-tap'),
+                      ),
+                      TextButton(
+                        onPressed: () {
+                          showModalBottomSheet<void>(
+                            context: context,
+                            builder: (ctx) => WorkspaceSection(
+                              conversationId: chat.conversation!.id,
+                              onClose: () => Navigator.of(ctx).maybePop(),
+                            ),
+                          );
+                        },
+                        child: const Text('open-more'),
+                      ),
+                    ],
+                  ),
+                );
+              },
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+
+      await tester.tap(find.text('open-more'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(WorkspaceSection.filesKey));
+      // The files panel shows a loading spinner, so pumpAndSettle never ends.
+      // Wait until the close control has finished the enter animation and is
+      // actually on-screen; the widget is in the tree from the first frame
+      // while the panel is still translated below the viewport.
+      final viewSize = tester.view.physicalSize / tester.view.devicePixelRatio;
+      var closeOnScreen = false;
+      for (var i = 0; i < 40; i++) {
+        await tester.pump(const Duration(milliseconds: 50));
+        final close = find.byKey(CustomBottomSheet.closeButtonKey);
+        if (close.evaluate().isEmpty) continue;
+        final center = tester.getCenter(close);
+        if (center.dy >= 0 && center.dy < viewSize.height) {
+          closeOnScreen = true;
+          break;
+        }
+      }
+      expect(closeOnScreen, isTrue);
+
+      await tester.tap(find.byKey(CustomBottomSheet.closeButtonKey));
+      await tester.pump();
+      for (var i = 0; i < 16; i++) {
+        await tester.pump(const Duration(milliseconds: 50));
+        if (find.byKey(CustomBottomSheet.closeButtonKey).evaluate().isEmpty) {
+          break;
+        }
+      }
+      expect(find.byKey(CustomBottomSheet.closeButtonKey), findsNothing);
+
+      await tester.tap(find.text('home-tap'));
+      await tester.pump();
+      expect(homeTaps, 1);
+      debugDefaultTargetPlatformOverride = null;
+    },
+  );
 
   testWidgets('picker returns the chosen workspace id', (tester) async {
     debugDefaultTargetPlatformOverride = TargetPlatform.iOS;

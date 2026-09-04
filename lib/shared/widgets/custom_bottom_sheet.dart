@@ -533,9 +533,7 @@ class _CustomBottomSheetState extends State<CustomBottomSheet>
     _animateToTop(
       hiddenTop,
       duration: const Duration(milliseconds: 220),
-      onComplete: () {
-        if (mounted) widget.onDismiss();
-      },
+      onComplete: widget.onDismiss,
     );
   }
 }

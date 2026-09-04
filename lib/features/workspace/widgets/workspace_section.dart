@@ -120,11 +120,22 @@ class _WorkspaceSectionState extends State<WorkspaceSection> {
   }
 
   void _afterClose(void Function(BuildContext ctx) action) {
-    final nav = Navigator.of(context, rootNavigator: true);
+    // Pop the tools sheet first and wait until its route is gone. Pushing the
+    // files (or skills) dialog in a microtask races `maybePop`: the delayed
+    // `pop()` can remove the new dialog instead, leaving its transparent
+    // `ModalBarrier` on screen so the home UI looks fine but ignores taps.
+    final navigator = Navigator.of(context);
+    final route = ModalRoute.of(context);
+    final waitForPopup = route is PopupRoute ? route.completed : null;
     widget.onClose?.call();
-    Future.microtask(() {
-      if (nav.mounted) action(nav.context);
-    });
+    unawaited(() async {
+      if (waitForPopup != null) {
+        await waitForPopup;
+      }
+      await WidgetsBinding.instance.endOfFrame;
+      if (!navigator.mounted) return;
+      action(navigator.context);
+    }());
   }
 
   Future<void> _bind(Workspace workspace) async {

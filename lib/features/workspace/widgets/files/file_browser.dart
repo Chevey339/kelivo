@@ -1145,6 +1145,7 @@ class FileBrowserState extends State<FileBrowser> {
         padding: EdgeInsets.zero,
         child: ListView.separated(
           key: FileBrowser.listKey,
+          primary: false,
           padding: EdgeInsets.zero,
           itemCount: _entries.length,
           separatorBuilder: (_, _) => const IosRowDivider(),
