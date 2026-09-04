@@ -34,6 +34,8 @@ const double _kCodeBlockRadius = 16;
 const double _kMinFontSize = 11;
 const double _kMaxFontSize = 20;
 const double _kDefaultFontSize = 13;
+const EdgeInsets _kGutterListPadding = EdgeInsets.fromLTRB(0, 8, 8, 12);
+const EdgeInsets _kCodeListPadding = EdgeInsets.fromLTRB(12, 8, 12, 12);
 
 class CodeFilePreview extends StatefulWidget {
   const CodeFilePreview({
@@ -533,11 +535,9 @@ class _VirtualizedSourceState extends State<_VirtualizedSource> {
           36.0,
           80.0,
         );
-    const listPadding = EdgeInsets.fromLTRB(8, 8, 12, 12);
-
     if (widget.wrap) {
       return ListView.builder(
-        padding: listPadding,
+        padding: const EdgeInsets.fromLTRB(0, 8, 12, 12),
         itemCount: widget.lines.length,
         itemBuilder: (context, index) {
           return _CodeLine(
@@ -554,74 +554,56 @@ class _VirtualizedSourceState extends State<_VirtualizedSource> {
       );
     }
 
-    final cs = Theme.of(context).colorScheme;
-    final gutterFill = Color.alphaBlend(
-      cs.surfaceContainer.withValues(alpha: _kCodeBlockFillAlpha),
-      cs.surface,
-    );
     final maxLineWidth = _measureWidestLine(
       widget.lines,
       widget.textStyle,
       MediaQuery.textScalerOf(context),
     );
-    final contentWidth = gutterWidth + 12 + maxLineWidth + 12;
 
     return LayoutBuilder(
       builder: (context, constraints) {
-        final width = contentWidth > constraints.maxWidth
-            ? contentWidth
-            : constraints.maxWidth;
-        return Stack(
+        final available = constraints.maxWidth.isFinite
+            ? (constraints.maxWidth - gutterWidth).clamp(0.0, double.infinity)
+            : maxLineWidth;
+        final codeWidth = maxLineWidth + _kCodeListPadding.horizontal;
+        final width = codeWidth > available ? codeWidth : available;
+        return Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            SingleChildScrollView(
-              key: CodeFilePreview.horizontalScrollKey,
-              scrollDirection: Axis.horizontal,
-              child: SizedBox(
-                width: width,
+            SizedBox(
+              width: gutterWidth,
+              child: IgnorePointer(
                 child: ListView.builder(
-                  controller: _codeCtrl,
-                  padding: EdgeInsets.fromLTRB(gutterWidth + 12, 8, 12, 12),
+                  controller: _gutterCtrl,
+                  physics: const NeverScrollableScrollPhysics(),
+                  padding: _kGutterListPadding,
                   itemCount: widget.lines.length,
                   itemBuilder: (context, index) {
-                    return _CodeLine(
-                      index: index,
-                      text: widget.lines[index],
-                      language: widget.language,
-                      theme: widget.theme,
-                      textStyle: widget.textStyle,
-                      gutterStyle: widget.gutterStyle,
-                      gutterWidth: gutterWidth,
-                      wrap: false,
-                    );
+                    return _GutterLine(index: index, style: widget.gutterStyle);
                   },
                 ),
               ),
             ),
-            Positioned(
-              left: 0,
-              top: 0,
-              bottom: 0,
-              width: gutterWidth,
-              child: IgnorePointer(
-                child: DecoratedBox(
-                  decoration: BoxDecoration(
-                    color: gutterFill,
-                    border: Border(
-                      right: BorderSide(
-                        color: cs.outlineVariant.withValues(alpha: 0.3),
-                        width: 1,
-                      ),
-                    ),
-                  ),
+            Expanded(
+              child: SingleChildScrollView(
+                key: CodeFilePreview.horizontalScrollKey,
+                scrollDirection: Axis.horizontal,
+                child: SizedBox(
+                  width: width,
                   child: ListView.builder(
-                    controller: _gutterCtrl,
-                    physics: const NeverScrollableScrollPhysics(),
-                    padding: const EdgeInsets.fromLTRB(0, 8, 8, 12),
+                    controller: _codeCtrl,
+                    padding: _kCodeListPadding,
                     itemCount: widget.lines.length,
                     itemBuilder: (context, index) {
-                      return _GutterLine(
+                      return _CodeLine(
                         index: index,
-                        style: widget.gutterStyle,
+                        text: widget.lines[index],
+                        language: widget.language,
+                        theme: widget.theme,
+                        textStyle: widget.textStyle,
+                        gutterStyle: widget.gutterStyle,
+                        gutterWidth: gutterWidth,
+                        wrap: false,
                       );
                     },
                   ),
@@ -694,10 +676,13 @@ class _CodeLine extends StatelessWidget {
               children: [
                 SizedBox(
                   width: gutterWidth,
-                  child: Text(
-                    '${index + 1}',
-                    textAlign: TextAlign.right,
-                    style: gutterStyle,
+                  child: Padding(
+                    padding: const EdgeInsets.only(right: 8),
+                    child: Text(
+                      '${index + 1}',
+                      textAlign: TextAlign.right,
+                      style: gutterStyle,
+                    ),
                   ),
                 ),
                 const SizedBox(width: 12),

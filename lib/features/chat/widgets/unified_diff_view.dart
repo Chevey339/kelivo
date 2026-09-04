@@ -41,6 +41,41 @@ UnifiedDiffLineKind classifyUnifiedDiffLine(String line) {
   return (added: added, removed: removed);
 }
 
+/// Horizontal scroller with its own controller. A [Scrollbar] without one
+/// falls back to the PrimaryScrollController, which horizontal scrollables
+/// never attach to, and asserts when its fade animation runs.
+class _HorizontalScroll extends StatefulWidget {
+  const _HorizontalScroll({required this.child});
+
+  final Widget child;
+
+  @override
+  State<_HorizontalScroll> createState() => _HorizontalScrollState();
+}
+
+class _HorizontalScrollState extends State<_HorizontalScroll> {
+  final ScrollController _controller = ScrollController();
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scrollbar(
+      controller: _controller,
+      thumbVisibility: false,
+      child: SingleChildScrollView(
+        controller: _controller,
+        scrollDirection: Axis.horizontal,
+        child: widget.child,
+      ),
+    );
+  }
+}
+
 /// Line-by-line unified diff with tinted `+` / `-` / `@@` rows.
 ///
 /// Uses [ListView.builder] when the payload exceeds [virtualizeAfter] lines.
@@ -111,13 +146,7 @@ class UnifiedDiffView extends StatelessWidget {
         final body = lines.length > _threshold
             ? _virtualized(context, lines, constraints, width, fontFamily)
             : _column(context, lines, width, fontFamily);
-        final scrolled = Scrollbar(
-          thumbVisibility: false,
-          child: SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: body,
-          ),
-        );
+        final scrolled = _HorizontalScroll(child: body);
         if (!showHeader) return scrolled;
         final header = _DiffHeader(
           fileName: fileName ?? '',

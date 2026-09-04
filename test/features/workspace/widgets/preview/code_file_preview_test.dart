@@ -222,7 +222,7 @@ void main() {
 
     // Slow drag so the list does not fling line 1 out of the builder cache.
     await tester.timedDrag(
-      find.byType(ListView).first,
+      find.byType(SelectableText).first,
       const Offset(0, -48),
       const Duration(milliseconds: 400),
     );
@@ -233,6 +233,35 @@ void main() {
         tester.getTopLeft(find.byType(SelectableText).first).dy - codeBefore.dy;
     expect(gutterDelta, isNot(0));
     expect(codeDelta, gutterDelta);
+  });
+
+  testWidgets('wrap and non-wrap gutters share the same unstyled column', (
+    tester,
+  ) async {
+    final long = List.filled(40, '神谕').join();
+    final file = File(p.join(tempDir.path, 'signs.json'))
+      ..writeAsStringSync('$long\nshort\n$long\n');
+
+    await tester.pumpWidget(
+      _app(
+        SizedBox(
+          width: 240,
+          height: 400,
+          child: CodeFilePreview(file: file, autoLoad: false),
+        ),
+      ),
+    );
+    await _loadPreview(tester);
+
+    final nonWrapGutter = tester.getTopLeft(find.text('1'));
+    expect(tester.takeException(), isNull);
+
+    await tester.tap(find.byKey(CodeFilePreview.wrapToggleKey));
+    await tester.pump();
+
+    expect(tester.takeException(), isNull);
+    expect(tester.getTopLeft(find.text('1')).dx, nonWrapGutter.dx);
+    expect(find.byKey(CodeFilePreview.horizontalScrollKey), findsNothing);
   });
 
   testWidgets('bashrc preview shows the shell language label', (tester) async {
