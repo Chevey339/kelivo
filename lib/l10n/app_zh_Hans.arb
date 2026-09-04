@@ -1729,6 +1729,8 @@
   "desktopDisplaySettingsTopicPositionRight": "右侧",
   "displaySettingsPageNewChatOnLaunchSubtitle": "应用启动时自动创建新对话",
   "displaySettingsPageChatFontSizeTitle": "聊天字体大小",
+  "displaySettingsPageUiFontSizeTitle": "界面字体大小",
+  "displaySettingsPageInputFontSizeTitle": "输入框字体大小",
   "displaySettingsPageAutoScrollEnableTitle": "自动回到底部",
   "displaySettingsPageAutoScrollIdleTitle": "自动回到底部延迟",
   "displaySettingsPageAutoScrollIdleSubtitle": "用户停止滚动后等待多久再自动回到底部",

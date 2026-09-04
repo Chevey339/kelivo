@@ -8965,6 +8965,18 @@ abstract class AppLocalizations {
   /// **'Chat Font Size'**
   String get displaySettingsPageChatFontSizeTitle;
 
+  /// No description provided for @displaySettingsPageUiFontSizeTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'UI Font Size'**
+  String get displaySettingsPageUiFontSizeTitle;
+
+  /// No description provided for @displaySettingsPageInputFontSizeTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Input Box Font Size'**
+  String get displaySettingsPageInputFontSizeTitle;
+
   /// No description provided for @displaySettingsPageAutoScrollEnableTitle.
   ///
   /// In en, this message translates to:
