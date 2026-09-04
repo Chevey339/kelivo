@@ -1,3 +1,5 @@
+import 'package:uuid/uuid.dart';
+
 import 'package:Kelivo/core/services/sandbox/channel_command_run.dart';
 import 'package:Kelivo/core/services/sandbox/channel_pty_session.dart';
 import 'package:Kelivo/core/services/sandbox/workspace_channel.dart';
@@ -8,8 +10,6 @@ class IosIshRuntime implements WorkspaceRuntime {
   IosIshRuntime({required this.channel});
 
   final WorkspaceChannel channel;
-
-  int _ptySeq = 0;
 
   @override
   bool get supportsPty => true;
@@ -81,7 +81,11 @@ class IosIshRuntime implements WorkspaceRuntime {
     required int cols,
     required int rows,
   }) async {
-    final sessionId = 'pty-${++_ptySeq}';
+    // Unique per open, never a counter: the native session map lives on the
+    // platform side and outlives the Dart isolate, so a hot restart would hand
+    // out ids that are still registered there — iSH rejects the open, proot
+    // silently kills the older session.
+    final sessionId = 'pty-${const Uuid().v4()}';
     final session = ChannelPtySession(channel: channel, sessionId: sessionId);
     await channel.ptyOpen(
       sessionId: sessionId,

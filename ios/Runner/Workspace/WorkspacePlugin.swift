@@ -329,14 +329,32 @@ final class WorkspacePlugin: NSObject, FlutterStreamHandler {
         rows: rows
       )
       if pid < 0 {
-        self.complete(
-          result,
-          FlutterError(code: "pty_failed", message: "ptyOpen failed: \(pid)", details: nil)
-        )
+        self.complete(result, Self.ptyOpenError(pid))
         return
       }
       self.complete(result, ["pid": pid])
     }
+  }
+
+  /// Names the wrapper's own refusals; anything else is a guest errno, which
+  /// overlaps them numerically only if the enum drifts into that range.
+  private static func ptyOpenError(_ code: Int32) -> FlutterError {
+    let reason: String
+    switch code {
+    case KelivoISHPtyOpenError.notBooted.rawValue:
+      reason = "kernel not booted"
+    case KelivoISHPtyOpenError.badSessionId.rawValue:
+      reason = "empty sessionId"
+    case KelivoISHPtyOpenError.sessionExists.rawValue:
+      reason = "sessionId already open"
+    default:
+      reason = "guest error"
+    }
+    return FlutterError(
+      code: "pty_failed",
+      message: "ptyOpen failed: \(reason) (\(code))",
+      details: nil
+    )
   }
 
   private func ptyWrite(call: FlutterMethodCall, result: @escaping FlutterResult) {

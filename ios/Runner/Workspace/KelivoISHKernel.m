@@ -553,13 +553,16 @@ static void KelivoDnsReachabilityChanged(SCNetworkReachabilityRef target,
                   env:(NSDictionary<NSString *, NSString *> *)env
                  cols:(int)cols
                  rows:(int)rows {
-    if (!_isBooted) return -1;
-    if (sessionId.length == 0) return -1;
+    if (!_isBooted) return KelivoISHPtyOpenErrorNotBooted;
+    if (sessionId.length == 0) return KelivoISHPtyOpenErrorBadSessionId;
 
     [_ptyLock lock];
     BOOL exists = _ptyBySession[sessionId] != nil;
     [_ptyLock unlock];
-    if (exists) return -1;
+    if (exists) {
+        NSLog(@"KelivoISHKernel: pty session %@ is already open", sessionId);
+        return KelivoISHPtyOpenErrorSessionExists;
+    }
 
     __block int resultPid = -1;
     [self performOnSpawnQueue:^{

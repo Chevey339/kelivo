@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:path/path.dart' as p;
+import 'package:uuid/uuid.dart';
 
 import 'package:Kelivo/core/models/environment_state.dart';
 import 'package:Kelivo/core/providers/environment_provider.dart';
@@ -24,8 +25,6 @@ class AndroidProotRuntime implements WorkspaceRuntime {
   final EnvironmentProvider env;
   final Directory rootfsDir;
   final Directory tmpDir;
-
-  int _ptySeq = 0;
 
   @override
   bool get supportsPty => true;
@@ -82,7 +81,11 @@ class AndroidProotRuntime implements WorkspaceRuntime {
     required int cols,
     required int rows,
   }) async {
-    final sessionId = 'pty-${++_ptySeq}';
+    // Unique per open, never a counter: the native session map lives on the
+    // platform side and outlives the Dart isolate, so a hot restart would hand
+    // out ids that are still registered there — iSH rejects the open, proot
+    // silently kills the older session.
+    final sessionId = 'pty-${const Uuid().v4()}';
     final session = ChannelPtySession(channel: channel, sessionId: sessionId);
     await channel.ptyOpen(
       sessionId: sessionId,

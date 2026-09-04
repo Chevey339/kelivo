@@ -216,4 +216,27 @@ void main() {
     await sub.cancel();
     expect(chunks.single, Uint8List.fromList(<int>[33]));
   });
+
+  test('every openPty asks for an id no other session can hold', () async {
+    Future<void> open(IosIshRuntime runtime) => runtime.openPty(
+      mounts: const [],
+      cwd: '/',
+      env: const <String, String>{},
+      cols: 80,
+      rows: 24,
+    );
+
+    await open(runtime);
+    await open(runtime);
+    // A fresh runtime stands in for a hot restart: the platform side keeps its
+    // session map, so a per-instance counter would hand back the first id.
+    await open(IosIshRuntime(channel: workspace.channel));
+
+    final ids = <String>{
+      for (final call in workspace.calls)
+        if (call.method == 'ptyOpen')
+          (call.arguments as Map)['sessionId'] as String,
+    };
+    expect(ids, hasLength(3));
+  });
 }

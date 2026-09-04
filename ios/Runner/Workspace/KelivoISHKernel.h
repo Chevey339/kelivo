@@ -16,6 +16,15 @@ extern NSNotificationName const KelivoISHProcessExitedNotification;
 typedef void (^KelivoISHPtyDataHandler)(NSString *sessionId, NSData *data);
 typedef void (^KelivoISHPtyExitHandler)(NSString *sessionId, int exitCode);
 
+/// Why -[KelivoISHKernel ptyOpenSession:...] refused before reaching the
+/// guest. Kept clear of the guest errno range (errno.h negates down to -133)
+/// so a wrapper refusal is never mistaken for a kernel error such as _EPERM.
+typedef NS_ENUM(int, KelivoISHPtyOpenError) {
+  KelivoISHPtyOpenErrorNotBooted = -1001,
+  KelivoISHPtyOpenErrorBadSessionId = -1002,
+  KelivoISHPtyOpenErrorSessionExists = -1003,
+};
+
 @interface KelivoISHKernel : NSObject
 
 + (instancetype)shared;
@@ -41,7 +50,12 @@ typedef void (^KelivoISHPtyExitHandler)(NSString *sessionId, int exitCode);
 @property (nonatomic, copy, nullable) KelivoISHPtyExitHandler ptyExitHandler;
 
 /// Open a login PTY session (`/bin/bash -l` if present, else `/bin/sh -l`).
-/// Returns the guest pid, or a negative errno-style code.
+/// Returns the guest pid, a negative errno-style code from the guest, or a
+/// [KelivoISHPtyOpenError] when this wrapper refused the request.
+///
+/// [sessionId] must be unique for the life of the process: a session is
+/// unregistered only once its guest process reports exit, so a reused id is
+/// refused rather than silently replacing the live session.
 - (int)ptyOpenSession:(NSString *)sessionId
                   cwd:(nullable NSString *)cwd
                   env:(nullable NSDictionary<NSString *, NSString *> *)env
