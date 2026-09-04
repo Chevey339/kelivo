@@ -58,6 +58,49 @@ class AppDirectories {
     return Directory('${root.path}/cache');
   }
 
+  /// Managed workspace roots: `<appData>/workspaces`.
+  static Future<Directory> getWorkspacesDirectory() =>
+      _ensureSubdir('workspaces');
+
+  /// Per-conversation session roots: `<appData>/sessions`.
+  static Future<Directory> getSessionsDirectory() => _ensureSubdir('sessions');
+
+  /// Installed skill bodies: `<appData>/skills`.
+  static Future<Directory> getSkillsDirectory() => _ensureSubdir('skills');
+
+  /// Sandbox environment install root: `<appData>/environment`.
+  static Future<Directory> getEnvironmentDirectory() =>
+      _ensureSubdir('environment');
+
+  /// Files root for a managed workspace: `<appData>/workspaces/<id>/files`.
+  static Future<Directory> workspaceFilesDir(String workspaceId) {
+    return _ensurePath('workspaces/$workspaceId/files');
+  }
+
+  /// Session root for a conversation, with `attachments/` and `outputs/`.
+  static Future<Directory> sessionDir(String conversationId) async {
+    final dir = await _ensurePath('sessions/$conversationId');
+    await Directory('${dir.path}/attachments').create(recursive: true);
+    await Directory('${dir.path}/outputs').create(recursive: true);
+    return dir;
+  }
+
+  /// Skill body directory: `<appData>/skills/<id>`.
+  static Future<Directory> skillDir(String skillId) {
+    return _ensurePath('skills/$skillId');
+  }
+
+  static Future<Directory> _ensureSubdir(String name) => _ensurePath(name);
+
+  static Future<Directory> _ensurePath(String relativePath) async {
+    final root = await getAppDataDirectory();
+    final dir = Directory('${root.path}/$relativePath');
+    if (!await dir.exists()) {
+      await dir.create(recursive: true);
+    }
+    return dir;
+  }
+
   /// Gets the platform-provided application cache directory.
   ///
   /// - Android: /data/user/0/`<package>`/cache

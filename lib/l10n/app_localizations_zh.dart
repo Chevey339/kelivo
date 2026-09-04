@@ -8574,6 +8574,1483 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get toolSchemaSettingsCancel => '取消';
+
+  @override
+  String get workspaceFileNotAvailable => '文件不可用';
+
+  @override
+  String get workspaceTerminalNotAvailable => '终端不可用';
+
+  @override
+  String get workspacePreviewCopyPath => '复制路径';
+
+  @override
+  String get workspacePreviewShare => '分享';
+
+  @override
+  String get workspacePreviewOpenExternally => '用其他应用打开';
+
+  @override
+  String get workspacePreviewOpenWith => '打开方式…';
+
+  @override
+  String get workspacePreviewFileTooLarge => '文件过大，无法预览，请用其他应用打开。';
+
+  @override
+  String get workspacePreviewSource => '源码';
+
+  @override
+  String get workspacePreviewRendered => '渲染';
+
+  @override
+  String get workspacePreviewFileName => '名称';
+
+  @override
+  String get workspacePreviewFileSize => '大小';
+
+  @override
+  String get workspacePreviewFileModified => '修改时间';
+
+  @override
+  String get workspacePreviewPathCopied => '已复制路径';
+
+  @override
+  String workspacePreviewLineCount(int count) {
+    return '$count 行';
+  }
+
+  @override
+  String get workspaceFilesSort => '排序';
+
+  @override
+  String get workspaceFilesSortName => '名称';
+
+  @override
+  String get workspaceFilesSortModified => '修改时间';
+
+  @override
+  String get workspaceFilesSortSize => '大小';
+
+  @override
+  String get workspaceFilesSortAscending => '升序';
+
+  @override
+  String get workspaceFilesSortDescending => '降序';
+
+  @override
+  String get workspaceFilesShowHidden => '显示隐藏文件';
+
+  @override
+  String get workspaceFilesHideHidden => '隐藏隐藏文件';
+
+  @override
+  String get workspaceFilesRefresh => '刷新';
+
+  @override
+  String get workspaceFilesNewFolder => '新建文件夹';
+
+  @override
+  String get workspaceFilesNewFile => '新建文件';
+
+  @override
+  String get workspaceFilesImport => '导入';
+
+  @override
+  String get workspaceFilesExport => '导出';
+
+  @override
+  String get workspaceFilesExportFolder => '导出当前文件夹';
+
+  @override
+  String get workspaceFilesEmpty => '此文件夹为空';
+
+  @override
+  String get workspaceFilesError => '无法加载这些文件';
+
+  @override
+  String get workspaceFilesRetry => '重试';
+
+  @override
+  String get workspaceFilesPreview => '预览';
+
+  @override
+  String get workspaceFilesRename => '重命名';
+
+  @override
+  String get workspaceFilesMove => '移动';
+
+  @override
+  String get workspaceFilesDelete => '删除';
+
+  @override
+  String get workspaceFilesShare => '分享';
+
+  @override
+  String get workspaceFilesCopyPath => '复制路径';
+
+  @override
+  String get workspaceFilesExportItem => '导出';
+
+  @override
+  String get workspaceFilesNameLabel => '名称';
+
+  @override
+  String get workspaceFilesNameHint => '输入名称';
+
+  @override
+  String get workspaceFilesCreate => '创建';
+
+  @override
+  String get workspaceFilesCancel => '取消';
+
+  @override
+  String get workspaceFilesConfirm => '确认';
+
+  @override
+  String get workspaceFilesSave => '保存';
+
+  @override
+  String get workspaceFilesDeleteTitle => '删除此项？';
+
+  @override
+  String workspaceFilesDeleteMessage(String name) {
+    return '删除 $name？';
+  }
+
+  @override
+  String workspaceFilesDeleteFolderMessage(String name) {
+    return '删除文件夹 $name 及其全部内容？';
+  }
+
+  @override
+  String get workspaceFilesMoveTitle => '移动到文件夹';
+
+  @override
+  String get workspaceFilesMoveHere => '移动到此处';
+
+  @override
+  String get workspaceFilesPathCopied => '已复制路径';
+
+  @override
+  String get workspaceFilesInvalidName => '名称无效';
+
+  @override
+  String get workspaceFilesInvalidPath => '该路径超出当前文件夹';
+
+  @override
+  String workspaceFilesOperationFailed(String error) {
+    return '操作失败：$error';
+  }
+
+  @override
+  String get workspaceFilesActions => '操作';
+
+  @override
+  String get workspaceFilesMore => '更多';
+
+  @override
+  String get workspaceFilesJustNow => '刚刚';
+
+  @override
+  String workspaceFilesMinutesAgo(int count) {
+    return '$count 分钟前';
+  }
+
+  @override
+  String workspaceFilesHoursAgo(int count) {
+    return '$count 小时前';
+  }
+
+  @override
+  String workspaceFilesDaysAgo(int count) {
+    return '$count 天前';
+  }
+
+  @override
+  String get workspaceFilesPanelTitle => '对话文件';
+
+  @override
+  String get workspaceFilesTabAttachments => '附件';
+
+  @override
+  String get workspaceFilesTabOutputs => '输出';
+
+  @override
+  String get workspaceFilesTabWorkspace => '工作区';
+
+  @override
+  String get workspaceFilesNoWorkspaceBound => '尚未绑定工作区';
+
+  @override
+  String get workspaceFilesKindManaged => '托管';
+
+  @override
+  String get workspaceFilesKindLinked => '链接';
+
+  @override
+  String get workspaceFilesMissingWorkspace => '找不到工作区';
+
+  @override
+  String get workspaceFilesClose => '关闭';
+
+  @override
+  String get workspacesTitle => '工作区';
+
+  @override
+  String get workspacesCreate => '创建';
+
+  @override
+  String get workspacesCreateTitle => '新建工作区';
+
+  @override
+  String get workspacesNameLabel => '名称';
+
+  @override
+  String get workspacesNameHint => '工作区名称';
+
+  @override
+  String get workspacesLinkFolder => '链接文件夹';
+
+  @override
+  String get workspacesEmpty => '还没有工作区';
+
+  @override
+  String get workspacesEmptyCta => '创建工作区';
+
+  @override
+  String get workspacesSettings => '设置';
+
+  @override
+  String get workspacesOpenFiles => '打开文件';
+
+  @override
+  String get workspacesLastUsedNever => '从未使用';
+
+  @override
+  String workspacesLastUsed(String when) {
+    return '最近使用 $when';
+  }
+
+  @override
+  String get workspacesDeleteTitle => '删除此工作区？';
+
+  @override
+  String workspacesDeleteMessage(String name) {
+    return '删除工作区 $name？';
+  }
+
+  @override
+  String get workspacesDeleteAlsoFiles => '同时删除文件';
+
+  @override
+  String get workspacesUnlinkTitle => '取消链接此工作区？';
+
+  @override
+  String workspacesUnlinkMessage(String name) {
+    return '取消链接 $name？磁盘上的文件会保留。';
+  }
+
+  @override
+  String get workspacesSettingsTitle => '工作区设置';
+
+  @override
+  String get workspacesShellNeedsApproval => '运行终端命令前询问';
+
+  @override
+  String get workspacesDefaultCwd => '默认工作目录';
+
+  @override
+  String get workspacesDefaultCwdHint => '相对路径，例如 src';
+
+  @override
+  String get workspacesDefaultCwdInvalid => '请使用不含 .. 的相对路径';
+
+  @override
+  String get workspacesCreateManaged => '创建工作区';
+
+  @override
+  String get workspacesLinkExisting => '链接已有文件夹';
+
+  @override
+  String get workspacesUnlink => '取消链接';
+
+  @override
+  String get workspacesItemMore => '工作区操作';
+
+  @override
+  String get workspaceToolDenied => '已拒绝';
+
+  @override
+  String get workspaceToolTimeout => '超时';
+
+  @override
+  String get workspaceToolCancelled => '已取消';
+
+  @override
+  String get workspaceToolInterrupted => '已中断';
+
+  @override
+  String get workspaceToolEnvironmentNotReady => '沙箱环境未安装';
+
+  @override
+  String get workspaceToolInstall => '安装';
+
+  @override
+  String get workspaceToolFuzzy => '模糊';
+
+  @override
+  String get workspaceToolCreated => '已创建';
+
+  @override
+  String get workspaceToolUpdated => '已更新';
+
+  @override
+  String get workspaceToolTruncated => '已截断';
+
+  @override
+  String get workspaceToolImageTag => '图片';
+
+  @override
+  String get workspaceToolAllowAll => '本会话全部允许';
+
+  @override
+  String get workspaceToolStdout => 'stdout';
+
+  @override
+  String get workspaceToolStderr => 'stderr';
+
+  @override
+  String get workspaceToolOpenFullOutput => '打开完整输出';
+
+  @override
+  String get workspaceToolChangedFiles => '变更的文件';
+
+  @override
+  String get workspaceToolCancel => '取消';
+
+  @override
+  String get workspaceToolCopyCommand => '复制命令';
+
+  @override
+  String get workspaceToolCopyOutput => '复制输出';
+
+  @override
+  String get workspaceToolCopyDiff => '复制差异';
+
+  @override
+  String get workspaceToolCopied => '已复制';
+
+  @override
+  String get workspaceToolDiffTruncated => '差异已截断';
+
+  @override
+  String get workspaceToolOpenPreview => '打开预览';
+
+  @override
+  String get workspaceToolNoOutput => '无输出';
+
+  @override
+  String get workspaceToolNotAvailable => '不可用';
+
+  @override
+  String get workspaceToolClose => '关闭';
+
+  @override
+  String get workspaceToolTitleShell => '运行命令';
+
+  @override
+  String get workspaceToolTitleReadFile => '读取文件';
+
+  @override
+  String get workspaceToolTitleWriteFile => '写入文件';
+
+  @override
+  String get workspaceToolTitleEditFile => '编辑文件';
+
+  @override
+  String get workspaceToolTitleListDir => '列出目录';
+
+  @override
+  String get workspaceToolTitleGlob => 'Glob';
+
+  @override
+  String get workspaceToolTitleGrep => 'Grep';
+
+  @override
+  String workspaceToolCount(int count) {
+    return '$count';
+  }
+
+  @override
+  String workspaceToolMoreFiles(int count) {
+    return '+$count';
+  }
+
+  @override
+  String workspaceToolDurationMs(int ms) {
+    return '${ms}ms';
+  }
+
+  @override
+  String workspaceToolDurationSec(String sec) {
+    return '${sec}s';
+  }
+
+  @override
+  String get workspaceEnvTitle => '环境';
+
+  @override
+  String workspaceEnvEngineUbuntu(String version) {
+    return 'Ubuntu $version (PRoot)';
+  }
+
+  @override
+  String workspaceEnvEngineAlpine(String version) {
+    return 'Alpine $version (iSH)';
+  }
+
+  @override
+  String get workspaceEnvEngineNative => '系统终端';
+
+  @override
+  String get workspaceEnvPhaseNotInstalled => '未安装';
+
+  @override
+  String get workspaceEnvPhaseDownloading => '下载中';
+
+  @override
+  String get workspaceEnvPhaseVerifying => '校验中';
+
+  @override
+  String get workspaceEnvPhaseExtracting => '解压中';
+
+  @override
+  String get workspaceEnvPhasePatching => '配置中';
+
+  @override
+  String get workspaceEnvPhaseReady => '就绪';
+
+  @override
+  String get workspaceEnvPhaseError => '错误';
+
+  @override
+  String get workspaceEnvPhaseNeedsRestart => '需要重启';
+
+  @override
+  String workspaceEnvMetaLine(String version, String arch) {
+    return '$version · $arch';
+  }
+
+  @override
+  String workspaceEnvInstalledAt(String date) {
+    return '安装于 $date';
+  }
+
+  @override
+  String workspaceEnvDiskUsage(String size) {
+    return '占用空间 $size';
+  }
+
+  @override
+  String workspaceEnvRuntimeReason(String reason) {
+    return '$reason';
+  }
+
+  @override
+  String get workspaceEnvInstall => '安装';
+
+  @override
+  String get workspaceEnvInstallSubtitleAndroid => '约 30 MB 下载，约 150 MB 磁盘空间';
+
+  @override
+  String get workspaceEnvInstallSubtitleIos => '已内置，无需下载';
+
+  @override
+  String get workspaceEnvCancel => '取消';
+
+  @override
+  String get workspaceEnvRetry => '重试';
+
+  @override
+  String get workspaceEnvRepair => '修复';
+
+  @override
+  String get workspaceEnvReset => '重置';
+
+  @override
+  String get workspaceEnvResetConfirmTitle => '重置环境？';
+
+  @override
+  String get workspaceEnvResetConfirmBody => '这将删除已安装的软件包和沙箱文件系统。';
+
+  @override
+  String get workspaceEnvCheckForUpdate => '检查更新';
+
+  @override
+  String get workspaceEnvUpdate => '更新';
+
+  @override
+  String workspaceEnvAvailableVersion(String version) {
+    return '新版本 $version 可用';
+  }
+
+  @override
+  String get workspaceEnvUpToDate => '已是最新';
+
+  @override
+  String get workspaceEnvRestartBanner => '请重启 Kelivo 以完成安装';
+
+  @override
+  String get workspaceEnvDetectingMirrors => '正在检测最快镜像…';
+
+  @override
+  String workspaceEnvApplyingMirror(String category) {
+    return '正在应用 $category 镜像…';
+  }
+
+  @override
+  String get workspaceEnvMirrorsSection => '镜像';
+
+  @override
+  String get workspaceEnvUseMirror => '使用镜像';
+
+  @override
+  String get workspaceEnvDetect => '测速';
+
+  @override
+  String get workspaceEnvOfficial => '官方';
+
+  @override
+  String get workspaceEnvMirrorsDisabled => '镜像设置在沙箱中执行，就绪后才能更改。';
+
+  @override
+  String workspaceEnvMirrorsDisabledReason(String reason) {
+    return '镜像设置在沙箱中执行，当前不可用：$reason';
+  }
+
+  @override
+  String get workspaceEnvMirrorDetectTitle => '镜像测速';
+
+  @override
+  String workspaceEnvMirrorLatency(int ms) {
+    return '$ms ms';
+  }
+
+  @override
+  String workspaceEnvMirrorFailed(String reason) {
+    return '$reason';
+  }
+
+  @override
+  String get workspaceEnvErrorUnsupportedAbi => '当前设备架构不受支持。';
+
+  @override
+  String get workspaceEnvErrorProotMissing => '缺少 PRoot 可执行文件。';
+
+  @override
+  String get workspaceEnvErrorInsufficientDisk => '存储空间不足，无法安装沙箱。';
+
+  @override
+  String get workspaceEnvErrorInsufficientDiskHint => '请至少腾出 600 MB 后再试。';
+
+  @override
+  String get workspaceEnvErrorNetwork => '下载失败，请检查网络后重试。';
+
+  @override
+  String get workspaceEnvErrorChecksumMismatch => '下载文件已损坏，请重试。';
+
+  @override
+  String get workspaceEnvErrorExtractFailed => '无法解压沙箱镜像。';
+
+  @override
+  String get workspaceEnvErrorPatchFailed => '无法完成沙箱配置。';
+
+  @override
+  String get workspaceEnvErrorCancelled => '安装已取消。';
+
+  @override
+  String get workspaceEnvErrorGeneric => '安装沙箱时出错。';
+
+  @override
+  String get workspaceEnvChipInstall => '安装沙箱';
+
+  @override
+  String workspaceEnvChipInstalling(int percent) {
+    return '正在安装… $percent %';
+  }
+
+  @override
+  String get workspaceEnvChipInstallingIndeterminate => '正在安装…';
+
+  @override
+  String get workspaceEnvChipError => '沙箱错误';
+
+  @override
+  String get workspaceEnvChipRestart => '需要重启';
+
+  @override
+  String get workspaceEnvNativeExplanation =>
+      '在桌面端，Kelivo 使用系统终端，而不是 Linux 沙箱。';
+
+  @override
+  String workspaceEnvNativeShellPath(String path) {
+    return '终端：$path';
+  }
+
+  @override
+  String get workspaceEnvNativeShellApproval => '除非此会话允许全部工具，否则 shell 工具需要批准。';
+
+  @override
+  String workspaceEnvDownloadProgress(
+    String downloaded,
+    String total,
+    int percent,
+  ) {
+    return '$downloaded / $total MB ($percent%)';
+  }
+
+  @override
+  String get workspaceEnvMirrorsFailed => '无法检测镜像';
+
+  @override
+  String get workspaceEnvCategoryApt => 'APT';
+
+  @override
+  String get workspaceEnvCategoryApk => 'APK';
+
+  @override
+  String get workspaceEnvCategoryPip => 'pip';
+
+  @override
+  String get workspaceEnvCategoryNpm => 'npm';
+
+  @override
+  String get skillsTitle => '技能';
+
+  @override
+  String get skillsTab => '技能';
+
+  @override
+  String get skillsSearchHint => '搜索技能';
+
+  @override
+  String get skillsEmptyTitle => '还没有技能';
+
+  @override
+  String get skillsEmptyBody =>
+      '技能是包含 SKILL.md 的文件夹。可粘贴 Markdown、导入 .md/.zip，或从 GitHub 安装。';
+
+  @override
+  String get skillsEmptyFormat =>
+      '---\nname: my-skill\ndescription: 这个技能做什么\n---\n\n# 说明';
+
+  @override
+  String get skillsImport => '导入';
+
+  @override
+  String get skillsImportPaste => '粘贴 Markdown';
+
+  @override
+  String get skillsImportFile => '从文件';
+
+  @override
+  String get skillsImportGitHub => '从 GitHub';
+
+  @override
+  String get skillsImportPasteLabel => 'SKILL.md';
+
+  @override
+  String get skillsImportPasteHint => '粘贴带 YAML 前置元数据的 SKILL.md';
+
+  @override
+  String get skillsImportGitHubLabel => 'GitHub 链接';
+
+  @override
+  String get skillsImportGitHubHint =>
+      'github.com/owner/repo 或 github.com/owner/repo/tree/ref/path';
+
+  @override
+  String get skillsImportConfirm => '导入';
+
+  @override
+  String get skillsCancel => '取消';
+
+  @override
+  String get skillsSave => '保存';
+
+  @override
+  String skillsUsedCount(int count) {
+    return '已使用 $count 次';
+  }
+
+  @override
+  String get skillsEnabled => '启用';
+
+  @override
+  String get skillsBrowseFiles => '浏览文件';
+
+  @override
+  String get skillsEdit => '编辑';
+
+  @override
+  String get skillsExport => '导出';
+
+  @override
+  String get skillsDelete => '删除';
+
+  @override
+  String get skillsDeleteTitle => '删除此技能？';
+
+  @override
+  String skillsDeleteMessage(String name) {
+    return '删除 $name？此操作无法撤销。';
+  }
+
+  @override
+  String get skillsUseAll => '使用全部技能';
+
+  @override
+  String get skillsUseAllSubtitle => '此助手可以使用所有已启用的技能。';
+
+  @override
+  String get skillsDisabledHint => '请先在技能页启用此技能。';
+
+  @override
+  String get skillsOpenPage => '管理技能';
+
+  @override
+  String get skillsInheritAssistant => '跟随助手';
+
+  @override
+  String get skillsInheritAssistantSubtitle => '使用与此对话助手相同的技能。';
+
+  @override
+  String get skillsActiveLabel => '生效中';
+
+  @override
+  String get skillsSessionTitle => '此对话的技能';
+
+  @override
+  String get skillsEditTitle => '编辑技能';
+
+  @override
+  String get skillsDetailKindLabel => 'Skill';
+
+  @override
+  String get skillsNoEnabled => '没有已启用的技能';
+
+  @override
+  String get terminalTitle => '终端';
+
+  @override
+  String get terminalOpenInSystem => '在系统终端中打开';
+
+  @override
+  String get terminalHostDirectory => '主机目录';
+
+  @override
+  String get terminalBindWorkspaceFirst => '请先绑定工作区';
+
+  @override
+  String get terminalNotAvailable => '不可用';
+
+  @override
+  String get terminalRuntimeUnavailable => '终端环境尚未就绪';
+
+  @override
+  String get terminalRename => '重命名';
+
+  @override
+  String get terminalClose => '关闭';
+
+  @override
+  String get terminalClear => '清屏';
+
+  @override
+  String get terminalCloseSession => '关闭会话';
+
+  @override
+  String get terminalCopy => '复制';
+
+  @override
+  String get terminalPaste => '粘贴';
+
+  @override
+  String get terminalNewSession => '新建会话';
+
+  @override
+  String get terminalMore => '更多';
+
+  @override
+  String get terminalNameLabel => '名称';
+
+  @override
+  String get terminalCancel => '取消';
+
+  @override
+  String get terminalSave => '保存';
+
+  @override
+  String get workspaceDeskMenuWorkspace => '工作区';
+
+  @override
+  String get workspaceDeskMenuSkills => '技能';
+
+  @override
+  String get workspaceDeskBarTitle => '工作区';
+
+  @override
+  String get workspaceDeskBarNoWorkspace => '无工作区';
+
+  @override
+  String get workspaceDeskBarEmptyHint => '从工具栏绑定工作区后即可在此浏览文件';
+
+  @override
+  String get workspaceDeskBarToggle => '工作区文件';
+
+  @override
+  String get workspaceDeskOpenSystemTerminal => '在系统终端中打开';
+
+  @override
+  String get workspaceDeskReveal => '在文件管理器中显示';
+
+  @override
+  String get workspaceDeskBarClose => '关闭工作区栏';
+
+  @override
+  String get workspaceEntryBind => '绑定工作区';
+
+  @override
+  String get workspaceEntryUnbind => '解除绑定';
+
+  @override
+  String get workspaceEntryChange => '更换';
+
+  @override
+  String get workspaceEntryLocked => '已锁定';
+
+  @override
+  String get workspaceEntryChangeConfirmTitle => '更换工作区？';
+
+  @override
+  String get workspaceEntryUnbindConfirmTitle => '解除绑定？';
+
+  @override
+  String get workspaceEntryChangeConfirmBody =>
+      '此对话已使用过工作区工具，之前消息中的文件链接可能不再可用。';
+
+  @override
+  String get workspaceEntryCwd => '工作目录';
+
+  @override
+  String get workspaceEntryCwdHint => '相对于工作区根目录';
+
+  @override
+  String get workspaceEntryCwdInvalid => '路径无效或已超出工作区';
+
+  @override
+  String get workspaceEntryCwdMissing => '该目录不存在';
+
+  @override
+  String get workspaceEntryCwdCreate => '创建它';
+
+  @override
+  String get workspaceEntryFiles => '文件';
+
+  @override
+  String get workspaceEntryTerminal => '终端';
+
+  @override
+  String get workspaceEntryOpenSystemTerminal => '在系统终端中打开';
+
+  @override
+  String get workspaceEntryReveal => '在文件管理器中显示';
+
+  @override
+  String get workspaceEntrySessionSkills => '本会话技能';
+
+  @override
+  String get workspaceEntryAllowAll => '本会话全部允许';
+
+  @override
+  String get workspaceEntryAllowAllSubtitle => '此对话中的 Shell 命令将不再需要批准。';
+
+  @override
+  String get workspaceEntryEnvironment => '环境';
+
+  @override
+  String get workspaceEntryManage => '管理工作区';
+
+  @override
+  String get workspaceEntryCreate => '新建工作区…';
+
+  @override
+  String get workspaceEntryDefaultWorkspace => '默认工作区';
+
+  @override
+  String get workspaceEntryDefaultWorkspaceSubtitle => '使用此助手的新对话将绑定到该工作区。';
+
+  @override
+  String get workspaceEntryNone => '无';
+
+  @override
+  String get workspaceEntryStartConversationFirst => '请先开始对话';
+
+  @override
+  String get workspaceEntryTooltip => '工作区';
+
+  @override
+  String get workspaceEntryPickerTitle => '选择工作区';
+
+  @override
+  String get settingsPageWorkspace => '工作区与环境';
+
+  @override
+  String get settingsPageSkills => '技能';
+
+  @override
+  String get commonClose => '关闭';
+
+  @override
+  String get terminalCopyAllOutput => '复制全部输出';
+
+  @override
+  String get terminalFontDecrease => '字号 −';
+
+  @override
+  String get terminalFontIncrease => '字号 +';
+
+  @override
+  String get terminalCloseSessionConfirmMessage => '会话仍在运行。关闭将结束该进程。';
+
+  @override
+  String get terminalCopiedAll => '已复制全部输出';
+
+  @override
+  String get terminalConfirm => '确认';
+
+  @override
+  String terminalExitCode(int code) {
+    return 'exit $code';
+  }
+
+  @override
+  String get workspaceMgmtNewWorkspace => '新建工作区';
+
+  @override
+  String get workspaceMgmtEmptyHint => '新建一个工作区来存放项目文件和工作目录。';
+
+  @override
+  String get workspaceMgmtKindManagedTitle => '托管工作区';
+
+  @override
+  String get workspaceMgmtKindManagedSubtitle => '应用内目录，沙盒可读写';
+
+  @override
+  String get workspaceMgmtKindLinkedTitle => '链接文件夹';
+
+  @override
+  String get workspaceMgmtKindLinkedSubtitle => '直接使用本机文件夹';
+
+  @override
+  String get workspaceMgmtImportFromFolder => '从文件夹导入';
+
+  @override
+  String get workspaceMgmtImportFromFolderSubtitle => '将文件夹复制到新的托管工作区';
+
+  @override
+  String get workspaceMgmtKindSection => '类型';
+
+  @override
+  String get workspaceMgmtCreate => '创建';
+
+  @override
+  String get workspaceMgmtShellApprovalSubtitle => '每次运行命令前询问';
+
+  @override
+  String get workspaceMgmtDefaultCwdRoot => '/';
+
+  @override
+  String get workspaceMgmtPickCwdTitle => '默认工作目录';
+
+  @override
+  String get workspaceMgmtFolderPickerUnavailable => '此设备不支持选择文件夹。';
+
+  @override
+  String get workspaceMgmtImportProgressTitle => '正在导入文件夹';
+
+  @override
+  String get workspaceMgmtImportProgressPhase => '正在复制文件…';
+
+  @override
+  String get workspaceMgmtImportFailed => '无法导入该文件夹。';
+
+  @override
+  String workspaceMgmtImportDone(String name) {
+    return '已导入 $name';
+  }
+
+  @override
+  String get workspaceMgmtLastUsedJustNow => '刚刚';
+
+  @override
+  String workspaceMgmtLastUsedMinutesAgo(int n) {
+    return '$n 分钟前';
+  }
+
+  @override
+  String workspaceMgmtLastUsedHoursAgo(int n) {
+    return '$n 小时前';
+  }
+
+  @override
+  String workspaceMgmtLastUsedDaysAgo(int n) {
+    return '$n 天前';
+  }
+
+  @override
+  String workspaceMgmtRowDetail(String kind, String when) {
+    return '$kind · 上次使用 $when';
+  }
+
+  @override
+  String workspaceMgmtRowDetailNever(String kind) {
+    return '$kind · 从未使用';
+  }
+
+  @override
+  String get workspacePreviewBack => '返回';
+
+  @override
+  String get workspacePreviewWrap => '自动换行';
+
+  @override
+  String get workspacePreviewFontDecrease => '减小字号';
+
+  @override
+  String get workspacePreviewFontIncrease => '增大字号';
+
+  @override
+  String get workspacePreviewCopy => '复制';
+
+  @override
+  String get workspacePreviewRetry => '重试';
+
+  @override
+  String get workspacePreviewLoadError => '无法加载此文件。';
+
+  @override
+  String get workspacePreviewRevealInFinder => '在 Finder 中显示';
+
+  @override
+  String get workspacePreviewOpenInSystemApp => '用系统应用打开';
+
+  @override
+  String get workspacePreviewOpenInBrowser => '在浏览器中打开';
+
+  @override
+  String get workspacePreviewTable => '表格';
+
+  @override
+  String get workspacePreviewPlainLanguage => '代码';
+
+  @override
+  String get workspacePreviewOpen => '打开';
+
+  @override
+  String get workspacePreviewRevealFailed => '无法在文件管理器中显示此文件。';
+
+  @override
+  String get workspacePreviewEmptyTable => '此表格为空。';
+
+  @override
+  String get workspaceFilesNew => '新建';
+
+  @override
+  String get workspaceFilesFoldersFirst => '文件夹优先';
+
+  @override
+  String get workspaceFilesSelectDirectory => '选择此目录';
+
+  @override
+  String get workspaceFilesEmptyHint => '用「新建」或「导入」添加文件';
+
+  @override
+  String get workspaceFilesEmptyAttachments => '还没有附件';
+
+  @override
+  String get workspaceFilesEmptyOutputs => '助手还没有产出文件';
+
+  @override
+  String get workspaceFilesMoveTo => '移动到…';
+
+  @override
+  String workspaceFilesItemCount(int count) {
+    return '$count 项';
+  }
+
+  @override
+  String get skillsImportTooltip => '导入技能';
+
+  @override
+  String get skillsImportPasteSubtitle => '粘贴带 frontmatter 的 SKILL.md';
+
+  @override
+  String get skillsImportFileSubtitle => '选择 .md 或 .zip 文件';
+
+  @override
+  String get skillsImportGitHubSubtitle => '从仓库导入 SKILL.md';
+
+  @override
+  String get skillsImportGitHubRepoLabel => '仓库地址';
+
+  @override
+  String get skillsImportGitHubUrlHint =>
+      'https://github.com/owner/repo 或 owner/repo[/path]';
+
+  @override
+  String get skillsImportGitHubHelp => '支持仓库根目录或子目录下的 SKILL.md';
+
+  @override
+  String get skillsEmptyHint => '技能是带 frontmatter 的 SKILL.md，导入后助手可按需调用';
+
+  @override
+  String get skillsMoreActions => '更多';
+
+  @override
+  String get skillsSearchClear => '清除';
+
+  @override
+  String get skillsSessionEmpty => '还没有已启用的技能，请先在技能库中启用';
+
+  @override
+  String get workspaceToolRunning => '运行中';
+
+  @override
+  String workspaceToolExitCode(int code) {
+    return 'exit $code';
+  }
+
+  @override
+  String get workspaceToolAwaitingApproval => '等待批准';
+
+  @override
+  String get workspaceToolCompleted => '完成';
+
+  @override
+  String workspaceToolLines(int count) {
+    return '$count 行';
+  }
+
+  @override
+  String workspaceToolItems(int count) {
+    return '$count 项';
+  }
+
+  @override
+  String workspaceToolFileMatches(int count) {
+    return '$count 个匹配';
+  }
+
+  @override
+  String workspaceToolContentMatches(int count) {
+    return '$count 处匹配';
+  }
+
+  @override
+  String get workspaceToolExpand => '展开';
+
+  @override
+  String get workspaceToolSectionCommand => '命令';
+
+  @override
+  String get workspaceToolSectionPath => '路径';
+
+  @override
+  String get workspaceToolSectionPattern => '模式';
+
+  @override
+  String get workspaceToolSectionOutput => '输出';
+
+  @override
+  String get workspaceToolSectionDiff => '差异';
+
+  @override
+  String get workspaceToolSectionError => '错误';
+
+  @override
+  String get workspaceToolSavedOutput => '已保存完整输出';
+
+  @override
+  String get workspaceToolApprove => '允许';
+
+  @override
+  String get workspaceToolDeny => '拒绝';
+
+  @override
+  String get workspaceToolCopy => '复制';
+
+  @override
+  String get workspaceEnvEngineLocalShell => '本机 Shell';
+
+  @override
+  String get workspaceEnvInstallEnvironment => '安装环境';
+
+  @override
+  String get workspaceEnvInstallDescription => '安装 Linux 环境，以便在沙盒中运行工具。';
+
+  @override
+  String get workspaceEnvStatusLabel => '状态';
+
+  @override
+  String get workspaceEnvStatusInstalled => '已安装';
+
+  @override
+  String get workspaceEnvSizeLabel => '大小';
+
+  @override
+  String get workspaceEnvPathLabel => '路径';
+
+  @override
+  String get workspaceEnvInstalledAtLabel => '安装于';
+
+  @override
+  String get workspaceEnvArchLabel => '架构';
+
+  @override
+  String workspaceEnvArchVersion(String arch, String version) {
+    return '$arch · $version';
+  }
+
+  @override
+  String get workspaceEnvBrowseSection => '浏览';
+
+  @override
+  String get workspaceEnvBrowseFiles => '浏览文件系统';
+
+  @override
+  String get workspaceEnvBrowseFilesDetail => '查看沙盒中的完整目录';
+
+  @override
+  String get workspaceEnvDetectFastMirrors => '检测快速镜像';
+
+  @override
+  String get workspaceEnvActionsSection => '操作';
+
+  @override
+  String get workspaceEnvInfoSection => '信息';
+
+  @override
+  String get workspaceEnvInfoBody =>
+      '环境是沙盒使用的 Linux 根文件系统。工作区单独存放，重置环境不会删除工作区文件。数据保存在本机已解压的 rootfs 中。';
+
+  @override
+  String get workspaceEnvRepairDetail => '重新校验并修补文件';
+
+  @override
+  String get workspaceEnvUpdateCurrent => '已是最新';
+
+  @override
+  String workspaceEnvUpdateAvailableShort(String version) {
+    return '可更新到 $version';
+  }
+
+  @override
+  String get workspaceEnvResetConfirmMessage =>
+      '这将删除整个 Linux 环境及其中安装的软件包。工作区文件不受影响。';
+
+  @override
+  String get workspaceEnvRestartDoneBanner => '重置已完成，请重启应用以完成安装。';
+
+  @override
+  String get workspaceEnvPathCopied => '已复制路径';
+
+  @override
+  String get workspaceEnvUseMirrorSubtitle => '将所选镜像写入沙盒';
+
+  @override
+  String get workspaceEnvRegionGlobal => '全球';
+
+  @override
+  String get workspaceEnvRegionChina => '中国';
+
+  @override
+  String get workspaceEnvRegionEurope => '欧洲';
+
+  @override
+  String get workspaceEnvRegionAsia => '亚洲';
+
+  @override
+  String get workspaceEnvMirrorTimeout => '超时';
+
+  @override
+  String get workspaceEnvSpeedTest => '测速';
+
+  @override
+  String get workspaceEnvApplySuccess => '镜像已应用';
+
+  @override
+  String get workspaceEnvApplyFailed => '无法应用镜像';
+
+  @override
+  String get workspaceEnvRestoreSuccess => '已恢复官方源';
+
+  @override
+  String get workspaceEnvMirrorsTested => '已应用最快镜像';
+
+  @override
+  String get workspaceEnvRelativeJustNow => '刚刚';
+
+  @override
+  String workspaceEnvRelativeMinutesAgo(int count) {
+    return '$count 分钟前';
+  }
+
+  @override
+  String workspaceEnvRelativeHoursAgo(int count) {
+    return '$count 小时前';
+  }
+
+  @override
+  String workspaceEnvRelativeDaysAgo(int count) {
+    return '$count 天前';
+  }
+
+  @override
+  String workspaceEnvDownloadLine(
+    String downloaded,
+    String total,
+    String phase,
+  ) {
+    return '$downloaded / $total · $phase';
+  }
+
+  @override
+  String get workspaceEnvNativeUnsandboxed =>
+      '命令在本机直接运行（无沙盒），除非允许本会话全部工具，否则需要批准。';
+
+  @override
+  String get workspaceEnvRootfsTitle => '/';
+
+  @override
+  String get workspaceEnvBrowserUnavailable => '沙盒文件系统不可用。';
+
+  @override
+  String get workspaceEnvMirrorNameOfficial => '官方';
+
+  @override
+  String get workspaceEnvMirrorNameOfficialCdn => '官方 CDN';
+
+  @override
+  String get workspaceEnvMirrorNameOfficialPypi => '官方 PyPI';
+
+  @override
+  String get workspaceEnvMirrorNameOfficialNpm => '官方 npm';
+
+  @override
+  String get workspaceEnvMirrorNameTuna => '清华 TUNA';
+
+  @override
+  String get workspaceEnvMirrorNameAlibaba => '阿里云';
+
+  @override
+  String get workspaceEnvMirrorNameUstc => '中科大 USTC';
+
+  @override
+  String get workspaceEnvMirrorNameHuawei => '华为云';
+
+  @override
+  String get workspaceEnvMirrorNameTencent => '腾讯云';
+
+  @override
+  String get workspaceEnvMirrorNameNetease => '网易';
+
+  @override
+  String get workspaceEnvMirrorNameLeaseweb => 'LEASEWEB UK';
+
+  @override
+  String get workspaceEnvMirrorNameRwth => 'RWTH Germany';
+
+  @override
+  String get workspaceEnvMirrorNameJaist => 'JAIST Japan';
+
+  @override
+  String get workspaceEnvMirrorNameKakao => 'Kakao Korea';
+
+  @override
+  String get workspaceEnvMirrorNameNpmmirror => 'npmmirror';
+
+  @override
+  String workspaceEnvSelectionNamed(String name, String region) {
+    return '$name · $region';
+  }
+
+  @override
+  String get workspaceFilesEmptyPickerHint => '点「新建文件夹」添加子文件夹';
+
+  @override
+  String get skillsDetailBodyEmpty => '还没有技能正文';
+
+  @override
+  String get workspaceEnvSizeTimeout => '计算超时';
+
+  @override
+  String get workspaceEnvInfoCopied => '已复制环境信息';
+
+  @override
+  String get workspacePreviewEmptyFile => '文件为空';
+
+  @override
+  String get workspacePreviewEmptyHint => '此文件没有任何可预览的内容。';
+
+  @override
+  String get workspacePreviewRevealInExplorer => '在文件资源管理器中显示';
+
+  @override
+  String get workspacePreviewRevealInFileManager => '在文件管理器中显示';
+
+  @override
+  String workspaceBindingSetAssistantDefault(String assistant) {
+    return '已设为「$assistant」的默认工作区';
+  }
+
+  @override
+  String get workspaceUnbindHint => '已解绑本对话；助手默认工作区可在助手设置中修改';
+
+  @override
+  String get storageSpaceCategoryWorkspaceFiles => '工作区文件';
+
+  @override
+  String get storageSpaceCategoryWorkspaceFilesHint => '托管工作区中保存的文件。';
+
+  @override
+  String get storageSpaceCategorySandboxEnvironment => '沙箱环境';
+
+  @override
+  String get storageSpaceCategorySandboxEnvironmentHint => '沙箱安装目录与根文件系统。';
+
+  @override
+  String get storageSpaceCategorySkills => '技能';
+
+  @override
+  String get storageSpaceCategorySkillsHint => '已安装的技能文件。';
+
+  @override
+  String get storageSpaceCategorySessionFiles => '会话文件';
+
+  @override
+  String get storageSpaceCategorySessionFilesHint => '各对话的附件与输出。';
+
+  @override
+  String get storageSpaceManageSkills => '管理技能';
+
+  @override
+  String get storageSessionFilesCleanOrphans => '清理无对话的会话文件';
+
+  @override
+  String storageSessionFilesCleanOrphansHint(String size) {
+    return '删除已无对应对话的会话目录。可回收 $size。';
+  }
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hans`).
@@ -17072,6 +18549,1483 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get toolSchemaSettingsCancel => '取消';
+
+  @override
+  String get workspaceFileNotAvailable => '文件不可用';
+
+  @override
+  String get workspaceTerminalNotAvailable => '终端不可用';
+
+  @override
+  String get workspacePreviewCopyPath => '复制路径';
+
+  @override
+  String get workspacePreviewShare => '分享';
+
+  @override
+  String get workspacePreviewOpenExternally => '用其他应用打开';
+
+  @override
+  String get workspacePreviewOpenWith => '打开方式…';
+
+  @override
+  String get workspacePreviewFileTooLarge => '文件过大，无法预览，请用其他应用打开。';
+
+  @override
+  String get workspacePreviewSource => '源码';
+
+  @override
+  String get workspacePreviewRendered => '渲染';
+
+  @override
+  String get workspacePreviewFileName => '名称';
+
+  @override
+  String get workspacePreviewFileSize => '大小';
+
+  @override
+  String get workspacePreviewFileModified => '修改时间';
+
+  @override
+  String get workspacePreviewPathCopied => '已复制路径';
+
+  @override
+  String workspacePreviewLineCount(int count) {
+    return '$count 行';
+  }
+
+  @override
+  String get workspaceFilesSort => '排序';
+
+  @override
+  String get workspaceFilesSortName => '名称';
+
+  @override
+  String get workspaceFilesSortModified => '修改时间';
+
+  @override
+  String get workspaceFilesSortSize => '大小';
+
+  @override
+  String get workspaceFilesSortAscending => '升序';
+
+  @override
+  String get workspaceFilesSortDescending => '降序';
+
+  @override
+  String get workspaceFilesShowHidden => '显示隐藏文件';
+
+  @override
+  String get workspaceFilesHideHidden => '隐藏隐藏文件';
+
+  @override
+  String get workspaceFilesRefresh => '刷新';
+
+  @override
+  String get workspaceFilesNewFolder => '新建文件夹';
+
+  @override
+  String get workspaceFilesNewFile => '新建文件';
+
+  @override
+  String get workspaceFilesImport => '导入';
+
+  @override
+  String get workspaceFilesExport => '导出';
+
+  @override
+  String get workspaceFilesExportFolder => '导出当前文件夹';
+
+  @override
+  String get workspaceFilesEmpty => '此文件夹为空';
+
+  @override
+  String get workspaceFilesError => '无法加载这些文件';
+
+  @override
+  String get workspaceFilesRetry => '重试';
+
+  @override
+  String get workspaceFilesPreview => '预览';
+
+  @override
+  String get workspaceFilesRename => '重命名';
+
+  @override
+  String get workspaceFilesMove => '移动';
+
+  @override
+  String get workspaceFilesDelete => '删除';
+
+  @override
+  String get workspaceFilesShare => '分享';
+
+  @override
+  String get workspaceFilesCopyPath => '复制路径';
+
+  @override
+  String get workspaceFilesExportItem => '导出';
+
+  @override
+  String get workspaceFilesNameLabel => '名称';
+
+  @override
+  String get workspaceFilesNameHint => '输入名称';
+
+  @override
+  String get workspaceFilesCreate => '创建';
+
+  @override
+  String get workspaceFilesCancel => '取消';
+
+  @override
+  String get workspaceFilesConfirm => '确认';
+
+  @override
+  String get workspaceFilesSave => '保存';
+
+  @override
+  String get workspaceFilesDeleteTitle => '删除此项？';
+
+  @override
+  String workspaceFilesDeleteMessage(String name) {
+    return '删除 $name？';
+  }
+
+  @override
+  String workspaceFilesDeleteFolderMessage(String name) {
+    return '删除文件夹 $name 及其全部内容？';
+  }
+
+  @override
+  String get workspaceFilesMoveTitle => '移动到文件夹';
+
+  @override
+  String get workspaceFilesMoveHere => '移动到此处';
+
+  @override
+  String get workspaceFilesPathCopied => '已复制路径';
+
+  @override
+  String get workspaceFilesInvalidName => '名称无效';
+
+  @override
+  String get workspaceFilesInvalidPath => '该路径超出当前文件夹';
+
+  @override
+  String workspaceFilesOperationFailed(String error) {
+    return '操作失败：$error';
+  }
+
+  @override
+  String get workspaceFilesActions => '操作';
+
+  @override
+  String get workspaceFilesMore => '更多';
+
+  @override
+  String get workspaceFilesJustNow => '刚刚';
+
+  @override
+  String workspaceFilesMinutesAgo(int count) {
+    return '$count 分钟前';
+  }
+
+  @override
+  String workspaceFilesHoursAgo(int count) {
+    return '$count 小时前';
+  }
+
+  @override
+  String workspaceFilesDaysAgo(int count) {
+    return '$count 天前';
+  }
+
+  @override
+  String get workspaceFilesPanelTitle => '对话文件';
+
+  @override
+  String get workspaceFilesTabAttachments => '附件';
+
+  @override
+  String get workspaceFilesTabOutputs => '输出';
+
+  @override
+  String get workspaceFilesTabWorkspace => '工作区';
+
+  @override
+  String get workspaceFilesNoWorkspaceBound => '尚未绑定工作区';
+
+  @override
+  String get workspaceFilesKindManaged => '托管';
+
+  @override
+  String get workspaceFilesKindLinked => '链接';
+
+  @override
+  String get workspaceFilesMissingWorkspace => '找不到工作区';
+
+  @override
+  String get workspaceFilesClose => '关闭';
+
+  @override
+  String get workspacesTitle => '工作区';
+
+  @override
+  String get workspacesCreate => '创建';
+
+  @override
+  String get workspacesCreateTitle => '新建工作区';
+
+  @override
+  String get workspacesNameLabel => '名称';
+
+  @override
+  String get workspacesNameHint => '工作区名称';
+
+  @override
+  String get workspacesLinkFolder => '链接文件夹';
+
+  @override
+  String get workspacesEmpty => '还没有工作区';
+
+  @override
+  String get workspacesEmptyCta => '创建工作区';
+
+  @override
+  String get workspacesSettings => '设置';
+
+  @override
+  String get workspacesOpenFiles => '打开文件';
+
+  @override
+  String get workspacesLastUsedNever => '从未使用';
+
+  @override
+  String workspacesLastUsed(String when) {
+    return '最近使用 $when';
+  }
+
+  @override
+  String get workspacesDeleteTitle => '删除此工作区？';
+
+  @override
+  String workspacesDeleteMessage(String name) {
+    return '删除工作区 $name？';
+  }
+
+  @override
+  String get workspacesDeleteAlsoFiles => '同时删除文件';
+
+  @override
+  String get workspacesUnlinkTitle => '取消链接此工作区？';
+
+  @override
+  String workspacesUnlinkMessage(String name) {
+    return '取消链接 $name？磁盘上的文件会保留。';
+  }
+
+  @override
+  String get workspacesSettingsTitle => '工作区设置';
+
+  @override
+  String get workspacesShellNeedsApproval => '运行终端命令前询问';
+
+  @override
+  String get workspacesDefaultCwd => '默认工作目录';
+
+  @override
+  String get workspacesDefaultCwdHint => '相对路径，例如 src';
+
+  @override
+  String get workspacesDefaultCwdInvalid => '请使用不含 .. 的相对路径';
+
+  @override
+  String get workspacesCreateManaged => '创建工作区';
+
+  @override
+  String get workspacesLinkExisting => '链接已有文件夹';
+
+  @override
+  String get workspacesUnlink => '取消链接';
+
+  @override
+  String get workspacesItemMore => '工作区操作';
+
+  @override
+  String get workspaceToolDenied => '已拒绝';
+
+  @override
+  String get workspaceToolTimeout => '超时';
+
+  @override
+  String get workspaceToolCancelled => '已取消';
+
+  @override
+  String get workspaceToolInterrupted => '已中断';
+
+  @override
+  String get workspaceToolEnvironmentNotReady => '沙箱环境未安装';
+
+  @override
+  String get workspaceToolInstall => '安装';
+
+  @override
+  String get workspaceToolFuzzy => '模糊';
+
+  @override
+  String get workspaceToolCreated => '已创建';
+
+  @override
+  String get workspaceToolUpdated => '已更新';
+
+  @override
+  String get workspaceToolTruncated => '已截断';
+
+  @override
+  String get workspaceToolImageTag => '图片';
+
+  @override
+  String get workspaceToolAllowAll => '本会话全部允许';
+
+  @override
+  String get workspaceToolStdout => 'stdout';
+
+  @override
+  String get workspaceToolStderr => 'stderr';
+
+  @override
+  String get workspaceToolOpenFullOutput => '打开完整输出';
+
+  @override
+  String get workspaceToolChangedFiles => '变更的文件';
+
+  @override
+  String get workspaceToolCancel => '取消';
+
+  @override
+  String get workspaceToolCopyCommand => '复制命令';
+
+  @override
+  String get workspaceToolCopyOutput => '复制输出';
+
+  @override
+  String get workspaceToolCopyDiff => '复制差异';
+
+  @override
+  String get workspaceToolCopied => '已复制';
+
+  @override
+  String get workspaceToolDiffTruncated => '差异已截断';
+
+  @override
+  String get workspaceToolOpenPreview => '打开预览';
+
+  @override
+  String get workspaceToolNoOutput => '无输出';
+
+  @override
+  String get workspaceToolNotAvailable => '不可用';
+
+  @override
+  String get workspaceToolClose => '关闭';
+
+  @override
+  String get workspaceToolTitleShell => '运行命令';
+
+  @override
+  String get workspaceToolTitleReadFile => '读取文件';
+
+  @override
+  String get workspaceToolTitleWriteFile => '写入文件';
+
+  @override
+  String get workspaceToolTitleEditFile => '编辑文件';
+
+  @override
+  String get workspaceToolTitleListDir => '列出目录';
+
+  @override
+  String get workspaceToolTitleGlob => 'Glob';
+
+  @override
+  String get workspaceToolTitleGrep => 'Grep';
+
+  @override
+  String workspaceToolCount(int count) {
+    return '$count';
+  }
+
+  @override
+  String workspaceToolMoreFiles(int count) {
+    return '+$count';
+  }
+
+  @override
+  String workspaceToolDurationMs(int ms) {
+    return '${ms}ms';
+  }
+
+  @override
+  String workspaceToolDurationSec(String sec) {
+    return '${sec}s';
+  }
+
+  @override
+  String get workspaceEnvTitle => '环境';
+
+  @override
+  String workspaceEnvEngineUbuntu(String version) {
+    return 'Ubuntu $version (PRoot)';
+  }
+
+  @override
+  String workspaceEnvEngineAlpine(String version) {
+    return 'Alpine $version (iSH)';
+  }
+
+  @override
+  String get workspaceEnvEngineNative => '系统终端';
+
+  @override
+  String get workspaceEnvPhaseNotInstalled => '未安装';
+
+  @override
+  String get workspaceEnvPhaseDownloading => '下载中';
+
+  @override
+  String get workspaceEnvPhaseVerifying => '校验中';
+
+  @override
+  String get workspaceEnvPhaseExtracting => '解压中';
+
+  @override
+  String get workspaceEnvPhasePatching => '配置中';
+
+  @override
+  String get workspaceEnvPhaseReady => '就绪';
+
+  @override
+  String get workspaceEnvPhaseError => '错误';
+
+  @override
+  String get workspaceEnvPhaseNeedsRestart => '需要重启';
+
+  @override
+  String workspaceEnvMetaLine(String version, String arch) {
+    return '$version · $arch';
+  }
+
+  @override
+  String workspaceEnvInstalledAt(String date) {
+    return '安装于 $date';
+  }
+
+  @override
+  String workspaceEnvDiskUsage(String size) {
+    return '占用空间 $size';
+  }
+
+  @override
+  String workspaceEnvRuntimeReason(String reason) {
+    return '$reason';
+  }
+
+  @override
+  String get workspaceEnvInstall => '安装';
+
+  @override
+  String get workspaceEnvInstallSubtitleAndroid => '约 30 MB 下载，约 150 MB 磁盘空间';
+
+  @override
+  String get workspaceEnvInstallSubtitleIos => '已内置，无需下载';
+
+  @override
+  String get workspaceEnvCancel => '取消';
+
+  @override
+  String get workspaceEnvRetry => '重试';
+
+  @override
+  String get workspaceEnvRepair => '修复';
+
+  @override
+  String get workspaceEnvReset => '重置';
+
+  @override
+  String get workspaceEnvResetConfirmTitle => '重置环境？';
+
+  @override
+  String get workspaceEnvResetConfirmBody => '这将删除已安装的软件包和沙箱文件系统。';
+
+  @override
+  String get workspaceEnvCheckForUpdate => '检查更新';
+
+  @override
+  String get workspaceEnvUpdate => '更新';
+
+  @override
+  String workspaceEnvAvailableVersion(String version) {
+    return '新版本 $version 可用';
+  }
+
+  @override
+  String get workspaceEnvUpToDate => '已是最新';
+
+  @override
+  String get workspaceEnvRestartBanner => '请重启 Kelivo 以完成安装';
+
+  @override
+  String get workspaceEnvDetectingMirrors => '正在检测最快镜像…';
+
+  @override
+  String workspaceEnvApplyingMirror(String category) {
+    return '正在应用 $category 镜像…';
+  }
+
+  @override
+  String get workspaceEnvMirrorsSection => '镜像';
+
+  @override
+  String get workspaceEnvUseMirror => '使用镜像';
+
+  @override
+  String get workspaceEnvDetect => '测速';
+
+  @override
+  String get workspaceEnvOfficial => '官方';
+
+  @override
+  String get workspaceEnvMirrorsDisabled => '镜像设置在沙箱中执行，就绪后才能更改。';
+
+  @override
+  String workspaceEnvMirrorsDisabledReason(String reason) {
+    return '镜像设置在沙箱中执行，当前不可用：$reason';
+  }
+
+  @override
+  String get workspaceEnvMirrorDetectTitle => '镜像测速';
+
+  @override
+  String workspaceEnvMirrorLatency(int ms) {
+    return '$ms ms';
+  }
+
+  @override
+  String workspaceEnvMirrorFailed(String reason) {
+    return '$reason';
+  }
+
+  @override
+  String get workspaceEnvErrorUnsupportedAbi => '当前设备架构不受支持。';
+
+  @override
+  String get workspaceEnvErrorProotMissing => '缺少 PRoot 可执行文件。';
+
+  @override
+  String get workspaceEnvErrorInsufficientDisk => '存储空间不足，无法安装沙箱。';
+
+  @override
+  String get workspaceEnvErrorInsufficientDiskHint => '请至少腾出 600 MB 后再试。';
+
+  @override
+  String get workspaceEnvErrorNetwork => '下载失败，请检查网络后重试。';
+
+  @override
+  String get workspaceEnvErrorChecksumMismatch => '下载文件已损坏，请重试。';
+
+  @override
+  String get workspaceEnvErrorExtractFailed => '无法解压沙箱镜像。';
+
+  @override
+  String get workspaceEnvErrorPatchFailed => '无法完成沙箱配置。';
+
+  @override
+  String get workspaceEnvErrorCancelled => '安装已取消。';
+
+  @override
+  String get workspaceEnvErrorGeneric => '安装沙箱时出错。';
+
+  @override
+  String get workspaceEnvChipInstall => '安装沙箱';
+
+  @override
+  String workspaceEnvChipInstalling(int percent) {
+    return '正在安装… $percent %';
+  }
+
+  @override
+  String get workspaceEnvChipInstallingIndeterminate => '正在安装…';
+
+  @override
+  String get workspaceEnvChipError => '沙箱错误';
+
+  @override
+  String get workspaceEnvChipRestart => '需要重启';
+
+  @override
+  String get workspaceEnvNativeExplanation =>
+      '在桌面端，Kelivo 使用系统终端，而不是 Linux 沙箱。';
+
+  @override
+  String workspaceEnvNativeShellPath(String path) {
+    return '终端：$path';
+  }
+
+  @override
+  String get workspaceEnvNativeShellApproval => '除非此会话允许全部工具，否则 shell 工具需要批准。';
+
+  @override
+  String workspaceEnvDownloadProgress(
+    String downloaded,
+    String total,
+    int percent,
+  ) {
+    return '$downloaded / $total MB ($percent%)';
+  }
+
+  @override
+  String get workspaceEnvMirrorsFailed => '无法检测镜像';
+
+  @override
+  String get workspaceEnvCategoryApt => 'APT';
+
+  @override
+  String get workspaceEnvCategoryApk => 'APK';
+
+  @override
+  String get workspaceEnvCategoryPip => 'pip';
+
+  @override
+  String get workspaceEnvCategoryNpm => 'npm';
+
+  @override
+  String get skillsTitle => '技能';
+
+  @override
+  String get skillsTab => '技能';
+
+  @override
+  String get skillsSearchHint => '搜索技能';
+
+  @override
+  String get skillsEmptyTitle => '还没有技能';
+
+  @override
+  String get skillsEmptyBody =>
+      '技能是包含 SKILL.md 的文件夹。可粘贴 Markdown、导入 .md/.zip，或从 GitHub 安装。';
+
+  @override
+  String get skillsEmptyFormat =>
+      '---\nname: my-skill\ndescription: 这个技能做什么\n---\n\n# 说明';
+
+  @override
+  String get skillsImport => '导入';
+
+  @override
+  String get skillsImportPaste => '粘贴 Markdown';
+
+  @override
+  String get skillsImportFile => '从文件';
+
+  @override
+  String get skillsImportGitHub => '从 GitHub';
+
+  @override
+  String get skillsImportPasteLabel => 'SKILL.md';
+
+  @override
+  String get skillsImportPasteHint => '粘贴带 YAML 前置元数据的 SKILL.md';
+
+  @override
+  String get skillsImportGitHubLabel => 'GitHub 链接';
+
+  @override
+  String get skillsImportGitHubHint =>
+      'github.com/owner/repo 或 github.com/owner/repo/tree/ref/path';
+
+  @override
+  String get skillsImportConfirm => '导入';
+
+  @override
+  String get skillsCancel => '取消';
+
+  @override
+  String get skillsSave => '保存';
+
+  @override
+  String skillsUsedCount(int count) {
+    return '已使用 $count 次';
+  }
+
+  @override
+  String get skillsEnabled => '启用';
+
+  @override
+  String get skillsBrowseFiles => '浏览文件';
+
+  @override
+  String get skillsEdit => '编辑';
+
+  @override
+  String get skillsExport => '导出';
+
+  @override
+  String get skillsDelete => '删除';
+
+  @override
+  String get skillsDeleteTitle => '删除此技能？';
+
+  @override
+  String skillsDeleteMessage(String name) {
+    return '删除 $name？此操作无法撤销。';
+  }
+
+  @override
+  String get skillsUseAll => '使用全部技能';
+
+  @override
+  String get skillsUseAllSubtitle => '此助手可以使用所有已启用的技能。';
+
+  @override
+  String get skillsDisabledHint => '请先在技能页启用此技能。';
+
+  @override
+  String get skillsOpenPage => '管理技能';
+
+  @override
+  String get skillsInheritAssistant => '跟随助手';
+
+  @override
+  String get skillsInheritAssistantSubtitle => '使用与此对话助手相同的技能。';
+
+  @override
+  String get skillsActiveLabel => '生效中';
+
+  @override
+  String get skillsSessionTitle => '此对话的技能';
+
+  @override
+  String get skillsEditTitle => '编辑技能';
+
+  @override
+  String get skillsDetailKindLabel => 'Skill';
+
+  @override
+  String get skillsNoEnabled => '没有已启用的技能';
+
+  @override
+  String get terminalTitle => '终端';
+
+  @override
+  String get terminalOpenInSystem => '在系统终端中打开';
+
+  @override
+  String get terminalHostDirectory => '主机目录';
+
+  @override
+  String get terminalBindWorkspaceFirst => '请先绑定工作区';
+
+  @override
+  String get terminalNotAvailable => '不可用';
+
+  @override
+  String get terminalRuntimeUnavailable => '终端环境尚未就绪';
+
+  @override
+  String get terminalRename => '重命名';
+
+  @override
+  String get terminalClose => '关闭';
+
+  @override
+  String get terminalClear => '清屏';
+
+  @override
+  String get terminalCloseSession => '关闭会话';
+
+  @override
+  String get terminalCopy => '复制';
+
+  @override
+  String get terminalPaste => '粘贴';
+
+  @override
+  String get terminalNewSession => '新建会话';
+
+  @override
+  String get terminalMore => '更多';
+
+  @override
+  String get terminalNameLabel => '名称';
+
+  @override
+  String get terminalCancel => '取消';
+
+  @override
+  String get terminalSave => '保存';
+
+  @override
+  String get workspaceDeskMenuWorkspace => '工作区';
+
+  @override
+  String get workspaceDeskMenuSkills => '技能';
+
+  @override
+  String get workspaceDeskBarTitle => '工作区';
+
+  @override
+  String get workspaceDeskBarNoWorkspace => '无工作区';
+
+  @override
+  String get workspaceDeskBarEmptyHint => '从工具栏绑定工作区后即可在此浏览文件';
+
+  @override
+  String get workspaceDeskBarToggle => '工作区文件';
+
+  @override
+  String get workspaceDeskOpenSystemTerminal => '在系统终端中打开';
+
+  @override
+  String get workspaceDeskReveal => '在文件管理器中显示';
+
+  @override
+  String get workspaceDeskBarClose => '关闭工作区栏';
+
+  @override
+  String get workspaceEntryBind => '绑定工作区';
+
+  @override
+  String get workspaceEntryUnbind => '解除绑定';
+
+  @override
+  String get workspaceEntryChange => '更换';
+
+  @override
+  String get workspaceEntryLocked => '已锁定';
+
+  @override
+  String get workspaceEntryChangeConfirmTitle => '更换工作区？';
+
+  @override
+  String get workspaceEntryUnbindConfirmTitle => '解除绑定？';
+
+  @override
+  String get workspaceEntryChangeConfirmBody =>
+      '此对话已使用过工作区工具，之前消息中的文件链接可能不再可用。';
+
+  @override
+  String get workspaceEntryCwd => '工作目录';
+
+  @override
+  String get workspaceEntryCwdHint => '相对于工作区根目录';
+
+  @override
+  String get workspaceEntryCwdInvalid => '路径无效或已超出工作区';
+
+  @override
+  String get workspaceEntryCwdMissing => '该目录不存在';
+
+  @override
+  String get workspaceEntryCwdCreate => '创建它';
+
+  @override
+  String get workspaceEntryFiles => '文件';
+
+  @override
+  String get workspaceEntryTerminal => '终端';
+
+  @override
+  String get workspaceEntryOpenSystemTerminal => '在系统终端中打开';
+
+  @override
+  String get workspaceEntryReveal => '在文件管理器中显示';
+
+  @override
+  String get workspaceEntrySessionSkills => '本会话技能';
+
+  @override
+  String get workspaceEntryAllowAll => '本会话全部允许';
+
+  @override
+  String get workspaceEntryAllowAllSubtitle => '此对话中的 Shell 命令将不再需要批准。';
+
+  @override
+  String get workspaceEntryEnvironment => '环境';
+
+  @override
+  String get workspaceEntryManage => '管理工作区';
+
+  @override
+  String get workspaceEntryCreate => '新建工作区…';
+
+  @override
+  String get workspaceEntryDefaultWorkspace => '默认工作区';
+
+  @override
+  String get workspaceEntryDefaultWorkspaceSubtitle => '使用此助手的新对话将绑定到该工作区。';
+
+  @override
+  String get workspaceEntryNone => '无';
+
+  @override
+  String get workspaceEntryStartConversationFirst => '请先开始对话';
+
+  @override
+  String get workspaceEntryTooltip => '工作区';
+
+  @override
+  String get workspaceEntryPickerTitle => '选择工作区';
+
+  @override
+  String get settingsPageWorkspace => '工作区与环境';
+
+  @override
+  String get settingsPageSkills => '技能';
+
+  @override
+  String get commonClose => '关闭';
+
+  @override
+  String get terminalCopyAllOutput => '复制全部输出';
+
+  @override
+  String get terminalFontDecrease => '字号 −';
+
+  @override
+  String get terminalFontIncrease => '字号 +';
+
+  @override
+  String get terminalCloseSessionConfirmMessage => '会话仍在运行。关闭将结束该进程。';
+
+  @override
+  String get terminalCopiedAll => '已复制全部输出';
+
+  @override
+  String get terminalConfirm => '确认';
+
+  @override
+  String terminalExitCode(int code) {
+    return 'exit $code';
+  }
+
+  @override
+  String get workspaceMgmtNewWorkspace => '新建工作区';
+
+  @override
+  String get workspaceMgmtEmptyHint => '新建一个工作区来存放项目文件和工作目录。';
+
+  @override
+  String get workspaceMgmtKindManagedTitle => '托管工作区';
+
+  @override
+  String get workspaceMgmtKindManagedSubtitle => '应用内目录，沙盒可读写';
+
+  @override
+  String get workspaceMgmtKindLinkedTitle => '链接文件夹';
+
+  @override
+  String get workspaceMgmtKindLinkedSubtitle => '直接使用本机文件夹';
+
+  @override
+  String get workspaceMgmtImportFromFolder => '从文件夹导入';
+
+  @override
+  String get workspaceMgmtImportFromFolderSubtitle => '将文件夹复制到新的托管工作区';
+
+  @override
+  String get workspaceMgmtKindSection => '类型';
+
+  @override
+  String get workspaceMgmtCreate => '创建';
+
+  @override
+  String get workspaceMgmtShellApprovalSubtitle => '每次运行命令前询问';
+
+  @override
+  String get workspaceMgmtDefaultCwdRoot => '/';
+
+  @override
+  String get workspaceMgmtPickCwdTitle => '默认工作目录';
+
+  @override
+  String get workspaceMgmtFolderPickerUnavailable => '此设备不支持选择文件夹。';
+
+  @override
+  String get workspaceMgmtImportProgressTitle => '正在导入文件夹';
+
+  @override
+  String get workspaceMgmtImportProgressPhase => '正在复制文件…';
+
+  @override
+  String get workspaceMgmtImportFailed => '无法导入该文件夹。';
+
+  @override
+  String workspaceMgmtImportDone(String name) {
+    return '已导入 $name';
+  }
+
+  @override
+  String get workspaceMgmtLastUsedJustNow => '刚刚';
+
+  @override
+  String workspaceMgmtLastUsedMinutesAgo(int n) {
+    return '$n 分钟前';
+  }
+
+  @override
+  String workspaceMgmtLastUsedHoursAgo(int n) {
+    return '$n 小时前';
+  }
+
+  @override
+  String workspaceMgmtLastUsedDaysAgo(int n) {
+    return '$n 天前';
+  }
+
+  @override
+  String workspaceMgmtRowDetail(String kind, String when) {
+    return '$kind · 上次使用 $when';
+  }
+
+  @override
+  String workspaceMgmtRowDetailNever(String kind) {
+    return '$kind · 从未使用';
+  }
+
+  @override
+  String get workspacePreviewBack => '返回';
+
+  @override
+  String get workspacePreviewWrap => '自动换行';
+
+  @override
+  String get workspacePreviewFontDecrease => '减小字号';
+
+  @override
+  String get workspacePreviewFontIncrease => '增大字号';
+
+  @override
+  String get workspacePreviewCopy => '复制';
+
+  @override
+  String get workspacePreviewRetry => '重试';
+
+  @override
+  String get workspacePreviewLoadError => '无法加载此文件。';
+
+  @override
+  String get workspacePreviewRevealInFinder => '在 Finder 中显示';
+
+  @override
+  String get workspacePreviewOpenInSystemApp => '用系统应用打开';
+
+  @override
+  String get workspacePreviewOpenInBrowser => '在浏览器中打开';
+
+  @override
+  String get workspacePreviewTable => '表格';
+
+  @override
+  String get workspacePreviewPlainLanguage => '代码';
+
+  @override
+  String get workspacePreviewOpen => '打开';
+
+  @override
+  String get workspacePreviewRevealFailed => '无法在文件管理器中显示此文件。';
+
+  @override
+  String get workspacePreviewEmptyTable => '此表格为空。';
+
+  @override
+  String get workspaceFilesNew => '新建';
+
+  @override
+  String get workspaceFilesFoldersFirst => '文件夹优先';
+
+  @override
+  String get workspaceFilesSelectDirectory => '选择此目录';
+
+  @override
+  String get workspaceFilesEmptyHint => '用「新建」或「导入」添加文件';
+
+  @override
+  String get workspaceFilesEmptyAttachments => '还没有附件';
+
+  @override
+  String get workspaceFilesEmptyOutputs => '助手还没有产出文件';
+
+  @override
+  String get workspaceFilesMoveTo => '移动到…';
+
+  @override
+  String workspaceFilesItemCount(int count) {
+    return '$count 项';
+  }
+
+  @override
+  String get skillsImportTooltip => '导入技能';
+
+  @override
+  String get skillsImportPasteSubtitle => '粘贴带 frontmatter 的 SKILL.md';
+
+  @override
+  String get skillsImportFileSubtitle => '选择 .md 或 .zip 文件';
+
+  @override
+  String get skillsImportGitHubSubtitle => '从仓库导入 SKILL.md';
+
+  @override
+  String get skillsImportGitHubRepoLabel => '仓库地址';
+
+  @override
+  String get skillsImportGitHubUrlHint =>
+      'https://github.com/owner/repo 或 owner/repo[/path]';
+
+  @override
+  String get skillsImportGitHubHelp => '支持仓库根目录或子目录下的 SKILL.md';
+
+  @override
+  String get skillsEmptyHint => '技能是带 frontmatter 的 SKILL.md，导入后助手可按需调用';
+
+  @override
+  String get skillsMoreActions => '更多';
+
+  @override
+  String get skillsSearchClear => '清除';
+
+  @override
+  String get skillsSessionEmpty => '还没有已启用的技能，请先在技能库中启用';
+
+  @override
+  String get workspaceToolRunning => '运行中';
+
+  @override
+  String workspaceToolExitCode(int code) {
+    return 'exit $code';
+  }
+
+  @override
+  String get workspaceToolAwaitingApproval => '等待批准';
+
+  @override
+  String get workspaceToolCompleted => '完成';
+
+  @override
+  String workspaceToolLines(int count) {
+    return '$count 行';
+  }
+
+  @override
+  String workspaceToolItems(int count) {
+    return '$count 项';
+  }
+
+  @override
+  String workspaceToolFileMatches(int count) {
+    return '$count 个匹配';
+  }
+
+  @override
+  String workspaceToolContentMatches(int count) {
+    return '$count 处匹配';
+  }
+
+  @override
+  String get workspaceToolExpand => '展开';
+
+  @override
+  String get workspaceToolSectionCommand => '命令';
+
+  @override
+  String get workspaceToolSectionPath => '路径';
+
+  @override
+  String get workspaceToolSectionPattern => '模式';
+
+  @override
+  String get workspaceToolSectionOutput => '输出';
+
+  @override
+  String get workspaceToolSectionDiff => '差异';
+
+  @override
+  String get workspaceToolSectionError => '错误';
+
+  @override
+  String get workspaceToolSavedOutput => '已保存完整输出';
+
+  @override
+  String get workspaceToolApprove => '允许';
+
+  @override
+  String get workspaceToolDeny => '拒绝';
+
+  @override
+  String get workspaceToolCopy => '复制';
+
+  @override
+  String get workspaceEnvEngineLocalShell => '本机 Shell';
+
+  @override
+  String get workspaceEnvInstallEnvironment => '安装环境';
+
+  @override
+  String get workspaceEnvInstallDescription => '安装 Linux 环境，以便在沙盒中运行工具。';
+
+  @override
+  String get workspaceEnvStatusLabel => '状态';
+
+  @override
+  String get workspaceEnvStatusInstalled => '已安装';
+
+  @override
+  String get workspaceEnvSizeLabel => '大小';
+
+  @override
+  String get workspaceEnvPathLabel => '路径';
+
+  @override
+  String get workspaceEnvInstalledAtLabel => '安装于';
+
+  @override
+  String get workspaceEnvArchLabel => '架构';
+
+  @override
+  String workspaceEnvArchVersion(String arch, String version) {
+    return '$arch · $version';
+  }
+
+  @override
+  String get workspaceEnvBrowseSection => '浏览';
+
+  @override
+  String get workspaceEnvBrowseFiles => '浏览文件系统';
+
+  @override
+  String get workspaceEnvBrowseFilesDetail => '查看沙盒中的完整目录';
+
+  @override
+  String get workspaceEnvDetectFastMirrors => '检测快速镜像';
+
+  @override
+  String get workspaceEnvActionsSection => '操作';
+
+  @override
+  String get workspaceEnvInfoSection => '信息';
+
+  @override
+  String get workspaceEnvInfoBody =>
+      '环境是沙盒使用的 Linux 根文件系统。工作区单独存放，重置环境不会删除工作区文件。数据保存在本机已解压的 rootfs 中。';
+
+  @override
+  String get workspaceEnvRepairDetail => '重新校验并修补文件';
+
+  @override
+  String get workspaceEnvUpdateCurrent => '已是最新';
+
+  @override
+  String workspaceEnvUpdateAvailableShort(String version) {
+    return '可更新到 $version';
+  }
+
+  @override
+  String get workspaceEnvResetConfirmMessage =>
+      '这将删除整个 Linux 环境及其中安装的软件包。工作区文件不受影响。';
+
+  @override
+  String get workspaceEnvRestartDoneBanner => '重置已完成，请重启应用以完成安装。';
+
+  @override
+  String get workspaceEnvPathCopied => '已复制路径';
+
+  @override
+  String get workspaceEnvUseMirrorSubtitle => '将所选镜像写入沙盒';
+
+  @override
+  String get workspaceEnvRegionGlobal => '全球';
+
+  @override
+  String get workspaceEnvRegionChina => '中国';
+
+  @override
+  String get workspaceEnvRegionEurope => '欧洲';
+
+  @override
+  String get workspaceEnvRegionAsia => '亚洲';
+
+  @override
+  String get workspaceEnvMirrorTimeout => '超时';
+
+  @override
+  String get workspaceEnvSpeedTest => '测速';
+
+  @override
+  String get workspaceEnvApplySuccess => '镜像已应用';
+
+  @override
+  String get workspaceEnvApplyFailed => '无法应用镜像';
+
+  @override
+  String get workspaceEnvRestoreSuccess => '已恢复官方源';
+
+  @override
+  String get workspaceEnvMirrorsTested => '已应用最快镜像';
+
+  @override
+  String get workspaceEnvRelativeJustNow => '刚刚';
+
+  @override
+  String workspaceEnvRelativeMinutesAgo(int count) {
+    return '$count 分钟前';
+  }
+
+  @override
+  String workspaceEnvRelativeHoursAgo(int count) {
+    return '$count 小时前';
+  }
+
+  @override
+  String workspaceEnvRelativeDaysAgo(int count) {
+    return '$count 天前';
+  }
+
+  @override
+  String workspaceEnvDownloadLine(
+    String downloaded,
+    String total,
+    String phase,
+  ) {
+    return '$downloaded / $total · $phase';
+  }
+
+  @override
+  String get workspaceEnvNativeUnsandboxed =>
+      '命令在本机直接运行（无沙盒），除非允许本会话全部工具，否则需要批准。';
+
+  @override
+  String get workspaceEnvRootfsTitle => '/';
+
+  @override
+  String get workspaceEnvBrowserUnavailable => '沙盒文件系统不可用。';
+
+  @override
+  String get workspaceEnvMirrorNameOfficial => '官方';
+
+  @override
+  String get workspaceEnvMirrorNameOfficialCdn => '官方 CDN';
+
+  @override
+  String get workspaceEnvMirrorNameOfficialPypi => '官方 PyPI';
+
+  @override
+  String get workspaceEnvMirrorNameOfficialNpm => '官方 npm';
+
+  @override
+  String get workspaceEnvMirrorNameTuna => '清华 TUNA';
+
+  @override
+  String get workspaceEnvMirrorNameAlibaba => '阿里云';
+
+  @override
+  String get workspaceEnvMirrorNameUstc => '中科大 USTC';
+
+  @override
+  String get workspaceEnvMirrorNameHuawei => '华为云';
+
+  @override
+  String get workspaceEnvMirrorNameTencent => '腾讯云';
+
+  @override
+  String get workspaceEnvMirrorNameNetease => '网易';
+
+  @override
+  String get workspaceEnvMirrorNameLeaseweb => 'LEASEWEB UK';
+
+  @override
+  String get workspaceEnvMirrorNameRwth => 'RWTH Germany';
+
+  @override
+  String get workspaceEnvMirrorNameJaist => 'JAIST Japan';
+
+  @override
+  String get workspaceEnvMirrorNameKakao => 'Kakao Korea';
+
+  @override
+  String get workspaceEnvMirrorNameNpmmirror => 'npmmirror';
+
+  @override
+  String workspaceEnvSelectionNamed(String name, String region) {
+    return '$name · $region';
+  }
+
+  @override
+  String get workspaceFilesEmptyPickerHint => '点「新建文件夹」添加子文件夹';
+
+  @override
+  String get skillsDetailBodyEmpty => '还没有技能正文';
+
+  @override
+  String get workspaceEnvSizeTimeout => '计算超时';
+
+  @override
+  String get workspaceEnvInfoCopied => '已复制环境信息';
+
+  @override
+  String get workspacePreviewEmptyFile => '文件为空';
+
+  @override
+  String get workspacePreviewEmptyHint => '此文件没有任何可预览的内容。';
+
+  @override
+  String get workspacePreviewRevealInExplorer => '在文件资源管理器中显示';
+
+  @override
+  String get workspacePreviewRevealInFileManager => '在文件管理器中显示';
+
+  @override
+  String workspaceBindingSetAssistantDefault(String assistant) {
+    return '已设为「$assistant」的默认工作区';
+  }
+
+  @override
+  String get workspaceUnbindHint => '已解绑本对话；助手默认工作区可在助手设置中修改';
+
+  @override
+  String get storageSpaceCategoryWorkspaceFiles => '工作区文件';
+
+  @override
+  String get storageSpaceCategoryWorkspaceFilesHint => '托管工作区中保存的文件。';
+
+  @override
+  String get storageSpaceCategorySandboxEnvironment => '沙箱环境';
+
+  @override
+  String get storageSpaceCategorySandboxEnvironmentHint => '沙箱安装目录与根文件系统。';
+
+  @override
+  String get storageSpaceCategorySkills => '技能';
+
+  @override
+  String get storageSpaceCategorySkillsHint => '已安装的技能文件。';
+
+  @override
+  String get storageSpaceCategorySessionFiles => '会话文件';
+
+  @override
+  String get storageSpaceCategorySessionFilesHint => '各对话的附件与输出。';
+
+  @override
+  String get storageSpaceManageSkills => '管理技能';
+
+  @override
+  String get storageSessionFilesCleanOrphans => '清理无对话的会话文件';
+
+  @override
+  String storageSessionFilesCleanOrphansHint(String size) {
+    return '删除已无对应对话的会话目录。可回收 $size。';
+  }
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hant`).
@@ -25645,4 +28599,1482 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get toolSchemaSettingsCancel => '取消';
+
+  @override
+  String get workspaceFileNotAvailable => '檔案不可用';
+
+  @override
+  String get workspaceTerminalNotAvailable => '終端機不可用';
+
+  @override
+  String get workspacePreviewCopyPath => '複製路徑';
+
+  @override
+  String get workspacePreviewShare => '分享';
+
+  @override
+  String get workspacePreviewOpenExternally => '用其他應用程式開啟';
+
+  @override
+  String get workspacePreviewOpenWith => '開啟方式…';
+
+  @override
+  String get workspacePreviewFileTooLarge => '檔案過大，無法預覽，請用其他應用程式開啟。';
+
+  @override
+  String get workspacePreviewSource => '原始碼';
+
+  @override
+  String get workspacePreviewRendered => '渲染';
+
+  @override
+  String get workspacePreviewFileName => '名稱';
+
+  @override
+  String get workspacePreviewFileSize => '大小';
+
+  @override
+  String get workspacePreviewFileModified => '修改時間';
+
+  @override
+  String get workspacePreviewPathCopied => '已複製路徑';
+
+  @override
+  String workspacePreviewLineCount(int count) {
+    return '$count 行';
+  }
+
+  @override
+  String get workspaceFilesSort => '排序';
+
+  @override
+  String get workspaceFilesSortName => '名稱';
+
+  @override
+  String get workspaceFilesSortModified => '修改時間';
+
+  @override
+  String get workspaceFilesSortSize => '大小';
+
+  @override
+  String get workspaceFilesSortAscending => '升序';
+
+  @override
+  String get workspaceFilesSortDescending => '降序';
+
+  @override
+  String get workspaceFilesShowHidden => '顯示隱藏檔案';
+
+  @override
+  String get workspaceFilesHideHidden => '隱藏隱藏檔案';
+
+  @override
+  String get workspaceFilesRefresh => '重新整理';
+
+  @override
+  String get workspaceFilesNewFolder => '新增資料夾';
+
+  @override
+  String get workspaceFilesNewFile => '新增檔案';
+
+  @override
+  String get workspaceFilesImport => '匯入';
+
+  @override
+  String get workspaceFilesExport => '匯出';
+
+  @override
+  String get workspaceFilesExportFolder => '匯出目前資料夾';
+
+  @override
+  String get workspaceFilesEmpty => '此資料夾是空的';
+
+  @override
+  String get workspaceFilesError => '無法載入這些檔案';
+
+  @override
+  String get workspaceFilesRetry => '重試';
+
+  @override
+  String get workspaceFilesPreview => '預覽';
+
+  @override
+  String get workspaceFilesRename => '重新命名';
+
+  @override
+  String get workspaceFilesMove => '移動';
+
+  @override
+  String get workspaceFilesDelete => '刪除';
+
+  @override
+  String get workspaceFilesShare => '分享';
+
+  @override
+  String get workspaceFilesCopyPath => '複製路徑';
+
+  @override
+  String get workspaceFilesExportItem => '匯出';
+
+  @override
+  String get workspaceFilesNameLabel => '名稱';
+
+  @override
+  String get workspaceFilesNameHint => '輸入名稱';
+
+  @override
+  String get workspaceFilesCreate => '建立';
+
+  @override
+  String get workspaceFilesCancel => '取消';
+
+  @override
+  String get workspaceFilesConfirm => '確認';
+
+  @override
+  String get workspaceFilesSave => '儲存';
+
+  @override
+  String get workspaceFilesDeleteTitle => '刪除此項目？';
+
+  @override
+  String workspaceFilesDeleteMessage(String name) {
+    return '刪除 $name？';
+  }
+
+  @override
+  String workspaceFilesDeleteFolderMessage(String name) {
+    return '刪除資料夾 $name 及其全部內容？';
+  }
+
+  @override
+  String get workspaceFilesMoveTitle => '移動到資料夾';
+
+  @override
+  String get workspaceFilesMoveHere => '移動到此處';
+
+  @override
+  String get workspaceFilesPathCopied => '已複製路徑';
+
+  @override
+  String get workspaceFilesInvalidName => '名稱無效';
+
+  @override
+  String get workspaceFilesInvalidPath => '該路徑超出目前資料夾';
+
+  @override
+  String workspaceFilesOperationFailed(String error) {
+    return '操作失敗：$error';
+  }
+
+  @override
+  String get workspaceFilesActions => '操作';
+
+  @override
+  String get workspaceFilesMore => '更多';
+
+  @override
+  String get workspaceFilesJustNow => '剛剛';
+
+  @override
+  String workspaceFilesMinutesAgo(int count) {
+    return '$count 分鐘前';
+  }
+
+  @override
+  String workspaceFilesHoursAgo(int count) {
+    return '$count 小時前';
+  }
+
+  @override
+  String workspaceFilesDaysAgo(int count) {
+    return '$count 天前';
+  }
+
+  @override
+  String get workspaceFilesPanelTitle => '對話檔案';
+
+  @override
+  String get workspaceFilesTabAttachments => '附件';
+
+  @override
+  String get workspaceFilesTabOutputs => '輸出';
+
+  @override
+  String get workspaceFilesTabWorkspace => '工作區';
+
+  @override
+  String get workspaceFilesNoWorkspaceBound => '尚未綁定工作區';
+
+  @override
+  String get workspaceFilesKindManaged => '託管';
+
+  @override
+  String get workspaceFilesKindLinked => '連結';
+
+  @override
+  String get workspaceFilesMissingWorkspace => '找不到工作區';
+
+  @override
+  String get workspaceFilesClose => '關閉';
+
+  @override
+  String get workspacesTitle => '工作區';
+
+  @override
+  String get workspacesCreate => '建立';
+
+  @override
+  String get workspacesCreateTitle => '新增工作區';
+
+  @override
+  String get workspacesNameLabel => '名稱';
+
+  @override
+  String get workspacesNameHint => '工作區名稱';
+
+  @override
+  String get workspacesLinkFolder => '連結資料夾';
+
+  @override
+  String get workspacesEmpty => '還沒有工作區';
+
+  @override
+  String get workspacesEmptyCta => '建立工作區';
+
+  @override
+  String get workspacesSettings => '設定';
+
+  @override
+  String get workspacesOpenFiles => '開啟檔案';
+
+  @override
+  String get workspacesLastUsedNever => '從未使用';
+
+  @override
+  String workspacesLastUsed(String when) {
+    return '最近使用 $when';
+  }
+
+  @override
+  String get workspacesDeleteTitle => '刪除此工作區？';
+
+  @override
+  String workspacesDeleteMessage(String name) {
+    return '刪除工作區 $name？';
+  }
+
+  @override
+  String get workspacesDeleteAlsoFiles => '同時刪除檔案';
+
+  @override
+  String get workspacesUnlinkTitle => '取消連結此工作區？';
+
+  @override
+  String workspacesUnlinkMessage(String name) {
+    return '取消連結 $name？磁碟上的檔案會保留。';
+  }
+
+  @override
+  String get workspacesSettingsTitle => '工作區設定';
+
+  @override
+  String get workspacesShellNeedsApproval => '執行終端機命令前詢問';
+
+  @override
+  String get workspacesDefaultCwd => '預設工作目錄';
+
+  @override
+  String get workspacesDefaultCwdHint => '相對路徑，例如 src';
+
+  @override
+  String get workspacesDefaultCwdInvalid => '請使用不含 .. 的相對路徑';
+
+  @override
+  String get workspacesCreateManaged => '建立工作區';
+
+  @override
+  String get workspacesLinkExisting => '連結既有資料夾';
+
+  @override
+  String get workspacesUnlink => '取消連結';
+
+  @override
+  String get workspacesItemMore => '工作區操作';
+
+  @override
+  String get workspaceToolDenied => '已拒絕';
+
+  @override
+  String get workspaceToolTimeout => '逾時';
+
+  @override
+  String get workspaceToolCancelled => '已取消';
+
+  @override
+  String get workspaceToolInterrupted => '已中斷';
+
+  @override
+  String get workspaceToolEnvironmentNotReady => '沙箱環境未安裝';
+
+  @override
+  String get workspaceToolInstall => '安裝';
+
+  @override
+  String get workspaceToolFuzzy => '模糊';
+
+  @override
+  String get workspaceToolCreated => '已建立';
+
+  @override
+  String get workspaceToolUpdated => '已更新';
+
+  @override
+  String get workspaceToolTruncated => '已截斷';
+
+  @override
+  String get workspaceToolImageTag => '圖片';
+
+  @override
+  String get workspaceToolAllowAll => '本工作階段全部允許';
+
+  @override
+  String get workspaceToolStdout => 'stdout';
+
+  @override
+  String get workspaceToolStderr => 'stderr';
+
+  @override
+  String get workspaceToolOpenFullOutput => '開啟完整輸出';
+
+  @override
+  String get workspaceToolChangedFiles => '變更的檔案';
+
+  @override
+  String get workspaceToolCancel => '取消';
+
+  @override
+  String get workspaceToolCopyCommand => '複製命令';
+
+  @override
+  String get workspaceToolCopyOutput => '複製輸出';
+
+  @override
+  String get workspaceToolCopyDiff => '複製差異';
+
+  @override
+  String get workspaceToolCopied => '已複製';
+
+  @override
+  String get workspaceToolDiffTruncated => '差異已截斷';
+
+  @override
+  String get workspaceToolOpenPreview => '開啟預覽';
+
+  @override
+  String get workspaceToolNoOutput => '無輸出';
+
+  @override
+  String get workspaceToolNotAvailable => '不可用';
+
+  @override
+  String get workspaceToolClose => '關閉';
+
+  @override
+  String get workspaceToolTitleShell => '執行命令';
+
+  @override
+  String get workspaceToolTitleReadFile => '讀取檔案';
+
+  @override
+  String get workspaceToolTitleWriteFile => '寫入檔案';
+
+  @override
+  String get workspaceToolTitleEditFile => '編輯檔案';
+
+  @override
+  String get workspaceToolTitleListDir => '列出目錄';
+
+  @override
+  String get workspaceToolTitleGlob => 'Glob';
+
+  @override
+  String get workspaceToolTitleGrep => 'Grep';
+
+  @override
+  String workspaceToolCount(int count) {
+    return '$count';
+  }
+
+  @override
+  String workspaceToolMoreFiles(int count) {
+    return '+$count';
+  }
+
+  @override
+  String workspaceToolDurationMs(int ms) {
+    return '${ms}ms';
+  }
+
+  @override
+  String workspaceToolDurationSec(String sec) {
+    return '${sec}s';
+  }
+
+  @override
+  String get workspaceEnvTitle => '環境';
+
+  @override
+  String workspaceEnvEngineUbuntu(String version) {
+    return 'Ubuntu $version (PRoot)';
+  }
+
+  @override
+  String workspaceEnvEngineAlpine(String version) {
+    return 'Alpine $version (iSH)';
+  }
+
+  @override
+  String get workspaceEnvEngineNative => '系統終端機';
+
+  @override
+  String get workspaceEnvPhaseNotInstalled => '未安裝';
+
+  @override
+  String get workspaceEnvPhaseDownloading => '下載中';
+
+  @override
+  String get workspaceEnvPhaseVerifying => '校驗中';
+
+  @override
+  String get workspaceEnvPhaseExtracting => '解壓中';
+
+  @override
+  String get workspaceEnvPhasePatching => '設定中';
+
+  @override
+  String get workspaceEnvPhaseReady => '就緒';
+
+  @override
+  String get workspaceEnvPhaseError => '錯誤';
+
+  @override
+  String get workspaceEnvPhaseNeedsRestart => '需要重新啟動';
+
+  @override
+  String workspaceEnvMetaLine(String version, String arch) {
+    return '$version · $arch';
+  }
+
+  @override
+  String workspaceEnvInstalledAt(String date) {
+    return '安裝於 $date';
+  }
+
+  @override
+  String workspaceEnvDiskUsage(String size) {
+    return '佔用空間 $size';
+  }
+
+  @override
+  String workspaceEnvRuntimeReason(String reason) {
+    return '$reason';
+  }
+
+  @override
+  String get workspaceEnvInstall => '安裝';
+
+  @override
+  String get workspaceEnvInstallSubtitleAndroid => '約 30 MB 下載，約 150 MB 磁碟空間';
+
+  @override
+  String get workspaceEnvInstallSubtitleIos => '已內建，無需下載';
+
+  @override
+  String get workspaceEnvCancel => '取消';
+
+  @override
+  String get workspaceEnvRetry => '重試';
+
+  @override
+  String get workspaceEnvRepair => '修復';
+
+  @override
+  String get workspaceEnvReset => '重設';
+
+  @override
+  String get workspaceEnvResetConfirmTitle => '重設環境？';
+
+  @override
+  String get workspaceEnvResetConfirmBody => '這會刪除已安裝的套件和沙箱檔案系統。';
+
+  @override
+  String get workspaceEnvCheckForUpdate => '檢查更新';
+
+  @override
+  String get workspaceEnvUpdate => '更新';
+
+  @override
+  String workspaceEnvAvailableVersion(String version) {
+    return '新版本 $version 可用';
+  }
+
+  @override
+  String get workspaceEnvUpToDate => '已是最新';
+
+  @override
+  String get workspaceEnvRestartBanner => '請重新啟動 Kelivo 以完成安裝';
+
+  @override
+  String get workspaceEnvDetectingMirrors => '正在偵測最快鏡像…';
+
+  @override
+  String workspaceEnvApplyingMirror(String category) {
+    return '正在套用 $category 鏡像…';
+  }
+
+  @override
+  String get workspaceEnvMirrorsSection => '鏡像';
+
+  @override
+  String get workspaceEnvUseMirror => '使用鏡像';
+
+  @override
+  String get workspaceEnvDetect => '測速';
+
+  @override
+  String get workspaceEnvOfficial => '官方';
+
+  @override
+  String get workspaceEnvMirrorsDisabled => '鏡像設定在沙箱中執行，就緒後才能變更。';
+
+  @override
+  String workspaceEnvMirrorsDisabledReason(String reason) {
+    return '鏡像設定在沙箱中執行，目前不可用：$reason';
+  }
+
+  @override
+  String get workspaceEnvMirrorDetectTitle => '鏡像測速';
+
+  @override
+  String workspaceEnvMirrorLatency(int ms) {
+    return '$ms ms';
+  }
+
+  @override
+  String workspaceEnvMirrorFailed(String reason) {
+    return '$reason';
+  }
+
+  @override
+  String get workspaceEnvErrorUnsupportedAbi => '目前裝置架構不受支援。';
+
+  @override
+  String get workspaceEnvErrorProotMissing => '缺少 PRoot 執行檔。';
+
+  @override
+  String get workspaceEnvErrorInsufficientDisk => '儲存空間不足，無法安裝沙箱。';
+
+  @override
+  String get workspaceEnvErrorInsufficientDiskHint => '請至少騰出 600 MB 後再試。';
+
+  @override
+  String get workspaceEnvErrorNetwork => '下載失敗，請檢查網路後重試。';
+
+  @override
+  String get workspaceEnvErrorChecksumMismatch => '下載檔案已損毀，請重試。';
+
+  @override
+  String get workspaceEnvErrorExtractFailed => '無法解壓沙箱映像。';
+
+  @override
+  String get workspaceEnvErrorPatchFailed => '無法完成沙箱設定。';
+
+  @override
+  String get workspaceEnvErrorCancelled => '安裝已取消。';
+
+  @override
+  String get workspaceEnvErrorGeneric => '安裝沙箱時發生錯誤。';
+
+  @override
+  String get workspaceEnvChipInstall => '安裝沙箱';
+
+  @override
+  String workspaceEnvChipInstalling(int percent) {
+    return '正在安裝… $percent %';
+  }
+
+  @override
+  String get workspaceEnvChipInstallingIndeterminate => '正在安裝…';
+
+  @override
+  String get workspaceEnvChipError => '沙箱錯誤';
+
+  @override
+  String get workspaceEnvChipRestart => '需要重新啟動';
+
+  @override
+  String get workspaceEnvNativeExplanation =>
+      '在桌面端，Kelivo 使用系統終端機，而不是 Linux 沙箱。';
+
+  @override
+  String workspaceEnvNativeShellPath(String path) {
+    return '終端機：$path';
+  }
+
+  @override
+  String get workspaceEnvNativeShellApproval =>
+      '除非此工作階段允許全部工具，否則 shell 工具需要核准。';
+
+  @override
+  String workspaceEnvDownloadProgress(
+    String downloaded,
+    String total,
+    int percent,
+  ) {
+    return '$downloaded / $total MB ($percent%)';
+  }
+
+  @override
+  String get workspaceEnvMirrorsFailed => '無法偵測鏡像';
+
+  @override
+  String get workspaceEnvCategoryApt => 'APT';
+
+  @override
+  String get workspaceEnvCategoryApk => 'APK';
+
+  @override
+  String get workspaceEnvCategoryPip => 'pip';
+
+  @override
+  String get workspaceEnvCategoryNpm => 'npm';
+
+  @override
+  String get skillsTitle => '技能';
+
+  @override
+  String get skillsTab => '技能';
+
+  @override
+  String get skillsSearchHint => '搜尋技能';
+
+  @override
+  String get skillsEmptyTitle => '還沒有技能';
+
+  @override
+  String get skillsEmptyBody =>
+      '技能是包含 SKILL.md 的資料夾。可貼上 Markdown、匯入 .md/.zip，或從 GitHub 安裝。';
+
+  @override
+  String get skillsEmptyFormat =>
+      '---\nname: my-skill\ndescription: 這個技能做什麼\n---\n\n# 說明';
+
+  @override
+  String get skillsImport => '匯入';
+
+  @override
+  String get skillsImportPaste => '貼上 Markdown';
+
+  @override
+  String get skillsImportFile => '從檔案';
+
+  @override
+  String get skillsImportGitHub => '從 GitHub';
+
+  @override
+  String get skillsImportPasteLabel => 'SKILL.md';
+
+  @override
+  String get skillsImportPasteHint => '貼上含 YAML 前置資料的 SKILL.md';
+
+  @override
+  String get skillsImportGitHubLabel => 'GitHub 連結';
+
+  @override
+  String get skillsImportGitHubHint =>
+      'github.com/owner/repo 或 github.com/owner/repo/tree/ref/path';
+
+  @override
+  String get skillsImportConfirm => '匯入';
+
+  @override
+  String get skillsCancel => '取消';
+
+  @override
+  String get skillsSave => '儲存';
+
+  @override
+  String skillsUsedCount(int count) {
+    return '已使用 $count 次';
+  }
+
+  @override
+  String get skillsEnabled => '啟用';
+
+  @override
+  String get skillsBrowseFiles => '瀏覽檔案';
+
+  @override
+  String get skillsEdit => '編輯';
+
+  @override
+  String get skillsExport => '匯出';
+
+  @override
+  String get skillsDelete => '刪除';
+
+  @override
+  String get skillsDeleteTitle => '刪除此技能？';
+
+  @override
+  String skillsDeleteMessage(String name) {
+    return '刪除 $name？此操作無法復原。';
+  }
+
+  @override
+  String get skillsUseAll => '使用全部技能';
+
+  @override
+  String get skillsUseAllSubtitle => '此助手可以使用所有已啟用的技能。';
+
+  @override
+  String get skillsDisabledHint => '請先在技能頁啟用此技能。';
+
+  @override
+  String get skillsOpenPage => '管理技能';
+
+  @override
+  String get skillsInheritAssistant => '跟隨助手';
+
+  @override
+  String get skillsInheritAssistantSubtitle => '使用與此對話助手相同的技能。';
+
+  @override
+  String get skillsActiveLabel => '生效中';
+
+  @override
+  String get skillsSessionTitle => '此對話的技能';
+
+  @override
+  String get skillsEditTitle => '編輯技能';
+
+  @override
+  String get skillsDetailKindLabel => 'Skill';
+
+  @override
+  String get skillsNoEnabled => '沒有已啟用的技能';
+
+  @override
+  String get terminalTitle => '終端機';
+
+  @override
+  String get terminalOpenInSystem => '在系統終端機中開啟';
+
+  @override
+  String get terminalHostDirectory => '主機目錄';
+
+  @override
+  String get terminalBindWorkspaceFirst => '請先綁定工作區';
+
+  @override
+  String get terminalNotAvailable => '不可用';
+
+  @override
+  String get terminalRuntimeUnavailable => '終端機環境尚未就緒';
+
+  @override
+  String get terminalRename => '重新命名';
+
+  @override
+  String get terminalClose => '關閉';
+
+  @override
+  String get terminalClear => '清除';
+
+  @override
+  String get terminalCloseSession => '關閉工作階段';
+
+  @override
+  String get terminalCopy => '複製';
+
+  @override
+  String get terminalPaste => '貼上';
+
+  @override
+  String get terminalNewSession => '新增工作階段';
+
+  @override
+  String get terminalMore => '更多';
+
+  @override
+  String get terminalNameLabel => '名稱';
+
+  @override
+  String get terminalCancel => '取消';
+
+  @override
+  String get terminalSave => '儲存';
+
+  @override
+  String get workspaceDeskMenuWorkspace => '工作區';
+
+  @override
+  String get workspaceDeskMenuSkills => '技能';
+
+  @override
+  String get workspaceDeskBarTitle => '工作區';
+
+  @override
+  String get workspaceDeskBarNoWorkspace => '無工作區';
+
+  @override
+  String get workspaceDeskBarEmptyHint => '從工具列綁定工作區後即可在此瀏覽檔案';
+
+  @override
+  String get workspaceDeskBarToggle => '工作區檔案';
+
+  @override
+  String get workspaceDeskOpenSystemTerminal => '在系統終端機中開啟';
+
+  @override
+  String get workspaceDeskReveal => '在檔案管理員中顯示';
+
+  @override
+  String get workspaceDeskBarClose => '關閉工作區列';
+
+  @override
+  String get workspaceEntryBind => '綁定工作區';
+
+  @override
+  String get workspaceEntryUnbind => '解除綁定';
+
+  @override
+  String get workspaceEntryChange => '更換';
+
+  @override
+  String get workspaceEntryLocked => '已鎖定';
+
+  @override
+  String get workspaceEntryChangeConfirmTitle => '更換工作區？';
+
+  @override
+  String get workspaceEntryUnbindConfirmTitle => '解除綁定？';
+
+  @override
+  String get workspaceEntryChangeConfirmBody =>
+      '此對話已使用過工作區工具，之前訊息中的檔案連結可能不再可用。';
+
+  @override
+  String get workspaceEntryCwd => '工作目錄';
+
+  @override
+  String get workspaceEntryCwdHint => '相對於工作區根目錄';
+
+  @override
+  String get workspaceEntryCwdInvalid => '路徑無效或已超出工作區';
+
+  @override
+  String get workspaceEntryCwdMissing => '該目錄不存在';
+
+  @override
+  String get workspaceEntryCwdCreate => '建立它';
+
+  @override
+  String get workspaceEntryFiles => '檔案';
+
+  @override
+  String get workspaceEntryTerminal => '終端機';
+
+  @override
+  String get workspaceEntryOpenSystemTerminal => '在系統終端機中開啟';
+
+  @override
+  String get workspaceEntryReveal => '在檔案管理員中顯示';
+
+  @override
+  String get workspaceEntrySessionSkills => '本工作階段技能';
+
+  @override
+  String get workspaceEntryAllowAll => '本工作階段全部允許';
+
+  @override
+  String get workspaceEntryAllowAllSubtitle => '此對話中的 Shell 命令將不再需要核准。';
+
+  @override
+  String get workspaceEntryEnvironment => '環境';
+
+  @override
+  String get workspaceEntryManage => '管理工作區';
+
+  @override
+  String get workspaceEntryCreate => '新增工作區…';
+
+  @override
+  String get workspaceEntryDefaultWorkspace => '預設工作區';
+
+  @override
+  String get workspaceEntryDefaultWorkspaceSubtitle => '使用此助手的新對話將綁定到此工作區。';
+
+  @override
+  String get workspaceEntryNone => '無';
+
+  @override
+  String get workspaceEntryStartConversationFirst => '請先開始對話';
+
+  @override
+  String get workspaceEntryTooltip => '工作區';
+
+  @override
+  String get workspaceEntryPickerTitle => '選擇工作區';
+
+  @override
+  String get settingsPageWorkspace => '工作區與環境';
+
+  @override
+  String get settingsPageSkills => '技能';
+
+  @override
+  String get commonClose => '關閉';
+
+  @override
+  String get terminalCopyAllOutput => '複製全部輸出';
+
+  @override
+  String get terminalFontDecrease => '字級 −';
+
+  @override
+  String get terminalFontIncrease => '字級 +';
+
+  @override
+  String get terminalCloseSessionConfirmMessage => '工作階段仍在執行。關閉將結束該程序。';
+
+  @override
+  String get terminalCopiedAll => '已複製全部輸出';
+
+  @override
+  String get terminalConfirm => '確認';
+
+  @override
+  String terminalExitCode(int code) {
+    return 'exit $code';
+  }
+
+  @override
+  String get workspaceMgmtNewWorkspace => '新增工作區';
+
+  @override
+  String get workspaceMgmtEmptyHint => '新增一個工作區來存放專案檔案和工作目錄。';
+
+  @override
+  String get workspaceMgmtKindManagedTitle => '託管工作區';
+
+  @override
+  String get workspaceMgmtKindManagedSubtitle => '應用程式內目錄，沙盒可讀寫';
+
+  @override
+  String get workspaceMgmtKindLinkedTitle => '連結資料夾';
+
+  @override
+  String get workspaceMgmtKindLinkedSubtitle => '直接使用本機資料夾';
+
+  @override
+  String get workspaceMgmtImportFromFolder => '從資料夾匯入';
+
+  @override
+  String get workspaceMgmtImportFromFolderSubtitle => '將資料夾複製到新的託管工作區';
+
+  @override
+  String get workspaceMgmtKindSection => '類型';
+
+  @override
+  String get workspaceMgmtCreate => '建立';
+
+  @override
+  String get workspaceMgmtShellApprovalSubtitle => '每次執行命令前詢問';
+
+  @override
+  String get workspaceMgmtDefaultCwdRoot => '/';
+
+  @override
+  String get workspaceMgmtPickCwdTitle => '預設工作目錄';
+
+  @override
+  String get workspaceMgmtFolderPickerUnavailable => '此裝置不支援選擇資料夾。';
+
+  @override
+  String get workspaceMgmtImportProgressTitle => '正在匯入資料夾';
+
+  @override
+  String get workspaceMgmtImportProgressPhase => '正在複製檔案…';
+
+  @override
+  String get workspaceMgmtImportFailed => '無法匯入該資料夾。';
+
+  @override
+  String workspaceMgmtImportDone(String name) {
+    return '已匯入 $name';
+  }
+
+  @override
+  String get workspaceMgmtLastUsedJustNow => '剛剛';
+
+  @override
+  String workspaceMgmtLastUsedMinutesAgo(int n) {
+    return '$n 分鐘前';
+  }
+
+  @override
+  String workspaceMgmtLastUsedHoursAgo(int n) {
+    return '$n 小時前';
+  }
+
+  @override
+  String workspaceMgmtLastUsedDaysAgo(int n) {
+    return '$n 天前';
+  }
+
+  @override
+  String workspaceMgmtRowDetail(String kind, String when) {
+    return '$kind · 上次使用 $when';
+  }
+
+  @override
+  String workspaceMgmtRowDetailNever(String kind) {
+    return '$kind · 從未使用';
+  }
+
+  @override
+  String get workspacePreviewBack => '返回';
+
+  @override
+  String get workspacePreviewWrap => '自動換行';
+
+  @override
+  String get workspacePreviewFontDecrease => '縮小字級';
+
+  @override
+  String get workspacePreviewFontIncrease => '增大字級';
+
+  @override
+  String get workspacePreviewCopy => '複製';
+
+  @override
+  String get workspacePreviewRetry => '重試';
+
+  @override
+  String get workspacePreviewLoadError => '無法載入此檔案。';
+
+  @override
+  String get workspacePreviewRevealInFinder => '在 Finder 中顯示';
+
+  @override
+  String get workspacePreviewOpenInSystemApp => '用系統應用程式開啟';
+
+  @override
+  String get workspacePreviewOpenInBrowser => '在瀏覽器中開啟';
+
+  @override
+  String get workspacePreviewTable => '表格';
+
+  @override
+  String get workspacePreviewPlainLanguage => '程式碼';
+
+  @override
+  String get workspacePreviewOpen => '開啟';
+
+  @override
+  String get workspacePreviewRevealFailed => '無法在檔案管理員中顯示此檔案。';
+
+  @override
+  String get workspacePreviewEmptyTable => '此表格為空。';
+
+  @override
+  String get workspaceFilesNew => '新增';
+
+  @override
+  String get workspaceFilesFoldersFirst => '資料夾優先';
+
+  @override
+  String get workspaceFilesSelectDirectory => '選擇此目錄';
+
+  @override
+  String get workspaceFilesEmptyHint => '用「新增」或「匯入」加入檔案';
+
+  @override
+  String get workspaceFilesEmptyAttachments => '還沒有附件';
+
+  @override
+  String get workspaceFilesEmptyOutputs => '助手還沒有產出檔案';
+
+  @override
+  String get workspaceFilesMoveTo => '移動到…';
+
+  @override
+  String workspaceFilesItemCount(int count) {
+    return '$count 項';
+  }
+
+  @override
+  String get skillsImportTooltip => '匯入技能';
+
+  @override
+  String get skillsImportPasteSubtitle => '貼上帶 frontmatter 的 SKILL.md';
+
+  @override
+  String get skillsImportFileSubtitle => '選擇 .md 或 .zip 檔案';
+
+  @override
+  String get skillsImportGitHubSubtitle => '從倉庫匯入 SKILL.md';
+
+  @override
+  String get skillsImportGitHubRepoLabel => '倉庫地址';
+
+  @override
+  String get skillsImportGitHubUrlHint =>
+      'https://github.com/owner/repo 或 owner/repo[/path]';
+
+  @override
+  String get skillsImportGitHubHelp => '支援倉庫根目錄或子目錄下的 SKILL.md';
+
+  @override
+  String get skillsEmptyHint => '技能是帶 frontmatter 的 SKILL.md，匯入後助手可按需呼叫';
+
+  @override
+  String get skillsMoreActions => '更多';
+
+  @override
+  String get skillsSearchClear => '清除';
+
+  @override
+  String get skillsSessionEmpty => '還沒有已啟用的技能，請先在技能庫中啟用';
+
+  @override
+  String get workspaceToolRunning => '執行中';
+
+  @override
+  String workspaceToolExitCode(int code) {
+    return 'exit $code';
+  }
+
+  @override
+  String get workspaceToolAwaitingApproval => '等待核准';
+
+  @override
+  String get workspaceToolCompleted => '完成';
+
+  @override
+  String workspaceToolLines(int count) {
+    return '$count 行';
+  }
+
+  @override
+  String workspaceToolItems(int count) {
+    return '$count 項';
+  }
+
+  @override
+  String workspaceToolFileMatches(int count) {
+    return '$count 個符合';
+  }
+
+  @override
+  String workspaceToolContentMatches(int count) {
+    return '$count 處符合';
+  }
+
+  @override
+  String get workspaceToolExpand => '展開';
+
+  @override
+  String get workspaceToolSectionCommand => '命令';
+
+  @override
+  String get workspaceToolSectionPath => '路徑';
+
+  @override
+  String get workspaceToolSectionPattern => '模式';
+
+  @override
+  String get workspaceToolSectionOutput => '輸出';
+
+  @override
+  String get workspaceToolSectionDiff => '差異';
+
+  @override
+  String get workspaceToolSectionError => '錯誤';
+
+  @override
+  String get workspaceToolSavedOutput => '已儲存完整輸出';
+
+  @override
+  String get workspaceToolApprove => '允許';
+
+  @override
+  String get workspaceToolDeny => '拒絕';
+
+  @override
+  String get workspaceToolCopy => '複製';
+
+  @override
+  String get workspaceEnvEngineLocalShell => '本機 Shell';
+
+  @override
+  String get workspaceEnvInstallEnvironment => '安裝環境';
+
+  @override
+  String get workspaceEnvInstallDescription => '安裝 Linux 環境，以便在沙盒中執行工具。';
+
+  @override
+  String get workspaceEnvStatusLabel => '狀態';
+
+  @override
+  String get workspaceEnvStatusInstalled => '已安裝';
+
+  @override
+  String get workspaceEnvSizeLabel => '大小';
+
+  @override
+  String get workspaceEnvPathLabel => '路徑';
+
+  @override
+  String get workspaceEnvInstalledAtLabel => '安裝於';
+
+  @override
+  String get workspaceEnvArchLabel => '架構';
+
+  @override
+  String workspaceEnvArchVersion(String arch, String version) {
+    return '$arch · $version';
+  }
+
+  @override
+  String get workspaceEnvBrowseSection => '瀏覽';
+
+  @override
+  String get workspaceEnvBrowseFiles => '瀏覽檔案系統';
+
+  @override
+  String get workspaceEnvBrowseFilesDetail => '檢視沙盒中的完整目錄';
+
+  @override
+  String get workspaceEnvDetectFastMirrors => '偵測快速鏡像';
+
+  @override
+  String get workspaceEnvActionsSection => '操作';
+
+  @override
+  String get workspaceEnvInfoSection => '資訊';
+
+  @override
+  String get workspaceEnvInfoBody =>
+      '環境是沙盒使用的 Linux 根檔案系統。工作區單獨存放，重設環境不會刪除工作區檔案。資料保存在本機已解壓的 rootfs 中。';
+
+  @override
+  String get workspaceEnvRepairDetail => '重新校驗並修補檔案';
+
+  @override
+  String get workspaceEnvUpdateCurrent => '已是最新';
+
+  @override
+  String workspaceEnvUpdateAvailableShort(String version) {
+    return '可更新到 $version';
+  }
+
+  @override
+  String get workspaceEnvResetConfirmMessage =>
+      '這將刪除整個 Linux 環境及其中安裝的套件。工作區檔案不受影響。';
+
+  @override
+  String get workspaceEnvRestartDoneBanner => '重設已完成，請重新啟動應用以完成安裝。';
+
+  @override
+  String get workspaceEnvPathCopied => '已複製路徑';
+
+  @override
+  String get workspaceEnvUseMirrorSubtitle => '將所選鏡像寫入沙盒';
+
+  @override
+  String get workspaceEnvRegionGlobal => '全球';
+
+  @override
+  String get workspaceEnvRegionChina => '中國';
+
+  @override
+  String get workspaceEnvRegionEurope => '歐洲';
+
+  @override
+  String get workspaceEnvRegionAsia => '亞洲';
+
+  @override
+  String get workspaceEnvMirrorTimeout => '逾時';
+
+  @override
+  String get workspaceEnvSpeedTest => '測速';
+
+  @override
+  String get workspaceEnvApplySuccess => '鏡像已套用';
+
+  @override
+  String get workspaceEnvApplyFailed => '無法套用鏡像';
+
+  @override
+  String get workspaceEnvRestoreSuccess => '已恢復官方來源';
+
+  @override
+  String get workspaceEnvMirrorsTested => '已套用最快鏡像';
+
+  @override
+  String get workspaceEnvRelativeJustNow => '剛剛';
+
+  @override
+  String workspaceEnvRelativeMinutesAgo(int count) {
+    return '$count 分鐘前';
+  }
+
+  @override
+  String workspaceEnvRelativeHoursAgo(int count) {
+    return '$count 小時前';
+  }
+
+  @override
+  String workspaceEnvRelativeDaysAgo(int count) {
+    return '$count 天前';
+  }
+
+  @override
+  String workspaceEnvDownloadLine(
+    String downloaded,
+    String total,
+    String phase,
+  ) {
+    return '$downloaded / $total · $phase';
+  }
+
+  @override
+  String get workspaceEnvNativeUnsandboxed =>
+      '指令在本機直接執行（無沙盒），除非允許本工作階段全部工具，否則需要核准。';
+
+  @override
+  String get workspaceEnvRootfsTitle => '/';
+
+  @override
+  String get workspaceEnvBrowserUnavailable => '沙盒檔案系統不可用。';
+
+  @override
+  String get workspaceEnvMirrorNameOfficial => '官方';
+
+  @override
+  String get workspaceEnvMirrorNameOfficialCdn => '官方 CDN';
+
+  @override
+  String get workspaceEnvMirrorNameOfficialPypi => '官方 PyPI';
+
+  @override
+  String get workspaceEnvMirrorNameOfficialNpm => '官方 npm';
+
+  @override
+  String get workspaceEnvMirrorNameTuna => '清華 TUNA';
+
+  @override
+  String get workspaceEnvMirrorNameAlibaba => '阿里雲';
+
+  @override
+  String get workspaceEnvMirrorNameUstc => '中科大 USTC';
+
+  @override
+  String get workspaceEnvMirrorNameHuawei => '華為雲';
+
+  @override
+  String get workspaceEnvMirrorNameTencent => '騰訊雲';
+
+  @override
+  String get workspaceEnvMirrorNameNetease => '網易';
+
+  @override
+  String get workspaceEnvMirrorNameLeaseweb => 'LEASEWEB UK';
+
+  @override
+  String get workspaceEnvMirrorNameRwth => 'RWTH Germany';
+
+  @override
+  String get workspaceEnvMirrorNameJaist => 'JAIST Japan';
+
+  @override
+  String get workspaceEnvMirrorNameKakao => 'Kakao Korea';
+
+  @override
+  String get workspaceEnvMirrorNameNpmmirror => 'npmmirror';
+
+  @override
+  String workspaceEnvSelectionNamed(String name, String region) {
+    return '$name · $region';
+  }
+
+  @override
+  String get workspaceFilesEmptyPickerHint => '點「新增資料夾」新增子資料夾';
+
+  @override
+  String get skillsDetailBodyEmpty => '還沒有技能正文';
+
+  @override
+  String get workspaceEnvSizeTimeout => '計算逾時';
+
+  @override
+  String get workspaceEnvInfoCopied => '已複製環境資訊';
+
+  @override
+  String get workspacePreviewEmptyFile => '檔案為空';
+
+  @override
+  String get workspacePreviewEmptyHint => '此檔案沒有任何可預覽的內容。';
+
+  @override
+  String get workspacePreviewRevealInExplorer => '在檔案總管中顯示';
+
+  @override
+  String get workspacePreviewRevealInFileManager => '在檔案管理員中顯示';
+
+  @override
+  String workspaceBindingSetAssistantDefault(String assistant) {
+    return '已設為「$assistant」的預設工作區';
+  }
+
+  @override
+  String get workspaceUnbindHint => '已解除綁定本對話；助手預設工作區可在助手設定中修改';
+
+  @override
+  String get storageSpaceCategoryWorkspaceFiles => '工作區檔案';
+
+  @override
+  String get storageSpaceCategoryWorkspaceFilesHint => '託管工作區中儲存的檔案。';
+
+  @override
+  String get storageSpaceCategorySandboxEnvironment => '沙箱環境';
+
+  @override
+  String get storageSpaceCategorySandboxEnvironmentHint => '沙箱安裝目錄與根檔案系統。';
+
+  @override
+  String get storageSpaceCategorySkills => '技能';
+
+  @override
+  String get storageSpaceCategorySkillsHint => '已安裝的技能檔案。';
+
+  @override
+  String get storageSpaceCategorySessionFiles => '會話檔案';
+
+  @override
+  String get storageSpaceCategorySessionFilesHint => '各對話的附件與輸出。';
+
+  @override
+  String get storageSpaceManageSkills => '管理技能';
+
+  @override
+  String get storageSessionFilesCleanOrphans => '清理無對話的會話檔案';
+
+  @override
+  String storageSessionFilesCleanOrphansHint(String size) {
+    return '刪除已無對應對話的會話目錄。可回收 $size。';
+  }
 }

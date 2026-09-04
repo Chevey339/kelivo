@@ -99,7 +99,7 @@ void main() {
               toolParts: const [
                 ToolUIPart(
                   id: 't0',
-                  toolName: 'read_file',
+                  toolName: 'search',
                   arguments: {'path': 'lib/a.dart'},
                   content: 'ok',
                 ),
@@ -198,7 +198,7 @@ void main() {
               toolParts: const [
                 ToolUIPart(
                   id: 't0',
-                  toolName: 'read_file',
+                  toolName: 'search',
                   arguments: {'path': 'lib/a.dart'},
                   loading: true,
                 ),
@@ -230,7 +230,7 @@ void main() {
 
     const part = ToolUIPart(
       id: 't0',
-      toolName: 'read_file',
+      toolName: 'search',
       arguments: {'path': 'lib/a.dart'},
       content: 'ok',
     );
@@ -317,7 +317,7 @@ void main() {
       for (var i = 0; i < 4; i++)
         ToolUIPart(
           id: '',
-          toolName: 'read_file',
+          toolName: 'search',
           arguments: {'path': 'lib/foo_$i.dart'},
           content: 'ok $i',
         ),
@@ -370,8 +370,8 @@ void main() {
     expect(
       collapsed,
       containsAll(<String>[
-        timelineToolStepKey(id: '', sourceOrdinal: 2, toolName: 'read_file'),
-        timelineToolStepKey(id: '', sourceOrdinal: 3, toolName: 'read_file'),
+        timelineToolStepKey(id: '', sourceOrdinal: 2, toolName: 'search'),
+        timelineToolStepKey(id: '', sourceOrdinal: 3, toolName: 'search'),
       ]),
     );
 
@@ -404,7 +404,7 @@ void main() {
       for (var i = 0; i < 4; i++)
         ToolUIPart(
           id: ' ',
-          toolName: 'read_file',
+          toolName: 'search',
           arguments: {'path': 'lib/foo_$i.dart'},
           content: 'ok $i',
         ),
@@ -457,8 +457,8 @@ void main() {
     expect(
       keys,
       containsAll(<String>[
-        timelineToolStepKey(id: ' ', sourceOrdinal: 2, toolName: 'read_file'),
-        timelineToolStepKey(id: ' ', sourceOrdinal: 3, toolName: 'read_file'),
+        timelineToolStepKey(id: ' ', sourceOrdinal: 2, toolName: 'search'),
+        timelineToolStepKey(id: ' ', sourceOrdinal: 3, toolName: 'search'),
       ]),
     );
   });
@@ -472,7 +472,7 @@ void main() {
 
     const part = ToolUIPart(
       id: '',
-      toolName: 'read_file',
+      toolName: 'search',
       arguments: {'path': 'lib/a.dart'},
       content: 'ok',
     );
@@ -543,7 +543,7 @@ void main() {
     expect(_toolKeys(tester), [firstKey]);
     expect(
       firstKey,
-      timelineToolStepKey(id: '', sourceOrdinal: 0, toolName: 'read_file'),
+      timelineToolStepKey(id: '', sourceOrdinal: 0, toolName: 'search'),
     );
   });
 
@@ -654,11 +654,11 @@ void main() {
                 conversationId: 'c1',
                 parts: const [
                   ToolCallPart(
-                    '{"id":"","name":"read_file","arguments":{"path":"a.dart"}}',
+                    '{"id":"","name":"search","arguments":{"path":"a.dart"}}',
                   ),
                   TextPart('middle'),
                   ToolCallPart(
-                    '{"id":"","name":"read_file","arguments":{"path":"b.dart"}}',
+                    '{"id":"","name":"search","arguments":{"path":"b.dart"}}',
                   ),
                 ],
               ),
@@ -666,13 +666,13 @@ void main() {
               toolParts: const [
                 ToolUIPart(
                   id: '',
-                  toolName: 'read_file',
+                  toolName: 'search',
                   arguments: {'path': 'a.dart'},
                   content: 'LIVE-A',
                 ),
                 ToolUIPart(
                   id: '',
-                  toolName: 'read_file',
+                  toolName: 'search',
                   arguments: {'path': 'b.dart'},
                   content: 'LIVE-B',
                 ),
@@ -735,7 +735,7 @@ void main() {
                     '{"id":"","name":"builtin_search","arguments":{}}',
                   ),
                   ToolCallPart(
-                    '{"id":"t1","name":"read_file","arguments":{"path":"a.dart"}}',
+                    '{"id":"t1","name":"search","arguments":{"path":"a.dart"}}',
                   ),
                 ],
               ),
@@ -749,7 +749,7 @@ void main() {
                 ),
                 ToolUIPart(
                   id: 't1',
-                  toolName: 'read_file',
+                  toolName: 'search',
                   arguments: {'path': 'a.dart'},
                   content: 'LIVE-FILE',
                 ),
@@ -807,10 +807,10 @@ void main() {
                 conversationId: 'c1',
                 parts: const [
                   ToolCallPart(
-                    '{"id":"","name":"read_file","arguments":{"path":"a.dart"}}',
+                    '{"id":"","name":"search","arguments":{"path":"a.dart"}}',
                   ),
                   ToolCallPart(
-                    '{"id":"read_file-0","name":"grep","arguments":{"q":"x"}}',
+                    '{"id":"read_file-0","name":"http","arguments":{"q":"x"}}',
                   ),
                 ],
               ),
@@ -818,13 +818,13 @@ void main() {
               toolParts: const [
                 ToolUIPart(
                   id: 'read_file-0',
-                  toolName: 'grep',
+                  toolName: 'http',
                   arguments: {'q': 'x'},
                   content: 'GREP-LIVE',
                 ),
                 ToolUIPart(
                   id: '',
-                  toolName: 'read_file',
+                  toolName: 'search',
                   arguments: {'path': 'a.dart'},
                   content: 'READ-LIVE',
                 ),
@@ -855,7 +855,7 @@ void main() {
         for (var i = 0; i < 3; i++)
           ToolUIPart(
             id: 't$i',
-            toolName: 'read_file',
+            toolName: 'search',
             arguments: {'path': 'lib/$i.dart'},
             content: 'ok $i',
           ),
@@ -919,7 +919,7 @@ void main() {
 
       tools[1] = ToolUIPart(
         id: 't1',
-        toolName: 'read_file',
+        toolName: 'search',
         arguments: const {'path': 'lib/1.dart'},
         content: 'changed',
       );

@@ -3889,5 +3889,845 @@
   "toolSchemaSettingsDescriptionLabel": "Description",
   "toolSchemaSettingsToolName": "Tool name",
   "toolSchemaEditorPageTitle": "Edit description",
-  "toolSchemaSettingsCancel": "Cancel"
+  "toolSchemaSettingsCancel": "Cancel",
+  "workspaceFileNotAvailable": "File not available",
+  "workspaceTerminalNotAvailable": "Terminal not available",
+  "workspacePreviewCopyPath": "Copy path",
+  "workspacePreviewShare": "Share",
+  "workspacePreviewOpenExternally": "Open externally",
+  "workspacePreviewOpenWith": "Open with…",
+  "workspacePreviewFileTooLarge": "This file is too large to preview. Open it externally instead.",
+  "workspacePreviewSource": "Source",
+  "workspacePreviewRendered": "Rendered",
+  "workspacePreviewFileName": "Name",
+  "workspacePreviewFileSize": "Size",
+  "workspacePreviewFileModified": "Modified",
+  "workspacePreviewPathCopied": "Path copied",
+  "workspacePreviewLineCount": "{count} lines",
+  "@workspacePreviewLineCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "workspaceFilesSort": "Sort",
+  "workspaceFilesSortName": "Name",
+  "workspaceFilesSortModified": "Modified",
+  "workspaceFilesSortSize": "Size",
+  "workspaceFilesSortAscending": "Ascending",
+  "workspaceFilesSortDescending": "Descending",
+  "workspaceFilesShowHidden": "Show hidden files",
+  "workspaceFilesHideHidden": "Hide hidden files",
+  "workspaceFilesRefresh": "Refresh",
+  "workspaceFilesNewFolder": "New folder",
+  "workspaceFilesNewFile": "New file",
+  "workspaceFilesImport": "Import",
+  "workspaceFilesExport": "Export",
+  "workspaceFilesExportFolder": "Export folder",
+  "workspaceFilesEmpty": "This folder is empty",
+  "workspaceFilesError": "Couldn’t load these files",
+  "workspaceFilesRetry": "Retry",
+  "workspaceFilesPreview": "Preview",
+  "workspaceFilesRename": "Rename",
+  "workspaceFilesMove": "Move",
+  "workspaceFilesDelete": "Delete",
+  "workspaceFilesShare": "Share",
+  "workspaceFilesCopyPath": "Copy path",
+  "workspaceFilesExportItem": "Export",
+  "workspaceFilesNameLabel": "Name",
+  "workspaceFilesNameHint": "Enter a name",
+  "workspaceFilesCreate": "Create",
+  "workspaceFilesCancel": "Cancel",
+  "workspaceFilesConfirm": "Confirm",
+  "workspaceFilesSave": "Save",
+  "workspaceFilesDeleteTitle": "Delete this item?",
+  "workspaceFilesDeleteMessage": "Delete {name}?",
+  "@workspaceFilesDeleteMessage": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "workspaceFilesDeleteFolderMessage": "Delete folder {name} and everything inside?",
+  "@workspaceFilesDeleteFolderMessage": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "workspaceFilesMoveTitle": "Move to folder",
+  "workspaceFilesMoveHere": "Move here",
+  "workspaceFilesPathCopied": "Path copied",
+  "workspaceFilesInvalidName": "That name isn’t valid",
+  "workspaceFilesInvalidPath": "That path is outside this folder",
+  "workspaceFilesOperationFailed": "Couldn’t complete that action: {error}",
+  "@workspaceFilesOperationFailed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "workspaceFilesActions": "Actions",
+  "workspaceFilesMore": "More",
+  "workspaceFilesJustNow": "Just now",
+  "workspaceFilesMinutesAgo": "{count}m ago",
+  "@workspaceFilesMinutesAgo": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "workspaceFilesHoursAgo": "{count}h ago",
+  "@workspaceFilesHoursAgo": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "workspaceFilesDaysAgo": "{count}d ago",
+  "@workspaceFilesDaysAgo": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "workspaceFilesPanelTitle": "Conversation files",
+  "workspaceFilesTabAttachments": "Attachments",
+  "workspaceFilesTabOutputs": "Outputs",
+  "workspaceFilesTabWorkspace": "Workspace",
+  "workspaceFilesNoWorkspaceBound": "No workspace bound",
+  "workspaceFilesKindManaged": "Managed",
+  "workspaceFilesKindLinked": "Linked",
+  "workspaceFilesMissingWorkspace": "Workspace not found",
+  "workspaceFilesClose": "Close",
+  "workspacesTitle": "Workspaces",
+  "workspacesCreate": "Create",
+  "workspacesCreateTitle": "New workspace",
+  "workspacesNameLabel": "Name",
+  "workspacesNameHint": "Workspace name",
+  "workspacesLinkFolder": "Link folder",
+  "workspacesEmpty": "No workspaces yet",
+  "workspacesEmptyCta": "Create a workspace",
+  "workspacesSettings": "Settings",
+  "workspacesOpenFiles": "Open files",
+  "workspacesLastUsedNever": "Never used",
+  "workspacesLastUsed": "Last used {when}",
+  "@workspacesLastUsed": {
+    "placeholders": {
+      "when": {
+        "type": "String"
+      }
+    }
+  },
+  "workspacesDeleteTitle": "Delete this workspace?",
+  "workspacesDeleteMessage": "Delete workspace {name}?",
+  "@workspacesDeleteMessage": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "workspacesDeleteAlsoFiles": "Also delete files",
+  "workspacesUnlinkTitle": "Unlink this workspace?",
+  "workspacesUnlinkMessage": "Unlink {name}? Files on disk will be kept.",
+  "@workspacesUnlinkMessage": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "workspacesSettingsTitle": "Workspace settings",
+  "workspacesShellNeedsApproval": "Ask before running shell commands",
+  "workspacesDefaultCwd": "Default working directory",
+  "workspacesDefaultCwdHint": "Relative path, e.g. src",
+  "workspacesDefaultCwdInvalid": "Use a relative path without ..",
+  "workspacesCreateManaged": "Create workspace",
+  "workspacesLinkExisting": "Link an existing folder",
+  "workspacesUnlink": "Unlink",
+  "workspacesItemMore": "Workspace actions",
+  "workspaceToolDenied": "Denied",
+  "workspaceToolTimeout": "timeout",
+  "workspaceToolCancelled": "cancelled",
+  "workspaceToolInterrupted": "interrupted",
+  "workspaceToolEnvironmentNotReady": "Sandbox environment not installed",
+  "workspaceToolInstall": "Install",
+  "workspaceToolFuzzy": "fuzzy",
+  "workspaceToolCreated": "created",
+  "workspaceToolUpdated": "updated",
+  "workspaceToolTruncated": "truncated",
+  "workspaceToolImageTag": "image",
+  "workspaceToolAllowAll": "Allow all this session",
+  "workspaceToolStdout": "stdout",
+  "workspaceToolStderr": "stderr",
+  "workspaceToolOpenFullOutput": "Open full output",
+  "workspaceToolChangedFiles": "Changed files",
+  "workspaceToolCancel": "Cancel",
+  "workspaceToolCopyCommand": "Copy command",
+  "workspaceToolCopyOutput": "Copy output",
+  "workspaceToolCopyDiff": "Copy diff",
+  "workspaceToolCopied": "Copied",
+  "workspaceToolDiffTruncated": "Diff truncated",
+  "workspaceToolOpenPreview": "Open preview",
+  "workspaceToolNoOutput": "No output",
+  "workspaceToolNotAvailable": "Not available",
+  "workspaceToolClose": "Close",
+  "workspaceToolTitleShell": "Run command",
+  "workspaceToolTitleReadFile": "Read file",
+  "workspaceToolTitleWriteFile": "Write file",
+  "workspaceToolTitleEditFile": "Edit file",
+  "workspaceToolTitleListDir": "List directory",
+  "workspaceToolTitleGlob": "Glob",
+  "workspaceToolTitleGrep": "Grep",
+  "workspaceToolCount": "{count}",
+  "@workspaceToolCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "workspaceToolMoreFiles": "+{count}",
+  "@workspaceToolMoreFiles": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "workspaceToolDurationMs": "{ms}ms",
+  "@workspaceToolDurationMs": {
+    "placeholders": {
+      "ms": {
+        "type": "int"
+      }
+    }
+  },
+  "workspaceToolDurationSec": "{sec}s",
+  "@workspaceToolDurationSec": {
+    "placeholders": {
+      "sec": {
+        "type": "String"
+      }
+    }
+  },
+  "workspaceEnvTitle": "Environment",
+  "workspaceEnvEngineUbuntu": "Ubuntu {version} (PRoot)",
+  "@workspaceEnvEngineUbuntu": {
+    "placeholders": {
+      "version": {
+        "type": "String"
+      }
+    }
+  },
+  "workspaceEnvEngineAlpine": "Alpine {version} (iSH)",
+  "@workspaceEnvEngineAlpine": {
+    "placeholders": {
+      "version": {
+        "type": "String"
+      }
+    }
+  },
+  "workspaceEnvEngineNative": "Native shell",
+  "workspaceEnvPhaseNotInstalled": "Not installed",
+  "workspaceEnvPhaseDownloading": "Downloading",
+  "workspaceEnvPhaseVerifying": "Verifying",
+  "workspaceEnvPhaseExtracting": "Extracting",
+  "workspaceEnvPhasePatching": "Patching",
+  "workspaceEnvPhaseReady": "Ready",
+  "workspaceEnvPhaseError": "Error",
+  "workspaceEnvPhaseNeedsRestart": "Restart required",
+  "workspaceEnvMetaLine": "{version} · {arch}",
+  "@workspaceEnvMetaLine": {
+    "placeholders": {
+      "version": {
+        "type": "String"
+      },
+      "arch": {
+        "type": "String"
+      }
+    }
+  },
+  "workspaceEnvInstalledAt": "Installed {date}",
+  "@workspaceEnvInstalledAt": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "workspaceEnvDiskUsage": "Disk usage {size}",
+  "@workspaceEnvDiskUsage": {
+    "placeholders": {
+      "size": {
+        "type": "String"
+      }
+    }
+  },
+  "workspaceEnvRuntimeReason": "{reason}",
+  "@workspaceEnvRuntimeReason": {
+    "placeholders": {
+      "reason": {
+        "type": "String"
+      }
+    }
+  },
+  "workspaceEnvInstall": "Install",
+  "workspaceEnvInstallSubtitleAndroid": "≈30 MB download, ≈150 MB on disk",
+  "workspaceEnvInstallSubtitleIos": "Bundled, no download",
+  "workspaceEnvCancel": "Cancel",
+  "workspaceEnvRetry": "Retry",
+  "workspaceEnvRepair": "Repair",
+  "workspaceEnvReset": "Reset",
+  "workspaceEnvResetConfirmTitle": "Reset environment?",
+  "workspaceEnvResetConfirmBody": "This deletes installed packages and the sandbox filesystem.",
+  "workspaceEnvCheckForUpdate": "Check for update",
+  "workspaceEnvUpdate": "Update",
+  "workspaceEnvAvailableVersion": "Version {version} is available",
+  "@workspaceEnvAvailableVersion": {
+    "placeholders": {
+      "version": {
+        "type": "String"
+      }
+    }
+  },
+  "workspaceEnvUpToDate": "You're up to date",
+  "workspaceEnvRestartBanner": "Restart Kelivo to finish",
+  "workspaceEnvDetectingMirrors": "Detecting fastest mirrors…",
+  "workspaceEnvApplyingMirror": "Applying {category} mirror…",
+  "@workspaceEnvApplyingMirror": {
+    "placeholders": {
+      "category": {
+        "type": "String"
+      }
+    }
+  },
+  "workspaceEnvMirrorsSection": "Mirrors",
+  "workspaceEnvUseMirror": "Use mirror",
+  "workspaceEnvDetect": "Detect",
+  "workspaceEnvOfficial": "Official",
+  "workspaceEnvMirrorsDisabled": "Mirror changes run in the sandbox and are unavailable until it is ready.",
+  "workspaceEnvMirrorsDisabledReason": "Mirror changes run in the sandbox and are unavailable: {reason}",
+  "@workspaceEnvMirrorsDisabledReason": {
+    "placeholders": {
+      "reason": {
+        "type": "String"
+      }
+    }
+  },
+  "workspaceEnvMirrorDetectTitle": "Mirror speed",
+  "workspaceEnvMirrorLatency": "{ms} ms",
+  "@workspaceEnvMirrorLatency": {
+    "placeholders": {
+      "ms": {
+        "type": "int"
+      }
+    }
+  },
+  "workspaceEnvMirrorFailed": "{reason}",
+  "@workspaceEnvMirrorFailed": {
+    "placeholders": {
+      "reason": {
+        "type": "String"
+      }
+    }
+  },
+  "workspaceEnvErrorUnsupportedAbi": "This device architecture is not supported.",
+  "workspaceEnvErrorProotMissing": "The PRoot binary is missing.",
+  "workspaceEnvErrorInsufficientDisk": "Not enough free storage to install the sandbox.",
+  "workspaceEnvErrorInsufficientDiskHint": "Free at least 600 MB and try again.",
+  "workspaceEnvErrorNetwork": "Download failed. Check your connection and try again.",
+  "workspaceEnvErrorChecksumMismatch": "The download was corrupted. Try again.",
+  "workspaceEnvErrorExtractFailed": "Could not extract the sandbox image.",
+  "workspaceEnvErrorPatchFailed": "Could not finish setting up the sandbox.",
+  "workspaceEnvErrorCancelled": "Installation was cancelled.",
+  "workspaceEnvErrorGeneric": "Something went wrong installing the sandbox.",
+  "workspaceEnvChipInstall": "Install sandbox",
+  "workspaceEnvChipInstalling": "Installing… {percent} %",
+  "@workspaceEnvChipInstalling": {
+    "placeholders": {
+      "percent": {
+        "type": "int"
+      }
+    }
+  },
+  "workspaceEnvChipInstallingIndeterminate": "Installing…",
+  "workspaceEnvChipError": "Sandbox error",
+  "workspaceEnvChipRestart": "Restart required",
+  "workspaceEnvNativeExplanation": "On desktop, Kelivo uses your system shell instead of a Linux sandbox.",
+  "workspaceEnvNativeShellPath": "Shell: {path}",
+  "@workspaceEnvNativeShellPath": {
+    "placeholders": {
+      "path": {
+        "type": "String"
+      }
+    }
+  },
+  "workspaceEnvNativeShellApproval": "The shell tool needs approval unless this session allows all tools.",
+  "workspaceEnvDownloadProgress": "{downloaded} / {total} MB ({percent}%)",
+  "@workspaceEnvDownloadProgress": {
+    "placeholders": {
+      "downloaded": {
+        "type": "String"
+      },
+      "total": {
+        "type": "String"
+      },
+      "percent": {
+        "type": "int"
+      }
+    }
+  },
+  "workspaceEnvMirrorsFailed": "Could not detect mirrors",
+  "workspaceEnvCategoryApt": "APT",
+  "workspaceEnvCategoryApk": "APK",
+  "workspaceEnvCategoryPip": "pip",
+  "workspaceEnvCategoryNpm": "npm",
+  "skillsTitle": "Skills",
+  "skillsTab": "Skills",
+  "skillsSearchHint": "Search skills",
+  "skillsEmptyTitle": "No skills yet",
+  "skillsEmptyBody": "A skill is a folder with a SKILL.md file. Import markdown, a .md or .zip file, or a GitHub URL.",
+  "skillsEmptyFormat": "---\nname: my-skill\ndescription: What this skill does\n---\n\n# Instructions",
+  "skillsImport": "Import",
+  "skillsImportPaste": "Paste markdown",
+  "skillsImportFile": "From file",
+  "skillsImportGitHub": "From GitHub",
+  "skillsImportPasteLabel": "SKILL.md",
+  "skillsImportPasteHint": "Paste a SKILL.md with YAML frontmatter",
+  "skillsImportGitHubLabel": "GitHub URL",
+  "skillsImportGitHubHint": "github.com/owner/repo or github.com/owner/repo/tree/ref/path",
+  "skillsImportConfirm": "Import",
+  "skillsCancel": "Cancel",
+  "skillsSave": "Save",
+  "skillsUsedCount": "used {count} times",
+  "@skillsUsedCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "skillsEnabled": "Enabled",
+  "skillsBrowseFiles": "Browse files",
+  "skillsEdit": "Edit",
+  "skillsExport": "Export",
+  "skillsDelete": "Delete",
+  "skillsDeleteTitle": "Delete this skill?",
+  "skillsDeleteMessage": "Delete {name}? This cannot be undone.",
+  "@skillsDeleteMessage": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "skillsUseAll": "Use all skills",
+  "skillsUseAllSubtitle": "Every enabled skill is available to this assistant.",
+  "skillsDisabledHint": "Enable this skill in Skills to use it here.",
+  "skillsOpenPage": "Manage skills",
+  "skillsInheritAssistant": "Inherit from assistant",
+  "skillsInheritAssistantSubtitle": "Use the same skills as this conversation’s assistant.",
+  "skillsActiveLabel": "Active",
+  "skillsSessionTitle": "Skills for this chat",
+  "skillsEditTitle": "Edit skill",
+  "skillsDetailKindLabel": "Skill",
+  "skillsNoEnabled": "No enabled skills",
+  "terminalTitle": "Terminal",
+  "terminalOpenInSystem": "Open in system terminal",
+  "terminalHostDirectory": "Host directory",
+  "terminalBindWorkspaceFirst": "Bind a workspace first",
+  "terminalNotAvailable": "Not available",
+  "terminalRuntimeUnavailable": "Terminal environment is not ready",
+  "terminalRename": "Rename",
+  "terminalClose": "Close",
+  "terminalClear": "Clear",
+  "terminalCloseSession": "Close session",
+  "terminalCopy": "Copy",
+  "terminalPaste": "Paste",
+  "terminalNewSession": "New session",
+  "terminalMore": "More",
+  "terminalNameLabel": "Name",
+  "terminalCancel": "Cancel",
+  "terminalSave": "Save",
+  "workspaceDeskMenuWorkspace": "Workspace",
+  "workspaceDeskMenuSkills": "Skills",
+  "workspaceDeskBarTitle": "Workspace",
+  "workspaceDeskBarNoWorkspace": "No workspace",
+  "workspaceDeskBarEmptyHint": "Bind a workspace from the toolbar to browse files here",
+  "workspaceDeskBarToggle": "Workspace files",
+  "workspaceDeskOpenSystemTerminal": "Open in system terminal",
+  "workspaceDeskReveal": "Reveal in file manager",
+  "workspaceDeskBarClose": "Close workspace bar",
+  "workspaceEntryBind": "Bind workspace",
+  "workspaceEntryUnbind": "Unbind",
+  "workspaceEntryChange": "Change",
+  "workspaceEntryLocked": "Locked",
+  "workspaceEntryChangeConfirmTitle": "Change workspace?",
+  "workspaceEntryUnbindConfirmTitle": "Unbind?",
+  "workspaceEntryChangeConfirmBody": "This conversation has already used workspace tools. File links in earlier messages may no longer work.",
+  "workspaceEntryCwd": "Working directory",
+  "workspaceEntryCwdHint": "Relative to the workspace root",
+  "workspaceEntryCwdInvalid": "That path is invalid or leaves the workspace",
+  "workspaceEntryCwdMissing": "That directory does not exist",
+  "workspaceEntryCwdCreate": "Create it",
+  "workspaceEntryFiles": "Files",
+  "workspaceEntryTerminal": "Terminal",
+  "workspaceEntryOpenSystemTerminal": "Open in system terminal",
+  "workspaceEntryReveal": "Reveal in file manager",
+  "workspaceEntrySessionSkills": "Session skills",
+  "workspaceEntryAllowAll": "Allow all this session",
+  "workspaceEntryAllowAllSubtitle": "Shell commands in this conversation will run without approval.",
+  "workspaceEntryEnvironment": "Environment",
+  "workspaceEntryManage": "Manage workspaces",
+  "workspaceEntryCreate": "Create new workspace…",
+  "workspaceEntryDefaultWorkspace": "Default workspace",
+  "workspaceEntryDefaultWorkspaceSubtitle": "New conversations with this assistant start bound to this workspace.",
+  "workspaceEntryNone": "None",
+  "workspaceEntryStartConversationFirst": "Start a conversation first",
+  "workspaceEntryTooltip": "Workspace",
+  "workspaceEntryPickerTitle": "Choose a workspace",
+  "settingsPageWorkspace": "Workspace & environment",
+  "settingsPageSkills": "Skills",
+  "commonClose": "Close",
+  "terminalCopyAllOutput": "Copy all output",
+  "terminalFontDecrease": "Font size −",
+  "terminalFontIncrease": "Font size +",
+  "terminalCloseSessionConfirmMessage": "This session is still running. Closing it will end the process.",
+  "terminalCopiedAll": "Copied all output",
+  "terminalConfirm": "Confirm",
+  "terminalExitCode": "exit {code}",
+  "@terminalExitCode": {
+    "placeholders": {
+      "code": {
+        "type": "int"
+      }
+    }
+  },
+  "workspaceMgmtNewWorkspace": "New workspace",
+  "workspaceMgmtEmptyHint": "Create a workspace to keep project files together.",
+  "workspaceMgmtKindManagedTitle": "Managed workspace",
+  "workspaceMgmtKindManagedSubtitle": "App-managed folder, sandbox read/write",
+  "workspaceMgmtKindLinkedTitle": "Linked folder",
+  "workspaceMgmtKindLinkedSubtitle": "Use a folder on this computer",
+  "workspaceMgmtImportFromFolder": "Import from folder",
+  "workspaceMgmtImportFromFolderSubtitle": "Copy a folder into a new managed workspace",
+  "workspaceMgmtKindSection": "Type",
+  "workspaceMgmtCreate": "Create",
+  "workspaceMgmtShellApprovalSubtitle": "Ask before each command",
+  "workspaceMgmtDefaultCwdRoot": "/",
+  "workspaceMgmtPickCwdTitle": "Default working directory",
+  "workspaceMgmtFolderPickerUnavailable": "Folder picker is not available.",
+  "workspaceMgmtImportProgressTitle": "Importing folder",
+  "workspaceMgmtImportProgressPhase": "Copying files…",
+  "workspaceMgmtImportFailed": "Could not import that folder.",
+  "workspaceMgmtImportDone": "Imported {name}",
+  "@workspaceMgmtImportDone": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "workspaceMgmtLastUsedJustNow": "just now",
+  "workspaceMgmtLastUsedMinutesAgo": "{n} min ago",
+  "@workspaceMgmtLastUsedMinutesAgo": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "workspaceMgmtLastUsedHoursAgo": "{n} hr ago",
+  "@workspaceMgmtLastUsedHoursAgo": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "workspaceMgmtLastUsedDaysAgo": "{n} d ago",
+  "@workspaceMgmtLastUsedDaysAgo": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "workspaceMgmtRowDetail": "{kind} · Last used {when}",
+  "@workspaceMgmtRowDetail": {
+    "placeholders": {
+      "kind": {
+        "type": "String"
+      },
+      "when": {
+        "type": "String"
+      }
+    }
+  },
+  "workspaceMgmtRowDetailNever": "{kind} · Never used",
+  "@workspaceMgmtRowDetailNever": {
+    "placeholders": {
+      "kind": {
+        "type": "String"
+      }
+    }
+  },
+  "workspacePreviewBack": "Back",
+  "workspacePreviewWrap": "Wrap lines",
+  "workspacePreviewFontDecrease": "Smaller text",
+  "workspacePreviewFontIncrease": "Larger text",
+  "workspacePreviewCopy": "Copy",
+  "workspacePreviewRetry": "Retry",
+  "workspacePreviewLoadError": "Couldn’t load this file.",
+  "workspacePreviewRevealInFinder": "Show in Finder",
+  "workspacePreviewOpenInSystemApp": "Open with system app",
+  "workspacePreviewOpenInBrowser": "Open in browser",
+  "workspacePreviewTable": "Table",
+  "workspacePreviewPlainLanguage": "Code",
+  "workspacePreviewOpen": "Open",
+  "workspacePreviewRevealFailed": "Couldn’t show this file in the file manager.",
+  "workspacePreviewEmptyTable": "This table is empty.",
+  "workspaceFilesNew": "New",
+  "workspaceFilesFoldersFirst": "Folders first",
+  "workspaceFilesSelectDirectory": "Select this folder",
+  "workspaceFilesEmptyHint": "Use New or Import to add files",
+  "workspaceFilesEmptyAttachments": "No attachments yet",
+  "workspaceFilesEmptyOutputs": "The assistant hasn’t produced any files yet",
+  "workspaceFilesMoveTo": "Move to…",
+  "workspaceFilesItemCount": "{count} items",
+  "@workspaceFilesItemCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "skillsImportTooltip": "Import skill",
+  "skillsImportPasteSubtitle": "Paste SKILL.md with YAML frontmatter",
+  "skillsImportFileSubtitle": "Choose a .md or .zip file",
+  "skillsImportGitHubSubtitle": "Import SKILL.md from a repository",
+  "skillsImportGitHubRepoLabel": "Repository URL",
+  "skillsImportGitHubUrlHint": "https://github.com/owner/repo or owner/repo[/path]",
+  "skillsImportGitHubHelp": "SKILL.md at the repo root or in a subdirectory is supported.",
+  "skillsEmptyHint": "A skill is a SKILL.md with frontmatter. After import, the assistant can use it on demand.",
+  "skillsMoreActions": "More",
+  "skillsSearchClear": "Clear",
+  "skillsSessionEmpty": "No enabled skills yet. Enable skills in the library first.",
+  "workspaceToolRunning": "Running",
+  "workspaceToolExitCode": "exit {code}",
+  "@workspaceToolExitCode": {
+    "placeholders": {
+      "code": {
+        "type": "int"
+      }
+    }
+  },
+  "workspaceToolAwaitingApproval": "Awaiting approval",
+  "workspaceToolCompleted": "Done",
+  "workspaceToolLines": "{count} lines",
+  "@workspaceToolLines": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "workspaceToolItems": "{count} items",
+  "@workspaceToolItems": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "workspaceToolFileMatches": "{count} matches",
+  "@workspaceToolFileMatches": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "workspaceToolContentMatches": "{count} matches",
+  "@workspaceToolContentMatches": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "workspaceToolExpand": "Expand",
+  "workspaceToolSectionCommand": "Command",
+  "workspaceToolSectionPath": "Path",
+  "workspaceToolSectionPattern": "Pattern",
+  "workspaceToolSectionOutput": "Output",
+  "workspaceToolSectionDiff": "Diff",
+  "workspaceToolSectionError": "Error",
+  "workspaceToolSavedOutput": "Full output saved",
+  "workspaceToolApprove": "Allow",
+  "workspaceToolDeny": "Deny",
+  "workspaceToolCopy": "Copy",
+  "workspaceEnvEngineLocalShell": "Local shell",
+  "workspaceEnvInstallEnvironment": "Install environment",
+  "workspaceEnvInstallDescription": "Install a Linux environment to run tools in a sandbox.",
+  "workspaceEnvStatusLabel": "Status",
+  "workspaceEnvStatusInstalled": "Installed",
+  "workspaceEnvSizeLabel": "Size",
+  "workspaceEnvPathLabel": "Path",
+  "workspaceEnvInstalledAtLabel": "Installed",
+  "workspaceEnvArchLabel": "Architecture",
+  "workspaceEnvArchVersion": "{arch} · {version}",
+  "@workspaceEnvArchVersion": {
+    "placeholders": {
+      "arch": {
+        "type": "String"
+      },
+      "version": {
+        "type": "String"
+      }
+    }
+  },
+  "workspaceEnvBrowseSection": "Browse",
+  "workspaceEnvBrowseFiles": "Browse file system",
+  "workspaceEnvBrowseFilesDetail": "View the full directory tree inside the sandbox",
+  "workspaceEnvDetectFastMirrors": "Detect fast mirrors",
+  "workspaceEnvActionsSection": "Actions",
+  "workspaceEnvInfoSection": "Info",
+  "workspaceEnvInfoBody": "The environment is a Linux root filesystem used by the sandbox. Workspaces are stored separately and are not deleted when you reset. Files live in the extracted rootfs on this device.",
+  "workspaceEnvRepairDetail": "Re-verify and patch files",
+  "workspaceEnvUpdateCurrent": "You're up to date",
+  "workspaceEnvUpdateAvailableShort": "Update available: {version}",
+  "@workspaceEnvUpdateAvailableShort": {
+    "placeholders": {
+      "version": {
+        "type": "String"
+      }
+    }
+  },
+  "workspaceEnvResetConfirmMessage": "This will delete the entire Linux environment and any packages installed in it. Workspace files are not affected.",
+  "workspaceEnvRestartDoneBanner": "Reset finished. Restart the app to complete installation.",
+  "workspaceEnvPathCopied": "Path copied",
+  "workspaceEnvUseMirrorSubtitle": "Write the selected mirror into the sandbox",
+  "workspaceEnvRegionGlobal": "Global",
+  "workspaceEnvRegionChina": "China",
+  "workspaceEnvRegionEurope": "Europe",
+  "workspaceEnvRegionAsia": "Asia",
+  "workspaceEnvMirrorTimeout": "Timeout",
+  "workspaceEnvSpeedTest": "Test speed",
+  "workspaceEnvApplySuccess": "Mirror applied",
+  "workspaceEnvApplyFailed": "Could not apply mirror",
+  "workspaceEnvRestoreSuccess": "Official source restored",
+  "workspaceEnvMirrorsTested": "Fastest mirrors applied",
+  "workspaceEnvRelativeJustNow": "Just now",
+  "workspaceEnvRelativeMinutesAgo": "{count}m ago",
+  "@workspaceEnvRelativeMinutesAgo": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "workspaceEnvRelativeHoursAgo": "{count}h ago",
+  "@workspaceEnvRelativeHoursAgo": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "workspaceEnvRelativeDaysAgo": "{count}d ago",
+  "@workspaceEnvRelativeDaysAgo": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "workspaceEnvDownloadLine": "{downloaded} / {total} · {phase}",
+  "@workspaceEnvDownloadLine": {
+    "placeholders": {
+      "downloaded": {
+        "type": "String"
+      },
+      "total": {
+        "type": "String"
+      },
+      "phase": {
+        "type": "String"
+      }
+    }
+  },
+  "workspaceEnvNativeUnsandboxed": "Commands run on this computer, not in a sandbox, and need approval unless this session allows all tools.",
+  "workspaceEnvRootfsTitle": "/",
+  "workspaceEnvBrowserUnavailable": "The sandbox file system is not available.",
+  "workspaceEnvMirrorNameOfficial": "Official",
+  "workspaceEnvMirrorNameOfficialCdn": "Official CDN",
+  "workspaceEnvMirrorNameOfficialPypi": "Official PyPI",
+  "workspaceEnvMirrorNameOfficialNpm": "Official npm",
+  "workspaceEnvMirrorNameTuna": "Tsinghua TUNA",
+  "workspaceEnvMirrorNameAlibaba": "Alibaba",
+  "workspaceEnvMirrorNameUstc": "USTC",
+  "workspaceEnvMirrorNameHuawei": "Huawei",
+  "workspaceEnvMirrorNameTencent": "Tencent",
+  "workspaceEnvMirrorNameNetease": "NetEase",
+  "workspaceEnvMirrorNameLeaseweb": "LEASEWEB UK",
+  "workspaceEnvMirrorNameRwth": "RWTH Germany",
+  "workspaceEnvMirrorNameJaist": "JAIST Japan",
+  "workspaceEnvMirrorNameKakao": "Kakao Korea",
+  "workspaceEnvMirrorNameNpmmirror": "npmmirror",
+  "workspaceEnvSelectionNamed": "{name} · {region}",
+  "@workspaceEnvSelectionNamed": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      },
+      "region": {
+        "type": "String"
+      }
+    }
+  },
+  "workspaceFilesEmptyPickerHint": "Use New folder to add a subfolder",
+  "skillsDetailBodyEmpty": "No skill body yet",
+  "workspaceEnvSizeTimeout": "Timed out",
+  "workspaceEnvInfoCopied": "Environment info copied",
+  "workspacePreviewEmptyFile": "This file is empty",
+  "workspacePreviewEmptyHint": "There's nothing to preview.",
+  "workspacePreviewRevealInExplorer": "Show in File Explorer",
+  "workspacePreviewRevealInFileManager": "Show in Files",
+  "workspaceBindingSetAssistantDefault": "Set as default workspace for “{assistant}”",
+  "@workspaceBindingSetAssistantDefault": {
+    "placeholders": {
+      "assistant": {
+        "type": "String"
+      }
+    }
+  },
+  "workspaceUnbindHint": "Unbound this conversation; change the assistant's default workspace in assistant settings",
+  "storageSpaceCategoryWorkspaceFiles": "Workspace files",
+  "storageSpaceCategoryWorkspaceFilesHint": "Files stored in managed workspaces.",
+  "storageSpaceCategorySandboxEnvironment": "Sandbox environment",
+  "storageSpaceCategorySandboxEnvironmentHint": "Sandbox install and root filesystem.",
+  "storageSpaceCategorySkills": "Skills",
+  "storageSpaceCategorySkillsHint": "Installed skill files.",
+  "storageSpaceCategorySessionFiles": "Conversation files",
+  "storageSpaceCategorySessionFilesHint": "Per-conversation attachments and outputs.",
+  "storageSpaceManageSkills": "Manage skills",
+  "storageSessionFilesCleanOrphans": "Clean orphaned conversation files",
+  "storageSessionFilesCleanOrphansHint": "Deletes session folders that no longer have a conversation. Reclaimable: {size}.",
+  "@storageSessionFilesCleanOrphansHint": {
+    "placeholders": {
+      "size": {
+        "type": "String"
+      }
+    }
+  }
 }

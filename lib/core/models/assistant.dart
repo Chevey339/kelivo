@@ -50,6 +50,12 @@ class Assistant {
   final bool searchEnabled; // per-assistant external web search switch
   final List<String> mcpServerIds; // bound MCP server IDs
   final List<String> localToolIds; // enabled local tool IDs
+  /// Default workspace for new conversations started with this assistant.
+  final String? defaultWorkspaceId;
+
+  /// Enabled skill IDs. `null` means every installed skill is available.
+  final List<String>? skillIds;
+
   /// HealthKit metric IDs this collaborator may read. Kept when the health
   /// master toggle is off so turning it back on restores the selection.
   final List<String> healthDataTypeIds;
@@ -94,6 +100,8 @@ class Assistant {
     this.searchEnabled = false,
     this.mcpServerIds = const <String>[],
     this.localToolIds = const <String>[],
+    this.defaultWorkspaceId,
+    this.skillIds,
     this.healthDataTypeIds = HealthDataTypeIds.defaultSelected,
     this.background,
     this.customHeaders = const <Map<String, String>>[],
@@ -131,6 +139,8 @@ class Assistant {
     bool? searchEnabled,
     List<String>? mcpServerIds,
     List<String>? localToolIds,
+    String? defaultWorkspaceId,
+    List<String>? skillIds,
     List<String>? healthDataTypeIds,
     String? background,
     List<Map<String, String>>? customHeaders,
@@ -147,6 +157,8 @@ class Assistant {
     List<PresetMessage>? presetMessages,
     List<AssistantRegex>? regexRules,
     bool clearChatModel = false,
+    bool clearDefaultWorkspaceId = false,
+    bool clearSkillIds = false,
     bool clearAvatar = false,
     bool clearTemperature = false,
     bool clearTopP = false,
@@ -178,6 +190,10 @@ class Assistant {
       searchEnabled: searchEnabled ?? this.searchEnabled,
       mcpServerIds: mcpServerIds ?? this.mcpServerIds,
       localToolIds: localToolIds ?? this.localToolIds,
+      defaultWorkspaceId: clearDefaultWorkspaceId
+          ? null
+          : (defaultWorkspaceId ?? this.defaultWorkspaceId),
+      skillIds: clearSkillIds ? null : (skillIds ?? this.skillIds),
       healthDataTypeIds: healthDataTypeIds ?? this.healthDataTypeIds,
       background: clearBackground ? null : (background ?? this.background),
       customHeaders: customHeaders ?? this.customHeaders,
@@ -221,6 +237,8 @@ class Assistant {
     'searchEnabled': searchEnabled,
     'mcpServerIds': mcpServerIds,
     'localToolIds': localToolIds,
+    'defaultWorkspaceId': defaultWorkspaceId,
+    'skillIds': skillIds,
     'healthDataTypeIds': healthDataTypeIds,
     'background': background,
     'customHeaders': customHeaders,
@@ -260,6 +278,10 @@ class Assistant {
         (json['mcpServerIds'] as List?)?.cast<String>() ?? const <String>[],
     localToolIds:
         (json['localToolIds'] as List?)?.cast<String>() ?? const <String>[],
+    defaultWorkspaceId: json['defaultWorkspaceId'] as String?,
+    skillIds: json['skillIds'] == null
+        ? null
+        : (json['skillIds'] as List).map((e) => e.toString()).toList(),
     healthDataTypeIds: HealthDataTypeIds.parseStoredIds(
       json['healthDataTypeIds'],
     ),

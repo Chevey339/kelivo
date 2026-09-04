@@ -3,7 +3,9 @@ import 'dart:io';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:open_filex/open_filex.dart';
+import 'package:provider/provider.dart';
 
+import '../../../core/services/chat/chat_service.dart';
 import '../../../core/services/haptics.dart';
 import '../../../core/services/native_file_save.dart';
 import '../../../core/services/storage/storage_usage_service.dart';
@@ -13,13 +15,28 @@ import '../../../shared/widgets/ios_checkbox.dart';
 import '../../../shared/widgets/ios_tactile.dart';
 import '../../../shared/widgets/ios_tile_button.dart';
 import '../../../shared/widgets/snackbar.dart';
+import '../../../theme/app_font_weights.dart';
 import '../../../utils/platform_utils.dart';
 import '../../backup/pages/local_snapshots_page.dart';
 import '../../chat/pages/image_viewer_page.dart';
+import '../../workspace/pages/environment_page.dart';
+import '../../workspace/pages/skills_page.dart';
+import '../../workspace/pages/workspaces_page.dart';
 import 'log_viewer_page.dart';
-import '../../../theme/app_font_weights.dart';
 import 'package:Kelivo/theme/app_semantic_colors.dart';
 import 'package:Kelivo/shared/widgets/section_card.dart';
+
+Set<String>? _conversationIdsOrNull(BuildContext context) {
+  try {
+    return context
+        .read<ChatService>()
+        .getAllConversations()
+        .map((conversation) => conversation.id)
+        .toSet();
+  } catch (_) {
+    return null;
+  }
+}
 
 class StorageSpacePage extends StatefulWidget {
   const StorageSpacePage({super.key, this.embedded = false});
@@ -93,6 +110,10 @@ class _StorageSpacePageState extends State<StorageSpacePage> {
       StorageUsageCategoryKey.assistantData,
       StorageUsageCategoryKey.cache,
       StorageUsageCategoryKey.logs,
+      StorageUsageCategoryKey.workspaceFiles,
+      StorageUsageCategoryKey.sandboxEnvironment,
+      StorageUsageCategoryKey.skills,
+      StorageUsageCategoryKey.sessionFiles,
     ];
     final series = appColors.chartSeries;
     return series[order.indexOf(key) % series.length];
@@ -122,6 +143,14 @@ class _StorageSpacePageState extends State<StorageSpacePage> {
         return Lucide.FileText;
       case StorageUsageCategoryKey.other:
         return Lucide.Box;
+      case StorageUsageCategoryKey.workspaceFiles:
+        return Lucide.FolderCode;
+      case StorageUsageCategoryKey.sandboxEnvironment:
+        return Lucide.Box;
+      case StorageUsageCategoryKey.skills:
+        return Lucide.Sparkles;
+      case StorageUsageCategoryKey.sessionFiles:
+        return Lucide.Paperclip;
     }
   }
 
@@ -149,6 +178,14 @@ class _StorageSpacePageState extends State<StorageSpacePage> {
         return l10n.storageSpaceCategoryLogs;
       case StorageUsageCategoryKey.other:
         return l10n.storageSpaceCategoryOther;
+      case StorageUsageCategoryKey.workspaceFiles:
+        return l10n.storageSpaceCategoryWorkspaceFiles;
+      case StorageUsageCategoryKey.sandboxEnvironment:
+        return l10n.storageSpaceCategorySandboxEnvironment;
+      case StorageUsageCategoryKey.skills:
+        return l10n.storageSpaceCategorySkills;
+      case StorageUsageCategoryKey.sessionFiles:
+        return l10n.storageSpaceCategorySessionFiles;
     }
   }
 
@@ -470,6 +507,50 @@ class _StorageSpacePageState extends State<StorageSpacePage> {
     }
   }
 
+  Future<void> _doCleanOrphanSessionFiles() async {
+    if (_clearing) return;
+    final l10n = AppLocalizations.of(context)!;
+    final conversationIds = _conversationIdsOrNull(context);
+    final reclaimable = await StorageUsageService.measureOrphanSessionFiles(
+      conversationIds: conversationIds,
+    );
+    if (!mounted) return;
+    final ok = await _confirmAction(
+      context,
+      title: l10n.storageSpaceClearConfirmTitle,
+      message: l10n.storageSessionFilesCleanOrphansHint(
+        _fmtBytes(reclaimable.bytes),
+      ),
+      actionLabel: l10n.storageSpaceClearButton,
+    );
+    if (!ok) return;
+
+    setState(() => _clearing = true);
+    try {
+      await StorageUsageService.clearOrphanSessionFiles(
+        conversationIds: conversationIds,
+      );
+      if (!mounted) return;
+      showAppSnackBar(
+        context,
+        message: l10n.storageSpaceClearDone(
+          l10n.storageSpaceCategorySessionFiles,
+        ),
+        type: NotificationType.success,
+      );
+      await _refreshReport();
+    } catch (e) {
+      if (!mounted) return;
+      showAppSnackBar(
+        context,
+        message: l10n.storageSpaceClearFailed(e.toString()),
+        type: NotificationType.error,
+      );
+    } finally {
+      if (mounted) setState(() => _clearing = false);
+    }
+  }
+
   Future<void> _openCategoryDetail(StorageUsageCategoryKey key) async {
     final report = _report;
     if (report == null) return;
@@ -666,6 +747,9 @@ class _StorageSpacePageState extends State<StorageSpacePage> {
                         onClearDisplacedDatabases: _clearing
                             ? null
                             : _doClearDisplacedDatabases,
+                        onCleanOrphanSessionFiles: _clearing
+                            ? null
+                            : _doCleanOrphanSessionFiles,
                         refreshReport: _refreshReport,
                       ),
                     ),
@@ -1095,6 +1179,49 @@ class _StorageCategoryPageState extends State<_StorageCategoryPage> {
     }
   }
 
+  Future<void> _clearOrphanSessionFiles() async {
+    if (_clearing) return;
+    final l10n = AppLocalizations.of(context)!;
+    final conversationIds = _conversationIdsOrNull(context);
+    final reclaimable = await StorageUsageService.measureOrphanSessionFiles(
+      conversationIds: conversationIds,
+    );
+    if (!mounted) return;
+    final ok = await _confirmAction(
+      title: l10n.storageSpaceClearConfirmTitle,
+      message: l10n.storageSessionFilesCleanOrphansHint(
+        widget.fmtBytes(reclaimable.bytes),
+      ),
+      actionLabel: l10n.storageSpaceClearButton,
+    );
+    if (!ok) return;
+
+    setState(() => _clearing = true);
+    try {
+      await StorageUsageService.clearOrphanSessionFiles(
+        conversationIds: conversationIds,
+      );
+      if (!mounted) return;
+      showAppSnackBar(
+        context,
+        message: l10n.storageSpaceClearDone(
+          l10n.storageSpaceCategorySessionFiles,
+        ),
+        type: NotificationType.success,
+      );
+      await _refresh();
+    } catch (e) {
+      if (!mounted) return;
+      showAppSnackBar(
+        context,
+        message: l10n.storageSpaceClearFailed(e.toString()),
+        type: NotificationType.error,
+      );
+    } finally {
+      if (mounted) setState(() => _clearing = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
@@ -1154,6 +1281,10 @@ class _StorageCategoryPageState extends State<_StorageCategoryPage> {
           onClearDisplacedDatabases:
               (category.key == StorageUsageCategoryKey.displacedDatabases)
               ? _clearDisplacedDatabases
+              : null,
+          onCleanOrphanSessionFiles:
+              (category.key == StorageUsageCategoryKey.sessionFiles)
+              ? _clearOrphanSessionFiles
               : null,
           refreshReport: _refresh,
         ),
@@ -1356,6 +1487,7 @@ class _CategoryDetail extends StatelessWidget {
     required this.onClearLegacyChatData,
     required this.onClearRestoreTraces,
     required this.onClearDisplacedDatabases,
+    required this.onCleanOrphanSessionFiles,
     required this.refreshReport,
   });
 
@@ -1371,6 +1503,7 @@ class _CategoryDetail extends StatelessWidget {
   final Future<void> Function()? onClearLegacyChatData;
   final Future<void> Function()? onClearRestoreTraces;
   final Future<void> Function()? onClearDisplacedDatabases;
+  final Future<void> Function()? onCleanOrphanSessionFiles;
   final Future<void> Function() refreshReport;
 
   @override
@@ -1391,6 +1524,13 @@ class _CategoryDetail extends StatelessWidget {
       StorageUsageCategoryKey.restoreTraces =>
         l10n.storageSpaceRestoreTracesHint,
       StorageUsageCategoryKey.other => l10n.storageSpaceOtherHint,
+      StorageUsageCategoryKey.workspaceFiles =>
+        l10n.storageSpaceCategoryWorkspaceFilesHint,
+      StorageUsageCategoryKey.sandboxEnvironment =>
+        l10n.storageSpaceCategorySandboxEnvironmentHint,
+      StorageUsageCategoryKey.skills => l10n.storageSpaceCategorySkillsHint,
+      StorageUsageCategoryKey.sessionFiles =>
+        l10n.storageSpaceCategorySessionFilesHint,
       _ =>
         safeToClear
             ? l10n.storageSpaceSafeToClearHint
@@ -1477,6 +1617,41 @@ class _CategoryDetail extends StatelessWidget {
         onTap: () => Navigator.of(context).push<void>(
           MaterialPageRoute(builder: (_) => const LocalSnapshotsPage()),
         ),
+      );
+    } else if (category.key == StorageUsageCategoryKey.workspaceFiles) {
+      actions = IosTileButton(
+        label: l10n.workspaceEntryManage,
+        icon: Lucide.ChevronRight,
+        enabled: !clearing,
+        onTap: () => Navigator.of(
+          context,
+        ).push<void>(MaterialPageRoute(builder: (_) => const WorkspacesPage())),
+      );
+    } else if (category.key == StorageUsageCategoryKey.sandboxEnvironment) {
+      actions = IosTileButton(
+        label: l10n.workspaceEnvTitle,
+        icon: Lucide.ChevronRight,
+        enabled: !clearing,
+        onTap: () => Navigator.of(context).push<void>(
+          MaterialPageRoute(builder: (_) => const EnvironmentPage()),
+        ),
+      );
+    } else if (category.key == StorageUsageCategoryKey.skills) {
+      actions = IosTileButton(
+        label: l10n.storageSpaceManageSkills,
+        icon: Lucide.ChevronRight,
+        enabled: !clearing,
+        onTap: () => Navigator.of(
+          context,
+        ).push<void>(MaterialPageRoute(builder: (_) => const SkillsPage())),
+      );
+    } else if (category.key == StorageUsageCategoryKey.sessionFiles) {
+      actions = IosTileButton(
+        label: l10n.storageSessionFilesCleanOrphans,
+        icon: Lucide.Trash2,
+        backgroundColor: cs.primary,
+        enabled: !clearing && onCleanOrphanSessionFiles != null,
+        onTap: () => onCleanOrphanSessionFiles?.call(),
       );
     }
 

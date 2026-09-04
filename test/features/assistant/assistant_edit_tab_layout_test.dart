@@ -13,6 +13,7 @@ void main() {
         'custom',
         'regex',
         'localTools',
+        'skills',
         'mcp',
       ]);
     });

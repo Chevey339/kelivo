@@ -113,5 +113,7 @@
 	</array>
 	<key>io.flutter.embedded_views_preview</key>
 	<true/>
+	<key>KelivoBundledRootfsVersion</key>
+	<string>alpine-3.21.3-r4</string>
 </dict>
 </plist>

@@ -8,6 +8,7 @@ import 'package:Kelivo/core/models/assistant_regex.dart';
 import 'package:Kelivo/core/models/chat_message.dart';
 import 'package:Kelivo/core/models/message_part.dart';
 import 'package:Kelivo/features/chat/widgets/timeline_projection.dart';
+import 'package:Kelivo/features/chat/widgets/timeline_visibility.dart';
 import 'package:Kelivo/core/providers/assistant_provider.dart';
 import 'package:Kelivo/core/providers/settings_provider.dart';
 import 'package:Kelivo/core/providers/tts_provider.dart';
@@ -193,7 +194,7 @@ void main() {
     );
 
     expect(empty, 96);
-    expect(withTools, closeTo(96 + 12 * 44.0, 0.1));
+    expect(withTools, closeTo(96 + 12 * _workspaceReadFileCard, 0.1));
     expect(hiddenTools, 96);
     expect(withSummary, greaterThan(headerOnly));
   });
@@ -229,8 +230,8 @@ void main() {
       toolParts: {'tools-collapse': tools},
     );
 
-    expect(collapsed, closeTo(96 + 36 + 2 * 44.0, 0.1));
-    expect(expanded, closeTo(96 + 30 * 44.0, 0.1));
+    expect(collapsed, closeTo(96 + 36 + 2 * _workspaceReadFileCard, 0.1));
+    expect(expanded, closeTo(96 + 30 * _workspaceReadFileCard, 0.1));
     expect(collapsed, lessThan(expanded * 0.25));
   });
 
@@ -1287,6 +1288,10 @@ List<String> _timelineStepKeys(WidgetTester tester) {
   tester.element(find.byType(ChatMessageWidget)).visitChildren(visit);
   return keys;
 }
+
+/// Timeline shell + inline body for a `read_file` with a path: 44px + summary + chip.
+const double _workspaceReadFileCard =
+    44.0 + kEstimateWorkspaceSummaryLine + kEstimateWorkspaceChipRow;
 
 Future<double> _estimateExtent(
   WidgetTester tester, {

@@ -34,7 +34,13 @@ import 'package:Kelivo/theme/app_font_weights.dart';
 import 'package:Kelivo/theme/theme_factory.dart' show getPlatformFontFallback;
 import 'package:provider/provider.dart';
 import 'package:flutter_math_fork/flutter_math.dart';
+import '../../core/models/workspace_binding.dart';
 import '../../core/providers/settings_provider.dart';
+import '../../core/providers/workspace_provider.dart';
+import '../../core/services/chat/chat_service.dart';
+import '../../core/services/workspace/file_link_resolver.dart';
+import '../../features/workspace/workspace_navigation.dart';
+import '../../features/workspace/widgets/preview/file_preview.dart';
 import 'package:Kelivo/desktop/html_preview_dialog.dart';
 import '../cache/byte_lru_cache.dart';
 import 'incremental_markdown_document.dart';
@@ -91,9 +97,11 @@ class MarkdownWithCodeHighlight extends StatefulWidget {
     this.citationIndexResolver,
     this.baseStyle,
     this.streaming = false,
+    this.conversationId,
   });
 
   final String text;
+  final String? conversationId;
   final void Function(String id)? onCitationTap;
 
   /// Resolves a citation id (from `[cite:id]` markers) to its display index
@@ -338,6 +346,14 @@ class _MarkdownWithCodeHighlightState extends State<MarkdownWithCodeHighlight> {
         components: [DetailsHtmlMd(detailsRegistry), ...components],
         inlineComponents: inlineComponents,
         imageBuilder: (ctx, url, width, height) {
+          if (KelivoLink.tryParse(url) != null) {
+            return _KelivoMarkdownImage(
+              url: url,
+              width: width,
+              height: height,
+              conversationId: widget.conversationId,
+            );
+          }
           final imgs = imageUrls.isNotEmpty ? imageUrls : <String>[url];
           final idx = imgs.indexOf(url);
           final initial = idx >= 0 ? idx : 0;
@@ -665,6 +681,11 @@ class _MarkdownWithCodeHighlightState extends State<MarkdownWithCodeHighlight> {
   }
 
   Future<void> _handleLinkTap(BuildContext context, String url) async {
+    final kelivo = KelivoLink.tryParse(_stripFormatChars(url));
+    if (kelivo != null) {
+      await _handleKelivoLinkTap(context, kelivo);
+      return;
+    }
     Uri uri;
     try {
       uri = _normalizeUrl(url);
@@ -688,12 +709,232 @@ class _MarkdownWithCodeHighlightState extends State<MarkdownWithCodeHighlight> {
     }
   }
 
+  Future<void> _handleKelivoLinkTap(
+    BuildContext context,
+    KelivoLink link,
+  ) async {
+    final l10n = AppLocalizations.of(context)!;
+    if (link.kind == KelivoLinkKind.terminal) {
+      WorkspaceNavigation.openTerminal(context, command: link.terminalCommand);
+      return;
+    }
+
+    ChatService? chat;
+    try {
+      chat = context.read<ChatService>();
+    } on ProviderNotFoundException {
+      chat = null;
+    }
+    final conversationId = widget.conversationId ?? chat?.currentConversationId;
+    final conversation = conversationId == null || chat == null
+        ? null
+        : chat.getConversation(conversationId);
+    if (conversation == null) {
+      showAppSnackBar(
+        context,
+        message: l10n.workspaceFileNotAvailable,
+        type: NotificationType.info,
+      );
+      return;
+    }
+    final binding = WorkspaceBinding.fromExtras(conversation.extras);
+    if (link.kind == KelivoLinkKind.workspaceFile && !binding.isBound) {
+      showAppSnackBar(
+        context,
+        message: l10n.workspaceFileNotAvailable,
+        type: NotificationType.info,
+      );
+      return;
+    }
+
+    final file = await _resolveKelivoHostFile(
+      context,
+      link,
+      conversationId: conversation.id,
+    );
+    if (!context.mounted) return;
+    if (file == null) {
+      showAppSnackBar(
+        context,
+        message: l10n.workspaceFileNotAvailable,
+        type: NotificationType.info,
+      );
+      return;
+    }
+    await showFilePreview(context, file);
+  }
+
   Uri _normalizeUrl(String url) {
     var u = url.trim();
     if (!RegExp(r'^[a-zA-Z][a-zA-Z0-9+.-]*:').hasMatch(u)) {
       u = 'https://$u';
     }
     return Uri.parse(u);
+  }
+}
+
+Future<File?> _resolveKelivoHostFile(
+  BuildContext context,
+  KelivoLink link, {
+  String? conversationId,
+}) async {
+  if (link.kind == KelivoLinkKind.terminal) return null;
+
+  FileLinkResolver? resolver;
+  try {
+    resolver = context.read<FileLinkResolver>();
+  } on ProviderNotFoundException {
+    resolver = null;
+  }
+  if (resolver == null) {
+    try {
+      resolver = FileLinkResolver(
+        workspaces: context.read<WorkspaceProvider>(),
+      );
+    } on ProviderNotFoundException {
+      return null;
+    }
+  }
+
+  ChatService? chat;
+  try {
+    chat = context.read<ChatService>();
+  } on ProviderNotFoundException {
+    return null;
+  }
+  final id = (conversationId != null && conversationId.isNotEmpty)
+      ? conversationId
+      : chat.currentConversationId;
+  if (id == null || id.isEmpty) return null;
+  final conversation = chat.getConversation(id);
+  if (conversation == null) return null;
+  final binding = WorkspaceBinding.fromExtras(conversation.extras);
+  if (link.kind == KelivoLinkKind.workspaceFile && !binding.isBound) {
+    return null;
+  }
+  try {
+    return await resolver.resolveToHostFile(
+      link,
+      conversationId: conversation.id,
+      binding: binding,
+    );
+  } catch (_) {
+    return null;
+  }
+}
+
+class _KelivoMarkdownImage extends StatefulWidget {
+  const _KelivoMarkdownImage({
+    required this.url,
+    this.width,
+    this.height,
+    this.conversationId,
+  });
+
+  final String url;
+  final double? width;
+  final double? height;
+  final String? conversationId;
+
+  @override
+  State<_KelivoMarkdownImage> createState() => _KelivoMarkdownImageState();
+}
+
+class _KelivoMarkdownImageState extends State<_KelivoMarkdownImage> {
+  Future<File?>? _future;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _future ??= _resolve();
+  }
+
+  @override
+  void didUpdateWidget(covariant _KelivoMarkdownImage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.url != widget.url ||
+        oldWidget.conversationId != widget.conversationId) {
+      _future = _resolve();
+    }
+  }
+
+  Future<File?> _resolve() async {
+    final link = KelivoLink.tryParse(widget.url);
+    if (link == null) return null;
+    return _resolveKelivoHostFile(
+      context,
+      link,
+      conversationId: widget.conversationId,
+    );
+  }
+
+  Widget _broken(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return SizedBox(
+      width: widget.width ?? 36,
+      height: widget.height ?? 36,
+      child: Center(
+        child: Icon(
+          Lucide.ImageOff,
+          size: 22,
+          color: cs.onSurfaceVariant.withValues(alpha: 0.7),
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<File?>(
+      future: _future,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState != ConnectionState.done) {
+          return SizedBox(
+            width: widget.width ?? 36,
+            height: widget.height ?? 36,
+            child: const Center(
+              child: SizedBox(
+                width: 14,
+                height: 14,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              ),
+            ),
+          );
+        }
+        final file = snapshot.data;
+        if (file == null) return _broken(context);
+        return GestureDetector(
+          onTap: () {
+            Navigator.of(context).push(
+              PageRouteBuilder<void>(
+                pageBuilder: (_, __, ___) =>
+                    ImageViewerPage(images: [file.path]),
+                transitionDuration: const Duration(milliseconds: 360),
+                reverseTransitionDuration: const Duration(milliseconds: 280),
+                transitionsBuilder: (context, anim, sec, child) {
+                  final curved = CurvedAnimation(
+                    parent: anim,
+                    curve: Curves.easeOutCubic,
+                    reverseCurve: Curves.easeInCubic,
+                  );
+                  return FadeTransition(opacity: curved, child: child);
+                },
+              ),
+            );
+          },
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(8),
+            child: Image.file(
+              file,
+              width: widget.width,
+              height: widget.height,
+              fit: BoxFit.contain,
+              errorBuilder: (context, error, stack) => _broken(context),
+            ),
+          ),
+        );
+      },
+    );
   }
 }
 
@@ -2232,15 +2473,42 @@ int _findMatchingOpenBracket(String tex, int close) {
   return -1;
 }
 
+String _stripFormatChars(String input) {
+  return input.replaceAll(RegExp(r'[\u200B\u200C\u200D\uFEFF]'), '');
+}
+
+String _softBreakLongTableTokens(String input) {
+  return input.replaceAllMapped(
+    RegExp(r'[^\s/\\-_]{22,}'),
+    (match) => _insertSoftBreaks(match.group(0)!, every: 18),
+  );
+}
+
 String _softBreakInline(String input) {
   // Insert zero-width break for inline code segments with long tokens.
   if (input.length < 60) return input;
-  final buf = StringBuffer();
-  for (int i = 0; i < input.length; i++) {
-    buf.write(input[i]);
-    if ((i + 1) % 24 == 0) buf.write('\u200B');
+  return _insertSoftBreaks(input, every: 24);
+}
+
+/// Inserts U+200B after every [every] UTF-16 code units, never between the
+/// two halves of a surrogate pair (which would make the string ill-formed and
+/// throw inside `Paragraph.addText`).
+@visibleForTesting
+String insertMarkdownSoftBreaksForTesting(String value, {required int every}) =>
+    _insertSoftBreaks(value, every: every);
+
+String _insertSoftBreaks(String value, {required int every}) {
+  final buffer = StringBuffer();
+  for (var i = 0; i < value.length; i++) {
+    final unit = value.codeUnitAt(i);
+    buffer.writeCharCode(unit);
+    final isHighSurrogate = unit >= 0xD800 && unit <= 0xDBFF;
+    if (isHighSurrogate) continue;
+    if ((i + 1) % every == 0 && i != value.length - 1) {
+      buffer.write('\u200B');
+    }
   }
-  return buf.toString();
+  return buffer.toString();
 }
 
 List<String> _extractImageUrls(String md) {
@@ -3827,17 +4095,22 @@ class _MarkdownTableCell extends StatelessWidget {
   }
 
   String _softBreakTableCellText(String input) {
-    return input.replaceAllMapped(RegExp(r'[^\s/\\-]{22,}'), (match) {
-      final value = match.group(0)!;
-      final buffer = StringBuffer();
-      for (var i = 0; i < value.length; i++) {
-        buffer.write(value[i]);
-        if ((i + 1) % 18 == 0 && i != value.length - 1) {
-          buffer.write('\u200B');
-        }
-      }
-      return buffer.toString();
-    });
+    // Keep markdown links intact. Inserting ZWSP into `[label](kelivo://…)`
+    // (long snake_case names are one token because `_` is not a wrap point)
+    // corrupts the scheme so KelivoLink.tryParse fails and launchUrl opens
+    // the system browser.
+    final link = RegExp(r'\[[^\]]*\]\([^)]*\)');
+    final buffer = StringBuffer();
+    var start = 0;
+    for (final match in link.allMatches(input)) {
+      buffer.write(
+        _softBreakLongTableTokens(input.substring(start, match.start)),
+      );
+      buffer.write(match.group(0));
+      start = match.end;
+    }
+    buffer.write(_softBreakLongTableTokens(input.substring(start)));
+    return buffer.toString();
   }
 }
 

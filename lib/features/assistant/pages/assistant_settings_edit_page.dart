@@ -29,6 +29,9 @@ import '../../../core/models/conversation.dart';
 import '../../../core/models/preset_message.dart';
 import '../../../core/models/quick_phrase.dart';
 import '../../../core/providers/assistant_provider.dart';
+import '../../../core/providers/workspace_provider.dart';
+import '../../../core/models/workspace.dart';
+import '../../../shared/widgets/option_sheet.dart';
 import '../../../core/providers/mcp_provider.dart';
 import '../../../core/providers/quick_phrase_provider.dart';
 import '../../../core/models/memory_entry.dart';
@@ -63,6 +66,7 @@ import '../../../utils/platform_utils.dart';
 import '../../../utils/sandbox_path_resolver.dart';
 import '../utils/assistant_edit_tab_layout.dart';
 import 'assistant_regex_tab.dart';
+import 'assistant_settings_edit_skills_tab.dart';
 import 'health_data_settings_page.dart';
 import 'package:Kelivo/theme/app_semantic_colors.dart';
 import 'package:Kelivo/shared/widgets/section_card.dart';
@@ -122,6 +126,12 @@ List<_AssistantEditTabSpec> _assistantEditTabSpecs(
       label: l10n.assistantEditPageLocalToolsTab,
       icon: Lucide.Wrench,
       child: _LocalToolsTab(assistantId: assistantId),
+    ),
+    _AssistantEditTabSpec(
+      id: assistantEditTabSkills,
+      label: l10n.skillsTab,
+      icon: Lucide.Sparkles,
+      child: AssistantSettingsEditSkillsTab(assistantId: assistantId),
     ),
     _AssistantEditTabSpec(
       id: assistantEditTabMcp,
@@ -1535,6 +1545,7 @@ enum _AssistantDesktopMenu {
   prompts,
   memory,
   localTools,
+  skills,
   mcp,
   quick,
   custom,
@@ -1645,6 +1656,10 @@ class _DesktopAssistantDialogShellState
                         return _MemoryTab(assistantId: widget.assistantId);
                       case _AssistantDesktopMenu.localTools:
                         return _LocalToolsTab(assistantId: widget.assistantId);
+                      case _AssistantDesktopMenu.skills:
+                        return AssistantSettingsEditSkillsTab(
+                          assistantId: widget.assistantId,
+                        );
                       case _AssistantDesktopMenu.mcp:
                         return _McpTab(assistantId: widget.assistantId);
                       case _AssistantDesktopMenu.quick:
@@ -1689,6 +1704,7 @@ class _DesktopAssistantMenuState extends State<_DesktopAssistantMenu> {
       (_AssistantDesktopMenu.prompts, l10n.assistantEditPagePromptsTab),
       (_AssistantDesktopMenu.memory, l10n.assistantEditPageMemoryTab),
       (_AssistantDesktopMenu.localTools, l10n.assistantEditPageLocalToolsTab),
+      (_AssistantDesktopMenu.skills, l10n.skillsTab),
       (_AssistantDesktopMenu.mcp, l10n.assistantEditPageMcpTab),
       (_AssistantDesktopMenu.quick, l10n.assistantEditPageQuickPhraseTab),
       (_AssistantDesktopMenu.custom, l10n.assistantEditPageCustomTab),

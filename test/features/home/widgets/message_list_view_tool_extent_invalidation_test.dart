@@ -7,6 +7,7 @@ import 'package:Kelivo/core/providers/settings_provider.dart';
 import 'package:Kelivo/core/providers/tts_provider.dart';
 import 'package:Kelivo/core/providers/user_provider.dart';
 import 'package:Kelivo/features/chat/widgets/chat_message_widget.dart';
+import 'package:Kelivo/features/chat/widgets/timeline_visibility.dart';
 import 'package:Kelivo/features/home/controllers/stream_controller.dart'
     as stream_ctrl;
 import 'package:Kelivo/features/home/controllers/streaming_content_notifier.dart';
@@ -19,6 +20,10 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:super_sliver_list/super_sliver_list.dart';
+
+/// Timeline shell + inline body for a `read_file` with a path: 44px + summary + chip.
+const double _workspaceReadFileCard =
+    44.0 + kEstimateWorkspaceSummaryLine + kEstimateWorkspaceChipRow;
 
 void main() {
   setUp(() => SharedPreferences.setMockInitialValues({}));
@@ -83,7 +88,7 @@ void main() {
     await tester.pump();
 
     final after = list.extentEstimation!(0, 400);
-    expect(after, closeTo(96 + 8 * 44.0, 0.1));
+    expect(after, closeTo(96 + 8 * _workspaceReadFileCard, 0.1));
     expect(after, isNot(empty));
   });
 
@@ -138,7 +143,7 @@ void main() {
     final after = tester
         .widget<SuperListView>(find.byType(SuperListView))
         .extentEstimation!(0, 400);
-    expect(after, closeTo(96 + 8 * 44.0, 0.1));
+    expect(after, closeTo(96 + 8 * _workspaceReadFileCard, 0.1));
   });
 
   testWidgets('recovered tool signature change invalidates without oldWidget', (

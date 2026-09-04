@@ -188,6 +188,9 @@ class TaskProgressDialogCard extends StatelessWidget {
                               const SizedBox(height: 8),
                             if (showCancel || showAck)
                               IosTileButton(
+                                key: showAck
+                                    ? const Key('task_progress_acknowledge')
+                                    : const Key('task_progress_cancel'),
                                 icon: showAck ? Lucide.Check : Lucide.X,
                                 label: showAck ? acknowledgeLabel : cancelLabel,
                                 onTap: showAck

@@ -45,6 +45,9 @@ app.*.map.json
 /android/app/profile
 /android/app/release
 
+# Termux PRoot / talloc / shmem ELFs fetched by tool/fetch_proot.sh
+android/app/src/main/jniLibs/**/*.so
+
 pubspec.lock
 /linux/flutter/generated_plugin_registrant.cc
 /windows/flutter/generated_plugin_registrant.cc

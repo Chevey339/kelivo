@@ -14,6 +14,7 @@ import android.view.SurfaceHolder
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.android.FlutterSurfaceView
 import io.flutter.embedding.engine.FlutterEngine
+import com.psyche.kelivo.workspace.WorkspacePlugin
 import io.flutter.plugin.common.MethodChannel
 import java.io.File
 import java.io.FileInputStream
@@ -51,6 +52,7 @@ class MainActivity : FlutterActivity() {
      @Volatile private var writableFileState = WritableFileState.IDLE
      private val writableFileExecutor = Executors.newSingleThreadExecutor()
      private var deviceLocalToolsHandler: DeviceLocalToolsHandler? = null
+     private var workspacePlugin: WorkspacePlugin? = null
 
     override fun onFlutterSurfaceViewCreated(flutterSurfaceView: FlutterSurfaceView) {
         super.onFlutterSurfaceViewCreated(flutterSurfaceView)
@@ -79,6 +81,9 @@ class MainActivity : FlutterActivity() {
          super.configureFlutterEngine(flutterEngine)
          McpOAuthHandler.configure(this, flutterEngine.dartExecutor.binaryMessenger)
          deviceLocalToolsHandler = DeviceLocalToolsHandler(this).also {
+             it.configure(flutterEngine.dartExecutor.binaryMessenger)
+         }
+         workspacePlugin = WorkspacePlugin(this).also {
              it.configure(flutterEngine.dartExecutor.binaryMessenger)
          }
         processTextChannel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, processTextChannelName)
@@ -188,6 +193,7 @@ class MainActivity : FlutterActivity() {
             }
         }
         writableFileExecutor.shutdown()
+        workspacePlugin?.dispose()
         super.onDestroy()
     }
  

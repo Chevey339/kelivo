@@ -1,5 +1,6 @@
 import '../../../core/services/memory/memory_tools.dart';
 import '../../../core/services/search/search_tool_service.dart';
+import '../../../core/services/workspace/workspace_tools_service.dart';
 import 'local_tools_service.dart';
 
 /// Client-side built-in function names that MCP tools must not expose.
@@ -13,5 +14,6 @@ abstract final class BuiltInToolNames {
     ...MemoryTools.allToolNames,
     ...MemoryTools.legacyToolNames,
     ...LocalToolNames.all,
+    ...WorkspaceToolsService.toolNames,
   };
 }

@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:path/path.dart' as p;
+import 'package:sqlite3/sqlite3.dart';
 
 import '../../database/app_database.dart';
 import '../../database/database_installation_gate.dart';
@@ -12,6 +13,7 @@ import '../../../utils/app_directories.dart';
 import '../../../utils/avatar_cache.dart';
 import '../logging/flutter_logger.dart';
 import '../network/request_logger.dart';
+import '../sandbox/rootfs_disk_usage.dart';
 
 enum StorageUsageCategoryKey {
   images,
@@ -25,6 +27,10 @@ enum StorageUsageCategoryKey {
   cache,
   logs,
   other,
+  workspaceFiles,
+  sandboxEnvironment,
+  skills,
+  sessionFiles,
 }
 
 class StorageUsageStats {
@@ -142,7 +148,13 @@ abstract final class StorageUsageService {
     }
   }
 
-  static Future<StorageUsageReport> computeReport() async {
+  static Future<StorageUsageReport> computeReport({
+    Future<Directory> Function()? workspacesDirectory,
+    Future<Directory> Function()? environmentDirectory,
+    Future<Directory> Function()? skillsDirectory,
+    Future<Directory> Function()? sessionsDirectory,
+    Future<Directory> Function()? rootfsUsageDirectory,
+  }) async {
     final root = await AppDirectories.getAppDataDirectory();
     var migrationCompleted = false;
     try {
@@ -215,6 +227,13 @@ abstract final class StorageUsageService {
     try {
       await for (final ent in root.list(recursive: true, followLinks: false)) {
         if (ent is! File) continue;
+        final rel = p.relative(ent.path, from: root.path);
+        final parts = p.split(rel);
+        if (parts.isNotEmpty &&
+            _isolateMeasuredTopDirs.contains(parts.first.toLowerCase())) {
+          // Walked on a background isolate — do not count here.
+          continue;
+        }
         int bytes = 0;
         try {
           bytes = await ent.length();
@@ -224,8 +243,6 @@ abstract final class StorageUsageService {
         totalFiles += 1;
         totalBytes += bytes;
 
-        final rel = p.relative(ent.path, from: root.path);
-        final parts = p.split(rel);
         if (parts.isEmpty) {
           byCat[StorageUsageCategoryKey.other]!.add(bytes);
           otherSubs['app']!.add(bytes);
@@ -322,6 +339,38 @@ abstract final class StorageUsageService {
     } catch (_) {
       // If listing fails for any reason, fall back to 0s; UI will show load failed.
     }
+
+    final [
+      workspaceUsage,
+      skillsUsage,
+      sessionsUsage,
+      sandboxUsage,
+    ] = await Future.wait([
+      _measureUsageOf(
+        workspacesDirectory ?? AppDirectories.getWorkspacesDirectory,
+      ),
+      _measureUsageOf(skillsDirectory ?? AppDirectories.getSkillsDirectory),
+      _measureUsageOf(sessionsDirectory ?? AppDirectories.getSessionsDirectory),
+      _measureSandboxEnvironment(
+        environmentDirectory:
+            environmentDirectory ?? AppDirectories.getEnvironmentDirectory,
+        rootfsUsageDirectory: rootfsUsageDirectory,
+      ),
+    ]);
+    byCat[StorageUsageCategoryKey.workspaceFiles]!.addStats(workspaceUsage);
+    byCat[StorageUsageCategoryKey.skills]!.addStats(skillsUsage);
+    byCat[StorageUsageCategoryKey.sessionFiles]!.addStats(sessionsUsage);
+    byCat[StorageUsageCategoryKey.sandboxEnvironment]!.addStats(sandboxUsage);
+    totalFiles +=
+        workspaceUsage.fileCount +
+        skillsUsage.fileCount +
+        sessionsUsage.fileCount +
+        sandboxUsage.fileCount;
+    totalBytes +=
+        workspaceUsage.bytes +
+        skillsUsage.bytes +
+        sessionsUsage.bytes +
+        sandboxUsage.bytes;
 
     final avatarsDir = await AppDirectories.getAvatarsDirectory();
     final fontsDir = await AppDirectories.getFontsDirectory();
@@ -530,6 +579,22 @@ abstract final class StorageUsageService {
             ),
         ],
       ),
+      StorageUsageCategory(
+        key: StorageUsageCategoryKey.workspaceFiles,
+        stats: byCat[StorageUsageCategoryKey.workspaceFiles]!.toStats(),
+      ),
+      StorageUsageCategory(
+        key: StorageUsageCategoryKey.sandboxEnvironment,
+        stats: byCat[StorageUsageCategoryKey.sandboxEnvironment]!.toStats(),
+      ),
+      StorageUsageCategory(
+        key: StorageUsageCategoryKey.skills,
+        stats: byCat[StorageUsageCategoryKey.skills]!.toStats(),
+      ),
+      StorageUsageCategory(
+        key: StorageUsageCategoryKey.sessionFiles,
+        stats: byCat[StorageUsageCategoryKey.sessionFiles]!.toStats(),
+      ),
     ];
 
     // Ensure consistent ordering.
@@ -737,6 +802,129 @@ abstract final class StorageUsageService {
     return deleted;
   }
 
+  static Future<StorageUsageStats> measureOrphanSessionFiles({
+    Set<String>? conversationIds,
+    Future<Directory> Function()? sessionsDirectory,
+  }) async {
+    final ids = conversationIds ?? await _readConversationIdsFromDatabase();
+    final sessions =
+        await (sessionsDirectory ?? AppDirectories.getSessionsDirectory)();
+    return _orphanSessionStats(sessions: sessions, conversationIds: ids);
+  }
+
+  static Future<StorageUsageStats> clearOrphanSessionFiles({
+    Set<String>? conversationIds,
+    Future<Directory> Function()? sessionsDirectory,
+  }) async {
+    final ids = conversationIds ?? await _readConversationIdsFromDatabase();
+    final sessions =
+        await (sessionsDirectory ?? AppDirectories.getSessionsDirectory)();
+    final stats = await _orphanSessionStats(
+      sessions: sessions,
+      conversationIds: ids,
+    );
+    if (!await sessions.exists()) return stats;
+    try {
+      await for (final ent in sessions.list(
+        recursive: false,
+        followLinks: false,
+      )) {
+        if (ent is! Directory) continue;
+        if (ids.contains(p.basename(ent.path))) continue;
+        try {
+          await ent.delete(recursive: true);
+        } catch (_) {}
+      }
+    } catch (_) {}
+    return stats;
+  }
+
+  static Future<StorageUsageStats> _orphanSessionStats({
+    required Directory sessions,
+    required Set<String> conversationIds,
+  }) async {
+    if (!await sessions.exists()) {
+      return const StorageUsageStats(fileCount: 0, bytes: 0);
+    }
+    var bytes = 0;
+    var fileCount = 0;
+    try {
+      await for (final ent in sessions.list(
+        recursive: false,
+        followLinks: false,
+      )) {
+        if (ent is! Directory) continue;
+        if (conversationIds.contains(p.basename(ent.path))) continue;
+        final usage = await measureDirectoryUsage(ent);
+        bytes += usage.bytes;
+        fileCount += usage.fileCount;
+      }
+    } catch (_) {}
+    return StorageUsageStats(fileCount: fileCount, bytes: bytes);
+  }
+
+  static Future<Set<String>> _readConversationIdsFromDatabase() async {
+    try {
+      final root = await AppDirectories.getAppDataDirectory();
+      final dbFile = File(p.join(root.path, AppDatabase.databaseFileName));
+      if (!await dbFile.exists()) return <String>{};
+      final database = sqlite3.open(dbFile.path, mode: OpenMode.readOnly);
+      try {
+        final rows = database.select('SELECT id FROM conversation_rows');
+        return {for (final row in rows) row['id'] as String};
+      } finally {
+        database.close();
+      }
+    } catch (_) {
+      return <String>{};
+    }
+  }
+
+  static Future<StorageUsageStats> _measureUsage(Directory dir) async {
+    final usage = await measureDirectoryUsage(dir);
+    return StorageUsageStats(fileCount: usage.fileCount, bytes: usage.bytes);
+  }
+
+  static Future<StorageUsageStats> _measureUsageOf(
+    Future<Directory> Function() directory,
+  ) async => _measureUsage(await directory());
+
+  static Future<StorageUsageStats> _measureSandboxEnvironment({
+    required Future<Directory> Function() environmentDirectory,
+    Future<Directory> Function()? rootfsUsageDirectory,
+  }) async {
+    final envDir = await environmentDirectory();
+    final rootfsDir = await (rootfsUsageDirectory ?? resolveRootfsUsageDir)();
+    final unique = _dedupeNestedDirectories([envDir, rootfsDir]);
+    final usages = await Future.wait(unique.map(_measureUsage));
+    var bytes = 0;
+    var fileCount = 0;
+    for (final usage in usages) {
+      bytes += usage.bytes;
+      fileCount += usage.fileCount;
+    }
+    return StorageUsageStats(fileCount: fileCount, bytes: bytes);
+  }
+
+  static List<Directory> _dedupeNestedDirectories(Iterable<Directory> dirs) {
+    final normalized = <String>{};
+    for (final dir in dirs) {
+      final path = dir.path;
+      if (path.isEmpty) continue;
+      normalized.add(p.normalize(Directory(path).absolute.path));
+    }
+    final sorted = normalized.toList()
+      ..sort((a, b) => a.length.compareTo(b.length));
+    final kept = <String>[];
+    for (final path in sorted) {
+      final nested = kept.any(
+        (outer) => p.equals(outer, path) || p.isWithin(outer, path),
+      );
+      if (!nested) kept.add(path);
+    }
+    return [for (final path in kept) Directory(path)];
+  }
+
   static Future<void> _deleteDirectoryContents(
     Directory dir, {
     Set<String> keepFileNames = const <String>{},
@@ -790,6 +978,11 @@ class _MutableStats {
     bytes += b;
   }
 
+  void addStats(StorageUsageStats stats) {
+    fileCount += stats.fileCount;
+    bytes += stats.bytes;
+  }
+
   StorageUsageStats toStats() =>
       StorageUsageStats(fileCount: fileCount, bytes: bytes);
 }
@@ -806,7 +999,18 @@ const List<StorageUsageCategoryKey> _categoryOrder = <StorageUsageCategoryKey>[
   StorageUsageCategoryKey.cache,
   StorageUsageCategoryKey.logs,
   StorageUsageCategoryKey.other,
+  StorageUsageCategoryKey.workspaceFiles,
+  StorageUsageCategoryKey.sandboxEnvironment,
+  StorageUsageCategoryKey.skills,
+  StorageUsageCategoryKey.sessionFiles,
 ];
+
+const Set<String> _isolateMeasuredTopDirs = {
+  'workspaces',
+  'sessions',
+  'skills',
+  'environment',
+};
 
 bool _isAlwaysVisibleCategory(StorageUsageCategoryKey key) {
   switch (key) {
@@ -822,6 +1026,10 @@ bool _isAlwaysVisibleCategory(StorageUsageCategoryKey key) {
     case StorageUsageCategoryKey.cache:
     case StorageUsageCategoryKey.logs:
     case StorageUsageCategoryKey.other:
+    case StorageUsageCategoryKey.workspaceFiles:
+    case StorageUsageCategoryKey.sandboxEnvironment:
+    case StorageUsageCategoryKey.skills:
+    case StorageUsageCategoryKey.sessionFiles:
       return true;
   }
 }

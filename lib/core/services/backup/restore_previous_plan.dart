@@ -75,7 +75,15 @@ final class RestorePreviousDatabasePlan {
 }
 
 final class RestorePreviousAssetsPlan {
-  static const rootNames = ['upload', 'images', 'avatars', 'fonts'];
+  static const rootNames = [
+    'upload',
+    'images',
+    'avatars',
+    'fonts',
+    'skills',
+    'workspaces',
+    'sessions',
+  ];
 
   RestorePreviousAssetsPlan({
     required Map<String, RestorePreviousAssetRootState> rootStates,

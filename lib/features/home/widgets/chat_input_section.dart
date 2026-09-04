@@ -1,8 +1,11 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../../core/models/chat_input_data.dart';
 import '../../../core/models/assistant.dart';
+import '../../../core/models/workspace_binding.dart';
 import '../../../core/providers/asr_provider.dart';
 import '../../../core/providers/settings_provider.dart';
 import '../../../core/providers/assistant_provider.dart';
@@ -10,6 +13,10 @@ import '../../../core/providers/mcp_provider.dart';
 import '../../../core/providers/quick_phrase_provider.dart';
 import '../../../core/providers/instruction_injection_provider.dart';
 import '../../../core/providers/world_book_provider.dart';
+import '../../../core/services/chat/chat_service.dart';
+import '../../../features/workspace/widgets/environment/environment_status_chip.dart';
+import '../../../features/workspace/workspace_navigation.dart';
+import '../../../theme/design_tokens.dart';
 import 'chat_input_bar.dart';
 import 'model_icon.dart';
 
@@ -47,6 +54,7 @@ class ChatInputSection extends StatelessWidget {
     this.onLongPressSelectModel,
     this.onOpenMcp,
     this.onLongPressMcp,
+    this.onOpenWorkspace,
     this.onOpenSearch,
     this.onConfigureReasoning,
     this.onSend,
@@ -89,6 +97,7 @@ class ChatInputSection extends StatelessWidget {
   final VoidCallback? onLongPressSelectModel;
   final VoidCallback? onOpenMcp;
   final VoidCallback? onLongPressMcp;
+  final VoidCallback? onOpenWorkspace;
   final VoidCallback? onOpenSearch;
   final VoidCallback? onConfigureReasoning;
   final Future<ChatInputSubmissionResult> Function(ChatInputData)? onSend;
@@ -148,8 +157,14 @@ class ChatInputSection extends StatelessWidget {
     final isDesktop = _isDesktopPlatform(context);
     final hasWorldBooks =
         isTablet && context.watch<WorldBookProvider>().books.isNotEmpty;
+    final showWorkspaceButton = isDesktop && onOpenWorkspace != null;
+    final showEnvChip = !isDesktop && (Platform.isAndroid || Platform.isIOS);
+    var workspaceBound = false;
+    if (showWorkspaceButton || showEnvChip) {
+      workspaceBound = _isWorkspaceBound(context);
+    }
 
-    return ChatInputBar(
+    final bar = ChatInputBar(
       key: inputBarKey,
       chatModelProviderKey: pk,
       chatModelId: mid,
@@ -159,6 +174,9 @@ class ChatInputSection extends StatelessWidget {
       conversationId: conversationId,
       onOpenMcp: onOpenMcp,
       onLongPressMcp: onLongPressMcp,
+      onOpenWorkspace: onOpenWorkspace,
+      showWorkspaceButton: showWorkspaceButton,
+      workspaceActive: workspaceBound,
       onStop: onStop,
       modelIcon: (pk != null && mid != null)
           ? CurrentModelIcon(
@@ -235,6 +253,40 @@ class ChatInputSection extends StatelessWidget {
       inputBackgroundOpacityLight: settings.chatInputBackgroundOpacityLight,
       inputBackgroundOpacityDark: settings.chatInputBackgroundOpacityDark,
     );
+
+    if (!showEnvChip || !workspaceBound) return bar;
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(
+            AppSpacing.sm,
+            AppSpacing.xxs,
+            AppSpacing.sm,
+            0,
+          ),
+          child: EnvironmentStatusChip(
+            onTap: () => WorkspaceNavigation.openEnvironmentPage(context),
+          ),
+        ),
+        bar,
+      ],
+    );
+  }
+
+  bool _isWorkspaceBound(BuildContext context) {
+    try {
+      return context.select<ChatService, bool>((chat) {
+        final id = conversationId;
+        if (id == null) return false;
+        final conversation = chat.getConversation(id);
+        if (conversation == null) return false;
+        return WorkspaceBinding.fromExtras(conversation.extras).isBound;
+      });
+    } catch (_) {
+      return false;
+    }
   }
 
   bool _isDesktopPlatform(BuildContext context) {

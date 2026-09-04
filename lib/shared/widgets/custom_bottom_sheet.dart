@@ -4,6 +4,7 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 
 import '../../icons/lucide_adapter.dart';
+import '../../l10n/app_localizations.dart';
 import '../../theme/app_font_weights.dart';
 import '../../theme/app_semantic_colors.dart';
 import 'ios_tactile.dart';
@@ -601,13 +602,19 @@ class _SheetHeader extends StatelessWidget {
             key: CustomBottomSheet.closeButtonKey,
             width: 24,
             height: 24,
-            child: IosIconButton(
-              icon: Lucide.X,
-              size: 20,
-              padding: EdgeInsets.zero,
-              color: cs.onSurface.withValues(alpha: 0.62),
-              semanticLabel: closeSemanticLabel,
-              onTap: onClose,
+            child: Tooltip(
+              message:
+                  AppLocalizations.of(context)?.commonClose ??
+                  closeSemanticLabel ??
+                  MaterialLocalizations.of(context).closeButtonTooltip,
+              child: IosIconButton(
+                icon: Lucide.X,
+                size: 20,
+                padding: EdgeInsets.zero,
+                color: cs.onSurface.withValues(alpha: 0.62),
+                semanticLabel: closeSemanticLabel,
+                onTap: onClose,
+              ),
             ),
           ),
         ],

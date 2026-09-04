@@ -27,6 +27,7 @@ import 'package:Kelivo/core/providers/backup_provider.dart';
 import 'package:Kelivo/core/services/backup/backup_cancel_token.dart';
 import 'package:Kelivo/core/services/backup/backup_task_progress.dart';
 import 'package:Kelivo/core/services/backup/data_sync.dart';
+import 'package:Kelivo/core/services/backup/restore_previous_plan.dart';
 import 'package:Kelivo/core/services/backup/restore_receipt.dart';
 import 'package:Kelivo/core/services/backup/restore_startup_gate.dart';
 import 'package:Kelivo/core/services/chat/chat_service.dart';
@@ -2122,7 +2123,7 @@ void main() {
     );
 
     test('empty versioned asset roots clear old files on startup', () async {
-      for (final rootName in const ['upload', 'images', 'avatars', 'fonts']) {
+      for (final rootName in RestorePreviousAssetsPlan.rootNames) {
         final directory = Directory('${root.path}/$rootName');
         await directory.create(recursive: true);
         await File('${directory.path}/old.bin').writeAsBytes([1, 2, 3]);
@@ -2142,7 +2143,7 @@ void main() {
         const WebDavConfig(includeChats: true, includeFiles: true),
       );
 
-      for (final rootName in const ['upload', 'images', 'avatars', 'fonts']) {
+      for (final rootName in RestorePreviousAssetsPlan.rootNames) {
         expect(
           await File('${root.path}/$rootName/old.bin').exists(),
           isTrue,
@@ -2153,12 +2154,135 @@ void main() {
       final terminal = await _recoverAcrossColdRestart(appDataDirectory: root);
       expect(terminal?.state, RestoreReceiptState.committed);
 
-      for (final rootName in const ['upload', 'images', 'avatars', 'fonts']) {
+      for (final rootName in RestorePreviousAssetsPlan.rootNames) {
         final directory = Directory('${root.path}/$rootName');
         expect(await directory.exists(), isTrue, reason: rootName);
         expect(await directory.list().toList(), isEmpty, reason: rootName);
       }
     });
+
+    test(
+      'packs skills, workspaces, and sessions and excludes environment',
+      () async {
+        final nested = <String, List<int>>{
+          'skills/demo/SKILL.md': utf8.encode('# skill'),
+          'workspaces/ws1/files/note.txt': utf8.encode('workspace file'),
+          'sessions/conv1/attachments/a.bin': [1, 2, 3, 4],
+        };
+        for (final entry in nested.entries) {
+          final file = File(p.join(root.path, entry.key));
+          await file.parent.create(recursive: true);
+          await file.writeAsBytes(entry.value, flush: true);
+        }
+        final environmentFile = File(
+          p.join(root.path, 'environment', 'rootfs.img'),
+        );
+        await environmentFile.parent.create(recursive: true);
+        await environmentFile.writeAsBytes(
+          List<int>.filled(64 * 1024, 9),
+          flush: true,
+        );
+        final assetBytes = nested.values.fold<int>(
+          0,
+          (sum, bytes) => sum + bytes.length,
+        );
+
+        final events = <BackupProgress>[];
+        final backupFile =
+            await DataSync(
+              businessRepository: businessRepository,
+              chatService: ChatService(),
+            ).prepareBackupFile(
+              const WebDavConfig(includeChats: false, includeFiles: true),
+              onProgress: events.add,
+            );
+        addTearDown(() => DataSync.cleanupTemporaryBackupFile(backupFile));
+
+        final packing = events
+            .where(
+              (event) =>
+                  event.phase == BackupPhase.packing && event.total != null,
+            )
+            .toList();
+        expect(packing, isNotEmpty);
+        expect(packing.last.total, greaterThanOrEqualTo(assetBytes));
+        expect(packing.last.processed, packing.last.total);
+
+        final input = InputFileStream(backupFile.path);
+        Archive? archive;
+        try {
+          archive = ZipDecoder().decodeStream(input);
+          for (final name in nested.keys) {
+            expect(archive.findFile(name), isNotNull, reason: name);
+          }
+          expect(archive.findFile('environment/rootfs.img'), isNull);
+          final manifest =
+              jsonDecode(
+                    utf8.decode(
+                      archive.findFile('manifest.json')!.readBytes()!,
+                    ),
+                  )
+                  as Map<String, dynamic>;
+          final manifestEntries = manifest['entries'] as Map;
+          expect(manifestEntries.keys, containsAll(nested.keys));
+          expect(
+            manifestEntries.keys.any(
+              (name) => name.toString().startsWith('environment'),
+            ),
+            isFalse,
+          );
+        } finally {
+          archive?.clearSync();
+          input.closeSync();
+        }
+      },
+    );
+
+    test(
+      'restore recreates skills, workspaces, and sessions after startup',
+      () async {
+        final nested = <String, String>{
+          'skills/demo/SKILL.md': '# skill',
+          'workspaces/ws1/files/note.txt': 'workspace file',
+          'sessions/conv1/outputs/out.txt': 'session output',
+        };
+        final zipFile = await _createSqliteBackupFixture(
+          root: root,
+          prefix: 'new_asset_roots',
+          settings: const {},
+          includeFiles: true,
+          extraEntries: nested,
+        );
+
+        await DataSync(
+          businessRepository: businessRepository,
+          chatService: ChatService(),
+        ).restoreFromLocalFile(
+          zipFile,
+          const WebDavConfig(includeChats: true, includeFiles: true),
+        );
+
+        for (final path in nested.keys) {
+          expect(await File(p.join(root.path, path)).exists(), isFalse);
+        }
+
+        final terminal = await _recoverAcrossColdRestart(
+          appDataDirectory: root,
+        );
+        expect(terminal?.state, RestoreReceiptState.committed);
+
+        for (final entry in nested.entries) {
+          expect(
+            await File(p.join(root.path, entry.key)).readAsString(),
+            entry.value,
+          );
+        }
+        expect(
+          await Directory(p.join(root.path, 'environment')).exists(),
+          isFalse,
+        );
+      },
+    );
 
     test('retains every selected SQLite and asset component', () async {
       final zipFile = await _createSqliteBackupFixture(

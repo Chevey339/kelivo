@@ -4170,6 +4170,35 @@ class ChatDatabaseRepository {
     });
   }
 
+  /// Reads [conversationId]'s extras, applies [update], and writes the result
+  /// in one transaction. [updatedAt] is bumped only when the map changes.
+  Future<void> updateConversationExtras(
+    String conversationId,
+    Map<String, dynamic> Function(Map<String, dynamic> current) update,
+  ) {
+    return _db.transaction(() async {
+      final row = await (_db.select(
+        _db.conversationRows,
+      )..where((t) => t.id.equals(conversationId))).getSingleOrNull();
+      if (row == null) {
+        throw StateError('conversation_not_found');
+      }
+      final current = _decodeExtrasJson(row.extrasJson);
+      final next = update(Map<String, dynamic>.from(current));
+      if (jsonEncode(current) == jsonEncode(next)) {
+        return;
+      }
+      await (_db.update(
+        _db.conversationRows,
+      )..where((t) => t.id.equals(conversationId))).write(
+        ConversationRowsCompanion(
+          extrasJson: Value(jsonEncode(next)),
+          updatedAt: Value(DateTime.now()),
+        ),
+      );
+    });
+  }
+
   Future<Conversation?> duplicateConversation(String sourceId) {
     return _db.transaction(() async {
       final sourceRow = await (_db.select(
@@ -4395,6 +4424,7 @@ class ChatDatabaseRepository {
                 messageIds: [
                   for (final message in kept) messageIdMap[message.id]!,
                 ],
+                extras: source.extras,
               ),
             ),
           );
@@ -6743,6 +6773,7 @@ class ChatDatabaseRepository {
       lastMemoryExtractedOrder: row.lastMemoryExtractedOrder,
       chatModelProvider: row.chatModelProvider,
       chatModelId: row.chatModelId,
+      extras: _decodeExtrasJson(row.extrasJson),
     );
   }
 
@@ -6769,6 +6800,7 @@ class ChatDatabaseRepository {
       lastMemoryExtractedOrder: Value(conversation.lastMemoryExtractedOrder),
       chatModelProvider: Value(conversation.chatModelProvider),
       chatModelId: Value(conversation.chatModelId),
+      extrasJson: Value(jsonEncode(conversation.extras)),
     );
   }
 
@@ -7127,6 +7159,10 @@ class ChatDatabaseRepository {
     } catch (_) {
       return <String>[];
     }
+  }
+
+  Map<String, dynamic> _decodeExtrasJson(String raw) {
+    return Conversation.decodeExtras(raw);
   }
 
   // —— Memory system V1 read path (§13.3) ——

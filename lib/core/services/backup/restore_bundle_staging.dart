@@ -68,7 +68,15 @@ final class RestoreBundleStaging {
   /// imported, as _backupFormatVersion above already is, because DataSync
   /// depends on this file.
   static const _minimumReadableFormatKey = 'minimumReadableFormatVersion';
-  static const _assetRoots = ['upload', 'images', 'avatars', 'fonts'];
+  static const _assetRoots = [
+    'upload',
+    'images',
+    'avatars',
+    'fonts',
+    'skills',
+    'workspaces',
+    'sessions',
+  ];
   static const _databaseEntry = 'database/kelivo.db';
   static const _maximumManifestBytes = 16 * 1024 * 1024;
   // Settings contain structured preferences, never chat rows or binary assets.

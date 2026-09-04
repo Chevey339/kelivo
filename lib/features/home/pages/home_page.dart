@@ -28,6 +28,7 @@ import '../../../utils/platform_utils.dart';
 import '../../../desktop/search_provider_popover.dart';
 import '../../../desktop/reasoning_budget_popover.dart';
 import '../../../desktop/mcp_servers_popover.dart';
+import '../../../desktop/workspace_popover.dart';
 import '../../../desktop/mini_map_popover.dart';
 import '../../../desktop/quick_phrase_popover.dart';
 import '../../../desktop/instruction_injection_popover.dart';
@@ -1398,6 +1399,20 @@ class _HomePageState extends State<HomePage>
           context,
         ).push(MaterialPageRoute(builder: (_) => const ProvidersPage()));
       },
+      onOpenWorkspace: () {
+        final a = context.read<AssistantProvider>().currentAssistant;
+        if (PlatformUtils.isDesktop) {
+          showDesktopWorkspacePopover(
+            context,
+            anchorKey: _inputBarKey,
+            conversationListenable: _controller,
+            conversationId: () => _controller.currentConversation?.id,
+            assistantId: a?.id,
+          );
+        } else {
+          _toggleTools();
+        }
+      },
       onOpenMcp: () {
         final a = context.read<AssistantProvider>().currentAssistant;
         if (a != null) {
@@ -1751,27 +1766,34 @@ class _HomePageState extends State<HomePage>
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
       builder: (ctx) {
-        return SafeArea(
-          top: false,
-          child: BottomToolsSheet(
-            onPhotos: () {
-              Navigator.of(ctx).maybePop();
-              _controller.onPickPhotos();
-            },
-            onCamera: () {
-              Navigator.of(ctx).maybePop();
-              _controller.onPickCamera();
-            },
-            onUpload: () {
-              Navigator.of(ctx).maybePop();
-              _controller.onPickFiles();
-            },
-            onClear: () async {
-              await Navigator.of(ctx).maybePop();
-              _showContextManagementSheet();
-            },
-            assistantId: assistantId,
-          ),
+        return ListenableBuilder(
+          listenable: _controller,
+          builder: (context, _) {
+            return SafeArea(
+              top: false,
+              child: BottomToolsSheet(
+                onPhotos: () {
+                  Navigator.of(ctx).maybePop();
+                  _controller.onPickPhotos();
+                },
+                onCamera: () {
+                  Navigator.of(ctx).maybePop();
+                  _controller.onPickCamera();
+                },
+                onUpload: () {
+                  Navigator.of(ctx).maybePop();
+                  _controller.onPickFiles();
+                },
+                onClear: () async {
+                  await Navigator.of(ctx).maybePop();
+                  _showContextManagementSheet();
+                },
+                assistantId: assistantId,
+                conversationId: _controller.currentConversation?.id,
+                onClose: () => Navigator.of(ctx).maybePop(),
+              ),
+            );
+          },
         );
       },
     );

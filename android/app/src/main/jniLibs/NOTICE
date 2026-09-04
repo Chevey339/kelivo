@@ -1,0 +1,59 @@
+Kelivo Android workspace sandbox — third-party native code
+==========================================================
+
+This directory packages prebuilt Termux binaries (fetched by
+`tool/fetch_proot.sh`, gitignored) and JNI derived from Termux.
+
+PRoot (libproot_exec.so, libproot_loader.so)
+--------------------------------------------
+PRoot <https://proot-me.github.io> / <https://github.com/termux/proot>
+License: GNU GPL-2.0-or-later
+
+Kelivo executes these binaries as a separate process (not linked into the
+AGPL-3 application). Corresponding source is the Termux proot tree at the
+version below.
+
+Termux package: proot 5.1.107.92
+Pool: https://packages.termux.dev/apt/termux-main/pool/main/p/proot/
+
+  proot_5.1.107.92_aarch64.deb  →  jniLibs/arm64-v8a/
+  proot_5.1.107.92_x86_64.deb   →  jniLibs/x86_64/
+
+SHA-256 of deployed files (also in tool/proot_checksums.txt):
+
+  ea47e17da8e6ff4882c169c6508861e5b4be9227e477c6020f4f14facc85c10d  arm64-v8a/libproot_exec.so
+  44ef39c1e1a18c09f6e4c4b5d6f8bba82d30596598bd155ec162d05c5122ff04  arm64-v8a/libproot_loader.so
+  5c6b99c48ebb87580551afd654e49eb8d178fd45fef0b65397c99a1d901c417b  x86_64/libproot_exec.so
+  914564ea1c66f50b38f18cac857fcf814c6b1ab027789178880fca1d530599b3  x86_64/libproot_loader.so
+
+libtalloc (libtalloc.so)
+------------------------
+Samba talloc <https://talloc.samba.org>
+License: LGPL-3.0-or-later
+Termux package: libtalloc 2.4.3
+(DT_NEEDED of Termux proot is libtalloc.so.2; the ELF is shipped as
+libtalloc.so so Android packages it, and the runtime copies it to
+libtalloc.so.2 on a writable LD_LIBRARY_PATH.)
+
+  3c9b207c0a6ea2896b7523e03f55d9ab0d9e88baa115d4c32b84058ff4246fbb  arm64-v8a/libtalloc.so
+  77be445f4ec245fff9c19e9874ebcf99618244cf48737f5fca938316daaa70da  x86_64/libtalloc.so
+
+libandroid-shmem (libandroid-shmem.so)
+--------------------------------------
+Termux libandroid-shmem <https://github.com/termux/libandroid-shmem>
+License: BSD-3-Clause
+Termux package: libandroid-shmem 0.7
+Required by Termux proot 5.1.107.92 (DT_NEEDED libandroid-shmem.so).
+The older OpenMinis pin (proot 5.1.107-70) is no longer on the Termux pool.
+
+  84475798e07c8174dbbfaec70a827fdb02f19ffa69a589380c13e7507fd0e731  arm64-v8a/libandroid-shmem.so
+  092926060298acd3778e6239033d7aef1280dcb59aebe021a3719612e6a3465f  x86_64/libandroid-shmem.so
+
+Termux PTY JNI (src/main/cpp/termux_pty.cpp → libtermux_pty.so)
+--------------------------------------------------------------
+Derived from Termux terminal-emulator JNI
+<https://github.com/termux/termux-app>
+License: GNU GPL-3.0-or-later
+
+Compatible with Kelivo's AGPL-3. The C++ sources are included in this
+repository; the JNI class is com.psyche.kelivo.workspace.PtyJni.

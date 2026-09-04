@@ -100,6 +100,9 @@ class ChatInputBar extends StatefulWidget {
     this.onLongPressSelectModel,
     this.onOpenMcp,
     this.onLongPressMcp,
+    this.onOpenWorkspace,
+    this.showWorkspaceButton = false,
+    this.workspaceActive = false,
     this.onOpenSearch,
     this.onMore,
     this.onConfigureReasoning,
@@ -152,6 +155,9 @@ class ChatInputBar extends StatefulWidget {
   final VoidCallback? onLongPressSelectModel;
   final VoidCallback? onOpenMcp;
   final VoidCallback? onLongPressMcp;
+  final VoidCallback? onOpenWorkspace;
+  final bool showWorkspaceButton;
+  final bool workspaceActive;
   final VoidCallback? onOpenSearch;
   final VoidCallback? onMore;
   final VoidCallback? onConfigureReasoning;
@@ -1913,6 +1919,25 @@ class _ChatInputBarState extends State<ChatInputBar>
                 svgAsset: ReasoningIcons.assetForBudget(widget.reasoningBudget),
                 label: l10n.chatInputBarReasoningStrengthTooltip,
                 onTap: lockTap(widget.onConfigureReasoning),
+              ),
+            ),
+          );
+        }
+
+        if (widget.showWorkspaceButton) {
+          actions.add(
+            _OverflowAction(
+              width: normalButtonW,
+              builder: () => _CompactIconButton(
+                tooltip: l10n.workspaceEntryTooltip,
+                icon: Lucide.FolderCode,
+                active: widget.workspaceActive,
+                onTap: lockTap(widget.onOpenWorkspace),
+              ),
+              menu: DesktopContextMenuItem(
+                icon: Lucide.FolderCode,
+                label: l10n.workspaceEntryTooltip,
+                onTap: lockTap(widget.onOpenWorkspace),
               ),
             ),
           );

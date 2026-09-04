@@ -80,6 +80,8 @@ private let backgroundProcessingIdentifier = "psyche.kelivo.background-generatio
          self?.deviceLocalToolsHandler.handle(call: call, result: result)
        }
 
+      WorkspacePlugin.register(messenger: controller.binaryMessenger)
+
       // Free space on the volume holding the app's data. Uses the "important
       // usage" capacity, which is what iOS will actually free up for data the
       // app cannot regenerate -- the plain available-capacity value understates

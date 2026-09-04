@@ -406,6 +406,8 @@ class SettingsProvider extends ChangeNotifier {
   static const String _desktopSidebarOpenKey = 'desktop_sidebar_open_v1';
   static const String _desktopRightSidebarWidthKey =
       'desktop_right_sidebar_width_v1';
+  static const String _desktopWorkspaceBarOpenKey =
+      'desktop_workspace_bar_open_v1';
 
   // ===== Network TTS services =====
   List<TtsServiceOptions> _ttsServices = const <TtsServiceOptions>[];
@@ -545,6 +547,8 @@ class SettingsProvider extends ChangeNotifier {
       _desktopTopicPosition == DesktopTopicPosition.right;
   bool _desktopRightSidebarOpen = true;
   bool get desktopRightSidebarOpen => _desktopRightSidebarOpen;
+  bool _desktopWorkspaceBarOpen = false;
+  bool get desktopWorkspaceBarOpen => _desktopWorkspaceBarOpen;
 
   Map<String, ProviderConfig> _providerConfigs = {};
   Map<String, ProviderConfig> get providerConfigs =>
@@ -1291,6 +1295,8 @@ class SettingsProvider extends ChangeNotifier {
     }
     _desktopRightSidebarOpen =
         prefs.getBool(_desktopRightSidebarOpenKey) ?? true;
+    _desktopWorkspaceBarOpen =
+        prefs.getBool(_desktopWorkspaceBarOpenKey) ?? false;
     // Chat message background style (default | frosted | solid)
     final bgStyleStr =
         prefs.getString(_displayChatMessageBackgroundStyleKey) ?? 'default';
@@ -2159,6 +2165,14 @@ class SettingsProvider extends ChangeNotifier {
     notifyListeners();
     final prefs = _preferences;
     await prefs.setBool(_desktopRightSidebarOpenKey, _desktopRightSidebarOpen);
+  }
+
+  Future<void> setDesktopWorkspaceBarOpen(bool open) async {
+    if (_desktopWorkspaceBarOpen == open) return;
+    _desktopWorkspaceBarOpen = open;
+    notifyListeners();
+    final prefs = _preferences;
+    await prefs.setBool(_desktopWorkspaceBarOpenKey, _desktopWorkspaceBarOpen);
   }
 
   // ===== App locale (UI language) =====

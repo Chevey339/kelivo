@@ -12,9 +12,10 @@ import '../../home/widgets/world_book_sheet.dart';
 import '../../instruction_injection/pages/instruction_injection_page.dart';
 import '../../world_book/pages/world_book_page.dart';
 import '../../model/widgets/ocr_prompt_sheet.dart';
-import 'package:Kelivo/theme/app_font_weights.dart';
+import '../../workspace/widgets/workspace_section.dart';
 import 'package:Kelivo/theme/app_semantic_colors.dart';
 import '../../../shared/widgets/section_card.dart';
+import 'tools_sheet_row.dart';
 
 class BottomToolsSheet extends StatelessWidget {
   const BottomToolsSheet({
@@ -25,6 +26,8 @@ class BottomToolsSheet extends StatelessWidget {
     this.onClear,
     this.clearLabel,
     this.assistantId,
+    this.conversationId,
+    this.onClose,
   });
 
   final VoidCallback? onCamera;
@@ -33,6 +36,8 @@ class BottomToolsSheet extends StatelessWidget {
   final VoidCallback? onClear;
   final String? clearLabel;
   final String? assistantId;
+  final String? conversationId;
+  final VoidCallback? onClose;
 
   @override
   Widget build(BuildContext context) {
@@ -140,6 +145,13 @@ class BottomToolsSheet extends StatelessWidget {
                       ],
                     ),
                     const SizedBox(height: 12),
+                    WorkspaceSection(
+                      key: ValueKey<String?>(conversationId),
+                      conversationId: conversationId,
+                      assistantId: assistantId,
+                      onClose: onClose,
+                    ),
+                    const SizedBox(height: 12),
                     _LearningAndClearSection(
                       clearLabel: clearLabel,
                       onClear: onClear,
@@ -181,66 +193,21 @@ class _LearningAndClearSectionState extends State<_LearningAndClearSection> {
     });
   }
 
-  Widget _row({
-    required IconData icon,
-    required String label,
-    bool selected = false,
-    VoidCallback? onTap,
-    VoidCallback? onLongPress,
-    Widget? trailing,
-  }) {
-    final cs = Theme.of(context).colorScheme;
-    final onColor = selected ? cs.primary : cs.onSurface;
-    final radius = BorderRadius.circular(14);
-    return SizedBox(
-      height: 48,
-      child: IosCardPress(
-        borderRadius: radius,
-        baseColor: sheetTileColor(context),
-        duration: const Duration(milliseconds: 260),
-        onTap: onTap,
-        onLongPress: onLongPress,
-        padding: const EdgeInsets.symmetric(horizontal: 12),
-        child: Row(
-          children: [
-            Icon(icon, size: 20, color: onColor),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Text(
-                label,
-                style: TextStyle(
-                  fontSize: 15,
-                  fontWeight: AppFontWeights.medium,
-                  color: onColor,
-                ),
-              ),
-            ),
-            trailing ??
-                (selected
-                    ? Icon(Lucide.Check, size: 18, color: cs.primary)
-                    : const SizedBox(width: 18)),
-          ],
-        ),
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
     final settings = context.watch<SettingsProvider>();
     final worldBookProvider = context.watch<WorldBookProvider>();
-    final cs = Theme.of(context).colorScheme;
     final hasOcrModel =
         settings.ocrModelProvider != null && settings.ocrModelId != null;
     final hasWorldBooks = worldBookProvider.books.isNotEmpty;
+    final chevron = ToolsSheetRow.chevron(context);
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        _row(
+        ToolsSheetRow(
           icon: Lucide.Layers,
           label: l10n.instructionInjectionTitle,
-          selected: false,
           onTap: () async {
             Haptics.light();
             await showInstructionInjectionSheet(
@@ -260,18 +227,13 @@ class _LearningAndClearSectionState extends State<_LearningAndClearSection> {
               );
             });
           },
-          trailing: Icon(
-            Lucide.ChevronRight,
-            size: 18,
-            color: cs.onSurface.withValues(alpha: 0.55),
-          ),
+          trailing: chevron,
         ),
         if (hasWorldBooks) ...[
           const SizedBox(height: 8),
-          _row(
+          ToolsSheetRow(
             icon: Lucide.BookOpen,
             label: l10n.worldBookTitle,
-            selected: false,
             onTap: () async {
               Haptics.light();
               await showWorldBookSheet(
@@ -289,16 +251,12 @@ class _LearningAndClearSectionState extends State<_LearningAndClearSection> {
                 );
               });
             },
-            trailing: Icon(
-              Lucide.ChevronRight,
-              size: 18,
-              color: cs.onSurface.withValues(alpha: 0.55),
-            ),
+            trailing: chevron,
           ),
         ],
         if (hasOcrModel) ...[
           const SizedBox(height: 8),
-          _row(
+          ToolsSheetRow(
             icon: Lucide.Eye,
             label: l10n.bottomToolsSheetOcr,
             selected: settings.ocrEnabled,
@@ -313,18 +271,14 @@ class _LearningAndClearSectionState extends State<_LearningAndClearSection> {
           ),
         ],
         const SizedBox(height: 8),
-        _row(
+        ToolsSheetRow(
           icon: Lucide.workflow,
           label: l10n.contextManagement,
           onTap: () {
             Haptics.light();
             widget.onClear?.call();
           },
-          trailing: Icon(
-            Lucide.ChevronRight,
-            size: 18,
-            color: cs.onSurface.withValues(alpha: 0.55),
-          ),
+          trailing: chevron,
         ),
       ],
     );

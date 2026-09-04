@@ -207,6 +207,7 @@ void main() {
         lastMemoryExtractedOrder: 7,
         chatModelProvider: 'OpenAI',
         chatModelId: 'gpt-5',
+        extras: const {'workspace.id': 'ws-1'},
       );
 
       await service.restoreConversation(source, const []);
@@ -217,6 +218,7 @@ void main() {
       expect(restored.summary, 'a summary');
       expect(restored.injectedMemoryHash, 'hash-1');
       expect(restored.lastMemoryExtractedOrder, 7);
+      expect(restored.extras['workspace.id'], 'ws-1');
     });
 
     test('the override survives a JSON round trip', () {

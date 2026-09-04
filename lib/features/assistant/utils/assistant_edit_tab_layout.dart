@@ -3,6 +3,7 @@ const String assistantEditTabPrompts = 'prompts';
 const String assistantEditTabMemory = 'memory';
 const String assistantEditTabMcp = 'mcp';
 const String assistantEditTabLocalTools = 'localTools';
+const String assistantEditTabSkills = 'skills';
 const String assistantEditTabQuickPhrase = 'quickPhrase';
 const String assistantEditTabCustom = 'custom';
 const String assistantEditTabRegex = 'regex';
@@ -15,6 +16,7 @@ const List<String> defaultAssistantEditTabIds = [
   assistantEditTabCustom,
   assistantEditTabRegex,
   assistantEditTabLocalTools,
+  assistantEditTabSkills,
   assistantEditTabMcp,
 ];
 

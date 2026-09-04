@@ -36,7 +36,7 @@ void main() {
       if (await root.exists()) await root.delete(recursive: true);
     });
 
-    test('describes selected database and all four asset roots', () async {
+    test('describes selected database and all declared asset roots', () async {
       final database = File(p.join(root.path, 'kelivo.db'));
       await database.writeAsBytes([1, 2, 3, 4], flush: true);
       final upload = File(p.join(root.path, 'upload', 'nested', 'note.txt'));
@@ -63,6 +63,9 @@ void main() {
         'images': RestorePreviousAssetRootState.directory,
         'avatars': RestorePreviousAssetRootState.missing,
         'fonts': RestorePreviousAssetRootState.directory,
+        'skills': RestorePreviousAssetRootState.missing,
+        'workspaces': RestorePreviousAssetRootState.missing,
+        'sessions': RestorePreviousAssetRootState.missing,
       });
       expect(bundle.plan.assets?.entries.keys, [
         'fonts/font.bin',

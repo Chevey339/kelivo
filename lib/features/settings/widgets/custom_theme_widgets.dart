@@ -219,11 +219,15 @@ class AppDialogHeader extends StatelessWidget {
               ),
             ),
             ...?actions,
-            IosIconButton(
-              icon: Lucide.X,
-              size: 18,
-              color: cs.onSurface.withValues(alpha: 0.62),
-              onTap: () => Navigator.of(context).maybePop(),
+            Tooltip(
+              message: AppLocalizations.of(context)!.commonClose,
+              child: IosIconButton(
+                icon: Lucide.X,
+                size: 18,
+                color: cs.onSurface.withValues(alpha: 0.62),
+                semanticLabel: AppLocalizations.of(context)!.commonClose,
+                onTap: () => Navigator.of(context).maybePop(),
+              ),
             ),
           ],
         ),

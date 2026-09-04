@@ -51,4 +51,8 @@ post_install do |installer|
       end
     end
   end
+
+  # iSH Workspace sandbox: Runner link/include flags live in
+  # Flutter/Workspace.xcconfig (included from Debug/Release.xcconfig) so they
+  # survive `pod install` / `flutter build ios`.
 end

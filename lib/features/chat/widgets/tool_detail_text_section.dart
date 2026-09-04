@@ -13,6 +13,8 @@ class ToolDetailTextSection extends StatelessWidget {
     required this.label,
     required this.text,
     this.textStyle = const TextStyle(fontSize: 12),
+    this.trailing,
+    this.belowLabel,
   });
 
   /// Above this many lines (or characters) the text is chunked and built lazily.
@@ -27,6 +29,12 @@ class ToolDetailTextSection extends StatelessWidget {
   final String label;
   final String text;
   final TextStyle textStyle;
+
+  /// Optional control aligned to the right of [label] (e.g. a copy button).
+  final Widget? trailing;
+
+  /// Optional content rendered between the label row and the text box.
+  final Widget? belowLabel;
 
   static bool shouldChunk(String text) {
     if (text.length > lazyCharThreshold) return true;
@@ -59,23 +67,39 @@ class ToolDetailTextSection extends StatelessWidget {
       border: Border.all(color: cs.outlineVariant.withValues(alpha: 0.2)),
     );
 
+    final labelStyle = TextStyle(
+      fontSize: 12,
+      color: cs.onSurface.withValues(alpha: 0.6),
+    );
+    final labelText = Text(label, style: labelStyle);
     final header = SliverToBoxAdapter(
       child: Padding(
         padding: const EdgeInsets.only(bottom: 6),
-        child: Text(
-          label,
-          style: TextStyle(
-            fontSize: 12,
-            color: cs.onSurface.withValues(alpha: 0.6),
-          ),
-        ),
+        child: trailing == null
+            ? labelText
+            : Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  Expanded(child: labelText),
+                  trailing!,
+                ],
+              ),
       ),
     );
+    final below = belowLabel == null
+        ? null
+        : SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: belowLabel,
+            ),
+          );
 
     if (!shouldChunk(text)) {
       return SliverMainAxisGroup(
         slivers: [
           header,
+          if (below != null) below,
           SliverToBoxAdapter(
             child: Container(
               width: double.infinity,
@@ -92,6 +116,7 @@ class ToolDetailTextSection extends StatelessWidget {
     return SliverMainAxisGroup(
       slivers: [
         header,
+        if (below != null) below,
         DecoratedSliver(
           decoration: decoration,
           sliver: SliverPadding(

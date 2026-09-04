@@ -24,7 +24,12 @@ import '../../../core/services/logging/context_log_models.dart';
 import '../../../core/services/logging/context_logger.dart';
 import '../../../core/services/memory/memory_block_builder.dart';
 import '../../../core/services/memory/memory_prompts.dart';
+import '../../../core/models/skills_binding.dart';
+import '../../../core/providers/workspace_provider.dart';
 import '../../../core/services/search/search_tool_service.dart';
+import '../../../core/services/skills/skills_service.dart';
+import '../../../core/services/workspace/workspace_runtime.dart';
+import '../../../core/services/workspace/workspace_tools_service.dart';
 import '../../../core/providers/instruction_injection_provider.dart';
 import '../../../core/providers/world_book_provider.dart';
 import '../../../core/services/api/builtin_tools.dart';
@@ -1602,7 +1607,8 @@ class MessageBuilderService {
   /// user template)` — must not vary with memory content or the clock (§11.1).
   /// Relative order among remaining system injections is preserved by the
   /// caller (`injectSystemPrompt` → this → `injectSearchPrompt` →
-  /// `injectInstructionPrompts` → `injectWorldBookPrompts`).
+  /// `injectInstructionPrompts` → `injectWorldBookPrompts` →
+  /// `injectWorkspacePrompt` → `injectSkillsPrompt`).
   Future<void> injectMemoryAndRecentChats(
     List<Map<String, dynamic>> apiMessages,
     Assistant? assistant, {
@@ -1769,6 +1775,74 @@ class MessageBuilderService {
           source: ContextSource.instructionInjection,
         );
       }
+    } catch (_) {}
+  }
+
+  /// Inject the workspace path / tool prompt after other system injections.
+  Future<void> injectWorkspacePrompt(
+    List<Map<String, dynamic>> apiMessages,
+    Assistant? assistant, {
+    String? conversationId,
+    WorkspaceToolContext? workspaceContext,
+    List<AttachmentInfo> attachments = const [],
+  }) async {
+    try {
+      final ctx =
+          workspaceContext ??
+          await WorkspaceToolsService.resolve(
+            conversationId: conversationId,
+            workspaceProvider: contextProvider.read<WorkspaceProvider>(),
+            runtimeProvider: contextProvider.read<WorkspaceRuntimeProvider>(),
+            chatService: chatService,
+          );
+      if (ctx == null) return;
+      final fragment = WorkspaceToolsService.buildPromptFragment(
+        ctx,
+        attachments: attachments,
+      );
+      if (fragment.trim().isEmpty) return;
+      _appendToSystemMessage(
+        apiMessages,
+        fragment,
+        source: ContextSource.instructionInjection,
+      );
+    } catch (_) {}
+  }
+
+  /// Inject the `<available_skills>` list after the workspace prompt.
+  Future<void> injectSkillsPrompt(
+    List<Map<String, dynamic>> apiMessages,
+    Assistant? assistant, {
+    String? conversationId,
+    WorkspaceToolContext? workspaceContext,
+  }) async {
+    try {
+      final skillsService = contextProvider.read<SkillsService>();
+      await skillsService.loaded;
+      List<String>? override;
+      if (conversationId != null && conversationId.isNotEmpty) {
+        final conversation = chatService.getConversation(conversationId);
+        if (conversation != null) {
+          override = SkillsBinding.fromExtras(conversation.extras).skillIds;
+        }
+      }
+      final skills = skillsService.resolveForAssistant(
+        assistant,
+        conversationOverride: override,
+      );
+      if (skills.isEmpty) return;
+      final skillsModelRoot =
+          workspaceContext?.paths.modelSkillsDir ?? '/skills';
+      final fragment = buildAvailableSkillsFragment(
+        skills,
+        skillsModelRoot: skillsModelRoot,
+      );
+      if (fragment.trim().isEmpty) return;
+      _appendToSystemMessage(
+        apiMessages,
+        fragment,
+        source: ContextSource.instructionInjection,
+      );
     } catch (_) {}
   }
 
