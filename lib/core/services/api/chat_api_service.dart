@@ -24,6 +24,7 @@ import 'providers/openai_responses.dart';
 import 'providers/zhipu_layout_parsing.dart';
 import 'retry_policy.dart';
 import 'stream/retrying_stream.dart';
+import 'stream/stream_chunk_emit.dart';
 
 export 'chat_api_helpers.dart' show ToolCallHandler;
 export 'generation/text_generation_result.dart';
@@ -222,26 +223,28 @@ class ChatApiService {
               )
             : null,
         attemptStartEvent: emitRetryUi ? () => const RetryAttemptStart() : null,
-        attempt: (_) => _sendOnce(
-          config: config,
-          modelId: modelId,
-          messages: safeMessages,
-          userImagePaths: safeUserImagePaths,
-          thinkingBudget: thinkingBudget,
-          temperature: temperature,
-          topP: topP,
-          maxTokens: maxTokens,
-          tools: tools,
-          onToolCall: onToolCall,
-          extraHeaders: extraHeaders,
-          extraBody: extraBody,
-          stream: stream,
-          builtInSearchOnly: builtInSearchOnly,
-          skipImageParsing: skipImageParsing || !parseMarkdownImageLinks,
-          kind: kind,
-          useOpenAIImagesApi: useOpenAIImagesApi,
-          useZhipuLayoutParsing: useZhipuLayoutParsing,
-          sessionToken: sessionToken,
+        attempt: (_) => carrySplitSurrogates(
+          _sendOnce(
+            config: config,
+            modelId: modelId,
+            messages: safeMessages,
+            userImagePaths: safeUserImagePaths,
+            thinkingBudget: thinkingBudget,
+            temperature: temperature,
+            topP: topP,
+            maxTokens: maxTokens,
+            tools: tools,
+            onToolCall: onToolCall,
+            extraHeaders: extraHeaders,
+            extraBody: extraBody,
+            stream: stream,
+            builtInSearchOnly: builtInSearchOnly,
+            skipImageParsing: skipImageParsing || !parseMarkdownImageLinks,
+            kind: kind,
+            useOpenAIImagesApi: useOpenAIImagesApi,
+            useZhipuLayoutParsing: useZhipuLayoutParsing,
+            sessionToken: sessionToken,
+          ),
         ),
       );
     } finally {

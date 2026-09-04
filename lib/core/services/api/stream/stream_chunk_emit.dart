@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import '../../../../utils/unicode_sanitizer.dart';
 import '../../../models/token_usage.dart';
 import 'stream_chunk.dart';
 import 'stream_chunk_ids.dart';
@@ -21,6 +22,73 @@ Future<StreamChunk> sanitizeStreamChunk(
     }
   }
   return chunk;
+}
+
+/// Holds back a trailing lone high surrogate at chunk boundaries so SSE
+/// JSON escapes split across [TextDelta] / [ReasoningDelta] events can be
+/// reassembled before the UI sees ill-formed UTF-16.
+Stream<StreamChunk> carrySplitSurrogates(Stream<StreamChunk> source) async* {
+  var textCarry = '';
+  var reasoningCarry = '';
+  String? lastTextId;
+  String? lastReasoningId;
+
+  Stream<StreamChunk> flushCarries() async* {
+    if (textCarry.isNotEmpty && lastTextId != null) {
+      yield TextDelta(id: lastTextId, text: '\uFFFD');
+      textCarry = '';
+    }
+    if (reasoningCarry.isNotEmpty && lastReasoningId != null) {
+      yield ReasoningDelta(id: lastReasoningId, text: '\uFFFD');
+      reasoningCarry = '';
+    }
+  }
+
+  await for (final chunk in source) {
+    switch (chunk) {
+      case TextDelta():
+        lastTextId = chunk.id;
+        final processed = _processCarriedText(textCarry, chunk.text);
+        textCarry = processed.carry;
+        if (processed.text.isNotEmpty) {
+          yield TextDelta(id: chunk.id, text: processed.text);
+        }
+      case ReasoningDelta():
+        lastReasoningId = chunk.id;
+        final processed = _processCarriedText(reasoningCarry, chunk.text);
+        reasoningCarry = processed.carry;
+        if (processed.text.isNotEmpty ||
+            (processed.text.isEmpty && chunk.details != null)) {
+          yield ReasoningDelta(
+            id: chunk.id,
+            text: processed.text,
+            metadata: chunk.metadata,
+            reasoningType: chunk.reasoningType,
+            details: chunk.details,
+          );
+        }
+      case Finish():
+        yield* flushCarries();
+        yield chunk;
+      default:
+        yield chunk;
+    }
+  }
+
+  yield* flushCarries();
+}
+
+({String text, String carry}) _processCarriedText(String carry, String delta) {
+  var text = carry + delta;
+  var nextCarry = '';
+  if (text.isNotEmpty) {
+    final last = text.codeUnitAt(text.length - 1);
+    if (last >= 0xD800 && last <= 0xDBFF) {
+      nextCarry = String.fromCharCode(last);
+      text = text.substring(0, text.length - 1);
+    }
+  }
+  return (text: UnicodeSanitizer.sanitize(text), carry: nextCarry);
 }
 
 Stream<StreamChunk> emitText(
