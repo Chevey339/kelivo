@@ -17,9 +17,10 @@ import 'package:Kelivo/utils/app_directories.dart';
 
 /// Resolves mounts/cwd and pushes [TerminalPage].
 ///
-/// Prefers a conversation workspace binding; otherwise uses [workspaceId].
-/// Reuses a live session for the same target and appends [command] to its
-/// input line. Does not assign [WorkspaceNavigation.openTerminal].
+/// Opens a PTY for [workspaceId] when that id is set; otherwise prefers the
+/// conversation workspace binding. Reuses a live session for the same target
+/// and appends [command] to its input line. Does not assign
+/// [WorkspaceNavigation.openTerminal].
 Future<void> openTerminal(
   BuildContext context, {
   String? conversationId,
@@ -49,8 +50,11 @@ Future<void> openTerminal(
     return;
   }
 
+  final explicitWorkspaceId = workspaceId?.trim();
   final resolvedConversationId =
-      conversationId ?? chatService.currentConversationId;
+      explicitWorkspaceId != null && explicitWorkspaceId.isNotEmpty
+      ? null
+      : (conversationId ?? chatService.currentConversationId);
   final ctx = resolvedConversationId == null
       ? null
       : await WorkspaceToolsService.resolve(

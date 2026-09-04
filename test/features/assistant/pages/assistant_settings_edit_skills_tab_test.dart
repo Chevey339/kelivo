@@ -93,7 +93,11 @@ void main() {
     );
     expect(
       find.byKey(AssistantSettingsEditSkillsTab.skillKey('keep')),
-      findsNothing,
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(AssistantSettingsEditSkillsTab.skillKey('off')),
+      findsOneWidget,
     );
 
     await tester.tap(find.byKey(AssistantSettingsEditSkillsTab.useAllKey));

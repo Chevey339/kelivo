@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:Kelivo/core/models/assistant.dart';
 import 'package:Kelivo/core/models/skills_binding.dart';
+import 'package:Kelivo/core/providers/assistant_provider.dart';
 import 'package:Kelivo/core/services/chat/chat_service.dart';
 import 'package:Kelivo/core/services/skills/skills_service.dart';
 import 'package:Kelivo/features/settings/widgets/custom_theme_widgets.dart';
@@ -72,11 +73,29 @@ class ConversationSkillsPanel extends StatelessWidget {
     return SkillsBinding.fromExtras(extras);
   }
 
-  Future<void> _write(BuildContext context, List<String>? skillIds) {
+  Future<void> _writeConversation(
+    BuildContext context,
+    List<String>? skillIds,
+  ) {
     return context.read<ChatService>().updateConversationExtras(
       conversationId,
       (extras) => SkillsBinding(skillIds: skillIds).applyTo(extras),
     );
+  }
+
+  Future<void> _writeAssistant(BuildContext context, List<String> skillIds) {
+    final id = assistant?.id;
+    if (id == null) return Future<void>.value();
+    final ap = context.read<AssistantProvider>();
+    final current = ap.getById(id);
+    if (current == null) return Future<void>.value();
+    return ap.updateAssistant(current.copyWith(skillIds: skillIds));
+  }
+
+  Assistant? _liveAssistant(BuildContext context) {
+    final id = assistant?.id;
+    if (id == null) return assistant;
+    return context.watch<AssistantProvider>().getById(id) ?? assistant;
   }
 
   @override
@@ -85,6 +104,7 @@ class ConversationSkillsPanel extends StatelessWidget {
     final cs = Theme.of(context).colorScheme;
     final chat = context.watch<ChatService>();
     final skillsService = context.watch<SkillsService>();
+    final live = _liveAssistant(context);
     final binding = _binding(chat);
     final inherit = binding.skillIds == null;
     final enabled = [
@@ -92,7 +112,7 @@ class ConversationSkillsPanel extends StatelessWidget {
         if (skill.record.enabled) skill,
     ];
     final active = skillsService.resolveForAssistant(
-      assistant,
+      live,
       conversationOverride: binding.skillIds,
     );
     final activeIds = {for (final skill in active) skill.record.id};
@@ -109,16 +129,14 @@ class ConversationSkillsPanel extends StatelessWidget {
               value: inherit,
               onChanged: (value) {
                 if (value) {
-                  unawaited(_write(context, null));
+                  unawaited(_writeConversation(context, null));
                   return;
                 }
                 final snapshot = [
-                  for (final skill in skillsService.resolveForAssistant(
-                    assistant,
-                  ))
+                  for (final skill in skillsService.resolveForAssistant(live))
                     skill.record.id,
                 ];
-                unawaited(_write(context, snapshot));
+                unawaited(_writeConversation(context, snapshot));
               },
             ),
           ],
@@ -161,17 +179,31 @@ class ConversationSkillsPanel extends StatelessWidget {
                       : (binding.skillIds ?? const <String>[]).contains(
                           enabled[i].record.id,
                         ),
-                  onChanged: inherit
-                      ? (_) {}
-                      : (checked) {
-                          final ids = {...?binding.skillIds};
-                          if (checked) {
-                            ids.add(enabled[i].record.id);
-                          } else {
-                            ids.remove(enabled[i].record.id);
-                          }
-                          unawaited(_write(context, ids.toList()));
-                        },
+                  onChanged: (checked) {
+                    final skillId = enabled[i].record.id;
+                    if (inherit) {
+                      final ids = {
+                        for (final skill in skillsService.resolveForAssistant(
+                          live,
+                        ))
+                          skill.record.id,
+                      };
+                      if (checked) {
+                        ids.add(skillId);
+                      } else {
+                        ids.remove(skillId);
+                      }
+                      unawaited(_writeAssistant(context, ids.toList()));
+                      return;
+                    }
+                    final ids = {...?binding.skillIds};
+                    if (checked) {
+                      ids.add(skillId);
+                    } else {
+                      ids.remove(skillId);
+                    }
+                    unawaited(_writeConversation(context, ids.toList()));
+                  },
                 ),
               ],
             ],

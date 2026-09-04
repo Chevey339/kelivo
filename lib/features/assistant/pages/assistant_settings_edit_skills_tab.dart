@@ -105,48 +105,45 @@ class AssistantSettingsEditSkillsTab extends StatelessWidget {
             ),
           ],
         ),
-        if (!useAll) ...[
-          const SizedBox(height: 12),
-          if (skills.isEmpty)
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-              child: Text(
-                l10n.skillsEmptyTitle,
-                style: TextStyle(color: cs.onSurface.withValues(alpha: 0.6)),
-              ),
-            )
-          else
-            SectionCard(
-              dividers: true,
-              children: [
-                for (var i = 0; i < skills.length; i++)
-                  _AssistantSkillRow(
-                    name: skills[i].name,
-                    description: skills[i].description,
-                    enabled: skills[i].record.enabled,
-                    selected: selected.contains(skills[i].record.id),
-                    disabledHint: l10n.skillsDisabledHint,
-                    onChanged: skills[i].record.enabled
-                        ? (checked) {
-                            final next = {...selected};
-                            if (checked) {
-                              next.add(skills[i].record.id);
-                            } else {
-                              next.remove(skills[i].record.id);
-                            }
-                            unawaited(
-                              _persist(
-                                context: context,
-                                skillIds: next.toList(),
-                              ),
-                            );
-                          }
-                        : null,
-                    rowKey: skillKey(skills[i].record.id),
-                  ),
-              ],
+        const SizedBox(height: 12),
+        if (skills.isEmpty)
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+            child: Text(
+              l10n.skillsEmptyTitle,
+              style: TextStyle(color: cs.onSurface.withValues(alpha: 0.6)),
             ),
-        ],
+          )
+        else
+          SectionCard(
+            dividers: true,
+            children: [
+              for (final skill in skills)
+                _AssistantSkillRow(
+                  name: skill.name,
+                  description: skill.description,
+                  enabled: skill.record.enabled,
+                  selected: useAll
+                      ? skill.record.enabled
+                      : selected.contains(skill.record.id),
+                  disabledHint: l10n.skillsDisabledHint,
+                  onChanged: useAll || !skill.record.enabled
+                      ? null
+                      : (checked) {
+                          final next = {...selected};
+                          if (checked) {
+                            next.add(skill.record.id);
+                          } else {
+                            next.remove(skill.record.id);
+                          }
+                          unawaited(
+                            _persist(context: context, skillIds: next.toList()),
+                          );
+                        },
+                  rowKey: skillKey(skill.record.id),
+                ),
+            ],
+          ),
         const SizedBox(height: 16),
         IosTileButton(
           key: openPageKey,

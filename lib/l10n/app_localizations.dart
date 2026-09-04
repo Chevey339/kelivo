@@ -1528,6 +1528,12 @@ abstract class AppLocalizations {
   /// **'Assistant not found'**
   String get assistantEditPageNotFound;
 
+  /// No description provided for @assistantEditPageWorkspaceTab.
+  ///
+  /// In en, this message translates to:
+  /// **'Workspace'**
+  String get assistantEditPageWorkspaceTab;
+
   /// No description provided for @assistantEditPageBasicTab.
   ///
   /// In en, this message translates to:
@@ -17792,7 +17798,7 @@ abstract class AppLocalizations {
   /// No description provided for @workspaceEntrySessionSkills.
   ///
   /// In en, this message translates to:
-  /// **'Session skills'**
+  /// **'Skills'**
   String get workspaceEntrySessionSkills;
 
   /// No description provided for @workspaceEntryAllowAll.

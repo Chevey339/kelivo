@@ -629,6 +629,47 @@ void main() {
     expect(tester.widget<Text>(find.text('Delete')).style?.color, error);
   });
 
+  testWidgets('more menu opens the workspace terminal', (tester) async {
+    var opened = 0;
+    File(p.join(tempDir.path, 'keep.txt')).writeAsStringSync('k');
+
+    await pumpHarness(
+      tester,
+      child: SizedBox(
+        width: 300,
+        height: 640,
+        child: FileBrowser(
+          root: tempDir,
+          rootLabel: 'Root',
+          modelPathOf: (host) => host,
+          onOpenTerminal: () => opened++,
+        ),
+      ),
+    );
+    await _reload(tester);
+
+    await tester.tap(find.byKey(FileBrowser.moreKey));
+    await _pumpUi(tester);
+    expect(find.byKey(FileBrowser.terminalKey), findsOneWidget);
+    await tester.tap(find.byKey(FileBrowser.terminalKey));
+    await _pumpUi(tester);
+    expect(opened, 1);
+  });
+
+  testWidgets('more menu omits terminal without a callback', (tester) async {
+    File(p.join(tempDir.path, 'keep.txt')).writeAsStringSync('k');
+
+    await pumpHarness(
+      tester,
+      child: SizedBox(width: 300, height: 640, child: _browser(tempDir)),
+    );
+    await _reload(tester);
+
+    await tester.tap(find.byKey(FileBrowser.moreKey));
+    await _pumpUi(tester);
+    expect(find.byKey(FileBrowser.terminalKey), findsNothing);
+  });
+
   testWidgets('sort sheet returns the chosen field', (tester) async {
     File(p.join(tempDir.path, 'b.txt')).writeAsStringSync('bb');
     File(p.join(tempDir.path, 'a.txt')).writeAsStringSync('a');

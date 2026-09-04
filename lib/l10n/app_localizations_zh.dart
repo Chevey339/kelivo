@@ -760,6 +760,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get assistantEditPageNotFound => '助手不存在';
 
   @override
+  String get assistantEditPageWorkspaceTab => '工作区设置';
+
+  @override
   String get assistantEditPageBasicTab => '基础设置';
 
   @override
@@ -9470,7 +9473,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get workspaceEntryReveal => '在文件管理器中显示';
 
   @override
-  String get workspaceEntrySessionSkills => '本会话技能';
+  String get workspaceEntrySessionSkills => '技能';
 
   @override
   String get workspaceEntryAllowAll => '本会话全部允许';
@@ -10810,6 +10813,9 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get assistantEditPageNotFound => '助手不存在';
+
+  @override
+  String get assistantEditPageWorkspaceTab => '工作区设置';
 
   @override
   String get assistantEditPageBasicTab => '基础设置';
@@ -19448,7 +19454,7 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get workspaceEntryReveal => '在文件管理器中显示';
 
   @override
-  String get workspaceEntrySessionSkills => '本会话技能';
+  String get workspaceEntrySessionSkills => '技能';
 
   @override
   String get workspaceEntryAllowAll => '本会话全部允许';
@@ -20788,6 +20794,9 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get assistantEditPageNotFound => '助理不存在';
+
+  @override
+  String get assistantEditPageWorkspaceTab => '工作區設定';
 
   @override
   String get assistantEditPageBasicTab => '基礎設定';
@@ -29502,7 +29511,7 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get workspaceEntryReveal => '在檔案管理員中顯示';
 
   @override
-  String get workspaceEntrySessionSkills => '本工作階段技能';
+  String get workspaceEntrySessionSkills => '技能';
 
   @override
   String get workspaceEntryAllowAll => '本工作階段全部允許';

@@ -777,6 +777,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get assistantEditPageNotFound => 'Assistant not found';
 
   @override
+  String get assistantEditPageWorkspaceTab => 'Workspace';
+
+  @override
   String get assistantEditPageBasicTab => 'Basic';
 
   @override
@@ -9887,7 +9890,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get workspaceEntryReveal => 'Reveal in file manager';
 
   @override
-  String get workspaceEntrySessionSkills => 'Session skills';
+  String get workspaceEntrySessionSkills => 'Skills';
 
   @override
   String get workspaceEntryAllowAll => 'Allow all this session';

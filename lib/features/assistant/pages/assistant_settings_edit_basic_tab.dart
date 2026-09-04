@@ -49,59 +49,6 @@ class _BasicSettingsTabState extends State<_BasicSettingsTab> {
     super.dispose();
   }
 
-  String _defaultWorkspaceLabel(BuildContext context, Assistant a) {
-    final l10n = AppLocalizations.of(context)!;
-    final id = a.defaultWorkspaceId;
-    if (id == null || id.isEmpty) return l10n.workspaceEntryNone;
-    try {
-      final workspace = context.watch<WorkspaceProvider>().byId(id);
-      if (workspace == null) return l10n.workspaceEntryNone;
-      return workspace.name;
-    } catch (_) {
-      return l10n.workspaceEntryNone;
-    }
-  }
-
-  Future<void> _pickDefaultWorkspace(BuildContext context, Assistant a) async {
-    final l10n = AppLocalizations.of(context)!;
-    List<Workspace> workspaces = const <Workspace>[];
-    try {
-      workspaces = context.read<WorkspaceProvider>().workspaces;
-    } catch (_) {}
-    final currentId = a.defaultWorkspaceId ?? '';
-
-    final selected = await showOptionSheet<String>(
-      context,
-      title: l10n.workspaceEntryDefaultWorkspace,
-      selected: currentId,
-      items: [
-        OptionSheetItem<String>(
-          value: '',
-          icon: Lucide.Ban,
-          label: l10n.workspaceEntryNone,
-        ),
-        for (final workspace in workspaces)
-          OptionSheetItem<String>(
-            value: workspace.id,
-            icon: workspace.kind == WorkspaceKind.linked
-                ? Lucide.Link
-                : Lucide.FolderCode,
-            label: workspace.name,
-            subtitle: workspace.kind == WorkspaceKind.linked
-                ? l10n.workspaceFilesKindLinked
-                : l10n.workspaceFilesKindManaged,
-          ),
-      ],
-    );
-    if (selected == null || !context.mounted) return;
-    await context.read<AssistantProvider>().updateAssistant(
-      a.copyWith(
-        clearDefaultWorkspaceId: selected.isEmpty,
-        defaultWorkspaceId: selected.isEmpty ? null : selected,
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
@@ -312,15 +259,6 @@ class _BasicSettingsTabState extends State<_BasicSettingsTab> {
                 onChanged: (v) => context
                     .read<AssistantProvider>()
                     .updateAssistant(a.copyWith(streamOutput: v)),
-              ),
-              _iosDivider(context),
-              _iosNavRow(
-                context,
-                icon: Lucide.FolderCode,
-                label: l10n.workspaceEntryDefaultWorkspace,
-                subtitle: l10n.workspaceEntryDefaultWorkspaceSubtitle,
-                detailText: _defaultWorkspaceLabel(context, a),
-                onTap: () => _pickDefaultWorkspace(context, a),
               ),
             ],
           ),

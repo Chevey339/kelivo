@@ -6,6 +6,7 @@ void main() {
   group('assistant edit tab layout', () {
     test('default order keeps MCP after regex replace', () {
       expect(defaultAssistantEditTabIds, const [
+        'workspace',
         'basic',
         'prompts',
         'memory',
@@ -23,7 +24,7 @@ void main() {
         savedOrder: const ['mcp', 'basic'],
       );
 
-      expect(ordered.take(4), const ['mcp', 'basic', 'prompts', 'memory']);
+      expect(ordered.take(4), const ['mcp', 'basic', 'workspace', 'prompts']);
       expect(ordered, containsAll(defaultAssistantEditTabIds));
     });
 
@@ -43,7 +44,7 @@ void main() {
         hiddenIds: const {'prompts', 'mcp'},
       );
 
-      expect(visible.take(3), const ['basic', 'memory', 'quickPhrase']);
+      expect(visible.take(3), const ['basic', 'workspace', 'memory']);
       expect(visible, isNot(contains('mcp')));
       expect(visible, isNot(contains('prompts')));
     });

@@ -108,6 +108,7 @@ class FileBrowser extends StatefulWidget {
     this.emptyIcon,
     this.emptyTitle,
     this.emptyHint,
+    this.onOpenTerminal,
   });
 
   final Directory root;
@@ -123,6 +124,7 @@ class FileBrowser extends StatefulWidget {
   final IconData? emptyIcon;
   final String? emptyTitle;
   final String? emptyHint;
+  final VoidCallback? onOpenTerminal;
 
   static const Key emptyKey = ValueKey<String>('file-browser-empty');
   static const Key errorKey = ValueKey<String>('file-browser-error');
@@ -136,6 +138,7 @@ class FileBrowser extends StatefulWidget {
   static const Key importKey = ValueKey<String>('file-browser-import');
   static const Key exportKey = ValueKey<String>('file-browser-export');
   static const Key moreKey = ValueKey<String>('file-browser-more');
+  static const Key terminalKey = ValueKey<String>('file-browser-terminal');
   static const Key pickBarKey = ValueKey<String>('file-browser-pick-bar');
   static const Key toolbarRowKey = ValueKey<String>('file-browser-toolbar-row');
   static const Key pickDirectoryKey = ValueKey<String>(
@@ -677,6 +680,8 @@ class FileBrowserState extends State<FileBrowser> {
       _hiddenButton(),
       if (_canMutateFiles) ...[_newButton(), _importButton(), _exportButton()],
       if (desktop && !widget.pickDirectoryMode) _refreshButton(),
+      if (widget.onOpenTerminal != null && !widget.pickDirectoryMode)
+        _terminalButton(),
     ];
   }
 
@@ -767,6 +772,16 @@ class FileBrowserState extends State<FileBrowser> {
       tooltip: l10n.workspaceFilesExportFolder,
       icon: Lucide.Download,
       onTap: () => unawaited(_exportCurrent()),
+    );
+  }
+
+  Widget _terminalButton() {
+    final l10n = AppLocalizations.of(context)!;
+    return _toolbarIcon(
+      key: FileBrowser.terminalKey,
+      tooltip: l10n.workspaceEntryTerminal,
+      icon: Lucide.Terminal,
+      onTap: widget.onOpenTerminal!,
     );
   }
 
@@ -941,6 +956,13 @@ class FileBrowserState extends State<FileBrowser> {
       anchor: _anchorFromKey(_moreAnchorKey),
       title: l10n.workspaceFilesMore,
       items: [
+        if (widget.onOpenTerminal != null && !widget.pickDirectoryMode)
+          ActionSheetItem(
+            key: FileBrowser.terminalKey,
+            icon: Lucide.Terminal,
+            label: l10n.workspaceEntryTerminal,
+            onTap: widget.onOpenTerminal!,
+          ),
         if (includeSort)
           ActionSheetItem(
             key: const ValueKey<String>('file-browser-more-sort'),

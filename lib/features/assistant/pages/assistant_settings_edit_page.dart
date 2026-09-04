@@ -29,9 +29,6 @@ import '../../../core/models/conversation.dart';
 import '../../../core/models/preset_message.dart';
 import '../../../core/models/quick_phrase.dart';
 import '../../../core/providers/assistant_provider.dart';
-import '../../../core/providers/workspace_provider.dart';
-import '../../../core/models/workspace.dart';
-import '../../../shared/widgets/option_sheet.dart';
 import '../../../core/providers/mcp_provider.dart';
 import '../../../core/providers/quick_phrase_provider.dart';
 import '../../../core/models/memory_entry.dart';
@@ -67,6 +64,7 @@ import '../../../utils/sandbox_path_resolver.dart';
 import '../utils/assistant_edit_tab_layout.dart';
 import 'assistant_regex_tab.dart';
 import 'assistant_settings_edit_skills_tab.dart';
+import 'assistant_settings_edit_workspace_tab.dart';
 import 'health_data_settings_page.dart';
 import 'package:Kelivo/theme/app_semantic_colors.dart';
 import 'package:Kelivo/shared/widgets/section_card.dart';
@@ -103,6 +101,12 @@ List<_AssistantEditTabSpec> _assistantEditTabSpecs(
 ) {
   final l10n = AppLocalizations.of(context)!;
   return [
+    _AssistantEditTabSpec(
+      id: assistantEditTabWorkspace,
+      label: l10n.assistantEditPageWorkspaceTab,
+      icon: Lucide.FolderCode,
+      child: AssistantSettingsEditWorkspaceTab(assistantId: assistantId),
+    ),
     _AssistantEditTabSpec(
       id: assistantEditTabBasic,
       label: l10n.assistantEditPageBasicTab,
@@ -1541,6 +1545,7 @@ class _IosButtonState extends State<_IosButton> {
 // ===== Desktop Assistant Dialog (reuses mobile tabs) =====
 
 enum _AssistantDesktopMenu {
+  workspace,
   basic,
   prompts,
   memory,
@@ -1583,7 +1588,7 @@ class _DesktopAssistantDialogShell extends StatefulWidget {
 
 class _DesktopAssistantDialogShellState
     extends State<_DesktopAssistantDialogShell> {
-  _AssistantDesktopMenu _menu = _AssistantDesktopMenu.basic;
+  _AssistantDesktopMenu _menu = _AssistantDesktopMenu.workspace;
 
   @override
   Widget build(BuildContext context) {
@@ -1645,6 +1650,11 @@ class _DesktopAssistantDialogShellState
                   switchInCurve: Curves.easeOutCubic,
                   child: () {
                     switch (_menu) {
+                      case _AssistantDesktopMenu.workspace:
+                        return AssistantSettingsEditWorkspaceTab(
+                          assistantId: widget.assistantId,
+                          key: const ValueKey('workspace'),
+                        );
                       case _AssistantDesktopMenu.basic:
                         return _DesktopAssistantBasicPane(
                           assistantId: widget.assistantId,
@@ -1700,6 +1710,7 @@ class _DesktopAssistantMenuState extends State<_DesktopAssistantMenu> {
     final cs = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final items = <(_AssistantDesktopMenu, String)>[
+      (_AssistantDesktopMenu.workspace, l10n.assistantEditPageWorkspaceTab),
       (_AssistantDesktopMenu.basic, l10n.assistantEditPageBasicTab),
       (_AssistantDesktopMenu.prompts, l10n.assistantEditPagePromptsTab),
       (_AssistantDesktopMenu.memory, l10n.assistantEditPageMemoryTab),

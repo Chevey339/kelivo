@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:Kelivo/core/models/workspace.dart';
 import 'package:Kelivo/core/providers/workspace_provider.dart';
 import 'package:Kelivo/features/workspace/pages/workspace_files_page.dart';
+import 'package:Kelivo/features/workspace/terminal/open_terminal.dart';
 import 'package:Kelivo/features/workspace/widgets/files/file_browser.dart';
 import 'package:Kelivo/features/workspace/widgets/files/file_browser_ops.dart';
 import 'package:Kelivo/icons/lucide_adapter.dart';
@@ -183,6 +184,9 @@ class WorkspaceFilesBodyState extends State<WorkspaceFilesBody> {
       initialRelativePath: widget.initialRelativePath,
       showToolbar: widget.showToolbar,
       modelPathOf: (host) => WorkspaceModelPaths.workspaceFile(host, root.path),
+      onOpenTerminal: () {
+        unawaited(openTerminal(context, workspaceId: widget.workspace.id));
+      },
     );
   }
 }
