@@ -29,8 +29,6 @@ import 'package:Kelivo/theme/app_semantic_colors.dart';
 import 'package:Kelivo/utils/mcp_structured_image.dart';
 
 import 'chat_surface.dart';
-import 'unified_diff_view.dart';
-import 'workspace_tool_detail.dart';
 
 /// Snapshot of a tool call used by workspace cards and the detail sheet.
 class WorkspaceToolPart {
@@ -732,25 +730,6 @@ class WorkspaceAddedRemovedCounts extends StatelessWidget {
   }
 }
 
-class WorkspaceMutedTag extends StatelessWidget {
-  const WorkspaceMutedTag({super.key, required this.label});
-
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    return Text(
-      label,
-      style: TextStyle(
-        fontSize: 11,
-        fontWeight: AppFontWeights.medium,
-        color: cs.onSurface.withValues(alpha: 0.5),
-      ),
-    );
-  }
-}
-
 class _WorkspaceToolSummary extends StatelessWidget {
   const _WorkspaceToolSummary({
     required this.part,
@@ -1105,12 +1084,6 @@ class WorkspaceToolCardBody extends StatelessWidget {
     switch (part.toolName) {
       case 'shell':
         return _ShellTail(part: part, meta: meta, run: liveRun);
-      case 'edit_file':
-        return _EditPreview(
-          part: part,
-          meta: meta,
-          conversationId: conversationId,
-        );
       case 'write_file':
       case 'read_file':
       case 'list_dir':
@@ -1278,60 +1251,6 @@ class _ShellTail extends StatelessWidget {
         fontFamily: workspaceCodeFontFamily(context),
         color: fg.body,
       ),
-    );
-  }
-}
-
-class _EditPreview extends StatelessWidget {
-  const _EditPreview({
-    required this.part,
-    required this.meta,
-    required this.conversationId,
-  });
-
-  final WorkspaceToolPart part;
-  final WorkspaceToolMetadata? meta;
-  final String conversationId;
-
-  @override
-  Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context)!;
-    final fg = chatSurfaceForegroundPalette(context);
-    final diff = meta?.diff ?? '';
-    final fuzzy = meta?.strategy != null && meta!.strategy != 'exact';
-    if (diff.isEmpty && !fuzzy) return const SizedBox.shrink();
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        if (diff.isNotEmpty) UnifiedDiffView(diff: diff, maxLines: 6),
-        if (fuzzy)
-          Padding(
-            padding: EdgeInsets.only(top: diff.isEmpty ? 0 : 6),
-            child: WorkspaceMutedTag(
-              key: const ValueKey<String>('workspace-tool-fuzzy'),
-              label: l10n.workspaceToolFuzzy,
-            ),
-          ),
-        if (diff.isNotEmpty)
-          IosCardPress(
-            baseColor: Colors.transparent,
-            borderRadius: BorderRadius.circular(8),
-            padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 2),
-            onTap: () => showWorkspaceToolDetail(
-              context,
-              part,
-              conversationId: conversationId,
-            ),
-            child: Text(
-              l10n.workspaceToolExpand,
-              style: TextStyle(
-                fontSize: 12.5,
-                fontWeight: AppFontWeights.medium,
-                color: fg.accent,
-              ),
-            ),
-          ),
-      ],
     );
   }
 }

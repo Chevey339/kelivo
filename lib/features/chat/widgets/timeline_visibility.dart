@@ -357,9 +357,6 @@ const double kEstimateWorkspaceTailLine = 17.0;
 /// Environment-not-ready notice plus install button.
 const double kEstimateWorkspaceEnvNotice = 36.0;
 
-/// One compact unified-diff line.
-const double kEstimateWorkspaceDiffLine = 17.0;
-
 /// Extra height under a collapsed tool header. Not gated on the normal
 /// four-line summary flag — ask-user, TTS, Screen Time, images, pending
 /// approval, and workspace tool bodies each have their own structure.
@@ -485,9 +482,7 @@ double _estimateWorkspaceToolCardExtra({
   if (toolName == 'shell') {
     final tail = _workspaceEstimateTailLineCount(content, metadata);
     if (tail > 0) extra += tail * kEstimateWorkspaceTailLine;
-  } else if (toolName == 'edit_file') {
-    extra += _workspaceEstimateDiffHeight(metadata);
-  } else {
+  } else if (toolName != 'edit_file') {
     final hasChips = switch (toolName) {
       'read_file' || 'write_file' => path.isNotEmpty,
       'list_dir' =>
@@ -551,15 +546,6 @@ int _workspaceEstimateTailLineCount(
       .toList();
   if (lines.isEmpty) return 0;
   return lines.length > 4 ? 4 : lines.length;
-}
-
-double _workspaceEstimateDiffHeight(Map<String, dynamic>? metadata) {
-  final diff = _workspaceMetaString(metadata, 'diff');
-  if (diff.isEmpty) return 0;
-  final lines = const LineSplitter().convert(diff);
-  final visible = lines.length > 6 ? 6 : lines.length;
-  if (visible == 0) return 0;
-  return visible * kEstimateWorkspaceDiffLine;
 }
 
 bool _workspaceEstimateEnvNotReady(Map<String, dynamic>? metadata) {

@@ -330,7 +330,9 @@ void main() {
     expect(opened, 1);
   });
 
-  testWidgets('edit_file shows +N −N and fuzzy hint', (tester) async {
+  testWidgets('edit_file shows path and +N −N without an inline diff', (
+    tester,
+  ) async {
     await tester.pumpWidget(
       _harness(
         toolParts: [
@@ -355,8 +357,8 @@ void main() {
     expect(find.textContaining('src/app.dart'), findsWidgets);
     expect(find.textContaining('+4'), findsWidgets);
     expect(find.textContaining('−2'), findsWidgets);
-    expect(find.text('fuzzy'), findsOneWidget);
-    expect(find.text('Expand'), findsOneWidget);
+    expect(find.text('Expand'), findsNothing);
+    expect(find.textContaining('--- a/src/app.dart'), findsNothing);
   });
 
   testWidgets('write_file / read_file / list_dir chips', (tester) async {
