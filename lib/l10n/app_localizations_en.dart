@@ -10499,4 +10499,25 @@ class AppLocalizationsEn extends AppLocalizations {
   String storageSessionFilesCleanOrphansHint(String size) {
     return 'Deletes session folders that no longer have a conversation. Reclaimable: $size.';
   }
+
+  @override
+  String get workspaceDesktopFolderPath => 'Folder path';
+
+  @override
+  String get workspaceDesktopFolderMissing =>
+      'Choose an existing folder or enter its absolute path.';
+
+  @override
+  String get workspaceDesktopManagedHint =>
+      'Kelivo creates and manages a folder for this project.';
+
+  @override
+  String get workspaceDesktopHostHint =>
+      'Files and commands use this computer.';
+
+  @override
+  String get workspaceDesktopSearch => 'Search workspaces';
+
+  @override
+  String get workspaceDesktopNoResults => 'No matching workspaces';
 }

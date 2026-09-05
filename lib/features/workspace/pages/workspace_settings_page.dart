@@ -12,7 +12,7 @@ import 'package:Kelivo/features/workspace/widgets/environment/environment_labels
 import 'package:Kelivo/features/workspace/workspace_navigation.dart';
 import 'package:Kelivo/icons/lucide_adapter.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
-import 'package:Kelivo/shared/responsive/screen_type_helper.dart';
+import 'package:Kelivo/features/workspace/workspace_layout.dart';
 import 'package:Kelivo/shared/widgets/ios_settings_rows.dart';
 import 'package:Kelivo/shared/widgets/ios_tactile.dart';
 import 'package:Kelivo/shared/widgets/section_card.dart';
@@ -42,7 +42,7 @@ class _WorkspaceSettingsPageState extends State<WorkspaceSettingsPage> {
 
   @override
   Widget build(BuildContext context) {
-    if (ResponsiveHelper.isDesktop(context)) {
+    if (useDesktopWorkspaceLayout(context)) {
       return const WorkspacesPage();
     }
     final l10n = AppLocalizations.of(context)!;

@@ -7,7 +7,7 @@ import 'package:Kelivo/core/services/haptics.dart';
 import 'package:Kelivo/features/workspace/widgets/environment/environment_labels.dart';
 import 'package:Kelivo/icons/lucide_adapter.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
-import 'package:Kelivo/shared/responsive/screen_type_helper.dart';
+import 'package:Kelivo/features/workspace/workspace_layout.dart';
 import 'package:Kelivo/shared/widgets/ios_tactile.dart';
 import 'package:Kelivo/theme/app_font_weights.dart';
 import 'package:Kelivo/theme/app_semantic_colors.dart';
@@ -60,7 +60,7 @@ class EnvironmentStatusChip extends StatelessWidget {
         ],
       ),
     );
-    if (ResponsiveHelper.isDesktop(context)) {
+    if (useDesktopWorkspaceLayout(context)) {
       return Tooltip(message: label, child: chip);
     }
     return chip;

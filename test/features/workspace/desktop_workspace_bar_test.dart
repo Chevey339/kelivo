@@ -1,5 +1,7 @@
 import 'dart:io';
 
+import 'package:Kelivo/features/workspace/widgets/files/conversation_files_panel.dart';
+
 import 'package:Kelivo/core/database/app_database.dart';
 import 'package:Kelivo/core/database/extension_entity_store.dart';
 import 'package:Kelivo/core/models/conversation.dart';
@@ -125,20 +127,29 @@ void main() {
     );
   }
 
-  testWidgets('shows empty state when conversation is unbound', (tester) async {
+  testWidgets('unbound conversation can bind directly from the workspace tab', (
+    tester,
+  ) async {
     const conversationId = 'conv-unbound';
     final conversation = Conversation(id: conversationId, title: 'Chat');
 
     await tester.pumpWidget(harness(conversation: conversation));
-    await tester.pump();
+    for (
+      var i = 0;
+      i < 80 &&
+          find.byKey(ConversationFilesPanel.bindCtaKey).evaluate().isEmpty;
+      i++
+    ) {
+      await tester.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 25)),
+      );
+      await tester.pump();
+    }
 
-    expect(find.byKey(DesktopWorkspaceBar.emptyStateKey), findsOneWidget);
+    expect(find.byKey(DesktopWorkspaceBar.emptyStateKey), findsNothing);
     expect(find.text('No workspace'), findsOneWidget);
-    expect(
-      find.text('Bind a workspace from the toolbar to browse files here'),
-      findsOneWidget,
-    );
-    expect(find.byType(SegmentedTabs), findsNothing);
+    expect(find.byKey(ConversationFilesPanel.bindCtaKey), findsOneWidget);
+    expect(find.byType(SegmentedTabs), findsOneWidget);
     expect(find.byKey(DesktopWorkspaceBar.openTerminalKey), findsNothing);
   });
 
@@ -168,7 +179,7 @@ void main() {
     await tester.pump();
 
     expect(find.byKey(DesktopWorkspaceBar.emptyStateKey), findsNothing);
-    expect(find.text('Desk WS'), findsOneWidget);
+    expect(find.text('Desk WS'), findsWidgets);
     final tabs = tester.widget<SegmentedTabs>(find.byType(SegmentedTabs));
     expect(tabs.tabs, hasLength(3));
     expect(find.text('Attachments'), findsWidgets);

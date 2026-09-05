@@ -4731,5 +4731,11 @@
         "type": "String"
       }
     }
-  }
+  },
+  "workspaceDesktopFolderPath": "Folder path",
+  "workspaceDesktopFolderMissing": "Choose an existing folder or enter its absolute path.",
+  "workspaceDesktopManagedHint": "Kelivo creates and manages a folder for this project.",
+  "workspaceDesktopHostHint": "Files and commands use this computer.",
+  "workspaceDesktopSearch": "Search workspaces",
+  "workspaceDesktopNoResults": "No matching workspaces"
 }

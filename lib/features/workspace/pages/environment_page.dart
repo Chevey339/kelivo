@@ -5,7 +5,7 @@ import 'package:Kelivo/features/workspace/pages/environment_page_desktop_layout.
 import 'package:Kelivo/features/workspace/pages/environment_page_mobile_layout.dart';
 import 'package:Kelivo/features/workspace/widgets/environment/environment_pane.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
-import 'package:Kelivo/shared/responsive/screen_type_helper.dart';
+import 'package:Kelivo/features/workspace/workspace_layout.dart';
 
 export 'package:Kelivo/features/workspace/widgets/environment/environment_pane.dart';
 export 'package:Kelivo/features/workspace/widgets/environment/environment_status_chip.dart';
@@ -17,7 +17,7 @@ class EnvironmentPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (ResponsiveHelper.isDesktop(context)) {
+    if (useDesktopWorkspaceLayout(context)) {
       return const EnvironmentPageDesktopLayout();
     }
     return const EnvironmentPageMobileLayout();
@@ -26,7 +26,7 @@ class EnvironmentPage extends StatelessWidget {
 
 /// Mobile: push [EnvironmentPage]. Desktop: a ~640 × 80% dialog of the pane.
 Future<void> openEnvironmentPage(BuildContext context) {
-  if (ResponsiveHelper.isDesktop(context)) {
+  if (useDesktopWorkspaceLayout(context)) {
     final l10n = AppLocalizations.of(context)!;
     final height = MediaQuery.sizeOf(context).height * 0.8;
     return showAppDialog<void>(

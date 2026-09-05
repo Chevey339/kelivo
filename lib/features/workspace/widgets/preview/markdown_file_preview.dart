@@ -6,7 +6,7 @@ import 'package:flutter/material.dart';
 
 import 'package:Kelivo/icons/lucide_adapter.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
-import 'package:Kelivo/shared/responsive/screen_type_helper.dart';
+import 'package:Kelivo/features/workspace/workspace_layout.dart';
 import 'package:Kelivo/shared/widgets/markdown_with_highlight.dart';
 import 'package:Kelivo/shared/widgets/segmented_tabs.dart';
 
@@ -113,7 +113,7 @@ class _MarkdownRenderedView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final desktop = ResponsiveHelper.isDesktop(context);
+    final desktop = useDesktopWorkspaceLayout(context);
     final bool isDesktopPlatform =
         defaultTargetPlatform == TargetPlatform.macOS ||
         defaultTargetPlatform == TargetPlatform.windows ||

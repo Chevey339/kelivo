@@ -10057,6 +10057,24 @@ class AppLocalizationsZh extends AppLocalizations {
   String storageSessionFilesCleanOrphansHint(String size) {
     return '删除已无对应对话的会话目录。可回收 $size。';
   }
+
+  @override
+  String get workspaceDesktopFolderPath => '文件夹路径';
+
+  @override
+  String get workspaceDesktopFolderMissing => '请选择已存在的文件夹，或输入它的绝对路径。';
+
+  @override
+  String get workspaceDesktopManagedHint => '由 Kelivo 为此项目创建并管理文件夹。';
+
+  @override
+  String get workspaceDesktopHostHint => '在本机访问文件和执行命令。';
+
+  @override
+  String get workspaceDesktopSearch => '搜索工作区';
+
+  @override
+  String get workspaceDesktopNoResults => '没有匹配的工作区';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hans`).
@@ -20038,6 +20056,24 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String storageSessionFilesCleanOrphansHint(String size) {
     return '删除已无对应对话的会话目录。可回收 $size。';
   }
+
+  @override
+  String get workspaceDesktopFolderPath => '文件夹路径';
+
+  @override
+  String get workspaceDesktopFolderMissing => '请选择已存在的文件夹，或输入它的绝对路径。';
+
+  @override
+  String get workspaceDesktopManagedHint => '由 Kelivo 为此项目创建并管理文件夹。';
+
+  @override
+  String get workspaceDesktopHostHint => '在本机访问文件和执行命令。';
+
+  @override
+  String get workspaceDesktopSearch => '搜索工作区';
+
+  @override
+  String get workspaceDesktopNoResults => '没有匹配的工作区';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hant`).
@@ -30095,4 +30131,22 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String storageSessionFilesCleanOrphansHint(String size) {
     return '刪除已無對應對話的會話目錄。可回收 $size。';
   }
+
+  @override
+  String get workspaceDesktopFolderPath => '資料夾路徑';
+
+  @override
+  String get workspaceDesktopFolderMissing => '請選擇已存在的資料夾，或輸入它的絕對路徑。';
+
+  @override
+  String get workspaceDesktopManagedHint => '由 Kelivo 為此專案建立並管理資料夾。';
+
+  @override
+  String get workspaceDesktopHostHint => '在本機存取檔案和執行命令。';
+
+  @override
+  String get workspaceDesktopSearch => '搜尋工作區';
+
+  @override
+  String get workspaceDesktopNoResults => '沒有符合的工作區';
 }

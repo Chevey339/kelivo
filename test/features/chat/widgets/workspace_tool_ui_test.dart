@@ -3,6 +3,7 @@ import 'dart:convert';
 
 import '../../../support/business_test_harness.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 
@@ -663,6 +664,67 @@ void main() {
     expect(find.text('Path'), findsWidgets);
     expect(find.text('Command'), findsNothing);
   });
+
+  testWidgets(
+    'workspace tool cards keep desktop dialogs below the width breakpoint',
+    (tester) async {
+      tester.view.physicalSize = const Size(1162, 759);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      for (final (tool, title) in const [
+        ('list_dir', 'List directory'),
+        ('shell', 'Run command'),
+      ]) {
+        await tester.pumpWidget(
+          _harness(
+            toolParts: [
+              _uiPart(
+                tool: tool,
+                arguments: const {'path': '/project', 'command': 'ls'},
+                content: 'README.md\nlib/',
+                meta: WorkspaceToolMetadata(
+                  tool: tool,
+                  status: 'ok',
+                  path: '/project',
+                  command: tool == 'shell' ? 'ls' : null,
+                  stdoutPreview: 'README.md\nlib/',
+                ),
+              ),
+            ],
+          ),
+        );
+        await tester.pumpAndSettle();
+        await tester.tap(find.text(title));
+        await tester.pumpAndSettle();
+
+        final dialog = find.byKey(kWorkspaceToolDetailDesktopKey);
+        expect(dialog, findsOneWidget);
+        expect(find.byKey(CustomBottomSheet.panelKey), findsNothing);
+        expect(find.text('Output'), findsOneWidget);
+        expect(find.text('README.md\nlib/'), findsWidgets);
+
+        tester.view.physicalSize = const Size(800, 500);
+        await tester.pumpAndSettle();
+        final bounds = tester.getRect(dialog);
+        expect(bounds.left, greaterThanOrEqualTo(24));
+        expect(bounds.right, lessThanOrEqualTo(776));
+        expect(bounds.top, greaterThanOrEqualTo(24));
+        expect(bounds.bottom, lessThanOrEqualTo(476));
+        expect(tester.takeException(), isNull);
+
+        await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+        await tester.pumpAndSettle();
+        expect(dialog, findsNothing);
+      }
+    },
+    variant: TargetPlatformVariant({
+      TargetPlatform.macOS,
+      TargetPlatform.windows,
+      TargetPlatform.linux,
+    }),
+  );
 
   testWidgets('detail opens as a dialog on desktop size', (tester) async {
     tester.view.physicalSize = const Size(1400, 900);

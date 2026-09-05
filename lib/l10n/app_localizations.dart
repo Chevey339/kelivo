@@ -18866,6 +18866,42 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Deletes session folders that no longer have a conversation. Reclaimable: {size}.'**
   String storageSessionFilesCleanOrphansHint(String size);
+
+  /// No description provided for @workspaceDesktopFolderPath.
+  ///
+  /// In en, this message translates to:
+  /// **'Folder path'**
+  String get workspaceDesktopFolderPath;
+
+  /// No description provided for @workspaceDesktopFolderMissing.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose an existing folder or enter its absolute path.'**
+  String get workspaceDesktopFolderMissing;
+
+  /// No description provided for @workspaceDesktopManagedHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Kelivo creates and manages a folder for this project.'**
+  String get workspaceDesktopManagedHint;
+
+  /// No description provided for @workspaceDesktopHostHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Files and commands use this computer.'**
+  String get workspaceDesktopHostHint;
+
+  /// No description provided for @workspaceDesktopSearch.
+  ///
+  /// In en, this message translates to:
+  /// **'Search workspaces'**
+  String get workspaceDesktopSearch;
+
+  /// No description provided for @workspaceDesktopNoResults.
+  ///
+  /// In en, this message translates to:
+  /// **'No matching workspaces'**
+  String get workspaceDesktopNoResults;
 }
 
 class _AppLocalizationsDelegate

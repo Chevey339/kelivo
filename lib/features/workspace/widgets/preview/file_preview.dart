@@ -13,7 +13,7 @@ import 'package:Kelivo/features/settings/widgets/custom_theme_widgets.dart';
 import 'package:Kelivo/features/workspace/widgets/preview/code_file_preview.dart';
 import 'package:Kelivo/icons/lucide_adapter.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
-import 'package:Kelivo/shared/responsive/screen_type_helper.dart';
+import 'package:Kelivo/features/workspace/workspace_layout.dart';
 import 'package:Kelivo/shared/widgets/ios_tactile.dart';
 import 'package:Kelivo/shared/widgets/snackbar.dart';
 
@@ -100,7 +100,7 @@ Future<void> showFilePreview(
   if (!context.mounted) return;
 
   final resolvedTitle = title ?? p.basename(file.path);
-  final desktop = ResponsiveHelper.isDesktop(context);
+  final desktop = useDesktopWorkspaceLayout(context);
 
   if (resolvedKind == FilePreviewKind.image) {
     await _showImagePreview(
@@ -266,7 +266,7 @@ class FilePreviewFrame extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
-    final desktop = dialog || ResponsiveHelper.isDesktop(context);
+    final desktop = dialog || useDesktopWorkspaceLayout(context);
     final actions = _headerActions(context, desktop: desktop);
     if (dialog) {
       return Column(

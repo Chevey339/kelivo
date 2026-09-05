@@ -9,7 +9,7 @@ import 'package:Kelivo/features/settings/widgets/custom_theme_widgets.dart';
 import 'package:Kelivo/features/workspace/widgets/skills/skill_labels.dart';
 import 'package:Kelivo/icons/lucide_adapter.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
-import 'package:Kelivo/shared/responsive/screen_type_helper.dart';
+import 'package:Kelivo/features/workspace/workspace_layout.dart';
 import 'package:Kelivo/shared/widgets/form_sheet.dart';
 import 'package:Kelivo/shared/widgets/ios_settings_rows.dart';
 import 'package:Kelivo/shared/widgets/section_card.dart';
@@ -26,7 +26,7 @@ Future<void> showConversationSkillsSheet(
     conversationId: conversationId,
     assistant: assistant,
   );
-  if (ResponsiveHelper.isDesktop(context)) {
+  if (useDesktopWorkspaceLayout(context)) {
     return showAppDialog<void>(
       context,
       maxWidth: 480,

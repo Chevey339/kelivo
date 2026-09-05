@@ -3770,5 +3770,11 @@
   "storageSpaceCategorySessionFilesHint": "各对话的附件与输出。",
   "storageSpaceManageSkills": "管理技能",
   "storageSessionFilesCleanOrphans": "清理无对话的会话文件",
-  "storageSessionFilesCleanOrphansHint": "删除已无对应对话的会话目录。可回收 {size}。"
+  "storageSessionFilesCleanOrphansHint": "删除已无对应对话的会话目录。可回收 {size}。",
+  "workspaceDesktopFolderPath": "文件夹路径",
+  "workspaceDesktopFolderMissing": "请选择已存在的文件夹，或输入它的绝对路径。",
+  "workspaceDesktopManagedHint": "由 Kelivo 为此项目创建并管理文件夹。",
+  "workspaceDesktopHostHint": "在本机访问文件和执行命令。",
+  "workspaceDesktopSearch": "搜索工作区",
+  "workspaceDesktopNoResults": "没有匹配的工作区"
 }

@@ -24,18 +24,8 @@ class WorkspacesDesktopLayout extends StatelessWidget {
           onTap: () => Navigator.of(context).maybePop(),
         ),
         title: Text(l10n.workspacesTitle),
-        actions: workspaceMgmtCreateActions(context),
       ),
-      body: Align(
-        alignment: Alignment.topCenter,
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 960),
-          child: const Padding(
-            padding: EdgeInsets.fromLTRB(20, 12, 20, 16),
-            child: WorkspacesPane(showHeader: false),
-          ),
-        ),
-      ),
+      body: const WorkspacesPane(showHeader: false),
     );
   }
 }

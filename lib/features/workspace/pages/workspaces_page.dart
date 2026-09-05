@@ -9,10 +9,13 @@ import 'package:Kelivo/features/settings/widgets/custom_theme_widgets.dart';
 import 'package:Kelivo/features/workspace/pages/workspace_files_page.dart';
 import 'package:Kelivo/features/workspace/pages/workspaces_desktop_layout.dart';
 import 'package:Kelivo/features/workspace/pages/workspaces_mobile_layout.dart';
+import 'package:Kelivo/features/workspace/widgets/desktop_workspace_create_dialog.dart';
+import 'package:Kelivo/features/workspace/widgets/desktop_workspace_button.dart';
+import 'package:Kelivo/features/workspace/widgets/desktop_workspaces_view.dart';
 import 'package:Kelivo/features/workspace/widgets/files/workspace_prompts.dart';
+import 'package:Kelivo/features/workspace/workspace_layout.dart';
 import 'package:Kelivo/icons/lucide_adapter.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
-import 'package:Kelivo/shared/responsive/screen_type_helper.dart';
 import 'package:Kelivo/shared/widgets/action_sheet.dart';
 import 'package:Kelivo/shared/widgets/form_sheet.dart';
 import 'package:Kelivo/shared/widgets/ios_checkbox.dart';
@@ -31,60 +34,44 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:path/path.dart' as p;
 import 'package:provider/provider.dart';
 
-enum _CreateWorkspaceMode { managed, linked, importFromFolder }
+enum _CreateWorkspaceMode { managed, importFromFolder }
 
 class _CreateWorkspaceDraft {
-  const _CreateWorkspaceDraft({
-    required this.name,
-    required this.mode,
-    this.linkedPath,
-  });
+  const _CreateWorkspaceDraft({required this.name, required this.mode});
 
   final String name;
   final _CreateWorkspaceMode mode;
-  final String? linkedPath;
 }
 
 /// Opens the create-workspace sheet (mobile) or dialog (desktop).
 Future<Workspace?> showCreateWorkspaceFlow(BuildContext context) async {
+  if (useDesktopWorkspaceLayout(context)) {
+    return showAppDialog<Workspace>(
+      context,
+      maxWidth: 540,
+      child: DesktopWorkspaceCreateDialog(
+        provider: context.read<WorkspaceProvider>(),
+      ),
+    );
+  }
   final draft = await _promptCreateWorkspace(context);
   if (draft == null || !context.mounted) return null;
   return _materializeWorkspace(context, draft);
 }
 
 Future<void> openWorkspacesPage(BuildContext context) {
-  if (ResponsiveHelper.isDesktop(context)) {
-    final l10n = AppLocalizations.of(context)!;
-    final height = MediaQuery.sizeOf(context).height * 0.8;
+  if (useDesktopWorkspaceLayout(context)) {
     return showAppDialog<void>(
       context,
-      maxWidth: 640,
+      maxWidth: 1120,
       child: SizedBox(
-        height: height,
+        height: MediaQuery.sizeOf(context).height * 0.82,
         child: Column(
           children: [
             AppDialogHeader(
-              title: l10n.workspacesTitle,
-              actions: [
-                IosIconButton(
-                  key: WorkspacesPane.createKey,
-                  icon: Lucide.Plus,
-                  size: 18,
-                  tooltip: l10n.workspaceMgmtNewWorkspace,
-                  semanticLabel: l10n.workspaceMgmtNewWorkspace,
-                  onTap: () {
-                    Haptics.light();
-                    unawaited(showCreateWorkspaceFlow(context));
-                  },
-                ),
-              ],
+              title: AppLocalizations.of(context)!.workspacesTitle,
             ),
-            const Expanded(
-              child: Padding(
-                padding: EdgeInsets.fromLTRB(16, 0, 16, 16),
-                child: WorkspacesPane(showHeader: false),
-              ),
-            ),
+            const Expanded(child: WorkspacesPane(showHeader: false)),
           ],
         ),
       ),
@@ -100,7 +87,7 @@ class WorkspacesPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (ResponsiveHelper.isDesktop(context)) {
+    if (useDesktopWorkspaceLayout(context)) {
       return const WorkspacesDesktopLayout();
     }
     return const WorkspacesMobileLayout();
@@ -332,6 +319,15 @@ class WorkspacesPaneState extends State<WorkspacesPane> {
     final cs = Theme.of(context).colorScheme;
     final provider = context.watch<WorkspaceProvider>();
     final workspaces = _sorted(provider.workspaces);
+    if (useDesktopWorkspaceLayout(context)) {
+      return DesktopWorkspacesView(
+        workspaces: workspaces,
+        showHeader: widget.showHeader,
+        onCreate: () => showCreateWorkspaceFlow(context),
+        onMore: (workspace, position) =>
+            unawaited(_showItemActions(workspace, globalPosition: position)),
+      );
+    }
 
     return LayoutBuilder(
       builder: (context, constraints) {
@@ -497,35 +493,14 @@ class _DeleteFilesToggleState extends State<_DeleteFilesToggle> {
 Future<_CreateWorkspaceDraft?> _promptCreateWorkspace(
   BuildContext context,
 ) async {
-  final l10n = AppLocalizations.of(context)!;
-  final desktop = ResponsiveHelper.isDesktop(context);
-  if (desktop) {
-    return showAppDialog<_CreateWorkspaceDraft>(
-      context,
-      maxWidth: 480,
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          AppDialogHeader(title: l10n.workspacesCreateTitle),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
-            child: _CreateWorkspaceForm(desktop: true),
-          ),
-        ],
-      ),
-    );
-  }
   return showFormSheet<_CreateWorkspaceDraft>(
     context,
-    builder: (ctx) => const _CreateWorkspaceForm(desktop: false),
+    builder: (ctx) => const _CreateWorkspaceForm(),
   );
 }
 
 class _CreateWorkspaceForm extends StatefulWidget {
-  const _CreateWorkspaceForm({required this.desktop});
-
-  final bool desktop;
+  const _CreateWorkspaceForm();
 
   @override
   State<_CreateWorkspaceForm> createState() => _CreateWorkspaceFormState();
@@ -534,7 +509,6 @@ class _CreateWorkspaceForm extends StatefulWidget {
 class _CreateWorkspaceFormState extends State<_CreateWorkspaceForm> {
   final TextEditingController _nameController = TextEditingController();
   _CreateWorkspaceMode _mode = _CreateWorkspaceMode.managed;
-  String? _linkedPath;
 
   @override
   void dispose() {
@@ -542,40 +516,10 @@ class _CreateWorkspaceFormState extends State<_CreateWorkspaceForm> {
     super.dispose();
   }
 
-  Future<void> _pickLinkedFolder() async {
-    final l10n = AppLocalizations.of(context)!;
-    String? path;
-    try {
-      path = await FilePicker.platform.getDirectoryPath(
-        dialogTitle: l10n.workspacesLinkFolder,
-      );
-    } catch (_) {
-      path = null;
-    }
-    if (!mounted) return;
-    if (path == null) {
-      showAppSnackBar(
-        context,
-        message: l10n.workspaceMgmtFolderPickerUnavailable,
-        type: NotificationType.info,
-      );
-      return;
-    }
-    setState(() {
-      _linkedPath = path;
-      _mode = _CreateWorkspaceMode.linked;
-      if (_nameController.text.trim().isEmpty) {
-        _nameController.text = p.basename(path!);
-      }
-    });
-  }
-
   void _submit() {
     final name = _nameController.text.trim();
     if (name.isEmpty) return;
-    Navigator.of(context).pop(
-      _CreateWorkspaceDraft(name: name, mode: _mode, linkedPath: _linkedPath),
-    );
+    Navigator.of(context).pop(_CreateWorkspaceDraft(name: name, mode: _mode));
   }
 
   Widget _kindCheck(bool selected) {
@@ -614,27 +558,17 @@ class _CreateWorkspaceFormState extends State<_CreateWorkspaceForm> {
             onTap: () => setState(() => _mode = _CreateWorkspaceMode.managed),
           ),
           const IosRowDivider(),
-          if (widget.desktop)
-            IosNavRow(
-              icon: Lucide.Link,
-              label: l10n.workspaceMgmtKindLinkedTitle,
-              subtitle: _linkedPath ?? l10n.workspaceMgmtKindLinkedSubtitle,
-              labelWeight: AppFontWeights.medium,
-              trailing: _kindCheck(_mode == _CreateWorkspaceMode.linked),
-              onTap: () => unawaited(_pickLinkedFolder()),
-            )
-          else
-            IosNavRow(
-              icon: Lucide.FolderInput,
-              label: l10n.workspaceMgmtImportFromFolder,
-              subtitle: l10n.workspaceMgmtImportFromFolderSubtitle,
-              labelWeight: AppFontWeights.medium,
-              trailing: _kindCheck(
-                _mode == _CreateWorkspaceMode.importFromFolder,
-              ),
-              onTap: () =>
-                  setState(() => _mode = _CreateWorkspaceMode.importFromFolder),
+          IosNavRow(
+            icon: Lucide.FolderInput,
+            label: l10n.workspaceMgmtImportFromFolder,
+            subtitle: l10n.workspaceMgmtImportFromFolderSubtitle,
+            labelWeight: AppFontWeights.medium,
+            trailing: _kindCheck(
+              _mode == _CreateWorkspaceMode.importFromFolder,
             ),
+            onTap: () =>
+                setState(() => _mode = _CreateWorkspaceMode.importFromFolder),
+          ),
         ],
       ),
     ];
@@ -645,14 +579,6 @@ class _CreateWorkspaceFormState extends State<_CreateWorkspaceForm> {
       onCancel: () => Navigator.of(context).pop(),
       onConfirm: canCreate ? _submit : null,
     );
-
-    if (widget.desktop) {
-      return Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [...children, const SizedBox(height: 16), actions],
-      );
-    }
 
     return FormSheet(
       title: l10n.workspacesCreateTitle,
@@ -667,36 +593,9 @@ Future<Workspace?> _materializeWorkspace(
   _CreateWorkspaceDraft draft,
 ) async {
   final provider = context.read<WorkspaceProvider>();
-  final l10n = AppLocalizations.of(context)!;
   switch (draft.mode) {
     case _CreateWorkspaceMode.managed:
       return provider.create(name: draft.name);
-    case _CreateWorkspaceMode.linked:
-      var path = draft.linkedPath;
-      if (path == null || path.isEmpty) {
-        try {
-          path = await FilePicker.platform.getDirectoryPath(
-            dialogTitle: l10n.workspacesLinkFolder,
-          );
-        } catch (_) {
-          path = null;
-        }
-      }
-      if (!context.mounted) return null;
-      if (path == null) {
-        showAppSnackBar(
-          context,
-          message: l10n.workspaceMgmtFolderPickerUnavailable,
-          type: NotificationType.info,
-        );
-        return null;
-      }
-      final name = draft.name.isEmpty ? p.basename(path) : draft.name;
-      return provider.create(
-        name: name,
-        kind: WorkspaceKind.linked,
-        hostPath: path,
-      );
     case _CreateWorkspaceMode.importFromFolder:
       return _importFromFolder(context, draft.name);
   }
@@ -835,7 +734,7 @@ Future<void> showWorkspaceSettingsEditor(
   Workspace workspace,
 ) async {
   final l10n = AppLocalizations.of(context)!;
-  if (ResponsiveHelper.isDesktop(context)) {
+  if (useDesktopWorkspaceLayout(context)) {
     await showAppDialog<void>(
       context,
       maxWidth: 480,
@@ -844,11 +743,13 @@ Future<void> showWorkspaceSettingsEditor(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           AppDialogHeader(title: l10n.workspacesSettingsTitle),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
-            child: _WorkspaceSettingsForm(
-              workspaceId: workspace.id,
-              desktop: true,
+          Flexible(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
+              child: _WorkspaceSettingsForm(
+                workspaceId: workspace.id,
+                desktop: true,
+              ),
             ),
           ),
         ],
@@ -1005,7 +906,27 @@ class _WorkspaceSettingsFormState extends State<_WorkspaceSettingsForm> {
       return Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [...children, const SizedBox(height: 16), actions],
+        children: [
+          ...children,
+          const SizedBox(height: 16),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.end,
+            children: [
+              DesktopWorkspaceButton(
+                label: l10n.workspaceFilesCancel,
+                icon: Lucide.X,
+                onPressed: () => Navigator.of(context).pop(),
+              ),
+              const SizedBox(width: 8),
+              DesktopWorkspaceButton(
+                label: l10n.workspaceFilesSave,
+                icon: Lucide.Check,
+                primary: true,
+                onPressed: canSave ? () => unawaited(_save()) : null,
+              ),
+            ],
+          ),
+        ],
       );
     }
 

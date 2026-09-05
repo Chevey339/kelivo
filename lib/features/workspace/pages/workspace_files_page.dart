@@ -3,7 +3,7 @@ import 'package:Kelivo/core/providers/workspace_provider.dart';
 import 'package:Kelivo/features/workspace/pages/workspace_files_desktop_layout.dart';
 import 'package:Kelivo/features/workspace/pages/workspace_files_mobile_layout.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
-import 'package:Kelivo/shared/responsive/screen_type_helper.dart';
+import 'package:Kelivo/features/workspace/workspace_layout.dart';
 import 'package:Kelivo/theme/app_font_weights.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -35,7 +35,7 @@ class WorkspaceFilesPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (ResponsiveHelper.isDesktop(context)) {
+    if (useDesktopWorkspaceLayout(context)) {
       return WorkspaceFilesDesktopLayout(
         workspaceId: workspaceId,
         initialRelativePath: initialRelativePath,

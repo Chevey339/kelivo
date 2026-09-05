@@ -11,7 +11,7 @@ import 'package:Kelivo/features/workspace/widgets/skills/skill_import.dart';
 import 'package:Kelivo/features/workspace/widgets/skills/skill_labels.dart';
 import 'package:Kelivo/icons/lucide_adapter.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
-import 'package:Kelivo/shared/responsive/screen_type_helper.dart';
+import 'package:Kelivo/features/workspace/workspace_layout.dart';
 import 'package:Kelivo/shared/widgets/action_sheet.dart';
 import 'package:Kelivo/shared/widgets/ios_switch.dart';
 import 'package:Kelivo/shared/widgets/ios_tactile.dart';
@@ -32,7 +32,7 @@ String skillModelPath(Skill skill, String hostPath) {
 }
 
 Future<void> showSkillDetail(BuildContext context, {required String skillId}) {
-  if (ResponsiveHelper.isDesktop(context)) {
+  if (useDesktopWorkspaceLayout(context)) {
     final height = MediaQuery.sizeOf(context).height * 0.8;
     return showAppDialog<void>(
       context,
@@ -78,7 +78,7 @@ Future<void> exportSkill(BuildContext context, Skill skill) async {
     );
     final zip = await service.exportZip(skill.record.id, outDir);
     if (!context.mounted) return;
-    final desktop = ResponsiveHelper.isDesktop(context);
+    final desktop = useDesktopWorkspaceLayout(context);
     if (desktop) {
       final savePath = await FilePicker.platform.saveFile(
         dialogTitle: l10n.skillsExport,
@@ -466,7 +466,7 @@ Future<void> browseSkillFiles(BuildContext context, Skill skill) async {
     rootLabel: skill.name,
     modelPathOf: (hostPath) => skillModelPath(skill, hostPath),
   );
-  if (ResponsiveHelper.isDesktop(context)) {
+  if (useDesktopWorkspaceLayout(context)) {
     final height = MediaQuery.sizeOf(context).height * 0.8;
     await showAppDialog<void>(
       context,

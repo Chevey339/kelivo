@@ -1,8 +1,5 @@
 import 'dart:async';
 
-import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
-
 import 'package:Kelivo/core/models/workspace.dart';
 import 'package:Kelivo/core/models/workspace_binding.dart';
 import 'package:Kelivo/core/providers/environment_provider.dart';
@@ -21,14 +18,18 @@ import 'package:Kelivo/features/workspace/widgets/files/conversation_files_panel
 import 'package:Kelivo/features/workspace/widgets/files/file_browser_ops.dart';
 import 'package:Kelivo/features/workspace/widgets/files/workspace_prompts.dart';
 import 'package:Kelivo/features/workspace/widgets/workspace_picker.dart';
+import 'package:Kelivo/features/workspace/workspace_layout.dart';
 import 'package:Kelivo/features/workspace/workspace_navigation.dart';
 import 'package:Kelivo/icons/lucide_adapter.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
-import 'package:Kelivo/shared/responsive/screen_type_helper.dart';
 import 'package:Kelivo/shared/widgets/action_sheet.dart';
 import 'package:Kelivo/shared/widgets/ios_switch.dart';
 import 'package:Kelivo/shared/widgets/ios_tactile.dart';
 import 'package:Kelivo/shared/widgets/snackbar.dart';
+import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+
+import 'desktop_workspace_button.dart';
 
 class WorkspaceSection extends StatefulWidget {
   const WorkspaceSection({
@@ -292,10 +293,14 @@ class _WorkspaceSectionState extends State<WorkspaceSection> {
     final runtime = context.watch<WorkspaceRuntimeProvider>().runtime;
     final env = context.watch<EnvironmentProvider>();
     final envManager = _resolvedEnvManager();
-    final desktop = ResponsiveHelper.isDesktop(context);
+    final desktop = useDesktopWorkspaceLayout(context);
     final showEnvironment = envManager != null && !desktop;
     final envStatus = workspaceEnvPhaseLabel(l10n, env.state.phase);
     final chevron = ToolsSheetRow.chevron(context);
+
+    if (desktop) {
+      return _desktopPanel(l10n, workspace, binding, runtime);
+    }
 
     final rows = <Widget>[];
     if (!binding.isBound || workspace == null) {
@@ -345,6 +350,120 @@ class _WorkspaceSectionState extends State<WorkspaceSection> {
           if (i > 0) const SizedBox(height: 8),
           rows[i],
         ],
+      ],
+    );
+  }
+
+  Widget _desktopPanel(
+    AppLocalizations l10n,
+    Workspace? workspace,
+    WorkspaceBinding binding,
+    WorkspaceRuntime? runtime,
+  ) {
+    final cs = Theme.of(context).colorScheme;
+    if (workspace == null) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(
+            l10n.workspaceDeskBarEmptyHint,
+            style: TextStyle(color: cs.onSurfaceVariant, height: 1.5),
+          ),
+          const SizedBox(height: 16),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: DesktopWorkspaceButton(
+              key: WorkspaceSection.bindKey,
+              label: l10n.workspaceEntryBind,
+              icon: Lucide.FolderPlus,
+              primary: true,
+              onPressed: () => unawaited(_pickWorkspace()),
+            ),
+          ),
+        ],
+      );
+    }
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Row(
+          children: [
+            Icon(Lucide.FolderCode, color: cs.primary, size: 22),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                workspace.name,
+                key: WorkspaceSection.nameKey,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  fontSize: 17,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Builder(
+              builder: (buttonContext) => IosIconButton(
+                icon: Lucide.Ellipsis,
+                tooltip: l10n.workspacesItemMore,
+                onTap: () => _openBoundMenu(buttonContext, workspace, binding),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            DesktopWorkspaceButton(
+              key: WorkspaceSection.filesKey,
+              label: l10n.workspaceEntryFiles,
+              icon: Lucide.FolderOpen,
+              onPressed: _openFiles,
+            ),
+            if (runtime != null &&
+                (runtime.supportsSystemTerminal || runtime.supportsPty))
+              DesktopWorkspaceButton(
+                key: WorkspaceSection.terminalKey,
+                label: runtime.supportsSystemTerminal
+                    ? l10n.workspaceEntryOpenSystemTerminal
+                    : l10n.workspaceEntryTerminal,
+                icon: Lucide.Terminal,
+                onPressed: runtime.supportsSystemTerminal
+                    ? () => unawaited(
+                        _openSystemThenClose(runtime, workspace, binding),
+                      )
+                    : _openTerminal,
+              ),
+            if (runtime != null)
+              DesktopWorkspaceButton(
+                key: WorkspaceSection.revealKey,
+                label: l10n.workspaceEntryReveal,
+                icon: Lucide.ExternalLink,
+                onPressed: () =>
+                    unawaited(_revealThenClose(runtime, workspace, binding)),
+              ),
+          ],
+        ),
+        const SizedBox(height: 16),
+        Divider(
+          height: 1,
+          thickness: 0.5,
+          color: cs.outlineVariant.withValues(alpha: 0.12),
+        ),
+        const SizedBox(height: 12),
+        ToolsSheetRow(
+          key: WorkspaceSection.cwdKey,
+          icon: Lucide.Folder,
+          label: l10n.workspaceEntryCwd,
+          detail: binding.cwd.isEmpty ? '/' : binding.cwd,
+          trailing: ToolsSheetRow.chevron(context),
+          onTap: () => _editCwd(workspace, binding),
+        ),
+        const SizedBox(height: 12),
+        _allowAllRow(l10n, binding),
       ],
     );
   }
@@ -416,7 +535,7 @@ class _WorkspaceSectionState extends State<WorkspaceSection> {
                     _openSystemThenClose(runtime, workspace, binding),
                   ),
                 ),
-              if (runtime != null && ResponsiveHelper.isDesktop(context))
+              if (runtime != null && useDesktopWorkspaceLayout(context))
                 action(
                   key: WorkspaceSection.revealKey,
                   icon: Lucide.ExternalLink,

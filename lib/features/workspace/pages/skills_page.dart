@@ -5,7 +5,7 @@ import 'package:Kelivo/features/workspace/widgets/skills/skill_import.dart';
 import 'package:Kelivo/features/workspace/widgets/skills/skill_labels.dart';
 import 'package:Kelivo/features/workspace/widgets/skills/skills_pane.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
-import 'package:Kelivo/shared/responsive/screen_type_helper.dart';
+import 'package:Kelivo/features/workspace/workspace_layout.dart';
 import 'package:flutter/material.dart';
 
 export 'package:Kelivo/features/workspace/widgets/skills/skills_pane.dart';
@@ -17,7 +17,7 @@ class SkillsPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (ResponsiveHelper.isDesktop(context)) {
+    if (useDesktopWorkspaceLayout(context)) {
       return const SkillsPageDesktopLayout();
     }
     return const SkillsPageMobileLayout();
@@ -26,7 +26,7 @@ class SkillsPage extends StatelessWidget {
 
 /// Mobile: push [SkillsPage]. Desktop: a ~640 × 80% dialog of the pane.
 Future<void> openSkillsPage(BuildContext context) {
-  if (ResponsiveHelper.isDesktop(context)) {
+  if (useDesktopWorkspaceLayout(context)) {
     final l10n = AppLocalizations.of(context)!;
     final height = MediaQuery.sizeOf(context).height * 0.8;
     return showAppDialog<void>(

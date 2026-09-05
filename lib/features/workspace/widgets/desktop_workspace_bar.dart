@@ -8,6 +8,8 @@ import 'package:Kelivo/core/services/chat/chat_service.dart';
 import 'package:Kelivo/core/services/workspace/tool_run_registry.dart';
 import 'package:Kelivo/core/services/workspace/workspace_runtime.dart';
 import 'package:Kelivo/features/workspace/pages/workspace_files_page.dart';
+import 'package:Kelivo/features/workspace/pages/workspaces_page.dart';
+import 'package:Kelivo/features/workspace/widgets/desktop_workspace_button.dart';
 import 'package:Kelivo/features/workspace/widgets/files/conversation_files_panel.dart';
 import 'package:Kelivo/icons/lucide_adapter.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
@@ -93,11 +95,12 @@ class DesktopWorkspaceBar extends StatelessWidget {
               color: cs.outlineVariant.withValues(alpha: 0.16),
             ),
             Expanded(
-              child: bound && conversationId != null
+              child: conversationId != null
                   ? ConversationFilesPanel(
-                      key: ValueKey<String>('$conversationId-${workspace.id}'),
+                      key: ValueKey<String>('$conversationId-${workspace?.id}'),
                       conversationId: conversationId!,
                       embedded: true,
+                      initialTab: ConversationFilesTab.workspace,
                     )
                   : _EmptyState(hint: l10n.workspaceDeskBarEmptyHint),
             ),
@@ -296,6 +299,12 @@ class _EmptyState extends StatelessWidget {
                 height: 1.4,
                 color: cs.onSurface.withValues(alpha: 0.62),
               ),
+            ),
+            const SizedBox(height: 16),
+            DesktopWorkspaceButton(
+              label: AppLocalizations.of(context)!.workspaceEntryManage,
+              icon: Lucide.FolderPlus,
+              onPressed: () => openWorkspacesPage(context),
             ),
           ],
         ),

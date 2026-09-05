@@ -18,6 +18,7 @@ class IosFormTextField extends StatelessWidget {
     this.autofocus = false,
     this.enabled = true,
     this.onChanged,
+    this.onSubmitted,
     this.selectAllOnFocus = false,
     this.cursorToEndOnFocus = false,
     this.cursorToEndOnTap = false,
@@ -38,6 +39,7 @@ class IosFormTextField extends StatelessWidget {
   final bool autofocus;
   final bool enabled;
   final ValueChanged<String>? onChanged;
+  final ValueChanged<String>? onSubmitted;
   final bool selectAllOnFocus;
   final bool cursorToEndOnFocus;
   final bool cursorToEndOnTap;
@@ -93,6 +95,7 @@ class IosFormTextField extends StatelessWidget {
       textInputAction: textInputAction,
       textCapitalization: textCapitalization,
       onChanged: onChanged,
+      onSubmitted: onSubmitted,
       onTap: cursorToEndOnTap
           ? () {
               WidgetsBinding.instance.addPostFrameCallback((_) {

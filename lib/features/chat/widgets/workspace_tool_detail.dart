@@ -10,9 +10,9 @@ import 'package:Kelivo/core/services/workspace/tool_run_registry.dart';
 import 'package:Kelivo/core/services/workspace/workspace_runtime.dart';
 import 'package:Kelivo/core/services/workspace/workspace_tool_metadata.dart';
 import 'package:Kelivo/features/settings/widgets/custom_theme_widgets.dart';
+import 'package:Kelivo/features/workspace/workspace_layout.dart';
 import 'package:Kelivo/icons/lucide_adapter.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
-import 'package:Kelivo/shared/responsive/screen_type_helper.dart';
 import 'package:Kelivo/shared/widgets/custom_bottom_sheet.dart';
 import 'package:Kelivo/shared/widgets/ios_tactile.dart';
 import 'package:Kelivo/shared/widgets/ios_tile_button.dart';
@@ -34,7 +34,7 @@ Future<void> showWorkspaceToolDetail(
 }) {
   final l10n = AppLocalizations.of(context)!;
   final title = workspaceToolTitle(l10n, part.toolName);
-  if (ResponsiveHelper.isDesktop(context)) {
+  if (useDesktopWorkspaceLayout(context)) {
     final height = MediaQuery.sizeOf(context).height * 0.8;
     return showAppDialog<void>(
       context,

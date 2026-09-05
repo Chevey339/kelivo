@@ -18,7 +18,7 @@ import 'package:Kelivo/features/workspace/widgets/environment/environment_keys.d
 import 'package:Kelivo/features/workspace/widgets/environment/environment_labels.dart';
 import 'package:Kelivo/icons/lucide_adapter.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
-import 'package:Kelivo/shared/responsive/screen_type_helper.dart';
+import 'package:Kelivo/features/workspace/workspace_layout.dart';
 import 'package:Kelivo/shared/utils/format_bytes.dart';
 import 'package:Kelivo/shared/widgets/animated_progress_bar.dart';
 import 'package:Kelivo/shared/widgets/ios_settings_rows.dart';
@@ -617,7 +617,7 @@ class _StatusCard extends StatelessWidget {
                   value: _sizeValue(context, l10n, cs),
                 ),
               ),
-              if (ResponsiveHelper.isDesktop(context) &&
+              if (useDesktopWorkspaceLayout(context) &&
                   rootfsPath != null &&
                   rootfsPath!.isNotEmpty) ...[
                 const IosRowDivider(),

@@ -5,12 +5,13 @@ import 'package:Kelivo/core/services/haptics.dart';
 import 'package:Kelivo/features/settings/widgets/custom_theme_widgets.dart';
 import 'package:Kelivo/features/chat/widgets/workspace_tool_ui.dart'
     show workspaceFileTypeIcon;
+import 'package:Kelivo/features/workspace/widgets/desktop_workspace_button.dart';
 import 'package:Kelivo/features/workspace/widgets/files/file_browser_ops.dart';
 import 'package:Kelivo/features/workspace/widgets/files/workspace_prompts.dart';
 import 'package:Kelivo/features/workspace/widgets/preview/file_preview.dart';
 import 'package:Kelivo/icons/lucide_adapter.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
-import 'package:Kelivo/shared/responsive/screen_type_helper.dart';
+import 'package:Kelivo/features/workspace/workspace_layout.dart';
 import 'package:Kelivo/shared/utils/format_bytes.dart';
 import 'package:Kelivo/shared/widgets/action_sheet.dart';
 import 'package:Kelivo/shared/widgets/custom_bottom_sheet.dart';
@@ -59,7 +60,7 @@ Future<String?> showWorkspaceFolderPicker(
     );
   }
 
-  if (ResponsiveHelper.isDesktop(context)) {
+  if (useDesktopWorkspaceLayout(context)) {
     final height = (MediaQuery.sizeOf(context).height * 0.7).clamp(
       360.0,
       640.0,
@@ -165,6 +166,7 @@ class FileBrowser extends StatefulWidget {
 }
 
 class FileBrowserState extends State<FileBrowser> {
+  final ScrollController _desktopScroll = ScrollController();
   final List<String> _segments = <String>[];
   final GlobalKey _sortAnchorKey = GlobalKey();
   final GlobalKey _newAnchorKey = GlobalKey();
@@ -197,6 +199,12 @@ class FileBrowserState extends State<FileBrowser> {
     super.initState();
     _applyInitialPath();
     unawaited(refreshEntries());
+  }
+
+  @override
+  void dispose() {
+    _desktopScroll.dispose();
+    super.dispose();
   }
 
   @override
@@ -662,7 +670,7 @@ class FileBrowserState extends State<FileBrowser> {
   }
 
   List<Widget> pageAppBarActions() {
-    if (ResponsiveHelper.isDesktop(context)) {
+    if (useDesktopWorkspaceLayout(context)) {
       return _fullToolbarActions();
     }
     if (!_canMutateFiles) {
@@ -674,7 +682,7 @@ class FileBrowserState extends State<FileBrowser> {
   List<Widget> toolbarActions() => pageAppBarActions();
 
   List<Widget> _fullToolbarActions() {
-    final desktop = ResponsiveHelper.isDesktop(context);
+    final desktop = useDesktopWorkspaceLayout(context);
     return [
       _sortButton(),
       _hiddenButton(),
@@ -702,7 +710,7 @@ class FileBrowserState extends State<FileBrowser> {
         key: key,
         icon: icon,
         semanticLabel: tooltip,
-        minSize: 44,
+        minSize: useDesktopWorkspaceLayout(context) ? 34 : 44,
         builder: anchorKey == null
             ? null
             : (color) => KeyedSubtree(
@@ -917,7 +925,7 @@ class FileBrowserState extends State<FileBrowser> {
 
   Future<void> _openNewMenu() async {
     final l10n = AppLocalizations.of(context)!;
-    final desktop = ResponsiveHelper.isDesktop(context);
+    final desktop = useDesktopWorkspaceLayout(context);
     await showAdaptiveActionMenu(
       context,
       anchor: _anchorFromKey(_newAnchorKey),
@@ -976,6 +984,13 @@ class FileBrowserState extends State<FileBrowser> {
           label: hiddenLabel,
           onTap: _toggleHidden,
         ),
+        if (useDesktopWorkspaceLayout(context) && _canMutateFiles)
+          ActionSheetItem(
+            key: FileBrowser.importKey,
+            icon: Lucide.Import,
+            label: l10n.workspaceFilesImport,
+            onTap: () => unawaited(_importFiles()),
+          ),
         if (!widget.pickDirectoryMode)
           ActionSheetItem(
             key: FileBrowser.exportKey,
@@ -995,9 +1010,9 @@ class FileBrowserState extends State<FileBrowser> {
 
   @override
   Widget build(BuildContext context) {
-    final desktop = ResponsiveHelper.isDesktop(context);
+    final desktop = useDesktopWorkspaceLayout(context);
     return PopScope(
-      canPop: _segments.isEmpty,
+      canPop: desktop || _segments.isEmpty,
       onPopInvokedWithResult: (didPop, _) {
         if (didPop) return;
         _popStack();
@@ -1031,7 +1046,21 @@ class FileBrowserState extends State<FileBrowser> {
               },
             ),
           ),
-          Expanded(child: _buildBody(desktop)),
+          Expanded(
+            child:
+                desktop && (_error != null || (!_loading && _entries.isEmpty))
+                ? LayoutBuilder(
+                    builder: (context, constraints) => SingleChildScrollView(
+                      child: ConstrainedBox(
+                        constraints: BoxConstraints(
+                          minHeight: constraints.maxHeight,
+                        ),
+                        child: _buildBody(desktop),
+                      ),
+                    ),
+                  )
+                : _buildBody(desktop),
+          ),
           if (widget.pickDirectoryMode) _pickBar(),
         ],
       ),
@@ -1041,6 +1070,31 @@ class FileBrowserState extends State<FileBrowser> {
   Widget _pickBar() {
     final l10n = AppLocalizations.of(context)!;
     final cs = Theme.of(context).colorScheme;
+    if (useDesktopWorkspaceLayout(context)) {
+      return Padding(
+        key: FileBrowser.pickBarKey,
+        padding: const EdgeInsets.all(16),
+        child: Row(
+          children: [
+            if (_canCreateFolder)
+              DesktopWorkspaceButton(
+                key: FileBrowser.newFolderKey,
+                label: l10n.workspaceFilesNewFolder,
+                icon: Lucide.FolderPlus,
+                onPressed: () => unawaited(_promptNewFolder()),
+              ),
+            const Spacer(),
+            DesktopWorkspaceButton(
+              key: FileBrowser.pickDirectoryKey,
+              label: l10n.workspaceFilesSelectDirectory,
+              icon: Lucide.Check,
+              primary: true,
+              onPressed: () => widget.onPickDirectory?.call(currentRelPath),
+            ),
+          ],
+        ),
+      );
+    }
     final bottomInset = MediaQuery.viewPaddingOf(context).bottom;
     return Padding(
       key: FileBrowser.pickBarKey,
@@ -1158,6 +1212,174 @@ class FileBrowserState extends State<FileBrowser> {
             ],
           ),
         ),
+      );
+    }
+
+    if (desktop) {
+      return LayoutBuilder(
+        builder: (context, constraints) {
+          final columns = constraints.maxWidth >= 540;
+          Widget heading(String label, FileBrowserSortField field) =>
+              TextButton(
+                onPressed: () => _setSortField(field),
+                style: TextButton.styleFrom(
+                  splashFactory: NoSplash.splashFactory,
+                  overlayColor: cs.onSurface.withValues(alpha: 0.05),
+                  alignment: Alignment.centerLeft,
+                  foregroundColor: cs.onSurfaceVariant,
+                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                ),
+                child: Row(
+                  children: [
+                    Flexible(
+                      child: Text(
+                        label,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(fontSize: 12),
+                      ),
+                    ),
+                    if (_sort == field) ...[
+                      const SizedBox(width: 4),
+                      Icon(
+                        _ascending ? Lucide.ChevronUp : Lucide.ChevronDown,
+                        size: 12,
+                      ),
+                    ],
+                  ],
+                ),
+              );
+          return Column(
+            children: [
+              if (columns)
+                SizedBox(
+                  height: 34,
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: heading(
+                            l10n.workspaceFilesSortName,
+                            FileBrowserSortField.name,
+                          ),
+                        ),
+                        SizedBox(
+                          width: 132,
+                          child: heading(
+                            l10n.workspaceFilesSortModified,
+                            FileBrowserSortField.modified,
+                          ),
+                        ),
+                        SizedBox(
+                          width: 92,
+                          child: heading(
+                            l10n.workspaceFilesSortSize,
+                            FileBrowserSortField.size,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              Divider(
+                height: 1,
+                thickness: 0.5,
+                color: cs.outlineVariant.withValues(alpha: 0.12),
+              ),
+              Expanded(
+                child: Scrollbar(
+                  controller: _desktopScroll,
+                  child: ListView.builder(
+                    key: FileBrowser.listKey,
+                    controller: _desktopScroll,
+                    padding: const EdgeInsets.all(8),
+                    itemCount: _entries.length,
+                    itemBuilder: (context, index) {
+                      final entry = _entries[index];
+                      return Material(
+                        color: Colors.transparent,
+                        child: InkWell(
+                          splashFactory: NoSplash.splashFactory,
+                          hoverColor: cs.onSurface.withValues(alpha: 0.035),
+                          highlightColor: cs.onSurface.withValues(alpha: 0.065),
+                          focusColor: cs.primary.withValues(alpha: 0.08),
+                          key: FileBrowser.itemKey(entry.name),
+                          borderRadius: BorderRadius.circular(6),
+                          onTap: () => unawaited(_openEntry(entry)),
+                          onSecondaryTapDown: widget.pickDirectoryMode
+                              ? null
+                              : (details) => unawaited(
+                                  _showItemActions(
+                                    entry,
+                                    details.globalPosition,
+                                  ),
+                                ),
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 10,
+                            ),
+                            child: Row(
+                              children: [
+                                Icon(
+                                  entry.isDirectory
+                                      ? Lucide.Folder
+                                      : workspaceFileTypeIcon(entry.name),
+                                  size: 18,
+                                  color: entry.isDirectory
+                                      ? cs.primary
+                                      : cs.onSurfaceVariant,
+                                ),
+                                const SizedBox(width: 10),
+                                Expanded(
+                                  child: Text(
+                                    entry.name,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(fontSize: 13),
+                                  ),
+                                ),
+                                if (columns) ...[
+                                  const SizedBox(width: 12),
+                                  SizedBox(
+                                    width: 132,
+                                    child: Text(
+                                      _relativeMtime(
+                                        entry.modified,
+                                        l10n,
+                                        MaterialLocalizations.of(context),
+                                      ),
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        color: cs.onSurfaceVariant,
+                                      ),
+                                    ),
+                                  ),
+                                  SizedBox(
+                                    width: 80,
+                                    child: Text(
+                                      entry.isDirectory
+                                          ? '—'
+                                          : formatBytes(entry.size),
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        color: cs.onSurfaceVariant,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ],
+                            ),
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              ),
+            ],
+          );
+        },
       );
     }
 

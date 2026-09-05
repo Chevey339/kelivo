@@ -13,7 +13,7 @@ import 'package:Kelivo/features/workspace/widgets/files/file_browser_ops.dart';
 import 'package:Kelivo/features/workspace/widgets/workspace_picker.dart';
 import 'package:Kelivo/icons/lucide_adapter.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
-import 'package:Kelivo/shared/responsive/screen_type_helper.dart';
+import 'package:Kelivo/features/workspace/workspace_layout.dart';
 import 'package:Kelivo/shared/widgets/custom_bottom_sheet.dart';
 import 'package:Kelivo/shared/widgets/ios_tile_button.dart';
 import 'package:Kelivo/shared/widgets/segmented_tabs.dart';
@@ -31,7 +31,7 @@ Future<void> showConversationFilesPanel(
   ConversationFilesTab initialTab = ConversationFilesTab.attachments,
 }) {
   final l10n = AppLocalizations.of(context)!;
-  if (ResponsiveHelper.isDesktop(context)) {
+  if (useDesktopWorkspaceLayout(context)) {
     final height = MediaQuery.sizeOf(context).height * 0.8;
     return showAppDialog<void>(
       context,

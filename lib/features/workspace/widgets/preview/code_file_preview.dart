@@ -14,7 +14,7 @@ import 'package:Kelivo/core/providers/settings_provider.dart';
 import 'package:Kelivo/core/services/haptics.dart';
 import 'package:Kelivo/icons/lucide_adapter.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
-import 'package:Kelivo/shared/responsive/screen_type_helper.dart';
+import 'package:Kelivo/features/workspace/workspace_layout.dart';
 import 'package:Kelivo/shared/utils/format_bytes.dart';
 import 'package:Kelivo/shared/widgets/ios_tactile.dart';
 import 'package:Kelivo/shared/widgets/ios_tile_button.dart';
@@ -401,7 +401,7 @@ class _TooLargeState extends StatelessWidget {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
     final cs = Theme.of(context).colorScheme;
-    final desktop = ResponsiveHelper.isDesktop(context);
+    final desktop = useDesktopWorkspaceLayout(context);
     return Center(
       key: CodeFilePreview.tooLargeKey,
       child: Padding(

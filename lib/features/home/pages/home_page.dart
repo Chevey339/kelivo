@@ -28,7 +28,7 @@ import '../../../utils/platform_utils.dart';
 import '../../../desktop/search_provider_popover.dart';
 import '../../../desktop/reasoning_budget_popover.dart';
 import '../../../desktop/tools_popover.dart';
-import '../../../desktop/workspace_popover.dart';
+import '../../../desktop/workspace_dialog.dart';
 import '../../../desktop/mini_map_popover.dart';
 import '../../../desktop/quick_phrase_popover.dart';
 import '../../../desktop/instruction_injection_popover.dart';
@@ -1402,9 +1402,8 @@ class _HomePageState extends State<HomePage>
       onOpenWorkspace: () {
         final a = context.read<AssistantProvider>().currentAssistant;
         if (PlatformUtils.isDesktop) {
-          showDesktopWorkspacePopover(
+          showDesktopWorkspaceDialog(
             context,
-            anchorKey: _inputBarKey,
             conversationListenable: _controller,
             conversationId: () => _controller.currentConversation?.id,
             assistantId: a?.id,

@@ -1,5 +1,12 @@
 import 'dart:io';
 
+import 'package:file_picker/file_picker.dart';
+
+import 'package:flutter/services.dart';
+import 'package:Kelivo/core/models/workspace.dart';
+import 'package:Kelivo/features/workspace/widgets/files/file_browser.dart';
+import 'package:Kelivo/features/workspace/pages/workspace_files_desktop_layout.dart';
+
 import 'package:Kelivo/core/database/app_database.dart';
 import 'package:Kelivo/core/database/extension_entity_store.dart';
 import 'package:Kelivo/core/providers/settings_provider.dart';
@@ -18,6 +25,17 @@ import 'package:path_provider_platform_interface/path_provider_platform_interfac
 import 'package:provider/provider.dart';
 
 import '../../../support/business_test_harness.dart';
+
+class _FolderPicker extends FilePicker {
+  String? folder;
+
+  @override
+  Future<String?> getDirectoryPath({
+    String? dialogTitle,
+    bool lockParentWindow = false,
+    String? initialDirectory,
+  }) async => folder;
+}
 
 class _FakePathProviderPlatform extends PathProviderPlatform {
   _FakePathProviderPlatform(this.path);
@@ -81,6 +99,7 @@ void main() {
   late WorkspaceProvider workspaces;
 
   setUp(() async {
+    FilePicker.platform = _FolderPicker();
     tempDir = Directory.systemTemp.createTempSync('kelivo_workspaces_pane_');
     previousPathProvider = PathProviderPlatform.instance;
     PathProviderPlatform.instance = _FakePathProviderPlatform(tempDir.path);
@@ -115,6 +134,219 @@ void main() {
       ),
     );
   }
+
+  testWidgets(
+    'native desktop creates a managed workspace below the desktop breakpoint',
+    (tester) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(900, 620);
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      await tester.pumpWidget(harness());
+      await _pumpUi(tester);
+      await tester.tap(find.byKey(WorkspacesPane.createKey));
+      await _settleSheet(tester);
+      expect(find.byType(BottomSheet), findsNothing);
+      await tester.enterText(find.byType(TextField), 'Native workspace');
+      await tester.pump();
+      await tester.testTextInput.receiveAction(TextInputAction.done);
+      await _awaitIo(tester, () => workspaces.workspaces.isNotEmpty);
+      expect(workspaces.workspaces.single.name, 'Native workspace');
+      expect(find.byType(DesktopWorkspaceFiles), findsOneWidget);
+      await _awaitIo(
+        tester,
+        () => find.byType(FileBrowser).evaluate().isNotEmpty,
+      );
+      expect(tester.takeException(), isNull);
+    },
+    variant: TargetPlatformVariant.only(TargetPlatform.macOS),
+  );
+
+  testWidgets(
+    'desktop links an existing folder and keeps invalid input editable',
+    (tester) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(1000, 660);
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      final folder = Directory(p.join(tempDir.path, 'Linked project'))
+        ..createSync();
+      File(
+        p.join(folder.path, 'existing.txt'),
+      ).writeAsStringSync('keep this file');
+      await tester.pumpWidget(harness());
+      await _pumpUi(tester);
+      await tester.tap(find.byKey(WorkspacesPane.createKey));
+      await _settleSheet(tester);
+      await tester.enterText(find.byType(TextField), 'Linked project');
+      await tester.tap(
+        find.byKey(const ValueKey('workspace-desktop-kind-linked')),
+      );
+      await tester.pump();
+      final pathField = find.descendant(
+        of: find.byKey(const ValueKey('workspace-desktop-path')),
+        matching: find.byType(TextField),
+      );
+      await tester.enterText(pathField, 'missing-relative-folder');
+      await tester.pump();
+      await tester.tap(find.byKey(const ValueKey('workspaces-create-confirm')));
+      await _pumpUi(tester);
+      expect(
+        find.byKey(const ValueKey('workspace-desktop-create-error')),
+        findsOneWidget,
+      );
+      expect(workspaces.workspaces, isEmpty);
+      await tester.enterText(pathField, folder.path);
+      await tester.pump();
+      await tester.tap(find.byKey(const ValueKey('workspaces-create-confirm')));
+      await _awaitIo(tester, () => workspaces.workspaces.isNotEmpty);
+      expect(workspaces.workspaces.single.kind, WorkspaceKind.linked);
+      expect(workspaces.workspaces.single.hostPath, folder.path);
+      await _awaitIo(
+        tester,
+        () => find
+            .byKey(FileBrowser.itemKey('existing.txt'))
+            .evaluate()
+            .isNotEmpty,
+      );
+      expect(find.byKey(FileBrowser.itemKey('existing.txt')), findsOneWidget);
+      expect(
+        File(p.join(folder.path, 'existing.txt')).readAsStringSync(),
+        'keep this file',
+      );
+      expect(tester.takeException(), isNull);
+    },
+    variant: TargetPlatformVariant.only(TargetPlatform.macOS),
+  );
+
+  testWidgets(
+    'desktop folder picker can cancel and then link using the folder name',
+    (tester) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(1000, 700);
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      final previousPicker = FilePicker.platform;
+      final picker = _FolderPicker();
+      FilePicker.platform = picker;
+      addTearDown(() => FilePicker.platform = previousPicker);
+      await tester.pumpWidget(harness());
+      await _pumpUi(tester);
+      await tester.tap(find.byKey(WorkspacesPane.createKey));
+      await _settleSheet(tester);
+      await tester.tap(
+        find.byKey(const ValueKey('workspace-desktop-kind-linked')),
+      );
+      await tester.pump();
+      await tester.tap(find.text('Link folder'));
+      await _pumpUi(tester);
+      expect(
+        find.byKey(const ValueKey('workspace-desktop-create-error')),
+        findsNothing,
+      );
+      expect(workspaces.workspaces, isEmpty);
+      final folder = Directory(p.join(tempDir.path, 'Picked folder'))
+        ..createSync();
+      picker.folder = folder.path;
+      await tester.tap(find.text('Link folder'));
+      await _pumpUi(tester);
+      expect(find.text('Picked folder'), findsOneWidget);
+      await tester.tap(find.byKey(const ValueKey('workspaces-create-confirm')));
+      await _awaitIo(tester, () => workspaces.workspaces.isNotEmpty);
+      expect(workspaces.workspaces.single.hostPath, folder.path);
+      expect(workspaces.workspaces.single.name, 'Picked folder');
+    },
+    variant: TargetPlatformVariant.only(TargetPlatform.macOS),
+  );
+
+  testWidgets(
+    'desktop create actions remain visible in a short window and Escape cancels',
+    (tester) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(820, 420);
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      await tester.pumpWidget(harness());
+      await _pumpUi(tester);
+      await tester.tap(find.byKey(WorkspacesPane.createKey));
+      await _settleSheet(tester);
+      await tester.enterText(find.byType(TextField), 'Short window');
+      await tester.pump();
+      final confirm = find.byKey(const ValueKey('workspaces-create-confirm'));
+      expect(confirm.hitTestable(), findsOneWidget);
+      expect(tester.takeException(), isNull);
+      await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+      await _settleSheet(tester);
+      expect(confirm, findsNothing);
+      expect(workspaces.workspaces, isEmpty);
+    },
+    variant: TargetPlatformVariant.only(TargetPlatform.macOS),
+  );
+
+  testWidgets(
+    'desktop manager filters and switches files without pushing a page',
+    (tester) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(1280, 800);
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      late Workspace alpha;
+      late Workspace beta;
+      await tester.runAsync(() async {
+        alpha = await workspaces.create(name: 'App redesign');
+        beta = await workspaces.create(name: 'Research notes');
+        final root = await workspaces.hostRootFor(alpha);
+        Directory(p.join(root, 'src')).createSync();
+        File(p.join(root, 'README.md')).writeAsStringSync('# App redesign');
+        File(p.join(root, 'package.json')).writeAsStringSync('{}');
+        final secondRoot = await workspaces.hostRootFor(beta);
+        File(p.join(secondRoot, 'notes.md')).writeAsStringSync('# Research');
+      });
+      await tester.pumpWidget(harness());
+      await _awaitIo(
+        tester,
+        () =>
+            find.byKey(FileBrowser.itemKey('README.md')).evaluate().isNotEmpty,
+      );
+      expect(find.byKey(FileBrowser.itemKey('README.md')), findsOneWidget);
+      await tester.runAsync(
+        () => workspaces.update(alpha.copyWith(name: 'Z app redesign')),
+      );
+      await tester.pump();
+      expect(
+        tester
+            .widget<DesktopWorkspaceFiles>(find.byType(DesktopWorkspaceFiles))
+            .workspace
+            .id,
+        alpha.id,
+      );
+      await tester.tap(find.byKey(WorkspacesPane.itemKey(beta.id)));
+      await _awaitIo(
+        tester,
+        () => find.byKey(FileBrowser.itemKey('notes.md')).evaluate().isNotEmpty,
+      );
+      expect(find.byKey(FileBrowser.itemKey('notes.md')), findsOneWidget);
+      expect(find.byKey(FileBrowser.itemKey('README.md')), findsNothing);
+      expect(find.byType(Scaffold), findsOneWidget);
+      final search = find.descendant(
+        of: find.byKey(const ValueKey('workspace-desktop-search')),
+        matching: find.byType(TextField),
+      );
+      await tester.enterText(search, 'research');
+      await tester.pump();
+      expect(find.byKey(WorkspacesPane.itemKey(alpha.id)), findsNothing);
+      expect(find.byKey(WorkspacesPane.itemKey(beta.id)), findsOneWidget);
+      tester.view.physicalSize = const Size(600, 650);
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const ValueKey('workspace-desktop-select')),
+        findsOneWidget,
+      );
+      expect(find.byKey(FileBrowser.itemKey('notes.md')), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+    variant: TargetPlatformVariant.only(TargetPlatform.macOS),
+  );
 
   testWidgets('creates renames and deletes a workspace', (tester) async {
     tester.view.devicePixelRatio = 1;
