@@ -5,6 +5,8 @@ import '../../../core/services/memory/memory_tools.dart';
 import '../../../core/services/search/search_tool_service.dart';
 import '../../../core/services/tools/built_in_tool_catalog.dart';
 import '../../../features/home/services/local_tool_labels.dart';
+import '../../chat/widgets/workspace_tool_ui.dart';
+import '../../../core/services/workspace/workspace_tools_service.dart';
 import '../../../icons/lucide_adapter.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../shared/widgets/ios_tactile.dart';
@@ -13,6 +15,9 @@ import '../../../theme/app_font_weights.dart';
 import 'package:Kelivo/theme/app_semantic_colors.dart';
 
 IconData toolSchemaIconFor(String name) {
+  if (WorkspaceToolsService.toolNames.contains(name)) {
+    return workspaceToolIcon(name);
+  }
   switch (name) {
     case SearchToolService.toolName:
       return Lucide.Earth;

@@ -55,6 +55,8 @@ class ToolHandlerService {
         updateConversationExtras: chat.updateConversationExtras,
         touchLastUsed: workspaces.touchLastUsed,
         onSkillRead: onSkillRead,
+        isToolEnabled: (id, name) =>
+            workspaces.byId(id)?.isToolEnabled(name) ?? false,
       );
     } catch (_) {
       return WorkspaceToolsService();

@@ -88,6 +88,7 @@ void main() {
     bool shellNeedsApproval = false,
     RuntimeStatus? status,
     bool runtimeRegistered = true,
+    Set<String> disabledTools = const {},
   }) {
     final paths = sandboxed
         ? WorkspacePaths.sandboxed(
@@ -101,7 +102,9 @@ void main() {
             skillsHostDir: skillsDir.path,
           );
     return WorkspaceToolContext(
-      workspace: workspace(shellNeedsApproval: shellNeedsApproval),
+      workspace: workspace(
+        shellNeedsApproval: shellNeedsApproval,
+      ).copyWith(disabledTools: disabledTools),
       binding: WorkspaceBinding(
         workspaceId: 'ws1',
         toolsUsed: toolsUsed,
@@ -146,6 +149,79 @@ void main() {
   WorkspaceToolMetadata metaOf(Object? raw) {
     return WorkspaceToolMetadata.fromJson(client(raw).metadata!);
   }
+
+  test(
+    'disabled tools are omitted and rejected before any side effects',
+    () async {
+      final tools = service(
+        runtime: FakeWorkspaceRuntime(useRealProcess: true),
+      );
+      final context = ctx(disabledTools: WorkspaceToolsService.toolNames);
+      expect(tools.buildToolDefinitions(context), isEmpty);
+      final approval = _RecordingApproval();
+      final target = File(p.join(workspaceDir.path, 'untouched.txt'));
+      await target.writeAsString('original');
+      for (final name in WorkspaceToolsService.toolNames) {
+        final result = await tools.handle(
+          context,
+          name,
+          {
+            'path': target.path,
+            'command': 'exit 0',
+            'content': 'changed',
+            'old_string': 'original',
+            'new_string': 'changed',
+            'pattern': '*',
+          },
+          toolCallId: 'disabled-$name',
+          approvalService: approval,
+        );
+        expect(jsonOf(result)['error'], 'tool_disabled', reason: name);
+      }
+      expect(await target.readAsString(), 'original');
+      expect(approval.calls, 0);
+      expect(extrasById, isEmpty);
+      expect(touched, isEmpty);
+      expect(
+        WorkspaceToolsService.buildPromptFragment(context),
+        isNot(contains('shell is one-shot')),
+      );
+    },
+  );
+
+  test(
+    'execution rechecks current switches after definitions were built',
+    () async {
+      var enabled = true;
+      final tools = WorkspaceToolsService(isToolEnabled: (_, _) => enabled);
+      final context = ctx();
+      expect(tools.buildToolDefinitions(context), hasLength(7));
+      enabled = false;
+      expect(
+        jsonOf(
+          await tools.handle(
+            context,
+            'list_dir',
+            {},
+            toolCallId: 'disabled-later',
+          ),
+        )['error'],
+        'tool_disabled',
+      );
+      enabled = true;
+      expect(
+        metaOf(
+          await tools.handle(
+            context,
+            'list_dir',
+            {},
+            toolCallId: 'enabled-again',
+          ),
+        ).status,
+        'ok',
+      );
+    },
+  );
 
   group('shell', () {
     test(

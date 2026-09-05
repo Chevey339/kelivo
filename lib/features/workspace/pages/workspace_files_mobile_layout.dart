@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:Kelivo/core/models/workspace.dart';
 import 'package:Kelivo/core/providers/workspace_provider.dart';
 import 'package:Kelivo/features/workspace/pages/workspace_files_page.dart';
+import 'package:Kelivo/features/workspace/widgets/workspace_tools_pane.dart';
 import 'package:Kelivo/features/workspace/terminal/open_terminal.dart';
 import 'package:Kelivo/features/workspace/widgets/files/file_browser.dart';
 import 'package:Kelivo/features/workspace/widgets/files/file_browser_ops.dart';
@@ -51,6 +52,7 @@ class WorkspaceFilesScaffold extends StatefulWidget {
 
 class _WorkspaceFilesScaffoldState extends State<WorkspaceFilesScaffold> {
   final GlobalKey<FileBrowserState> _browserKey = GlobalKey<FileBrowserState>();
+  int _tab = 0;
 
   @override
   Widget build(BuildContext context) {
@@ -87,21 +89,42 @@ class _WorkspaceFilesScaffoldState extends State<WorkspaceFilesScaffold> {
             ? Text(l10n.workspaceFilesMissingWorkspace)
             : WorkspaceFilesTitle(workspace: workspace),
         actions: [
-          if (browser != null) ...fileBrowserToolbarActions(browser),
+          if (_tab == 0 && browser != null)
+            ...fileBrowserToolbarActions(browser),
           const SizedBox(width: 12),
         ],
+        bottom: workspace == null
+            ? null
+            : PreferredSize(
+                preferredSize: const Size.fromHeight(56),
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
+                  child: WorkspaceDetailTabs(
+                    index: _tab,
+                    onChanged: (index) => setState(() => _tab = index),
+                  ),
+                ),
+              ),
       ),
       body: widget.constrainWidth
           ? Align(
               alignment: Alignment.topCenter,
               child: ConstrainedBox(
                 constraints: const BoxConstraints(maxWidth: 960),
-                child: body,
+                child: _content(body),
               ),
             )
-          : body,
+          : _content(body),
     );
   }
+
+  Widget _content(Widget files) => IndexedStack(
+    index: _tab,
+    children: [
+      TickerMode(enabled: _tab == 0, child: files),
+      WorkspaceToolsPane(workspaceId: widget.workspaceId),
+    ],
+  );
 }
 
 class WorkspaceFilesBody extends StatefulWidget {

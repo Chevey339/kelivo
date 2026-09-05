@@ -3781,5 +3781,14 @@
   "workspaceEnvDownloadInvalidUrl": "请输入有效的 HTTP 或 HTTPS 链接。",
   "workspaceEnvDownloadVerified": "所有来源均使用内置的官方 SHA-256 校验。此选项不会更改软件包源。",
   "workspaceEnvDownloadStart": "下载并安装",
-  "workspaceEnvDownloadSave": "保存下载源"
+  "workspaceEnvDownloadSave": "保存下载源",
+  "workspaceToolsTitle": "工具",
+  "workspaceToolsDescription": "选择此工作区的对话可以使用哪些工具，修改后自动保存。",
+  "workspaceToolHelpShell": "在工作区环境中执行命令。",
+  "workspaceToolHelpRead": "按行读取文件内容，支持分页。",
+  "workspaceToolHelpWrite": "创建文件或覆盖文件内容。",
+  "workspaceToolHelpEdit": "替换已有文件中的指定文本。",
+  "workspaceToolHelpList": "浏览目录及其中的文件。",
+  "workspaceToolHelpGlob": "按文件名或路径模式查找文件。",
+  "workspaceToolHelpGrep": "搜索文件中的文本内容。"
 }

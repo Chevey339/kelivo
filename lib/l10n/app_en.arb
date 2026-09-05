@@ -4766,5 +4766,14 @@
   "workspaceEnvDownloadInvalidUrl": "Enter a valid HTTP or HTTPS URL.",
   "workspaceEnvDownloadVerified": "Every source is checked against the bundled official SHA-256. This choice does not change package sources.",
   "workspaceEnvDownloadStart": "Download and install",
-  "workspaceEnvDownloadSave": "Save source"
+  "workspaceEnvDownloadSave": "Save source",
+  "workspaceToolsTitle": "Tools",
+  "workspaceToolsDescription": "Choose which tools conversations can use in this workspace. Changes are saved automatically.",
+  "workspaceToolHelpShell": "Run commands in the workspace environment.",
+  "workspaceToolHelpRead": "Read files with line numbers and paging.",
+  "workspaceToolHelpWrite": "Create files or overwrite their contents.",
+  "workspaceToolHelpEdit": "Replace specific text in an existing file.",
+  "workspaceToolHelpList": "Browse directories and their entries.",
+  "workspaceToolHelpGlob": "Find files by name or path pattern.",
+  "workspaceToolHelpGrep": "Search text inside files."
 }

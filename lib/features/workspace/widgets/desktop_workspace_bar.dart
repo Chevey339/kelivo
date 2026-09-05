@@ -32,6 +32,7 @@ class DesktopWorkspaceBar extends StatelessWidget {
     'workspace-desk-bar-open-terminal',
   );
   static const Key revealKey = ValueKey<String>('workspace-desk-bar-reveal');
+  static const Key manageKey = ValueKey<String>('workspace-desk-bar-manage');
   static const Key closeKey = ValueKey<String>('workspace-desk-bar-close');
   static const Key runningKey = ValueKey<String>('workspace-desk-bar-running');
   static const Key headerTitleKey = ValueKey<String>(
@@ -253,6 +254,15 @@ class _Header extends StatelessWidget {
               ),
             ),
           ],
+          IosIconButton(
+            key: DesktopWorkspaceBar.manageKey,
+            icon: Lucide.Settings2,
+            size: 16,
+            minSize: 32,
+            tooltip: l10n.workspaceEntryManage,
+            semanticLabel: l10n.workspaceEntryManage,
+            onTap: () => unawaited(openWorkspacesPage(context)),
+          ),
           Tooltip(
             message: l10n.workspaceDeskBarClose,
             child: IosIconButton(

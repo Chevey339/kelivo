@@ -39,6 +39,7 @@ class WorkspaceToolsService {
     this.updateConversationExtras,
     this.touchLastUsed,
     this.onSkillRead,
+    this.isToolEnabled,
   }) : registry = registry ?? ToolRunRegistry(),
        runtimeProvider = runtimeProvider ?? WorkspaceRuntimeProvider();
 
@@ -60,6 +61,11 @@ class WorkspaceToolsService {
   final ConversationExtrasUpdater? updateConversationExtras;
   final Future<void> Function(String workspaceId)? touchLastUsed;
   final Future<void> Function(String skillId)? onSkillRead;
+  final bool Function(String workspaceId, String tool)? isToolEnabled;
+
+  bool _enabled(WorkspaceToolContext ctx, String name) =>
+      isToolEnabled?.call(ctx.workspace.id, name) ??
+      ctx.workspace.isToolEnabled(name);
 
   static Future<WorkspaceToolContext?> resolve({
     required String? conversationId,
@@ -152,10 +158,24 @@ class WorkspaceToolsService {
         ),
       ];
     }
-    final vocab = _pathVocab(ctx.paths);
-    final outputHint = ctx.paths.sandboxed
-        ? '${WorkspacePaths.guestChat}/outputs/<id>.txt'
-        : '${ctx.paths.sessionHostDir}/outputs/<id>.txt';
+    return definitions(
+          vocab: _pathVocab(ctx.paths),
+          outputHint: ctx.paths.sandboxed
+              ? '${WorkspacePaths.guestChat}/outputs/<id>.txt'
+              : '${ctx.paths.sessionHostDir}/outputs/<id>.txt',
+        )
+        .where(
+          (definition) =>
+              _enabled(ctx, (definition['function'] as Map)['name'] as String),
+        )
+        .toList();
+  }
+
+  /// Shared schemas for execution and the ungated description editor.
+  static List<Map<String, dynamic>> definitions({
+    List<String> vocab = const ['/workspace', '/chat', '/skills', '/tmp'],
+    String outputHint = '/chat/outputs/<id>.txt',
+  }) {
     return [
       _fn(
         'shell',
@@ -329,14 +349,27 @@ class WorkspaceToolsService {
       ..writeln('- $skills — installed skills (read-only)')
       ..writeln('- $tmp — scratch (writable, ephemeral)')
       ..writeln('cwd: ${ctx.cwd}')
-      ..writeln()
       ..writeln(
+        'Enabled tools: ${toolNames.where(ctx.workspace.isToolEnabled).join(', ')}',
+      )
+      ..writeln();
+    if (ctx.workspace.isToolEnabled('shell')) {
+      buf.writeln(
         'shell is one-shot: a fresh non-interactive sh -lc each call. '
         'No cd or env persists. Chain with &&. Use non-interactive flags (-y). '
-        'Output is capped; long output is saved to $outputsHint. '
-        'Prefer read_file, edit_file, and write_file over cat/sed. '
-        'Always read_file before editing.',
-      )
+        'Output is capped; long output is saved to $outputsHint.',
+      );
+    }
+    if (ctx.workspace.isToolEnabled('read_file') &&
+        ctx.workspace.isToolEnabled('edit_file')) {
+      if (ctx.workspace.isToolEnabled('write_file')) {
+        buf.writeln(
+          'Prefer read_file, edit_file, and write_file over cat/sed.',
+        );
+      }
+      buf.writeln('Always read_file before editing.');
+    }
+    buf
       ..writeln()
       ..writeln(
         'Cite files as [name](kelivo://workspace/rel/path), outputs as '
@@ -369,6 +402,13 @@ class WorkspaceToolsService {
         tool: name,
         error: 'skills_only',
         message: 'Only read_file is available without a workspace',
+      );
+    }
+    if (!ctx.skillsOnly && !_enabled(ctx, name)) {
+      return _errorResult(
+        tool: name,
+        error: 'tool_disabled',
+        message: 'This tool is disabled for the workspace',
       );
     }
     try {

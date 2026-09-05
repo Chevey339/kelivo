@@ -6,6 +6,7 @@ import 'package:Kelivo/core/database/business_preferences.dart';
 import 'package:Kelivo/core/database/extension_entity_store.dart';
 import 'package:Kelivo/core/models/assistant.dart';
 import 'package:Kelivo/core/models/conversation.dart';
+import 'package:Kelivo/core/models/workspace_binding.dart';
 import 'package:Kelivo/core/providers/assistant_provider.dart';
 import 'package:Kelivo/core/providers/environment_provider.dart';
 import 'package:Kelivo/core/providers/mcp_provider.dart';
@@ -18,6 +19,7 @@ import 'package:Kelivo/features/chat/widgets/chat_tools_sheet.dart';
 import 'package:Kelivo/features/home/services/local_tool_labels.dart';
 import 'package:Kelivo/features/home/services/local_tools_service.dart';
 import 'package:Kelivo/features/workspace/widgets/workspace_section.dart';
+import 'package:Kelivo/features/workspace/pages/workspace_settings_page.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
 import 'package:Kelivo/shared/widgets/ios_switch.dart';
 import 'package:Kelivo/shared/widgets/snackbar.dart';
@@ -207,6 +209,47 @@ void main() {
     );
     await tester.pump();
     return AppLocalizations.of(tester.element(find.byType(Scaffold)))!;
+  }
+
+  for (final platform in [TargetPlatform.android, TargetPlatform.iOS]) {
+    testWidgets(
+      'workspace row settings opens the existing workspace and environment page on $platform',
+      (tester) async {
+        final workspace = await tester.runAsync(
+          () => workspaces.create(name: 'Test workspace'),
+        );
+        final l10n = await pumpSheet(
+          tester,
+          conversation: Conversation(
+            title: 'Chat',
+            extras: WorkspaceBinding(workspaceId: workspace!.id).applyTo({}),
+          ),
+        );
+        await tester.pumpAndSettle();
+        final action = find.byKey(WorkspaceSection.manageKey);
+        final files = find.byKey(WorkspaceSection.filesKey);
+        expect(
+          find.descendant(
+            of: find.byKey(WorkspaceSection.nameKey),
+            matching: action,
+          ),
+          findsOneWidget,
+        );
+        expect(
+          tester.getCenter(action).dx,
+          lessThan(tester.getCenter(files).dx),
+        );
+        expect(tester.getCenter(action).dy, tester.getCenter(files).dy);
+        await tester.ensureVisible(action);
+        await tester.tap(action);
+        await tester.pumpAndSettle();
+        expect(find.byType(WorkspaceSettingsPage), findsOneWidget);
+        expect(find.text(l10n.settingsPageWorkspace), findsOneWidget);
+        expect(find.text(l10n.workspaceEnvTitle), findsOneWidget);
+        expect(tester.takeException(), isNull);
+      },
+      variant: TargetPlatformVariant.only(platform),
+    );
   }
 
   testWidgets('shows the local tools group folded with an enabled count', (

@@ -1,3 +1,5 @@
+import 'package:flutter/foundation.dart';
+
 enum WorkspaceKind { managed, linked }
 
 class Workspace {
@@ -7,6 +9,7 @@ class Workspace {
   final String? hostPath;
   final bool shellNeedsApproval;
   final String defaultCwd;
+  final Set<String> disabledTools;
   final DateTime createdAt;
   final DateTime updatedAt;
   final DateTime? lastUsedAt;
@@ -18,10 +21,13 @@ class Workspace {
     this.hostPath,
     this.shellNeedsApproval = false,
     this.defaultCwd = '',
+    this.disabledTools = const {},
     required this.createdAt,
     required this.updatedAt,
     this.lastUsedAt,
   });
+
+  bool isToolEnabled(String name) => !disabledTools.contains(name);
 
   Workspace copyWith({
     String? id,
@@ -30,6 +36,7 @@ class Workspace {
     String? hostPath,
     bool? shellNeedsApproval,
     String? defaultCwd,
+    Set<String>? disabledTools,
     DateTime? createdAt,
     DateTime? updatedAt,
     DateTime? lastUsedAt,
@@ -43,6 +50,9 @@ class Workspace {
       hostPath: clearHostPath ? null : (hostPath ?? this.hostPath),
       shellNeedsApproval: shellNeedsApproval ?? this.shellNeedsApproval,
       defaultCwd: defaultCwd ?? this.defaultCwd,
+      disabledTools: disabledTools == null
+          ? this.disabledTools
+          : Set.unmodifiable(disabledTools),
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
       lastUsedAt: clearLastUsedAt ? null : (lastUsedAt ?? this.lastUsedAt),
@@ -56,6 +66,7 @@ class Workspace {
     'hostPath': hostPath,
     'shellNeedsApproval': shellNeedsApproval,
     'defaultCwd': defaultCwd,
+    'disabledTools': disabledTools.toList()..sort(),
     'createdAt': createdAt.toIso8601String(),
     'updatedAt': updatedAt.toIso8601String(),
     'lastUsedAt': lastUsedAt?.toIso8601String(),
@@ -69,6 +80,9 @@ class Workspace {
       hostPath: json['hostPath'] as String?,
       shellNeedsApproval: json['shellNeedsApproval'] as bool? ?? false,
       defaultCwd: (json['defaultCwd'] as String?) ?? '',
+      disabledTools: Set.unmodifiable(
+        (json['disabledTools'] as List? ?? const []).cast<String>(),
+      ),
       createdAt: DateTime.parse(json['createdAt'] as String),
       updatedAt: DateTime.parse(json['updatedAt'] as String),
       lastUsedAt: json['lastUsedAt'] == null
@@ -97,6 +111,7 @@ class Workspace {
             other.hostPath == hostPath &&
             other.shellNeedsApproval == shellNeedsApproval &&
             other.defaultCwd == defaultCwd &&
+            setEquals(other.disabledTools, disabledTools) &&
             other.createdAt == createdAt &&
             other.updatedAt == updatedAt &&
             other.lastUsedAt == lastUsedAt;
@@ -110,6 +125,7 @@ class Workspace {
     hostPath,
     shellNeedsApproval,
     defaultCwd,
+    Object.hashAllUnordered(disabledTools),
     createdAt,
     updatedAt,
     lastUsedAt,

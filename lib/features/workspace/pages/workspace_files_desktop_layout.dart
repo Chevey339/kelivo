@@ -9,6 +9,7 @@ import 'package:Kelivo/core/providers/workspace_provider.dart';
 import 'package:Kelivo/core/services/workspace/workspace_runtime.dart';
 import 'package:Kelivo/features/workspace/pages/workspace_files_page.dart';
 import 'package:Kelivo/features/workspace/pages/workspaces_page.dart';
+import 'package:Kelivo/features/workspace/widgets/workspace_tools_pane.dart';
 import 'package:Kelivo/features/workspace/widgets/desktop_workspace_button.dart';
 import 'package:Kelivo/features/workspace/widgets/files/file_browser.dart';
 import 'package:Kelivo/features/workspace/widgets/files/file_browser_ops.dart';
@@ -39,7 +40,7 @@ class WorkspaceFilesDesktopLayout extends StatelessWidget {
           tooltip: l10n.settingsPageBackButton,
           onTap: () => Navigator.of(context).maybePop(),
         ),
-        title: Text(l10n.workspacesOpenFiles),
+        title: Text(l10n.workspacesTitle),
       ),
       body: workspace == null
           ? Center(child: Text(l10n.workspaceFilesMissingWorkspace))
@@ -68,6 +69,7 @@ class DesktopWorkspaceFiles extends StatefulWidget {
 
 class _DesktopWorkspaceFilesState extends State<DesktopWorkspaceFiles> {
   late Future<String> _root;
+  int _tab = 0;
 
   @override
   void initState() {
@@ -192,6 +194,12 @@ class _DesktopWorkspaceFilesState extends State<DesktopWorkspaceFiles> {
                   ),
                 ],
               ),
+              const SizedBox(height: 12),
+              WorkspaceDetailTabs(
+                index: _tab,
+                desktop: true,
+                onChanged: (index) => setState(() => _tab = index),
+              ),
             ],
           ),
         ),
@@ -201,33 +209,45 @@ class _DesktopWorkspaceFilesState extends State<DesktopWorkspaceFiles> {
           color: cs.outlineVariant.withValues(alpha: 0.12),
         ),
         Expanded(
-          child: FutureBuilder<String>(
-            future: _root,
-            builder: (context, snapshot) {
-              if (snapshot.hasError) {
-                return Center(
-                  child: DesktopWorkspaceButton(
-                    label: l10n.workspaceFilesRetry,
-                    icon: Lucide.RefreshCw,
-                    onPressed: () => setState(_loadRoot),
-                  ),
-                );
-              }
-              final root = snapshot.data;
-              if (root == null) {
-                return const Center(
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                );
-              }
-              return FileBrowser(
-                key: ValueKey('${workspace.id}-$root'),
-                root: Directory(root),
-                rootLabel: workspace.name,
-                initialRelativePath: widget.initialRelativePath,
-                modelPathOf: (host) =>
-                    WorkspaceModelPaths.workspaceFile(host, root),
-              );
-            },
+          child: IndexedStack(
+            index: _tab,
+            children: [
+              TickerMode(
+                enabled: _tab == 0,
+                child: FutureBuilder<String>(
+                  future: _root,
+                  builder: (context, snapshot) {
+                    if (snapshot.hasError) {
+                      return Center(
+                        child: DesktopWorkspaceButton(
+                          label: l10n.workspaceFilesRetry,
+                          icon: Lucide.RefreshCw,
+                          onPressed: () => setState(_loadRoot),
+                        ),
+                      );
+                    }
+                    final root = snapshot.data;
+                    if (root == null) {
+                      return const Center(
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      );
+                    }
+                    return FileBrowser(
+                      key: ValueKey('${workspace.id}-$root'),
+                      root: Directory(root),
+                      rootLabel: workspace.name,
+                      initialRelativePath: widget.initialRelativePath,
+                      modelPathOf: (host) =>
+                          WorkspaceModelPaths.workspaceFile(host, root),
+                    );
+                  },
+                ),
+              ),
+              WorkspaceToolsPane(
+                key: ValueKey(workspace.id),
+                workspaceId: workspace.id,
+              ),
+            ],
           ),
         ),
       ],

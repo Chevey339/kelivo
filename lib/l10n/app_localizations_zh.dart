@@ -10166,6 +10166,33 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get workspaceEnvDownloadSave => '保存下载源';
+
+  @override
+  String get workspaceToolsTitle => '工具';
+
+  @override
+  String get workspaceToolsDescription => '选择此工作区的对话可以使用哪些工具，修改后自动保存。';
+
+  @override
+  String get workspaceToolHelpShell => '在工作区环境中执行命令。';
+
+  @override
+  String get workspaceToolHelpRead => '按行读取文件内容，支持分页。';
+
+  @override
+  String get workspaceToolHelpWrite => '创建文件或覆盖文件内容。';
+
+  @override
+  String get workspaceToolHelpEdit => '替换已有文件中的指定文本。';
+
+  @override
+  String get workspaceToolHelpList => '浏览目录及其中的文件。';
+
+  @override
+  String get workspaceToolHelpGlob => '按文件名或路径模式查找文件。';
+
+  @override
+  String get workspaceToolHelpGrep => '搜索文件中的文本内容。';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hans`).
@@ -20256,6 +20283,33 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get workspaceEnvDownloadSave => '保存下载源';
+
+  @override
+  String get workspaceToolsTitle => '工具';
+
+  @override
+  String get workspaceToolsDescription => '选择此工作区的对话可以使用哪些工具，修改后自动保存。';
+
+  @override
+  String get workspaceToolHelpShell => '在工作区环境中执行命令。';
+
+  @override
+  String get workspaceToolHelpRead => '按行读取文件内容，支持分页。';
+
+  @override
+  String get workspaceToolHelpWrite => '创建文件或覆盖文件内容。';
+
+  @override
+  String get workspaceToolHelpEdit => '替换已有文件中的指定文本。';
+
+  @override
+  String get workspaceToolHelpList => '浏览目录及其中的文件。';
+
+  @override
+  String get workspaceToolHelpGlob => '按文件名或路径模式查找文件。';
+
+  @override
+  String get workspaceToolHelpGrep => '搜索文件中的文本内容。';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hant`).
@@ -30422,4 +30476,31 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get workspaceEnvDownloadSave => '儲存下載來源';
+
+  @override
+  String get workspaceToolsTitle => '工具';
+
+  @override
+  String get workspaceToolsDescription => '選擇此工作區的對話可以使用哪些工具，修改後自動儲存。';
+
+  @override
+  String get workspaceToolHelpShell => '在工作區環境中執行命令。';
+
+  @override
+  String get workspaceToolHelpRead => '按行讀取檔案內容，支援分頁。';
+
+  @override
+  String get workspaceToolHelpWrite => '建立檔案或覆寫檔案內容。';
+
+  @override
+  String get workspaceToolHelpEdit => '取代現有檔案中的指定文字。';
+
+  @override
+  String get workspaceToolHelpList => '瀏覽目錄及其中的檔案。';
+
+  @override
+  String get workspaceToolHelpGlob => '按檔名或路徑模式尋找檔案。';
+
+  @override
+  String get workspaceToolHelpGrep => '搜尋檔案中的文字內容。';
 }

@@ -19076,6 +19076,60 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Save source'**
   String get workspaceEnvDownloadSave;
+
+  /// No description provided for @workspaceToolsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Tools'**
+  String get workspaceToolsTitle;
+
+  /// No description provided for @workspaceToolsDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose which tools conversations can use in this workspace. Changes are saved automatically.'**
+  String get workspaceToolsDescription;
+
+  /// No description provided for @workspaceToolHelpShell.
+  ///
+  /// In en, this message translates to:
+  /// **'Run commands in the workspace environment.'**
+  String get workspaceToolHelpShell;
+
+  /// No description provided for @workspaceToolHelpRead.
+  ///
+  /// In en, this message translates to:
+  /// **'Read files with line numbers and paging.'**
+  String get workspaceToolHelpRead;
+
+  /// No description provided for @workspaceToolHelpWrite.
+  ///
+  /// In en, this message translates to:
+  /// **'Create files or overwrite their contents.'**
+  String get workspaceToolHelpWrite;
+
+  /// No description provided for @workspaceToolHelpEdit.
+  ///
+  /// In en, this message translates to:
+  /// **'Replace specific text in an existing file.'**
+  String get workspaceToolHelpEdit;
+
+  /// No description provided for @workspaceToolHelpList.
+  ///
+  /// In en, this message translates to:
+  /// **'Browse directories and their entries.'**
+  String get workspaceToolHelpList;
+
+  /// No description provided for @workspaceToolHelpGlob.
+  ///
+  /// In en, this message translates to:
+  /// **'Find files by name or path pattern.'**
+  String get workspaceToolHelpGlob;
+
+  /// No description provided for @workspaceToolHelpGrep.
+  ///
+  /// In en, this message translates to:
+  /// **'Search text inside files.'**
+  String get workspaceToolHelpGrep;
 }
 
 class _AppLocalizationsDelegate

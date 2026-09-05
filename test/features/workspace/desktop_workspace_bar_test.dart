@@ -11,6 +11,7 @@ import 'package:Kelivo/core/providers/workspace_provider.dart';
 import 'package:Kelivo/core/services/chat/chat_service.dart';
 import 'package:Kelivo/core/services/workspace/workspace_runtime.dart';
 import 'package:Kelivo/features/workspace/widgets/desktop_workspace_bar.dart';
+import 'package:Kelivo/features/workspace/pages/workspaces_page.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
 import 'package:Kelivo/shared/widgets/segmented_tabs.dart';
 import 'package:drift/native.dart';
@@ -126,6 +127,22 @@ void main() {
       ),
     );
   }
+
+  testWidgets(
+    'settings shortcut opens the desktop workspace manager',
+    (tester) async {
+      await tester.pumpWidget(harness(conversation: null));
+      await tester.pumpAndSettle();
+      final action = find.byKey(DesktopWorkspaceBar.manageKey);
+      expect(action, findsOneWidget);
+      await tester.tap(action);
+      await tester.pumpAndSettle();
+      expect(find.byType(WorkspacesPane), findsOneWidget);
+      expect(find.byType(BottomSheet), findsNothing);
+      expect(tester.takeException(), isNull);
+    },
+    variant: TargetPlatformVariant.only(TargetPlatform.macOS),
+  );
 
   testWidgets('unbound conversation can bind directly from the workspace tab', (
     tester,

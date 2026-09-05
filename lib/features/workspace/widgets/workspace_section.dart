@@ -15,6 +15,7 @@ import 'package:Kelivo/features/chat/widgets/tools_sheet_row.dart';
 import 'package:Kelivo/features/workspace/terminal/open_terminal.dart';
 import 'package:Kelivo/features/workspace/widgets/environment/environment_labels.dart';
 import 'package:Kelivo/features/workspace/pages/workspace_files_page.dart';
+import 'package:Kelivo/features/workspace/pages/workspace_settings_page.dart';
 import 'package:Kelivo/features/workspace/widgets/files/conversation_files_panel.dart';
 import 'package:Kelivo/features/workspace/widgets/files/file_browser_ops.dart';
 import 'package:Kelivo/features/workspace/widgets/files/workspace_prompts.dart';
@@ -515,6 +516,20 @@ class _WorkspaceSectionState extends State<WorkspaceSection> {
             children: [
               const SizedBox.shrink(key: WorkspaceSection.unbindKey),
               const SizedBox.shrink(key: WorkspaceSection.changeKey),
+              action(
+                key: WorkspaceSection.manageKey,
+                icon: Lucide.Settings2,
+                label: l10n.settingsPageWorkspace,
+                onTap: () => _afterClose((ctx) {
+                  unawaited(
+                    Navigator.of(ctx).push<void>(
+                      MaterialPageRoute<void>(
+                        builder: (_) => const WorkspaceSettingsPage(),
+                      ),
+                    ),
+                  );
+                }),
+              ),
               action(
                 key: WorkspaceSection.filesKey,
                 icon: Lucide.FolderOpen,

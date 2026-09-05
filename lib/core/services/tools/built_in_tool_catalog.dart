@@ -2,8 +2,9 @@ import '../../services/memory/memory_prompts.dart';
 import '../../services/memory/memory_tools.dart';
 import '../../services/search/search_tool_service.dart';
 import '../../../features/home/services/local_tools_service.dart';
+import '../workspace/workspace_tools_service.dart';
 
-enum BuiltInToolGroup { search, memory, local }
+enum BuiltInToolGroup { search, memory, local, workspace }
 
 class BuiltInToolCatalogEntry {
   const BuiltInToolCatalogEntry({
@@ -64,6 +65,15 @@ abstract final class BuiltInToolCatalog {
           name: name,
           defaultDefinition: LocalToolsService.definitionFor(name),
           group: BuiltInToolGroup.local,
+        ),
+      );
+    }
+    for (final definition in WorkspaceToolsService.definitions()) {
+      out.add(
+        BuiltInToolCatalogEntry(
+          name: _toolName(definition)!,
+          defaultDefinition: definition,
+          group: BuiltInToolGroup.workspace,
         ),
       );
     }

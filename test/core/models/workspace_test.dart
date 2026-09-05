@@ -40,6 +40,30 @@ void main() {
       expect(decoded, workspace);
     });
 
+    test('tool choices round trip independently and survive other edits', () {
+      final original = sample();
+      final disabled = original.copyWith(
+        disabledTools: {'shell', 'write_file'},
+      );
+      final reloaded = Workspace.fromJson(disabled.toJson());
+      expect(reloaded.isToolEnabled('shell'), isFalse);
+      expect(reloaded.isToolEnabled('read_file'), isTrue);
+      expect(original.isToolEnabled('shell'), isTrue);
+      expect(reloaded.copyWith(name: 'Renamed').disabledTools, {
+        'shell',
+        'write_file',
+      });
+      final reordered = original.copyWith(
+        disabledTools: {'write_file', 'shell'},
+      );
+      expect(reordered, reloaded);
+      expect(reordered.hashCode, reloaded.hashCode);
+      expect(
+        reloaded.copyWith(disabledTools: {}).isToolEnabled('shell'),
+        isTrue,
+      );
+    });
+
     test('equality and copyWith', () {
       final workspace = sample();
       expect(workspace, workspace.copyWith());

@@ -10619,4 +10619,36 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get workspaceEnvDownloadSave => 'Save source';
+
+  @override
+  String get workspaceToolsTitle => 'Tools';
+
+  @override
+  String get workspaceToolsDescription =>
+      'Choose which tools conversations can use in this workspace. Changes are saved automatically.';
+
+  @override
+  String get workspaceToolHelpShell =>
+      'Run commands in the workspace environment.';
+
+  @override
+  String get workspaceToolHelpRead =>
+      'Read files with line numbers and paging.';
+
+  @override
+  String get workspaceToolHelpWrite =>
+      'Create files or overwrite their contents.';
+
+  @override
+  String get workspaceToolHelpEdit =>
+      'Replace specific text in an existing file.';
+
+  @override
+  String get workspaceToolHelpList => 'Browse directories and their entries.';
+
+  @override
+  String get workspaceToolHelpGlob => 'Find files by name or path pattern.';
+
+  @override
+  String get workspaceToolHelpGrep => 'Search text inside files.';
 }
