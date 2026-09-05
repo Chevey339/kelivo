@@ -167,25 +167,27 @@ class _SkillsPopover extends StatelessWidget {
     final cs = Theme.of(context).colorScheme;
     final l10n = AppLocalizations.of(context)!;
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    const radius = BorderRadius.vertical(top: Radius.circular(14));
     return ClipRRect(
       key: desktopSkillsPopoverKey,
-      borderRadius: const BorderRadius.vertical(top: Radius.circular(14)),
+      borderRadius: radius,
       child: BackdropFilter(
         filter: ui.ImageFilter.blur(sigmaX: 20, sigmaY: 20),
         child: DecoratedBox(
           decoration: BoxDecoration(
             color: AppOverlayColors.desktopPopoverSurface(cs),
+            borderRadius: radius,
             border: Border(
               top: BorderSide(
-                color: cs.onSurface.withValues(alpha: isDark ? 0.06 : 0.18),
+                color: cs.onSurface.withValues(alpha: isDark ? 0.06 : 0.12),
                 width: 0.7,
               ),
               left: BorderSide(
-                color: cs.onSurface.withValues(alpha: isDark ? 0.04 : 0.12),
+                color: cs.onSurface.withValues(alpha: isDark ? 0.06 : 0.12),
                 width: 0.6,
               ),
               right: BorderSide(
-                color: cs.onSurface.withValues(alpha: isDark ? 0.04 : 0.12),
+                color: cs.onSurface.withValues(alpha: isDark ? 0.06 : 0.12),
                 width: 0.6,
               ),
             ),
