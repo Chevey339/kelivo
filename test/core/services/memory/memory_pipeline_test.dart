@@ -113,6 +113,7 @@ void main() {
             required ProviderConfig config,
             required String modelId,
             required String prompt,
+            String? conversationId,
             int? thinkingBudget,
           }) async =>
               throw StateError('use processWindow llmCall in these tests'),

@@ -150,6 +150,7 @@ class TranslationService {
       final provider = settings.getProviderConfig(translateProvider);
 
       final translationStream = ChatApiService.sendMessageStream(
+        conversationId: message.conversationId,
         config: provider,
         modelId: translateModelId,
         messages: [

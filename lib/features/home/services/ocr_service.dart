@@ -134,6 +134,7 @@ class OcrService {
     String out = '';
     try {
       final result = await ChatApiService.generateMessage(
+        conversationId: requestId,
         config: cfg,
         modelId: model,
         messages: messages,

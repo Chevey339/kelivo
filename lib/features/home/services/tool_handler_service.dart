@@ -583,6 +583,7 @@ class ToolHandlerService {
           ? (assistant.thinkingBudget ?? settings.thinkingBudget)
           : 0;
       memoryLlmCall = (prompt) => ChatApiService.generateText(
+        conversationId: conversationId,
         config: cfg,
         modelId: mdlId,
         prompt: prompt,
