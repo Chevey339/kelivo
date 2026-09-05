@@ -10520,4 +10520,103 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get workspaceDesktopNoResults => 'No matching workspaces';
+
+  @override
+  String get workspaceEnvDependencies => 'Environment presets';
+
+  @override
+  String get workspaceEnvDependenciesDetail =>
+      'Install tools in the shared sandbox. All workspaces can use them.';
+
+  @override
+  String get workspaceEnvDependencyPython =>
+      'Python, pip and virtual environments';
+
+  @override
+  String get workspaceEnvDependencyNode => 'Node.js and npm';
+
+  @override
+  String get workspaceEnvDependencyGit =>
+      'Clone repositories and manage versions';
+
+  @override
+  String get workspaceEnvDependencySsh => 'SSH, SCP, SFTP and key generation';
+
+  @override
+  String get workspaceEnvDependencyNetwork => 'Network tools';
+
+  @override
+  String get workspaceEnvDependencyArchive => 'Archive tools';
+
+  @override
+  String get workspaceEnvDependencyInstalled => 'Installed';
+
+  @override
+  String get workspaceEnvDependencyUnknown => 'Not checked';
+
+  @override
+  String get workspaceEnvDependencyChecking => 'Checking tools…';
+
+  @override
+  String get workspaceEnvDependencyInstalling => 'Installing…';
+
+  @override
+  String get workspaceEnvDependencyCheckFailed =>
+      'Could not check tools. Tap refresh to try again.';
+
+  @override
+  String get workspaceEnvDependencyInstallFailed =>
+      'Installation did not finish. Check the log or change the package source, then retry.';
+
+  @override
+  String get workspaceEnvDependencyLog => 'Installation log';
+
+  @override
+  String get workspaceEnvDependencyRefresh => 'Refresh tool status';
+
+  @override
+  String get workspaceEnvDependencyReadyFirst =>
+      'Install the sandbox first to add these tools.';
+
+  @override
+  String get workspaceEnvDependencySources => 'Package sources';
+
+  @override
+  String get workspaceEnvDependencySourcesDetail =>
+      'Installation uses the selected apt/apk source. pip and npm sources apply to packages you install later.';
+
+  @override
+  String get workspaceEnvDownloadSource => 'Sandbox download source';
+
+  @override
+  String get workspaceEnvDownloadAutomatic => 'Auto-select fastest';
+
+  @override
+  String get workspaceEnvDownloadAutomaticDetail =>
+      'Test the official source and built-in mirrors before downloading.';
+
+  @override
+  String get workspaceEnvDownloadCustom => 'Custom URL';
+
+  @override
+  String get workspaceEnvDownloadCustomHint =>
+      'https://example.com/ubuntu-base/releases/24.04/release/';
+
+  @override
+  String get workspaceEnvDownloadCustomDetail =>
+      'Enter a release directory or a full .tar.gz URL. The image must match Ubuntu Base 24.04.3 and this device’s architecture.';
+
+  @override
+  String get workspaceEnvDownloadInvalidUrl =>
+      'Enter a valid HTTP or HTTPS URL.';
+
+  @override
+  String get workspaceEnvDownloadVerified =>
+      'Every source is checked against the bundled official SHA-256. This choice does not change package sources.';
+
+  @override
+  String get workspaceEnvDownloadStart => 'Download and install';
+
+  @override
+  String get workspaceEnvDownloadSave => 'Save source';
 }

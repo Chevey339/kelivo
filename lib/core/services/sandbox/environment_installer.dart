@@ -64,7 +64,9 @@ class EnvironmentInstaller implements EnvironmentManager {
   Directory? _resolvedEnvDir;
 
   bool _cancelled = false;
-  bool _forceOfficial = false;
+  bool _installing = false;
+  Completer<void>? _abortDownload;
+  Completer<void>? _downloadDone;
   StreamSubscription<List<int>>? _downloadSub;
   void Function(EnvironmentState)? _onProgress;
 
@@ -80,17 +82,25 @@ class EnvironmentInstaller implements EnvironmentManager {
 
   @override
   Future<void> install({void Function(EnvironmentState)? onProgress}) async {
+    if (_installing) return;
+    _installing = true;
     _cancelled = false;
+    _abortDownload = Completer<void>();
     _onProgress = onProgress;
-    await _resolveEnvDir();
     try {
+      await env.loaded;
+      await _resolveEnvDir();
       await channel.keepScreenOn(true);
       await _installBody();
     } on _InstallStopped {
       // State already persisted by [_fail] or [_throwIfCancelled].
     } finally {
+      _installing = false;
       _onProgress = null;
       _downloadSub = null;
+      if (_abortDownload?.isCompleted == false) _abortDownload!.complete();
+      _abortDownload = null;
+      _downloadDone = null;
       try {
         await channel.keepScreenOn(false);
       } catch (_) {}
@@ -100,6 +110,8 @@ class EnvironmentInstaller implements EnvironmentManager {
   @override
   Future<void> cancel() async {
     _cancelled = true;
+    if (_abortDownload?.isCompleted == false) _abortDownload!.complete();
+    if (_downloadDone?.isCompleted == false) _downloadDone!.complete();
     await _downloadSub?.cancel();
     _downloadSub = null;
   }
@@ -141,7 +153,6 @@ class EnvironmentInstaller implements EnvironmentManager {
   @override
   Future<void> reset() async {
     await _resolveEnvDir();
-    _forceOfficial = false;
     await _deleteIfExists(rootfsDir);
     await _deleteIfExists(Directory(p.join(_requireEnvDir().path, 'staging')));
     await _deleteIfExists(downloadsDir);
@@ -188,6 +199,8 @@ class EnvironmentInstaller implements EnvironmentManager {
   }
 
   Future<void> _installBody() async {
+    final selectedSource = env.downloadSource;
+    final customUrl = env.downloadUrl;
     final probe = await _safeProbe();
     if (!probe.supported) {
       await _fail(EnvironmentError.prootMissing);
@@ -216,21 +229,33 @@ class EnvironmentInstaller implements EnvironmentManager {
       return;
     }
 
-    final expectedSha = await _safeFetchSha256(arch);
-    if (expectedSha == null) return;
+    final expectedSha = source.checksums[arch]!;
 
     final tarballName = RootfsSource.tarballFileName(arch);
     final partFile = File(p.join(downloadsDir.path, '$tarballName.part'));
-    final useOfficial =
-        _forceOfficial ||
-        env.state.errorMessage == EnvironmentError.checksumMismatch;
-    final downloadUri = await _pickDownloadUri(arch, useOfficial: useOfficial);
+    Uri downloadUri;
+    try {
+      downloadUri =
+          source.selectedUri(selectedSource, customUrl, arch) ??
+          await _pickDownloadUri(arch);
+    } catch (_) {
+      await _fail(EnvironmentError.network);
+      return;
+    }
+    final originFile = File('${partFile.path}.url');
+    if (await partFile.exists() &&
+        (!await originFile.exists() ||
+            await originFile.readAsString() != downloadUri.toString())) {
+      await partFile.delete();
+    }
+    await originFile.parent.create(recursive: true);
+    await originFile.writeAsString(downloadUri.toString(), flush: true);
     await _throwIfCancelled();
 
     await _setPhase(
       env.state.copyWith(
         phase: EnvironmentPhase.downloading,
-        lastMirrorBase: source.releaseBaseForUri(downloadUri),
+        lastMirrorBase: downloadUri.toString(),
         progress: 0,
         bytesDownloaded: 0,
         clearErrorMessage: true,
@@ -243,7 +268,9 @@ class EnvironmentInstaller implements EnvironmentManager {
       rethrow;
     } catch (error) {
       if (error is _InstallStopped) rethrow;
-      await _fail(EnvironmentError.network);
+      await _fail(
+        _cancelled ? EnvironmentError.cancelled : EnvironmentError.network,
+      );
       return;
     }
 
@@ -260,7 +287,6 @@ class EnvironmentInstaller implements EnvironmentManager {
       return;
     }
     if (digest != expectedSha.toLowerCase()) {
-      _forceOfficial = true;
       if (await partFile.exists()) await partFile.delete();
       await _fail(EnvironmentError.checksumMismatch);
       return;
@@ -335,7 +361,6 @@ class EnvironmentInstaller implements EnvironmentManager {
     await File(
       p.join(rootfsDir.path, kKelivoVersionFile),
     ).writeAsString('$kUbuntuDistro $kUbuntuBaseVersion $arch\n', flush: true);
-    _forceOfficial = false;
     await _setPhase(
       EnvironmentState(
         phase: EnvironmentPhase.ready,
@@ -367,18 +392,8 @@ class EnvironmentInstaller implements EnvironmentManager {
     }
   }
 
-  Future<String?> _safeFetchSha256(String arch) async {
-    try {
-      return await source.fetchExpectedSha256(arch);
-    } catch (_) {
-      await _fail(EnvironmentError.network);
-      return null;
-    }
-  }
-
-  Future<Uri> _pickDownloadUri(String arch, {required bool useOfficial}) async {
+  Future<Uri> _pickDownloadUri(String arch) async {
     final official = source.officialTarballUri(arch);
-    if (useOfficial) return official;
     try {
       final probes = await speedTest.probe(source.tarballCandidates(arch));
       return MirrorSpeedTest.pickFastest(probes, official: official);
@@ -394,15 +409,27 @@ class EnvironmentInstaller implements EnvironmentManager {
       existing = await partFile.length();
     }
 
-    final request = http.Request('GET', uri);
+    final request = http.AbortableRequest(
+      'GET',
+      uri,
+      abortTrigger: _abortDownload?.future,
+    );
     if (existing > 0) {
       request.headers['range'] = 'bytes=$existing-';
       request.headers['Range'] = 'bytes=$existing-';
     }
 
-    final response = await _client.send(request);
+    final response = await _client
+        .send(request)
+        .timeout(const Duration(seconds: 30));
     await _throwIfCancelled();
 
+    if (existing > 0 &&
+        response.statusCode == 416 &&
+        _totalFromResponse(response, 0) == existing) {
+      await response.stream.drain<void>();
+      return; // A complete cached archive still goes through SHA-256 verification.
+    }
     if (existing > 0 && response.statusCode == 200) {
       await partFile.writeAsBytes(const <int>[], flush: true);
       existing = 0;
@@ -427,36 +454,38 @@ class EnvironmentInstaller implements EnvironmentManager {
     final sink = partFile.openWrite(mode: FileMode.append);
     var downloaded = existing;
     try {
-      final completer = Completer<void>();
-      _downloadSub = response.stream.listen(
-        (chunk) {
-          if (_cancelled) {
-            if (!completer.isCompleted) completer.complete();
-            return;
-          }
-          sink.add(chunk);
-          downloaded += chunk.length;
-          unawaited(
-            _setPhase(
-              env.state.copyWith(
-                phase: EnvironmentPhase.downloading,
-                bytesDownloaded: downloaded,
-                bytesTotal: total,
-                progress: total == null || total == 0
-                    ? null
-                    : (downloaded / total).clamp(0.0, 1.0),
-              ),
-            ),
+      final completer = _downloadDone = Completer<void>();
+      _downloadSub = response.stream
+          .timeout(const Duration(seconds: 30))
+          .listen(
+            (chunk) {
+              if (_cancelled) {
+                if (!completer.isCompleted) completer.complete();
+                return;
+              }
+              sink.add(chunk);
+              downloaded += chunk.length;
+              unawaited(
+                _setPhase(
+                  env.state.copyWith(
+                    phase: EnvironmentPhase.downloading,
+                    bytesDownloaded: downloaded,
+                    bytesTotal: total,
+                    progress: total == null || total == 0
+                        ? null
+                        : (downloaded / total).clamp(0.0, 1.0),
+                  ),
+                ),
+              );
+            },
+            onError: (Object error, StackTrace stack) {
+              if (!completer.isCompleted) completer.completeError(error, stack);
+            },
+            onDone: () {
+              if (!completer.isCompleted) completer.complete();
+            },
+            cancelOnError: true,
           );
-        },
-        onError: (Object error, StackTrace stack) {
-          if (!completer.isCompleted) completer.completeError(error, stack);
-        },
-        onDone: () {
-          if (!completer.isCompleted) completer.complete();
-        },
-        cancelOnError: true,
-      );
       await completer.future;
       await sink.flush();
     } finally {

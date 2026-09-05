@@ -47,7 +47,7 @@ void main() {
 
   EnvironmentInstaller buildInstaller(http.Client client) {
     final source = RootfsSource(
-      client: client,
+      checksums: {'arm64': digest, 'amd64': digest},
       officialReleaseBase: _officialBase,
       cdimageReleaseBases: const [_officialBase],
     );
@@ -100,6 +100,101 @@ void main() {
     });
   }
 
+  for (final selected in [
+    RootfsDownloadSource.official,
+    RootfsDownloadSource.tuna,
+    RootfsDownloadSource.huawei,
+    RootfsDownloadSource.custom,
+  ]) {
+    test(
+      'explicit $selected bypasses auto probes and official manifest',
+      () async {
+        await env.setDownloadSource(
+          selected,
+          customUrl: 'https://custom.test/release/',
+        );
+        final requests = <http.BaseRequest>[];
+        final installer = buildInstaller(
+          servingTarball(onRequest: requests.add),
+        );
+        await installer.install();
+        expect(env.state.phase, EnvironmentPhase.ready);
+        expect(requests, hasLength(1));
+        expect(
+          requests.single.url,
+          installer.source.selectedUri(selected, env.downloadUrl, 'arm64'),
+        );
+        expect(requests.single.headers['range'], isNull);
+      },
+    );
+  }
+
+  test('switching source removes the previous partial archive', () async {
+    final part = File(
+      p.join(
+        envDir.path,
+        'downloads',
+        '${RootfsSource.tarballFileName('arm64')}.part',
+      ),
+    );
+    await part.parent.create(recursive: true);
+    await part.writeAsBytes([0, 1, 2]);
+    await File(
+      '${part.path}.url',
+    ).writeAsString('https://old.test/image.tar.gz');
+    await env.setDownloadSource(
+      RootfsDownloadSource.custom,
+      customUrl: 'https://new.test/image.tar.gz',
+    );
+    final requests = <http.BaseRequest>[];
+    await buildInstaller(servingTarball(onRequest: requests.add)).install();
+    expect(env.state.phase, EnvironmentPhase.ready);
+    expect(requests.single.headers['range'], isNull);
+  });
+
+  test(
+    'a complete partial archive is verified after a Range 416 response',
+    () async {
+      final part = File(
+        p.join(
+          envDir.path,
+          'downloads',
+          '${RootfsSource.tarballFileName('arm64')}.part',
+        ),
+      );
+      await part.parent.create(recursive: true);
+      await part.writeAsBytes(tarball);
+      await File('${part.path}.url').writeAsString(
+        '$_officialBase/${RootfsSource.tarballFileName('arm64')}',
+      );
+      await env.setDownloadSource(RootfsDownloadSource.official);
+      final installer = buildInstaller(
+        MockClient((request) async {
+          expect(request.headers['range'], 'bytes=${tarball.length}-');
+          return http.Response(
+            '',
+            416,
+            headers: {'content-range': 'bytes */${tarball.length}'},
+          );
+        }),
+      );
+      await installer.install();
+      expect(env.state.phase, EnvironmentPhase.ready);
+    },
+  );
+
+  test('custom selection persists across provider recreation', () async {
+    await env.setDownloadSource(
+      RootfsDownloadSource.custom,
+      customUrl: 'https://custom.test/image.tar.gz',
+    );
+    final reloaded = EnvironmentProvider(preferences: env.preferences);
+    await reloaded.loaded;
+    expect(reloaded.downloadSource, RootfsDownloadSource.custom);
+    expect(reloaded.downloadUrl, 'https://custom.test/image.tar.gz');
+    reloaded.dispose();
+  });
+
   test('happy path installs rootfs and writes version file', () async {
     workspace.freeBytes = 8 * 1024 * 1024 * 1024;
     final installer = buildInstaller(servingTarball());
@@ -151,6 +246,9 @@ void main() {
     );
     await part.create(recursive: true);
     await part.writeAsBytes(tarball.sublist(0, 4));
+    await File(
+      '${part.path}.url',
+    ).writeAsString('$_officialBase/${RootfsSource.tarballFileName('arm64')}');
     String? seenRange;
     final installer = buildInstaller(
       servingTarball(
@@ -178,6 +276,9 @@ void main() {
     );
     await part.create(recursive: true);
     await part.writeAsBytes(const <int>[1, 2, 3, 4]);
+    await File(
+      '${part.path}.url',
+    ).writeAsString('$_officialBase/${RootfsSource.tarballFileName('arm64')}');
     final installer = buildInstaller(servingTarball(ignoreRange: true));
     await installer.install();
     expect(env.state.phase, EnvironmentPhase.ready);

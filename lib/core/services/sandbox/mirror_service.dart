@@ -150,12 +150,27 @@ class MirrorService {
   final Duration guestTimeout;
   MirrorCancelToken? _activeCancel;
 
-  static List<MirrorEntry> entriesFor(MirrorCategory category) {
+  static List<MirrorEntry> entriesFor(
+    MirrorCategory category, {
+    String arch = 'arm64',
+  }) {
     switch (category) {
       case MirrorCategory.apk:
         return _apk;
       case MirrorCategory.apt:
-        return _apt;
+        if (arch != 'amd64') return _apt;
+        return [
+          for (final entry in _apt)
+            MirrorEntry(
+              id: entry.id,
+              name: entry.name,
+              region: entry.region,
+              official: entry.official,
+              baseUrl: entry.baseUrl
+                  .replaceFirst('ports.ubuntu.com', 'archive.ubuntu.com')
+                  .replaceFirst('/ubuntu-ports/', '/ubuntu/'),
+            ),
+        ];
       case MirrorCategory.pip:
         return _pip;
       case MirrorCategory.npm:
@@ -163,16 +178,23 @@ class MirrorService {
     }
   }
 
-  static MirrorEntry officialEntry(MirrorCategory category) {
-    return entriesFor(category).firstWhere((entry) => entry.official);
+  static MirrorEntry officialEntry(
+    MirrorCategory category, {
+    String arch = 'arm64',
+  }) {
+    return entriesFor(
+      category,
+      arch: arch,
+    ).firstWhere((entry) => entry.official);
   }
 
   static MirrorEntry? findEntry(
     MirrorCategory category, {
     String? id,
     String? url,
+    String arch = 'arm64',
   }) {
-    final entries = entriesFor(category);
+    final entries = entriesFor(category, arch: arch);
     if (id != null && id.isNotEmpty) {
       for (final entry in entries) {
         if (entry.id == id) return entry;
@@ -206,7 +228,12 @@ class MirrorService {
     Duration? timeout,
     MirrorCancelToken? cancelToken,
   }) {
-    return _probeEntries(category, entriesFor(category), timeout, cancelToken);
+    return _probeEntries(
+      category,
+      entriesFor(category, arch: _arch),
+      timeout,
+      cancelToken,
+    );
   }
 
   Stream<MirrorProbeResult> probeCategories(
@@ -251,7 +278,7 @@ class MirrorService {
     MirrorCancelToken? cancelToken,
   }) {
     final entry =
-        findEntry(category, url: base.toString()) ??
+        findEntry(category, url: base.toString(), arch: _arch) ??
         MirrorEntry(
           id: base.host,
           name: base.host,
@@ -300,9 +327,9 @@ class MirrorService {
     MirrorCancelToken? cancelToken,
   }) {
     return _withCancel(cancelToken, () async {
-      final official = officialEntry(category);
-      // Persist first so the Environment subtitle updates even if the guest
-      // script later fails (iSH restore used to throw before setMirror).
+      final official = officialEntry(category, arch: _arch);
+      final code = await _runGuest(_applyScript(category, official.baseUri));
+      if (code != 0) throw StateError('guest mirror restore exited $code');
       await env.setMirror(
         category,
         MirrorSelection(
@@ -313,13 +340,6 @@ class MirrorService {
           manual: manual,
         ),
       );
-      var code = await _runGuest(_restoreScript(category));
-      if (code != 0) {
-        code = await _runGuest(_applyScript(category, official.baseUri));
-      }
-      if (code != 0) {
-        throw StateError('guest mirror restore exited $code');
-      }
     });
   }
 
@@ -379,22 +399,13 @@ class MirrorService {
           );
           continue;
         }
-        final official = officialEntry(category);
         final hits =
             (collected[category] ?? const <MirrorProbeResult>[])
                 .where((item) => item.ok)
                 .toList()
               ..sort((a, b) => a.latency!.compareTo(b.latency!));
         if (hits.isEmpty || hits.first.entry.official) {
-          await env.setMirror(
-            category,
-            MirrorSelection(
-              selectedBaseUrl: official.baseUrl,
-              useMirror: false,
-              mirrorId: official.id,
-              displayName: official.name,
-            ),
-          );
+          await restoreOfficial(category);
         } else {
           await applyEntry(category, hits.first.entry, manual: false);
         }
@@ -611,19 +622,6 @@ class MirrorService {
         return GuestScripts.applyPipMirror(url);
       case MirrorCategory.npm:
         return GuestScripts.applyNpmMirror(url);
-    }
-  }
-
-  String _restoreScript(MirrorCategory category) {
-    switch (category) {
-      case MirrorCategory.apk:
-        return GuestScripts.restoreApkMirror(alpineBranch: alpineBranch);
-      case MirrorCategory.apt:
-        return GuestScripts.restoreAptMirror();
-      case MirrorCategory.pip:
-        return GuestScripts.restorePipMirror();
-      case MirrorCategory.npm:
-        return GuestScripts.restoreNpmMirror();
     }
   }
 

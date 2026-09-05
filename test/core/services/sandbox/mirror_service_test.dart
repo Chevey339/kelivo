@@ -49,6 +49,26 @@ void main() {
     );
   }
 
+  test(
+    'amd64 APT selections use Ubuntu archives instead of ARM ports',
+    () async {
+      await env.setState(
+        const EnvironmentState(phase: EnvironmentPhase.ready, arch: 'amd64'),
+      );
+      final scripts = <String>[];
+      final mirrors = service(scripts: scripts);
+      await mirrors.restoreOfficial(MirrorCategory.apt);
+      expect(scripts.single, contains('http://archive.ubuntu.com/ubuntu'));
+      expect(scripts.single, isNot(contains('ubuntu-ports')));
+      final tuna = MirrorService.findEntry(
+        MirrorCategory.apt,
+        id: 'apt.tuna',
+        arch: 'amd64',
+      )!;
+      expect(tuna.baseUrl, 'https://mirrors.tuna.tsinghua.edu.cn/ubuntu/');
+    },
+  );
+
   test('named tables cover official plus regional mirrors', () {
     expect(MirrorService.entriesFor(MirrorCategory.apk).length, 10);
     expect(MirrorService.entriesFor(MirrorCategory.apt).length, 7);
@@ -102,11 +122,13 @@ void main() {
     expect(selection?.manual, isTrue);
   });
 
-  test('restoreOfficial runs restore script and clears useMirror', () async {
+  test('restoreOfficial writes official source and clears useMirror', () async {
     final scripts = <String>[];
     final mirrors = service(scripts: scripts);
     await mirrors.restoreOfficial(MirrorCategory.npm);
-    expect(scripts, [GuestScripts.restoreNpmMirror()]);
+    expect(scripts, [
+      GuestScripts.applyNpmMirror('https://registry.npmjs.org'),
+    ]);
     expect(env.mirrors[MirrorCategory.npm]?.useMirror, isFalse);
     expect(
       env.mirrors[MirrorCategory.npm]?.selectedBaseUrl,
@@ -186,14 +208,20 @@ void main() {
     ]);
 
     await mirrors.applyEntry(MirrorCategory.apk, official);
-    expect(scripts.last, GuestScripts.restoreApkMirror(alpineBranch: 'v3.21'));
+    expect(
+      scripts.last,
+      GuestScripts.applyApkMirror(
+        'https://dl-cdn.alpinelinux.org/alpine',
+        'v3.21',
+      ),
+    );
     expect(env.mirrors[MirrorCategory.apk]?.useMirror, isFalse);
     expect(env.mirrors[MirrorCategory.apk]?.mirrorId, 'alpine.official');
     expect(env.mirrors[MirrorCategory.apk]?.selectedBaseUrl, official.baseUrl);
     expect(env.mirrors[MirrorCategory.apk]?.manual, isTrue);
   });
 
-  test('restoreOfficial persists apk selection before guest runs', () async {
+  test('failed restore keeps the last applied mirror selection', () async {
     final scripts = <String>[];
     final aliyun = MirrorService.findEntry(
       MirrorCategory.apk,
@@ -212,8 +240,8 @@ void main() {
       mirrors.restoreOfficial(MirrorCategory.apk),
       throwsA(isA<StateError>()),
     );
-    expect(env.mirrors[MirrorCategory.apk]?.useMirror, isFalse);
-    expect(env.mirrors[MirrorCategory.apk]?.mirrorId, 'alpine.official');
+    expect(env.mirrors[MirrorCategory.apk]?.useMirror, isTrue);
+    expect(env.mirrors[MirrorCategory.apk]?.mirrorId, 'alpine.aliyun');
   });
 
   test('autoDetect skips a manual pick', () async {

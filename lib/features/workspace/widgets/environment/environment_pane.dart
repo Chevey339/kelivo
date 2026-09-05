@@ -1,3 +1,8 @@
+import 'package:flutter/cupertino.dart' show CupertinoPageRoute;
+import 'package:Kelivo/core/services/sandbox/environment_dependencies.dart';
+import 'package:Kelivo/core/services/sandbox/environment_installer.dart';
+import 'package:Kelivo/features/workspace/pages/environment_download_page.dart';
+import 'environment_dependencies_section.dart';
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
@@ -74,7 +79,9 @@ class EnvironmentPane extends StatefulWidget {
 
 class _EnvironmentPaneState extends State<EnvironmentPane> {
   bool _busy = false;
-  bool _detectingMirrors = false;
+  EnvironmentPhase? _lastDependenciesPhase;
+  bool get _dependenciesBusy =>
+      context.read<EnvironmentDependencies?>()?.busy ?? false;
   bool _checkedUpdate = false;
   int? _diskUsageBytes;
   String? _rootfsPath;
@@ -217,33 +224,21 @@ class _EnvironmentPaneState extends State<EnvironmentPane> {
 
   Future<void> _install() async {
     final manager = context.read<EnvironmentManager?>();
-    if (manager == null || _busy) return;
+    if (manager == null || _busy || _dependenciesBusy) return;
     setState(() => _busy = true);
     try {
+      if (manager is EnvironmentInstaller) {
+        final confirmed = await Navigator.of(context).push<bool>(
+          CupertinoPageRoute(
+            builder: (_) =>
+                EnvironmentDownloadPage(installer: manager, install: true),
+          ),
+        );
+        if (confirmed != true || !mounted) return;
+      }
       await manager.install();
       await _refreshRuntime();
       if (!mounted) return;
-      final ready =
-          context.read<EnvironmentProvider>().state.phase ==
-          EnvironmentPhase.ready;
-      final mirrors = context.read<MirrorService?>();
-      if (ready && mirrors != null) {
-        setState(() => _detectingMirrors = true);
-        try {
-          await mirrors.autoDetectAndApplyAll(
-            categories: manager.mirrorCategories,
-          );
-        } catch (_) {
-          if (!mounted) return;
-          showAppSnackBar(
-            context,
-            message: AppLocalizations.of(context)!.workspaceEnvMirrorsFailed,
-            type: NotificationType.error,
-          );
-        } finally {
-          if (mounted) setState(() => _detectingMirrors = false);
-        }
-      }
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -257,7 +252,7 @@ class _EnvironmentPaneState extends State<EnvironmentPane> {
 
   Future<void> _repair() async {
     final manager = context.read<EnvironmentManager?>();
-    if (manager == null || _busy) return;
+    if (manager == null || _busy || _dependenciesBusy) return;
     setState(() => _busy = true);
     try {
       await manager.repair();
@@ -269,7 +264,7 @@ class _EnvironmentPaneState extends State<EnvironmentPane> {
 
   Future<void> _reset() async {
     final manager = context.read<EnvironmentManager?>();
-    if (manager == null || _busy) return;
+    if (manager == null || _busy || _dependenciesBusy) return;
     final confirmed = await confirmEnvironmentReset(context);
     if (!confirmed || !mounted) return;
     setState(() => _busy = true);
@@ -292,7 +287,7 @@ class _EnvironmentPaneState extends State<EnvironmentPane> {
 
   Future<void> _checkForUpdate() async {
     final manager = context.read<EnvironmentManager?>();
-    if (manager == null || _busy) return;
+    if (manager == null || _busy || _dependenciesBusy) return;
     final available = context
         .read<EnvironmentProvider>()
         .state
@@ -341,7 +336,17 @@ class _EnvironmentPaneState extends State<EnvironmentPane> {
 
   @override
   Widget build(BuildContext context) {
-    context.watch<EnvironmentProvider>();
+    final environment = context.watch<EnvironmentProvider>();
+    final dependencies = context.watch<EnvironmentDependencies?>();
+    if (dependencies != null &&
+        _lastDependenciesPhase != environment.state.phase) {
+      _lastDependenciesPhase = environment.state.phase;
+      if (environment.state.phase == EnvironmentPhase.ready) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) unawaited(dependencies.refresh());
+        });
+      }
+    }
     context.watch<WorkspaceRuntimeProvider>();
     context.watch<EnvironmentManager?>();
     context.watch<MirrorService?>();
@@ -379,10 +384,11 @@ class _EnvironmentPaneState extends State<EnvironmentPane> {
 
   List<Widget> _sandboxChildren() {
     final l10n = AppLocalizations.of(context)!;
-    final cs = Theme.of(context).colorScheme;
     final state = context.watch<EnvironmentProvider>().state;
     context.watch<WorkspaceRuntimeProvider>();
     final manager = context.watch<EnvironmentManager?>();
+    final dependencies = context.watch<EnvironmentDependencies?>();
+    final busy = _busy || (dependencies?.busy ?? false);
     final ready = state.phase == EnvironmentPhase.ready;
     final showBrowse = ready && !workspaceEnvIsDesktopTarget();
     final showMirrors = ready && manager != null;
@@ -397,7 +403,7 @@ class _EnvironmentPaneState extends State<EnvironmentPane> {
         diskUsageBytes: _diskUsageBytes,
         diskUsageTimedOut: _diskUsageTimedOut,
         rootfsPath: _rootfsPath,
-        busy: _busy,
+        busy: busy,
         onInstall: () => unawaited(_install()),
         onCancel: () => unawaited(_cancel()),
         onRetry: () => unawaited(_install()),
@@ -423,10 +429,15 @@ class _EnvironmentPaneState extends State<EnvironmentPane> {
       ],
       if (showMirrors)
         _MirrorsSection(
-          busy: _busy,
+          busy: busy,
           onDetectAll: () => unawaited(_detectAll()),
           onOpenCategory: (category) =>
               unawaited(openMirrorPage(context, category: category)),
+        ),
+      if (dependencies != null)
+        EnvironmentDependenciesSection(
+          service: dependencies,
+          enabled: ready && !_busy,
         ),
       if (showActions) ...[
         IosSectionHeader(text: l10n.workspaceEnvActionsSection),
@@ -440,7 +451,7 @@ class _EnvironmentPaneState extends State<EnvironmentPane> {
                   label: l10n.workspaceEnvRepair,
                   subtitle: l10n.workspaceEnvRepairDetail,
                   trailing: const SizedBox.shrink(),
-                  onTap: _busy ? null : () => unawaited(_repair()),
+                  onTap: busy ? null : () => unawaited(_repair()),
                 ),
               ),
               const IosRowDivider(),
@@ -457,7 +468,7 @@ class _EnvironmentPaneState extends State<EnvironmentPane> {
                     label: l10n.workspaceEnvCheckForUpdate,
                     subtitle: _updateDetail(l10n, state),
                     trailing: const SizedBox.shrink(),
-                    onTap: _busy ? null : () => unawaited(_checkForUpdate()),
+                    onTap: busy ? null : () => unawaited(_checkForUpdate()),
                   ),
                 ),
               ),
@@ -470,26 +481,36 @@ class _EnvironmentPaneState extends State<EnvironmentPane> {
                 label: l10n.workspaceEnvReset,
                 destructive: true,
                 trailing: const SizedBox.shrink(),
-                onTap: _busy ? null : () => unawaited(_reset()),
+                onTap: busy ? null : () => unawaited(_reset()),
               ),
             ),
           ],
         ),
-        IosSectionFooter(text: l10n.workspaceEnvInfoBody),
-      ] else
-        IosSectionFooter(text: l10n.workspaceEnvInfoBody),
-      if (_detectingMirrors)
-        Padding(
-          padding: const EdgeInsets.only(top: 12),
-          child: Text(
-            key: EnvironmentPane.detectingMirrorsKey,
-            l10n.workspaceEnvDetectingMirrors,
-            style: TextStyle(
-              fontSize: 13,
-              color: cs.onSurface.withValues(alpha: 0.68),
+      ],
+      if (manager is EnvironmentInstaller) ...[
+        IosSectionHeader(text: l10n.workspaceEnvDownloadSource),
+        SectionCard(
+          children: [
+            IosNavRow(
+              key: const ValueKey('environment-download-source'),
+              icon: Lucide.Download,
+              label: environmentDownloadSourceLabel(
+                l10n,
+                context.watch<EnvironmentProvider>().downloadSource,
+              ),
+              onTap: busy
+                  ? null
+                  : () => Navigator.of(context).push(
+                      CupertinoPageRoute(
+                        builder: (_) =>
+                            EnvironmentDownloadPage(installer: manager),
+                      ),
+                    ),
             ),
-          ),
+          ],
         ),
+      ],
+      IosSectionFooter(text: l10n.workspaceEnvInfoBody),
     ];
   }
 
@@ -542,10 +563,9 @@ class _StatusCard extends StatelessWidget {
     );
     final icon = desktopNative
         ? Lucide.SquareTerminal
-        : workspaceEnvIsUbuntu(state: state, status: status)
+        : workspaceEnvIsUbuntu(state: state, status: status) ||
+              workspaceEnvIsAlpine(state: state, status: status)
         ? Lucide.Package
-        : workspaceEnvIsAlpine(state: state, status: status)
-        ? Lucide.Boxes
         : Lucide.SquareTerminal;
 
     final installing =

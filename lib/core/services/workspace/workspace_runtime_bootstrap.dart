@@ -1,3 +1,4 @@
+import 'package:Kelivo/core/services/sandbox/environment_dependencies.dart';
 import 'dart:async';
 import 'dart:io';
 
@@ -12,8 +13,14 @@ import 'desktop_process_runtime.dart';
 import 'workspace_runtime.dart';
 
 class WorkspaceStack {
-  const WorkspaceStack({this.runtime, this.environmentManager, this.mirrors});
+  const WorkspaceStack({
+    this.runtime,
+    this.environmentManager,
+    this.mirrors,
+    this.dependencies,
+  });
 
+  final EnvironmentDependencies? dependencies;
   final WorkspaceRuntime? runtime;
   final EnvironmentManager? environmentManager;
   final MirrorService? mirrors;
@@ -38,6 +45,7 @@ Future<WorkspaceStack> createWorkspaceStack({
     runtime: mobile.runtime,
     environmentManager: mobile.manager,
     mirrors: mobile.mirrors,
+    dependencies: mobile.dependencies,
   );
 }
 

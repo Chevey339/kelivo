@@ -28,6 +28,7 @@ class ExecRunner(
         cancel(request.runId)
         request.tmpDir.mkdirs()
         ProotCommand.stageTalloc(request.nativeLibDir, request.tmpDir)
+        RootfsCertificates.ensureInstalled(request.rootfsDir)
         val launch = ProotCommand.build(
             nativeLibDir = request.nativeLibDir,
             rootfsDir = request.rootfsDir,

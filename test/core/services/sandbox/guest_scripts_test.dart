@@ -13,12 +13,6 @@ void main() {
       ),
       'set -e\n'
       'mkdir -p "\$(dirname /etc/apt/sources.list.d/ubuntu.sources)"\n'
-      'if [ -f /etc/apt/sources.list.d/ubuntu.sources ] && [ ! -f /etc/apt/sources.list.d/ubuntu.sources.bak ] && [ ! -f /etc/apt/sources.list.d/ubuntu.sources.kelivo-created ]; then\n'
-      '  cp /etc/apt/sources.list.d/ubuntu.sources /etc/apt/sources.list.d/ubuntu.sources.bak\n'
-      'fi\n'
-      'if [ ! -f /etc/apt/sources.list.d/ubuntu.sources ]; then\n'
-      '  touch /etc/apt/sources.list.d/ubuntu.sources.kelivo-created\n'
-      'fi\n'
       "cat > /etc/apt/sources.list.d/ubuntu.sources <<'EOF'\n"
       'Types: deb\n'
       'URIs: https://mirrors.tuna.tsinghua.edu.cn/ubuntu-ports\n'
@@ -37,12 +31,6 @@ void main() {
       ),
       'set -e\n'
       'mkdir -p "\$(dirname /etc/apk/repositories)"\n'
-      'if [ -f /etc/apk/repositories ] && [ ! -f /etc/apk/repositories.bak ] && [ ! -f /etc/apk/repositories.kelivo-created ]; then\n'
-      '  cp /etc/apk/repositories /etc/apk/repositories.bak\n'
-      'fi\n'
-      'if [ ! -f /etc/apk/repositories ]; then\n'
-      '  touch /etc/apk/repositories.kelivo-created\n'
-      'fi\n'
       "cat > /etc/apk/repositories <<'EOF'\n"
       'https://mirrors.tuna.tsinghua.edu.cn/alpine/latest-stable/main\n'
       'https://mirrors.tuna.tsinghua.edu.cn/alpine/latest-stable/community\n'
@@ -52,12 +40,6 @@ void main() {
       GuestScripts.applyPipMirror('https://pypi.tuna.tsinghua.edu.cn/simple'),
       'set -e\n'
       'mkdir -p "\$(dirname /etc/pip.conf)"\n'
-      'if [ -f /etc/pip.conf ] && [ ! -f /etc/pip.conf.bak ] && [ ! -f /etc/pip.conf.kelivo-created ]; then\n'
-      '  cp /etc/pip.conf /etc/pip.conf.bak\n'
-      'fi\n'
-      'if [ ! -f /etc/pip.conf ]; then\n'
-      '  touch /etc/pip.conf.kelivo-created\n'
-      'fi\n'
       "cat > /etc/pip.conf <<'EOF'\n"
       '[global]\n'
       'index-url = https://pypi.tuna.tsinghua.edu.cn/simple\n'
@@ -68,71 +50,10 @@ void main() {
       GuestScripts.applyNpmMirror('https://registry.npmmirror.com'),
       'set -e\n'
       'mkdir -p "\$(dirname /root/.npmrc)"\n'
-      'if [ -f /root/.npmrc ] && [ ! -f /root/.npmrc.bak ] && [ ! -f /root/.npmrc.kelivo-created ]; then\n'
-      '  cp /root/.npmrc /root/.npmrc.bak\n'
-      'fi\n'
-      'if [ ! -f /root/.npmrc ]; then\n'
-      '  touch /root/.npmrc.kelivo-created\n'
-      'fi\n'
       "cat > /root/.npmrc <<'EOF'\n"
       'registry=https://registry.npmmirror.com\n'
       'EOF\n',
     );
-  });
-
-  test('apply twice preserves the .bak guard', () {
-    final script = GuestScripts.applyPipMirror(
-      'https://pypi.tuna.tsinghua.edu.cn/simple',
-    );
-    expect(
-      script,
-      contains(
-        'if [ -f /etc/pip.conf ] && [ ! -f /etc/pip.conf.bak ] && [ ! -f /etc/pip.conf.kelivo-created ]; then',
-      ),
-    );
-    expect(
-      script,
-      contains(
-        'if [ ! -f /etc/pip.conf ]; then\n'
-        '  touch /etc/pip.conf.kelivo-created\n',
-      ),
-    );
-  });
-
-  test('restore handles .bak, sentinel, and neither', () {
-    expect(
-      GuestScripts.restoreAptMirror(),
-      'set -e\n'
-      'if [ -f /etc/apt/sources.list.d/ubuntu.sources.bak ]; then\n'
-      '  cat /etc/apt/sources.list.d/ubuntu.sources.bak > /etc/apt/sources.list.d/ubuntu.sources\n'
-      '  rm -f /etc/apt/sources.list.d/ubuntu.sources.bak /etc/apt/sources.list.d/ubuntu.sources.kelivo-created\n'
-      'elif [ -f /etc/apt/sources.list.d/ubuntu.sources.kelivo-created ]; then\n'
-      '  rm -f /etc/apt/sources.list.d/ubuntu.sources /etc/apt/sources.list.d/ubuntu.sources.kelivo-created\n'
-      'else\n'
-      "cat > /etc/apt/sources.list.d/ubuntu.sources <<'EOF'\n"
-      'Types: deb\n'
-      'URIs: http://ports.ubuntu.com/ubuntu-ports/\n'
-      'Suites: noble noble-updates noble-security\n'
-      'Components: main universe\n'
-      'Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg\n'
-      'EOF\n'
-      'fi\n',
-    );
-    expect(
-      GuestScripts.restoreApkMirror(),
-      contains('/etc/apk/repositories.bak'),
-    );
-    expect(
-      GuestScripts.restoreApkMirror(),
-      contains('/etc/apk/repositories.kelivo-created'),
-    );
-    expect(GuestScripts.restorePipMirror(), contains('/etc/pip.conf.bak'));
-    expect(
-      GuestScripts.restorePipMirror(),
-      contains('/etc/pip.conf.kelivo-created'),
-    );
-    expect(GuestScripts.restoreNpmMirror(), contains('/root/.npmrc.bak'));
-    expect(GuestScripts.restoreNpmMirror(), contains('elif [ -f'));
   });
 
   test('rejects command substitution and quotes', () {
@@ -155,89 +76,24 @@ void main() {
     );
   });
 
-  test('apply twice then restore keeps original content', () async {
-    final dir = Directory.systemTemp.createTempSync('kelivo_guest_scripts_');
-    addTearDown(() {
-      if (dir.existsSync()) dir.deleteSync(recursive: true);
-    });
-    final path = '${dir.path}/pip.conf';
-    File(path).writeAsStringSync('original\n');
-
-    final apply = GuestScripts.writeFile(path: path, body: 'mirror\n');
-    final restore = GuestScripts.restore(path);
-
-    await _runSh(apply);
-    expect(File(path).readAsStringSync(), 'mirror\n');
-    expect(File('$path.bak').readAsStringSync(), 'original\n');
-
-    await _runSh(apply);
-    expect(File('$path.bak').readAsStringSync(), 'original\n');
-    expect(File(path).readAsStringSync(), 'mirror\n');
-    expect(File('$path.kelivo-created').existsSync(), isFalse);
-
-    await _runSh(restore);
-    expect(File(path).readAsStringSync(), 'original\n');
-    expect(File('$path.bak').existsSync(), isFalse);
-    expect(File('$path.kelivo-created').existsSync(), isFalse);
-  });
-
-  test('apply then restore on a missing file leaves no file', () async {
-    final dir = Directory.systemTemp.createTempSync('kelivo_guest_scripts_');
-    addTearDown(() {
-      if (dir.existsSync()) dir.deleteSync(recursive: true);
-    });
-    final path = '${dir.path}/nested/pip.conf';
-
-    final apply = GuestScripts.writeFile(path: path, body: 'mirror\n');
-    final restore = GuestScripts.restore(path);
-
-    await _runSh(apply);
-    expect(File(path).readAsStringSync(), 'mirror\n');
-    expect(File('$path.kelivo-created').existsSync(), isTrue);
-    expect(File('$path.bak').existsSync(), isFalse);
-
-    await _runSh(restore);
-    expect(File(path).existsSync(), isFalse);
-    expect(File('$path.kelivo-created').existsSync(), isFalse);
-    expect(File('$path.bak').existsSync(), isFalse);
-  });
-
-  test('restoreApkMirror without bak writes official repositories', () async {
-    final dir = Directory.systemTemp.createTempSync('kelivo_guest_scripts_');
-    addTearDown(() {
-      if (dir.existsSync()) dir.deleteSync(recursive: true);
-    });
-    final path = '${dir.path}/repositories';
-    File(
-      path,
-    ).writeAsStringSync('https://mirrors.aliyun.com/alpine/v3.21/main\n');
-
-    await _runSh(
-      GuestScripts.restore(
-        path,
-        officialBody:
-            'https://dl-cdn.alpinelinux.org/alpine/v3.21/main\n'
-            'https://dl-cdn.alpinelinux.org/alpine/v3.21/community\n',
-      ),
-    );
-    expect(
-      File(path).readAsStringSync(),
-      'https://dl-cdn.alpinelinux.org/alpine/v3.21/main\n'
-      'https://dl-cdn.alpinelinux.org/alpine/v3.21/community\n',
-    );
-  });
-
-  test('restore with neither bak nor sentinel is a no-op', () async {
-    final dir = Directory.systemTemp.createTempSync('kelivo_guest_scripts_');
-    addTearDown(() {
-      if (dir.existsSync()) dir.deleteSync(recursive: true);
-    });
-    final path = '${dir.path}/ubuntu.sources';
-    File(path).writeAsStringSync('official\n');
-
-    await _runSh(GuestScripts.restore(path));
-    expect(File(path).readAsStringSync(), 'official\n');
-  });
+  test(
+    'source replacement writes official content even with an old backup',
+    () async {
+      final dir = await Directory.systemTemp.createTemp('kelivo_source_');
+      addTearDown(() => dir.delete(recursive: true));
+      final path = '${dir.path}/repositories';
+      await File(path).writeAsString('https://old-mirror.test/\n');
+      await File('$path.bak').writeAsString('https://another-mirror.test/\n');
+      await _runSh(
+        GuestScripts.writeFile(path: path, body: 'https://official.test/\n'),
+      );
+      expect(await File(path).readAsString(), 'https://official.test/\n');
+      await _runSh(
+        GuestScripts.writeFile(path: path, body: 'https://new-mirror.test/\n'),
+      );
+      expect(await File(path).readAsString(), 'https://new-mirror.test/\n');
+    },
+  );
 }
 
 Future<void> _runSh(String script) async {

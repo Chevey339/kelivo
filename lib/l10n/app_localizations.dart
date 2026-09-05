@@ -18902,6 +18902,180 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'No matching workspaces'**
   String get workspaceDesktopNoResults;
+
+  /// No description provided for @workspaceEnvDependencies.
+  ///
+  /// In en, this message translates to:
+  /// **'Environment presets'**
+  String get workspaceEnvDependencies;
+
+  /// No description provided for @workspaceEnvDependenciesDetail.
+  ///
+  /// In en, this message translates to:
+  /// **'Install tools in the shared sandbox. All workspaces can use them.'**
+  String get workspaceEnvDependenciesDetail;
+
+  /// No description provided for @workspaceEnvDependencyPython.
+  ///
+  /// In en, this message translates to:
+  /// **'Python, pip and virtual environments'**
+  String get workspaceEnvDependencyPython;
+
+  /// No description provided for @workspaceEnvDependencyNode.
+  ///
+  /// In en, this message translates to:
+  /// **'Node.js and npm'**
+  String get workspaceEnvDependencyNode;
+
+  /// No description provided for @workspaceEnvDependencyGit.
+  ///
+  /// In en, this message translates to:
+  /// **'Clone repositories and manage versions'**
+  String get workspaceEnvDependencyGit;
+
+  /// No description provided for @workspaceEnvDependencySsh.
+  ///
+  /// In en, this message translates to:
+  /// **'SSH, SCP, SFTP and key generation'**
+  String get workspaceEnvDependencySsh;
+
+  /// No description provided for @workspaceEnvDependencyNetwork.
+  ///
+  /// In en, this message translates to:
+  /// **'Network tools'**
+  String get workspaceEnvDependencyNetwork;
+
+  /// No description provided for @workspaceEnvDependencyArchive.
+  ///
+  /// In en, this message translates to:
+  /// **'Archive tools'**
+  String get workspaceEnvDependencyArchive;
+
+  /// No description provided for @workspaceEnvDependencyInstalled.
+  ///
+  /// In en, this message translates to:
+  /// **'Installed'**
+  String get workspaceEnvDependencyInstalled;
+
+  /// No description provided for @workspaceEnvDependencyUnknown.
+  ///
+  /// In en, this message translates to:
+  /// **'Not checked'**
+  String get workspaceEnvDependencyUnknown;
+
+  /// No description provided for @workspaceEnvDependencyChecking.
+  ///
+  /// In en, this message translates to:
+  /// **'Checking tools…'**
+  String get workspaceEnvDependencyChecking;
+
+  /// No description provided for @workspaceEnvDependencyInstalling.
+  ///
+  /// In en, this message translates to:
+  /// **'Installing…'**
+  String get workspaceEnvDependencyInstalling;
+
+  /// No description provided for @workspaceEnvDependencyCheckFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not check tools. Tap refresh to try again.'**
+  String get workspaceEnvDependencyCheckFailed;
+
+  /// No description provided for @workspaceEnvDependencyInstallFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Installation did not finish. Check the log or change the package source, then retry.'**
+  String get workspaceEnvDependencyInstallFailed;
+
+  /// No description provided for @workspaceEnvDependencyLog.
+  ///
+  /// In en, this message translates to:
+  /// **'Installation log'**
+  String get workspaceEnvDependencyLog;
+
+  /// No description provided for @workspaceEnvDependencyRefresh.
+  ///
+  /// In en, this message translates to:
+  /// **'Refresh tool status'**
+  String get workspaceEnvDependencyRefresh;
+
+  /// No description provided for @workspaceEnvDependencyReadyFirst.
+  ///
+  /// In en, this message translates to:
+  /// **'Install the sandbox first to add these tools.'**
+  String get workspaceEnvDependencyReadyFirst;
+
+  /// No description provided for @workspaceEnvDependencySources.
+  ///
+  /// In en, this message translates to:
+  /// **'Package sources'**
+  String get workspaceEnvDependencySources;
+
+  /// No description provided for @workspaceEnvDependencySourcesDetail.
+  ///
+  /// In en, this message translates to:
+  /// **'Installation uses the selected apt/apk source. pip and npm sources apply to packages you install later.'**
+  String get workspaceEnvDependencySourcesDetail;
+
+  /// No description provided for @workspaceEnvDownloadSource.
+  ///
+  /// In en, this message translates to:
+  /// **'Sandbox download source'**
+  String get workspaceEnvDownloadSource;
+
+  /// No description provided for @workspaceEnvDownloadAutomatic.
+  ///
+  /// In en, this message translates to:
+  /// **'Auto-select fastest'**
+  String get workspaceEnvDownloadAutomatic;
+
+  /// No description provided for @workspaceEnvDownloadAutomaticDetail.
+  ///
+  /// In en, this message translates to:
+  /// **'Test the official source and built-in mirrors before downloading.'**
+  String get workspaceEnvDownloadAutomaticDetail;
+
+  /// No description provided for @workspaceEnvDownloadCustom.
+  ///
+  /// In en, this message translates to:
+  /// **'Custom URL'**
+  String get workspaceEnvDownloadCustom;
+
+  /// No description provided for @workspaceEnvDownloadCustomHint.
+  ///
+  /// In en, this message translates to:
+  /// **'https://example.com/ubuntu-base/releases/24.04/release/'**
+  String get workspaceEnvDownloadCustomHint;
+
+  /// No description provided for @workspaceEnvDownloadCustomDetail.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter a release directory or a full .tar.gz URL. The image must match Ubuntu Base 24.04.3 and this device’s architecture.'**
+  String get workspaceEnvDownloadCustomDetail;
+
+  /// No description provided for @workspaceEnvDownloadInvalidUrl.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter a valid HTTP or HTTPS URL.'**
+  String get workspaceEnvDownloadInvalidUrl;
+
+  /// No description provided for @workspaceEnvDownloadVerified.
+  ///
+  /// In en, this message translates to:
+  /// **'Every source is checked against the bundled official SHA-256. This choice does not change package sources.'**
+  String get workspaceEnvDownloadVerified;
+
+  /// No description provided for @workspaceEnvDownloadStart.
+  ///
+  /// In en, this message translates to:
+  /// **'Download and install'**
+  String get workspaceEnvDownloadStart;
+
+  /// No description provided for @workspaceEnvDownloadSave.
+  ///
+  /// In en, this message translates to:
+  /// **'Save source'**
+  String get workspaceEnvDownloadSave;
 }
 
 class _AppLocalizationsDelegate

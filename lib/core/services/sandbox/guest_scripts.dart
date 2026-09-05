@@ -46,76 +46,14 @@ class GuestScripts {
     return writeFile(path: '/root/.npmrc', body: 'registry=$url\n');
   }
 
-  static String restoreAptMirror() => restore(
-    '/etc/apt/sources.list.d/ubuntu.sources',
-    officialBody:
-        'Types: deb\n'
-        'URIs: http://ports.ubuntu.com/ubuntu-ports/\n'
-        'Suites: noble noble-updates noble-security\n'
-        'Components: main universe\n'
-        'Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg\n',
-  );
-
-  static String restoreApkMirror({String alpineBranch = 'v3.21'}) {
-    _requireToken(alpineBranch, 'alpineBranch');
-    return restore(
-      '/etc/apk/repositories',
-      officialBody:
-          'https://dl-cdn.alpinelinux.org/alpine/$alpineBranch/main\n'
-          'https://dl-cdn.alpinelinux.org/alpine/$alpineBranch/community\n',
-    );
-  }
-
-  static String restorePipMirror() => restore(
-    '/etc/pip.conf',
-    officialBody:
-        '[global]\n'
-        'index-url = https://pypi.org/simple/\n'
-        'trusted-host = pypi.org\n',
-  );
-
-  static String restoreNpmMirror() => restore(
-    '/root/.npmrc',
-    officialBody: 'registry=https://registry.npmjs.org/\n',
-  );
-
-  /// Writes [body] to [path], backing up an existing original only once.
+  /// Replaces the selected source in place, including on iSH fakefs.
   @visibleForTesting
   static String writeFile({required String path, required String body}) {
     return 'set -e\n'
         'mkdir -p "\$(dirname $path)"\n'
-        'if [ -f $path ] && [ ! -f $path.bak ] && [ ! -f $path.kelivo-created ]; then\n'
-        '  cp $path $path.bak\n'
-        'fi\n'
-        'if [ ! -f $path ]; then\n'
-        '  touch $path.kelivo-created\n'
-        'fi\n'
         "cat > $path <<'EOF'\n"
         '$body'
         'EOF\n';
-  }
-
-  /// Restores [path] from `.bak`, or removes a file we created from scratch.
-  ///
-  /// Uses `cat > dest` instead of `mv` so iSH's 9p fakefs can replace an
-  /// existing file. When neither `.bak` nor the sentinel exists, writes
-  /// [officialBody] so a missing backup still returns the guest to official.
-  @visibleForTesting
-  static String restore(String path, {String? officialBody}) {
-    final fallback = officialBody == null || officialBody.isEmpty
-        ? ''
-        : 'else\n'
-              "cat > $path <<'EOF'\n"
-              '$officialBody'
-              'EOF\n';
-    return 'set -e\n'
-        'if [ -f $path.bak ]; then\n'
-        '  cat $path.bak > $path\n'
-        '  rm -f $path.bak $path.kelivo-created\n'
-        'elif [ -f $path.kelivo-created ]; then\n'
-        '  rm -f $path $path.kelivo-created\n'
-        '$fallback'
-        'fi\n';
   }
 
   static String _validatedHttpUrl(String base) =>

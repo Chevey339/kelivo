@@ -60,6 +60,11 @@ object ProotCommand {
         argv += listOf("/usr/bin/env", "-i")
 
         val guestEnv = LinkedHashMap(env)
+        // env -i discards the host environment. Export guest defaults so child
+        // processes (including dpkg) receive PATH, not only bash's shell default.
+        guestEnv.putIfAbsent("HOME", "/root")
+        guestEnv.putIfAbsent("PATH", "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin")
+        guestEnv.putIfAbsent("LANG", "C.UTF-8")
         if (command == null) {
             guestEnv.putIfAbsent("TERM", "xterm-256color")
         }

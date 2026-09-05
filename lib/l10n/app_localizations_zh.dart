@@ -10075,6 +10075,97 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get workspaceDesktopNoResults => '没有匹配的工作区';
+
+  @override
+  String get workspaceEnvDependencies => '环境预设';
+
+  @override
+  String get workspaceEnvDependenciesDetail => '安装到共享沙盒，所有工作区均可使用。';
+
+  @override
+  String get workspaceEnvDependencyPython => 'Python、pip 和虚拟环境';
+
+  @override
+  String get workspaceEnvDependencyNode => 'Node.js 和 npm';
+
+  @override
+  String get workspaceEnvDependencyGit => '克隆仓库与版本管理';
+
+  @override
+  String get workspaceEnvDependencySsh => 'SSH、SCP、SFTP 与密钥生成';
+
+  @override
+  String get workspaceEnvDependencyNetwork => '网络工具';
+
+  @override
+  String get workspaceEnvDependencyArchive => '压缩工具';
+
+  @override
+  String get workspaceEnvDependencyInstalled => '已安装';
+
+  @override
+  String get workspaceEnvDependencyUnknown => '未检测';
+
+  @override
+  String get workspaceEnvDependencyChecking => '正在检测工具…';
+
+  @override
+  String get workspaceEnvDependencyInstalling => '正在安装…';
+
+  @override
+  String get workspaceEnvDependencyCheckFailed => '未能检测工具，请刷新重试。';
+
+  @override
+  String get workspaceEnvDependencyInstallFailed => '安装未完成，请查看日志或更换软件包源后重试。';
+
+  @override
+  String get workspaceEnvDependencyLog => '安装日志';
+
+  @override
+  String get workspaceEnvDependencyRefresh => '刷新工具状态';
+
+  @override
+  String get workspaceEnvDependencyReadyFirst => '请先安装沙盒环境，再安装这些工具。';
+
+  @override
+  String get workspaceEnvDependencySources => '软件包源';
+
+  @override
+  String get workspaceEnvDependencySourcesDetail =>
+      '预设使用所选 apt/apk 源安装；pip 和 npm 源用于后续安装的软件包。';
+
+  @override
+  String get workspaceEnvDownloadSource => '沙盒下载源';
+
+  @override
+  String get workspaceEnvDownloadAutomatic => '自动选择最快源';
+
+  @override
+  String get workspaceEnvDownloadAutomaticDetail => '下载前检测官方源和内置镜像的速度。';
+
+  @override
+  String get workspaceEnvDownloadCustom => '自定义链接';
+
+  @override
+  String get workspaceEnvDownloadCustomHint =>
+      'https://example.com/ubuntu-base/releases/24.04/release/';
+
+  @override
+  String get workspaceEnvDownloadCustomDetail =>
+      '填写镜像的发布目录或完整 .tar.gz 链接，文件须为对应设备架构的 Ubuntu Base 24.04.3。';
+
+  @override
+  String get workspaceEnvDownloadInvalidUrl => '请输入有效的 HTTP 或 HTTPS 链接。';
+
+  @override
+  String get workspaceEnvDownloadVerified =>
+      '所有来源均使用内置的官方 SHA-256 校验。此选项不会更改软件包源。';
+
+  @override
+  String get workspaceEnvDownloadStart => '下载并安装';
+
+  @override
+  String get workspaceEnvDownloadSave => '保存下载源';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hans`).
@@ -20074,6 +20165,97 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get workspaceDesktopNoResults => '没有匹配的工作区';
+
+  @override
+  String get workspaceEnvDependencies => '环境预设';
+
+  @override
+  String get workspaceEnvDependenciesDetail => '安装到共享沙盒，所有工作区均可使用。';
+
+  @override
+  String get workspaceEnvDependencyPython => 'Python、pip 和虚拟环境';
+
+  @override
+  String get workspaceEnvDependencyNode => 'Node.js 和 npm';
+
+  @override
+  String get workspaceEnvDependencyGit => '克隆仓库与版本管理';
+
+  @override
+  String get workspaceEnvDependencySsh => 'SSH、SCP、SFTP 与密钥生成';
+
+  @override
+  String get workspaceEnvDependencyNetwork => '网络工具';
+
+  @override
+  String get workspaceEnvDependencyArchive => '压缩工具';
+
+  @override
+  String get workspaceEnvDependencyInstalled => '已安装';
+
+  @override
+  String get workspaceEnvDependencyUnknown => '未检测';
+
+  @override
+  String get workspaceEnvDependencyChecking => '正在检测工具…';
+
+  @override
+  String get workspaceEnvDependencyInstalling => '正在安装…';
+
+  @override
+  String get workspaceEnvDependencyCheckFailed => '未能检测工具，请刷新重试。';
+
+  @override
+  String get workspaceEnvDependencyInstallFailed => '安装未完成，请查看日志或更换软件包源后重试。';
+
+  @override
+  String get workspaceEnvDependencyLog => '安装日志';
+
+  @override
+  String get workspaceEnvDependencyRefresh => '刷新工具状态';
+
+  @override
+  String get workspaceEnvDependencyReadyFirst => '请先安装沙盒环境，再安装这些工具。';
+
+  @override
+  String get workspaceEnvDependencySources => '软件包源';
+
+  @override
+  String get workspaceEnvDependencySourcesDetail =>
+      '预设使用所选 apt/apk 源安装；pip 和 npm 源用于后续安装的软件包。';
+
+  @override
+  String get workspaceEnvDownloadSource => '沙盒下载源';
+
+  @override
+  String get workspaceEnvDownloadAutomatic => '自动选择最快源';
+
+  @override
+  String get workspaceEnvDownloadAutomaticDetail => '下载前检测官方源和内置镜像的速度。';
+
+  @override
+  String get workspaceEnvDownloadCustom => '自定义链接';
+
+  @override
+  String get workspaceEnvDownloadCustomHint =>
+      'https://example.com/ubuntu-base/releases/24.04/release/';
+
+  @override
+  String get workspaceEnvDownloadCustomDetail =>
+      '填写镜像的发布目录或完整 .tar.gz 链接，文件须为对应设备架构的 Ubuntu Base 24.04.3。';
+
+  @override
+  String get workspaceEnvDownloadInvalidUrl => '请输入有效的 HTTP 或 HTTPS 链接。';
+
+  @override
+  String get workspaceEnvDownloadVerified =>
+      '所有来源均使用内置的官方 SHA-256 校验。此选项不会更改软件包源。';
+
+  @override
+  String get workspaceEnvDownloadStart => '下载并安装';
+
+  @override
+  String get workspaceEnvDownloadSave => '保存下载源';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hant`).
@@ -30149,4 +30331,95 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get workspaceDesktopNoResults => '沒有符合的工作區';
+
+  @override
+  String get workspaceEnvDependencies => '環境預設';
+
+  @override
+  String get workspaceEnvDependenciesDetail => '安裝到共用沙盒，所有工作區均可使用。';
+
+  @override
+  String get workspaceEnvDependencyPython => 'Python、pip 和虛擬環境';
+
+  @override
+  String get workspaceEnvDependencyNode => 'Node.js 和 npm';
+
+  @override
+  String get workspaceEnvDependencyGit => '複製儲存庫與版本管理';
+
+  @override
+  String get workspaceEnvDependencySsh => 'SSH、SCP、SFTP 與金鑰產生';
+
+  @override
+  String get workspaceEnvDependencyNetwork => '網路工具';
+
+  @override
+  String get workspaceEnvDependencyArchive => '壓縮工具';
+
+  @override
+  String get workspaceEnvDependencyInstalled => '已安裝';
+
+  @override
+  String get workspaceEnvDependencyUnknown => '未檢測';
+
+  @override
+  String get workspaceEnvDependencyChecking => '正在檢測工具…';
+
+  @override
+  String get workspaceEnvDependencyInstalling => '正在安裝…';
+
+  @override
+  String get workspaceEnvDependencyCheckFailed => '未能檢測工具，請重新整理再試。';
+
+  @override
+  String get workspaceEnvDependencyInstallFailed => '安裝未完成，請查看記錄或更換軟體套件來源後重試。';
+
+  @override
+  String get workspaceEnvDependencyLog => '安裝記錄';
+
+  @override
+  String get workspaceEnvDependencyRefresh => '重新整理工具狀態';
+
+  @override
+  String get workspaceEnvDependencyReadyFirst => '請先安裝沙盒環境，再安裝這些工具。';
+
+  @override
+  String get workspaceEnvDependencySources => '軟體套件來源';
+
+  @override
+  String get workspaceEnvDependencySourcesDetail =>
+      '預設使用所選 apt/apk 來源安裝；pip 和 npm 來源用於後續安裝的軟體套件。';
+
+  @override
+  String get workspaceEnvDownloadSource => '沙盒下載來源';
+
+  @override
+  String get workspaceEnvDownloadAutomatic => '自動選擇最快來源';
+
+  @override
+  String get workspaceEnvDownloadAutomaticDetail => '下載前檢測官方來源和內建鏡像的速度。';
+
+  @override
+  String get workspaceEnvDownloadCustom => '自訂連結';
+
+  @override
+  String get workspaceEnvDownloadCustomHint =>
+      'https://example.com/ubuntu-base/releases/24.04/release/';
+
+  @override
+  String get workspaceEnvDownloadCustomDetail =>
+      '填寫鏡像的發佈目錄或完整 .tar.gz 連結，檔案須為對應裝置架構的 Ubuntu Base 24.04.3。';
+
+  @override
+  String get workspaceEnvDownloadInvalidUrl => '請輸入有效的 HTTP 或 HTTPS 連結。';
+
+  @override
+  String get workspaceEnvDownloadVerified =>
+      '所有來源均使用內建的官方 SHA-256 校驗。此選項不會更改軟體套件來源。';
+
+  @override
+  String get workspaceEnvDownloadStart => '下載並安裝';
+
+  @override
+  String get workspaceEnvDownloadSave => '儲存下載來源';
 }

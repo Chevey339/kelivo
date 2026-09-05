@@ -4,10 +4,13 @@ import 'package:flutter/foundation.dart';
 
 import '../database/business_preferences.dart';
 import '../models/environment_state.dart';
+import '../services/sandbox/rootfs_source.dart';
 
 class EnvironmentProvider extends ChangeNotifier {
   static const String stateKey = 'environment_state_v1';
   static const String mirrorsKey = 'environment_mirrors_v1';
+  static const String downloadSourceKey = 'environment_download_source_v1';
+  static const String downloadUrlKey = 'environment_download_url_v1';
   static const String diskUsageKey = 'environment_disk_usage_v1';
 
   EnvironmentProvider({required this.preferences}) {
@@ -21,6 +24,26 @@ class EnvironmentProvider extends ChangeNotifier {
   int? _cachedDiskBytes;
   DateTime? _cachedDiskAt;
   String? _cachedDiskRoot;
+
+  RootfsDownloadSource _downloadSource = RootfsDownloadSource.automatic;
+  String _downloadUrl = '';
+  RootfsDownloadSource get downloadSource => _downloadSource;
+  String get downloadUrl => _downloadUrl;
+
+  Future<void> setDownloadSource(
+    RootfsDownloadSource source, {
+    String? customUrl,
+  }) async {
+    final url = customUrl?.trim() ?? _downloadUrl;
+    if (source == RootfsDownloadSource.custom) {
+      RootfsSource.customTarballUri(url, 'arm64');
+    }
+    await preferences.setString(downloadUrlKey, url);
+    await preferences.setString(downloadSourceKey, source.name);
+    _downloadSource = source;
+    _downloadUrl = url;
+    notifyListeners();
+  }
 
   late final Future<void> loaded;
 
@@ -51,6 +74,13 @@ class EnvironmentProvider extends ChangeNotifier {
     if (!preferences.isLoaded) {
       await preferences.load();
     }
+    final sourceName = preferences.getString(downloadSourceKey);
+    _downloadSource =
+        RootfsDownloadSource.values
+            .where((s) => s.name == sourceName)
+            .firstOrNull ??
+        RootfsDownloadSource.automatic;
+    _downloadUrl = preferences.getString(downloadUrlKey) ?? '';
     final rawState = preferences.getString(stateKey);
     if (rawState != null && rawState.isNotEmpty) {
       try {

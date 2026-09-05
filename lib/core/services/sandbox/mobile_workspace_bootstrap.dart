@@ -1,3 +1,4 @@
+import 'package:Kelivo/core/services/sandbox/environment_dependencies.dart';
 import 'package:flutter/foundation.dart';
 
 import 'package:Kelivo/core/providers/environment_provider.dart';
@@ -19,8 +20,10 @@ class MobileWorkspaceStack {
     required this.manager,
     required this.mirrors,
     required this.channel,
+    required this.dependencies,
   });
 
+  final EnvironmentDependencies dependencies;
   final WorkspaceRuntime runtime;
   final EnvironmentManager manager;
   final MirrorService mirrors;
@@ -59,15 +62,22 @@ Future<MobileWorkspaceStack> _android(EnvironmentProvider env) async {
     tmpDir: installer.tmpDir,
   );
   final guest = _MirrorGuestRunner(runtime);
+  final mirrors = MirrorService(
+    env: env,
+    speedTest: speedTest,
+    runInGuest: guest.run,
+    cancelGuest: guest.cancel,
+  );
   return MobileWorkspaceStack(
     runtime: runtime,
-    manager: installer,
-    mirrors: MirrorService(
+    dependencies: EnvironmentDependencies(
+      runtime: runtime,
       env: env,
-      speedTest: speedTest,
-      runInGuest: guest.run,
-      cancelGuest: guest.cancel,
+      alpine: false,
+      mirrors: mirrors,
     ),
+    manager: installer,
+    mirrors: mirrors,
     channel: channel,
   );
 }
@@ -76,15 +86,22 @@ Future<MobileWorkspaceStack> _ios(EnvironmentProvider env) async {
   final channel = WorkspaceChannel();
   final runtime = IosIshRuntime(channel: channel);
   final guest = _MirrorGuestRunner(runtime);
+  final mirrors = MirrorService(
+    env: env,
+    speedTest: MirrorSpeedTest(),
+    runInGuest: guest.run,
+    cancelGuest: guest.cancel,
+  );
   return MobileWorkspaceStack(
     runtime: runtime,
-    manager: IosRootfsManager(channel: channel, env: env),
-    mirrors: MirrorService(
+    dependencies: EnvironmentDependencies(
+      runtime: runtime,
       env: env,
-      speedTest: MirrorSpeedTest(),
-      runInGuest: guest.run,
-      cancelGuest: guest.cancel,
+      alpine: true,
+      mirrors: mirrors,
     ),
+    manager: IosRootfsManager(channel: channel, env: env),
+    mirrors: mirrors,
     channel: channel,
   );
 }

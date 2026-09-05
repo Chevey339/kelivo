@@ -1,3 +1,4 @@
+import 'package:Kelivo/core/services/sandbox/environment_dependencies.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart'
     show debugPrint, kIsWeb, defaultTargetPlatform, TargetPlatform;
@@ -635,10 +636,12 @@ class MigrationApp extends StatelessWidget {
 class _WorkspaceStackHolder extends ChangeNotifier {
   EnvironmentManager? environmentManager;
   MirrorService? mirrors;
+  EnvironmentDependencies? dependencies;
 
   void apply(WorkspaceStack stack) {
     environmentManager = stack.environmentManager;
     mirrors = stack.mirrors;
+    dependencies = stack.dependencies;
     notifyListeners();
   }
 }
@@ -772,6 +775,10 @@ class MyApp extends StatelessWidget {
         ProxyProvider<_WorkspaceStackHolder, MirrorService?>(
           update: (_, extras, __) => extras.mirrors,
         ),
+        ListenableProxyProvider<
+          _WorkspaceStackHolder,
+          EnvironmentDependencies?
+        >(update: (_, extras, __) => extras.dependencies),
         ChangeNotifierProvider(create: (_) => ToolRunRegistry()),
         ChangeNotifierProvider(create: (_) => TerminalSessionManager()),
         Provider<MemoryPipelineService>(

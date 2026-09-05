@@ -26,6 +26,7 @@ class PtySessions(
         close(sessionId)
         tmpDir.mkdirs()
         ProotCommand.stageTalloc(nativeLibDir, tmpDir)
+        RootfsCertificates.ensureInstalled(rootfsDir)
         val launch = ProotCommand.build(
             nativeLibDir = nativeLibDir,
             rootfsDir = rootfsDir,

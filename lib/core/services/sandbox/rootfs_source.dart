@@ -1,118 +1,87 @@
-import 'package:http/http.dart' as http;
-
-/// Pinned Ubuntu Base point release. Both 24.04.3 and 24.04.4 are listed on
-/// the official SHA256SUMS; 24.04.3 is the requested pin and the file exists.
+/// Pinned Ubuntu Base image and hashes from the official release manifest:
+/// https://cdimage.ubuntu.com/ubuntu-base/releases/24.04/release/SHA256SUMS
+/// Update the version and both hashes together.
 const String kUbuntuBaseVersion = '24.04.3';
 const String kUbuntuCodename = 'noble';
 const String kUbuntuDistro = 'ubuntu';
-
 const String kOfficialCdimageReleaseBase =
     'https://cdimage.ubuntu.com/ubuntu-base/releases/24.04/release';
-
-/// Tsinghua TUNA — SHA256SUMS GET 200 (2026-09-03).
 const String kTunaCdimageReleaseBase =
     'https://mirrors.tuna.tsinghua.edu.cn/ubuntu-cdimage/ubuntu-base/releases/24.04/release';
-
-/// Huawei Cloud repo — SHA256SUMS Range GET 206 (2026-09-03).
 const String kHuaweiCdimageReleaseBase =
     'https://repo.huaweicloud.com/ubuntu-cdimage/ubuntu-base/releases/24.04/release';
 
-class RootfsSource {
-  RootfsSource({
-    http.Client? client,
-    this.officialReleaseBase = kOfficialCdimageReleaseBase,
-    List<String>? cdimageReleaseBases,
-  }) : _client = client ?? http.Client(),
-       cdimageReleaseBases =
-           cdimageReleaseBases ??
-           const <String>[
-             kOfficialCdimageReleaseBase,
-             kTunaCdimageReleaseBase,
-             kHuaweiCdimageReleaseBase,
-           ];
+enum RootfsDownloadSource { automatic, official, tuna, huawei, custom }
 
-  final http.Client _client;
+class RootfsSource {
+  const RootfsSource({
+    this.officialReleaseBase = kOfficialCdimageReleaseBase,
+    this.cdimageReleaseBases = const [
+      kOfficialCdimageReleaseBase,
+      kTunaCdimageReleaseBase,
+      kHuaweiCdimageReleaseBase,
+    ],
+    this.checksums = const {
+      'arm64':
+          '7b2dced6dd56ad5e4a813fa25c8de307b655fdabc6ea9213175a92c48dabb048',
+      'amd64':
+          '6bc2cde3930ad088b3bb46fa45279e96d25bc3810f209850ecbe4722711874f9',
+    },
+  });
+
   final String officialReleaseBase;
   final List<String> cdimageReleaseBases;
+  final Map<String, String> checksums;
 
-  static String? archForAbi(String abi) {
-    switch (abi) {
-      case 'arm64-v8a':
-      case 'arm64':
-        return 'arm64';
-      case 'x86_64':
-      case 'amd64':
-        return 'amd64';
-      default:
-        return null;
-    }
-  }
+  static String? archForAbi(String abi) => switch (abi) {
+    'arm64-v8a' || 'arm64' => 'arm64',
+    'x86_64' || 'amd64' => 'amd64',
+    _ => null,
+  };
 
   static String tarballFileName(String arch) =>
       'ubuntu-base-$kUbuntuBaseVersion-base-$arch.tar.gz';
 
-  Uri officialSha256SumsUri() => sha256SumsUri(officialReleaseBase);
-
   Uri officialTarballUri(String arch) => tarballUri(officialReleaseBase, arch);
 
-  Uri sha256SumsUri(String releaseBase) =>
-      Uri.parse('${_trimSlash(releaseBase)}/SHA256SUMS');
-
-  Uri tarballUri(String releaseBase, String arch) =>
-      Uri.parse('${_trimSlash(releaseBase)}/${tarballFileName(arch)}');
+  Uri tarballUri(String releaseBase, String arch) => Uri.parse(
+    '${releaseBase.replaceFirst(RegExp(r'/+$'), '')}/${tarballFileName(arch)}',
+  );
 
   List<Uri> tarballCandidates(String arch) => [
     for (final base in cdimageReleaseBases) tarballUri(base, arch),
   ];
 
-  List<Uri> sha256SumsCandidates() => [
-    for (final base in cdimageReleaseBases) sha256SumsUri(base),
-  ];
-
-  String releaseBaseForUri(Uri uri) {
-    final text = uri.toString();
-    for (final base in cdimageReleaseBases) {
-      if (text.startsWith(_trimSlash(base))) return base;
-    }
-    return officialReleaseBase;
+  /// A custom source may be a release directory or an exact archive URL.
+  /// It always installs the pinned, checksum-verified image for this ABI.
+  Uri? selectedUri(RootfsDownloadSource source, String customUrl, String arch) {
+    return switch (source) {
+      RootfsDownloadSource.automatic => null,
+      RootfsDownloadSource.official => officialTarballUri(arch),
+      RootfsDownloadSource.tuna => tarballUri(kTunaCdimageReleaseBase, arch),
+      RootfsDownloadSource.huawei => tarballUri(
+        kHuaweiCdimageReleaseBase,
+        arch,
+      ),
+      RootfsDownloadSource.custom => customTarballUri(customUrl, arch),
+    };
   }
 
-  /// Always reads SHA256SUMS from the official host, never a mirror.
-  Future<String> fetchExpectedSha256(String arch) async {
-    final response = await _client.get(officialSha256SumsUri());
-    if (response.statusCode != 200) {
-      throw StateError(
-        'SHA256SUMS HTTP ${response.statusCode} from official host',
-      );
+  static Uri customTarballUri(String value, String arch) {
+    final uri = Uri.tryParse(value.trim());
+    if (uri == null ||
+        !['https', 'http'].contains(uri.scheme) ||
+        uri.host.isEmpty ||
+        uri.userInfo.isNotEmpty ||
+        uri.hasFragment ||
+        RegExp(r'\s').hasMatch(value.trim())) {
+      throw const FormatException('Invalid download URL');
     }
-    final digest = parseSha256Sums(response.body, tarballFileName(arch));
-    if (digest == null) {
-      throw StateError('SHA256SUMS has no entry for ${tarballFileName(arch)}');
-    }
-    return digest;
-  }
-
-  static String? parseSha256Sums(String body, String fileName) {
-    for (final rawLine in body.split(RegExp(r'\r?\n'))) {
-      final line = rawLine.trim();
-      if (line.isEmpty || line.startsWith('#')) continue;
-      final match = _sha256Line.firstMatch(line);
-      if (match == null) continue;
-      if (match.group(2) == fileName) {
-        return match.group(1)!.toLowerCase();
-      }
-    }
-    return null;
-  }
-
-  static final RegExp _sha256Line = RegExp(
-    r'^([0-9a-fA-F]{64})\s+\*?(\S+)\s*$',
-  );
-
-  static String _trimSlash(String value) {
-    if (value.endsWith('/')) {
-      return value.substring(0, value.length - 1);
-    }
-    return value;
+    if (uri.path.endsWith('.tar.gz')) return uri;
+    if (uri.hasQuery) throw const FormatException('Use a complete archive URL');
+    return uri.replace(
+      path:
+          '${uri.path.replaceFirst(RegExp(r'/+$'), '')}/${tarballFileName(arch)}',
+    );
   }
 }

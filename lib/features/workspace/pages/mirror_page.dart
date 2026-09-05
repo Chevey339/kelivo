@@ -86,13 +86,18 @@ class _MirrorPageBodyState extends State<MirrorPageBody> {
         return;
       }
       final selection = env.mirrors[widget.category];
-      final entry =
-          MirrorService.findEntry(
-            widget.category,
-            id: selection?.mirrorId,
-            url: selection?.selectedBaseUrl,
-          ) ??
-          MirrorService.officialEntry(widget.category);
+      final saved = MirrorService.findEntry(
+        widget.category,
+        id: selection?.mirrorId,
+        url: selection?.selectedBaseUrl,
+        arch: env.state.arch ?? 'arm64',
+      );
+      final entry = saved != null && !saved.official
+          ? saved
+          : MirrorService.entriesFor(
+              widget.category,
+              arch: env.state.arch ?? 'arm64',
+            ).firstWhere((entry) => !entry.official);
       await mirrors.applyEntry(widget.category, entry);
       if (!mounted) return;
       showAppSnackBar(
@@ -172,13 +177,18 @@ class _MirrorPageBodyState extends State<MirrorPageBody> {
     final cs = Theme.of(context).colorScheme;
     final env = context.watch<EnvironmentProvider>();
     final selection = env.mirrors[widget.category];
-    final entries = MirrorService.entriesFor(widget.category);
+    final entries = MirrorService.entriesFor(
+      widget.category,
+      arch: env.state.arch ?? 'arm64',
+    );
     final selectedId =
         selection?.mirrorId ??
         MirrorService.findEntry(
           widget.category,
           url: selection?.selectedBaseUrl,
-        )?.id;
+          arch: env.state.arch ?? 'arm64',
+        )?.id ??
+        MirrorService.officialEntry(widget.category).id;
     final useMirror = selection?.useMirror ?? false;
 
     return ListView(
