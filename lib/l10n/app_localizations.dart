@@ -11161,6 +11161,12 @@ abstract class AppLocalizations {
   /// **'Read a one-shot location from this device, requires the location permission.'**
   String get assistantEditLocalToolLocationSubtitle;
 
+  /// No description provided for @assistantEditLocationPermissionSettingsMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Location permission is blocked. Allow location access in system settings, then turn this tool on again.'**
+  String get assistantEditLocationPermissionSettingsMessage;
+
   /// No description provided for @assistantEditLocalToolWeatherTitle.
   ///
   /// In en, this message translates to:

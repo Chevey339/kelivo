@@ -2571,6 +2571,7 @@
    "assistantEditLocalToolCalendarCreateSubtitle": "Create calendar events on this device with your confirmation, requires the calendar permission.",
   "assistantEditLocalToolLocationTitle": "Current Location",
   "assistantEditLocalToolLocationSubtitle": "Read a one-shot location from this device, requires the location permission.",
+  "assistantEditLocationPermissionSettingsMessage": "Location permission is blocked. Allow location access in system settings, then turn this tool on again.",
   "assistantEditLocalToolWeatherTitle": "Weather",
   "assistantEditLocalToolWeatherSubtitle": "Get Apple Weather for the current or a specified location. WeatherKit attribution is shown in the result.",
   "assistantEditLocalToolHealthTitle": "Health Summary",

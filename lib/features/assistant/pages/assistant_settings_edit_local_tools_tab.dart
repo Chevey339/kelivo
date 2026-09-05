@@ -107,8 +107,25 @@ class _LocalToolsTab extends StatelessWidget {
           DeviceLocalTools.locationSupported) {
         final granted = await DeviceLocalTools.hasLocationPermission();
         if (!granted) {
-          final requested = await DeviceLocalTools.requestLocationPermission();
-          if (!requested) {
+          try {
+            final requested =
+                await DeviceLocalTools.requestLocationPermission();
+            if (!requested) return;
+          } on PlatformException catch (error) {
+            if (error.code !=
+                DeviceLocalTools.locationPermissionPermanentlyDenied) {
+              rethrow;
+            }
+            if (context.mounted) {
+              showAppSnackBar(
+                context,
+                message: l10n.assistantEditLocationPermissionSettingsMessage,
+                type: NotificationType.warning,
+                duration: const Duration(seconds: 8),
+                actionLabel: l10n.hotkeyOpenSettings,
+                onAction: () => unawaited(DeviceLocalTools.openAppSettings()),
+              );
+            }
             return;
           }
         }

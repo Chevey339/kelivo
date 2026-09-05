@@ -1,6 +1,7 @@
 import 'dart:io';
 import "../../../support/business_test_harness.dart";
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 // ignore: depend_on_referenced_packages
 import 'package:path_provider_platform_interface/path_provider_platform_interface.dart';
@@ -17,8 +18,11 @@ import 'package:Kelivo/core/services/chat/chat_service.dart';
 import 'package:Kelivo/core/services/memory/memory_pipeline.dart';
 import 'package:Kelivo/core/services/memory/memory_repository.dart';
 import 'package:Kelivo/features/assistant/pages/assistant_settings_edit_page.dart';
+import 'package:Kelivo/features/home/services/local_tools_service.dart';
 import 'package:Kelivo/icons/lucide_adapter.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
+import 'package:Kelivo/shared/widgets/ios_switch.dart';
+import 'package:Kelivo/shared/widgets/snackbar.dart';
 
 class _FakePathProviderPlatform extends PathProviderPlatform {
   _FakePathProviderPlatform(this.path);
@@ -208,6 +212,96 @@ void main() {
       findsNothing,
     );
   });
+
+  testWidgets(
+    'blocked location permission offers settings and can recover',
+    (tester) async {
+      const channel = MethodChannel('app.device_tools');
+      final messenger =
+          TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+      addTearDown(() {
+        messenger.setMockMethodCallHandler(channel, null);
+      });
+      var granted = false;
+      var permanentlyDenied = false;
+      var settingsOpened = false;
+      messenger.setMockMethodCallHandler(channel, (call) async {
+        switch (call.method) {
+          case 'hasLocationPermission':
+            return granted;
+          case 'requestLocationPermission':
+            if (permanentlyDenied) {
+              throw PlatformException(
+                code: DeviceLocalTools.locationPermissionPermanentlyDenied,
+              );
+            }
+            return false;
+          case 'openAppSettings':
+            settingsOpened = true;
+            return null;
+          default:
+            fail('Unexpected device call: ${call.method}');
+        }
+      });
+      final bundle = await _createAssistantProvider(tester);
+      await tester.pumpWidget(
+        _buildHarness(
+          assistantProvider: bundle.assistantProvider,
+          chatService: bundle.chatService,
+          memoryV2: bundle.memoryV2,
+          pipeline: bundle.pipeline,
+          child: const AppSnackBarOverlay(
+            child: AssistantSettingsEditPage(assistantId: _assistantId),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Local Tools'));
+      await tester.pumpAndSettle();
+      final locationTitle = find.text('Current Location');
+      await tester.ensureVisible(locationTitle);
+      await tester.pumpAndSettle();
+      final locationSwitch = find.descendant(
+        of: find.ancestor(of: locationTitle, matching: find.byType(Row)).first,
+        matching: find.byType(IosSwitch),
+      );
+
+      // Ordinary denial should not redirect or offer a permanent-denial action.
+      await tester.tap(locationSwitch);
+      await tester.pumpAndSettle();
+      expect(find.text('Open Settings'), findsNothing);
+      expect(tester.widget<IosSwitch>(locationSwitch).value, isFalse);
+
+      permanentlyDenied = true;
+      await tester.tap(locationSwitch);
+      await tester.pumpAndSettle();
+      expect(find.text('Open Settings'), findsOneWidget);
+      expect(
+        find.text(
+          'Location permission is blocked. Allow location access in system settings, then turn this tool on again.',
+        ),
+        findsOneWidget,
+      );
+      expect(settingsOpened, isFalse);
+      expect(tester.widget<IosSwitch>(locationSwitch).value, isFalse);
+      await tester.tap(find.text('Open Settings'));
+      await tester.pumpAndSettle();
+      expect(settingsOpened, isTrue);
+
+      granted = true;
+      await tester.tap(locationSwitch);
+      await tester.pumpAndSettle();
+      expect(tester.widget<IosSwitch>(locationSwitch).value, isTrue);
+      expect(
+        bundle.assistantProvider.getById(_assistantId)!.localToolIds,
+        contains(LocalToolNames.currentLocation),
+      );
+      // Drain the notification's dismissal timer before disposing its navigator.
+      await tester.pump(const Duration(seconds: 8));
+      await tester.pumpAndSettle();
+    },
+    variant: TargetPlatformVariant.only(TargetPlatform.android),
+  );
 
   testWidgets('assistant desktop dialog shows MCP menu item', (tester) async {
     final bundle = await _createAssistantProvider(tester);

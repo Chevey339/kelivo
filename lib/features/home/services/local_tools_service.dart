@@ -70,7 +70,10 @@ class DeviceLocalTools {
   static bool get iosDeviceToolsSupported =>
       !kIsWeb && defaultTargetPlatform == TargetPlatform.iOS;
 
-  static bool get locationSupported => iosDeviceToolsSupported;
+  static bool get locationSupported =>
+      !kIsWeb &&
+      (defaultTargetPlatform == TargetPlatform.android ||
+          defaultTargetPlatform == TargetPlatform.iOS);
 
   /// WeatherKit is iOS 16+. Defaults false until [prefetchIosCapabilities].
   static bool? _weatherKitAvailable;
@@ -169,6 +172,11 @@ class DeviceLocalTools {
     }
   }
 
+  static const locationPermissionPermanentlyDenied =
+      'LOCATION_PERMISSION_PERMANENTLY_DENIED';
+
+  /// Throws [PlatformException] with [locationPermissionPermanentlyDenied] on
+  /// Android so settings UI can offer a way to restore permission.
   static Future<bool> requestLocationPermission() async {
     if (!locationSupported) return false;
     try {
@@ -178,7 +186,8 @@ class DeviceLocalTools {
       return result == true;
     } on MissingPluginException {
       return false;
-    } on PlatformException {
+    } on PlatformException catch (error) {
+      if (error.code == locationPermissionPermanentlyDenied) rethrow;
       return false;
     }
   }
@@ -334,10 +343,9 @@ class DeviceLocalTools {
     }
   }
 
-  /// Opens the iOS Settings page for this app (Health read access is managed
-  /// there / in the Health app).
+  /// Opens this app's system settings page on Android or iOS.
   static Future<void> openAppSettings() async {
-    if (!iosDeviceToolsSupported) return;
+    if (!locationSupported) return;
     try {
       await _channel.invokeMethod<void>('openAppSettings');
     } on MissingPluginException {

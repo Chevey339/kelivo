@@ -6094,6 +6094,10 @@ class AppLocalizationsEn extends AppLocalizations {
       'Read a one-shot location from this device, requires the location permission.';
 
   @override
+  String get assistantEditLocationPermissionSettingsMessage =>
+      'Location permission is blocked. Allow location access in system settings, then turn this tool on again.';
+
+  @override
   String get assistantEditLocalToolWeatherTitle => 'Weather';
 
   @override

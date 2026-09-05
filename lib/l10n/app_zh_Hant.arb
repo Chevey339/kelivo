@@ -2111,6 +2111,7 @@
    "assistantEditLocalToolCalendarCreateSubtitle": "在你確認後於本裝置建立日曆行程，需要授予日曆權限。",
   "assistantEditLocalToolLocationTitle": "目前位置",
   "assistantEditLocalToolLocationSubtitle": "讀取本裝置的一次性位置，需要授予定位權限。",
+  "assistantEditLocationPermissionSettingsMessage": "定位權限已被禁止。請在系統設定中允許定位存取，然後重新開啟此工具。",
   "assistantEditLocalToolWeatherTitle": "天氣",
   "assistantEditLocalToolWeatherSubtitle": "取得目前位置或指定地點的 Apple 天氣，結果中會顯示 WeatherKit 資料來源。",
   "assistantEditLocalToolHealthTitle": "健康摘要",

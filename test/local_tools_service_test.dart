@@ -266,7 +266,7 @@ void main() {
       );
     });
 
-    test('iOS device tools are defined only on iOS', () {
+    test('Android exposes location while other iOS tools stay gated', () {
       const iosAssistant = Assistant(
         id: 'a1',
         name: 'Assistant',
@@ -286,8 +286,8 @@ void main() {
         LocalToolsService.buildToolDefinitions(
           assistant: iosAssistant,
           supportsTools: true,
-        ),
-        isEmpty,
+        ).map((tool) => tool['function']['name']),
+        [LocalToolNames.currentLocation],
       );
 
       debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
@@ -305,6 +305,152 @@ void main() {
         LocalToolNames.remindersCreate,
         LocalToolNames.remindersComplete,
       ]);
+    });
+
+    test('location is unavailable on desktop platforms', () {
+      addTearDown(() => debugDefaultTargetPlatformOverride = null);
+      for (final platform in [
+        TargetPlatform.macOS,
+        TargetPlatform.windows,
+        TargetPlatform.linux,
+      ]) {
+        debugDefaultTargetPlatformOverride = platform;
+        expect(
+          LocalToolsService.isAvailableOnThisPlatform(
+            LocalToolNames.currentLocation,
+          ),
+          isFalse,
+        );
+      }
+    });
+
+    test(
+      'Android location permissions and calls use the native channel',
+      () async {
+        debugDefaultTargetPlatformOverride = TargetPlatform.android;
+        const channel = MethodChannel('app.device_tools');
+        final messenger =
+            TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+        addTearDown(() {
+          debugDefaultTargetPlatformOverride = null;
+          messenger.setMockMethodCallHandler(channel, null);
+        });
+        var granted = false;
+        final calls = <String>[];
+        const payload = '{"latitude":31.2,"longitude":121.5,"accuracy_m":100}';
+        messenger.setMockMethodCallHandler(channel, (call) async {
+          calls.add(call.method);
+          switch (call.method) {
+            case 'hasLocationPermission':
+              return granted;
+            case 'requestLocationPermission':
+              granted = true;
+              return true;
+            case 'getCurrentLocation':
+              expect(jsonDecode(call.arguments as String), isEmpty);
+              return payload;
+            default:
+              fail('Unexpected platform call: ${call.method}');
+          }
+        });
+
+        expect(await DeviceLocalTools.hasLocationPermission(), isFalse);
+        expect(await DeviceLocalTools.requestLocationPermission(), isTrue);
+        expect(await DeviceLocalTools.hasLocationPermission(), isTrue);
+        const assistant = Assistant(
+          id: 'a1',
+          name: 'Assistant',
+          localToolIds: [LocalToolNames.currentLocation],
+        );
+        expect(
+          await LocalToolsService.tryHandleToolCall(
+            LocalToolNames.currentLocation,
+            {},
+            assistant,
+          ),
+          payload,
+        );
+        expect(calls, [
+          'hasLocationPermission',
+          'requestLocationPermission',
+          'hasLocationPermission',
+          'getCurrentLocation',
+        ]);
+        calls.clear();
+        expect(
+          await LocalToolsService.tryHandleToolCall(
+            LocalToolNames.currentLocation,
+            {},
+            const Assistant(id: 'disabled', name: 'Disabled'),
+          ),
+          isNull,
+        );
+        expect(calls, isEmpty);
+      },
+    );
+
+    test(
+      'Android permanent denial reaches the UI and settings can open',
+      () async {
+        debugDefaultTargetPlatformOverride = TargetPlatform.android;
+        const channel = MethodChannel('app.device_tools');
+        final messenger =
+            TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+        addTearDown(() {
+          debugDefaultTargetPlatformOverride = null;
+          messenger.setMockMethodCallHandler(channel, null);
+        });
+        final calls = <String>[];
+        messenger.setMockMethodCallHandler(channel, (call) async {
+          calls.add(call.method);
+          if (call.method == 'requestLocationPermission') {
+            throw PlatformException(
+              code: DeviceLocalTools.locationPermissionPermanentlyDenied,
+            );
+          }
+          return null;
+        });
+
+        await expectLater(
+          DeviceLocalTools.requestLocationPermission(),
+          throwsA(
+            isA<PlatformException>().having(
+              (error) => error.code,
+              'code',
+              DeviceLocalTools.locationPermissionPermanentlyDenied,
+            ),
+          ),
+        );
+        expect(calls, ['requestLocationPermission']);
+        await DeviceLocalTools.openAppSettings();
+        expect(calls, ['requestLocationPermission', 'openAppSettings']);
+      },
+    );
+
+    test('Android location preserves native permission errors', () async {
+      debugDefaultTargetPlatformOverride = TargetPlatform.android;
+      const channel = MethodChannel('app.device_tools');
+      final messenger =
+          TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+      addTearDown(() {
+        debugDefaultTargetPlatformOverride = null;
+        messenger.setMockMethodCallHandler(channel, null);
+      });
+      messenger.setMockMethodCallHandler(channel, (call) async {
+        if (call.method == 'requestLocationPermission') return false;
+        return '{"error":"NO_PERMISSION","message":"Location permission is not granted."}';
+      });
+      expect(await DeviceLocalTools.requestLocationPermission(), isFalse);
+      final result = await LocalToolsService.tryHandleToolCall(
+        LocalToolNames.currentLocation,
+        {},
+        const Assistant(
+          id: 'a1',
+          name: 'Assistant',
+          localToolIds: [LocalToolNames.currentLocation],
+        ),
+      );
+      expect(jsonDecode(result!)['error'], 'NO_PERMISSION');
     });
 
     test('weather tool is hidden until WeatherKit is available', () {
