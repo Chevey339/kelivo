@@ -2,7 +2,7 @@
 ///
 /// Values must match MethodChannel / Swift identifiers. New sensitive types
 /// default OFF; [defaultSelected] is the original six-metric summary.
-enum HealthDataCategory { activity, rest, heart, body }
+enum HealthDataCategory { activity, rest, heart, body, reproductive }
 
 enum HealthDataType {
   steps,
@@ -22,6 +22,7 @@ enum HealthDataType {
   weight,
   bmi,
   bloodGlucose,
+  menstrualFlow,
 }
 
 abstract final class HealthDataTypeIds {
@@ -44,6 +45,7 @@ abstract final class HealthDataTypeIds {
   static const String weight = 'weight';
   static const String bmi = 'bmi';
   static const String bloodGlucose = 'blood_glucose';
+  static const String menstrualFlow = 'menstrual_flow';
 
   static const List<String> all = [
     steps,
@@ -63,6 +65,7 @@ abstract final class HealthDataTypeIds {
     weight,
     bmi,
     bloodGlucose,
+    menstrualFlow,
   ];
 
   /// Types that existed in the original Health summary tool.
@@ -94,6 +97,7 @@ abstract final class HealthDataTypeIds {
     weight,
     bmi,
     bloodGlucose,
+    menstrualFlow,
   ];
 
   static const Set<String> known = {
@@ -114,6 +118,7 @@ abstract final class HealthDataTypeIds {
     weight,
     bmi,
     bloodGlucose,
+    menstrualFlow,
   };
 
   static HealthDataType? typeForId(String id) {
@@ -135,6 +140,7 @@ abstract final class HealthDataTypeIds {
       weight => HealthDataType.weight,
       bmi => HealthDataType.bmi,
       bloodGlucose => HealthDataType.bloodGlucose,
+      menstrualFlow => HealthDataType.menstrualFlow,
       _ => null,
     };
   }
@@ -158,6 +164,7 @@ abstract final class HealthDataTypeIds {
       HealthDataType.weight => weight,
       HealthDataType.bmi => bmi,
       HealthDataType.bloodGlucose => bloodGlucose,
+      HealthDataType.menstrualFlow => menstrualFlow,
     };
   }
 
@@ -180,6 +187,7 @@ abstract final class HealthDataTypeIds {
       HealthDataType.weight ||
       HealthDataType.bmi ||
       HealthDataType.bloodGlucose => HealthDataCategory.body,
+      HealthDataType.menstrualFlow => HealthDataCategory.reproductive,
     };
   }
 
@@ -200,7 +208,8 @@ abstract final class HealthDataTypeIds {
       standTime => 'stand time',
       distance => 'walking/running distance',
       workouts => 'recent workouts',
-      sleep => 'last-night sleep',
+      sleep =>
+        'sleep, time in bed, awake periods and sleep stages over the past 24 hours',
       mindfulness => 'mindfulness/resting sessions',
       heartRate => 'latest heart rate',
       restingHeartRate => 'resting heart rate',
@@ -210,6 +219,7 @@ abstract final class HealthDataTypeIds {
       weight => 'body weight',
       bmi => 'BMI',
       bloodGlucose => 'blood glucose',
+      menstrualFlow => 'recorded menstrual flow',
       _ => id,
     };
   }

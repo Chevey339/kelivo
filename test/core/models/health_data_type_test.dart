@@ -14,7 +14,11 @@ void main() {
         HealthDataTypeIds.heartRate,
         HealthDataTypeIds.workouts,
       ]);
-      expect(HealthDataTypeIds.all, hasLength(17));
+      expect(HealthDataTypeIds.all, hasLength(18));
+      expect(
+        HealthDataTypeIds.defaultSelected,
+        isNot(contains(HealthDataTypeIds.menstrualFlow)),
+      );
       expect(
         HealthDataTypeIds.defaultSelected,
         isNot(contains(HealthDataTypeIds.bloodGlucose)),
@@ -52,15 +56,11 @@ void main() {
       );
     });
 
-    test('sleep tool label is duration, not stages', () {
-      expect(
-        HealthDataTypeIds.toolLabel(HealthDataTypeIds.sleep),
-        'last-night sleep',
-      );
-      expect(
-        HealthDataTypeIds.toolLabel(HealthDataTypeIds.sleep).toLowerCase(),
-        isNot(contains('stage')),
-      );
+    test('sleep tool label includes separate states and the query window', () {
+      final label = HealthDataTypeIds.toolLabel(HealthDataTypeIds.sleep);
+      expect(label, contains('time in bed'));
+      expect(label, contains('sleep stages'));
+      expect(label, contains('24 hours'));
     });
   });
 
@@ -77,12 +77,14 @@ void main() {
         healthDataTypeIds: const [
           HealthDataTypeIds.steps,
           HealthDataTypeIds.bloodGlucose,
+          HealthDataTypeIds.menstrualFlow,
         ],
       );
       final decoded = Assistant.fromJson(assistant.toJson());
       expect(decoded.healthDataTypeIds, [
         HealthDataTypeIds.steps,
         HealthDataTypeIds.bloodGlucose,
+        HealthDataTypeIds.menstrualFlow,
       ]);
     });
 

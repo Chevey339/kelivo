@@ -672,6 +672,25 @@ class LocalToolsService {
         );
     final labels = [for (final id in ids) HealthDataTypeIds.toolLabel(id)];
     final listed = labels.isEmpty ? 'none' : labels.join(', ');
+    final sleepDescription = ids.contains(HealthDataTypeIds.sleep)
+        ? ' Sleep covers the past 24 hours, including naps and daytime sleep. '
+              'Asleep, in_bed, awake and each stage have separate recorded durations '
+              'and merged intervals clipped to the query window. In-bed time is not '
+              'actual sleep. Missing states are unavailable, not zero. Awake means '
+              'recorded wakefulness within sleep tracking, not all waking time in '
+              'the day. Stages from different sources may overlap; use asleep for '
+              'the total instead of adding stages or states. A query_error means '
+              'the query failed. Sleep schedules are not recorded sleep.'
+        : '';
+    final menstrualDescription = ids.contains(HealthDataTypeIds.menstrualFlow)
+        ? ' Menstrual flow returns up to 180 recorded samples overlapping the past '
+              '90 days, newest first, with original dates, flow, and cycle-start '
+              'markers when available. A sample is not necessarily a whole period; '
+              'multiple samples or sources may overlap. These are records, not '
+              'predictions. Missing records do not mean no menstruation, and '
+              'truncated means older records were omitted. A query_error means '
+              'the query failed, not that no data exists.'
+        : '';
     return {
       'type': 'function',
       'function': {
@@ -682,8 +701,8 @@ class LocalToolsService {
             'Each metric includes its time interval. '
             'A metric with status "unavailable" means there is no authorized or recorded '
             'data — never treat unavailable as 0. Do not request metrics that are not in '
-            'the enabled list. This tool does not return raw HealthKit history. '
-            'Requires Health access.',
+            'the enabled list. '
+            'Requires Health access.$sleepDescription$menstrualDescription',
         'parameters': {'type': 'object', 'properties': <String, dynamic>{}},
       },
     };

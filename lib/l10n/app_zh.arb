@@ -2150,7 +2150,7 @@
   "healthDataSettingsTypeWorkoutsTitle": "健身训练",
   "healthDataSettingsTypeWorkoutsSubtitle": "训练记录：类型、时长、距离与消耗",
   "healthDataSettingsTypeSleepTitle": "睡眠",
-  "healthDataSettingsTypeSleepSubtitle": "睡眠时长",
+  "healthDataSettingsTypeSleepSubtitle": "最近 24 小时的睡眠、卧床、清醒与睡眠分期",
   "healthDataSettingsTypeMindfulnessTitle": "静息",
   "healthDataSettingsTypeMindfulnessSubtitle": "正念或静息时段",
   "healthDataSettingsTypeHeartRateTitle": "心率",
@@ -3217,5 +3217,8 @@
   "toolSchemaSettingsDescriptionLabel": "描述",
   "toolSchemaSettingsToolName": "工具名",
   "toolSchemaEditorPageTitle": "编辑描述",
-  "toolSchemaSettingsCancel": "取消"
+  "toolSchemaSettingsCancel": "取消",
+  "healthDataSettingsCategoryReproductive": "生殖健康",
+  "healthDataSettingsTypeMenstrualFlowTitle": "经期记录",
+  "healthDataSettingsTypeMenstrualFlowSubtitle": "最近 90 天记录的经量与周期开始日期"
 }

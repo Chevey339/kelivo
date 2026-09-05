@@ -71,6 +71,41 @@ void main() {
     expect(toggled, [(HealthDataTypeIds.steps, false)]);
   });
 
+  testWidgets('menstrual flow is off by default and can be selected', (
+    tester,
+  ) async {
+    final toggled = <(String, bool)>[];
+    await tester.pumpWidget(
+      MaterialApp(
+        locale: const Locale('en'),
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        theme: buildLightTheme(null),
+        home: Scaffold(
+          body: HealthDataSettingsView(
+            masterEnabled: true,
+            selectedIds: HealthDataTypeIds.defaultSelected,
+            availableIds: HealthDataTypeIds.all,
+            onToggleMaster: (_) {},
+            onToggleType: (id, enabled) => toggled.add((id, enabled)),
+            onEnableAll: () {},
+            onDisableAll: () {},
+            onOpenSystemSettings: () {},
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    final category = find.byKey(const Key('health_category_reproductive'));
+    await tester.ensureVisible(category);
+    await tester.pumpAndSettle();
+    await tester.tap(category);
+    await tester.pumpAndSettle();
+    expect(find.text('Menstrual flow'), findsOneWidget);
+    await tester.tap(find.byKey(const Key('health_type_menstrual_flow')));
+    expect(toggled, [(HealthDataTypeIds.menstrualFlow, true)]);
+  });
+
   testWidgets('unsupported types are hidden from counts and pills', (
     tester,
   ) async {
@@ -96,7 +131,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('6/16 on'), findsOneWidget);
+    expect(find.text('6/17 on'), findsOneWidget);
     expect(find.text('Sunlight'), findsNothing);
   });
 

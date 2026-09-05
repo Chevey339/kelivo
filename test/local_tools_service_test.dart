@@ -457,7 +457,10 @@ void main() {
       expect(tools, hasLength(1));
       final description = tools.first['function']['description'] as String;
       expect(description, contains('steps'));
-      expect(description, contains('last-night sleep'));
+      expect(description, contains('sleep stages over the past 24 hours'));
+      expect(description, contains('In-bed time is not actual sleep'));
+      expect(description, contains('including naps and daytime sleep'));
+      expect(description, contains('Missing states are unavailable, not zero'));
       expect(description, isNot(contains('blood glucose')));
       expect(description, isNot(contains('body weight')));
     });
@@ -515,6 +518,61 @@ void main() {
         );
       },
     );
+
+    test('menstrual flow reaches native code only when selected', () async {
+      debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
+      addTearDown(() => debugDefaultTargetPlatformOverride = null);
+      DeviceLocalTools.debugSetHealthDataAvailable(true);
+      const channel = MethodChannel('app.device_tools');
+      final queriedTypes = <List<dynamic>>[];
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(channel, (call) async {
+            if (call.method == 'getHealthSummary') {
+              final args =
+                  jsonDecode(call.arguments as String) as Map<String, dynamic>;
+              queriedTypes.add(args['types'] as List<dynamic>);
+              return '{}';
+            }
+            return null;
+          });
+      addTearDown(() {
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+            .setMockMethodCallHandler(channel, null);
+      });
+      const assistant = Assistant(
+        id: 'a1',
+        name: 'Assistant',
+        localToolIds: [LocalToolNames.healthSummary],
+        healthDataTypeIds: [HealthDataTypeIds.steps],
+      );
+      await LocalToolsService.tryHandleToolCall(
+        LocalToolNames.healthSummary,
+        const {
+          'types': [HealthDataTypeIds.menstrualFlow],
+        },
+        assistant,
+      );
+      final selected = assistant.copyWith(
+        healthDataTypeIds: [HealthDataTypeIds.menstrualFlow],
+      );
+      await LocalToolsService.tryHandleToolCall(
+        LocalToolNames.healthSummary,
+        const {},
+        selected,
+      );
+      expect(queriedTypes, [
+        [HealthDataTypeIds.steps],
+        [HealthDataTypeIds.menstrualFlow],
+      ]);
+      final tool = LocalToolsService.buildToolDefinitions(
+        assistant: selected,
+        supportsTools: true,
+      ).single;
+      final description = tool['function']['description'] as String;
+      expect(description, contains('recorded menstrual flow'));
+      expect(description, contains('not predictions'));
+      expect(description, contains('90 days'));
+    });
 
     test(
       'enableAll requests HealthKit once for every available type',

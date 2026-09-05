@@ -2615,7 +2615,7 @@
   "healthDataSettingsTypeWorkoutsTitle": "Workouts",
   "healthDataSettingsTypeWorkoutsSubtitle": "Workout records: type, duration, distance, and energy",
   "healthDataSettingsTypeSleepTitle": "Sleep",
-  "healthDataSettingsTypeSleepSubtitle": "Sleep duration last night",
+  "healthDataSettingsTypeSleepSubtitle": "Past 24 hours: sleep, time in bed, awake periods and sleep stages",
   "healthDataSettingsTypeMindfulnessTitle": "Resting",
   "healthDataSettingsTypeMindfulnessSubtitle": "Mindfulness or resting periods",
   "healthDataSettingsTypeHeartRateTitle": "Heart Rate",
@@ -3891,5 +3891,8 @@
   "toolSchemaSettingsDescriptionLabel": "Description",
   "toolSchemaSettingsToolName": "Tool name",
   "toolSchemaEditorPageTitle": "Edit description",
-  "toolSchemaSettingsCancel": "Cancel"
+  "toolSchemaSettingsCancel": "Cancel",
+  "healthDataSettingsCategoryReproductive": "Reproductive health",
+  "healthDataSettingsTypeMenstrualFlowTitle": "Menstrual flow",
+  "healthDataSettingsTypeMenstrualFlowSubtitle": "Recorded menstrual flow and cycle starts in the past 90 days"
 }
