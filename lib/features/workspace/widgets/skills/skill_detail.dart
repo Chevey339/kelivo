@@ -12,6 +12,7 @@ import 'package:Kelivo/features/workspace/widgets/skills/skill_labels.dart';
 import 'package:Kelivo/icons/lucide_adapter.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
 import 'package:Kelivo/features/workspace/workspace_layout.dart';
+import 'package:Kelivo/shared/utils/save_file_picker.dart';
 import 'package:Kelivo/shared/widgets/action_sheet.dart';
 import 'package:Kelivo/shared/widgets/ios_switch.dart';
 import 'package:Kelivo/shared/widgets/ios_tactile.dart';
@@ -19,11 +20,9 @@ import 'package:Kelivo/shared/widgets/markdown_with_highlight.dart';
 import 'package:Kelivo/shared/widgets/section_card.dart';
 import 'package:Kelivo/shared/widgets/snackbar.dart';
 import 'package:Kelivo/theme/app_font_weights.dart';
-import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:path/path.dart' as p;
 import 'package:provider/provider.dart';
-import 'package:share_plus/share_plus.dart';
 
 String skillModelPath(Skill skill, String hostPath) {
   final rel = p.relative(hostPath, from: skill.dir).replaceAll('\\', '/');
@@ -78,24 +77,16 @@ Future<void> exportSkill(BuildContext context, Skill skill) async {
     );
     final zip = await service.exportZip(skill.record.id, outDir);
     if (!context.mounted) return;
-    final desktop = useDesktopWorkspaceLayout(context);
-    if (desktop) {
-      final savePath = await FilePicker.platform.saveFile(
-        dialogTitle: l10n.skillsExport,
-        fileName: '${skill.record.id}.zip',
-        type: FileType.custom,
-        allowedExtensions: const ['zip'],
-      );
-      if (savePath == null) return;
-      await File(savePath).parent.create(recursive: true);
-      await zip.copy(savePath);
-      return;
-    }
-    await SharePlus.instance.share(
-      ShareParams(
-        files: [XFile(zip.path, name: '${skill.record.id}.zip')],
-        sharePositionOrigin: _shareAnchor(context),
-      ),
+    final savePath = await saveHostFileWithPicker(
+      file: zip,
+      fileName: '${skill.record.id}.zip',
+      dialogTitle: l10n.skillsExport,
+    );
+    if (savePath == null || !context.mounted) return;
+    showAppSnackBar(
+      context,
+      message: l10n.messageExportSheetExportedAs(p.basename(savePath)),
+      type: NotificationType.success,
     );
   } catch (error) {
     if (!context.mounted) return;
@@ -507,23 +498,5 @@ Future<void> browseSkillFiles(BuildContext context, Skill skill) async {
         body: browser,
       ),
     ),
-  );
-}
-
-Rect _shareAnchor(BuildContext context) {
-  try {
-    final box = context.findRenderObject() as RenderBox?;
-    if (box != null &&
-        box.hasSize &&
-        box.size.width > 0 &&
-        box.size.height > 0) {
-      return box.localToGlobal(Offset.zero) & box.size;
-    }
-  } catch (_) {}
-  final size = MediaQuery.sizeOf(context);
-  return Rect.fromCenter(
-    center: Offset(size.width / 2, size.height / 2),
-    width: 1,
-    height: 1,
   );
 }

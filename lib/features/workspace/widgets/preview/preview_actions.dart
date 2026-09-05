@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'dart:io';
 
-import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -11,6 +10,7 @@ import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import 'package:Kelivo/l10n/app_localizations.dart';
+import 'package:Kelivo/shared/utils/save_file_picker.dart';
 import 'package:Kelivo/shared/widgets/snackbar.dart';
 
 HttpServer? _previewBrowserServer;
@@ -29,31 +29,16 @@ Future<void> copyFilePath(BuildContext context, File file) async {
 
 Future<void> exportPreviewFile(BuildContext context, File file) async {
   final l10n = AppLocalizations.of(context)!;
-  final fileName = p.basename(file.path);
   try {
-    final desktop =
-        !kIsWeb &&
-        !Platform.isAndroid &&
-        !Platform.isIOS &&
-        (defaultTargetPlatform == TargetPlatform.macOS ||
-            defaultTargetPlatform == TargetPlatform.windows ||
-            defaultTargetPlatform == TargetPlatform.linux);
-    if (desktop) {
-      final savePath = await FilePicker.platform.saveFile(
-        fileName: fileName,
-        type: FileType.any,
-      );
-      if (savePath == null) return;
-      await File(savePath).parent.create(recursive: true);
-      await file.copy(savePath);
-      return;
-    }
-    if (!context.mounted) return;
-    await SharePlus.instance.share(
-      ShareParams(
-        files: [XFile(file.path, name: fileName)],
-        sharePositionOrigin: shareAnchorRect(context),
-      ),
+    final savePath = await saveHostFileWithPicker(
+      file: file,
+      dialogTitle: l10n.workspaceFilesExportItem,
+    );
+    if (savePath == null || !context.mounted) return;
+    showAppSnackBar(
+      context,
+      message: l10n.messageExportSheetExportedAs(p.basename(savePath)),
+      type: NotificationType.success,
     );
   } catch (e) {
     if (!context.mounted) return;

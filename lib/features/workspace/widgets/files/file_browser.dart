@@ -13,6 +13,7 @@ import 'package:Kelivo/icons/lucide_adapter.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
 import 'package:Kelivo/features/workspace/workspace_layout.dart';
 import 'package:Kelivo/shared/utils/format_bytes.dart';
+import 'package:Kelivo/shared/utils/save_file_picker.dart';
 import 'package:Kelivo/shared/widgets/action_sheet.dart';
 import 'package:Kelivo/shared/widgets/custom_bottom_sheet.dart';
 import 'package:Kelivo/shared/widgets/ios_settings_rows.dart';
@@ -24,7 +25,6 @@ import 'package:Kelivo/shared/widgets/snackbar.dart';
 import 'package:Kelivo/theme/app_font_weights.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/cupertino.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:path/path.dart' as p;
@@ -425,52 +425,69 @@ class FileBrowserState extends State<FileBrowser> {
     }
   }
 
+  Future<({File file, String fileName})?> _zipDirectory(
+    Directory dir, {
+    required String name,
+  }) async {
+    final zipName = _safeFileName(name.isEmpty ? widget.rootLabel : name);
+    final temp = File(
+      p.join(
+        Directory.systemTemp.path,
+        'kelivo-$zipName-${DateTime.now().microsecondsSinceEpoch}.zip',
+      ),
+    );
+    await _runMutation(
+      ZipDirectoryMutation(
+        rootPath: _rootPath,
+        sourcePath: dir.path,
+        destPath: temp.path,
+      ),
+    );
+    if (!mounted) return null;
+    return (file: temp, fileName: '$zipName.zip');
+  }
+
   Future<void> _exportDirectory(Directory dir, {required String name}) async {
     try {
-      final zipName = _safeFileName(name.isEmpty ? widget.rootLabel : name);
-      final temp = File(
-        p.join(
-          Directory.systemTemp.path,
-          'kelivo-$zipName-${DateTime.now().microsecondsSinceEpoch}.zip',
-        ),
-      );
-      await _runMutation(
-        ZipDirectoryMutation(
-          rootPath: _rootPath,
-          sourcePath: dir.path,
-          destPath: temp.path,
-        ),
-      );
-      if (!mounted) return;
-      await _shareOrSave(temp, fileName: '$zipName.zip');
+      final zipped = await _zipDirectory(dir, name: name);
+      if (zipped == null) return;
+      await _exportFile(zipped.file, fileName: zipped.fileName);
     } catch (e) {
       await _handleError(e);
     }
   }
 
-  Future<void> _shareOrSave(File file, {required String fileName}) async {
-    final desktop =
-        !Platform.isAndroid &&
-        !Platform.isIOS &&
-        (defaultTargetPlatform == TargetPlatform.macOS ||
-            defaultTargetPlatform == TargetPlatform.windows ||
-            defaultTargetPlatform == TargetPlatform.linux);
-    if (desktop) {
-      final savePath = await FilePicker.platform.saveFile(
-        fileName: fileName,
-        type: FileType.any,
-      );
-      if (savePath == null) return;
-      await File(savePath).parent.create(recursive: true);
-      await file.copy(savePath);
-      return;
+  Future<void> _shareDirectory(Directory dir, {required String name}) async {
+    try {
+      final zipped = await _zipDirectory(dir, name: name);
+      if (zipped == null) return;
+      await _shareFile(zipped.file, fileName: zipped.fileName);
+    } catch (e) {
+      await _handleError(e);
     }
+  }
+
+  Future<void> _shareFile(File file, {required String fileName}) async {
     if (!mounted) return;
     await SharePlus.instance.share(
       ShareParams(
         files: [XFile(file.path, name: fileName)],
         sharePositionOrigin: _shareAnchor(context),
       ),
+    );
+  }
+
+  Future<void> _exportFile(File file, {required String fileName}) async {
+    final l10n = AppLocalizations.of(context)!;
+    final savePath = await saveHostFileWithPicker(
+      file: file,
+      fileName: fileName,
+      dialogTitle: l10n.workspaceFilesExport,
+    );
+    if (savePath == null || !mounted) return;
+    _showSnack(
+      l10n.messageExportSheetExportedAs(p.basename(savePath)),
+      NotificationType.success,
     );
   }
 
@@ -489,9 +506,9 @@ class FileBrowserState extends State<FileBrowser> {
       case _FileItemAction.share:
         try {
           if (entry.isDirectory) {
-            await _exportDirectory(Directory(entry.hostPath), name: entry.name);
+            await _shareDirectory(Directory(entry.hostPath), name: entry.name);
           } else {
-            await _shareOrSave(File(entry.hostPath), fileName: entry.name);
+            await _shareFile(File(entry.hostPath), fileName: entry.name);
           }
         } catch (e) {
           await _handleError(e);
@@ -507,7 +524,7 @@ class FileBrowserState extends State<FileBrowser> {
           if (entry.isDirectory) {
             await _exportDirectory(Directory(entry.hostPath), name: entry.name);
           } else {
-            await _shareOrSave(File(entry.hostPath), fileName: entry.name);
+            await _exportFile(File(entry.hostPath), fileName: entry.name);
           }
         } catch (e) {
           await _handleError(e);
