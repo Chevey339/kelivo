@@ -33,6 +33,8 @@ import 'package:Kelivo/l10n/app_localizations.dart';
 import 'package:Kelivo/theme/app_font_weights.dart';
 import 'package:Kelivo/theme/theme_factory.dart' show getPlatformFontFallback;
 import 'package:provider/provider.dart';
+import 'package:flutter_math_fork/ast.dart'
+    show EquationArrayNode, GreenNode, TransparentNode;
 import 'package:flutter_math_fork/flutter_math.dart';
 import '../../core/providers/settings_provider.dart';
 import 'package:Kelivo/desktop/html_preview_dialog.dart';
@@ -1020,6 +1022,10 @@ String _preprocessFences(
   });
 
   // STEP 2: PROCESSING (on masked string, code is now protected)
+  if (enableMath && out.contains(r'\begin{')) {
+    out = _wrapBareMathEnvironments(out);
+  }
+
   if (streaming) {
     out = _stabilizeStreamingTables(out);
     if (enableMath && enableDollarLatex) {
@@ -1155,6 +1161,28 @@ String _preprocessFences(
   });
 
   return out;
+}
+
+String _wrapBareMathEnvironments(String input) {
+  if (!input.contains(r'\begin{')) return input;
+  // Let the shared scanner pair nested environments before handing display
+  // math to the regex-based renderer. Preserve the TeX environment itself.
+  final environments = markdownScanDisplayMath(
+    input,
+  ).spans.where((span) => input.startsWith(r'\begin{', span.start));
+  final wrapped = StringBuffer();
+  var cursor = 0;
+  for (final span in environments) {
+    wrapped
+      ..write(input.substring(cursor, span.start))
+      ..write('\\[\n')
+      ..write(input.substring(span.start, span.end))
+      ..write('\n\\]');
+    cursor = span.end;
+  }
+  if (cursor == 0) return input;
+  wrapped.write(input.substring(cursor));
+  return wrapped.toString();
 }
 
 String _maskHtmlTagStartsInsideFencedCode(String input) {
@@ -1547,12 +1575,37 @@ Widget _renderMath(String tex, {TextStyle? style, bool displayMode = false}) {
     return Math.tex(
       normalizedTex,
       mathStyle: displayMode ? MathStyle.display : MathStyle.text,
+      settings: TexParserSettings(displayMode: displayMode),
       textStyle: resolved,
       onErrorFallback: (_) => Text(normalizedTex, style: resolved),
     );
   } catch (_) {
     return Text(normalizedTex, style: resolved);
   }
+}
+
+bool _usesFullWidthEquationLayout(Widget math) {
+  if (math is! Math) return false;
+  final root = math.ast?.greenRoot;
+  if (root == null) return false;
+
+  final flattened = <GreenNode>[];
+  void collect(GreenNode node) {
+    if (node is TransparentNode) {
+      for (final child in node.children) {
+        collect(child);
+      }
+    } else {
+      flattened.add(node);
+    }
+  }
+
+  for (final child in root.children) {
+    collect(child);
+    if (flattened.length > 1) return false;
+  }
+  final child = flattened.length == 1 ? flattened.single : null;
+  return child is EquationArrayNode && child.displayLayout;
 }
 
 TextStyle _inlineMathTextStyle(TextStyle? style) {
@@ -2155,6 +2208,11 @@ bool _looksLikeLiteralMathBraceGroup(String tex, int open, int close) {
 bool _isCommandArgumentBrace(String tex, int open) {
   final prev = _previousNonWhitespaceIndex(tex, open - 1);
   if (prev == -1) return false;
+
+  if (tex.codeUnitAt(prev) == 0x2A &&
+      _endsControlWordAt(tex, _previousNonWhitespaceIndex(tex, prev - 1))) {
+    return true;
+  }
 
   if (tex.codeUnitAt(prev) == 0x5D) {
     final optionalOpen = _findMatchingOpenBracket(tex, prev);
@@ -5049,7 +5107,7 @@ class FencedCodeBlockMd extends BlockMd {
 /// Scrollable LaTeX block to prevent overflow when equations are very wide
 class LatexBlockScrollableMd extends BlockMd {
   @override
-  // Match either $$...$$ or \[...\] as standalone block
+  // Bare environments are wrapped by _preprocessFences after balanced scanning.
   String get expString =>
       (r"^(?:\s*\$\$([\s\S]*?)\$\$\s*|\s*\\\[([\s\S]*?)\\\]\s*)$");
 
@@ -5057,10 +5115,11 @@ class LatexBlockScrollableMd extends BlockMd {
   Widget build(BuildContext context, String text, GptMarkdownConfig config) {
     final m = exp.firstMatch(text.trim());
     if (m == null) return const SizedBox.shrink();
-    final body = ((m.group(1) ?? m.group(2) ?? '')).trim();
+    final body = (m.group(1) ?? m.group(2) ?? '').trim();
     if (body.isEmpty) return const SizedBox.shrink();
 
     final math = _renderMath(body, style: config.style, displayMode: true);
+    final usesFullWidthLayout = _usesFullWidthEquationLayout(math);
     // Wrap in horizontal scroll to avoid overflow and center within available width
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
@@ -5072,7 +5131,7 @@ class LatexBlockScrollableMd extends BlockMd {
               primary: false,
               child: ConstrainedBox(
                 constraints: BoxConstraints(minWidth: constraints.maxWidth),
-                child: Center(child: math),
+                child: usesFullWidthLayout ? math : Center(child: math),
               ),
             ),
           );
@@ -5382,7 +5441,7 @@ class ModernBlockQuote extends InlineMd {
         sb.writeln(line);
       }
     }
-    final data = _unmaskBlockquoteFenceMarkers(sb.toString().trim());
+    final data = _unmaskBlockquoteFenceMarkers(sb.toString().trimRight());
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
     final isDark = theme.brightness == Brightness.dark;
@@ -5403,6 +5462,9 @@ class ModernBlockQuote extends InlineMd {
       data: data,
       config: config,
       components: innerComponents,
+      enableBareMath: innerComponents.any(
+        (component) => component is LatexBlockScrollableMd,
+      ),
     );
     final child = Directionality(
       textDirection: config.textDirection,
@@ -5450,35 +5512,73 @@ class _BlockquoteMarkdownContent extends StatelessWidget {
     required this.data,
     required this.config,
     required this.components,
+    required this.enableBareMath,
   });
 
   final String data;
   final GptMarkdownConfig config;
   final List<MarkdownComponent> components;
+  final bool enableBareMath;
 
   @override
   Widget build(BuildContext context) {
     final children = <Widget>[];
     final textBuffer = StringBuffer();
     final lines = data.split('\n');
+    final lineStarts = <int>[];
+    var nextLineStart = 0;
+    for (final line in lines) {
+      lineStarts.add(nextLineStart);
+      nextLineStart += line.length + 1;
+    }
+    final mathScan = enableBareMath
+        ? markdownScanDisplayMath(data)
+        : const MarkdownDisplayMathScan();
+    var atBlockBoundary = true;
 
     void flushText() {
-      final text = textBuffer.toString().trim();
-      if (text.isEmpty) {
+      final rawText = textBuffer.toString();
+      if (rawText.trim().isEmpty) {
         textBuffer.clear();
         return;
       }
-      children.add(_buildMarkdown(text));
+      final text = enableBareMath
+          ? _wrapBareMathEnvironments(rawText)
+          : rawText;
+      children.add(_buildMarkdown(text.trimRight()));
       textBuffer.clear();
     }
 
     for (var i = 0; i < lines.length; i++) {
       final line = lines[i];
-      final open = RegExp(
-        r'^[ \t]*(([`~])\2{2,})[ \t]*([^\n]*)$',
-      ).firstMatch(line);
+      final coveredByMath = mathScan.covers(lineStarts[i]);
+      final indentedCode = _blockquoteIndentedCodeLine(line);
+      if (indentedCode != null && atBlockBoundary && !coveredByMath) {
+        flushText();
+        final codeBuffer = StringBuffer()..writeln(indentedCode);
+        while (i + 1 < lines.length) {
+          final next = _blockquoteIndentedCodeLine(lines[i + 1]);
+          if (next == null) break;
+          i++;
+          codeBuffer.writeln(next);
+        }
+        children.add(
+          _CollapsibleCodeBlock(
+            language: '',
+            code: codeBuffer.toString(),
+            streaming: false,
+            closed: true,
+          ),
+        );
+        atBlockBoundary = true;
+        continue;
+      }
+      final open = coveredByMath
+          ? null
+          : RegExp(r'^[ \t]*(([`~])\2{2,})[ \t]*([^\n]*)$').firstMatch(line);
       if (open == null) {
         textBuffer.writeln(line);
+        atBlockBoundary = line.trim().isEmpty;
         continue;
       }
 
@@ -5511,6 +5611,7 @@ class _BlockquoteMarkdownContent extends StatelessWidget {
           closed: closed,
         ),
       );
+      atBlockBoundary = true;
     }
 
     flushText();
@@ -5541,7 +5642,12 @@ class _BlockquoteMarkdownContent extends StatelessWidget {
       orderedListBuilder: config.orderedListBuilder,
       unOrderedListBuilder: config.unOrderedListBuilder,
       tableBuilder: config.tableBuilder,
-      components: components,
+      // Fences outside math were already extracted above. Keeping the block
+      // matcher here would reinterpret a TeX spacing line inside a wrapped
+      // environment as the start of a code fence.
+      components: components
+          .where((component) => component is! FencedCodeBlockMd)
+          .toList(growable: false),
       inlineComponents: config.inlineComponents,
       followLinkColor: config.followLinkColor,
       useDollarSignsForLatex: false,
@@ -5549,6 +5655,23 @@ class _BlockquoteMarkdownContent extends StatelessWidget {
       generation: config.generation,
     );
   }
+}
+
+String? _blockquoteIndentedCodeLine(String line) {
+  var columns = 0;
+  var i = 0;
+  while (i < line.length && columns < 4) {
+    final unit = line.codeUnitAt(i);
+    if (unit == 0x20) {
+      columns++;
+    } else if (unit == 0x09) {
+      columns += 4 - (columns % 4);
+    } else {
+      return null;
+    }
+    i++;
+  }
+  return columns >= 4 ? line.substring(i) : null;
 }
 
 // Modern task checkbox: square with subtle border, primary check on done

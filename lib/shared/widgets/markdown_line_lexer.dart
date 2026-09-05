@@ -837,7 +837,267 @@ _FenceMark? _fenceMarkOf(String rawLine, int lineStart) {
   );
 }
 
-/// A successful `$$…$$` or `\[…\]` span under the shared pairing rules.
+/// Math environments understood by the bundled TeX parser.
+const markdownMathEnvironments = <String>[
+  'array',
+  'darray',
+  'matrix',
+  'pmatrix',
+  'bmatrix',
+  'Bmatrix',
+  'vmatrix',
+  'Vmatrix',
+  'smallmatrix',
+  'subarray',
+  'cases',
+  'dcases',
+  'rcases',
+  'drcases',
+  'aligned',
+  'alignedat',
+  'equation',
+  'equation*',
+  'align',
+  'align*',
+  'alignat',
+  'alignat*',
+  'gather',
+  'gather*',
+  'gathered',
+  'split',
+];
+
+final _mathEnvironmentToken = RegExp(
+  r'\\(begin|end)\{('
+  '${markdownMathEnvironments.map(RegExp.escape).join('|')}'
+  r')\}',
+);
+
+final _mathEnvironmentTokenTexts = <String>[
+  for (final name in markdownMathEnvironments) ...[
+    '\\begin{$name}',
+    '\\end{$name}',
+  ],
+];
+final _maxMathEnvironmentTokenLength = _mathEnvironmentTokenTexts.fold<int>(
+  0,
+  (longest, token) => token.length > longest ? token.length : longest,
+);
+
+final class _MathEnvironmentMark {
+  const _MathEnvironmentMark(this.name, this.start, this.end);
+
+  final String name;
+  final int start;
+  final int end;
+}
+
+final class _MathEnvironmentToken {
+  const _MathEnvironmentToken(this.start, this.end, this.opening);
+
+  final int start;
+  final int end;
+  final bool opening;
+}
+
+final class _MathEnvironmentCloser {
+  const _MathEnvironmentCloser(this.start, this.tokenEnd, this.spanEnd);
+
+  final int start;
+  final int tokenEnd;
+  final int spanEnd;
+}
+
+enum _TexVerbProbeStatus { none, pending, complete }
+
+final class _TexVerbProbe {
+  const _TexVerbProbe._none()
+    : status = _TexVerbProbeStatus.none,
+      end = null,
+      delimiter = null,
+      searchedTo = 0;
+
+  static const none = _TexVerbProbe._none();
+
+  const _TexVerbProbe.pending({this.delimiter, required this.searchedTo})
+    : status = _TexVerbProbeStatus.pending,
+      end = null;
+
+  const _TexVerbProbe.complete(this.end)
+    : status = _TexVerbProbeStatus.complete,
+      delimiter = null,
+      searchedTo = 0;
+
+  final _TexVerbProbeStatus status;
+  final int? end;
+  final int? delimiter;
+  final int searchedTo;
+}
+
+final class _DisplayMathLineState {
+  const _DisplayMathLineState({
+    required this.lineLeading,
+    required this.environmentLineLeading,
+    required this.environmentIndentColumns,
+    required this.environmentComment,
+    required this.pendingEnvironmentName,
+    required this.pendingEnvironmentStart,
+    required this.pendingEnvironmentTokenAt,
+    required this.pendingEnvironmentDepth,
+    required this.commentMatchedEnvironmentName,
+    required this.commentMatchedEnvironmentStart,
+    required this.commentMatchedEnvironmentCloseStart,
+    required this.commentMatchedEnvironmentCloseAt,
+  });
+
+  final bool lineLeading;
+  final bool environmentLineLeading;
+  final int environmentIndentColumns;
+  final bool environmentComment;
+  final String? pendingEnvironmentName;
+  final int? pendingEnvironmentStart;
+  final int pendingEnvironmentTokenAt;
+  final int pendingEnvironmentDepth;
+  final String? commentMatchedEnvironmentName;
+  final int? commentMatchedEnvironmentStart;
+  final int? commentMatchedEnvironmentCloseStart;
+  final int? commentMatchedEnvironmentCloseAt;
+}
+
+final class _IncrementalBacktickResult {
+  _IncrementalBacktickResult({
+    required this.start,
+    required this.end,
+    required this.length,
+    required this.paired,
+    this.state,
+  });
+
+  final int start;
+  final int end;
+  final int length;
+  final bool paired;
+  final _DisplayMathLineState? state;
+  late final int index;
+}
+
+/// Resolves current-line backtick runs with the same greedy rule as
+/// [_LineBackticks], while allowing the final run to grow across appends.
+final class _IncrementalLineBackticks {
+  final _results = <_IncrementalBacktickResult>[];
+  final _standaloneByLength = <int, _IncrementalBacktickResult>{};
+  int? _trailingStart;
+  var _trailingLength = 0;
+  _DisplayMathLineState? _trailingState;
+
+  void reset() {
+    _results.clear();
+    _standaloneByLength.clear();
+    _trailingStart = null;
+    _trailingLength = 0;
+    _trailingState = null;
+  }
+
+  void consume(int offset, _DisplayMathLineState state) {
+    if (_trailingStart == null) {
+      _trailingStart = offset;
+      _trailingLength = 1;
+      _trailingState = state;
+    } else {
+      _trailingLength++;
+    }
+  }
+
+  _DisplayMathLineState? finishRun() {
+    final start = _trailingStart;
+    if (start == null) return null;
+    final length = _trailingLength;
+    final end = start + length;
+    final opener = _standaloneByLength[length];
+    _DisplayMathLineState? restored;
+    if (opener == null) {
+      restored = _trailingState;
+      _append(
+        _IncrementalBacktickResult(
+          start: start,
+          end: end,
+          length: length,
+          paired: false,
+          state: _trailingState,
+        ),
+      );
+    } else {
+      restored = opener.state;
+      while (_results.length > opener.index) {
+        final removed = _results.removeLast();
+        if (!removed.paired) {
+          _standaloneByLength.remove(removed.length);
+        }
+      }
+      _append(
+        _IncrementalBacktickResult(
+          start: opener.start,
+          end: end,
+          length: length,
+          paired: true,
+        ),
+      );
+    }
+    _trailingStart = null;
+    _trailingLength = 0;
+    _trailingState = null;
+    return restored;
+  }
+
+  _DisplayMathLineState? get provisionalState =>
+      _standaloneByLength[_trailingLength]?.state;
+
+  bool get hasTrailingRun => _trailingStart != null;
+
+  bool get hasStandaloneRuns => _standaloneByLength.isNotEmpty;
+
+  bool hasStandaloneRun(int length) => _standaloneByLength.containsKey(length);
+
+  _DisplayMathLineState? get pairingState {
+    if (_trailingStart == null) return null;
+    return _standaloneByLength[_trailingLength]?.state ?? _trailingState;
+  }
+
+  bool contains(int offset) => hiddenSpanEnd(offset) != null;
+
+  int? hiddenSpanEnd(int offset) {
+    final provisionalOpener = _standaloneByLength[_trailingLength];
+    if (provisionalOpener != null &&
+        offset >= provisionalOpener.start &&
+        offset < _trailingStart! + _trailingLength) {
+      return _trailingStart! + _trailingLength;
+    }
+    final resultLimit = provisionalOpener?.index ?? _results.length;
+    if (resultLimit == 0 || offset < _results.first.start) return null;
+    var low = 0;
+    var high = resultLimit;
+    while (low < high) {
+      _noteScanVisit();
+      final middle = (low + high) >> 1;
+      if (_results[middle].start <= offset) {
+        low = middle + 1;
+      } else {
+        high = middle;
+      }
+    }
+    if (low == 0) return null;
+    final result = _results[low - 1];
+    return result.paired && offset < result.end ? result.end : null;
+  }
+
+  void _append(_IncrementalBacktickResult result) {
+    result.index = _results.length;
+    _results.add(result);
+    if (!result.paired) _standaloneByLength[result.length] = result;
+  }
+}
+
+/// A successful display-math span under the shared pairing rules.
 final class MarkdownDisplayMathSpan {
   const MarkdownDisplayMathSpan({required this.start, required this.end});
 
@@ -850,6 +1110,8 @@ final class MarkdownDisplayMathSpan {
 /// [contains] is the extractor/classifier view: only successful spans occupy
 /// later content. [covers] is the splitter view: an unclosed opener holds a
 /// later blank until a closer arrives or a later successful span abandons it.
+/// Raw environments retain their unfinished outer body, including completed
+/// nested environments, until their matching outer end arrives.
 final class MarkdownDisplayMathScan {
   const MarkdownDisplayMathScan({this.spans = const [], this.unclosedStart});
 
@@ -877,16 +1139,29 @@ final class MarkdownDisplayMathScanner {
   var _scannedTo = 0;
   var _lineStart = 0;
   var _lineLeading = true;
+  var _environmentLineLeading = true;
+  var _environmentIndentColumns = 0;
+  var _environmentComment = false;
+  var _precedingBackslashes = 0;
+  final _currentLineBackticks = _IncrementalLineBackticks();
+  var _currentLineBackticksChanged = false;
+  _DisplayMathLineState? _lineStartPairState;
   final _dollarOpens = <int>[];
   final _dollarCloses = <int>[];
   final _bracketOpens = <int>[];
   final _bracketCloses = <int>[];
+  final _environmentOpens = <_MathEnvironmentMark>[];
+  final _environmentCloses = <String, List<_MathEnvironmentCloser>>{};
+  final _environmentTokens = <String, List<_MathEnvironmentToken>>{};
   final _fenceOpens = <_FenceMark>[];
   final _fenceCloses = <_FenceMark>[];
   var _chkDollarOpens = 0;
   var _chkDollarCloses = 0;
   var _chkBracketOpens = 0;
   var _chkBracketCloses = 0;
+  var _chkEnvironmentOpens = 0;
+  final _chkEnvironmentCloses = <String, int>{};
+  final _chkEnvironmentTokens = <String, int>{};
   var _chkFenceOpens = 0;
   var _chkFenceCloses = 0;
   final _spans = <MarkdownDisplayMathSpan>[];
@@ -896,24 +1171,55 @@ final class MarkdownDisplayMathScanner {
   var _frozenBracketOpenAt = 0;
   var _frozenDollarCloseAt = 0;
   var _frozenBracketCloseAt = 0;
+  var _frozenEnvironmentOpenAt = 0;
+  final _frozenEnvironmentCloseAt = <String, int>{};
+  final _frozenEnvironmentTokenAt = <String, int>{};
   var _frozenFenceOpenAt = 0;
   var _frozenFenceCloseAt = 0;
+  String? _pendingEnvironmentName;
+  int? _pendingEnvironmentStart;
+  var _pendingEnvironmentTokenAt = 0;
+  var _pendingEnvironmentDepth = 0;
+  String? _commentMatchedEnvironmentName;
+  int? _commentMatchedEnvironmentStart;
+  int? _commentMatchedEnvironmentCloseStart;
+  int? _commentMatchedEnvironmentCloseAt;
+  int? _pendingTexVerbStart;
+  int? _pendingTexVerbDelimiter;
+  int? _pendingTexVerbCompleteEnd;
+  var _pendingTexVerbSearchedTo = 0;
+  var _pendingTexVerbBacktickSearchedTo = 0;
+  int? _pendingTexVerbBacktickRunStart;
+  var _pendingTexVerbBacktickRunLength = 0;
 
   void reset() {
     _text = '';
     _scannedTo = 0;
     _lineStart = 0;
     _lineLeading = true;
+    _environmentLineLeading = true;
+    _environmentIndentColumns = 0;
+    _environmentComment = false;
+    _precedingBackslashes = 0;
+    _currentLineBackticks.reset();
+    _currentLineBackticksChanged = false;
+    _lineStartPairState = null;
     _dollarOpens.clear();
     _dollarCloses.clear();
     _bracketOpens.clear();
     _bracketCloses.clear();
+    _environmentOpens.clear();
+    _environmentCloses.clear();
+    _environmentTokens.clear();
     _fenceOpens.clear();
     _fenceCloses.clear();
     _chkDollarOpens = 0;
     _chkDollarCloses = 0;
     _chkBracketOpens = 0;
     _chkBracketCloses = 0;
+    _chkEnvironmentOpens = 0;
+    _chkEnvironmentCloses.clear();
+    _chkEnvironmentTokens.clear();
     _chkFenceOpens = 0;
     _chkFenceCloses = 0;
     _spans.clear();
@@ -923,8 +1229,14 @@ final class MarkdownDisplayMathScanner {
     _frozenBracketOpenAt = 0;
     _frozenDollarCloseAt = 0;
     _frozenBracketCloseAt = 0;
+    _frozenEnvironmentOpenAt = 0;
+    _frozenEnvironmentCloseAt.clear();
+    _frozenEnvironmentTokenAt.clear();
     _frozenFenceOpenAt = 0;
     _frozenFenceCloseAt = 0;
+    _clearPendingEnvironment();
+    _clearCommentMatchedEnvironment();
+    _clearPendingTexVerb();
   }
 
   MarkdownDisplayMathScan synchronize(
@@ -945,26 +1257,149 @@ final class MarkdownDisplayMathScanner {
             ))) {
       reset();
     }
+    final pendingTexVerbValidatedTo =
+        _pendingTexVerbBacktickSearchedTo > _pendingTexVerbSearchedTo
+        ? _pendingTexVerbBacktickSearchedTo
+        : _pendingTexVerbSearchedTo;
+    if (_pendingTexVerbStart != null &&
+        (pendingTexVerbValidatedTo > limit ||
+            pendingTexVerbValidatedTo > text.length ||
+            !text.startsWith(
+              _text.substring(
+                0,
+                pendingTexVerbValidatedTo.clamp(0, _text.length),
+              ),
+            ))) {
+      _clearPendingTexVerb();
+    }
     _text = text;
     _feed(limit);
+    if (_currentLineBackticksChanged) {
+      final state = _currentLineBackticks.pairingState;
+      if (state != null) _restorePairState(state);
+      _currentLineBackticksChanged = false;
+    }
     return _pair(limit);
   }
 
   void _feed(int limit) {
     while (_scannedTo < limit) {
       final unit = _text.codeUnitAt(_scannedTo);
+      if (unit != 0x60) {
+        final restored = _currentLineBackticks.finishRun();
+        if (restored != null) _restoreLineState(restored);
+      }
+      if (!_environmentComment &&
+          unit == 0x5C &&
+          _precedingBackslashes.isEven) {
+        final resumesVerb = _pendingTexVerbStart == _scannedTo;
+        final verb = resumesVerb && _pendingTexVerbCompleteEnd != null
+            ? _TexVerbProbe.complete(_pendingTexVerbCompleteEnd!)
+            : _probeTexVerb(
+                _text,
+                _scannedTo,
+                limit,
+                knownDelimiter: resumesVerb ? _pendingTexVerbDelimiter : null,
+                searchFrom: resumesVerb ? _pendingTexVerbSearchedTo : null,
+              );
+        final interruptedByCode = _verbClosingBacktickRun(
+          verb,
+          limit,
+          resumesVerb: resumesVerb,
+        );
+        if (interruptedByCode != null) {
+          if (interruptedByCode.provisional) {
+            _pendingTexVerbStart = _scannedTo;
+            _pendingTexVerbDelimiter = verb.delimiter;
+            _pendingTexVerbCompleteEnd =
+                verb.status == _TexVerbProbeStatus.complete ? verb.end : null;
+            _pendingTexVerbSearchedTo =
+                verb.status == _TexVerbProbeStatus.complete
+                ? verb.end!
+                : verb.searchedTo;
+            _revokeEnvironmentClosersThrough(_scannedTo);
+            return;
+          }
+          _clearPendingTexVerb();
+          _pair(interruptedByCode.start);
+          _lineLeading = false;
+          _environmentLineLeading = false;
+          for (
+            var i = interruptedByCode.start;
+            i < interruptedByCode.end;
+            i++
+          ) {
+            _currentLineBackticks.consume(i, _lineState());
+          }
+          _currentLineBackticksChanged = true;
+          _scannedTo = interruptedByCode.end;
+          _precedingBackslashes = 0;
+          continue;
+        }
+        if (verb.status == _TexVerbProbeStatus.pending) {
+          _pendingTexVerbStart = _scannedTo;
+          _pendingTexVerbDelimiter = verb.delimiter;
+          _pendingTexVerbCompleteEnd = null;
+          _pendingTexVerbSearchedTo = verb.searchedTo;
+          _revokeEnvironmentClosersThrough(_scannedTo);
+          return;
+        }
+        if (verb.status == _TexVerbProbeStatus.complete) {
+          final skipEnd = _pendingTexVerbBacktickSearchedTo > verb.end!
+              ? _pendingTexVerbBacktickSearchedTo
+              : verb.end!;
+          _clearPendingTexVerb();
+          _revokeClosersThrough(_scannedTo);
+          _lineLeading = false;
+          _environmentLineLeading = false;
+          _scannedTo = skipEnd;
+          _precedingBackslashes = 0;
+          continue;
+        }
+        _clearPendingTexVerb();
+      }
       if (!markdownIsLogicalLineBreak(unit) &&
           _scannedTo + 1 >= limit &&
           (unit == 0x24 || unit == 0x5C)) {
+        if (!_environmentComment) {
+          _revokeEnvironmentClosersThrough(_scannedTo);
+        }
+        return;
+      }
+      if (!_environmentComment &&
+          unit == 0x5C &&
+          _precedingBackslashes.isEven &&
+          _hasIncompleteEnvironmentToken(_scannedTo, limit)) {
+        _revokeEnvironmentClosersThrough(_scannedTo);
         return;
       }
       _noteScanVisit();
       if (markdownIsLogicalLineBreak(unit)) {
+        final lineStartPairState = _lineStartPairState;
+        if (lineStartPairState == null) {
+          _clearPendingEnvironment();
+          _clearCommentMatchedEnvironment();
+        } else {
+          _restorePairState(lineStartPairState);
+        }
         _rollbackCurrentLine();
         _collectCompleteLine(_lineStart, _scannedTo);
+        // Complete-line collection has already applied the authoritative
+        // backtick walk. Do not filter those exact candidates through the
+        // provisional current-line resolver again.
+        _currentLineBackticks.reset();
+        _currentLineBackticksChanged = false;
+        _environmentComment = false;
+        _pair(_scannedTo);
+        _clearCommentMatchedEnvironment();
         _scannedTo = _skipLogicalLineBreak(_text, _scannedTo, limit);
         _lineStart = _scannedTo;
         _lineLeading = true;
+        _environmentLineLeading = true;
+        _environmentIndentColumns = 0;
+        _environmentComment = false;
+        _precedingBackslashes = 0;
+        _lineStartPairState = _lineState();
         _checkpointCurrentLine();
         continue;
       }
@@ -977,6 +1412,13 @@ final class MarkdownDisplayMathScanner {
     _chkDollarCloses = _dollarCloses.length;
     _chkBracketOpens = _bracketOpens.length;
     _chkBracketCloses = _bracketCloses.length;
+    _chkEnvironmentOpens = _environmentOpens.length;
+    for (final entry in _environmentCloses.entries) {
+      _chkEnvironmentCloses[entry.key] = entry.value.length;
+    }
+    for (final entry in _environmentTokens.entries) {
+      _chkEnvironmentTokens[entry.key] = entry.value.length;
+    }
     _chkFenceOpens = _fenceOpens.length;
     _chkFenceCloses = _fenceCloses.length;
   }
@@ -986,38 +1428,206 @@ final class MarkdownDisplayMathScanner {
     _dollarCloses.length = _chkDollarCloses;
     _bracketOpens.length = _chkBracketOpens;
     _bracketCloses.length = _chkBracketCloses;
+    _environmentOpens.length = _chkEnvironmentOpens;
+    for (final entry in _environmentCloses.entries) {
+      entry.value.length = _chkEnvironmentCloses[entry.key] ?? 0;
+    }
+    for (final entry in _environmentTokens.entries) {
+      entry.value.length = _chkEnvironmentTokens[entry.key] ?? 0;
+    }
     _fenceOpens.length = _chkFenceOpens;
     _fenceCloses.length = _chkFenceCloses;
   }
 
   void _consumeAt(int i, int limit) {
+    final unit = _text.codeUnitAt(i);
+    if (unit == 0x60) {
+      if (!_currentLineBackticks.hasTrailingRun) _pair(i);
+      _currentLineBackticksChanged = true;
+    }
+    final environmentCanOpen =
+        _environmentLineLeading && _environmentIndentColumns < 4;
+    final beginsEnvironmentComment =
+        !_environmentComment && unit == 0x25 && _precedingBackslashes.isEven;
+    if (!_environmentComment &&
+        !beginsEnvironmentComment &&
+        !markdownIsWhitespace(unit)) {
+      _revokeEnvironmentClosersThrough(i);
+    }
+    if (beginsEnvironmentComment) {
+      _environmentComment = true;
+    }
+    if (!_environmentComment && unit == 0x5C && _precedingBackslashes.isEven) {
+      final token = _mathEnvironmentToken.matchAsPrefix(_text, i);
+      if (token != null && token.end <= limit) {
+        final name = token.group(2)!;
+        final opening = token.group(1) == 'begin';
+        (_environmentTokens[name] ??= []).add(
+          _MathEnvironmentToken(i, token.end, opening),
+        );
+        _revokeClosersThrough(i);
+        if (opening) {
+          if (environmentCanOpen) {
+            _environmentOpens.add(_MathEnvironmentMark(name, i, token.end));
+          }
+        } else {
+          (_environmentCloses[name] ??= []).add(
+            _MathEnvironmentCloser(i, token.end, token.end),
+          );
+        }
+        _lineLeading = false;
+        _environmentLineLeading = false;
+        _scannedTo = token.end;
+        _precedingBackslashes = 0;
+        return;
+      }
+    }
     if (i + 1 < limit && _atDoubleDollar(_text, i)) {
       if (_lineLeading) _dollarOpens.add(i);
       _dollarCloses.add(i);
       _lineLeading = false;
+      _environmentLineLeading = false;
       _scannedTo = i + 2;
+      _precedingBackslashes = 0;
       return;
     }
-    if (i + 1 < limit && _atEscaped(_text, i, 0x5B)) {
+    if (i + 1 < limit &&
+        _precedingBackslashes.isEven &&
+        _atEscaped(_text, i, 0x5B)) {
       if (_lineLeading) _bracketOpens.add(i);
       _lineLeading = false;
+      _environmentLineLeading = false;
       _scannedTo = i + 2;
+      _precedingBackslashes = 0;
       return;
     }
-    if (i + 1 < limit && _atEscaped(_text, i, 0x5D)) {
+    if (i + 1 < limit &&
+        _precedingBackslashes.isEven &&
+        _atEscaped(_text, i, 0x5D)) {
       _bracketCloses.add(i);
       _lineLeading = false;
+      _environmentLineLeading = false;
       _scannedTo = i + 2;
+      _precedingBackslashes = 0;
       return;
     }
-    if (!markdownIsWhitespace(_text.codeUnitAt(i))) {
+    if (_environmentLineLeading) {
+      if (unit == 0x20) {
+        _environmentIndentColumns++;
+      } else if (unit == 0x09) {
+        _environmentIndentColumns += 4 - (_environmentIndentColumns % 4);
+      } else {
+        _environmentLineLeading = false;
+      }
+    }
+    if (!markdownIsWhitespace(unit)) {
       _lineLeading = false;
-      _revokeClosersThrough(i);
+      _revokeClosersThrough(i, includeEnvironments: !_environmentComment);
     }
     _scannedTo = i + 1;
+    _precedingBackslashes = unit == 0x5C ? _precedingBackslashes + 1 : 0;
+    if (unit == 0x60) {
+      _currentLineBackticks.consume(i, _lineState());
+    }
   }
 
-  void _revokeClosersThrough(int nonWsAt) {
+  _DisplayMathLineState _lineState() => _DisplayMathLineState(
+    lineLeading: _lineLeading,
+    environmentLineLeading: _environmentLineLeading,
+    environmentIndentColumns: _environmentIndentColumns,
+    environmentComment: _environmentComment,
+    pendingEnvironmentName: _pendingEnvironmentName,
+    pendingEnvironmentStart: _pendingEnvironmentStart,
+    pendingEnvironmentTokenAt: _pendingEnvironmentTokenAt,
+    pendingEnvironmentDepth: _pendingEnvironmentDepth,
+    commentMatchedEnvironmentName: _commentMatchedEnvironmentName,
+    commentMatchedEnvironmentStart: _commentMatchedEnvironmentStart,
+    commentMatchedEnvironmentCloseStart: _commentMatchedEnvironmentCloseStart,
+    commentMatchedEnvironmentCloseAt: _commentMatchedEnvironmentCloseAt,
+  );
+
+  void _restoreLineState(_DisplayMathLineState state) {
+    _lineLeading = state.lineLeading;
+    _environmentLineLeading = state.environmentLineLeading;
+    _environmentIndentColumns = state.environmentIndentColumns;
+    _environmentComment = state.environmentComment;
+    _precedingBackslashes = 0;
+    _clearPendingTexVerb();
+    _restorePairState(state);
+  }
+
+  void _restorePairState(_DisplayMathLineState state) {
+    _pendingEnvironmentName = state.pendingEnvironmentName;
+    _pendingEnvironmentStart = state.pendingEnvironmentStart;
+    _pendingEnvironmentTokenAt = state.pendingEnvironmentTokenAt;
+    _pendingEnvironmentDepth = state.pendingEnvironmentDepth;
+    _commentMatchedEnvironmentName = state.commentMatchedEnvironmentName;
+    _commentMatchedEnvironmentStart = state.commentMatchedEnvironmentStart;
+    _commentMatchedEnvironmentCloseStart =
+        state.commentMatchedEnvironmentCloseStart;
+    _commentMatchedEnvironmentCloseAt = state.commentMatchedEnvironmentCloseAt;
+  }
+
+  ({int start, int end, bool provisional})? _verbClosingBacktickRun(
+    _TexVerbProbe verb,
+    int limit, {
+    required bool resumesVerb,
+  }) {
+    if (!_currentLineBackticks.hasStandaloneRuns ||
+        verb.status == _TexVerbProbeStatus.none) {
+      return null;
+    }
+    final verbEnd = verb.status == _TexVerbProbeStatus.complete
+        ? verb.end!
+        : verb.searchedTo;
+    var i = resumesVerb ? _pendingTexVerbBacktickSearchedTo : _scannedTo;
+    var runStart = resumesVerb ? _pendingTexVerbBacktickRunStart : null;
+    var runLength = resumesVerb ? _pendingTexVerbBacktickRunLength : 0;
+    while (i < verbEnd) {
+      _noteScanVisit();
+      if (_text.codeUnitAt(i) == 0x60) {
+        runStart ??= i;
+        runLength++;
+        i++;
+        continue;
+      }
+      if (runStart != null &&
+          _currentLineBackticks.hasStandaloneRun(runLength)) {
+        return (start: runStart, end: i, provisional: false);
+      }
+      runStart = null;
+      runLength = 0;
+      i++;
+    }
+    if (runStart != null && verb.status == _TexVerbProbeStatus.complete) {
+      while (i < limit && _text.codeUnitAt(i) == 0x60) {
+        _noteScanVisit();
+        runLength++;
+        i++;
+      }
+      if (i < limit) {
+        if (_currentLineBackticks.hasStandaloneRun(runLength)) {
+          return (start: runStart, end: i, provisional: false);
+        }
+        runStart = null;
+        runLength = 0;
+      }
+    }
+    _pendingTexVerbBacktickSearchedTo = i;
+    _pendingTexVerbBacktickRunStart = runStart;
+    _pendingTexVerbBacktickRunLength = runLength;
+    if (runStart != null) {
+      return (start: runStart, end: i, provisional: true);
+    }
+    if (verb.status == _TexVerbProbeStatus.pending) {
+      _pendingTexVerbBacktickSearchedTo = verbEnd;
+      _pendingTexVerbBacktickRunStart = runStart;
+      _pendingTexVerbBacktickRunLength = runLength;
+    }
+    return null;
+  }
+
+  void _revokeClosersThrough(int nonWsAt, {bool includeEnvironments = true}) {
     while (_dollarCloses.length > _chkDollarCloses) {
       _noteScanVisit();
       final closer = _dollarCloses.last;
@@ -1030,6 +1640,28 @@ final class MarkdownDisplayMathScanner {
       if (closer + 2 > nonWsAt) break;
       _bracketCloses.removeLast();
     }
+    if (includeEnvironments) _revokeEnvironmentClosersThrough(nonWsAt);
+  }
+
+  void _revokeEnvironmentClosersThrough(int nonWsAt) {
+    for (final entry in _environmentCloses.entries) {
+      final closes = entry.value;
+      final checkpoint = _chkEnvironmentCloses[entry.key] ?? 0;
+      while (closes.length > checkpoint) {
+        _noteScanVisit();
+        if (closes.last.tokenEnd > nonWsAt) break;
+        closes.removeLast();
+      }
+    }
+  }
+
+  bool _hasIncompleteEnvironmentToken(int start, int limit) {
+    // Every supported token is short; avoid copying a potentially large tail.
+    if (limit - start > _maxMathEnvironmentTokenLength) return false;
+    final tail = _text.substring(start, limit);
+    return _mathEnvironmentTokenTexts.any(
+      (token) => token.length > tail.length && token.startsWith(tail),
+    );
   }
 
   void _collectCompleteLine(int start, int end) {
@@ -1041,37 +1673,109 @@ final class MarkdownDisplayMathScanner {
     }
     final ticks = _LineBackticks.of(rawLine);
     var lineLeading = true;
+    var environmentLineLeading = true;
+    var environmentIndentColumns = 0;
+    var environmentComment = false;
+    var precedingBackslashes = 0;
     var j = 0;
     while (j < rawLine.length) {
       _noteScanVisit();
       if (rawLine.codeUnitAt(j) == 0x60) {
         j = ticks.advance(j);
         lineLeading = false;
+        environmentLineLeading = false;
+        precedingBackslashes = 0;
         continue;
+      }
+      if (rawLine.codeUnitAt(j) == 0x25 && precedingBackslashes.isEven) {
+        environmentComment = true;
+      }
+      if (!environmentComment && rawLine.codeUnitAt(j) == 0x5C) {
+        if (precedingBackslashes.isEven) {
+          final verb = _probeTexVerb(rawLine, j, rawLine.length);
+          if (verb.status == _TexVerbProbeStatus.complete) {
+            lineLeading = false;
+            environmentLineLeading = false;
+            j = verb.end!;
+            precedingBackslashes = 0;
+            continue;
+          }
+        }
+        if (precedingBackslashes.isEven) {
+          final token = _mathEnvironmentToken.matchAsPrefix(rawLine, j);
+          if (token != null) {
+            final name = token.group(2)!;
+            final opening = token.group(1) == 'begin';
+            (_environmentTokens[name] ??= []).add(
+              _MathEnvironmentToken(start + j, start + token.end, opening),
+            );
+            if (opening) {
+              if (environmentLineLeading && environmentIndentColumns < 4) {
+                _environmentOpens.add(
+                  _MathEnvironmentMark(name, start + j, start + token.end),
+                );
+              }
+            } else {
+              final closerEnd = _environmentCloserEnd(rawLine, token.end);
+              if (closerEnd != null) {
+                (_environmentCloses[name] ??= []).add(
+                  _MathEnvironmentCloser(
+                    start + j,
+                    start + token.end,
+                    start + closerEnd,
+                  ),
+                );
+              }
+            }
+            lineLeading = false;
+            environmentLineLeading = false;
+            j = token.end;
+            precedingBackslashes = 0;
+            continue;
+          }
+        }
       }
       if (_atDoubleDollar(rawLine, j)) {
         final at = start + j;
         if (lineLeading) _dollarOpens.add(at);
         if (_onlyWhitespaceAfter(rawLine, j + 2)) _dollarCloses.add(at);
         lineLeading = false;
+        environmentLineLeading = false;
         j += 2;
+        precedingBackslashes = 0;
         continue;
       }
-      if (_atEscaped(rawLine, j, 0x5B)) {
+      if (precedingBackslashes.isEven && _atEscaped(rawLine, j, 0x5B)) {
         if (lineLeading) _bracketOpens.add(start + j);
         lineLeading = false;
+        environmentLineLeading = false;
         j += 2;
+        precedingBackslashes = 0;
         continue;
       }
-      if (_atEscaped(rawLine, j, 0x5D)) {
+      if (precedingBackslashes.isEven && _atEscaped(rawLine, j, 0x5D)) {
         if (_onlyWhitespaceAfter(rawLine, j + 2)) {
           _bracketCloses.add(start + j);
         }
         lineLeading = false;
+        environmentLineLeading = false;
         j += 2;
+        precedingBackslashes = 0;
         continue;
       }
-      if (!markdownIsWhitespace(rawLine.codeUnitAt(j))) lineLeading = false;
+      if (environmentLineLeading) {
+        final unit = rawLine.codeUnitAt(j);
+        if (unit == 0x20) {
+          environmentIndentColumns++;
+        } else if (unit == 0x09) {
+          environmentIndentColumns += 4 - (environmentIndentColumns % 4);
+        } else {
+          environmentLineLeading = false;
+        }
+      }
+      final unit = rawLine.codeUnitAt(j);
+      if (!markdownIsWhitespace(unit)) lineLeading = false;
+      precedingBackslashes = unit == 0x5C ? precedingBackslashes + 1 : 0;
       j++;
     }
   }
@@ -1083,14 +1787,38 @@ final class MarkdownDisplayMathScanner {
     var bracketOpenAt = _frozenBracketOpenAt;
     var dollarCloseAt = _frozenDollarCloseAt;
     var bracketCloseAt = _frozenBracketCloseAt;
+    var environmentOpenAt = _frozenEnvironmentOpenAt;
+    final environmentCloseAt = Map<String, int>.of(_frozenEnvironmentCloseAt);
+    final environmentTokenAt = Map<String, int>.of(_frozenEnvironmentTokenAt);
     var fenceOpenAt = _frozenFenceOpenAt;
     var fenceCloseAt = _frozenFenceCloseAt;
     int? unclosedStart;
     int? earliestUnresolved;
     final peeked = _peekIncompleteFence(limit);
+    final currentEnvironmentComment =
+        _currentLineBackticks.provisionalState?.environmentComment ??
+        _environmentComment;
+
+    bool hiddenByInlineCode(int offset) =>
+        offset >= _lineStart && _currentLineBackticks.contains(offset);
 
     int advanceInt(List<int> values, int index, int min) {
-      while (index < values.length && values[index] < min) {
+      while (index < values.length &&
+          (values[index] < min || hiddenByInlineCode(values[index]))) {
+        _noteScanVisit();
+        index++;
+      }
+      return index;
+    }
+
+    int advanceEnvironmentClose(
+      List<_MathEnvironmentCloser> values,
+      int index,
+      int min,
+    ) {
+      while (index < values.length &&
+          (values[index].start < min ||
+              hiddenByInlineCode(values[index].start))) {
         _noteScanVisit();
         index++;
       }
@@ -1122,6 +1850,13 @@ final class MarkdownDisplayMathScanner {
       _frozenBracketOpenAt = nextBracketOpen;
       _frozenDollarCloseAt = nextDollarClose;
       _frozenBracketCloseAt = nextBracketClose;
+      _frozenEnvironmentOpenAt = environmentOpenAt;
+      _frozenEnvironmentCloseAt
+        ..clear()
+        ..addAll(environmentCloseAt);
+      _frozenEnvironmentTokenAt
+        ..clear()
+        ..addAll(environmentTokenAt);
       _frozenFenceOpenAt = nextFenceOpen;
       _frozenFenceCloseAt = nextFenceClose;
     }
@@ -1131,6 +1866,12 @@ final class MarkdownDisplayMathScanner {
       fenceOpenAt = advanceFence(fenceOpenAt, pos);
       dollarOpenAt = advanceInt(_dollarOpens, dollarOpenAt, pos);
       bracketOpenAt = advanceInt(_bracketOpens, bracketOpenAt, pos);
+      while (environmentOpenAt < _environmentOpens.length &&
+          (_environmentOpens[environmentOpenAt].start < pos ||
+              hiddenByInlineCode(_environmentOpens[environmentOpenAt].start))) {
+        _noteScanVisit();
+        environmentOpenAt++;
+      }
       final dollarAt = dollarOpenAt < _dollarOpens.length
           ? _dollarOpens[dollarOpenAt]
           : null;
@@ -1148,16 +1889,154 @@ final class MarkdownDisplayMathScanner {
       }
       final useDollar =
           dollarAt != null && (bracketAt == null || dollarAt <= bracketAt);
-      final mathAt = useDollar ? dollarAt : bracketAt;
+      final delimitedMathAt = useDollar ? dollarAt : bracketAt;
+      final environment = environmentOpenAt < _environmentOpens.length
+          ? _environmentOpens[environmentOpenAt]
+          : null;
+      final useEnvironment =
+          environment != null &&
+          (delimitedMathAt == null || environment.start < delimitedMathAt);
+      final mathAt = useEnvironment ? environment.start : delimitedMathAt;
       if (mathAt == null && fenceAt == null) break;
 
       final mathFirst =
           mathAt != null && (fenceAt == null || mathAt <= fenceAt.start);
+      if (mathFirst && useEnvironment) {
+        final closes =
+            _environmentCloses[environment.name] ??
+            const <_MathEnvironmentCloser>[];
+        final resumesCommentMatch =
+            currentEnvironmentComment &&
+            _commentMatchedEnvironmentStart == environment.start &&
+            _commentMatchedEnvironmentName == environment.name;
+        if (resumesCommentMatch) {
+          final cachedCloseStart = _commentMatchedEnvironmentCloseStart!;
+          final closeAt = _commentMatchedEnvironmentCloseAt!;
+          environmentCloseAt[environment.name] = closeAt;
+          if (closeAt < closes.length &&
+              closes[closeAt].start == cachedCloseStart) {
+            environmentOpenAt++;
+            pos = limit;
+            _spans.add(
+              MarkdownDisplayMathSpan(start: environment.start, end: pos),
+            );
+            unclosedStart = null;
+            break;
+          }
+          _clearCommentMatchedEnvironmentFor(environment);
+        }
+        final tokens = _environmentTokens[environment.name]!;
+        final resumesPending =
+            _pendingEnvironmentStart == environment.start &&
+            _pendingEnvironmentName == environment.name;
+        var tokenAt = resumesPending
+            ? _pendingEnvironmentTokenAt
+            : environmentTokenAt[environment.name] ?? 0;
+        var depth = resumesPending ? _pendingEnvironmentDepth : 0;
+        if (!resumesPending) {
+          while (tokenAt < tokens.length &&
+              tokens[tokenAt].start < environment.start) {
+            _noteScanVisit();
+            tokenAt++;
+          }
+        }
+        environmentTokenAt[environment.name] = tokenAt;
+        var stableTokenAt = tokenAt;
+        var stableDepth = depth;
+        _MathEnvironmentToken? closingToken;
+        for (var i = tokenAt; i < tokens.length; i++) {
+          _noteScanVisit();
+          final token = tokens[i];
+          final hiddenEnd = _currentLineBackticks.hiddenSpanEnd(token.start);
+          if (hiddenEnd != null) {
+            var low = i + 1;
+            var high = tokens.length;
+            while (low < high) {
+              _noteScanVisit();
+              final middle = (low + high) >> 1;
+              if (tokens[middle].start < hiddenEnd) {
+                low = middle + 1;
+              } else {
+                high = middle;
+              }
+            }
+            stableTokenAt = low;
+            stableDepth = depth;
+            i = low - 1;
+            continue;
+          }
+          stableTokenAt = i + 1;
+          depth += token.opening ? 1 : -1;
+          stableDepth = depth;
+          if (depth == 0) {
+            closingToken = token;
+            break;
+          }
+        }
+        final closeAt = advanceEnvironmentClose(
+          closes,
+          environmentCloseAt[environment.name] ?? 0,
+          closingToken?.start ?? environment.end,
+        );
+        environmentCloseAt[environment.name] = closeAt;
+        environmentOpenAt++;
+        if (closingToken != null &&
+            closeAt < closes.length &&
+            closes[closeAt].start == closingToken.start) {
+          _clearPendingEnvironmentFor(environment);
+          final close = closes[closeAt];
+          final commentExtendsCurrentLine =
+              currentEnvironmentComment && close.start >= _lineStart;
+          if (commentExtendsCurrentLine) {
+            _commentMatchedEnvironmentName = environment.name;
+            _commentMatchedEnvironmentStart = environment.start;
+            _commentMatchedEnvironmentCloseStart = close.start;
+            _commentMatchedEnvironmentCloseAt = closeAt;
+          } else {
+            _clearCommentMatchedEnvironmentFor(environment);
+          }
+          pos = commentExtendsCurrentLine ? limit : close.spanEnd;
+          _spans.add(
+            MarkdownDisplayMathSpan(start: environment.start, end: pos),
+          );
+          unclosedStart = null;
+          freeze(
+            pos,
+            dollarOpenAt,
+            bracketOpenAt,
+            dollarCloseAt,
+            bracketCloseAt,
+            fenceOpenAt,
+            fenceCloseAt,
+          );
+          if (commentExtendsCurrentLine) break;
+        } else if (closingToken == null) {
+          _clearCommentMatchedEnvironmentFor(environment);
+          _pendingEnvironmentName = environment.name;
+          _pendingEnvironmentStart = environment.start;
+          _pendingEnvironmentTokenAt = stableTokenAt;
+          _pendingEnvironmentDepth = stableDepth;
+          unclosedStart ??= environment.start;
+          earliestUnresolved ??= environment.start;
+          // A later environment may be a nested matrix or alignment whose
+          // outer end has not streamed in yet. Keep the outer body together.
+          break;
+        } else {
+          _clearPendingEnvironmentFor(environment);
+          _clearCommentMatchedEnvironmentFor(environment);
+          // The balanced environment ends mid-line, so it is ordinary text
+          // rather than a standalone display block.
+          pos = closingToken.end;
+        }
+        continue;
+      }
       if (mathFirst) {
         final openAt = mathAt;
         final closes = useDollar ? _dollarCloses : _bracketCloses;
         var closeAt = useDollar ? dollarCloseAt : bracketCloseAt;
-        while (closeAt < closes.length && closes[closeAt] < openAt + 2) {
+        while (closeAt < closes.length &&
+            (closes[closeAt] < openAt + 2 ||
+                hiddenByInlineCode(closes[closeAt]))) {
           _noteScanVisit();
           closeAt++;
         }
@@ -1249,6 +2128,44 @@ final class MarkdownDisplayMathScanner {
     return MarkdownDisplayMathScan(spans: _spans, unclosedStart: unclosedStart);
   }
 
+  void _clearPendingEnvironmentFor(_MathEnvironmentMark environment) {
+    if (_pendingEnvironmentStart == environment.start &&
+        _pendingEnvironmentName == environment.name) {
+      _clearPendingEnvironment();
+    }
+  }
+
+  void _clearPendingEnvironment() {
+    _pendingEnvironmentName = null;
+    _pendingEnvironmentStart = null;
+    _pendingEnvironmentTokenAt = 0;
+    _pendingEnvironmentDepth = 0;
+  }
+
+  void _clearCommentMatchedEnvironmentFor(_MathEnvironmentMark environment) {
+    if (_commentMatchedEnvironmentStart == environment.start &&
+        _commentMatchedEnvironmentName == environment.name) {
+      _clearCommentMatchedEnvironment();
+    }
+  }
+
+  void _clearCommentMatchedEnvironment() {
+    _commentMatchedEnvironmentName = null;
+    _commentMatchedEnvironmentStart = null;
+    _commentMatchedEnvironmentCloseStart = null;
+    _commentMatchedEnvironmentCloseAt = null;
+  }
+
+  void _clearPendingTexVerb() {
+    _pendingTexVerbStart = null;
+    _pendingTexVerbDelimiter = null;
+    _pendingTexVerbCompleteEnd = null;
+    _pendingTexVerbSearchedTo = 0;
+    _pendingTexVerbBacktickSearchedTo = 0;
+    _pendingTexVerbBacktickRunStart = null;
+    _pendingTexVerbBacktickRunLength = 0;
+  }
+
   _FenceMark? _peekIncompleteFence(int limit) {
     var i = _lineStart;
     while (i < limit) {
@@ -1265,11 +2182,13 @@ final class MarkdownDisplayMathScanner {
   }
 }
 
-/// Successful display-math spans in [text] using the same pairing as
-/// [LatexBlockScrollableMd]: a closer may be followed only by whitespace on
+/// Successful display-math spans in [text] for Markdown rendering: a closer
+/// may be followed only by whitespace on
 /// its line; an unclosed opener does not occupy later content; a candidate
 /// that starts inside a successful outer span is discarded; leftmost
 /// successful dollar wins over bracket at the same site.
+/// Named environments balance nested instances of the same name, and an
+/// unfinished outer environment protects its body from paragraph splitting.
 ///
 /// Fence and math candidates are merged by start: a successful earlier
 /// fence hides inner math, and a successful earlier math span treats inner
@@ -1288,7 +2207,7 @@ MarkdownDisplayMathScan markdownScanDisplayMath(
 }
 
 /// Whether [content] ends (at [end]) with a successful display-math span
-/// that [LatexBlockScrollableMd] would match.
+/// that the renderer recognizes after normalizing raw environments.
 bool markdownEndsWithDisplayMath(String content, int end) {
   final spans = markdownScanDisplayMath(content, end: end).spans;
   return spans.isNotEmpty && spans.last.end == end;
@@ -1304,6 +2223,82 @@ bool _atEscaped(String line, int i, int unit) {
   return i + 1 < line.length &&
       line.codeUnitAt(i) == 0x5C &&
       line.codeUnitAt(i + 1) == unit;
+}
+
+_TexVerbProbe _probeTexVerb(
+  String text,
+  int start,
+  int limit, {
+  int? knownDelimiter,
+  int? searchFrom,
+}) {
+  const prefix = r'\verb';
+  var prefixAt = 0;
+  while (prefixAt < prefix.length && start + prefixAt < limit) {
+    _noteScanVisit();
+    if (text.codeUnitAt(start + prefixAt) != prefix.codeUnitAt(prefixAt)) {
+      return _TexVerbProbe.none;
+    }
+    prefixAt++;
+  }
+  if (prefixAt < prefix.length) {
+    return _TexVerbProbe.pending(searchedTo: limit);
+  }
+
+  var delimiterAt = start + prefix.length;
+  if (delimiterAt >= limit) {
+    return _TexVerbProbe.pending(searchedTo: limit);
+  }
+  var delimiter = text.codeUnitAt(delimiterAt);
+  if (delimiter == 0x2A) {
+    delimiterAt++;
+    if (delimiterAt >= limit) {
+      return _TexVerbProbe.pending(searchedTo: limit);
+    }
+    delimiter = text.codeUnitAt(delimiterAt);
+  } else if (_isAsciiLetter(delimiter)) {
+    return _TexVerbProbe.none;
+  }
+  if (markdownIsLogicalLineBreak(delimiter)) return _TexVerbProbe.none;
+
+  final payloadStart = delimiterAt + 1;
+  var i = knownDelimiter == delimiter && searchFrom != null
+      ? searchFrom
+      : payloadStart;
+  if (i < payloadStart) i = payloadStart;
+  while (i < limit) {
+    _noteScanVisit();
+    final unit = text.codeUnitAt(i);
+    if (markdownIsLogicalLineBreak(unit)) return _TexVerbProbe.none;
+    if (unit == delimiter) return _TexVerbProbe.complete(i + 1);
+    i++;
+  }
+  return _TexVerbProbe.pending(delimiter: delimiter, searchedTo: i);
+}
+
+bool _isAsciiLetter(int unit) =>
+    (unit >= 0x41 && unit <= 0x5A) || (unit >= 0x61 && unit <= 0x7A);
+
+bool _texCharacterIsEscaped(String text, int index) {
+  var backslashes = 0;
+  for (var i = index - 1; i >= 0 && text.codeUnitAt(i) == 0x5C; i--) {
+    _noteScanVisit();
+    backslashes++;
+  }
+  return backslashes.isOdd;
+}
+
+int? _environmentCloserEnd(String line, int tokenEnd) {
+  var i = tokenEnd;
+  while (i < line.length && markdownIsWhitespace(line.codeUnitAt(i))) {
+    _noteScanVisit();
+    i++;
+  }
+  if (i == line.length) return tokenEnd;
+  if (line.codeUnitAt(i) == 0x25 && !_texCharacterIsEscaped(line, i)) {
+    return line.length;
+  }
+  return null;
 }
 
 bool _onlyWhitespaceAfter(String line, int start) {

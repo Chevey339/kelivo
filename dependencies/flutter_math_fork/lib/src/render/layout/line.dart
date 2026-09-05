@@ -19,9 +19,11 @@ class LineParentData extends ContainerBoxParentData<RenderBox> {
 
   bool alignerOrSpacer = false;
 
+  bool useParentWidthConstraints = false;
+
   @override
   String toString() =>
-      '${super.toString()}; canBreakBefore = $canBreakBefore; customSize = ${customCrossSize != null}; trailingMargin = $trailingMargin; alignerOrSpacer = $alignerOrSpacer';
+      '${super.toString()}; canBreakBefore = $canBreakBefore; customSize = ${customCrossSize != null}; trailingMargin = $trailingMargin; alignerOrSpacer = $alignerOrSpacer; useParentWidthConstraints = $useParentWidthConstraints';
 }
 
 class LineElement extends ParentDataWidget<LineParentData> {
@@ -29,6 +31,7 @@ class LineElement extends ParentDataWidget<LineParentData> {
   final BoxConstraints Function(double height, double depth)? customCrossSize;
   final double trailingMargin;
   final bool alignerOrSpacer;
+  final bool useParentWidthConstraints;
 
   const LineElement({
     Key? key,
@@ -36,6 +39,7 @@ class LineElement extends ParentDataWidget<LineParentData> {
     this.customCrossSize,
     this.trailingMargin = 0.0,
     this.alignerOrSpacer = false,
+    this.useParentWidthConstraints = false,
     required Widget child,
   }) : super(key: key, child: child);
 
@@ -65,6 +69,11 @@ class LineElement extends ParentDataWidget<LineParentData> {
       needsLayout = true;
     }
 
+    if (parentData.useParentWidthConstraints != useParentWidthConstraints) {
+      parentData.useParentWidthConstraints = useParentWidthConstraints;
+      needsLayout = true;
+    }
+
     if (needsLayout) {
       final targetParent = renderObject.parent;
       if (targetParent is RenderObject) targetParent.markNeedsLayout();
@@ -81,6 +90,9 @@ class LineElement extends ParentDataWidget<LineParentData> {
     properties.add(DoubleProperty('trailingMargin', trailingMargin));
     properties.add(FlagProperty('alignerOrSpacer',
         value: alignerOrSpacer, ifTrue: 'is a alignment symbol'));
+    properties.add(FlagProperty('useParentWidthConstraints',
+        value: useParentWidthConstraints,
+        ifTrue: 'uses the parent line width constraints'));
   }
 
   @override
@@ -340,7 +352,14 @@ class RenderLine extends RenderBox
       } else if (childParentData.alignerOrSpacer) {
         alignerAndSpacers.add(child);
       } else {
-        final childSize = child.getLayoutSize(infiniteConstraint, dry: dry);
+        final childConstraints = childParentData.useParentWidthConstraints &&
+                constraints.hasBoundedWidth
+            ? BoxConstraints(
+                minWidth: constraints.minWidth,
+                maxWidth: constraints.maxWidth,
+              )
+            : infiniteConstraint;
+        final childSize = child.getLayoutSize(childConstraints, dry: dry);
         sizeMap[child] = childSize;
         final distance = dry ? 0.0 : child.getDistanceToBaseline(textBaseline)!;
         maxHeightAboveBaseline = math.max(maxHeightAboveBaseline, distance);

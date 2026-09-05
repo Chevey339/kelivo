@@ -4,12 +4,14 @@ import 'package:collection/collection.dart';
 
 import '../../ast/nodes/accent.dart';
 import '../../ast/nodes/accent_under.dart';
+import '../../ast/nodes/equation_array.dart';
 import '../../ast/nodes/frac.dart';
 import '../../ast/nodes/function.dart';
 import '../../ast/nodes/left_right.dart';
 import '../../ast/nodes/multiscripts.dart';
 import '../../ast/nodes/nary_op.dart';
 import '../../ast/nodes/over.dart';
+import '../../ast/nodes/space.dart';
 import '../../ast/nodes/sqrt.dart';
 import '../../ast/nodes/stretchy_op.dart';
 import '../../ast/nodes/style.dart';
@@ -34,6 +36,7 @@ import 'encoder.dart';
 
 part 'functions/accent.dart';
 part 'functions/accent_under.dart';
+part 'functions/equation_array.dart';
 part 'functions/frac.dart';
 part 'functions/function.dart';
 part 'functions/left_right.dart';
@@ -48,8 +51,12 @@ const Map<Type, EncoderFun> encoderFunctions = {
   EquationRowNode: _equationRowNodeEncoderFun,
   AccentNode: _accentEncoder,
   AccentUnderNode: _accentUnderEncoder,
+  EquationArrayNode: _equationArrayEncoder,
+  EquationTagNode: _equationTagEncoder,
+  EquationTagMarkerNode: _equationTagMarkerEncoder,
   FracNode: _fracEncoder,
   FunctionNode: _functionEncoder,
+  OperatorNameNode: _operatorNameEncoder,
   LeftRightNode: _leftRightEncoder,
   MultiscriptsNode: _multisciprtsEncoder,
   NaryOperatorNode: _naryEncoder,

@@ -491,6 +491,11 @@ class EquationRowNode extends ParentableNode<GreenNode>
         flattenedBuildResults.map((e) => e.options).toList(growable: false);
     // assert(flattenedChildList.length == actualChildWidgets.length);
 
+    final displayLayout = flattenedBuildResults.length == 1 &&
+            flattenedBuildResults.single.isDisplayLayout
+        ? flattenedBuildResults.single
+        : null;
+
     // We need to calculate spacings between nodes
     // There are several caveats to consider
     // - bin can only be bin, if it satisfies some conditions. Otherwise it will
@@ -554,12 +559,17 @@ class EquationRowNode extends ParentableNode<GreenNode>
         alignerOrSpacer: flattenedChildList[index] is SpaceNode &&
             (flattenedChildList[index] as SpaceNode).alignerOrSpacer,
         trailingMargin: childSpacingConfs[index].spacingAfter,
+        useParentWidthConstraints: displayLayout != null,
       ),
       growable: false,
     );
 
     final widget = Consumer<FlutterMathMode>(builder: (context, mode, child) {
       if (mode == FlutterMathMode.view) {
+        // A display layout must receive the constraints of the surrounding
+        // Math widget directly. A Line first lays its children out with
+        // unconstrained width, which would hide the display edge from labels.
+        if (displayLayout != null) return displayLayout.widget;
         return Line(
           key: _key!,
           children: lineChildren,
@@ -642,6 +652,7 @@ class EquationRowNode extends ParentableNode<GreenNode>
           ? flattenedBuildResults.first.italic
           : 0.0,
       widget: widget,
+      isDisplayLayout: displayLayout != null,
     );
   }
 
@@ -813,7 +824,6 @@ enum AtomType {
   inner,
 
   spacing, // symbols
-
 }
 
 /// Only for improvisional use during parsing. Do not use.
@@ -849,12 +859,14 @@ class BuildResult {
   final double italic;
   final double skew;
   final List<BuildResult>? results;
+  final bool isDisplayLayout;
   const BuildResult({
     required this.widget,
     required this.options,
     this.italic = 0.0,
     this.skew = 0.0,
     this.results,
+    this.isDisplayLayout = false,
   });
 }
 

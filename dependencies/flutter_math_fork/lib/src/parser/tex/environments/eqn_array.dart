@@ -51,13 +51,30 @@ const eqnArrayEntries = {
     numArgs: 0,
     handler: _casesHandler,
   ),
-  ['aligned']: EnvSpec(
+  ['equation', 'equation*']: EnvSpec(numArgs: 0, handler: _equationHandler),
+  ['aligned', 'align', 'align*', 'split']: EnvSpec(
     numArgs: 0,
     handler: _alignedHandler,
   ),
-  // ['gathered']: EnvSpec(numArgs: 0, handler: _gatheredHandler),
-  ['alignedat']: EnvSpec(numArgs: 1, handler: _alignedAtHandler),
+  ['gathered', 'gather', 'gather*']:
+      EnvSpec(numArgs: 0, handler: _gatheredHandler),
+  ['alignedat', 'alignat', 'alignat*']:
+      EnvSpec(numArgs: 1, handler: _alignedAtHandler),
 };
+
+GreenNode _equationHandler(TexParser parser, EnvContext context) {
+  final outerTag = parser.equationTag;
+  parser.equationTag = null;
+  try {
+    final body = parser.parseExpression().wrapWithEquationRow();
+    return parser.finishTaggedEquation(
+      body,
+      environment: EquationArrayEnvironment.fromTexName(context.envName),
+    );
+  } finally {
+    parser.equationTag = outerTag;
+  }
+}
 
 GreenNode _casesHandler(TexParser parser, EnvContext context) {
   final body = parseEqnArray(
@@ -106,7 +123,12 @@ GreenNode _alignedHandler(TexParser parser, EnvContext context) =>
     parseEqnArray(
       parser,
       addJot: true,
+      tagged: context.envName == 'align' || context.envName == 'align*',
+      environment: EquationArrayEnvironment.fromTexName(context.envName),
       concatRow: (cells) {
+        if (context.envName == 'split' && cells.length > 2) {
+          throw ParseException('{split} can contain only two columns');
+        }
         final expanded = cells
             .expand((cell) => [...cell.children, SpaceNode.alignerOrSpacer()])
             .toList(growable: true);
@@ -114,7 +136,20 @@ GreenNode _alignedHandler(TexParser parser, EnvContext context) =>
       },
     );
 
-// GreenNode _gatheredHandler(TexParser parser, EnvContext context) {}
+GreenNode _gatheredHandler(TexParser parser, EnvContext context) =>
+    parseEqnArray(
+      parser,
+      addJot: true,
+      tagged: context.envName != 'gathered',
+      environment: EquationArrayEnvironment.fromTexName(context.envName),
+      concatRow: (cells) {
+        if (cells.length != 1) {
+          throw ParseException(
+              '{${context.envName}} can contain only one column');
+        }
+        return cells.single;
+      },
+    );
 
 GreenNode _alignedAtHandler(TexParser parser, EnvContext context) {
   final arg = parser.parseArgNode(mode: null, optional: false);
@@ -123,12 +158,16 @@ GreenNode _alignedAtHandler(TexParser parser, EnvContext context) {
       .map((e) => assertNodeType<SymbolNode>(e).symbol)
       .join('');
   final cols = int.tryParse(string);
-  if (cols == null) {
-    throw ParseException('Invalid argument for environment: alignedat');
+  if (cols == null || cols < 1) {
+    throw ParseException(
+        'Invalid argument for environment: ${context.envName}');
   }
   return parseEqnArray(
     parser,
     addJot: true,
+    tagged: context.envName != 'alignedat',
+    environment: EquationArrayEnvironment.fromTexName(context.envName),
+    alignmentColumns: cols,
     concatRow: (cells) {
       if (cells.length > 2 * cols) {
         throw ParseException('Too many math in a row: '
@@ -145,8 +184,15 @@ GreenNode _alignedAtHandler(TexParser parser, EnvContext context) {
 EquationArrayNode parseEqnArray(
   TexParser parser, {
   bool addJot = false,
+  bool tagged = false,
+  EquationArrayEnvironment? environment,
+  int? alignmentColumns,
   required EquationRowNode Function(List<EquationRowNode> cells) concatRow,
 }) {
+  // Only outer display environments own a tag for each row. Inner environments
+  // such as aligned leave their label on the enclosing equation.
+  final outerTag = parser.equationTag;
+  if (tagged) parser.equationTag = null;
   // Parse body of array with \\ temporarily mapped to \cr
   parser.macroExpander.beginGroup();
   parser.macroExpander.macros.set('\\\\', MacroDefinition.fromString('\\cr'));
@@ -170,7 +216,8 @@ EquationArrayNode parseEqnArray(
   parser.macroExpander.beginGroup();
 
   var row = <EquationRowNode>[];
-  final body = [row];
+  final rows = <EquationRowNode>[];
+  final tags = <EquationRowNode?>[];
   final rowGaps = <Measurement>[];
   final hLinesBeforeRow = <MatrixSeparatorStyle>[];
 
@@ -195,14 +242,21 @@ EquationArrayNode parseEqnArray(
       // Arrays terminate newlines with `\crcr` which consumes a `\cr` if
       // the last line is empty.
       // NOTE: Currently, `cell` is the last item added into `row`.
-      if (row.length == 1 && cell is StyleNode && cell.children.isEmpty) {
-        body.removeLast();
+      if (row.length != 1 ||
+          cellBody.isNotEmpty ||
+          (tagged && parser.equationTag != null)) {
+        final equation = concatRow(row);
+        rows.add(equation);
+        tags.add(tagged ? parser.takeEquationTag() : null);
       }
-      if (hLinesBeforeRow.length < body.length + 1) {
+      if (hLinesBeforeRow.length < rows.length + 1) {
         hLinesBeforeRow.add(MatrixSeparatorStyle.none);
       }
       break;
     } else if (next == '\\cr') {
+      final equation = concatRow(row);
+      rows.add(equation);
+      tags.add(tagged ? parser.takeEquationTag() : null);
       final cr = assertNodeType<CrNode>(parser.parseFunction(null, null, null));
       rowGaps.add(cr.size ?? Measurement.zero);
 
@@ -211,7 +265,6 @@ EquationArrayNode parseEqnArray(
           .add(getHLines(parser).lastOrNull ?? MatrixSeparatorStyle.none);
 
       row = [];
-      body.add(row);
     } else {
       throw ParseException(
           'Expected & or \\\\ or \\cr or \\end', parser.nextToken);
@@ -223,7 +276,7 @@ EquationArrayNode parseEqnArray(
   // End array group defining \\
   parser.macroExpander.endGroup();
 
-  final rows = body.map<EquationRowNode>(concatRow).toList();
+  if (tagged) parser.equationTag = outerTag;
 
   return EquationArrayNode(
     arrayStretch: arrayStretch,
@@ -231,5 +284,9 @@ EquationArrayNode parseEqnArray(
     rowSpacings: rowGaps,
     addJot: addJot,
     body: rows,
+    tags: tagged ? tags : null,
+    displayLayout: tagged,
+    environment: environment,
+    alignmentColumns: alignmentColumns,
   );
 }
