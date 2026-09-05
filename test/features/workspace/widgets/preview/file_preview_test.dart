@@ -342,11 +342,16 @@ void main() {
     expect(find.byType(IosTileButton), findsNWidgets(3));
     expect(find.byKey(BinaryFilePreview.openWithKey), findsOneWidget);
     expect(find.byKey(BinaryFilePreview.shareKey), findsOneWidget);
-    expect(find.byKey(BinaryFilePreview.copyPathKey), findsOneWidget);
+    expect(find.byKey(BinaryFilePreview.exportKey), findsOneWidget);
     expect(find.byKey(BinaryFilePreview.revealKey), findsNothing);
+    expect(find.byKey(FilePreviewFrame.exportActionKey), findsOneWidget);
+    expect(find.byIcon(Lucide.Copy), findsNothing);
+    expect(find.text('Copy path'), findsNothing);
   });
 
-  testWidgets('binary card exposes open/share/copy on mobile', (tester) async {
+  testWidgets('binary card exposes open/share/export on mobile', (
+    tester,
+  ) async {
     final pdf = File(p.join(tempDir.path, 'report.pdf'))
       ..writeAsBytesSync(const [0x25, 0x50, 0x44, 0x46, 0x2D, 0x00, 0x01]);
 
@@ -357,7 +362,7 @@ void main() {
     expect(find.byType(IosTileButton), findsNWidgets(3));
     expect(find.text('Open with…'), findsOneWidget);
     expect(find.text('Share'), findsOneWidget);
-    expect(find.text('Copy path'), findsOneWidget);
+    expect(find.text('Export'), findsOneWidget);
     expect(find.byIcon(Lucide.FileText), findsOneWidget);
     final typeIcon = tester.widget<Icon>(
       find.byKey(BinaryFilePreview.typeIconKey),
@@ -390,21 +395,57 @@ void main() {
     expect(find.byIcon(Lucide.FileArchive), findsOneWidget);
     expect(find.byKey(BinaryFilePreview.openWithKey), findsOneWidget);
     expect(find.byKey(BinaryFilePreview.shareKey), findsOneWidget);
-    expect(find.byKey(BinaryFilePreview.copyPathKey), findsOneWidget);
+    expect(find.byKey(BinaryFilePreview.exportKey), findsOneWidget);
     expect(find.byKey(BinaryFilePreview.revealKey), findsOneWidget);
     expect(find.text('Open with…'), findsOneWidget);
     expect(find.text('Share'), findsOneWidget);
-    expect(find.text('Copy path'), findsOneWidget);
+    expect(find.text('Export'), findsOneWidget);
     expect(find.text('Show in Finder'), findsOneWidget);
     final openRect = tester.getRect(find.byKey(BinaryFilePreview.openWithKey));
     final shareRect = tester.getRect(find.byKey(BinaryFilePreview.shareKey));
-    final copyRect = tester.getRect(find.byKey(BinaryFilePreview.copyPathKey));
+    final exportRect = tester.getRect(find.byKey(BinaryFilePreview.exportKey));
     final revealRect = tester.getRect(find.byKey(BinaryFilePreview.revealKey));
     expect(openRect.top, closeTo(shareRect.top, 1));
-    expect(copyRect.top, closeTo(revealRect.top, 1));
+    expect(exportRect.top, closeTo(revealRect.top, 1));
     expect(openRect.left, lessThan(shareRect.left));
-    expect(copyRect.left, lessThan(revealRect.left));
-    expect(copyRect.top, greaterThan(openRect.bottom));
+    expect(exportRect.left, lessThan(revealRect.left));
+    expect(exportRect.top, greaterThan(openRect.bottom));
+  });
+
+  testWidgets('html preview has export and one browser action', (tester) async {
+    final html = File(p.join(tempDir.path, '2048.html'))
+      ..writeAsStringSync('<html><body>2048</body></html>');
+
+    await tester.pumpWidget(
+      _previewHarness(
+        child: FilePreviewPage(
+          file: html,
+          title: '2048.html',
+          kind: FilePreviewKind.html,
+          child: HtmlFilePreview(file: html, autoLoad: false),
+        ),
+      ),
+    );
+
+    expect(find.byKey(FilePreviewFrame.exportActionKey), findsOneWidget);
+    expect(find.byKey(FilePreviewFrame.openInBrowserActionKey), findsOneWidget);
+    expect(find.byIcon(Lucide.Globe), findsOneWidget);
+    expect(find.byIcon(Lucide.Download), findsOneWidget);
+    expect(find.byIcon(Lucide.Copy), findsNothing);
+    expect(find.byIcon(Lucide.ExternalLink), findsOneWidget);
+    expect(find.text('Rendered'), findsOneWidget);
+    expect(find.text('Source'), findsOneWidget);
+  });
+
+  test('preview browser server binds a loopback http uri', () async {
+    final html = File(p.join(tempDir.path, 'page.html'))
+      ..writeAsStringSync('<html>ok</html>');
+    final uri = await startPreviewFileBrowserServer(html);
+    addTearDown(closePreviewFileBrowserServer);
+    expect(uri.scheme, 'http');
+    expect(uri.host, '127.0.0.1');
+    expect(uri.port, greaterThan(0));
+    expect(uri.path, '/page.html');
   });
 
   testWidgets('desktop preview opens via dialog, not a bottom sheet', (

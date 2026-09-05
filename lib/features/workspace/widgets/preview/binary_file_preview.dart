@@ -23,7 +23,7 @@ class BinaryFilePreview extends StatelessWidget {
   static const Key typeIconKey = ValueKey<String>('file-preview-binary-type');
   static const Key openWithKey = ValueKey<String>('file-preview-open-with');
   static const Key shareKey = ValueKey<String>('file-preview-share');
-  static const Key copyPathKey = ValueKey<String>('file-preview-copy-path');
+  static const Key exportKey = ValueKey<String>('file-preview-export');
   static const Key revealKey = ValueKey<String>('file-preview-reveal');
 
   static const double desktopCardMaxWidth = 440;
@@ -128,10 +128,10 @@ class BinaryFilePreview extends StatelessWidget {
                 const SizedBox(height: 8),
                 _PreviewActionPair(
                   primary: IosTileButton(
-                    key: copyPathKey,
-                    icon: Lucide.Copy,
-                    label: l10n.workspacePreviewCopyPath,
-                    onTap: () => unawaited(copyFilePath(context, file)),
+                    key: exportKey,
+                    icon: Lucide.Download,
+                    label: l10n.workspaceFilesExportItem,
+                    onTap: () => unawaited(exportPreviewFile(context, file)),
                   ),
                   secondary: desktop
                       ? IosTileButton(

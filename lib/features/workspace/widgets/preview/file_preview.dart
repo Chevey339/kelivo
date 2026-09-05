@@ -257,6 +257,13 @@ class FilePreviewFrame extends StatelessWidget {
     required this.child,
   });
 
+  static const Key exportActionKey = ValueKey<String>(
+    'file-preview-header-export',
+  );
+  static const Key openInBrowserActionKey = ValueKey<String>(
+    'file-preview-header-open-in-browser',
+  );
+
   final File file;
   final String title;
   final FilePreviewKind kind;
@@ -307,6 +314,7 @@ class FilePreviewFrame extends StatelessWidget {
     final minSize = dialog ? 36.0 : 44.0;
 
     Widget action({
+      Key? key,
       required String label,
       required IconData icon,
       required VoidCallback onTap,
@@ -314,6 +322,7 @@ class FilePreviewFrame extends StatelessWidget {
       return Tooltip(
         message: label,
         child: IosIconButton(
+          key: key,
           icon: icon,
           semanticLabel: label,
           color: cs.onSurface,
@@ -329,9 +338,10 @@ class FilePreviewFrame extends StatelessWidget {
 
     final items = <Widget>[
       action(
-        label: l10n.workspacePreviewCopyPath,
-        icon: Lucide.Copy,
-        onTap: () => unawaited(copyFilePath(context, file)),
+        key: FilePreviewFrame.exportActionKey,
+        label: l10n.workspaceFilesExportItem,
+        icon: Lucide.Download,
+        onTap: () => unawaited(exportPreviewFile(context, file)),
       ),
       action(
         label: l10n.workspacePreviewShare,
@@ -356,6 +366,7 @@ class FilePreviewFrame extends StatelessWidget {
     if (kind == FilePreviewKind.html) {
       items.add(
         action(
+          key: FilePreviewFrame.openInBrowserActionKey,
           label: l10n.workspacePreviewOpenInBrowser,
           icon: Lucide.Globe,
           onTap: () => unawaited(openPreviewFileInBrowser(context, file)),

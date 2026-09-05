@@ -608,8 +608,24 @@ void main() {
         of: folderRow,
         matching: find.byIcon(Lucide.ChevronRight),
       ),
-      findsOneWidget,
+      findsNothing,
     );
+    expect(find.byKey(FileBrowser.itemMoreKey('plain.txt')), findsOneWidget);
+    expect(find.byKey(FileBrowser.itemMoreKey('docs')), findsOneWidget);
+  });
+
+  testWidgets('row more button opens the item action menu', (tester) async {
+    File(p.join(tempDir.path, 'notes.txt')).writeAsStringSync('hi');
+
+    await pumpHarness(tester, child: _browser(tempDir));
+    await _reload(tester);
+
+    await tester.tap(find.byKey(FileBrowser.itemMoreKey('notes.txt')));
+    await _pumpUi(tester);
+
+    expect(find.text('Delete'), findsOneWidget);
+    expect(find.text('Export'), findsOneWidget);
+    expect(find.byKey(FileBrowser.itemKey('notes.txt')), findsOneWidget);
   });
 
   testWidgets('long-press opens a destructive delete action', (tester) async {

@@ -155,6 +155,9 @@ class FileBrowser extends StatefulWidget {
   static Key itemKey(String name) =>
       ValueKey<String>('file-browser-item-$name');
 
+  static Key itemMoreKey(String name) =>
+      ValueKey<String>('file-browser-item-more-$name');
+
   static Key breadcrumbKey(String label) =>
       ValueKey<String>('file-browser-crumb-$label');
 
@@ -1398,6 +1401,9 @@ class FileBrowserState extends State<FileBrowser> {
             return _FileRow(
               entry: entry,
               onOpen: () => unawaited(_openEntry(entry)),
+              onMore: desktop || widget.pickDirectoryMode
+                  ? null
+                  : (pos) => unawaited(_showItemActions(entry, pos)),
               onLongPress: desktop || widget.pickDirectoryMode
                   ? null
                   : (pos) => unawaited(_showItemActions(entry, pos)),
@@ -1527,12 +1533,14 @@ class _FileRow extends StatelessWidget {
   const _FileRow({
     required this.entry,
     required this.onOpen,
+    this.onMore,
     this.onLongPress,
     this.onSecondaryTap,
   });
 
   final FileBrowserEntry entry;
   final VoidCallback onOpen;
+  final ValueChanged<Offset>? onMore;
   final ValueChanged<Offset>? onLongPress;
   final ValueChanged<Offset>? onSecondaryTap;
 
@@ -1541,6 +1549,8 @@ class _FileRow extends StatelessWidget {
     final l10n = AppLocalizations.of(context)!;
     final loc = MaterialLocalizations.of(context);
     final meta = _metaLabel(context, loc, l10n);
+    final cs = Theme.of(context).colorScheme;
+    final more = onMore;
     final row = IosNavRow(
       key: FileBrowser.itemKey(entry.name),
       icon: entry.isDirectory
@@ -1549,7 +1559,24 @@ class _FileRow extends StatelessWidget {
       label: entry.name,
       labelWeight: AppFontWeights.medium,
       subtitle: meta,
-      trailing: entry.isDirectory ? null : const SizedBox.shrink(),
+      trailing: more == null
+          ? (entry.isDirectory ? null : const SizedBox.shrink())
+          : IosIconButton(
+              key: FileBrowser.itemMoreKey(entry.name),
+              icon: Lucide.Ellipsis,
+              semanticLabel: l10n.workspaceFilesActions,
+              size: 18,
+              minSize: 36,
+              color: cs.onSurface.withValues(alpha: 0.55),
+              onTap: () {
+                Haptics.light();
+                final box = context.findRenderObject() as RenderBox?;
+                final pos = box == null
+                    ? Offset.zero
+                    : box.localToGlobal(box.size.center(Offset.zero));
+                more(pos);
+              },
+            ),
       onTap: onOpen,
       onLongPress: onLongPress == null
           ? null

@@ -4,14 +4,11 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 
-import 'package:Kelivo/core/services/haptics.dart';
 import 'package:Kelivo/icons/lucide_adapter.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
-import 'package:Kelivo/shared/widgets/ios_tactile.dart';
 import 'package:Kelivo/shared/widgets/segmented_tabs.dart';
 
 import 'code_file_preview.dart';
-import 'preview_actions.dart';
 import 'preview_states.dart';
 
 class HtmlFilePreview extends StatefulWidget {
@@ -71,39 +68,19 @@ class _HtmlFilePreviewState extends State<HtmlFilePreview> {
       children: [
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
-          child: Row(
-            children: [
-              Expanded(
-                child: SegmentedTabs(
-                  tabs: [
-                    SegmentedTab(
-                      label: l10n.workspacePreviewRendered,
-                      icon: Lucide.Eye,
-                    ),
-                    SegmentedTab(
-                      label: l10n.workspacePreviewSource,
-                      icon: Lucide.FileCode,
-                    ),
-                  ],
-                  index: _showSource ? 1 : 0,
-                  onChanged: (next) => setState(() => _showSource = next == 1),
-                ),
+          child: SegmentedTabs(
+            tabs: [
+              SegmentedTab(
+                label: l10n.workspacePreviewRendered,
+                icon: Lucide.Eye,
               ),
-              const SizedBox(width: 8),
-              Tooltip(
-                message: l10n.workspacePreviewOpenInBrowser,
-                child: IosIconButton(
-                  icon: Lucide.ExternalLink,
-                  semanticLabel: l10n.workspacePreviewOpenInBrowser,
-                  size: 20,
-                  minSize: 40,
-                  onTap: () {
-                    Haptics.light();
-                    unawaited(openPreviewFileInBrowser(context, widget.file));
-                  },
-                ),
+              SegmentedTab(
+                label: l10n.workspacePreviewSource,
+                icon: Lucide.FileCode,
               ),
             ],
+            index: _showSource ? 1 : 0,
+            onChanged: (next) => setState(() => _showSource = next == 1),
           ),
         ),
         Expanded(child: _body()),
