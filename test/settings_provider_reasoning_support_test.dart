@@ -36,6 +36,28 @@ void main() {
       expect(moonshot.modelOverrides, isEmpty);
     });
 
+    test('default Atlas Cloud preset uses OpenAI-compatible settings', () {
+      final atlas = ProviderConfig.defaultsFor('Atlas Cloud');
+
+      expect(atlas.enabled, isTrue);
+      expect(atlas.providerType, ProviderKind.openai);
+      expect(atlas.baseUrl, 'https://api.atlascloud.ai/v1');
+      expect(atlas.chatPath, '/chat/completions');
+      expect(atlas.useResponseApi, isFalse);
+      expect(atlas.models, const [
+        'qwen/qwen3.5-flash',
+        'deepseek-ai/deepseek-v4-pro',
+      ]);
+
+      final qwen =
+          atlas.modelOverrides['qwen/qwen3.5-flash'] as Map<String, dynamic>;
+      final deepseek =
+          atlas.modelOverrides['deepseek-ai/deepseek-v4-pro']
+              as Map<String, dynamic>;
+      expect(qwen['abilities'], const ['tool']);
+      expect(deepseek['abilities'], const ['tool', 'reasoning']);
+    });
+
     test('built-in provider order does not add Kimi preset', () async {
       final harness = await createBusinessTestHarness(
         initial: {

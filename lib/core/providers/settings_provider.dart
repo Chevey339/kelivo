@@ -77,6 +77,7 @@ class SettingsProvider extends ChangeNotifier {
     'SiliconFlow',
     'Gemini',
     'OpenRouter',
+    'Atlas Cloud',
     'KelivoIN',
     'Tensdaq',
     'DeepSeek',
@@ -6433,6 +6434,9 @@ class ProviderConfig {
     if (k.contains('tensdaq')) return 'https://tensdaq-api.x-aio.com/v1';
     if (k.contains('kelivoin')) return 'https://text.pollinations.ai/openai';
     if (k.contains('openrouter')) return 'https://openrouter.ai/api/v1';
+    if (RegExp(r'atlas\s*cloud|atlascloud').hasMatch(k)) {
+      return 'https://api.atlascloud.ai/v1';
+    }
     if (k.contains('aihubmix')) return 'https://aihubmix.com/v1';
     if (k.contains('随想')) return 'https://sui-xiang.com/v1';
     if (k.contains('marucode') || k.contains('muteki')) {
@@ -6472,6 +6476,7 @@ class ProviderConfig {
       if (s.contains('gemini') || s.contains('google')) return true;
       if (s.contains('silicon')) return true;
       if (s.contains('openrouter')) return true;
+      if (RegExp(r'atlas\s*cloud|atlascloud').hasMatch(s)) return true;
       if (s.contains('kelivoin')) return true;
       return false; // others disabled by default
     }
@@ -6567,6 +6572,49 @@ class ProviderConfig {
                 'input': ['text'],
                 'output': ['text'],
                 'abilities': ['tool'],
+              },
+            },
+            proxyEnabled: false,
+            proxyHost: '',
+            proxyPort: '8080',
+            proxyUsername: '',
+            proxyPassword: '',
+            multiKeyEnabled: false,
+            apiKeys: const [],
+            keyManagement: const KeyManagementConfig(),
+            aihubmixAppCodeEnabled: false,
+            balanceEnabled: _defaultBalanceEnabled(key),
+            balanceApiPath: _defaultBalanceApiPath(key),
+            balanceResultPath: _defaultBalanceResultPath(key),
+            claudePromptCachingEnabled: false,
+          );
+        }
+        if (RegExp(r'atlas\s*cloud|atlascloud').hasMatch(lowerKey)) {
+          return ProviderConfig(
+            id: key,
+            enabled: defaultEnabled(key),
+            name: displayName ?? key,
+            apiKey: '',
+            baseUrl: _defaultBase(key),
+            providerType: ProviderKind.openai,
+            chatPath: '/chat/completions',
+            useResponseApi: false,
+            models: const [
+              'qwen/qwen3.5-flash',
+              'deepseek-ai/deepseek-v4-pro',
+            ],
+            modelOverrides: const {
+              'qwen/qwen3.5-flash': {
+                'type': 'chat',
+                'input': ['text'],
+                'output': ['text'],
+                'abilities': ['tool'],
+              },
+              'deepseek-ai/deepseek-v4-pro': {
+                'type': 'chat',
+                'input': ['text'],
+                'output': ['text'],
+                'abilities': ['tool', 'reasoning'],
               },
             },
             proxyEnabled: false,
