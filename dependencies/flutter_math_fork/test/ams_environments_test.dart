@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_math_fork/ast.dart';
 import 'package:flutter_math_fork/flutter_math.dart';
+import 'package:flutter_math_fork/src/encoder/tex/encoder.dart';
 import 'package:flutter_math_fork/src/parser/tex/parser.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -75,8 +76,13 @@ void main() {
       ]) {
         final result = parse(source);
         expect(symbols(result), 'a=bc=d(A)');
-        final array = descendants(result).whereType<EquationArrayNode>().single;
-        expect(array.body.map(symbols), ['a=b', 'c=d']);
+        final arrays = descendants(result).whereType<EquationArrayNode>();
+        final tagged = arrays.singleWhere((array) => array.displayLayout);
+        final aligned = arrays.singleWhere((array) => !array.displayLayout);
+        expect(tagged.tags.map((tag) => tag == null ? null : symbols(tag)), [
+          '(A)',
+        ]);
+        expect(aligned.body.map(symbols), ['a=b', 'c=d']);
       }
     });
 
@@ -102,6 +108,29 @@ void main() {
       expect(symbols(parse(r'x\tag{\textbf{A} $n+1$}')), 'x(A n+1)');
     });
 
+    test('encoding retains equation bodies and visible labels', () {
+      final regular = parse(r'x\tag{A}').encodeTeX(
+        conf: TexEncodeConf.mathParamConf,
+      );
+      final literal = parse(r'x\tag*{A}').encodeTeX(
+        conf: TexEncodeConf.mathParamConf,
+      );
+      final multiline = parse(
+        r'\begin{align}a=b\tag{A}\\c=d\tag*{B}\end{align}',
+      ).encodeTeX(conf: TexEncodeConf.mathParamConf);
+
+      expect(regular, contains('x'));
+      expect(regular, contains('(A)'));
+      expect(literal, contains('x'));
+      expect(literal, contains('A'));
+      expect(literal, isNot(contains('(A)')));
+      expect(multiline, contains('a=b'));
+      expect(multiline, contains('(A)'));
+      expect(multiline, contains(r'\\'));
+      expect(multiline, contains('c=d'));
+      expect(multiline, contains('B'));
+    });
+
     test('each alignment row owns its tag', () {
       for (final name in ['align', 'align*', 'alignat', 'alignat*', 'gather']) {
         final columns = name.startsWith('alignat') ? '{1}' : '';
@@ -113,7 +142,12 @@ void main() {
             name +
             '}');
         final array = descendants(result).whereType<EquationArrayNode>().single;
-        expect(array.body.map(symbols), ['a=b(A)', 'c=dB', 'e=f']);
+        expect(array.body.map(symbols), ['a=b', 'c=d', 'e=f']);
+        expect(array.tags.map((tag) => tag == null ? null : symbols(tag)), [
+          '(A)',
+          'B',
+          null,
+        ]);
       }
     });
 
@@ -133,7 +167,9 @@ void main() {
     test('allows whitespace before the optional star', () {
       final result = parse(r'\operatorname *{arg\,max}_x f(x)');
       expect(symbols(result), 'argmaxxf(x)');
-      expect(descendants(result).whereType<UnderNode>(), hasLength(1));
+      final operator = descendants(result).whereType<OperatorNameNode>().single;
+      expect(operator.limitsInDisplayStyle, isTrue);
+      expect(operator.lowerLimit, isNotNull);
     });
 
     test('leaves right delimiters and environment endings for their owner', () {
@@ -146,20 +182,19 @@ void main() {
       }
     });
 
-    test('starred names put limits below in display mode only', () {
+    test('starred names retain their default and explicit limit policy', () {
       const source = r'\operatorname*{arg\,max}_{x}f(x)';
-      expect(descendants(parse(source)).whereType<UnderNode>(), hasLength(1));
-      expect(
-          descendants(parse(source, displayMode: false)).whereType<UnderNode>(),
-          isEmpty);
-      expect(
-          descendants(parse(source, displayMode: false))
-              .whereType<MultiscriptsNode>(),
-          hasLength(1));
-      expect(
-          descendants(parse(r'\operatorname*{arg\,max}\nolimits_x f(x)'))
-              .whereType<UnderNode>(),
-          isEmpty);
+      final starred =
+          descendants(parse(source)).whereType<OperatorNameNode>().single;
+      expect(starred.limitsInDisplayStyle, isTrue);
+      expect(starred.limits, isNull);
+      expect(starred.lowerLimit, isNotNull);
+
+      final noLimits = descendants(
+        parse(r'\operatorname*{arg\,max}\nolimits_x f(x)'),
+      ).whereType<OperatorNameNode>().single;
+      expect(noLimits.limitsInDisplayStyle, isTrue);
+      expect(noLimits.limits, isFalse);
     });
   });
 

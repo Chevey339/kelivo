@@ -18,6 +18,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_math_fork/flutter_math.dart';
+import 'package:flutter_math_fork/src/render/layout/eqn_array.dart';
 import 'package:flutter_math_fork/tex.dart' show TexEncoderExt;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:gpt_markdown/gpt_markdown.dart' show GptMarkdown, HTag;
@@ -2672,6 +2673,58 @@ a^2+b^2=c^2\tag*{Identity}
     expect(_encodedMathTex(tester)[1], contains('Identity'));
     expect(find.textContaining(r'\tag'), findsNothing);
     expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('centers a tagged formula and puts its label at the block edge', (
+    tester,
+  ) async {
+    for (final source in [
+      r'\[x+y\tag{1}\]',
+      r'\[\displaystyle\begin{align}x&=y\tag{1}\end{align}\]',
+    ]) {
+      await tester.pumpWidget(_markdownHarness(source, width: 360));
+      await tester.pump();
+
+      final arrayFinder = find.byType(EqnArray);
+      final scrollFinder = find
+          .ancestor(
+            of: arrayFinder,
+            matching: find.byType(SingleChildScrollView),
+          )
+          .first;
+      final array = tester.renderObject<RenderEqnArray>(arrayFinder);
+      RenderBox? body;
+      RenderBox? tag;
+      var child = array.firstChild;
+      while (child != null) {
+        final parentData = child.parentData! as EqnArrayParentData;
+        if (parentData.isTag) {
+          tag = child;
+        } else {
+          body = child;
+        }
+        child = parentData.nextSibling;
+      }
+
+      expect(body, isNotNull, reason: source);
+      expect(tag, isNotNull, reason: source);
+      final arrayRect = tester.getRect(arrayFinder);
+      final bodyRect = body!.localToGlobal(Offset.zero) & body.size;
+      final tagRect = tag!.localToGlobal(Offset.zero) & tag.size;
+      expect(
+        arrayRect.width,
+        closeTo(tester.getSize(scrollFinder).width, 0.01),
+        reason: source,
+      );
+      expect(
+        bodyRect.center.dx,
+        closeTo(arrayRect.center.dx, 0.01),
+        reason: source,
+      );
+      expect(tagRect.right, closeTo(arrayRect.right, 0.01), reason: source);
+      expect(tagRect.top, lessThan(bodyRect.bottom), reason: source);
+      expect(tester.takeException(), isNull, reason: source);
+    }
   });
 
   testWidgets(

@@ -47,32 +47,12 @@ GreenNode _operatorNameHandler(TexParser parser, FunctionContext context) {
     ),
   );
 
-  if (!scripts.empty) {
-    final limits = scripts.limits ?? (starred && parser.settings.displayMode);
-    if (limits) {
-      name = scripts.superscript != null
-          ? OverNode(
-              base: name.wrapWithEquationRow(),
-              above: scripts.superscript!,
-            )
-          : name;
-      name = scripts.subscript != null
-          ? UnderNode(
-              base: name.wrapWithEquationRow(),
-              below: scripts.subscript!,
-            )
-          : name;
-    } else {
-      name = MultiscriptsNode(
-        base: name.wrapWithEquationRow(),
-        sub: scripts.subscript,
-        sup: scripts.superscript,
-      );
-    }
-  }
-
-  return FunctionNode(
+  return OperatorNameNode(
     functionName: name.wrapWithEquationRow(),
     argument: body.wrapWithEquationRow(),
+    lowerLimit: scripts.subscript,
+    upperLimit: scripts.superscript,
+    limits: scripts.limits,
+    limitsInDisplayStyle: starred,
   );
 }

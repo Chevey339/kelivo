@@ -23,6 +23,19 @@ class EquationArrayNode extends SlotableNode<EquationRowNode?> {
   /// Arrayed equations.
   final List<EquationRowNode> body;
 
+  /// Optional equation labels, parallel to [body].
+  ///
+  /// Keeping labels in their own slots lets the renderer center equation
+  /// bodies independently from labels placed at the edge of a display.
+  final List<EquationRowNode?> tags;
+
+  /// Whether this array owns the available display width.
+  ///
+  /// This is true for outer display environments such as `align` and
+  /// `gather`, and for a standalone equation with an explicit tag. Inner
+  /// environments such as `aligned` remain intrinsically sized.
+  final bool displayLayout;
+
   /// Style for horizontal separator lines.
   ///
   /// This includes outermost lines. Different from MathML!
@@ -34,10 +47,14 @@ class EquationArrayNode extends SlotableNode<EquationRowNode?> {
   EquationArrayNode({
     this.addJot = false,
     required this.body,
+    List<EquationRowNode?>? tags,
+    this.displayLayout = false,
     this.arrayStretch = 1.0,
     List<MatrixSeparatorStyle>? hlines,
     List<Measurement>? rowSpacings,
-  })  : hlines = (hlines ?? [])
+  })  : assert(tags == null || tags.length == body.length),
+        tags = tags ?? List<EquationRowNode?>.filled(body.length, null),
+        hlines = (hlines ?? [])
             .extendToByFill(body.length + 1, MatrixSeparatorStyle.none),
         rowSpacings =
             (rowSpacings ?? []).extendToByFill(body.length, Measurement.zero);
@@ -56,21 +73,37 @@ class EquationArrayNode extends SlotableNode<EquationRowNode?> {
             jotSize: addJot ? 3.0.pt.toLpUnder(options) : 0.0,
             arrayskip: 12.0.pt.toLpUnder(options) * arrayStretch,
             hlines: hlines,
+            tagGap: 1.0.em.toLpUnder(options),
+            expandToMaxWidth: displayLayout,
             rowSpacings: rowSpacings
                 .map((e) => e.toLpUnder(options))
                 .toList(growable: false),
-            children:
-                childBuildResults.map((e) => e!.widget).toList(growable: false),
+            rows: List.generate(
+              body.length,
+              (index) => childBuildResults[index * 2]!.widget,
+              growable: false,
+            ),
+            tags: List.generate(
+              body.length,
+              (index) => childBuildResults[index * 2 + 1]?.widget,
+              growable: false,
+            ),
           ),
         ),
+        isDisplayLayout: displayLayout,
       );
 
   @override
   List<MathOptions> computeChildOptions(MathOptions options) =>
-      List.filled(body.length, options, growable: false);
+      List.filled(children.length, options, growable: false);
 
   @override
-  List<EquationRowNode> computeChildren() => body;
+  List<EquationRowNode?> computeChildren() => [
+        for (var index = 0; index < body.length; index++) ...[
+          body[index],
+          tags[index],
+        ],
+      ];
 
   @override
   AtomType get leftType => AtomType.ord;
@@ -83,14 +116,29 @@ class EquationArrayNode extends SlotableNode<EquationRowNode?> {
       false;
 
   @override
-  EquationArrayNode updateChildren(List<EquationRowNode> newChildren) =>
-      copyWith(body: newChildren);
+  EquationArrayNode updateChildren(List<EquationRowNode?> newChildren) {
+    assert(newChildren.length == body.length * 2);
+    return copyWith(
+      body: List.generate(
+        body.length,
+        (index) => newChildren[index * 2]!,
+        growable: false,
+      ),
+      tags: List.generate(
+        body.length,
+        (index) => newChildren[index * 2 + 1],
+        growable: false,
+      ),
+    );
+  }
 
   @override
   Map<String, Object?> toJson() => super.toJson()
     ..addAll({
       if (addJot != false) 'addJot': addJot,
       'body': body.map((e) => e.toJson()),
+      'tags': tags.map((e) => e?.toJson()),
+      if (displayLayout != false) 'displayLayout': displayLayout,
       if (arrayStretch != 1.0) 'arrayStretch': arrayStretch,
       'hlines': hlines.map((e) => e.toString()),
       'rowSpacings': rowSpacings.map((e) => e.toString())
@@ -100,6 +148,8 @@ class EquationArrayNode extends SlotableNode<EquationRowNode?> {
     double? arrayStretch,
     bool? addJot,
     List<EquationRowNode>? body,
+    List<EquationRowNode?>? tags,
+    bool? displayLayout,
     List<MatrixSeparatorStyle>? hlines,
     List<Measurement>? rowSpacings,
   }) =>
@@ -107,6 +157,8 @@ class EquationArrayNode extends SlotableNode<EquationRowNode?> {
         arrayStretch: arrayStretch ?? this.arrayStretch,
         addJot: addJot ?? this.addJot,
         body: body ?? this.body,
+        tags: tags ?? this.tags,
+        displayLayout: displayLayout ?? this.displayLayout,
         hlines: hlines ?? this.hlines,
         rowSpacings: rowSpacings ?? this.rowSpacings,
       );

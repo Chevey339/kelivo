@@ -33,6 +33,8 @@ import 'package:Kelivo/l10n/app_localizations.dart';
 import 'package:Kelivo/theme/app_font_weights.dart';
 import 'package:Kelivo/theme/theme_factory.dart' show getPlatformFontFallback;
 import 'package:provider/provider.dart';
+import 'package:flutter_math_fork/ast.dart'
+    show EquationArrayNode, GreenNode, TransparentNode;
 import 'package:flutter_math_fork/flutter_math.dart';
 import '../../core/providers/settings_provider.dart';
 import 'package:Kelivo/desktop/html_preview_dialog.dart';
@@ -1576,6 +1578,30 @@ Widget _renderMath(String tex, {TextStyle? style, bool displayMode = false}) {
   } catch (_) {
     return Text(normalizedTex, style: resolved);
   }
+}
+
+bool _usesFullWidthEquationLayout(Widget math) {
+  if (math is! Math) return false;
+  final root = math.ast?.greenRoot;
+  if (root == null) return false;
+
+  final flattened = <GreenNode>[];
+  void collect(GreenNode node) {
+    if (node is TransparentNode) {
+      for (final child in node.children) {
+        collect(child);
+      }
+    } else {
+      flattened.add(node);
+    }
+  }
+
+  for (final child in root.children) {
+    collect(child);
+    if (flattened.length > 1) return false;
+  }
+  final child = flattened.length == 1 ? flattened.single : null;
+  return child is EquationArrayNode && child.displayLayout;
 }
 
 TextStyle _inlineMathTextStyle(TextStyle? style) {
@@ -5089,6 +5115,7 @@ class LatexBlockScrollableMd extends BlockMd {
     if (body.isEmpty) return const SizedBox.shrink();
 
     final math = _renderMath(body, style: config.style, displayMode: true);
+    final usesFullWidthLayout = _usesFullWidthEquationLayout(math);
     // Wrap in horizontal scroll to avoid overflow and center within available width
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
@@ -5100,7 +5127,7 @@ class LatexBlockScrollableMd extends BlockMd {
               primary: false,
               child: ConstrainedBox(
                 constraints: BoxConstraints(minWidth: constraints.maxWidth),
-                child: Center(child: math),
+                child: usesFullWidthLayout ? math : Center(child: math),
               ),
             ),
           );

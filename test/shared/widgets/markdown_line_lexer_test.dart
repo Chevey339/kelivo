@@ -45,6 +45,45 @@ void main() {
     },
   );
 
+  test('bare environments reject CommonMark indented code openers', () {
+    for (final indent in const ['    ', '\t', ' \t', '   \t']) {
+      final source =
+          '$indent\\begin{equation}\n'
+          '${indent}x = 1\n'
+          '$indent\\end{equation}';
+      final scan = markdownScanDisplayMath(source);
+      expect(scan.spans, isEmpty, reason: 'indent ${indent.codeUnits}');
+      expect(scan.unclosedStart, isNull, reason: 'indent ${indent.codeUnits}');
+
+      final scanner = MarkdownDisplayMathScanner();
+      for (var end = 1; end <= source.length; end++) {
+        final streamed = scanner.synchronize(source.substring(0, end));
+        expect(
+          streamed.spans,
+          isEmpty,
+          reason: 'indent ${indent.codeUnits}, prefix $end',
+        );
+        expect(
+          streamed.unclosedStart,
+          isNull,
+          reason: 'indent ${indent.codeUnits}, prefix $end',
+        );
+      }
+    }
+  });
+
+  test('bare environments allow up to three leading columns', () {
+    for (final indent in const ['', ' ', '  ', '   ']) {
+      final source =
+          '$indent\\begin{equation}\n'
+          'x = 1\n'
+          '\\end{equation}';
+      expect(_normalizedSpans(source), [
+        (indent.length, source.length),
+      ], reason: 'indent ${indent.codeUnits}');
+    }
+  });
+
   test(
     'outer environments retain nested math and ignore unrelated closers',
     () {
@@ -132,6 +171,81 @@ void main() {
     expect(_normalizedSpans(escaped), [(0, escaped.length)]);
   });
 
+  test('an unescaped TeX comment may follow an environment closer', () {
+    for (final tail in const [
+      '% comment',
+      '  % comment',
+      '% \\end{equation}',
+    ]) {
+      final source = '\\begin{equation}\nx = 1\n\\end{equation}$tail';
+      final oneShot = markdownScanDisplayMath(source);
+      expect(oneShot.spans, hasLength(1), reason: tail);
+      expect(oneShot.spans.single.start, 0, reason: tail);
+      expect(oneShot.spans.single.end, source.length, reason: tail);
+      expect(oneShot.unclosedStart, isNull, reason: tail);
+
+      final scanner = MarkdownDisplayMathScanner();
+      for (var end = 1; end <= source.length; end++) {
+        final prefix = source.substring(0, end);
+        final streamed = scanner.synchronize(prefix);
+        final complete = markdownScanDisplayMath(prefix);
+        expect(
+          [for (final span in streamed.spans) (span.start, span.end)],
+          [for (final span in complete.spans) (span.start, span.end)],
+          reason: prefix,
+        );
+        expect(streamed.unclosedStart, complete.unclosedStart, reason: prefix);
+      }
+    }
+  });
+
+  test('an escaped percent after an environment closer remains content', () {
+    const source =
+        '\\begin{equation}\n'
+        'x = 1\n'
+        '\\end{equation}\\% visible';
+    final oneShot = markdownScanDisplayMath(source);
+    expect(oneShot.spans, isEmpty);
+    expect(oneShot.unclosedStart, isNull);
+
+    final scanner = MarkdownDisplayMathScanner();
+    for (var end = 1; end <= source.length; end++) {
+      final prefix = source.substring(0, end);
+      final streamed = scanner.synchronize(prefix);
+      final complete = markdownScanDisplayMath(prefix);
+      expect(
+        [for (final span in streamed.spans) (span.start, span.end)],
+        [for (final span in complete.spans) (span.start, span.end)],
+        reason: prefix,
+      );
+      expect(streamed.unclosedStart, complete.unclosedStart, reason: prefix);
+    }
+  });
+
+  test('math delimiters split inside a TeX-comment line stay equivalent', () {
+    for (final source in const [
+      r'$$'
+          '\n%'
+          r'$$',
+      r'\['
+          '\n%'
+          r'\]',
+    ]) {
+      final scanner = MarkdownDisplayMathScanner();
+      for (var end = 1; end <= source.length; end++) {
+        final prefix = source.substring(0, end);
+        final streamed = scanner.synchronize(prefix);
+        final complete = markdownScanDisplayMath(prefix);
+        expect(
+          [for (final span in streamed.spans) (span.start, span.end)],
+          [for (final span in complete.spans) (span.start, span.end)],
+          reason: prefix,
+        );
+        expect(streamed.unclosedStart, complete.unclosedStart, reason: prefix);
+      }
+    }
+  });
+
   test('environment tokens can arrive one character at a time', () {
     for (final source in const [
       'before\n\n\\begin{equation*}\na\n\nb\n\\end{equation*}\n\nafter',
@@ -164,6 +278,30 @@ void main() {
     _expectLinearScan(
       (i) => '\\begin{equation}\nx$i\n\\end{equation}\n\n',
       chunks: 80,
+    );
+  });
+
+  test('an unclosed outer environment resumes same-name pairing linearly', () {
+    final scanner = MarkdownDisplayMathScanner();
+    var source = '\\begin{pmatrix}\n';
+    debugResetMarkdownScanVisits();
+    scanner.synchronize(source);
+    for (var i = 0; i < 1000; i++) {
+      source += '\\begin{pmatrix}x\\end{pmatrix}\n';
+      final scan = scanner.synchronize(source);
+      expect(scan.spans, isEmpty);
+      expect(scan.unclosedStart, 0);
+    }
+    expect(source.length, 30016);
+    expect(
+      debugMarkdownScanVisits,
+      lessThanOrEqualTo(source.length * debugMarkdownScanVisitBudgetFactor),
+    );
+    source += r'\end{pmatrix}';
+    final complete = scanner.synchronize(source);
+    expect(
+      [for (final span in complete.spans) (span.start, span.end)],
+      [(0, source.length)],
     );
   });
 

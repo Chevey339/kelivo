@@ -16,6 +16,50 @@ EncodeResult _functionEncoder(GreenNode node) {
   );
 }
 
+EncodeResult _operatorNameEncoder(GreenNode node) {
+  final operatorName = node as OperatorNameNode;
+  dynamic name = operatorName.functionName;
+  final firstNameChild = operatorName.functionName.children.firstOrNull;
+  if (operatorName.functionName.children.length == 1 &&
+      firstNameChild is StyleNode &&
+      firstNameChild.optionsDiff.mathFontOptions ==
+          texMathFontOptions['\\mathrm']) {
+    name = _optionsDiffEncode(
+      firstNameChild.optionsDiff.removeMathFont(),
+      firstNameChild.children,
+    );
+  }
+  return _OperatorNameEncodeResult(operatorName, name);
+}
+
+class _OperatorNameEncodeResult extends EncodeResult {
+  final OperatorNameNode node;
+  final dynamic name;
+
+  const _OperatorNameEncodeResult(this.node, this.name);
+
+  @override
+  String stringify(TexEncodeConf conf) {
+    final command = TexCommandEncodeResult(
+      command: node.limitsInDisplayStyle ? '\\operatorname*' : '\\operatorname',
+      args: [name],
+    ).stringify(conf);
+    final limits = node.limits == null
+        ? ''
+        : node.limits!
+            ? '\\limits'
+            : '\\nolimits';
+    final subscript = node.lowerLimit == null
+        ? ''
+        : '_{${node.lowerLimit!.encodeTeX(conf: conf.mathParam())}}';
+    final superscript = node.upperLimit == null
+        ? ''
+        : '^{${node.upperLimit!.encodeTeX(conf: conf.mathParam())}}';
+    final argument = node.argument.encodeTeX(conf: conf.ord());
+    return '$command$limits$subscript$superscript$argument';
+  }
+}
+
 final _functionOptimizationEntries = [
   OptimizationEntry(
     matcher: isA<FunctionNode>(

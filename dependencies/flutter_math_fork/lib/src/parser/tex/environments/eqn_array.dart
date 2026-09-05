@@ -208,6 +208,7 @@ EquationArrayNode parseEqnArray(
 
   var row = <EquationRowNode>[];
   final rows = <EquationRowNode>[];
+  final tags = <EquationRowNode?>[];
   final rowGaps = <Measurement>[];
   final hLinesBeforeRow = <MatrixSeparatorStyle>[];
 
@@ -236,7 +237,8 @@ EquationArrayNode parseEqnArray(
           cellBody.isNotEmpty ||
           (tagged && parser.equationTag != null)) {
         final equation = concatRow(row);
-        rows.add(tagged ? parser.finishTaggedEquation(equation) : equation);
+        rows.add(equation);
+        tags.add(tagged ? parser.takeEquationTag() : null);
       }
       if (hLinesBeforeRow.length < rows.length + 1) {
         hLinesBeforeRow.add(MatrixSeparatorStyle.none);
@@ -244,7 +246,8 @@ EquationArrayNode parseEqnArray(
       break;
     } else if (next == '\\cr') {
       final equation = concatRow(row);
-      rows.add(tagged ? parser.finishTaggedEquation(equation) : equation);
+      rows.add(equation);
+      tags.add(tagged ? parser.takeEquationTag() : null);
       final cr = assertNodeType<CrNode>(parser.parseFunction(null, null, null));
       rowGaps.add(cr.size ?? Measurement.zero);
 
@@ -272,5 +275,7 @@ EquationArrayNode parseEqnArray(
     rowSpacings: rowGaps,
     addJot: addJot,
     body: rows,
+    tags: tagged ? tags : null,
+    displayLayout: tagged,
   );
 }

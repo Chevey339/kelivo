@@ -26,9 +26,9 @@ import 'dart:ui';
 
 import 'package:collection/collection.dart';
 
+import '../../ast/nodes/equation_array.dart';
 import '../../ast/nodes/multiscripts.dart';
 import '../../ast/nodes/over.dart';
-import '../../ast/nodes/space.dart';
 import '../../ast/nodes/style.dart';
 import '../../ast/nodes/symbol.dart';
 import '../../ast/nodes/under.dart';
@@ -69,15 +69,21 @@ class TexParser {
   /// Explicit label for the current display equation or alignment row.
   EquationRowNode? equationTag;
 
-  EquationRowNode finishTaggedEquation(EquationRowNode body) {
+  EquationRowNode? takeEquationTag() {
     final tag = equationTag;
     equationTag = null;
+    return tag;
+  }
+
+  GreenNode finishTaggedEquation(EquationRowNode body) {
+    final tag = takeEquationTag();
     if (tag == null) return body;
-    return EquationRowNode(children: [
-      ...body.children,
-      SpaceNode(height: Measurement.zero, width: 1.0.em, mode: Mode.math),
-      tag,
-    ]);
+    return EquationArrayNode(
+      body: [body],
+      tags: [tag],
+      displayLayout: true,
+      arrayStretch: 0.0,
+    );
   }
 
   /// Get parse result
@@ -98,7 +104,8 @@ class TexParser {
     if (!this.settings.globalGroup) {
       this.macroExpander.endGroup();
     }
-    return finishTaggedEquation(parse.wrapWithEquationRow());
+    return finishTaggedEquation(parse.wrapWithEquationRow())
+        .wrapWithEquationRow();
   }
 
   List<GreenNode> parseExpression({
@@ -206,7 +213,12 @@ class TexParser {
     // Operators may look ahead for an argument at the end of an environment.
     // Leave its delimiter for the enclosing expression to consume.
     final next = this.fetch().text;
-    if (endOfExpression.contains(next) || next == breakOnTokenText) {
+    final middleBelongsToCurrentLeftRight = next == '\\middle' &&
+        argParsingContexts.isNotEmpty &&
+        currArgParsingContext.funcName == '\\left';
+    if (endOfExpression.contains(next) ||
+        next == breakOnTokenText ||
+        (next == '\\middle' && !middleBelongsToCurrentLeftRight)) {
       return null;
     }
     final base = this.parseGroup('atom',
