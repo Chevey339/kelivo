@@ -603,17 +603,6 @@ final Map<String, MacroDefinition> builtinMacros = {
 // \def\qquad{\hskip2em\relax}
   '\\qquad': MacroDefinition.fromString("\\hskip2em\\relax"),
 
-// \tag@in@display form of \tag
-// TODO tag
-  '\\tag': MacroDefinition.fromString("\\@ifstar\\tag@literal\\tag@paren"),
-  '\\tag@paren': MacroDefinition.fromString("\\tag@literal{({#1})}"),
-  '\\tag@literal': MacroDefinition.fromCtxString((context) {
-    if (context.macros.get("\\df@tag") != null) {
-      throw ParseException("Multiple \\tag");
-    }
-    return "\\gdef\\df@tag{\\text{#1}}";
-  }),
-
 // \renewcommand{\bmod}{\nonscript\mskip-\medmuskip\mkern5mu\mathbin
 //   {\operator@font mod}\penalty900
 //   \mkern5mu\nonscript\mskip-\medmuskip}

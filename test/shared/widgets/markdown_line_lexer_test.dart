@@ -15,6 +15,158 @@ String _unmatchedBacktickRuns({int maxRun = 200}) {
 void main() {
   tearDown(debugDisableMarkdownScanVisits);
 
+  test('supported bare math environments retain their complete source', () {
+    for (final name in markdownMathEnvironments) {
+      final source = '\\begin{$name}\na^2 + b^2 = c^2\n\n\\end{$name}';
+      expect(_normalizedSpans(source), [(0, source.length)], reason: name);
+      expect(markdownEndsWithDisplayMath(source, source.length), isTrue);
+    }
+  });
+
+  test(
+    'bare environments require matching supported names and block bounds',
+    () {
+      for (final source in const [
+        r'\begin{equation}x\end{align}',
+        r'\begin{equation*}x\end{equation}',
+        r'\begin{document}x\end{document}',
+        r'Prose \begin{equation}x\end{equation}',
+        r'\begin{equation}x\end{equation} trailing prose',
+        r'\\begin{equation}x\end{equation}',
+      ]) {
+        expect(markdownScanDisplayMath(source).spans, isEmpty, reason: source);
+      }
+      final disabled = markdownScanDisplayMath(
+        r'\begin{equation}x\end{equation}',
+        enableMath: false,
+      );
+      expect(disabled.spans, isEmpty);
+      expect(disabled.unclosedStart, isNull);
+    },
+  );
+
+  test(
+    'outer environments retain nested math and ignore unrelated closers',
+    () {
+      const source =
+          r'\begin{equation}'
+          '\n'
+          r'\begin{aligned} a &= b \\ c &= d \end{aligned}'
+          '\n'
+          r'\end{equation}';
+      expect(_normalizedSpans(source), [(0, source.length)]);
+
+      final wrapped = '\$\$\n$source\n\$\$';
+      expect(_normalizedSpans(wrapped), [(0, wrapped.length)]);
+
+      const later =
+          r'\begin{equation}'
+          '\n'
+          r'\begin{align}a &= b\end{align}';
+      final scan = markdownScanDisplayMath(later);
+      expect(scan.spans, isEmpty);
+      expect(scan.unclosedStart, 0);
+    },
+  );
+
+  test('nested instances of one environment close at the matching depth', () {
+    for (final source in const [
+      '\\begin{pmatrix}\n\\begin{pmatrix}a\\end{pmatrix}\n'
+          '\n& b\n\\end{pmatrix}',
+      r'\begin{pmatrix}\begin{pmatrix}a\end{pmatrix} & b\end{pmatrix}',
+    ]) {
+      expect(_normalizedSpans(source), [(0, source.length)]);
+      final adjacent = '$source\n\n$source';
+      expect(_normalizedSpans(adjacent), [
+        (0, source.length),
+        (source.length + 2, adjacent.length),
+      ]);
+    }
+    const pending = '\\begin{pmatrix}\n\\begin{pmatrix}a\\end{pmatrix}\n\n';
+    final scan = markdownScanDisplayMath(pending);
+    expect(scan.spans, isEmpty);
+    expect(scan.unclosedStart, 0);
+  });
+
+  test('code fences and inline code keep environment commands literal', () {
+    for (final fence in const ['```', '~~~~']) {
+      final source = '$fence\n\\begin{equation}\nx\n\\end{equation}\n$fence';
+      expect(markdownScanDisplayMath(source).spans, isEmpty);
+    }
+    const inline =
+        r'`\begin{equation}`'
+        '\n\nnext';
+    expect(markdownScanDisplayMath(inline).unclosedStart, isNull);
+
+    const hiddenClose =
+        r'\begin{equation}'
+        '\n'
+        r'`\end{equation}`'
+        '\n';
+    final scan = markdownScanDisplayMath(hiddenClose);
+    expect(scan.spans, isEmpty);
+    expect(scan.unclosedStart, 0);
+  });
+
+  test('bare environments protect details bodies and trailing separators', () {
+    const source =
+        r'\begin{equation}'
+        '\n'
+        '<details><summary>literal</summary>body</details>\n'
+        r'\end{equation}';
+    expect(MarkdownDetailsRegistry(enableMath: true).rewrite(source), source);
+    expect(markdownEndsWithDisplayMath(source, source.length), isTrue);
+  });
+
+  test('TeX comments do not contribute environment begin or end tokens', () {
+    for (final comment in const [
+      r'% \begin{equation}',
+      r'% \end{equation}',
+      r'\\% \begin{equation}',
+    ]) {
+      final source = '\\begin{equation}\nx $comment\n\\end{equation}';
+      expect(_normalizedSpans(source), [(0, source.length)], reason: comment);
+    }
+    const escaped =
+        r'\begin{pmatrix}x\% \begin{pmatrix}y\end{pmatrix}\end{pmatrix}';
+    expect(_normalizedSpans(escaped), [(0, escaped.length)]);
+  });
+
+  test('environment tokens can arrive one character at a time', () {
+    for (final source in const [
+      'before\n\n\\begin{equation*}\na\n\nb\n\\end{equation*}\n\nafter',
+      '\\begin{equation}\n\\begin{aligned}a &= b\\end{aligned}\n'
+          '\\end{equation} trailing\n\\end{equation}\n',
+      '```\n\\begin{equation}\nx\n\\end{equation}\n```\n'
+          '\\begin{gather}a\\end{gather}\n',
+      '\\begin{pmatrix}\n\\begin{pmatrix}a\\end{pmatrix}\n'
+          '\n& b\n\\end{pmatrix}\n',
+      r'\begin{equation}a\end{equation}$$',
+      '\\begin{equation}\nx % \\begin{equation}\n\\end{equation}',
+      '\\begin{equation}\nx % \\end{equation}\n\\end{equation}',
+    ]) {
+      final scanner = MarkdownDisplayMathScanner();
+      for (var end = 1; end <= source.length; end++) {
+        final prefix = source.substring(0, end);
+        final scan = scanner.synchronize(prefix);
+        final oneShot = markdownScanDisplayMath(prefix);
+        expect(
+          [for (final span in scan.spans) (span.start, span.end)],
+          [for (final span in oneShot.spans) (span.start, span.end)],
+          reason: prefix,
+        );
+        expect(scan.unclosedStart, oneShot.unclosedStart, reason: prefix);
+      }
+    }
+  });
+
+  test('environment-dense scans stay linear one-shot and chunked', () {
+    _expectLinearScan(
+      (i) => '\\begin{equation}\nx$i\n\\end{equation}\n\n',
+      chunks: 80,
+    );
+  });
+
   test('unclosed inline code does not hide a later display-math closer', () {
     const content = '`unclosed\n\$\$ `x` \$\$';
     expect(markdownEndsWithDisplayMath(content, content.length), isTrue);

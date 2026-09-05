@@ -28,6 +28,7 @@ import 'package:collection/collection.dart';
 
 import '../../ast/nodes/multiscripts.dart';
 import '../../ast/nodes/over.dart';
+import '../../ast/nodes/space.dart';
 import '../../ast/nodes/style.dart';
 import '../../ast/nodes/symbol.dart';
 import '../../ast/nodes/under.dart';
@@ -65,6 +66,20 @@ class TexParser {
   final MacroExpander macroExpander;
   Token? nextToken;
 
+  /// Explicit label for the current display equation or alignment row.
+  EquationRowNode? equationTag;
+
+  EquationRowNode finishTaggedEquation(EquationRowNode body) {
+    final tag = equationTag;
+    equationTag = null;
+    if (tag == null) return body;
+    return EquationRowNode(children: [
+      ...body.children,
+      SpaceNode(height: Measurement.zero, width: 1.0.em, mode: Mode.math),
+      tag,
+    ]);
+  }
+
   /// Get parse result
   EquationRowNode parse() {
     if (!this.settings.globalGroup) {
@@ -83,7 +98,7 @@ class TexParser {
     if (!this.settings.globalGroup) {
       this.macroExpander.endGroup();
     }
-    return parse.wrapWithEquationRow();
+    return finishTaggedEquation(parse.wrapWithEquationRow());
   }
 
   List<GreenNode> parseExpression({
@@ -188,6 +203,12 @@ class TexParser {
   }
 
   GreenNode? parseAtom(String? breakOnTokenText) {
+    // Operators may look ahead for an argument at the end of an environment.
+    // Leave its delimiter for the enclosing expression to consume.
+    final next = this.fetch().text;
+    if (endOfExpression.contains(next) || next == breakOnTokenText) {
+      return null;
+    }
     final base = this.parseGroup('atom',
         optional: false, greediness: null, breakOnTokenText: breakOnTokenText);
 

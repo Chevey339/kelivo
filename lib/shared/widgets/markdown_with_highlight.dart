@@ -1020,6 +1020,28 @@ String _preprocessFences(
   });
 
   // STEP 2: PROCESSING (on masked string, code is now protected)
+  if (enableMath && out.contains(r'\begin{')) {
+    // Let the shared scanner pair nested environments before handing display
+    // math to the regex-based renderer. Preserve the TeX environment itself.
+    final environments = markdownScanDisplayMath(
+      out,
+    ).spans.where((span) => out.startsWith(r'\begin{', span.start));
+    final wrapped = StringBuffer();
+    var cursor = 0;
+    for (final span in environments) {
+      wrapped
+        ..write(out.substring(cursor, span.start))
+        ..write('\\[\n')
+        ..write(out.substring(span.start, span.end))
+        ..write('\n\\]');
+      cursor = span.end;
+    }
+    if (cursor > 0) {
+      wrapped.write(out.substring(cursor));
+      out = wrapped.toString();
+    }
+  }
+
   if (streaming) {
     out = _stabilizeStreamingTables(out);
     if (enableMath && enableDollarLatex) {
@@ -1547,6 +1569,7 @@ Widget _renderMath(String tex, {TextStyle? style, bool displayMode = false}) {
     return Math.tex(
       normalizedTex,
       mathStyle: displayMode ? MathStyle.display : MathStyle.text,
+      settings: TexParserSettings(displayMode: displayMode),
       textStyle: resolved,
       onErrorFallback: (_) => Text(normalizedTex, style: resolved),
     );
@@ -2155,6 +2178,11 @@ bool _looksLikeLiteralMathBraceGroup(String tex, int open, int close) {
 bool _isCommandArgumentBrace(String tex, int open) {
   final prev = _previousNonWhitespaceIndex(tex, open - 1);
   if (prev == -1) return false;
+
+  if (tex.codeUnitAt(prev) == 0x2A &&
+      _endsControlWordAt(tex, _previousNonWhitespaceIndex(tex, prev - 1))) {
+    return true;
+  }
 
   if (tex.codeUnitAt(prev) == 0x5D) {
     final optionalOpen = _findMatchingOpenBracket(tex, prev);
@@ -5049,7 +5077,7 @@ class FencedCodeBlockMd extends BlockMd {
 /// Scrollable LaTeX block to prevent overflow when equations are very wide
 class LatexBlockScrollableMd extends BlockMd {
   @override
-  // Match either $$...$$ or \[...\] as standalone block
+  // Bare environments are wrapped by _preprocessFences after balanced scanning.
   String get expString =>
       (r"^(?:\s*\$\$([\s\S]*?)\$\$\s*|\s*\\\[([\s\S]*?)\\\]\s*)$");
 
@@ -5057,7 +5085,7 @@ class LatexBlockScrollableMd extends BlockMd {
   Widget build(BuildContext context, String text, GptMarkdownConfig config) {
     final m = exp.firstMatch(text.trim());
     if (m == null) return const SizedBox.shrink();
-    final body = ((m.group(1) ?? m.group(2) ?? '')).trim();
+    final body = (m.group(1) ?? m.group(2) ?? '').trim();
     if (body.isEmpty) return const SizedBox.shrink();
 
     final math = _renderMath(body, style: config.style, displayMode: true);

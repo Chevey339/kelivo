@@ -95,6 +95,55 @@ void main() {
     expect(blocks[1].text, contains('\$\$'));
   });
 
+  test('bare equation environments preserve blanks and the next paragraph', () {
+    for (final name in const ['equation', 'equation*', 'align', 'gather']) {
+      final equation = '\\begin{$name}\na + b\n\nc + d\n\\end{$name}';
+      final blocks = IncrementalMarkdownDocument().update(
+        'before\n\n$equation\n\nafter',
+      );
+      expect(blocks, hasLength(3), reason: name);
+      expect(blocks[1].text, equation);
+      expect(blocks.last.text, 'after');
+    }
+  });
+
+  test('streamed bare environments keep blanks until the matching end', () {
+    final document = IncrementalMarkdownDocument();
+    const prefix = '\\begin{equation}\na\n\nb\n';
+    for (var end = 1; end <= prefix.length; end++) {
+      final blocks = document.update(prefix.substring(0, end));
+      expect(blocks, hasLength(1));
+      expect(blocks.single.stable, isFalse);
+    }
+
+    const source = '$prefix\\end{equation}\n\nafter';
+    final blocks = document.update(source);
+    expect(blocks, hasLength(2));
+    expect(blocks.first.text, '$prefix\\end{equation}');
+    expect(blocks.first.stable, isTrue);
+    expect(blocks.last.text, 'after');
+  });
+
+  test('inline environment examples do not retain later paragraphs', () {
+    final blocks = IncrementalMarkdownDocument().update(
+      'Use `\\begin{equation}`.\n\nfirst\n\nsecond',
+    );
+    expect(blocks, hasLength(3));
+    expect(blocks.last.text, 'second');
+  });
+
+  test('nested environments stay in one block through the outer closer', () {
+    final document = IncrementalMarkdownDocument();
+    const source = '\\begin{pmatrix}\n\\begin{pmatrix}a\\end{pmatrix}\n\n';
+    final pending = document.update(source);
+    expect(pending, hasLength(1));
+    expect(pending.single.stable, isFalse);
+    final complete = document.update('$source& b\n\\end{pmatrix}\n\nafter');
+    expect(complete, hasLength(2));
+    expect(complete.first.text, contains(source));
+    expect(complete.last.text, 'after');
+  });
+
   test(
     'blank lines inside bracket display math do not split source blocks',
     () {

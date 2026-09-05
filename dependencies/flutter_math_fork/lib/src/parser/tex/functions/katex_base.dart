@@ -54,6 +54,7 @@ part 'katex_base/rule.dart';
 part 'katex_base/sizing.dart';
 part 'katex_base/sqrt.dart';
 part 'katex_base/styling.dart';
+part 'katex_base/tag.dart';
 part 'katex_base/text.dart';
 part 'katex_base/underover.dart';
 
@@ -83,6 +84,7 @@ const katexBaseFunctionEntries = {
   ..._sizingEntries,
   ..._sqrtEntries,
   ..._stylingEntries,
+  ..._tagEntries,
   ..._textEntries,
   ..._underOverEntries,
 };

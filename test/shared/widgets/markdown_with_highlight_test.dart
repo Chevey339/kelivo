@@ -2615,6 +2615,223 @@ A-->B
     },
   );
 
+  for (final entry in <String, String>{
+    'equation': r'a^2+b^2=c^2',
+    'equation*': r'a^2+b^2=c^2',
+    'align': r'a&=b\\c&=d',
+    'align*': r'a&=b\\c&=d',
+    'gather': r'a=b\\c=d',
+    'gather*': r'a=b\\c=d',
+    'aligned': r'a&=b\\c&=d',
+    'gathered': r'a=b\\c=d',
+    'split': r'a&=b\\&=c',
+    'pmatrix': r'a&b\\c&d',
+    'cases': r'x&x>0\\0&x=0',
+  }.entries) {
+    testWidgets('renders bare ${entry.key} math environment', (tester) async {
+      final source =
+          '\\begin{${entry.key}}\n${entry.value}\n\\end{${entry.key}}';
+      await tester.pumpWidget(_markdownHarness('Before\n\n$source\n\nAfter'));
+      await tester.pump();
+
+      final widgets = _mathWidgets(tester);
+      expect(widgets, hasLength(1));
+      expect(widgets.single.parseError, isNull);
+      expect(widgets.single.mathStyle, MathStyle.display);
+      expect(find.textContaining(r'\begin'), findsNothing);
+      expect(find.textContaining('Before'), findsOneWidget);
+      expect(find.textContaining('After'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
+  }
+
+  testWidgets('renders nested environments and visible equation tags', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      _markdownHarness(r'''
+\begin{equation}
+\begin{aligned}
+f(x)&=\operatorname{sin} x\\
+g(x)&=\operatorname*{arg\,max}_{y} f(y)
+\end{aligned}
+\tag{Pythagoras}
+\end{equation}
+
+\[
+a^2+b^2=c^2\tag*{Identity}
+\]
+'''),
+    );
+    await tester.pump();
+
+    final widgets = _mathWidgets(tester);
+    expect(widgets, hasLength(2));
+    expect(widgets.map((widget) => widget.parseError), everyElement(isNull));
+    expect(_encodedMathTex(tester)[0], contains('Pythagoras'));
+    expect(_encodedMathTex(tester)[1], contains('Identity'));
+    expect(find.textContaining(r'\tag'), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets(
+    'keeps environment code examples and unknown environments literal',
+    (tester) async {
+      await tester.pumpWidget(
+        _markdownHarness(r'''
+`\begin{equation}x=1\end{equation}`
+
+```latex
+\begin{equation}
+x=1
+\end{equation}
+```
+
+\begin{document}
+Literal document
+\end{document}
+'''),
+      );
+      await tester.pump();
+
+      expect(_findMathWidget(), findsNothing);
+      expect(find.textContaining('Literal document'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets('bare environments respect the math rendering setting', (
+    tester,
+  ) async {
+    final harness = await createBusinessTestHarness(
+      initial: const {'display_enable_math_rendering_v1': false},
+    );
+    await tester.pumpWidget(
+      _markdownHarness(
+        r'\begin{equation}a^2+b^2=c^2\end{equation}',
+        businessPreferences: harness.preferences,
+      ),
+    );
+    await tester.pump();
+
+    expect(_findMathWidget(), findsNothing);
+    expect(find.textContaining('a^2+b^2=c^2'), findsOneWidget);
+  });
+
+  testWidgets('bare environments render when dollar math is disabled', (
+    tester,
+  ) async {
+    final harness = await createBusinessTestHarness(
+      initial: const {'display_enable_dollar_latex_v1': false},
+    );
+    await tester.pumpWidget(
+      _markdownHarness(
+        r'\begin{equation}a^2+b^2=c^2\end{equation}',
+        businessPreferences: harness.preferences,
+      ),
+    );
+    await tester.pump();
+
+    expect(_findMathWidget(), findsOneWidget);
+    expect(_mathWidgets(tester).single.parseError, isNull);
+  });
+
+  testWidgets('streaming keeps a bare environment with blank lines intact', (
+    tester,
+  ) async {
+    final prefix = '${List.filled(60, 'Introduction.').join(' ')}\n\n';
+    const body =
+        r'\begin{equation}'
+        '\n\nx^2+y^2=z^2\n\n';
+    await tester.pumpWidget(_markdownHarness('$prefix$body', streaming: true));
+    await tester.pump();
+    expect(tester.takeException(), isNull);
+
+    final complete =
+        '$prefix$body'
+        r'\end{equation}'
+        '\n\nAfter';
+    await tester.pumpWidget(_markdownHarness(complete, streaming: true));
+    await tester.pump();
+    expect(_findMathWidget(), findsOneWidget);
+    expect(_mathWidgets(tester).single.parseError, isNull);
+    expect(find.textContaining('After'), findsOneWidget);
+
+    await tester.pumpWidget(_markdownHarness(complete));
+    await tester.pump();
+    expect(_findMathWidget(), findsOneWidget);
+    expect(_mathWidgets(tester).single.parseError, isNull);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('preserves spaced starred command arguments', (tester) async {
+    await tester.pumpWidget(
+      _markdownHarness(r'''
+\[x=1\tag *{A,B}\]
+
+\[\operatorname *{arg\,max}_{x} f(x)\]
+'''),
+    );
+    await tester.pump();
+
+    expect(_mathWidgets(tester), hasLength(2));
+    expect(
+      _mathWidgets(tester).map((math) => math.parseError),
+      everyElement(isNull),
+    );
+    final encoded = _encodedMathTex(tester);
+    expect(encoded.first, contains('A,B'));
+    expect(encoded, everyElement(isNot(contains(r'\{'))));
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('renders nested matrices with the same environment name', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      _markdownHarness(r'''
+\begin{pmatrix}
+\begin{pmatrix}1\\2\end{pmatrix}
+\end{pmatrix}
+'''),
+    );
+    await tester.pump();
+
+    expect(_mathWidgets(tester), hasLength(1));
+    expect(_mathWidgets(tester).single.parseError, isNull);
+    expect(find.textContaining(r'\end'), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('renders complex operatorname expressions from issue 960', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      _markdownHarness(r'''
+$\operatorname{Var}\left( \frac{1}{n}\sum_{i=1}^n a_i X_i \right)$
+
+$\operatorname{Var}\left( \prod_{j=1}^m \exp\left( \beta_j Z_j \right) \right)$
+
+$\operatorname{Var}\left( \hat{\theta}_{\mathrm{MLE}} \right)$
+
+$\operatorname{Var}_{\theta}\left( \frac{\partial}{\partial \theta} \log L(\theta; \mathbf{x}) \right)$
+
+$\operatorname{Var}\left( \sqrt{n}\left( \bar{X} - \mu \right) \right)$
+
+$\operatorname{Var}\left( \frac{1}{N} \sum_{k=1}^{N} \left( f(X_k) - \frac{1}{N}\sum_{j=1}^{N} f(X_j) \right)^2 \right)$
+
+\(\operatorname*{arg\,max}_{x} f(x)\)
+'''),
+    );
+    await tester.pump();
+
+    final widgets = _mathWidgets(tester);
+    expect(widgets, hasLength(7));
+    expect(widgets.map((widget) => widget.parseError), everyElement(isNull));
+    expect(find.textContaining(r'\operatorname'), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets(
     r'MarkdownWithCodeHighlight renders nested ovalbox and operatorname expressions',
     (tester) async {
