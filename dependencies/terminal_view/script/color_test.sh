@@ -1,0 +1,1 @@
+msgcat --color=test

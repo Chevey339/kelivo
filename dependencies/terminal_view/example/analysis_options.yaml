@@ -1,0 +1,27 @@
+include: package:lints/recommended.yaml
+
+linter:
+  rules:
+    prefer_function_declarations_over_variables: false
+
+analyzer:
+  plugins:
+    - dart_code_metrics
+
+dart_code_metrics:
+  anti-patterns:
+  # - long-method
+  # - long-parameter-list
+  metrics:
+    cyclomatic-complexity: 20
+    maximum-nesting-level: 5
+    number-of-parameters: 4
+    source-lines-of-code: 50
+  metrics-exclude:
+    - test/**
+  rules:
+    # - no-boolean-literal-compare
+    # - no-empty-block
+    - prefer-trailing-comma
+    - prefer-conditional-expressions
+    - no-equal-then-else

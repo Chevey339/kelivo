@@ -1,0 +1,23 @@
+name: example
+description: A minimal terminal_view demo.
+publish_to: "none"
+version: 1.0.0+1
+
+environment:
+  sdk: ">=3.0.0 <4.0.0"
+
+dependencies:
+  terminal_view:
+    path: ../
+
+  flutter:
+    sdk: flutter
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+
+  lints: ^3.0.0
+
+flutter:
+  uses-material-design: true
