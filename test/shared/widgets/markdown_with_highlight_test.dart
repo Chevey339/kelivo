@@ -2646,6 +2646,80 @@ A-->B
     });
   }
 
+  testWidgets(
+    'renders bare environments in blockquotes but keeps code literal',
+    (tester) async {
+      await tester.pumpWidget(
+        _markdownHarness(r'''
+>     \begin{equation}
+>     indented
+>     \end{equation}
+>
+> ~~~latex
+> \begin{equation}
+> fenced
+> \end{equation}
+> ~~~
+>
+> \begin{equation}
+> \verb|\begin{equation}|
+>
+>     x=1
+> \end{equation}
+'''),
+      );
+      await tester.pump();
+
+      final widgets = _mathWidgets(tester);
+      expect(widgets, hasLength(1));
+      expect(widgets.single.parseError, isNull);
+      expect(find.byKey(const ValueKey('markdown-blockquote')), findsOneWidget);
+      expect(find.textContaining('fenced'), findsOneWidget);
+      expect(find.textContaining('indented'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets('keeps quoted fence markers inside bare math', (tester) async {
+    const inner = r'''\begin{equation}
+
+~~~
+x=1
+\end{equation}''';
+    expect(markdownScanDisplayMath(inner).spans, hasLength(1));
+    await tester.pumpWidget(
+      _markdownHarness(r'''> \begin{equation}
+>
+> ~~~
+> x=1
+> \end{equation}'''),
+    );
+    await tester.pump();
+
+    final widgets = _mathWidgets(tester);
+    expect(widgets, hasLength(1));
+    expect(widgets.single.parseError, isNull);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('keeps indented blockquote math delimiters literal', (
+    tester,
+  ) async {
+    for (final source in const [
+      r'''>     \[
+>     x=1
+>     \]''',
+      r'''>     \(x=1\)''',
+    ]) {
+      await tester.pumpWidget(_markdownHarness(source));
+      await tester.pump();
+
+      expect(_findMathWidget(), findsNothing, reason: source);
+      expect(find.textContaining('x=1'), findsOneWidget, reason: source);
+      expect(tester.takeException(), isNull, reason: source);
+    }
+  });
+
   testWidgets('renders nested environments and visible equation tags', (
     tester,
   ) async {

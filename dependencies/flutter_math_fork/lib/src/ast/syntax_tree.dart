@@ -559,6 +559,7 @@ class EquationRowNode extends ParentableNode<GreenNode>
         alignerOrSpacer: flattenedChildList[index] is SpaceNode &&
             (flattenedChildList[index] as SpaceNode).alignerOrSpacer,
         trailingMargin: childSpacingConfs[index].spacingAfter,
+        useParentWidthConstraints: displayLayout != null,
       ),
       growable: false,
     );

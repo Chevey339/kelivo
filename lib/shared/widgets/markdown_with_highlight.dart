@@ -1023,25 +1023,7 @@ String _preprocessFences(
 
   // STEP 2: PROCESSING (on masked string, code is now protected)
   if (enableMath && out.contains(r'\begin{')) {
-    // Let the shared scanner pair nested environments before handing display
-    // math to the regex-based renderer. Preserve the TeX environment itself.
-    final environments = markdownScanDisplayMath(
-      out,
-    ).spans.where((span) => out.startsWith(r'\begin{', span.start));
-    final wrapped = StringBuffer();
-    var cursor = 0;
-    for (final span in environments) {
-      wrapped
-        ..write(out.substring(cursor, span.start))
-        ..write('\\[\n')
-        ..write(out.substring(span.start, span.end))
-        ..write('\n\\]');
-      cursor = span.end;
-    }
-    if (cursor > 0) {
-      wrapped.write(out.substring(cursor));
-      out = wrapped.toString();
-    }
+    out = _wrapBareMathEnvironments(out);
   }
 
   if (streaming) {
@@ -1179,6 +1161,28 @@ String _preprocessFences(
   });
 
   return out;
+}
+
+String _wrapBareMathEnvironments(String input) {
+  if (!input.contains(r'\begin{')) return input;
+  // Let the shared scanner pair nested environments before handing display
+  // math to the regex-based renderer. Preserve the TeX environment itself.
+  final environments = markdownScanDisplayMath(
+    input,
+  ).spans.where((span) => input.startsWith(r'\begin{', span.start));
+  final wrapped = StringBuffer();
+  var cursor = 0;
+  for (final span in environments) {
+    wrapped
+      ..write(input.substring(cursor, span.start))
+      ..write('\\[\n')
+      ..write(input.substring(span.start, span.end))
+      ..write('\n\\]');
+    cursor = span.end;
+  }
+  if (cursor == 0) return input;
+  wrapped.write(input.substring(cursor));
+  return wrapped.toString();
 }
 
 String _maskHtmlTagStartsInsideFencedCode(String input) {
@@ -5437,7 +5441,7 @@ class ModernBlockQuote extends InlineMd {
         sb.writeln(line);
       }
     }
-    final data = _unmaskBlockquoteFenceMarkers(sb.toString().trim());
+    final data = _unmaskBlockquoteFenceMarkers(sb.toString().trimRight());
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
     final isDark = theme.brightness == Brightness.dark;
@@ -5458,6 +5462,9 @@ class ModernBlockQuote extends InlineMd {
       data: data,
       config: config,
       components: innerComponents,
+      enableBareMath: innerComponents.any(
+        (component) => component is LatexBlockScrollableMd,
+      ),
     );
     final child = Directionality(
       textDirection: config.textDirection,
@@ -5505,35 +5512,73 @@ class _BlockquoteMarkdownContent extends StatelessWidget {
     required this.data,
     required this.config,
     required this.components,
+    required this.enableBareMath,
   });
 
   final String data;
   final GptMarkdownConfig config;
   final List<MarkdownComponent> components;
+  final bool enableBareMath;
 
   @override
   Widget build(BuildContext context) {
     final children = <Widget>[];
     final textBuffer = StringBuffer();
     final lines = data.split('\n');
+    final lineStarts = <int>[];
+    var nextLineStart = 0;
+    for (final line in lines) {
+      lineStarts.add(nextLineStart);
+      nextLineStart += line.length + 1;
+    }
+    final mathScan = enableBareMath
+        ? markdownScanDisplayMath(data)
+        : const MarkdownDisplayMathScan();
+    var atBlockBoundary = true;
 
     void flushText() {
-      final text = textBuffer.toString().trim();
-      if (text.isEmpty) {
+      final rawText = textBuffer.toString();
+      if (rawText.trim().isEmpty) {
         textBuffer.clear();
         return;
       }
-      children.add(_buildMarkdown(text));
+      final text = enableBareMath
+          ? _wrapBareMathEnvironments(rawText)
+          : rawText;
+      children.add(_buildMarkdown(text.trimRight()));
       textBuffer.clear();
     }
 
     for (var i = 0; i < lines.length; i++) {
       final line = lines[i];
-      final open = RegExp(
-        r'^[ \t]*(([`~])\2{2,})[ \t]*([^\n]*)$',
-      ).firstMatch(line);
+      final coveredByMath = mathScan.covers(lineStarts[i]);
+      final indentedCode = _blockquoteIndentedCodeLine(line);
+      if (indentedCode != null && atBlockBoundary && !coveredByMath) {
+        flushText();
+        final codeBuffer = StringBuffer()..writeln(indentedCode);
+        while (i + 1 < lines.length) {
+          final next = _blockquoteIndentedCodeLine(lines[i + 1]);
+          if (next == null) break;
+          i++;
+          codeBuffer.writeln(next);
+        }
+        children.add(
+          _CollapsibleCodeBlock(
+            language: '',
+            code: codeBuffer.toString(),
+            streaming: false,
+            closed: true,
+          ),
+        );
+        atBlockBoundary = true;
+        continue;
+      }
+      final open = coveredByMath
+          ? null
+          : RegExp(r'^[ \t]*(([`~])\2{2,})[ \t]*([^\n]*)$').firstMatch(line);
       if (open == null) {
         textBuffer.writeln(line);
+        atBlockBoundary = line.trim().isEmpty;
         continue;
       }
 
@@ -5566,6 +5611,7 @@ class _BlockquoteMarkdownContent extends StatelessWidget {
           closed: closed,
         ),
       );
+      atBlockBoundary = true;
     }
 
     flushText();
@@ -5596,7 +5642,12 @@ class _BlockquoteMarkdownContent extends StatelessWidget {
       orderedListBuilder: config.orderedListBuilder,
       unOrderedListBuilder: config.unOrderedListBuilder,
       tableBuilder: config.tableBuilder,
-      components: components,
+      // Fences outside math were already extracted above. Keeping the block
+      // matcher here would reinterpret a TeX spacing line inside a wrapped
+      // environment as the start of a code fence.
+      components: components
+          .where((component) => component is! FencedCodeBlockMd)
+          .toList(growable: false),
       inlineComponents: config.inlineComponents,
       followLinkColor: config.followLinkColor,
       useDollarSignsForLatex: false,
@@ -5604,6 +5655,23 @@ class _BlockquoteMarkdownContent extends StatelessWidget {
       generation: config.generation,
     );
   }
+}
+
+String? _blockquoteIndentedCodeLine(String line) {
+  var columns = 0;
+  var i = 0;
+  while (i < line.length && columns < 4) {
+    final unit = line.codeUnitAt(i);
+    if (unit == 0x20) {
+      columns++;
+    } else if (unit == 0x09) {
+      columns += 4 - (columns % 4);
+    } else {
+      return null;
+    }
+    i++;
+  }
+  return columns >= 4 ? line.substring(i) : null;
 }
 
 // Modern task checkbox: square with subtle border, primary check on done

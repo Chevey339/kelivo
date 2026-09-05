@@ -171,6 +171,222 @@ void main() {
     expect(_normalizedSpans(escaped), [(0, escaped.length)]);
   });
 
+  test('TeX verb payloads do not contribute environment tokens', () {
+    for (final source in const [
+      '\\begin{equation}\n'
+          '\\verb|\\begin{equation}|\n'
+          'x=1\n'
+          '\\end{equation}',
+      '\\begin{equation}\n'
+          '\\verb*+\\end{equation}+\n'
+          'x=1\n'
+          '\\end{equation}',
+    ]) {
+      expect(_normalizedSpans(source), [(0, source.length)], reason: source);
+
+      final scanner = MarkdownDisplayMathScanner();
+      for (var end = 1; end <= source.length; end++) {
+        final prefix = source.substring(0, end);
+        final streamed = scanner.synchronize(prefix);
+        final oneShot = markdownScanDisplayMath(prefix);
+        expect(
+          [for (final span in streamed.spans) (span.start, span.end)],
+          [for (final span in oneShot.spans) (span.start, span.end)],
+          reason: prefix,
+        );
+        expect(streamed.unclosedStart, oneShot.unclosedStart, reason: prefix);
+      }
+    }
+  });
+
+  test('TeX verb eligibility stays linear on streamed backslash runs', () {
+    final scanner = MarkdownDisplayMathScanner();
+    var source = '';
+    debugResetMarkdownScanVisits();
+    for (var i = 0; i < 2000; i++) {
+      source += String.fromCharCode(0x5C);
+      expect(scanner.synchronize(source).spans, isEmpty);
+    }
+    expect(source.length, 2000);
+    expect(
+      debugMarkdownScanVisits,
+      lessThanOrEqualTo(source.length * debugMarkdownScanVisitBudgetFactor),
+    );
+  });
+
+  test('pending verb backtick checks resume without rescanning payload', () {
+    final scanner = MarkdownDisplayMathScanner();
+    final backtick = String.fromCharCode(0x60);
+    var source = '${backtick}x\\verb|';
+    debugResetMarkdownScanVisits();
+    scanner.synchronize(source);
+    for (var i = 0; i < 2000; i++) {
+      source += 'a';
+      expect(scanner.synchronize(source).spans, isEmpty);
+    }
+    expect(source.length, 2008);
+    expect(
+      debugMarkdownScanVisits,
+      lessThanOrEqualTo(source.length * debugMarkdownScanVisitBudgetFactor),
+    );
+  });
+
+  test('a slash-delimited TeX verb does not escape following comments', () {
+    const source =
+        '\\begin{equation}\n'
+        '\\verb\\foo\\% \\begin{equation}\n'
+        'x=1\n'
+        '\\end{equation}';
+    expect(_normalizedSpans(source), [(0, source.length)]);
+
+    final scanner = MarkdownDisplayMathScanner();
+    for (var end = 1; end <= source.length; end++) {
+      final prefix = source.substring(0, end);
+      final streamed = scanner.synchronize(prefix);
+      final oneShot = markdownScanDisplayMath(prefix);
+      expect(
+        [for (final span in streamed.spans) (span.start, span.end)],
+        [for (final span in oneShot.spans) (span.start, span.end)],
+        reason: prefix,
+      );
+      expect(streamed.unclosedStart, oneShot.unclosedStart, reason: prefix);
+    }
+  });
+
+  test('inline code can close inside a TeX verb payload before newline', () {
+    final backtick = String.fromCharCode(0x60);
+    final source =
+        '\\begin{equation}\n'
+        '$backtick\\verb|abc$backtick \\end{equation}%|';
+    final oneShot = markdownScanDisplayMath(source);
+    expect(
+      [for (final span in oneShot.spans) (span.start, span.end)],
+      [(0, source.length)],
+    );
+    expect(oneShot.unclosedStart, isNull);
+
+    final scanner = MarkdownDisplayMathScanner();
+    for (var end = 1; end <= source.length; end++) {
+      final prefix = source.substring(0, end);
+      final streamed = scanner.synchronize(prefix);
+      final fresh = markdownScanDisplayMath(prefix);
+      expect(
+        [for (final span in streamed.spans) (span.start, span.end)],
+        [for (final span in fresh.spans) (span.start, span.end)],
+        reason: prefix,
+      );
+      expect(streamed.unclosedStart, fresh.unclosedStart, reason: prefix);
+    }
+  });
+
+  test('a terminal verb backtick pair can extend before it is finalized', () {
+    final backtick = String.fromCharCode(0x60);
+    final base = '\\begin{equation}\n$backtick\\verb|abc';
+    final pairedAtEnd = '$base$backtick';
+    final extendedAtEnd = '$pairedAtEnd$backtick';
+    for (final source in [pairedAtEnd, extendedAtEnd]) {
+      final scan = markdownScanDisplayMath(source);
+      expect(scan.spans, isEmpty, reason: source);
+      expect(scan.unclosedStart, 0, reason: source);
+    }
+
+    final pairedThenClosed = '$pairedAtEnd \\end{equation}%|';
+    final pairedScanner = MarkdownDisplayMathScanner();
+    pairedScanner.synchronize(pairedAtEnd);
+    final paired = pairedScanner.synchronize(pairedThenClosed);
+    expect(
+      [for (final span in paired.spans) (span.start, span.end)],
+      [(0, pairedThenClosed.length)],
+    );
+
+    final extendedThenClosed = '$extendedAtEnd \\end{equation}|';
+    final extendedScanner = MarkdownDisplayMathScanner();
+    extendedScanner.synchronize(pairedAtEnd);
+    extendedScanner.synchronize(extendedAtEnd);
+    final extended = extendedScanner.synchronize(extendedThenClosed);
+    expect(extended.spans, isEmpty);
+    expect(extended.unclosedStart, 0);
+    expect(
+      [for (final span in extended.spans) (span.start, span.end)],
+      [
+        for (final span in markdownScanDisplayMath(extendedThenClosed).spans)
+          (span.start, span.end),
+      ],
+    );
+  });
+
+  test('a finalized verb code span does not leak pending environments', () {
+    final ticks = String.fromCharCode(0x60) * 2;
+    final source = '\\begin{array}$ticks\\verb$ticks\\end{array}$ticks';
+    expect(source.length, 35);
+
+    final scanner = MarkdownDisplayMathScanner();
+    scanner.synchronize(source.substring(0, 22));
+    final streamed = scanner.synchronize(source);
+    final fresh = markdownScanDisplayMath(source);
+    expect(streamed.spans, isEmpty);
+    expect(streamed.unclosedStart, isNull);
+    expect(fresh.spans, isEmpty);
+    expect(fresh.unclosedStart, isNull);
+  });
+
+  test('complete-line backticks replace provisional verb run state', () {
+    final backtick = String.fromCharCode(0x60);
+    final source =
+        '\\begin{array}\\verb${backtick * 3}'
+        '\\end{array}$backtick\n$backtick\\end{array}$backtick';
+    expect(source.length, 47);
+
+    final scanner = MarkdownDisplayMathScanner();
+    scanner.synchronize(source.substring(0, 46));
+    final streamed = scanner.synchronize(source);
+    final fresh = markdownScanDisplayMath(source);
+    expect(streamed.spans, isEmpty);
+    expect(streamed.unclosedStart, isNull);
+    expect(fresh.spans, isEmpty);
+    expect(fresh.unclosedStart, isNull);
+  });
+
+  test('backslash-led math tokens respect slash-run parity', () {
+    for (final source in const [
+      r'\begin{equation}'
+          '\n'
+          r'\\begin{equation}'
+          '\nx=1\n'
+          r'\end{equation}',
+      r'\begin{equation}'
+          '\n'
+          r'\\end{equation}'
+          '\nx=1\n'
+          r'\end{equation}',
+      r'\['
+          '\n'
+          r'\\['
+          '\nx=1\n'
+          r'\]',
+      r'\['
+          '\n'
+          r'\\]'
+          '\nx=1\n'
+          r'\]',
+    ]) {
+      expect(_normalizedSpans(source), [(0, source.length)], reason: source);
+
+      final scanner = MarkdownDisplayMathScanner();
+      for (var end = 1; end <= source.length; end++) {
+        final prefix = source.substring(0, end);
+        final streamed = scanner.synchronize(prefix);
+        final oneShot = markdownScanDisplayMath(prefix);
+        expect(
+          [for (final span in streamed.spans) (span.start, span.end)],
+          [for (final span in oneShot.spans) (span.start, span.end)],
+          reason: prefix,
+        );
+        expect(streamed.unclosedStart, oneShot.unclosedStart, reason: prefix);
+      }
+    }
+  });
+
   test('an unescaped TeX comment may follow an environment closer', () {
     for (final tail in const [
       '% comment',
@@ -305,9 +521,180 @@ void main() {
     );
   });
 
+  test('an unclosed outer environment resumes same-line pairing linearly', () {
+    final scanner = MarkdownDisplayMathScanner();
+    var source = r'\begin{pmatrix}';
+    debugResetMarkdownScanVisits();
+    scanner.synchronize(source);
+    for (var i = 0; i < 1000; i++) {
+      source += r'\begin{pmatrix}x\end{pmatrix}';
+      final scan = scanner.synchronize(source);
+      expect(scan.spans, isEmpty);
+      expect(scan.unclosedStart, 0);
+    }
+    expect(source.length, 29015);
+    expect(
+      debugMarkdownScanVisits,
+      lessThanOrEqualTo(source.length * debugMarkdownScanVisitBudgetFactor),
+    );
+    source += r'\end{pmatrix}';
+    final complete = scanner.synchronize(source);
+    expect(
+      [for (final span in complete.spans) (span.start, span.end)],
+      [(0, source.length)],
+    );
+  });
+
+  test(
+    'an unmatched backtick does not stall same-line environment pairing',
+    () {
+      final scanner = MarkdownDisplayMathScanner();
+      var source = r'\begin{pmatrix}' + String.fromCharCode(0x60);
+      debugResetMarkdownScanVisits();
+      scanner.synchronize(source);
+      for (var i = 0; i < 1000; i++) {
+        source += r'\begin{pmatrix}x\end{pmatrix}';
+        final scan = scanner.synchronize(source);
+        expect(scan.spans, isEmpty);
+        expect(scan.unclosedStart, 0);
+      }
+      expect(source.length, 29016);
+      expect(
+        debugMarkdownScanVisits,
+        lessThanOrEqualTo(source.length * debugMarkdownScanVisitBudgetFactor),
+      );
+      source += r'\end{pmatrix}';
+      final complete = scanner.synchronize(source);
+      expect(
+        [for (final span in complete.spans) (span.start, span.end)],
+        [(0, source.length)],
+      );
+    },
+  );
+
+  test('incremental backtick pairing stays linear across many runs', () {
+    final scanner = MarkdownDisplayMathScanner();
+    final backtick = String.fromCharCode(0x60);
+    var source = r'\begin{pmatrix}';
+    debugResetMarkdownScanVisits();
+    scanner.synchronize(source);
+    for (var i = 0; i < 1000; i++) {
+      source += '${backtick}x';
+      final scan = scanner.synchronize(source);
+      expect(scan.spans, isEmpty);
+      expect(scan.unclosedStart, 0);
+    }
+    expect(source.length, 2015);
+    expect(
+      debugMarkdownScanVisits,
+      lessThanOrEqualTo(source.length * debugMarkdownScanVisitBudgetFactor),
+    );
+  });
+
+  test('many finalized inline-code tokens keep pairing linear', () {
+    final scanner = MarkdownDisplayMathScanner();
+    final backtick = String.fromCharCode(0x60);
+    var source = r'\begin{pmatrix}';
+    debugResetMarkdownScanVisits();
+    scanner.synchronize(source);
+    for (var i = 0; i < 1000; i++) {
+      source += '$backtick\\begin{pmatrix}$backtick ';
+      final scan = scanner.synchronize(source);
+      expect(scan.spans, isEmpty);
+      expect(scan.unclosedStart, 0);
+    }
+    expect(
+      debugMarkdownScanVisits,
+      lessThanOrEqualTo(source.length * debugMarkdownScanVisitBudgetFactor),
+    );
+  });
+
+  test('growing terminal runs skip hidden environment suffixes linearly', () {
+    final scanner = MarkdownDisplayMathScanner();
+    final backtick = String.fromCharCode(0x60);
+    var source = r'\begin{pmatrix}';
+    debugResetMarkdownScanVisits();
+    scanner.synchronize(source);
+    for (var length = 1; length <= 300; length++) {
+      source += '${backtick * length}x';
+      expect(scanner.synchronize(source).unclosedStart, 0);
+    }
+    for (var i = 0; i < 3000; i++) {
+      source += r'\begin{pmatrix}x\end{pmatrix}';
+      expect(scanner.synchronize(source).unclosedStart, 0);
+    }
+    for (var length = 1; length <= 300; length++) {
+      source += backtick;
+      expect(scanner.synchronize(source).unclosedStart, 0);
+    }
+    expect(source.length, 132765);
+    expect(
+      debugMarkdownScanVisits,
+      lessThanOrEqualTo(source.length * debugMarkdownScanVisitBudgetFactor),
+    );
+  });
+
+  test('chunked backtick and partial-token changes stay equivalent', () {
+    final scanner = MarkdownDisplayMathScanner();
+    final backticks = String.fromCharCode(0x60) * 2;
+    final chunks = [
+      r'\[',
+      r'\]',
+      r'\begin{pmatri',
+      backticks,
+      r'$$',
+      r'\%',
+      r'\]',
+      r'\[',
+    ];
+    var source = '';
+    for (final chunk in chunks) {
+      source += chunk;
+      final streamed = scanner.synchronize(source);
+      final oneShot = markdownScanDisplayMath(source);
+      expect(
+        [for (final span in streamed.spans) (span.start, span.end)],
+        [for (final span in oneShot.spans) (span.start, span.end)],
+        reason: source,
+      );
+      expect(streamed.unclosedStart, oneShot.unclosedStart, reason: source);
+    }
+  });
+
+  test('a backtick-paired region rolls pending environment depth back', () {
+    final backtick = String.fromCharCode(0x60);
+    final pending = '\\begin{pmatrix}$backtick\\begin{pmatrix}';
+    final complete = '$pending$backtick\n\\end{pmatrix}';
+    final scanner = MarkdownDisplayMathScanner();
+
+    expect(scanner.synchronize(pending).unclosedStart, 0);
+    final streamed = scanner.synchronize(complete);
+    expect(
+      [for (final span in streamed.spans) (span.start, span.end)],
+      [(0, complete.length)],
+    );
+    expect([
+      for (final span in streamed.spans) (span.start, span.end),
+    ], _normalizedSpans(complete));
+  });
+
   test('unclosed inline code does not hide a later display-math closer', () {
     const content = '`unclosed\n\$\$ `x` \$\$';
     expect(markdownEndsWithDisplayMath(content, content.length), isTrue);
+  });
+
+  test('inline code hides a fake environment closer before a newline', () {
+    final backtick = String.fromCharCode(0x60);
+    final source = '\\begin{equation}\n$backtick\\end{equation}$backtick';
+    final scanner = MarkdownDisplayMathScanner();
+
+    final oneShot = markdownScanDisplayMath(source);
+    expect(oneShot.spans, isEmpty);
+    expect(oneShot.unclosedStart, 0);
+    final streamed = scanner.synchronize(source);
+    expect(streamed.spans, isEmpty);
+    expect(streamed.unclosedStart, 0);
+    expect(scanner.synchronize('$source\n').unclosedStart, 0);
   });
 
   test(

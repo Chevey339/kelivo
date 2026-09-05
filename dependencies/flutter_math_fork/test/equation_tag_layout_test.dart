@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_math_fork/ast.dart';
 import 'package:flutter_math_fork/flutter_math.dart';
+import 'package:flutter_math_fork/src/parser/tex/parser.dart';
 import 'package:flutter_math_fork/src/render/layout/eqn_array.dart';
 import 'package:flutter_math_fork/src/render/layout/line.dart';
+import 'package:flutter_math_fork/src/render/layout/line_editable.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 EquationRowNode _row(String text, {Mode mode = Mode.math}) => EquationRowNode(
@@ -208,24 +210,52 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('selectable display arrays retain the root editable line',
+  testWidgets('selectable display arrays use the parent display width',
       (tester) async {
-    final array = EquationArrayNode(
-      body: [_row('x')],
-      tags: [_row('(1)', mode: Mode.text)],
-      displayLayout: true,
-    );
     final ast = SyntaxTree(
-      greenRoot: EquationRowNode(children: [array]),
+      greenRoot: TexParser(
+        r'x\tag{1}',
+        const TexParserSettings(displayMode: true),
+      ).parse(),
     );
 
     await tester.pumpWidget(MaterialApp(
-      home: Center(child: SelectableMath(ast: ast)),
+      home: Center(
+        child: SizedBox(
+          width: 320,
+          child: SelectableMath(ast: ast),
+        ),
+      ),
     ));
     await tester.tap(find.byType(SelectableMath));
     await tester.pump();
 
     expect(ast.greenRoot.key, isNotNull);
+    final arrayRenderObject =
+        tester.renderObject<RenderEqnArray>(find.byType(EqnArray));
+    final body = arrayRenderObject.firstChild!;
+    final bodyParentData = body.parentData! as EqnArrayParentData;
+    final tag = bodyParentData.nextSibling!;
+    final tagParentData = tag.parentData! as EqnArrayParentData;
+    final editableLine = ast.greenRoot.key!.currentContext!.findRenderObject()!
+        as RenderEditableLine;
+
+    expect(arrayRenderObject.constraints.minWidth, closeTo(320, 0.01));
+    expect(arrayRenderObject.constraints.maxWidth, closeTo(320, 0.01));
+    expect(arrayRenderObject.size.width, closeTo(320, 0.01));
+    expect(
+      bodyParentData.offset.dx + body.size.width / 2,
+      closeTo(arrayRenderObject.size.width / 2, 0.01),
+    );
+    expect(
+      tagParentData.offset.dx + tag.size.width,
+      closeTo(arrayRenderObject.size.width, 0.01),
+    );
+    expect(
+      ast.greenRoot.key!.currentContext!.findRenderObject(),
+      same(editableLine),
+    );
+    expect(editableLine.toStringShort(), isNot(contains('OVERFLOWING')));
     expect(tester.takeException(), isNull);
   });
 }

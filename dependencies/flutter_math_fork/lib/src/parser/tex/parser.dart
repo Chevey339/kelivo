@@ -24,8 +24,6 @@
 import 'dart:collection';
 import 'dart:ui';
 
-import 'package:collection/collection.dart';
-
 import '../../ast/nodes/equation_array.dart';
 import '../../ast/nodes/multiscripts.dart';
 import '../../ast/nodes/over.dart';
@@ -67,21 +65,25 @@ class TexParser {
   Token? nextToken;
 
   /// Explicit label for the current display equation or alignment row.
-  EquationRowNode? equationTag;
+  EquationTagNode? equationTag;
 
-  EquationRowNode? takeEquationTag() {
+  EquationTagNode? takeEquationTag() {
     final tag = equationTag;
     equationTag = null;
     return tag;
   }
 
-  GreenNode finishTaggedEquation(EquationRowNode body) {
+  GreenNode finishTaggedEquation(
+    EquationRowNode body, {
+    EquationArrayEnvironment? environment,
+  }) {
     final tag = takeEquationTag();
     if (tag == null) return body;
     return EquationArrayNode(
       body: [body],
       tags: [tag],
       displayLayout: true,
+      environment: environment,
       arrayStretch: 0.0,
     );
   }
@@ -649,7 +651,7 @@ class TexParser {
     } else {
       return StyleNode(
         optionsDiff: OptionsDiff(style: MathStyle.text),
-        children: res?.children.whereNotNull().toList(growable: false) ?? [],
+        children: res?.children.nonNulls.toList(growable: false) ?? [],
       );
     }
   }

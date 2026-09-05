@@ -15,8 +15,10 @@ GreenNode _tagHandler(TexParser parser, FunctionContext context) {
   parser.consumeSpaces();
   final literal = parser.fetch().text == '*';
   if (literal) parser.consume();
-  final body = parser.parseArgNode(mode: Mode.text, optional: false)!;
-  parser.equationTag = StyleNode(
+  final body = parser
+      .parseArgNode(mode: Mode.text, optional: false)!
+      .wrapWithEquationRow();
+  final displayBody = StyleNode(
     optionsDiff: OptionsDiff(
       style: MathStyle.text,
       textFontOptions: texTextFontOptions['\\textnormal'],
@@ -27,5 +29,9 @@ GreenNode _tagHandler(TexParser parser, FunctionContext context) {
       if (!literal) SymbolNode(symbol: ')', mode: Mode.text),
     ],
   ).wrapWithEquationRow();
-  return EquationRowNode.empty();
+  parser.equationTag = EquationTagNode(
+    literal: literal,
+    displayBody: displayBody,
+  );
+  return EquationTagMarkerNode();
 }

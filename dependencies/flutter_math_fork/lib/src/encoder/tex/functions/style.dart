@@ -78,10 +78,11 @@ EncodeResult _optionsDiffEncode(OptionsDiff diff, List<dynamic> children) {
     }
   }
   if (diff.color != null) {
+    final rgb = diff.color!.toARGB32() & 0x00ffffff;
     res = TexCommandEncodeResult(
       command: '\\textcolor',
       args: <dynamic>[
-        '#${diff.color!.value.toRadixString(16).padLeft(6, '0')}',
+        '#${rgb.toRadixString(16).padLeft(6, '0')}',
         res,
       ],
     );

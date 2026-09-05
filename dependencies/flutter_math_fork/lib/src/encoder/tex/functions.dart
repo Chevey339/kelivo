@@ -11,6 +11,7 @@ import '../../ast/nodes/left_right.dart';
 import '../../ast/nodes/multiscripts.dart';
 import '../../ast/nodes/nary_op.dart';
 import '../../ast/nodes/over.dart';
+import '../../ast/nodes/space.dart';
 import '../../ast/nodes/sqrt.dart';
 import '../../ast/nodes/stretchy_op.dart';
 import '../../ast/nodes/style.dart';
@@ -51,6 +52,8 @@ const Map<Type, EncoderFun> encoderFunctions = {
   AccentNode: _accentEncoder,
   AccentUnderNode: _accentUnderEncoder,
   EquationArrayNode: _equationArrayEncoder,
+  EquationTagNode: _equationTagEncoder,
+  EquationTagMarkerNode: _equationTagMarkerEncoder,
   FracNode: _fracEncoder,
   FunctionNode: _functionEncoder,
   OperatorNameNode: _operatorNameEncoder,

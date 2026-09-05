@@ -3,6 +3,7 @@ library katex_base;
 import '../../../ast/nodes/accent.dart';
 import '../../../ast/nodes/accent_under.dart';
 import '../../../ast/nodes/enclosure.dart';
+import '../../../ast/nodes/equation_array.dart';
 import '../../../ast/nodes/frac.dart';
 import '../../../ast/nodes/function.dart';
 import '../../../ast/nodes/left_right.dart';

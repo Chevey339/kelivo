@@ -67,7 +67,10 @@ GreenNode _equationHandler(TexParser parser, EnvContext context) {
   parser.equationTag = null;
   try {
     final body = parser.parseExpression().wrapWithEquationRow();
-    return parser.finishTaggedEquation(body);
+    return parser.finishTaggedEquation(
+      body,
+      environment: EquationArrayEnvironment.fromTexName(context.envName),
+    );
   } finally {
     parser.equationTag = outerTag;
   }
@@ -121,6 +124,7 @@ GreenNode _alignedHandler(TexParser parser, EnvContext context) =>
       parser,
       addJot: true,
       tagged: context.envName == 'align' || context.envName == 'align*',
+      environment: EquationArrayEnvironment.fromTexName(context.envName),
       concatRow: (cells) {
         if (context.envName == 'split' && cells.length > 2) {
           throw ParseException('{split} can contain only two columns');
@@ -137,6 +141,7 @@ GreenNode _gatheredHandler(TexParser parser, EnvContext context) =>
       parser,
       addJot: true,
       tagged: context.envName != 'gathered',
+      environment: EquationArrayEnvironment.fromTexName(context.envName),
       concatRow: (cells) {
         if (cells.length != 1) {
           throw ParseException(
@@ -161,6 +166,8 @@ GreenNode _alignedAtHandler(TexParser parser, EnvContext context) {
     parser,
     addJot: true,
     tagged: context.envName != 'alignedat',
+    environment: EquationArrayEnvironment.fromTexName(context.envName),
+    alignmentColumns: cols,
     concatRow: (cells) {
       if (cells.length > 2 * cols) {
         throw ParseException('Too many math in a row: '
@@ -178,6 +185,8 @@ EquationArrayNode parseEqnArray(
   TexParser parser, {
   bool addJot = false,
   bool tagged = false,
+  EquationArrayEnvironment? environment,
+  int? alignmentColumns,
   required EquationRowNode Function(List<EquationRowNode> cells) concatRow,
 }) {
   // Only outer display environments own a tag for each row. Inner environments
@@ -277,5 +286,7 @@ EquationArrayNode parseEqnArray(
     body: rows,
     tags: tagged ? tags : null,
     displayLayout: tagged,
+    environment: environment,
+    alignmentColumns: alignmentColumns,
   );
 }

@@ -108,7 +108,7 @@ void main() {
       expect(symbols(parse(r'x\tag{\textbf{A} $n+1$}')), 'x(A n+1)');
     });
 
-    test('encoding retains equation bodies and visible labels', () {
+    test('encoding retains tag commands and their environments', () {
       final regular = parse(r'x\tag{A}').encodeTeX(
         conf: TexEncodeConf.mathParamConf,
       );
@@ -119,16 +119,12 @@ void main() {
         r'\begin{align}a=b\tag{A}\\c=d\tag*{B}\end{align}',
       ).encodeTeX(conf: TexEncodeConf.mathParamConf);
 
-      expect(regular, contains('x'));
-      expect(regular, contains('(A)'));
-      expect(literal, contains('x'));
-      expect(literal, contains('A'));
-      expect(literal, isNot(contains('(A)')));
-      expect(multiline, contains('a=b'));
-      expect(multiline, contains('(A)'));
-      expect(multiline, contains(r'\\'));
-      expect(multiline, contains('c=d'));
-      expect(multiline, contains('B'));
+      expect(regular, r'x\tag{A}');
+      expect(literal, r'x\tag*{A}');
+      expect(
+        multiline,
+        r'\begin{align}a=b\tag{A}\\c=d\tag*{B}\end{align}',
+      );
     });
 
     test('each alignment row owns its tag', () {
