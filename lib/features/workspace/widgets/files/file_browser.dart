@@ -48,7 +48,7 @@ Future<String?> showWorkspaceFolderPicker(
   String? rootLabel,
   String? excludePath,
 }) {
-  Widget browser(BuildContext ctx) {
+  Widget browser(BuildContext ctx, [ScrollController? scrollController]) {
     return FileBrowser(
       root: Directory(root),
       rootLabel: rootLabel ?? title,
@@ -57,6 +57,7 @@ Future<String?> showWorkspaceFolderPicker(
       excludePath: excludePath,
       onPickDirectory: (rel) => Navigator.of(ctx).pop(rel),
       modelPathOf: (host) => host,
+      scrollController: scrollController,
     );
   }
 
@@ -89,7 +90,7 @@ Future<String?> showWorkspaceFolderPicker(
     title: title,
     partialHeightFactor: 0.90,
     expandedHeightFactor: 0.90,
-    builder: (ctx, _) => browser(ctx),
+    builder: browser,
   );
 }
 
@@ -110,6 +111,7 @@ class FileBrowser extends StatefulWidget {
     this.emptyTitle,
     this.emptyHint,
     this.onOpenTerminal,
+    this.scrollController,
   });
 
   final Directory root;
@@ -126,6 +128,11 @@ class FileBrowser extends StatefulWidget {
   final String? emptyTitle;
   final String? emptyHint;
   final VoidCallback? onOpenTerminal;
+
+  /// The host's scroll controller, when it needs to read the list's offset —
+  /// a bottom sheet decides from it whether a downward drag scrolls the list or
+  /// pulls the sheet down.
+  final ScrollController? scrollController;
 
   static const Key emptyKey = ValueKey<String>('file-browser-empty');
   static const Key errorKey = ValueKey<String>('file-browser-error');
@@ -1392,6 +1399,7 @@ class FileBrowserState extends State<FileBrowser> {
         padding: EdgeInsets.zero,
         child: ListView.separated(
           key: FileBrowser.listKey,
+          controller: widget.scrollController,
           primary: false,
           padding: EdgeInsets.zero,
           itemCount: _entries.length,

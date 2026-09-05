@@ -705,4 +705,64 @@ void main() {
     final bY = tester.getTopLeft(find.byKey(FileBrowser.itemKey('b.txt'))).dy;
     expect(aY, lessThan(bY));
   });
+
+  testWidgets('a sheet reads the list offset before pulling itself down', (
+    tester,
+  ) async {
+    for (var i = 0; i < 40; i += 1) {
+      File(
+        p.join(tempDir.path, 'file_${i.toString().padLeft(2, '0')}.txt'),
+      ).writeAsStringSync('x');
+    }
+    tester.view.physicalSize = const Size(400, 800);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    late ScrollController listController;
+
+    await tester.pumpWidget(
+      _harness(
+        child: Builder(
+          builder: (context) => TextButton(
+            onPressed: () => showCustomBottomSheet<void>(
+              context: context,
+              title: 'Files',
+              partialHeightFactor: 0.9,
+              expandedHeightFactor: 0.9,
+              builder: (sheetContext, controller) {
+                listController = controller;
+                return FileBrowser(
+                  root: tempDir,
+                  rootLabel: 'Root',
+                  modelPathOf: (host) => host,
+                  scrollController: controller,
+                );
+              },
+            ),
+            child: const Text('open'),
+          ),
+        ),
+      ),
+    );
+    await tester.tap(find.text('open'));
+    await tester.pump();
+    await _reload(tester);
+    await tester.pumpAndSettle();
+
+    final panel = find.byKey(CustomBottomSheet.panelKey);
+    final sheetTop = tester.getTopLeft(panel).dy;
+
+    await tester.drag(find.byKey(FileBrowser.listKey), const Offset(0, -200));
+    await tester.pumpAndSettle();
+    final scrolled = listController.offset;
+    expect(scrolled, greaterThan(0));
+    expect(tester.getTopLeft(panel).dy, sheetTop);
+
+    // Pulling down mid-list scrolls back up; the sheet only follows once the
+    // list has nothing left to give.
+    await tester.drag(find.byKey(FileBrowser.listKey), const Offset(0, 100));
+    await tester.pumpAndSettle();
+    expect(listController.offset, lessThan(scrolled));
+    expect(tester.getTopLeft(panel).dy, sheetTop);
+  });
 }

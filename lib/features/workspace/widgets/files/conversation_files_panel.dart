@@ -58,10 +58,11 @@ Future<void> showConversationFilesPanel(
     title: l10n.workspaceFilesPanelTitle,
     partialHeightFactor: 0.90,
     expandedHeightFactor: 0.90,
-    builder: (ctx, _) {
+    builder: (ctx, scrollController) {
       return ConversationFilesPanel(
         conversationId: conversationId,
         initialTab: initialTab,
+        scrollController: scrollController,
       );
     },
   );
@@ -73,6 +74,7 @@ class ConversationFilesPanel extends StatefulWidget {
     required this.conversationId,
     this.embedded = false,
     this.initialTab = ConversationFilesTab.attachments,
+    this.scrollController,
   });
 
   final String conversationId;
@@ -82,6 +84,10 @@ class ConversationFilesPanel extends StatefulWidget {
   final bool embedded;
 
   final ConversationFilesTab initialTab;
+
+  /// Handed to whichever tab is showing, so the host sheet can tell a list
+  /// scroll apart from a pull on the sheet itself.
+  final ScrollController? scrollController;
 
   static const Key unboundHintKey = ValueKey<String>(
     'conversation-files-unbound',
@@ -265,6 +271,7 @@ class ConversationFilesPanelState extends State<ConversationFilesPanel> {
           readOnly: true,
           emptyIcon: Lucide.Paperclip,
           emptyTitle: l10n.workspaceFilesEmptyAttachments,
+          scrollController: widget.scrollController,
           modelPathOf: (host) => WorkspaceModelPaths.chatFile(
             host,
             _attachments!.path,
@@ -278,6 +285,7 @@ class ConversationFilesPanelState extends State<ConversationFilesPanel> {
           readOnly: true,
           emptyIcon: Lucide.Sparkles,
           emptyTitle: l10n.workspaceFilesEmptyOutputs,
+          scrollController: widget.scrollController,
           modelPathOf: (host) =>
               WorkspaceModelPaths.chatFile(host, _outputs!.path, 'outputs'),
         );
@@ -327,6 +335,7 @@ class ConversationFilesPanelState extends State<ConversationFilesPanel> {
     return FileBrowser(
       root: root,
       rootLabel: _workspace!.name,
+      scrollController: widget.scrollController,
       modelPathOf: (host) => WorkspaceModelPaths.workspaceFile(host, root.path),
     );
   }

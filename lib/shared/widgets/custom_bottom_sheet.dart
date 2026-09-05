@@ -34,11 +34,22 @@ Future<T?> showCustomBottomSheet<T>({
         closeSemanticLabel: closeSemanticLabel,
         partialHeightFactor: partialHeightFactor,
         expandedHeightFactor: expandedHeightFactor,
-        onDismiss: () => Navigator.of(dialogContext).maybePop(),
+        onDismiss: () => _closeSheetRoute(dialogContext),
         builder: builder,
       );
     },
   );
+}
+
+/// Takes the sheet route off the navigator instead of asking through
+/// [Navigator.maybePop]. Content is free to install a [PopScope] to steer the
+/// system back gesture — the file browser does, to walk up its folder stack —
+/// and a refused pop would strand the route with the panel already animated off
+/// screen, where its full-screen barrier silently swallows every touch.
+void _closeSheetRoute(BuildContext dialogContext) {
+  final route = ModalRoute.of(dialogContext);
+  if (route == null || !route.isActive) return;
+  Navigator.of(dialogContext).removeRoute(route);
 }
 
 class CustomBottomSheet extends StatefulWidget {
@@ -93,6 +104,12 @@ class _CustomBottomSheetState extends State<CustomBottomSheet>
   bool? _contentDragIsVertical;
   VelocityTracker? _contentVelocityTracker;
   bool _contentDragChangedSheetTop = false;
+
+  /// Set the moment a close starts. The closing animation owns the sheet from
+  /// then on, so every drag handler below stands down: one that stopped the
+  /// animation would drop the completion callback that pops the route, leaving
+  /// the sheet either stuck on screen with a dead close button or invisible on
+  /// top of an app that no longer takes touches.
   bool _dismissScheduled = false;
 
   @override
@@ -222,9 +239,11 @@ class _CustomBottomSheetState extends State<CustomBottomSheet>
               GestureDetector(
                 behavior: HitTestBehavior.opaque,
                 onVerticalDragStart: (_) {
+                  if (_dismissScheduled) return;
                   _handleDragStartTop = _currentTop(partialTop);
                 },
                 onVerticalDragUpdate: (details) {
+                  if (_dismissScheduled) return;
                   _dragSheetBy(
                     details.delta.dy,
                     expandedTop: expandedTop,
@@ -232,6 +251,7 @@ class _CustomBottomSheetState extends State<CustomBottomSheet>
                   );
                 },
                 onVerticalDragEnd: (details) {
+                  if (_dismissScheduled) return;
                   _settleDrag(
                     startTop: _handleDragStartTop,
                     currentTop: _currentTop(partialTop),
@@ -242,6 +262,7 @@ class _CustomBottomSheetState extends State<CustomBottomSheet>
                   );
                 },
                 onVerticalDragCancel: () {
+                  if (_dismissScheduled) return;
                   _animateToTop(partialTop);
                 },
                 child: _DragHandle(color: handleColor),
@@ -321,6 +342,7 @@ class _CustomBottomSheetState extends State<CustomBottomSheet>
   double _currentTop(double fallback) => _sheetTop.value ?? fallback;
 
   void _startContentDrag(PointerDownEvent event, {required double partialTop}) {
+    if (_dismissScheduled) return;
     if (_contentPointer != null) return;
     _contentPointer = event.pointer;
     _contentPointerStart = event.position;
@@ -338,6 +360,7 @@ class _CustomBottomSheetState extends State<CustomBottomSheet>
     required double partialTop,
     required double hiddenTop,
   }) {
+    if (_dismissScheduled) return;
     if (_contentPointer != event.pointer) return;
     _contentVelocityTracker?.addPosition(event.timeStamp, event.position);
     final lastY = _lastContentPointerY;
@@ -374,6 +397,7 @@ class _CustomBottomSheetState extends State<CustomBottomSheet>
     required double partialTop,
     required double hiddenTop,
   }) {
+    if (_dismissScheduled) return;
     if (_contentPointer != event.pointer) return;
     final velocityY =
         _contentVelocityTracker?.getVelocity().pixelsPerSecond.dy ?? 0;
@@ -395,6 +419,7 @@ class _CustomBottomSheetState extends State<CustomBottomSheet>
   }
 
   void _cancelContentDrag(int pointer, {required double partialTop}) {
+    if (_dismissScheduled) return;
     if (_contentPointer != pointer) return;
     _contentPointer = null;
     _contentPointerStart = null;
