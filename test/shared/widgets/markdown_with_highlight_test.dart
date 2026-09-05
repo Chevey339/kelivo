@@ -963,6 +963,165 @@ Inline ***strong emphasis*** text.
     });
   });
 
+  for (final longReply in [false, true]) {
+    testWidgets(
+      'streaming table preserves its offset and active drag (long=$longReply)',
+      (tester) async {
+        _overrideMarkdownTablePlatform(TargetPlatform.iOS);
+        await tester.binding.setSurfaceSize(const Size(800, 1600));
+        addTearDown(() => tester.binding.setSurfaceSize(null));
+        final prefix = longReply ? '${'Intro text. ' * 50}\n\n' : '';
+        final text = ValueNotifier(
+          '$prefix| A | B | C | D | E |\n'
+          '| --- | --- | --- | --- | --- |\n| apple',
+        );
+        addTearDown(text.dispose);
+        await tester.pumpWidget(_streamingMarkdownHarness(text, width: 320));
+        await tester.pump();
+        final viewport = find.byKey(
+          const ValueKey('markdown-table-horizontal-scroll'),
+        );
+        final scroll = find.descendant(
+          of: viewport,
+          matching: find.byType(Scrollable),
+        );
+        final state = tester.state<ScrollableState>(scroll);
+        await tester.drag(viewport, const Offset(-100, 0));
+        await tester.pumpAndSettle();
+        final offset = state.position.pixels;
+        expect(offset, greaterThan(50));
+
+        text.value += ' banana';
+        await tester.pump();
+        expect(tester.state<ScrollableState>(scroll), same(state));
+        expect(state.position.pixels, offset);
+        expect(
+          find.textContaining('apple banana', findRichText: true),
+          findsWidgets,
+        );
+
+        final gesture = await tester.startGesture(tester.getCenter(viewport));
+        await gesture.moveBy(const Offset(-40, 0));
+        await tester.pump();
+        final duringDrag = state.position.pixels;
+        text.value += ' cherry';
+        await tester.pump();
+        expect(tester.state<ScrollableState>(scroll), same(state));
+        expect(state.position.pixels, duringDrag);
+        await gesture.moveBy(const Offset(-40, 0));
+        await tester.pump();
+        expect(state.position.pixels, greaterThan(duringDrag));
+        await gesture.up();
+        await tester.pumpAndSettle();
+      },
+    );
+  }
+
+  testWidgets(
+    'table offset survives stream growth, block close and completion',
+    (tester) async {
+      _overrideMarkdownTablePlatform(TargetPlatform.iOS);
+      var text =
+          '| A | B | C | D | E |\n'
+          '| --- | --- | --- | --- | --- |\n| apple';
+      Future<void> render({bool streaming = true}) async {
+        await tester.pumpWidget(
+          _markdownHarness(text, width: 320, streaming: streaming),
+        );
+        await tester.pump();
+      }
+
+      await render();
+      final viewport = find.byKey(
+        const ValueKey('markdown-table-horizontal-scroll'),
+      );
+      final scroll = find.descendant(
+        of: viewport,
+        matching: find.byType(Scrollable),
+      );
+      final state = tester.state<ScrollableState>(scroll);
+      await tester.drag(viewport, const Offset(-100, 0));
+      await tester.pumpAndSettle();
+      final offset = state.position.pixels;
+      expect(offset, greaterThan(50));
+
+      // Cross the old whole-document / incremental rendering threshold.
+      text += ' | ${'wide ' * 100} | C | D | E |';
+      expect(text.length, greaterThan(512));
+      await render();
+      expect(tester.state<ScrollableState>(scroll), same(state));
+      expect(state.position.pixels, offset);
+      for (final suffix in ['\n', '\nFollowing paragraph']) {
+        text += suffix;
+        await render();
+        expect(tester.state<ScrollableState>(scroll), same(state));
+        expect(state.position.pixels, offset);
+      }
+      await render(streaming: false);
+      expect(tester.state<ScrollableState>(scroll), same(state));
+      expect(state.position.pixels, offset);
+      expect(
+        find.textContaining('Following paragraph', findRichText: true),
+        findsWidgets,
+      );
+
+      text = text.replaceFirst('apple', 'replacement');
+      await render(streaming: false);
+      expect(tester.state<ScrollableState>(scroll).position.pixels, 0);
+      expect(
+        find.textContaining('replacement', findRichText: true),
+        findsWidgets,
+      );
+    },
+  );
+
+  testWidgets('appending to a table reuses the earlier table and its offset', (
+    tester,
+  ) async {
+    _overrideMarkdownTablePlatform(TargetPlatform.iOS);
+    const header =
+        '| A | B | C | D | E |\n'
+        '| --- | --- | --- | --- | --- |\n';
+    final text = ValueNotifier(
+      '$header| apple | B | C | D | E |\n\n$header| banana',
+    );
+    addTearDown(text.dispose);
+    await tester.pumpWidget(_streamingMarkdownHarness(text, width: 320));
+    await tester.pump();
+    final viewports = find.byKey(
+      const ValueKey('markdown-table-horizontal-scroll'),
+    );
+    expect(viewports, findsNWidgets(2));
+    final states = <ScrollableState>[];
+    for (var i = 0; i < 2; i++) {
+      states.add(
+        tester.state<ScrollableState>(
+          find.descendant(
+            of: viewports.at(i),
+            matching: find.byType(Scrollable),
+          ),
+        ),
+      );
+      await tester.drag(viewports.at(i), Offset(-80.0 * (i + 1), 0));
+      await tester.pumpAndSettle();
+    }
+    final offsets = states.map((state) => state.position.pixels).toList();
+    expect(offsets.first, greaterThan(0));
+    expect(offsets.last, greaterThan(offsets.first));
+    final cached = tester.widget<GptMarkdown>(find.byType(GptMarkdown).first);
+
+    text.value += ' cherry';
+    await tester.pump();
+    expect(tester.widget(find.byType(GptMarkdown).first), same(cached));
+    for (var i = 0; i < 2; i++) {
+      final state = tester.state<ScrollableState>(
+        find.descendant(of: viewports.at(i), matching: find.byType(Scrollable)),
+      );
+      expect(state, same(states[i]));
+      expect(state.position.pixels, offsets[i]);
+    }
+  });
+
   testWidgets('MarkdownWithCodeHighlight scrolls only overflowing table', (
     tester,
   ) async {
