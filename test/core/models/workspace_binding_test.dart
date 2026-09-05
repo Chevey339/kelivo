@@ -52,5 +52,24 @@ void main() {
       expect(next['other.flag'], isTrue);
       expect(const WorkspaceBinding().isBound, isFalse);
     });
+
+    test('extrasHaveWorkspace requires a live bound workspace', () {
+      bool exists(String id) => id == 'ws-1';
+
+      expect(
+        WorkspaceBinding.extrasHaveWorkspace({
+          WorkspaceBinding.keyId: 'ws-1',
+        }, exists),
+        isTrue,
+      );
+      expect(
+        WorkspaceBinding.extrasHaveWorkspace({
+          WorkspaceBinding.keyId: 'missing',
+        }, exists),
+        isFalse,
+      );
+      expect(WorkspaceBinding.extrasHaveWorkspace(const {}, exists), isFalse);
+      expect(WorkspaceBinding.extrasHaveWorkspace(null, exists), isFalse);
+    });
   });
 }

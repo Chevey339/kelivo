@@ -18,6 +18,17 @@ class WorkspaceBinding {
 
   bool get isBound => workspaceId != null && workspaceId!.isNotEmpty;
 
+  /// True when extras name a workspace that [exists] still finds.
+  static bool extrasHaveWorkspace(
+    Map<String, dynamic>? extras,
+    bool Function(String id) exists,
+  ) {
+    final binding = WorkspaceBinding.fromExtras(
+      extras ?? const <String, dynamic>{},
+    );
+    return binding.isBound && exists(binding.workspaceId!);
+  }
+
   factory WorkspaceBinding.fromExtras(Map<String, dynamic> extras) {
     return WorkspaceBinding(
       workspaceId: extras[keyId] as String?,

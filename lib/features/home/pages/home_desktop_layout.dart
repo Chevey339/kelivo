@@ -12,9 +12,11 @@ import '../../../l10n/app_localizations.dart';
 import '../widgets/side_drawer.dart';
 import '../../../icons/lucide_adapter.dart';
 import '../../../core/models/assistant.dart';
+import '../../../core/models/workspace_binding.dart';
 import '../../../core/providers/user_provider.dart';
 import '../../../core/providers/settings_provider.dart';
 import '../../../core/providers/assistant_provider.dart';
+import '../../../core/providers/workspace_provider.dart';
 import '../../../core/services/chat/chat_service.dart';
 import '../../workspace/widgets/desktop_workspace_bar.dart';
 import '../../../shared/animations/widgets.dart';
@@ -121,6 +123,7 @@ class HomeDesktopScaffold extends StatelessWidget {
     final cs = Theme.of(context).colorScheme;
     final sp = context.watch<SettingsProvider>();
     final topicsOnRight = sp.desktopTopicPosition == DesktopTopicPosition.right;
+    final workspaceBound = _isDesktop && _hasBoundWorkspace(context);
 
     return ChatFrostedBackdrop(
       backdrop: buildAssistantBackground(context),
@@ -157,11 +160,17 @@ class HomeDesktopScaffold extends StatelessWidget {
                 extendBodyBehindAppBar: true,
                 backgroundColor: Colors.transparent,
                 appBar:
-                    appBarOverride ?? _buildAppBar(context, cs, topicsOnRight),
+                    appBarOverride ??
+                    _buildAppBar(
+                      context,
+                      cs,
+                      topicsOnRight,
+                      workspaceBound: workspaceBound,
+                    ),
                 body: body,
               ),
             ),
-            _buildWorkspaceBar(context, cs),
+            _buildWorkspaceBar(context, cs, workspaceBound: workspaceBound),
             // Right sidebar (desktop only with topics on right)
             _buildRightSidebar(context, cs, topicsOnRight),
           ],
@@ -269,9 +278,30 @@ class HomeDesktopScaffold extends StatelessWidget {
     );
   }
 
-  Widget _buildWorkspaceBar(BuildContext context, ColorScheme cs) {
+  bool _hasBoundWorkspace(BuildContext context) {
+    try {
+      final chat = context.watch<ChatService>();
+      final workspaces = context.watch<WorkspaceProvider>();
+      final id = chat.currentConversationId;
+      if (id == null) return false;
+      return WorkspaceBinding.extrasHaveWorkspace(
+        chat.getConversation(id)?.extras,
+        (workspaceId) => workspaces.byId(workspaceId) != null,
+      );
+    } on ProviderNotFoundException {
+      return false;
+    }
+  }
+
+  Widget _buildWorkspaceBar(
+    BuildContext context,
+    ColorScheme cs, {
+    required bool workspaceBound,
+  }) {
     if (!_isDesktop) return const SizedBox.shrink();
-    final open = context.watch<SettingsProvider>().desktopWorkspaceBarOpen;
+    final open =
+        workspaceBound &&
+        context.watch<SettingsProvider>().desktopWorkspaceBarOpen;
     final conversationId = context.watch<ChatService>().currentConversationId;
     return Row(
       mainAxisSize: MainAxisSize.min,
@@ -318,8 +348,9 @@ class HomeDesktopScaffold extends StatelessWidget {
   PreferredSizeWidget _buildAppBar(
     BuildContext context,
     ColorScheme cs,
-    bool topicsOnRight,
-  ) {
+    bool topicsOnRight, {
+    required bool workspaceBound,
+  }) {
     return AppBar(
       centerTitle: false,
       systemOverlayStyle: (Theme.of(context).brightness == Brightness.dark)
@@ -351,7 +382,11 @@ class HomeDesktopScaffold extends StatelessWidget {
       ),
       titleSpacing: 2,
       title: _buildTitle(context, cs),
-      actions: _buildActions(context, topicsOnRight),
+      actions: _buildActions(
+        context,
+        topicsOnRight,
+        workspaceBound: workspaceBound,
+      ),
     );
   }
 
@@ -584,10 +619,14 @@ class HomeDesktopScaffold extends StatelessWidget {
     DesktopSidebarTabBus.instance.switchToTopics();
   }
 
-  List<Widget> _buildActions(BuildContext context, bool topicsOnRight) {
+  List<Widget> _buildActions(
+    BuildContext context,
+    bool topicsOnRight, {
+    required bool workspaceBound,
+  }) {
     final l10n = AppLocalizations.of(context)!;
     return [
-      if (_isDesktop)
+      if (_isDesktop && workspaceBound)
         Tooltip(
           message: l10n.workspaceDeskBarToggle,
           child: IosIconButton(
