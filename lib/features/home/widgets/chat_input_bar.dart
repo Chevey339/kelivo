@@ -103,6 +103,8 @@ class ChatInputBar extends StatefulWidget {
     this.onOpenWorkspace,
     this.showWorkspaceButton = false,
     this.workspaceActive = false,
+    this.onOpenSkills,
+    this.skillsActive = false,
     this.onOpenSearch,
     this.onMore,
     this.onConfigureReasoning,
@@ -158,6 +160,8 @@ class ChatInputBar extends StatefulWidget {
   final VoidCallback? onOpenWorkspace;
   final bool showWorkspaceButton;
   final bool workspaceActive;
+  final VoidCallback? onOpenSkills;
+  final bool skillsActive;
   final VoidCallback? onOpenSearch;
   final VoidCallback? onMore;
   final VoidCallback? onConfigureReasoning;
@@ -1943,7 +1947,26 @@ class _ChatInputBarState extends State<ChatInputBar>
           );
         }
 
-        // Tools button (local tools, MCP servers, workspace)
+        if (widget.onOpenSkills != null) {
+          actions.add(
+            _OverflowAction(
+              width: normalButtonW,
+              builder: () => _CompactIconButton(
+                tooltip: l10n.workspaceEntrySessionSkills,
+                icon: Lucide.WandSparkles,
+                active: widget.skillsActive,
+                onTap: lockTap(widget.onOpenSkills),
+              ),
+              menu: DesktopContextMenuItem(
+                icon: Lucide.WandSparkles,
+                label: l10n.workspaceEntrySessionSkills,
+                onTap: lockTap(widget.onOpenSkills),
+              ),
+            ),
+          );
+        }
+
+        // Tools button (local tools and MCP servers)
         if (widget.showToolsButton) {
           actions.add(
             _OverflowAction(

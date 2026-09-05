@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 import '../../../core/models/chat_input_data.dart';
 import '../../../core/models/assistant.dart';
 import '../../../core/models/workspace_binding.dart';
+import '../../../core/models/skills_binding.dart';
 import '../../../core/providers/asr_provider.dart';
 import '../../../core/providers/settings_provider.dart';
 import '../../../core/providers/assistant_provider.dart';
@@ -14,6 +15,7 @@ import '../../../core/providers/quick_phrase_provider.dart';
 import '../../../core/providers/instruction_injection_provider.dart';
 import '../../../core/providers/world_book_provider.dart';
 import '../../../core/services/chat/chat_service.dart';
+import '../../../core/services/skills/skills_service.dart';
 import '../../../features/workspace/widgets/environment/environment_status_chip.dart';
 import '../../../features/workspace/workspace_navigation.dart';
 import '../../../theme/design_tokens.dart';
@@ -55,6 +57,7 @@ class ChatInputSection extends StatelessWidget {
     this.onOpenTools,
     this.onLongPressTools,
     this.onOpenWorkspace,
+    this.onOpenSkills,
     this.onOpenSearch,
     this.onConfigureReasoning,
     this.onSend,
@@ -98,6 +101,7 @@ class ChatInputSection extends StatelessWidget {
   final VoidCallback? onOpenTools;
   final VoidCallback? onLongPressTools;
   final VoidCallback? onOpenWorkspace;
+  final VoidCallback? onOpenSkills;
   final VoidCallback? onOpenSearch;
   final VoidCallback? onConfigureReasoning;
   final Future<ChatInputSubmissionResult> Function(ChatInputData)? onSend;
@@ -177,6 +181,9 @@ class ChatInputSection extends StatelessWidget {
       onOpenWorkspace: onOpenWorkspace,
       showWorkspaceButton: showWorkspaceButton,
       workspaceActive: workspaceBound,
+      onOpenSkills: isDesktop ? onOpenSkills : null,
+      skillsActive:
+          isDesktop && onOpenSkills != null && _isSkillsActive(context, a),
       onStop: onStop,
       modelIcon: (pk != null && mid != null)
           ? CurrentModelIcon(
@@ -272,6 +279,20 @@ class ChatInputSection extends StatelessWidget {
         ),
         bar,
       ],
+    );
+  }
+
+  bool _isSkillsActive(BuildContext context, Assistant? assistant) {
+    final skillIds = context.select<ChatService?, List<String>?>((chat) {
+      final extras = chat?.getConversation(conversationId ?? '')?.extras;
+      return SkillsBinding.fromExtras(extras ?? const {}).skillIds;
+    });
+    return context.select<SkillsService?, bool>(
+      (skills) =>
+          skills
+              ?.resolveForAssistant(assistant, conversationOverride: skillIds)
+              .isNotEmpty ??
+          false,
     );
   }
 

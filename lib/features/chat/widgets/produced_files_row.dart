@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 
+import 'package:Kelivo/core/services/workspace/file_link_resolver.dart';
 import 'package:Kelivo/icons/lucide_adapter.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
 import 'package:Kelivo/shared/widgets/ios_tactile.dart';
@@ -56,7 +57,9 @@ List<ProducedFileEntry> collectProducedFileEntries(
     for (var i = 0; i < links.length; i++) {
       final link = links[i];
       if (link.isEmpty || !seen.add(link)) continue;
-      final path = i < files.length && files[i].isNotEmpty ? files[i] : link;
+      final path = i < files.length && files[i].isNotEmpty
+          ? files[i]
+          : KelivoLink.tryParse(link)?.relativePath ?? link;
       out.add(
         ProducedFileEntry(
           label: path,

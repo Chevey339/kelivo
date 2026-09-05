@@ -12,6 +12,8 @@ import 'package:Kelivo/l10n/app_localizations.dart';
 import 'package:Kelivo/features/workspace/workspace_layout.dart';
 import 'package:Kelivo/shared/widgets/form_sheet.dart';
 import 'package:Kelivo/shared/widgets/ios_settings_rows.dart';
+import 'package:Kelivo/shared/widgets/ios_checkbox.dart';
+import 'package:Kelivo/shared/widgets/ios_tactile.dart';
 import 'package:Kelivo/shared/widgets/section_card.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -59,10 +61,81 @@ class ConversationSkillsPanel extends StatelessWidget {
     super.key,
     required this.conversationId,
     required this.assistant,
+    this.compact = false,
+    this.footerAction,
   });
 
   final String conversationId;
   final Assistant? assistant;
+  final bool compact;
+  final Widget? footerAction;
+
+  Widget _group({required List<Widget> children}) => compact
+      ? Column(mainAxisSize: MainAxisSize.min, children: children)
+      : SectionCard(children: children);
+
+  Widget _switchRow({
+    required Key key,
+    IconData? icon,
+    required String label,
+    required bool value,
+    required ValueChanged<bool> onChanged,
+  }) {
+    if (!compact) {
+      return IosSwitchRow(
+        key: key,
+        icon: icon,
+        label: label,
+        value: value,
+        onChanged: onChanged,
+      );
+    }
+    return Builder(
+      key: key,
+      builder: (context) {
+        final cs = Theme.of(context).colorScheme;
+        final color = value ? cs.primary : cs.onSurface;
+        return Semantics(
+          toggled: value,
+          child: IosCardPress(
+            baseColor: Colors.transparent,
+            borderRadius: BorderRadius.circular(8),
+            padding: const EdgeInsets.symmetric(horizontal: 8),
+            haptics: false,
+            onTap: () => onChanged(!value),
+            child: SizedBox(
+              height: 40,
+              child: Row(
+                children: [
+                  SizedBox(
+                    width: 22,
+                    child: icon == null
+                        ? null
+                        : Icon(icon, size: 16, color: color),
+                  ),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      label,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(fontSize: 13, color: color),
+                    ),
+                  ),
+                  SizedBox(
+                    width: 16,
+                    child: value
+                        ? Icon(Lucide.Check, size: 16, color: cs.primary)
+                        : null,
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
 
   static const Key inheritKey = SkillsKeys.inherit;
 
@@ -124,31 +197,35 @@ class ConversationSkillsPanel extends StatelessWidget {
     );
     final activeIds = {for (final skill in active) skill.record.id};
 
+    void setInherit(bool value) {
+      if (value) {
+        unawaited(_writeConversation(context, null));
+        return;
+      }
+      final snapshot = [
+        for (final skill in skillsService.resolveForAssistant(live))
+          skill.record.id,
+      ];
+      unawaited(_writeConversation(context, snapshot));
+    }
+
     return Column(
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        SectionCard(
-          children: [
-            IosSwitchRow(
-              key: inheritKey,
-              label: l10n.skillsInheritAssistant,
-              value: inherit,
-              onChanged: (value) {
-                if (value) {
-                  unawaited(_writeConversation(context, null));
-                  return;
-                }
-                final snapshot = [
-                  for (final skill in skillsService.resolveForAssistant(live))
-                    skill.record.id,
-                ];
-                unawaited(_writeConversation(context, snapshot));
-              },
-            ),
-          ],
-        ),
-        const SizedBox(height: 12),
+        if (!compact) ...[
+          _group(
+            children: [
+              _switchRow(
+                key: inheritKey,
+                label: l10n.skillsInheritAssistant,
+                value: inherit,
+                onChanged: setInherit,
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+        ],
         if (listed.isEmpty)
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 24),
@@ -173,11 +250,11 @@ class ConversationSkillsPanel extends StatelessWidget {
             ),
           )
         else
-          SectionCard(
+          _group(
             children: [
               for (var i = 0; i < listed.length; i++) ...[
-                if (i > 0) const IosRowDivider(),
-                IosSwitchRow(
+                if (i > 0 && !compact) const IosRowDivider(),
+                _switchRow(
                   key: ConversationSkillsPanel.skillKey(listed[i].record.id),
                   icon: Lucide.WandSparkles,
                   label: listed[i].name,
@@ -221,6 +298,55 @@ class ConversationSkillsPanel extends StatelessWidget {
               ],
             ],
           ),
+        if (compact) ...[
+          const SizedBox(height: 8),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Flexible(
+                child: IosCardPress(
+                  key: inheritKey,
+                  baseColor: Colors.transparent,
+                  borderRadius: BorderRadius.circular(8),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 8,
+                  ),
+                  haptics: false,
+                  onTap: () => setInherit(!inherit),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      IosCheckbox(
+                        value: inherit,
+                        onChanged: setInherit,
+                        size: 16,
+                        hitTestSize: 20,
+                        borderWidth: 1.5,
+                        activeColor: cs.primary,
+                        enableHaptics: false,
+                        semanticLabel: l10n.skillsInheritAssistant,
+                      ),
+                      const SizedBox(width: 6),
+                      Flexible(
+                        child: Text(
+                          l10n.skillsInheritAssistant,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(fontSize: 12, color: cs.onSurface),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              if (footerAction != null) ...[
+                const SizedBox(width: 8),
+                footerAction!,
+              ],
+            ],
+          ),
+        ],
       ],
     );
   }

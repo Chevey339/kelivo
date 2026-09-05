@@ -29,6 +29,7 @@ import '../../../desktop/search_provider_popover.dart';
 import '../../../desktop/reasoning_budget_popover.dart';
 import '../../../desktop/tools_popover.dart';
 import '../../../desktop/workspace_dialog.dart';
+import '../../../desktop/skills_popover.dart';
 import '../../../desktop/mini_map_popover.dart';
 import '../../../desktop/quick_phrase_popover.dart';
 import '../../../desktop/instruction_injection_popover.dart';
@@ -36,6 +37,7 @@ import '../../../desktop/world_book_popover.dart';
 import '../../../icons/lucide_adapter.dart';
 import '../../chat/widgets/bottom_tools_sheet.dart';
 import '../../chat/widgets/chat_tools_sheet.dart';
+import '../../chat/utils/ensure_conversation.dart';
 import '../../chat/widgets/context_management_sheet.dart';
 import '../../chat/widgets/reasoning_budget_sheet.dart';
 import '../../search/widgets/search_settings_sheet.dart';
@@ -1411,6 +1413,21 @@ class _HomePageState extends State<HomePage>
         } else {
           _toggleTools();
         }
+      },
+      onOpenSkills: () async {
+        final assistant = context.read<AssistantProvider>().currentAssistant;
+        final id = await ensureConversationId(
+          context,
+          conversationId: _controller.currentConversation?.id,
+          assistantId: assistant?.id,
+        );
+        if (id == null || !context.mounted) return;
+        await showDesktopSkillsPopover(
+          context,
+          anchorKey: _inputBarKey,
+          conversationId: id,
+          assistant: assistant,
+        );
       },
       onOpenTools: () {
         final a = context.read<AssistantProvider>().currentAssistant;
