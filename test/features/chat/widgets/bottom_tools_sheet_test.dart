@@ -17,6 +17,7 @@ import 'package:Kelivo/core/services/skills/skills_service.dart';
 import 'package:Kelivo/core/services/workspace/workspace_runtime.dart';
 import 'package:Kelivo/features/chat/widgets/bottom_tools_sheet.dart';
 import 'package:Kelivo/features/workspace/pages/skills_page.dart';
+import 'package:Kelivo/features/workspace/widgets/skills/conversation_skills_sheet.dart';
 import 'package:Kelivo/features/workspace/widgets/workspace_section.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
 import 'package:Kelivo/shared/widgets/snackbar.dart';
@@ -202,6 +203,22 @@ void main() {
     );
     expect(find.text(l10n.instructionInjectionTitle), findsOneWidget);
     expect(find.text(l10n.contextManagement), findsOneWidget);
+  });
+
+  testWidgets('tapping session skills stacks the picker on the more sheet', (
+    tester,
+  ) async {
+    final l10n = await pumpSheet(
+      tester,
+      conversation: Conversation(id: 'c1', title: 'Chat'),
+    );
+
+    await tester.tap(find.byKey(sessionSkillsKey));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(BottomToolsSheet), findsOneWidget);
+    expect(find.byType(ConversationSkillsPanel), findsOneWidget);
+    expect(find.text(l10n.skillsSessionTitle), findsOneWidget);
   });
 
   testWidgets('long-pressing session skills opens the skills library', (

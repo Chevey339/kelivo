@@ -19,7 +19,6 @@ import '../../model/widgets/ocr_prompt_sheet.dart';
 import '../../workspace/pages/skills_page.dart';
 import '../../workspace/widgets/skills/conversation_skills_sheet.dart';
 import '../utils/ensure_conversation.dart';
-import '../utils/sheet_navigation.dart';
 import 'package:Kelivo/theme/app_semantic_colors.dart';
 import '../../../shared/widgets/section_card.dart';
 import 'tools_sheet_row.dart';
@@ -222,17 +221,10 @@ class _LearningAndClearSectionState extends State<_LearningAndClearSection> {
       assistantId: widget.assistantId,
     );
     if (id == null || !mounted) return;
-    final assistant = _assistant();
-    afterSheetClose(
+    await showConversationSkillsSheet(
       context,
-      onClose: widget.onClose,
-      action: (ctx) => unawaited(
-        showConversationSkillsSheet(
-          ctx,
-          conversationId: id,
-          assistant: assistant,
-        ),
-      ),
+      conversationId: id,
+      assistant: _assistant(),
     );
   }
 

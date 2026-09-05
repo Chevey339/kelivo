@@ -14,6 +14,7 @@ import 'package:Kelivo/core/services/chat/chat_service.dart';
 import 'package:Kelivo/core/services/sandbox/environment_manager.dart';
 import 'package:Kelivo/core/services/workspace/workspace_runtime.dart';
 import 'package:Kelivo/features/chat/widgets/tools_sheet_row.dart';
+import 'package:Kelivo/features/workspace/pages/workspace_files_page.dart';
 import 'package:Kelivo/features/workspace/widgets/files/file_browser.dart';
 import 'package:Kelivo/features/workspace/widgets/workspace_picker.dart';
 import 'package:Kelivo/features/workspace/widgets/workspace_section.dart';
@@ -341,6 +342,26 @@ void main() {
     // in the ＋ sheet now.
     expect(find.text(l10n.workspaceEntryFiles), findsNothing);
     expect(find.text(l10n.workspaceEntrySessionSkills), findsNothing);
+  });
+
+  testWidgets('long-pressing the bound workspace opens its files page', (
+    tester,
+  ) async {
+    final workspace = await tester.runAsync(
+      () => workspaces.create(name: 'Alpha'),
+    );
+    if (workspace == null) fail('workspace create failed');
+    final chat = _FakeChatService(
+      Conversation(
+        title: 'Chat',
+        extras: WorkspaceBinding(workspaceId: workspace.id).applyTo({}),
+      ),
+    );
+    await pumpSection(tester, chat: chat);
+    await tester.longPress(find.byKey(WorkspaceSection.nameKey));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
+    expect(find.byType(WorkspaceFilesPage), findsOneWidget);
   });
 
   testWidgets('toolsUsed still opens the menu and confirms before unbind', (

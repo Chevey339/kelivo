@@ -8,6 +8,7 @@ import 'package:Kelivo/core/providers/settings_provider.dart';
 import 'package:Kelivo/core/services/chat/chat_service.dart';
 import 'package:Kelivo/core/services/skills/skills_service.dart';
 import 'package:Kelivo/features/workspace/widgets/skills/conversation_skills_sheet.dart';
+import 'package:Kelivo/features/workspace/widgets/skills/skill_detail.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -216,4 +217,32 @@ void main() {
       );
     },
   );
+
+  testWidgets('long-pressing a skill opens its detail page', (tester) async {
+    final enabled = createTempSkill(
+      id: 'alpha',
+      name: 'Alpha',
+      description: 'First',
+      parent: tempDir,
+    );
+    final skills = FakeSkillsService(
+      skills: [enabled],
+      skillsDirectory: tempDir,
+    );
+    final chat = FakeChatService(
+      conversation: Conversation(id: 'c1', title: 'Chat'),
+    );
+    final assistants = await loadAssistant(tester);
+
+    await pumpPanel(tester, skills: skills, chat: chat, assistants: assistants);
+
+    await tester.longPress(
+      find.byKey(ConversationSkillsPanel.skillKey('alpha')),
+    );
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
+
+    expect(find.byType(SkillDetailPage), findsOneWidget);
+    expect(skills.enabledCalls, isEmpty);
+  });
 }

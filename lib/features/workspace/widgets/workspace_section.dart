@@ -14,6 +14,7 @@ import 'package:Kelivo/features/chat/utils/sheet_navigation.dart';
 import 'package:Kelivo/features/chat/widgets/tools_sheet_row.dart';
 import 'package:Kelivo/features/workspace/terminal/open_terminal.dart';
 import 'package:Kelivo/features/workspace/widgets/environment/environment_labels.dart';
+import 'package:Kelivo/features/workspace/pages/workspace_files_page.dart';
 import 'package:Kelivo/features/workspace/widgets/files/conversation_files_panel.dart';
 import 'package:Kelivo/features/workspace/widgets/files/file_browser_ops.dart';
 import 'package:Kelivo/features/workspace/widgets/files/workspace_prompts.dart';
@@ -504,6 +505,7 @@ class _WorkspaceSectionState extends State<WorkspaceSection> {
         icon: Lucide.FolderCode,
         label: workspace.name,
         onTap: () => _openBoundMenu(rowContext, workspace, binding),
+        onLongPress: () => _openWorkspacePage(workspace),
         // Shift out the last button's own tap padding so the icons end on the
         // same edge as the switches and chevrons on the rows below.
         trailing: Transform.translate(
@@ -548,6 +550,13 @@ class _WorkspaceSectionState extends State<WorkspaceSection> {
         ),
       ),
     );
+  }
+
+  void _openWorkspacePage(Workspace workspace) {
+    Haptics.light();
+    _afterClose((ctx) {
+      unawaited(WorkspaceFilesPage.open(ctx, workspaceId: workspace.id));
+    });
   }
 
   void _openFiles() {

@@ -4,8 +4,10 @@ import 'package:Kelivo/core/models/assistant.dart';
 import 'package:Kelivo/core/models/skills_binding.dart';
 import 'package:Kelivo/core/providers/assistant_provider.dart';
 import 'package:Kelivo/core/services/chat/chat_service.dart';
+import 'package:Kelivo/core/services/haptics.dart';
 import 'package:Kelivo/core/services/skills/skills_service.dart';
 import 'package:Kelivo/features/settings/widgets/custom_theme_widgets.dart';
+import 'package:Kelivo/features/workspace/widgets/skills/skill_detail.dart';
 import 'package:Kelivo/features/workspace/widgets/skills/skill_labels.dart';
 import 'package:Kelivo/icons/lucide_adapter.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
@@ -80,6 +82,7 @@ class ConversationSkillsPanel extends StatelessWidget {
     required String label,
     required bool value,
     required ValueChanged<bool> onChanged,
+    VoidCallback? onLongPress,
   }) {
     if (!compact) {
       return IosSwitchRow(
@@ -88,6 +91,7 @@ class ConversationSkillsPanel extends StatelessWidget {
         label: label,
         value: value,
         onChanged: onChanged,
+        onLongPress: onLongPress,
       );
     }
     return Builder(
@@ -103,6 +107,7 @@ class ConversationSkillsPanel extends StatelessWidget {
             padding: const EdgeInsets.symmetric(horizontal: 8),
             haptics: false,
             onTap: () => onChanged(!value),
+            onLongPress: onLongPress,
             child: SizedBox(
               height: 40,
               child: Row(
@@ -265,6 +270,12 @@ class ConversationSkillsPanel extends StatelessWidget {
                       : (binding.skillIds ?? const <String>[]).contains(
                           listed[i].record.id,
                         ),
+                  onLongPress: () {
+                    Haptics.light();
+                    unawaited(
+                      showSkillDetail(context, skillId: listed[i].record.id),
+                    );
+                  },
                   onChanged: (checked) {
                     final skillId = listed[i].record.id;
                     if (followGlobal) {

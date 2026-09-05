@@ -149,6 +149,7 @@ class IosSwitchRow extends StatelessWidget {
     required this.label,
     required this.value,
     required this.onChanged,
+    this.onLongPress,
     this.destructive = false,
     this.iconColor,
   });
@@ -157,6 +158,7 @@ class IosSwitchRow extends StatelessWidget {
   final String label;
   final bool value;
   final ValueChanged<bool> onChanged;
+  final VoidCallback? onLongPress;
   final bool destructive;
   final Color? iconColor;
 
@@ -175,6 +177,7 @@ class IosSwitchRow extends StatelessWidget {
       pressedScale: 1.0,
       haptics: true,
       onTap: () => onChanged(!value),
+      onLongPress: onLongPress,
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
         child: Row(
