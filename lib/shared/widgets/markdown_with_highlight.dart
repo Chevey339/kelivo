@@ -5,6 +5,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:gpt_markdown/gpt_markdown.dart';
 import 'package:gpt_markdown/custom_widgets/markdown_config.dart'
     show GptMarkdownConfig;
+import 'package:gpt_markdown/custom_widgets/selectable_adapter.dart';
 import 'package:flutter_highlight/themes/github.dart';
 import 'package:flutter_highlight/themes/atom-one-dark-reasonable.dart';
 import 'package:flutter/rendering.dart';
@@ -853,14 +854,17 @@ class _MarkdownBlockSeparator extends StatelessWidget {
     // The paragraph carries the `NewLines` style, and its one run is a space:
     // the style has to sit on the paragraph because a line box is measured from
     // the paragraph style when there is no run, and that path rounds
-    // differently from a line that has one. A space is invisible, and the
-    // separator stays out of selection so it cannot be copied.
-    return SelectionContainer.disabled(
-      child: Text.rich(
-        const TextSpan(text: ' '),
-        style: (style ?? const TextStyle()).copyWith(
-          fontSize: style?.fontSize ?? _fallbackFontSize,
-          height: _newLinesHeight,
+    // differently from a line that has one. Copy the paragraph break instead
+    // of the invisible space used to measure it.
+    return SelectableAdapter(
+      selectedText: '\n\n',
+      child: SelectionContainer.disabled(
+        child: Text.rich(
+          const TextSpan(text: ' '),
+          style: (style ?? const TextStyle()).copyWith(
+            fontSize: style?.fontSize ?? _fallbackFontSize,
+            height: _newLinesHeight,
+          ),
         ),
       ),
     );
@@ -874,9 +878,11 @@ class _MarkdownBlockColumn extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Let loose-width bubbles hug their content; tight parent constraints
+    // still make the column fill the available width.
     final column = Column(
       mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.stretch,
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: children,
     );
     return LayoutBuilder(
@@ -884,9 +890,10 @@ class _MarkdownBlockColumn extends StatelessWidget {
         if (!constraints.hasBoundedHeight) return column;
         return OverflowBox(
           alignment: Alignment.topCenter,
+          fit: OverflowBoxFit.deferToChild,
           minHeight: 0,
           maxHeight: double.infinity,
-          child: SizedBox(width: constraints.maxWidth, child: column),
+          child: column,
         );
       },
     );

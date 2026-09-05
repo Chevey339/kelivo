@@ -963,6 +963,71 @@ Inline ***strong emphasis*** text.
     });
   });
 
+  testWidgets(
+    'paragraph selection keeps line breaks through streaming',
+    (tester) async {
+      const text = 'First paragraph.\n\nSecond paragraph.';
+      final streaming = ValueNotifier(true);
+      addTearDown(streaming.dispose);
+      String? selected;
+      await tester.pumpWidget(
+        _settingsHarness(
+          onSettingsReady: (_) {},
+          child: SelectionArea(
+            onSelectionChanged: (content) => selected = content?.plainText,
+            child: Align(
+              alignment: Alignment.topLeft,
+              child: ValueListenableBuilder<bool>(
+                valueListenable: streaming,
+                builder: (_, value, _) =>
+                    MarkdownWithCodeHighlight(text: text, streaming: value),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      for (final value in [true, false]) {
+        streaming.value = value;
+        await tester.pumpAndSettle();
+        final region = tester.state<SelectableRegionState>(
+          find.byType(SelectableRegion),
+        );
+        region.selectAll(SelectionChangedCause.keyboard);
+        await tester.pumpAndSettle();
+        expect(selected, text, reason: 'streaming=$value');
+        region.clearSelection();
+        await tester.pump();
+
+        // A drag across the gap must include the same break as Select All.
+        final first = _paragraphContaining('First paragraph.');
+        final second = _paragraphContaining('Second paragraph.');
+        final start = first.localToGlobal(const Offset(1, 8));
+        final end = second.localToGlobal(Offset(second.size.width - 1, 8));
+        for (final reverse in [true, false]) {
+          // Separate the gestures so reversing at the previous endpoint does
+          // not become a double click and select a word instead of a range.
+          await tester.pump(const Duration(milliseconds: 400));
+          final gesture = await tester.startGesture(
+            reverse ? end : start,
+            kind: ui.PointerDeviceKind.mouse,
+          );
+          await tester.pump();
+          await gesture.moveTo(reverse ? start : end);
+          await tester.pump();
+          await gesture.up();
+          await gesture.removePointer();
+          await tester.pumpAndSettle();
+          expect(selected, text, reason: 'streaming=$value reverse=$reverse');
+          region.clearSelection();
+          await tester.pump();
+        }
+      }
+    },
+    variant: TargetPlatformVariant.desktop(),
+  );
+
   for (final longReply in [false, true]) {
     testWidgets(
       'streaming table preserves its offset and active drag (long=$longReply)',
