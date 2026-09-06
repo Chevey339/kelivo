@@ -1,5 +1,6 @@
 import "../../../support/business_test_harness.dart";
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -75,22 +76,31 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   group('ReasoningBudgetSheet', () {
-    testWidgets('shows max reasoning for Claude Fable 5', (tester) async {
+    testWidgets('shows max reasoning stop for Claude Fable 5', (tester) async {
       final settings = await _settingsForClaudeModel(tester, 'claude-fable-5');
       await _pumpSheetLauncher(tester, settings: settings);
 
       await _openSheet(tester);
 
-      expect(find.text('Extreme Reasoning'), findsOneWidget);
-      expect(find.text('Maximum Reasoning'), findsOneWidget);
+      expect(
+        find.byKey(const ValueKey('reasoning-stop-64000')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const ValueKey('reasoning-stop-128000')),
+        findsOneWidget,
+      );
 
-      await tester.tap(find.text('Maximum Reasoning'));
+      await tester.tapAt(
+        tester.getCenter(find.byKey(const ValueKey('reasoning-stop-128000'))),
+      );
       await tester.pumpAndSettle();
 
       expect(settings.thinkingBudget, 128000);
+      expect(find.text('Max'), findsOneWidget);
     });
 
-    testWidgets('keeps max reasoning hidden for older Claude models', (
+    testWidgets('keeps max reasoning stop hidden for older Claude models', (
       tester,
     ) async {
       final settings = await _settingsForClaudeModel(
@@ -101,8 +111,68 @@ void main() {
 
       await _openSheet(tester);
 
-      expect(find.text('Extreme Reasoning'), findsNothing);
-      expect(find.text('Maximum Reasoning'), findsNothing);
+      expect(find.byKey(const ValueKey('reasoning-stop-64000')), findsNothing);
+      expect(find.byKey(const ValueKey('reasoning-stop-128000')), findsNothing);
+    });
+
+    testWidgets('animates label layout when the level changes', (
+      tester,
+    ) async {
+      final settings = await _settingsForClaudeModel(
+        tester,
+        'claude-sonnet-4-5',
+      );
+      await tester.pumpWidget(
+        MultiProvider(
+          providers: [
+            ChangeNotifierProvider<SettingsProvider>.value(value: settings),
+            ChangeNotifierProvider<AssistantProvider>(
+              create: (_) =>
+                  AssistantProvider(preferences: createBusinessTestPreferences()),
+            ),
+          ],
+          child: MaterialApp(
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
+            home: Scaffold(
+              body: Builder(
+                builder: (context) => TextButton(
+                  key: const ValueKey('open-reasoning-sheet'),
+                  onPressed: () =>
+                      showReasoningBudgetSheet(context, initialBudget: 16000),
+                  child: const Text('open'),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+      await _openSheet(tester);
+      expect(find.text('Medium'), findsOneWidget);
+
+      double iconX() =>
+          tester.getCenter(find.byType(SvgPicture).first).dx;
+      final xs = <double>[iconX()];
+
+      // Medium -> Low shrinks the title; the row must re-center over many
+      // frames, not in a single jump.
+      await tester.tapAt(
+        tester.getCenter(find.byKey(const ValueKey('reasoning-stop-1024'))),
+      );
+      for (var i = 0; i < 40; i++) {
+        await tester.pump(const Duration(milliseconds: 16));
+        xs.add(iconX());
+      }
+      await tester.pumpAndSettle();
+
+      expect(find.text('Low'), findsOneWidget);
+      final movedFrames = <double>[];
+      for (var i = 1; i < xs.length; i++) {
+        if ((xs[i] - xs[i - 1]).abs() > 0.01) movedFrames.add(xs[i]);
+      }
+      expect(xs.first, isNot(closeTo(xs.last, 0.5)));
+      // A jump would move exactly once; an animation moves over many frames.
+      expect(movedFrames.length, greaterThan(3));
     });
   });
 }
