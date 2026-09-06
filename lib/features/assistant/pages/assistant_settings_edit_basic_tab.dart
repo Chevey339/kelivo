@@ -200,22 +200,24 @@ class _BasicSettingsTabState extends State<_BasicSettingsTab> {
                 label: l10n.assistantEditThinkingBudgetTitle,
                 detailText: a.thinkingBudget?.toString() ?? '-',
                 onTap: () async {
-                  final settingsProvider = context.read<SettingsProvider>();
                   final assistantProvider = context.read<AssistantProvider>();
-                  final currentBudget = a.thinkingBudget;
-                  if (currentBudget != null) {
-                    settingsProvider.setThinkingBudget(currentBudget);
-                  }
+                  // Seed via initialBudget instead of pre-writing global
+                  // settings: the synchronous notify would rebuild the page
+                  // during the sheet's entrance animation.
+                  int? chosen;
                   await showReasoningBudgetSheet(
                     context,
                     modelProvider: a.chatModelProvider,
                     modelId: a.chatModelId,
+                    initialBudget: a.thinkingBudget,
+                    onChanged: (v) => chosen = v,
                   );
                   if (!context.mounted) return;
-                  final chosen = settingsProvider.thinkingBudget;
-                  await assistantProvider.updateAssistant(
-                    a.copyWith(thinkingBudget: chosen),
-                  );
+                  if (chosen != null && chosen != a.thinkingBudget) {
+                    await assistantProvider.updateAssistant(
+                      a.copyWith(thinkingBudget: chosen),
+                    );
+                  }
                 },
               ),
               _iosDivider(context),

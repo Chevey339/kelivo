@@ -115,6 +115,65 @@ void main() {
       expect(find.byKey(const ValueKey('reasoning-stop-128000')), findsNothing);
     });
 
+    testWidgets(
+      'seeds from initialBudget without notifying global settings on open',
+      (tester) async {
+        final settings = await _settingsForClaudeModel(
+          tester,
+          'claude-sonnet-4-5',
+        );
+        var notifies = 0;
+        settings.addListener(() => notifies++);
+        int? changed;
+        await tester.pumpWidget(
+          MultiProvider(
+            providers: [
+              ChangeNotifierProvider<SettingsProvider>.value(value: settings),
+              ChangeNotifierProvider<AssistantProvider>(
+                create: (_) => AssistantProvider(
+                  preferences: createBusinessTestPreferences(),
+                ),
+              ),
+            ],
+            child: MaterialApp(
+              localizationsDelegates: AppLocalizations.localizationsDelegates,
+              supportedLocales: AppLocalizations.supportedLocales,
+              home: Scaffold(
+                body: Builder(
+                  builder: (context) => TextButton(
+                    key: const ValueKey('open-reasoning-sheet'),
+                    onPressed: () => showReasoningBudgetSheet(
+                      context,
+                      initialBudget: 32000,
+                      onChanged: (v) => changed = v,
+                    ),
+                    child: const Text('open'),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+
+        await _openSheet(tester);
+
+        // Opening must not mutate or notify global settings — that rebuilds
+        // the caller's page during the entrance animation.
+        expect(notifies, 0);
+        expect(settings.thinkingBudget, isNull);
+        // The sheet still displays the seeded selection.
+        expect(find.text('High'), findsOneWidget);
+
+        await tester.tapAt(
+          tester.getCenter(find.byKey(const ValueKey('reasoning-stop-16000'))),
+        );
+        await tester.pumpAndSettle();
+
+        expect(changed, 16000);
+        expect(settings.thinkingBudget, 16000);
+      },
+    );
+
     testWidgets('animates label layout when the level changes', (
       tester,
     ) async {
