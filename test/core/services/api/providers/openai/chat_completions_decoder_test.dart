@@ -1108,7 +1108,7 @@ void main() {
     });
   });
 
-  test('follow-up decoder usage is the cumulative snapshot', () {
+  test('follow-up decoder usage is the last round only', () {
     final first = ChatCompletionsStreamDecoder();
     first.accept(
       _event(<String, dynamic>{
@@ -1134,9 +1134,9 @@ void main() {
       }),
     );
 
-    expect(second.usage!.promptTokens, 400);
-    expect(second.usage!.completionTokens, 60);
-    expect(second.usage!.totalTokens, 460);
+    expect(second.usage!.promptTokens, 300);
+    expect(second.usage!.completionTokens, 40);
+    expect(second.usage!.totalTokens, 340);
     expect(result.chunks.whereType<Usage>(), isEmpty);
   });
 

@@ -531,7 +531,7 @@ Stream<StreamChunk> sendGoogleVertexClaudeStream({
         try {
           final u = (obj['usage'] as Map?)?.cast<String, dynamic>();
           if (u != null) {
-            totalUsage = (totalUsage ?? const TokenUsage()).accumulate(
+            totalUsage = (totalUsage ?? const TokenUsage()).merge(
               claudeUsageFromMap(u),
             );
           }
