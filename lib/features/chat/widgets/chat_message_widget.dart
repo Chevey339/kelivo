@@ -2483,6 +2483,24 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
     return Align(alignment: Alignment.centerLeft, child: child);
   }
 
+  /// The trailing streaming indicator, plus the auto-retry countdown while a
+  /// round is waiting to be retried. Rounds after the first keep their earlier
+  /// output on screen, so the countdown has to ride along with this indicator
+  /// instead of only the empty waiting bubble.
+  Widget _streamingIndicator() {
+    if (widget.hideStreamingIndicator) return const SizedBox(height: 16);
+    final retryStatus = widget.retryStatus;
+    if (retryStatus == null) return const LoadingIndicator();
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        const LoadingIndicator(),
+        const SizedBox(width: 8),
+        _RetryCountdownHint(status: retryStatus),
+      ],
+    );
+  }
+
   /// Same 8pt gap [addVisible] applies between sibling assistant bubbles.
   List<Widget> _interleaveAssistantBubbles(List<Widget> bubbles) {
     return <Widget>[
@@ -2904,20 +2922,7 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
                                   widget.retryStatus!.attempt,
                                   widget.retryStatus!.maxRetries,
                                 ),
-                          child: widget.hideStreamingIndicator
-                              ? const SizedBox(height: 16)
-                              : Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    const LoadingIndicator(),
-                                    if (widget.retryStatus != null) ...[
-                                      const SizedBox(width: 8),
-                                      _RetryCountdownHint(
-                                        status: widget.retryStatus!,
-                                      ),
-                                    ],
-                                  ],
-                                ),
+                          child: _streamingIndicator(),
                         ),
                       ),
                     ),
@@ -2941,9 +2946,7 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
                   if (widget.message.isStreaming && visualContent.isNotEmpty)
                     Padding(
                       padding: const EdgeInsets.only(left: 4, top: 4),
-                      child: widget.hideStreamingIndicator
-                          ? const SizedBox(height: 16)
-                          : const LoadingIndicator(),
+                      child: _streamingIndicator(),
                     ),
                 ];
               }
@@ -3008,13 +3011,14 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
                 );
               }
 
-              if (widget.message.isStreaming && visualContent.isNotEmpty) {
+              // A round that only called tools leaves no visible text, but a
+              // pending retry still has to say so somewhere.
+              if (widget.message.isStreaming &&
+                  (visualContent.isNotEmpty || widget.retryStatus != null)) {
                 widgets.add(
                   Padding(
                     padding: const EdgeInsets.only(left: 4, top: 4),
-                    child: widget.hideStreamingIndicator
-                        ? const SizedBox(height: 16)
-                        : const LoadingIndicator(),
+                    child: _streamingIndicator(),
                   ),
                 );
               }
