@@ -124,6 +124,7 @@ void main() {
   WorkspaceToolsService service({
     WorkspaceRuntime? runtime,
     bool registerRuntime = true,
+    Future<void> Function()? onShellCompleted,
   }) {
     final provider = WorkspaceRuntimeProvider();
     if (registerRuntime && runtime != null) {
@@ -132,6 +133,7 @@ void main() {
     return WorkspaceToolsService(
       registry: registry,
       runtimeProvider: provider,
+      onShellCompleted: onShellCompleted,
       updateConversationExtras: (id, update) async {
         extrasById[id] = update(extrasById[id] ?? <String, dynamic>{});
       },
@@ -149,6 +151,69 @@ void main() {
   WorkspaceToolMetadata metaOf(Object? raw) {
     return WorkspaceToolMetadata.fromJson(client(raw).metadata!);
   }
+
+  test('post-command refresh runs for every execution outcome', () async {
+    final runtime = FakeWorkspaceRuntime();
+    var refreshes = 0;
+    final tools = service(
+      runtime: runtime,
+      onShellCompleted: () async {
+        refreshes++;
+      },
+    );
+    for (final status in [
+      'ok',
+      'failed',
+      'cancelled',
+      'timed_out',
+      'no_exit',
+    ]) {
+      runtime.enqueue(status, [
+        const CommandStarted(pid: 0),
+        if (status != 'no_exit')
+          CommandExited(
+            exitCode: status == 'ok' ? 0 : 1,
+            timedOut: status == 'timed_out',
+            cancelled: status == 'cancelled',
+            interrupted: false,
+            duration: Duration.zero,
+          ),
+      ]);
+      await tools.handle(ctx(), 'shell', {
+        'command': 'install',
+      }, toolCallId: status);
+    }
+    expect(refreshes, 5);
+    await tools.handle(ctx(), 'read_file', {
+      'path': 'missing',
+    }, toolCallId: 'read');
+    await tools.handle(ctx(), 'shell', {}, toolCallId: 'invalid');
+    await tools.handle(ctx(disabledTools: {'shell'}), 'shell', {
+      'command': 'install',
+    }, toolCallId: 'disabled');
+    await tools.handle(
+      ctx(allowAll: false, shellNeedsApproval: true),
+      'shell',
+      {'command': 'install'},
+      toolCallId: 'denied',
+      approvalService: _RecordingApproval()..allow = false,
+    );
+    expect(refreshes, 5);
+  });
+
+  test('refresh failures do not change a successful command result', () async {
+    final tools = service(
+      runtime: FakeWorkspaceRuntime(),
+      onShellCompleted: () async {
+        throw const FileSystemException('unavailable');
+      },
+    );
+    final result = await tools.handle(ctx(), 'shell', {
+      'command': 'echo done',
+    }, toolCallId: 'refresh-fails');
+    expect(metaOf(result).status, 'ok');
+    expect(jsonOf(result)['exit_code'], 0);
+  });
 
   test(
     'disabled tools are omitted and rejected before any side effects',

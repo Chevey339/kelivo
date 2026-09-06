@@ -25,16 +25,40 @@ description: Extract text and tables from PDF files with pdfplumber.
 # PDF Tools
 ''';
 
+class _PausingSkillStore extends ExtensionEntityStore {
+  _PausingSkillStore(super.database);
+
+  Completer<void>? pauseNextRead;
+  Completer<void>? readStarted;
+  bool failNextRead = false;
+
+  @override
+  Future<List<ExtensionEntity>> listByKind(String kind) async {
+    if (failNextRead) {
+      failNextRead = false;
+      throw StateError('store temporarily unavailable');
+    }
+    final rows = await super.listByKind(kind);
+    final pause = pauseNextRead;
+    if (pause != null) {
+      pauseNextRead = null;
+      readStarted!.complete();
+      await pause.future;
+    }
+    return rows;
+  }
+}
+
 void main() {
   late AppDatabase database;
-  late ExtensionEntityStore store;
+  late _PausingSkillStore store;
   late Directory tmp;
   late Directory skillsDir;
   late SkillsService service;
 
   setUp(() async {
     database = AppDatabase(NativeDatabase.memory());
-    store = ExtensionEntityStore(database);
+    store = _PausingSkillStore(database);
     await database.customSelect('SELECT 1;').getSingle();
     tmp = await Directory.systemTemp.createTemp('kelivo_skills_');
     skillsDir = Directory(p.join(tmp.path, 'skills'));
@@ -87,6 +111,55 @@ body
       );
     },
   );
+
+  test(
+    'live rescan preserves concurrent settings, usage and imports',
+    () async {
+      final skill = await service.importFromText(_skillMd);
+      final release = Completer<void>();
+      final started = Completer<void>();
+      store.pauseNextRead = release;
+      store.readStarted = started;
+      final scan = service.rescan();
+      await started.future;
+      final toggle = service.setEnabled(skill.record.id, false);
+      final use = service.incrementUseCount(skill.record.id);
+      final imported = service.importFromText(
+        _skillMd.replaceAll('pdf-tools', 'another-skill'),
+      );
+      release.complete();
+      await Future.wait([scan, toggle, use, imported]);
+      final current = service.skills.firstWhere(
+        (s) => s.record.id == skill.record.id,
+      );
+      expect(current.record.enabled, isFalse);
+      expect(current.record.useCount, 1);
+      expect(service.skills, hasLength(2));
+      await service.rescan();
+      final saved = service.skills.firstWhere(
+        (s) => s.record.id == skill.record.id,
+      );
+      expect(saved.record.enabled, isFalse);
+      expect(saved.record.useCount, 1);
+      expect(
+        service.skills
+            .singleWhere((s) => s.record.id == 'another-skill')
+            .record
+            .source,
+        SkillSource.paste,
+      );
+    },
+  );
+
+  test('a failed refresh does not block later imports or refreshes', () async {
+    store.failNextRead = true;
+    await expectLater(service.rescan(), throwsStateError);
+    final skill = await service.importFromText(_skillMd);
+    await service.rescan();
+    expect(service.skills.single.record.id, skill.record.id);
+    await Future.wait([service.delete(skill.record.id), service.rescan()]);
+    expect(service.skills, isEmpty);
+  });
 
   test('importFromText writes SKILL.md and dedupes ids', () async {
     final first = await service.importFromText(_skillMd);

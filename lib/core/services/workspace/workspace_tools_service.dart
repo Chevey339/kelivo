@@ -39,6 +39,7 @@ class WorkspaceToolsService {
     this.updateConversationExtras,
     this.touchLastUsed,
     this.onSkillRead,
+    this.onShellCompleted,
     this.isToolEnabled,
   }) : registry = registry ?? ToolRunRegistry(),
        runtimeProvider = runtimeProvider ?? WorkspaceRuntimeProvider();
@@ -61,6 +62,7 @@ class WorkspaceToolsService {
   final ConversationExtrasUpdater? updateConversationExtras;
   final Future<void> Function(String workspaceId)? touchLastUsed;
   final Future<void> Function(String skillId)? onSkillRead;
+  final Future<void> Function()? onShellCompleted;
   final bool Function(String workspaceId, String tool)? isToolEnabled;
 
   bool _enabled(WorkspaceToolContext ctx, String name) =>
@@ -608,6 +610,14 @@ class WorkspaceToolsService {
           command: command,
         ),
       );
+    } finally {
+      // A failed or cancelled command may still have installed/updated files.
+      // Refresh observers without turning a refresh failure into a tool error.
+      try {
+        await onShellCompleted?.call();
+      } catch (error) {
+        debugPrint('Workspace post-command refresh failed: $error');
+      }
     }
 
     if (exited == null) {

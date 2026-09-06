@@ -41,6 +41,19 @@ class SkillsService extends ChangeNotifier {
   late final Future<void> loaded;
 
   Directory? _skillsDirectory;
+  Future<void> _mutationTail = Future<void>.value();
+  bool _disposed = false;
+
+  // Command-triggered rescans share the same queue as imports and settings
+  // changes so an older disk snapshot cannot replace newer user choices.
+  Future<T> _serializeMutation<T>(Future<T> Function() operation) {
+    final result = _mutationTail.then((_) => operation());
+    _mutationTail = result.then<void>(
+      (_) {},
+      onError: (Object _, StackTrace __) {},
+    );
+    return result;
+  }
 
   List<Skill> get skills => List.unmodifiable(_skills);
 
@@ -66,7 +79,10 @@ class SkillsService extends ChangeNotifier {
     return dir;
   }
 
-  Future<void> rescan() async {
+  Future<void> rescan() => _serializeMutation(_rescan);
+
+  Future<void> _rescan() async {
+    if (_disposed) return;
     final root = await _ensureRoot();
     final entities = await store.listByKind(ExtensionEntityStore.kindSkill);
     final records = <String, SkillRecord>{
@@ -110,6 +126,7 @@ class SkillsService extends ChangeNotifier {
       next.add(await _skillFromDisk(root, record));
     }
     next.sort((a, b) => a.record.id.compareTo(b.record.id));
+    if (_disposed) return;
     _skills
       ..clear()
       ..addAll(next);
@@ -211,17 +228,19 @@ class SkillsService extends ChangeNotifier {
     if (errors.isNotEmpty) {
       throw FormatException('Invalid SKILL.md: ${errors.join(', ')}');
     }
-    final root = await _ensureRoot();
-    final id = await _allocateId(slugify(parsed.name));
-    checkCancelled?.call();
-    final dest = await extracted.rename(p.join(root.path, id));
-    try {
+    return _serializeMutation(() async {
+      final root = await _ensureRoot();
+      final id = await _allocateId(slugify(parsed.name));
       checkCancelled?.call();
-      return await _registerImport(root, id, source);
-    } catch (_) {
-      await dest.delete(recursive: true);
-      rethrow;
-    }
+      final dest = await extracted.rename(p.join(root.path, id));
+      try {
+        checkCancelled?.call();
+        return await _registerImport(root, id, source);
+      } catch (_) {
+        await dest.delete(recursive: true);
+        rethrow;
+      }
+    });
   }
 
   static void _extractArchive((String, String, String?, bool) args) {
@@ -258,46 +277,52 @@ class SkillsService extends ChangeNotifier {
 
   Future<void> delete(String id) async {
     await loaded;
-    await store.delete(ExtensionEntityStore.kindSkill, id);
-    final dir = Directory(p.join((await _ensureRoot()).path, id));
-    if (await dir.exists()) {
-      await dir.delete(recursive: true);
-    }
-    _skills.removeWhere((skill) => skill.record.id == id);
-    notifyListeners();
+    await _serializeMutation(() async {
+      await store.delete(ExtensionEntityStore.kindSkill, id);
+      final dir = Directory(p.join((await _ensureRoot()).path, id));
+      if (await dir.exists()) {
+        await dir.delete(recursive: true);
+      }
+      _skills.removeWhere((skill) => skill.record.id == id);
+      notifyListeners();
+    });
   }
 
   Future<void> setEnabled(String id, bool enabled) async {
     await loaded;
-    final skill = _require(id);
-    final next = skill.record.copyWith(
-      enabled: enabled,
-      updatedAt: DateTime.now().toUtc(),
-    );
-    await _upsertRecord(next);
-    _replace(skill, record: next);
-    notifyListeners();
+    await _serializeMutation(() async {
+      final skill = _require(id);
+      final next = skill.record.copyWith(
+        enabled: enabled,
+        updatedAt: DateTime.now().toUtc(),
+      );
+      await _upsertRecord(next);
+      _replace(skill, record: next);
+      notifyListeners();
+    });
   }
 
   Future<void> incrementUseCount(String id) async {
     try {
       await loaded;
-      final index = _skills.indexWhere((skill) => skill.record.id == id);
-      if (index < 0) return;
-      final skill = _skills[index];
-      final next = skill.record.copyWith(
-        useCount: skill.record.useCount + 1,
-        updatedAt: DateTime.now().toUtc(),
-      );
-      await _upsertRecord(next);
-      _skills[index] = Skill(
-        record: next,
-        name: skill.name,
-        description: skill.description,
-        dir: skill.dir,
-        skillMdPath: skill.skillMdPath,
-      );
-      notifyListeners();
+      await _serializeMutation(() async {
+        final index = _skills.indexWhere((skill) => skill.record.id == id);
+        if (index < 0) return;
+        final skill = _skills[index];
+        final next = skill.record.copyWith(
+          useCount: skill.record.useCount + 1,
+          updatedAt: DateTime.now().toUtc(),
+        );
+        await _upsertRecord(next);
+        _skills[index] = Skill(
+          record: next,
+          name: skill.name,
+          description: skill.description,
+          dir: skill.dir,
+          skillMdPath: skill.skillMdPath,
+        );
+        notifyListeners();
+      });
     } catch (e) {
       debugPrint('incrementUseCount failed: $e');
     }
@@ -305,18 +330,20 @@ class SkillsService extends ChangeNotifier {
 
   Future<void> updateBody(String id, String markdown) async {
     await loaded;
-    final skill = _require(id);
-    final parsed = SkillFrontmatter.parse(markdown);
-    await File(skill.skillMdPath).writeAsString(markdown, flush: true);
-    final next = skill.record.copyWith(updatedAt: DateTime.now().toUtc());
-    await _upsertRecord(next);
-    _replace(
-      skill,
-      record: next,
-      name: parsed.name.trim().isEmpty ? skill.name : parsed.name.trim(),
-      description: parsed.description,
-    );
-    notifyListeners();
+    await _serializeMutation(() async {
+      final skill = _require(id);
+      final parsed = SkillFrontmatter.parse(markdown);
+      await File(skill.skillMdPath).writeAsString(markdown, flush: true);
+      final next = skill.record.copyWith(updatedAt: DateTime.now().toUtc());
+      await _upsertRecord(next);
+      _replace(
+        skill,
+        record: next,
+        name: parsed.name.trim().isEmpty ? skill.name : parsed.name.trim(),
+        description: parsed.description,
+      );
+      notifyListeners();
+    });
   }
 
   List<Skill> resolveForAssistant(
@@ -338,6 +365,7 @@ class SkillsService extends ChangeNotifier {
 
   @override
   void dispose() {
+    _disposed = true;
     if (_ownsHttpClient) _httpClient.close();
     super.dispose();
   }
@@ -357,12 +385,12 @@ class SkillsService extends ChangeNotifier {
     required String name,
     required Map<String, List<int>> files,
     required SkillSource source,
-  }) async {
+  }) => _serializeMutation(() async {
     final root = await _ensureRoot();
     final id = await _allocateId(slugify(name));
     await _writeSkillFiles(root, id, files);
     return _registerImport(root, id, source);
-  }
+  });
 
   Future<Skill> _registerImport(
     Directory root,

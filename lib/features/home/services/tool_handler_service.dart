@@ -45,9 +45,11 @@ class ToolHandlerService {
       final chat = contextProvider.read<ChatService>();
       final workspaces = contextProvider.read<WorkspaceProvider>();
       Future<void> Function(String skillId)? onSkillRead;
+      Future<void> Function()? onShellCompleted;
       try {
         final skills = contextProvider.read<SkillsService>();
         onSkillRead = skills.incrementUseCount;
+        onShellCompleted = skills.rescan;
       } catch (_) {}
       return WorkspaceToolsService(
         registry: contextProvider.read<ToolRunRegistry>(),
@@ -55,6 +57,7 @@ class ToolHandlerService {
         updateConversationExtras: chat.updateConversationExtras,
         touchLastUsed: workspaces.touchLastUsed,
         onSkillRead: onSkillRead,
+        onShellCompleted: onShellCompleted,
         isToolEnabled: (id, name) =>
             workspaces.byId(id)?.isToolEnabled(name) ?? false,
       );
