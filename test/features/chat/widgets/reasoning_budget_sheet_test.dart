@@ -174,9 +174,7 @@ void main() {
       },
     );
 
-    testWidgets('animates label layout when the level changes', (
-      tester,
-    ) async {
+    testWidgets('animates label layout when the level changes', (tester) async {
       final settings = await _settingsForClaudeModel(
         tester,
         'claude-sonnet-4-5',
@@ -186,8 +184,9 @@ void main() {
           providers: [
             ChangeNotifierProvider<SettingsProvider>.value(value: settings),
             ChangeNotifierProvider<AssistantProvider>(
-              create: (_) =>
-                  AssistantProvider(preferences: createBusinessTestPreferences()),
+              create: (_) => AssistantProvider(
+                preferences: createBusinessTestPreferences(),
+              ),
             ),
           ],
           child: MaterialApp(
@@ -209,8 +208,7 @@ void main() {
       await _openSheet(tester);
       expect(find.text('Medium'), findsOneWidget);
 
-      double iconX() =>
-          tester.getCenter(find.byType(SvgPicture).first).dx;
+      double iconX() => tester.getCenter(find.byType(SvgPicture).first).dx;
       final xs = <double>[iconX()];
 
       // Medium -> Low shrinks the title; the row must re-center over many

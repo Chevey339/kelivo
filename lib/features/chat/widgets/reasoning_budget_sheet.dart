@@ -90,7 +90,8 @@ class _ReasoningBudgetSheetState extends State<_ReasoningBudgetSheet>
   @override
   void initState() {
     super.initState();
-    _selected = widget.initialBudget ??
+    _selected =
+        widget.initialBudget ??
         context.read<SettingsProvider>().thinkingBudget ??
         -1;
     _snap = AnimationController.unbounded(vsync: this)
