@@ -581,33 +581,9 @@ class _ModelDetailSheetState extends State<_ModelDetailSheet>
   }
 
   List<Widget> _buildAdvanced(BuildContext context, AppLocalizations l10n) {
-    final cs = Theme.of(context).colorScheme;
     return [
       Padding(
         padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              l10n.modelDetailSheetProviderOverrideDescription,
-              style: TextStyle(
-                color: cs.onSurface.withValues(alpha: 0.8),
-                fontSize: 13,
-              ),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 8),
-            Center(
-              child: _OutlinedAddButton(
-                label: l10n.modelDetailSheetAddProviderOverride,
-                onTap: () {},
-              ),
-            ),
-          ],
-        ),
-      ),
-      Padding(
-        padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
         child: Text(
           l10n.modelDetailSheetCustomHeadersTitle,
           style: TextStyle(fontSize: 15, fontWeight: AppFontWeights.semibold),

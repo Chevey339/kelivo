@@ -6649,18 +6649,6 @@ abstract class AppLocalizations {
   /// **'Reasoning'**
   String get modelDetailSheetReasoningAbility;
 
-  /// No description provided for @modelDetailSheetProviderOverrideDescription.
-  ///
-  /// In en, this message translates to:
-  /// **'Provider overrides: customize provider for a specific model.'**
-  String get modelDetailSheetProviderOverrideDescription;
-
-  /// No description provided for @modelDetailSheetAddProviderOverride.
-  ///
-  /// In en, this message translates to:
-  /// **'Add Provider Override'**
-  String get modelDetailSheetAddProviderOverride;
-
   /// No description provided for @modelDetailSheetCustomHeadersTitle.
   ///
   /// In en, this message translates to:

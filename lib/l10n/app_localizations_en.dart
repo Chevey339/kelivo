@@ -3605,13 +3605,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get modelDetailSheetReasoningAbility => 'Reasoning';
 
   @override
-  String get modelDetailSheetProviderOverrideDescription =>
-      'Provider overrides: customize provider for a specific model.';
-
-  @override
-  String get modelDetailSheetAddProviderOverride => 'Add Provider Override';
-
-  @override
   String get modelDetailSheetCustomHeadersTitle => 'Custom Headers';
 
   @override

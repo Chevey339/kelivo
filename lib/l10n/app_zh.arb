@@ -1252,8 +1252,6 @@
   "modelDetailSheetImageMode": "图片",
   "modelDetailSheetToolsAbility": "工具",
   "modelDetailSheetReasoningAbility": "推理",
-  "modelDetailSheetProviderOverrideDescription": "供应商重写：允许为特定模型自定义供应商设置。（暂未实现）",
-  "modelDetailSheetAddProviderOverride": "添加供应商重写",
   "modelDetailSheetCustomHeadersTitle": "自定义 Headers",
   "modelDetailSheetAddHeader": "添加 Header",
   "modelDetailSheetCustomBodyTitle": "自定义 Body",

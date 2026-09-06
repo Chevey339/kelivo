@@ -1646,8 +1646,6 @@
   "modelDetailSheetImageMode": "Image",
   "modelDetailSheetToolsAbility": "Tools",
   "modelDetailSheetReasoningAbility": "Reasoning",
-  "modelDetailSheetProviderOverrideDescription": "Provider overrides: customize provider for a specific model.",
-  "modelDetailSheetAddProviderOverride": "Add Provider Override",
   "modelDetailSheetCustomHeadersTitle": "Custom Headers",
   "modelDetailSheetAddHeader": "Add Header",
   "modelDetailSheetCustomBodyTitle": "Custom Body",
