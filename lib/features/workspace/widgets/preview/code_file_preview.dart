@@ -1,9 +1,9 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
-import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_highlight/themes/atom-one-dark-reasonable.dart';
 import 'package:flutter_highlight/themes/github.dart';
@@ -34,23 +34,25 @@ const double _kCodeBlockRadius = 16;
 const double _kMinFontSize = 11;
 const double _kMaxFontSize = 20;
 const double _kDefaultFontSize = 13;
-const EdgeInsets _kLinePadding = EdgeInsets.symmetric(vertical: 1);
-const EdgeInsets _kGutterListPadding = EdgeInsets.fromLTRB(0, 8, 8, 12);
-const EdgeInsets _kCodeListPadding = EdgeInsets.fromLTRB(12, 8, 12, 12);
+const EdgeInsets _kGutterPadding = EdgeInsets.fromLTRB(0, 8, 8, 12);
+const EdgeInsets _kCodePadding = EdgeInsets.fromLTRB(12, 8, 12, 12);
+const double _kCursorWidth = 2;
+
+/// RenderEditable reserves a caret gap plus the cursor width and lays the text
+/// out at `maxWidth - this`, so a wrap measurement has to subtract it too.
+const double _kCaretMargin = 1 + _kCursorWidth;
 
 class CodeFilePreview extends StatefulWidget {
   const CodeFilePreview({
     super.key,
     required this.file,
     this.maxBytes = defaultMaxBytes,
-    this.virtualizeAfterLines = defaultVirtualizeAfterLines,
     this.showCopyButton = true,
     this.autoLoad = true,
     this.language,
   });
 
   static const int defaultMaxBytes = 2 * 1024 * 1024;
-  static const int defaultVirtualizeAfterLines = 1000;
   static const Key tooLargeKey = ValueKey<String>(
     'code-file-preview-too-large',
   );
@@ -66,10 +68,11 @@ class CodeFilePreview extends StatefulWidget {
   static const Key horizontalScrollKey = ValueKey<String>(
     'code-file-preview-horizontal-scroll',
   );
+  static const Key gutterKey = ValueKey<String>('code-file-preview-gutter');
+  static const Key codeKey = ValueKey<String>('code-file-preview-code');
 
   final File file;
   final int maxBytes;
-  final int virtualizeAfterLines;
   final bool showCopyButton;
   final bool autoLoad;
 
@@ -121,7 +124,6 @@ class CodeFilePreviewState extends State<CodeFilePreview> {
 
   @visibleForTesting
   Future<void> load() async {
-    assert(widget.virtualizeAfterLines >= 0);
     try {
       final length = widget.file.lengthSync();
       if (length > widget.maxBytes) {
@@ -347,7 +349,7 @@ class CodeFilePreviewState extends State<CodeFilePreview> {
               Expanded(
                 child: ColoredBox(
                   color: bodyBg,
-                  child: _VirtualizedSource(
+                  child: _SourceBody(
                     lines: lines,
                     language: language,
                     theme: theme,
@@ -476,8 +478,16 @@ class _TooLargeState extends StatelessWidget {
   }
 }
 
-class _VirtualizedSource extends StatefulWidget {
-  const _VirtualizedSource({
+/// The whole file as one paragraph, with the line numbers as a second
+/// paragraph beside it.
+///
+/// One paragraph is what makes a selection span lines: separate per-line
+/// widgets cannot be selected across, and copying them back concatenates their
+/// text without the line breaks. It also lets multi-line syntax (block
+/// comments, template strings) highlight correctly, and it removes the need to
+/// keep two scroll positions in sync.
+class _SourceBody extends StatelessWidget {
+  const _SourceBody({
     required this.lines,
     required this.language,
     required this.theme,
@@ -494,282 +504,174 @@ class _VirtualizedSource extends StatefulWidget {
   final bool wrap;
 
   @override
-  State<_VirtualizedSource> createState() => _VirtualizedSourceState();
-}
-
-class _VirtualizedSourceState extends State<_VirtualizedSource> {
-  late final ScrollController _codeCtrl;
-  late final ScrollController _gutterCtrl;
-
-  @override
-  void initState() {
-    super.initState();
-    _codeCtrl = ScrollController();
-    _gutterCtrl = ScrollController();
-    _codeCtrl.addListener(_syncGutterToCode);
-  }
-
-  @override
-  void dispose() {
-    _codeCtrl.removeListener(_syncGutterToCode);
-    _codeCtrl.dispose();
-    _gutterCtrl.dispose();
-    super.dispose();
-  }
-
-  void _syncGutterToCode() {
-    if (!_codeCtrl.hasClients || !_gutterCtrl.hasClients) return;
-    final target = _codeCtrl.offset.clamp(
-      0.0,
-      _gutterCtrl.position.maxScrollExtent,
-    );
-    if (_gutterCtrl.offset != target) {
-      _gutterCtrl.jumpTo(target);
-    }
-  }
-
-  @override
   Widget build(BuildContext context) {
-    final fontSize = widget.textStyle.fontSize ?? _kDefaultFontSize;
-    final gutterWidth =
-        (widget.lines.length.toString().length * fontSize * 0.62 + 16).clamp(
-          36.0,
-          80.0,
-        );
-    // Without a forced strut a line box takes the tallest run's ascent plus the
-    // tallest run's descent, so a line mixing latin and CJK grows past the
-    // latin-only line number beside it.
+    final fontSize = textStyle.fontSize ?? _kDefaultFontSize;
+    final gutterWidth = (lines.length.toString().length * fontSize * 0.62 + 16)
+        .clamp(36.0, 80.0);
+    // Forcing the strut pins every rendered line to fontSize * height. Without
+    // it a line box takes the tallest run's ascent plus the tallest run's
+    // descent, so a line mixing latin and CJK would outgrow the number beside
+    // it and the two columns would drift apart.
     final strutStyle = StrutStyle.fromTextStyle(
-      widget.textStyle,
+      textStyle,
       forceStrutHeight: true,
     );
-    if (widget.wrap) {
-      return ListView.builder(
-        padding: const EdgeInsets.fromLTRB(0, 8, 12, 12),
-        itemCount: widget.lines.length,
-        itemBuilder: (context, index) {
-          return _CodeLine(
-            index: index,
-            text: widget.lines[index],
-            language: widget.language,
-            theme: widget.theme,
-            textStyle: widget.textStyle,
-            gutterStyle: widget.gutterStyle,
-            strutStyle: strutStyle,
-            gutterWidth: gutterWidth,
-            wrap: true,
-          );
-        },
-      );
-    }
-
+    final source = lines.join('\n');
+    final spans = (language.isEmpty || language == 'plaintext')
+        ? <InlineSpan>[TextSpan(text: source, style: textStyle)]
+        : highlightSpans(source, language, theme, textStyle);
+    final span = TextSpan(style: textStyle, children: spans);
     final textScaler = MediaQuery.textScalerOf(context);
-    final maxLineWidth = _measureWidestLine(
-      widget.lines,
-      widget.textStyle,
-      textScaler,
-    );
-    // Unwrapped, gutter and code are two lists synced by scroll offset, so any
-    // per-line height difference accumulates into visible drift. A `Text` line
-    // box is rounded up to a whole pixel while the `SelectableText` beside it
-    // keeps the raw strut height, which alone is enough to pull the columns
-    // apart. Pinning both lists to one measured extent removes the difference.
-    final lineExtent =
-        _measureLineHeight(widget.textStyle, strutStyle, textScaler) +
-        _kLinePadding.vertical;
-
     return LayoutBuilder(
       builder: (context, constraints) {
         final available = constraints.maxWidth.isFinite
             ? (constraints.maxWidth - gutterWidth).clamp(0.0, double.infinity)
-            : maxLineWidth;
-        final codeWidth = maxLineWidth + _kCodeListPadding.horizontal;
-        final width = codeWidth > available ? codeWidth : available;
-        return Row(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            SizedBox(
-              width: gutterWidth,
-              child: IgnorePointer(
-                child: ListView.builder(
-                  controller: _gutterCtrl,
-                  physics: const NeverScrollableScrollPhysics(),
-                  padding: _kGutterListPadding,
-                  itemExtent: lineExtent,
-                  itemCount: widget.lines.length,
-                  itemBuilder: (context, index) {
-                    return _GutterLine(
-                      index: index,
-                      style: widget.gutterStyle,
+            : double.infinity;
+        final wrapWidth = wrap && available.isFinite
+            ? (available - _kCodePadding.horizontal - _kCaretMargin).clamp(
+                0.0,
+                double.infinity,
+              )
+            : null;
+        final code = Padding(
+          padding: _kCodePadding,
+          child: _column(
+            span,
+            key: CodeFilePreview.codeKey,
+            style: textStyle,
+            strutStyle: strutStyle,
+          ),
+        );
+        return SingleChildScrollView(
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              SizedBox(
+                width: gutterWidth,
+                child: Padding(
+                  padding: _kGutterPadding,
+                  // Numbers are never selected, and never take a gesture: a
+                  // drag anywhere over the file scrolls it.
+                  child: IgnorePointer(
+                    child: _column(
+                      TextSpan(
+                        text: _gutterLabels(
+                          span: span,
+                          lines: lines,
+                          strutStyle: strutStyle,
+                          textScaler: textScaler,
+                          wrapWidth: wrapWidth,
+                        ),
+                        style: gutterStyle,
+                      ),
+                      key: CodeFilePreview.gutterKey,
+                      style: gutterStyle,
                       strutStyle: strutStyle,
-                    );
-                  },
-                ),
-              ),
-            ),
-            Expanded(
-              child: SingleChildScrollView(
-                key: CodeFilePreview.horizontalScrollKey,
-                scrollDirection: Axis.horizontal,
-                child: SizedBox(
-                  width: width,
-                  child: ListView.builder(
-                    controller: _codeCtrl,
-                    padding: _kCodeListPadding,
-                    itemExtent: lineExtent,
-                    itemCount: widget.lines.length,
-                    itemBuilder: (context, index) {
-                      return _CodeLine(
-                        index: index,
-                        text: widget.lines[index],
-                        language: widget.language,
-                        theme: widget.theme,
-                        textStyle: widget.textStyle,
-                        gutterStyle: widget.gutterStyle,
-                        strutStyle: strutStyle,
-                        gutterWidth: gutterWidth,
-                        wrap: false,
-                      );
-                    },
+                      textAlign: TextAlign.right,
+                      selectable: false,
+                    ),
                   ),
                 ),
               ),
-            ),
-          ],
+              if (wrap)
+                Expanded(child: code)
+              else
+                Expanded(
+                  child: SingleChildScrollView(
+                    key: CodeFilePreview.horizontalScrollKey,
+                    scrollDirection: Axis.horizontal,
+                    child: ConstrainedBox(
+                      constraints: BoxConstraints(minWidth: available),
+                      child: code,
+                    ),
+                  ),
+                ),
+            ],
+          ),
         );
       },
     );
   }
 }
 
-/// Width of the widest rendered line. Laying out the whole text once with an
-/// unbounded width yields the widest line directly, so CJK and other
-/// double-width glyphs are measured instead of guessed from code-unit counts.
-double _measureWidestLine(
-  List<String> lines,
-  TextStyle textStyle,
-  TextScaler textScaler,
-) {
-  final painter = TextPainter(
-    text: TextSpan(text: lines.join('\n'), style: textStyle),
-    textDirection: TextDirection.ltr,
-    textScaler: textScaler,
-  )..layout();
-  // Unlike `width`, the intrinsic width keeps trailing whitespace, which the
-  // per-line text below still occupies.
-  final width = painter.maxIntrinsicWidth;
-  painter.dispose();
-  // SelectableText.rich is a few pixels wider than a bare TextPainter.
-  return width + 32;
+/// One column of the view, code or line numbers.
+///
+/// Both are the same widget even though only the code is ever selected:
+/// RenderParagraph and RenderEditable round a forced-strut line box
+/// differently - on iOS a 13px / 1.5 style measures 20.0 per line as a `Text`
+/// and 19.0 as a `SelectableText` - so a `Text` gutter beside selectable code
+/// drifts a pixel per line, which is a whole line every twenty.
+Widget _column(
+  TextSpan span, {
+  required Key key,
+  required TextStyle style,
+  required StrutStyle strutStyle,
+  TextAlign? textAlign,
+  bool selectable = true,
+}) {
+  return SelectableText.rich(
+    span,
+    key: key,
+    style: style,
+    strutStyle: strutStyle,
+    textAlign: textAlign,
+    cursorWidth: _kCursorWidth,
+    enableInteractiveSelection: selectable,
+    // The column is laid out in full inside the scroll views around it, so its
+    // own viewport must not swallow their drags.
+    scrollPhysics: const NeverScrollableScrollPhysics(),
+  );
 }
 
-/// Height of one rendered line box, measured the way a `Text` renders it so
-/// the gutter and the code column can share a single list extent.
-double _measureLineHeight(
-  TextStyle textStyle,
-  StrutStyle strutStyle,
-  TextScaler textScaler,
-) {
+/// Line numbers as one paragraph, one label per rendered line.
+///
+/// Unwrapped that is one label per source line. When wrapping, a source line
+/// can occupy several rendered lines, so its number is followed by as many
+/// blank lines as the code beside it takes; laying the code out here with the
+/// styled spans and the width it is rendered at is what keeps the two columns
+/// on the same rows.
+String _gutterLabels({
+  required TextSpan span,
+  required List<String> lines,
+  required StrutStyle strutStyle,
+  required TextScaler textScaler,
+  required double? wrapWidth,
+}) {
+  String plainLabels() =>
+      <String>[for (var i = 1; i <= lines.length; i++) '$i'].join('\n');
+  if (wrapWidth == null) return plainLabels();
+
   final painter = TextPainter(
-    text: TextSpan(text: '0', style: textStyle),
+    text: span,
     strutStyle: strutStyle,
     textDirection: TextDirection.ltr,
     textScaler: textScaler,
-  )..layout();
-  final height = painter.height;
+  )..layout(maxWidth: wrapWidth);
+  final metrics = painter.computeLineMetrics();
+  // Every rendered line is the strut's height, so a caret offset divided by it
+  // is the row that offset sits on.
+  final lineHeight = metrics.isEmpty ? 0.0 : metrics.first.height;
+  if (lineHeight <= 0) {
+    painter.dispose();
+    return plainLabels();
+  }
+
+  final buffer = StringBuffer();
+  var offset = 0;
+  var previousRow = 0;
+  for (var i = 0; i < lines.length; i++) {
+    final caret = painter.getOffsetForCaret(
+      TextPosition(offset: offset),
+      Rect.zero,
+    );
+    final row = (caret.dy / lineHeight).round();
+    if (i > 0) buffer.write('\n' * math.max(1, row - previousRow));
+    buffer.write('${i + 1}');
+    previousRow = row;
+    offset += lines[i].length + 1; // + the line break
+  }
   painter.dispose();
-  return height;
-}
-
-class _CodeLine extends StatelessWidget {
-  const _CodeLine({
-    required this.index,
-    required this.text,
-    required this.language,
-    required this.theme,
-    required this.textStyle,
-    required this.gutterStyle,
-    required this.strutStyle,
-    required this.gutterWidth,
-    required this.wrap,
-  });
-
-  final int index;
-  final String text;
-  final String language;
-  final Map<String, TextStyle> theme;
-  final TextStyle textStyle;
-  final TextStyle gutterStyle;
-  final StrutStyle strutStyle;
-  final double gutterWidth;
-  final bool wrap;
-
-  @override
-  Widget build(BuildContext context) {
-    final spans = (language.isEmpty || language == 'plaintext')
-        ? <InlineSpan>[TextSpan(text: text, style: textStyle)]
-        : highlightSpans(text, language, theme, textStyle);
-    final body = SelectableText.rich(
-      TextSpan(style: textStyle, children: spans),
-      style: textStyle,
-      strutStyle: strutStyle,
-    );
-    return Padding(
-      padding: _kLinePadding,
-      child: wrap
-          ? Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                SizedBox(
-                  width: gutterWidth,
-                  child: Padding(
-                    padding: const EdgeInsets.only(right: 8),
-                    child: Text(
-                      '${index + 1}',
-                      textAlign: TextAlign.right,
-                      style: gutterStyle,
-                      strutStyle: strutStyle,
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(child: body),
-              ],
-            )
-          : OverflowBox(
-              alignment: Alignment.topLeft,
-              minWidth: 0,
-              maxWidth: double.infinity,
-              fit: OverflowBoxFit.deferToChild,
-              child: body,
-            ),
-    );
-  }
-}
-
-class _GutterLine extends StatelessWidget {
-  const _GutterLine({
-    required this.index,
-    required this.style,
-    required this.strutStyle,
-  });
-
-  final int index;
-  final TextStyle style;
-  final StrutStyle strutStyle;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: _kLinePadding,
-      child: Text(
-        '${index + 1}',
-        textAlign: TextAlign.right,
-        style: style,
-        strutStyle: strutStyle,
-      ),
-    );
-  }
+  return buffer.toString();
 }
 
 List<InlineSpan> highlightSpans(

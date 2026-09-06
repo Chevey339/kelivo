@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:Kelivo/core/providers/settings_provider.dart';
 import 'package:Kelivo/features/workspace/widgets/preview/code_file_preview.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:path/path.dart' as p;
@@ -20,6 +21,15 @@ Widget _app(Widget child) {
     ),
   );
 }
+
+final Finder _gutter = find.byKey(CodeFilePreview.gutterKey);
+final Finder _code = find.byKey(CodeFilePreview.codeKey);
+
+String _codeText(WidgetTester tester) =>
+    tester.widget<SelectableText>(_code).textSpan!.toPlainText();
+
+String _gutterText(WidgetTester tester) =>
+    tester.widget<SelectableText>(_gutter).textSpan!.toPlainText();
 
 Future<void> _loadPreview(WidgetTester tester) async {
   await tester.pump();
@@ -162,12 +172,40 @@ void main() {
     await _loadPreview(tester);
 
     expect(tester.takeException(), isNull);
-    expect(find.text(long, findRichText: true), findsOneWidget);
+    expect(_codeText(tester), contains(long));
+  });
+
+  testWidgets('the whole file is one selectable paragraph', (tester) async {
+    // Per-line widgets cannot be selected across, and copying them back drops
+    // the line breaks, so the code column has to stay a single paragraph.
+    final file = File(p.join(tempDir.path, 'many.py'))
+      ..writeAsStringSync('first\nsecond\nthird\n');
+
+    await tester.pumpWidget(_app(CodeFilePreview(file: file, autoLoad: false)));
+    await _loadPreview(tester);
+
+    // Two: the code and the gutter, which share a widget type so their line
+    // boxes match. Only the code one is selectable.
+    expect(find.byType(SelectableText), findsNWidgets(2));
+    expect(find.byKey(CodeFilePreview.codeKey), findsOneWidget);
+    expect(
+      tester.widget<SelectableText>(_code).enableInteractiveSelection,
+      isTrue,
+    );
+    expect(
+      tester.widget<SelectableText>(_gutter).enableInteractiveSelection,
+      isFalse,
+    );
+    expect(_codeText(tester), 'first\nsecond\nthird\n');
   });
 
   testWidgets('non-wrap gutter stays pinned while code scrolls horizontally', (
     tester,
   ) async {
+    // The code paragraph covers the whole scroll view, and on Android its own
+    // gesture detector claims horizontal drags before the scroll view sees
+    // them, so this only describes the iOS behaviour.
+    debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
     final long = List.filled(80, 'M').join();
     final file = File(p.join(tempDir.path, 'pinned.py'))
       ..writeAsStringSync('$long\nshort\n');
@@ -183,20 +221,23 @@ void main() {
     );
     await _loadPreview(tester);
 
-    final gutterBefore = tester.getTopLeft(find.text('1'));
-    final codeBefore = tester.getTopLeft(find.byType(SelectableText).first);
+    final gutterBefore = tester.getTopLeft(_gutter);
+    final codeBefore = tester.getTopLeft(_code);
 
-    await tester.drag(
-      find.byKey(CodeFilePreview.horizontalScrollKey),
-      const Offset(-150, 0),
+    await tester.dragFrom(
+      codeBefore + const Offset(40, 20),
+      const Offset(-100, 0),
     );
     await tester.pumpAndSettle();
 
-    expect(tester.getTopLeft(find.text('1')).dx, gutterBefore.dx);
-    expect(
-      tester.getTopLeft(find.byType(SelectableText).first).dx,
-      lessThan(codeBefore.dx),
-    );
+    final gutterAfter = tester.getTopLeft(_gutter);
+    final codeAfter = tester.getTopLeft(_code);
+    // Reset before the expects: the binding checks this is unset when the test
+    // body returns, and a failed expect would leak it into the next test.
+    debugDefaultTargetPlatformOverride = null;
+
+    expect(gutterAfter.dx, gutterBefore.dx);
+    expect(codeAfter.dx, lessThan(codeBefore.dx));
   });
 
   testWidgets('non-wrap vertical scroll keeps gutter and code aligned', (
@@ -217,20 +258,19 @@ void main() {
     );
     await _loadPreview(tester);
 
-    final gutterBefore = tester.getTopLeft(find.text('1'));
-    final codeBefore = tester.getTopLeft(find.byType(SelectableText).first);
+    final gutterBefore = tester.getTopLeft(_gutter);
+    final codeBefore = tester.getTopLeft(_code);
 
-    // Slow drag so the list does not fling line 1 out of the builder cache.
-    await tester.timedDrag(
-      find.byType(SelectableText).first,
+    // Drag inside the viewport: the paragraph is taller than the window, so its
+    // centre is off screen.
+    await tester.dragFrom(
+      codeBefore + const Offset(40, 20),
       const Offset(0, -48),
-      const Duration(milliseconds: 400),
     );
-    await tester.pump();
+    await tester.pumpAndSettle();
 
-    final gutterDelta = tester.getTopLeft(find.text('1')).dy - gutterBefore.dy;
-    final codeDelta =
-        tester.getTopLeft(find.byType(SelectableText).first).dy - codeBefore.dy;
+    final gutterDelta = tester.getTopLeft(_gutter).dy - gutterBefore.dy;
+    final codeDelta = tester.getTopLeft(_code).dy - codeBefore.dy;
     expect(gutterDelta, isNot(0));
     expect(codeDelta, gutterDelta);
   });
@@ -253,24 +293,26 @@ void main() {
     );
     await _loadPreview(tester);
 
-    final nonWrapGutter = tester.getTopLeft(find.text('1'));
+    final nonWrapGutter = tester.getTopLeft(_gutter);
     expect(tester.takeException(), isNull);
 
     await tester.tap(find.byKey(CodeFilePreview.wrapToggleKey));
     await tester.pump();
 
     expect(tester.takeException(), isNull);
-    expect(tester.getTopLeft(find.text('1')).dx, nonWrapGutter.dx);
+    expect(tester.getTopLeft(_gutter).dx, nonWrapGutter.dx);
     expect(find.byKey(CodeFilePreview.horizontalScrollKey), findsNothing);
   });
 
-  testWidgets('non-wrap gutter and code lines share one line box', (
+  testWidgets('gutter and code occupy the same rows in both modes', (
     tester,
   ) async {
-    // Mixed scripts on one line make the code side taller than the gutter
-    // digits unless both sides force the same strut height.
+    // Mixed scripts on one line make the code side taller than the latin-only
+    // line numbers unless both paragraphs force the same strut height, and a
+    // wrapped line has to push the following numbers down with it.
+    final long = List.filled(60, 'M').join();
     final file = File(p.join(tempDir.path, 'mixed.json'))
-      ..writeAsStringSync('{"a": "\u795e\u8c15 skill"}\n{"b": 1}\n');
+      ..writeAsStringSync('{"a": "神谕 skill"}\n$long\n{"b": 1}\n');
 
     await tester.pumpWidget(
       _app(
@@ -283,28 +325,23 @@ void main() {
     );
     await _loadPreview(tester);
 
-    final gutter = tester.widget<Text>(find.text('1'));
-    final code = tester.widget<SelectableText>(
-      find.byType(SelectableText).first,
-    );
+    final gutter = tester.widget<SelectableText>(_gutter);
+    final code = tester.widget<SelectableText>(_code);
     expect(gutter.strutStyle?.forceStrutHeight, isTrue);
     expect(code.strutStyle?.forceStrutHeight, isTrue);
     expect(code.strutStyle?.fontSize, gutter.strutStyle?.fontSize);
-    expect(code.strutStyle?.height, gutter.strutStyle?.height);
-    expect(
-      tester.getSize(find.byType(SelectableText).first).height,
-      tester.getSize(find.text('1')).height,
-    );
+    expect(_gutterText(tester), '1\n2\n3\n4');
+    expect(tester.getSize(_gutter).height, tester.getSize(_code).height);
 
-    // Gutter and code are separate lists, so they also have to advance by the
-    // same extent per line or the columns drift apart while scrolling.
-    final extents = tester
-        .widgetList<ListView>(find.byType(ListView))
-        .map((list) => list.itemExtent)
-        .toList();
-    expect(extents, hasLength(2));
-    expect(extents.first, isNotNull);
-    expect(extents.last, extents.first);
+    await tester.tap(find.byKey(CodeFilePreview.wrapToggleKey));
+    await tester.pump();
+
+    // The long line now spans several rows, so its number is followed by that
+    // many blank rows and the numbers after it stay beside their own code.
+    final wrapped = _gutterText(tester).split('\n');
+    expect(wrapped.first, '1');
+    expect(wrapped.indexOf('3'), greaterThan(2));
+    expect(tester.getSize(_gutter).height, tester.getSize(_code).height);
   });
 
   testWidgets('bashrc preview shows the shell language label', (tester) async {
