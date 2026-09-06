@@ -310,7 +310,9 @@ class FilePreviewFrame extends StatelessWidget {
   List<Widget> _headerActions(BuildContext context, {required bool desktop}) {
     final l10n = AppLocalizations.of(context)!;
     final cs = Theme.of(context).colorScheme;
-    final size = dialog ? 18.0 : 22.0;
+    // 20 is the IosIconButton default every other page's app-bar actions use;
+    // only the leading back arrow is 22.
+    final size = dialog ? 18.0 : 20.0;
     final minSize = dialog ? 36.0 : 44.0;
 
     Widget action({
