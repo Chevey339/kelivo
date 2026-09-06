@@ -23,6 +23,11 @@ const OpenAIReasoningSupport _gpt5Support = OpenAIReasoningSupport(
 );
 const OpenAIReasoningSupport _gpt5ProSupport = OpenAIReasoningSupport(
   supportedEfforts: <String>['high'],
+  offFallback: 'high',
+);
+const OpenAIReasoningSupport _gpt5CodexSupport = OpenAIReasoningSupport(
+  supportedEfforts: <String>['low', 'medium', 'high'],
+  offFallback: 'low',
 );
 const OpenAIReasoningSupport _gpt51Support = OpenAIReasoningSupport(
   supportedEfforts: <String>['none', 'low', 'medium', 'high'],
@@ -37,17 +42,28 @@ const OpenAIReasoningSupport _gpt52Support = OpenAIReasoningSupport(
 const OpenAIReasoningSupport _gpt52ChatLatestSupport = OpenAIReasoningSupport(
   supportedEfforts: <String>['none', 'low', 'medium', 'high', 'xhigh'],
 );
+const OpenAIReasoningSupport _gpt51CodexSupport = OpenAIReasoningSupport(
+  supportedEfforts: <String>['low', 'medium', 'high'],
+  offFallback: 'low',
+);
+const OpenAIReasoningSupport _gpt51CodexMaxSupport = OpenAIReasoningSupport(
+  supportedEfforts: <String>['low', 'medium', 'high', 'xhigh'],
+  offFallback: 'low',
+);
 const OpenAIReasoningSupport _gpt52ProSupport = OpenAIReasoningSupport(
   supportedEfforts: <String>['medium', 'high', 'xhigh'],
+  offFallback: 'medium',
 );
 const OpenAIReasoningSupport _gpt52CodexSupport = OpenAIReasoningSupport(
   supportedEfforts: <String>['low', 'medium', 'high', 'xhigh'],
+  offFallback: 'low',
 );
 const OpenAIReasoningSupport _gpt53ChatLatestSupport = OpenAIReasoningSupport(
   supportedEfforts: <String>['none', 'low', 'medium', 'high', 'xhigh'],
 );
 const OpenAIReasoningSupport _gpt53CodexSupport = OpenAIReasoningSupport(
   supportedEfforts: <String>['low', 'medium', 'high', 'xhigh'],
+  offFallback: 'low',
 );
 const OpenAIReasoningSupport _gpt54Support = OpenAIReasoningSupport(
   supportedEfforts: <String>['none', 'low', 'medium', 'high', 'xhigh'],
@@ -55,6 +71,7 @@ const OpenAIReasoningSupport _gpt54Support = OpenAIReasoningSupport(
 );
 const OpenAIReasoningSupport _gpt54ProSupport = OpenAIReasoningSupport(
   supportedEfforts: <String>['medium', 'high', 'xhigh'],
+  offFallback: 'medium',
 );
 const OpenAIReasoningSupport _gpt55Support = OpenAIReasoningSupport(
   supportedEfforts: <String>['none', 'low', 'medium', 'high', 'xhigh'],
@@ -62,6 +79,7 @@ const OpenAIReasoningSupport _gpt55Support = OpenAIReasoningSupport(
 );
 const OpenAIReasoningSupport _gpt55ProSupport = OpenAIReasoningSupport(
   supportedEfforts: <String>['medium', 'high', 'xhigh'],
+  offFallback: 'medium',
 );
 const OpenAIReasoningSupport _gpt56Support = OpenAIReasoningSupport(
   supportedEfforts: <String>['none', 'low', 'medium', 'high', 'xhigh', 'max'],
@@ -98,6 +116,12 @@ const OpenAIReasoningSupport _glm53Support = OpenAIReasoningSupport(
   supportedEfforts: <String>['low', 'high', 'max'],
   offFallback: 'low',
 );
+// Official 5.2 effort: none/minimal abandon thinking; low/medium map to high;
+// xhigh maps to max. We disable via thinking.type and send the rest as-is.
+// https://docs.bigmodel.cn/cn/guide/start/concept-param
+const OpenAIReasoningSupport _glm52Support = OpenAIReasoningSupport(
+  supportedEfforts: <String>['low', 'medium', 'high', 'xhigh', 'max'],
+);
 // Official V4 effort: low / high / max. medium and xhigh map to high.
 // https://api-docs.deepseek.com/guides/thinking_mode
 const OpenAIReasoningSupport _deepSeekSupport = OpenAIReasoningSupport(
@@ -130,6 +154,13 @@ bool isGlm53FamilyModel(String modelId) {
   return _matchesModel(
     modelId.trim().toLowerCase(),
     r'(^|[/_:@])glm-5\.3(?:$|[-.])',
+  );
+}
+
+bool isGlm52FamilyModel(String modelId) {
+  return _matchesModel(
+    modelId.trim().toLowerCase(),
+    r'(^|[/_:@])glm-5\.2(?:$|[-.])',
   );
 }
 
@@ -265,6 +296,9 @@ OpenAIReasoningSupport? openAIReasoningSupport(String modelId) {
   if (isGlm53FamilyModel(normalized)) {
     return _glm53Support;
   }
+  if (isGlm52FamilyModel(normalized)) {
+    return _glm52Support;
+  }
   if (isOpenAIGpt6FamilyModel(normalized)) {
     return _gpt6AstraSupport;
   }
@@ -276,64 +310,82 @@ OpenAIReasoningSupport? openAIReasoningSupport(String modelId) {
   )) {
     return _gpt56Support;
   }
-  if (_matchesModel(normalized, r'^gpt-5\.5-pro(?:$|[-.])')) {
+  if (_matchesModel(normalized, r'(^|[/_:@])gpt-5\.5-pro(?:$|[-.])')) {
     return _gpt55ProSupport;
   }
-  if (_matchesModel(normalized, r'^gpt-5\.5-(?:codex|chat-latest)(?:$|[-.])')) {
+  if (_matchesModel(
+    normalized,
+    r'(^|[/_:@])gpt-5\.5-(?:codex|chat-latest)(?:$|[-.])',
+  )) {
     return null;
   }
-  if (_matchesModel(normalized, r'^gpt-5\.5(?:$|[-.])')) {
+  if (_matchesModel(normalized, r'(^|[/_:@])gpt-5\.5(?:$|[-.])')) {
     return _gpt55Support;
   }
-  if (_matchesModel(normalized, r'^gpt-5\.4-pro(?:$|[-.])')) {
+  if (_matchesModel(normalized, r'(^|[/_:@])gpt-5\.4-pro(?:$|[-.])')) {
     return _gpt54ProSupport;
   }
-  if (_matchesModel(normalized, r'^gpt-5\.4-(?:codex|chat-latest)(?:$|[-.])')) {
+  if (_matchesModel(
+    normalized,
+    r'(^|[/_:@])gpt-5\.4-(?:codex|chat-latest)(?:$|[-.])',
+  )) {
     return null;
   }
-  if (_matchesModel(normalized, r'^gpt-5\.4(?:$|[-.])')) {
+  if (_matchesModel(normalized, r'(^|[/_:@])gpt-5\.4(?:$|[-.])')) {
     return _gpt54Support;
   }
-  if (_matchesModel(normalized, r'^gpt-5\.3-codex(?:$|[-.])')) {
+  if (_matchesModel(normalized, r'(^|[/_:@])gpt-5\.3-codex(?:$|[-.])')) {
     return _gpt53CodexSupport;
   }
-  if (_matchesModel(normalized, r'^gpt-5\.3-chat-latest(?:$|[-.])')) {
+  if (_matchesModel(normalized, r'(^|[/_:@])gpt-5\.3-chat-latest(?:$|[-.])')) {
     return _gpt53ChatLatestSupport;
   }
-  if (_matchesModel(normalized, r'^gpt-5\.3-(?:pro|chat-latest)(?:$|[-.])')) {
+  if (_matchesModel(
+    normalized,
+    r'(^|[/_:@])gpt-5\.3-(?:pro|chat-latest)(?:$|[-.])',
+  )) {
     return null;
   }
-  if (_matchesModel(normalized, r'^gpt-5\.3(?:$|[-.])')) {
+  if (_matchesModel(normalized, r'(^|[/_:@])gpt-5\.3(?:$|[-.])')) {
     return null;
   }
-  if (_matchesModel(normalized, r'^gpt-5\.2-pro(?:$|[-.])')) {
+  if (_matchesModel(normalized, r'(^|[/_:@])gpt-5\.2-pro(?:$|[-.])')) {
     return _gpt52ProSupport;
   }
-  if (_matchesModel(normalized, r'^gpt-5\.2-codex(?:$|[-.])')) {
+  if (_matchesModel(normalized, r'(^|[/_:@])gpt-5\.2-codex(?:$|[-.])')) {
     return _gpt52CodexSupport;
   }
-  if (_matchesModel(normalized, r'^gpt-5\.2-chat-latest(?:$|[-.])')) {
+  if (_matchesModel(normalized, r'(^|[/_:@])gpt-5\.2-chat-latest(?:$|[-.])')) {
     return _gpt52ChatLatestSupport;
   }
-  if (_matchesModel(normalized, r'^gpt-5\.2(?:$|[-.])')) {
+  if (_matchesModel(normalized, r'(^|[/_:@])gpt-5\.2(?:$|[-.])')) {
     return _gpt52Support;
   }
-  if (_matchesModel(normalized, r'^gpt-5\.1-chat-latest(?:$|[-.])')) {
+  if (_matchesModel(normalized, r'(^|[/_:@])gpt-5\.1-chat-latest(?:$|[-.])')) {
     return _gpt51ChatLatestSupport;
   }
-  if (_matchesModel(normalized, r'^gpt-5\.1-(?:pro|codex)(?:$|[-.])')) {
+  if (_matchesModel(normalized, r'(^|[/_:@])gpt-5\.1-codex-max(?:$|[-.])')) {
+    return _gpt51CodexMaxSupport;
+  }
+  if (_matchesModel(normalized, r'(^|[/_:@])gpt-5\.1-codex(?:$|[-.])')) {
+    return _gpt51CodexSupport;
+  }
+  if (_matchesModel(normalized, r'(^|[/_:@])gpt-5\.1-pro(?:$|[-.])')) {
     return null;
   }
-  if (_matchesModel(normalized, r'^gpt-5\.1(?:$|[-.])')) {
+  if (_matchesModel(normalized, r'(^|[/_:@])gpt-5\.1(?:$|[-.])')) {
     return _gpt51Support;
   }
-  if (_matchesModel(normalized, r'^gpt-5-pro(?:$|[-.])')) {
+  if (_matchesModel(normalized, r'(^|[/_:@])gpt-5-pro(?:$|[-.])')) {
     return _gpt5ProSupport;
   }
-  if (_matchesModel(normalized, r'^gpt-5-(?:codex|chat-latest)(?:$|[-.])')) {
+  if (_matchesModel(normalized, r'(^|[/_:@])gpt-5-codex(?:$|[-.])')) {
+    return _gpt5CodexSupport;
+  }
+  if (_matchesModel(normalized, r'(^|[/_:@])gpt-5-chat-latest(?:$|[-.])')) {
     return null;
   }
-  if (_matchesModel(normalized, r'^gpt-5(?:$|-)')) {
+  if (_matchesModel(normalized, r'(^|[/_:@])gpt-5(?:$|-)')) {
     return _gpt5Support;
   }
   return null;

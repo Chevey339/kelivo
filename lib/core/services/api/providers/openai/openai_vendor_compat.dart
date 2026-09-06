@@ -125,11 +125,35 @@ void applyCompatibleResponsesReasoning(
   final forceThinkingForQwen3Max =
       builtInSearchEnabled &&
       upstreamModelId.toLowerCase().startsWith('qwen3-max');
+  if (isDashScopeThinkingOnlyModel(upstreamModelId)) {
+    body.remove('enable_thinking');
+    return;
+  }
   body['enable_thinking'] = forceThinkingForQwen3Max || !isOff(thinkingBudget);
 }
 
-bool _isKimiK25Model(String upstreamModelId) {
-  return upstreamModelId.toLowerCase().contains('kimi-k2.5');
+bool isDashScopeThinkingOnlyModel(String modelId) {
+  final lower = modelId.trim().toLowerCase();
+  if (lower.contains('qwen3.7-max-preview') ||
+      lower.contains('qwen3.7-max-2026-05-17')) {
+    return true;
+  }
+  if (RegExp(r'(^|[/_:@])qwq(?:$|[-.])').hasMatch(lower)) return true;
+  if (RegExp(r'(^|[/_:@])deepseek-r1(?:$|[-.])').hasMatch(lower)) {
+    return true;
+  }
+  if (lower.contains('kimi-k2.7-code') || lower.contains('kimi-k2-thinking')) {
+    return true;
+  }
+  if (RegExp(r'(^|[/_:@])minimax-m2\.(?:1|5)(?:$|[-.])').hasMatch(lower)) {
+    return true;
+  }
+  return lower.contains('-thinking');
+}
+
+bool _isKimiHybridThinkingModel(String upstreamModelId) {
+  final lower = upstreamModelId.toLowerCase();
+  return lower.contains('kimi-k2.5') || lower.contains('kimi-k2.6');
 }
 
 bool isKimiK3Model(String upstreamModelId) {
@@ -225,9 +249,11 @@ void normalizeMoonshotKimiChatBody(
     return;
   }
 
-  if (_isKimiK25Model(upstreamModelId)) {
+  if (_isKimiHybridThinkingModel(upstreamModelId)) {
     body['thinking'] = {'type': isOff(thinkingBudget) ? 'disabled' : 'enabled'};
-    _removeMoonshotKimiUnsupportedSamplingParams(body);
+    if (upstreamModelId.toLowerCase().contains('kimi-k2.5')) {
+      _removeMoonshotKimiUnsupportedSamplingParams(body);
+    }
     return;
   }
 
@@ -592,7 +618,11 @@ void applyVendorReasoningKnobs(
     );
   } else if (info.isDashScope) {
     if (isReasoning) {
-      body['enable_thinking'] = !off;
+      if (isDashScopeThinkingOnlyModel(info.upstreamModelId)) {
+        body.remove('enable_thinking');
+      } else {
+        body['enable_thinking'] = !off;
+      }
       if (!off && thinkingBudget != null && thinkingBudget > 0) {
         body['thinking_budget'] = thinkingBudget;
       } else {
@@ -618,6 +648,26 @@ void applyVendorReasoningKnobs(
           body['reasoning_effort'] = effort;
         }
       } else {
+        body.remove('reasoning_effort');
+      }
+    } else if (isGlm52FamilyModel(info.upstreamModelId)) {
+      if (isReasoning) {
+        body['thinking'] = {'type': off ? 'disabled' : 'enabled'};
+        if (off) {
+          body.remove('reasoning_effort');
+        } else {
+          final effort = openAIEffortForBudget(
+            thinkingBudget,
+            info.upstreamModelId,
+          );
+          if (effort == 'auto') {
+            body.remove('reasoning_effort');
+          } else {
+            body['reasoning_effort'] = effort;
+          }
+        }
+      } else {
+        body.remove('thinking');
         body.remove('reasoning_effort');
       }
     } else if (isReasoning) {

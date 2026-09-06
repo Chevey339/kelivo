@@ -204,6 +204,69 @@ void main() {
       },
     );
 
+    test('kimi-k2.6 maps thinking budget to enabled or disabled', () async {
+      final requestBodies = <Map<String, dynamic>>[];
+      final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+      addTearDown(() async {
+        await server.close(force: true);
+      });
+
+      server.listen((request) async {
+        requestBodies.add(
+          jsonDecode(await utf8.decoder.bind(request).join())
+              as Map<String, dynamic>,
+        );
+        request.response.statusCode = HttpStatus.ok;
+        request.response.headers.contentType = ContentType(
+          'text',
+          'event-stream',
+          charset: 'utf-8',
+        );
+        request.response.write(
+          'data: ${jsonEncode({
+            'id': 'cmpl-k26',
+            'object': 'chat.completion.chunk',
+            'created': 0,
+            'model': 'kimi-k2.6',
+            'choices': [
+              {
+                'index': 0,
+                'delta': {'role': 'assistant', 'content': 'ok'},
+                'finish_reason': 'stop',
+              },
+            ],
+          })}\n\n',
+        );
+        request.response.write('data: [DONE]\n\n');
+        await request.response.close();
+      });
+
+      final baseUrl = 'http://${server.address.address}:${server.port}/v1';
+      await ChatApiService.sendMessageStream(
+        config: _moonshotConfig(baseUrl),
+        modelId: 'kimi-k2.6',
+        messages: const [
+          {'role': 'user', 'content': 'hello'},
+        ],
+        thinkingBudget: 16000,
+      ).toList();
+      await ChatApiService.sendMessageStream(
+        config: _moonshotConfig(baseUrl),
+        modelId: 'kimi-k2.6',
+        messages: const [
+          {'role': 'user', 'content': 'hello again'},
+        ],
+        thinkingBudget: 0,
+      ).toList();
+
+      expect(requestBodies, hasLength(2));
+      expect(requestBodies[0]['thinking'], {'type': 'enabled'});
+      expect(requestBodies[1]['thinking'], {'type': 'disabled'});
+      for (final body in requestBodies) {
+        expect(body.containsKey('reasoning_effort'), isFalse);
+      }
+    });
+
     test(
       'kimi-k2.7-code omits unsupported thinking and sampling params',
       () async {
@@ -608,7 +671,7 @@ void main() {
 
         expect(chunks.isGenerationDone, isTrue);
         expect(secondBody.containsKey('reasoning_effort'), isFalse);
-        expect(secondBody.containsKey('thinking'), isFalse);
+        expect(secondBody['thinking'], {'type': 'enabled'});
         expect(assistantToolMessage['content'], '我来帮您查看当前时间。');
         expect(assistantToolMessage['reasoning_content'], '');
         expect(assistantToolMessage['tool_calls'], [

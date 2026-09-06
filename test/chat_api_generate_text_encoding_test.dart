@@ -394,6 +394,29 @@ void main() {
     );
 
     test(
+      'DashScope thinking-only models omit enable_thinking instead of disabling',
+      () async {
+        final enabledBody = await _captureGenerateTextBody(
+          providerId: 'DashScopeCompatTest',
+          modelId: 'qwen3.7-max-preview',
+          thinkingBudget: 2048,
+          configBaseUrl: 'http://dashscope.aliyuncs.com/compatible-mode/v1',
+        );
+        final disabledBody = await _captureGenerateTextBody(
+          providerId: 'DashScopeCompatTest',
+          modelId: 'qwen3-235b-a22b-thinking-2507',
+          thinkingBudget: 0,
+          configBaseUrl: 'http://dashscope.aliyuncs.com/compatible-mode/v1',
+        );
+
+        expect(enabledBody.containsKey('enable_thinking'), isFalse);
+        expect(enabledBody['thinking_budget'], 2048);
+        expect(disabledBody.containsKey('enable_thinking'), isFalse);
+        expect(disabledBody.containsKey('thinking_budget'), isFalse);
+      },
+    );
+
+    test(
       'maps SiliconFlow reasoning knobs for non-streaming text generation',
       () async {
         final enabledBody = await _captureGenerateTextBody(

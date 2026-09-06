@@ -89,7 +89,7 @@ void main() {
 
       expect(requests, hasLength(2));
       expect(requests[0]['thinking'], {'type': 'enabled'});
-      expect(requests[0].containsKey('reasoning_effort'), isFalse);
+      expect(requests[0]['reasoning_effort'], 'low');
       expect(requests[1]['thinking'], {'type': 'disabled'});
       expect(requests[1].containsKey('reasoning_effort'), isFalse);
     });
@@ -206,7 +206,7 @@ void main() {
 
       expect(chunks.isGenerationDone, isTrue);
       expect(secondBody['thinking'], {'type': 'enabled'});
-      expect(secondBody.containsKey('reasoning_effort'), isFalse);
+      expect(secondBody['reasoning_effort'], 'low');
       expect(assistantToolMessage['content'], '我先查一下日期。');
       expect(assistantToolMessage['reasoning_content'], '先获取当前日期');
       expect(assistantToolMessage['tool_calls'], [

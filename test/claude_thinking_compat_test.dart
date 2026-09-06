@@ -169,8 +169,11 @@ void main() {
         thinkingBudget: 16000,
       );
 
-      expect(offBody.containsKey('thinking'), isFalse);
-      expect(offBody.containsKey('output_config'), isFalse);
+      expect(offBody['thinking'], {
+        'type': 'adaptive',
+        'display': 'summarized',
+      });
+      expect(offBody['output_config'], {'effort': 'low'});
       expect(offBody.containsKey('temperature'), isFalse);
       expect(offBody.containsKey('top_p'), isFalse);
       expect(mediumBody['thinking'], {
@@ -202,12 +205,73 @@ void main() {
           thinkingBudget: 128000,
         );
 
-        expect(offBody.containsKey('thinking'), isFalse);
-        expect(offBody.containsKey('output_config'), isFalse);
+        expect(offBody['thinking'], {
+          'type': 'adaptive',
+          'display': 'summarized',
+        });
+        expect(offBody['output_config'], {'effort': 'low'});
         expect(maxBody['thinking'], {
           'type': 'adaptive',
           'display': 'summarized',
         });
+        expect(maxBody['output_config'], {'effort': 'max'});
+        expect(maxBody['max_tokens'], 128000);
+      },
+    );
+
+    test(
+      'Fable 5.1 maps effort levels and never disables adaptive thinking',
+      () async {
+        const modelId = 'claude-fable-5-1';
+        final offBody = await captureClaudeRequestBody(
+          modelId: modelId,
+          thinkingBudget: 0,
+        );
+        final autoBody = await captureClaudeRequestBody(
+          modelId: modelId,
+          thinkingBudget: -1,
+        );
+        final lowBody = await captureClaudeRequestBody(
+          modelId: modelId,
+          thinkingBudget: 1024,
+        );
+        final highBody = await captureClaudeRequestBody(
+          modelId: modelId,
+          thinkingBudget: 32000,
+        );
+        final xhighBody = await captureClaudeRequestBody(
+          modelId: modelId,
+          thinkingBudget: 64000,
+        );
+        final maxBody = await captureClaudeRequestBody(
+          modelId: modelId,
+          thinkingBudget: 128000,
+        );
+
+        for (final body in [
+          offBody,
+          autoBody,
+          lowBody,
+          highBody,
+          xhighBody,
+          maxBody,
+        ]) {
+          expect(body['thinking'], {
+            'type': 'adaptive',
+            'display': 'summarized',
+          });
+          expect(
+            (body['thinking'] as Map<String, dynamic>).containsKey(
+              'budget_tokens',
+            ),
+            isFalse,
+          );
+        }
+        expect(offBody['output_config'], {'effort': 'low'});
+        expect(autoBody.containsKey('output_config'), isFalse);
+        expect(lowBody['output_config'], {'effort': 'low'});
+        expect(highBody['output_config'], {'effort': 'high'});
+        expect(xhighBody['output_config'], {'effort': 'xhigh'});
         expect(maxBody['output_config'], {'effort': 'max'});
         expect(maxBody['max_tokens'], 128000);
       },
