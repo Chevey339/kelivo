@@ -1,6 +1,10 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:Kelivo/core/models/environment_state.dart';
+import 'package:Kelivo/core/services/workspace/workspace_runtime.dart';
 import 'package:Kelivo/features/workspace/widgets/environment/environment_labels.dart';
+import 'package:Kelivo/icons/lucide_adapter.dart';
 
 void main() {
   group('formatDistroVersion', () {
@@ -29,6 +33,46 @@ void main() {
       expect(formatDistroVersion(null), '');
       expect(formatDistroVersion(''), '');
       expect(formatDistroVersion('   '), '');
+    });
+  });
+
+  group('workspaceEnvEngineIcon', () {
+    test('uses the package icon for alpine and ubuntu', () {
+      debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
+      addTearDown(() => debugDefaultTargetPlatformOverride = null);
+
+      expect(
+        workspaceEnvEngineIcon(
+          state: const EnvironmentState(distro: 'alpine'),
+          status: const RuntimeStatus(
+            ready: true,
+            engine: 'ish',
+            sandboxed: true,
+          ),
+        ),
+        Lucide.Package,
+      );
+      expect(
+        workspaceEnvEngineIcon(
+          state: const EnvironmentState(distro: 'ubuntu'),
+          status: const RuntimeStatus(
+            ready: true,
+            engine: 'proot',
+            sandboxed: true,
+          ),
+        ),
+        Lucide.Package,
+      );
+    });
+
+    test('uses the terminal icon for desktop native shells', () {
+      expect(
+        workspaceEnvEngineIcon(
+          state: const EnvironmentState(),
+          desktopNative: true,
+        ),
+        Lucide.SquareTerminal,
+      );
     });
   });
 

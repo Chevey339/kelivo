@@ -1,11 +1,13 @@
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
+import 'package:flutter/widgets.dart';
 
 import 'package:Kelivo/core/models/environment_state.dart';
 import 'package:Kelivo/core/services/sandbox/mirror_service.dart';
 import 'package:Kelivo/core/services/sandbox/mirror_speed_test.dart';
 import 'package:Kelivo/core/services/workspace/workspace_runtime.dart';
+import 'package:Kelivo/icons/lucide_adapter.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
 import 'package:Kelivo/shared/utils/format_bytes.dart';
 
@@ -29,6 +31,21 @@ bool workspaceEnvIsUbuntu({
 }) {
   final engine = status?.engine;
   return engine == 'proot' || state.distro == 'ubuntu';
+}
+
+IconData workspaceEnvEngineIcon({
+  required EnvironmentState state,
+  RuntimeStatus? status,
+  bool desktopNative = false,
+}) {
+  if (desktopNative || workspaceEnvIsDesktopTarget()) {
+    return Lucide.SquareTerminal;
+  }
+  if (workspaceEnvIsUbuntu(state: state, status: status) ||
+      workspaceEnvIsAlpine(state: state, status: status)) {
+    return Lucide.Package;
+  }
+  return Lucide.SquareTerminal;
 }
 
 /// Turns a stored distro version into the short display form.

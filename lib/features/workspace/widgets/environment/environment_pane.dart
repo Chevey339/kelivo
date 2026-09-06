@@ -582,12 +582,11 @@ class _StatusCard extends StatelessWidget {
       state: state,
       status: status,
     );
-    final icon = desktopNative
-        ? Lucide.SquareTerminal
-        : workspaceEnvIsUbuntu(state: state, status: status) ||
-              workspaceEnvIsAlpine(state: state, status: status)
-        ? Lucide.Package
-        : Lucide.SquareTerminal;
+    final icon = workspaceEnvEngineIcon(
+      state: state,
+      status: status,
+      desktopNative: desktopNative,
+    );
 
     final installing =
         state.phase == EnvironmentPhase.downloading ||

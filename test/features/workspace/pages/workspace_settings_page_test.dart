@@ -12,7 +12,9 @@ import 'package:Kelivo/core/providers/workspace_provider.dart';
 import 'package:Kelivo/core/services/workspace/workspace_runtime.dart';
 import 'package:Kelivo/features/workspace/pages/workspace_settings_page.dart';
 import 'package:Kelivo/features/workspace/pages/workspaces_page.dart';
+import 'package:Kelivo/icons/lucide_adapter.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
+import 'package:Kelivo/shared/widgets/ios_settings_rows.dart';
 import 'package:Kelivo/theme/theme_factory.dart';
 import 'package:drift/native.dart';
 
@@ -168,6 +170,17 @@ void main() {
         findsOneWidget,
       );
       expect(find.textContaining('alpine-3.21.3-r4'), findsNothing);
+      expect(
+        tester
+            .widget<IosNavRow>(
+              find.ancestor(
+                of: find.text(l10n.workspaceEnvEngineAlpine('3.21.3')),
+                matching: find.byType(IosNavRow),
+              ),
+            )
+            .icon,
+        Lucide.Package,
+      );
     });
   });
 }

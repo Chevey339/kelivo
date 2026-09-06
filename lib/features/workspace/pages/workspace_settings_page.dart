@@ -99,7 +99,7 @@ class _EnvironmentNavRow extends StatelessWidget {
     return SectionCard(
       children: [
         IosNavRow(
-          icon: _engineIcon(env.state, status),
+          icon: workspaceEnvEngineIcon(state: env.state, status: status),
           label: label,
           subtitle: _phaseLabel(l10n, phase),
           labelWeight: AppFontWeights.medium,
@@ -107,14 +107,6 @@ class _EnvironmentNavRow extends StatelessWidget {
         ),
       ],
     );
-  }
-
-  IconData _engineIcon(EnvironmentState state, RuntimeStatus? status) {
-    if (_envIsDesktopTarget()) return Lucide.SquareTerminal;
-    final engine = status?.engine;
-    if (engine == 'proot' || state.distro == 'ubuntu') return Lucide.Package;
-    if (engine == 'ish' || state.distro == 'alpine') return Lucide.Boxes;
-    return Lucide.SquareTerminal;
   }
 }
 
