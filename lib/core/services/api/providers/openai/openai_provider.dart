@@ -640,6 +640,12 @@ Stream<StreamChunk> sendOpenAIStream(
   if (extraBodyCfg.isNotEmpty) {
     body.addAll(extraBodyCfg);
   }
+  applyPoolsideThinkingIfNeeded(
+    body,
+    info: info,
+    isReasoning: isReasoning,
+    thinkingBudget: thinkingBudget,
+  );
   // Built-in tools run after the custom body and merge by type so custom
   // function tools and provider server tools coexist.
   if (config.useResponseApi != true) {

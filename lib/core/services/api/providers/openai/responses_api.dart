@@ -261,6 +261,12 @@ Stream<StreamChunk> runOpenAIResponsesToolFollowUps({
       );
       final extraCfg = customBody(config, modelId, assistantBody: extraBody);
       if (extraCfg.isNotEmpty) body2.addAll(extraCfg);
+      applyPoolsideThinkingIfNeeded(
+        body2,
+        info: info,
+        isReasoning: isReasoning,
+        thinkingBudget: thinkingBudget,
+      );
       try {
         if (body2['tools'] is List) {
           final raw = (body2['tools'] as List).cast<dynamic>();

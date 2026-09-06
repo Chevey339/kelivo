@@ -825,6 +825,12 @@ Stream<StreamChunk> runOpenAIChatCompletionsToolFollowUps({
       if (extraBodyCfg.isNotEmpty) {
         body2.addAll(extraBodyCfg);
       }
+      applyPoolsideThinkingIfNeeded(
+        body2,
+        info: info,
+        isReasoning: isReasoning,
+        thinkingBudget: thinkingBudget,
+      );
       // Built-in tools run after the custom body and merge by type.
       applyChatCompletionsBuiltInTools(
         body2,

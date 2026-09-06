@@ -346,6 +346,29 @@ void main() {
     );
 
     test(
+      'maps Poolside Laguna thinking knobs for non-streaming text generation',
+      () async {
+        final enabledBody = await _captureGenerateTextBody(
+          providerId: 'PoolsideCompatTest',
+          modelId: 'poolside/laguna-s-2.1',
+          thinkingBudget: 128000,
+        );
+        final disabledBody = await _captureGenerateTextBody(
+          providerId: 'PoolsideCompatTest',
+          modelId: 'poolside/laguna-xs-2.1',
+          thinkingBudget: 0,
+        );
+
+        expect(enabledBody['chat_template_kwargs'], {'enable_thinking': true});
+        expect(enabledBody.containsKey('reasoning_effort'), isFalse);
+        expect(disabledBody['chat_template_kwargs'], {
+          'enable_thinking': false,
+        });
+        expect(disabledBody.containsKey('reasoning_effort'), isFalse);
+      },
+    );
+
+    test(
       'maps DashScope reasoning knobs for non-streaming text generation',
       () async {
         final enabledBody = await _captureGenerateTextBody(

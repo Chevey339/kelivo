@@ -69,6 +69,20 @@ void applyCompatibleResponsesReasoning(
 }) {
   if (config.useResponseApi != true) return;
 
+  final poolsideInfo = OpenAIProviderInfo(
+    host: Uri.tryParse(config.baseUrl)?.host.toLowerCase() ?? '',
+    providerId: config.id.toLowerCase(),
+    upstreamModelId: upstreamModelId,
+  );
+  if (poolsideInfo.usesPoolsideThinking && !poolsideInfo.isOpenRouter) {
+    applyPoolsideThinkingKnob(
+      body,
+      isReasoning: isReasoning,
+      thinkingBudget: thinkingBudget,
+    );
+    return;
+  }
+
   if (BuiltInToolsHelper.isMimoProvider(config)) {
     body.remove('reasoning');
     if (!isReasoning) return;
@@ -458,6 +472,13 @@ class OpenAIProviderInfo {
     return id.startsWith('laguna-') || id.contains('/laguna-');
   }
 
+  bool get isPoolsideHost =>
+      host == 'poolside.ai' ||
+      host == 'inference.poolside.ai' ||
+      host.endsWith('.poolside.ai');
+
+  bool get usesPoolsideThinking => isLaguna || isPoolsideHost;
+
   bool get isSiliconFlow =>
       providerId.contains('siliconflow') || host.contains('siliconflow');
   bool get isAzureOpenAI => host.contains('openai.azure.com');
@@ -485,9 +506,14 @@ class OpenAIProviderInfo {
   }
 
   bool get needsReasoningEcho =>
-      isLaguna || isDeepSeek || isMimo || isZhipu || isKimiThinkingModel;
+      usesPoolsideThinking ||
+      isDeepSeek ||
+      isMimo ||
+      isZhipu ||
+      isKimiThinkingModel;
   ReasoningContentReplayPolicy get reasoningContentReplayPolicy {
-    if (isLaguna || _isKimiPreservedThinkingModel(upstreamModelId)) {
+    if (usesPoolsideThinking ||
+        _isKimiPreservedThinkingModel(upstreamModelId)) {
       return ReasoningContentReplayPolicy.all;
     }
     if (needsReasoningEcho) {
@@ -498,6 +524,37 @@ class OpenAIProviderInfo {
 
   String get completionTokensKey =>
       (isAzureOpenAI || isMimo) ? 'max_completion_tokens' : 'max_tokens';
+}
+
+void applyPoolsideThinkingKnob(
+  Map<String, dynamic> body, {
+  required bool isReasoning,
+  int? thinkingBudget,
+}) {
+  final enable = isReasoning && !isOff(thinkingBudget);
+  final existing = body['chat_template_kwargs'];
+  final kwargs = <String, dynamic>{
+    if (existing is Map)
+      ...existing.map((key, value) => MapEntry(key.toString(), value)),
+  };
+  kwargs.putIfAbsent('enable_thinking', () => enable);
+  body['chat_template_kwargs'] = kwargs;
+  body.remove('reasoning_effort');
+  body.remove('reasoning');
+}
+
+void applyPoolsideThinkingIfNeeded(
+  Map<String, dynamic> body, {
+  required OpenAIProviderInfo info,
+  required bool isReasoning,
+  int? thinkingBudget,
+}) {
+  if (!info.usesPoolsideThinking || info.isOpenRouter) return;
+  applyPoolsideThinkingKnob(
+    body,
+    isReasoning: isReasoning,
+    thinkingBudget: thinkingBudget,
+  );
 }
 
 void applyVendorReasoningKnobs(
@@ -527,13 +584,12 @@ void applyVendorReasoningKnobs(
       body.remove('reasoning');
       body.remove('reasoning_effort');
     }
-  } else if (info.isLaguna) {
-    if (isReasoning) {
-      body['chat_template_kwargs'] = {'enable_thinking': !off};
-    } else {
-      body.remove('chat_template_kwargs');
-    }
-    body.remove('reasoning_effort');
+  } else if (info.usesPoolsideThinking) {
+    applyPoolsideThinkingKnob(
+      body,
+      isReasoning: isReasoning,
+      thinkingBudget: thinkingBudget,
+    );
   } else if (info.isDashScope) {
     if (isReasoning) {
       body['enable_thinking'] = !off;
