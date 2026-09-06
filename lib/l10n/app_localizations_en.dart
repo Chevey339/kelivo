@@ -10136,6 +10136,18 @@ class AppLocalizationsEn extends AppLocalizations {
   String get skillsImportGitHubSubtitle => 'Import SKILL.md from a repository';
 
   @override
+  String get skillsImportResolving => 'Resolving repository…';
+
+  @override
+  String get skillsImportDownloading => 'Downloading…';
+
+  @override
+  String get skillsImportExtracting => 'Extracting…';
+
+  @override
+  String get skillsImportInstalling => 'Installing…';
+
+  @override
   String get skillsImportGitHubRepoLabel => 'Repository URL';
 
   @override

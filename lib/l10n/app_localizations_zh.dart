@@ -9708,6 +9708,18 @@ class AppLocalizationsZh extends AppLocalizations {
   String get skillsImportGitHubSubtitle => '从仓库导入 SKILL.md';
 
   @override
+  String get skillsImportResolving => '正在解析仓库…';
+
+  @override
+  String get skillsImportDownloading => '正在下载…';
+
+  @override
+  String get skillsImportExtracting => '正在解压…';
+
+  @override
+  String get skillsImportInstalling => '正在安装…';
+
+  @override
   String get skillsImportGitHubRepoLabel => '仓库地址';
 
   @override
@@ -19823,6 +19835,18 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get skillsImportGitHubSubtitle => '从仓库导入 SKILL.md';
+
+  @override
+  String get skillsImportResolving => '正在解析仓库…';
+
+  @override
+  String get skillsImportDownloading => '正在下载…';
+
+  @override
+  String get skillsImportExtracting => '正在解压…';
+
+  @override
+  String get skillsImportInstalling => '正在安装…';
 
   @override
   String get skillsImportGitHubRepoLabel => '仓库地址';
@@ -30016,6 +30040,18 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get skillsImportGitHubSubtitle => '從倉庫匯入 SKILL.md';
+
+  @override
+  String get skillsImportResolving => '正在解析儲存庫…';
+
+  @override
+  String get skillsImportDownloading => '正在下載…';
+
+  @override
+  String get skillsImportExtracting => '正在解壓縮…';
+
+  @override
+  String get skillsImportInstalling => '正在安裝…';
 
   @override
   String get skillsImportGitHubRepoLabel => '倉庫地址';

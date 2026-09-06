@@ -8,13 +8,16 @@ import 'package:Kelivo/features/workspace/widgets/skills/skill_labels.dart';
 import 'package:Kelivo/icons/lucide_adapter.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
 import 'package:Kelivo/features/workspace/workspace_layout.dart';
+import 'package:Kelivo/shared/utils/format_bytes.dart';
 import 'package:Kelivo/shared/widgets/action_sheet.dart';
+import 'package:Kelivo/shared/widgets/animated_progress_bar.dart';
 import 'package:Kelivo/shared/widgets/form_sheet.dart';
 import 'package:Kelivo/shared/widgets/ios_form_text_field.dart';
 import 'package:Kelivo/shared/widgets/ios_tactile.dart';
 import 'package:Kelivo/shared/widgets/section_card.dart';
 import 'package:Kelivo/shared/widgets/snackbar.dart';
 import 'package:file_picker/file_picker.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -113,21 +116,34 @@ Future<bool> showSkillPasteImport(BuildContext context) {
   );
 }
 
-Future<bool> showSkillGitHubImport(BuildContext context) {
+Future<bool> showSkillGitHubImport(BuildContext context) async {
   final l10n = AppLocalizations.of(context)!;
-  return showSkillTextImport(
-    context: context,
-    title: l10n.skillsImportGitHub,
-    label: l10n.skillsImportGitHubRepoLabel,
-    hint: l10n.skillsImportGitHubUrlHint,
-    confirmLabel: l10n.skillsImportConfirm,
-    minLines: 1,
-    maxLines: 1,
-    keyboardType: TextInputType.url,
-    onSubmit: (url) {
-      return context.read<SkillsService>().importFromGitHub(url.trim());
-    },
-  );
+  final service = context.read<SkillsService>();
+  final progress = ValueNotifier<SkillImportProgress?>(null);
+  final cancel = Completer<void>();
+  try {
+    return await showSkillTextImport(
+      context: context,
+      title: l10n.skillsImportGitHub,
+      label: l10n.skillsImportGitHubRepoLabel,
+      hint: l10n.skillsImportGitHubUrlHint,
+      confirmLabel: l10n.skillsImportConfirm,
+      minLines: 1,
+      maxLines: 1,
+      keyboardType: TextInputType.url,
+      progress: progress,
+      onSubmit: (url) => service.importFromGitHub(
+        url.trim(),
+        cancelSignal: cancel.future,
+        onProgress: (value) {
+          if (!cancel.isCompleted) progress.value = value;
+        },
+      ),
+    );
+  } finally {
+    cancel.complete();
+    progress.dispose();
+  }
 }
 
 Future<bool> showSkillTextImport({
@@ -140,6 +156,7 @@ Future<bool> showSkillTextImport({
   int? minLines,
   String initial = '',
   TextInputType? keyboardType,
+  ValueListenable<SkillImportProgress?>? progress,
   required Future<void> Function(String text) onSubmit,
 }) async {
   final form = SkillTextImportForm(
@@ -151,6 +168,7 @@ Future<bool> showSkillTextImport({
     minLines: minLines,
     initial: initial,
     keyboardType: keyboardType,
+    progress: progress,
     onSubmit: onSubmit,
   );
 
@@ -178,6 +196,7 @@ class SkillTextImportForm extends StatefulWidget {
     this.minLines,
     this.initial = '',
     this.keyboardType,
+    this.progress,
   });
 
   final String title;
@@ -188,6 +207,7 @@ class SkillTextImportForm extends StatefulWidget {
   final int? minLines;
   final String initial;
   final TextInputType? keyboardType;
+  final ValueListenable<SkillImportProgress?>? progress;
   final Future<void> Function(String text) onSubmit;
 
   @override
@@ -218,13 +238,16 @@ class _SkillTextImportFormState extends State<SkillTextImportForm> {
   Future<void> _submit() async {
     final text = _controller.text;
     if (text.trim().isEmpty || _busy) return;
+    FocusScope.of(context).unfocus();
     setState(() {
       _busy = true;
       _error = null;
     });
     try {
       await widget.onSubmit(text);
-      if (mounted) Navigator.of(context).pop(true);
+      if (mounted && ModalRoute.of(context)?.isCurrent == true) {
+        Navigator.of(context).pop(true);
+      }
     } catch (error) {
       if (!mounted) return;
       setState(() {
@@ -254,6 +277,13 @@ class _SkillTextImportFormState extends State<SkillTextImportForm> {
               ? TextInputAction.done
               : TextInputAction.newline,
         ),
+        if (_busy && widget.progress != null)
+          ValueListenableBuilder<SkillImportProgress?>(
+            valueListenable: widget.progress!,
+            builder: (context, progress, _) => progress == null
+                ? const SizedBox.shrink()
+                : _SkillImportProgressView(progress: progress),
+          ),
         if (_error != null)
           Padding(
             key: SkillsKeys.importError,
@@ -298,6 +328,60 @@ class _SkillTextImportFormState extends State<SkillTextImportForm> {
     }
 
     return FormSheet(title: widget.title, actions: actions, children: [fields]);
+  }
+}
+
+class _SkillImportProgressView extends StatelessWidget {
+  const _SkillImportProgressView({required this.progress});
+
+  final SkillImportProgress progress;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    final label = switch (progress.phase) {
+      SkillImportPhase.resolving => l10n.skillsImportResolving,
+      SkillImportPhase.downloading => l10n.skillsImportDownloading,
+      SkillImportPhase.extracting => l10n.skillsImportExtracting,
+      SkillImportPhase.installing => l10n.skillsImportInstalling,
+    };
+    final fraction = progress.fraction;
+    final total = progress.totalBytes;
+    final size = total != null && total > 0
+        ? '${formatBytes(progress.receivedBytes)} / ${formatBytes(total)}'
+        : formatBytes(progress.receivedBytes);
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(12, 0, 12, 14),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(label, style: const TextStyle(fontSize: 13)),
+              ),
+              if (fraction != null)
+                Text(
+                  '${(fraction * 100).floor()}%',
+                  style: const TextStyle(fontSize: 13),
+                ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          AnimatedProgressBar(fraction: fraction),
+          if (progress.phase == SkillImportPhase.downloading) ...[
+            const SizedBox(height: 6),
+            Text(
+              size,
+              style: TextStyle(
+                fontSize: 12,
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
   }
 }
 

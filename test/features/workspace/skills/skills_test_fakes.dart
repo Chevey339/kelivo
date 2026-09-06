@@ -97,7 +97,11 @@ class FakeSkillsService extends ChangeNotifier implements SkillsService {
   }
 
   @override
-  Future<Skill> importFromGitHub(String url) {
+  Future<Skill> importFromGitHub(
+    String url, {
+    ValueChanged<SkillImportProgress>? onProgress,
+    Future<void>? cancelSignal,
+  }) {
     throw UnimplementedError();
   }
 

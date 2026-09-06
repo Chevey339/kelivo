@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
@@ -13,8 +14,10 @@ import 'github_skill_ref.dart';
 import 'skill.dart';
 import 'skill_archive.dart';
 import 'skill_frontmatter.dart';
+import 'skill_import_progress.dart';
 
 export 'skill.dart';
+export 'skill_import_progress.dart';
 export 'skill_frontmatter.dart' show SkillFrontmatter, slugify;
 export 'skills_prompt.dart' show buildAvailableSkillsFragment;
 
@@ -128,27 +131,106 @@ class SkillsService extends ChangeNotifier {
       return _importMarkdown(await file.readAsString(), SkillSource.file);
     }
     if (ext == '.zip') {
-      final bytes = await file.readAsBytes();
-      if (bytes.length > kSkillImportMaxBytes) {
-        throw const FormatException('zip exceeds 20 MB');
+      final root = await _ensureRoot();
+      final staging = await root.createTemp('.import-');
+      try {
+        return await _importArchive(file, staging, SkillSource.file);
+      } finally {
+        await staging.delete(recursive: true);
       }
-      final tree = extractSkillArchive(bytes);
-      return _importTree(tree, SkillSource.file);
     }
     throw FormatException('Unsupported skill file type: $ext');
   }
 
-  Future<Skill> importFromGitHub(String url) async {
+  Future<Skill> importFromGitHub(
+    String url, {
+    ValueChanged<SkillImportProgress>? onProgress,
+    Future<void>? cancelSignal,
+  }) async {
+    var cancelled = false;
+    unawaited(cancelSignal?.then((_) => cancelled = true));
+    void checkCancelled() {
+      if (cancelled) throw http.RequestAbortedException();
+    }
+
     await loaded;
+    checkCancelled();
     final ref = GitHubSkillRef.parse(url);
-    final branch = await _resolveGitHubRef(ref);
-    final zipBytes = await _downloadGitHubZip(ref, branch);
-    final tree = extractSkillArchive(
-      zipBytes,
-      subdir: ref.subdir,
-      stripSingleRoot: true,
+    onProgress?.call(const SkillImportProgress(SkillImportPhase.resolving));
+    final branch = await _resolveGitHubRef(ref, cancelSignal: cancelSignal);
+    checkCancelled();
+    final root = await _ensureRoot();
+    final staging = await root.createTemp('.import-');
+    try {
+      final zip = File(p.join(staging.path, 'download.zip'));
+      await _downloadGitHubZip(
+        ref,
+        branch,
+        zip,
+        onProgress: onProgress,
+        cancelSignal: cancelSignal,
+      );
+      checkCancelled();
+      return await _importArchive(
+        zip,
+        staging,
+        SkillSource.github,
+        subdir: ref.subdir,
+        stripSingleRoot: true,
+        onProgress: onProgress,
+        checkCancelled: checkCancelled,
+      );
+    } finally {
+      await staging.delete(recursive: true);
+    }
+  }
+
+  Future<Skill> _importArchive(
+    File zip,
+    Directory staging,
+    SkillSource source, {
+    String? subdir,
+    bool stripSingleRoot = false,
+    ValueChanged<SkillImportProgress>? onProgress,
+    VoidCallback? checkCancelled,
+  }) async {
+    onProgress?.call(const SkillImportProgress(SkillImportPhase.extracting));
+    final extracted = Directory(p.join(staging.path, 'files'));
+    await compute(_extractArchive, (
+      zip.path,
+      extracted.path,
+      subdir,
+      stripSingleRoot,
+    ));
+    checkCancelled?.call();
+    onProgress?.call(const SkillImportProgress(SkillImportPhase.installing));
+    final parsed = SkillFrontmatter.parse(
+      await File(p.join(extracted.path, 'SKILL.md')).readAsString(),
     );
-    return _importTree(tree, SkillSource.github);
+    final errors = parsed.validate();
+    if (errors.isNotEmpty) {
+      throw FormatException('Invalid SKILL.md: ${errors.join(', ')}');
+    }
+    final root = await _ensureRoot();
+    final id = await _allocateId(slugify(parsed.name));
+    checkCancelled?.call();
+    final dest = await extracted.rename(p.join(root.path, id));
+    try {
+      checkCancelled?.call();
+      return await _registerImport(root, id, source);
+    } catch (_) {
+      await dest.delete(recursive: true);
+      rethrow;
+    }
+  }
+
+  static void _extractArchive((String, String, String?, bool) args) {
+    extractSkillArchive(
+      args.$1,
+      args.$2,
+      subdir: args.$3,
+      stripSingleRoot: args.$4,
+    );
   }
 
   Future<File> exportZip(String id, Directory outDir) async {
@@ -271,20 +353,6 @@ class SkillsService extends ChangeNotifier {
     return _commitImport(name: parsed.name, files: files, source: source);
   }
 
-  Future<Skill> _importTree(ExtractedSkillTree tree, SkillSource source) async {
-    await loaded;
-    final raw = tree.files['SKILL.md'];
-    if (raw == null) {
-      throw const FormatException('SKILL.md not found');
-    }
-    final parsed = SkillFrontmatter.parse(utf8.decode(raw));
-    final errors = parsed.validate();
-    if (errors.isNotEmpty) {
-      throw FormatException('Invalid SKILL.md: ${errors.join(', ')}');
-    }
-    return _commitImport(name: parsed.name, files: tree.files, source: source);
-  }
-
   Future<Skill> _commitImport({
     required String name,
     required Map<String, List<int>> files,
@@ -293,6 +361,14 @@ class SkillsService extends ChangeNotifier {
     final root = await _ensureRoot();
     final id = await _allocateId(slugify(name));
     await _writeSkillFiles(root, id, files);
+    return _registerImport(root, id, source);
+  }
+
+  Future<Skill> _registerImport(
+    Directory root,
+    String id,
+    SkillSource source,
+  ) async {
     final now = DateTime.now().toUtc();
     final record = SkillRecord(
       id: id,
@@ -409,14 +485,24 @@ class SkillsService extends ChangeNotifier {
     );
   }
 
-  Future<String> _resolveGitHubRef(GitHubSkillRef ref) async {
+  Future<String> _resolveGitHubRef(
+    GitHubSkillRef ref, {
+    Future<void>? cancelSignal,
+  }) async {
     if (ref.ref != null && ref.ref!.isNotEmpty) return ref.ref!;
     try {
       final uri = Uri.https(
         'api.github.com',
         '/repos/${ref.owner}/${ref.repo}',
       );
-      final response = await _httpClient.get(uri, headers: _githubHeaders);
+      final request = http.AbortableRequest(
+        'GET',
+        uri,
+        abortTrigger: cancelSignal,
+      )..headers.addAll(_githubHeaders);
+      final response = await http.Response.fromStream(
+        await _httpClient.send(request),
+      );
       if (response.statusCode >= 200 && response.statusCode < 300) {
         final decoded = jsonDecode(response.body);
         if (decoded is Map && decoded['default_branch'] != null) {
@@ -424,39 +510,80 @@ class SkillsService extends ChangeNotifier {
           if (branch.isNotEmpty) return branch;
         }
       }
+    } on http.RequestAbortedException {
+      rethrow;
     } catch (e) {
       debugPrint('GitHub default_branch lookup failed: $e');
     }
     return 'main';
   }
 
-  Future<List<int>> _downloadGitHubZip(
+  Future<void> _downloadGitHubZip(
     GitHubSkillRef ref,
     String branch,
-  ) async {
-    Future<http.Response> getZip(String resolved) {
+    File destination, {
+    ValueChanged<SkillImportProgress>? onProgress,
+    Future<void>? cancelSignal,
+  }) async {
+    Future<http.StreamedResponse> getZip(String resolved) {
       final uri = Uri.https(
         'codeload.github.com',
         '/${ref.owner}/${ref.repo}/zip/$resolved',
       );
-      return _httpClient.get(uri, headers: _githubHeaders);
+      final request = http.AbortableRequest(
+        'GET',
+        uri,
+        abortTrigger: cancelSignal,
+      )..headers.addAll(_githubHeaders);
+      return _httpClient.send(request);
     }
 
+    onProgress?.call(const SkillImportProgress(SkillImportPhase.downloading));
     var response = await getZip(branch);
     if (response.statusCode == 404 && ref.ref == null && branch == 'main') {
+      await response.stream.listen(null).cancel();
       response = await getZip('master');
     }
     if (response.statusCode < 200 || response.statusCode >= 300) {
+      await response.stream.listen(null).cancel();
       throw HttpException(
         'GitHub zip download failed (${response.statusCode})',
         uri: response.request?.url,
       );
     }
-    final bytes = response.bodyBytes;
-    if (bytes.length > kSkillImportMaxBytes) {
-      throw const FormatException('zip exceeds 20 MB');
+    final total = response.contentLength;
+    if (total != null && total > kSkillImportMaxBytes) {
+      await response.stream.listen(null).cancel();
+      throw const FormatException('zip exceeds 200 MB');
     }
-    return bytes;
+    var received = 0;
+    final clock = Stopwatch()..start();
+    void report() {
+      onProgress?.call(
+        SkillImportProgress(
+          SkillImportPhase.downloading,
+          receivedBytes: received,
+          totalBytes: total,
+        ),
+      );
+      clock.reset();
+    }
+
+    report();
+    final output = await destination.open(mode: FileMode.write);
+    try {
+      await for (final chunk in response.stream) {
+        received += chunk.length;
+        if (received > kSkillImportMaxBytes) {
+          throw const FormatException('zip exceeds 200 MB');
+        }
+        await output.writeFrom(chunk);
+        if (clock.elapsedMilliseconds >= 100) report();
+      }
+      report();
+    } finally {
+      await output.close();
+    }
   }
 
   static const Map<String, String> _githubHeaders = {

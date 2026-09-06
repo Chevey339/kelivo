@@ -18233,6 +18233,30 @@ abstract class AppLocalizations {
   /// **'Import SKILL.md from a repository'**
   String get skillsImportGitHubSubtitle;
 
+  /// No description provided for @skillsImportResolving.
+  ///
+  /// In en, this message translates to:
+  /// **'Resolving repository…'**
+  String get skillsImportResolving;
+
+  /// No description provided for @skillsImportDownloading.
+  ///
+  /// In en, this message translates to:
+  /// **'Downloading…'**
+  String get skillsImportDownloading;
+
+  /// No description provided for @skillsImportExtracting.
+  ///
+  /// In en, this message translates to:
+  /// **'Extracting…'**
+  String get skillsImportExtracting;
+
+  /// No description provided for @skillsImportInstalling.
+  ///
+  /// In en, this message translates to:
+  /// **'Installing…'**
+  String get skillsImportInstalling;
+
   /// No description provided for @skillsImportGitHubRepoLabel.
   ///
   /// In en, this message translates to:
