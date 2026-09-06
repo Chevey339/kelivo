@@ -264,6 +264,49 @@ void main() {
     expect(find.byKey(CodeFilePreview.horizontalScrollKey), findsNothing);
   });
 
+  testWidgets('non-wrap gutter and code lines share one line box', (
+    tester,
+  ) async {
+    // Mixed scripts on one line make the code side taller than the gutter
+    // digits unless both sides force the same strut height.
+    final file = File(p.join(tempDir.path, 'mixed.json'))
+      ..writeAsStringSync('{"a": "\u795e\u8c15 skill"}\n{"b": 1}\n');
+
+    await tester.pumpWidget(
+      _app(
+        SizedBox(
+          width: 240,
+          height: 400,
+          child: CodeFilePreview(file: file, autoLoad: false),
+        ),
+      ),
+    );
+    await _loadPreview(tester);
+
+    final gutter = tester.widget<Text>(find.text('1'));
+    final code = tester.widget<SelectableText>(
+      find.byType(SelectableText).first,
+    );
+    expect(gutter.strutStyle?.forceStrutHeight, isTrue);
+    expect(code.strutStyle?.forceStrutHeight, isTrue);
+    expect(code.strutStyle?.fontSize, gutter.strutStyle?.fontSize);
+    expect(code.strutStyle?.height, gutter.strutStyle?.height);
+    expect(
+      tester.getSize(find.byType(SelectableText).first).height,
+      tester.getSize(find.text('1')).height,
+    );
+
+    // Gutter and code are separate lists, so they also have to advance by the
+    // same extent per line or the columns drift apart while scrolling.
+    final extents = tester
+        .widgetList<ListView>(find.byType(ListView))
+        .map((list) => list.itemExtent)
+        .toList();
+    expect(extents, hasLength(2));
+    expect(extents.first, isNotNull);
+    expect(extents.last, extents.first);
+  });
+
   testWidgets('bashrc preview shows the shell language label', (tester) async {
     final file = File(p.join(tempDir.path, '.bashrc'))
       ..writeAsStringSync('export PATH=/usr/bin\n');

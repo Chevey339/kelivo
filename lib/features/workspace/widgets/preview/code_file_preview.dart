@@ -34,6 +34,7 @@ const double _kCodeBlockRadius = 16;
 const double _kMinFontSize = 11;
 const double _kMaxFontSize = 20;
 const double _kDefaultFontSize = 13;
+const EdgeInsets _kLinePadding = EdgeInsets.symmetric(vertical: 1);
 const EdgeInsets _kGutterListPadding = EdgeInsets.fromLTRB(0, 8, 8, 12);
 const EdgeInsets _kCodeListPadding = EdgeInsets.fromLTRB(12, 8, 12, 12);
 
@@ -535,6 +536,13 @@ class _VirtualizedSourceState extends State<_VirtualizedSource> {
           36.0,
           80.0,
         );
+    // Without a forced strut a line box takes the tallest run's ascent plus the
+    // tallest run's descent, so a line mixing latin and CJK grows past the
+    // latin-only line number beside it.
+    final strutStyle = StrutStyle.fromTextStyle(
+      widget.textStyle,
+      forceStrutHeight: true,
+    );
     if (widget.wrap) {
       return ListView.builder(
         padding: const EdgeInsets.fromLTRB(0, 8, 12, 12),
@@ -547,6 +555,7 @@ class _VirtualizedSourceState extends State<_VirtualizedSource> {
             theme: widget.theme,
             textStyle: widget.textStyle,
             gutterStyle: widget.gutterStyle,
+            strutStyle: strutStyle,
             gutterWidth: gutterWidth,
             wrap: true,
           );
@@ -554,11 +563,20 @@ class _VirtualizedSourceState extends State<_VirtualizedSource> {
       );
     }
 
+    final textScaler = MediaQuery.textScalerOf(context);
     final maxLineWidth = _measureWidestLine(
       widget.lines,
       widget.textStyle,
-      MediaQuery.textScalerOf(context),
+      textScaler,
     );
+    // Unwrapped, gutter and code are two lists synced by scroll offset, so any
+    // per-line height difference accumulates into visible drift. A `Text` line
+    // box is rounded up to a whole pixel while the `SelectableText` beside it
+    // keeps the raw strut height, which alone is enough to pull the columns
+    // apart. Pinning both lists to one measured extent removes the difference.
+    final lineExtent =
+        _measureLineHeight(widget.textStyle, strutStyle, textScaler) +
+        _kLinePadding.vertical;
 
     return LayoutBuilder(
       builder: (context, constraints) {
@@ -577,9 +595,14 @@ class _VirtualizedSourceState extends State<_VirtualizedSource> {
                   controller: _gutterCtrl,
                   physics: const NeverScrollableScrollPhysics(),
                   padding: _kGutterListPadding,
+                  itemExtent: lineExtent,
                   itemCount: widget.lines.length,
                   itemBuilder: (context, index) {
-                    return _GutterLine(index: index, style: widget.gutterStyle);
+                    return _GutterLine(
+                      index: index,
+                      style: widget.gutterStyle,
+                      strutStyle: strutStyle,
+                    );
                   },
                 ),
               ),
@@ -593,6 +616,7 @@ class _VirtualizedSourceState extends State<_VirtualizedSource> {
                   child: ListView.builder(
                     controller: _codeCtrl,
                     padding: _kCodeListPadding,
+                    itemExtent: lineExtent,
                     itemCount: widget.lines.length,
                     itemBuilder: (context, index) {
                       return _CodeLine(
@@ -602,6 +626,7 @@ class _VirtualizedSourceState extends State<_VirtualizedSource> {
                         theme: widget.theme,
                         textStyle: widget.textStyle,
                         gutterStyle: widget.gutterStyle,
+                        strutStyle: strutStyle,
                         gutterWidth: gutterWidth,
                         wrap: false,
                       );
@@ -638,6 +663,24 @@ double _measureWidestLine(
   return width + 32;
 }
 
+/// Height of one rendered line box, measured the way a `Text` renders it so
+/// the gutter and the code column can share a single list extent.
+double _measureLineHeight(
+  TextStyle textStyle,
+  StrutStyle strutStyle,
+  TextScaler textScaler,
+) {
+  final painter = TextPainter(
+    text: TextSpan(text: '0', style: textStyle),
+    strutStyle: strutStyle,
+    textDirection: TextDirection.ltr,
+    textScaler: textScaler,
+  )..layout();
+  final height = painter.height;
+  painter.dispose();
+  return height;
+}
+
 class _CodeLine extends StatelessWidget {
   const _CodeLine({
     required this.index,
@@ -646,6 +689,7 @@ class _CodeLine extends StatelessWidget {
     required this.theme,
     required this.textStyle,
     required this.gutterStyle,
+    required this.strutStyle,
     required this.gutterWidth,
     required this.wrap,
   });
@@ -656,6 +700,7 @@ class _CodeLine extends StatelessWidget {
   final Map<String, TextStyle> theme;
   final TextStyle textStyle;
   final TextStyle gutterStyle;
+  final StrutStyle strutStyle;
   final double gutterWidth;
   final bool wrap;
 
@@ -667,9 +712,10 @@ class _CodeLine extends StatelessWidget {
     final body = SelectableText.rich(
       TextSpan(style: textStyle, children: spans),
       style: textStyle,
+      strutStyle: strutStyle,
     );
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 1),
+      padding: _kLinePadding,
       child: wrap
           ? Row(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -682,6 +728,7 @@ class _CodeLine extends StatelessWidget {
                       '${index + 1}',
                       textAlign: TextAlign.right,
                       style: gutterStyle,
+                      strutStyle: strutStyle,
                     ),
                   ),
                 ),
@@ -701,16 +748,26 @@ class _CodeLine extends StatelessWidget {
 }
 
 class _GutterLine extends StatelessWidget {
-  const _GutterLine({required this.index, required this.style});
+  const _GutterLine({
+    required this.index,
+    required this.style,
+    required this.strutStyle,
+  });
 
   final int index;
   final TextStyle style;
+  final StrutStyle strutStyle;
 
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 1),
-      child: Text('${index + 1}', textAlign: TextAlign.right, style: style),
+      padding: _kLinePadding,
+      child: Text(
+        '${index + 1}',
+        textAlign: TextAlign.right,
+        style: style,
+        strutStyle: strutStyle,
+      ),
     );
   }
 }
