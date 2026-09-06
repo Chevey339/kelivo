@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import 'package:path/path.dart' as p;
 
@@ -26,6 +27,7 @@ class SkillsService extends ChangeNotifier {
     required this.store,
     Directory? skillsDirectory,
     http.Client? httpClient,
+    this._bundledAssets,
   }) : _injectedSkillsDirectory = skillsDirectory,
        _httpClient = httpClient ?? http.Client(),
        _ownsHttpClient = httpClient == null {
@@ -34,6 +36,7 @@ class SkillsService extends ChangeNotifier {
 
   final ExtensionEntityStore store;
   final Directory? _injectedSkillsDirectory;
+  final AssetBundle? _bundledAssets;
   final http.Client _httpClient;
   final bool _ownsHttpClient;
   final List<Skill> _skills = <Skill>[];
@@ -65,8 +68,69 @@ class SkillsService extends ChangeNotifier {
     return dir;
   }
 
-  Future<void> _load() async {
-    await rescan();
+  Future<void> _load() => _serializeMutation(() async {
+    final assets = _bundledAssets;
+    if (assets != null) {
+      await _seedSkillCreator(await _ensureRoot(), assets);
+    }
+    await _rescan();
+  });
+
+  Future<void> _seedSkillCreator(Directory root, AssetBundle assets) async {
+    const id = 'skill-creator';
+    // Keep this receipt beside the skills so backup/restore also preserves a
+    // user's deletion. Seeding never replaces an existing skill or its settings.
+    final receipt = File(p.join(root.path, '.bundled-skill-creator'));
+    if (await receipt.exists()) return;
+    final dest = Directory(p.join(root.path, id));
+    final destType = await FileSystemEntity.type(dest.path, followLinks: false);
+    final md = File(p.join(dest.path, 'SKILL.md'));
+    if ((destType == FileSystemEntityType.notFound ||
+            destType == FileSystemEntityType.directory) &&
+        !await md.exists()) {
+      final entity = await store.get(ExtensionEntityStore.kindSkill, id);
+      final previous = entity == null
+          ? null
+          : SkillRecord.fromJson(entity.payload);
+      final markdown = await assets.loadString('assets/skills/$id/SKILL.md');
+      final errors = SkillFrontmatter.parse(markdown).validate();
+      if (errors.isNotEmpty) {
+        throw FormatException('Invalid bundled SKILL.md: ${errors.join(', ')}');
+      }
+      final staging = await root.createTemp('.bundled-');
+      try {
+        await File(
+          p.join(staging.path, 'SKILL.md'),
+        ).writeAsString(markdown, flush: true);
+        if (destType == FileSystemEntityType.notFound) {
+          await staging.rename(dest.path);
+        } else {
+          await File(p.join(staging.path, 'SKILL.md')).rename(md.path);
+        }
+        try {
+          final now = DateTime.now().toUtc();
+          await _upsertRecord(
+            previous?.copyWith(source: SkillSource.bundled, updatedAt: now) ??
+                SkillRecord(
+                  id: id,
+                  source: SkillSource.bundled,
+                  installedAt: now,
+                  updatedAt: now,
+                ),
+          );
+        } catch (_) {
+          if (destType == FileSystemEntityType.notFound) {
+            await dest.delete(recursive: true);
+          } else {
+            await md.delete();
+          }
+          rethrow;
+        }
+      } finally {
+        if (await staging.exists()) await staging.delete(recursive: true);
+      }
+    }
+    await receipt.writeAsString('1\n', flush: true);
   }
 
   Future<Directory> _ensureRoot() async {

@@ -741,8 +741,10 @@ class MyApp extends StatelessWidget {
           ),
         ),
         ChangeNotifierProvider(
-          create: (ctx) =>
-              SkillsService(store: ctx.read<ExtensionEntityStore>()),
+          create: (ctx) => SkillsService(
+            store: ctx.read<ExtensionEntityStore>(),
+            bundledAssets: rootBundle,
+          ),
         ),
         ChangeNotifierProvider(
           create: (_) => EnvironmentProvider(preferences: businessPreferences),
