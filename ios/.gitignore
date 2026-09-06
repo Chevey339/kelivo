@@ -13,6 +13,8 @@ Icon?
 **/Pods/
 **/.symlinks/
 profile
+# Bundled shell configuration, not a Flutter profile build artifact.
+!sandbox/overlay/etc/profile
 xcuserdata
 **/.generated/
 Flutter/App.framework

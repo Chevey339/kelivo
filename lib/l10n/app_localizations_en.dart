@@ -10663,4 +10663,60 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get workspaceToolHelpGrep => 'Search text inside files.';
+
+  @override
+  String get workspaceEnvVariablesTitle => 'Environment variables';
+
+  @override
+  String get workspaceEnvVariablesEntryDetail =>
+      'Variables for commands, with output privacy controls';
+
+  @override
+  String get workspaceEnvVariablesEmpty =>
+      'No variables yet. Add API keys or other configuration for your tools.';
+
+  @override
+  String get workspaceEnvVariablesScope =>
+      'Shared by all workspaces. Changes apply to new Agent commands and new in-app terminal sessions; reopen existing sessions to apply them. External system terminals keep their own environment.';
+
+  @override
+  String get workspaceEnvPrivacyMode => 'Privacy mode';
+
+  @override
+  String get workspaceEnvPrivacyDetail =>
+      'Commands can use the real values. Before workspace tool output is sent to the model, matching values of at least 5 characters are replaced with [REDACTED]. Local logs remain unchanged. Shorter values are not masked, to avoid replacing common flags and numbers.';
+
+  @override
+  String get workspaceEnvVariableAdd => 'Add variable';
+
+  @override
+  String get workspaceEnvVariableEdit => 'Edit variable';
+
+  @override
+  String get workspaceEnvVariableName => 'Name';
+
+  @override
+  String get workspaceEnvVariableValue => 'Value';
+
+  @override
+  String get workspaceEnvVariableNote => 'Note (optional)';
+
+  @override
+  String get workspaceEnvVariableNameHint =>
+      'Use letters, digits and underscores; do not start with a digit. Names are case-sensitive. Reference variables in commands with \$NAME.';
+
+  @override
+  String get workspaceEnvVariableInvalidName => 'Enter a valid variable name.';
+
+  @override
+  String get workspaceEnvVariableInvalidValue =>
+      'Enter a nonempty value without NUL characters.';
+
+  @override
+  String get workspaceEnvVariableDuplicate =>
+      'A variable with this name already exists.';
+
+  @override
+  String get workspaceEnvVariablesSaveFailed =>
+      'Could not save the environment settings. Please try again.';
 }

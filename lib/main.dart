@@ -780,7 +780,15 @@ class MyApp extends StatelessWidget {
           EnvironmentDependencies?
         >(update: (_, extras, __) => extras.dependencies),
         ChangeNotifierProvider(create: (_) => ToolRunRegistry()),
-        ChangeNotifierProvider(create: (_) => TerminalSessionManager()),
+        ChangeNotifierProvider(
+          create: (ctx) {
+            final environment = ctx.read<EnvironmentProvider>();
+            return TerminalSessionManager(
+              loadEnvironment: () async =>
+                  (await environment.loadExecutionConfig()).variables,
+            );
+          },
+        ),
         Provider<MemoryPipelineService>(
           create: (ctx) {
             final memoryV2 = ctx.read<MemoryProviderV2>();

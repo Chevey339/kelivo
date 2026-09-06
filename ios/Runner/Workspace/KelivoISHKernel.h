@@ -23,6 +23,8 @@ typedef NS_ENUM(int, KelivoISHPtyOpenError) {
   KelivoISHPtyOpenErrorNotBooted = -1001,
   KelivoISHPtyOpenErrorBadSessionId = -1002,
   KelivoISHPtyOpenErrorSessionExists = -1003,
+  KelivoISHPtyOpenErrorEnvironmentTooLarge = -1004,
+  KelivoISHPtyOpenErrorInvalidEnvironment = -1005,
 };
 
 @interface KelivoISHKernel : NSObject

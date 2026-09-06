@@ -6,6 +6,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:path/path.dart' as p;
 
 import 'package:Kelivo/core/models/workspace.dart';
+import 'package:Kelivo/core/models/environment_variable.dart';
 import 'package:Kelivo/core/models/workspace_binding.dart';
 import 'package:Kelivo/core/services/workspace/tool_run_registry.dart';
 import 'package:Kelivo/core/services/workspace/workspace_paths.dart';
@@ -125,6 +126,7 @@ void main() {
     WorkspaceRuntime? runtime,
     bool registerRuntime = true,
     Future<void> Function()? onShellCompleted,
+    Future<EnvironmentExecutionConfig> Function()? loadEnvironment,
   }) {
     final provider = WorkspaceRuntimeProvider();
     if (registerRuntime && runtime != null) {
@@ -134,6 +136,7 @@ void main() {
       registry: registry,
       runtimeProvider: provider,
       onShellCompleted: onShellCompleted,
+      loadEnvironment: loadEnvironment,
       updateConversationExtras: (id, update) async {
         extrasById[id] = update(extrasById[id] ?? <String, dynamic>{});
       },
@@ -151,6 +154,124 @@ void main() {
   WorkspaceToolMetadata metaOf(Object? raw) {
     return WorkspaceToolMetadata.fromJson(client(raw).metadata!);
   }
+
+  test(
+    'environment injection uses raw values but shell and file results are private',
+    () async {
+      const secret = 'test-token-秘密-123';
+      var config = EnvironmentExecutionConfig(variables: {'TOKEN': secret});
+      final runtime = FakeWorkspaceRuntime(useRealProcess: true);
+      final tools = service(
+        runtime: runtime,
+        loadEnvironment: () async => config,
+      );
+      final context = ctx();
+      final raw = await tools.handle(context, 'shell', {
+        'command':
+            r'printf "%s" "$TOKEN"; printf "%s" "$TOKEN" >&2; printf "%s" "$TOKEN" > secret.txt; exit 1',
+      }, toolCallId: 'env-shell');
+      expect(runtime.requests.single.env['TOKEN'], secret);
+      expect(runtime.requests.single.env['NO_COLOR'], '1');
+      expect(client(raw).content, isNot(contains(secret)));
+      expect(jsonOf(raw)['exit_code'], 1);
+      expect(metaOf(raw).stdoutPreview, secret);
+      expect(metaOf(raw).stderrPreview, secret);
+      final read = await tools.handle(context, 'read_file', {
+        'path': 'secret.txt',
+      }, toolCallId: 'env-read');
+      expect(client(read).content, contains('[REDACTED]'));
+      expect(client(read).content, isNot(contains(secret)));
+      expect(metaOf(read).stdoutPreview, contains(secret));
+      config = EnvironmentExecutionConfig(
+        variables: {'TOKEN': secret},
+        privacyMode: false,
+      );
+      final unmasked = await tools.handle(context, 'shell', {
+        'command': r'printf "%s" "$TOKEN"',
+      }, toolCallId: 'env-off');
+      expect(client(unmasked).content, contains(secret));
+      config = EnvironmentExecutionConfig();
+      await tools.handle(context, 'shell', {
+        'command': 'true',
+      }, toolCallId: 'env-removed');
+      expect(runtime.requests.last.env.containsKey('TOKEN'), isFalse);
+    },
+    skip: !canRunReal,
+  );
+
+  test(
+    'execution and redaction share a snapshot when settings change mid-command',
+    () async {
+      var config = EnvironmentExecutionConfig(
+        variables: {'TOKEN': 'old-secret'},
+      );
+      final tools = service(
+        runtime: FakeWorkspaceRuntime(useRealProcess: true),
+        loadEnvironment: () async => config,
+        onShellCompleted: () async {
+          config = EnvironmentExecutionConfig(
+            variables: {'TOKEN': 'new-secret'},
+          );
+        },
+      );
+      final output = await tools.handle(ctx(), 'shell', {
+        'command': r'printf "%s" "$TOKEN"',
+      }, toolCallId: 'snapshot');
+      expect(client(output).content, isNot(contains('old-secret')));
+      expect(metaOf(output).stdoutPreview, 'old-secret');
+    },
+    skip: !canRunReal,
+  );
+
+  test(
+    'offloaded command output is redacted when the model reads it later',
+    () async {
+      const secret = 'long-output-secret-token';
+      final stdout = List.filled(1600, '$secret\n').join();
+      final runtime = FakeWorkspaceRuntime();
+      runtime.enqueue('private-offload', [
+        CommandOutput(
+          OutputStreamKind.stdout,
+          Uint8List.fromList(utf8.encode(stdout)),
+        ),
+        const CommandExited(
+          exitCode: 0,
+          timedOut: false,
+          cancelled: false,
+          interrupted: false,
+          duration: Duration.zero,
+        ),
+      ]);
+      final tools = service(
+        runtime: runtime,
+        loadEnvironment: () async =>
+            EnvironmentExecutionConfig(variables: {'TOKEN': secret}),
+      );
+      final context = ctx();
+      final result = await tools.handle(context, 'shell', {
+        'command': 'produce-output',
+      }, toolCallId: 'private-offload');
+      final outputPath = jsonOf(result)['output_file'] as String;
+      expect(client(result).content, isNot(contains(secret)));
+      expect(await File(outputPath).readAsString(), contains(secret));
+      final read = await tools.handle(context, 'read_file', {
+        'path': outputPath,
+        'limit': 10,
+      }, toolCallId: 'read-private-offload');
+      expect(client(read).content, contains('[REDACTED]'));
+      expect(client(read).content, isNot(contains(secret)));
+      expect(metaOf(read).stdoutPreview, contains(secret));
+    },
+  );
+
+  test('workspace prompt lists names without including values', () {
+    final prompt = WorkspaceToolsService.buildPromptFragment(
+      ctx(),
+      environmentVariableNames: ['API_KEY', 'BASE_URL'],
+    );
+    expect(prompt, contains('API_KEY, BASE_URL'));
+    expect(prompt, contains(r'Use $NAME references'));
+  });
 
   test('post-command refresh runs for every execution outcome', () async {
     final runtime = FakeWorkspaceRuntime();

@@ -347,6 +347,10 @@ final class WorkspacePlugin: NSObject, FlutterStreamHandler {
       reason = "empty sessionId"
     case KelivoISHPtyOpenError.sessionExists.rawValue:
       reason = "sessionId already open"
+    case KelivoISHPtyOpenError.environmentTooLarge.rawValue:
+      reason = "environment variables exceed the iOS sandbox limit of 128 KiB (UTF-8); reduce their total size"
+    case KelivoISHPtyOpenError.invalidEnvironment.rawValue:
+      reason = "invalid environment variable name or value"
     default:
       reason = "guest error"
     }

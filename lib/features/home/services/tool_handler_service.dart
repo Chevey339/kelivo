@@ -5,6 +5,7 @@ import 'package:flutter/widgets.dart';
 import 'package:provider/provider.dart';
 import '../../../core/models/assistant.dart';
 import '../../../core/providers/assistant_provider.dart';
+import '../../../core/providers/environment_provider.dart';
 import '../../../core/providers/mcp_provider.dart';
 import '../../../core/providers/memory_provider.dart';
 import '../../../core/providers/memory_provider_v2.dart';
@@ -58,6 +59,9 @@ class ToolHandlerService {
         touchLastUsed: workspaces.touchLastUsed,
         onSkillRead: onSkillRead,
         onShellCompleted: onShellCompleted,
+        loadEnvironment: contextProvider
+            .read<EnvironmentProvider?>()
+            ?.loadExecutionConfig,
         isToolEnabled: (id, name) =>
             workspaces.byId(id)?.isToolEnabled(name) ?? false,
       );

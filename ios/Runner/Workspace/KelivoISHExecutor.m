@@ -9,6 +9,7 @@
 
 #import "KelivoISHExecutor.h"
 #import "KelivoISHKernel.h"
+#import "KelivoISHEnvironment.h"
 #import "KelivoISHCompat.h"
 
 #include "ish/kernel/init.h"
@@ -264,6 +265,27 @@ static dispatch_queue_t _readerQueue;
         return;
     }
 
+    NSMutableDictionary<NSString *, NSString *> *merged = [[self defaultEnv] mutableCopy];
+    NSTimeZone *tz = [NSTimeZone systemTimeZone];
+    NSInteger secs = tz.secondsFromGMT;
+    NSInteger hrs = secs / 3600;
+    NSInteger mins = labs(secs % 3600) / 60;
+    if (mins != 0) {
+        merged[@"TZ"] = [NSString stringWithFormat:@"LCL%+ld:%02ld", (long)-hrs, (long)mins];
+    } else {
+        merged[@"TZ"] = [NSString stringWithFormat:@"LCL%+ld", (long)-hrs];
+    }
+    if (env) [merged addEntriesFromDictionary:env];
+    KelivoISHEnvironmentError environmentError;
+    __attribute__((objc_precise_lifetime)) NSData *environmentData =
+        KelivoISHEncodeEnvironment(merged, &environmentError);
+    if (environmentData == nil) {
+        NSString *reason = KelivoISHEnvironmentErrorMessage(environmentError);
+        chunk(runId, YES, [[reason stringByAppendingString:@"\n"] dataUsingEncoding:NSUTF8StringEncoding]);
+        fail(reason);
+        return;
+    }
+
     KelivoISHRunContext *ctx = [[KelivoISHRunContext alloc] init];
     ctx.runId = runId;
     ctx.chunk = chunk;
@@ -366,33 +388,7 @@ static dispatch_queue_t _readerQueue;
     }
     argv_buf[pos] = '\0';
 
-    NSMutableDictionary<NSString *, NSString *> *merged = [[self defaultEnv] mutableCopy];
-    NSTimeZone *tz = [NSTimeZone systemTimeZone];
-    NSInteger secs = tz.secondsFromGMT;
-    NSInteger hrs = secs / 3600;
-    NSInteger mins = labs(secs % 3600) / 60;
-    if (mins != 0) {
-        merged[@"TZ"] = [NSString stringWithFormat:@"LCL%+ld:%02ld", (long)-hrs, (long)mins];
-    } else {
-        merged[@"TZ"] = [NSString stringWithFormat:@"LCL%+ld", (long)-hrs];
-    }
-    if (env) {
-        [merged addEntriesFromDictionary:env];
-    }
-
-    char envp_buf[8192];
-    size_t envp_pos = 0;
-    for (NSString *key in merged) {
-        NSString *entry = [NSString stringWithFormat:@"%@=%@", key, merged[key]];
-        const char *s = entry.UTF8String;
-        size_t len = strlen(s) + 1;
-        if (envp_pos + len >= sizeof(envp_buf) - 1) break;
-        memcpy(envp_buf + envp_pos, s, len);
-        envp_pos += len;
-    }
-    envp_buf[envp_pos] = '\0';
-
-    err = do_execve("/bin/sh", exec_argc, argv_buf, envp_buf);
+    err = do_execve("/bin/sh", exec_argc, argv_buf, environmentData.bytes);
     if (err < 0) {
         current = saved;
         [ctx closePipeEnds];

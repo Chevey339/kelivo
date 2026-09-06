@@ -8,9 +8,11 @@ import '../../../features/home/services/tool_approval_service.dart';
 import '../../../utils/app_directories.dart';
 import '../../../utils/mcp_structured_image.dart';
 import '../../models/workspace_binding.dart';
+import '../../models/environment_variable.dart';
 import '../../providers/workspace_provider.dart';
 import '../chat/chat_service.dart';
 import 'conversation_files.dart';
+import 'environment_output_redactor.dart';
 import 'file_link_resolver.dart';
 import 'host_file_tools.dart';
 import 'output_buffer.dart';
@@ -41,6 +43,7 @@ class WorkspaceToolsService {
     this.onSkillRead,
     this.onShellCompleted,
     this.isToolEnabled,
+    this.loadEnvironment,
   }) : registry = registry ?? ToolRunRegistry(),
        runtimeProvider = runtimeProvider ?? WorkspaceRuntimeProvider();
 
@@ -64,6 +67,7 @@ class WorkspaceToolsService {
   final Future<void> Function(String skillId)? onSkillRead;
   final Future<void> Function()? onShellCompleted;
   final bool Function(String workspaceId, String tool)? isToolEnabled;
+  final Future<EnvironmentExecutionConfig> Function()? loadEnvironment;
 
   bool _enabled(WorkspaceToolContext ctx, String name) =>
       isToolEnabled?.call(ctx.workspace.id, name) ??
@@ -323,6 +327,7 @@ class WorkspaceToolsService {
   static String buildPromptFragment(
     WorkspaceToolContext ctx, {
     List<AttachmentInfo> attachments = const [],
+    Iterable<String> environmentVariableNames = const [],
   }) {
     if (ctx.skillsOnly) return '';
     final paths = ctx.paths;
@@ -361,6 +366,13 @@ class WorkspaceToolsService {
         'No cd or env persists. Chain with &&. Use non-interactive flags (-y). '
         'Output is capped; long output is saved to $outputsHint.',
       );
+      if (environmentVariableNames.isNotEmpty) {
+        buf.writeln(
+          'User-configured environment variables are already injected: '
+          '${environmentVariableNames.join(', ')}. '
+          r'Use $NAME references; do not print or attempt to discover their values.',
+        );
+      }
     }
     if (ctx.workspace.isToolEnabled('read_file') &&
         ctx.workspace.isToolEnabled('edit_file')) {
@@ -399,6 +411,30 @@ class WorkspaceToolsService {
     ToolApprovalService? approvalService,
     String? conversationId,
   }) async {
+    final environment =
+        await loadEnvironment?.call() ?? EnvironmentExecutionConfig();
+    final redactor = EnvironmentOutputRedactor(environment);
+    final result = await _handle(
+      ctx,
+      name,
+      args,
+      toolCallId: toolCallId,
+      approvalService: approvalService,
+      conversationId: conversationId,
+      environment: environment.variables,
+    );
+    return redactor.redact(ClientToolResult.fromHandler(result));
+  }
+
+  Future<Object?> _handle(
+    WorkspaceToolContext ctx,
+    String name,
+    Map<String, dynamic> args, {
+    required String toolCallId,
+    ToolApprovalService? approvalService,
+    String? conversationId,
+    required Map<String, String> environment,
+  }) async {
     if (ctx.skillsOnly && name != 'read_file') {
       return _errorResult(
         tool: name,
@@ -422,6 +458,7 @@ class WorkspaceToolsService {
             toolCallId: toolCallId,
             approvalService: approvalService,
             conversationId: conversationId,
+            environment: environment,
           );
         case 'read_file':
           return await _handleReadFile(ctx, args);
@@ -498,6 +535,7 @@ class WorkspaceToolsService {
     required String toolCallId,
     ToolApprovalService? approvalService,
     String? conversationId,
+    required Map<String, String> environment,
   }) async {
     const tool = 'shell';
     final command = _stringArg(args, 'command');
@@ -560,6 +598,7 @@ class WorkspaceToolsService {
       'TERM': 'dumb',
       'LANG': 'C.UTF-8',
       'HOME': sandboxed ? '/root' : (Platform.environment['HOME'] ?? ''),
+      ...environment,
     };
 
     final run = registry.start(toolCallId, tool, command: command);

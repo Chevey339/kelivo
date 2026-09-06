@@ -3,15 +3,19 @@ import 'dart:io';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:path/path.dart' as p;
+import 'package:provider/provider.dart';
 
 import 'package:Kelivo/core/models/assistant.dart';
 import 'package:Kelivo/core/models/workspace.dart';
 import 'package:Kelivo/core/models/workspace_binding.dart';
+import 'package:Kelivo/core/models/environment_variable.dart';
+import 'package:Kelivo/core/providers/environment_provider.dart';
 import 'package:Kelivo/core/services/chat/chat_service.dart';
 import 'package:Kelivo/core/services/workspace/workspace_paths.dart';
 import 'package:Kelivo/core/services/workspace/workspace_runtime.dart';
 import 'package:Kelivo/core/services/workspace/workspace_tools_service.dart';
 import 'package:Kelivo/features/home/services/message_builder_service.dart';
+import '../../../support/business_test_harness.dart';
 
 class _FakeBuildContext implements BuildContext {
   @override
@@ -122,30 +126,58 @@ void main() {
     expect(apiMessages.single['content'], isNot(contains('<workspace>')));
   });
 
-  test('injectWorkspacePrompt appends the fragment when bound', () async {
-    final service = MessageBuilderService(
-      chatService: _FakeChatService(),
-      contextProvider: _FakeBuildContext(),
-    );
-    final apiMessages = <Map<String, dynamic>>[
-      {'role': 'system', 'content': 'sys'},
-    ];
-    await service.injectWorkspacePrompt(
-      apiMessages,
-      const Assistant(id: 'a1', name: 'A'),
-      conversationId: 'conv-1',
-      workspaceContext: sandboxed,
-      attachments: const [
-        AttachmentInfo(
-          name: 'a.txt',
-          size: 1,
-          modelPath: '/chat/attachments/a.txt',
+  testWidgets(
+    'injectWorkspacePrompt appends the fragment and variable names without values',
+    (tester) async {
+      late EnvironmentProvider environment;
+      await tester.runAsync(() async {
+        environment = EnvironmentProvider(
+          preferences: createBusinessTestPreferences(),
+        );
+        await environment.saveVariable(
+          const EnvironmentVariable(
+            name: 'API_KEY',
+            value: 'never-send-this-secret',
+            note: 'private-note',
+          ),
+        );
+      });
+      addTearDown(environment.dispose);
+      await tester.pumpWidget(
+        ChangeNotifierProvider.value(
+          value: environment,
+          child: const SizedBox(),
         ),
-      ],
-    );
-    final content = apiMessages.single['content'] as String;
-    expect(content, startsWith('sys'));
-    expect(content, contains('<workspace>'));
-    expect(content, contains('a.txt'));
-  });
+      );
+      final service = MessageBuilderService(
+        chatService: _FakeChatService(),
+        contextProvider: tester.element(find.byType(SizedBox)),
+      );
+      final apiMessages = <Map<String, dynamic>>[
+        {'role': 'system', 'content': 'sys'},
+      ];
+      await tester.runAsync(
+        () => service.injectWorkspacePrompt(
+          apiMessages,
+          const Assistant(id: 'a1', name: 'A'),
+          conversationId: 'conv-1',
+          workspaceContext: sandboxed,
+          attachments: const [
+            AttachmentInfo(
+              name: 'a.txt',
+              size: 1,
+              modelPath: '/chat/attachments/a.txt',
+            ),
+          ],
+        ),
+      );
+      final content = apiMessages.single['content'] as String;
+      expect(content, startsWith('sys'));
+      expect(content, contains('<workspace>'));
+      expect(content, contains('a.txt'));
+      expect(content, contains('API_KEY'));
+      expect(content, isNot(contains('never-send-this-secret')));
+      expect(content, isNot(contains('private-note')));
+    },
+  );
 }

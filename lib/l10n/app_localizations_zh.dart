@@ -10205,6 +10205,57 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get workspaceToolHelpGrep => '搜索文件中的文本内容。';
+
+  @override
+  String get workspaceEnvVariablesTitle => '环境变量';
+
+  @override
+  String get workspaceEnvVariablesEntryDetail => '管理命令使用的变量与输出隐私';
+
+  @override
+  String get workspaceEnvVariablesEmpty => '还没有环境变量。可以添加工具需要的 API 密钥等配置。';
+
+  @override
+  String get workspaceEnvVariablesScope =>
+      '所有工作区共用。修改会用于新的 Agent 命令和应用内终端会话，已有终端需重新打开。外部系统终端使用其自身的环境变量。';
+
+  @override
+  String get workspaceEnvPrivacyMode => '隐私模式';
+
+  @override
+  String get workspaceEnvPrivacyDetail =>
+      '命令仍能使用真实值。工作区工具输出发给模型前，匹配到的至少 5 个字符的变量值会替换为 [REDACTED]，本地日志保留原文。较短的值不做遮蔽，以免误替换常见开关和数字。';
+
+  @override
+  String get workspaceEnvVariableAdd => '添加变量';
+
+  @override
+  String get workspaceEnvVariableEdit => '编辑变量';
+
+  @override
+  String get workspaceEnvVariableName => '名称';
+
+  @override
+  String get workspaceEnvVariableValue => '值';
+
+  @override
+  String get workspaceEnvVariableNote => '备注（可选）';
+
+  @override
+  String get workspaceEnvVariableNameHint =>
+      '名称使用字母、数字和下划线，不能以数字开头，区分大小写。命令中可通过 \$NAME 使用变量。';
+
+  @override
+  String get workspaceEnvVariableInvalidName => '请输入有效的变量名称。';
+
+  @override
+  String get workspaceEnvVariableInvalidValue => '值不能为空，也不能包含空字符（NUL）。';
+
+  @override
+  String get workspaceEnvVariableDuplicate => '已存在同名变量。';
+
+  @override
+  String get workspaceEnvVariablesSaveFailed => '环境设置保存失败，请重试。';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hans`).
@@ -20334,6 +20385,57 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get workspaceToolHelpGrep => '搜索文件中的文本内容。';
+
+  @override
+  String get workspaceEnvVariablesTitle => '环境变量';
+
+  @override
+  String get workspaceEnvVariablesEntryDetail => '管理命令使用的变量与输出隐私';
+
+  @override
+  String get workspaceEnvVariablesEmpty => '还没有环境变量。可以添加工具需要的 API 密钥等配置。';
+
+  @override
+  String get workspaceEnvVariablesScope =>
+      '所有工作区共用。修改会用于新的 Agent 命令和应用内终端会话，已有终端需重新打开。外部系统终端使用其自身的环境变量。';
+
+  @override
+  String get workspaceEnvPrivacyMode => '隐私模式';
+
+  @override
+  String get workspaceEnvPrivacyDetail =>
+      '命令仍能使用真实值。工作区工具输出发给模型前，匹配到的至少 5 个字符的变量值会替换为 [REDACTED]，本地日志保留原文。较短的值不做遮蔽，以免误替换常见开关和数字。';
+
+  @override
+  String get workspaceEnvVariableAdd => '添加变量';
+
+  @override
+  String get workspaceEnvVariableEdit => '编辑变量';
+
+  @override
+  String get workspaceEnvVariableName => '名称';
+
+  @override
+  String get workspaceEnvVariableValue => '值';
+
+  @override
+  String get workspaceEnvVariableNote => '备注（可选）';
+
+  @override
+  String get workspaceEnvVariableNameHint =>
+      '名称使用字母、数字和下划线，不能以数字开头，区分大小写。命令中可通过 \$NAME 使用变量。';
+
+  @override
+  String get workspaceEnvVariableInvalidName => '请输入有效的变量名称。';
+
+  @override
+  String get workspaceEnvVariableInvalidValue => '值不能为空，也不能包含空字符（NUL）。';
+
+  @override
+  String get workspaceEnvVariableDuplicate => '已存在同名变量。';
+
+  @override
+  String get workspaceEnvVariablesSaveFailed => '环境设置保存失败，请重试。';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hant`).
@@ -30539,4 +30641,55 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get workspaceToolHelpGrep => '搜尋檔案中的文字內容。';
+
+  @override
+  String get workspaceEnvVariablesTitle => '環境變數';
+
+  @override
+  String get workspaceEnvVariablesEntryDetail => '管理命令使用的變數與輸出隱私';
+
+  @override
+  String get workspaceEnvVariablesEmpty => '還沒有環境變數。可以新增工具需要的 API 金鑰等設定。';
+
+  @override
+  String get workspaceEnvVariablesScope =>
+      '所有工作區共用。修改會用於新的 Agent 命令和應用程式內終端機工作階段，已有終端機需重新開啟。外部系統終端機使用其自身的環境變數。';
+
+  @override
+  String get workspaceEnvPrivacyMode => '隱私模式';
+
+  @override
+  String get workspaceEnvPrivacyDetail =>
+      '命令仍能使用真實值。工作區工具輸出傳給模型前，匹配到的至少 5 個字元的變數值會替換為 [REDACTED]，本機日誌保留原文。較短的值不做遮蔽，以免誤替換常見開關和數字。';
+
+  @override
+  String get workspaceEnvVariableAdd => '新增變數';
+
+  @override
+  String get workspaceEnvVariableEdit => '編輯變數';
+
+  @override
+  String get workspaceEnvVariableName => '名稱';
+
+  @override
+  String get workspaceEnvVariableValue => '值';
+
+  @override
+  String get workspaceEnvVariableNote => '備註（選填）';
+
+  @override
+  String get workspaceEnvVariableNameHint =>
+      '名稱使用字母、數字和底線，不能以數字開頭，區分大小寫。命令中可透過 \$NAME 使用變數。';
+
+  @override
+  String get workspaceEnvVariableInvalidName => '請輸入有效的變數名稱。';
+
+  @override
+  String get workspaceEnvVariableInvalidValue => '值不能為空，也不能包含空字元（NUL）。';
+
+  @override
+  String get workspaceEnvVariableDuplicate => '已存在同名變數。';
+
+  @override
+  String get workspaceEnvVariablesSaveFailed => '環境設定儲存失敗，請重試。';
 }

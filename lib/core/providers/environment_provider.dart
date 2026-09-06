@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 
 import '../database/business_preferences.dart';
 import '../models/environment_state.dart';
+import '../models/environment_variable.dart';
 import '../services/sandbox/rootfs_source.dart';
 
 class EnvironmentProvider extends ChangeNotifier {
@@ -12,12 +13,89 @@ class EnvironmentProvider extends ChangeNotifier {
   static const String downloadSourceKey = 'environment_download_source_v1';
   static const String downloadUrlKey = 'environment_download_url_v1';
   static const String diskUsageKey = 'environment_disk_usage_v1';
+  static const String variablesKey = 'environment_variables_v1';
+  static const String privacyModeKey = 'environment_privacy_mode_v1';
 
   EnvironmentProvider({required this.preferences}) {
     loaded = _load();
   }
 
   final BusinessPreferences preferences;
+  List<EnvironmentVariable> _variables = [];
+  bool _privacyMode = true;
+  Future<void> _variablesWrite = Future<void>.value();
+
+  List<EnvironmentVariable> get variables => List.unmodifiable(_variables);
+  bool get privacyMode => _privacyMode;
+
+  Future<EnvironmentExecutionConfig> loadExecutionConfig() async {
+    await loaded;
+    return EnvironmentExecutionConfig(
+      variables: {
+        for (final variable in _variables) variable.name: variable.value,
+      },
+      privacyMode: _privacyMode,
+    );
+  }
+
+  Future<void> _writeVariables(Future<void> Function() write) {
+    final operation = _variablesWrite.then((_) async {
+      await loaded;
+      await write();
+      notifyListeners();
+    });
+    _variablesWrite = operation.catchError((Object _) {});
+    return operation;
+  }
+
+  Future<void> saveVariable(
+    EnvironmentVariable variable, {
+    String? previousName,
+  }) {
+    return _writeVariables(() async {
+      final name = variable.name.trim();
+      if (!EnvironmentVariable.namePattern.hasMatch(name)) {
+        throw EnvironmentVariableError.invalidName;
+      }
+      if (variable.value.isEmpty || variable.value.contains('\u0000')) {
+        throw EnvironmentVariableError.invalidValue;
+      }
+      if (_variables.any((v) => v.name == name && v.name != previousName)) {
+        throw EnvironmentVariableError.duplicateName;
+      }
+      final next = [..._variables];
+      final index = next.indexWhere((v) => v.name == previousName);
+      final saved = EnvironmentVariable(
+        name: name,
+        value: variable.value,
+        note: variable.note.trim(),
+      );
+      if (index < 0) {
+        next.add(saved);
+      } else {
+        next[index] = saved;
+      }
+      await preferences.setString(
+        variablesKey,
+        jsonEncode(next.map((v) => v.toJson()).toList()),
+      );
+      _variables = next;
+    });
+  }
+
+  Future<void> deleteVariable(String name) => _writeVariables(() async {
+    final next = _variables.where((v) => v.name != name).toList();
+    await preferences.setString(
+      variablesKey,
+      jsonEncode(next.map((v) => v.toJson()).toList()),
+    );
+    _variables = next;
+  });
+
+  Future<void> setPrivacyMode(bool enabled) => _writeVariables(() async {
+    await preferences.setBool(privacyModeKey, enabled);
+    _privacyMode = enabled;
+  });
   EnvironmentState _state = const EnvironmentState();
   Map<MirrorCategory, MirrorSelection> _mirrors =
       <MirrorCategory, MirrorSelection>{};
@@ -73,6 +151,22 @@ class EnvironmentProvider extends ChangeNotifier {
   Future<void> _load() async {
     if (!preferences.isLoaded) {
       await preferences.load();
+    }
+    _privacyMode = preferences.getBool(privacyModeKey) ?? true;
+    final rawVariables = preferences.getString(variablesKey);
+    if (rawVariables != null && rawVariables.isNotEmpty) {
+      try {
+        _variables = (jsonDecode(rawVariables) as List)
+            .map(
+              (v) => EnvironmentVariable.fromJson(
+                (v as Map).cast<String, dynamic>(),
+              ),
+            )
+            .toList();
+      } catch (_) {
+        // Never print malformed stored values: they may contain credentials.
+        debugPrint('Failed to load environment variables');
+      }
     }
     final sourceName = preferences.getString(downloadSourceKey);
     _downloadSource =

@@ -3818,5 +3818,21 @@
   "workspaceToolHelpEdit": "取代現有檔案中的指定文字。",
   "workspaceToolHelpList": "瀏覽目錄及其中的檔案。",
   "workspaceToolHelpGlob": "按檔名或路徑模式尋找檔案。",
-  "workspaceToolHelpGrep": "搜尋檔案中的文字內容。"
+  "workspaceToolHelpGrep": "搜尋檔案中的文字內容。",
+  "workspaceEnvVariablesTitle": "環境變數",
+  "workspaceEnvVariablesEntryDetail": "管理命令使用的變數與輸出隱私",
+  "workspaceEnvVariablesEmpty": "還沒有環境變數。可以新增工具需要的 API 金鑰等設定。",
+  "workspaceEnvVariablesScope": "所有工作區共用。修改會用於新的 Agent 命令和應用程式內終端機工作階段，已有終端機需重新開啟。外部系統終端機使用其自身的環境變數。",
+  "workspaceEnvPrivacyMode": "隱私模式",
+  "workspaceEnvPrivacyDetail": "命令仍能使用真實值。工作區工具輸出傳給模型前，匹配到的至少 5 個字元的變數值會替換為 [REDACTED]，本機日誌保留原文。較短的值不做遮蔽，以免誤替換常見開關和數字。",
+  "workspaceEnvVariableAdd": "新增變數",
+  "workspaceEnvVariableEdit": "編輯變數",
+  "workspaceEnvVariableName": "名稱",
+  "workspaceEnvVariableValue": "值",
+  "workspaceEnvVariableNote": "備註（選填）",
+  "workspaceEnvVariableNameHint": "名稱使用字母、數字和底線，不能以數字開頭，區分大小寫。命令中可透過 $NAME 使用變數。",
+  "workspaceEnvVariableInvalidName": "請輸入有效的變數名稱。",
+  "workspaceEnvVariableInvalidValue": "值不能為空，也不能包含空字元（NUL）。",
+  "workspaceEnvVariableDuplicate": "已存在同名變數。",
+  "workspaceEnvVariablesSaveFailed": "環境設定儲存失敗，請重試。"
 }

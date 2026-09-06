@@ -2,6 +2,7 @@ import 'package:flutter/cupertino.dart' show CupertinoPageRoute;
 import 'package:Kelivo/core/services/sandbox/environment_dependencies.dart';
 import 'package:Kelivo/core/services/sandbox/environment_installer.dart';
 import 'package:Kelivo/features/workspace/pages/environment_download_page.dart';
+import 'package:Kelivo/features/workspace/pages/environment_variables_page.dart';
 import 'environment_dependencies_section.dart';
 import 'dart:async';
 
@@ -379,6 +380,7 @@ class _EnvironmentPaneState extends State<EnvironmentPane> {
         child: IosSectionFooter(text: l10n.workspaceEnvNativeExplanation),
       ),
       IosSectionFooter(text: l10n.workspaceEnvNativeUnsandboxed),
+      ..._variablesSection(),
     ];
   }
 
@@ -439,6 +441,7 @@ class _EnvironmentPaneState extends State<EnvironmentPane> {
           service: dependencies,
           enabled: ready && !_busy,
         ),
+      ..._variablesSection(),
       if (showActions) ...[
         IosSectionHeader(text: l10n.workspaceEnvActionsSection),
         SectionCard(
@@ -511,6 +514,24 @@ class _EnvironmentPaneState extends State<EnvironmentPane> {
         ),
       ],
       IosSectionFooter(text: l10n.workspaceEnvInfoBody),
+    ];
+  }
+
+  List<Widget> _variablesSection() {
+    final l10n = AppLocalizations.of(context)!;
+    return [
+      IosSectionHeader(text: l10n.workspaceEnvVariablesTitle),
+      SectionCard(
+        children: [
+          IosNavRow(
+            key: const ValueKey('environment-variables-entry'),
+            icon: Lucide.KeyRound,
+            label: l10n.workspaceEnvVariablesTitle,
+            subtitle: l10n.workspaceEnvVariablesEntryDetail,
+            onTap: () => openEnvironmentVariablesPage(context),
+          ),
+        ],
+      ),
     ];
   }
 

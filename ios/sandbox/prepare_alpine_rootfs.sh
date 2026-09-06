@@ -469,18 +469,8 @@ open(path, "w").write("\n".join(out) + "\n")
 PY
     fi
 
-    if [ -f "$root/etc/profile" ] && ! grep -q "Kelivo Workspace" "$root/etc/profile"; then
-        cat >> "$root/etc/profile" << 'EOF'
-
-# Kelivo Workspace
-export PS1='\u@kelivo:\w\$ '
-export TERM=xterm-256color
-export HOME=/root
-export LANG=C.UTF-8
-export CHARSET=UTF-8
-export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
-EOF
-    fi
+    # Shell defaults live in overlay/etc/profile and profile.d/kelivo.sh.
+    # The kernel applies them at every boot, including to installed rootfses.
 
     # PEP 668: allow pip in this embedded rootfs (also mirrored by overlay pip.conf).
     find "$root/usr/lib" -name EXTERNALLY-MANAGED -delete 2>/dev/null || true

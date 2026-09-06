@@ -244,10 +244,13 @@ class TerminalSession {
 
 /// Owns open [TerminalSession]s, PTY wiring, OSC 1337 handling, and wakelock.
 class TerminalSessionManager extends ChangeNotifier {
-  TerminalSessionManager({TerminalWakelockSetter? setWakelock})
-    : _setWakelock = setWakelock ?? _pluginWakelock;
+  TerminalSessionManager({
+    TerminalWakelockSetter? setWakelock,
+    this.loadEnvironment,
+  }) : _setWakelock = setWakelock ?? _pluginWakelock;
 
   final TerminalWakelockSetter _setWakelock;
+  final Future<Map<String, String>> Function()? loadEnvironment;
   final List<TerminalSession> _sessions = <TerminalSession>[];
   bool _wakelockOn = false;
   bool _disposed = false;
@@ -312,7 +315,7 @@ class TerminalSessionManager extends ChangeNotifier {
     final pty = await runtime.openPty(
       mounts: mounts,
       cwd: cwd,
-      env: kTerminalGuestEnv,
+      env: {...kTerminalGuestEnv, ...?await loadEnvironment?.call()},
       cols: cols,
       rows: rows,
     );

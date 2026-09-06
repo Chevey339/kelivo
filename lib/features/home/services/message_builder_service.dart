@@ -13,6 +13,7 @@ import '../../../core/models/instruction_injection.dart';
 import '../../../core/models/memory_entry.dart';
 import '../../../core/models/world_book.dart';
 import '../../../core/providers/memory_provider.dart';
+import '../../../core/providers/environment_provider.dart';
 import '../../../core/providers/settings_provider.dart';
 import '../../../core/providers/user_provider.dart';
 import '../../../core/services/chat/chat_service.dart';
@@ -1787,6 +1788,7 @@ class MessageBuilderService {
     List<AttachmentInfo> attachments = const [],
   }) async {
     try {
+      final environmentProvider = contextProvider.read<EnvironmentProvider?>();
       final ctx =
           workspaceContext ??
           await WorkspaceToolsService.resolve(
@@ -1796,9 +1798,11 @@ class MessageBuilderService {
             chatService: chatService,
           );
       if (ctx == null) return;
+      final environment = await environmentProvider?.loadExecutionConfig();
       final fragment = WorkspaceToolsService.buildPromptFragment(
         ctx,
         attachments: attachments,
+        environmentVariableNames: environment?.variables.keys ?? const [],
       );
       if (fragment.trim().isEmpty) return;
       _appendToSystemMessage(

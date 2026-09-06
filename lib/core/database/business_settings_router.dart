@@ -171,6 +171,8 @@ final class BusinessKeyRegistry {
     'tool_schema_overrides_v1',
     'environment_state_v1',
     'environment_mirrors_v1',
+    'environment_variables_v1',
+    'environment_privacy_mode_v1',
   };
 
   static BusinessKeyDisposition classify(String key) {

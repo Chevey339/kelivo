@@ -37,6 +37,36 @@ void main() {
     expect(session.terminal.buffer.getText(), contains('hello from pty'));
   });
 
+  test(
+    'new PTY sessions load current variables and preserve terminal defaults',
+    () async {
+      var variables = <String, String>{'TOKEN': 'original-secret'};
+      final runtime = FakeWorkspaceRuntime();
+      final manager = TerminalSessionManager(
+        setWakelock: (_) async {},
+        loadEnvironment: () async => variables,
+      );
+      addTearDown(() async {
+        await manager.closeAll();
+        manager.dispose();
+      });
+      final first = await manager.open(
+        runtime: runtime,
+        mounts: const [],
+        cwd: '/workspace',
+      );
+      expect(runtime.lastEnv!['TOKEN'], 'original-secret');
+      expect(runtime.lastEnv!['TERM'], 'xterm-256color');
+      runtime.lastPty!.emitString('original-secret');
+      await flush();
+      expect(first.terminal.buffer.getText(), contains('original-secret'));
+      variables = {'NEW_TOKEN': 'new-secret'};
+      await manager.open(runtime: runtime, mounts: const [], cwd: '/workspace');
+      expect(runtime.lastEnv!.containsKey('TOKEN'), isFalse);
+      expect(runtime.lastEnv!['NEW_TOKEN'], 'new-secret');
+    },
+  );
+
   test('forwards typed input bytes to the PTY', () async {
     final runtime = FakeWorkspaceRuntime();
     final manager = managerWithLock((_) {});

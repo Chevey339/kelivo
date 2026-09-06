@@ -10,6 +10,7 @@
 #import "KelivoISHKernel.h"
 #import "KelivoISHCrashGuards.h"
 #import "KelivoISHExecutor.h"
+#import "KelivoISHEnvironment.h"
 #import "KelivoISHCompat.h"
 
 @import SystemConfiguration;
@@ -564,6 +565,22 @@ static void KelivoDnsReachabilityChanged(SCNetworkReachabilityRef target,
         return KelivoISHPtyOpenErrorSessionExists;
     }
 
+    NSMutableDictionary<NSString *, NSString *> *merged = [@{
+        @"TERM": @"xterm-256color",
+        @"HOME": @"/root",
+        @"PATH": @"/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+        @"LANG": @"C.UTF-8",
+        @"PS1": @"\\u@kelivo:\\w\\$ ",
+    } mutableCopy];
+    if (env) [merged addEntriesFromDictionary:env];
+    KelivoISHEnvironmentError environmentError;
+    NSData *environmentData = KelivoISHEncodeEnvironment(merged, &environmentError);
+    if (environmentData == nil) {
+        return environmentError == KelivoISHEnvironmentErrorTooLarge
+            ? KelivoISHPtyOpenErrorEnvironmentTooLarge
+            : KelivoISHPtyOpenErrorInvalidEnvironment;
+    }
+
     __block int resultPid = -1;
     [self performOnSpawnQueue:^{
         int err = become_new_init_child();
@@ -619,29 +636,7 @@ static void KelivoDnsReachabilityChanged(SCNetworkReachabilityRef target,
         }
         argv_buf[pos] = '\0';
 
-        NSMutableDictionary<NSString *, NSString *> *merged = [@{
-            @"TERM": @"xterm-256color",
-            @"HOME": @"/root",
-            @"PATH": @"/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
-            @"LANG": @"C.UTF-8",
-            @"ENV": @"/etc/profile",
-        } mutableCopy];
-        if (env) {
-            [merged addEntriesFromDictionary:env];
-        }
-        char envp_buf[8192];
-        size_t envp_pos = 0;
-        for (NSString *key in merged) {
-            NSString *entry = [NSString stringWithFormat:@"%@=%@", key, merged[key]];
-            const char *s = entry.UTF8String;
-            size_t len = strlen(s) + 1;
-            if (envp_pos + len >= sizeof(envp_buf) - 1) break;
-            memcpy(envp_buf + envp_pos, s, len);
-            envp_pos += len;
-        }
-        envp_buf[envp_pos] = '\0';
-
-        err = do_execve(execPath, argc, argv_buf, envp_buf);
+        err = do_execve(execPath, argc, argv_buf, environmentData.bytes);
         if (err < 0) {
             resultPid = err;
             return;

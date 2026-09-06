@@ -19154,6 +19154,102 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Search text inside files.'**
   String get workspaceToolHelpGrep;
+
+  /// No description provided for @workspaceEnvVariablesTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Environment variables'**
+  String get workspaceEnvVariablesTitle;
+
+  /// No description provided for @workspaceEnvVariablesEntryDetail.
+  ///
+  /// In en, this message translates to:
+  /// **'Variables for commands, with output privacy controls'**
+  String get workspaceEnvVariablesEntryDetail;
+
+  /// No description provided for @workspaceEnvVariablesEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No variables yet. Add API keys or other configuration for your tools.'**
+  String get workspaceEnvVariablesEmpty;
+
+  /// No description provided for @workspaceEnvVariablesScope.
+  ///
+  /// In en, this message translates to:
+  /// **'Shared by all workspaces. Changes apply to new Agent commands and new in-app terminal sessions; reopen existing sessions to apply them. External system terminals keep their own environment.'**
+  String get workspaceEnvVariablesScope;
+
+  /// No description provided for @workspaceEnvPrivacyMode.
+  ///
+  /// In en, this message translates to:
+  /// **'Privacy mode'**
+  String get workspaceEnvPrivacyMode;
+
+  /// No description provided for @workspaceEnvPrivacyDetail.
+  ///
+  /// In en, this message translates to:
+  /// **'Commands can use the real values. Before workspace tool output is sent to the model, matching values of at least 5 characters are replaced with [REDACTED]. Local logs remain unchanged. Shorter values are not masked, to avoid replacing common flags and numbers.'**
+  String get workspaceEnvPrivacyDetail;
+
+  /// No description provided for @workspaceEnvVariableAdd.
+  ///
+  /// In en, this message translates to:
+  /// **'Add variable'**
+  String get workspaceEnvVariableAdd;
+
+  /// No description provided for @workspaceEnvVariableEdit.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit variable'**
+  String get workspaceEnvVariableEdit;
+
+  /// No description provided for @workspaceEnvVariableName.
+  ///
+  /// In en, this message translates to:
+  /// **'Name'**
+  String get workspaceEnvVariableName;
+
+  /// No description provided for @workspaceEnvVariableValue.
+  ///
+  /// In en, this message translates to:
+  /// **'Value'**
+  String get workspaceEnvVariableValue;
+
+  /// No description provided for @workspaceEnvVariableNote.
+  ///
+  /// In en, this message translates to:
+  /// **'Note (optional)'**
+  String get workspaceEnvVariableNote;
+
+  /// No description provided for @workspaceEnvVariableNameHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Use letters, digits and underscores; do not start with a digit. Names are case-sensitive. Reference variables in commands with \$NAME.'**
+  String get workspaceEnvVariableNameHint;
+
+  /// No description provided for @workspaceEnvVariableInvalidName.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter a valid variable name.'**
+  String get workspaceEnvVariableInvalidName;
+
+  /// No description provided for @workspaceEnvVariableInvalidValue.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter a nonempty value without NUL characters.'**
+  String get workspaceEnvVariableInvalidValue;
+
+  /// No description provided for @workspaceEnvVariableDuplicate.
+  ///
+  /// In en, this message translates to:
+  /// **'A variable with this name already exists.'**
+  String get workspaceEnvVariableDuplicate;
+
+  /// No description provided for @workspaceEnvVariablesSaveFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not save the environment settings. Please try again.'**
+  String get workspaceEnvVariablesSaveFailed;
 }
 
 class _AppLocalizationsDelegate
