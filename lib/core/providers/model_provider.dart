@@ -20,15 +20,15 @@ class ModelRegistry {
   // every Qwen 3.7 Max id is multimodal.
   static final RegExp vision = RegExp(
     // GPT family incl. 4o, 4.1, 5 (exclude gpt-5-chat), and OpenAI o* series
-    r'(gpt-4o|gpt-4\.1|gpt-5(?!-chat)|o\d|gemini|claude|kimi-k2([-.])(?:5|6|7)|kimi-k3(?:$|[/_:@.-])|muse-spark-1\.1(?:$|[/_:@.-])|doubao.+(?:1([-.])(?:6|8)|seed-2|seed-evolving)|grok-4|step-3|intern-s1|minimax-m3(?:$|[/_:@])|mimo-v2(?:-omni(?:$|[/_:@])|\.5(?:$|[/_:@]))|sensenova-6\.7-flash-lite|deepseek.+vision)',
+    r'(gpt-4o|gpt-4\.1|gpt-5(?!-chat)|gpt-6|o\d|gemini|claude|kimi-k2([-.])(?:5|6|7)|kimi-k3(?:$|[/_:@.-])|muse-spark-1(?:$|[/_:@.-])|doubao.+(?:1([-.])(?:6|8)|seed-2|seed-evolving)|grok-4|step-3|intern-s1|minimax-m3(?:$|[/_:@])|mimo-v2(?:-omni(?:$|[/_:@])|\.5(?:$|[/_:@]))|sensenova-6\.7-flash-lite|deepseek.+vision)',
     caseSensitive: false,
   );
   // Tool-using models
   static final RegExp tool = RegExp(
-    (r'(gpt-4o|gpt-4\.1|gpt-oss|gpt-5(?!-chat)|o\d|'
+    (r'(gpt-4o|gpt-4\.1|gpt-oss|gpt-5(?!-chat)|gpt-6|o\d|'
             r'gemini|claude|'
             r'qwen-?3|doubao.+(?:1([-.])(?:6|8)|seed-2|seed-evolving)|grok-4|kimi-k2|'
-            r'kimi-k3(?:$|[/_:@.-])|muse-spark-1\.1(?:$|[/_:@.-])|'
+            r'kimi-k3(?:$|[/_:@.-])|muse-spark-1(?:$|[/_:@.-])|'
             r'step-3|intern-s1|glm-4([-.])(?:5|6|7)|glm-5|minimax-(?:m2|m3)|'
             r'deepseek-(?:r1|v3|chat|v3\.1|v3\.2|v4)|'
             r'deepseek-reasoner|'
@@ -40,13 +40,13 @@ class ModelRegistry {
     caseSensitive: false,
   );
   static final RegExp reasoning = RegExp(
-    (r'(gpt-oss|gpt-5(?!-chat)|o\d|'
+    (r'(gpt-oss|gpt-5(?!-chat)|gpt-6|o\d|'
             r'gemini-(?:2\.5|3).*|gemini-(?:flash-latest|pro-latest)|'
             r'gemini-3-pro-image-preview|'
             r'gemma[-_]?4|'
             r'claude|'
             r'qwen-?3|doubao.+(?:1([-.])(?:6|8)|seed-2|seed-evolving)|grok-4|kimi-k2|'
-            r'kimi-k3(?:$|[/_:@.-])|muse-spark-1\.1(?:$|[/_:@.-])|'
+            r'kimi-k3(?:$|[/_:@.-])|muse-spark-1(?:$|[/_:@.-])|'
             r'step-3|intern-s1|glm-4([-.])(?:5|6|7)|glm-5|minimax-(?:m2|m3)|'
             r'deepseek-(?:r1|v3\.1|v3\.2|v4)|'
             r'deepseek-reasoner|'
@@ -61,15 +61,17 @@ class ModelRegistry {
   /// - `qwen3.5*` (existing)
   /// - `qwen3.7-plus` / `qwen3.7-flash` (+ snapshots)
   /// - vision Max snapshot `qwen3.7-max-2026-06-08` and later only
-  /// - `qwen3.8-max` (+ snapshots)
-  /// Plain / earlier `qwen3.7-max` text-only SKUs are intentionally excluded.
+  /// - `qwen3.8-max` / `qwen3.8-flash` / `qwen3.8-27b` (+ snapshots)
+  /// Open `qwen3.8-2.4t-a95b` and plain / earlier `qwen3.7-max` stay text-only.
   static bool _isQwenVisionModel(String id) {
     final lower = id.toLowerCase();
     if (RegExp(r'qwen-?3([-.])5').hasMatch(lower)) return true;
     if (RegExp(r'qwen-?3([-.])7-(?:plus|flash)').hasMatch(lower)) {
       return true;
     }
-    if (RegExp(r'qwen-?3([-.])8-max').hasMatch(lower)) return true;
+    if (RegExp(r'qwen-?3([-.])8-(?:max|flash|27b)').hasMatch(lower)) {
+      return true;
+    }
     final maxSnap = RegExp(
       r'qwen-?3([-.])7-max-(\d{4}-\d{2}-\d{2})',
     ).firstMatch(lower);
@@ -77,6 +79,14 @@ class ModelRegistry {
     final date = DateTime.tryParse(maxSnap.group(2)!);
     if (date == null) return false;
     return !date.isBefore(DateTime(2026, 6, 8));
+  }
+
+  /// GLM-5.3-Flash is the first native multimodal GLM-5 SKU.
+  static bool _isGlmVisionModel(String id) {
+    return RegExp(
+      r'(^|[/_:@])glm-5\.3-flash(?:$|[-.])',
+      caseSensitive: false,
+    ).hasMatch(id);
   }
 
   static bool isLikelyEmbeddingId(String rawId) {
@@ -133,7 +143,9 @@ class ModelRegistry {
       }
       return base.copyWith(input: inMods, output: outMods, abilities: ab);
     }
-    if (vision.hasMatch(id) || _isQwenVisionModel(id)) {
+    if (vision.hasMatch(id) ||
+        _isQwenVisionModel(id) ||
+        _isGlmVisionModel(id)) {
       if (!inMods.contains(Modality.image)) inMods.add(Modality.image);
     }
     if (tool.hasMatch(id) && !ab.contains(ModelAbility.tool)) {
@@ -325,6 +337,7 @@ class GoogleProvider extends BaseProvider {
       // we manually inject known supported Claude models for convenience.
       if (cfg.vertexAI == true) {
         final knownClaude = [
+          'claude-fable-5-1',
           'claude-fable-5',
           'claude-opus-5',
           'claude-opus-4-8',

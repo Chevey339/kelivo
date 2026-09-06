@@ -186,11 +186,14 @@ abstract class BuiltInToolsHelper {
   /// to be listed explicitly because Anthropic ids carry no version ordering.
   static bool _isClaudeModelIn(String? modelId, Set<String> supported) {
     final normalized = _normalizedModelId(modelId);
-    return normalized.contains('mythos') || supported.contains(normalized);
+    return normalized.contains('mythos') ||
+        normalized.contains('fable') ||
+        supported.contains(normalized);
   }
 
   /// Current-generation Claude ids, which support every server tool below.
   static const _claudeCurrentModels = <String>{
+    'claude-fable-5-1',
     'claude-fable-5',
     'claude-opus-5',
     'claude-opus-4-8',
@@ -233,7 +236,8 @@ abstract class BuiltInToolsHelper {
         m.startsWith('o4-mini') ||
         m == 'o3' ||
         m.startsWith('o3-') ||
-        m.startsWith('gpt-5');
+        m.startsWith('gpt-5') ||
+        m.startsWith('gpt-6');
   }
 
   static bool isOpenRouterProvider(ProviderConfig? cfg) {
@@ -321,7 +325,9 @@ abstract class BuiltInToolsHelper {
           minSnapshot: '2025-07-15',
           extraExact: const <String>['qwen-turbo-latest'],
         ) ||
-        m == 'qwq-plus';
+        m == 'qwq-plus' ||
+        _isDashScopeQwen37SearchModel(m) ||
+        _isDashScopeQwen38SearchModel(m);
   }
 
   static bool isDashScopeResponsesBuiltInSearchSupportedModel(String? modelId) {
@@ -351,22 +357,43 @@ abstract class BuiltInToolsHelper {
           alias: 'qwen3-max',
           minSnapshot: '2026-01-23',
         ) ||
-        // Official Responses web_search whitelist additions:
-        // Qwen3.7 Max / Plus. Do NOT guess-enable 3.7 Flash.
-        _matchesExactOrSnapshot(
-          m,
+        _isDashScopeQwen37SearchModel(m) ||
+        _isDashScopeQwen38SearchModel(m);
+  }
+
+  static bool _isDashScopeQwen37SearchModel(String normalizedModelId) {
+    return _matchesExactOrSnapshot(
+          normalizedModelId,
           alias: 'qwen3.7-max',
           minSnapshot: '2026-05-17',
           extraExact: const <String>['qwen3.7-max-preview'],
         ) ||
         _matchesExactOrSnapshot(
-          m,
+          normalizedModelId,
           alias: 'qwen3.7-plus',
           minSnapshot: '2026-05-26',
         ) ||
-        // Token Plan / Responses only for the preview SKU. Plain
-        // `qwen3.8-max` is intentionally not opened without Key verification.
-        m == 'qwen3.8-max-preview';
+        _matchesExactOrSnapshot(
+          normalizedModelId,
+          alias: 'qwen3.7-flash',
+          minSnapshot: '2026-07-15',
+        );
+  }
+
+  static bool _isDashScopeQwen38SearchModel(String normalizedModelId) {
+    return _matchesExactOrSnapshot(
+          normalizedModelId,
+          alias: 'qwen3.8-max',
+          minSnapshot: '2026-08-02',
+          extraExact: const <String>['qwen3.8-max-preview', 'qwen3.8-max-0902'],
+        ) ||
+        _matchesExactOrSnapshot(
+          normalizedModelId,
+          alias: 'qwen3.8-flash',
+          minSnapshot: '2026-08-26',
+        ) ||
+        normalizedModelId == 'qwen3.8-2.4t-a95b' ||
+        normalizedModelId == 'qwen3.8-27b';
   }
 
   static bool isArkProvider(ProviderConfig? cfg) {

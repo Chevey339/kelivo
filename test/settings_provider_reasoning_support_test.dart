@@ -128,6 +128,20 @@ void main() {
           settings.supportsMaxReasoning('OpenAI', 'muse-spark-1.1'),
           isFalse,
         );
+        expect(
+          settings.supportsMaxReasoning('OpenAI', 'muse-spark-1.3'),
+          isTrue,
+        );
+        expect(
+          settings.supportsXhighReasoning('OpenAI', 'gpt-6-astra'),
+          isTrue,
+        );
+        expect(settings.supportsMaxReasoning('OpenAI', 'gpt-6-astra'), isTrue);
+        expect(settings.supportsMaxReasoning('OpenAI', 'glm-5.3'), isTrue);
+        expect(
+          settings.supportsXhighReasoning('OpenAI', 'glm-5.3-flash'),
+          isFalse,
+        );
       },
     );
 

@@ -604,12 +604,29 @@ void applyVendorReasoningKnobs(
     }
     body.remove('reasoning_effort');
   } else if (info.isZhipu || info.isMimo) {
-    if (isReasoning) {
+    if (isGlm53FamilyModel(info.upstreamModelId)) {
+      // GLM-5.3 / 5.3-Flash always think. disabled returns 400; off maps to low.
+      body['thinking'] = const <String, dynamic>{'type': 'enabled'};
+      if (isReasoning) {
+        final effort = openAIEffortForBudget(
+          thinkingBudget,
+          info.upstreamModelId,
+        );
+        if (effort == 'auto') {
+          body.remove('reasoning_effort');
+        } else {
+          body['reasoning_effort'] = effort;
+        }
+      } else {
+        body.remove('reasoning_effort');
+      }
+    } else if (isReasoning) {
       body['thinking'] = {'type': off ? 'disabled' : 'enabled'};
+      body.remove('reasoning_effort');
     } else {
       body.remove('thinking');
+      body.remove('reasoning_effort');
     }
-    body.remove('reasoning_effort');
   } else if (info.isVolc) {
     if (isReasoning) {
       body['thinking'] = {'type': off ? 'disabled' : 'enabled'};

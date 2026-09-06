@@ -25,7 +25,7 @@ ProviderConfig _cfg({
 
 void main() {
   group('Built-in search tools', () {
-    test('enables 3.7 max/plus and 3.8-max-preview only', () {
+    test('enables official Qwen 3.7 / 3.8 search SKUs', () {
       expect(
         BuiltInToolsHelper.isDashScopeResponsesBuiltInSearchSupportedModel(
           'qwen3.7-plus',
@@ -40,6 +40,12 @@ void main() {
       );
       expect(
         BuiltInToolsHelper.isDashScopeResponsesBuiltInSearchSupportedModel(
+          'qwen3.7-flash',
+        ),
+        isTrue,
+      );
+      expect(
+        BuiltInToolsHelper.isDashScopeResponsesBuiltInSearchSupportedModel(
           'qwen3.8-max-preview',
         ),
         isTrue,
@@ -48,13 +54,31 @@ void main() {
         BuiltInToolsHelper.isDashScopeResponsesBuiltInSearchSupportedModel(
           'qwen3.8-max',
         ),
-        isFalse,
+        isTrue,
       );
       expect(
         BuiltInToolsHelper.isDashScopeResponsesBuiltInSearchSupportedModel(
-          'qwen3.7-flash',
+          'qwen3.8-max-0902',
         ),
-        isFalse,
+        isTrue,
+      );
+      expect(
+        BuiltInToolsHelper.isDashScopeResponsesBuiltInSearchSupportedModel(
+          'qwen3.8-flash',
+        ),
+        isTrue,
+      );
+      expect(
+        BuiltInToolsHelper.isDashScopeChatBuiltInSearchSupportedModel(
+          'qwen3.8-flash',
+        ),
+        isTrue,
+      );
+      expect(
+        BuiltInToolsHelper.isOpenAIResponsesBuiltInSearchSupportedModel(
+          'gpt-6-astra',
+        ),
+        isTrue,
       );
     });
 
