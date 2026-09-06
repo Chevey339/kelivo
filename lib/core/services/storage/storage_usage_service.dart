@@ -644,6 +644,16 @@ abstract final class StorageUsageService {
     );
   }
 
+  static Future<void> clearFonts() async {
+    final dir = await AppDirectories.getFontsDirectory();
+    await _deleteDirectoryContents(dir);
+  }
+
+  static Future<void> clearLocalModels() async {
+    final root = await AppDirectories.getAppDataDirectory();
+    await _deleteDirectoryContents(Directory(p.join(root.path, 'asr_models')));
+  }
+
   static Future<List<StorageFileEntry>> listUploadEntries({
     required bool images,
   }) async {

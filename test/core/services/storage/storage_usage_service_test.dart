@@ -389,6 +389,114 @@ void main() {
     );
   });
 
+  test('clearFonts deletes managed font files only', () async {
+    await _writeSizedFile(tempDir, p.join('fonts', 'Custom.ttf'), 40);
+    await _writeSizedFile(tempDir, p.join('fonts', 'nested', 'Extra.otf'), 12);
+    await _writeSizedFile(tempDir, 'settings.json', 8);
+    await _writeSizedFile(
+      tempDir,
+      p.join('asr_models', 'paraformer', 'model.int8.onnx'),
+      80,
+    );
+
+    await StorageUsageService.clearFonts();
+
+    expect(
+      await File(p.join(tempDir.path, 'fonts', 'Custom.ttf')).exists(),
+      isFalse,
+    );
+    expect(
+      await File(p.join(tempDir.path, 'fonts', 'nested', 'Extra.otf')).exists(),
+      isFalse,
+    );
+    expect(await File(p.join(tempDir.path, 'settings.json')).exists(), isTrue);
+    expect(
+      await File(
+        p.join(tempDir.path, 'asr_models', 'paraformer', 'model.int8.onnx'),
+      ).exists(),
+      isTrue,
+    );
+
+    final report = await StorageUsageService.computeReport();
+    final other = report.categories.singleWhere(
+      (category) => category.key == StorageUsageCategoryKey.other,
+    );
+    expect(
+      other.subcategories.where((subcategory) => subcategory.id == 'fonts'),
+      isEmpty,
+    );
+    expect(
+      other.subcategories
+          .singleWhere((subcategory) => subcategory.id == 'local_models')
+          .stats
+          .bytes,
+      80,
+    );
+  });
+
+  test('clearLocalModels deletes downloaded ASR models only', () async {
+    await _writeSizedFile(tempDir, p.join('fonts', 'Custom.ttf'), 40);
+    await _writeSizedFile(
+      tempDir,
+      p.join('asr_models', 'paraformer-zh-small-2024-03-09', 'model.int8.onnx'),
+      80,
+    );
+    await _writeSizedFile(
+      tempDir,
+      p.join('asr_models', '.downloads', 'partial.tar.bz2.part'),
+      16,
+    );
+    await _writeSizedFile(tempDir, 'settings.json', 8);
+
+    await StorageUsageService.clearLocalModels();
+
+    expect(
+      await File(
+        p.join(
+          tempDir.path,
+          'asr_models',
+          'paraformer-zh-small-2024-03-09',
+          'model.int8.onnx',
+        ),
+      ).exists(),
+      isFalse,
+    );
+    expect(
+      await File(
+        p.join(
+          tempDir.path,
+          'asr_models',
+          '.downloads',
+          'partial.tar.bz2.part',
+        ),
+      ).exists(),
+      isFalse,
+    );
+    expect(
+      await File(p.join(tempDir.path, 'fonts', 'Custom.ttf')).exists(),
+      isTrue,
+    );
+    expect(await File(p.join(tempDir.path, 'settings.json')).exists(), isTrue);
+
+    final report = await StorageUsageService.computeReport();
+    final other = report.categories.singleWhere(
+      (category) => category.key == StorageUsageCategoryKey.other,
+    );
+    expect(
+      other.subcategories.where(
+        (subcategory) => subcategory.id == 'local_models',
+      ),
+      isEmpty,
+    );
+    expect(
+      other.subcategories
+          .singleWhere((subcategory) => subcategory.id == 'fonts')
+          .stats
+          .bytes,
+      40,
+    );
+  });
+
   test(
     'image entries distinguish user uploads from assistant images',
     () async {
