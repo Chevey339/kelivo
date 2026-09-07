@@ -23,6 +23,7 @@ import '../../workspace/pages/environment_page.dart';
 import '../../workspace/pages/skills_page.dart';
 import '../../workspace/pages/workspaces_page.dart';
 import 'log_viewer_page.dart';
+import '../widgets/storage_contents_list.dart';
 import 'package:Kelivo/theme/app_semantic_colors.dart';
 import 'package:Kelivo/shared/widgets/section_card.dart';
 
@@ -1537,6 +1538,13 @@ class _CategoryDetail extends StatelessWidget {
             : l10n.storageSpaceNotSafeToClearHint,
     };
 
+    Future<void> openManager(Widget page) async {
+      await Navigator.of(
+        context,
+      ).push<void>(MaterialPageRoute(builder: (_) => page));
+      await refreshReport();
+    }
+
     Widget? actions;
     if (category.key == StorageUsageCategoryKey.cache) {
       actions = Wrap(
@@ -1623,27 +1631,21 @@ class _CategoryDetail extends StatelessWidget {
         label: l10n.workspaceEntryManage,
         icon: Lucide.ChevronRight,
         enabled: !clearing,
-        onTap: () => Navigator.of(
-          context,
-        ).push<void>(MaterialPageRoute(builder: (_) => const WorkspacesPage())),
+        onTap: () => openManager(const WorkspacesPage()),
       );
     } else if (category.key == StorageUsageCategoryKey.sandboxEnvironment) {
       actions = IosTileButton(
         label: l10n.workspaceEnvTitle,
         icon: Lucide.ChevronRight,
         enabled: !clearing,
-        onTap: () => Navigator.of(context).push<void>(
-          MaterialPageRoute(builder: (_) => const EnvironmentPage()),
-        ),
+        onTap: () => openManager(const EnvironmentPage()),
       );
     } else if (category.key == StorageUsageCategoryKey.skills) {
       actions = IosTileButton(
         label: l10n.storageSpaceManageSkills,
         icon: Lucide.ChevronRight,
         enabled: !clearing,
-        onTap: () => Navigator.of(
-          context,
-        ).push<void>(MaterialPageRoute(builder: (_) => const SkillsPage())),
+        onTap: () => openManager(const SkillsPage()),
       );
     } else if (category.key == StorageUsageCategoryKey.sessionFiles) {
       actions = IosTileButton(
@@ -1719,121 +1721,128 @@ class _CategoryDetail extends StatelessWidget {
         const SizedBox(height: 14),
         if (actions != null) actions,
         if (actions != null) const SizedBox(height: 14),
-        Expanded(
-          child: SingleChildScrollView(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                if (category.subcategories.isNotEmpty) ...[
-                  Text(
-                    l10n.storageSpaceBreakdownTitle,
-                    style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: AppFontWeights.emphasis,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  for (final s in category.subcategories)
-                    Container(
-                      margin: const EdgeInsets.only(bottom: 8),
-                      padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
-                      decoration: BoxDecoration(
-                        color: cs.onSurface.withValues(alpha: 0.03),
-                        borderRadius: BorderRadius.circular(10),
-                        border: Border.all(
-                          color: cs.onSurface.withValues(alpha: 0.08),
-                        ),
+        if (StorageContentsList.supports(category.key))
+          Expanded(
+            child: StorageContentsList(category: category, fmtBytes: fmtBytes),
+          ),
+        if (!StorageContentsList.supports(category.key))
+          Expanded(
+            child: SingleChildScrollView(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if (category.subcategories.isNotEmpty) ...[
+                    Text(
+                      l10n.storageSpaceBreakdownTitle,
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: AppFontWeights.emphasis,
                       ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      subTitleFor(s.id),
-                                      style: TextStyle(
-                                        fontSize: 13,
-                                        fontWeight: AppFontWeights.semibold,
-                                      ),
-                                    ),
-                                    const SizedBox(height: 2),
-                                    Text(
-                                      '${fmtBytes(s.stats.bytes)} · ${l10n.storageSpaceFilesCount(s.stats.fileCount)}',
-                                      style: TextStyle(
-                                        fontSize: 12,
-                                        color: cs.onSurface.withValues(
-                                          alpha: 0.65,
+                    ),
+                    const SizedBox(height: 8),
+                    for (final s in category.subcategories)
+                      Container(
+                        margin: const EdgeInsets.only(bottom: 8),
+                        padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+                        decoration: BoxDecoration(
+                          color: cs.onSurface.withValues(alpha: 0.03),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(
+                            color: cs.onSurface.withValues(alpha: 0.08),
+                          ),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        subTitleFor(s.id),
+                                        style: TextStyle(
+                                          fontSize: 13,
+                                          fontWeight: AppFontWeights.semibold,
                                         ),
                                       ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                              if (category.key ==
-                                      StorageUsageCategoryKey.cache &&
-                                  s.id == 'avatar_cache')
-                                _MiniActionButton(
-                                  label: l10n.storageSpaceClearButton,
-                                  enabled: !clearing,
-                                  onTap: () =>
-                                      onClearCache?.call(avatarsOnly: true),
-                                ),
-                              if (category.key ==
-                                      StorageUsageCategoryKey.cache &&
-                                  s.id == 'other_cache')
-                                _MiniActionButton(
-                                  label: l10n.storageSpaceClearButton,
-                                  enabled: !clearing,
-                                  onTap: () => onClearOtherCache?.call(),
-                                ),
-                              if (category.key ==
-                                      StorageUsageCategoryKey.cache &&
-                                  s.id == 'system_cache')
-                                _MiniActionButton(
-                                  label: l10n.storageSpaceClearButton,
-                                  enabled: !clearing,
-                                  onTap: () => onClearSystemCache?.call(),
-                                ),
-                              if (category.key ==
-                                      StorageUsageCategoryKey.legacyChatData &&
-                                  s.path != null &&
-                                  s.path!.isNotEmpty)
-                                _MiniActionButton(
-                                  label: l10n
-                                      .storageSpaceExportLegacyChatFileButton,
-                                  enabled: true,
-                                  onTap: () => _exportLegacyHiveFile(
-                                    context,
-                                    sourcePath: s.path!,
-                                    fileName: s.id,
+                                      const SizedBox(height: 2),
+                                      Text(
+                                        '${fmtBytes(s.stats.bytes)} · ${l10n.storageSpaceFilesCount(s.stats.fileCount)}',
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          color: cs.onSurface.withValues(
+                                            alpha: 0.65,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
                                   ),
                                 ),
-                            ],
-                          ),
-                          if (s.path != null && s.path!.isNotEmpty) ...[
-                            const SizedBox(height: 6),
-                            Text(
-                              _wrapableFilePath(s.path!),
-                              style: TextStyle(
-                                fontSize: 11.5,
-                                height: 1.35,
-                                color: cs.onSurface.withValues(alpha: 0.55),
-                              ),
+                                if (category.key ==
+                                        StorageUsageCategoryKey.cache &&
+                                    s.id == 'avatar_cache')
+                                  _MiniActionButton(
+                                    label: l10n.storageSpaceClearButton,
+                                    enabled: !clearing,
+                                    onTap: () =>
+                                        onClearCache?.call(avatarsOnly: true),
+                                  ),
+                                if (category.key ==
+                                        StorageUsageCategoryKey.cache &&
+                                    s.id == 'other_cache')
+                                  _MiniActionButton(
+                                    label: l10n.storageSpaceClearButton,
+                                    enabled: !clearing,
+                                    onTap: () => onClearOtherCache?.call(),
+                                  ),
+                                if (category.key ==
+                                        StorageUsageCategoryKey.cache &&
+                                    s.id == 'system_cache')
+                                  _MiniActionButton(
+                                    label: l10n.storageSpaceClearButton,
+                                    enabled: !clearing,
+                                    onTap: () => onClearSystemCache?.call(),
+                                  ),
+                                if (category.key ==
+                                        StorageUsageCategoryKey
+                                            .legacyChatData &&
+                                    s.path != null &&
+                                    s.path!.isNotEmpty)
+                                  _MiniActionButton(
+                                    label: l10n
+                                        .storageSpaceExportLegacyChatFileButton,
+                                    enabled: true,
+                                    onTap: () => _exportLegacyHiveFile(
+                                      context,
+                                      sourcePath: s.path!,
+                                      fileName: s.id,
+                                    ),
+                                  ),
+                              ],
                             ),
+                            if (s.path != null && s.path!.isNotEmpty) ...[
+                              const SizedBox(height: 6),
+                              Text(
+                                _wrapableFilePath(s.path!),
+                                style: TextStyle(
+                                  fontSize: 11.5,
+                                  height: 1.35,
+                                  color: cs.onSurface.withValues(alpha: 0.55),
+                                ),
+                              ),
+                            ],
                           ],
-                        ],
+                        ),
                       ),
-                    ),
+                  ],
                 ],
-              ],
+              ),
             ),
           ),
-        ),
       ],
     );
   }
@@ -2047,18 +2056,26 @@ class _UploadManagerState extends State<_UploadManager> {
     );
     if (ok != true) return;
 
-    final deleted = await StorageUsageService.deleteUploadFiles(
-      _selected,
-      images: widget.images,
-    );
-    if (!mounted) return;
-
-    _clearSelection();
-    showAppSnackBar(
-      context,
-      message: l10n.storageSpaceDeletedUploadsDone(deleted),
-      type: NotificationType.success,
-    );
+    try {
+      final deleted = await StorageUsageService.deleteUploadFiles(
+        _selected,
+        images: widget.images,
+      );
+      if (!mounted) return;
+      _clearSelection();
+      showAppSnackBar(
+        context,
+        message: l10n.storageSpaceDeletedUploadsDone(deleted),
+        type: NotificationType.success,
+      );
+    } catch (error) {
+      if (!mounted) return;
+      showAppSnackBar(
+        context,
+        message: l10n.storageSpaceClearFailed(error.toString()),
+        type: NotificationType.error,
+      );
+    }
     await _load();
     await widget.refreshReport();
   }

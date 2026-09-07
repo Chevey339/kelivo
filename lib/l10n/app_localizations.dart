@@ -637,7 +637,7 @@ abstract class AppLocalizations {
   /// No description provided for @storageSpaceDeleteUploadsConfirmMessage.
   ///
   /// In en, this message translates to:
-  /// **'Delete {count} items? Attachments in chat history may become unavailable.'**
+  /// **'Delete {count} items and their associated conversation attachment copies? These attachments will no longer be available in chat history.'**
   String storageSpaceDeleteUploadsConfirmMessage(int count);
 
   /// No description provided for @storageSpaceDeletedUploadsDone.
@@ -19250,6 +19250,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Could not save the environment settings. Please try again.'**
   String get workspaceEnvVariablesSaveFailed;
+
+  /// No description provided for @storageSessionFilesUnlinked.
+  ///
+  /// In en, this message translates to:
+  /// **'Unlinked conversation'**
+  String get storageSessionFilesUnlinked;
 }
 
 class _AppLocalizationsDelegate

@@ -116,6 +116,43 @@ void main() {
       expect(cat(StorageUsageCategoryKey.sessionFiles).stats.fileCount, 2);
       expect(cat(StorageUsageCategoryKey.files).stats.bytes, 12);
       expect(cat(StorageUsageCategoryKey.other).stats.bytes, 0);
+      for (final key in [
+        StorageUsageCategoryKey.workspaceFiles,
+        StorageUsageCategoryKey.skills,
+        StorageUsageCategoryKey.sessionFiles,
+        StorageUsageCategoryKey.sandboxEnvironment,
+      ]) {
+        final category = cat(key);
+        expect(category.subcategories, isNotEmpty);
+        expect(
+          category.subcategories.fold<int>(
+            0,
+            (sum, entry) => sum + entry.stats.bytes,
+          ),
+          category.stats.bytes,
+        );
+        expect(
+          category.subcategories.fold<int>(
+            0,
+            (sum, entry) => sum + entry.stats.fileCount,
+          ),
+          category.stats.fileCount,
+        );
+        for (final entry in category.subcategories) {
+          expect(
+            FileSystemEntity.typeSync(entry.path!),
+            entry.isDirectory
+                ? FileSystemEntityType.directory
+                : FileSystemEntityType.file,
+          );
+        }
+      }
+      expect(
+        cat(
+          StorageUsageCategoryKey.sessionFiles,
+        ).subcategories.map((s) => s.id),
+        ['conv-live', 'conv-gone'],
+      );
     },
   );
 

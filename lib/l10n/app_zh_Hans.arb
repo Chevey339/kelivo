@@ -88,7 +88,7 @@
   "storageSpaceClearLegacyChatDataConfirmMessage": "确定清理保留的旧聊天文件吗？当前 SQLite 聊天记录不会受到影响。",
   "storageSpaceViewLogsButton": "查看日志",
   "storageSpaceDeleteConfirmTitle": "确认删除",
-  "storageSpaceDeleteUploadsConfirmMessage": "删除 {count} 个项目？删除后聊天记录中的附件可能无法打开。",
+  "storageSpaceDeleteUploadsConfirmMessage": "删除 {count} 个项目及其对应的会话附件副本？删除后，聊天记录中的这些附件将无法使用。",
   "storageSpaceDeletedUploadsDone": "已删除 {count} 个项目",
   "storageSpaceNoUploads": "暂无内容",
   "storageSpaceSelectAll": "全选",
@@ -3810,5 +3810,6 @@
   "workspaceEnvVariableInvalidName": "请输入有效的变量名称。",
   "workspaceEnvVariableInvalidValue": "值不能为空，也不能包含空字符（NUL）。",
   "workspaceEnvVariableDuplicate": "已存在同名变量。",
-  "workspaceEnvVariablesSaveFailed": "环境设置保存失败，请重试。"
+  "workspaceEnvVariablesSaveFailed": "环境设置保存失败，请重试。",
+  "storageSessionFilesUnlinked": "未关联的会话"
 }

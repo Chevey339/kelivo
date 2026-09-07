@@ -299,7 +299,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String storageSpaceDeleteUploadsConfirmMessage(int count) {
-    return '删除 $count 个项目？删除后聊天记录中的附件可能无法打开。';
+    return '删除 $count 个项目及其对应的会话附件副本？删除后，聊天记录中的这些附件将无法使用。';
   }
 
   @override
@@ -10256,6 +10256,9 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get workspaceEnvVariablesSaveFailed => '环境设置保存失败，请重试。';
+
+  @override
+  String get storageSessionFilesUnlinked => '未关联的会话';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hans`).
@@ -10553,7 +10556,7 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String storageSpaceDeleteUploadsConfirmMessage(int count) {
-    return '删除 $count 个项目？删除后聊天记录中的附件可能无法打开。';
+    return '删除 $count 个项目及其对应的会话附件副本？删除后，聊天记录中的这些附件将无法使用。';
   }
 
   @override
@@ -20436,6 +20439,9 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get workspaceEnvVariablesSaveFailed => '环境设置保存失败，请重试。';
+
+  @override
+  String get storageSessionFilesUnlinked => '未关联的会话';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hant`).
@@ -20733,7 +20739,7 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String storageSpaceDeleteUploadsConfirmMessage(int count) {
-    return '刪除 $count 個項目？刪除後聊天記錄中的附件可能無法開啟。';
+    return '刪除 $count 個項目及其對應的對話附件副本？刪除後，聊天記錄中的這些附件將無法使用。';
   }
 
   @override
@@ -30692,4 +30698,7 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get workspaceEnvVariablesSaveFailed => '環境設定儲存失敗，請重試。';
+
+  @override
+  String get storageSessionFilesUnlinked => '未關聯的對話';
 }

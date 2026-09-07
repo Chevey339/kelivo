@@ -140,7 +140,7 @@
   "storageSpaceClearLegacyChatDataConfirmMessage": "Clear the retained old chat files? Your current SQLite chat records will remain available.",
   "storageSpaceViewLogsButton": "View Logs",
   "storageSpaceDeleteConfirmTitle": "Confirm deletion",
-  "storageSpaceDeleteUploadsConfirmMessage": "Delete {count} items? Attachments in chat history may become unavailable.",
+  "storageSpaceDeleteUploadsConfirmMessage": "Delete {count} items and their associated conversation attachment copies? These attachments will no longer be available in chat history.",
   "@storageSpaceDeleteUploadsConfirmMessage": {
     "placeholders": {
       "count": {
@@ -4795,5 +4795,6 @@
   "workspaceEnvVariableInvalidName": "Enter a valid variable name.",
   "workspaceEnvVariableInvalidValue": "Enter a nonempty value without NUL characters.",
   "workspaceEnvVariableDuplicate": "A variable with this name already exists.",
-  "workspaceEnvVariablesSaveFailed": "Could not save the environment settings. Please try again."
+  "workspaceEnvVariablesSaveFailed": "Could not save the environment settings. Please try again.",
+  "storageSessionFilesUnlinked": "Unlinked conversation"
 }

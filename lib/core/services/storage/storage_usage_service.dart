@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:isolate';
 
 import 'package:path/path.dart' as p;
 import 'package:sqlite3/sqlite3.dart';
@@ -14,6 +15,7 @@ import '../../../utils/avatar_cache.dart';
 import '../logging/flutter_logger.dart';
 import '../network/request_logger.dart';
 import '../sandbox/rootfs_disk_usage.dart';
+import '../workspace/workspace_session_sync.dart';
 
 enum StorageUsageCategoryKey {
   images,
@@ -50,10 +52,12 @@ class StorageUsageSubcategory {
   final String id;
   final StorageUsageStats stats;
   final String? path;
+  final bool isDirectory;
   const StorageUsageSubcategory({
     required this.id,
     required this.stats,
     this.path,
+    this.isDirectory = false,
   });
 }
 
@@ -225,15 +229,12 @@ abstract final class StorageUsageService {
     }
 
     try {
-      await for (final ent in root.list(recursive: true, followLinks: false)) {
-        if (ent is! File) continue;
+      await for (final ent in _listFiles(
+        root,
+        excludedTopDirectories: _isolateMeasuredTopDirs,
+      )) {
         final rel = p.relative(ent.path, from: root.path);
         final parts = p.split(rel);
-        if (parts.isNotEmpty &&
-            _isolateMeasuredTopDirs.contains(parts.first.toLowerCase())) {
-          // Walked on a background isolate — do not count here.
-          continue;
-        }
         int bytes = 0;
         try {
           bytes = await ent.length();
@@ -285,6 +286,7 @@ abstract final class StorageUsageService {
             byCat[StorageUsageCategoryKey.localSnapshots]!.add(bytes);
             break;
           case 'upload':
+          case 'images':
             final name = parts.last;
             if (_isImageExt(name)) {
               byCat[StorageUsageCategoryKey.images]!.add(bytes);
@@ -303,11 +305,6 @@ abstract final class StorageUsageService {
           case 'asr_models':
             byCat[StorageUsageCategoryKey.other]!.add(bytes);
             otherSubs['local_models']!.add(bytes);
-            break;
-          case 'images':
-            // Inline/generated images are stored under appData/images.
-            // Treat them as "Images" so users can manage them together.
-            byCat[StorageUsageCategoryKey.images]!.add(bytes);
             break;
           case 'cache':
             byCat[StorageUsageCategoryKey.cache]!.add(bytes);
@@ -337,7 +334,7 @@ abstract final class StorageUsageService {
         }
       }
     } catch (_) {
-      // If listing fails for any reason, fall back to 0s; UI will show load failed.
+      // Keep successfully measured files if a file disappears during the scan.
     }
 
     final [
@@ -346,31 +343,37 @@ abstract final class StorageUsageService {
       sessionsUsage,
       sandboxUsage,
     ] = await Future.wait([
-      _measureUsageOf(
+      _measureContentsOf(
         workspacesDirectory ?? AppDirectories.getWorkspacesDirectory,
       ),
-      _measureUsageOf(skillsDirectory ?? AppDirectories.getSkillsDirectory),
-      _measureUsageOf(sessionsDirectory ?? AppDirectories.getSessionsDirectory),
+      _measureContentsOf(skillsDirectory ?? AppDirectories.getSkillsDirectory),
+      _measureContentsOf(
+        sessionsDirectory ?? AppDirectories.getSessionsDirectory,
+      ),
       _measureSandboxEnvironment(
         environmentDirectory:
             environmentDirectory ?? AppDirectories.getEnvironmentDirectory,
         rootfsUsageDirectory: rootfsUsageDirectory,
       ),
     ]);
-    byCat[StorageUsageCategoryKey.workspaceFiles]!.addStats(workspaceUsage);
-    byCat[StorageUsageCategoryKey.skills]!.addStats(skillsUsage);
-    byCat[StorageUsageCategoryKey.sessionFiles]!.addStats(sessionsUsage);
-    byCat[StorageUsageCategoryKey.sandboxEnvironment]!.addStats(sandboxUsage);
+    byCat[StorageUsageCategoryKey.workspaceFiles]!.addStats(
+      workspaceUsage.stats,
+    );
+    byCat[StorageUsageCategoryKey.skills]!.addStats(skillsUsage.stats);
+    byCat[StorageUsageCategoryKey.sessionFiles]!.addStats(sessionsUsage.stats);
+    byCat[StorageUsageCategoryKey.sandboxEnvironment]!.addStats(
+      sandboxUsage.stats,
+    );
     totalFiles +=
-        workspaceUsage.fileCount +
-        skillsUsage.fileCount +
-        sessionsUsage.fileCount +
-        sandboxUsage.fileCount;
+        workspaceUsage.stats.fileCount +
+        skillsUsage.stats.fileCount +
+        sessionsUsage.stats.fileCount +
+        sandboxUsage.stats.fileCount;
     totalBytes +=
-        workspaceUsage.bytes +
-        skillsUsage.bytes +
-        sessionsUsage.bytes +
-        sandboxUsage.bytes;
+        workspaceUsage.stats.bytes +
+        skillsUsage.stats.bytes +
+        sessionsUsage.stats.bytes +
+        sandboxUsage.stats.bytes;
 
     final avatarsDir = await AppDirectories.getAvatarsDirectory();
     final fontsDir = await AppDirectories.getFontsDirectory();
@@ -582,18 +585,22 @@ abstract final class StorageUsageService {
       StorageUsageCategory(
         key: StorageUsageCategoryKey.workspaceFiles,
         stats: byCat[StorageUsageCategoryKey.workspaceFiles]!.toStats(),
+        subcategories: workspaceUsage.subcategories,
       ),
       StorageUsageCategory(
         key: StorageUsageCategoryKey.sandboxEnvironment,
         stats: byCat[StorageUsageCategoryKey.sandboxEnvironment]!.toStats(),
+        subcategories: sandboxUsage.subcategories,
       ),
       StorageUsageCategory(
         key: StorageUsageCategoryKey.skills,
         stats: byCat[StorageUsageCategoryKey.skills]!.toStats(),
+        subcategories: skillsUsage.subcategories,
       ),
       StorageUsageCategory(
         key: StorageUsageCategoryKey.sessionFiles,
         stats: byCat[StorageUsageCategoryKey.sessionFiles]!.toStats(),
+        subcategories: sessionsUsage.subcategories,
       ),
     ];
 
@@ -723,8 +730,7 @@ abstract final class StorageUsageService {
     }) async {
       if (!await d.exists()) return;
       try {
-        await for (final ent in d.list(recursive: true, followLinks: false)) {
-          if (ent is! File) continue;
+        await for (final ent in _listFiles(d)) {
           final name = p.basename(ent.path);
           final isImg = _isImageExt(name);
           if (isImg && !includeImages) continue;
@@ -762,14 +768,12 @@ abstract final class StorageUsageService {
       includeNonImages: !images,
       source: StorageFileSource.userUpload,
     );
-    if (images) {
-      await addFromDir(
-        imagesDir,
-        includeImages: true,
-        includeNonImages: false,
-        source: StorageFileSource.assistant,
-      );
-    }
+    await addFromDir(
+      imagesDir,
+      includeImages: images,
+      includeNonImages: !images,
+      source: StorageFileSource.assistant,
+    );
     out.sort((a, b) => b.modifiedAt.compareTo(a.modifiedAt));
     return out;
   }
@@ -781,25 +785,48 @@ abstract final class StorageUsageService {
     final dir = await AppDirectories.getUploadDirectory();
     final imagesDir = await AppDirectories.getImagesDirectory();
     final roots = <String>[
-      p.normalize(Directory(dir.path).absolute.path),
-      if (images) p.normalize(Directory(imagesDir.path).absolute.path),
+      p.normalize(dir.absolute.path),
+      p.normalize(imagesDir.absolute.path),
     ];
-    int deleted = 0;
+    final realRoots = await Future.wait(
+      roots.map((root) async {
+        try {
+          return await Directory(root).resolveSymbolicLinks();
+        } catch (_) {
+          return root;
+        }
+      }),
+    );
+    final removedPaths = <String>{};
     for (final raw in paths) {
       try {
         final abs = p.normalize(File(raw).absolute.path);
-        final allowed = roots.any(
-          (root) => p.isWithin(root, abs) || abs == root,
-        );
+        if (_isImageExt(abs) != images) continue;
+        final allowed = roots.any((root) => p.isWithin(root, abs));
         if (!allowed) continue;
-        final f = File(abs);
-        if (await f.exists()) {
-          await f.delete();
-          deleted += 1;
+        // A symlinked child directory must not let storage cleanup escape the
+        // app's upload roots. Only regular files are eligible for deletion.
+        final parent = await File(abs).parent.resolveSymbolicLinks();
+        if (!realRoots.any(
+          (root) => p.equals(root, parent) || p.isWithin(root, parent),
+        )) {
+          continue;
         }
+        if (await FileSystemEntity.type(abs, followLinks: false) !=
+            FileSystemEntityType.file) {
+          continue;
+        }
+        await File(abs).delete();
+        removedPaths.add(abs);
       } catch (_) {}
     }
-    return deleted;
+    if (removedPaths.isNotEmpty) {
+      await deleteSessionAttachmentCopies(
+        removedPaths,
+        sessionsDirectory: await AppDirectories.getSessionsDirectory(),
+      );
+    }
+    return removedPaths.length;
   }
 
   static Future<StorageUsageStats> measureOrphanSessionFiles({
@@ -885,25 +912,96 @@ abstract final class StorageUsageService {
     return StorageUsageStats(fileCount: usage.fileCount, bytes: usage.bytes);
   }
 
-  static Future<StorageUsageStats> _measureUsageOf(
+  static Future<_StorageContents> _measureContentsOf(
     Future<Directory> Function() directory,
-  ) async => _measureUsage(await directory());
+  ) async {
+    final path = (await directory()).path;
+    // Collect the breakdown during the same background walk as the total.
+    return Isolate.run(() {
+      final entries = <StorageUsageSubcategory>[];
+      try {
+        for (final child in Directory(path).listSync(followLinks: false)) {
+          try {
+            final isDirectory = child is Directory;
+            if (!isDirectory && child is! File) continue;
+            final usage = isDirectory
+                ? measureDirectoryUsageSync(child.path)
+                : (bytes: child.statSync().size, fileCount: 1);
+            if (usage.fileCount == 0) continue;
+            entries.add(
+              StorageUsageSubcategory(
+                id: p.basename(child.path),
+                path: child.path,
+                isDirectory: isDirectory,
+                stats: StorageUsageStats(
+                  fileCount: usage.fileCount,
+                  bytes: usage.bytes,
+                ),
+              ),
+            );
+          } catch (_) {}
+        }
+      } catch (_) {}
+      return _StorageContents(entries);
+    });
+  }
 
-  static Future<StorageUsageStats> _measureSandboxEnvironment({
+  static Future<_StorageContents> _measureSandboxEnvironment({
     required Future<Directory> Function() environmentDirectory,
     Future<Directory> Function()? rootfsUsageDirectory,
   }) async {
     final envDir = await environmentDirectory();
     final rootfsDir = await (rootfsUsageDirectory ?? resolveRootfsUsageDir)();
     final unique = _dedupeNestedDirectories([envDir, rootfsDir]);
-    final usages = await Future.wait(unique.map(_measureUsage));
-    var bytes = 0;
-    var fileCount = 0;
-    for (final usage in usages) {
-      bytes += usage.bytes;
-      fileCount += usage.fileCount;
+    final entries = <StorageUsageSubcategory>[];
+    for (final dir in unique) {
+      if (p.equals(dir.path, envDir.absolute.path)) {
+        entries.addAll(
+          (await _measureContentsOf(() async => dir)).subcategories,
+        );
+      } else {
+        final stats = await _measureUsage(dir);
+        if (stats.fileCount == 0) continue;
+        entries.add(
+          StorageUsageSubcategory(
+            id: p.basename(dir.path),
+            path: dir.path,
+            isDirectory: true,
+            stats: stats,
+          ),
+        );
+      }
     }
-    return StorageUsageStats(fileCount: fileCount, bytes: bytes);
+    return _StorageContents(entries);
+  }
+
+  /// Prune separately measured trees before descending, and isolate failures
+  /// to the unreadable directory rather than aborting all remaining siblings.
+  static Stream<File> _listFiles(
+    Directory root, {
+    Set<String> excludedTopDirectories = const {},
+  }) async* {
+    final pending = <Directory>[root];
+    while (pending.isNotEmpty) {
+      final dir = pending.removeLast();
+      try {
+        await for (final entity in dir.list(followLinks: false)) {
+          if (entity is Directory) {
+            if (dir.path == root.path &&
+                excludedTopDirectories.contains(
+                  p.basename(entity.path).toLowerCase(),
+                )) {
+              continue;
+            }
+            pending.add(entity);
+          } else if (entity is File) {
+            yield entity;
+          }
+        }
+      } on FileSystemException {
+        // Other directories can still be measured/listed.
+      }
+    }
   }
 
   static List<Directory> _dedupeNestedDirectories(Iterable<Directory> dirs) {
@@ -1032,4 +1130,17 @@ bool _isAlwaysVisibleCategory(StorageUsageCategoryKey key) {
     case StorageUsageCategoryKey.sessionFiles:
       return true;
   }
+}
+
+class _StorageContents {
+  _StorageContents(List<StorageUsageSubcategory> entries)
+    : subcategories = entries
+        ..sort((a, b) => b.stats.bytes.compareTo(a.stats.bytes));
+
+  final List<StorageUsageSubcategory> subcategories;
+
+  StorageUsageStats get stats => subcategories.fold(
+    const StorageUsageStats(fileCount: 0, bytes: 0),
+    (total, entry) => total + entry.stats,
+  );
 }

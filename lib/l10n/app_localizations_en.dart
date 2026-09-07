@@ -308,7 +308,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String storageSpaceDeleteUploadsConfirmMessage(int count) {
-    return 'Delete $count items? Attachments in chat history may become unavailable.';
+    return 'Delete $count items and their associated conversation attachment copies? These attachments will no longer be available in chat history.';
   }
 
   @override
@@ -10719,4 +10719,7 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get workspaceEnvVariablesSaveFailed =>
       'Could not save the environment settings. Please try again.';
+
+  @override
+  String get storageSessionFilesUnlinked => 'Unlinked conversation';
 }
