@@ -4810,5 +4810,29 @@
   "@attachmentRequiresWorkspace": {
     "placeholders": {"name": {"type": "String"}}
   },
-  "storageSessionFilesUnlinked": "Unlinked conversation"
+  "storageSessionFilesUnlinked": "Unlinked conversation",
+  "workspaceExternalMount": "Mount external folder",
+  "workspaceExternalMountSubtitle": "Selected folders are mounted at /mounts/<name> and shared across workspaces. AI tools, Shell and the file browser can access them. Up to 10 folders.",
+  "workspaceExternalStorageTitle": "Allow file access",
+  "workspaceExternalStorageMessage": "To read and write external folders in the workspace and Shell, allow Kelivo to manage files in Android settings. On Android 11 or later, enable All files access. Then select an on-device folder to mount.",
+  "workspaceExternalGrantAccess": "Grant access",
+  "workspaceExternalLocalOnly": "Android can mount on-device folders only. This document provider does not expose a local folder to Shell.",
+  "workspaceExternalUnavailable": "The external folder is unavailable. Check its storage connection and permissions, then select the folder again to restore access.",
+  "workspaceExternalReconnect": "Select folder again",
+  "workspaceMountAdd": "Add folder",
+  "workspaceMountEdit": "Edit mount",
+  "workspaceMountEmpty": "No mounted folders",
+  "workspaceMountReadOnly": "Read-only",
+  "workspaceMountReadWrite": "Read-write",
+  "workspaceMountAllowWrite": "Allow writes",
+  "workspaceMountPermissionsHint": "AI file tools and the file browser respect this setting. Shell guards cover common file commands; arbitrary scripts may bypass them. Saving mount changes stops running commands and terminal sessions.",
+  "workspaceMountBrowse": "Browse files",
+  "workspaceMountUnmount": "Unmount",
+  "workspaceMountUnmountMessage": "Remove this mount? The original folder and its files will be kept.",
+  "workspaceMountInactive": "Unavailable — select the folder again",
+  "workspaceMountInvalidName": "Use a name of up to 64 characters without slashes, colons or control characters. Do not use . or ..",
+  "workspaceMountDuplicate": "A mount with this name already exists.",
+  "workspaceMountLimit": "Up to 10 folders can be mounted. Remove a mount before adding another.",
+  "workspaceMountOverlap": "This folder overlaps an existing mount. Choose a different folder so permissions remain unambiguous.",
+  "workspaceMountTargetOccupied": "A mount target under /mounts already contains local files. Choose a different mount name or move those files first. No files were removed."
 }

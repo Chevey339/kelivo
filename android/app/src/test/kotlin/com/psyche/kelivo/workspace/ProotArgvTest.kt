@@ -2,6 +2,7 @@ package com.psyche.kelivo.workspace
 
 import java.io.File
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Assume.assumeTrue
 import org.junit.Test
@@ -78,5 +79,28 @@ class ProotArgvTest {
         assertTrue(output, lines.contains("PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"))
         assertTrue(output, lines.contains("HOME=/root"))
         assertTrue(output, lines.contains("LANG=C.UTF-8"))
+    }
+
+    @Test
+    fun readOnlyPreferenceUsesUnmodifiedProotForExecAndPty() {
+        for (command in listOf("echo hello", null)) {
+            val binds = listOf(BindMount("/storage/My Notes", "/mounts/Notes", true))
+            validateExternalMounts(binds)
+            val launch = ProotCommand.build(File("/libs"), File("/rootfs"), File("/tmp"), binds, "/workspace", command, emptyMap())
+            assertEquals("/libs/libproot_exec.so", launch.argv.first())
+            assertTrue(launch.argv.contains("/storage/My Notes:/mounts/Notes"))
+            assertFalse(launch.argv.any { it.startsWith("--read-only") })
+            assertFalse(launch.processEnv.containsKey("PROOT_NO_SECCOMP"))
+        }
+    }
+
+    @Test(expected = IllegalArgumentException::class)
+    fun externalMountGuestCannotEscapeMountRoot() {
+        validateExternalMounts(listOf(BindMount("/storage/Notes", "/mounts/../root")))
+    }
+
+    @Test(expected = IllegalArgumentException::class)
+    fun externalMountHostCannotInjectProotDelimiter() {
+        validateExternalMounts(listOf(BindMount("/storage/Notes:other", "/mounts/Notes")))
     }
 }

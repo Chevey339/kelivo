@@ -1,6 +1,8 @@
 import 'package:flutter/cupertino.dart' show CupertinoPageRoute;
 import 'package:Kelivo/core/services/sandbox/environment_dependencies.dart';
 import 'package:Kelivo/core/services/sandbox/environment_installer.dart';
+import 'package:Kelivo/core/services/sandbox/workspace_channel.dart';
+import 'package:Kelivo/features/workspace/pages/external_mounts_page.dart';
 import 'package:Kelivo/features/workspace/pages/environment_download_page.dart';
 import 'package:Kelivo/features/workspace/pages/environment_variables_page.dart';
 import 'environment_dependencies_section.dart';
@@ -393,6 +395,7 @@ class _EnvironmentPaneState extends State<EnvironmentPane> {
     final busy = _busy || (dependencies?.busy ?? false);
     final ready = state.phase == EnvironmentPhase.ready;
     final showBrowse = ready && !workspaceEnvIsDesktopTarget();
+    final showExternalMounts = WorkspaceChannel.isSupportedPlatform;
     final showMirrors = ready && manager != null;
     final showActions =
         manager != null &&
@@ -413,19 +416,32 @@ class _EnvironmentPaneState extends State<EnvironmentPane> {
             ? null
             : () => unawaited(_copyPath(_rootfsPath!)),
       ),
-      if (showBrowse) ...[
+      if (showBrowse || showExternalMounts) ...[
         IosSectionHeader(text: l10n.workspaceEnvBrowseSection),
         SectionCard(
           children: [
-            KeyedSubtree(
-              key: EnvironmentPane.browseKey,
-              child: IosNavRow(
-                icon: Lucide.HardDrive,
-                label: l10n.workspaceEnvBrowseFiles,
-                subtitle: l10n.workspaceEnvBrowseFilesDetail,
-                onTap: () => unawaited(openRootfsBrowserPage(context)),
+            if (showBrowse)
+              KeyedSubtree(
+                key: EnvironmentPane.browseKey,
+                child: IosNavRow(
+                  icon: Lucide.HardDrive,
+                  label: l10n.workspaceEnvBrowseFiles,
+                  subtitle: l10n.workspaceEnvBrowseFilesDetail,
+                  onTap: () => unawaited(openRootfsBrowserPage(context)),
+                ),
               ),
-            ),
+            if (showBrowse && showExternalMounts) const IosRowDivider(),
+            if (showExternalMounts)
+              IosNavRow(
+                icon: Lucide.FolderOpen,
+                label: l10n.workspaceExternalMount,
+                subtitle: l10n.workspaceExternalMountSubtitle,
+                onTap: () => Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    builder: (_) => const ExternalMountsPage(),
+                  ),
+                ),
+              ),
           ],
         ),
       ],

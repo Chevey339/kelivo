@@ -1,25 +1,29 @@
 import 'package:flutter/foundation.dart';
 
 /// Classification of a resolved path relative to the workspace zones.
-enum WorkspaceZone { workspace, chat, skills, tmp, outside }
+enum WorkspaceZone { workspace, chat, skills, tmp, external, outside }
 
 /// Which pipe a [CommandOutput] chunk came from.
 enum OutputStreamKind { stdout, stderr }
 
 /// A host directory exposed to the guest at [guest].
 class Mount {
-  const Mount({required this.host, required this.guest});
+  const Mount({required this.host, required this.guest, this.readOnly = false});
 
   final String host;
   final String guest;
+  final bool readOnly;
 
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
-      other is Mount && other.host == host && other.guest == guest;
+      other is Mount &&
+          other.host == host &&
+          other.guest == guest &&
+          other.readOnly == readOnly;
 
   @override
-  int get hashCode => Object.hash(host, guest);
+  int get hashCode => Object.hash(host, guest, readOnly);
 
   @override
   String toString() => 'Mount(host: $host, guest: $guest)';

@@ -19,10 +19,17 @@ final class WorkspacePlugin: NSObject, FlutterStreamHandler {
   private var lastInstallProgressAt: CFAbsoluteTime = 0
   private var backgroundTask: UIBackgroundTaskIdentifier = .invalid
   private var backgroundTaskLock = NSLock()
+  private let directories: WorkspaceDirectoryAccess
+  private var externalMounts: [[String: Any]] = []
+
+  private init(presenter: UIViewController) {
+    directories = WorkspaceDirectoryAccess(presenter: presenter)
+    super.init()
+  }
 
   @discardableResult
-  static func register(messenger: FlutterBinaryMessenger) -> WorkspacePlugin {
-    let plugin = WorkspacePlugin()
+  static func register(messenger: FlutterBinaryMessenger, presenter: UIViewController) -> WorkspacePlugin {
+    let plugin = WorkspacePlugin(presenter: presenter)
     let methods = FlutterMethodChannel(name: methodChannelName, binaryMessenger: messenger)
     methods.setMethodCallHandler { [weak plugin] call, result in
       plugin?.handle(call, result: result)
@@ -97,6 +104,43 @@ final class WorkspacePlugin: NSObject, FlutterStreamHandler {
 
   private func handle(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
     switch call.method {
+    case "setExternalMounts":
+      let args = call.arguments as? [String: Any] ?? [:]
+      let mounts = Self.parseBinds(args["mounts"])
+      guard mounts.count <= 10, mounts.allSatisfy(Self.validExternalMount), Set(mounts.compactMap { ($0["guest"] as? String)?.lowercased() }).count == mounts.count else {
+        result(FlutterError(code: "bad_args", message: "Invalid external mounts", details: nil))
+        return
+      }
+      queue.async {
+        if !NSArray(array: mounts).isEqual(to: self.externalMounts) {
+          KelivoISHExecutor.cancelAllInterrupted(true)
+          KelivoISHKernel.shared().ptyCloseAll()
+          let error = KelivoISHKernel.shared().reconcileExternalBinds(mounts)
+          if error < 0 {
+            _ = KelivoISHKernel.shared().reconcileExternalBinds(self.externalMounts)
+            self.complete(result, Self.mountError(error))
+            return
+          }
+          self.externalMounts = mounts
+        }
+        self.complete(result, nil)
+      }
+    case "hasDirectoryStorageAccess", "requestDirectoryStorageAccess":
+      result(true)
+    case "pickDirectory":
+      directories.pick(result: result)
+    case "resolveDirectory", "releaseDirectory":
+      guard let args = call.arguments as? [String: Any],
+        let token = args["token"] as? String, !token.isEmpty
+      else {
+        result(FlutterError(code: "bad_args", message: "token required", details: nil))
+        return
+      }
+      if call.method == "resolveDirectory" {
+        directories.resolve(token: token, result: result)
+      } else {
+        directories.release(token: token, result: result)
+      }
     case "probe":
       probe(result: result)
     case "installRootfs":
@@ -239,11 +283,11 @@ final class WorkspacePlugin: NSObject, FlutterStreamHandler {
         self.complete(result, error)
         return
       }
-      let mountErr = KelivoISHKernel.shared().reconcileBinds(binds)
+      let mountErr = KelivoISHKernel.shared().reconcileBinds(self.commandBinds(binds))
       if mountErr < 0 {
         self.complete(
           result,
-          FlutterError(code: "mount_failed", message: "bind mount failed: \(mountErr)", details: nil)
+          Self.mountError(mountErr)
         )
         return
       }
@@ -313,11 +357,11 @@ final class WorkspacePlugin: NSObject, FlutterStreamHandler {
         self.complete(result, error)
         return
       }
-      let mountErr = KelivoISHKernel.shared().reconcileBinds(binds)
+      let mountErr = KelivoISHKernel.shared().reconcileBinds(self.commandBinds(binds))
       if mountErr < 0 {
         self.complete(
           result,
-          FlutterError(code: "mount_failed", message: "bind mount failed: \(mountErr)", details: nil)
+          Self.mountError(mountErr)
         )
         return
       }
@@ -491,13 +535,37 @@ final class WorkspacePlugin: NSObject, FlutterStreamHandler {
     flag(value) ? kCFBooleanTrue : kCFBooleanFalse
   }
 
-  private static func parseBinds(_ raw: Any?) -> [[String: String]] {
+  private static func validExternalMount(_ mount: [String: Any]) -> Bool {
+    guard let guest = mount["guest"] as? String, let host = mount["host"] as? String,
+      guest.hasPrefix("/mounts/"), host.hasPrefix("/"), !host.contains("\0") else { return false }
+    let name = String(guest.dropFirst("/mounts/".count))
+    return !name.isEmpty && name != "." && name != ".." &&
+      name == name.trimmingCharacters(in: .whitespacesAndNewlines) &&
+      name.rangeOfCharacter(from: CharacterSet(charactersIn: "/\\:").union(.controlCharacters)) == nil
+  }
+
+  private func commandBinds(_ binds: [[String: Any]]) -> [[String: Any]] {
+    binds.filter { !(($0["guest"] as? String)?.hasPrefix("/mounts/") ?? false) } + externalMounts
+  }
+
+  private static func mountError(_ code: Int32) -> FlutterError {
+    if code == KelivoISHMountTargetOccupied {
+      return FlutterError(
+        code: "external_mount_target_occupied",
+        message: "A mount target under /mounts already contains local files. Choose a different mount name or move those files first. No files were removed.",
+        details: nil
+      )
+    }
+    return FlutterError(code: "mount_failed", message: "bind mount failed: \(code)", details: nil)
+  }
+
+  private static func parseBinds(_ raw: Any?) -> [[String: Any]] {
     guard let list = raw as? [[String: Any]] else { return [] }
     return list.compactMap { item in
       guard let host = item["host"] as? String, !host.isEmpty,
         let guest = item["guest"] as? String, !guest.isEmpty
       else { return nil }
-      return ["host": host, "guest": guest]
+      return ["host": host, "guest": guest, "readOnly": item["readOnly"] as? Bool ?? false]
     }
   }
 

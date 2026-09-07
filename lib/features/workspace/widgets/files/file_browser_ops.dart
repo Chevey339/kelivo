@@ -30,6 +30,26 @@ sealed class FileMutation {
   const FileMutation({required this.rootPath});
 
   final String rootPath;
+
+  /// Paths modified by this operation; copying only reads the source.
+  Iterable<String> get writePaths => switch (this) {
+    CreateFolderMutation(:final parentPath, :final name) ||
+    CreateFileMutation(
+      :final parentPath,
+      :final name,
+    ) => [p.join(parentPath, name)],
+    RenameMutation(:final hostPath, :final newName) => [
+      hostPath,
+      p.join(p.dirname(hostPath), newName),
+    ],
+    MoveMutation(:final hostPath, :final destDirPath) => [
+      hostPath,
+      destDirPath,
+    ],
+    DeleteMutation(:final hostPath) => [hostPath],
+    CopyIntoMutation(:final destDirPath) => [destDirPath],
+    ZipDirectoryMutation(:final destPath) => [destPath],
+  };
 }
 
 final class CreateFolderMutation extends FileMutation {

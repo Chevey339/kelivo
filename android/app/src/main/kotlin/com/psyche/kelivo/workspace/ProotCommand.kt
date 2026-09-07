@@ -5,6 +5,7 @@ import java.io.File
 data class BindMount(
     val host: String,
     val guest: String,
+    val readOnly: Boolean = false,
 )
 
 data class ProotLaunch(
@@ -56,6 +57,8 @@ object ProotCommand {
             argv += "-b"
             argv += "${bind.host}:${bind.guest}"
         }
+        // PRoot bindings are writable. The app and file tools enforce the
+        // user's read-only preference; arbitrary shell programs are not isolated.
         argv += listOf("-b", "/dev", "-b", "/proc", "-b", "/sys")
         argv += listOf("/usr/bin/env", "-i")
 
@@ -103,5 +106,18 @@ object ProotCommand {
         val staged = File(tmpDir, TALLOC_SONAME)
         if (staged.isFile && staged.length() == source.length()) return
         source.copyTo(staged, overwrite = true)
+    }
+}
+
+
+internal fun validateExternalMounts(mounts: List<BindMount>) {
+    val prefix = "/mounts/"
+    require(mounts.size <= 10 && mounts.map { it.guest.lowercase() }.distinct().size == mounts.size)
+    for (mount in mounts) {
+        require(mount.guest.startsWith(prefix))
+        val name = mount.guest.removePrefix(prefix)
+        require(name.isNotEmpty() && name == name.trim() && name != "." && name != "..")
+        require(name.none { it == '/' || it == '\\' || it == ':' || it.code < 32 || it.code == 127 })
+        require(File(mount.host).isAbsolute && mount.host.none { it == ':' || it == '\u0000' })
     }
 }

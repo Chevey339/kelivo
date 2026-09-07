@@ -2,6 +2,8 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:Kelivo/core/services/haptics.dart';
+import 'package:Kelivo/core/providers/external_mounts_provider.dart';
+import 'package:Kelivo/core/services/sandbox/workspace_channel.dart';
 import 'package:Kelivo/features/settings/widgets/custom_theme_widgets.dart';
 import 'package:Kelivo/features/chat/widgets/workspace_tool_ui.dart'
     show workspaceFileTypeIcon;
@@ -29,6 +31,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:path/path.dart' as p;
+import 'package:provider/provider.dart';
 import 'package:share_plus/share_plus.dart';
 
 enum _FileItemAction { preview, rename, move, share, copyPath, export, delete }
@@ -244,9 +247,19 @@ class FileBrowserState extends State<FileBrowser> {
   @visibleForTesting
   Future<void> refreshEntries() => _reload();
 
-  Future<void> _runMutation(FileMutation mutation) {
+  Future<void> _runMutation(FileMutation mutation) async {
+    final mounts = context.read<ExternalMountsProvider?>();
+    final readOnlyMessage = AppLocalizations.of(
+      context,
+    )!.workspaceMountReadOnly;
+    try {
+      await mounts?.requireWritableHostPaths(mutation.writePaths);
+    } on WorkspaceChannelException catch (error) {
+      if (error.code == 'mount_readonly') throw StateError(readOnlyMessage);
+      rethrow;
+    }
     final runner = widget.mutationRunner ?? FileBrowserOps.runMutation;
-    return runner(mutation);
+    await runner(mutation);
   }
 
   Future<void> _reload() async {

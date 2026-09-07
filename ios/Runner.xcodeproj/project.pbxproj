@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		W5A0000000000000000E001 /* KelivoISHEnvironment.m in Sources */ = {isa = PBXBuildFile; fileRef = W5A0000000000000000E003 /* KelivoISHEnvironment.m */; };
+		W5D0000000000000000F001 /* KelivoISHMountTarget.m in Sources */ = {isa = PBXBuildFile; fileRef = W5D0000000000000000F003 /* KelivoISHMountTarget.m */; };
 		A10000000000000000000001 /* KelivoGenerationActivityAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000010 /* KelivoGenerationActivityAttributes.swift */; };
 		A10000000000000000000002 /* KelivoGenerationActivityAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000010 /* KelivoGenerationActivityAttributes.swift */; };
 		A10000000000000000000003 /* GenerationActivityExtension.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000011 /* GenerationActivityExtension.swift */; };
@@ -24,6 +25,7 @@
 		A2DT00000000000000000006 /* DeviceToolsSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2DT00000000000000000016 /* DeviceToolsSupport.swift */; };
 		A2DT00000000000000000031 /* HealthKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = A2DT00000000000000000032 /* HealthKit.framework */; };
 		W5A0000000000000000000A1 /* WorkspacePlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = W5A0000000000000000000B1 /* WorkspacePlugin.swift */; };
+		W5D0000000000000000000A1 /* WorkspaceDirectoryAccess.swift in Sources */ = {isa = PBXBuildFile; fileRef = W5D0000000000000000000B1 /* WorkspaceDirectoryAccess.swift */; };
 		W5A0000000000000000000A2 /* RootfsInstaller.swift in Sources */ = {isa = PBXBuildFile; fileRef = W5A0000000000000000000B2 /* RootfsInstaller.swift */; };
 		W5A0000000000000000000A3 /* KelivoISHKernel.m in Sources */ = {isa = PBXBuildFile; fileRef = W5A0000000000000000000B4 /* KelivoISHKernel.m */; };
 		W5A0000000000000000000A4 /* KelivoISHExecutor.m in Sources */ = {isa = PBXBuildFile; fileRef = W5A0000000000000000000B6 /* KelivoISHExecutor.m */; };
@@ -96,7 +98,9 @@
 
 /* Begin PBXFileReference section */
 		W5A0000000000000000E002 /* KelivoISHEnvironment.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = KelivoISHEnvironment.h; sourceTree = "<group>"; };
+		W5D0000000000000000F002 /* KelivoISHMountTarget.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = KelivoISHMountTarget.h; sourceTree = "<group>"; };
 		W5A0000000000000000E003 /* KelivoISHEnvironment.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = KelivoISHEnvironment.m; sourceTree = "<group>"; };
+		W5D0000000000000000F003 /* KelivoISHMountTarget.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = KelivoISHMountTarget.m; sourceTree = "<group>"; };
 		A10000000000000000000010 /* KelivoGenerationActivityAttributes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KelivoGenerationActivityAttributes.swift; sourceTree = "<group>"; };
 		A10000000000000000000011 /* GenerationActivityExtension.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GenerationActivityExtension.swift; sourceTree = "<group>"; };
 		A10000000000000000000012 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
@@ -128,6 +132,7 @@
 		A2DT00000000000000000021 /* Runner.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Runner.entitlements; sourceTree = "<group>"; };
 		A2DT00000000000000000032 /* HealthKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = HealthKit.framework; path = System/Library/Frameworks/HealthKit.framework; sourceTree = SDKROOT; };
 		W5A0000000000000000000B1 /* WorkspacePlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkspacePlugin.swift; sourceTree = "<group>"; };
+		W5D0000000000000000000B1 /* WorkspaceDirectoryAccess.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkspaceDirectoryAccess.swift; sourceTree = "<group>"; };
 		W5A0000000000000000000B2 /* RootfsInstaller.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootfsInstaller.swift; sourceTree = "<group>"; };
 		W5A0000000000000000000B3 /* KelivoISHKernel.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = KelivoISHKernel.h; sourceTree = "<group>"; };
 		W5A0000000000000000000B4 /* KelivoISHKernel.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = KelivoISHKernel.m; sourceTree = "<group>"; };
@@ -261,8 +266,11 @@
 				W5A0000000000000000000B9 /* WorkspaceBridging.h */,
 				W5A0000000000000000000BD /* KelivoISHCompat.h */,
 				W5A0000000000000000E002 /* KelivoISHEnvironment.h */,
+				W5D0000000000000000F002 /* KelivoISHMountTarget.h */,
 				W5A0000000000000000E003 /* KelivoISHEnvironment.m */,
+				W5D0000000000000000F003 /* KelivoISHMountTarget.m */,
 				W5A0000000000000000000B1 /* WorkspacePlugin.swift */,
+				W5D0000000000000000000B1 /* WorkspaceDirectoryAccess.swift */,
 				W5A0000000000000000000B2 /* RootfsInstaller.swift */,
 				W5A0000000000000000000B3 /* KelivoISHKernel.h */,
 				W5A0000000000000000000B4 /* KelivoISHKernel.m */,
@@ -716,10 +724,12 @@
 				A2DT00000000000000000005 /* RemindersToolHandler.swift in Sources */,
 				1498D2341E8E89220040F4C2 /* GeneratedPluginRegistrant.m in Sources */,
 				W5A0000000000000000000A1 /* WorkspacePlugin.swift in Sources */,
+				W5D0000000000000000000A1 /* WorkspaceDirectoryAccess.swift in Sources */,
 				W5A0000000000000000000A2 /* RootfsInstaller.swift in Sources */,
 				W5A0000000000000000000A3 /* KelivoISHKernel.m in Sources */,
 				W5A0000000000000000000A4 /* KelivoISHExecutor.m in Sources */,
 				W5A0000000000000000E001 /* KelivoISHEnvironment.m in Sources */,
+				W5D0000000000000000F001 /* KelivoISHMountTarget.m in Sources */,
 				W5A0000000000000000000A5 /* KelivoISHCrashGuards.c in Sources */,
 				82816D88DA05AE704751053C /* IncomingShareInbox.swift in Sources */,
 				1050AF28EF974F7205A3DFE3 /* IosIncomingShareHandler.swift in Sources */,

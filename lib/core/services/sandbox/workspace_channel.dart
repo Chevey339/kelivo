@@ -3,6 +3,8 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 
+import 'package:Kelivo/core/models/workspace_directory_access.dart';
+
 const String kWorkspaceMethodChannel = 'app.workspace';
 const String kWorkspaceEventChannel = 'app.workspace/events';
 
@@ -187,6 +189,65 @@ class WorkspaceChannel {
     await _invoke('keepScreenOn', {'enabled': enabled});
   }
 
+  Future<bool> hasDirectoryStorageAccess() async =>
+      await _invoke('hasDirectoryStorageAccess') == true;
+
+  Future<void> setExternalMounts(List<BindMount> mounts) async {
+    await _invoke('setExternalMounts', {
+      'mounts': [for (final mount in mounts) mount.toMap()],
+    });
+  }
+
+  Future<bool> requestDirectoryStorageAccess() async =>
+      await _invoke('requestDirectoryStorageAccess') == true;
+
+  Future<WorkspaceDirectory?> pickDirectory() async {
+    final raw = await _invoke('pickDirectory');
+    return raw == null ? null : _directoryResult(raw);
+  }
+
+  Future<WorkspaceDirectory> resolveDirectory(
+    WorkspaceDirectoryAccess access,
+  ) async {
+    _checkDirectoryPlatform(access);
+    return _directoryResult(
+      await _invoke('resolveDirectory', {'token': access.token}),
+    );
+  }
+
+  Future<void> releaseDirectory(WorkspaceDirectoryAccess access) async {
+    if (!isSupportedPlatform || access.platform != defaultTargetPlatform.name) {
+      return;
+    }
+    await _invoke('releaseDirectory', {'token': access.token});
+  }
+
+  void _checkDirectoryPlatform(WorkspaceDirectoryAccess access) {
+    if (!isSupportedPlatform || access.platform != defaultTargetPlatform.name) {
+      throw const WorkspaceChannelException(
+        code: 'external_folder_unavailable',
+      );
+    }
+  }
+
+  WorkspaceDirectory _directoryResult(Object? raw) {
+    final map = _asStringKeyedMap(raw, 'directory');
+    final path = map['path'] as String?;
+    final token = map['token'] as String?;
+    if (path == null || path.isEmpty || token == null || token.isEmpty) {
+      throw const WorkspaceChannelException(
+        code: 'external_folder_unavailable',
+      );
+    }
+    return WorkspaceDirectory(
+      path: path,
+      access: WorkspaceDirectoryAccess(
+        platform: defaultTargetPlatform.name,
+        token: token,
+      ),
+    );
+  }
+
   Future<Object?> _invoke(String method, [Map<String, Object?>? args]) async {
     try {
       return await _methods.invokeMethod<Object?>(method, args);
@@ -325,12 +386,21 @@ class ExecArgs {
 }
 
 class BindMount {
-  const BindMount({required this.host, required this.guest});
+  const BindMount({
+    required this.host,
+    required this.guest,
+    this.readOnly = false,
+  });
 
   final String host;
   final String guest;
+  final bool readOnly;
 
-  Map<String, Object?> toMap() => {'host': host, 'guest': guest};
+  Map<String, Object?> toMap() => {
+    'host': host,
+    'guest': guest,
+    if (readOnly) 'readOnly': true,
+  };
 }
 
 class FreeSpace {

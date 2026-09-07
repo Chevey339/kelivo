@@ -219,6 +219,7 @@ class MainActivity : FlutterActivity() {
          permissions: Array<out String>,
          grantResults: IntArray,
      ) {
+         if (workspacePlugin?.onRequestPermissionsResult(requestCode) == true) return
          if (deviceLocalToolsHandler?.onRequestPermissionsResult(requestCode, grantResults) == true) {
              return
          }
@@ -226,6 +227,7 @@ class MainActivity : FlutterActivity() {
      }
 
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        if (workspacePlugin?.onActivityResult(requestCode, resultCode, data) == true) return
         super.onActivityResult(requestCode, resultCode, data)
         if (requestCode != CREATE_DOCUMENT_REQUEST_CODE) {
             return

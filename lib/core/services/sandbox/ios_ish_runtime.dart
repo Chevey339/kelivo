@@ -60,7 +60,11 @@ class IosIshRuntime implements WorkspaceRuntime {
         env: request.env,
         binds: [
           for (final mount in request.mounts)
-            BindMount(host: mount.host, guest: mount.guest),
+            BindMount(
+              host: mount.host,
+              guest: mount.guest,
+              readOnly: mount.readOnly,
+            ),
         ],
       ),
       before: channel.beginBackgroundTask,
@@ -93,7 +97,11 @@ class IosIshRuntime implements WorkspaceRuntime {
       env: env,
       binds: [
         for (final mount in mounts)
-          BindMount(host: mount.host, guest: mount.guest),
+          BindMount(
+            host: mount.host,
+            guest: mount.guest,
+            readOnly: mount.readOnly,
+          ),
       ],
       cols: cols,
       rows: rows,

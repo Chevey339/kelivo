@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:path/path.dart' as p;
@@ -63,35 +64,59 @@ void main() {
     if (await tmp.exists()) await tmp.delete(recursive: true);
   });
 
-  test('fragment mentions zones, cwd, links, attachments, and engine', () {
-    final fragment = WorkspaceToolsService.buildPromptFragment(
-      sandboxed,
-      attachments: const [
-        AttachmentInfo(
-          name: 'notes.pdf',
-          size: 12,
-          modelPath: '/chat/attachments/notes.pdf',
-        ),
-      ],
-    );
-    expect(fragment, contains('<workspace>'));
-    expect(fragment, contains('/workspace'));
-    expect(fragment, contains('/chat'));
-    expect(fragment, contains('/skills'));
-    expect(fragment, contains('/tmp'));
-    expect(fragment, contains('cwd: /workspace'));
-    expect(fragment, contains('kelivo://workspace/rel/path'));
-    expect(fragment, contains('kelivo://chat/outputs/x.txt'));
-    expect(fragment, contains('kelivo://workspace/plot.png'));
-    expect(fragment, contains('notes.pdf'));
-    expect(fragment, contains('12 bytes'));
-    expect(fragment, contains('Ubuntu (PRoot)'));
-    final withoutAttachments = fragment.replaceAll(
-      RegExp(r'Attachments under[\s\S]*?(?=</workspace>)'),
-      '',
-    );
-    expect(withoutAttachments.length, lessThan(1200));
-  });
+  for (final platform in [TargetPlatform.android, TargetPlatform.iOS]) {
+    test('fragment includes the ${platform.name} directory description', () {
+      debugDefaultTargetPlatformOverride = platform;
+      addTearDown(() => debugDefaultTargetPlatformOverride = null);
+      final fragment = WorkspaceToolsService.buildPromptFragment(
+        sandboxed,
+        attachments: const [
+          AttachmentInfo(
+            name: 'notes.pdf',
+            size: 12,
+            modelPath: '/chat/attachments/notes.pdf',
+          ),
+        ],
+      );
+      expect(fragment, contains('<workspace>'));
+      expect(fragment, contains('/workspace'));
+      expect(fragment, contains('/chat'));
+      expect(fragment, contains('/skills'));
+      expect(fragment, contains('/tmp'));
+      expect(fragment, contains('- /mounts/<name>/'));
+      expect(
+        fragment.contains('from iOS Files'),
+        platform == TargetPlatform.iOS,
+      );
+      expect(fragment.contains('iCloud'), platform == TargetPlatform.iOS);
+      expect(
+        fragment.contains('on-device folders'),
+        platform == TargetPlatform.android,
+      );
+      expect(fragment, contains('list /mounts/ first for external/user files'));
+      expect(
+        fragment,
+        contains('File tools reject writes to read-only mounts'),
+      );
+      expect(
+        fragment.indexOf('/mounts/<name>/'),
+        lessThan(fragment.indexOf('cwd:')),
+      );
+      expect(fragment, isNot(contains('<external_mounts>')));
+      expect(fragment, contains('cwd: /workspace'));
+      expect(fragment, contains('kelivo://workspace/rel/path'));
+      expect(fragment, contains('kelivo://chat/outputs/x.txt'));
+      expect(fragment, contains('kelivo://workspace/plot.png'));
+      expect(fragment, contains('notes.pdf'));
+      expect(fragment, contains('12 bytes'));
+      expect(fragment, contains('Ubuntu (PRoot)'));
+      final withoutAttachments = fragment.replaceAll(
+        RegExp(r'Attachments under[\s\S]*?(?=</workspace>)'),
+        '',
+      );
+      expect(withoutAttachments.length, lessThan(1200));
+    });
+  }
 
   test('fragment warns when the sandbox is not installed', () {
     final fragment = WorkspaceToolsService.buildPromptFragment(

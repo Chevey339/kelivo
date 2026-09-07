@@ -34,7 +34,10 @@ class WorkspacePaths {
     required String workspaceHostRoot,
     required String sessionHostDir,
     required String skillsHostDir,
-  }) : sandboxed = true,
+    List<Mount> externalMounts = const [],
+    this.loadExternalMounts,
+  }) : _externalMounts = List.unmodifiable(externalMounts),
+       sandboxed = true,
        workspaceHostRoot = _canonHost(workspaceHostRoot),
        sessionHostDir = _canonHost(sessionHostDir),
        skillsHostDir = _canonHost(skillsHostDir),
@@ -44,7 +47,9 @@ class WorkspacePaths {
     required String workspaceHostRoot,
     required String sessionHostDir,
     required String skillsHostDir,
-  }) : sandboxed = false,
+  }) : _externalMounts = const [],
+       loadExternalMounts = null,
+       sandboxed = false,
        workspaceHostRoot = _canonHost(workspaceHostRoot),
        sessionHostDir = _canonHost(sessionHostDir),
        skillsHostDir = _canonHost(skillsHostDir),
@@ -55,6 +60,19 @@ class WorkspacePaths {
   final String sessionHostDir;
   final String skillsHostDir;
   final String tmpHostRoot;
+  List<Mount> _externalMounts;
+  final Future<List<Mount>> Function()? loadExternalMounts;
+  List<Mount> get externalMounts => List.unmodifiable(_externalMounts);
+
+  Future<void> refreshExternalMounts() async {
+    if (loadExternalMounts != null) {
+      _externalMounts = await loadExternalMounts!();
+    }
+  }
+
+  bool isReadOnlyPath(String hostPath) => _externalMounts.any(
+    (mount) => mount.readOnly && _hostInside(mount.host, hostPath),
+  );
 
   static const String guestWorkspace = '/workspace';
   static const String guestChat = '/chat';
@@ -73,6 +91,7 @@ class WorkspacePaths {
       Mount(host: workspaceHostRoot, guest: guestWorkspace),
       Mount(host: sessionHostDir, guest: guestChat),
       Mount(host: skillsHostDir, guest: guestSkills),
+      ..._externalMounts,
     ];
   }
 
@@ -81,6 +100,7 @@ class WorkspacePaths {
       case WorkspaceZone.workspace:
       case WorkspaceZone.chat:
       case WorkspaceZone.tmp:
+      case WorkspaceZone.external:
         return true;
       case WorkspaceZone.skills:
       case WorkspaceZone.outside:
@@ -103,7 +123,7 @@ class WorkspacePaths {
     required String cwd,
   }) async {
     final lexical = resolve(modelPath, cwd: cwd);
-    final realHost = await _followSymlinks(lexical.hostPath);
+    final realHost = await resolveHostPath(lexical.hostPath);
     final zone = _classifyHost(realHost);
     if (sandboxed) {
       return ResolvedPath(
@@ -118,6 +138,10 @@ class WorkspacePaths {
   /// Inverse of [resolve] for a host path that sits under a known root.
   String toModelPath(String hostPath) {
     if (!sandboxed) return _canonHost(hostPath);
+    for (final mount in _externalMounts) {
+      final rel = _relativeToRoot(mount.host, hostPath);
+      if (rel != null) return _guestJoin(mount.guest, rel);
+    }
     final workspaceRel = _relativeToRoot(workspaceHostRoot, hostPath);
     if (workspaceRel != null) {
       return _guestJoin(guestWorkspace, workspaceRel);
@@ -164,6 +188,16 @@ class WorkspacePaths {
     final intended = _classifyGuest(_lexicalAnchor(raw, posix: true));
     final normalized = p.posix.normalize(raw);
     final mapped = _mapGuest(normalized);
+    // Each mount is its own path boundary, including sibling mounts.
+    for (final mount in _externalMounts) {
+      if (_guestRelative(_lexicalAnchor(raw, posix: true), mount.guest) !=
+              null &&
+          _guestRelative(normalized, mount.guest) == null) {
+        throw PathResolutionException(
+          'path escapes external mount: $modelPath',
+        );
+      }
+    }
     if (mapped == null || !_hostInsideZone(intended, mapped.hostPath)) {
       throw PathResolutionException(
         'path escapes a workspace zone: $modelPath',
@@ -221,12 +255,26 @@ class WorkspacePaths {
         return _hostInside(skillsHostDir, hostPath);
       case WorkspaceZone.tmp:
         return _hostInside(tmpHostRoot, hostPath);
+      case WorkspaceZone.external:
+        return _externalMounts.any(
+          (mount) => _hostInside(mount.host, hostPath),
+        );
       case WorkspaceZone.outside:
         return false;
     }
   }
 
   ResolvedPath? _mapGuest(String normalized) {
+    for (final mount in _externalMounts) {
+      final rel = _guestRelative(normalized, mount.guest);
+      if (rel != null) {
+        return ResolvedPath(
+          hostPath: _joinHost(mount.host, rel),
+          modelPath: normalized,
+          zone: WorkspaceZone.external,
+        );
+      }
+    }
     final workspace = _guestRelative(normalized, guestWorkspace);
     if (workspace != null) {
       return ResolvedPath(
@@ -263,6 +311,9 @@ class WorkspacePaths {
   }
 
   WorkspaceZone _classifyHost(String hostPath) {
+    if (_externalMounts.any((mount) => _hostInside(mount.host, hostPath))) {
+      return WorkspaceZone.external;
+    }
     if (_hostInside(workspaceHostRoot, hostPath)) {
       return WorkspaceZone.workspace;
     }
@@ -340,7 +391,8 @@ class WorkspacePaths {
     return aliases.toList();
   }
 
-  static Future<String> _followSymlinks(String hostPath) async {
+  /// Follows existing symlinks, including parents of a not-yet-created file.
+  static Future<String> resolveHostPath(String hostPath) async {
     try {
       if (await FileSystemEntity.isLink(hostPath)) {
         return p.canonicalize(await Link(hostPath).resolveSymbolicLinks());

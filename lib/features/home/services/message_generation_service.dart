@@ -1,3 +1,4 @@
+import 'package:Kelivo/core/providers/external_mounts_provider.dart';
 import 'dart:async';
 import 'package:flutter/widgets.dart';
 import 'package:provider/provider.dart';
@@ -148,9 +149,11 @@ class MessageGenerationService {
     };
     WorkspaceProvider? workspaceProvider;
     WorkspaceRuntimeProvider? runtimeProvider;
+    ExternalMountsProvider? externalMounts;
     try {
       workspaceProvider = contextProvider.read<WorkspaceProvider>();
       runtimeProvider = contextProvider.read<WorkspaceRuntimeProvider>();
+      externalMounts = contextProvider.read<ExternalMountsProvider?>();
     } catch (_) {}
 
     // Build API messages
@@ -213,6 +216,7 @@ class MessageGenerationService {
     try {
       if (workspaceProvider != null && runtimeProvider != null) {
         workspaceContext = await WorkspaceToolsService.resolve(
+          externalMounts: externalMounts,
           conversationId: currentConversation?.id,
           workspaceProvider: workspaceProvider,
           runtimeProvider: runtimeProvider,

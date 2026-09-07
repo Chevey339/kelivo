@@ -1,3 +1,5 @@
+import 'package:Kelivo/core/services/sandbox/workspace_channel.dart';
+import 'package:Kelivo/core/providers/external_mounts_provider.dart';
 import 'package:Kelivo/core/services/sandbox/environment_dependencies.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart'
@@ -734,6 +736,12 @@ class MyApp extends StatelessWidget {
         Provider<ExtensionEntityStore>.value(
           value: databaseLease.extensionEntityStore,
         ),
+        if (WorkspaceChannel.isSupportedPlatform)
+          ChangeNotifierProvider(
+            lazy: false,
+            create: (ctx) =>
+                ExternalMountsProvider(store: ctx.read<ExtensionEntityStore>()),
+          ),
         ChangeNotifierProvider(
           create: (ctx) => WorkspaceProvider(
             store: ctx.read<ExtensionEntityStore>(),

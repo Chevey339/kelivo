@@ -1,3 +1,4 @@
+import 'package:Kelivo/core/providers/external_mounts_provider.dart';
 import 'dart:async';
 import 'dart:io';
 
@@ -150,6 +151,7 @@ class ConversationFilesPanelState extends State<ConversationFilesPanel> {
     final conversationId = widget.conversationId;
     try {
       final chat = context.read<ChatService>();
+      final externalMounts = context.read<ExternalMountsProvider?>();
       final provider = context.read<WorkspaceProvider>();
       final runtime =
           context.read<WorkspaceRuntimeProvider?>() ??
@@ -172,6 +174,7 @@ class ConversationFilesPanelState extends State<ConversationFilesPanel> {
           // Also populate attachments for conversations bound after sending,
           // without requiring the user to make another model request.
           final tools = await WorkspaceToolsService.resolve(
+            externalMounts: externalMounts,
             conversationId: conversationId,
             workspaceProvider: provider,
             runtimeProvider: runtime,

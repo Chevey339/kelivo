@@ -90,9 +90,13 @@ void main() {
     RuntimeStatus? status,
     bool runtimeRegistered = true,
     Set<String> disabledTools = const {},
+    List<Mount> externalMounts = const [],
+    Future<List<Mount>> Function()? loadExternalMounts,
   }) {
     final paths = sandboxed
         ? WorkspacePaths.sandboxed(
+            externalMounts: externalMounts,
+            loadExternalMounts: loadExternalMounts,
             workspaceHostRoot: workspaceDir.path,
             sessionHostDir: sessionDir.path,
             skillsHostDir: skillsDir.path,
@@ -516,6 +520,73 @@ void main() {
   });
 
   group('file tools', () {
+    test(
+      'external mounts appear in prompt and readonly beats allow-all',
+      () async {
+        final dir = Directory(p.join(tmp.path, 'external'))..createSync();
+        final file = File(p.join(dir.path, 'note.txt'))
+          ..writeAsStringSync('original');
+        const guest = '/mounts/Notes';
+        final context = ctx(
+          sandboxed: true,
+          externalMounts: [Mount(host: dir.path, guest: guest, readOnly: true)],
+        );
+        final prompt = WorkspaceToolsService.buildPromptFragment(context);
+        expect(prompt, contains('/mounts/<name>/'));
+        expect(
+          prompt,
+          contains('File tools reject writes to read-only mounts'),
+        );
+        expect(prompt, isNot(contains('<external_mounts>')));
+        expect(prompt, contains('Read-only: $guest.'));
+        expect(prompt, contains('respect this in Shell too'));
+        final approval = _RecordingApproval();
+        final result = await service().handle(
+          context,
+          'write_file',
+          {'path': '$guest/note.txt', 'content': 'bad'},
+          toolCallId: 'mount-write',
+          approvalService: approval,
+        );
+        expect(metaOf(result).code, 'mount_readonly');
+        expect(approval.calls, 0);
+        expect(file.readAsStringSync(), 'original');
+      },
+    );
+
+    test(
+      'mount permission is rechecked before the actual file write',
+      () async {
+        final dir = Directory(p.join(tmp.path, 'external'))..createSync();
+        final file = File(p.join(dir.path, 'note.txt'))
+          ..writeAsStringSync('original');
+        const guest = '/mounts/Notes';
+        var resolves = 0;
+        List<Mount> current() => [
+          Mount(host: dir.path, guest: guest, readOnly: resolves > 1),
+        ];
+        final context = ctx(
+          sandboxed: true,
+          externalMounts: current(),
+          loadExternalMounts: () async {
+            resolves++;
+            return current();
+          },
+        );
+        final approval = _RecordingApproval();
+        final result = await service().handle(
+          context,
+          'write_file',
+          {'path': '$guest/note.txt', 'content': 'bad'},
+          toolCallId: 'mount-write',
+          approvalService: approval,
+        );
+        expect(approval.calls, 0);
+        expect(metaOf(result).status, 'error');
+        expect(file.readAsStringSync(), 'original');
+      },
+    );
+
     test('read_file numbers text and reports next offset', () async {
       File(p.join(workspaceDir.path, 'n.txt')).writeAsStringSync('a\nb\nc\n');
       final tools = service();

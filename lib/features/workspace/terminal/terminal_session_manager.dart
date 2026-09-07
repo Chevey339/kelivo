@@ -268,11 +268,12 @@ class TerminalSessionManager extends ChangeNotifier {
     return null;
   }
 
-  /// Reuses a live session for the same conversation/workspace + cwd.
+  /// Reuses a live session only while its mount snapshot is unchanged.
   TerminalSession? findReusable({
     String? conversationId,
     String? workspaceId,
     required String cwd,
+    required List<Mount> mounts,
   }) {
     final key = sessionTargetKey(
       conversationId: conversationId,
@@ -281,7 +282,11 @@ class TerminalSessionManager extends ChangeNotifier {
     );
     for (var i = _sessions.length - 1; i >= 0; i--) {
       final session = _sessions[i];
-      if (!session.exited && session.targetKey == key) return session;
+      if (!session.exited &&
+          session.targetKey == key &&
+          listEquals(session.mounts, mounts)) {
+        return session;
+      }
     }
     return null;
   }

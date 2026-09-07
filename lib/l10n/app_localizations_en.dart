@@ -10761,4 +10761,87 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get storageSessionFilesUnlinked => 'Unlinked conversation';
+
+  @override
+  String get workspaceExternalMount => 'Mount external folder';
+
+  @override
+  String get workspaceExternalMountSubtitle =>
+      'Selected folders are mounted at /mounts/<name> and shared across workspaces. AI tools, Shell and the file browser can access them. Up to 10 folders.';
+
+  @override
+  String get workspaceExternalStorageTitle => 'Allow file access';
+
+  @override
+  String get workspaceExternalStorageMessage =>
+      'To read and write external folders in the workspace and Shell, allow Kelivo to manage files in Android settings. On Android 11 or later, enable All files access. Then select an on-device folder to mount.';
+
+  @override
+  String get workspaceExternalGrantAccess => 'Grant access';
+
+  @override
+  String get workspaceExternalLocalOnly =>
+      'Android can mount on-device folders only. This document provider does not expose a local folder to Shell.';
+
+  @override
+  String get workspaceExternalUnavailable =>
+      'The external folder is unavailable. Check its storage connection and permissions, then select the folder again to restore access.';
+
+  @override
+  String get workspaceExternalReconnect => 'Select folder again';
+
+  @override
+  String get workspaceMountAdd => 'Add folder';
+
+  @override
+  String get workspaceMountEdit => 'Edit mount';
+
+  @override
+  String get workspaceMountEmpty => 'No mounted folders';
+
+  @override
+  String get workspaceMountReadOnly => 'Read-only';
+
+  @override
+  String get workspaceMountReadWrite => 'Read-write';
+
+  @override
+  String get workspaceMountAllowWrite => 'Allow writes';
+
+  @override
+  String get workspaceMountPermissionsHint =>
+      'AI file tools and the file browser respect this setting. Shell guards cover common file commands; arbitrary scripts may bypass them. Saving mount changes stops running commands and terminal sessions.';
+
+  @override
+  String get workspaceMountBrowse => 'Browse files';
+
+  @override
+  String get workspaceMountUnmount => 'Unmount';
+
+  @override
+  String get workspaceMountUnmountMessage =>
+      'Remove this mount? The original folder and its files will be kept.';
+
+  @override
+  String get workspaceMountInactive => 'Unavailable — select the folder again';
+
+  @override
+  String get workspaceMountInvalidName =>
+      'Use a name of up to 64 characters without slashes, colons or control characters. Do not use . or ..';
+
+  @override
+  String get workspaceMountDuplicate =>
+      'A mount with this name already exists.';
+
+  @override
+  String get workspaceMountLimit =>
+      'Up to 10 folders can be mounted. Remove a mount before adding another.';
+
+  @override
+  String get workspaceMountOverlap =>
+      'This folder overlaps an existing mount. Choose a different folder so permissions remain unambiguous.';
+
+  @override
+  String get workspaceMountTargetOccupied =>
+      'A mount target under /mounts already contains local files. Choose a different mount name or move those files first. No files were removed.';
 }

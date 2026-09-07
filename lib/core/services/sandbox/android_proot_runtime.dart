@@ -128,7 +128,11 @@ class AndroidProotRuntime implements WorkspaceRuntime {
   List<BindMount> _binds(List<Mount> mounts) {
     return [
       for (final mount in mounts)
-        BindMount(host: mount.host, guest: mount.guest),
+        BindMount(
+          host: mount.host,
+          guest: mount.guest,
+          readOnly: mount.readOnly,
+        ),
     ];
   }
 

@@ -8,6 +8,7 @@
 //
 
 #import <Foundation/Foundation.h>
+#import "KelivoISHMountTarget.h"
 
 NS_ASSUME_NONNULL_BEGIN
 
@@ -43,9 +44,10 @@ typedef NS_ENUM(int, KelivoISHPtyOpenError) {
 - (int)bootWithRootPath:(NSString *)rootPath;
 
 /// For each {host, guest}, mount if absent and remount if the host changed.
-- (int)reconcileBinds:(NSArray<NSDictionary<NSString *, NSString *> *> *)binds;
+- (int)reconcileBinds:(NSArray<NSDictionary<NSString *, id> *> *)binds;
+- (int)reconcileExternalBinds:(NSArray<NSDictionary<NSString *, id> *> *)binds;
 
-- (int)bindMountPath:(NSString *)linuxPath toHostPath:(NSString *)hostPath;
+- (int)bindMountPath:(NSString *)linuxPath toHostPath:(NSString *)hostPath readOnly:(BOOL)readOnly;
 - (int)bindUnmountPath:(NSString *)linuxPath;
 
 @property (nonatomic, copy, nullable) KelivoISHPtyDataHandler ptyDataHandler;
@@ -67,6 +69,7 @@ typedef NS_ENUM(int, KelivoISHPtyOpenError) {
 - (void)ptyWriteSession:(NSString *)sessionId data:(NSData *)data;
 - (void)ptyResizeSession:(NSString *)sessionId cols:(int)cols rows:(int)rows;
 - (void)ptyCloseSession:(NSString *)sessionId;
+- (void)ptyCloseAll;
 
 @end
 

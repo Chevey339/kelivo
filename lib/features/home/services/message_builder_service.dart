@@ -1,3 +1,4 @@
+import 'package:Kelivo/core/providers/external_mounts_provider.dart';
 import 'dart:convert';
 import 'dart:io';
 import 'package:drift/drift.dart' show Value;
@@ -1824,6 +1825,7 @@ class MessageBuilderService {
       final ctx =
           workspaceContext ??
           await WorkspaceToolsService.resolve(
+            externalMounts: contextProvider.read<ExternalMountsProvider?>(),
             conversationId: conversationId,
             workspaceProvider: contextProvider.read<WorkspaceProvider>(),
             runtimeProvider: contextProvider.read<WorkspaceRuntimeProvider>(),

@@ -10295,6 +10295,85 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get storageSessionFilesUnlinked => '未关联的会话';
+
+  @override
+  String get workspaceExternalMount => '挂载外部文件夹';
+
+  @override
+  String get workspaceExternalMountSubtitle =>
+      '所选文件夹挂载到 /mounts/<name>，供各工作区的 AI 工具、Shell 和文件浏览器访问。最多挂载 10 个文件夹。';
+
+  @override
+  String get workspaceExternalStorageTitle => '允许访问文件';
+
+  @override
+  String get workspaceExternalStorageMessage =>
+      '工作区和 Shell 需要直接读写外部文件夹，请在 Android 系统设置中允许 Kelivo 访问文件。Android 11 及以上需开启“所有文件访问权限”，然后选择要挂载的本地文件夹。';
+
+  @override
+  String get workspaceExternalGrantAccess => '前往授权';
+
+  @override
+  String get workspaceExternalLocalOnly =>
+      'Android 仅支持挂载本地文件夹，此文件提供方没有可供 Shell 访问的本地目录。';
+
+  @override
+  String get workspaceExternalUnavailable =>
+      '外部文件夹不可用。请检查存储连接和访问权限，重新选择文件夹以恢复访问。';
+
+  @override
+  String get workspaceExternalReconnect => '重新选择文件夹';
+
+  @override
+  String get workspaceMountAdd => '添加文件夹';
+
+  @override
+  String get workspaceMountEdit => '编辑挂载';
+
+  @override
+  String get workspaceMountEmpty => '尚未挂载文件夹';
+
+  @override
+  String get workspaceMountReadOnly => '只读';
+
+  @override
+  String get workspaceMountReadWrite => '读写';
+
+  @override
+  String get workspaceMountAllowWrite => '允许写入';
+
+  @override
+  String get workspaceMountPermissionsHint =>
+      '关闭后，AI 文件工具和文件浏览器会拒绝修改此文件夹。Shell 会检查部分常用文件命令，但任意脚本不保证受限。保存挂载变更时会停止正在运行的命令和终端会话。';
+
+  @override
+  String get workspaceMountBrowse => '浏览文件';
+
+  @override
+  String get workspaceMountUnmount => '卸载';
+
+  @override
+  String get workspaceMountUnmountMessage => '卸载此挂载？原文件夹及其中的文件会保留。';
+
+  @override
+  String get workspaceMountInactive => '不可用，请重新选择文件夹';
+
+  @override
+  String get workspaceMountInvalidName =>
+      '名称最多 64 个字符，不能包含斜杠、冒号或控制字符，也不能为 . 或 ..。';
+
+  @override
+  String get workspaceMountDuplicate => '已存在同名挂载。';
+
+  @override
+  String get workspaceMountLimit => '最多挂载 10 个文件夹，请先卸载一个挂载。';
+
+  @override
+  String get workspaceMountOverlap => '此文件夹与已有挂载相同或互相包含。请选择其他文件夹，以避免权限冲突。';
+
+  @override
+  String get workspaceMountTargetOccupied =>
+      '/mounts 下的同名位置已有本地文件。请更换挂载名称，或先移走这些文件。原有文件未被删除。';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hans`).
@@ -20514,6 +20593,85 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get storageSessionFilesUnlinked => '未关联的会话';
+
+  @override
+  String get workspaceExternalMount => '挂载外部文件夹';
+
+  @override
+  String get workspaceExternalMountSubtitle =>
+      '所选文件夹挂载到 /mounts/<name>，供各工作区的 AI 工具、Shell 和文件浏览器访问。最多挂载 10 个文件夹。';
+
+  @override
+  String get workspaceExternalStorageTitle => '允许访问文件';
+
+  @override
+  String get workspaceExternalStorageMessage =>
+      '工作区和 Shell 需要直接读写外部文件夹，请在 Android 系统设置中允许 Kelivo 访问文件。Android 11 及以上需开启“所有文件访问权限”，然后选择要挂载的本地文件夹。';
+
+  @override
+  String get workspaceExternalGrantAccess => '前往授权';
+
+  @override
+  String get workspaceExternalLocalOnly =>
+      'Android 仅支持挂载本地文件夹，此文件提供方没有可供 Shell 访问的本地目录。';
+
+  @override
+  String get workspaceExternalUnavailable =>
+      '外部文件夹不可用。请检查存储连接和访问权限，重新选择文件夹以恢复访问。';
+
+  @override
+  String get workspaceExternalReconnect => '重新选择文件夹';
+
+  @override
+  String get workspaceMountAdd => '添加文件夹';
+
+  @override
+  String get workspaceMountEdit => '编辑挂载';
+
+  @override
+  String get workspaceMountEmpty => '尚未挂载文件夹';
+
+  @override
+  String get workspaceMountReadOnly => '只读';
+
+  @override
+  String get workspaceMountReadWrite => '读写';
+
+  @override
+  String get workspaceMountAllowWrite => '允许写入';
+
+  @override
+  String get workspaceMountPermissionsHint =>
+      '关闭后，AI 文件工具和文件浏览器会拒绝修改此文件夹。Shell 会检查部分常用文件命令，但任意脚本不保证受限。保存挂载变更时会停止正在运行的命令和终端会话。';
+
+  @override
+  String get workspaceMountBrowse => '浏览文件';
+
+  @override
+  String get workspaceMountUnmount => '卸载';
+
+  @override
+  String get workspaceMountUnmountMessage => '卸载此挂载？原文件夹及其中的文件会保留。';
+
+  @override
+  String get workspaceMountInactive => '不可用，请重新选择文件夹';
+
+  @override
+  String get workspaceMountInvalidName =>
+      '名称最多 64 个字符，不能包含斜杠、冒号或控制字符，也不能为 . 或 ..。';
+
+  @override
+  String get workspaceMountDuplicate => '已存在同名挂载。';
+
+  @override
+  String get workspaceMountLimit => '最多挂载 10 个文件夹，请先卸载一个挂载。';
+
+  @override
+  String get workspaceMountOverlap => '此文件夹与已有挂载相同或互相包含。请选择其他文件夹，以避免权限冲突。';
+
+  @override
+  String get workspaceMountTargetOccupied =>
+      '/mounts 下的同名位置已有本地文件。请更换挂载名称，或先移走这些文件。原有文件未被删除。';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hant`).
@@ -30809,4 +30967,83 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get storageSessionFilesUnlinked => '未關聯的對話';
+
+  @override
+  String get workspaceExternalMount => '掛載外部資料夾';
+
+  @override
+  String get workspaceExternalMountSubtitle =>
+      '所選資料夾掛載至 /mounts/<name>，供各工作區的 AI 工具、Shell 和檔案瀏覽器存取。最多掛載 10 個資料夾。';
+
+  @override
+  String get workspaceExternalStorageTitle => '允許存取檔案';
+
+  @override
+  String get workspaceExternalStorageMessage =>
+      '工作區和 Shell 需要直接讀寫外部資料夾，請在 Android 系統設定中允許 Kelivo 存取檔案。Android 11 及以上需開啟「所有檔案存取權限」，然後選擇要掛載的本機資料夾。';
+
+  @override
+  String get workspaceExternalGrantAccess => '前往授權';
+
+  @override
+  String get workspaceExternalLocalOnly =>
+      'Android 僅支援掛載本機資料夾，此檔案提供者沒有可供 Shell 存取的本機目錄。';
+
+  @override
+  String get workspaceExternalUnavailable =>
+      '外部資料夾無法使用。請檢查儲存裝置連線及存取權限，重新選擇資料夾以恢復存取。';
+
+  @override
+  String get workspaceExternalReconnect => '重新選擇資料夾';
+
+  @override
+  String get workspaceMountAdd => '新增資料夾';
+
+  @override
+  String get workspaceMountEdit => '編輯掛載';
+
+  @override
+  String get workspaceMountEmpty => '尚未掛載資料夾';
+
+  @override
+  String get workspaceMountReadOnly => '唯讀';
+
+  @override
+  String get workspaceMountReadWrite => '讀寫';
+
+  @override
+  String get workspaceMountAllowWrite => '允許寫入';
+
+  @override
+  String get workspaceMountPermissionsHint =>
+      '關閉後，AI 檔案工具和檔案瀏覽器會拒絕修改此資料夾。Shell 會檢查部分常用檔案命令，但任意腳本不保證受限。儲存掛載變更時會停止正在執行的命令和終端工作階段。';
+
+  @override
+  String get workspaceMountBrowse => '瀏覽檔案';
+
+  @override
+  String get workspaceMountUnmount => '卸載';
+
+  @override
+  String get workspaceMountUnmountMessage => '卸載此掛載？原資料夾及其中的檔案會保留。';
+
+  @override
+  String get workspaceMountInactive => '無法使用，請重新選擇資料夾';
+
+  @override
+  String get workspaceMountInvalidName =>
+      '名稱最多 64 個字元，不能包含斜線、冒號或控制字元，也不能為 . 或 ..。';
+
+  @override
+  String get workspaceMountDuplicate => '已存在同名掛載。';
+
+  @override
+  String get workspaceMountLimit => '最多掛載 10 個資料夾，請先卸載一個掛載。';
+
+  @override
+  String get workspaceMountOverlap => '此資料夾與已有掛載相同或互相包含。請選擇其他資料夾，以避免權限衝突。';
+
+  @override
+  String get workspaceMountTargetOccupied =>
+      '/mounts 下的同名位置已有本機檔案。請更換掛載名稱，或先移走這些檔案。原有檔案未被刪除。';
 }

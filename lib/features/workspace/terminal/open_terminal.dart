@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:path/path.dart' as p;
 import 'package:provider/provider.dart';
 
+import 'package:Kelivo/core/providers/external_mounts_provider.dart';
 import 'package:Kelivo/core/providers/workspace_provider.dart';
 import 'package:Kelivo/core/services/chat/chat_service.dart';
 import 'package:Kelivo/core/services/workspace/workspace_paths.dart';
@@ -32,6 +33,7 @@ Future<void> openTerminal(
   final workspaceProvider = context.read<WorkspaceProvider>();
   final chatService = context.read<ChatService>();
   final manager = context.read<TerminalSessionManager>();
+  final externalMounts = context.read<ExternalMountsProvider?>();
 
   final runtime = runtimeProvider.runtime;
   RuntimeStatus? status;
@@ -58,6 +60,7 @@ Future<void> openTerminal(
   final ctx = resolvedConversationId == null
       ? null
       : await WorkspaceToolsService.resolve(
+          externalMounts: externalMounts,
           conversationId: resolvedConversationId,
           workspaceProvider: workspaceProvider,
           runtimeProvider: runtimeProvider,
@@ -124,6 +127,7 @@ Future<void> openTerminal(
       workspaceHostRoot: hostRoot,
       sessionHostDir: scratch.path,
       skillsHostDir: skillsDir.path,
+      externalMounts: await externalMounts?.resolveMounts() ?? const [],
     );
     mounts = paths.mounts;
     cwd = paths.modelRoot;
@@ -141,6 +145,7 @@ Future<void> openTerminal(
       conversationId: boundConversationId,
       workspaceId: boundWorkspaceId,
       cwd: cwd,
+      mounts: mounts,
     );
     if (existing != null) {
       if (command != null && command.isNotEmpty) {

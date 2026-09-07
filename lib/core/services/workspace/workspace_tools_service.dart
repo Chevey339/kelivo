@@ -8,7 +8,9 @@ import '../../../features/home/services/tool_approval_service.dart';
 import '../../../utils/app_directories.dart';
 import '../../../utils/mcp_structured_image.dart';
 import '../../models/workspace_binding.dart';
+import '../../models/external_mount.dart';
 import '../../models/environment_variable.dart';
+import '../../providers/external_mounts_provider.dart';
 import '../../providers/workspace_provider.dart';
 import '../chat/chat_service.dart';
 import 'conversation_files.dart';
@@ -78,6 +80,7 @@ class WorkspaceToolsService {
     required WorkspaceProvider workspaceProvider,
     required WorkspaceRuntimeProvider runtimeProvider,
     required ChatService chatService,
+    ExternalMountsProvider? externalMounts,
   }) async {
     if (conversationId == null || conversationId.isEmpty) return null;
     try {
@@ -118,6 +121,8 @@ class WorkspaceToolsService {
             workspaceHostRoot: hostRoot,
             sessionHostDir: sessionDir.path,
             skillsHostDir: skillsDir.path,
+            externalMounts: await externalMounts?.resolveMounts() ?? const [],
+            loadExternalMounts: externalMounts?.resolveMounts,
           )
         : WorkspacePaths.native(
             workspaceHostRoot: hostRoot,
@@ -353,7 +358,24 @@ class WorkspaceToolsService {
       ..writeln('Path zones:')
       ..writeln('- $workspace — project files (writable)')
       ..writeln('- $chat — this chat\'s attachments/ and outputs/ (writable)')
-      ..writeln('- $skills — installed skills (read-only)')
+      ..writeln('- $skills — installed skills (read-only)');
+    if (paths.sandboxed) {
+      final source = defaultTargetPlatform == TargetPlatform.iOS
+          ? "from iOS Files (e.g. an Obsidian vault, Downloads, another app's iCloud container)"
+          : 'from Environment settings (on-device folders)';
+      final readOnly = paths.externalMounts
+          .where((mount) => mount.readOnly)
+          .map((mount) => mount.guest)
+          .join(', ');
+      buf.writeln(
+        '- ${ExternalMount.root}/<name>/ — user-mounted external folders '
+        '$source, shared across workspaces. '
+        'Names and availability vary: list ${ExternalMount.root}/ first for external/user files. '
+        'File tools reject writes to read-only mounts; respect this in Shell too.'
+        '${readOnly.isEmpty ? '' : ' Read-only: $readOnly.'}',
+      );
+    }
+    buf
       ..writeln('- $tmp — scratch (writable, ephemeral)')
       ..writeln('cwd: ${ctx.cwd}')
       ..writeln(
@@ -450,6 +472,7 @@ class WorkspaceToolsService {
       );
     }
     try {
+      await ctx.paths.refreshExternalMounts();
       switch (name) {
         case 'shell':
           return await _handleShell(
@@ -524,6 +547,7 @@ class WorkspaceToolsService {
         if (rel == null || rel.isEmpty) return null;
         return 'kelivo://skills/${KelivoLink.encodePath(rel)}';
       case WorkspaceZone.tmp:
+      case WorkspaceZone.external:
       case WorkspaceZone.outside:
         return null;
     }
@@ -1146,6 +1170,14 @@ class WorkspaceToolsService {
     ToolApprovalService? approvalService,
     String? conversationId,
   }) async {
+    if (ctx.paths.isReadOnlyPath(resolved.hostPath)) {
+      return _deniedResult(
+        tool: tool,
+        error: 'mount_readonly',
+        message: 'This external mount is read-only',
+        path: resolved.modelPath,
+      );
+    }
     if (resolved.zone == WorkspaceZone.skills) {
       return _deniedResult(
         tool: tool,
@@ -1329,11 +1361,12 @@ class WorkspaceToolsService {
 
   static List<String> _pathVocab(WorkspacePaths paths) {
     if (paths.sandboxed) {
-      return const [
+      return [
         WorkspacePaths.guestWorkspace,
         WorkspacePaths.guestChat,
         WorkspacePaths.guestSkills,
         WorkspacePaths.guestTmp,
+        ExternalMount.root,
       ];
     }
     return [

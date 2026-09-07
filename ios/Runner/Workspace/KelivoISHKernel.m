@@ -157,6 +157,7 @@ static int kelivo_pty_write(struct tty *tty, const void *buf, size_t len, bool b
     SCNetworkReachabilityRef _dnsReachability;
     dispatch_queue_t _spawnQueue;
     NSMutableDictionary<NSString *, NSString *> *_activeBinds;
+    NSMutableDictionary<NSString *, NSNumber *> *_readOnlyBinds;
     NSMutableDictionary<NSString *, KelivoISHPtySession *> *_ptyBySession;
     NSMutableDictionary<NSNumber *, KelivoISHPtySession *> *_ptyByPid;
     NSMutableDictionary<NSNumber *, KelivoISHPtySession *> *_ptyByTtyNum;
@@ -185,6 +186,7 @@ static int kelivo_pty_write(struct tty *tty, const void *buf, size_t len, bool b
         _isBooted = NO;
         _spawnQueue = dispatch_queue_create("psyche.kelivo.workspace.ish.spawn", DISPATCH_QUEUE_SERIAL);
         _activeBinds = [NSMutableDictionary dictionary];
+        _readOnlyBinds = [NSMutableDictionary dictionary];
         _ptyBySession = [NSMutableDictionary dictionary];
         _ptyByPid = [NSMutableDictionary dictionary];
         _ptyByTtyNum = [NSMutableDictionary dictionary];
@@ -243,7 +245,7 @@ static int kelivo_pty_write(struct tty *tty, const void *buf, size_t len, bool b
 
     [self createDeviceNodes];
     [self applyBundleOverlay];
-    [self ensureGuestDirs:@[@"/workspace", @"/chat", @"/skills"]];
+    [self ensureGuestDirs:@[@"/workspace", @"/chat", @"/skills", @"/mounts"]];
 
     do_mount(&procfs, "proc", "/proc", "", 0);
     do_mount(&devptsfs, "devpts", "/dev/pts", "", 0);
@@ -489,11 +491,16 @@ static void KelivoDnsReachabilityChanged(SCNetworkReachabilityRef target,
 
 #pragma mark - Bind mounts
 
-- (int)bindMountPath:(NSString *)linuxPath toHostPath:(NSString *)hostPath {
+- (int)bindMountPath:(NSString *)linuxPath toHostPath:(NSString *)hostPath readOnly:(BOOL)readOnly {
     if (!_isBooted) return -1;
+    // fakefs_bind_mount recursively removes its destination before binding.
+    // Only replace an empty placeholder or an existing mount symlink.
+    int targetError = KelivoISHValidateMountTarget(_dataPath, linuxPath);
+    if (targetError < 0) return targetError;
     NSFileManager *fm = [NSFileManager defaultManager];
     BOOL isDir = NO;
     if (![fm fileExistsAtPath:hostPath isDirectory:&isDir]) {
+        if ([linuxPath hasPrefix:@"/mounts/"]) return -ENOENT;
         NSError *error = nil;
         if (![fm createDirectoryAtPath:hostPath withIntermediateDirectories:YES attributes:nil error:&error]) {
             NSLog(@"KelivoISHKernel: host mkdir %@ failed: %@", hostPath, error);
@@ -507,12 +514,13 @@ static void KelivoDnsReachabilityChanged(SCNetworkReachabilityRef target,
     current = prev;
 
     int err = fakefs_bind_mount(linuxPath.fileSystemRepresentation,
-                                hostPath.fileSystemRepresentation, false);
+                                hostPath.fileSystemRepresentation, readOnly);
     if (err < 0) {
         NSLog(@"KelivoISHKernel: bindMount %@ -> %@ failed: %d", linuxPath, hostPath, err);
         return err;
     }
     _activeBinds[linuxPath] = hostPath;
+    _readOnlyBinds[linuxPath] = @(readOnly);
     return 0;
 }
 
@@ -520,24 +528,56 @@ static void KelivoDnsReachabilityChanged(SCNetworkReachabilityRef target,
     if (!_isBooted) return -1;
     int err = fakefs_bind_unmount(linuxPath.fileSystemRepresentation);
     [_activeBinds removeObjectForKey:linuxPath];
+    [_readOnlyBinds removeObjectForKey:linuxPath];
+    if (err == 0 && [linuxPath hasPrefix:@"/mounts/"]) {
+        struct task *prev = current;
+        current = pid_get_task(1);
+        generic_rmdirat(AT_PWD, linuxPath.fileSystemRepresentation);
+        current = prev;
+    }
     return err;
 }
 
-- (int)reconcileBinds:(NSArray<NSDictionary<NSString *, NSString *> *> *)binds {
+- (int)reconcileBinds:(NSArray<NSDictionary<NSString *, id> *> *)binds {
     if (!_isBooted) return -1;
-    for (NSDictionary<NSString *, NSString *> *bind in binds) {
+    for (NSDictionary<NSString *, id> *bind in binds) {
         NSString *host = bind[@"host"];
         NSString *guest = bind[@"guest"];
         if (host.length == 0 || guest.length == 0) continue;
         NSString *currentHost = _activeBinds[guest];
-        if ([currentHost isEqualToString:host]) continue;
+        BOOL readOnly = [bind[@"readOnly"] boolValue];
+        if ([currentHost isEqualToString:host] && [_readOnlyBinds[guest] boolValue] == readOnly) continue;
         if (currentHost != nil) {
             [self bindUnmountPath:guest];
         }
-        int err = [self bindMountPath:guest toHostPath:host];
+        int err = [self bindMountPath:guest toHostPath:host readOnly:readOnly];
         if (err < 0) return err;
     }
     return 0;
+}
+
+- (int)reconcileExternalBinds:(NSArray<NSDictionary<NSString *, id> *> *)binds {
+    if (!_isBooted) return 0;
+    // Check the whole snapshot before removing any existing bindings.
+    for (NSDictionary<NSString *, id> *bind in binds) {
+        int err = KelivoISHValidateMountTarget(_dataPath, bind[@"guest"]);
+        if (err < 0) return err;
+    }
+    NSSet *desired = [NSSet setWithArray:[binds valueForKey:@"guest"]];
+    for (NSString *guest in [_activeBinds.allKeys copy]) {
+        if ([guest hasPrefix:@"/mounts/"] && ![desired containsObject:guest]) {
+            int err = [self bindUnmountPath:guest];
+            if (err < 0) return err;
+        }
+    }
+    return [self reconcileBinds:binds];
+}
+
+- (void)ptyCloseAll {
+    [_ptyLock lock];
+    NSArray *sessions = [_ptyBySession.allKeys copy];
+    [_ptyLock unlock];
+    for (NSString *session in sessions) [self ptyCloseSession:session];
 }
 
 #pragma mark - PTY

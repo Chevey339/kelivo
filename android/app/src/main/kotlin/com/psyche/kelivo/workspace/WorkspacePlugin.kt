@@ -1,6 +1,7 @@
 package com.psyche.kelivo.workspace
 
 import android.app.Activity
+import android.content.Intent
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
@@ -23,6 +24,8 @@ class WorkspacePlugin(private val activity: Activity) {
     private val events = WorkspaceEvents()
     private val execRunner = ExecRunner(events)
     private val ptySessions = PtySessions(events)
+    private val directories = WorkspaceDirectoryAccess(activity)
+    private var externalMounts = emptyList<BindMount>()
 
     fun configure(messenger: BinaryMessenger) {
         EventChannel(messenger, EVENT_CHANNEL_NAME).setStreamHandler(events)
@@ -30,6 +33,26 @@ class WorkspacePlugin(private val activity: Activity) {
             try {
                 when (call.method) {
                     "probe" -> result.success(probe())
+                    "setExternalMounts" -> {
+                        val next = parseBinds(asMap(call.arguments)["mounts"])
+                        validateExternalMounts(next)
+                        if (next != externalMounts) {
+                            execRunner.cancelAll()
+                            ptySessions.closeAll()
+                            externalMounts = next
+                        }
+                        result.success(null)
+                    }
+                    "hasDirectoryStorageAccess" -> result.success(directories.hasStorageAccess())
+                    "requestDirectoryStorageAccess" -> directories.requestStorageAccess(result)
+                    "pickDirectory" -> directories.pick(result)
+                    "resolveDirectory" -> runAsync(result, "external_folder_unavailable") {
+                        directories.resolve(requiredString(asMap(call.arguments), "token"))
+                    }
+                    "releaseDirectory" -> runAsync(result) {
+                        directories.release(requiredString(asMap(call.arguments), "token"))
+                        null
+                    }
                     "exec" -> {
                         exec(asMap(call.arguments))
                         result.success(mapOf("started" to true))
@@ -73,10 +96,17 @@ class WorkspacePlugin(private val activity: Activity) {
     }
 
     fun dispose() {
+        directories.dispose()
         execRunner.cancelAll()
         ptySessions.closeAll()
         executor.shutdownNow()
     }
+
+    fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?): Boolean =
+        directories.onActivityResult(requestCode, resultCode, data)
+
+    fun onRequestPermissionsResult(requestCode: Int): Boolean =
+        directories.onRequestPermissionsResult(requestCode)
 
     private fun probe(): Map<String, Any?> {
         val nativeLibDir = File(activity.applicationInfo.nativeLibraryDir)
@@ -110,7 +140,7 @@ class WorkspacePlugin(private val activity: Activity) {
                 nativeLibDir = File(activity.applicationInfo.nativeLibraryDir),
                 rootfsDir = File(requiredString(args, "rootfsDir")),
                 tmpDir = File(requiredString(args, "tmpDir")),
-                binds = parseBinds(args["binds"]),
+                binds = commandBinds(args),
                 cwd = ProotCommand.validateGuestCwd(requiredString(args, "cwd")),
                 command = requiredString(args, "command"),
                 env = parseEnv(args["env"]),
@@ -125,7 +155,7 @@ class WorkspacePlugin(private val activity: Activity) {
             nativeLibDir = File(activity.applicationInfo.nativeLibraryDir),
             rootfsDir = File(requiredString(args, "rootfsDir")),
             tmpDir = File(requiredString(args, "tmpDir")),
-            binds = parseBinds(args["binds"]),
+            binds = commandBinds(args),
             cwd = ProotCommand.validateGuestCwd(requiredString(args, "cwd")),
             env = parseEnv(args["env"]),
             cols = number(args["cols"], 80L).toInt(),
@@ -211,13 +241,13 @@ class WorkspacePlugin(private val activity: Activity) {
         }
     }
 
-    private fun runAsync(result: MethodChannel.Result, block: () -> Any?) {
+    private fun runAsync(result: MethodChannel.Result, errorCode: String = "workspace", block: () -> Any?) {
         executor.execute {
             try {
                 val value = block()
                 mainHandler.post { result.success(value) }
             } catch (error: Exception) {
-                mainHandler.post { result.error("workspace", error.message, null) }
+                mainHandler.post { result.error(errorCode, error.message, null) }
             }
         }
     }
@@ -255,10 +285,29 @@ class WorkspacePlugin(private val activity: Activity) {
         val list = raw as? List<*> ?: return emptyList()
         return list.mapNotNull { item ->
             val map = item as? Map<*, *> ?: return@mapNotNull null
-            val host = map["host"]?.toString()?.trim().orEmpty()
-            val guest = map["guest"]?.toString()?.trim().orEmpty()
-            if (host.isEmpty() || guest.isEmpty()) return@mapNotNull null
-            BindMount(host, guest)
+            val host = map["host"]?.toString().orEmpty()
+            val guest = map["guest"]?.toString().orEmpty()
+            if (host.isBlank() || guest.isBlank()) return@mapNotNull null
+            BindMount(host, guest, map["readOnly"] == true)
         }
+    }
+
+    private fun commandBinds(args: Map<*, *>): List<BindMount> {
+        val rootfs = File(requiredString(args, "rootfsDir"))
+        val mountRoot = File(rootfs, "mounts")
+        require(mountRoot.canonicalPath.startsWith(rootfs.canonicalPath + "/"))
+        mountRoot.mkdirs()
+        val names = externalMounts.map { it.guest.substringAfterLast('/') }.toSet()
+        // Only remove empty placeholders left by renamed or detached mounts.
+        mountRoot.listFiles()?.filter { it.name !in names && it.isDirectory && it.list()?.isEmpty() == true }?.forEach { it.delete() }
+        for (mount in externalMounts) {
+            val target = File(mountRoot, mount.guest.substringAfterLast('/'))
+            require(target.canonicalFile.parentFile == mountRoot.canonicalFile)
+            target.mkdirs()
+        }
+        MountWriteGuards.install(rootfs, externalMounts)
+        return parseBinds(args["binds"]).filterNot {
+            it.guest.startsWith("/mounts/")
+        } + externalMounts
     }
 }

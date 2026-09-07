@@ -19322,6 +19322,150 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Unlinked conversation'**
   String get storageSessionFilesUnlinked;
+
+  /// No description provided for @workspaceExternalMount.
+  ///
+  /// In en, this message translates to:
+  /// **'Mount external folder'**
+  String get workspaceExternalMount;
+
+  /// No description provided for @workspaceExternalMountSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Selected folders are mounted at /mounts/<name> and shared across workspaces. AI tools, Shell and the file browser can access them. Up to 10 folders.'**
+  String get workspaceExternalMountSubtitle;
+
+  /// No description provided for @workspaceExternalStorageTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Allow file access'**
+  String get workspaceExternalStorageTitle;
+
+  /// No description provided for @workspaceExternalStorageMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'To read and write external folders in the workspace and Shell, allow Kelivo to manage files in Android settings. On Android 11 or later, enable All files access. Then select an on-device folder to mount.'**
+  String get workspaceExternalStorageMessage;
+
+  /// No description provided for @workspaceExternalGrantAccess.
+  ///
+  /// In en, this message translates to:
+  /// **'Grant access'**
+  String get workspaceExternalGrantAccess;
+
+  /// No description provided for @workspaceExternalLocalOnly.
+  ///
+  /// In en, this message translates to:
+  /// **'Android can mount on-device folders only. This document provider does not expose a local folder to Shell.'**
+  String get workspaceExternalLocalOnly;
+
+  /// No description provided for @workspaceExternalUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'The external folder is unavailable. Check its storage connection and permissions, then select the folder again to restore access.'**
+  String get workspaceExternalUnavailable;
+
+  /// No description provided for @workspaceExternalReconnect.
+  ///
+  /// In en, this message translates to:
+  /// **'Select folder again'**
+  String get workspaceExternalReconnect;
+
+  /// No description provided for @workspaceMountAdd.
+  ///
+  /// In en, this message translates to:
+  /// **'Add folder'**
+  String get workspaceMountAdd;
+
+  /// No description provided for @workspaceMountEdit.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit mount'**
+  String get workspaceMountEdit;
+
+  /// No description provided for @workspaceMountEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No mounted folders'**
+  String get workspaceMountEmpty;
+
+  /// No description provided for @workspaceMountReadOnly.
+  ///
+  /// In en, this message translates to:
+  /// **'Read-only'**
+  String get workspaceMountReadOnly;
+
+  /// No description provided for @workspaceMountReadWrite.
+  ///
+  /// In en, this message translates to:
+  /// **'Read-write'**
+  String get workspaceMountReadWrite;
+
+  /// No description provided for @workspaceMountAllowWrite.
+  ///
+  /// In en, this message translates to:
+  /// **'Allow writes'**
+  String get workspaceMountAllowWrite;
+
+  /// No description provided for @workspaceMountPermissionsHint.
+  ///
+  /// In en, this message translates to:
+  /// **'AI file tools and the file browser respect this setting. Shell guards cover common file commands; arbitrary scripts may bypass them. Saving mount changes stops running commands and terminal sessions.'**
+  String get workspaceMountPermissionsHint;
+
+  /// No description provided for @workspaceMountBrowse.
+  ///
+  /// In en, this message translates to:
+  /// **'Browse files'**
+  String get workspaceMountBrowse;
+
+  /// No description provided for @workspaceMountUnmount.
+  ///
+  /// In en, this message translates to:
+  /// **'Unmount'**
+  String get workspaceMountUnmount;
+
+  /// No description provided for @workspaceMountUnmountMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove this mount? The original folder and its files will be kept.'**
+  String get workspaceMountUnmountMessage;
+
+  /// No description provided for @workspaceMountInactive.
+  ///
+  /// In en, this message translates to:
+  /// **'Unavailable — select the folder again'**
+  String get workspaceMountInactive;
+
+  /// No description provided for @workspaceMountInvalidName.
+  ///
+  /// In en, this message translates to:
+  /// **'Use a name of up to 64 characters without slashes, colons or control characters. Do not use . or ..'**
+  String get workspaceMountInvalidName;
+
+  /// No description provided for @workspaceMountDuplicate.
+  ///
+  /// In en, this message translates to:
+  /// **'A mount with this name already exists.'**
+  String get workspaceMountDuplicate;
+
+  /// No description provided for @workspaceMountLimit.
+  ///
+  /// In en, this message translates to:
+  /// **'Up to 10 folders can be mounted. Remove a mount before adding another.'**
+  String get workspaceMountLimit;
+
+  /// No description provided for @workspaceMountOverlap.
+  ///
+  /// In en, this message translates to:
+  /// **'This folder overlaps an existing mount. Choose a different folder so permissions remain unambiguous.'**
+  String get workspaceMountOverlap;
+
+  /// No description provided for @workspaceMountTargetOccupied.
+  ///
+  /// In en, this message translates to:
+  /// **'A mount target under /mounts already contains local files. Choose a different mount name or move those files first. No files were removed.'**
+  String get workspaceMountTargetOccupied;
 }
 
 class _AppLocalizationsDelegate
