@@ -1,6 +1,18 @@
 import Cocoa
 import FlutterMacOS
 
+private class TitleBarInteractionView: NSView {
+  override var mouseDownCanMoveWindow: Bool { true }
+
+  override func mouseDown(with event: NSEvent) {
+    if event.clickCount >= 2 {
+      window?.performZoom(nil)
+      return
+    }
+    super.mouseDown(with: event)
+  }
+}
+
 class MainFlutterWindow: NSWindow {
   // Use Cocoa autosave to persist and restore window frame precisely on macOS.
   private let autosaveName = NSWindow.FrameAutosaveName("KelivoMainWindowFrame")
@@ -89,9 +101,12 @@ class MainFlutterWindow: NSWindow {
 
     // Add a transparent accessory view to reserve 40pt height in the title bar
     let customToolbar = NSTitlebarAccessoryViewController()
-    let newView = NSView()
-    newView.frame = NSRect(origin: CGPoint(), size: CGSize(width: 0, height: 40))
+    let newView = TitleBarInteractionView()
+    newView.frame = NSRect(origin: .zero, size: NSSize(width: 100, height: 40))
     customToolbar.view = newView
+    if #available(macOS 11.0, *) {
+      customToolbar.layoutAttribute = .right
+    }
     self.addTitlebarAccessoryViewController(customToolbar)
   }
 
