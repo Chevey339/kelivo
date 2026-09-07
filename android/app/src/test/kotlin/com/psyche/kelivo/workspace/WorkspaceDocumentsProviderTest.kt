@@ -1,6 +1,7 @@
 package com.psyche.kelivo.workspace
 
 import android.content.Context
+import android.content.Intent
 import android.content.pm.ProviderInfo
 import android.database.ContentObserver
 import android.database.Cursor
@@ -11,6 +12,7 @@ import android.os.Looper
 import android.os.OperationCanceledException
 import android.os.ParcelFileDescriptor
 import android.provider.DocumentsContract.Document
+import android.provider.DocumentsContract
 import android.provider.DocumentsContract.Root
 import android.system.Os
 import org.json.JSONObject
@@ -22,6 +24,8 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
 import org.robolectric.Shadows.shadowOf
+import org.robolectric.shadows.ShadowContentResolver
+import com.psyche.kelivo.IncomingShareHandler
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.Implementation
 import org.robolectric.annotation.Implements
@@ -75,6 +79,35 @@ class WorkspaceDocumentsProviderTest {
         val values = mutableListOf<String>()
         while (moveToNext()) values += getString(getColumnIndexOrThrow(column))
         values
+    }
+
+    @Test
+    @Config(shadows = [DocumentDescriptorOsShadow::class])
+    fun workspaceDocumentsCanStillBeImportedThroughTheShareReceiver() {
+        val context = RuntimeEnvironment.getApplication()
+        val source = File(workspace(), "hello.txt").apply { writeText("workspace attachment") }
+        DocumentDescriptorOsShadow.openedPath = source.path
+        val authority = context.packageName + ".workspace.documents"
+        val info = ProviderInfo().apply {
+            this.authority = authority
+            packageName = context.packageName
+            applicationInfo = context.applicationInfo
+            name = WorkspaceDocumentsProvider::class.java.name
+            exported = true
+        }
+        shadowOf(context.packageManager).addOrUpdateProvider(info)
+        ShadowContentResolver.registerProviderInternal(authority, provider)
+        val uri = DocumentsContract.buildDocumentUri(authority, "workspace/one/hello.txt")
+        val intent = Intent(Intent.ACTION_SEND).putExtra(Intent.EXTRA_STREAM, uri)
+        val output = File(context.cacheDir, "workspace-share-copy")
+        try {
+            val payload = IncomingShareHandler.copyShare(context, intent, output, "test")
+            assertEquals(0, payload.getInt("failedFiles"))
+            val copied = payload.getJSONArray("files").getJSONObject(0).getString("path")
+            assertEquals("workspace attachment", File(copied).readText())
+        } finally {
+            output.deleteRecursively()
+        }
     }
 
     private fun children(id: String = WorkspaceDocumentPaths.ROOT): Cursor =

@@ -10258,6 +10258,42 @@ class AppLocalizationsZh extends AppLocalizations {
   String get workspaceEnvVariablesSaveFailed => '环境设置保存失败，请重试。';
 
   @override
+  String get incomingShareTitle => '接收分享';
+
+  @override
+  String get incomingShareReplaceDraft => '输入框中有尚未发送的内容。是否替换为分享的内容，并开始新对话？';
+
+  @override
+  String get incomingShareFailed =>
+      '部分分享内容未能导入，请检查文件访问权限和可用存储空间。一次最多分享 32 个文件。';
+
+  @override
+  String get incomingShareImporting => '正在导入';
+
+  @override
+  String get incomingShareMoveTo => '移动到…';
+
+  @override
+  String get incomingShareNewChat => '新对话';
+
+  @override
+  String get incomingShareMoveHint => '将草稿和附件移到其他对话，内容不会自动发送。';
+
+  @override
+  String get incomingShareNoConversations => '没有匹配的对话';
+
+  @override
+  String get chatInputBarRemoveAttachment => '移除附件';
+
+  @override
+  String get incomingShareMoveFailed => '无法切换对话，草稿已保留。';
+
+  @override
+  String attachmentRequiresWorkspace(String name) {
+    return '「$name」无法在普通对话中直接读取。请绑定工作区并启用文件工具，或将草稿移到已有工作区的对话。';
+  }
+
+  @override
   String get storageSessionFilesUnlinked => '未关联的会话';
 }
 
@@ -20439,6 +20475,42 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get workspaceEnvVariablesSaveFailed => '环境设置保存失败，请重试。';
+
+  @override
+  String get incomingShareTitle => '接收分享';
+
+  @override
+  String get incomingShareReplaceDraft => '输入框中有尚未发送的内容。是否替换为分享的内容，并开始新对话？';
+
+  @override
+  String get incomingShareFailed =>
+      '部分分享内容未能导入，请检查文件访问权限和可用存储空间。一次最多分享 32 个文件。';
+
+  @override
+  String get incomingShareImporting => '正在导入';
+
+  @override
+  String get incomingShareMoveTo => '移动到…';
+
+  @override
+  String get incomingShareNewChat => '新对话';
+
+  @override
+  String get incomingShareMoveHint => '将草稿和附件移到其他对话，内容不会自动发送。';
+
+  @override
+  String get incomingShareNoConversations => '没有匹配的对话';
+
+  @override
+  String get chatInputBarRemoveAttachment => '移除附件';
+
+  @override
+  String get incomingShareMoveFailed => '无法切换对话，草稿已保留。';
+
+  @override
+  String attachmentRequiresWorkspace(String name) {
+    return '「$name」无法在普通对话中直接读取。请绑定工作区并启用文件工具，或将草稿移到已有工作区的对话。';
+  }
 
   @override
   String get storageSessionFilesUnlinked => '未关联的会话';
@@ -30698,6 +30770,42 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get workspaceEnvVariablesSaveFailed => '環境設定儲存失敗，請重試。';
+
+  @override
+  String get incomingShareTitle => '接收分享';
+
+  @override
+  String get incomingShareReplaceDraft => '輸入框中有尚未傳送的內容。是否替換為分享的內容，並開始新對話？';
+
+  @override
+  String get incomingShareFailed =>
+      '部分分享內容未能匯入，請檢查檔案存取權限和可用儲存空間。一次最多分享 32 個檔案。';
+
+  @override
+  String get incomingShareImporting => '正在匯入';
+
+  @override
+  String get incomingShareMoveTo => '移動到…';
+
+  @override
+  String get incomingShareNewChat => '新對話';
+
+  @override
+  String get incomingShareMoveHint => '將草稿和附件移到其他對話，內容不會自動傳送。';
+
+  @override
+  String get incomingShareNoConversations => '沒有符合的對話';
+
+  @override
+  String get chatInputBarRemoveAttachment => '移除附件';
+
+  @override
+  String get incomingShareMoveFailed => '無法切換對話，草稿已保留。';
+
+  @override
+  String attachmentRequiresWorkspace(String name) {
+    return '「$name」無法在一般對話中直接讀取。請綁定工作區並啟用檔案工具，或將草稿移到已有工作區的對話。';
+  }
 
   @override
   String get storageSessionFilesUnlinked => '未關聯的對話';

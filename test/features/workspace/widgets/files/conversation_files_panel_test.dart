@@ -3,6 +3,8 @@ import 'dart:io';
 import 'package:Kelivo/core/database/app_database.dart';
 import 'package:Kelivo/core/database/extension_entity_store.dart';
 import 'package:Kelivo/core/models/conversation.dart';
+import 'package:Kelivo/core/models/chat_message.dart';
+import 'package:Kelivo/core/models/message_part.dart';
 import 'package:Kelivo/core/models/workspace_binding.dart';
 import 'package:Kelivo/core/providers/settings_provider.dart';
 import 'package:Kelivo/core/providers/workspace_provider.dart';
@@ -41,9 +43,21 @@ class _FakePathProviderPlatform extends PathProviderPlatform {
 }
 
 class _FakeChatService extends ChatService {
-  _FakeChatService(this.conversation);
+  _FakeChatService(this.conversation, [this.messages = const []]);
 
   final Conversation? conversation;
+  final List<ChatMessage> messages;
+
+  @override
+  int getMessageCount(String conversationId) => messages.length;
+
+  @override
+  Future<List<ChatMessage>> loadMessagesRange(
+    String conversationId, {
+    required int start,
+    required int limit,
+    bool cacheInTimeline = true,
+  }) async => messages.skip(start).take(limit).toList();
 
   @override
   String? get currentConversationId => conversation?.id;
@@ -105,6 +119,7 @@ void main() {
     required Conversation? conversation,
     required String conversationId,
     ConversationFilesTab initialTab = ConversationFilesTab.attachments,
+    List<ChatMessage> messages = const [],
   }) {
     return MultiProvider(
       providers: [
@@ -112,7 +127,7 @@ void main() {
           create: (_) => SettingsProvider(createBusinessTestPreferences()),
         ),
         ChangeNotifierProvider<ChatService>.value(
-          value: _FakeChatService(conversation),
+          value: _FakeChatService(conversation, messages),
         ),
         ChangeNotifierProvider<WorkspaceProvider>.value(value: workspaces),
       ],
@@ -212,6 +227,55 @@ void main() {
     expect(find.byKey(ConversationFilesPanel.unboundHintKey), findsNothing);
     expect(find.byKey(FileBrowser.itemKey('readme.md')), findsOneWidget);
   });
+
+  testWidgets(
+    'opening attachments syncs pre-binding files and skips deleted history',
+    (tester) async {
+      const id = 'bound-after-send';
+      late String workspaceId;
+      final source = File(p.join(tempDir.path, '项目.zip'))
+        ..writeAsBytesSync([80, 75, 0, 1]);
+      await tester.runAsync(() async {
+        workspaceId = (await workspaces.create(name: 'Work')).id;
+      });
+      await tester.pumpWidget(
+        harness(
+          conversation: Conversation(
+            id: id,
+            title: 'Chat',
+            extras: {WorkspaceBinding.keyId: workspaceId},
+          ),
+          conversationId: id,
+          messages: [
+            ChatMessage(
+              role: 'user',
+              conversationId: id,
+              parts: [
+                FilePart(
+                  uri: p.join(tempDir.path, 'deleted.pdf'),
+                  name: 'deleted.pdf',
+                ),
+              ],
+            ),
+            ChatMessage(
+              role: 'user',
+              conversationId: id,
+              parts: [FilePart(uri: source.path, name: '项目.zip')],
+            ),
+          ],
+        ),
+      );
+      await _awaitPanel(tester);
+      expect(find.byKey(FileBrowser.itemKey('项目.zip')), findsOneWidget);
+      final session = await tester.runAsync(
+        () => AppDirectories.sessionDir(id),
+      );
+      expect(
+        File(p.join(session!.path, 'attachments', '项目.zip')).readAsBytesSync(),
+        [80, 75, 0, 1],
+      );
+    },
+  );
 
   testWidgets('initialTab opens the workspace tab', (tester) async {
     const conversationId = 'conv-initial-tab';

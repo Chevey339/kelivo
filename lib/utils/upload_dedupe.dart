@@ -25,10 +25,24 @@ class UploadDedupe {
   /// a freshly created path, so a name that gets deleted and later reused does
   /// not inherit a stale mark.
   static final Set<String> _shared = <String>{};
+  static final Set<String> _deleting = <String>{};
 
   /// Whether anything besides its creator may be pointing at [path]. A caller
   /// that wants to clean up its own copy has to leave shared files alone.
   static bool isShared(String path) => _shared.contains(_key(path));
+
+  /// Removes an unclaimed upload without racing a new dedupe reader. The
+  /// deletion claim and readers' shared marks happen before any await.
+  static Future<void> deleteIfUnshared(String path) async {
+    final key = _key(path);
+    if (_shared.contains(key) || !_deleting.add(key)) return;
+    try {
+      final file = File(path);
+      if (await file.exists()) await file.delete();
+    } finally {
+      _deleting.remove(key);
+    }
+  }
 
   /// Returns the path of a stored file that carries exactly [bytes] and was
   /// saved under [fileName] (or a versioned variant such as "notes(1).txt"),
@@ -110,6 +124,7 @@ class UploadDedupe {
     List<int> digest,
   ) async {
     for (final candidate in candidates) {
+      if (_deleting.contains(_key(candidate.path))) continue;
       // Marked before the read, not after: a concurrent import must not delete
       // this file out from under the stream we are about to open.
       _shared.add(_key(candidate.path));

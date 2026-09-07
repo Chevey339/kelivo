@@ -1,0 +1,8 @@
+"saveDraft" = "Save Draft";
+"saved" = "Saved to Kelivo";
+"savedMessage" = "Open Kelivo to review and send this draft.";
+"partialMessage" = "Some files could not be saved. Open Kelivo to review the content that was received.";
+"done" = "Done";
+"failed" = "Could not save";
+"failedMessage" = "Check that the files are available and there is enough storage, then try again. Up to 32 files are supported.";
+"importing" = "Importing";

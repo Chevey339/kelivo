@@ -5,6 +5,7 @@ import android.content.ActivityNotFoundException
 import android.net.Uri
 import android.content.Intent
 import android.os.Build
+import android.os.Bundle
 import android.os.ParcelFileDescriptor
 import android.os.StatFs
 import android.provider.DocumentsContract
@@ -53,6 +54,19 @@ class MainActivity : FlutterActivity() {
      private val writableFileExecutor = Executors.newSingleThreadExecutor()
      private var deviceLocalToolsHandler: DeviceLocalToolsHandler? = null
      private var workspacePlugin: WorkspacePlugin? = null
+    private var incomingShareHandler: IncomingShareHandler? = null
+    private var receivedShare = false
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        receivedShare = savedInstanceState?.getBoolean("kelivo.receivedShare") == true
+        if (!receivedShare) receivedShare = incomingShareHandler?.receive(intent) == true
+    }
+
+    override fun onSaveInstanceState(outState: Bundle) {
+        outState.putBoolean("kelivo.receivedShare", receivedShare)
+        super.onSaveInstanceState(outState)
+    }
 
     override fun onFlutterSurfaceViewCreated(flutterSurfaceView: FlutterSurfaceView) {
         super.onFlutterSurfaceViewCreated(flutterSurfaceView)
@@ -79,6 +93,7 @@ class MainActivity : FlutterActivity() {
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
          super.configureFlutterEngine(flutterEngine)
+        incomingShareHandler = IncomingShareHandler(this, flutterEngine.dartExecutor.binaryMessenger)
          McpOAuthHandler.configure(this, flutterEngine.dartExecutor.binaryMessenger)
          deviceLocalToolsHandler = DeviceLocalToolsHandler(this).also {
              it.configure(flutterEngine.dartExecutor.binaryMessenger)
@@ -170,6 +185,7 @@ class MainActivity : FlutterActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
+        receivedShare = incomingShareHandler?.receive(intent) == true
         val text = extractProcessText(intent) ?: return
         val ch = processTextChannel
         if (ch != null) {
@@ -193,6 +209,7 @@ class MainActivity : FlutterActivity() {
             }
         }
         writableFileExecutor.shutdown()
+        incomingShareHandler?.dispose()
         workspacePlugin?.dispose()
         super.onDestroy()
     }

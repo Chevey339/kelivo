@@ -10721,5 +10721,44 @@ class AppLocalizationsEn extends AppLocalizations {
       'Could not save the environment settings. Please try again.';
 
   @override
+  String get incomingShareTitle => 'Shared content';
+
+  @override
+  String get incomingShareReplaceDraft =>
+      'There is unsent content in the input box. Replace it with the shared content in a new chat?';
+
+  @override
+  String get incomingShareFailed =>
+      'Some shared content could not be imported. Check file access and available storage. Up to 32 files can be shared at once.';
+
+  @override
+  String get incomingShareImporting => 'Importing';
+
+  @override
+  String get incomingShareMoveTo => 'Move to…';
+
+  @override
+  String get incomingShareNewChat => 'New conversation';
+
+  @override
+  String get incomingShareMoveHint =>
+      'Move this draft and its attachments to another conversation. Nothing will be sent automatically.';
+
+  @override
+  String get incomingShareNoConversations => 'No matching conversations';
+
+  @override
+  String get chatInputBarRemoveAttachment => 'Remove attachment';
+
+  @override
+  String get incomingShareMoveFailed =>
+      'Could not switch conversations. Your draft has been kept.';
+
+  @override
+  String attachmentRequiresWorkspace(String name) {
+    return 'To use “$name”, bind a workspace and enable file tools, or move this draft to a conversation with a workspace. This file cannot be read directly in a regular chat.';
+  }
+
+  @override
   String get storageSessionFilesUnlinked => 'Unlinked conversation';
 }

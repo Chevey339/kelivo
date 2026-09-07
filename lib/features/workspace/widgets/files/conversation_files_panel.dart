@@ -6,6 +6,8 @@ import 'package:Kelivo/core/models/workspace_binding.dart';
 import 'package:Kelivo/core/providers/workspace_provider.dart';
 import 'package:Kelivo/core/services/chat/chat_service.dart';
 import 'package:Kelivo/core/services/workspace/workspace_binding_actions.dart';
+import 'package:Kelivo/core/services/workspace/workspace_runtime.dart';
+import 'package:Kelivo/core/services/workspace/workspace_tools_service.dart';
 import 'package:Kelivo/core/services/haptics.dart';
 import 'package:Kelivo/features/settings/widgets/custom_theme_widgets.dart';
 import 'package:Kelivo/features/workspace/widgets/files/file_browser.dart';
@@ -102,6 +104,7 @@ class ConversationFilesPanel extends StatefulWidget {
 class ConversationFilesPanelState extends State<ConversationFilesPanel> {
   late int _index;
   Directory? _attachments;
+  int _loadSerial = 0;
   Directory? _outputs;
   Directory? _workspaceRoot;
   Workspace? _workspace;
@@ -143,14 +146,19 @@ class ConversationFilesPanelState extends State<ConversationFilesPanel> {
 
   @visibleForTesting
   Future<void> load() async {
+    final serial = ++_loadSerial;
+    final conversationId = widget.conversationId;
     try {
       final chat = context.read<ChatService>();
       final provider = context.read<WorkspaceProvider>();
-      final session = await AppDirectories.sessionDir(widget.conversationId);
-      if (!mounted) return;
+      final runtime =
+          context.read<WorkspaceRuntimeProvider?>() ??
+          WorkspaceRuntimeProvider();
+      final session = await AppDirectories.sessionDir(conversationId);
+      if (!mounted || serial != _loadSerial) return;
       final attachments = Directory('${session.path}/attachments');
       final outputs = Directory('${session.path}/outputs');
-      final conversation = chat.getConversation(widget.conversationId);
+      final conversation = chat.getConversation(conversationId);
       final binding = WorkspaceBinding.fromExtras(
         conversation?.extras ?? const <String, dynamic>{},
       );
@@ -161,9 +169,30 @@ class ConversationFilesPanelState extends State<ConversationFilesPanel> {
         if (workspace != null) {
           final host = await provider.hostRootFor(workspace);
           workspaceRoot = Directory(host);
+          // Also populate attachments for conversations bound after sending,
+          // without requiring the user to make another model request.
+          final tools = await WorkspaceToolsService.resolve(
+            conversationId: conversationId,
+            workspaceProvider: provider,
+            runtimeProvider: runtime,
+            chatService: chat,
+          );
+          if (tools != null) {
+            final count = chat.getMessageCount(conversationId);
+            for (var start = 0; start < count; start += 100) {
+              if (!mounted || serial != _loadSerial) return;
+              final messages = await chat.loadMessagesRange(
+                conversationId,
+                start: start,
+                limit: 100,
+                cacheInTimeline: false,
+              );
+              await syncAttachments(tools, messages);
+            }
+          }
         }
       }
-      if (!mounted) return;
+      if (!mounted || serial != _loadSerial) return;
       setState(() {
         _attachments = attachments;
         _outputs = outputs;
@@ -174,7 +203,7 @@ class ConversationFilesPanelState extends State<ConversationFilesPanel> {
         _loaded = true;
       });
     } catch (e) {
-      if (!mounted) return;
+      if (!mounted || serial != _loadSerial) return;
       setState(() {
         _error = e;
         _loaded = true;

@@ -1746,6 +1746,7 @@ class ChatService extends ChangeNotifier {
     String conversationId, {
     required int start,
     required int limit,
+    bool cacheInTimeline = true,
   }) async {
     if (!_initialized || limit <= 0) return const <ChatMessage>[];
 
@@ -1770,8 +1771,10 @@ class ChatService extends ChangeNotifier {
       start: start,
       limit: limit,
     );
-    _cacheLoadedMessages(conversationId, messages);
-    await _cacheMessageArtifacts(messages);
+    if (cacheInTimeline) {
+      _cacheLoadedMessages(conversationId, messages);
+      await _cacheMessageArtifacts(messages);
+    }
     return messages;
   }
 

@@ -12,6 +12,8 @@ import '../../../core/services/api/builtin_tools.dart';
 import '../../../core/services/api/chat_api_service.dart';
 import '../../../core/providers/workspace_provider.dart';
 import '../../../core/services/chat/chat_service.dart';
+import '../../../core/services/chat/document_text_extractor.dart';
+import '../../../l10n/app_localizations.dart';
 import '../../../core/services/logging/context_logger.dart';
 import '../../../core/services/skills/skills_service.dart';
 import '../../../core/services/workspace/workspace_runtime.dart';
@@ -281,6 +283,18 @@ class MessageGenerationService {
       modelId: modelId,
       clientTools: toolDefs,
     );
+    final hasWorkspaceFileTools =
+        workspaceContext != null &&
+        !workspaceContext.skillsOnly &&
+        toolDefs.any((tool) {
+          final name = (tool['function'] as Map?)?['name'];
+          return (name == 'read_file' || name == 'shell') &&
+              workspaceContext!.workspace.isToolEnabled(name as String);
+        });
+    final localAttachments = <String, AttachmentInfo>{
+      if (hasWorkspaceFileTools)
+        for (final file in workspaceAttachments) file.sourceUri: file,
+    };
     final indicatorMessageId =
         processingMessageId != null &&
             messageBuilderService.hasPendingAttachmentWork(
@@ -289,6 +303,7 @@ class MessageGenerationService {
               conversation: currentConversation,
               sourceMessages: messages,
               sandboxDataFiles: sandboxDataFiles,
+              workspaceAttachments: localAttachments,
             )
         ? processingMessageId
         : null;
@@ -305,7 +320,16 @@ class MessageGenerationService {
             conversation: currentConversation,
             sourceMessages: messages,
             sandboxDataFiles: sandboxDataFiles,
+            workspaceAttachments: localAttachments,
           );
+    } on AttachmentRequiresWorkspace catch (e) {
+      if (!contextProvider.mounted) rethrow;
+      throw Exception(
+        AppLocalizations.of(
+              contextProvider,
+            )?.attachmentRequiresWorkspace(e.name) ??
+            e.toString(),
+      );
     } finally {
       if (indicatorMessageId != null) {
         onFileProcessingFinished?.call(indicatorMessageId);

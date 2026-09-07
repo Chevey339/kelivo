@@ -36,6 +36,13 @@
 		97C146FC1CF9000F007C117D /* Main.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 97C146FA1CF9000F007C117D /* Main.storyboard */; };
 		97C146FE1CF9000F007C117D /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 97C146FD1CF9000F007C117D /* Assets.xcassets */; };
 		97C147011CF9000F007C117D /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 97C146FF1CF9000F007C117D /* LaunchScreen.storyboard */; };
+		0D9F2113B38E5FFDD32D78D0 /* IncomingShareInbox.swift in Sources */ = {isa = PBXBuildFile; fileRef = 32AC1D1DB20EDFFCA1CD8D02 /* IncomingShareInbox.swift */; };
+		0F3AE53ED4C34C5A0D5B4EA5 /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 04335196CAB80860F8B0B1AB /* Foundation.framework */; };
+		1050AF28EF974F7205A3DFE3 /* IosIncomingShareHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = 55B47EEF2D64627B41D9B1BA /* IosIncomingShareHandler.swift */; };
+		478EE76A47FFCC51A736ECBD /* ShareViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = F26A26A905D84B280A4FAE80 /* ShareViewController.swift */; };
+		82816D88DA05AE704751053C /* IncomingShareInbox.swift in Sources */ = {isa = PBXBuildFile; fileRef = 32AC1D1DB20EDFFCA1CD8D02 /* IncomingShareInbox.swift */; };
+		8DCAD2D7AB85164F01BA9CA9 /* ShareExtension.appex in Embed App Extensions */ = {isa = PBXBuildFile; fileRef = 0495245F03CA1F742DAD1950 /* ShareExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		A4542529DC8187D43E5FB488 /* Localizable.strings in Resources */ = {isa = PBXBuildFile; fileRef = 7CDA787C43D9F507E7690744 /* Localizable.strings */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -53,6 +60,13 @@
 			remoteGlobalIDString = 97C146ED1CF9000F007C117D;
 			remoteInfo = Runner;
 		};
+		EDF13361E6AF333E182FE033 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 97C146E61CF9000F007C117D /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 5D77F8F7B311DF23353EE6FB;
+			remoteInfo = ShareExtension;
+		};
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXCopyFilesBuildPhase section */
@@ -63,6 +77,7 @@
 			dstSubfolderSpec = 13;
 			files = (
 				A10000000000000000000004 /* GenerationActivityExtension.appex in Embed App Extensions */,
+				8DCAD2D7AB85164F01BA9CA9 /* ShareExtension.appex in Embed App Extensions */,
 			);
 			name = "Embed App Extensions";
 			runOnlyForDeploymentPostprocessing = 0;
@@ -136,6 +151,16 @@
 		97C147021CF9000F007C117D /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		A0FC04191A5EC777C16F7895 /* Pods-Runner.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-Runner.debug.xcconfig"; path = "Target Support Files/Pods-Runner/Pods-Runner.debug.xcconfig"; sourceTree = "<group>"; };
 		C7611D570BED92819FE5AADD /* Pods_Runner.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = Pods_Runner.framework; sourceTree = BUILT_PRODUCTS_DIR; };
+		04335196CAB80860F8B0B1AB /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS18.0.sdk/System/Library/Frameworks/Foundation.framework; sourceTree = DEVELOPER_DIR; };
+		0495245F03CA1F742DAD1950 /* ShareExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = ShareExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		31790E2C03AF99B98A3F05B1 /* en */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.strings; name = en; path = en.lproj/Localizable.strings; sourceTree = "<group>"; };
+		32AC1D1DB20EDFFCA1CD8D02 /* IncomingShareInbox.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = IncomingShareInbox.swift; sourceTree = "<group>"; };
+		55B47EEF2D64627B41D9B1BA /* IosIncomingShareHandler.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = IosIncomingShareHandler.swift; sourceTree = "<group>"; };
+		6ECC4D7E49DE76801658ECA7 /* zh-Hant */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.strings; name = "zh-Hant"; path = "zh-Hant.lproj/Localizable.strings"; sourceTree = "<group>"; };
+		94A24F1C708902710CB67D29 /* Info.plist */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		E8BA2B1C4CC48439D40A61EF /* ShareExtension.entitlements */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.entitlements; path = ShareExtension.entitlements; sourceTree = "<group>"; };
+		F26A26A905D84B280A4FAE80 /* ShareViewController.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ShareViewController.swift; sourceTree = "<group>"; };
+		F91265C744C63BBCFA99BC1C /* zh-Hans */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.strings; name = "zh-Hans"; path = "zh-Hans.lproj/Localizable.strings"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -163,6 +188,14 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		3C7BE9764F9D913A3F4A4A63 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				0F3AE53ED4C34C5A0D5B4EA5 /* Foundation.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -172,6 +205,7 @@
 				A2DT00000000000000000032 /* HealthKit.framework */,
 				C7611D570BED92819FE5AADD /* Pods_Runner.framework */,
 				916AC80231ED78D192677E69 /* Pods_RunnerTests.framework */,
+				6A42D8FF3EFBE7251AEFEC44 /* iOS */,
 			);
 			name = Frameworks;
 			sourceTree = "<group>";
@@ -205,6 +239,8 @@
 				331C8082294A63A400263BE5 /* RunnerTests */,
 				CB99E8CD1E59B0861193D1F0 /* Pods */,
 				2EE6D5FD27723C6C9804D147 /* Frameworks */,
+				BA8BE8A40AC544D84FF92C67 /* IncomingShare */,
+				8566581D0EE5A7CDF6B18251 /* ShareExtension */,
 			);
 			sourceTree = "<group>";
 		};
@@ -214,6 +250,7 @@
 				97C146EE1CF9000F007C117D /* Runner.app */,
 				331C8081294A63A400263BE5 /* RunnerTests.xctest */,
 				A10000000000000000000013 /* GenerationActivityExtension.appex */,
+				0495245F03CA1F742DAD1950 /* ShareExtension.appex */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -294,6 +331,36 @@
 			path = Pods;
 			sourceTree = "<group>";
 		};
+		6A42D8FF3EFBE7251AEFEC44 /* iOS */ = {
+			isa = PBXGroup;
+			children = (
+				04335196CAB80860F8B0B1AB /* Foundation.framework */,
+			);
+			name = iOS;
+			sourceTree = "<group>";
+		};
+		8566581D0EE5A7CDF6B18251 /* ShareExtension */ = {
+			isa = PBXGroup;
+			children = (
+				F26A26A905D84B280A4FAE80 /* ShareViewController.swift */,
+				94A24F1C708902710CB67D29 /* Info.plist */,
+				E8BA2B1C4CC48439D40A61EF /* ShareExtension.entitlements */,
+				7CDA787C43D9F507E7690744 /* Localizable.strings */,
+			);
+			name = ShareExtension;
+			path = ShareExtension;
+			sourceTree = "<group>";
+		};
+		BA8BE8A40AC544D84FF92C67 /* IncomingShare */ = {
+			isa = PBXGroup;
+			children = (
+				32AC1D1DB20EDFFCA1CD8D02 /* IncomingShareInbox.swift */,
+				55B47EEF2D64627B41D9B1BA /* IosIncomingShareHandler.swift */,
+			);
+			name = IncomingShare;
+			path = IncomingShare;
+			sourceTree = "<group>";
+		};
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
@@ -353,11 +420,29 @@
 			);
 			dependencies = (
 				A10000000000000000000023 /* PBXTargetDependency */,
+				73F42990863D19D8F18E9049 /* PBXTargetDependency */,
 			);
 			name = Runner;
 			productName = Runner;
 			productReference = 97C146EE1CF9000F007C117D /* Runner.app */;
 			productType = "com.apple.product-type.application";
+		};
+		5D77F8F7B311DF23353EE6FB /* ShareExtension */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 0D8ACE98023423C797F15D9E /* Build configuration list for PBXNativeTarget "ShareExtension" */;
+			buildPhases = (
+				9AF88A06BE3F0B2D0DA656EA /* Sources */,
+				3C7BE9764F9D913A3F4A4A63 /* Frameworks */,
+				CC7DABCE36A2DB0905437219 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = ShareExtension;
+			productName = ShareExtension;
+			productReference = 0495245F03CA1F742DAD1950 /* ShareExtension.appex */;
+			productType = "com.apple.product-type.app-extension";
 		};
 /* End PBXNativeTarget section */
 
@@ -369,24 +454,34 @@
 				LastUpgradeCheck = 1510;
 				ORGANIZATIONNAME = "";
 				TargetAttributes = {
-					A10000000000000000000020 = {
-						CreatedOnToolsVersion = 15.0;
-					};
 					331C8080294A63A400263BE5 = {
 						CreatedOnToolsVersion = 14.0;
 						TestTargetID = 97C146ED1CF9000F007C117D;
+					};
+					5D77F8F7B311DF23353EE6FB = {
+						SystemCapabilities = {
+							com.apple.ApplicationGroups.iOS = {
+								enabled = 1;
+							};
+						};
 					};
 					97C146ED1CF9000F007C117D = {
 						CreatedOnToolsVersion = 7.3.1;
 						LastSwiftMigration = 1100;
 						SystemCapabilities = {
+							com.apple.ApplicationGroups.iOS = {
+								enabled = 1;
+							};
 							com.apple.HealthKit = {
 								enabled = 1;
 							};
-							"com.apple.developer.weatherkit" = {
+							com.apple.developer.weatherkit = {
 								enabled = 1;
 							};
 						};
+					};
+					A10000000000000000000020 = {
+						CreatedOnToolsVersion = 15.0;
 					};
 				};
 			};
@@ -408,6 +503,7 @@
 				97C146ED1CF9000F007C117D /* Runner */,
 				A10000000000000000000020 /* GenerationActivityExtension */,
 				331C8080294A63A400263BE5 /* RunnerTests */,
+				5D77F8F7B311DF23353EE6FB /* ShareExtension */,
 			);
 		};
 /* End PBXProject section */
@@ -438,6 +534,14 @@
 				W5A0000000000000000000A6 /* alpine-rootfs.zip in Resources */,
 				W5A0000000000000000000A7 /* overlay in Resources */,
 				W5A0000000000000000000A8 /* VERSION in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		CC7DABCE36A2DB0905437219 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A4542529DC8187D43E5FB488 /* Localizable.strings in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -617,6 +721,17 @@
 				W5A0000000000000000000A4 /* KelivoISHExecutor.m in Sources */,
 				W5A0000000000000000E001 /* KelivoISHEnvironment.m in Sources */,
 				W5A0000000000000000000A5 /* KelivoISHCrashGuards.c in Sources */,
+				82816D88DA05AE704751053C /* IncomingShareInbox.swift in Sources */,
+				1050AF28EF974F7205A3DFE3 /* IosIncomingShareHandler.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		9AF88A06BE3F0B2D0DA656EA /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				0D9F2113B38E5FFDD32D78D0 /* IncomingShareInbox.swift in Sources */,
+				478EE76A47FFCC51A736ECBD /* ShareViewController.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -632,6 +747,12 @@
 			isa = PBXTargetDependency;
 			target = 97C146ED1CF9000F007C117D /* Runner */;
 			targetProxy = 331C8085294A63A400263BE5 /* PBXContainerItemProxy */;
+		};
+		73F42990863D19D8F18E9049 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			name = ShareExtension;
+			target = 5D77F8F7B311DF23353EE6FB /* ShareExtension */;
+			targetProxy = EDF13361E6AF333E182FE033 /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
@@ -656,6 +777,16 @@
 				54161FB12E6B1519001222B5 /* en */,
 			);
 			name = LaunchScreen.storyboard;
+			sourceTree = "<group>";
+		};
+		7CDA787C43D9F507E7690744 /* Localizable.strings */ = {
+			isa = PBXVariantGroup;
+			children = (
+				31790E2C03AF99B98A3F05B1 /* en */,
+				F91265C744C63BBCFA99BC1C /* zh-Hans */,
+				6ECC4D7E49DE76801658ECA7 /* zh-Hant */,
+			);
+			name = Localizable.strings;
 			sourceTree = "<group>";
 		};
 /* End PBXVariantGroup section */
@@ -1124,6 +1255,96 @@
 			};
 			name = Release;
 		};
+		03BAA9DC0E10A4F47A1EE1B9 /* Release */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = 9740EEB31CF90195004384FC /* Generated.xcconfig */;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				CODE_SIGN_ENTITLEMENTS = ShareExtension/ShareExtension.entitlements;
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = "$(FLUTTER_BUILD_NUMBER)";
+				DEVELOPMENT_TEAM = 5WN7Y88J52;
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = ShareExtension/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = "$(FLUTTER_BUILD_NAME)";
+				PRODUCT_BUNDLE_IDENTIFIER = psyche.kelivo.ShareExtension;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		4BFA2ADB82F20990FC8B2038 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = 9740EEB31CF90195004384FC /* Generated.xcconfig */;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				CODE_SIGN_ENTITLEMENTS = ShareExtension/ShareExtension.entitlements;
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = "$(FLUTTER_BUILD_NUMBER)";
+				DEVELOPMENT_TEAM = 5WN7Y88J52;
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = ShareExtension/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = "$(FLUTTER_BUILD_NAME)";
+				PRODUCT_BUNDLE_IDENTIFIER = psyche.kelivo.ShareExtension;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		CFEC6A17D27639C3DF44B6E8 /* Profile */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = 9740EEB31CF90195004384FC /* Generated.xcconfig */;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				CODE_SIGN_ENTITLEMENTS = ShareExtension/ShareExtension.entitlements;
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = "$(FLUTTER_BUILD_NUMBER)";
+				DEVELOPMENT_TEAM = 5WN7Y88J52;
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = ShareExtension/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = "$(FLUTTER_BUILD_NAME)";
+				PRODUCT_BUNDLE_IDENTIFIER = psyche.kelivo.ShareExtension;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Profile;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -1163,6 +1384,16 @@
 				97C147061CF9000F007C117D /* Debug */,
 				97C147071CF9000F007C117D /* Release */,
 				249021D4217E4FDB00AE95B9 /* Profile */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		0D8ACE98023423C797F15D9E /* Build configuration list for PBXNativeTarget "ShareExtension" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				03BAA9DC0E10A4F47A1EE1B9 /* Release */,
+				4BFA2ADB82F20990FC8B2038 /* Debug */,
+				CFEC6A17D27639C3DF44B6E8 /* Profile */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

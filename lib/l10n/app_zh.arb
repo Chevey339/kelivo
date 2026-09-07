@@ -3835,5 +3835,16 @@
   "workspaceEnvVariableInvalidValue": "值不能为空，也不能包含空字符（NUL）。",
   "workspaceEnvVariableDuplicate": "已存在同名变量。",
   "workspaceEnvVariablesSaveFailed": "环境设置保存失败，请重试。",
+  "incomingShareTitle": "接收分享",
+  "incomingShareReplaceDraft": "输入框中有尚未发送的内容。是否替换为分享的内容，并开始新对话？",
+  "incomingShareFailed": "部分分享内容未能导入，请检查文件访问权限和可用存储空间。一次最多分享 32 个文件。",
+  "incomingShareImporting": "正在导入",
+  "incomingShareMoveTo": "移动到…",
+  "incomingShareNewChat": "新对话",
+  "incomingShareMoveHint": "将草稿和附件移到其他对话，内容不会自动发送。",
+  "incomingShareNoConversations": "没有匹配的对话",
+  "chatInputBarRemoveAttachment": "移除附件",
+  "incomingShareMoveFailed": "无法切换对话，草稿已保留。",
+  "attachmentRequiresWorkspace": "「{name}」无法在普通对话中直接读取。请绑定工作区并启用文件工具，或将草稿移到已有工作区的对话。",
   "storageSessionFilesUnlinked": "未关联的会话"
 }

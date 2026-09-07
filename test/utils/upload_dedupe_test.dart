@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:async';
 import 'dart:typed_data';
 
 import 'package:Kelivo/utils/upload_dedupe.dart';
@@ -28,6 +29,22 @@ void main() {
     final file = await UploadDedupe.reserveUniqueFile(dir, 'notes.txt');
 
     expect(UploadDedupe.isShared(file.path), isFalse);
+  });
+
+  test('a pending deletion cannot be handed to a new dedupe reader', () async {
+    final bytes = bytesOf('file contents');
+    final file = await store('notes.txt', bytes);
+    final deletionStarted = Completer<void>();
+    final finishDeletion = Completer<void>();
+    final deletion = IOOverrides.runWithIOOverrides(
+      () => UploadDedupe.deleteIfUnshared(file.path),
+      _DeleteOverride(file, deletionStarted, finishDeletion.future),
+    );
+    await deletionStarted.future;
+    expect(await UploadDedupe.findIdentical(dir, bytes, 'notes.txt'), isNull);
+    finishDeletion.complete();
+    await deletion;
+    expect(await file.exists(), isFalse);
   });
 
   test('a file is marked shared before its bytes are read', () async {
@@ -110,4 +127,30 @@ void main() {
 
     expect(await UploadDedupe.findIdentical(dir, big, 'clip.mp4'), isNull);
   });
+}
+
+final class _DeleteOverride extends IOOverrides {
+  _DeleteOverride(this.file, this.started, this.ready);
+  final File file;
+  final Completer<void> started;
+  final Future<void> ready;
+  @override
+  File createFile(String path) => path == file.path
+      ? _DeletingFile(file, started, ready)
+      : super.createFile(path);
+}
+
+class _DeletingFile extends Fake implements File {
+  _DeletingFile(this.file, this.started, this.ready);
+  final File file;
+  final Completer<void> started;
+  final Future<void> ready;
+  @override
+  Future<bool> exists() => file.exists();
+  @override
+  Future<FileSystemEntity> delete({bool recursive = false}) async {
+    started.complete();
+    await ready;
+    return file.delete(recursive: recursive);
+  }
 }

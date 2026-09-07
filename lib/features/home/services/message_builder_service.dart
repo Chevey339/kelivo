@@ -687,6 +687,7 @@ class MessageBuilderService {
     Conversation? conversation,
     List<ChatMessage>? sourceMessages,
     bool sandboxDataFiles = false,
+    Map<String, AttachmentInfo> workspaceAttachments = const {},
   }) {
     final bool ocrActive =
         settings.ocrEnabled &&
@@ -719,6 +720,7 @@ class MessageBuilderService {
           if (path.isNotEmpty) mediaPaths.add(path);
           continue;
         }
+        if (workspaceAttachments.containsKey(document.path)) continue;
         if (sandboxDataFiles &&
             isSandboxDataFile(fileName: document.fileName, mime: mime)) {
           continue;
@@ -753,6 +755,7 @@ class MessageBuilderService {
     Conversation? conversation,
     List<ChatMessage>? sourceMessages,
     bool sandboxDataFiles = false,
+    Map<String, AttachmentInfo> workspaceAttachments = const {},
   }) async {
     final bool ocrActive =
         settings.ocrEnabled &&
@@ -865,7 +868,7 @@ class MessageBuilderService {
       try {
         final text = await DocumentTextExtractor.extractResolved(
           path: resolvedPath,
-          mime: d.mime,
+          mime: _effectiveAttachmentMime(d),
         );
         // Cache only when stat is available; otherwise avoid staleness.
         if (stat != null) {
@@ -876,6 +879,8 @@ class MessageBuilderService {
           );
         }
         return text;
+      } on AttachmentRequiresWorkspace {
+        throw AttachmentRequiresWorkspace(d.fileName);
       } catch (_) {
         if (stat != null) {
           _docTextCache[resolvedPath] = _DocTextCacheEntry(
@@ -909,6 +914,23 @@ class MessageBuilderService {
       final parsedUser = chatMessageForParts != null
           ? parseInputFromMessage(chatMessageForParts)
           : parseInputFromApiMap(apiMessages[i]);
+      final hasWorkspaceDocuments = parsedUser.documents.any(
+        (d) => workspaceAttachments.containsKey(d.path),
+      );
+      // A local workspace already owns these documents. Do not additionally
+      // upload them to a provider's code-execution sandbox.
+      if (hasWorkspaceDocuments) {
+        final remaining = parseInternalDocumentRefs(
+          apiMessages[i][multimodalInternalDocumentPathsKey],
+        ).where((ref) => !workspaceAttachments.containsKey(ref.uri)).toList();
+        if (remaining.isEmpty) {
+          apiMessages[i].remove(multimodalInternalDocumentPathsKey);
+        } else {
+          apiMessages[i][multimodalInternalDocumentPathsKey] = remaining
+              .map(encodeInternalDocumentRef)
+              .toList();
+        }
+      }
       final videoPaths = <String>{
         for (final d in parsedUser.documents)
           if (isVideoMime(_effectiveAttachmentMime(d))) d.path.trim(),
@@ -1034,6 +1056,16 @@ class MessageBuilderService {
       final filePrompts = StringBuffer();
       var leftToSandbox = false;
       for (final d in parsedUser.documents) {
+        final local = workspaceAttachments[d.path];
+        if (local != null) {
+          leftToSandbox = true;
+          filePrompts.writeln('Attached file: ${d.fileName}');
+          filePrompts.writeln('Path: ${local.modelPath} (${local.size} bytes)');
+          filePrompts.writeln(
+            'Use workspace file tools to inspect it as needed.',
+          );
+          continue;
+        }
         final effectiveMime = _effectiveAttachmentMime(d);
         if (isVideoMime(effectiveMime) || isAudioMime(effectiveMime)) {
           continue;

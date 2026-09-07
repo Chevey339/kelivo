@@ -4796,5 +4796,19 @@
   "workspaceEnvVariableInvalidValue": "Enter a nonempty value without NUL characters.",
   "workspaceEnvVariableDuplicate": "A variable with this name already exists.",
   "workspaceEnvVariablesSaveFailed": "Could not save the environment settings. Please try again.",
+  "incomingShareTitle": "Shared content",
+  "incomingShareReplaceDraft": "There is unsent content in the input box. Replace it with the shared content in a new chat?",
+  "incomingShareFailed": "Some shared content could not be imported. Check file access and available storage. Up to 32 files can be shared at once.",
+  "incomingShareImporting": "Importing",
+  "incomingShareMoveTo": "Move to…",
+  "incomingShareNewChat": "New conversation",
+  "incomingShareMoveHint": "Move this draft and its attachments to another conversation. Nothing will be sent automatically.",
+  "incomingShareNoConversations": "No matching conversations",
+  "chatInputBarRemoveAttachment": "Remove attachment",
+  "incomingShareMoveFailed": "Could not switch conversations. Your draft has been kept.",
+  "attachmentRequiresWorkspace": "To use “{name}”, bind a workspace and enable file tools, or move this draft to a conversation with a workspace. This file cannot be read directly in a regular chat.",
+  "@attachmentRequiresWorkspace": {
+    "placeholders": {"name": {"type": "String"}}
+  },
   "storageSessionFilesUnlinked": "Unlinked conversation"
 }

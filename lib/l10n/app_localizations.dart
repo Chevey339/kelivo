@@ -19251,6 +19251,72 @@ abstract class AppLocalizations {
   /// **'Could not save the environment settings. Please try again.'**
   String get workspaceEnvVariablesSaveFailed;
 
+  /// No description provided for @incomingShareTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Shared content'**
+  String get incomingShareTitle;
+
+  /// No description provided for @incomingShareReplaceDraft.
+  ///
+  /// In en, this message translates to:
+  /// **'There is unsent content in the input box. Replace it with the shared content in a new chat?'**
+  String get incomingShareReplaceDraft;
+
+  /// No description provided for @incomingShareFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Some shared content could not be imported. Check file access and available storage. Up to 32 files can be shared at once.'**
+  String get incomingShareFailed;
+
+  /// No description provided for @incomingShareImporting.
+  ///
+  /// In en, this message translates to:
+  /// **'Importing'**
+  String get incomingShareImporting;
+
+  /// No description provided for @incomingShareMoveTo.
+  ///
+  /// In en, this message translates to:
+  /// **'Move to…'**
+  String get incomingShareMoveTo;
+
+  /// No description provided for @incomingShareNewChat.
+  ///
+  /// In en, this message translates to:
+  /// **'New conversation'**
+  String get incomingShareNewChat;
+
+  /// No description provided for @incomingShareMoveHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Move this draft and its attachments to another conversation. Nothing will be sent automatically.'**
+  String get incomingShareMoveHint;
+
+  /// No description provided for @incomingShareNoConversations.
+  ///
+  /// In en, this message translates to:
+  /// **'No matching conversations'**
+  String get incomingShareNoConversations;
+
+  /// No description provided for @chatInputBarRemoveAttachment.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove attachment'**
+  String get chatInputBarRemoveAttachment;
+
+  /// No description provided for @incomingShareMoveFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not switch conversations. Your draft has been kept.'**
+  String get incomingShareMoveFailed;
+
+  /// No description provided for @attachmentRequiresWorkspace.
+  ///
+  /// In en, this message translates to:
+  /// **'To use “{name}”, bind a workspace and enable file tools, or move this draft to a conversation with a workspace. This file cannot be read directly in a regular chat.'**
+  String attachmentRequiresWorkspace(String name);
+
   /// No description provided for @storageSessionFilesUnlinked.
   ///
   /// In en, this message translates to:

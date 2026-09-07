@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io' show Platform;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show MissingPluginException;
 import 'package:desktop_drop/desktop_drop.dart';
 import 'package:provider/provider.dart';
 import '../../../l10n/app_localizations.dart';
@@ -23,6 +24,7 @@ import '../../../core/models/chat_input_data.dart';
 import '../../../core/models/chat_message.dart';
 import '../../../core/models/compress_context_options.dart';
 import '../../../core/services/android_process_text.dart';
+import '../../../core/services/incoming_share_service.dart';
 import '../../../core/services/logging/flutter_logger.dart';
 import '../../../utils/platform_utils.dart';
 import '../../../desktop/search_provider_popover.dart';
@@ -704,6 +706,10 @@ class _HomePageState extends State<HomePage>
   bool _scrollNavHovering = false;
   double _lastViewInsetBottom = 0;
   StreamSubscription<String>? _processTextSub;
+  IncomingShareService? _incomingShares;
+  late final Future<void> _chatReady;
+  bool _readingIncomingShares = false;
+  bool _incomingShareChanged = false;
 
   // ============================================================================
   // Page Controller (manages all business logic and state)
@@ -736,8 +742,9 @@ class _HomePageState extends State<HomePage>
     _controller.addListener(_onControllerChanged);
     _drawerController.addListener(_onDrawerValueChanged);
 
-    _controller.initChat();
+    _chatReady = _controller.initChat();
     _initProcessText();
+    _initIncomingShares();
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
@@ -761,6 +768,7 @@ class _HomePageState extends State<HomePage>
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     _controller.onAppLifecycleStateChanged(state);
+    if (state == AppLifecycleState.resumed) _readIncomingShares();
   }
 
   @override
@@ -789,6 +797,7 @@ class _HomePageState extends State<HomePage>
       WidgetsBinding.instance.removeObserver(this);
     } catch (_) {}
     _processTextSub?.cancel();
+    _incomingShares?.dispose();
     _controller.removeListener(_onControllerChanged);
     _drawerController.removeListener(_onDrawerValueChanged);
     _inputFocus.dispose();
@@ -832,6 +841,84 @@ class _HomePageState extends State<HomePage>
         _handleProcessText(text);
       }
     });
+  }
+
+  void _initIncomingShares() {
+    if (!PlatformUtils.isMobile) return;
+    _incomingShares = IncomingShareService()
+      ..listen(
+        onChanged: _readIncomingShares,
+        onFailed: _showIncomingShareFailure,
+      );
+    _incomingShares!.progress.addListener(() {
+      _mediaController.shareImport.value = _incomingShares!.progress.value;
+    });
+    _mediaController.cancelShareImport = () =>
+        unawaited(_incomingShares!.cancelImport());
+    WidgetsBinding.instance.addPostFrameCallback((_) => _readIncomingShares());
+  }
+
+  void _showIncomingShareFailure() {
+    if (!mounted) return;
+    showAppSnackBar(
+      context,
+      message: AppLocalizations.of(context)!.incomingShareFailed,
+      type: NotificationType.error,
+    );
+  }
+
+  Future<void> _readIncomingShares() async {
+    final service = _incomingShares;
+    if (service == null || !mounted) return;
+    _incomingShareChanged = true;
+    if (_readingIncomingShares) return;
+    _readingIncomingShares = true;
+    try {
+      await _chatReady;
+      while (mounted && _incomingShareChanged) {
+        _incomingShareChanged = false;
+        final shares = await service.pending();
+        if (!mounted || shares.isEmpty) continue;
+        final hasContent = shares.any(
+          (share) => share.text.trim().isNotEmpty || share.files.isNotEmpty,
+        );
+        if (hasContent) {
+          final homeRoute = ModalRoute.of(context);
+          Navigator.of(
+            context,
+          ).popUntil((route) => route == homeRoute || route.isFirst);
+          _drawerController.close();
+          await WidgetsBinding.instance.endOfFrame;
+          if (!mounted) return;
+          final ChatInputData input;
+          try {
+            input = await service.prepare(shares);
+          } on ShareImportCancelled {
+            await service.acknowledge(shares);
+            continue;
+          }
+          var accepted = false;
+          try {
+            if (!mounted) return;
+            // Check the current draft at delivery time: preparing a large
+            // attachment may take long enough for the user to keep typing.
+            accepted = await _controller.acceptIncomingShareDraft(input);
+          } finally {
+            if (!accepted) await service.discardPrepared(input);
+          }
+        }
+        if (shares.any((share) => share.failedFiles > 0)) {
+          _showIncomingShareFailure();
+        }
+        await service.acknowledge(shares);
+      }
+    } on MissingPluginException {
+      // The desktop/test host does not have a mobile incoming-share inbox.
+    } catch (_) {
+      _showIncomingShareFailure();
+    } finally {
+      _readingIncomingShares = false;
+    }
   }
 
   void _handleProcessText(String text) {

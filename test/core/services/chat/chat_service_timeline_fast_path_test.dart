@@ -113,6 +113,28 @@ void main() {
   });
 
   test(
+    'attachment scans can read history without expanding the timeline cache',
+    () async {
+      final (service, conversationId, ids) = await seedRestartedService();
+      final before = service
+          .getMessages(conversationId)
+          .map((m) => m.id)
+          .toList();
+      final loaded = await service.loadMessagesRange(
+        conversationId,
+        start: 0,
+        limit: 100,
+        cacheInTimeline: false,
+      );
+      expect(loaded.map((m) => m.id), orderedEquals(ids));
+      expect(
+        service.getMessages(conversationId).map((m) => m.id),
+        orderedEquals(before),
+      );
+    },
+  );
+
+  test(
     'cold service misses the fast path and loads from the database',
     () async {
       final (service, conversationId, ids) = await seedRestartedService();

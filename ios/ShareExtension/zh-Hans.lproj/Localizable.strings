@@ -1,0 +1,8 @@
+"saveDraft" = "保存草稿";
+"saved" = "已保存到 Kelivo";
+"savedMessage" = "打开 Kelivo 即可继续编辑并发送。";
+"partialMessage" = "部分文件未能保存。打开 Kelivo 可查看已接收的内容。";
+"done" = "完成";
+"failed" = "保存失败";
+"failedMessage" = "请确认文件可用且存储空间充足后重试。一次最多支持 32 个文件。";
+"importing" = "正在导入";
