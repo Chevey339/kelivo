@@ -27,7 +27,6 @@ class BinaryFilePreview extends StatelessWidget {
   static const Key revealKey = ValueKey<String>('file-preview-reveal');
 
   static const double desktopCardMaxWidth = 440;
-  static const double actionPairBreakpoint = 340;
 
   final File file;
 
@@ -114,7 +113,7 @@ class BinaryFilePreview extends StatelessWidget {
                     key: openWithKey,
                     icon: Lucide.ExternalLink,
                     label: l10n.workspacePreviewOpenWith,
-                    backgroundColor: cs.primary,
+                    expand: true,
                     onTap: () =>
                         unawaited(openPreviewFileExternally(context, file)),
                   ),
@@ -122,6 +121,7 @@ class BinaryFilePreview extends StatelessWidget {
                     key: shareKey,
                     icon: Lucide.Share2,
                     label: l10n.workspacePreviewShare,
+                    expand: true,
                     onTap: () => unawaited(sharePreviewFile(context, file)),
                   ),
                 ),
@@ -131,6 +131,7 @@ class BinaryFilePreview extends StatelessWidget {
                     key: exportKey,
                     icon: Lucide.Download,
                     label: l10n.workspaceFilesExportItem,
+                    expand: true,
                     onTap: () => unawaited(exportPreviewFile(context, file)),
                   ),
                   secondary: desktop
@@ -138,6 +139,7 @@ class BinaryFilePreview extends StatelessWidget {
                           key: revealKey,
                           icon: Lucide.FolderOpen,
                           label: revealInFileManagerLabel(l10n),
+                          expand: true,
                           onTap: () => unawaited(
                             revealPreviewFileInFileManager(context, file),
                           ),
@@ -165,29 +167,18 @@ class _PreviewActionPair extends StatelessWidget {
     if (second == null) {
       return SizedBox(width: double.infinity, child: primary);
     }
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final stacked =
-            constraints.maxWidth < BinaryFilePreview.actionPairBreakpoint;
-        if (stacked) {
-          return Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [primary, const SizedBox(height: 8), second],
-          );
-        }
-        return Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Expanded(child: _fitTile(primary)),
-            const SizedBox(width: 8),
-            Expanded(child: _fitTile(second)),
-          ],
-        );
-      },
+    if (!useDesktopWorkspaceLayout(context)) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [primary, const SizedBox(height: 8), second],
+      );
+    }
+    return Row(
+      children: [
+        Expanded(child: primary),
+        const SizedBox(width: 8),
+        Expanded(child: second),
+      ],
     );
-  }
-
-  Widget _fitTile(Widget tile) {
-    return FittedBox(fit: BoxFit.scaleDown, child: tile);
   }
 }
