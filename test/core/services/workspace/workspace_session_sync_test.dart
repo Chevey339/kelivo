@@ -69,7 +69,7 @@ void main() {
   );
 
   test(
-    'missing files surface failure and a repaired source can be retried',
+    'missing new files surface failure and a repaired source can be retried',
     () async {
       final root = Directory.systemTemp.createTempSync('share_missing_');
       addTearDown(() => root.deleteSync(recursive: true));
@@ -77,11 +77,45 @@ void main() {
       final source = File('${root.path}/missing.zip');
       final messages = [_message(source, 'missing.zip')];
       await expectLater(
-        syncAttachments(ctx, messages),
+        syncAttachments(ctx, messages, requiredMessageId: messages.single.id),
         throwsA(isA<FileSystemException>()),
       );
       source.writeAsBytesSync([1, 2, 3]);
-      expect(await syncAttachments(ctx, messages), hasLength(1));
+      expect(
+        await syncAttachments(
+          ctx,
+          messages,
+          requiredMessageId: messages.single.id,
+        ),
+        hasLength(1),
+      );
+      // A previous index must not hide a missing file on a new submission.
+      await source.delete();
+      await expectLater(
+        syncAttachments(ctx, messages, requiredMessageId: messages.single.id),
+        throwsA(isA<FileSystemException>()),
+      );
+      expect(await syncAttachments(ctx, messages), isEmpty);
+    },
+  );
+
+  test(
+    'deleted names reserve case variants on case-insensitive volumes',
+    () async {
+      final root = Directory.systemTemp.createTempSync('share_case_names_');
+      addTearDown(() => root.deleteSync(recursive: true));
+      final ctx = _context(root);
+      final a = File('${root.path}/a')..writeAsStringSync('AAAA');
+      final b = File('${root.path}/b')..writeAsStringSync('BBBB');
+      final first = await syncAttachments(ctx, [_message(a, 'Report.txt')]);
+      await File(
+        '${ctx.sessionDir.path}/attachments/${first.single.name}',
+      ).delete();
+      final second = await syncAttachments(ctx, [_message(b, 'report.txt')]);
+      expect(
+        second.single.name.toLowerCase(),
+        isNot(first.single.name.toLowerCase()),
+      );
     },
   );
 

@@ -27,15 +27,17 @@ class AttachmentInfo {
 final _syncTails = <String, Future<void>>{};
 
 /// Copies user-message files/images into the conversation session attachments
-/// folder before generation. A failed local copy must stop preparation, rather
-/// than claiming the model has access to a file that is missing.
+/// folder before generation or while browsing historical attachments.
+/// Missing history is skipped; files in [requiredMessageId] belong to the new
+/// submission and must still be readable. Copy failures always propagate.
 Future<List<AttachmentInfo>> syncAttachments(
   WorkspaceToolContext ctx,
-  List<ChatMessage> messages,
-) {
+  List<ChatMessage> messages, {
+  String? requiredMessageId,
+}) {
   return _serializeSessionMutation(
     ctx.sessionDir,
-    () => _syncAttachments(ctx, messages),
+    () => _syncAttachments(ctx, messages, requiredMessageId: requiredMessageId),
   );
 }
 
@@ -118,8 +120,9 @@ Future<void> deleteSessionAttachmentCopies(
 
 Future<List<AttachmentInfo>> _syncAttachments(
   WorkspaceToolContext ctx,
-  List<ChatMessage> messages,
-) async {
+  List<ChatMessage> messages, {
+  required String? requiredMessageId,
+}) async {
   final out = <AttachmentInfo>[];
   final attachmentsDir = Directory(p.join(ctx.sessionDir.path, 'attachments'));
   await attachmentsDir.create(recursive: true);
@@ -131,12 +134,27 @@ Future<List<AttachmentInfo>> _syncAttachments(
           jsonDecode(await indexFile.readAsString()) as Map,
         )
       : <String, dynamic>{};
+  // Deleting a copy does not release its name: restoring that source must not
+  // overwrite another file that arrived in the meantime.
+  final reservedNames = <String>{
+    for (final record in index.values)
+      if (record is Map && record['name'] is String)
+        (record['name'] as String).toLowerCase(),
+  };
   final seen = <String>{};
 
   for (final message in messages) {
     if (message.role != 'user') continue;
     for (final part in message.parts) {
-      final info = await _syncPart(ctx, attachmentsDir, part, index, indexFile);
+      final info = await _syncPart(
+        ctx,
+        attachmentsDir,
+        part,
+        index,
+        indexFile,
+        reservedNames,
+        requiredForRequest: message.id == requiredMessageId,
+      );
       if (info != null && seen.add(info.sourceUri)) out.add(info);
     }
   }
@@ -149,7 +167,9 @@ Future<AttachmentInfo?> _syncPart(
   MessagePart part,
   Map<String, dynamic> index,
   File indexFile,
-) async {
+  Set<String> reservedNames, {
+  required bool requiredForRequest,
+}) async {
   late final String uri;
   late final String preferredName;
   if (part is FilePart) {
@@ -179,7 +199,7 @@ Future<AttachmentInfo?> _syncPart(
   final source = File(sourcePath);
   final stat = await source.stat();
   if (stat.type != FileSystemEntityType.file) {
-    if (stat.type == FileSystemEntityType.notFound && record is Map) {
+    if (stat.type == FileSystemEntityType.notFound && !requiredForRequest) {
       return null;
     }
     throw FileSystemException(
@@ -190,7 +210,11 @@ Future<AttachmentInfo?> _syncPart(
   final savedName = record is Map ? record['name'] : null;
   final destName = savedName is String && savedName == _safeName(savedName)
       ? savedName
-      : await _uniqueName(attachmentsDir, _safeName(preferredName));
+      : await _uniqueName(
+          attachmentsDir,
+          _safeName(preferredName),
+          reservedNames,
+        );
   final dest = File(p.join(attachmentsDir.path, destName));
   final sourceSize = stat.size;
   if (record is! Map ||
@@ -215,6 +239,7 @@ Future<AttachmentInfo?> _syncPart(
     final tempIndex = File('${indexFile.path}.tmp');
     await tempIndex.writeAsString(jsonEncode(index), flush: true);
     await tempIndex.rename(indexFile.path);
+    reservedNames.add(destName.toLowerCase());
   }
   final size = await dest.length();
   return AttachmentInfo(
@@ -233,14 +258,21 @@ String _safeName(String name) {
 }
 
 /// Picks a name that cannot overwrite a different attachment.
-Future<String> _uniqueName(Directory dir, String preferred) async {
+Future<String> _uniqueName(
+  Directory dir,
+  String preferred,
+  Set<String> reservedNames,
+) async {
   final cleaned = preferred.trim().isEmpty ? 'attachment' : preferred;
   var candidate = cleaned;
   var n = 2;
   while (true) {
     final file = File(p.join(dir.path, candidate));
-    if (await FileSystemEntity.type(file.path, followLinks: false) ==
-        FileSystemEntityType.notFound) {
+    // Reserve case variants too, including after the file has been deleted
+    // from a case-insensitive volume.
+    if (!reservedNames.contains(candidate.toLowerCase()) &&
+        await FileSystemEntity.type(file.path, followLinks: false) ==
+            FileSystemEntityType.notFound) {
       return candidate;
     }
     candidate = _withSuffix(cleaned, n);

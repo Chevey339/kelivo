@@ -120,6 +120,8 @@ class MessageGenerationService {
   }
 
   /// Prepare API messages with all injections applied.
+  /// [requiredAttachmentMessageId] identifies a new submission; retries and
+  /// historical context can legitimately reference attachments since removed.
   Future<PreparedGeneration> prepareApiMessagesWithInjections({
     required List<ChatMessage> messages,
     required Map<String, int> versionSelections,
@@ -132,6 +134,7 @@ class MessageGenerationService {
     ToolApprovalService? approvalService,
     AskUserInteractionService? askUserService,
     String? processingMessageId,
+    String? requiredAttachmentMessageId,
   }) async {
     final cfg = settings.getProviderConfig(providerKey);
     final kind = ProviderConfig.classify(
@@ -222,6 +225,7 @@ class MessageGenerationService {
         workspaceAttachments = await syncAttachments(
           workspaceContext,
           messages,
+          requiredMessageId: requiredAttachmentMessageId,
         );
       }
       if (workspaceContext != null) {
@@ -234,6 +238,11 @@ class MessageGenerationService {
         );
       }
     } catch (e) {
+      if (workspaceContext != null && !workspaceContext.skillsOnly) {
+        // Let the existing generation error UI offer retry. Continuing here
+        // would silently send without the attachments the user selected.
+        rethrow;
+      }
       debugPrint('Workspace prompt/attachments failed: $e');
     }
     await messageBuilderService.injectSkillsPrompt(

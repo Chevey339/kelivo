@@ -158,6 +158,71 @@ void main() {
     );
   });
 
+  test(
+    'cleanup keeps deleted attachment names reserved for their source',
+    () async {
+      final a = await _write(root, 'upload/a.txt', 'AAAA');
+      final b = await _write(root, 'upload/b.txt', 'BBBB');
+      final ctx = _context(root, 'names');
+      final first = await syncAttachments(ctx, [_message(a.path)]);
+      await StorageUsageService.deleteUploadFiles([a.path], images: false);
+      final newer = await syncAttachments(ctx, [_message(b.path)]);
+      expect(newer.single.modelPath, isNot(first.single.modelPath));
+
+      await a.writeAsString('AAAA');
+      final both = await syncAttachments(ctx, [
+        _message(a.path),
+        _message(b.path),
+      ]);
+      expect(both.map((info) => info.modelPath).toSet(), hasLength(2));
+      for (final info in both) {
+        expect(
+          await File(
+            '${ctx.sessionDir.path}/attachments/${info.name}',
+          ).readAsString(),
+          info.sourceUri == a.path ? 'AAAA' : 'BBBB',
+        );
+      }
+      await StorageUsageService.deleteUploadFiles([a.path], images: false);
+      expect(
+        await File(
+          '${ctx.sessionDir.path}/attachments/${newer.single.name}',
+        ).readAsString(),
+        'BBBB',
+      );
+    },
+  );
+
+  for (final images in [false, true]) {
+    test(
+      'cleanup before workspace binding does not block later files (images: $images)',
+      () async {
+        final old = await _write(
+          root,
+          images ? 'upload/old.png' : 'upload/old.txt',
+          'old',
+        );
+        final fresh = await _write(root, 'upload/new.txt', 'new');
+        await StorageUsageService.deleteUploadFiles([old.path], images: images);
+        final oldMessage = images
+            ? ChatMessage(
+                role: 'user',
+                conversationId: 'chat',
+                parts: [ImagePart(uri: old.path)],
+              )
+            : _message(old.path);
+        final ctx = _context(root, 'late-binding');
+        final newMessage = _message(fresh.path);
+        final copied = await syncAttachments(ctx, [
+          oldMessage,
+          newMessage,
+        ], requiredMessageId: newMessage.id);
+        expect(copied.map((info) => info.sourceUri), [fresh.path]);
+        expect(await syncAttachments(ctx, [oldMessage]), isEmpty);
+      },
+    );
+  }
+
   test('cleanup waits for an in-flight attachment copy', () async {
     final source = await _write(root, 'upload/report.txt', 'original');
     final ctx = _context(root, 'busy');

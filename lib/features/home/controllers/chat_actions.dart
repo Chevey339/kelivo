@@ -1348,6 +1348,7 @@ class ChatActions {
             approvalService: approvalService,
             askUserService: askUserService,
             processingMessageId: assistantMessage.id,
+            requiredAttachmentMessageId: userMessage.id,
           );
 
       // Build user image paths
