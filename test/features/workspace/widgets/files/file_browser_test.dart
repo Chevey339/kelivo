@@ -5,6 +5,7 @@ import 'package:Kelivo/core/providers/settings_provider.dart';
 import 'package:Kelivo/features/workspace/pages/workspace_files_page.dart';
 import 'package:Kelivo/features/workspace/widgets/files/file_browser.dart';
 import 'package:Kelivo/features/workspace/widgets/files/file_browser_ops.dart';
+import 'package:Kelivo/features/workspace/widgets/files/workspace_file_thumbnail.dart';
 import 'package:Kelivo/icons/lucide_adapter.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
 import 'package:Kelivo/shared/widgets/custom_bottom_sheet.dart';
@@ -613,6 +614,49 @@ void main() {
     expect(find.byKey(FileBrowser.itemMoreKey('plain.txt')), findsOneWidget);
     expect(find.byKey(FileBrowser.itemMoreKey('docs')), findsOneWidget);
   });
+
+  for (final desktop in [false, true]) {
+    testWidgets(
+      'image rows use thumbnails in ${desktop ? 'desktop' : 'mobile'} lists',
+      (tester) async {
+        File(p.join(tempDir.path, 'photo.PNG')).createSync();
+        File(p.join(tempDir.path, 'notes.txt')).writeAsStringSync('notes');
+        Directory(p.join(tempDir.path, 'folder.png')).createSync();
+        tester.view.physicalSize = desktop
+            ? const Size(1400, 900)
+            : const Size(390, 844);
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetDevicePixelRatio);
+        await tester.pumpWidget(_harness(child: _browser(tempDir)));
+        await _reload(tester);
+
+        expect(
+          find.descendant(
+            of: find.byKey(FileBrowser.itemKey('photo.PNG')),
+            matching: find.byType(WorkspaceFileThumbnail),
+          ),
+          findsOneWidget,
+        );
+        expect(find.byType(WorkspaceFileThumbnail), findsOneWidget);
+        expect(
+          tester
+              .widget<WorkspaceFileThumbnail>(
+                find.byType(WorkspaceFileThumbnail),
+              )
+              .size,
+          desktop ? 24 : 32,
+        );
+        expect(find.byKey(FileBrowser.itemKey('notes.txt')), findsOneWidget);
+        expect(find.byKey(FileBrowser.itemKey('folder.png')), findsOneWidget);
+        expect(
+          tester.getTopLeft(find.text('photo.PNG')).dx,
+          tester.getTopLeft(find.text('notes.txt')).dx,
+        );
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
 
   testWidgets('row more button opens the item action menu', (tester) async {
     File(p.join(tempDir.path, 'notes.txt')).writeAsStringSync('hi');

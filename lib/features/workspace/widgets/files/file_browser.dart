@@ -8,6 +8,7 @@ import 'package:Kelivo/features/chat/widgets/workspace_tool_ui.dart'
 import 'package:Kelivo/features/workspace/widgets/desktop_workspace_button.dart';
 import 'package:Kelivo/features/workspace/widgets/files/file_browser_ops.dart';
 import 'package:Kelivo/features/workspace/widgets/files/workspace_prompts.dart';
+import 'package:Kelivo/features/workspace/widgets/files/workspace_file_thumbnail.dart';
 import 'package:Kelivo/features/workspace/widgets/preview/file_preview.dart';
 import 'package:Kelivo/icons/lucide_adapter.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
@@ -1348,14 +1349,26 @@ class FileBrowserState extends State<FileBrowser> {
                             ),
                             child: Row(
                               children: [
-                                Icon(
-                                  entry.isDirectory
-                                      ? Lucide.Folder
-                                      : workspaceFileTypeIcon(entry.name),
-                                  size: 18,
-                                  color: entry.isDirectory
-                                      ? cs.primary
-                                      : cs.onSurfaceVariant,
+                                SizedBox.square(
+                                  dimension: 24,
+                                  child: WorkspaceFileThumbnail.supports(entry)
+                                      ? WorkspaceFileThumbnail(
+                                          entry: entry,
+                                          size: 24,
+                                          iconSize: 18,
+                                          iconColor: cs.onSurfaceVariant,
+                                        )
+                                      : Icon(
+                                          entry.isDirectory
+                                              ? Lucide.Folder
+                                              : workspaceFileTypeIcon(
+                                                  entry.name,
+                                                ),
+                                          size: 18,
+                                          color: entry.isDirectory
+                                              ? cs.primary
+                                              : cs.onSurfaceVariant,
+                                        ),
                                 ),
                                 const SizedBox(width: 10),
                                 Expanded(
@@ -1581,6 +1594,12 @@ class _FileRow extends StatelessWidget {
       icon: entry.isDirectory
           ? Lucide.Folder
           : workspaceFileTypeIcon(entry.name),
+      leading: WorkspaceFileThumbnail.supports(entry)
+          ? WorkspaceFileThumbnail(
+              entry: entry,
+              iconColor: cs.onSurface.withValues(alpha: 0.9),
+            )
+          : null,
       label: entry.name,
       labelWeight: AppFontWeights.medium,
       subtitle: meta,

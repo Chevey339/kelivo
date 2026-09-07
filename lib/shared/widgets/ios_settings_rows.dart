@@ -13,6 +13,7 @@ class IosNavRow extends StatelessWidget {
   const IosNavRow({
     super.key,
     this.icon,
+    this.leading,
     required this.label,
     this.subtitle,
     this.caption,
@@ -26,6 +27,9 @@ class IosNavRow extends StatelessWidget {
   });
 
   final IconData? icon;
+
+  /// Custom content in the existing icon slot, such as a file thumbnail.
+  final Widget? leading;
   final String label;
   final String? subtitle;
 
@@ -63,10 +67,12 @@ class IosNavRow extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
         child: Row(
           children: [
-            if (icon != null) ...[
+            if (icon != null || leading != null) ...[
               SizedBox(
                 width: 36,
-                child: Icon(icon, size: 20, color: resolvedIconColor),
+                child: leading != null
+                    ? Center(child: leading)
+                    : Icon(icon, size: 20, color: resolvedIconColor),
               ),
               const SizedBox(width: 12),
             ],
