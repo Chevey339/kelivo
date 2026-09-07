@@ -73,6 +73,19 @@
                 <data android:scheme="psyche.kelivo" android:host="mcp-oauth-callback"/>
             </intent-filter>
         </activity>
+        <!-- A separate process keeps Android SQLite handles separate from Drift's
+             native SQLite connection and works without starting a Flutter engine. -->
+        <provider
+            android:name=".workspace.WorkspaceDocumentsProvider"
+            android:authorities="${applicationId}.workspace.documents"
+            android:exported="true"
+            android:grantUriPermissions="true"
+            android:permission="android.permission.MANAGE_DOCUMENTS"
+            android:process=":workspace_documents">
+            <intent-filter>
+                <action android:name="android.content.action.DOCUMENTS_PROVIDER" />
+            </intent-filter>
+        </provider>
         <!-- Foreground service to keep Flutter isolate alive for background generation -->
         <service
             android:name="de.julianassmann.flutter_background.IsolateHolderService"
