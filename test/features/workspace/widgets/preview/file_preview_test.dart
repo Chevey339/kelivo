@@ -368,16 +368,12 @@ void main() {
         .toList();
     expect(buttons, hasLength(3));
     expect(buttons.every((button) => button.backgroundColor == null), isTrue);
-    expect(buttons.every((button) => button.expand), isTrue);
     final openRect = tester.getRect(find.byKey(BinaryFilePreview.openWithKey));
     final shareRect = tester.getRect(find.byKey(BinaryFilePreview.shareKey));
     final exportRect = tester.getRect(find.byKey(BinaryFilePreview.exportKey));
-    expect(shareRect.top, greaterThan(openRect.bottom));
-    expect(exportRect.top, greaterThan(shareRect.bottom));
-    expect(openRect.width, closeTo(shareRect.width, 1));
-    expect(shareRect.width, closeTo(exportRect.width, 1));
     expect(openRect.height, closeTo(shareRect.height, 1));
     expect(shareRect.height, closeTo(exportRect.height, 1));
+    expect(openRect.top, closeTo(shareRect.top, 1));
     expect(find.byIcon(Lucide.FileText), findsOneWidget);
     final typeIcon = tester.widget<Icon>(
       find.byKey(BinaryFilePreview.typeIconKey),
@@ -420,23 +416,16 @@ void main() {
     final shareRect = tester.getRect(find.byKey(BinaryFilePreview.shareKey));
     final exportRect = tester.getRect(find.byKey(BinaryFilePreview.exportKey));
     final revealRect = tester.getRect(find.byKey(BinaryFilePreview.revealKey));
-    expect(openRect.top, closeTo(shareRect.top, 1));
-    expect(exportRect.top, closeTo(revealRect.top, 1));
-    expect(openRect.left, lessThan(shareRect.left));
-    expect(exportRect.left, lessThan(revealRect.left));
-    expect(exportRect.top, greaterThan(openRect.bottom));
     expect(openRect.height, closeTo(shareRect.height, 1));
     expect(exportRect.height, closeTo(revealRect.height, 1));
-    expect(openRect.width, closeTo(shareRect.width, 4));
-    expect(exportRect.width, closeTo(revealRect.width, 4));
     final desktopButtons = tester
         .widgetList<IosTileButton>(find.byType(IosTileButton))
         .toList();
+    expect(desktopButtons, hasLength(4));
     expect(
       desktopButtons.every((button) => button.backgroundColor == null),
       isTrue,
     );
-    expect(desktopButtons.every((button) => button.expand), isTrue);
   });
 
   testWidgets('html preview has export and one browser action', (tester) async {

@@ -108,77 +108,46 @@ class BinaryFilePreview extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 14),
-                _PreviewActionPair(
-                  primary: IosTileButton(
-                    key: openWithKey,
-                    icon: Lucide.ExternalLink,
-                    label: l10n.workspacePreviewOpenWith,
-                    expand: true,
-                    onTap: () =>
-                        unawaited(openPreviewFileExternally(context, file)),
-                  ),
-                  secondary: IosTileButton(
-                    key: shareKey,
-                    icon: Lucide.Share2,
-                    label: l10n.workspacePreviewShare,
-                    expand: true,
-                    onTap: () => unawaited(sharePreviewFile(context, file)),
-                  ),
-                ),
-                const SizedBox(height: 8),
-                _PreviewActionPair(
-                  primary: IosTileButton(
-                    key: exportKey,
-                    icon: Lucide.Download,
-                    label: l10n.workspaceFilesExportItem,
-                    expand: true,
-                    onTap: () => unawaited(exportPreviewFile(context, file)),
-                  ),
-                  secondary: desktop
-                      ? IosTileButton(
-                          key: revealKey,
-                          icon: Lucide.FolderOpen,
-                          label: revealInFileManagerLabel(l10n),
-                          expand: true,
-                          onTap: () => unawaited(
-                            revealPreviewFileInFileManager(context, file),
-                          ),
-                        )
-                      : null,
+                Wrap(
+                  alignment: WrapAlignment.center,
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    IosTileButton(
+                      key: openWithKey,
+                      icon: Lucide.ExternalLink,
+                      label: l10n.workspacePreviewOpenWith,
+                      onTap: () =>
+                          unawaited(openPreviewFileExternally(context, file)),
+                    ),
+                    IosTileButton(
+                      key: shareKey,
+                      icon: Lucide.Share2,
+                      label: l10n.workspacePreviewShare,
+                      onTap: () => unawaited(sharePreviewFile(context, file)),
+                    ),
+                    IosTileButton(
+                      key: exportKey,
+                      icon: Lucide.Download,
+                      label: l10n.workspaceFilesExportItem,
+                      onTap: () => unawaited(exportPreviewFile(context, file)),
+                    ),
+                    if (desktop)
+                      IosTileButton(
+                        key: revealKey,
+                        icon: Lucide.FolderOpen,
+                        label: revealInFileManagerLabel(l10n),
+                        onTap: () => unawaited(
+                          revealPreviewFileInFileManager(context, file),
+                        ),
+                      ),
+                  ],
                 ),
               ],
             ),
           ),
         ),
       ),
-    );
-  }
-}
-
-class _PreviewActionPair extends StatelessWidget {
-  const _PreviewActionPair({required this.primary, this.secondary});
-
-  final Widget primary;
-  final Widget? secondary;
-
-  @override
-  Widget build(BuildContext context) {
-    final second = secondary;
-    if (second == null) {
-      return SizedBox(width: double.infinity, child: primary);
-    }
-    if (!useDesktopWorkspaceLayout(context)) {
-      return Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [primary, const SizedBox(height: 8), second],
-      );
-    }
-    return Row(
-      children: [
-        Expanded(child: primary),
-        const SizedBox(width: 8),
-        Expanded(child: second),
-      ],
     );
   }
 }

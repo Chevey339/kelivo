@@ -16,7 +16,6 @@ class IosTileButton extends StatefulWidget {
     this.backgroundColor,
     this.foregroundColor,
     this.borderColor,
-    this.expand = false,
   }) : assert(
          (icon == null) != (leading == null),
          'Provide exactly one of icon or leading',
@@ -32,7 +31,6 @@ class IosTileButton extends StatefulWidget {
   final Color? backgroundColor;
   final Color? foregroundColor;
   final Color? borderColor;
-  final bool expand;
 
   @override
   State<IosTileButton> createState() => _IosTileButtonState();
@@ -92,8 +90,6 @@ class _IosTileButtonState extends State<IosTileButton> {
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 160),
           curve: Curves.easeOutCubic,
-          width: widget.expand ? double.infinity : null,
-          alignment: Alignment.center,
           padding: widget.padding,
           decoration: BoxDecoration(
             color: _pressed && widget.enabled ? pressedBg : baseBg,
@@ -104,46 +100,41 @@ class _IosTileButtonState extends State<IosTileButton> {
                   : effectiveBorder.withValues(alpha: 0.45),
             ),
           ),
-          child: _labelContent(slotColor: slotColor, textColor: textColor),
+          child: FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.only(left: 2.0),
+                  child: widget.leading != null
+                      ? IconTheme.merge(
+                          data: IconThemeData(size: 18, color: slotColor),
+                          child: SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: Center(child: widget.leading),
+                          ),
+                        )
+                      : Icon(widget.icon, size: 18, color: slotColor),
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  widget.label,
+                  style: TextStyle(
+                    fontSize: widget.fontSize,
+                    fontWeight: AppFontWeights.semibold,
+                    color: widget.enabled
+                        ? textColor
+                        : textColor.withValues(alpha: 0.45),
+                  ),
+                ),
+              ],
+            ),
+          ),
         ),
       ),
     );
-  }
-
-  Widget _labelContent({required Color slotColor, required Color textColor}) {
-    final label = Text(
-      widget.label,
-      maxLines: 1,
-      overflow: widget.expand ? TextOverflow.ellipsis : TextOverflow.visible,
-      style: TextStyle(
-        fontSize: widget.fontSize,
-        fontWeight: AppFontWeights.semibold,
-        color: widget.enabled ? textColor : textColor.withValues(alpha: 0.45),
-      ),
-    );
-    final icon = Padding(
-      padding: const EdgeInsets.only(left: 2.0),
-      child: widget.leading != null
-          ? IconTheme.merge(
-              data: IconThemeData(size: 18, color: slotColor),
-              child: SizedBox(
-                width: 18,
-                height: 18,
-                child: Center(child: widget.leading),
-              ),
-            )
-          : Icon(widget.icon, size: 18, color: slotColor),
-    );
-    final row = Row(
-      mainAxisAlignment: MainAxisAlignment.center,
-      mainAxisSize: widget.expand ? MainAxisSize.max : MainAxisSize.min,
-      children: [
-        icon,
-        const SizedBox(width: 8),
-        if (widget.expand) Flexible(child: label) else label,
-      ],
-    );
-    if (widget.expand) return row;
-    return FittedBox(fit: BoxFit.scaleDown, child: row);
   }
 }
