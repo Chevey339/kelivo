@@ -651,6 +651,8 @@
 			inputPaths = (
 				"$(SRCROOT)/sandbox/ensure_artifacts.sh",
 				"$(SRCROOT)/sandbox/build_ish.sh",
+				"$(SRCROOT)/sandbox/patches/0001-kernel-time-interruptible-nanosleep.patch",
+				"$(SRCROOT)/sandbox/patches/0002-fs-fake-bind-stat-device.patch",
 				"$(SRCROOT)/sandbox/prepare_alpine_rootfs.sh",
 				"$(SRCROOT)/sandbox/resources/VERSION",
 			);
@@ -659,9 +661,11 @@
 				"$(SRCROOT)/sandbox/build/$(PLATFORM_NAME)/libish.a",
 				"$(SRCROOT)/sandbox/build/$(PLATFORM_NAME)/libish_emu.a",
 				"$(SRCROOT)/sandbox/build/$(PLATFORM_NAME)/libfakefs.a",
+				"$(SRCROOT)/sandbox/build/$(PLATFORM_NAME)/.kelivo-ish-build",
 				"$(SRCROOT)/sandbox/build/fakefsify",
 				"$(SRCROOT)/sandbox/build/include/ish/cpu-offsets.h",
 				"$(SRCROOT)/sandbox/resources/alpine-rootfs.zip",
+				"$(SRCROOT)/sandbox/resources/libvdso.so.elf",
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;

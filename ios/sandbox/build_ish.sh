@@ -4,7 +4,7 @@ set -euo pipefail
 # ============================================================================
 # iSH-ARM64 static library build for the Kelivo iOS Workspace sandbox
 # ============================================================================
-# Builds libish.a / libish_emu.a / libfakefs.a (arm64) from the OpenMinis
+# Builds libish.a / libish_emu.a / libfakefs.a (arm64) from the Chevey339
 # ish-arm64 fork, which emulates an aarch64 Linux userland inside the app
 # process (asbestos engine = threaded interpreter, no JIT, App Store safe).
 #
@@ -59,11 +59,10 @@ OUTPUT_DIR="$SCRIPT_DIR/build"
 OUTPUT_INCLUDE="$OUTPUT_DIR/include"
 OUTPUT_RESOURCES="$SCRIPT_DIR/resources"
 
-# Pinned revision of https://github.com/OpenMinis/ish-arm64 (same SHA Cuplivo uses).
-ISH_REPO="https://github.com/OpenMinis/ish-arm64.git"
-ISH_SHA="de124dd66124a15239cea1465164f74980ada245"
-# Local checkout we may copy instead of cloning (OpenMinis deps/ish).
-ISH_LOCAL_HINT="/Users/psyche/tmp/llmclient/OpenMinis/deps/ish"
+# Follow the deps/ish gitlink in OpenMinis/OpenMinis main, using our fork.
+# Update this fixed SHA when their main project adopts a new iSH revision.
+ISH_REPO="https://github.com/Chevey339/ish-arm64.git"
+ISH_SHA="3f6384c70eefd1a370f121d3492a5f21f7767df9"
 
 ARCHS="arm64"
 IOS_DEPLOYMENT_TARGET="15.0"
@@ -154,41 +153,22 @@ ish_tree_usable() {
 }
 
 fetch_ish() {
-    if [ -f "$ISH_DIR/.kelivo-ish-sha" ] && [ "$(cat "$ISH_DIR/.kelivo-ish-sha")" = "$ISH_SHA" ] && ish_tree_usable "$ISH_DIR"; then
-        log_info "ish-arm64 checkout up to date (${ISH_SHA:0:12})"
-        return
-    fi
-
     if ish_tree_usable "$ISH_DIR"; then
         local have
         have="$(git -C "$ISH_DIR" rev-parse HEAD 2>/dev/null || true)"
         if [ "$have" = "$ISH_SHA" ]; then
-            echo "$ISH_SHA" > "$ISH_DIR/.kelivo-ish-sha"
-            log_info "existing ish checkout matches ${ISH_SHA:0:12}"
-            return
-        fi
-    fi
-
-    if ish_tree_usable "$ISH_LOCAL_HINT"; then
-        log_info "Copying local ish tree from $ISH_LOCAL_HINT"
-        rm -rf "$ISH_DIR"
-        mkdir -p "$(dirname "$ISH_DIR")"
-        cp -R "$ISH_LOCAL_HINT" "$ISH_DIR"
-        local copied
-        copied="$(git -C "$ISH_DIR" rev-parse HEAD 2>/dev/null || true)"
-        if [ "$copied" != "$ISH_SHA" ]; then
-            if git -C "$ISH_DIR" cat-file -e "${ISH_SHA}^{commit}" 2>/dev/null; then
-                git -C "$ISH_DIR" checkout -q --detach "$ISH_SHA"
-                copied="$ISH_SHA"
+            if [ "$(git -C "$ISH_DIR" remote get-url origin 2>/dev/null || true)" != "$ISH_REPO" ]; then
+                log_info "Switching existing checkout to $ISH_REPO"
+                git -C "$ISH_DIR" fetch -q --depth 1 "$ISH_REPO" "$ISH_SHA"
+                if git -C "$ISH_DIR" remote get-url origin >/dev/null 2>&1; then
+                    git -C "$ISH_DIR" remote set-url origin "$ISH_REPO"
+                else
+                    git -C "$ISH_DIR" remote add origin "$ISH_REPO"
+                fi
             fi
-        fi
-        if [ "$copied" = "$ISH_SHA" ] && ish_tree_usable "$ISH_DIR"; then
-            echo "$ISH_SHA" > "$ISH_DIR/.kelivo-ish-sha"
-            log_success "ish-arm64 copied from local OpenMinis checkout"
+            log_info "ish-arm64 checkout matches $ISH_REPO @ ${ISH_SHA:0:12}"
             return
         fi
-        log_warning "local ish copy was unusable; cloning instead"
-        rm -rf "$ISH_DIR"
     fi
 
     log_info "Fetching $ISH_REPO @ ${ISH_SHA:0:12}..."
@@ -198,8 +178,20 @@ fetch_ish() {
     git -C "$ISH_DIR" remote add origin "$ISH_REPO"
     git -C "$ISH_DIR" fetch -q --depth 1 origin "$ISH_SHA"
     git -C "$ISH_DIR" checkout -q FETCH_HEAD
-    echo "$ISH_SHA" > "$ISH_DIR/.kelivo-ish-sha"
     log_success "ish-arm64 checked out"
+}
+
+# Includes the repository, pinned revision, build flags, and local patches.
+# Each SDK records its own fingerprint only after all outputs are ready.
+build_fingerprint() {
+    {
+        cat "$SCRIPT_DIR/build_ish.sh"
+        local patch
+        for patch in "$SCRIPT_DIR"/patches/*.patch; do
+            [ -f "$patch" ] && cat "$patch"
+        done
+        printf '%s\n' "$BUILD_TYPE"
+    } | shasum -a 256 | awk '{print $1}'
 }
 
 init_submodules() {
@@ -485,6 +477,7 @@ print_summary() {
 }
 
 main() {
+    if [ "${1:-}" = "fingerprint" ]; then build_fingerprint; return; fi
     echo ""
     echo "============================================================"
     echo "  Kelivo iOS Workspace: iSH-ARM64 static library builder"
@@ -501,6 +494,14 @@ main() {
     apply_ish_patches
     init_submodules
 
+    local fingerprint
+    fingerprint="$(build_fingerprint)"
+    if [ ! -f "$OUTPUT_DIR/.kelivo-ish-build" ] || [ "$(cat "$OUTPUT_DIR/.kelivo-ish-build")" != "$fingerprint" ]; then
+        # Host tools and the guest VDSO must change with the source too.
+        # Retain the checkout and bundled rootfs; discard only build outputs.
+        clean_build
+    fi
+
     local sdk headers_from=""
     for sdk in $sdks; do
         build_ish_sdk "$sdk"
@@ -511,6 +512,10 @@ main() {
     copy_headers "$headers_from"
     build_vdso_once
     build_fakefsify
+    for sdk in $sdks; do
+        printf '%s\n' "$fingerprint" > "$(sdk_output_dir "$sdk")/.kelivo-ish-build"
+    done
+    printf '%s\n' "$fingerprint" > "$OUTPUT_DIR/.kelivo-ish-build"
     print_summary
 }
 

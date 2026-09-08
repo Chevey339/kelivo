@@ -239,6 +239,27 @@ void main() {
       expect(mountsLs.stdout, contains('host-skill.txt'));
     });
 
+    iosTest('3a. GNU cp overwrites files in rootfs and workspace', (
+      tester,
+    ) async {
+      final result = await runCmd(r'''
+set -e
+cp --version
+for base in /tmp /workspace; do
+  dir=$(mktemp -d "$base/kelivo-cp-XXXXXX")
+  printf 'new contents' > "$dir/src"
+  printf 'old contents' > "$dir/dst"
+  cp "$dir/src" "$dir/dst"
+  test "$(cat "$dir/dst")" = 'new contents'
+  rm -rf "$dir"
+done
+printf 'COPY_OK\n'
+''');
+      expect(result.exit.exitCode, 0, reason: result.stderr);
+      expect(result.stdout, contains('GNU coreutils'));
+      expect(result.stdout, contains('COPY_OK'));
+    });
+
     iosTest('4. UTF-8 printf and filename have no U+FFFD', (tester) async {
       final result = await runCmd("printf '中文\\n'; touch 中文名.txt; ls");
       expect(result.exit.exitCode, 0);

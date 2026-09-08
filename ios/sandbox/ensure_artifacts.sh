@@ -94,6 +94,12 @@ if [ -f "$BUILD_DIR/libish.a" ] && [ ! -f "$BUILD_DIR/iphoneos/libish.a" ]; then
 fi
 
 need_ish=0
+fingerprint="$("$SCRIPT_DIR/build_ish.sh" fingerprint)"
+stamp="$SLICE_DIR/.kelivo-ish-build"
+if [ ! -f "$stamp" ] || [ "$(cat "$stamp")" != "$fingerprint" ]; then
+    echo "ensure_artifacts: iSH source or build inputs changed; rebuilding $SDK"
+    need_ish=1
+fi
 for f in "$SLICE_DIR/libish.a" "$SLICE_DIR/libish_emu.a" "$SLICE_DIR/libfakefs.a"; do
     if [ ! -s "$f" ]; then
         need_ish=1
@@ -104,6 +110,9 @@ if [ ! -x "$BUILD_DIR/fakefsify" ]; then
     need_ish=1
 fi
 if [ ! -d "$BUILD_DIR/include" ] || [ -z "$(ls -A "$BUILD_DIR/include" 2>/dev/null)" ]; then
+    need_ish=1
+fi
+if [ ! -s "$RESOURCES_DIR/libvdso.so.elf" ]; then
     need_ish=1
 fi
 
@@ -133,6 +142,8 @@ stamp_outputs() {
     [ -f "$SLICE_DIR/libish.a" ] && stamp+=("$SLICE_DIR/libish.a")
     [ -f "$SLICE_DIR/libish_emu.a" ] && stamp+=("$SLICE_DIR/libish_emu.a")
     [ -f "$SLICE_DIR/libfakefs.a" ] && stamp+=("$SLICE_DIR/libfakefs.a")
+    [ -f "$SLICE_DIR/.kelivo-ish-build" ] && stamp+=("$SLICE_DIR/.kelivo-ish-build")
+    [ -s "$RESOURCES_DIR/libvdso.so.elf" ] && stamp+=("$RESOURCES_DIR/libvdso.so.elf")
     [ -x "$BUILD_DIR/fakefsify" ] && stamp+=("$BUILD_DIR/fakefsify")
     [ -f "$BUILD_DIR/include/ish/cpu-offsets.h" ] && stamp+=("$BUILD_DIR/include/ish/cpu-offsets.h")
     [ -s "$ZIP_PATH" ] && stamp+=("$ZIP_PATH")

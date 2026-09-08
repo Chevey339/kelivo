@@ -3,9 +3,10 @@ Kelivo iOS Linux sandbox (Workspace) third-party components
 
 1. iSH-ARM64 (static libraries libish.a, libish_emu.a, libfakefs.a)
 --------------------------------------------------------------------
-Built at build time (ios/sandbox/build_ish.sh) from the OpenMinis
-ish-arm64 fork: https://github.com/OpenMinis/ish-arm64
-(pinned revision recorded in build_ish.sh), itself a fork of iSH
+Built at build time (ios/sandbox/build_ish.sh) from the Chevey339
+ish-arm64 fork: https://github.com/Chevey339/ish-arm64
+(pinned revision recorded in build_ish.sh), derived from
+https://github.com/OpenMinis/ish-arm64 and upstream iSH
 (https://github.com/ish-app/ish).
 
 iSH is licensed under the GNU General Public License v3 or later, with
