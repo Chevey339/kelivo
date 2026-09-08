@@ -14,7 +14,9 @@ import '../../support/business_test_harness.dart';
 import 'package:Kelivo/features/workspace/pages/external_mounts_page.dart';
 import 'package:Kelivo/features/workspace/widgets/files/file_browser.dart';
 import 'package:Kelivo/features/workspace/widgets/files/file_browser_ops.dart';
+import 'package:Kelivo/icons/lucide_adapter.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
+import 'package:Kelivo/shared/widgets/ios_tactile.dart';
 import 'package:Kelivo/shared/widgets/snackbar.dart';
 import '../../core/services/sandbox/sandbox_channel_harness.dart';
 
@@ -101,6 +103,25 @@ void main() {
     );
     await settle(tester);
   }
+
+  testWidgets('app bar matches other workspace pages', (tester) async {
+    await showPage(tester);
+    final appBar = tester.widget<AppBar>(find.byType(AppBar));
+    expect(appBar.leading, isA<IosIconButton>());
+    final back = appBar.leading! as IosIconButton;
+    expect(back.icon, Lucide.ArrowLeft);
+    expect(back.size, 22);
+    expect(back.minSize, 44);
+    expect(appBar.actions, isNotNull);
+    expect(appBar.actions!.first, isA<IosIconButton>());
+    final add = appBar.actions!.first as IosIconButton;
+    expect(add.icon, Lucide.Plus);
+    expect(add.size, 22);
+    expect(add.minSize, 44);
+    expect(appBar.actions!.last, isA<SizedBox>());
+    expect((appBar.actions!.last as SizedBox).width, 12);
+    debugDefaultTargetPlatformOverride = null;
+  });
 
   testWidgets('edit independent mount name and permission', (tester) async {
     await showPage(tester);

@@ -110,16 +110,31 @@ class _ExternalMountsPageState extends State<ExternalMountsPage> {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
+    final cs = Theme.of(context).colorScheme;
     final provider = context.watch<ExternalMountsProvider>();
     return Scaffold(
       appBar: AppBar(
+        leading: IosIconButton(
+          icon: Lucide.ArrowLeft,
+          color: cs.onSurface,
+          size: 22,
+          minSize: 44,
+          tooltip: l10n.settingsPageBackButton,
+          semanticLabel: l10n.settingsPageBackButton,
+          onTap: () => Navigator.of(context).maybePop(),
+        ),
         title: Text(l10n.workspaceExternalMount),
         actions: [
           IosIconButton(
             icon: Lucide.Plus,
+            color: cs.onSurface,
+            size: 22,
+            minSize: 44,
             tooltip: l10n.workspaceMountAdd,
+            semanticLabel: l10n.workspaceMountAdd,
             onTap: () => unawaited(_add()),
           ),
+          const SizedBox(width: 12),
         ],
       ),
       body: Align(
@@ -439,8 +454,20 @@ class _MountFilesPageState extends State<_MountFilesPage> {
     final provider = context.watch<ExternalMountsProvider>();
     final mount = provider.byId(widget.mountId);
     final l10n = AppLocalizations.of(context)!;
+    final cs = Theme.of(context).colorScheme;
     return Scaffold(
-      appBar: AppBar(title: Text(mount?.name ?? l10n.workspaceMountBrowse)),
+      appBar: AppBar(
+        leading: IosIconButton(
+          icon: Lucide.ArrowLeft,
+          color: cs.onSurface,
+          size: 22,
+          minSize: 44,
+          tooltip: l10n.settingsPageBackButton,
+          semanticLabel: l10n.settingsPageBackButton,
+          onTap: () => Navigator.of(context).maybePop(),
+        ),
+        title: Text(mount?.name ?? l10n.workspaceMountBrowse),
+      ),
       body: FutureBuilder<void>(
         future: _ready,
         builder: (context, snapshot) {
