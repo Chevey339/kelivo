@@ -295,6 +295,11 @@ void _ensureGeminiFunctionCallThoughtSig(List<Map<String, dynamic>> parts) {
   }
 }
 
+/// A server-side tool invocation part (`google_search` and friends), which the
+/// model turn carries as a `toolCall` / `toolResponse` pair.
+bool _isGeminiServerToolPart(Map part) =>
+    part.containsKey('toolCall') || part.containsKey('toolResponse');
+
 Map<String, dynamic> _googleFunctionResponsePartFromToolMessage(
   Map<String, dynamic> message,
 ) {
@@ -1486,7 +1491,16 @@ Stream<StreamChunk> sendGoogleStream(
     append: (executed) {
       if (retryMalformed) return;
       if (isGemini3) {
-        convo.add({'role': 'model', 'parts': lastRoundModelParts});
+        // Replaying a server-side tool block is rejected as soon as the turn
+        // is answered by functionResponse parts — which a tool continuation
+        // always is: "Tool call part is missing thought_signature", pointing
+        // at the toolCall part however the turn is split or signed. Every
+        // other part stays in the order the model produced it.
+        final replayParts = <dynamic>[
+          for (final part in lastRoundModelParts)
+            if (!(part is Map && _isGeminiServerToolPart(part))) part,
+        ];
+        convo.add({'role': 'model', 'parts': replayParts});
         final responseParts = <Map<String, dynamic>>[];
         for (final c in lastRoundCalls) {
           final name = (c['name'] ?? '').toString();

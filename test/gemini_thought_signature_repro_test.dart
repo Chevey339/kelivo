@@ -60,6 +60,18 @@ Map<String, dynamic> _toolCallPart({
   };
 }
 
+Map<String, dynamic> _toolResponsePart({
+  required String toolType,
+  required Map<String, dynamic> response,
+  required String id,
+  String? thoughtSignature,
+}) {
+  return {
+    'toolResponse': {'toolType': toolType, 'response': response, 'id': id},
+    if (thoughtSignature != null) 'thoughtSignature': thoughtSignature,
+  };
+}
+
 Map<String, dynamic> _textPart({
   required String text,
   String? thoughtSignature,
@@ -562,7 +574,7 @@ void main() {
       expect(chunks.isGenerationDone, isTrue);
     });
 
-    test('preserves signed toolCall and functionCall parts in order', () async {
+    test('drops the server tool block from a replayed tool turn', () async {
       final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
       addTearDown(() async {
         await server.close(force: true);
@@ -597,17 +609,15 @@ void main() {
           final body = jsonDecode(bodyText) as Map<String, dynamic>;
           final contents = (body['contents'] as List).cast<Map>();
           final modelParts = (contents[1]['parts'] as List).cast<Map>();
-          final toolCallIndex = modelParts.indexWhere(
-            (p) => p.containsKey('toolCall'),
-          );
           final functionCallIndex = modelParts.indexWhere(
             (p) => p.containsKey('functionCall'),
           );
 
-          expect(toolCallIndex, isNonNegative);
+          // Gemini rejects a replayed toolCall part once the turn is answered
+          // by functionResponse parts, so the server tool block cannot travel
+          // with a tool continuation.
+          expect(modelParts.where((p) => p.containsKey('toolCall')), isEmpty);
           expect(functionCallIndex, isNonNegative);
-          expect(toolCallIndex, lessThan(functionCallIndex));
-          expect(_hasThoughtSignature(modelParts[toolCallIndex]), isTrue);
           expect(_hasThoughtSignature(modelParts[functionCallIndex]), isTrue);
 
           request.response.statusCode = HttpStatus.ok;
@@ -874,6 +884,104 @@ void main() {
           _thoughtSignatureOf(replayedCall),
           'context_engineering_is_the_way_to_go',
         );
+      },
+    );
+
+    test(
+      'drops a whole server tool block, keeping the unsigned client call',
+      () async {
+        final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+        addTearDown(() async {
+          await server.close(force: true);
+        });
+
+        var requestCount = 0;
+        Map<String, dynamic> requestBody = const <String, dynamic>{};
+        server.listen((request) async {
+          requestCount++;
+          final bodyText = await utf8.decoder.bind(request).join();
+
+          if (requestCount == 1) {
+            request.response.statusCode = HttpStatus.ok;
+            request.response.headers.contentType = ContentType(
+              'text',
+              'event-stream',
+            );
+            request.response.headers.set('Transfer-Encoding', 'chunked');
+            // The shape a live gemini-3 turn produces: only the server tool
+            // parts are signed, and the client call is spliced between them.
+            request.response.write(
+              'data: ${jsonEncode(_streamChunk([
+                _toolCallPart(toolType: 'GOOGLE_SEARCH_WEB', args: {
+                  'queries': ['latest Flutter stable release'],
+                }, id: 'call_search', thoughtSignature: 'sig-google-search'),
+                _functionCallPart(name: 'lookup_docs', args: {'query': 'widget X'}),
+                _toolResponsePart(toolType: 'GOOGLE_SEARCH_WEB', response: {'search_suggestions': '<style>.chip {}</style>'}, id: 'call_search', thoughtSignature: 'sig-tool-response'),
+              ]))}\n\n',
+            );
+            request.response.write('data: [DONE]');
+            await request.response.close();
+            return;
+          }
+
+          if (requestCount == 2) {
+            requestBody = jsonDecode(bodyText) as Map<String, dynamic>;
+            request.response.statusCode = HttpStatus.ok;
+            request.response.headers.contentType = ContentType(
+              'text',
+              'event-stream',
+            );
+            request.response.headers.set('Transfer-Encoding', 'chunked');
+            request.response.write(
+              'data: ${jsonEncode(_streamChunk([_textPart(text: 'ok')], finishReason: 'STOP'))}\n\n',
+            );
+            request.response.write('data: [DONE]');
+            await request.response.close();
+            return;
+          }
+
+          fail('Unexpected request count: $requestCount');
+        });
+
+        final chunks = await ChatApiService.sendMessageStream(
+          config: _geminiConfig(
+            'http://${server.address.address}:${server.port}/v1beta',
+          ),
+          modelId: 'gemini-3.1-pro-preview',
+          messages: const [
+            {
+              'role': 'user',
+              'content':
+                  'Search for the latest Flutter release and look up widget X.',
+            },
+          ],
+          tools: const [
+            {
+              'type': 'function',
+              'function': {
+                'name': 'lookup_docs',
+                'description': 'Look up internal docs',
+                'parameters': {
+                  'type': 'object',
+                  'properties': {
+                    'query': {'type': 'string'},
+                  },
+                  'required': ['query'],
+                },
+              },
+            },
+          ],
+          onToolCall: (name, args, {String? toolCallId}) async => '{}',
+        ).toList();
+
+        expect(chunks.isGenerationDone, isTrue);
+        final contents = (requestBody['contents'] as List).cast<Map>();
+        final modelParts = (contents[1]['parts'] as List).cast<Map>();
+
+        expect(modelParts.where((p) => p.containsKey('toolCall')), isEmpty);
+        expect(modelParts.where((p) => p.containsKey('toolResponse')), isEmpty);
+        expect(modelParts, hasLength(1));
+        expect(modelParts.single['functionCall'], isA<Map>());
       },
     );
   });
