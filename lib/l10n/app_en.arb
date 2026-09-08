@@ -4852,5 +4852,11 @@
   "workspaceEnvShellHint": "Leave empty to use /bin/bash when available, otherwise /bin/sh. A custom shell must use an absolute path inside the environment.",
   "workspaceEnvProotArguments": "Extra PRoot arguments",
   "workspaceEnvProotArgumentsHint": "One argument per line, without shell quotes. For example, put -k and 5.10.0 on separate lines, or use --kernel-release=5.10.0. Changes apply to new commands and terminal sessions.",
-  "workspaceEnvProotInvalid": "Enter a valid absolute shell path and one PRoot argument per line."
+  "workspaceEnvProotInvalid": "Enter a valid absolute shell path and one PRoot argument per line.",
+  "workspaceFileMissing": "File no longer exists",
+  "workspaceFilePreviewUnavailable": "Preview unavailable",
+  "workspaceToolRelatedFiles": "Related files",
+  "workspaceToolFilesTruncated": "Only some files are listed.",
+  "displaySettingsPageShowProducedFilesTitle": "Show Files Below Replies",
+  "displaySettingsPageShowProducedFilesSubtitle": "Show files created or modified by tools below replies."
 }

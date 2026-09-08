@@ -5,11 +5,13 @@ import 'package:path/path.dart' as p;
 /// Snapshots file mtimes under workspace-related roots so a later `shell`
 /// call can report which files it created or modified.
 class FileSnapshot {
+  static const int defaultMaxEntries = 20000;
+
   /// Returns host path → mtime milliseconds. Skips dot-directories and
   /// `.l2s.*` overlay files. Caps at [maxEntries].
   static Future<Map<String, int>> snapshot(
     List<Directory> roots, {
-    int maxEntries = 20000,
+    int maxEntries = defaultMaxEntries,
   }) async {
     final out = <String, int>{};
     for (final root in roots) {

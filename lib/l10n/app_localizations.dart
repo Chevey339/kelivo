@@ -19574,6 +19574,42 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Enter a valid absolute shell path and one PRoot argument per line.'**
   String get workspaceEnvProotInvalid;
+
+  /// No description provided for @workspaceFileMissing.
+  ///
+  /// In en, this message translates to:
+  /// **'File no longer exists'**
+  String get workspaceFileMissing;
+
+  /// No description provided for @workspaceFilePreviewUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'Preview unavailable'**
+  String get workspaceFilePreviewUnavailable;
+
+  /// No description provided for @workspaceToolRelatedFiles.
+  ///
+  /// In en, this message translates to:
+  /// **'Related files'**
+  String get workspaceToolRelatedFiles;
+
+  /// No description provided for @workspaceToolFilesTruncated.
+  ///
+  /// In en, this message translates to:
+  /// **'Only some files are listed.'**
+  String get workspaceToolFilesTruncated;
+
+  /// No description provided for @displaySettingsPageShowProducedFilesTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Show Files Below Replies'**
+  String get displaySettingsPageShowProducedFilesTitle;
+
+  /// No description provided for @displaySettingsPageShowProducedFilesSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Show files created or modified by tools below replies.'**
+  String get displaySettingsPageShowProducedFilesSubtitle;
 }
 
 class _AppLocalizationsDelegate

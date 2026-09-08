@@ -123,7 +123,7 @@ class _RecordingResolver extends FileLinkResolver {
   File? result;
 
   @override
-  Future<File?> resolveToHostFile(
+  Future<FileSystemEntity?> resolveToHostEntry(
     KelivoLink link, {
     required String conversationId,
     required WorkspaceBinding binding,

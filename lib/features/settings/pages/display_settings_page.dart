@@ -1754,6 +1754,16 @@ class ChatItemDisplaySettingsPage extends StatelessWidget {
                 onChanged: (v) =>
                     context.read<SettingsProvider>().setShowToolCards(v),
               ),
+              _iosDivider(context),
+              _iosSwitchRow(
+                context,
+                icon: Lucide.FileText,
+                label: l10n.displaySettingsPageShowProducedFilesTitle,
+                tip: l10n.displaySettingsPageShowProducedFilesSubtitle,
+                value: sp.showProducedFiles,
+                onChanged: (v) =>
+                    context.read<SettingsProvider>().setShowProducedFiles(v),
+              ),
             ],
           ),
         ],

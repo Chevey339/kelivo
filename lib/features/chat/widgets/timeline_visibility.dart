@@ -482,9 +482,9 @@ double _estimateWorkspaceToolCardExtra({
   if (toolName == 'shell') {
     final tail = _workspaceEstimateTailLineCount(content, metadata);
     if (tail > 0) extra += tail * kEstimateWorkspaceTailLine;
-  } else if (toolName != 'edit_file') {
+  } else {
     final hasChips = switch (toolName) {
-      'read_file' || 'write_file' => path.isNotEmpty,
+      'read_file' || 'write_file' || 'edit_file' => path.isNotEmpty,
       'list_dir' =>
         path.isNotEmpty || _workspaceEstimateHasResultPaths(content, metadata),
       'glob' || 'grep' => _workspaceEstimateHasResultPaths(content, metadata),
@@ -522,7 +522,7 @@ bool _workspaceEstimateHasResultPaths(
 ) {
   final nested = metadata?['workspace'];
   final map = nested is Map ? nested : metadata;
-  final files = map?['changedFiles'];
+  final files = map?['files'];
   if (files is List && files.isNotEmpty) return true;
   if (content == null || content.isEmpty) return false;
   return const LineSplitter()

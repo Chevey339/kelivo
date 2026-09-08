@@ -368,9 +368,11 @@ class _UnifiedDetailState extends State<_UnifiedDetail> {
     final fontFamily = workspaceCodeFontFamily(context);
     final command = _commandBlock;
     final output = _activeOutput;
-    final outputLink = _meta?.outputLink;
-    final changed = _meta?.changedFiles ?? const <String>[];
-    final changedLinks = _meta?.changedLinks ?? const <String>[];
+    final files = _meta?.files ?? const <WorkspaceToolFile>[];
+    final logs = files.where((file) => file.role == WorkspaceFileRole.log);
+    final referenced = files
+        .where((file) => file.role != WorkspaceFileRole.log)
+        .toList();
     final diff = _meta?.diff ?? '';
     final error = workspaceErrorMessage(widget.part, _meta);
     final path = workspacePathOf(widget.part, meta: _meta);
@@ -442,25 +444,29 @@ class _UnifiedDetailState extends State<_UnifiedDetail> {
               : null,
         ),
       );
-      if (outputLink != null && outputLink.isNotEmpty) {
+      for (final log in logs) {
         slivers.add(const SliverToBoxAdapter(child: SizedBox(height: 8)));
         slivers.add(
           SliverToBoxAdapter(
             child: WorkspaceFileChip(
-              path: outputLink,
+              path: log.path,
               displayName: l10n.workspaceToolSavedOutput,
-              link: outputLink,
+              link: log.link,
               conversationId: widget.conversationId,
             ),
           ),
         );
       }
     }
-    if (changed.isNotEmpty) {
+    if (referenced.isNotEmpty) {
       addGap();
       slivers.add(
         SliverToBoxAdapter(
-          child: _MutedSectionLabel(label: l10n.workspaceToolChangedFiles),
+          child: _MutedSectionLabel(
+            label: referenced.any((file) => file.isChanged)
+                ? l10n.workspaceToolChangedFiles
+                : l10n.workspaceToolRelatedFiles,
+          ),
         ),
       );
       slivers.add(
@@ -469,13 +475,28 @@ class _UnifiedDetailState extends State<_UnifiedDetail> {
             spacing: 8,
             runSpacing: 8,
             children: [
-              for (var i = 0; i < changed.length; i++)
+              for (final file in referenced)
                 WorkspaceFileChip(
-                  path: changed[i],
-                  link: i < changedLinks.length ? changedLinks[i] : null,
+                  path: file.path,
+                  link: file.link,
+                  isDirectory: file.isDirectory,
                   conversationId: widget.conversationId,
                 ),
             ],
+          ),
+        ),
+      );
+    }
+    if (_meta?.filesTruncated == true) {
+      addGap();
+      slivers.add(
+        SliverToBoxAdapter(
+          child: Text(
+            l10n.workspaceToolFilesTruncated,
+            style: TextStyle(
+              fontSize: 12,
+              color: cs.onSurface.withValues(alpha: 0.55),
+            ),
           ),
         ),
       );

@@ -2738,6 +2738,9 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
     final showToolCardsSetting = context.select<SettingsProvider, bool>(
       (s) => s.showToolCards,
     );
+    final showProducedFiles = context.select<SettingsProvider, bool>(
+      (s) => s.showProducedFiles,
+    );
     final modelDisplayName = context.select<SettingsProvider, String>(
       _resolveModelDisplayName,
     );
@@ -3031,7 +3034,8 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
               }
               return widgets;
             }(),
-            if (_producedWorkspaceParts(widget.toolParts).isNotEmpty) ...[
+            if (showProducedFiles &&
+                _producedWorkspaceParts(widget.toolParts).isNotEmpty) ...[
               const SizedBox(height: 8),
               ProducedFilesRow(
                 parts: _producedWorkspaceParts(widget.toolParts),

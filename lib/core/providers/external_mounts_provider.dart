@@ -86,6 +86,7 @@ class ExternalMountsProvider extends ChangeNotifier
         renewed |=
             entry.access != next.access || entry.sourcePath != next.sourcePath;
         active[entry.id] = Mount(
+          externalId: entry.id,
           host: directory.path,
           guest: next.guestPath,
           readOnly: next.readOnly,

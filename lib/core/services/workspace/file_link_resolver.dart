@@ -4,10 +4,15 @@ import 'package:path/path.dart' as p;
 
 import '../../models/workspace_binding.dart';
 import '../../providers/workspace_provider.dart';
+import '../../providers/external_mounts_provider.dart';
 import '../../../utils/app_directories.dart';
+import 'workspace_paths.dart';
 
 enum KelivoLinkKind {
   workspaceFile,
+  chatFile,
+  externalFile,
+  temporaryFile,
   chatAttachment,
   chatOutput,
   skillFile,
@@ -19,13 +24,31 @@ class KelivoLink {
     required this.kind,
     required this.relativePath,
     this.conversationId,
+    this.mountId,
     this.terminalCommand,
   });
 
   final KelivoLinkKind kind;
   final String relativePath;
   final String? conversationId;
+  final String? mountId;
   final String? terminalCommand;
+
+  /// Absolute guest path for the referenced entry in its owning mount/session.
+  String? guestPath({String? mountRoot}) {
+    final root = switch (kind) {
+      KelivoLinkKind.workspaceFile => WorkspacePaths.guestWorkspace,
+      KelivoLinkKind.chatFile => WorkspacePaths.guestChat,
+      KelivoLinkKind.chatAttachment =>
+        '${WorkspacePaths.guestChat}/attachments',
+      KelivoLinkKind.chatOutput => '${WorkspacePaths.guestChat}/outputs',
+      KelivoLinkKind.skillFile => WorkspacePaths.guestSkills,
+      KelivoLinkKind.temporaryFile => WorkspacePaths.guestTmp,
+      KelivoLinkKind.externalFile => mountRoot,
+      KelivoLinkKind.terminal => null,
+    };
+    return root == null ? null : p.posix.join(root, relativePath);
+  }
 
   static const String scheme = 'kelivo';
 
@@ -82,16 +105,33 @@ class KelivoLink {
     }
 
     final segments = _decodedRelativeSegments(rawPath);
-    if (segments == null || segments.isEmpty) return null;
+    if (segments == null) return null;
 
     switch (host) {
+      case 'session':
+        return KelivoLink(
+          kind: KelivoLinkKind.chatFile,
+          relativePath: segments.join('/'),
+        );
+      case 'tmp':
+        return KelivoLink(
+          kind: KelivoLinkKind.temporaryFile,
+          relativePath: segments.join('/'),
+        );
+      case 'mounts':
+        if (segments.isEmpty) return null;
+        return KelivoLink(
+          kind: KelivoLinkKind.externalFile,
+          mountId: segments.first,
+          relativePath: segments.skip(1).join('/'),
+        );
       case 'workspace':
         return KelivoLink(
           kind: KelivoLinkKind.workspaceFile,
           relativePath: segments.join('/'),
         );
       case 'chat':
-        if (segments.length < 2) return null;
+        if (segments.isEmpty) return null;
         final folder = segments.first;
         final rest = segments.sublist(1);
         if (folder == 'attachments') {
@@ -106,6 +146,7 @@ class KelivoLink {
             relativePath: rest.join('/'),
           );
         }
+        if (rest.isEmpty) return null;
         // kelivo://chat/<conversationId>/… — model-emitted or explicit id.
         if (!_isSafeSegment(folder)) return null;
         if (rest.first == 'attachments' || rest.first == 'outputs') {
@@ -124,7 +165,6 @@ class KelivoLink {
           conversationId: folder,
         );
       case 'skills':
-        if (segments.length < 2) return null;
         return KelivoLink(
           kind: KelivoLinkKind.skillFile,
           relativePath: segments.join('/'),
@@ -138,7 +178,7 @@ class KelivoLink {
   /// absolute-host / drive paths. [rawPath] is the `/...` portion before
   /// query/fragment, not a normalized [Uri.path].
   static List<String>? _decodedRelativeSegments(String? rawPath) {
-    if (rawPath == null || rawPath.isEmpty || rawPath == '/') return null;
+    if (rawPath == null || rawPath.isEmpty || rawPath == '/') return const [];
     if (!rawPath.startsWith('/')) return null;
     var path = rawPath.substring(1);
     if (path.startsWith('/') || path.startsWith(r'\')) return null;
@@ -187,80 +227,120 @@ class KelivoLink {
   }
 }
 
+enum FileLinkFailure { missing, mountUnavailable }
+
+class FileLinkException implements Exception {
+  const FileLinkException(this.reason);
+  final FileLinkFailure reason;
+}
+
 class FileLinkResolver {
-  FileLinkResolver({required this.workspaces});
+  FileLinkResolver({required this.workspaces, this.externalMounts});
 
   final WorkspaceProvider workspaces;
+  final ExternalMountsProvider? externalMounts;
 
   Future<File?> resolveToHostFile(
     KelivoLink link, {
     required String conversationId,
     required WorkspaceBinding binding,
   }) async {
+    try {
+      final entry = await resolveToHostEntry(
+        link,
+        conversationId: conversationId,
+        binding: binding,
+      );
+      return entry is File ? entry : null;
+    } on FileLinkException {
+      return null;
+    }
+  }
+
+  Future<FileSystemEntity?> resolveToHostEntry(
+    KelivoLink link, {
+    required String conversationId,
+    required WorkspaceBinding binding,
+  }) async {
     if (link.kind == KelivoLinkKind.terminal) return null;
     if (!_isSafeRelativePath(link.relativePath)) return null;
-    final sessionId =
-        (link.conversationId != null && link.conversationId!.isNotEmpty)
-        ? link.conversationId!
-        : conversationId;
-
+    final sessionId = link.conversationId ?? conversationId;
+    late final String root;
     switch (link.kind) {
       case KelivoLinkKind.workspaceFile:
         if (!binding.isBound) return null;
         await workspaces.loaded;
         final workspace = workspaces.byId(binding.workspaceId!);
         if (workspace == null) return null;
-        final root = await workspaces.hostRootFor(workspace);
-        return _fileUnderRoot(root, link.relativePath);
+        root = await workspaces.hostRootFor(workspace);
       case KelivoLinkKind.chatAttachment:
-        final session = await AppDirectories.sessionDir(sessionId);
-        return _fileUnderRoot(
-          p.join(session.path, 'attachments'),
-          link.relativePath,
+        root = p.join(
+          (await AppDirectories.sessionDir(sessionId)).path,
+          'attachments',
         );
       case KelivoLinkKind.chatOutput:
-        final session = await AppDirectories.sessionDir(sessionId);
-        return _fileUnderRoot(
-          p.join(session.path, 'outputs'),
-          link.relativePath,
+        root = p.join(
+          (await AppDirectories.sessionDir(sessionId)).path,
+          'outputs',
         );
+      case KelivoLinkKind.chatFile:
+        root = (await AppDirectories.sessionDir(sessionId)).path;
       case KelivoLinkKind.skillFile:
-        final parts = link.relativePath.split('/');
-        if (parts.length < 2) return null;
-        final skillId = parts.first;
-        if (!KelivoLink._isSafeSegment(skillId)) return null;
-        final rel = parts.sublist(1).join('/');
-        if (!_isSafeRelativePath(rel)) return null;
-        final skillRoot = await AppDirectories.skillDir(skillId);
-        return _fileUnderRoot(skillRoot.path, rel);
+        root = (await AppDirectories.getSkillsDirectory()).path;
+      case KelivoLinkKind.temporaryFile:
+        root = Directory.systemTemp.path;
+      case KelivoLinkKind.externalFile:
+        final provider = externalMounts;
+        if (provider == null) {
+          throw const FileLinkException(FileLinkFailure.mountUnavailable);
+        }
+        try {
+          final mounts = await provider.resolveMounts();
+          final mount = mounts
+              .where((m) => m.externalId == link.mountId)
+              .firstOrNull;
+          if (mount == null) {
+            throw const FileLinkException(FileLinkFailure.mountUnavailable);
+          }
+          root = mount.host;
+        } catch (_) {
+          throw const FileLinkException(FileLinkFailure.mountUnavailable);
+        }
       case KelivoLinkKind.terminal:
         return null;
     }
+    return _entryUnderRoot(root, link.relativePath);
   }
 
   static bool _isSafeRelativePath(String relativePath) {
-    if (relativePath.isEmpty) return false;
+    if (relativePath.isEmpty) return true;
     if (relativePath.startsWith('/') || relativePath.startsWith(r'\')) {
       return false;
     }
     if (RegExp(r'^[a-zA-Z]:').hasMatch(relativePath)) return false;
-    for (final part in relativePath.split('/')) {
-      if (!KelivoLink._isSafeSegment(part)) return false;
-    }
-    return true;
+    return relativePath.split('/').every(KelivoLink._isSafeSegment);
   }
 
-  static File? _fileUnderRoot(String root, String relativePath) {
-    if (!_isSafeRelativePath(relativePath)) return null;
+  static FileSystemEntity? _entryUnderRoot(String root, String relativePath) {
     try {
-      final canonicalRoot = p.canonicalize(root);
-      final joined = p.join(canonicalRoot, relativePath);
-      final canonical = p.canonicalize(joined);
-      if (!p.isWithin(canonicalRoot, canonical)) return null;
-      if (!FileSystemEntity.isFileSync(canonical)) return null;
-      return File(canonical);
-    } on FileSystemException {
+      final canonicalRoot = Directory(root).resolveSymbolicLinksSync();
+      final joined = p.join(p.canonicalize(root), relativePath);
+      final type = FileSystemEntity.typeSync(joined);
+      if (type == FileSystemEntityType.notFound) {
+        throw const FileLinkException(FileLinkFailure.missing);
+      }
+      final canonical = type == FileSystemEntityType.directory
+          ? Directory(joined).resolveSymbolicLinksSync()
+          : File(joined).resolveSymbolicLinksSync();
+      if (!p.equals(canonicalRoot, canonical) &&
+          !p.isWithin(canonicalRoot, canonical)) {
+        return null;
+      }
+      if (type == FileSystemEntityType.file) return File(joined);
+      if (type == FileSystemEntityType.directory) return Directory(joined);
       return null;
+    } on FileSystemException {
+      throw const FileLinkException(FileLinkFailure.missing);
     }
   }
 }

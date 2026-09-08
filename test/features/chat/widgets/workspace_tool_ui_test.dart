@@ -17,6 +17,7 @@ import 'package:Kelivo/core/services/workspace/workspace_tool_metadata.dart';
 import 'package:Kelivo/features/chat/widgets/chat_message_widget.dart';
 import 'package:Kelivo/features/home/services/ask_user_interaction_service.dart';
 import 'package:Kelivo/features/chat/widgets/workspace_tool_detail.dart';
+import 'package:Kelivo/features/chat/widgets/produced_files_row.dart';
 import 'package:Kelivo/features/chat/widgets/workspace_tool_ui.dart';
 import 'package:Kelivo/features/home/services/tool_approval_service.dart';
 import 'package:Kelivo/features/workspace/workspace_navigation.dart';
@@ -149,6 +150,46 @@ void main() {
       }
     },
   );
+
+  testWidgets('hiding produced files leaves the tool file chip available', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      _harness(
+        toolParts: [
+          _uiPart(
+            tool: 'write_file',
+            meta: const WorkspaceToolMetadata(
+              tool: 'write_file',
+              status: 'ok',
+              path: '/workspace/result.txt',
+              files: [
+                WorkspaceToolFile(
+                  path: '/workspace/result.txt',
+                  link: 'kelivo://workspace/result.txt',
+                  role: WorkspaceFileRole.created,
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+    await tester.pump();
+    expect(find.byKey(ProducedFilesRow.rowKey), findsOneWidget);
+    expect(find.text('result.txt'), findsNWidgets(2));
+    final settings = tester
+        .element(find.byType(ChatMessageWidget))
+        .read<SettingsProvider>();
+    await settings.setShowProducedFiles(false);
+    await tester.pump();
+    expect(find.byKey(ProducedFilesRow.rowKey), findsNothing);
+    expect(find.text('result.txt'), findsOneWidget);
+    expect(find.text('Write file'), findsOneWidget);
+    await settings.setShowProducedFiles(true);
+    await tester.pump();
+    expect(find.byKey(ProducedFilesRow.rowKey), findsOneWidget);
+  });
 
   testWidgets('status for running / exit 0 / exit 1', (tester) async {
     await tester.pumpWidget(
@@ -403,7 +444,17 @@ void main() {
               path: 'src',
               count: 8,
               truncated: true,
-              changedFiles: <String>['src/empty.md', 'src/attachments'],
+              files: [
+                WorkspaceToolFile(
+                  path: 'src/empty.md',
+                  link: 'kelivo://workspace/src/empty.md',
+                ),
+                WorkspaceToolFile(
+                  path: 'src/attachments',
+                  link: 'kelivo://workspace/src/attachments',
+                  isDirectory: true,
+                ),
+              ],
             ),
           ),
         ],
@@ -416,8 +467,8 @@ void main() {
     expect(find.textContaining('src'), findsWidgets);
     expect(find.textContaining('3 lines'), findsOneWidget);
     expect(find.textContaining('8 items'), findsOneWidget);
-    expect(find.text('empty.md'), findsNothing);
-    expect(find.text('attachments'), findsNothing);
+    expect(find.text('empty.md'), findsOneWidget);
+    expect(find.text('attachments'), findsOneWidget);
     expect(find.text('outputs'), findsNothing);
   });
 

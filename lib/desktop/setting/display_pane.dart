@@ -87,6 +87,8 @@ class _DisplaySettingsBody extends StatelessWidget {
                   _ToggleRowShowThinkingCards(),
                   _RowDivider(),
                   _ToggleRowShowToolCards(),
+                  _RowDivider(),
+                  _ToggleRowShowProducedFiles(),
                 ],
               ),
               const SizedBox(height: 16),
@@ -2530,6 +2532,22 @@ class _ToggleRowShowToolCards extends StatelessWidget {
       tip: l10n.displaySettingsPageShowToolCardsSubtitle,
       value: sp.showToolCards,
       onChanged: (v) => context.read<SettingsProvider>().setShowToolCards(v),
+    );
+  }
+}
+
+class _ToggleRowShowProducedFiles extends StatelessWidget {
+  const _ToggleRowShowProducedFiles();
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    final sp = context.watch<SettingsProvider>();
+    return _ToggleRow(
+      label: l10n.displaySettingsPageShowProducedFilesTitle,
+      tip: l10n.displaySettingsPageShowProducedFilesSubtitle,
+      value: sp.showProducedFiles,
+      onChanged: (v) =>
+          context.read<SettingsProvider>().setShowProducedFiles(v),
     );
   }
 }

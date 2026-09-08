@@ -1,3 +1,8 @@
+import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
+import 'package:Kelivo/core/models/workspace_directory_access.dart';
+import 'package:Kelivo/core/providers/external_mounts_provider.dart';
+import '../sandbox/sandbox_channel_harness.dart';
 import 'dart:io';
 
 import 'package:drift/native.dart';
@@ -65,6 +70,26 @@ void main() {
       expect(terminal?.relativePath, '');
     });
 
+    test('directory references retain complete guest paths for copying', () {
+      const cases = {
+        'kelivo://workspace/reports': '/workspace/reports',
+        'kelivo://chat/attachments/incoming': '/chat/attachments/incoming',
+        'kelivo://chat/outputs/reports': '/chat/outputs/reports',
+        'kelivo://session/notes': '/chat/notes',
+        'kelivo://skills/skill-id': '/skills/skill-id',
+        'kelivo://tmp/build': '/tmp/build',
+        'kelivo://mounts/mount-id/reports': '/mounts/Renamed/reports',
+      };
+      for (final entry in cases.entries) {
+        expect(
+          KelivoLink.tryParse(
+            entry.key,
+          )!.guestPath(mountRoot: '/mounts/Renamed'),
+          entry.value,
+        );
+      }
+    });
+
     test('accepts underscores in workspace paths', () {
       final link = KelivoLink.tryParse(
         'kelivo://workspace/shenyu/daily_sign.py',
@@ -130,8 +155,14 @@ void main() {
 
     test('rejects unknown hosts and incomplete chat/skill paths', () {
       expect(KelivoLink.tryParse('kelivo://other/foo'), isNull);
-      expect(KelivoLink.tryParse('kelivo://chat/attachments'), isNull);
-      expect(KelivoLink.tryParse('kelivo://skills/only-id'), isNull);
+      expect(
+        KelivoLink.tryParse('kelivo://chat/attachments')?.relativePath,
+        isEmpty,
+      );
+      expect(
+        KelivoLink.tryParse('kelivo://skills/only-id')?.relativePath,
+        'only-id',
+      );
       expect(KelivoLink.tryParse('https://example.com'), isNull);
       expect(KelivoLink.tryParse(''), isNull);
     });
@@ -346,6 +377,182 @@ void main() {
       );
       expect(resolved?.path, output.path);
     });
+
+    test(
+      'directory roots resolve to folders, and missing files have an explicit reason',
+      () async {
+        final rootLink = KelivoLink.tryParse('kelivo://workspace/')!;
+        final directory = await resolver.resolveToHostEntry(
+          rootLink,
+          conversationId: 'conv-1',
+          binding: binding(),
+        );
+        expect(directory, isA<Directory>());
+        expect(directory?.path, workspaceRoot.path);
+        expect(
+          await resolver.resolveToHostFile(
+            rootLink,
+            conversationId: 'conv-1',
+            binding: binding(),
+          ),
+          isNull,
+        );
+        await expectLater(
+          resolver.resolveToHostEntry(
+            KelivoLink.tryParse('kelivo://workspace/gone.txt')!,
+            conversationId: 'conv-1',
+            binding: binding(),
+          ),
+          throwsA(
+            isA<FileLinkException>().having(
+              (e) => e.reason,
+              'reason',
+              FileLinkFailure.missing,
+            ),
+          ),
+        );
+      },
+    );
+
+    test(
+      'rejects file and directory symlinks escaping a linked root',
+      () async {
+        final outside = File(p.join(tempDir.path, 'secret.txt'))
+          ..writeAsStringSync('private');
+        Link(p.join(workspaceRoot.path, 'escape.txt')).createSync(outside.path);
+        Link(p.join(workspaceRoot.path, 'escape-dir')).createSync(tempDir.path);
+        for (final path in [
+          'escape.txt',
+          'escape-dir',
+          'escape-dir/secret.txt',
+        ]) {
+          expect(
+            await resolver.resolveToHostEntry(
+              KelivoLink.tryParse('kelivo://workspace/$path')!,
+              conversationId: 'conv-1',
+              binding: binding(),
+            ),
+            isNull,
+          );
+        }
+      },
+      skip: Platform.isWindows ? 'requires symlink privileges' : false,
+    );
+
+    test(
+      'external references survive rename but reject revoked or removed grants',
+      () async {
+        debugDefaultTargetPlatformOverride = TargetPlatform.android;
+        final harness = SandboxChannelHarness();
+        final root = Directory(p.join(tempDir.path, 'external'))..createSync();
+        final file = File(p.join(root.path, '报告.txt'))..writeAsStringSync('ok');
+        var revoked = false;
+        harness.handler = (call) {
+          if (call.method == 'resolveDirectory') {
+            if (revoked) {
+              throw PlatformException(code: 'external_folder_unavailable');
+            }
+            return {'path': root.path, 'token': 'grant'};
+          }
+          return null;
+        };
+        harness.install();
+        final mounts = ExternalMountsProvider(
+          store: ExtensionEntityStore(database),
+          channel: harness.channel,
+        );
+        try {
+          await mounts.loaded;
+          await mounts.add(
+            WorkspaceDirectory(
+              path: root.path,
+              access: const WorkspaceDirectoryAccess(
+                platform: 'android',
+                token: 'grant',
+              ),
+            ),
+            name: 'Data',
+            readOnly: true,
+          );
+          final paths = WorkspacePaths.sandboxed(
+            workspaceHostRoot: workspaceRoot.path,
+            sessionHostDir: appData.path,
+            skillsHostDir: appData.path,
+            externalMounts: mounts.activeMounts,
+          );
+          final link = WorkspaceToolsService.linkFor(
+            await paths.resolveReal('/mounts/Data/报告.txt', cwd: '/workspace'),
+            paths: paths,
+          )!;
+          final parsed = KelivoLink.tryParse(link)!;
+          expect(parsed.mountId, mounts.entries.single.id);
+          final mountResolver = FileLinkResolver(
+            workspaces: workspaces,
+            externalMounts: mounts,
+          );
+          await mounts.update(parsed.mountId!, name: 'Renamed', readOnly: true);
+          expect(
+            (await mountResolver.resolveToHostFile(
+              parsed,
+              conversationId: 'conv-1',
+              binding: binding(),
+            ))?.path,
+            file.path,
+          );
+          final rootLink = KelivoLink.tryParse(
+            'kelivo://mounts/${parsed.mountId}',
+          )!;
+          expect(
+            await mountResolver.resolveToHostEntry(
+              rootLink,
+              conversationId: 'conv-1',
+              binding: binding(),
+            ),
+            isA<Directory>(),
+          );
+          revoked = true;
+          await expectLater(
+            mountResolver.resolveToHostEntry(
+              parsed,
+              conversationId: 'conv-1',
+              binding: binding(),
+            ),
+            throwsA(
+              isA<FileLinkException>().having(
+                (e) => e.reason,
+                'reason',
+                FileLinkFailure.mountUnavailable,
+              ),
+            ),
+          );
+          revoked = false;
+          await mounts.remove(parsed.mountId!);
+          await mounts.add(
+            WorkspaceDirectory(
+              path: root.path,
+              access: const WorkspaceDirectoryAccess(
+                platform: 'android',
+                token: 'grant',
+              ),
+            ),
+            name: 'Data',
+            readOnly: true,
+          );
+          expect(
+            await mountResolver.resolveToHostFile(
+              parsed,
+              conversationId: 'conv-1',
+              binding: binding(),
+            ),
+            isNull,
+          );
+        } finally {
+          mounts.dispose();
+          harness.dispose();
+          debugDefaultTargetPlatformOverride = null;
+        }
+      },
+    );
 
     test('terminal links do not resolve to a file', () async {
       final resolved = await resolver.resolveToHostFile(

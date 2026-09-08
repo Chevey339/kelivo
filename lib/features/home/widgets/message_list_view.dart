@@ -152,6 +152,7 @@ class MessageListView extends StatefulWidget {
     this.collapseThinkingSteps = false,
     this.showThinkingCards = true,
     this.showToolCards = true,
+    this.showProducedFiles = true,
     this.showToolResultSummary = false,
     this.hideToolResultImages = false,
     this.collapsedCodeLines,
@@ -258,6 +259,9 @@ class MessageListView extends StatefulWidget {
 
   /// Whether tool-use cards render in chat.
   final bool showToolCards;
+
+  /// Whether the file summary below a reply occupies height.
+  final bool showProducedFiles;
 
   /// Whether collapsed tool cards also show a short result summary.
   final bool showToolResultSummary;
@@ -1202,6 +1206,7 @@ class _MessageListViewState extends State<MessageListView> {
         oldWidget.collapseThinkingSteps != widget.collapseThinkingSteps ||
         oldWidget.showThinkingCards != widget.showThinkingCards ||
         oldWidget.showToolCards != widget.showToolCards ||
+        oldWidget.showProducedFiles != widget.showProducedFiles ||
         oldWidget.showToolResultSummary != widget.showToolResultSummary ||
         oldWidget.hideToolResultImages != widget.hideToolResultImages ||
         oldWidget.collapsedCodeLines != widget.collapsedCodeLines ||

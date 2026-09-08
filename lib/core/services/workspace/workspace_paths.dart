@@ -139,22 +139,22 @@ class WorkspacePaths {
   String toModelPath(String hostPath) {
     if (!sandboxed) return _canonHost(hostPath);
     for (final mount in _externalMounts) {
-      final rel = _relativeToRoot(mount.host, hostPath);
+      final rel = relativeToHostRoot(mount.host, hostPath);
       if (rel != null) return _guestJoin(mount.guest, rel);
     }
-    final workspaceRel = _relativeToRoot(workspaceHostRoot, hostPath);
+    final workspaceRel = relativeToHostRoot(workspaceHostRoot, hostPath);
     if (workspaceRel != null) {
       return _guestJoin(guestWorkspace, workspaceRel);
     }
-    final chatRel = _relativeToRoot(sessionHostDir, hostPath);
+    final chatRel = relativeToHostRoot(sessionHostDir, hostPath);
     if (chatRel != null) {
       return _guestJoin(guestChat, chatRel);
     }
-    final skillsRel = _relativeToRoot(skillsHostDir, hostPath);
+    final skillsRel = relativeToHostRoot(skillsHostDir, hostPath);
     if (skillsRel != null) {
       return _guestJoin(guestSkills, skillsRel);
     }
-    final tmpRel = _relativeToRoot(tmpHostRoot, hostPath);
+    final tmpRel = relativeToHostRoot(tmpHostRoot, hostPath);
     if (tmpRel != null) {
       return _guestJoin(guestTmp, tmpRel);
     }
@@ -365,7 +365,7 @@ class WorkspacePaths {
     return false;
   }
 
-  String? _relativeToRoot(String root, String hostPath) {
+  static String? relativeToHostRoot(String root, String hostPath) {
     for (final alias in _rootVariants(root)) {
       for (final cand in _rootVariants(hostPath)) {
         if (p.equals(alias, cand)) return '';

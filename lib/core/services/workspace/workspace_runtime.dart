@@ -8,8 +8,14 @@ enum OutputStreamKind { stdout, stderr }
 
 /// A host directory exposed to the guest at [guest].
 class Mount {
-  const Mount({required this.host, required this.guest, this.readOnly = false});
+  const Mount({
+    required this.host,
+    required this.guest,
+    this.readOnly = false,
+    this.externalId,
+  });
 
+  final String? externalId;
   final String host;
   final String guest;
   final bool readOnly;
@@ -18,12 +24,13 @@ class Mount {
   bool operator ==(Object other) =>
       identical(this, other) ||
       other is Mount &&
+          other.externalId == externalId &&
           other.host == host &&
           other.guest == guest &&
           other.readOnly == readOnly;
 
   @override
-  int get hashCode => Object.hash(host, guest, readOnly);
+  int get hashCode => Object.hash(host, guest, readOnly, externalId);
 
   @override
   String toString() => 'Mount(host: $host, guest: $guest)';

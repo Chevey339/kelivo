@@ -10434,6 +10434,25 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get workspaceEnvProotInvalid => '请填写有效的 Shell 绝对路径，并将 PRoot 参数逐行填写。';
+
+  @override
+  String get workspaceFileMissing => '文件已不存在';
+
+  @override
+  String get workspaceFilePreviewUnavailable => '无法预览';
+
+  @override
+  String get workspaceToolRelatedFiles => '相关文件';
+
+  @override
+  String get workspaceToolFilesTruncated => '仅列出部分文件。';
+
+  @override
+  String get displaySettingsPageShowProducedFilesTitle => '显示回复底部文件卡片';
+
+  @override
+  String get displaySettingsPageShowProducedFilesSubtitle =>
+      '在回复底部显示工具创建或修改的文件。';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hans`).
@@ -20792,6 +20811,25 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get workspaceEnvProotInvalid => '请填写有效的 Shell 绝对路径，并将 PRoot 参数逐行填写。';
+
+  @override
+  String get workspaceFileMissing => '文件已不存在';
+
+  @override
+  String get workspaceFilePreviewUnavailable => '无法预览';
+
+  @override
+  String get workspaceToolRelatedFiles => '相关文件';
+
+  @override
+  String get workspaceToolFilesTruncated => '仅列出部分文件。';
+
+  @override
+  String get displaySettingsPageShowProducedFilesTitle => '显示回复底部文件卡片';
+
+  @override
+  String get displaySettingsPageShowProducedFilesSubtitle =>
+      '在回复底部显示工具创建或修改的文件。';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hant`).
@@ -31227,4 +31265,23 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get workspaceEnvProotInvalid => '請填寫有效的 Shell 絕對路徑，並將 PRoot 參數逐行填寫。';
+
+  @override
+  String get workspaceFileMissing => '檔案已不存在';
+
+  @override
+  String get workspaceFilePreviewUnavailable => '無法預覽';
+
+  @override
+  String get workspaceToolRelatedFiles => '相關檔案';
+
+  @override
+  String get workspaceToolFilesTruncated => '僅列出部分檔案。';
+
+  @override
+  String get displaySettingsPageShowProducedFilesTitle => '顯示回覆底部檔案卡片';
+
+  @override
+  String get displaySettingsPageShowProducedFilesSubtitle =>
+      '在回覆底部顯示工具建立或修改的檔案。';
 }

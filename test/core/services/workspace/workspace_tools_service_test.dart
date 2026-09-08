@@ -8,6 +8,7 @@ import 'package:path/path.dart' as p;
 import 'package:Kelivo/core/models/workspace.dart';
 import 'package:Kelivo/core/models/environment_variable.dart';
 import 'package:Kelivo/core/models/workspace_binding.dart';
+import 'package:Kelivo/core/services/workspace/file_link_resolver.dart';
 import 'package:Kelivo/core/services/workspace/tool_run_registry.dart';
 import 'package:Kelivo/core/services/workspace/workspace_paths.dart';
 import 'package:Kelivo/core/services/workspace/workspace_runtime.dart';
@@ -41,6 +42,17 @@ class _SandboxedRuntime extends FakeWorkspaceRuntime {
   @override
   Future<RuntimeStatus> status() async {
     return const RuntimeStatus(ready: true, engine: 'fake', sandboxed: true);
+  }
+}
+
+class _InterruptedWriter extends FakeWorkspaceRuntime {
+  _InterruptedWriter(this.throwError);
+  final bool throwError;
+  @override
+  Stream<CommandEvent> run(CommandRequest request) async* {
+    yield const CommandStarted();
+    File(p.join(request.cwd, 'partial.txt')).writeAsStringSync('saved');
+    if (throwError) throw StateError('stream interrupted');
   }
 }
 
@@ -480,7 +492,13 @@ void main() {
         expect(payload['output_file'], isNotNull);
         final offload = File(p.join(sessionDir.path, 'outputs', 'run-seq.txt'));
         expect(offload.existsSync(), isTrue);
-        expect(metaOf(result).outputLink, isNotNull);
+        expect(
+          metaOf(result).files
+              .where((file) => file.role == WorkspaceFileRole.log)
+              .single
+              .link,
+          isNotNull,
+        );
       },
     );
 
@@ -794,6 +812,235 @@ void main() {
     );
   });
 
+  test(
+    'file tools return the same reference and only mutations are produced',
+    () async {
+      final tools = service();
+      final context = ctx(sandboxed: true);
+      final fileName = Platform.isWindows ? 'report 报告.txt' : 'report:报告.txt';
+      final path = '/workspace/$fileName';
+      final write = metaOf(
+        await tools.handle(context, 'write_file', {
+          'path': path,
+          'content': 'needle\nneedle',
+        }, toolCallId: 'w'),
+      );
+      final read = metaOf(
+        await tools.handle(context, 'read_file', {
+          'path': path,
+        }, toolCallId: 'r'),
+      );
+      final glob = metaOf(
+        await tools.handle(context, 'glob', {
+          'pattern': '*.txt',
+        }, toolCallId: 'g'),
+      );
+      final grep = metaOf(
+        await tools.handle(context, 'grep', {
+          'pattern': 'needle',
+        }, toolCallId: 's'),
+      );
+      final edit = metaOf(
+        await tools.handle(context, 'edit_file', {
+          'path': path,
+          'old_string': 'needle',
+          'new_string': 'updated',
+          'replace_all': true,
+        }, toolCallId: 'e'),
+      );
+      expect(
+        write.files.single.link,
+        Platform.isWindows
+            ? 'kelivo://workspace/report%20%E6%8A%A5%E5%91%8A.txt'
+            : 'kelivo://workspace/report%3A%E6%8A%A5%E5%91%8A.txt',
+      );
+      expect(
+        KelivoLink.tryParse(write.files.single.link!)?.relativePath,
+        fileName,
+      );
+      for (final result in [read, glob, grep, edit]) {
+        expect(result.files.single.link, write.files.single.link);
+        expect(result.files.single.path, path);
+      }
+      expect(grep.count, 2);
+      expect(
+        [
+          read,
+          glob,
+          grep,
+        ].expand((meta) => meta.files).any((f) => f.isProduced),
+        isFalse,
+      );
+      expect(write.files.single.role, WorkspaceFileRole.created);
+      expect(edit.files.single.role, WorkspaceFileRole.modified);
+      final noop = metaOf(
+        await tools.handle(context, 'edit_file', {
+          'path': path,
+          'old_string': 'updated',
+          'new_string': 'updated',
+          'replace_all': true,
+        }, toolCallId: 'noop'),
+      );
+      expect(noop.files.single.isProduced, isFalse);
+      final missing = metaOf(
+        await tools.handle(context, 'read_file', {
+          'path': '/workspace/missing',
+        }, toolCallId: 'missing'),
+      );
+      expect(missing.files, isEmpty);
+    },
+  );
+
+  test(
+    'directory, session and external results carry usable identities',
+    () async {
+      final external = Directory(p.join(tmp.path, 'external'))..createSync();
+      final context = ctx(
+        sandboxed: true,
+        externalMounts: [
+          Mount(
+            host: external.path,
+            guest: '/mounts/Data',
+            externalId: 'mount-1',
+          ),
+        ],
+      );
+      final tools = service();
+      for (final path in ['/mounts/Data/a.txt', '/chat/note.txt']) {
+        final result = metaOf(
+          await tools.handle(context, 'write_file', {
+            'path': path,
+            'content': 'ok',
+          }, toolCallId: path),
+        );
+        expect(result.files.single.isProduced, isTrue);
+        expect(
+          result.files.single.link,
+          path.startsWith('/mounts')
+              ? 'kelivo://mounts/mount-1/a.txt'
+              : 'kelivo://session/note.txt',
+        );
+      }
+      final listing = metaOf(
+        await tools.handle(context, 'list_dir', {
+          'path': '/mounts/Data',
+        }, toolCallId: 'list'),
+      );
+      expect(listing.files.first.isDirectory, isTrue);
+      expect(listing.files.first.link, 'kelivo://mounts/mount-1');
+      expect(listing.files.last.link, 'kelivo://mounts/mount-1/a.txt');
+      final glob = metaOf(
+        await tools.handle(context, 'glob', {
+          'path': '/mounts/Data',
+          'pattern': '*.txt',
+        }, toolCallId: 'glob'),
+      );
+      expect(glob.files.single.link, listing.files.last.link);
+    },
+  );
+
+  test(
+    'shell retains changes after failure and scans only workspace and session',
+    skip: canRunReal ? false : 'needs /bin/sh',
+    () async {
+      final existing = File(p.join(workspaceDir.path, 'existing.txt'))
+        ..writeAsStringSync('old');
+      existing.setLastModifiedSync(DateTime.utc(2000));
+      final tools = service(
+        runtime: FakeWorkspaceRuntime(useRealProcess: true),
+      );
+      final result = metaOf(
+        await tools.handle(ctx(), 'shell', {
+          'command':
+              'printf new > existing.txt; printf new > result.csv; printf session > ../session/note.txt; printf outside > ../outside.txt; exit 1',
+        }, toolCallId: 'failed-with-output'),
+      );
+      expect(result.exitCode, 1);
+      expect(result.files.map((f) => p.basename(f.path)).toSet(), {
+        'existing.txt',
+        'result.csv',
+        'note.txt',
+      });
+      expect(result.files.every((f) => f.link != null && f.isProduced), isTrue);
+      expect(
+        result.files
+            .firstWhere((f) => p.basename(f.path) == 'existing.txt')
+            .role,
+        WorkspaceFileRole.modified,
+      );
+      expect(
+        result.files.firstWhere((f) => p.basename(f.path) == 'note.txt').link,
+        'kelivo://session/note.txt',
+      );
+      final noChanges = metaOf(
+        await tools.handle(ctx(), 'shell', {
+          'command': 'cat result.csv',
+        }, toolCallId: 'read-only-shell'),
+      );
+      expect(noChanges.files, isEmpty);
+    },
+  );
+
+  test('newline-only edits remain produced files', () async {
+    final tools = service();
+    final context = ctx(sandboxed: true);
+    for (final pair in [('hello', 'hello\n'), ('hello\r\n', 'hello\n')]) {
+      final file = File(p.join(workspaceDir.path, 'newlines.txt'));
+      await file.writeAsString(pair.$1);
+      final result = metaOf(
+        await tools.handle(context, 'edit_file', {
+          'path': '/workspace/newlines.txt',
+          'old_string': pair.$1,
+          'new_string': pair.$2,
+        }, toolCallId: 'newline'),
+      );
+      expect(result.status, 'ok');
+      expect(result.added, 0);
+      expect(result.removed, 0);
+      expect(await file.readAsString(), pair.$2);
+      expect(result.files.single.isProduced, isTrue);
+    }
+  });
+
+  test(
+    'native skill reads report the skill ID without path separators',
+    () async {
+      final skillFile = File(p.join(skillsDir.path, 'skill-id', 'SKILL.md'));
+      await skillFile.parent.create();
+      await skillFile.writeAsString('Skill instructions');
+      final readIds = <String>[];
+      final tools = WorkspaceToolsService(
+        onSkillRead: (id) async {
+          readIds.add(id);
+        },
+      );
+      final result = metaOf(
+        await tools.handle(ctx(), 'read_file', {
+          'path': skillFile.path,
+        }, toolCallId: 'read-skill'),
+      );
+      expect(result.status, 'ok');
+      expect(readIds, ['skill-id']);
+    },
+  );
+
+  test('runtime failures still report files already written', () async {
+    for (final throwError in [true, false]) {
+      final result = metaOf(
+        await service(runtime: _InterruptedWriter(throwError)).handle(
+          ctx(),
+          'shell',
+          {'command': 'write'},
+          toolCallId: 'partial-$throwError',
+        ),
+      );
+      expect(result.status, 'error');
+      expect(result.files.single.link, 'kelivo://workspace/partial.txt');
+      expect(result.files.single.isProduced, isTrue);
+      File(p.join(workspaceDir.path, 'partial.txt')).deleteSync();
+    }
+  });
+
   group('metadata', () {
     test('fromJson(toJson) round trip', () {
       final original = WorkspaceToolMetadata(
@@ -801,7 +1048,6 @@ void main() {
         status: 'ok',
         code: 'x',
         path: '/workspace/a.txt',
-        link: 'kelivo://workspace/a.txt',
         command: 'echo hi',
         exitCode: 0,
         durationMs: 12,
@@ -810,9 +1056,19 @@ void main() {
         interrupted: false,
         stdoutPreview: 'out',
         stderrPreview: 'err',
-        outputLink: 'kelivo://chat/outputs/t.txt',
-        changedFiles: const ['/workspace/a.txt'],
-        changedLinks: const ['kelivo://workspace/a.txt'],
+        files: const [
+          WorkspaceToolFile(
+            path: '/workspace/a.txt',
+            link: 'kelivo://workspace/a.txt',
+            role: WorkspaceFileRole.modified,
+          ),
+          WorkspaceToolFile(
+            path: '/chat/outputs/t.txt',
+            link: 'kelivo://chat/outputs/t.txt',
+            role: WorkspaceFileRole.log,
+          ),
+        ],
+        filesTruncated: true,
         diff: '@@',
         added: 1,
         removed: 2,

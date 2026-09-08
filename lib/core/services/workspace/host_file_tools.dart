@@ -49,12 +49,14 @@ class WriteFileResult {
 
 class EditFileResult {
   const EditFileResult({
+    required this.changed,
     required this.diff,
     required this.replacements,
     required this.strategy,
     required this.updated,
   });
 
+  final bool changed;
   final UnifiedDiff diff;
   final int replacements;
   final String strategy;
@@ -244,6 +246,7 @@ class HostFileTools {
     final applied = outcome as EditApplied;
     await file.writeAsString(applied.updated);
     return EditFileResult(
+      changed: original != applied.updated,
       diff: UnifiedDiff.compute(
         original,
         applied.updated,

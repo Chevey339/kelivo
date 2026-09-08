@@ -1,4 +1,7 @@
 import 'output_buffer.dart';
+import 'workspace_tool_file.dart';
+
+export 'workspace_tool_file.dart';
 
 /// Chat-UI metadata for a workspace tool result.
 ///
@@ -11,7 +14,8 @@ class WorkspaceToolMetadata {
     required this.status,
     this.code,
     this.path,
-    this.link,
+    this.files = const [],
+    this.filesTruncated = false,
     this.command,
     this.exitCode,
     this.durationMs,
@@ -20,9 +24,6 @@ class WorkspaceToolMetadata {
     this.interrupted,
     this.stdoutPreview,
     this.stderrPreview,
-    this.outputLink,
-    this.changedFiles,
-    this.changedLinks,
     this.diff,
     this.added,
     this.removed,
@@ -38,7 +39,8 @@ class WorkspaceToolMetadata {
   final String status;
   final String? code;
   final String? path;
-  final String? link;
+  final List<WorkspaceToolFile> files;
+  final bool filesTruncated;
   final String? command;
   final int? exitCode;
   final int? durationMs;
@@ -47,9 +49,6 @@ class WorkspaceToolMetadata {
   final bool? interrupted;
   final String? stdoutPreview;
   final String? stderrPreview;
-  final String? outputLink;
-  final List<String>? changedFiles;
-  final List<String>? changedLinks;
   final String? diff;
   final int? added;
   final int? removed;
@@ -67,7 +66,8 @@ class WorkspaceToolMetadata {
         'status': status,
         'code': code,
         'path': path,
-        'link': link,
+        'files': [for (final file in files) file.toJson()],
+        'filesTruncated': filesTruncated,
         'command': command,
         'exitCode': exitCode,
         'durationMs': durationMs,
@@ -76,9 +76,6 @@ class WorkspaceToolMetadata {
         'interrupted': interrupted,
         'stdoutPreview': capPreview(stdoutPreview),
         'stderrPreview': capPreview(stderrPreview),
-        'outputLink': outputLink,
-        'changedFiles': changedFiles,
-        'changedLinks': changedLinks,
         'diff': diff,
         'added': added,
         'removed': removed,
@@ -102,7 +99,11 @@ class WorkspaceToolMetadata {
       status: map['status'] as String? ?? 'ok',
       code: map['code'] as String?,
       path: map['path'] as String?,
-      link: map['link'] as String?,
+      files: [
+        for (final file in map['files'] as List? ?? [])
+          WorkspaceToolFile.fromJson(Map<String, dynamic>.from(file as Map)),
+      ],
+      filesTruncated: map['filesTruncated'] == true,
       command: map['command'] as String?,
       exitCode: _asInt(map['exitCode']),
       durationMs: _asInt(map['durationMs']),
@@ -111,9 +112,6 @@ class WorkspaceToolMetadata {
       interrupted: map['interrupted'] as bool?,
       stdoutPreview: capPreview(map['stdoutPreview'] as String?),
       stderrPreview: capPreview(map['stderrPreview'] as String?),
-      outputLink: map['outputLink'] as String?,
-      changedFiles: _asStringList(map['changedFiles']),
-      changedLinks: _asStringList(map['changedLinks']),
       diff: map['diff'] as String?,
       added: _asInt(map['added']),
       removed: _asInt(map['removed']),
@@ -136,10 +134,5 @@ class WorkspaceToolMetadata {
     if (value is int) return value;
     if (value is num) return value.toInt();
     return int.tryParse(value.toString());
-  }
-
-  static List<String>? _asStringList(Object? value) {
-    if (value is! List) return null;
-    return [for (final item in value) item.toString()];
   }
 }

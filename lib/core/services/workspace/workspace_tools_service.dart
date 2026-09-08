@@ -529,28 +529,91 @@ class WorkspaceToolsService {
   }) {
     switch (resolved.zone) {
       case WorkspaceZone.workspace:
-        final rel = _relToRoot(paths.workspaceHostRoot, resolved.hostPath);
-        if (rel == null || rel.isEmpty) return null;
+        final rel = WorkspacePaths.relativeToHostRoot(
+          paths.workspaceHostRoot,
+          resolved.hostPath,
+        );
+        if (rel == null) return null;
         return 'kelivo://workspace/${KelivoLink.encodePath(rel)}';
       case WorkspaceZone.chat:
-        final rel = _relToRoot(paths.sessionHostDir, resolved.hostPath);
-        if (rel == null || rel.isEmpty) return null;
+        final rel = WorkspacePaths.relativeToHostRoot(
+          paths.sessionHostDir,
+          resolved.hostPath,
+        );
+        if (rel == null) return null;
         if (rel == 'attachments' ||
             rel == 'outputs' ||
             rel.startsWith('attachments/') ||
             rel.startsWith('outputs/')) {
           return 'kelivo://chat/${KelivoLink.encodePath(rel)}';
         }
-        return null;
+        return 'kelivo://session/${KelivoLink.encodePath(rel)}';
       case WorkspaceZone.skills:
-        final rel = _relToRoot(paths.skillsHostDir, resolved.hostPath);
-        if (rel == null || rel.isEmpty) return null;
+        final rel = WorkspacePaths.relativeToHostRoot(
+          paths.skillsHostDir,
+          resolved.hostPath,
+        );
+        if (rel == null) return null;
         return 'kelivo://skills/${KelivoLink.encodePath(rel)}';
       case WorkspaceZone.tmp:
+        final rel = WorkspacePaths.relativeToHostRoot(
+          paths.tmpHostRoot,
+          resolved.hostPath,
+        );
+        return rel == null
+            ? null
+            : 'kelivo://tmp/${KelivoLink.encodePath(rel)}';
       case WorkspaceZone.external:
+        for (final mount in paths.externalMounts) {
+          final rel = WorkspacePaths.relativeToHostRoot(
+            mount.host,
+            resolved.hostPath,
+          );
+          if (rel != null && mount.externalId != null) {
+            return 'kelivo://mounts/${Uri.encodeComponent(mount.externalId!)}${rel.isEmpty ? '' : '/${KelivoLink.encodePath(rel)}'}';
+          }
+        }
+        return null;
       case WorkspaceZone.outside:
         return null;
     }
+  }
+
+  static WorkspaceToolFile _fileFor(
+    WorkspaceToolContext ctx,
+    ResolvedPath resolved, {
+    WorkspaceFileRole role = WorkspaceFileRole.referenced,
+    bool isDirectory = false,
+  }) => WorkspaceToolFile(
+    path: resolved.modelPath,
+    link: linkFor(resolved, paths: ctx.paths),
+    isDirectory: isDirectory,
+    role: role,
+    temporary: resolved.zone == WorkspaceZone.tmp,
+  );
+
+  static Future<List<WorkspaceToolFile>> _referencedFiles(
+    WorkspaceToolContext ctx,
+    Iterable<String> paths,
+  ) async {
+    final files = <WorkspaceToolFile>[];
+    final seen = <String>{};
+    for (final path in paths.toSet()) {
+      try {
+        final resolved = await ctx.paths.resolveReal(path, cwd: ctx.cwd);
+        final file = _fileFor(
+          ctx,
+          resolved,
+          isDirectory: await FileSystemEntity.isDirectory(resolved.hostPath),
+        );
+        if (seen.add(file.identity)) files.add(file);
+      } on PathResolutionException {
+        files.add(WorkspaceToolFile(path: path));
+      } on FileSystemException {
+        files.add(WorkspaceToolFile(path: path));
+      }
+    }
+    return files;
   }
 
   Future<Object?> _handleShell(
@@ -634,6 +697,7 @@ class WorkspaceToolsService {
     ]);
 
     CommandExited? exited;
+    Object? executionError;
     try {
       await for (final event in runtime.run(
         CommandRequest(
@@ -661,18 +725,7 @@ class WorkspaceToolsService {
         }
       }
     } catch (e) {
-      run.complete(status: ToolRunStatus.failed);
-      return _errorResult(
-        tool: tool,
-        error: 'shell_failed',
-        message: e.toString(),
-        meta: WorkspaceToolMetadata(
-          tool: tool,
-          status: 'error',
-          code: 'shell_failed',
-          command: command,
-        ),
-      );
+      executionError = e;
     } finally {
       // A failed or cancelled command may still have installed/updated files.
       // Refresh observers without turning a refresh failure into a tool error.
@@ -683,46 +736,67 @@ class WorkspaceToolsService {
       }
     }
 
-    if (exited == null) {
-      run.complete(status: ToolRunStatus.failed);
-      return _errorResult(
-        tool: tool,
-        error: 'shell_failed',
-        message: 'Command ended without an exit event',
-        meta: WorkspaceToolMetadata(
-          tool: tool,
-          status: 'error',
-          code: 'shell_failed',
-          command: command,
-        ),
-      );
-    }
-
-    final runStatus = exited.cancelled
+    final runStatus = executionError != null || exited == null
+        ? ToolRunStatus.failed
+        : exited.cancelled
         ? ToolRunStatus.cancelled
         : exited.timedOut
         ? ToolRunStatus.timedOut
         : exited.exitCode == 0
         ? ToolRunStatus.succeeded
         : ToolRunStatus.failed;
-    run.complete(status: runStatus, exitCode: exited.exitCode);
+    run.complete(status: runStatus, exitCode: exited?.exitCode);
 
     final after = await FileSnapshot.snapshot([
       Directory(ctx.paths.workspaceHostRoot),
       ctx.sessionDir,
     ]);
     final changedHost = FileSnapshot.changedSince(before, after);
-    final changedFiles = <String>[];
-    final changedLinks = <String>[];
-    for (final hostPath in changedHost) {
-      if (changedFiles.length >= _changedFilesCap) break;
+    final files = <WorkspaceToolFile>[];
+    for (final hostPath in changedHost.take(_changedFilesCap)) {
       final modelPath = ctx.paths.toModelPath(hostPath);
-      changedFiles.add(modelPath);
       try {
-        final resolved = ctx.paths.resolve(modelPath, cwd: cwd);
-        final link = linkFor(resolved, paths: ctx.paths);
-        if (link != null) changedLinks.add(link);
-      } catch (_) {}
+        final resolved = await ctx.paths.resolveReal(modelPath, cwd: cwd);
+        if (!await FileSystemEntity.isFile(resolved.hostPath)) continue;
+        files.add(
+          _fileFor(
+            ctx,
+            resolved,
+            role: before.containsKey(hostPath)
+                ? WorkspaceFileRole.modified
+                : WorkspaceFileRole.created,
+          ),
+        );
+      } on PathResolutionException {
+        files.add(
+          WorkspaceToolFile(path: modelPath, role: WorkspaceFileRole.modified),
+        );
+      } on FileSystemException {
+        // A file removed again before collection is not a remaining output.
+      }
+    }
+    final filesTruncated =
+        changedHost.length > _changedFilesCap ||
+        before.length >= FileSnapshot.defaultMaxEntries ||
+        after.length >= FileSnapshot.defaultMaxEntries;
+
+    if (executionError != null || exited == null) {
+      return _errorResult(
+        tool: tool,
+        error: 'shell_failed',
+        message:
+            executionError?.toString() ?? 'Command ended without an exit event',
+        meta: WorkspaceToolMetadata(
+          tool: tool,
+          status: 'error',
+          code: 'shell_failed',
+          command: command,
+          stdoutPreview: stdoutBuf.text,
+          stderrPreview: stderrBuf.text,
+          files: files,
+          filesTruncated: filesTruncated,
+        ),
+      );
     }
 
     final offload = await ToolOutputOffloader.maybeOffload(
@@ -740,21 +814,16 @@ class WorkspaceToolsService {
     if (stdoutBuf.truncated || stderrBuf.truncated) {
       payload['truncated'] = true;
     }
-    String? outputFile;
-    String? outputLink;
+    if (files.isNotEmpty) {
+      payload['changed_files'] = [for (final file in files) file.path];
+    }
+    if (filesTruncated) payload['changed_files_truncated'] = true;
     if (offload.offloadHostPath != null) {
-      outputFile = ctx.paths.toModelPath(offload.offloadHostPath!);
+      final outputFile = ctx.paths.toModelPath(offload.offloadHostPath!);
       payload['output_file'] = outputFile;
       payload['truncated'] = true;
-      try {
-        final resolved = ctx.paths.resolve(outputFile, cwd: cwd);
-        outputLink = linkFor(resolved, paths: ctx.paths);
-      } catch (_) {
-        outputLink = 'kelivo://chat/outputs/$toolCallId.txt';
-      }
-    }
-    if (changedFiles.isNotEmpty) {
-      payload['changed_files'] = changedFiles;
+      final resolved = await ctx.paths.resolveReal(outputFile, cwd: cwd);
+      files.add(_fileFor(ctx, resolved, role: WorkspaceFileRole.log));
     }
 
     final metaStatus = exited.timedOut
@@ -781,9 +850,8 @@ class WorkspaceToolsService {
         _previewLimit,
         keepTail: true,
       ),
-      outputLink: outputLink,
-      changedFiles: changedFiles.isEmpty ? null : changedFiles,
-      changedLinks: changedLinks.isEmpty ? null : changedLinks,
+      files: files,
+      filesTruncated: filesTruncated,
       truncated: payload['truncated'] == true,
     );
     await _markToolsUsed(
@@ -822,12 +890,11 @@ class WorkspaceToolsService {
         limit: _intArg(args, 'limit'),
         cwd: ctx.cwd,
       );
-      final link = linkFor(resolved, paths: ctx.paths);
       final meta = WorkspaceToolMetadata(
         tool: tool,
         status: 'ok',
         path: resolved.modelPath,
-        link: link,
+        files: [_fileFor(ctx, resolved)],
       );
       if (result.imageBytes != null) {
         final uri = resolved.hostPath;
@@ -945,7 +1012,15 @@ class WorkspaceToolsService {
         tool: tool,
         status: 'ok',
         path: resolved.modelPath,
-        link: link,
+        files: [
+          _fileFor(
+            ctx,
+            resolved,
+            role: result.created
+                ? WorkspaceFileRole.created
+                : WorkspaceFileRole.modified,
+          ),
+        ],
         created: result.created,
         bytes: result.bytes,
       );
@@ -1023,7 +1098,15 @@ class WorkspaceToolsService {
         tool: tool,
         status: 'ok',
         path: resolved.modelPath,
-        link: link,
+        files: [
+          _fileFor(
+            ctx,
+            resolved,
+            role: result.changed
+                ? WorkspaceFileRole.modified
+                : WorkspaceFileRole.referenced,
+          ),
+        ],
         diff: result.diff.text,
         added: result.diff.added,
         removed: result.diff.removed,
@@ -1064,7 +1147,11 @@ class WorkspaceToolsService {
         tool: tool,
         status: 'ok',
         path: resolved?.modelPath,
-        link: resolved == null ? null : linkFor(resolved, paths: ctx.paths),
+        files: await _referencedFiles(ctx, [
+          if (resolved != null) resolved.modelPath,
+          for (final entry in result.entries) entry.path,
+        ]),
+        filesTruncated: result.truncated,
         count: result.entries.length,
         truncated: result.truncated,
       );
@@ -1103,6 +1190,8 @@ class WorkspaceToolsService {
       final meta = WorkspaceToolMetadata(
         tool: tool,
         status: 'ok',
+        files: await _referencedFiles(ctx, result.paths),
+        filesTruncated: result.truncated,
         count: result.paths.length,
         truncated: result.truncated,
       );
@@ -1145,6 +1234,11 @@ class WorkspaceToolsService {
       final meta = WorkspaceToolMetadata(
         tool: tool,
         status: 'ok',
+        files: await _referencedFiles(
+          ctx,
+          result.matches.map((match) => match.path),
+        ),
+        filesTruncated: result.truncated,
         count: result.matches.length,
         truncated: result.truncated,
       );
@@ -1184,7 +1278,6 @@ class WorkspaceToolsService {
         error: 'skills_readonly',
         message: 'The skills zone is read-only',
         path: resolved.modelPath,
-        link: linkFor(resolved, paths: ctx.paths),
       );
     }
     if (resolved.zone == WorkspaceZone.outside) {
@@ -1204,7 +1297,6 @@ class WorkspaceToolsService {
         args: args,
         conversationId: conversationId ?? ctx.conversationId,
         path: resolved.modelPath,
-        link: linkFor(resolved, paths: ctx.paths),
       );
     }
     return null;
@@ -1218,7 +1310,6 @@ class WorkspaceToolsService {
     required Map<String, dynamic> args,
     String? conversationId,
     String? path,
-    String? link,
   }) async {
     if (!needed) return null;
     if (approvalService == null) {
@@ -1227,7 +1318,6 @@ class WorkspaceToolsService {
         error: 'approval_denied',
         message: 'User denied the tool call',
         path: path,
-        link: link,
       );
     }
     final id = toolCallId.trim().isEmpty
@@ -1245,7 +1335,6 @@ class WorkspaceToolsService {
       error: 'approval_denied',
       message: result.denyReason ?? 'User denied the tool call',
       path: path,
-      link: link,
     );
   }
 
@@ -1305,7 +1394,6 @@ class WorkspaceToolsService {
     required String error,
     required String message,
     String? path,
-    String? link,
   }) {
     return ClientToolResult(
       jsonEncode(<String, Object?>{
@@ -1319,7 +1407,6 @@ class WorkspaceToolsService {
         status: 'denied',
         code: error,
         path: path,
-        link: link,
       ).toJson(),
     );
   }
@@ -1435,8 +1522,13 @@ class WorkspaceToolsService {
       if (rel.isEmpty) return null;
       return rel.split('/').first;
     }
-    final rel = _relToRoot(ctx.paths.skillsHostDir, resolved.hostPath);
-    if (rel != null && rel.isNotEmpty) return rel.split('/').first;
+    final rel = WorkspacePaths.relativeToHostRoot(
+      ctx.paths.skillsHostDir,
+      resolved.hostPath,
+    );
+    if (rel != null && rel.isNotEmpty) {
+      return rel.replaceAll('\\', '/').split('/').first;
+    }
     try {
       final root = p.canonicalize(
         Directory(ctx.paths.skillsHostDir).resolveSymbolicLinksSync(),
@@ -1453,14 +1545,6 @@ class WorkspaceToolsService {
       }
     } catch (_) {}
     return null;
-  }
-
-  static String? _relToRoot(String root, String hostPath) {
-    final canonRoot = p.canonicalize(root);
-    final canonHost = p.canonicalize(hostPath);
-    if (p.equals(canonRoot, canonHost)) return '';
-    if (!p.isWithin(canonRoot, canonHost)) return null;
-    return p.relative(canonHost, from: canonRoot).replaceAll('\\', '/');
   }
 
   static String _stringArg(

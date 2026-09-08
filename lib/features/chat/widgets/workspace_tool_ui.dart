@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
@@ -9,26 +8,26 @@ import 'package:provider/provider.dart';
 
 import 'package:Kelivo/core/models/workspace_binding.dart';
 import 'package:Kelivo/core/providers/settings_provider.dart';
-import 'package:Kelivo/core/providers/workspace_provider.dart';
 import 'package:Kelivo/core/services/chat/chat_service.dart';
-import 'package:Kelivo/core/services/workspace/file_link_resolver.dart';
 import 'package:Kelivo/core/services/workspace/tool_run_registry.dart';
 import 'package:Kelivo/core/services/workspace/workspace_tools_service.dart';
 import 'package:Kelivo/features/home/services/tool_approval_service.dart';
 import 'package:Kelivo/features/settings/widgets/custom_theme_widgets.dart';
-import 'package:Kelivo/features/workspace/widgets/preview/file_preview.dart';
+import 'package:Kelivo/features/workspace/workspace_file_navigation.dart';
+import 'package:Kelivo/features/workspace/workspace_layout.dart';
 import 'package:Kelivo/features/workspace/workspace_navigation.dart';
 import 'package:Kelivo/icons/lucide_adapter.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
 import 'package:Kelivo/shared/widgets/ios_form_text_field.dart';
 import 'package:Kelivo/shared/widgets/ios_tactile.dart';
 import 'package:Kelivo/shared/widgets/ios_tile_button.dart';
-import 'package:Kelivo/shared/widgets/snackbar.dart';
 import 'package:Kelivo/theme/app_font_weights.dart';
 import 'package:Kelivo/theme/app_semantic_colors.dart';
 import 'package:Kelivo/utils/mcp_structured_image.dart';
 
 import 'chat_surface.dart';
+
+export 'package:Kelivo/features/workspace/workspace_file_navigation.dart';
 
 /// Snapshot of a tool call used by workspace cards and the detail sheet.
 class WorkspaceToolPart {
@@ -246,55 +245,6 @@ String? workspaceErrorMessage(
   return null;
 }
 
-List<String> workspaceTouchedPaths(
-  WorkspaceToolPart part, {
-  WorkspaceToolMetadata? meta,
-}) {
-  switch (part.toolName) {
-    case 'read_file':
-    case 'write_file':
-    case 'edit_file':
-      final path = workspacePathOf(part, meta: meta);
-      return path.isEmpty ? const <String>[] : <String>[path];
-    case 'list_dir':
-    case 'glob':
-    case 'grep':
-      final fromMeta = meta?.changedFiles;
-      if (fromMeta != null && fromMeta.isNotEmpty) return fromMeta;
-      final content = part.content ?? '';
-      final out = <String>[];
-      for (final line in const LineSplitter().convert(content)) {
-        if (line.isEmpty || line.startsWith('...')) continue;
-        out.add(_pathFromResultLine(part.toolName, line));
-      }
-      if (out.isEmpty) {
-        final path = workspacePathOf(part, meta: meta);
-        if (path.isNotEmpty && part.toolName == 'list_dir') {
-          return <String>[path];
-        }
-      }
-      return out;
-    default:
-      return const <String>[];
-  }
-}
-
-String _pathFromResultLine(String tool, String line) {
-  if (tool == 'grep') {
-    final idx = line.indexOf(':');
-    return idx > 0 ? line.substring(0, idx) : line;
-  }
-  if (tool == 'list_dir') {
-    final trimmed = line.trimRight();
-    if (trimmed.endsWith('/')) {
-      return trimmed.substring(0, trimmed.length - 1);
-    }
-    final parts = trimmed.split(RegExp(r'\s{2,}'));
-    return parts.first;
-  }
-  return line;
-}
-
 List<String> workspaceOutputTailLines({
   required WorkspaceToolPart part,
   WorkspaceToolMetadata? meta,
@@ -331,92 +281,6 @@ T? maybeRead<T>(BuildContext context) {
   } on ProviderNotFoundException {
     return null;
   }
-}
-
-Future<File?> resolveWorkspaceLinkedFile(
-  BuildContext context,
-  String? link, {
-  String? conversationId,
-}) async {
-  if (link == null || link.trim().isEmpty) return null;
-  final parsed = KelivoLink.tryParse(link);
-  if (parsed == null || parsed.kind == KelivoLinkKind.terminal) return null;
-
-  FileLinkResolver? resolver = maybeRead<FileLinkResolver>(context);
-  if (resolver == null) {
-    final workspaces = maybeRead<WorkspaceProvider>(context);
-    if (workspaces == null) return null;
-    resolver = FileLinkResolver(workspaces: workspaces);
-  }
-
-  final chat = maybeRead<ChatService>(context);
-  if (chat == null) return null;
-  final id = (conversationId != null && conversationId.isNotEmpty)
-      ? conversationId
-      : chat.currentConversationId;
-  if (id == null || id.isEmpty) return null;
-  final conversation = chat.getConversation(id);
-  if (conversation == null) return null;
-  final binding = WorkspaceBinding.fromExtras(conversation.extras);
-  try {
-    return await resolver.resolveToHostFile(
-      parsed,
-      conversationId: conversation.id,
-      binding: binding,
-    );
-  } catch (_) {
-    return null;
-  }
-}
-
-Future<void> openWorkspaceLinkedFile(
-  BuildContext context,
-  String? link, {
-  String? conversationId,
-  String? title,
-}) async {
-  final l10n = AppLocalizations.of(context);
-  if (link == null || link.trim().isEmpty) {
-    if (l10n != null) {
-      showAppSnackBar(
-        context,
-        message: l10n.workspaceFileNotAvailable,
-        type: NotificationType.info,
-      );
-    }
-    return;
-  }
-  final parsed = KelivoLink.tryParse(link);
-  if (parsed == null) {
-    if (l10n != null) {
-      showAppSnackBar(
-        context,
-        message: l10n.workspaceFileNotAvailable,
-        type: NotificationType.info,
-      );
-    }
-    return;
-  }
-  if (parsed.kind == KelivoLinkKind.terminal) {
-    WorkspaceNavigation.openTerminal(context, command: parsed.terminalCommand);
-    return;
-  }
-  final file = await resolveWorkspaceLinkedFile(
-    context,
-    link,
-    conversationId: conversationId,
-  );
-  if (!context.mounted) return;
-  if (file == null) {
-    showAppSnackBar(
-      context,
-      message:
-          (l10n ?? AppLocalizations.of(context))!.workspaceFileNotAvailable,
-      type: NotificationType.info,
-    );
-    return;
-  }
-  await showFilePreview(context, file, title: title);
 }
 
 /// Tactile button for tool approval actions (approve / deny).
@@ -591,6 +455,8 @@ class WorkspaceFileChip extends StatelessWidget {
     this.link,
     this.conversationId,
     this.displayName,
+    this.isDirectory = false,
+    this.loading = false,
     this.tags = const <Widget>[],
     this.onTap,
   });
@@ -603,6 +469,8 @@ class WorkspaceFileChip extends StatelessWidget {
   final String? link;
   final String? conversationId;
   final String? displayName;
+  final bool isDirectory;
+  final bool loading;
   final List<Widget> tags;
   final VoidCallback? onTap;
 
@@ -636,7 +504,11 @@ class WorkspaceFileChip extends StatelessWidget {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(workspaceFileTypeIcon(path), size: 14, color: fg.muted),
+            Icon(
+              isDirectory ? Lucide.Folder : workspaceFileTypeIcon(path),
+              size: 14,
+              color: fg.muted,
+            ),
             const SizedBox(width: 6),
             Flexible(
               child: Text(
@@ -650,6 +522,17 @@ class WorkspaceFileChip extends StatelessWidget {
                 ),
               ),
             ),
+            if (open == null) ...[
+              const SizedBox(width: 6),
+              Text(
+                loading
+                    ? AppLocalizations.of(context)!.workspaceToolRunning
+                    : AppLocalizations.of(
+                        context,
+                      )!.workspaceFilePreviewUnavailable,
+                style: TextStyle(fontSize: 11, color: fg.muted),
+              ),
+            ],
             for (final tag in tags) ...[const SizedBox(width: 6), tag],
           ],
         ),
@@ -1085,7 +968,9 @@ class WorkspaceToolCardBody extends StatelessWidget {
       case 'shell':
         return _ShellTail(part: part, meta: meta, run: liveRun);
       case 'write_file':
+      case 'edit_file':
       case 'read_file':
+      case 'list_dir':
       case 'glob':
       case 'grep':
         return _TouchedPathChips(
@@ -1268,36 +1153,117 @@ class _TouchedPathChips extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
-    final paths = workspaceTouchedPaths(part, meta: meta);
-    if (paths.isEmpty) return const SizedBox.shrink();
+    final files = meta?.files ?? const <WorkspaceToolFile>[];
+    if (files.isEmpty) {
+      final path = workspacePathOf(part, meta: meta);
+      if (path.isEmpty ||
+          !{'read_file', 'write_file', 'edit_file'}.contains(part.toolName)) {
+        return const SizedBox.shrink();
+      }
+      return WorkspaceFileChip(path: path, loading: part.loading);
+    }
     const limit = 3;
-    final visible = paths.length <= limit ? paths : paths.sublist(0, limit);
-    final overflow = paths.length - visible.length;
-    final links = meta?.changedLinks ?? const <String>[];
-    final singleLink = meta?.link;
+    final visible = files.take(limit).toList();
+    final overflow = files.length - visible.length;
+
     return Wrap(
       spacing: 8,
       runSpacing: 8,
       crossAxisAlignment: WrapCrossAlignment.center,
       children: [
-        for (var i = 0; i < visible.length; i++)
+        for (final file in visible)
           WorkspaceFileChip(
-            path: visible[i],
-            link: i < links.length
-                ? links[i]
-                : (visible.length == 1 ? singleLink : null),
+            path: file.path,
+            link: file.link,
+            isDirectory: file.isDirectory,
             conversationId: conversationId,
           ),
         if (overflow > 0)
+          IosCardPress(
+            borderRadius: BorderRadius.circular(8),
+            baseColor: Colors.transparent,
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            onTap: () => unawaited(
+              showWorkspaceFileList(
+                context,
+                files: files,
+                conversationId: conversationId,
+                title: l10n.workspaceToolRelatedFiles,
+              ),
+            ),
+            child: Text(
+              l10n.workspaceToolMoreFiles(overflow),
+              style: TextStyle(
+                fontSize: 12,
+                color: Theme.of(context).colorScheme.primary,
+              ),
+            ),
+          ),
+        if (meta?.filesTruncated == true)
           Text(
-            l10n.workspaceToolMoreFiles(overflow),
+            l10n.workspaceToolFilesTruncated,
             style: TextStyle(
               fontSize: 12,
-              fontWeight: AppFontWeights.medium,
               color: chatSurfaceForegroundPalette(context).muted,
             ),
           ),
       ],
     );
   }
+}
+
+Future<void> showWorkspaceFileList(
+  BuildContext context, {
+  required List<WorkspaceToolFile> files,
+  required String title,
+  String? conversationId,
+}) {
+  final list = ListView.separated(
+    padding: const EdgeInsets.all(16),
+    itemCount: files.length,
+    separatorBuilder: (_, _) => const SizedBox(height: 8),
+    itemBuilder: (_, index) {
+      final file = files[index];
+      return Align(
+        alignment: Alignment.centerLeft,
+        child: WorkspaceFileChip(
+          path: file.path,
+          displayName: file.path,
+          link: file.link,
+          isDirectory: file.isDirectory,
+          conversationId: conversationId,
+        ),
+      );
+    },
+  );
+  if (useDesktopWorkspaceLayout(context)) {
+    return showAppDialog<void>(
+      context,
+      maxWidth: 760,
+      child: SizedBox(
+        height: MediaQuery.sizeOf(context).height * 0.8,
+        child: Column(
+          children: [
+            AppDialogHeader(title: title),
+            Expanded(child: list),
+          ],
+        ),
+      ),
+    );
+  }
+  return Navigator.of(context).push(
+    MaterialPageRoute<void>(
+      builder: (context) => Scaffold(
+        appBar: AppBar(
+          title: Text(title),
+          leading: IosIconButton(
+            icon: Lucide.ArrowLeft,
+            semanticLabel: AppLocalizations.of(context)!.workspacePreviewBack,
+            onTap: () => Navigator.of(context).pop(),
+          ),
+        ),
+        body: list,
+      ),
+    ),
+  );
 }

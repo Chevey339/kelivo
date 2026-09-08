@@ -10905,4 +10905,24 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get workspaceEnvProotInvalid =>
       'Enter a valid absolute shell path and one PRoot argument per line.';
+
+  @override
+  String get workspaceFileMissing => 'File no longer exists';
+
+  @override
+  String get workspaceFilePreviewUnavailable => 'Preview unavailable';
+
+  @override
+  String get workspaceToolRelatedFiles => 'Related files';
+
+  @override
+  String get workspaceToolFilesTruncated => 'Only some files are listed.';
+
+  @override
+  String get displaySettingsPageShowProducedFilesTitle =>
+      'Show Files Below Replies';
+
+  @override
+  String get displaySettingsPageShowProducedFilesSubtitle =>
+      'Show files created or modified by tools below replies.';
 }

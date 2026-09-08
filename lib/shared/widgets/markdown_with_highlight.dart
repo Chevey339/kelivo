@@ -34,13 +34,9 @@ import 'package:Kelivo/theme/app_font_weights.dart';
 import 'package:Kelivo/theme/theme_factory.dart' show getPlatformFontFallback;
 import 'package:provider/provider.dart';
 import 'package:flutter_math_fork/flutter_math.dart';
-import '../../core/models/workspace_binding.dart';
 import '../../core/providers/settings_provider.dart';
-import '../../core/providers/workspace_provider.dart';
-import '../../core/services/chat/chat_service.dart';
 import '../../core/services/workspace/file_link_resolver.dart';
-import '../../features/workspace/workspace_navigation.dart';
-import '../../features/workspace/widgets/preview/file_preview.dart';
+import '../../features/workspace/workspace_file_navigation.dart';
 import 'package:Kelivo/desktop/html_preview_dialog.dart';
 import '../cache/byte_lru_cache.dart';
 import 'incremental_markdown_document.dart';
@@ -683,7 +679,11 @@ class _MarkdownWithCodeHighlightState extends State<MarkdownWithCodeHighlight> {
   Future<void> _handleLinkTap(BuildContext context, String url) async {
     final kelivo = KelivoLink.tryParse(_stripFormatChars(url));
     if (kelivo != null) {
-      await _handleKelivoLinkTap(context, kelivo);
+      await openWorkspaceLinkedFile(
+        context,
+        _stripFormatChars(url),
+        conversationId: widget.conversationId,
+      );
       return;
     }
     Uri uri;
@@ -709,117 +709,12 @@ class _MarkdownWithCodeHighlightState extends State<MarkdownWithCodeHighlight> {
     }
   }
 
-  Future<void> _handleKelivoLinkTap(
-    BuildContext context,
-    KelivoLink link,
-  ) async {
-    final l10n = AppLocalizations.of(context)!;
-    if (link.kind == KelivoLinkKind.terminal) {
-      WorkspaceNavigation.openTerminal(context, command: link.terminalCommand);
-      return;
-    }
-
-    ChatService? chat;
-    try {
-      chat = context.read<ChatService>();
-    } on ProviderNotFoundException {
-      chat = null;
-    }
-    final conversationId = widget.conversationId ?? chat?.currentConversationId;
-    final conversation = conversationId == null || chat == null
-        ? null
-        : chat.getConversation(conversationId);
-    if (conversation == null) {
-      showAppSnackBar(
-        context,
-        message: l10n.workspaceFileNotAvailable,
-        type: NotificationType.info,
-      );
-      return;
-    }
-    final binding = WorkspaceBinding.fromExtras(conversation.extras);
-    if (link.kind == KelivoLinkKind.workspaceFile && !binding.isBound) {
-      showAppSnackBar(
-        context,
-        message: l10n.workspaceFileNotAvailable,
-        type: NotificationType.info,
-      );
-      return;
-    }
-
-    final file = await _resolveKelivoHostFile(
-      context,
-      link,
-      conversationId: conversation.id,
-    );
-    if (!context.mounted) return;
-    if (file == null) {
-      showAppSnackBar(
-        context,
-        message: l10n.workspaceFileNotAvailable,
-        type: NotificationType.info,
-      );
-      return;
-    }
-    await showFilePreview(context, file);
-  }
-
   Uri _normalizeUrl(String url) {
     var u = url.trim();
     if (!RegExp(r'^[a-zA-Z][a-zA-Z0-9+.-]*:').hasMatch(u)) {
       u = 'https://$u';
     }
     return Uri.parse(u);
-  }
-}
-
-Future<File?> _resolveKelivoHostFile(
-  BuildContext context,
-  KelivoLink link, {
-  String? conversationId,
-}) async {
-  if (link.kind == KelivoLinkKind.terminal) return null;
-
-  FileLinkResolver? resolver;
-  try {
-    resolver = context.read<FileLinkResolver>();
-  } on ProviderNotFoundException {
-    resolver = null;
-  }
-  if (resolver == null) {
-    try {
-      resolver = FileLinkResolver(
-        workspaces: context.read<WorkspaceProvider>(),
-      );
-    } on ProviderNotFoundException {
-      return null;
-    }
-  }
-
-  ChatService? chat;
-  try {
-    chat = context.read<ChatService>();
-  } on ProviderNotFoundException {
-    return null;
-  }
-  final id = (conversationId != null && conversationId.isNotEmpty)
-      ? conversationId
-      : chat.currentConversationId;
-  if (id == null || id.isEmpty) return null;
-  final conversation = chat.getConversation(id);
-  if (conversation == null) return null;
-  final binding = WorkspaceBinding.fromExtras(conversation.extras);
-  if (link.kind == KelivoLinkKind.workspaceFile && !binding.isBound) {
-    return null;
-  }
-  try {
-    return await resolver.resolveToHostFile(
-      link,
-      conversationId: conversation.id,
-      binding: binding,
-    );
-  } catch (_) {
-    return null;
   }
 }
 
@@ -861,9 +756,9 @@ class _KelivoMarkdownImageState extends State<_KelivoMarkdownImage> {
   Future<File?> _resolve() async {
     final link = KelivoLink.tryParse(widget.url);
     if (link == null) return null;
-    return _resolveKelivoHostFile(
+    return resolveWorkspaceLinkedFile(
       context,
-      link,
+      widget.url,
       conversationId: widget.conversationId,
     );
   }

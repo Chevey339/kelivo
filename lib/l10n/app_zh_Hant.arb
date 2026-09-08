@@ -3888,5 +3888,11 @@
   "workspaceEnvShellHint": "留空時優先使用 /bin/bash，否則使用 /bin/sh。自訂 Shell 需填寫環境內的絕對路徑。",
   "workspaceEnvProotArguments": "額外 PRoot 參數",
   "workspaceEnvProotArgumentsHint": "每行填寫一個參數，無需 Shell 引號。例如將 -k 和 5.10.0 分別放在兩行，或使用 --kernel-release=5.10.0。設定對之後啟動的命令和終端工作階段生效。",
-  "workspaceEnvProotInvalid": "請填寫有效的 Shell 絕對路徑，並將 PRoot 參數逐行填寫。"
+  "workspaceEnvProotInvalid": "請填寫有效的 Shell 絕對路徑，並將 PRoot 參數逐行填寫。",
+  "workspaceFileMissing": "檔案已不存在",
+  "workspaceFilePreviewUnavailable": "無法預覽",
+  "workspaceToolRelatedFiles": "相關檔案",
+  "workspaceToolFilesTruncated": "僅列出部分檔案。",
+  "displaySettingsPageShowProducedFilesTitle": "顯示回覆底部檔案卡片",
+  "displaySettingsPageShowProducedFilesSubtitle": "在回覆底部顯示工具建立或修改的檔案。"
 }

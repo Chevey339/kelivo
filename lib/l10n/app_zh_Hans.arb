@@ -3864,5 +3864,11 @@
   "workspaceEnvShellHint": "留空时优先使用 /bin/bash，否则使用 /bin/sh。自定义 Shell 需填写环境内的绝对路径。",
   "workspaceEnvProotArguments": "额外 PRoot 参数",
   "workspaceEnvProotArgumentsHint": "每行填写一个参数，无需 Shell 引号。例如将 -k 和 5.10.0 分别放在两行，或使用 --kernel-release=5.10.0。配置对之后启动的命令和终端会话生效。",
-  "workspaceEnvProotInvalid": "请填写有效的 Shell 绝对路径，并将 PRoot 参数逐行填写。"
+  "workspaceEnvProotInvalid": "请填写有效的 Shell 绝对路径，并将 PRoot 参数逐行填写。",
+  "workspaceFileMissing": "文件已不存在",
+  "workspaceFilePreviewUnavailable": "无法预览",
+  "workspaceToolRelatedFiles": "相关文件",
+  "workspaceToolFilesTruncated": "仅列出部分文件。",
+  "displaySettingsPageShowProducedFilesTitle": "显示回复底部文件卡片",
+  "displaySettingsPageShowProducedFilesSubtitle": "在回复底部显示工具创建或修改的文件。"
 }

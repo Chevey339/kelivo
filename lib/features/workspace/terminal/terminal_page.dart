@@ -1,3 +1,4 @@
+import 'package:Kelivo/features/workspace/workspace_file_navigation.dart';
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -7,9 +8,6 @@ import 'package:provider/provider.dart';
 import 'package:terminal_view/terminal_view.dart';
 import 'package:url_launcher/url_launcher.dart';
 
-import 'package:Kelivo/core/models/workspace_binding.dart';
-import 'package:Kelivo/core/providers/workspace_provider.dart';
-import 'package:Kelivo/core/services/chat/chat_service.dart';
 import 'package:Kelivo/core/services/haptics.dart';
 import 'package:Kelivo/core/services/workspace/file_link_resolver.dart';
 import 'package:Kelivo/core/services/workspace/workspace_runtime.dart';
@@ -19,7 +17,6 @@ import 'package:Kelivo/features/workspace/terminal/widgets/system_terminal_card.
 import 'package:Kelivo/features/workspace/terminal/widgets/terminal_key_bar.dart';
 import 'package:Kelivo/features/workspace/terminal/widgets/terminal_tab_strip.dart';
 import 'package:Kelivo/features/workspace/widgets/files/workspace_prompts.dart';
-import 'package:Kelivo/features/workspace/widgets/preview/file_preview.dart';
 import 'package:Kelivo/icons/lucide_adapter.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
 import 'package:Kelivo/shared/widgets/action_sheet.dart';
@@ -391,34 +388,11 @@ class _TerminalPageState extends State<TerminalPage> {
         showAppSnackBar(context, message: l10n.terminalNotAvailable);
         return;
       }
-      final chat = context.read<ChatService>();
-      final conversation = chat.getConversation(conversationId);
-      final binding = conversation == null
-          ? const WorkspaceBinding()
-          : WorkspaceBinding.fromExtras(conversation.extras);
-      if (!binding.isBound) {
-        showAppSnackBar(context, message: l10n.terminalNotAvailable);
-        return;
-      }
-      try {
-        final file =
-            await FileLinkResolver(
-              workspaces: context.read<WorkspaceProvider>(),
-            ).resolveToHostFile(
-              link,
-              conversationId: conversationId,
-              binding: binding,
-            );
-        if (!mounted) return;
-        if (file == null) {
-          showAppSnackBar(context, message: l10n.terminalNotAvailable);
-          return;
-        }
-        await showFilePreview(context, file);
-      } catch (_) {
-        if (!mounted) return;
-        showAppSnackBar(context, message: l10n.terminalNotAvailable);
-      }
+      await openWorkspaceLinkedFile(
+        context,
+        uri.toString(),
+        conversationId: conversationId,
+      );
       return;
     }
     if (uri.scheme == 'http' || uri.scheme == 'https') {

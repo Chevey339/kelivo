@@ -1,7 +1,11 @@
+import 'package:Kelivo/core/providers/settings_provider.dart';
+import 'package:provider/provider.dart';
+import '../../../support/business_test_harness.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:Kelivo/core/services/workspace/workspace_tool_metadata.dart';
+import 'package:Kelivo/core/services/workspace/file_link_resolver.dart';
 import 'package:Kelivo/features/chat/widgets/produced_files_row.dart';
 import 'package:Kelivo/features/chat/widgets/workspace_tool_ui.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
@@ -14,9 +18,16 @@ WorkspaceToolPart _write({required List<String> links, List<String>? files}) {
       tool: 'write_file',
       status: 'ok',
       path: files?.first ?? links.first,
-      link: links.length == 1 ? links.first : null,
-      changedLinks: links,
-      changedFiles: files,
+      files: [
+        for (var i = 0; i < links.length; i++)
+          WorkspaceToolFile(
+            path: files != null && i < files.length
+                ? files[i]
+                : KelivoLink.tryParse(links[i])?.relativePath ?? links[i],
+            link: links[i],
+            role: WorkspaceFileRole.modified,
+          ),
+      ],
     ).toJson(),
   );
 }
@@ -33,6 +44,66 @@ void main() {
       'kelivo://workspace/b.txt',
     ]);
   });
+
+  test(
+    'collects confirmed shell changes, excluding reads, logs, temp and denials',
+    () {
+      WorkspaceToolPart part(
+        String tool,
+        WorkspaceToolFile file, {
+        String status = 'ok',
+        String? id,
+      }) => WorkspaceToolPart(
+        id: id ?? tool,
+        toolName: tool,
+        metadata: WorkspaceToolMetadata(
+          tool: tool,
+          status: status,
+          files: [file],
+        ).toJson(),
+      );
+      const result = WorkspaceToolFile(
+        path: '/workspace/result.csv',
+        link: 'kelivo://workspace/result.csv',
+        role: WorkspaceFileRole.created,
+      );
+      final entries = collectProducedFileEntries([
+        part(
+          'read_file',
+          const WorkspaceToolFile(path: '/workspace/input.txt'),
+        ),
+        part('grep', const WorkspaceToolFile(path: '/workspace/found.txt')),
+        part('shell', result, status: 'error'),
+        part('edit_file', result, id: 'edit-again'),
+        part(
+          'shell',
+          const WorkspaceToolFile(
+            path: '/chat/outputs/log.txt',
+            role: WorkspaceFileRole.log,
+          ),
+        ),
+        part(
+          'write_file',
+          const WorkspaceToolFile(
+            path: '/tmp/temp.txt',
+            role: WorkspaceFileRole.created,
+            temporary: true,
+          ),
+        ),
+        part(
+          'write_file',
+          const WorkspaceToolFile(
+            path: '/workspace/denied.txt',
+            role: WorkspaceFileRole.created,
+          ),
+          status: 'denied',
+        ),
+      ]);
+      expect(entries, hasLength(1));
+      expect(entries.single.link, result.link);
+      expect(entries.single.revision, 'edit-again');
+    },
+  );
 
   test('marks image links', () {
     final entries = collectProducedFileEntries([
@@ -78,15 +149,18 @@ void main() {
   ) async {
     const link = 'kelivo://workspace/%E6%96%B0%E6%96%87%E4%BB%B6.txt';
     await tester.pumpWidget(
-      MaterialApp(
-        localizationsDelegates: AppLocalizations.localizationsDelegates,
-        supportedLocales: AppLocalizations.supportedLocales,
-        home: Scaffold(
-          body: ProducedFilesRow(
-            parts: [
-              _write(links: [link]),
-            ],
-            conversationId: 'c1',
+      ChangeNotifierProvider(
+        create: (_) => SettingsProvider(createBusinessTestPreferences()),
+        child: MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: Scaffold(
+            body: ProducedFilesRow(
+              parts: [
+                _write(links: [link]),
+              ],
+              conversationId: 'c1',
+            ),
           ),
         ),
       ),
@@ -110,11 +184,14 @@ void main() {
     expect(collectProducedFileEntries(parts), hasLength(15));
 
     await tester.pumpWidget(
-      MaterialApp(
-        localizationsDelegates: AppLocalizations.localizationsDelegates,
-        supportedLocales: AppLocalizations.supportedLocales,
-        home: Scaffold(
-          body: ProducedFilesRow(parts: parts, conversationId: 'c1'),
+      ChangeNotifierProvider(
+        create: (_) => SettingsProvider(createBusinessTestPreferences()),
+        child: MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: Scaffold(
+            body: ProducedFilesRow(parts: parts, conversationId: 'c1'),
+          ),
         ),
       ),
     );
@@ -125,5 +202,10 @@ void main() {
     expect(find.text('+3'), findsOneWidget);
     expect(find.text('file_0.txt'), findsOneWidget);
     expect(find.text('file_14.txt'), findsNothing);
+    await tester.tap(find.byKey(ProducedFilesRow.moreKey));
+    await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(find.text('file_14.txt'), 300);
+    expect(find.text('file_14.txt'), findsOneWidget);
+    expect(tester.takeException(), isNull);
   });
 }

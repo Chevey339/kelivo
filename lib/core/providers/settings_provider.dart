@@ -193,6 +193,8 @@ class SettingsProvider extends ChangeNotifier {
   static const String _displayShowThinkingCardsKey =
       'display_show_thinking_cards_v1';
   static const String _displayShowToolCardsKey = 'display_show_tool_cards_v1';
+  static const String _displayShowProducedFilesKey =
+      'display_show_produced_files_v1';
   static const String _displayAutoCollapseThinkingKey =
       'display_auto_collapse_thinking_v1';
   static const String _displayCollapseThinkingStepsKey =
@@ -1090,6 +1092,7 @@ class SettingsProvider extends ChangeNotifier {
         prefs.getBool(_displayShowUserMessageActionsKey) ?? true;
     _showThinkingCards = prefs.getBool(_displayShowThinkingCardsKey) ?? true;
     _showToolCards = prefs.getBool(_displayShowToolCardsKey) ?? true;
+    _showProducedFiles = prefs.getBool(_displayShowProducedFilesKey) ?? true;
     _autoCollapseThinking =
         prefs.getBool(_displayAutoCollapseThinkingKey) ?? true;
     _collapseThinkingSteps =
@@ -4721,6 +4724,16 @@ Requirements:
     await prefs.setBool(_displayShowToolCardsKey, v);
   }
 
+  // Display: files produced by tools at the bottom of assistant messages.
+  bool _showProducedFiles = true;
+  bool get showProducedFiles => _showProducedFiles;
+  Future<void> setShowProducedFiles(bool v) async {
+    if (_showProducedFiles == v) return;
+    _showProducedFiles = v;
+    notifyListeners();
+    await _preferences.setBool(_displayShowProducedFilesKey, v);
+  }
+
   // Display: auto-collapse reasoning/thinking section
   bool _autoCollapseThinking = true;
   bool get autoCollapseThinking => _autoCollapseThinking;
@@ -5769,6 +5782,7 @@ Requirements:
     copy._showModelTimestamp = _showModelTimestamp;
     copy._showThinkingCards = _showThinkingCards;
     copy._showToolCards = _showToolCards;
+    copy._showProducedFiles = _showProducedFiles;
     copy._autoCollapseThinking = _autoCollapseThinking;
     copy._collapseThinkingSteps = _collapseThinkingSteps;
     copy._showToolResultSummary = _showToolResultSummary;
