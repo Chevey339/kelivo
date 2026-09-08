@@ -5,6 +5,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:gpt_markdown/gpt_markdown.dart';
 import 'package:gpt_markdown/custom_widgets/markdown_config.dart'
     show GptMarkdownConfig;
+import 'package:gpt_markdown/custom_widgets/selectable_adapter.dart';
 import 'package:flutter_highlight/themes/github.dart';
 import 'package:flutter_highlight/themes/atom-one-dark-reasonable.dart';
 import 'package:flutter/rendering.dart';
@@ -201,8 +202,10 @@ class _MarkdownWithCodeHighlightState extends State<MarkdownWithCodeHighlight> {
       return value;
     }
 
+    // Keep the same block tree from the first streaming frame through
+    // completion, so growing replies do not dispose interactive children.
     final useIncrementalBlocks =
-        widget.streaming && sanitizedText.length >= 512;
+        widget.streaming || _incrementalDocument.blocks.isNotEmpty;
     final sourceBlocks = useIncrementalBlocks
         ? _incrementalDocument.update(sanitizedText)
         : const <IncrementalMarkdownBlock>[];
@@ -640,10 +643,9 @@ class _MarkdownWithCodeHighlightState extends State<MarkdownWithCodeHighlight> {
                 // Rendering the document as one string keeps the blank run
                 // between two blocks as a real line box. Rendering block by
                 // block drops it, so a long reply is laid out tighter while it
-                // streams and then grows the moment it finishes and switches to
-                // the whole-document render. Put the line back so both paths
-                // agree — unless the block before it ends in something whose own
-                // renderer eats the run.
+                // streams compared with a freshly loaded completed reply. Put
+                // the line back so both paths agree — unless the preceding
+                // block's renderer eats the run.
                 if (i > 0 &&
                     !_swallowsTrailingBlankLine(
                       blockContents[i - 1],
@@ -654,6 +656,7 @@ class _MarkdownWithCodeHighlightState extends State<MarkdownWithCodeHighlight> {
                   key: ValueKey(
                     'markdown-source-block-${sourceBlocks[i].start}',
                   ),
+                  source: sourceBlocks[i].text,
                   content: blockContents[i],
                   signature: themeSignature,
                   builder: buildMarkdown,
@@ -662,6 +665,7 @@ class _MarkdownWithCodeHighlightState extends State<MarkdownWithCodeHighlight> {
             ],
           )
         : _CachedMarkdownBlock(
+            source: sanitizedText,
             content: normalized!,
             signature: themeSignature,
             builder: buildMarkdown,
@@ -838,11 +842,13 @@ typedef _MarkdownBlockBuilder = Widget Function(String content, Key key);
 class _CachedMarkdownBlock extends StatefulWidget {
   const _CachedMarkdownBlock({
     super.key,
+    required this.source,
     required this.content,
     required this.signature,
     required this.builder,
   });
 
+  final String source;
   final String content;
   final String signature;
   final _MarkdownBlockBuilder builder;
@@ -859,7 +865,8 @@ class _CachedMarkdownBlockState extends State<_CachedMarkdownBlock> {
   @override
   void didUpdateWidget(covariant _CachedMarkdownBlock oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.content != widget.content ||
+    if (oldWidget.source != widget.source ||
+        oldWidget.content != widget.content ||
         oldWidget.signature != widget.signature) {
       _rendered = null;
     }
@@ -879,7 +886,10 @@ class _CachedMarkdownBlockState extends State<_CachedMarkdownBlock> {
   Widget build(BuildContext context) {
     return _rendered ??= widget.builder(
       widget.content,
-      _parseIdentity(widget.content),
+      // Synthetic table cells and math delimiters change as tokens arrive;
+      // only a replacement of the source should reset interactive state.
+      // The splitter removes trailing newlines when a block becomes stable.
+      _parseIdentity(widget.source.trimRight()),
     );
   }
 }
@@ -980,14 +990,17 @@ class _MarkdownBlockSeparator extends StatelessWidget {
     // The paragraph carries the `NewLines` style, and its one run is a space:
     // the style has to sit on the paragraph because a line box is measured from
     // the paragraph style when there is no run, and that path rounds
-    // differently from a line that has one. A space is invisible, and the
-    // separator stays out of selection so it cannot be copied.
-    return SelectionContainer.disabled(
-      child: Text.rich(
-        const TextSpan(text: ' '),
-        style: (style ?? const TextStyle()).copyWith(
-          fontSize: style?.fontSize ?? _fallbackFontSize,
-          height: _newLinesHeight,
+    // differently from a line that has one. Copy the paragraph break instead
+    // of the invisible space used to measure it.
+    return SelectableAdapter(
+      selectedText: '\n\n',
+      child: SelectionContainer.disabled(
+        child: Text.rich(
+          const TextSpan(text: ' '),
+          style: (style ?? const TextStyle()).copyWith(
+            fontSize: style?.fontSize ?? _fallbackFontSize,
+            height: _newLinesHeight,
+          ),
         ),
       ),
     );
@@ -1001,9 +1014,11 @@ class _MarkdownBlockColumn extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Let loose-width bubbles hug their content; tight parent constraints
+    // still make the column fill the available width.
     final column = Column(
       mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.stretch,
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: children,
     );
     return LayoutBuilder(
@@ -1011,9 +1026,10 @@ class _MarkdownBlockColumn extends StatelessWidget {
         if (!constraints.hasBoundedHeight) return column;
         return OverflowBox(
           alignment: Alignment.topCenter,
+          fit: OverflowBoxFit.deferToChild,
           minHeight: 0,
           maxHeight: double.infinity,
-          child: SizedBox(width: constraints.maxWidth, child: column),
+          child: column,
         );
       },
     );

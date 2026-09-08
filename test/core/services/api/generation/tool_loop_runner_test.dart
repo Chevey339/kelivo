@@ -160,7 +160,7 @@ void main() {
   });
 
   test(
-    'three tool-call rounds keep summed usage and do not double-count repeats',
+    'three tool-call rounds keep the latest usage and do not double-count repeats',
     () async {
       const snapshots = [
         TokenUsage(promptTokens: 100, completionTokens: 20, totalTokens: 120),

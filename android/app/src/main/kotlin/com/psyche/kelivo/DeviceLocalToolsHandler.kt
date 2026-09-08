@@ -33,7 +33,7 @@ import java.util.concurrent.Executors
 
 /**
  * Native backend for the AI assistant's device-local tools:
- * screen time (usage stats), calendar query and calendar event creation.
+ * screen time (usage stats), calendar query/creation and one-shot location.
  *
  * All methods receive the tool arguments as a JSON string and return a JSON
  * string payload. Errors that the LLM should see (missing permission, bad
@@ -44,11 +44,14 @@ class DeviceLocalToolsHandler(private val activity: Activity) {
     companion object {
         const val CHANNEL_NAME = "app.device_tools"
         const val CALENDAR_PERMISSION_REQUEST_CODE = 4201
+        const val LOCATION_PERMISSION_REQUEST_CODE = 4202
     }
 
     private val executor = Executors.newSingleThreadExecutor()
     private val mainHandler = Handler(Looper.getMainLooper())
     private var pendingCalendarPermissionCallback: ((Boolean) -> Unit)? = null
+    private var pendingLocationPermissionCallback: ((Boolean, Boolean) -> Unit)? = null
+    private val locationHandler = LocationToolHandler(activity)
 
     fun configure(messenger: BinaryMessenger) {
         val channel = MethodChannel(messenger, CHANNEL_NAME)
@@ -62,6 +65,50 @@ class DeviceLocalToolsHandler(private val activity: Activity) {
                 }
                 "hasCalendarPermission" -> result.success(hasCalendarPermission())
                 "requestCalendarPermission" -> requestCalendarPermission(result)
+                "hasLocationPermission" -> result.success(locationHandler.hasPermission())
+                "requestLocationPermission" -> requestLocationPermission { granted, permanentlyDenied ->
+                    if (permanentlyDenied) {
+                        result.error(
+                            "LOCATION_PERMISSION_PERMANENTLY_DENIED",
+                            "Allow location permission in system Settings.",
+                            null,
+                        )
+                    } else {
+                        result.success(granted)
+                    }
+                }
+                "openAppSettings" -> {
+                    try {
+                        activity.startActivity(
+                            Intent(
+                                Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                                Uri.fromParts("package", activity.packageName, null),
+                            ),
+                        )
+                        result.success(null)
+                    } catch (e: Exception) {
+                        result.error("SETTINGS_UNAVAILABLE", e.message, null)
+                    }
+                }
+                "getCurrentLocation" -> {
+                    if (locationHandler.hasPermission()) {
+                        locationHandler.getCurrentLocation(result)
+                    } else {
+                        requestLocationPermission { granted, _ ->
+                            if (granted) {
+                                locationHandler.getCurrentLocation(result)
+                            } else {
+                                result.success(
+                                    errorPayload(
+                                        "NO_PERMISSION",
+                                        "Location permission is not granted. Please allow location " +
+                                            "while using the app in system Settings and try again.",
+                                    ),
+                                )
+                            }
+                        }
+                    }
+                }
                 "getScreenTime" -> handleScreenTime(argsJson, result)
                 "queryCalendar" -> withCalendarPermission(
                     arrayOf(Manifest.permission.READ_CALENDAR),
@@ -81,6 +128,19 @@ class DeviceLocalToolsHandler(private val activity: Activity) {
         requestCode: Int,
         grantResults: IntArray,
     ): Boolean {
+        if (requestCode == LOCATION_PERMISSION_REQUEST_CODE) {
+            val callback = pendingLocationPermissionCallback
+            pendingLocationPermissionCallback = null
+            // Approximate (coarse) permission alone is sufficient.
+            val granted = locationHandler.hasPermission()
+            // Check after a completed request: false before the first request
+            // does not mean permanent denial. Empty results indicate cancellation.
+            val permanentlyDenied = !granted && grantResults.isNotEmpty() &&
+                !ActivityCompat.shouldShowRequestPermissionRationale(activity, Manifest.permission.ACCESS_COARSE_LOCATION) &&
+                !ActivityCompat.shouldShowRequestPermissionRationale(activity, Manifest.permission.ACCESS_FINE_LOCATION)
+            callback?.invoke(granted, permanentlyDenied)
+            return true
+        }
         if (requestCode != CALENDAR_PERMISSION_REQUEST_CODE) return false
         val callback = pendingCalendarPermissionCallback ?: return true
         pendingCalendarPermissionCallback = null
@@ -89,9 +149,32 @@ class DeviceLocalToolsHandler(private val activity: Activity) {
         return true
     }
 
+    fun dispose() {
+        locationHandler.dispose()
+        pendingLocationPermissionCallback?.invoke(false, false)
+        pendingLocationPermissionCallback = null
+    }
+
     // ---------------------------------------------------------------------
     // Permission helpers
     // ---------------------------------------------------------------------
+
+    private fun requestLocationPermission(completion: (Boolean, Boolean) -> Unit) {
+        if (locationHandler.hasPermission()) {
+            completion(true, false)
+            return
+        }
+        if (pendingCalendarPermissionCallback != null || pendingLocationPermissionCallback != null) {
+            completion(false, false)
+            return
+        }
+        pendingLocationPermissionCallback = completion
+        ActivityCompat.requestPermissions(
+            activity,
+            arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION),
+            LOCATION_PERMISSION_REQUEST_CODE,
+        )
+    }
 
     private fun calendarPermissions(): Array<String> = arrayOf(
         Manifest.permission.READ_CALENDAR,
@@ -113,7 +196,7 @@ class DeviceLocalToolsHandler(private val activity: Activity) {
             result.success(true)
             return
         }
-        if (pendingCalendarPermissionCallback != null) {
+        if (pendingCalendarPermissionCallback != null || pendingLocationPermissionCallback != null) {
             result.success(false)
             return
         }
@@ -137,7 +220,7 @@ class DeviceLocalToolsHandler(private val activity: Activity) {
             action()
             return
         }
-        if (pendingCalendarPermissionCallback != null) {
+        if (pendingCalendarPermissionCallback != null || pendingLocationPermissionCallback != null) {
             result.success(
                 errorPayload(
                     "PERMISSION_REQUEST_IN_PROGRESS",

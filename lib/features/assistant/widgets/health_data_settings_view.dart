@@ -529,6 +529,7 @@ IconData _categoryIcon(HealthDataCategory category) {
     HealthDataCategory.rest => Lucide.Bed,
     HealthDataCategory.heart => Lucide.Heart,
     HealthDataCategory.body => Lucide.Weight,
+    HealthDataCategory.reproductive => Lucide.Droplets,
   };
 }
 
@@ -538,6 +539,8 @@ String _categoryLabel(AppLocalizations l10n, HealthDataCategory category) {
     HealthDataCategory.rest => l10n.healthDataSettingsCategoryRest,
     HealthDataCategory.heart => l10n.healthDataSettingsCategoryHeart,
     HealthDataCategory.body => l10n.healthDataSettingsCategoryBody,
+    HealthDataCategory.reproductive =>
+      l10n.healthDataSettingsCategoryReproductive,
   };
 }
 
@@ -560,6 +563,7 @@ IconData healthDataTypeIcon(HealthDataType type) {
     HealthDataType.weight => Lucide.Weight,
     HealthDataType.bmi => Lucide.Hash,
     HealthDataType.bloodGlucose => Lucide.Syringe,
+    HealthDataType.menstrualFlow => Lucide.Droplets,
   };
 }
 
@@ -585,6 +589,8 @@ String healthDataTypeTitle(AppLocalizations l10n, HealthDataType type) {
     HealthDataType.weight => l10n.healthDataSettingsTypeWeightTitle,
     HealthDataType.bmi => l10n.healthDataSettingsTypeBmiTitle,
     HealthDataType.bloodGlucose => l10n.healthDataSettingsTypeBloodGlucoseTitle,
+    HealthDataType.menstrualFlow =>
+      l10n.healthDataSettingsTypeMenstrualFlowTitle,
   };
 }
 
@@ -614,5 +620,7 @@ String healthDataTypeSubtitle(AppLocalizations l10n, HealthDataType type) {
     HealthDataType.bmi => l10n.healthDataSettingsTypeBmiSubtitle,
     HealthDataType.bloodGlucose =>
       l10n.healthDataSettingsTypeBloodGlucoseSubtitle,
+    HealthDataType.menstrualFlow =>
+      l10n.healthDataSettingsTypeMenstrualFlowSubtitle,
   };
 }

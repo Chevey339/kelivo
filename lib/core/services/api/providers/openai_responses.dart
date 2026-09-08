@@ -4,6 +4,7 @@ import 'package:http/http.dart' as http;
 
 import '../../../providers/settings_provider.dart';
 import '../chat_api_helpers.dart';
+import '../generation/tool_loop_runner.dart';
 import '../stream/stream_chunk.dart';
 
 import 'openai/openai_provider.dart';
@@ -25,6 +26,7 @@ Stream<StreamChunk> sendOpenAIResponsesStream(
   bool stream = true,
   bool builtInSearchOnly = false,
   bool skipImageParsing = false,
+  StreamRoundRunner? retryRound,
 }) {
   final cfg = config.copyWith(useResponseApi: true);
   return sendOpenAIStream(
@@ -44,5 +46,6 @@ Stream<StreamChunk> sendOpenAIResponsesStream(
     stream: stream,
     builtInSearchOnly: builtInSearchOnly,
     skipImageParsing: skipImageParsing,
+    retryRound: retryRound,
   );
 }

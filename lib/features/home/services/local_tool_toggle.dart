@@ -1,4 +1,7 @@
+import 'dart:async';
+
 import 'package:flutter/widgets.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
 import 'package:Kelivo/core/models/assistant.dart';
@@ -76,8 +79,27 @@ Future<void> setLocalToolEnabled(
       DeviceLocalTools.locationSupported) {
     final granted = await DeviceLocalTools.hasLocationPermission();
     if (!granted) {
-      final requested = await DeviceLocalTools.requestLocationPermission();
-      if (!requested) return;
+      try {
+        final requested = await DeviceLocalTools.requestLocationPermission();
+        if (!requested) return;
+      } on PlatformException catch (error) {
+        if (error.code !=
+            DeviceLocalTools.locationPermissionPermanentlyDenied) {
+          rethrow;
+        }
+        if (context.mounted) {
+          final l10n = AppLocalizations.of(context)!;
+          showAppSnackBar(
+            context,
+            message: l10n.assistantEditLocationPermissionSettingsMessage,
+            type: NotificationType.warning,
+            duration: const Duration(seconds: 8),
+            actionLabel: l10n.hotkeyOpenSettings,
+            onAction: () => unawaited(DeviceLocalTools.openAppSettings()),
+          );
+        }
+        return;
+      }
     }
     await write(true);
     return;

@@ -753,6 +753,7 @@ Stream<StreamChunk> runOpenAIChatCompletionsToolFollowUps({
   required int approxPromptTokens,
   required int approxCompletionChars,
   required bool includeReasoningDetailsOnDone,
+  StreamRoundRunner? retryRound,
 }) async* {
   var usage = initialUsage;
   var chars = approxCompletionChars;
@@ -824,6 +825,12 @@ Stream<StreamChunk> runOpenAIChatCompletionsToolFollowUps({
       if (extraBodyCfg.isNotEmpty) {
         body2.addAll(extraBodyCfg);
       }
+      applyPoolsideThinkingIfNeeded(
+        body2,
+        info: info,
+        isReasoning: isReasoning,
+        thinkingBudget: thinkingBudget,
+      );
       // Built-in tools run after the custom body and merge by type.
       applyChatCompletionsBuiltInTools(
         body2,
@@ -908,6 +915,7 @@ Stream<StreamChunk> runOpenAIChatCompletionsToolFollowUps({
         totalTokens: usage?.totalTokens ?? approxTotal,
       );
     },
+    retryRound: retryRound,
     usageOf: () => usage,
   );
 }
@@ -932,6 +940,7 @@ Stream<StreamChunk> runOpenAIChatCompletionsNonStreamToolFollowUps({
   required bool needsReasoningEcho,
   required Map<String, String>? extraHeaders,
   required TokenUsage? initialUsage,
+  StreamRoundRunner? retryRound,
 }) async* {
   var usage = initialUsage;
   var lastObj = firstObj;
@@ -999,7 +1008,7 @@ Stream<StreamChunk> runOpenAIChatCompletionsNonStreamToolFollowUps({
               as Map<String, dynamic>;
       final roundUsage = openaiUsageFromObj(lastObj);
       if (roundUsage != null) {
-        usage = (usage ?? const TokenUsage()).accumulate(roundUsage);
+        usage = (usage ?? const TokenUsage()).merge(roundUsage);
       }
     },
     takeCallsAfterRound: () =>
@@ -1033,6 +1042,7 @@ Stream<StreamChunk> runOpenAIChatCompletionsNonStreamToolFollowUps({
             : choice['finish_reason'].toString(),
       );
     },
+    retryRound: retryRound,
     usageOf: () => usage,
   );
 }

@@ -196,6 +196,7 @@ class MainActivity : FlutterActivity() {
     }
 
     override fun onDestroy() {
+        deviceLocalToolsHandler?.dispose()
         val stream = pendingWritableStream
         val uri = pendingWritableUri
         if (stream != null && uri != null) {

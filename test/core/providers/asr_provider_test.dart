@@ -49,6 +49,40 @@ void main() {
     expect(capture.stopped, isTrue);
   });
 
+  for (final sampleRate in [16000, 8000]) {
+    test('Qwen Audio streams and finishes at $sampleRate Hz', () async {
+      final capture = _FakeAudioCapture();
+      final session = _FakeCloudSession(finalTranscript: 'hello world');
+      final options = QwenAudioAsrOptions(
+        apiKey: 'test-key',
+        sampleRate: sampleRate,
+      );
+      final provider = AsrProvider(
+        audioCaptureFactory: () => capture,
+        cloudSessionStarter: (service) async {
+          expect(service, same(options));
+          return session;
+        },
+      );
+      addTearDown(provider.dispose);
+
+      await provider.start(options);
+      expect(provider.state, AsrSessionState.listening);
+      expect(capture.sampleRate, sampleRate);
+
+      final pcm = _pcm16(6000);
+      capture.add(pcm);
+      session.emitPartial('hello');
+      await Future<void>.delayed(Duration.zero);
+      expect(provider.transcript, 'hello');
+
+      expect(await provider.finish(), 'hello world');
+      expect(session.receivedAudio, [pcm]);
+      expect(capture.stopped, isTrue);
+      expect(provider.state, AsrSessionState.idle);
+    });
+  }
+
   test('captures audio at each cloud provider sample rate', () async {
     final captures = <_FakeAudioCapture>[];
     final provider = AsrProvider(

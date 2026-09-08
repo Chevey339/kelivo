@@ -70,6 +70,7 @@ class ChatSuggestionService {
   }
 
   Future<List<String>> generate({
+    String? conversationId,
     required SettingsProvider settings,
     required String providerKey,
     required String modelId,
@@ -84,6 +85,7 @@ class ChatSuggestionService {
         .replaceAll('{content}', content)
         .replaceAll('{locale}', locale);
     final raw = await ChatApiService.generateText(
+      conversationId: conversationId,
       config: settings.getProviderConfig(providerKey),
       modelId: modelId,
       prompt: prompt,

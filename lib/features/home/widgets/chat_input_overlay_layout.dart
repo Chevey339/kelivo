@@ -31,15 +31,19 @@ class ChatInputOverlayLayout extends StatelessWidget {
               Positioned.fill(child: content),
               if (backgroundImageActive && topBackground != null)
                 Positioned.fill(
-                  child: ClipRect(
-                    clipper: _TopOverlayClipper(
-                      topInset + _topOverlayTailHeight,
-                    ),
-                    child: _TopBackgroundFade(
-                      height: topInset + _topOverlayTailHeight,
-                      child: IgnorePointer(
-                        key: const Key('chat-input-overlay-top-background'),
-                        child: _KeyboardStableBackground(child: topBackground!),
+                  child: RepaintBoundary(
+                    child: ClipRect(
+                      clipper: _TopOverlayClipper(
+                        topInset + _topOverlayTailHeight,
+                      ),
+                      child: _TopBackgroundFade(
+                        height: topInset + _topOverlayTailHeight,
+                        child: IgnorePointer(
+                          key: const Key('chat-input-overlay-top-background'),
+                          child: _KeyboardStableBackground(
+                            child: topBackground!,
+                          ),
+                        ),
                       ),
                     ),
                   ),
@@ -54,15 +58,21 @@ class ChatInputOverlayLayout extends StatelessWidget {
                 ),
               if (backgroundImageActive && topBackground != null)
                 Positioned.fill(
-                  child: ClipRect(
-                    clipper: const _BottomOverlayClipper(
-                      _bottomOverlayFadeHeight,
-                    ),
-                    child: _BottomBackgroundFade(
-                      height: _bottomOverlayFadeHeight,
-                      child: IgnorePointer(
-                        key: const Key('chat-input-overlay-bottom-background'),
-                        child: _KeyboardStableBackground(child: topBackground!),
+                  child: RepaintBoundary(
+                    child: ClipRect(
+                      clipper: const _BottomOverlayClipper(
+                        _bottomOverlayFadeHeight,
+                      ),
+                      child: _BottomBackgroundFade(
+                        height: _bottomOverlayFadeHeight,
+                        child: IgnorePointer(
+                          key: const Key(
+                            'chat-input-overlay-bottom-background',
+                          ),
+                          child: _KeyboardStableBackground(
+                            child: topBackground!,
+                          ),
+                        ),
                       ),
                     ),
                   ),

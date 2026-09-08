@@ -508,6 +508,74 @@ class _StorageSpacePageState extends State<StorageSpacePage> {
     }
   }
 
+  Future<void> _doClearFonts() async {
+    if (_clearing) return;
+    final l10n = AppLocalizations.of(context)!;
+    final targetName = l10n.storageSpaceCategoryFonts;
+    final ok = await _confirmAction(
+      context,
+      title: l10n.storageSpaceClearConfirmTitle,
+      message: l10n.storageSpaceClearConfirmMessage(targetName),
+      actionLabel: l10n.storageSpaceClearButton,
+    );
+    if (!ok) return;
+
+    setState(() => _clearing = true);
+    try {
+      await StorageUsageService.clearFonts();
+      if (!mounted) return;
+      showAppSnackBar(
+        context,
+        message: l10n.storageSpaceClearDone(targetName),
+        type: NotificationType.success,
+      );
+      await _refreshReport();
+    } catch (e) {
+      if (!mounted) return;
+      showAppSnackBar(
+        context,
+        message: l10n.storageSpaceClearFailed(e.toString()),
+        type: NotificationType.error,
+      );
+    } finally {
+      if (mounted) setState(() => _clearing = false);
+    }
+  }
+
+  Future<void> _doClearLocalModels() async {
+    if (_clearing) return;
+    final l10n = AppLocalizations.of(context)!;
+    final targetName = l10n.storageSpaceCategoryLocalModels;
+    final ok = await _confirmAction(
+      context,
+      title: l10n.storageSpaceClearConfirmTitle,
+      message: l10n.storageSpaceClearConfirmMessage(targetName),
+      actionLabel: l10n.storageSpaceClearButton,
+    );
+    if (!ok) return;
+
+    setState(() => _clearing = true);
+    try {
+      await StorageUsageService.clearLocalModels();
+      if (!mounted) return;
+      showAppSnackBar(
+        context,
+        message: l10n.storageSpaceClearDone(targetName),
+        type: NotificationType.success,
+      );
+      await _refreshReport();
+    } catch (e) {
+      if (!mounted) return;
+      showAppSnackBar(
+        context,
+        message: l10n.storageSpaceClearFailed(e.toString()),
+        type: NotificationType.error,
+      );
+    } finally {
+      if (mounted) setState(() => _clearing = false);
+    }
+  }
+
   Future<void> _doCleanOrphanSessionFiles() async {
     if (_clearing) return;
     final l10n = AppLocalizations.of(context)!;
@@ -748,6 +816,10 @@ class _StorageSpacePageState extends State<StorageSpacePage> {
                         onClearDisplacedDatabases: _clearing
                             ? null
                             : _doClearDisplacedDatabases,
+                        onClearFonts: _clearing ? null : _doClearFonts,
+                        onClearLocalModels: _clearing
+                            ? null
+                            : _doClearLocalModels,
                         onCleanOrphanSessionFiles: _clearing
                             ? null
                             : _doCleanOrphanSessionFiles,
@@ -1180,6 +1252,72 @@ class _StorageCategoryPageState extends State<_StorageCategoryPage> {
     }
   }
 
+  Future<void> _clearFonts() async {
+    if (_clearing) return;
+    final l10n = AppLocalizations.of(context)!;
+    final targetName = l10n.storageSpaceCategoryFonts;
+    final ok = await _confirmAction(
+      title: l10n.storageSpaceClearConfirmTitle,
+      message: l10n.storageSpaceClearConfirmMessage(targetName),
+      actionLabel: l10n.storageSpaceClearButton,
+    );
+    if (!ok) return;
+
+    setState(() => _clearing = true);
+    try {
+      await StorageUsageService.clearFonts();
+      if (!mounted) return;
+      showAppSnackBar(
+        context,
+        message: l10n.storageSpaceClearDone(targetName),
+        type: NotificationType.success,
+      );
+      await _refresh();
+    } catch (e) {
+      if (!mounted) return;
+      showAppSnackBar(
+        context,
+        message: l10n.storageSpaceClearFailed(e.toString()),
+        type: NotificationType.error,
+      );
+    } finally {
+      if (mounted) setState(() => _clearing = false);
+    }
+  }
+
+  Future<void> _clearLocalModels() async {
+    if (_clearing) return;
+    final l10n = AppLocalizations.of(context)!;
+    final targetName = l10n.storageSpaceCategoryLocalModels;
+    final ok = await _confirmAction(
+      title: l10n.storageSpaceClearConfirmTitle,
+      message: l10n.storageSpaceClearConfirmMessage(targetName),
+      actionLabel: l10n.storageSpaceClearButton,
+    );
+    if (!ok) return;
+
+    setState(() => _clearing = true);
+    try {
+      await StorageUsageService.clearLocalModels();
+      if (!mounted) return;
+      showAppSnackBar(
+        context,
+        message: l10n.storageSpaceClearDone(targetName),
+        type: NotificationType.success,
+      );
+      await _refresh();
+    } catch (e) {
+      if (!mounted) return;
+      showAppSnackBar(
+        context,
+        message: l10n.storageSpaceClearFailed(e.toString()),
+        type: NotificationType.error,
+      );
+    } finally {
+      if (mounted) setState(() => _clearing = false);
+    }
+  }
+
   Future<void> _clearOrphanSessionFiles() async {
     if (_clearing) return;
     final l10n = AppLocalizations.of(context)!;
@@ -1282,6 +1420,12 @@ class _StorageCategoryPageState extends State<_StorageCategoryPage> {
           onClearDisplacedDatabases:
               (category.key == StorageUsageCategoryKey.displacedDatabases)
               ? _clearDisplacedDatabases
+              : null,
+          onClearFonts: (category.key == StorageUsageCategoryKey.other)
+              ? _clearFonts
+              : null,
+          onClearLocalModels: (category.key == StorageUsageCategoryKey.other)
+              ? _clearLocalModels
               : null,
           onCleanOrphanSessionFiles:
               (category.key == StorageUsageCategoryKey.sessionFiles)
@@ -1488,6 +1632,8 @@ class _CategoryDetail extends StatelessWidget {
     required this.onClearLegacyChatData,
     required this.onClearRestoreTraces,
     required this.onClearDisplacedDatabases,
+    required this.onClearFonts,
+    required this.onClearLocalModels,
     required this.onCleanOrphanSessionFiles,
     required this.refreshReport,
   });
@@ -1504,6 +1650,8 @@ class _CategoryDetail extends StatelessWidget {
   final Future<void> Function()? onClearLegacyChatData;
   final Future<void> Function()? onClearRestoreTraces;
   final Future<void> Function()? onClearDisplacedDatabases;
+  final Future<void> Function()? onClearFonts;
+  final Future<void> Function()? onClearLocalModels;
   final Future<void> Function()? onCleanOrphanSessionFiles;
   final Future<void> Function() refreshReport;
 
@@ -1742,6 +1890,7 @@ class _CategoryDetail extends StatelessWidget {
                     const SizedBox(height: 8),
                     for (final s in category.subcategories)
                       Container(
+                        width: double.infinity,
                         margin: const EdgeInsets.only(bottom: 8),
                         padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
                         decoration: BoxDecoration(
@@ -1821,6 +1970,23 @@ class _CategoryDetail extends StatelessWidget {
                                       sourcePath: s.path!,
                                       fileName: s.id,
                                     ),
+                                  ),
+                                if (category.key ==
+                                        StorageUsageCategoryKey.other &&
+                                    s.id == 'fonts')
+                                  _MiniActionButton(
+                                    label: l10n.storageSpaceClearButton,
+                                    enabled: !clearing && onClearFonts != null,
+                                    onTap: () => onClearFonts?.call(),
+                                  ),
+                                if (category.key ==
+                                        StorageUsageCategoryKey.other &&
+                                    s.id == 'local_models')
+                                  _MiniActionButton(
+                                    label: l10n.storageSpaceClearButton,
+                                    enabled:
+                                        !clearing && onClearLocalModels != null,
+                                    onTap: () => onClearLocalModels?.call(),
                                   ),
                               ],
                             ),

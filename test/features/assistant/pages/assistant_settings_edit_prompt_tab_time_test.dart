@@ -125,6 +125,7 @@ _createAssistantProvider(
           required config,
           required modelId,
           required prompt,
+          String? conversationId,
           int? thinkingBudget,
         }) async => '<user_memory>false</user_memory>',
   );

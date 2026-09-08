@@ -67,7 +67,7 @@ class ResponsesStreamDecoder implements StreamChunkDecoder {
 
   TokenUsage? get usage {
     if (_round == null) return initialUsage;
-    return (initialUsage ?? const TokenUsage()).accumulate(_round!);
+    return (initialUsage ?? const TokenUsage()).merge(_round!);
   }
 
   bool completed = false;

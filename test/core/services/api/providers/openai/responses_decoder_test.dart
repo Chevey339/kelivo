@@ -493,7 +493,7 @@ void main() {
     },
   );
 
-  test('follow-up decoder usage is the cumulative snapshot', () {
+  test('follow-up decoder usage is the last round only', () {
     final first = ResponsesStreamDecoder();
     final firstDone = first.accept(
       _event({
@@ -520,13 +520,13 @@ void main() {
       }),
     );
 
-    expect(second.usage!.promptTokens, 400);
-    expect(second.usage!.completionTokens, 60);
-    expect(second.usage!.totalTokens, 460);
+    expect(second.usage!.promptTokens, 300);
+    expect(second.usage!.completionTokens, 40);
+    expect(second.usage!.totalTokens, 340);
     final streamed = follow.chunks.whereType<Usage>().single.usage;
-    expect(streamed.promptTokens, 400);
-    expect(streamed.completionTokens, 60);
-    expect(streamed.totalTokens, 460);
+    expect(streamed.promptTokens, 300);
+    expect(streamed.completionTokens, 40);
+    expect(streamed.totalTokens, 340);
   });
 
   test('a follow-up round without usage keeps the prior snapshot', () {

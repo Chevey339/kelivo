@@ -3464,13 +3464,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get modelDetailSheetReasoningAbility => '推理';
 
   @override
-  String get modelDetailSheetProviderOverrideDescription =>
-      '供应商重写：允许为特定模型自定义供应商设置。（暂未实现）';
-
-  @override
-  String get modelDetailSheetAddProviderOverride => '添加供应商重写';
-
-  @override
   String get modelDetailSheetCustomHeadersTitle => '自定义 Headers';
 
   @override
@@ -5959,7 +5952,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get healthDataSettingsTypeSleepTitle => '睡眠';
 
   @override
-  String get healthDataSettingsTypeSleepSubtitle => '睡眠时长';
+  String get healthDataSettingsTypeSleepSubtitle => '最近 24 小时的睡眠、卧床、清醒与睡眠分期';
 
   @override
   String get healthDataSettingsTypeMindfulnessTitle => '静息';
@@ -6274,7 +6267,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get autoRetryRestoreDefaults => '恢复默认';
 
   @override
-  String get autoRetryFooter => '仅在本次请求尚未产生任何输出时才会自动重试。';
+  String get autoRetryFooter => '仅在当前这轮模型响应尚未产生任何输出时才会自动重试。';
 
   @override
   String autoRetryCountdown(int seconds, int attempt, int maxRetries) {
@@ -10453,6 +10446,91 @@ class AppLocalizationsZh extends AppLocalizations {
   @override
   String get displaySettingsPageShowProducedFilesSubtitle =>
       '在回复底部显示工具创建或修改的文件。';
+
+  @override
+  String get reasoningBudgetSliderLow => 'Low';
+
+  @override
+  String get reasoningBudgetSliderMedium => 'Medium';
+
+  @override
+  String get reasoningBudgetSliderHigh => 'High';
+
+  @override
+  String get reasoningBudgetSliderXhigh => 'XHigh';
+
+  @override
+  String get reasoningBudgetSliderMax => 'Max';
+
+  @override
+  String get defaultModelPagePerChatModelTitle => '每个对话独立模型';
+
+  @override
+  String get defaultModelPagePerChatModelSubtitle =>
+      '开启后，在对话中切换模型只影响当前对话；关闭后会直接修改当前助手的模型，使用该助手的所有对话都会跟随。';
+
+  @override
+  String get googleFontsTitle => 'Google Fonts';
+
+  @override
+  String get googleFontsRefresh => '刷新字体列表';
+
+  @override
+  String get googleFontsSearchHint => '搜索字体或语言';
+
+  @override
+  String get googleFontsHint =>
+      '下载常规字重字体后预览并应用，已安装字体可离线使用。目录来自 Expo Google Fonts，字体从 Google Fonts 下载。';
+
+  @override
+  String get googleFontsNoResults => '没有匹配的字体';
+
+  @override
+  String get googleFontsFailed => '无法加载、下载或应用字体，请检查网络后重试。';
+
+  @override
+  String get googleFontsDownloading => '正在下载字体…';
+
+  @override
+  String get googleFontsPreview => '字体预览：你好，世界！Hello world 0123456789';
+
+  @override
+  String get googleFontsLicense => '字体许可证';
+
+  @override
+  String get assistantEditLocationPermissionSettingsMessage =>
+      '定位权限已被禁止。请在系统设置中允许定位访问，然后重新开启此工具。';
+
+  @override
+  String get healthDataSettingsCategoryReproductive => '生殖健康';
+
+  @override
+  String get healthDataSettingsTypeMenstrualFlowTitle => '经期记录';
+
+  @override
+  String get healthDataSettingsTypeMenstrualFlowSubtitle =>
+      '最近 90 天记录的经量与周期开始日期';
+
+  @override
+  String get assistantEditGradientBackgroundTitle => '渐变背景';
+
+  @override
+  String get assistantEditGradientStaticTitle => '静态模式';
+
+  @override
+  String get assistantEditGradientStaticDescription => '更省电，适合长对话和持续输出。';
+
+  @override
+  String get assistantEditGradientHorizontal => '水平位置';
+
+  @override
+  String get assistantEditGradientVertical => '垂直位置';
+
+  @override
+  String get assistantEditGradientPreview => '预览';
+
+  @override
+  String get assistantEditGradientNextFrame => '换一帧';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hans`).
@@ -13915,13 +13993,6 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get modelDetailSheetReasoningAbility => '推理';
 
   @override
-  String get modelDetailSheetProviderOverrideDescription =>
-      '供应商重写：允许为特定模型自定义供应商设置。（暂未实现）';
-
-  @override
-  String get modelDetailSheetAddProviderOverride => '添加供应商重写';
-
-  @override
   String get modelDetailSheetCustomHeadersTitle => '自定义 Headers';
 
   @override
@@ -16336,7 +16407,7 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get healthDataSettingsTypeSleepTitle => '睡眠';
 
   @override
-  String get healthDataSettingsTypeSleepSubtitle => '睡眠时长';
+  String get healthDataSettingsTypeSleepSubtitle => '最近 24 小时的睡眠、卧床、清醒与睡眠分期';
 
   @override
   String get healthDataSettingsTypeMindfulnessTitle => '静息';
@@ -16651,7 +16722,7 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get autoRetryRestoreDefaults => '恢复默认';
 
   @override
-  String get autoRetryFooter => '仅在本次请求尚未产生任何输出时才会自动重试。';
+  String get autoRetryFooter => '仅在当前这轮模型响应尚未产生任何输出时才会自动重试。';
 
   @override
   String autoRetryCountdown(int seconds, int attempt, int maxRetries) {
@@ -20830,6 +20901,91 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   @override
   String get displaySettingsPageShowProducedFilesSubtitle =>
       '在回复底部显示工具创建或修改的文件。';
+
+  @override
+  String get reasoningBudgetSliderLow => 'Low';
+
+  @override
+  String get reasoningBudgetSliderMedium => 'Medium';
+
+  @override
+  String get reasoningBudgetSliderHigh => 'High';
+
+  @override
+  String get reasoningBudgetSliderXhigh => 'XHigh';
+
+  @override
+  String get reasoningBudgetSliderMax => 'Max';
+
+  @override
+  String get defaultModelPagePerChatModelTitle => '每个对话独立模型';
+
+  @override
+  String get defaultModelPagePerChatModelSubtitle =>
+      '开启后，在对话中切换模型只影响当前对话；关闭后会直接修改当前助手的模型，使用该助手的所有对话都会跟随。';
+
+  @override
+  String get googleFontsTitle => 'Google Fonts';
+
+  @override
+  String get googleFontsRefresh => '刷新字体列表';
+
+  @override
+  String get googleFontsSearchHint => '搜索字体或语言';
+
+  @override
+  String get googleFontsHint =>
+      '下载常规字重字体后预览并应用，已安装字体可离线使用。目录来自 Expo Google Fonts，字体从 Google Fonts 下载。';
+
+  @override
+  String get googleFontsNoResults => '没有匹配的字体';
+
+  @override
+  String get googleFontsFailed => '无法加载、下载或应用字体，请检查网络后重试。';
+
+  @override
+  String get googleFontsDownloading => '正在下载字体…';
+
+  @override
+  String get googleFontsPreview => '字体预览：你好，世界！Hello world 0123456789';
+
+  @override
+  String get googleFontsLicense => '字体许可证';
+
+  @override
+  String get assistantEditLocationPermissionSettingsMessage =>
+      '定位权限已被禁止。请在系统设置中允许定位访问，然后重新开启此工具。';
+
+  @override
+  String get healthDataSettingsCategoryReproductive => '生殖健康';
+
+  @override
+  String get healthDataSettingsTypeMenstrualFlowTitle => '经期记录';
+
+  @override
+  String get healthDataSettingsTypeMenstrualFlowSubtitle =>
+      '最近 90 天记录的经量与周期开始日期';
+
+  @override
+  String get assistantEditGradientBackgroundTitle => '渐变背景';
+
+  @override
+  String get assistantEditGradientStaticTitle => '静态模式';
+
+  @override
+  String get assistantEditGradientStaticDescription => '更省电，适合长对话和持续输出。';
+
+  @override
+  String get assistantEditGradientHorizontal => '水平位置';
+
+  @override
+  String get assistantEditGradientVertical => '垂直位置';
+
+  @override
+  String get assistantEditGradientPreview => '预览';
+
+  @override
+  String get assistantEditGradientNextFrame => '换一帧';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hant`).
@@ -24292,13 +24448,6 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get modelDetailSheetReasoningAbility => '推理';
 
   @override
-  String get modelDetailSheetProviderOverrideDescription =>
-      '供應商覆寫：允許為特定模型自訂供應商設定。（暫未實現）';
-
-  @override
-  String get modelDetailSheetAddProviderOverride => '新增供應商覆寫';
-
-  @override
   String get modelDetailSheetCustomHeadersTitle => '自訂 Headers';
 
   @override
@@ -26788,7 +26937,7 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get healthDataSettingsTypeSleepTitle => '睡眠';
 
   @override
-  String get healthDataSettingsTypeSleepSubtitle => '睡眠時長';
+  String get healthDataSettingsTypeSleepSubtitle => '最近 24 小時的睡眠、臥床、清醒與睡眠分期';
 
   @override
   String get healthDataSettingsTypeMindfulnessTitle => '靜息';
@@ -27103,7 +27252,7 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get autoRetryRestoreDefaults => '恢復預設';
 
   @override
-  String get autoRetryFooter => '僅在本次請求尚未產生任何輸出時才會自動重試。';
+  String get autoRetryFooter => '僅在目前這輪模型回應尚未產生任何輸出時才會自動重試。';
 
   @override
   String autoRetryCountdown(int seconds, int attempt, int maxRetries) {
@@ -31284,4 +31433,89 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   @override
   String get displaySettingsPageShowProducedFilesSubtitle =>
       '在回覆底部顯示工具建立或修改的檔案。';
+
+  @override
+  String get reasoningBudgetSliderLow => 'Low';
+
+  @override
+  String get reasoningBudgetSliderMedium => 'Medium';
+
+  @override
+  String get reasoningBudgetSliderHigh => 'High';
+
+  @override
+  String get reasoningBudgetSliderXhigh => 'XHigh';
+
+  @override
+  String get reasoningBudgetSliderMax => 'Max';
+
+  @override
+  String get defaultModelPagePerChatModelTitle => '每個對話獨立模型';
+
+  @override
+  String get defaultModelPagePerChatModelSubtitle =>
+      '開啟後，在對話中切換模型只影響目前對話；關閉後會直接修改目前助手的模型，使用該助手的所有對話都會跟隨。';
+
+  @override
+  String get googleFontsTitle => 'Google Fonts';
+
+  @override
+  String get googleFontsRefresh => '重新整理字型列表';
+
+  @override
+  String get googleFontsSearchHint => '搜尋字型或語言';
+
+  @override
+  String get googleFontsHint =>
+      '下載一般字重字型後預覽並套用，已安裝字型可離線使用。目錄來自 Expo Google Fonts，字型從 Google Fonts 下載。';
+
+  @override
+  String get googleFontsNoResults => '沒有符合的字型';
+
+  @override
+  String get googleFontsFailed => '無法載入、下載或套用字型，請檢查網路後重試。';
+
+  @override
+  String get googleFontsDownloading => '正在下載字型…';
+
+  @override
+  String get googleFontsPreview => '字型預覽：你好，世界！Hello world 0123456789';
+
+  @override
+  String get googleFontsLicense => '字型授權條款';
+
+  @override
+  String get assistantEditLocationPermissionSettingsMessage =>
+      '定位權限已被禁止。請在系統設定中允許定位存取，然後重新開啟此工具。';
+
+  @override
+  String get healthDataSettingsCategoryReproductive => '生殖健康';
+
+  @override
+  String get healthDataSettingsTypeMenstrualFlowTitle => '經期記錄';
+
+  @override
+  String get healthDataSettingsTypeMenstrualFlowSubtitle =>
+      '最近 90 天記錄的經量與週期開始日期';
+
+  @override
+  String get assistantEditGradientBackgroundTitle => '漸層背景';
+
+  @override
+  String get assistantEditGradientStaticTitle => '靜態模式';
+
+  @override
+  String get assistantEditGradientStaticDescription => '更省電，適合長對話和持續輸出。';
+
+  @override
+  String get assistantEditGradientHorizontal => '水平位置';
+
+  @override
+  String get assistantEditGradientVertical => '垂直位置';
+
+  @override
+  String get assistantEditGradientPreview => '預覽';
+
+  @override
+  String get assistantEditGradientNextFrame => '換一幀';
 }

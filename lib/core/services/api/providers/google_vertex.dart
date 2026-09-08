@@ -39,6 +39,7 @@ Stream<StreamChunk> sendGoogleVertexStream(
   Map<String, dynamic>? extraBody,
   bool stream = true,
   bool skipImageParsing = false,
+  StreamRoundRunner? retryRound,
 }) {
   final cfg = config.copyWith(vertexAI: true);
   return sendGoogleStream(
@@ -57,6 +58,7 @@ Stream<StreamChunk> sendGoogleVertexStream(
     extraBody: extraBody,
     stream: stream,
     skipImageParsing: skipImageParsing,
+    retryRound: retryRound,
   );
 }
 
@@ -134,6 +136,7 @@ Future<String?> maybeVertexAccessToken(ProviderConfig cfg) async {
 int _getMaxOutputTokensForClaudeModel(String modelId) {
   // Limits based on Google Vertex AI documentation
   switch (modelId) {
+    case 'claude-fable-5-1':
     case 'claude-fable-5':
     case 'claude-opus-5':
     case 'claude-opus-4-8':
@@ -177,6 +180,7 @@ Stream<StreamChunk> sendGoogleVertexClaudeStream({
   Map<String, dynamic>? extraBody,
   bool stream = true,
   bool skipImageParsing = false,
+  StreamRoundRunner? retryRound,
 }) async* {
   final upstreamId = apiModelId(config, modelId);
   final loc = (config.location ?? 'us-central1').trim();
@@ -469,6 +473,7 @@ Stream<StreamChunk> sendGoogleVertexClaudeStream({
   var pauseTurn = false;
 
   yield* runProviderToolRounds(
+    retryRound: retryRound,
     sendRound: () async* {
       pendingCalls = [];
       lastStreamResults = [];
@@ -526,7 +531,7 @@ Stream<StreamChunk> sendGoogleVertexClaudeStream({
         try {
           final u = (obj['usage'] as Map?)?.cast<String, dynamic>();
           if (u != null) {
-            totalUsage = (totalUsage ?? const TokenUsage()).accumulate(
+            totalUsage = (totalUsage ?? const TokenUsage()).merge(
               claudeUsageFromMap(u),
             );
           }

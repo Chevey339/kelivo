@@ -72,7 +72,7 @@ English | [简体中文](README_ZH_CN.md)
 - 📤 **QR Code Sharing** - Export and import provider configurations via QR codes.
 - 💾 **Data Backup** - Supports chat history backup and restoration.
 - 🌐 **Custom Requests** - Supports custom HTTP request headers and bodies.
-- 🔡 **Custom Fonts** - Bring your own fonts (system fonts / local fonts).
+- 🔡 **Custom Fonts** - Use system fonts, import local fonts, or download Google Fonts on demand.
 - ⚙️ **Android Background Generation** - Keep chat generation running in the background (optional setting).
 
 ## 📱 Platform Support

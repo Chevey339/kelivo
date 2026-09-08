@@ -174,7 +174,7 @@ void main() {
       );
     });
 
-    test('off budget omits thinking config for Gemma 4', () async {
+    test('off budget sends minimal thinking level for Gemma 4', () async {
       late Map<String, dynamic> capturedBody;
       final server = await _startGeminiServer((body) {
         capturedBody = body;
@@ -195,7 +195,10 @@ void main() {
       ).toList();
 
       expect(chunks.isGenerationDone, isTrue);
-      expect(_thinkingConfig(capturedBody), isNull);
+      expect(_thinkingConfig(capturedBody), {
+        'includeThoughts': false,
+        'thinkingLevel': 'minimal',
+      });
     });
   });
 
@@ -306,6 +309,45 @@ void main() {
         'thinkingLevel': 'medium',
       });
     });
+
+    test(
+      'Gemini 3.8 Flash inherits 3.7 thinking levels and default medium',
+      () async {
+        late Map<String, dynamic> capturedBody;
+        final server = await _startGeminiServer((body) {
+          capturedBody = body;
+        });
+        addTearDown(() async {
+          await server.close(force: true);
+        });
+
+        final chunks = await ChatApiService.sendMessageStream(
+          config: _geminiConfig(
+            'http://${server.address.address}:${server.port}/v1beta',
+          ),
+          modelId: 'gemini-3.8-flash',
+          messages: const [
+            {'role': 'user', 'content': 'hello'},
+          ],
+          stream: false,
+        ).toList();
+
+        expect(chunks.isGenerationDone, isTrue);
+        expect(_thinkingConfig(capturedBody), {
+          'includeThoughts': true,
+          'thinkingLevel': 'medium',
+        });
+
+        final offBody = await _capture(
+          modelId: 'gemini-3.8-flash',
+          thinkingBudget: 0,
+        );
+        expect(_thinkingConfig(offBody), {
+          'includeThoughts': false,
+          'thinkingLevel': 'low',
+        });
+      },
+    );
 
     test(
       'Gemini 3.7 Flash floors at low because minimal is unsupported',

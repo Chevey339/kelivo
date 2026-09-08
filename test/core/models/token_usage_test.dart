@@ -29,46 +29,25 @@ void main() {
       expect(merged.totalTokens, 120);
     });
 
-    test('accumulate sums three settled rounds', () {
-      final summed = const TokenUsage(promptTokens: 100, completionTokens: 20)
-          .accumulate(const TokenUsage(promptTokens: 300, completionTokens: 40))
-          .accumulate(
-            const TokenUsage(promptTokens: 500, completionTokens: 10),
-          );
+    test('merge keeps only the newest round, never the sum of rounds', () {
+      final latest = const TokenUsage(promptTokens: 100, completionTokens: 20)
+          .merge(const TokenUsage(promptTokens: 300, completionTokens: 40))
+          .merge(const TokenUsage(promptTokens: 500, completionTokens: 10));
 
-      expect(summed.promptTokens, 900);
-      expect(summed.completionTokens, 70);
-      expect(summed.totalTokens, 970);
+      expect(latest.promptTokens, 500);
+      expect(latest.completionTokens, 10);
+      expect(latest.totalTokens, 510);
     });
 
-    test(
-      'accumulate sums explicit totals, then ignores them once split exists',
-      () {
-        final totalsOnly = const TokenUsage(
-          totalTokens: 50,
-        ).accumulate(const TokenUsage(totalTokens: 80));
-        expect(totalsOnly.promptTokens, 0);
-        expect(totalsOnly.completionTokens, 0);
-        expect(totalsOnly.totalTokens, 130);
+    test('merge keeps the prior snapshot when a round reports nothing', () {
+      final kept = const TokenUsage(
+        promptTokens: 100,
+        completionTokens: 20,
+      ).merge(const TokenUsage());
 
-        final splitAfterEstimate = totalsOnly.accumulate(
-          const TokenUsage(
-            promptTokens: 100,
-            completionTokens: 20,
-            totalTokens: 999,
-          ),
-        );
-        expect(splitAfterEstimate.promptTokens, 100);
-        expect(splitAfterEstimate.completionTokens, 20);
-        expect(splitAfterEstimate.totalTokens, 120);
-
-        final estimateAfterSplit = splitAfterEstimate.accumulate(
-          const TokenUsage(totalTokens: 80),
-        );
-        expect(estimateAfterSplit.promptTokens, 100);
-        expect(estimateAfterSplit.completionTokens, 20);
-        expect(estimateAfterSplit.totalTokens, 120);
-      },
-    );
+      expect(kept.promptTokens, 100);
+      expect(kept.completionTokens, 20);
+      expect(kept.totalTokens, 120);
+    });
   });
 }

@@ -40,6 +40,7 @@ final class BusinessKeyRegistry {
   static const preferenceKeys = <String>{
     'current_assistant_id_v1',
     'selected_model_v1',
+    'per_chat_model_enabled_v1',
     'pinned_models_v1',
     'provider_group_map_v1',
     'provider_group_collapsed_v1',

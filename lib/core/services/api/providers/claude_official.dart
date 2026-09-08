@@ -55,6 +55,7 @@ Stream<StreamChunk> sendClaudeStream(
   bool stream = true,
   bool builtInSearchOnly = false,
   bool skipImageParsing = false,
+  StreamRoundRunner? retryRound,
 }) async* {
   final upstreamModelId = apiModelId(config, modelId);
   // Endpoint and headers (constant across rounds)
@@ -325,6 +326,7 @@ Stream<StreamChunk> sendClaudeStream(
   await uploadDataFiles();
 
   yield* runProviderToolRounds(
+    retryRound: retryRound,
     sendRound: () async* {
       final omitSamplingParams = claudeShouldOmitSamplingParams(
         upstreamModelId,
@@ -415,7 +417,7 @@ Stream<StreamChunk> sendClaudeStream(
         try {
           final u = (obj['usage'] as Map?)?.cast<String, dynamic>();
           if (u != null) {
-            totalUsage = (totalUsage ?? const TokenUsage()).accumulate(
+            totalUsage = (totalUsage ?? const TokenUsage()).merge(
               claudeUsageFromMap(u),
             );
           }

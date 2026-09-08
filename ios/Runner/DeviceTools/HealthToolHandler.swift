@@ -84,9 +84,7 @@ final class HealthToolHandler {
     let calendar = DeviceToolsSupport.isoCalendar()
     let now = Date()
     let startOfToday = calendar.startOfDay(for: now)
-    // Last night: yesterday 18:00 → today noon (not yesterday 06:00).
-    let lastNightStart = calendar.date(byAdding: .hour, value: -6, to: startOfToday) ?? startOfToday
-    let lastNightEnd = calendar.date(byAdding: .hour, value: 12, to: startOfToday) ?? now
+    let sleepStart = now.addingTimeInterval(-24 * 60 * 60)
     let workoutLookback = calendar.date(byAdding: .day, value: -14, to: now) ?? now
     let updatedAt = DeviceToolsSupport.formatDateTime(now)
     let selected = Set(ids)
@@ -157,8 +155,16 @@ final class HealthToolHandler {
     }
     if selected.contains(HealthMetric.sleep.rawValue) {
       group.enter()
-      querySleep(start: lastNightStart, end: lastNightEnd) { metric in
-        put("sleep_last_night", metric)
+      querySleep(start: sleepStart, end: now) { metric in
+        put("sleep_last_24_hours", metric)
+        group.leave()
+      }
+    }
+    if selected.contains(HealthMetric.menstrualFlow.rawValue) {
+      group.enter()
+      let start = calendar.date(byAdding: .day, value: -90, to: now) ?? now
+      queryMenstrualFlow(start: start, end: now) { metric in
+        put("menstrual_flow", metric)
         group.leave()
       }
     }
@@ -323,24 +329,87 @@ final class HealthToolHandler {
       predicate: predicate,
       limit: HKObjectQueryNoLimit,
       sortDescriptors: [NSSortDescriptor(key: HKSampleSortIdentifierEndDate, ascending: true)]
-    ) { _, samples, _ in
-      let categorySamples = samples as? [HKCategorySample] ?? []
-      guard let asleep = Self.mergedAsleepInterval(
-        categorySamples,
-        windowStart: start,
-        windowEnd: end
-      ) else {
-        completion(Self.unavailable(start, end))
+    ) { _, samples, error in
+      if let error = error as NSError? {
+        var metric = Self.interval(start, end)
+        metric["status"] = "query_error"
+        metric["error_domain"] = error.domain
+        metric["error_code"] = error.code
+        completion(metric)
         return
       }
-      var metric = Self.interval(start, end)
-      metric["status"] = "ok"
-      metric["duration_minutes"] = Int((asleep.duration / 60).rounded())
-      metric["sleep_start"] = DeviceToolsSupport.formatDateTime(asleep.start)
-      metric["sleep_end"] = DeviceToolsSupport.formatDateTime(asleep.end)
-      completion(metric)
+      completion(Self.sleepSummary(samples as? [HKCategorySample] ?? [], start: start, end: end))
     }
     store.execute(query)
+  }
+
+  private func queryMenstrualFlow(
+    start: Date, end: Date, completion: @escaping ([String: Any]) -> Void
+  ) {
+    guard let type = HKObjectType.categoryType(forIdentifier: .menstrualFlow) else {
+      completion(Self.unavailable(start, end))
+      return
+    }
+    let query = HKSampleQuery(
+      sampleType: type,
+      predicate: HKQuery.predicateForSamples(withStart: start, end: end),
+      limit: Self.menstrualRecordLimit + 1,
+      sortDescriptors: [NSSortDescriptor(key: HKSampleSortIdentifierStartDate, ascending: false)]
+    ) { _, samples, error in
+      if let error = error as NSError? {
+        var metric = Self.interval(start, end)
+        metric["status"] = "query_error"
+        metric["error_domain"] = error.domain
+        metric["error_code"] = error.code
+        completion(metric)
+        return
+      }
+      completion(Self.menstrualFlowSummary(
+        samples as? [HKCategorySample] ?? [], start: start, end: end
+      ))
+    }
+    store.execute(query)
+  }
+
+  private static let menstrualRecordLimit = 180
+
+  /// Each item is a recorded sample, not a complete period or a prediction.
+  /// Preserve original dates: clipping would invent a cycle start at the window boundary.
+  static func menstrualFlowSummary(
+    _ samples: [HKCategorySample], start: Date, end: Date
+  ) -> [String: Any] {
+    guard !samples.isEmpty else {
+      var metric = unavailable(start, end)
+      metric["records"] = []
+      return metric
+    }
+    let records = samples.prefix(menstrualRecordLimit).map { sample -> [String: Any] in
+      // HealthKit's menstrual-flow values (also HKCategoryValueVaginalBleeding
+      // on iOS 18+) share these raw values. Unknown values remain explicit.
+      let flow: String
+      switch sample.value {
+      case 1: flow = "unspecified"
+      case 2: flow = "light"
+      case 3: flow = "medium"
+      case 4: flow = "heavy"
+      case 5: flow = "none"
+      default: flow = "unknown"
+      }
+      var record: [String: Any] = [
+        "start": DeviceToolsSupport.formatDateTime(sample.startDate),
+        "end": DeviceToolsSupport.formatDateTime(sample.endDate),
+        "flow": flow,
+      ]
+      if let cycleStart = sample.metadata?[HKMetadataKeyMenstrualCycleStart] as? Bool {
+        record["is_cycle_start"] = cycleStart
+      }
+      return record
+    }
+    var metric = interval(start, end)
+    metric["status"] = "ok"
+    metric["records"] = records
+    metric["truncated"] = samples.count > menstrualRecordLimit
+    return metric
   }
 
   private func queryMindfulness(start: Date, end: Date, completion: @escaping ([String: Any]) -> Void) {
@@ -458,21 +527,56 @@ final class HealthToolHandler {
     store.execute(query)
   }
 
-  /// Clips asleep samples to the query window, then unions overlaps so Watch
-  /// + third-party sources are not double-counted.
-  private static func mergedAsleepInterval(
+  /// Keep recorded sleep states separate: in-bed and awake are not actual sleep.
+  static func sleepSummary(
+    _ samples: [HKCategorySample], start: Date, end: Date
+  ) -> [String: Any] {
+    var hasData = false
+    func component(matching include: (HKCategorySample) -> Bool) -> [String: Any] {
+      let intervals = mergedSleepIntervals(
+        samples, windowStart: start, windowEnd: end, matching: include
+      )
+      guard !intervals.isEmpty else { return ["status": "unavailable"] }
+      hasData = true
+      let duration = intervals.reduce(0.0) { $0 + $1.end.timeIntervalSince($1.start) }
+      return [
+        "status": "ok",
+        "duration_minutes": Int((duration / 60).rounded()),
+        "intervals": intervals.map { Self.interval($0.start, $0.end) },
+      ]
+    }
+    var metric = interval(start, end)
+    metric["asleep"] = component(matching: isAsleep)
+    metric["in_bed"] = component { $0.value == HKCategoryValueSleepAnalysis.inBed.rawValue }
+    metric["awake"] = component { $0.value == HKCategoryValueSleepAnalysis.awake.rawValue }
+    // Value 1 is unspecified sleep on all supported iOS versions.
+    var stages: [String: Any] = ["unspecified": component { $0.value == 1 }]
+    if #available(iOS 16.0, *) {
+      stages["core"] = component { $0.value == HKCategoryValueSleepAnalysis.asleepCore.rawValue }
+      stages["deep"] = component { $0.value == HKCategoryValueSleepAnalysis.asleepDeep.rawValue }
+      stages["rem"] = component { $0.value == HKCategoryValueSleepAnalysis.asleepREM.rawValue }
+    }
+    metric["stages"] = stages
+    metric["status"] = hasData ? "ok" : "unavailable"
+    return metric
+  }
+
+  /// Clip to the query window, then union overlaps within each state and across
+  /// all asleep states for the total, so multiple sources do not inflate it.
+  private static func mergedSleepIntervals(
     _ samples: [HKCategorySample],
     windowStart: Date,
-    windowEnd: Date
-  ) -> (duration: TimeInterval, start: Date, end: Date)? {
+    windowEnd: Date,
+    matching include: (HKCategorySample) -> Bool
+  ) -> [(start: Date, end: Date)] {
     var intervals: [(start: Date, end: Date)] = []
-    for sample in samples where isAsleep(sample) {
+    for sample in samples where include(sample) {
       let clippedStart = max(sample.startDate, windowStart)
       let clippedEnd = min(sample.endDate, windowEnd)
       guard clippedStart < clippedEnd else { continue }
       intervals.append((clippedStart, clippedEnd))
     }
-    guard !intervals.isEmpty else { return nil }
+    guard !intervals.isEmpty else { return [] }
     intervals.sort { $0.start < $1.start }
 
     var merged: [(start: Date, end: Date)] = [intervals[0]]
@@ -484,12 +588,7 @@ final class HealthToolHandler {
         merged.append(interval)
       }
     }
-
-    let duration = merged.reduce(0.0) { $0 + $1.end.timeIntervalSince($1.start) }
-    guard duration > 0 else { return nil }
-    let start = merged[0].start
-    let end = merged.map(\.end).max() ?? merged[0].end
-    return (duration, start, end)
+    return merged
   }
 
   private static func isAsleep(_ sample: HKCategorySample) -> Bool {
@@ -560,6 +659,7 @@ private enum HealthMetric: String, CaseIterable {
   case weight = "weight"
   case bmi = "bmi"
   case bloodGlucose = "blood_glucose"
+  case menstrualFlow = "menstrual_flow"
 
   var objectType: HKObjectType? {
     switch self {
@@ -600,6 +700,8 @@ private enum HealthMetric: String, CaseIterable {
       return HKObjectType.quantityType(forIdentifier: .bodyMassIndex)
     case .bloodGlucose:
       return HKObjectType.quantityType(forIdentifier: .bloodGlucose)
+    case .menstrualFlow:
+      return HKObjectType.categoryType(forIdentifier: .menstrualFlow)
     }
     }
 }

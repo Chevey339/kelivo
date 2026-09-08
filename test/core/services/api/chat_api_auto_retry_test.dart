@@ -197,6 +197,99 @@ void main() {
     expect(result.text, 'hello');
   });
 
+  test('retries an empty tool follow-up without rerunning the tool', () async {
+    var requests = 0;
+    var toolCalls = 0;
+    final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+    addTearDown(() async {
+      await server.close(force: true);
+    });
+    server.listen((request) async {
+      requests++;
+      await request.drain<void>();
+      if (requests == 2) {
+        request.response.statusCode = HttpStatus.tooManyRequests;
+        request.response.write(
+          '{"error":{"code":"1305","message":"该模型当前访问量过大，请您稍后再试"}}',
+        );
+        await request.response.close();
+        return;
+      }
+
+      request.response.statusCode = HttpStatus.ok;
+      request.response.headers.contentType = ContentType(
+        'text',
+        'event-stream',
+      );
+      final data = requests == 1
+          ? {
+              'choices': [
+                {
+                  'index': 0,
+                  'delta': {
+                    'role': 'assistant',
+                    'tool_calls': [
+                      {
+                        'index': 0,
+                        'id': 'call_1',
+                        'type': 'function',
+                        'function': {'name': 'get_time', 'arguments': '{}'},
+                      },
+                    ],
+                  },
+                  'finish_reason': 'tool_calls',
+                },
+              ],
+            }
+          : {
+              'choices': [
+                {
+                  'index': 0,
+                  'delta': {'content': 'recovered'},
+                  'finish_reason': 'stop',
+                },
+              ],
+            };
+      request.response.write('data: ${jsonEncode(data)}\n\n');
+      request.response.write('data: [DONE]\n\n');
+      await request.response.close();
+    });
+    final baseUrl = 'http://${server.address.address}:${server.port}/v1';
+
+    final chunks = await ChatApiService.sendMessageStream(
+      config: _openAIConfig(baseUrl),
+      modelId: 'gpt-4o-mini',
+      messages: [
+        {'role': 'user', 'content': 'what time is it?'},
+      ],
+      tools: const [
+        {
+          'type': 'function',
+          'function': {
+            'name': 'get_time',
+            'description': 'Get the current time',
+            'parameters': {'type': 'object', 'properties': <String, dynamic>{}},
+          },
+        },
+      ],
+      onToolCall: (name, arguments, {toolCallId}) async {
+        toolCalls++;
+        return '12:34';
+      },
+      retryOverride: _retryTwice(),
+    ).toList();
+
+    expect(requests, 3);
+    expect(toolCalls, 1);
+    expect(chunks.whereType<RetryPending>(), hasLength(1));
+    expect(chunks.whereType<RetryAttemptStart>(), hasLength(1));
+    expect(
+      chunks.whereType<TextDelta>().map((chunk) => chunk.text).join(),
+      'recovered',
+    );
+    expect(chunks.whereType<Finish>(), hasLength(1));
+  });
+
   test(
     'Gemini native image-output models do not retry status-less disconnects',
     () async {

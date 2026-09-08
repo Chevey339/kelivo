@@ -8,7 +8,7 @@ import 'package:Kelivo/core/providers/settings_provider.dart';
 import 'package:Kelivo/core/services/api/chat_api_service.dart';
 import 'support/collect_generation.dart';
 
-ProviderConfig _zhipuConfig(String baseUrl) {
+ProviderConfig _zhipuConfig(String baseUrl, {String modelId = 'glm-5.2'}) {
   return ProviderConfig(
     id: 'ZhipuTest',
     enabled: true,
@@ -16,9 +16,9 @@ ProviderConfig _zhipuConfig(String baseUrl) {
     apiKey: 'test-key',
     baseUrl: baseUrl,
     providerType: ProviderKind.openai,
-    models: const ['glm-5.2'],
-    modelOverrides: const {
-      'glm-5.2': {
+    models: [modelId],
+    modelOverrides: {
+      modelId: {
         'type': 'chat',
         'input': ['text'],
         'output': ['text'],
@@ -89,7 +89,7 @@ void main() {
 
       expect(requests, hasLength(2));
       expect(requests[0]['thinking'], {'type': 'enabled'});
-      expect(requests[0].containsKey('reasoning_effort'), isFalse);
+      expect(requests[0]['reasoning_effort'], 'low');
       expect(requests[1]['thinking'], {'type': 'disabled'});
       expect(requests[1].containsKey('reasoning_effort'), isFalse);
     });
@@ -206,7 +206,7 @@ void main() {
 
       expect(chunks.isGenerationDone, isTrue);
       expect(secondBody['thinking'], {'type': 'enabled'});
-      expect(secondBody.containsKey('reasoning_effort'), isFalse);
+      expect(secondBody['reasoning_effort'], 'low');
       expect(assistantToolMessage['content'], '我先查一下日期。');
       expect(assistantToolMessage['reasoning_content'], '先获取当前日期');
       expect(assistantToolMessage['tool_calls'], [
@@ -216,6 +216,68 @@ void main() {
           'function': {'name': 'date', 'arguments': '{}'},
         },
       ]);
+    });
+
+    test('glm-5.3 keeps thinking on and maps off to low effort', () async {
+      final requests = <Map<String, dynamic>>[];
+      final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+      addTearDown(() async {
+        await server.close(force: true);
+      });
+
+      server.listen((request) async {
+        requests.add(
+          jsonDecode(await utf8.decoder.bind(request).join())
+              as Map<String, dynamic>,
+        );
+        request.response.statusCode = HttpStatus.ok;
+        request.response.headers.contentType = ContentType(
+          'text',
+          'event-stream',
+          charset: 'utf-8',
+        );
+        request.response.write(
+          'data: ${jsonEncode({
+            'id': 'cmpl-glm53',
+            'object': 'chat.completion.chunk',
+            'created': 0,
+            'model': 'glm-5.3',
+            'choices': [
+              {
+                'index': 0,
+                'delta': {'role': 'assistant', 'content': 'ok'},
+                'finish_reason': 'stop',
+              },
+            ],
+          })}\n\n',
+        );
+        request.response.write('data: [DONE]\n\n');
+        await request.response.close();
+      });
+
+      final baseUrl = 'http://${server.address.address}:${server.port}/v1';
+      await ChatApiService.sendMessageStream(
+        config: _zhipuConfig(baseUrl, modelId: 'glm-5.3'),
+        modelId: 'glm-5.3',
+        messages: const [
+          {'role': 'user', 'content': 'hello'},
+        ],
+        thinkingBudget: 128000,
+      ).toList();
+      await ChatApiService.sendMessageStream(
+        config: _zhipuConfig(baseUrl, modelId: 'glm-5.3-flash'),
+        modelId: 'glm-5.3-flash',
+        messages: const [
+          {'role': 'user', 'content': 'hello again'},
+        ],
+        thinkingBudget: 0,
+      ).toList();
+
+      expect(requests, hasLength(2));
+      expect(requests[0]['thinking'], {'type': 'enabled'});
+      expect(requests[0]['reasoning_effort'], 'max');
+      expect(requests[1]['thinking'], {'type': 'enabled'});
+      expect(requests[1]['reasoning_effort'], 'low');
     });
   });
 }

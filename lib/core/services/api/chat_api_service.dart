@@ -9,11 +9,13 @@ import '../../../utils/unicode_sanitizer.dart';
 import '../logging/context_log_models.dart';
 import '../../utils/multimodal_input_utils.dart';
 import 'generation/text_generation_result.dart';
+import 'generation/tool_loop_runner.dart';
 import 'stream/stream_chunk.dart';
 import 'stream/stream_chunk_handler.dart';
 
 import '../../models/auto_retry_options.dart';
 import 'chat_api_helpers.dart';
+import 'provider_request_headers.dart';
 import 'providers/claude_official.dart';
 import 'providers/google_gemini.dart';
 import 'providers/google_vertex.dart';
@@ -157,6 +159,7 @@ class ChatApiService {
     Map<String, dynamic>? extraBody,
     bool stream = true,
     String? requestId,
+    String? conversationId,
     bool allowImagesApiRouting = true,
     bool ocrActive = false,
     bool builtInSearchOnly = false,
@@ -165,6 +168,11 @@ class ChatApiService {
     AutoRetryOptions? retryOverride,
   }) async* {
     final options = retryOverride ?? AutoRetryConfig.current;
+    final sessionHeaders = providerSessionHeaders(
+      config,
+      conversationId: conversationId,
+      extraHeaders: extraHeaders,
+    );
     final kind = ProviderConfig.classify(
       config.id,
       explicitType: config.providerType,
@@ -208,8 +216,8 @@ class ChatApiService {
     final retryNetworkErrors =
         !useOpenAIImagesApi && !useZhipuLayoutParsing && !imageOutput;
     final emitRetryUi = options.enabled && options.maxRetries > 0;
-    try {
-      yield* retryingStream<StreamChunk>(
+    Stream<StreamChunk> retryRound(Stream<StreamChunk> Function() sendRound) {
+      return retryingStream<StreamChunk>(
         options: options,
         isCancelled: () => sessionToken.isCancelled,
         cancelled: _whenCancelled(sessionToken),
@@ -228,32 +236,37 @@ class ChatApiService {
               )
             : null,
         attemptStartEvent: emitRetryUi ? () => const RetryAttemptStart() : null,
-        attempt: (_) => carrySplitSurrogates(
-          _sendOnce(
-            config: config,
-            modelId: modelId,
-            messages: safeMessages,
-            userImagePaths: safeUserImagePaths,
-            thinkingBudget: thinkingBudget,
-            temperature: temperature,
-            topP: topP,
-            maxTokens: maxTokens,
-            tools: tools,
-            onToolCall: onToolCall == null
-                ? null
-                : (name, args, {toolCallId}) => toolCancellation.run(
-                    () => onToolCall(name, args, toolCallId: toolCallId),
-                  ),
-            extraHeaders: extraHeaders,
-            extraBody: extraBody,
-            stream: stream,
-            builtInSearchOnly: builtInSearchOnly,
-            skipImageParsing: skipImageParsing || !parseMarkdownImageLinks,
-            kind: kind,
-            useOpenAIImagesApi: useOpenAIImagesApi,
-            useZhipuLayoutParsing: useZhipuLayoutParsing,
-            sessionToken: sessionToken,
-          ),
+        attempt: (_) => carrySplitSurrogates(sendRound()),
+      );
+    }
+
+    try {
+      yield* retryRound(
+        () => _sendOnce(
+          config: config,
+          modelId: modelId,
+          messages: safeMessages,
+          userImagePaths: safeUserImagePaths,
+          thinkingBudget: thinkingBudget,
+          temperature: temperature,
+          topP: topP,
+          maxTokens: maxTokens,
+          tools: tools,
+          onToolCall: onToolCall == null
+              ? null
+              : (name, args, {toolCallId}) => toolCancellation.run(
+                  () => onToolCall(name, args, toolCallId: toolCallId),
+                ),
+          extraHeaders: sessionHeaders,
+          extraBody: extraBody,
+          stream: stream,
+          builtInSearchOnly: builtInSearchOnly,
+          skipImageParsing: skipImageParsing || !parseMarkdownImageLinks,
+          kind: kind,
+          useOpenAIImagesApi: useOpenAIImagesApi,
+          useZhipuLayoutParsing: useZhipuLayoutParsing,
+          sessionToken: sessionToken,
+          retryRound: retryRound,
         ),
       );
     } finally {
@@ -319,6 +332,7 @@ class ChatApiService {
     required bool useOpenAIImagesApi,
     required bool useZhipuLayoutParsing,
     required CancelToken sessionToken,
+    required StreamRoundRunner retryRound,
   }) async* {
     if (sessionToken.isCancelled) {
       throw http.ClientException('cancelled');
@@ -365,6 +379,7 @@ class ChatApiService {
             stream: stream,
             builtInSearchOnly: builtInSearchOnly,
             skipImageParsing: skipImageParsing,
+            retryRound: retryRound,
           );
         } else {
           yield* sendOpenAIChatCompletionsStream(
@@ -384,6 +399,7 @@ class ChatApiService {
             stream: stream,
             builtInSearchOnly: builtInSearchOnly,
             skipImageParsing: skipImageParsing,
+            retryRound: retryRound,
           );
         }
       } else if (kind == ProviderKind.claude) {
@@ -404,6 +420,7 @@ class ChatApiService {
           stream: stream,
           builtInSearchOnly: builtInSearchOnly,
           skipImageParsing: skipImageParsing,
+          retryRound: retryRound,
         );
       } else if (kind == ProviderKind.google) {
         final isVertex = config.vertexAI == true;
@@ -426,6 +443,7 @@ class ChatApiService {
             extraBody: extraBody,
             stream: stream,
             skipImageParsing: skipImageParsing,
+            retryRound: retryRound,
           );
         } else if (isVertex) {
           yield* sendGoogleVertexStream(
@@ -444,6 +462,7 @@ class ChatApiService {
             extraBody: extraBody,
             stream: stream,
             skipImageParsing: skipImageParsing,
+            retryRound: retryRound,
           );
         } else {
           yield* sendGoogleGeminiStream(
@@ -462,6 +481,7 @@ class ChatApiService {
             extraBody: extraBody,
             stream: stream,
             skipImageParsing: skipImageParsing,
+            retryRound: retryRound,
           );
         }
       }
@@ -485,6 +505,7 @@ class ChatApiService {
     Map<String, String>? extraHeaders,
     Map<String, dynamic>? extraBody,
     String? requestId,
+    String? conversationId,
     bool allowImagesApiRouting = true,
     bool ocrActive = false,
     bool builtInSearchOnly = false,
@@ -511,6 +532,7 @@ class ChatApiService {
       extraBody: extraBody,
       stream: false,
       requestId: requestId,
+      conversationId: conversationId,
       allowImagesApiRouting: allowImagesApiRouting,
       ocrActive: ocrActive,
       builtInSearchOnly: builtInSearchOnly,
@@ -531,6 +553,7 @@ class ChatApiService {
     required ProviderConfig config,
     required String modelId,
     required String prompt,
+    String? conversationId,
     Map<String, String>? extraHeaders,
     Map<String, dynamic>? extraBody,
     int? thinkingBudget,
@@ -539,6 +562,7 @@ class ChatApiService {
     final result = await generateMessage(
       config: config,
       modelId: modelId,
+      conversationId: conversationId,
       messages: [
         {'role': 'user', 'content': prompt},
       ],

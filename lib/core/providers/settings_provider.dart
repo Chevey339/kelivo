@@ -96,6 +96,7 @@ class SettingsProvider extends ChangeNotifier {
   static const String _providerConfigsKey = 'provider_configs_v1';
   static const String _pinnedModelsKey = 'pinned_models_v1';
   static const String _selectedModelKey = 'selected_model_v1';
+  static const String _perChatModelEnabledKey = 'per_chat_model_enabled_v1';
   static const String _titleModelKey = 'title_model_v1';
   static const String _titleGenerationEnabledKey =
       'title_generation_enabled_v1';
@@ -863,6 +864,7 @@ class SettingsProvider extends ChangeNotifier {
         _titleModelId = parts.sublist(1).join('::');
       }
     }
+    _perChatModelEnabled = prefs.getBool(_perChatModelEnabledKey) ?? false;
     _titleGenerationEnabled = prefs.getBool(_titleGenerationEnabledKey) ?? true;
     // load title prompt
     final tp = prefs.getString(_titlePromptKey);
@@ -1815,10 +1817,11 @@ class SettingsProvider extends ChangeNotifier {
       (_codeFontLocalAlias?.isNotEmpty == true) ? _codeFontLocalAlias : null;
 
   Future<void> setAppFontSystemFamily(String? family) async {
+    final previousPath = _appFontLocalPath;
     _appFontFamily = (family == null || family.trim().isEmpty)
         ? null
         : family.trim();
-    // Clear local alias for system/google switch
+    // Clear the local font selection when switching to a system family.
     _appFontLocalAlias = null;
     _appFontLocalPath = null;
     notifyListeners();
@@ -1826,9 +1829,11 @@ class SettingsProvider extends ChangeNotifier {
     await prefs.setString(_displayAppFontFamilyKey, _appFontFamily ?? '');
     await prefs.remove(_displayAppFontLocalAliasKey);
     await prefs.remove(_displayAppFontLocalPathKey);
+    await _deleteManagedFontFileIfUnused(previousPath);
   }
 
   Future<void> setCodeFontSystemFamily(String? family) async {
+    final previousPath = _codeFontLocalPath;
     _codeFontFamily = (family == null || family.trim().isEmpty)
         ? null
         : family.trim();
@@ -1839,22 +1844,27 @@ class SettingsProvider extends ChangeNotifier {
     await prefs.setString(_displayCodeFontFamilyKey, _codeFontFamily ?? '');
     await prefs.remove(_displayCodeFontLocalAliasKey);
     await prefs.remove(_displayCodeFontLocalPathKey);
+    await _deleteManagedFontFileIfUnused(previousPath);
   }
 
-  Future<void> setAppFontFromLocal({
+  Future<bool> setAppFontFromLocal({
     required String path,
     String? alias,
+    String? licenseText,
   }) async {
     final previousPath = _appFontLocalPath;
-    final localPath = await _importLocalFontFile(path);
-    if (localPath == null) return;
+    final localPath = await _importLocalFontFile(
+      path,
+      licenseText: licenseText,
+    );
+    if (localPath == null) return false;
     final fam = await _registerLocalFont(
       path: localPath,
       aliasPrefix: alias ?? 'kelivo_local_app',
     );
     if (fam == null) {
       await _deleteManagedFontFileIfUnused(localPath);
-      return;
+      return false;
     }
     _appFontFamily = fam;
     _appFontLocalAlias = fam;
@@ -1865,22 +1875,27 @@ class SettingsProvider extends ChangeNotifier {
     await prefs.setString(_displayAppFontLocalAliasKey, _appFontLocalAlias!);
     await prefs.setString(_displayAppFontLocalPathKey, _appFontLocalPath!);
     await _deleteManagedFontFileIfUnused(previousPath);
+    return true;
   }
 
-  Future<void> setCodeFontFromLocal({
+  Future<bool> setCodeFontFromLocal({
     required String path,
     String? alias,
+    String? licenseText,
   }) async {
     final previousPath = _codeFontLocalPath;
-    final localPath = await _importLocalFontFile(path);
-    if (localPath == null) return;
+    final localPath = await _importLocalFontFile(
+      path,
+      licenseText: licenseText,
+    );
+    if (localPath == null) return false;
     final fam = await _registerLocalFont(
       path: localPath,
       aliasPrefix: alias ?? 'kelivo_local_code',
     );
     if (fam == null) {
       await _deleteManagedFontFileIfUnused(localPath);
-      return;
+      return false;
     }
     _codeFontFamily = fam;
     _codeFontLocalAlias = fam;
@@ -1891,6 +1906,7 @@ class SettingsProvider extends ChangeNotifier {
     await prefs.setString(_displayCodeFontLocalAliasKey, _codeFontLocalAlias!);
     await prefs.setString(_displayCodeFontLocalPathKey, _codeFontLocalPath!);
     await _deleteManagedFontFileIfUnused(previousPath);
+    return true;
   }
 
   Future<void> clearAppFont() async {
@@ -2046,7 +2062,11 @@ class SettingsProvider extends ChangeNotifier {
     }
   }
 
-  Future<String?> _importLocalFontFile(String sourcePath) async {
+  Future<String?> _importLocalFontFile(
+    String sourcePath, {
+    String? licenseText,
+  }) async {
+    File? dest;
     try {
       final source = File(sourcePath);
       if (!await source.exists()) return null;
@@ -2062,15 +2082,21 @@ class SettingsProvider extends ChangeNotifier {
       final base = safeBase.isEmpty ? 'font' : safeBase;
       final ext = p.extension(sourceName).toLowerCase();
       final safeExt = (ext == '.ttf' || ext == '.otf') ? ext : '.ttf';
-      final dest = File(
+      dest = File(
         p.join(
           dir.path,
           '${base}_${DateTime.now().microsecondsSinceEpoch}$safeExt',
         ),
       );
       await dest.writeAsBytes(await source.readAsBytes(), flush: true);
+      if (licenseText != null) {
+        await File(
+          '${dest.path}.license.txt',
+        ).writeAsString(licenseText, flush: true);
+      }
       return dest.path;
     } catch (_) {
+      await _deleteManagedFontFileIfUnused(dest?.path);
       return null;
     }
   }
@@ -2087,6 +2113,8 @@ class SettingsProvider extends ChangeNotifier {
       if (await file.exists()) {
         await file.delete();
       }
+      final license = File('${file.path}.license.txt');
+      if (await license.exists()) await license.delete();
     } catch (_) {}
   }
 
@@ -3627,6 +3655,21 @@ class SettingsProvider extends ChangeNotifier {
     notifyListeners();
     final prefs = _preferences;
     await prefs.remove(_selectedModelKey);
+  }
+
+  // When on, picking a model in the chat pins it to that conversation only.
+  // When off, the pick rewrites the current assistant's model, so every chat
+  // under that assistant follows it. Conversation pins are kept either way and
+  // simply ignored while this is off, so toggling back restores them.
+  bool _perChatModelEnabled = false;
+  bool get perChatModelEnabled => _perChatModelEnabled;
+
+  Future<void> setPerChatModelEnabled(bool value) async {
+    if (_perChatModelEnabled == value) return;
+    _perChatModelEnabled = value;
+    notifyListeners();
+    final prefs = _preferences;
+    await prefs.setBool(_perChatModelEnabledKey, value);
   }
 
   // Title model and prompt
@@ -5710,6 +5753,7 @@ Requirements:
     copy._pinnedModels.addAll(_pinnedModels);
     copy._currentModelProvider = _currentModelProvider;
     copy._currentModelId = _currentModelId;
+    copy._perChatModelEnabled = _perChatModelEnabled;
     copy._titleModelProvider = _titleModelProvider;
     copy._titleModelId = _titleModelId;
     copy._titleGenerationEnabled = _titleGenerationEnabled;

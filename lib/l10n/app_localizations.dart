@@ -6619,18 +6619,6 @@ abstract class AppLocalizations {
   /// **'Reasoning'**
   String get modelDetailSheetReasoningAbility;
 
-  /// No description provided for @modelDetailSheetProviderOverrideDescription.
-  ///
-  /// In en, this message translates to:
-  /// **'Provider overrides: customize provider for a specific model.'**
-  String get modelDetailSheetProviderOverrideDescription;
-
-  /// No description provided for @modelDetailSheetAddProviderOverride.
-  ///
-  /// In en, this message translates to:
-  /// **'Add Provider Override'**
-  String get modelDetailSheetAddProviderOverride;
-
   /// No description provided for @modelDetailSheetCustomHeadersTitle.
   ///
   /// In en, this message translates to:
@@ -11356,7 +11344,7 @@ abstract class AppLocalizations {
   /// No description provided for @healthDataSettingsTypeSleepSubtitle.
   ///
   /// In en, this message translates to:
-  /// **'Sleep duration last night'**
+  /// **'Past 24 hours: sleep, time in bed, awake periods and sleep stages'**
   String get healthDataSettingsTypeSleepSubtitle;
 
   /// No description provided for @healthDataSettingsTypeMindfulnessTitle.
@@ -11962,7 +11950,7 @@ abstract class AppLocalizations {
   /// No description provided for @autoRetryFooter.
   ///
   /// In en, this message translates to:
-  /// **'Auto-retry only runs if this request has not produced any output yet.'**
+  /// **'Auto-retry only runs if the current model response has not produced any output yet.'**
   String get autoRetryFooter;
 
   /// No description provided for @autoRetryCountdown.
@@ -19610,6 +19598,168 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Show files created or modified by tools below replies.'**
   String get displaySettingsPageShowProducedFilesSubtitle;
+
+  /// No description provided for @reasoningBudgetSliderLow.
+  ///
+  /// In en, this message translates to:
+  /// **'Low'**
+  String get reasoningBudgetSliderLow;
+
+  /// No description provided for @reasoningBudgetSliderMedium.
+  ///
+  /// In en, this message translates to:
+  /// **'Medium'**
+  String get reasoningBudgetSliderMedium;
+
+  /// No description provided for @reasoningBudgetSliderHigh.
+  ///
+  /// In en, this message translates to:
+  /// **'High'**
+  String get reasoningBudgetSliderHigh;
+
+  /// No description provided for @reasoningBudgetSliderXhigh.
+  ///
+  /// In en, this message translates to:
+  /// **'XHigh'**
+  String get reasoningBudgetSliderXhigh;
+
+  /// No description provided for @reasoningBudgetSliderMax.
+  ///
+  /// In en, this message translates to:
+  /// **'Max'**
+  String get reasoningBudgetSliderMax;
+
+  /// No description provided for @defaultModelPagePerChatModelTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Per-Chat Model'**
+  String get defaultModelPagePerChatModelTitle;
+
+  /// No description provided for @defaultModelPagePerChatModelSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'On: picking a model in a chat applies to that chat only. Off: it becomes the current assistant\'s model, so every chat using that assistant follows it.'**
+  String get defaultModelPagePerChatModelSubtitle;
+
+  /// No description provided for @googleFontsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Google Fonts'**
+  String get googleFontsTitle;
+
+  /// No description provided for @googleFontsRefresh.
+  ///
+  /// In en, this message translates to:
+  /// **'Refresh font list'**
+  String get googleFontsRefresh;
+
+  /// No description provided for @googleFontsSearchHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Search fonts or languages'**
+  String get googleFontsSearchHint;
+
+  /// No description provided for @googleFontsHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Download a regular font to preview and apply it. Installed fonts work offline. Catalog: Expo Google Fonts; downloads: Google Fonts.'**
+  String get googleFontsHint;
+
+  /// No description provided for @googleFontsNoResults.
+  ///
+  /// In en, this message translates to:
+  /// **'No matching fonts'**
+  String get googleFontsNoResults;
+
+  /// No description provided for @googleFontsFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not load, download, or apply the font. Check your connection and try again.'**
+  String get googleFontsFailed;
+
+  /// No description provided for @googleFontsDownloading.
+  ///
+  /// In en, this message translates to:
+  /// **'Downloading font…'**
+  String get googleFontsDownloading;
+
+  /// No description provided for @googleFontsPreview.
+  ///
+  /// In en, this message translates to:
+  /// **'The quick brown fox 0123456789 · 字体预览'**
+  String get googleFontsPreview;
+
+  /// No description provided for @googleFontsLicense.
+  ///
+  /// In en, this message translates to:
+  /// **'Font license'**
+  String get googleFontsLicense;
+
+  /// No description provided for @assistantEditLocationPermissionSettingsMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Location permission is blocked. Allow location access in system settings, then turn this tool on again.'**
+  String get assistantEditLocationPermissionSettingsMessage;
+
+  /// No description provided for @healthDataSettingsCategoryReproductive.
+  ///
+  /// In en, this message translates to:
+  /// **'Reproductive health'**
+  String get healthDataSettingsCategoryReproductive;
+
+  /// No description provided for @healthDataSettingsTypeMenstrualFlowTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Menstrual flow'**
+  String get healthDataSettingsTypeMenstrualFlowTitle;
+
+  /// No description provided for @healthDataSettingsTypeMenstrualFlowSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Recorded menstrual flow and cycle starts in the past 90 days'**
+  String get healthDataSettingsTypeMenstrualFlowSubtitle;
+
+  /// No description provided for @assistantEditGradientBackgroundTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Gradient background'**
+  String get assistantEditGradientBackgroundTitle;
+
+  /// No description provided for @assistantEditGradientStaticTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Static mode'**
+  String get assistantEditGradientStaticTitle;
+
+  /// No description provided for @assistantEditGradientStaticDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Saves power during long chats and streaming.'**
+  String get assistantEditGradientStaticDescription;
+
+  /// No description provided for @assistantEditGradientHorizontal.
+  ///
+  /// In en, this message translates to:
+  /// **'Horizontal position'**
+  String get assistantEditGradientHorizontal;
+
+  /// No description provided for @assistantEditGradientVertical.
+  ///
+  /// In en, this message translates to:
+  /// **'Vertical position'**
+  String get assistantEditGradientVertical;
+
+  /// No description provided for @assistantEditGradientPreview.
+  ///
+  /// In en, this message translates to:
+  /// **'Preview'**
+  String get assistantEditGradientPreview;
+
+  /// No description provided for @assistantEditGradientNextFrame.
+  ///
+  /// In en, this message translates to:
+  /// **'Another frame'**
+  String get assistantEditGradientNextFrame;
 }
 
 class _AppLocalizationsDelegate

@@ -122,10 +122,51 @@ void main() {
         openAINormalizeReasoningEffort('max', 'deepseek-v4-flash-vision-exp'),
         'max',
       );
+      expect(openAINormalizeReasoningEffort('off', 'gpt-5-codex'), 'low');
+      expect(openAINormalizeReasoningEffort('off', 'gpt-5.1-codex'), 'low');
+      expect(
+        openAINormalizeReasoningEffort('off', 'openai/gpt-5.1-codex-max'),
+        'low',
+      );
+      expect(openAINormalizeReasoningEffort('xhigh', 'gpt-5.1-codex'), 'high');
+      expect(
+        openAINormalizeReasoningEffort('xhigh', 'gpt-5.1-codex-max'),
+        'xhigh',
+      );
+      expect(openAINormalizeReasoningEffort('off', 'gpt-5.2-codex'), 'low');
+      expect(openAINormalizeReasoningEffort('off', 'gpt-5.3-codex'), 'low');
+      expect(
+        openAINormalizeReasoningEffort('off', 'openai/gpt-5.3-codex'),
+        'low',
+      );
+      expect(openAINormalizeReasoningEffort('off', 'gpt-5-pro'), 'high');
+      expect(openAINormalizeReasoningEffort('off', 'gpt-5.2-pro'), 'medium');
+      expect(openAINormalizeReasoningEffort('off', 'gpt-5.4-pro'), 'medium');
+      expect(openAINormalizeReasoningEffort('off', 'gpt-5.5-pro'), 'medium');
+      expect(openAISupportsNoneReasoning('gpt-5.3-codex'), isFalse);
+      expect(openAISupportsXhighReasoning('gpt-5.3-codex'), isTrue);
+      expect(openAINormalizeReasoningEffort('off', 'gpt-6-astra'), 'low');
+      expect(
+        openAINormalizeReasoningEffort('none', 'openai/gpt-6-astra'),
+        'low',
+      );
+      expect(openAINormalizeReasoningEffort('max', 'gpt-6-astra'), 'max');
+      expect(openAISupportsNoneReasoning('gpt-6-astra'), isFalse);
+      expect(openAISupportsMaxReasoning('gpt-6-astra'), isTrue);
       expect(
         openAINormalizeReasoningEffort('high', 'meta/muse-spark-1.1'),
-        'auto',
+        'high',
       );
+      expect(openAINormalizeReasoningEffort('off', 'muse-spark-1.3'), 'low');
+      expect(openAISupportsMaxReasoning('muse-spark-1.3'), isTrue);
+      expect(openAISupportsMaxReasoning('muse-spark-1.3-contributor'), isFalse);
+      expect(openAINormalizeReasoningEffort('medium', 'glm-5.3'), 'high');
+      expect(openAINormalizeReasoningEffort('off', 'glm-5.3-flash'), 'low');
+      expect(openAISupportsMaxReasoning('z-ai/glm-5.3'), isTrue);
+      expect(openAINormalizeReasoningEffort('off', 'glm-5.2'), 'off');
+      expect(openAINormalizeReasoningEffort('low', 'glm-5.2'), 'low');
+      expect(openAINormalizeReasoningEffort('xhigh', 'z-ai/glm-5.2'), 'xhigh');
+      expect(openAISupportsMaxReasoning('glm-5.2'), isTrue);
     });
 
     test(
@@ -206,13 +247,77 @@ void main() {
       expect(body.containsKey('top_p'), isFalse);
     });
 
-    test('Muse Spark does not invent an undocumented effort field', () async {
-      final body = await _captureChatBody(
-        modelId: 'meta/muse-spark-1.1',
-        thinkingBudget: 128000,
+    test('Codex and Pro models clamp off to the lowest legal effort', () async {
+      final codexOff = await _captureChatBody(
+        modelId: 'gpt-5.3-codex',
+        thinkingBudget: 0,
+      );
+      final namespacedCodexOff = await _captureChatBody(
+        modelId: 'openai/gpt-5.2-codex',
+        thinkingBudget: 0,
+      );
+      final proOff = await _captureChatBody(
+        modelId: 'gpt-5.2-pro',
+        thinkingBudget: 0,
+      );
+      final openRouterCodexOff = await _captureChatBody(
+        modelId: 'openai/gpt-5.3-codex',
+        thinkingBudget: 0,
+        providerId: 'OpenRouter',
       );
 
-      expect(body.containsKey('reasoning_effort'), isFalse);
+      expect(codexOff['reasoning_effort'], 'low');
+      expect(namespacedCodexOff['reasoning_effort'], 'low');
+      expect(proOff['reasoning_effort'], 'medium');
+      expect(openRouterCodexOff['reasoning'], {'effort': 'low'});
+      expect(openRouterCodexOff.containsKey('reasoning_effort'), isFalse);
+      expect(openRouterCodexOff['reasoning'], isNot({'enabled': false}));
+    });
+
+    test('Muse Spark 1.3 sends documented effort including max', () async {
+      final body = await _captureChatBody(
+        modelId: 'meta/muse-spark-1.3',
+        thinkingBudget: 128000,
+      );
+      final offBody = await _captureChatBody(
+        modelId: 'muse-spark-1.1',
+        thinkingBudget: 0,
+      );
+
+      expect(body['reasoning_effort'], 'max');
+      expect(offBody['reasoning_effort'], 'low');
+    });
+
+    test('GPT-6 Astra omits sampling and never sends none', () async {
+      const tools = [
+        {
+          'type': 'function',
+          'function': {
+            'name': 'lookup',
+            'description': 'Look something up',
+            'parameters': {'type': 'object', 'properties': <String, dynamic>{}},
+          },
+        },
+      ];
+      final offBody = await _captureChatBody(
+        modelId: 'gpt-6-astra',
+        thinkingBudget: 0,
+        temperature: 0.7,
+        topP: 0.8,
+        tools: tools,
+      );
+      final maxBody = await _captureChatBody(
+        modelId: 'openai/gpt-6-astra',
+        thinkingBudget: 128000,
+        temperature: 0.7,
+        topP: 0.8,
+      );
+
+      expect(offBody['reasoning_effort'], 'low');
+      expect(offBody.containsKey('temperature'), isFalse);
+      expect(offBody.containsKey('top_p'), isFalse);
+      expect(maxBody['reasoning_effort'], 'max');
+      expect(maxBody.containsKey('temperature'), isFalse);
     });
 
     test('Grok 4.6 Responses keeps xhigh and clamps off to low', () async {

@@ -397,7 +397,7 @@ List<MessagePart> _partsWithVisibleThinkSlices(
   required bool insertReasoningParts,
 }) {
   final next = <MessagePart>[];
-  _walkThinkSlices(
+  ThinkingTagParser.walkSlices(
     parts,
     joined,
     ranges,
@@ -410,71 +410,6 @@ List<MessagePart> _partsWithVisibleThinkSlices(
     onOther: next.add,
   );
   return next;
-}
-
-void _walkThinkSlices(
-  List<MessagePart> parts,
-  String joined,
-  ThinkingTagParseRanges ranges, {
-  required void Function(String text) onVisible,
-  required void Function(int rangeIndex, String text) onThinking,
-  required void Function(MessagePart part) onOther,
-}) {
-  var offset = 0;
-  var hiddenIndex = 0;
-  var pendingRangeIndex = -1;
-  final hiddenRanges = ranges.hiddenRanges;
-  final pendingThinking = StringBuffer();
-
-  void flushThinking() {
-    final thinking = pendingThinking.toString();
-    pendingThinking.clear();
-    if (thinking.isNotEmpty && pendingRangeIndex >= 0) {
-      onThinking(pendingRangeIndex, thinking);
-    }
-    pendingRangeIndex = -1;
-  }
-
-  for (final part in parts) {
-    if (part is! TextPart) {
-      flushThinking();
-      onOther(part);
-      continue;
-    }
-    final start = offset;
-    final end = offset + part.text.length;
-    var cursor = start;
-    while (cursor < end) {
-      if (hiddenIndex < hiddenRanges.length &&
-          hiddenRanges[hiddenIndex].start <= cursor &&
-          cursor < hiddenRanges[hiddenIndex].end) {
-        final range = hiddenRanges[hiddenIndex];
-        final sliceStart = cursor < range.bodyStart ? range.bodyStart : cursor;
-        final sliceEnd = range.bodyEnd < end ? range.bodyEnd : end;
-        if (sliceEnd > sliceStart) {
-          pendingRangeIndex = hiddenIndex;
-          pendingThinking.write(joined.substring(sliceStart, sliceEnd));
-        }
-        cursor = range.end < end ? range.end : end;
-        if (cursor >= range.end) {
-          hiddenIndex++;
-          flushThinking();
-        }
-        continue;
-      }
-      final visibleEnd = hiddenIndex < hiddenRanges.length
-          ? hiddenRanges[hiddenIndex].start
-          : end;
-      final sliceEnd = visibleEnd < end ? visibleEnd : end;
-      if (sliceEnd > cursor) {
-        flushThinking();
-        onVisible(joined.substring(cursor, sliceEnd));
-      }
-      cursor = sliceEnd;
-    }
-    offset = end;
-  }
-  flushThinking();
 }
 
 void _addReasoningSegmentTexts(List<String> output, List<dynamic> segments) {
@@ -665,7 +600,7 @@ List<ReasoningSegment> _expandSegmentsByLegacyThinkFragments(
   if (ranges.hiddenRanges.isEmpty) return source;
 
   final fragments = <(int, String)>[];
-  _walkThinkSlices(
+  ThinkingTagParser.walkSlices(
     message.parts,
     message.content,
     ranges,

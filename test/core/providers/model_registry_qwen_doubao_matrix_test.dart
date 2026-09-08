@@ -28,11 +28,23 @@ void main() {
       final q38 = ModelRegistry.infer(
         ModelInfo(id: 'qwen3.8-max', displayName: 'qwen3.8-max'),
       );
+      final q38Flash = ModelRegistry.infer(
+        ModelInfo(id: 'qwen3.8-flash', displayName: 'qwen3.8-flash'),
+      );
+      final q3827b = ModelRegistry.infer(
+        ModelInfo(id: 'qwen3.8-27b', displayName: 'qwen3.8-27b'),
+      );
+      final q3824t = ModelRegistry.infer(
+        ModelInfo(id: 'qwen3.8-2.4t-a95b', displayName: 'qwen3.8-2.4t-a95b'),
+      );
 
       expect(plus.input, contains(Modality.image));
       expect(flash.input, contains(Modality.image));
       expect(visionMax.input, contains(Modality.image));
       expect(q38.input, contains(Modality.image));
+      expect(q38Flash.input, contains(Modality.image));
+      expect(q3827b.input, contains(Modality.image));
+      expect(q3824t.input, isNot(contains(Modality.image)));
       expect(plainMax.input, isNot(contains(Modality.image)));
       expect(earlyMax.input, isNot(contains(Modality.image)));
       expect(plus.abilities, contains(ModelAbility.tool));
@@ -73,6 +85,7 @@ void main() {
     test('Doubao seed 2.x / evolving get vision tool reasoning', () {
       for (final id in const [
         'doubao-seed-2.0-pro',
+        'doubao-seed-2.0-code',
         'doubao-seed-2-1-pro-260628',
         'doubao-seed-2.1-turbo',
         'doubao-seed-evolving',
@@ -83,5 +96,44 @@ void main() {
         expect(model.abilities, contains(ModelAbility.reasoning), reason: id);
       }
     });
+
+    test(
+      'GPT-6 Astra, Muse 1.3 and GLM-5.3-Flash infer documented abilities',
+      () {
+        final astra = ModelRegistry.infer(
+          ModelInfo(id: 'gpt-6-astra', displayName: 'gpt-6-astra'),
+        );
+        final muse = ModelRegistry.infer(
+          ModelInfo(id: 'muse-spark-1.3', displayName: 'muse-spark-1.3'),
+        );
+        final glmFlash = ModelRegistry.infer(
+          ModelInfo(id: 'glm-5.3-flash', displayName: 'glm-5.3-flash'),
+        );
+        final glm53 = ModelRegistry.infer(
+          ModelInfo(id: 'glm-5.3', displayName: 'glm-5.3'),
+        );
+
+        expect(astra.input, contains(Modality.image));
+        expect(
+          astra.abilities,
+          containsAll([ModelAbility.tool, ModelAbility.reasoning]),
+        );
+        expect(muse.input, contains(Modality.image));
+        expect(
+          muse.abilities,
+          containsAll([ModelAbility.tool, ModelAbility.reasoning]),
+        );
+        expect(glmFlash.input, contains(Modality.image));
+        expect(
+          glmFlash.abilities,
+          containsAll([ModelAbility.tool, ModelAbility.reasoning]),
+        );
+        expect(glm53.input, isNot(contains(Modality.image)));
+        expect(
+          glm53.abilities,
+          containsAll([ModelAbility.tool, ModelAbility.reasoning]),
+        );
+      },
+    );
   });
 }

@@ -200,22 +200,24 @@ class _BasicSettingsTabState extends State<_BasicSettingsTab> {
                 label: l10n.assistantEditThinkingBudgetTitle,
                 detailText: a.thinkingBudget?.toString() ?? '-',
                 onTap: () async {
-                  final settingsProvider = context.read<SettingsProvider>();
                   final assistantProvider = context.read<AssistantProvider>();
-                  final currentBudget = a.thinkingBudget;
-                  if (currentBudget != null) {
-                    settingsProvider.setThinkingBudget(currentBudget);
-                  }
+                  // Seed via initialBudget instead of pre-writing global
+                  // settings: the synchronous notify would rebuild the page
+                  // during the sheet's entrance animation.
+                  int? chosen;
                   await showReasoningBudgetSheet(
                     context,
                     modelProvider: a.chatModelProvider,
                     modelId: a.chatModelId,
+                    initialBudget: a.thinkingBudget,
+                    onChanged: (v) => chosen = v,
                   );
                   if (!context.mounted) return;
-                  final chosen = settingsProvider.thinkingBudget;
-                  await assistantProvider.updateAssistant(
-                    a.copyWith(thinkingBudget: chosen),
-                  );
+                  if (chosen != null && chosen != a.thinkingBudget) {
+                    await assistantProvider.updateAssistant(
+                      a.copyWith(thinkingBudget: chosen),
+                    );
+                  }
                 },
               ),
               _iosDivider(context),
@@ -413,99 +415,104 @@ class _BasicSettingsTabState extends State<_BasicSettingsTab> {
                   ),
                 ],
               ),
-              const SizedBox(height: 6),
-              Text(
-                l10n.assistantEditChatBackgroundDescription,
-                style: TextStyle(
-                  fontSize: 12,
-                  color: cs.onSurface.withValues(alpha: 0.7),
-                ),
-              ),
               const SizedBox(height: 8),
-              if ((a.background ?? '').isEmpty) ...[
-                // Single button when no background (full width)
-                _TactileRow(
-                  onTap: () => _pickBackground(context, a),
-                  pressedScale: 0.98,
-                  builder: (pressed) {
-                    final bg = context.appColors.surfaceFill;
-                    final overlay = cs.onSurface.withValues(
-                      alpha: isDark ? 0.06 : 0.05,
-                    );
-                    final pressedBg = Color.alphaBlend(overlay, bg);
-                    final iconColor = cs.onSurface.withValues(alpha: 0.75);
-                    final textColor = cs.onSurface.withValues(alpha: 0.9);
-                    return AnimatedContainer(
-                      duration: const Duration(milliseconds: 160),
-                      curve: Curves.easeOutCubic,
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 10,
-                      ),
-                      decoration: BoxDecoration(
-                        color: pressed ? pressedBg : bg,
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(
-                          color: cs.outlineVariant.withValues(alpha: 0.35),
+              AssistantGradientSettings(assistant: a),
+              if (!a.useGradientBackground) ...[
+                const SizedBox(height: 6),
+                Text(
+                  l10n.assistantEditChatBackgroundDescription,
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: cs.onSurface.withValues(alpha: 0.7),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                if ((a.background ?? '').isEmpty) ...[
+                  // Single button when no background (full width)
+                  _TactileRow(
+                    onTap: () => _pickBackground(context, a),
+                    pressedScale: 0.98,
+                    builder: (pressed) {
+                      final bg = context.appColors.surfaceFill;
+                      final overlay = cs.onSurface.withValues(
+                        alpha: isDark ? 0.06 : 0.05,
+                      );
+                      final pressedBg = Color.alphaBlend(overlay, bg);
+                      final iconColor = cs.onSurface.withValues(alpha: 0.75);
+                      final textColor = cs.onSurface.withValues(alpha: 0.9);
+                      return AnimatedContainer(
+                        duration: const Duration(milliseconds: 160),
+                        curve: Curves.easeOutCubic,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 10,
+                        ),
+                        decoration: BoxDecoration(
+                          color: pressed ? pressedBg : bg,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: cs.outlineVariant.withValues(alpha: 0.35),
+                          ),
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Padding(
+                              padding: const EdgeInsets.only(
+                                left: 2.0,
+                              ), // Material icon spacing
+                              child: Icon(
+                                Icons.image,
+                                size: 18,
+                                color: iconColor,
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              l10n.assistantEditChooseImageButton,
+                              style: TextStyle(
+                                fontSize: 14,
+                                fontWeight: AppFontWeights.semibold,
+                                color: textColor,
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    },
+                  ),
+                ] else ...[
+                  // Two buttons when background exists
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _IosButton(
+                          label: l10n.assistantEditChooseImageButton,
+                          icon: Icons.image,
+                          onTap: () => _pickBackground(context, a),
                         ),
                       ),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Padding(
-                            padding: const EdgeInsets.only(
-                              left: 2.0,
-                            ), // Material icon spacing
-                            child: Icon(
-                              Icons.image,
-                              size: 18,
-                              color: iconColor,
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          Text(
-                            l10n.assistantEditChooseImageButton,
-                            style: TextStyle(
-                              fontSize: 14,
-                              fontWeight: AppFontWeights.semibold,
-                              color: textColor,
-                            ),
-                          ),
-                        ],
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: _IosButton(
+                          label: l10n.assistantEditClearButton,
+                          icon: Lucide.X,
+                          onTap: () =>
+                              context.read<AssistantProvider>().updateAssistant(
+                                a.copyWith(clearBackground: true),
+                              ),
+                        ),
                       ),
-                    );
-                  },
-                ),
-              ] else ...[
-                // Two buttons when background exists
-                Row(
-                  children: [
-                    Expanded(
-                      child: _IosButton(
-                        label: l10n.assistantEditChooseImageButton,
-                        icon: Icons.image,
-                        onTap: () => _pickBackground(context, a),
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: _IosButton(
-                        label: l10n.assistantEditClearButton,
-                        icon: Lucide.X,
-                        onTap: () => context
-                            .read<AssistantProvider>()
-                            .updateAssistant(a.copyWith(clearBackground: true)),
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-              if ((a.background ?? '').isNotEmpty) ...[
-                const SizedBox(height: 12),
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(10),
-                  child: _BackgroundPreview(path: a.background!),
-                ),
+                    ],
+                  ),
+                ],
+                if ((a.background ?? '').isNotEmpty) ...[
+                  const SizedBox(height: 12),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(10),
+                    child: _BackgroundPreview(path: a.background!),
+                  ),
+                ],
               ],
             ],
           ),

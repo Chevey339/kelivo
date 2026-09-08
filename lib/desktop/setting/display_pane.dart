@@ -1803,6 +1803,8 @@ class _DesktopAppFontRow extends StatelessWidget {
     final current = sp.appFontFamily;
     final displayText = (current == null || current.isEmpty)
         ? l10n.desktopFontFamilySystemDefault
+        : sp.appFontLocalAlias != null
+        ? l10n.displaySettingsPageFontLocalFileLabel
         : current;
     return _LabeledRow(
       label: l10n.desktopFontAppLabel,
@@ -1828,6 +1830,14 @@ class _DesktopAppFontRow extends StatelessWidget {
           ),
           const SizedBox(width: 8),
           Tooltip(
+            message: l10n.googleFontsTitle,
+            child: _IconBtn(
+              icon: lucide.Lucide.Download,
+              onTap: () => showGoogleFontsPicker(context, forCode: false),
+            ),
+          ),
+          const SizedBox(width: 8),
+          Tooltip(
             message: l10n.displaySettingsPageFontResetLabel,
             child: _IconBtn(
               icon: lucide.Lucide.RotateCcw,
@@ -1850,6 +1860,8 @@ class _DesktopCodeFontRow extends StatelessWidget {
     final current = sp.codeFontFamily;
     final displayText = (current == null || current.isEmpty)
         ? l10n.desktopFontFamilyMonospaceDefault
+        : sp.codeFontLocalAlias != null
+        ? l10n.displaySettingsPageFontLocalFileLabel
         : current;
     return _LabeledRow(
       label: l10n.desktopFontCodeLabel,
@@ -1872,6 +1884,14 @@ class _DesktopCodeFontRow extends StatelessWidget {
                 await settingsProvider.setCodeFontSystemFamily(fam);
               }
             },
+          ),
+          const SizedBox(width: 8),
+          Tooltip(
+            message: l10n.googleFontsTitle,
+            child: _IconBtn(
+              icon: lucide.Lucide.Download,
+              onTap: () => showGoogleFontsPicker(context, forCode: true),
+            ),
           ),
           const SizedBox(width: 8),
           Tooltip(

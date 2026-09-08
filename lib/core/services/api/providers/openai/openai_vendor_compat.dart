@@ -69,6 +69,20 @@ void applyCompatibleResponsesReasoning(
 }) {
   if (config.useResponseApi != true) return;
 
+  final poolsideInfo = OpenAIProviderInfo(
+    host: Uri.tryParse(config.baseUrl)?.host.toLowerCase() ?? '',
+    providerId: config.id.toLowerCase(),
+    upstreamModelId: upstreamModelId,
+  );
+  if (poolsideInfo.usesPoolsideThinking && !poolsideInfo.isOpenRouter) {
+    applyPoolsideThinkingKnob(
+      body,
+      isReasoning: isReasoning,
+      thinkingBudget: thinkingBudget,
+    );
+    return;
+  }
+
   if (BuiltInToolsHelper.isMimoProvider(config)) {
     body.remove('reasoning');
     if (!isReasoning) return;
@@ -111,11 +125,35 @@ void applyCompatibleResponsesReasoning(
   final forceThinkingForQwen3Max =
       builtInSearchEnabled &&
       upstreamModelId.toLowerCase().startsWith('qwen3-max');
+  if (isDashScopeThinkingOnlyModel(upstreamModelId)) {
+    body.remove('enable_thinking');
+    return;
+  }
   body['enable_thinking'] = forceThinkingForQwen3Max || !isOff(thinkingBudget);
 }
 
-bool _isKimiK25Model(String upstreamModelId) {
-  return upstreamModelId.toLowerCase().contains('kimi-k2.5');
+bool isDashScopeThinkingOnlyModel(String modelId) {
+  final lower = modelId.trim().toLowerCase();
+  if (lower.contains('qwen3.7-max-preview') ||
+      lower.contains('qwen3.7-max-2026-05-17')) {
+    return true;
+  }
+  if (RegExp(r'(^|[/_:@])qwq(?:$|[-.])').hasMatch(lower)) return true;
+  if (RegExp(r'(^|[/_:@])deepseek-r1(?:$|[-.])').hasMatch(lower)) {
+    return true;
+  }
+  if (lower.contains('kimi-k2.7-code') || lower.contains('kimi-k2-thinking')) {
+    return true;
+  }
+  if (RegExp(r'(^|[/_:@])minimax-m2\.(?:1|5)(?:$|[-.])').hasMatch(lower)) {
+    return true;
+  }
+  return lower.contains('-thinking');
+}
+
+bool _isKimiHybridThinkingModel(String upstreamModelId) {
+  final lower = upstreamModelId.toLowerCase();
+  return lower.contains('kimi-k2.5') || lower.contains('kimi-k2.6');
 }
 
 bool isKimiK3Model(String upstreamModelId) {
@@ -211,9 +249,11 @@ void normalizeMoonshotKimiChatBody(
     return;
   }
 
-  if (_isKimiK25Model(upstreamModelId)) {
+  if (_isKimiHybridThinkingModel(upstreamModelId)) {
     body['thinking'] = {'type': isOff(thinkingBudget) ? 'disabled' : 'enabled'};
-    _removeMoonshotKimiUnsupportedSamplingParams(body);
+    if (upstreamModelId.toLowerCase().contains('kimi-k2.5')) {
+      _removeMoonshotKimiUnsupportedSamplingParams(body);
+    }
     return;
   }
 
@@ -458,6 +498,13 @@ class OpenAIProviderInfo {
     return id.startsWith('laguna-') || id.contains('/laguna-');
   }
 
+  bool get isPoolsideHost =>
+      host == 'poolside.ai' ||
+      host == 'inference.poolside.ai' ||
+      host.endsWith('.poolside.ai');
+
+  bool get usesPoolsideThinking => isLaguna || isPoolsideHost;
+
   bool get isSiliconFlow =>
       providerId.contains('siliconflow') || host.contains('siliconflow');
   bool get isAzureOpenAI => host.contains('openai.azure.com');
@@ -485,9 +532,14 @@ class OpenAIProviderInfo {
   }
 
   bool get needsReasoningEcho =>
-      isLaguna || isDeepSeek || isMimo || isZhipu || isKimiThinkingModel;
+      usesPoolsideThinking ||
+      isDeepSeek ||
+      isMimo ||
+      isZhipu ||
+      isKimiThinkingModel;
   ReasoningContentReplayPolicy get reasoningContentReplayPolicy {
-    if (isLaguna || _isKimiPreservedThinkingModel(upstreamModelId)) {
+    if (usesPoolsideThinking ||
+        _isKimiPreservedThinkingModel(upstreamModelId)) {
       return ReasoningContentReplayPolicy.all;
     }
     if (needsReasoningEcho) {
@@ -498,6 +550,37 @@ class OpenAIProviderInfo {
 
   String get completionTokensKey =>
       (isAzureOpenAI || isMimo) ? 'max_completion_tokens' : 'max_tokens';
+}
+
+void applyPoolsideThinkingKnob(
+  Map<String, dynamic> body, {
+  required bool isReasoning,
+  int? thinkingBudget,
+}) {
+  final enable = isReasoning && !isOff(thinkingBudget);
+  final existing = body['chat_template_kwargs'];
+  final kwargs = <String, dynamic>{
+    if (existing is Map)
+      ...existing.map((key, value) => MapEntry(key.toString(), value)),
+  };
+  kwargs.putIfAbsent('enable_thinking', () => enable);
+  body['chat_template_kwargs'] = kwargs;
+  body.remove('reasoning_effort');
+  body.remove('reasoning');
+}
+
+void applyPoolsideThinkingIfNeeded(
+  Map<String, dynamic> body, {
+  required OpenAIProviderInfo info,
+  required bool isReasoning,
+  int? thinkingBudget,
+}) {
+  if (!info.usesPoolsideThinking || info.isOpenRouter) return;
+  applyPoolsideThinkingKnob(
+    body,
+    isReasoning: isReasoning,
+    thinkingBudget: thinkingBudget,
+  );
 }
 
 void applyVendorReasoningKnobs(
@@ -527,16 +610,19 @@ void applyVendorReasoningKnobs(
       body.remove('reasoning');
       body.remove('reasoning_effort');
     }
-  } else if (info.isLaguna) {
-    if (isReasoning) {
-      body['chat_template_kwargs'] = {'enable_thinking': !off};
-    } else {
-      body.remove('chat_template_kwargs');
-    }
-    body.remove('reasoning_effort');
+  } else if (info.usesPoolsideThinking) {
+    applyPoolsideThinkingKnob(
+      body,
+      isReasoning: isReasoning,
+      thinkingBudget: thinkingBudget,
+    );
   } else if (info.isDashScope) {
     if (isReasoning) {
-      body['enable_thinking'] = !off;
+      if (isDashScopeThinkingOnlyModel(info.upstreamModelId)) {
+        body.remove('enable_thinking');
+      } else {
+        body['enable_thinking'] = !off;
+      }
       if (!off && thinkingBudget != null && thinkingBudget > 0) {
         body['thinking_budget'] = thinkingBudget;
       } else {
@@ -548,12 +634,49 @@ void applyVendorReasoningKnobs(
     }
     body.remove('reasoning_effort');
   } else if (info.isZhipu || info.isMimo) {
-    if (isReasoning) {
+    if (isGlm53FamilyModel(info.upstreamModelId)) {
+      // GLM-5.3 / 5.3-Flash always think. disabled returns 400; off maps to low.
+      body['thinking'] = const <String, dynamic>{'type': 'enabled'};
+      if (isReasoning) {
+        final effort = openAIEffortForBudget(
+          thinkingBudget,
+          info.upstreamModelId,
+        );
+        if (effort == 'auto') {
+          body.remove('reasoning_effort');
+        } else {
+          body['reasoning_effort'] = effort;
+        }
+      } else {
+        body.remove('reasoning_effort');
+      }
+    } else if (isGlm52FamilyModel(info.upstreamModelId)) {
+      if (isReasoning) {
+        body['thinking'] = {'type': off ? 'disabled' : 'enabled'};
+        if (off) {
+          body.remove('reasoning_effort');
+        } else {
+          final effort = openAIEffortForBudget(
+            thinkingBudget,
+            info.upstreamModelId,
+          );
+          if (effort == 'auto') {
+            body.remove('reasoning_effort');
+          } else {
+            body['reasoning_effort'] = effort;
+          }
+        }
+      } else {
+        body.remove('thinking');
+        body.remove('reasoning_effort');
+      }
+    } else if (isReasoning) {
       body['thinking'] = {'type': off ? 'disabled' : 'enabled'};
+      body.remove('reasoning_effort');
     } else {
       body.remove('thinking');
+      body.remove('reasoning_effort');
     }
-    body.remove('reasoning_effort');
   } else if (info.isVolc) {
     if (isReasoning) {
       body['thinking'] = {'type': off ? 'disabled' : 'enabled'};

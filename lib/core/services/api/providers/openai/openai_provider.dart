@@ -11,6 +11,7 @@ import '../../../../utils/multimodal_input_utils.dart';
 import '../../../../../utils/sandbox_path_resolver.dart';
 import '../../builtin_tools.dart';
 import '../../chat_api_helpers.dart';
+import '../../generation/tool_loop_runner.dart';
 import '../../kimi_formula_search.dart';
 import '../../stream/sse_framing.dart';
 import '../../stream/stream_chunk.dart';
@@ -112,6 +113,7 @@ Stream<StreamChunk> sendOpenAIStream(
   bool stream = true,
   bool builtInSearchOnly = false,
   bool skipImageParsing = false,
+  StreamRoundRunner? retryRound,
 }) async* {
   final upstreamModelId = apiModelId(config, modelId);
   // Utility calls (title / summary generation) only want search injected.
@@ -638,6 +640,12 @@ Stream<StreamChunk> sendOpenAIStream(
   if (extraBodyCfg.isNotEmpty) {
     body.addAll(extraBodyCfg);
   }
+  applyPoolsideThinkingIfNeeded(
+    body,
+    info: info,
+    isReasoning: isReasoning,
+    thinkingBudget: thinkingBudget,
+  );
   // Built-in tools run after the custom body and merge by type so custom
   // function tools and provider server tools coexist.
   if (config.useResponseApi != true) {
@@ -796,6 +804,7 @@ Stream<StreamChunk> sendOpenAIStream(
           needsReasoningEcho: needsReasoningEcho,
           extraHeaders: extraHeaders,
           initialUsage: firstUsage,
+          retryRound: retryRound,
         );
         return;
       }
@@ -984,6 +993,7 @@ Stream<StreamChunk> sendOpenAIStream(
             streamRound: streamRound,
             approxPromptTokens: approxPromptTokens,
             approxCompletionChars: approxCompletionChars,
+            retryRound: retryRound,
           );
           return;
         }
@@ -1053,6 +1063,7 @@ Stream<StreamChunk> sendOpenAIStream(
               approxPromptTokens: approxPromptTokens,
               approxCompletionChars: approxCompletionChars,
               includeReasoningDetailsOnDone: true,
+              retryRound: retryRound,
             );
             return;
           }
@@ -1119,6 +1130,7 @@ Stream<StreamChunk> sendOpenAIStream(
           approxPromptTokens: approxPromptTokens,
           approxCompletionChars: approxCompletionChars,
           includeReasoningDetailsOnDone: true,
+          retryRound: retryRound,
         );
         return;
       }
@@ -1172,6 +1184,7 @@ Stream<StreamChunk> sendOpenAIStream(
             approxPromptTokens: approxPromptTokens,
             approxCompletionChars: approxCompletionChars,
             includeReasoningDetailsOnDone: false,
+            retryRound: retryRound,
           );
           return;
         }

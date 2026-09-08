@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 import '../../../core/providers/assistant_provider.dart';
 import '../../../core/providers/settings_provider.dart';
 import '../../../utils/sandbox_path_resolver.dart';
+import 'chat_gradient_background.dart';
 
 /// Shared assistant wallpaper + surface-mask gradient for chat surfaces.
 ///
@@ -16,6 +17,7 @@ class ChatAssistantBackground extends StatelessWidget {
   const ChatAssistantBackground({
     super.key,
     this.desktop = false,
+    this.pinnedToBackdrop = false,
     this.includeSurfaceFill = false,
     this.expand = true,
     this.applyMaskStrength = true,
@@ -23,6 +25,8 @@ class ChatAssistantBackground extends StatelessWidget {
 
   /// Desktop chat uses a lighter mask so the wallpaper stays more visible.
   final bool desktop;
+
+  final bool pinnedToBackdrop;
 
   /// Desktop layout paints [ColorScheme.surface] under the wallpaper.
   final bool includeSurfaceFill;
@@ -36,7 +40,11 @@ class ChatAssistantBackground extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    final bg = context.watch<AssistantProvider>().currentAssistant?.background;
+    final assistant = context.watch<AssistantProvider>().currentAssistant;
+    if (assistant?.useGradientBackground ?? false) {
+      return ChatGradientBackground(pinned: pinnedToBackdrop);
+    }
+    final bg = assistant?.background;
     final maskStrength = applyMaskStrength
         ? context.watch<SettingsProvider>().chatBackgroundMaskStrength
         : 1.0;

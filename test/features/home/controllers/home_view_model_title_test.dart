@@ -230,6 +230,7 @@ void main() {
   ) async {
     final controller = await pumpHarness(tester);
     await tester.runAsync(() async {
+      await settings.setPerChatModelEnabled(true);
       final convo = await chatService.createConversation(
         title: 'New Chat',
         assistantId: assistantProvider.currentAssistantId,

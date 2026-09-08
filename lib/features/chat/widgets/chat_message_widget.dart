@@ -2494,6 +2494,24 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
     return Align(alignment: Alignment.centerLeft, child: child);
   }
 
+  /// The trailing streaming indicator, plus the auto-retry countdown while a
+  /// round is waiting to be retried. Rounds after the first keep their earlier
+  /// output on screen, so the countdown has to ride along with this indicator
+  /// instead of only the empty waiting bubble.
+  Widget _streamingIndicator() {
+    if (widget.hideStreamingIndicator) return const SizedBox(height: 16);
+    final retryStatus = widget.retryStatus;
+    if (retryStatus == null) return const LoadingIndicator();
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        const LoadingIndicator(),
+        const SizedBox(width: 8),
+        _RetryCountdownHint(status: retryStatus),
+      ],
+    );
+  }
+
   /// Same 8pt gap [addVisible] applies between sibling assistant bubbles.
   List<Widget> _interleaveAssistantBubbles(List<Widget> bubbles) {
     return <Widget>[
@@ -2617,6 +2635,7 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
         scope: AssistantRegexScope.assistant,
       ),
       partsArrivalOrdered: widget.message.isStreaming,
+      parseInlineThinking: _legacyInlineThinkingFor(widget).hasThinking,
     );
   }
 
@@ -2918,20 +2937,7 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
                                   widget.retryStatus!.attempt,
                                   widget.retryStatus!.maxRetries,
                                 ),
-                          child: widget.hideStreamingIndicator
-                              ? const SizedBox(height: 16)
-                              : Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    const LoadingIndicator(),
-                                    if (widget.retryStatus != null) ...[
-                                      const SizedBox(width: 8),
-                                      _RetryCountdownHint(
-                                        status: widget.retryStatus!,
-                                      ),
-                                    ],
-                                  ],
-                                ),
+                          child: _streamingIndicator(),
                         ),
                       ),
                     ),
@@ -2955,9 +2961,7 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
                   if (widget.message.isStreaming && visualContent.isNotEmpty)
                     Padding(
                       padding: const EdgeInsets.only(left: 4, top: 4),
-                      child: widget.hideStreamingIndicator
-                          ? const SizedBox(height: 16)
-                          : const LoadingIndicator(),
+                      child: _streamingIndicator(),
                     ),
                 ];
               }
@@ -3022,13 +3026,14 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
                 );
               }
 
-              if (widget.message.isStreaming && visualContent.isNotEmpty) {
+              // A round that only called tools leaves no visible text, but a
+              // pending retry still has to say so somewhere.
+              if (widget.message.isStreaming &&
+                  (visualContent.isNotEmpty || widget.retryStatus != null)) {
                 widgets.add(
                   Padding(
                     padding: const EdgeInsets.only(left: 4, top: 4),
-                    child: widget.hideStreamingIndicator
-                        ? const SizedBox(height: 16)
-                        : const LoadingIndicator(),
+                    child: _streamingIndicator(),
                   ),
                 );
               }
@@ -4038,7 +4043,7 @@ class _LoadingDotsPainter extends CustomPainter {
 /// Goals:
 /// - Make streaming output feel less "chunky" by smoothing size growth.
 /// - Respect reduce-motion settings.
-class _StreamingAssistantMessageMotion extends StatelessWidget {
+class _StreamingAssistantMessageMotion extends StatefulWidget {
   const _StreamingAssistantMessageMotion({
     required this.enabled,
     required this.child,
@@ -4048,8 +4053,20 @@ class _StreamingAssistantMessageMotion extends StatelessWidget {
   final Widget child;
 
   @override
+  State<_StreamingAssistantMessageMotion> createState() =>
+      _StreamingAssistantMessageMotionState();
+}
+
+class _StreamingAssistantMessageMotionState
+    extends State<_StreamingAssistantMessageMotion> {
+  final _contentKey = GlobalKey();
+
+  @override
   Widget build(BuildContext context) {
-    if (!enabled) return child;
+    // Reparent the same content when motion stops, retaining table gestures
+    // and offsets without leaving an AnimatedSize on completed messages.
+    final child = KeyedSubtree(key: _contentKey, child: widget.child);
+    if (!widget.enabled) return child;
 
     return AnimatedSize(
       key: const ValueKey('streaming-assistant-message-motion'),
