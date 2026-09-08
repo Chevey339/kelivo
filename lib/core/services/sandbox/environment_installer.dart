@@ -178,6 +178,11 @@ class EnvironmentInstaller implements EnvironmentManager {
     if (_installing) return;
     await channel.setEnvironmentBusy(true);
     try {
+      // Remove recovery data first so a later startup cannot resurrect it
+      // after the current rootfs has been deleted.
+      await _deleteIfExists(
+        Directory(p.join(_requireEnvDir().path, 'previous-rootfs')),
+      );
       await _deleteIfExists(rootfsDir);
       await _deleteIfExists(
         Directory(p.join(_requireEnvDir().path, 'staging')),
@@ -411,8 +416,13 @@ class EnvironmentInstaller implements EnvironmentManager {
       return;
     }
     await _throwIfCancelled();
+    final versionPath = p.join(staging.path, kKelivoVersionFile);
+    // Imported archives can contain guest-absolute links. Remove the link
+    // itself, including a dangling one, before writing this app-owned marker.
+    final versionLink = Link(versionPath);
+    if (await versionLink.exists()) await versionLink.delete();
     await File(
-      p.join(staging.path, kKelivoVersionFile),
+      versionPath,
     ).writeAsString('$distro $version $arch $codename\n', flush: true);
     // Keep the previous rootfs until the new one has been fully prepared.
     final previous = Directory(

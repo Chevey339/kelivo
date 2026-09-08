@@ -418,6 +418,78 @@ void main() {
     },
   );
 
+  for (final dangling in [false, true]) {
+    test(
+      'local image marker cannot write through a symlink, dangling=$dangling',
+      () async {
+        final outside = File(p.join(envDir.path, 'outside-marker'));
+        if (!dangling) await outside.writeAsString('keep original contents');
+        workspace.versionLinkTarget = outside.path;
+        final archive = await File(
+          p.join(envDir.path, 'local.tar'),
+        ).writeAsBytes(tarball);
+        await env.setRootfsSelection(
+          imageId: RootfsCatalog.defaultImage.id,
+          source: RootfsDownloadSource.local,
+          localArchivePath: archive.path,
+        );
+        final installer = buildInstaller(
+          MockClient((_) => throw StateError('No HTTP expected')),
+        );
+        await installer.install();
+        expect(env.state.phase, EnvironmentPhase.ready);
+        if (dangling) {
+          expect(await outside.exists(), isFalse);
+        } else {
+          expect(await outside.readAsString(), 'keep original contents');
+        }
+        final marker = File(
+          p.join(installer.rootfsDir.path, kKelivoVersionFile),
+        );
+        expect(
+          await FileSystemEntity.type(marker.path, followLinks: false),
+          FileSystemEntityType.file,
+        );
+        expect(await marker.readAsString(), 'ubuntu 24.04.3 arm64 noble\n');
+      },
+    );
+  }
+
+  for (final hasCurrent in [true, false]) {
+    test(
+      'reset removes recovery rootfs before restart, current=$hasCurrent',
+      () async {
+        final installer = buildInstaller(servingTarball());
+        final previous = await Directory(
+          p.join(envDir.path, 'previous-rootfs'),
+        ).create();
+        await File(
+          p.join(previous.path, kKelivoVersionFile),
+        ).writeAsString('debian 12 arm64 bookworm\n');
+        if (hasCurrent) {
+          await installer.rootfsDir.create();
+          await File(
+            p.join(installer.rootfsDir.path, kKelivoVersionFile),
+          ).writeAsString('ubuntu 24.04.3 arm64 noble\n');
+        }
+        await env.setState(
+          EnvironmentState(
+            phase: hasCurrent
+                ? EnvironmentPhase.ready
+                : EnvironmentPhase.patching,
+          ),
+        );
+        await installer.reset();
+        expect(await installer.rootfsDir.exists(), isFalse);
+        final restarted = buildInstaller(servingTarball());
+        await restarted.recoverInterruptedInstall();
+        expect(await restarted.rootfsDir.exists(), isFalse);
+        expect(await previous.exists(), isFalse);
+        expect(env.state.phase, EnvironmentPhase.notInstalled);
+      },
+    );
+  }
+
   test('local newer releases are not offered a downgrade', () async {
     final installer = buildInstaller(servingTarball());
     await installer.rootfsDir.create();
@@ -463,6 +535,7 @@ class _WorkspaceHarness {
   bool rejectExtract = false;
   List<int>? extractedBytes;
   String? extractedFormat;
+  String? versionLinkTarget;
   final busyCalls = <bool>[];
   Map<String, String> rootfsInfo = {
     'distro': 'ubuntu',
@@ -519,6 +592,11 @@ class _WorkspaceHarness {
           extractedFormat = (call.arguments as Map)['format'] as String;
           final dest = (call.arguments as Map)['destDir'] as String;
           await Directory(dest).create(recursive: true);
+          if (versionLinkTarget != null) {
+            await Link(
+              p.join(dest, kKelivoVersionFile),
+            ).create(versionLinkTarget!);
+          }
           sink?.success(<String, Object?>{
             'type': 'extract',
             'destDir': dest,

@@ -25,6 +25,10 @@ object RootfsExtractor {
             "archive is missing or empty: ${archive.absolutePath}"
         }
         destDir.mkdirs()
+        // Anchor all entries to the original directory, even if its path is
+        // replaced by a symlink later in the extraction.
+        val root = destDir.canonicalFile
+        require(root.isDirectory) { "rootfs destination is not a directory" }
         val raw = BufferedInputStream(archive.inputStream(), BUFFER)
         val input = when (format.lowercase(Locale.US)) {
             "tar.gz", "tgz" -> GZIPInputStream(raw)
@@ -36,7 +40,7 @@ object RootfsExtractor {
             }
         }
         input.use { stream ->
-            unpack(stream, destDir, onProgress)
+            unpack(stream, root, onProgress)
         }
     }
 
@@ -44,20 +48,20 @@ object RootfsExtractor {
         val normalized = path.replace('\\', '/').trim()
         require(!normalized.startsWith("/")) { "absolute tar path rejected: $path" }
         require(!normalized.contains('\u0000')) { "tar path contains a NUL byte" }
-        val cleaned = normalized.removePrefix("./")
-        if (cleaned.isEmpty() || cleaned == ".") return ""
-        require(cleaned.split('/').none { it == ".." }) {
+        val parts = normalized.split('/')
+        require(parts.none { it == ".." }) {
             "tar path escapes destination: $path"
         }
-        return cleaned
+        return parts.filter { it.isNotEmpty() && it != "." }.joinToString("/")
     }
 
+    // root is the canonical directory captured once by extract(). Never
+    // re-resolve it here: an entry must be strictly below that fixed boundary.
     internal fun resolveInside(root: File, path: String): File {
         val sanitized = sanitizeTarPath(path)
         require(sanitized.isNotEmpty()) { "tar path is blank" }
-        val base = root.canonicalFile
-        val target = File(base, sanitized).canonicalFile
-        require(target.path == base.path || target.path.startsWith(base.path + File.separator)) {
+        val target = File(root, sanitized).canonicalFile
+        require(target.path.startsWith(root.path + File.separator)) {
             "tar path escapes destination: $path"
         }
         return target
@@ -91,11 +95,10 @@ object RootfsExtractor {
 
     private fun writeEntry(reader: TarStream, root: File, entry: TarEntry): Long {
         if (entry.name.isEmpty()) {
-            if (entry.kind != TarKind.FILE) {
-                reader.skipCount(entry.size)
-            } else {
-                reader.skipCount(entry.size)
+            require(entry.kind == TarKind.DIRECTORY) {
+                "non-directory tar entry targets extraction root"
             }
+            reader.skipCount(entry.size)
             reader.align(entry.size)
             return 0L
         }
@@ -135,8 +138,7 @@ object RootfsExtractor {
             // Guest-absolute target (e.g. /usr/bin/python). Keep as written.
         } else {
             val resolved = File(target.parentFile ?: root, linkName).canonicalFile
-            val base = root.canonicalFile
-            require(resolved.path == base.path || resolved.path.startsWith(base.path + File.separator)) {
+            require(resolved.path == root.path || resolved.path.startsWith(root.path + File.separator)) {
                 "symlink escapes destination: ${target.name} -> $linkName"
             }
         }
