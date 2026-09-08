@@ -10,6 +10,7 @@ import 'package:syncfusion_flutter_sliders/sliders.dart';
 import 'package:syncfusion_flutter_core/theme.dart';
 import '../../../core/providers/settings_provider.dart';
 import 'auto_retry_page.dart';
+import 'google_fonts_picker_page.dart';
 import 'image_settings_page.dart';
 import 'message_style_settings_page.dart';
 import 'theme_settings_page.dart';
@@ -424,6 +425,12 @@ class _DisplaySettingsPageState extends State<DisplaySettingsPage> {
             children: [
               _sheetOption(
                 ctx,
+                label: l10n.googleFontsTitle,
+                onTap: () => Navigator.of(ctx).pop('google'),
+              ),
+              _sheetDividerNoIcon(ctx),
+              _sheetOption(
+                ctx,
                 label: l10n.fontPickerChooseLocalFile,
                 onTap: () => Navigator.of(ctx).pop('local'),
               ),
@@ -442,6 +449,10 @@ class _DisplaySettingsPageState extends State<DisplaySettingsPage> {
     if (!context.mounted) return;
 
     final settings = context.read<SettingsProvider>();
+    if (choice == 'google') {
+      await showGoogleFontsPicker(context, forCode: target == _FontTarget.code);
+      return;
+    }
     if (choice == 'local') {
       final res = await FilePicker.platform.pickFiles(
         type: FileType.custom,
