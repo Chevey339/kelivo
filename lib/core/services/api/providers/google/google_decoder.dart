@@ -107,6 +107,8 @@ class GoogleStreamDecoder implements StreamChunkDecoder {
   bool _imageStarted = false;
   bool _imageEnded = false;
   int _syntheticPartIndex = 0;
+  bool _sawPart = false;
+  bool _finishAfterAnyPart = false;
   bool _closed = false;
 
   bool get emittedImageEvents => _imageStarted;
@@ -121,8 +123,12 @@ class GoogleStreamDecoder implements StreamChunkDecoder {
     return null;
   }
 
+  /// Only a finish reason reached after a part ends the turn: some
+  /// Gemini-compatible endpoints open the stream with an empty candidate
+  /// already carrying `finishReason: STOP`, and closing there would drop the
+  /// whole reply. Such a stream ends when the transport does.
   bool get canFinishNow =>
-      finishReason != null &&
+      _finishAfterAnyPart &&
       !retryMalformedResponse &&
       functionCalls.isEmpty &&
       (!expectImage || receivedImage);
@@ -288,7 +294,10 @@ class GoogleStreamDecoder implements StreamChunkDecoder {
       }
 
       final fr = cand['finishReason'];
-      if (fr is String && fr.isNotEmpty) finishReason = fr;
+      if (fr is String && fr.isNotEmpty) {
+        finishReason = fr;
+        if (_sawPart) _finishAfterAnyPart = true;
+      }
 
       final gm = cand['groundingMetadata'] ?? obj['groundingMetadata'];
       final cite = _parseCitations(gm);
@@ -333,6 +342,7 @@ class GoogleStreamDecoder implements StreamChunkDecoder {
     final thought = p['thought'] as bool? ?? false;
     final fc = p['functionCall'];
     final rawPart = Map<String, dynamic>.from(p);
+    if (rawPart.isNotEmpty) _sawPart = true;
 
     if (isGemini3 && !thought && rawPart.isNotEmpty) {
       roundModelParts.add(rawPart);
