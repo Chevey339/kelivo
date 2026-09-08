@@ -23,6 +23,7 @@ abstract final class EnvironmentError {
   static const extractFailed = 'extract_failed';
   static const patchFailed = 'patch_failed';
   static const cancelled = 'cancelled';
+  static const invalidRootfs = 'invalid_rootfs';
 }
 
 /// Android grants the app network via GID 3003 (inet) and 9997 (everybody).
@@ -51,12 +52,19 @@ class EnvironmentInstaller implements EnvironmentManager {
   final EnvironmentProvider env;
 
   @override
-  Set<MirrorCategory> get mirrorCategories => const {
-    MirrorCategory.apt,
+  Set<MirrorCategory> get mirrorCategories => {
+    if (env.state.distro == 'alpine')
+      MirrorCategory.apk
+    else if (env.state.distro == 'ubuntu' ||
+        env.state.distro == 'debian' ||
+        env.state.distro == null)
+      MirrorCategory.apt,
     MirrorCategory.pip,
     MirrorCategory.npm,
   };
   final RootfsSource source;
+  EnvironmentState? _previousState;
+  int _minFreeBytes = kMinFreeBytes;
   final MirrorSpeedTest speedTest;
   final http.Client _client;
   final List<int> patchGids;
@@ -90,20 +98,34 @@ class EnvironmentInstaller implements EnvironmentManager {
     try {
       await env.loaded;
       await _resolveEnvDir();
+      _previousState = env.state.phase == EnvironmentPhase.ready
+          ? env.state
+          : null;
+      await channel.setEnvironmentBusy(true);
       await channel.keepScreenOn(true);
       await _installBody();
     } on _InstallStopped {
       // State already persisted by [_fail] or [_throwIfCancelled].
+    } catch (_) {
+      await _fail(EnvironmentError.extractFailed);
     } finally {
-      _installing = false;
       _onProgress = null;
       _downloadSub = null;
       if (_abortDownload?.isCompleted == false) _abortDownload!.complete();
       _abortDownload = null;
       _downloadDone = null;
+      if (_resolvedEnvDir != null) {
+        // Keep resumable downloads, but never retain a half-extracted image.
+        try {
+          await _deleteIfExists(stagingRootfsDir);
+        } catch (_) {}
+      }
+      _previousState = null;
       try {
+        await channel.setEnvironmentBusy(false);
         await channel.keepScreenOn(false);
       } catch (_) {}
+      _installing = false;
     }
   }
 
@@ -118,6 +140,7 @@ class EnvironmentInstaller implements EnvironmentManager {
 
   @override
   Future<void> repair() async {
+    if (_installing) return;
     await _resolveEnvDir();
     _cancelled = false;
     try {
@@ -131,8 +154,7 @@ class EnvironmentInstaller implements EnvironmentManager {
         rootfsDir: rootfsDir.path,
         arch: env.state.arch ?? 'arm64',
         gids: patchGids,
-        ubuntuCodename: kUbuntuCodename,
-        aptMirrorBaseUrl: env.mirrors[MirrorCategory.apt]?.selectedBaseUrl,
+        ubuntuCodename: env.state.codename ?? '',
       );
       await _setPhase(
         env.state.copyWith(
@@ -153,10 +175,18 @@ class EnvironmentInstaller implements EnvironmentManager {
   @override
   Future<void> reset() async {
     await _resolveEnvDir();
-    await _deleteIfExists(rootfsDir);
-    await _deleteIfExists(Directory(p.join(_requireEnvDir().path, 'staging')));
-    await _deleteIfExists(downloadsDir);
-    await _setPhase(const EnvironmentState());
+    if (_installing) return;
+    await channel.setEnvironmentBusy(true);
+    try {
+      await _deleteIfExists(rootfsDir);
+      await _deleteIfExists(
+        Directory(p.join(_requireEnvDir().path, 'staging')),
+      );
+      await _deleteIfExists(downloadsDir);
+      await _setPhase(const EnvironmentState());
+    } finally {
+      await channel.setEnvironmentBusy(false);
+    }
   }
 
   @override
@@ -164,13 +194,16 @@ class EnvironmentInstaller implements EnvironmentManager {
     await _resolveEnvDir();
     final installed = await _readVersionFile();
     if (installed == null) return false;
-    if (installed.version == kUbuntuBaseVersion) {
+    final versions = RootfsCatalog.forDistro(installed.distro);
+    if (versions.isEmpty) return false;
+    final latest = versions.first;
+    if (!_newerVersion(latest.version, installed.version)) {
       if (env.state.availableVersion != null) {
         await _setPhase(env.state.copyWith(clearAvailableVersion: true));
       }
       return false;
     }
-    await _setPhase(env.state.copyWith(availableVersion: kUbuntuBaseVersion));
+    await _setPhase(env.state.copyWith(availableVersion: latest.version));
     return true;
   }
 
@@ -184,9 +217,10 @@ class EnvironmentInstaller implements EnvironmentManager {
         await _setPhase(
           EnvironmentState(
             phase: EnvironmentPhase.ready,
-            distro: parsed?.distro ?? kUbuntuDistro,
-            version: parsed?.version ?? kUbuntuBaseVersion,
+            distro: parsed?.distro ?? 'custom',
+            version: parsed?.version ?? 'local',
             arch: parsed?.arch ?? 'arm64',
+            codename: parsed?.codename,
             installedAt: DateTime.now().toUtc(),
             rootfsDir: rootfsDir.path,
             lastMirrorBase: env.state.lastMirrorBase,
@@ -198,9 +232,27 @@ class EnvironmentInstaller implements EnvironmentManager {
     await install();
   }
 
+  static bool _newerVersion(String candidate, String installed) {
+    final a = candidate.split('.').map(int.tryParse).toList();
+    final b = installed.split('.').map(int.tryParse).toList();
+    if (a.contains(null) || b.contains(null)) return false;
+    for (var i = 0; i < max(a.length, b.length); i++) {
+      final comparison = (i < a.length ? a[i]! : 0).compareTo(
+        i < b.length ? b[i]! : 0,
+      );
+      if (comparison != 0) return comparison > 0;
+    }
+    return false;
+  }
+
   Future<void> _installBody() async {
     final selectedSource = env.downloadSource;
+    final source = this.source.forImage(env.rootfsImage);
+    final image = source.image;
+    final local = selectedSource == RootfsDownloadSource.local;
     final customUrl = env.downloadUrl;
+    final localPath = env.localArchivePath;
+    _minFreeBytes = local ? 64 * 1024 * 1024 : image.minFreeBytes;
     final probe = await _safeProbe();
     if (!probe.supported) {
       await _fail(EnvironmentError.prootMissing);
@@ -211,167 +263,186 @@ class EnvironmentInstaller implements EnvironmentManager {
       await _fail(EnvironmentError.unsupportedAbi);
       return;
     }
-
     await _setPhase(
       EnvironmentState(
-        phase: EnvironmentPhase.downloading,
-        distro: kUbuntuDistro,
-        version: kUbuntuBaseVersion,
+        phase: local
+            ? EnvironmentPhase.verifying
+            : EnvironmentPhase.downloading,
+        distro: local ? 'custom' : image.distro,
+        version: local ? null : image.version,
+        codename: local ? null : image.codename,
         arch: arch,
         rootfsDir: rootfsDir.path,
-        lastMirrorBase: env.state.lastMirrorBase,
       ),
     );
-
     final space = await _safeFreeSpace(_requireEnvDir().path);
-    if (space.freeBytes < kMinFreeBytes) {
+    if (space.freeBytes < _minFreeBytes) {
       await _fail(EnvironmentError.insufficientDisk);
       return;
     }
 
-    final expectedSha = source.checksums[arch]!;
-
-    final tarballName = RootfsSource.tarballFileName(arch);
-    final partFile = File(p.join(downloadsDir.path, '$tarballName.part'));
-    Uri downloadUri;
-    try {
-      downloadUri =
-          source.selectedUri(selectedSource, customUrl, arch) ??
-          await _pickDownloadUri(arch);
-    } catch (_) {
-      await _fail(EnvironmentError.network);
-      return;
-    }
-    final originFile = File('${partFile.path}.url');
-    if (await partFile.exists() &&
-        (!await originFile.exists() ||
-            await originFile.readAsString() != downloadUri.toString())) {
-      await partFile.delete();
-    }
-    await originFile.parent.create(recursive: true);
-    await originFile.writeAsString(downloadUri.toString(), flush: true);
-    await _throwIfCancelled();
-
-    await _setPhase(
-      env.state.copyWith(
-        phase: EnvironmentPhase.downloading,
-        lastMirrorBase: downloadUri.toString(),
-        progress: 0,
-        bytesDownloaded: 0,
-        clearErrorMessage: true,
-      ),
-    );
-
-    try {
-      await _download(uri: downloadUri, partFile: partFile);
-    } on _InstallStopped {
-      rethrow;
-    } catch (error) {
-      if (error is _InstallStopped) rethrow;
-      await _fail(
-        _cancelled ? EnvironmentError.cancelled : EnvironmentError.network,
+    final File archive;
+    final String format;
+    if (local) {
+      archive = File(localPath);
+      final detected = RootfsSource.archiveFormat(localPath);
+      if (detected == null ||
+          !await archive.exists() ||
+          await archive.length() == 0) {
+        await _fail(EnvironmentError.invalidRootfs);
+        return;
+      }
+      format = detected;
+      if (space.freeBytes < max(_minFreeBytes, await archive.length() * 4)) {
+        await _fail(EnvironmentError.insufficientDisk);
+        return;
+      }
+    } else {
+      format = image.format;
+      archive = File(
+        p.join(downloadsDir.path, '${source.tarballFileName(arch)}.part'),
       );
-      return;
-    }
-
-    await _throwIfCancelled();
-    await _setPhase(
-      env.state.copyWith(phase: EnvironmentPhase.verifying, progress: 1),
-    );
-
-    String digest;
-    try {
-      digest = (await channel.sha256File(partFile.path)).toLowerCase();
-    } catch (_) {
-      await _fail(EnvironmentError.network);
-      return;
-    }
-    if (digest != expectedSha.toLowerCase()) {
-      if (await partFile.exists()) await partFile.delete();
-      await _fail(EnvironmentError.checksumMismatch);
-      return;
+      Uri downloadUri;
+      try {
+        downloadUri =
+            source.selectedUri(selectedSource, customUrl, arch) ??
+            await _pickDownloadUri(source, arch);
+      } catch (_) {
+        await _fail(EnvironmentError.network);
+        return;
+      }
+      final origin = File('${archive.path}.url');
+      if (await archive.exists() &&
+          (!await origin.exists() ||
+              await origin.readAsString() != downloadUri.toString())) {
+        await archive.delete();
+      }
+      await origin.parent.create(recursive: true);
+      await origin.writeAsString(downloadUri.toString(), flush: true);
+      await _throwIfCancelled();
+      await _setPhase(
+        env.state.copyWith(
+          lastMirrorBase: downloadUri.toString(),
+          progress: 0,
+          bytesDownloaded: 0,
+        ),
+      );
+      try {
+        await _download(uri: downloadUri, partFile: archive);
+      } on _InstallStopped {
+        rethrow;
+      } catch (_) {
+        await _fail(
+          _cancelled ? EnvironmentError.cancelled : EnvironmentError.network,
+        );
+        return;
+      }
+      await _throwIfCancelled();
+      await _setPhase(
+        env.state.copyWith(phase: EnvironmentPhase.verifying, progress: 1),
+      );
+      final digest = (await channel.sha256File(archive.path)).toLowerCase();
+      if (digest != source.checksums[arch]!.toLowerCase()) {
+        await archive.delete();
+        await _fail(EnvironmentError.checksumMismatch);
+        return;
+      }
     }
 
     await _throwIfCancelled();
     final staging = stagingRootfsDir;
-    if (await staging.exists()) {
-      await staging.delete(recursive: true);
-    }
+    await _deleteIfExists(staging);
     await staging.create(recursive: true);
     await tmpDir.create(recursive: true);
-
-    await _setPhase(env.state.copyWith(phase: EnvironmentPhase.extracting));
+    await _setPhase(
+      env.state.copyWith(
+        phase: EnvironmentPhase.extracting,
+        clearProgress: true,
+        clearBytesDownloaded: true,
+        clearBytesTotal: true,
+      ),
+    );
     final extractSub = channel.events.listen((event) {
-      if (event['type'] != 'extract') return;
-      if (event['destDir']?.toString() != staging.path) return;
+      if (event['type'] != 'extract' ||
+          event['destDir']?.toString() != staging.path) {
+        return;
+      }
       final bytes = _asInt(event['bytes']);
-      if (bytes == null) return;
-      unawaited(
-        _setPhase(
-          env.state.copyWith(
-            phase: EnvironmentPhase.extracting,
-            bytesDownloaded: bytes,
-            progress: env.state.bytesTotal == null
-                ? null
-                : (bytes / env.state.bytesTotal!).clamp(0.0, 1.0),
-          ),
-        ),
-      );
+      if (bytes != null) {
+        unawaited(_setPhase(env.state.copyWith(bytesDownloaded: bytes)));
+      }
     });
     try {
       await channel.extractRootfs(
-        archivePath: partFile.path,
+        archivePath: archive.path,
         destDir: staging.path,
-        format: 'tar.gz',
+        format: format,
       );
-    } on WorkspaceChannelException {
-      await extractSub.cancel();
-      await _fail(EnvironmentError.extractFailed);
-      return;
     } catch (_) {
-      await extractSub.cancel();
       await _fail(EnvironmentError.extractFailed);
       return;
     } finally {
       await extractSub.cancel();
     }
-
     await _throwIfCancelled();
+    Map<String, Object?> info;
+    try {
+      info = await channel.inspectRootfs(staging.path, arch);
+      if (!local && info['distro'] != image.distro) {
+        throw const FormatException('Image distribution mismatch');
+      }
+    } catch (_) {
+      await _fail(EnvironmentError.invalidRootfs);
+      return;
+    }
+    final distro = info['distro']! as String;
+    final version = local ? info['version']! as String : image.version;
+    final codename = info['codename'] as String? ?? '';
     await _setPhase(env.state.copyWith(phase: EnvironmentPhase.patching));
     try {
       await channel.patchRootfs(
         rootfsDir: staging.path,
         arch: arch,
         gids: patchGids,
-        ubuntuCodename: kUbuntuCodename,
-        aptMirrorBaseUrl: env.mirrors[MirrorCategory.apt]?.selectedBaseUrl,
+        ubuntuCodename: codename,
       );
-    } on WorkspaceChannelException {
-      await _fail(EnvironmentError.patchFailed);
-      return;
     } catch (_) {
       await _fail(EnvironmentError.patchFailed);
       return;
     }
-
-    if (await rootfsDir.exists()) {
-      await rootfsDir.delete(recursive: true);
-    }
-    await staging.rename(rootfsDir.path);
+    await _throwIfCancelled();
     await File(
-      p.join(rootfsDir.path, kKelivoVersionFile),
-    ).writeAsString('$kUbuntuDistro $kUbuntuBaseVersion $arch\n', flush: true);
+      p.join(staging.path, kKelivoVersionFile),
+    ).writeAsString('$distro $version $arch $codename\n', flush: true);
+    // Keep the previous rootfs until the new one has been fully prepared.
+    final previous = Directory(
+      p.join(_requireEnvDir().path, 'previous-rootfs'),
+    );
+    await _deleteIfExists(previous);
+    final hadPrevious = await rootfsDir.exists();
+    if (hadPrevious) await rootfsDir.rename(previous.path);
+    try {
+      await staging.rename(rootfsDir.path);
+    } catch (_) {
+      if (hadPrevious) await previous.rename(rootfsDir.path);
+      rethrow;
+    }
     await _setPhase(
       EnvironmentState(
         phase: EnvironmentPhase.ready,
-        distro: kUbuntuDistro,
-        version: kUbuntuBaseVersion,
+        distro: distro,
+        version: version,
+        codename: codename,
         arch: arch,
         installedAt: DateTime.now().toUtc(),
         rootfsDir: rootfsDir.path,
         lastMirrorBase: env.state.lastMirrorBase,
       ),
     );
+    _previousState = null;
+    await env.clearCachedDiskUsage();
+    await _deleteIfExists(previous);
+    if (!local) await _deleteIfExists(downloadsDir);
   }
 
   Future<ProbeResult> _safeProbe() async {
@@ -392,7 +463,7 @@ class EnvironmentInstaller implements EnvironmentManager {
     }
   }
 
-  Future<Uri> _pickDownloadUri(String arch) async {
+  Future<Uri> _pickDownloadUri(RootfsSource source, String arch) async {
     final official = source.officialTarballUri(arch);
     try {
       final probes = await speedTest.probe(source.tarballCandidates(arch));
@@ -443,7 +514,7 @@ class EnvironmentInstaller implements EnvironmentManager {
 
     final total = _totalFromResponse(response, existing);
     if (total != null) {
-      final needed = max(total * 4, kMinFreeBytes);
+      final needed = max(total * 4, _minFreeBytes);
       final space = await channel.freeSpace(_requireEnvDir().path);
       if (space.freeBytes < needed) {
         await _fail(EnvironmentError.insufficientDisk);
@@ -522,8 +593,10 @@ class EnvironmentInstaller implements EnvironmentManager {
 
   Future<void> _fail(String code) async {
     await _setPhase(
-      env.state.copyWith(
-        phase: EnvironmentPhase.error,
+      (_previousState ?? env.state).copyWith(
+        phase: _previousState == null
+            ? EnvironmentPhase.error
+            : EnvironmentPhase.ready,
         errorMessage: code,
         clearProgress: true,
       ),
@@ -535,9 +608,42 @@ class EnvironmentInstaller implements EnvironmentManager {
     _onProgress?.call(state);
   }
 
+  /// Recover a process exit between the two directory renames on replacement.
+  Future<void> recoverInterruptedInstall() async {
+    await env.loaded;
+    await _resolveEnvDir();
+    if ({
+      EnvironmentPhase.downloading,
+      EnvironmentPhase.verifying,
+      EnvironmentPhase.extracting,
+      EnvironmentPhase.patching,
+    }.contains(env.state.phase)) {
+      final installed = await _readVersionFile();
+      await env.setState(
+        installed == null
+            ? const EnvironmentState()
+            : EnvironmentState(
+                phase: EnvironmentPhase.ready,
+                distro: installed.distro,
+                version: installed.version,
+                arch: installed.arch,
+                codename: installed.codename,
+                rootfsDir: rootfsDir.path,
+              ),
+      );
+    }
+  }
+
   Future<Directory> _resolveEnvDir() async {
-    return _resolvedEnvDir ??=
+    if (_resolvedEnvDir != null) return _resolvedEnvDir!;
+    final dir =
         environmentDir ?? await AppDirectories.getEnvironmentDirectory();
+    final root = Directory(p.join(dir.path, 'rootfs'));
+    final previous = Directory(p.join(dir.path, 'previous-rootfs'));
+    if (!await root.exists() && await previous.exists()) {
+      await previous.rename(root.path);
+    }
+    return _resolvedEnvDir = dir;
   }
 
   Directory _requireEnvDir() {
@@ -550,13 +656,18 @@ class EnvironmentInstaller implements EnvironmentManager {
     return dir;
   }
 
-  Future<({String distro, String version, String arch})?>
+  Future<({String distro, String version, String arch, String? codename})?>
   _readVersionFile() async {
     final file = File(p.join(rootfsDir.path, kKelivoVersionFile));
     if (!await file.exists()) return null;
     final parts = (await file.readAsString()).trim().split(RegExp(r'\s+'));
     if (parts.length < 3) return null;
-    return (distro: parts[0], version: parts[1], arch: parts[2]);
+    return (
+      distro: parts[0],
+      version: parts[1],
+      arch: parts[2],
+      codename: parts.length > 3 ? parts[3] : null,
+    );
   }
 
   Future<void> _deleteIfExists(FileSystemEntity entity) async {

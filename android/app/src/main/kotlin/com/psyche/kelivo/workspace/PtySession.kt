@@ -22,6 +22,8 @@ class PtySessions(
         env: Map<String, String>,
         cols: Int,
         rows: Int,
+        prootArguments: List<String> = emptyList(),
+        shell: String? = null,
     ): Int {
         close(sessionId)
         tmpDir.mkdirs()
@@ -35,6 +37,8 @@ class PtySessions(
             cwd = cwd,
             command = null,
             env = env,
+            extraArgs = prootArguments,
+            shell = shell,
         )
         val session = PtySession(sessionId, events)
         val pid = session.start(launch, rows = rows, cols = cols)

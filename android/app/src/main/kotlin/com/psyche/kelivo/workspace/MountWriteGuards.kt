@@ -52,9 +52,10 @@ internal object MountWriteGuards {
             |cfg=$quotedConfig
             |check_target() {
             |    [ -f "${'$'}cfg" ] || return 0
-            |    # Ubuntu coreutils resolves relative paths, .. and symlink parents,
-            |    # including targets which have not been created yet.
-            |    resolved=${'$'}(PATH=/usr/bin:/bin realpath -m -- "${'$'}1" 2>/dev/null) || resolved="${'$'}1"
+            |    # GNU realpath supports missing parents; BusyBox readlink handles
+            |    # existing symlink parents without requiring coreutils on Alpine.
+            |    resolved=${'$'}(PATH=/usr/bin:/bin realpath -m -- "${'$'}1" 2>/dev/null) ||
+            |        resolved=${'$'}(PATH=/usr/bin:/bin readlink -f -- "${'$'}1" 2>/dev/null) || resolved="${'$'}1"
             |    case "${'$'}resolved" in /*) ;; *) resolved="${'$'}PWD/${'$'}resolved";; esac
             |    while IFS= read -r prefix; do
             |        [ -n "${'$'}prefix" ] || continue

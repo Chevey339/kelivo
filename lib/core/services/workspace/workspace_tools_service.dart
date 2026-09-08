@@ -1384,7 +1384,7 @@ class WorkspaceToolsService {
     }
     switch (status.engine) {
       case 'proot':
-        return 'Engine: Ubuntu (PRoot)';
+        return 'Engine: Linux (PRoot); check /etc/os-release for distro';
       case 'ish':
         return 'Engine: Alpine (iSH)';
       case 'process':

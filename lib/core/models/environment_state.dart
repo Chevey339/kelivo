@@ -22,6 +22,7 @@ class EnvironmentState {
   final int? bytesTotal;
   final String? lastMirrorBase;
   final String? rootfsDir;
+  final String? codename;
 
   const EnvironmentState({
     this.phase = EnvironmentPhase.notInstalled,
@@ -36,6 +37,7 @@ class EnvironmentState {
     this.bytesTotal,
     this.lastMirrorBase,
     this.rootfsDir,
+    this.codename,
   });
 
   EnvironmentState copyWith({
@@ -51,6 +53,7 @@ class EnvironmentState {
     int? bytesTotal,
     String? lastMirrorBase,
     String? rootfsDir,
+    String? codename,
     bool clearDistro = false,
     bool clearVersion = false,
     bool clearArch = false,
@@ -84,6 +87,7 @@ class EnvironmentState {
           ? null
           : (lastMirrorBase ?? this.lastMirrorBase),
       rootfsDir: clearRootfsDir ? null : (rootfsDir ?? this.rootfsDir),
+      codename: codename ?? this.codename,
     );
   }
 
@@ -100,6 +104,7 @@ class EnvironmentState {
     'bytesTotal': bytesTotal,
     'lastMirrorBase': lastMirrorBase,
     'rootfsDir': rootfsDir,
+    'codename': codename,
   };
 
   factory EnvironmentState.fromJson(Map<String, dynamic> json) {
@@ -118,6 +123,7 @@ class EnvironmentState {
       bytesTotal: (json['bytesTotal'] as num?)?.toInt(),
       lastMirrorBase: json['lastMirrorBase'] as String?,
       rootfsDir: json['rootfsDir'] as String?,
+      codename: json['codename'] as String?,
     );
   }
 

@@ -12,6 +12,10 @@ void main() {
         'arm64',
       ),
       'set -e\n'
+      'if [ -f /etc/apt/sources.list ]; then\n'
+      '  mv /etc/apt/sources.list /etc/apt/sources.list.kelivo-bak\n'
+      'fi\n'
+      'set -e\n'
       'mkdir -p "\$(dirname /etc/apt/sources.list.d/ubuntu.sources)"\n'
       "cat > /etc/apt/sources.list.d/ubuntu.sources <<'EOF'\n"
       'Types: deb\n'
@@ -75,6 +79,50 @@ void main() {
       throwsArgumentError,
     );
   });
+
+  for (final distro in ['ubuntu', 'debian']) {
+    test(
+      '$distro mirror replaces the legacy list and preserves other sources',
+      () async {
+        final dir = await Directory.systemTemp.createTemp(
+          'kelivo_apt_sources_',
+        );
+        addTearDown(() => dir.delete(recursive: true));
+        final apt = await Directory(
+          '${dir.path}/etc/apt/sources.list.d',
+        ).create(recursive: true);
+        final legacy = File('${dir.path}/etc/apt/sources.list');
+        await legacy.writeAsString('old system source');
+        final thirdParty = File('${apt.path}/custom.list');
+        await thirdParty.writeAsString('keep third party source');
+        final script = GuestScripts.applyAptMirror(
+          'https://mirror.test/${distro == 'debian' ? 'debian' : 'ubuntu-ports'}',
+          'arm64',
+          distro: distro,
+          codename: distro == 'debian' ? 'trixie' : 'jammy',
+        ).replaceAll('/etc/', '${dir.path}/etc/');
+        await _runSh(script);
+        await _runSh(script);
+        expect(await legacy.exists(), isFalse);
+        expect(
+          await File('${legacy.path}.kelivo-bak').readAsString(),
+          'old system source',
+        );
+        expect(await thirdParty.readAsString(), 'keep third party source');
+        final contents = await File(
+          '${apt.path}/$distro.sources',
+        ).readAsString();
+        expect(
+          contents,
+          contains(distro == 'debian' ? 'trixie-security' : 'jammy-security'),
+        );
+        if (distro == 'debian') {
+          expect(contents, contains('https://mirror.test/debian-security/'));
+        }
+        expect(contents, isNot(contains('noble')));
+      },
+    );
+  }
 
   test(
     'source replacement writes official content even with an old backup',

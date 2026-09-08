@@ -109,7 +109,8 @@ void main() {
       expect(fragment, contains('kelivo://workspace/plot.png'));
       expect(fragment, contains('notes.pdf'));
       expect(fragment, contains('12 bytes'));
-      expect(fragment, contains('Ubuntu (PRoot)'));
+      expect(fragment, contains('Linux (PRoot)'));
+      expect(fragment, contains('/etc/os-release'));
       final withoutAttachments = fragment.replaceAll(
         RegExp(r'Attachments under[\s\S]*?(?=</workspace>)'),
         '',

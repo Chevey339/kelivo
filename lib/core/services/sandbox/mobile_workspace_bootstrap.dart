@@ -55,6 +55,7 @@ Future<MobileWorkspaceStack> _android(EnvironmentProvider env) async {
     speedTest: speedTest,
     environmentDir: await AppDirectories.getEnvironmentDirectory(),
   );
+  await installer.recoverInterruptedInstall();
   final runtime = AndroidProotRuntime(
     channel: channel,
     env: env,

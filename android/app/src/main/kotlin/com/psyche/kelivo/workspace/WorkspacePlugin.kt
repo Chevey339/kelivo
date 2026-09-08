@@ -26,6 +26,7 @@ class WorkspacePlugin(private val activity: Activity) {
     private val ptySessions = PtySessions(events)
     private val directories = WorkspaceDirectoryAccess(activity)
     private var externalMounts = emptyList<BindMount>()
+    private var environmentBusy = false
 
     fun configure(messenger: BinaryMessenger) {
         EventChannel(messenger, EVENT_CHANNEL_NAME).setStreamHandler(events)
@@ -33,6 +34,18 @@ class WorkspacePlugin(private val activity: Activity) {
             try {
                 when (call.method) {
                     "probe" -> result.success(probe())
+                    "setEnvironmentBusy" -> {
+                        environmentBusy = asMap(call.arguments)["busy"] == true
+                        if (environmentBusy) {
+                            execRunner.cancelAll()
+                            ptySessions.closeAll()
+                        }
+                        result.success(null)
+                    }
+                    "inspectRootfs" -> runAsync(result, "invalid_rootfs") {
+                        val args = asMap(call.arguments)
+                        RootfsInfo.inspect(File(requiredString(args, "rootfsDir")), requiredString(args, "arch"))
+                    }
                     "setExternalMounts" -> {
                         val next = parseBinds(asMap(call.arguments)["mounts"])
                         validateExternalMounts(next)
@@ -54,6 +67,7 @@ class WorkspacePlugin(private val activity: Activity) {
                         null
                     }
                     "exec" -> {
+                        require(!environmentBusy) { "environment is being replaced" }
                         exec(asMap(call.arguments))
                         result.success(mapOf("started" to true))
                     }
@@ -61,7 +75,10 @@ class WorkspacePlugin(private val activity: Activity) {
                         val runId = asMap(call.arguments)["runId"]?.toString().orEmpty()
                         result.success(runId.isNotEmpty() && execRunner.cancel(runId))
                     }
-                    "ptyOpen" -> result.success(mapOf("pid" to ptyOpen(asMap(call.arguments))))
+                    "ptyOpen" -> {
+                        require(!environmentBusy) { "environment is being replaced" }
+                        result.success(mapOf("pid" to ptyOpen(asMap(call.arguments))))
+                    }
                     "ptyWrite" -> {
                         ptyWrite(asMap(call.arguments))
                         result.success(null)
@@ -145,6 +162,8 @@ class WorkspacePlugin(private val activity: Activity) {
                 command = requiredString(args, "command"),
                 env = parseEnv(args["env"]),
                 timeoutMs = number(args["timeoutMs"], 60_000L),
+                prootArguments = parseStringList(args["prootArguments"]),
+                shell = args["shell"]?.toString(),
             ),
         )
     }
@@ -160,6 +179,8 @@ class WorkspacePlugin(private val activity: Activity) {
             env = parseEnv(args["env"]),
             cols = number(args["cols"], 80L).toInt(),
             rows = number(args["rows"], 24L).toInt(),
+            prootArguments = parseStringList(args["prootArguments"]),
+            shell = args["shell"]?.toString(),
         )
     }
 
@@ -208,7 +229,7 @@ class WorkspacePlugin(private val activity: Activity) {
             dnsServers = parseStringList(args["dnsServers"]),
             hostname = args["hostname"]?.toString()?.trim().orEmpty().ifBlank { "localhost" },
             aptMirrorBaseUrl = args["aptMirrorBaseUrl"]?.toString()?.trim()?.takeIf { it.isNotEmpty() },
-            ubuntuCodename = requiredString(args, "ubuntuCodename"),
+            ubuntuCodename = args["ubuntuCodename"]?.toString().orEmpty(),
             arch = requiredString(args, "arch"),
         )
         return mapOf("ok" to true)

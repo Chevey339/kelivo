@@ -1,37 +1,28 @@
-/// Pinned Ubuntu Base image and hashes from the official release manifest:
-/// https://cdimage.ubuntu.com/ubuntu-base/releases/24.04/release/SHA256SUMS
-/// Update the version and both hashes together.
-const String kUbuntuBaseVersion = '24.04.3';
-const String kUbuntuCodename = 'noble';
-const String kUbuntuDistro = 'ubuntu';
-const String kOfficialCdimageReleaseBase =
-    'https://cdimage.ubuntu.com/ubuntu-base/releases/24.04/release';
-const String kTunaCdimageReleaseBase =
-    'https://mirrors.tuna.tsinghua.edu.cn/ubuntu-cdimage/ubuntu-base/releases/24.04/release';
-const String kHuaweiCdimageReleaseBase =
-    'https://repo.huaweicloud.com/ubuntu-cdimage/ubuntu-base/releases/24.04/release';
+import 'rootfs_catalog.dart';
+export 'rootfs_catalog.dart';
 
-enum RootfsDownloadSource { automatic, official, tuna, huawei, custom }
+enum RootfsDownloadSource { automatic, official, tuna, huawei, custom, local }
 
 class RootfsSource {
   const RootfsSource({
-    this.officialReleaseBase = kOfficialCdimageReleaseBase,
-    this.cdimageReleaseBases = const [
-      kOfficialCdimageReleaseBase,
-      kTunaCdimageReleaseBase,
-      kHuaweiCdimageReleaseBase,
-    ],
-    this.checksums = const {
-      'arm64':
-          '7b2dced6dd56ad5e4a813fa25c8de307b655fdabc6ea9213175a92c48dabb048',
-      'amd64':
-          '6bc2cde3930ad088b3bb46fa45279e96d25bc3810f209850ecbe4722711874f9',
-    },
+    this.image = RootfsCatalog.defaultImage,
+    this.officialReleaseBase,
+    this.cdimageReleaseBases,
+    this.checksumOverrides,
   });
 
-  final String officialReleaseBase;
-  final List<String> cdimageReleaseBases;
-  final Map<String, String> checksums;
+  final RootfsImage image;
+  final String? officialReleaseBase;
+  final List<String>? cdimageReleaseBases;
+  final Map<String, String>? checksumOverrides;
+  Map<String, String> get checksums => checksumOverrides ?? image.checksums;
+
+  RootfsSource forImage(RootfsImage image) => RootfsSource(
+    image: image,
+    officialReleaseBase: officialReleaseBase,
+    cdimageReleaseBases: cdimageReleaseBases,
+    checksumOverrides: checksumOverrides,
+  );
 
   static String? archForAbi(String abi) => switch (abi) {
     'arm64-v8a' || 'arm64' => 'arm64',
@@ -39,35 +30,72 @@ class RootfsSource {
     _ => null,
   };
 
-  static String tarballFileName(String arch) =>
-      'ubuntu-base-$kUbuntuBaseVersion-base-$arch.tar.gz';
-
-  Uri officialTarballUri(String arch) => tarballUri(officialReleaseBase, arch);
-
-  Uri tarballUri(String releaseBase, String arch) => Uri.parse(
-    '${releaseBase.replaceFirst(RegExp(r'/+$'), '')}/${tarballFileName(arch)}',
-  );
-
-  List<Uri> tarballCandidates(String arch) => [
-    for (final base in cdimageReleaseBases) tarballUri(base, arch),
+  List<RootfsDownloadSource> get availableSources => [
+    RootfsDownloadSource.automatic,
+    RootfsDownloadSource.official,
+    if (image.distro != 'debian') ...[
+      RootfsDownloadSource.tuna,
+      RootfsDownloadSource.huawei,
+    ],
+    RootfsDownloadSource.custom,
+    RootfsDownloadSource.local,
   ];
 
-  /// A custom source may be a release directory or an exact archive URL.
-  /// It always installs the pinned, checksum-verified image for this ABI.
+  String tarballFileName(String arch) => image.cacheName(arch);
+
+  Uri officialTarballUri(String arch) => officialReleaseBase == null
+      ? Uri.parse(image.urls[arch]!)
+      : tarballUri(officialReleaseBase!, arch);
+
+  Uri tarballUri(String releaseBase, String arch) => Uri.parse(
+    '${releaseBase.replaceFirst(RegExp(r'/+$'), '')}/${image.fileName(arch)}',
+  );
+
+  List<Uri> tarballCandidates(String arch) => cdimageReleaseBases != null
+      ? [for (final base in cdimageReleaseBases!) tarballUri(base, arch)]
+      : [
+          for (final source in availableSources)
+            if (source == RootfsDownloadSource.official ||
+                source == RootfsDownloadSource.tuna ||
+                source == RootfsDownloadSource.huawei)
+              selectedUri(source, '', arch)!,
+        ];
+
   Uri? selectedUri(RootfsDownloadSource source, String customUrl, String arch) {
-    return switch (source) {
-      RootfsDownloadSource.automatic => null,
-      RootfsDownloadSource.official => officialTarballUri(arch),
-      RootfsDownloadSource.tuna => tarballUri(kTunaCdimageReleaseBase, arch),
-      RootfsDownloadSource.huawei => tarballUri(
-        kHuaweiCdimageReleaseBase,
-        arch,
-      ),
-      RootfsDownloadSource.custom => customTarballUri(customUrl, arch),
-    };
+    if (!availableSources.contains(source)) {
+      throw const FormatException(
+        'Download source unavailable for this system',
+      );
+    }
+    switch (source) {
+      case RootfsDownloadSource.automatic:
+      case RootfsDownloadSource.local:
+        return null;
+      case RootfsDownloadSource.official:
+        return officialTarballUri(arch);
+      case RootfsDownloadSource.custom:
+        return customTarballUri(customUrl, arch, image: image);
+      case RootfsDownloadSource.tuna:
+      case RootfsDownloadSource.huawei:
+        final host = source == RootfsDownloadSource.tuna
+            ? 'mirrors.tuna.tsinghua.edu.cn'
+            : 'repo.huaweicloud.com';
+        final official = Uri.parse(image.urls[arch]!);
+        return official.replace(
+          host: host,
+          path: image.distro == 'ubuntu'
+              ? '/ubuntu-cdimage${official.path}'
+              : official.path,
+        );
+    }
   }
 
-  static Uri customTarballUri(String value, String arch) {
+  /// Custom mirrors must serve the selected, checksum-verified image.
+  static Uri customTarballUri(
+    String value,
+    String arch, {
+    RootfsImage image = RootfsCatalog.defaultImage,
+  }) {
     final uri = Uri.tryParse(value.trim());
     if (uri == null ||
         !['https', 'http'].contains(uri.scheme) ||
@@ -77,11 +105,19 @@ class RootfsSource {
         RegExp(r'\s').hasMatch(value.trim())) {
       throw const FormatException('Invalid download URL');
     }
-    if (uri.path.endsWith('.tar.gz')) return uri;
+    if (archiveFormat(uri.path) != null) return uri;
     if (uri.hasQuery) throw const FormatException('Use a complete archive URL');
     return uri.replace(
       path:
-          '${uri.path.replaceFirst(RegExp(r'/+$'), '')}/${tarballFileName(arch)}',
+          '${uri.path.replaceFirst(RegExp(r'/+$'), '')}/${image.fileName(arch)}',
     );
+  }
+
+  static String? archiveFormat(String path) {
+    final name = path.toLowerCase();
+    if (name.endsWith('.tar.gz') || name.endsWith('.tgz')) return 'tar.gz';
+    if (name.endsWith('.tar.xz') || name.endsWith('.txz')) return 'tar.xz';
+    if (name.endsWith('.tar')) return 'tar';
+    return null;
   }
 }

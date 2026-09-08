@@ -39,14 +39,22 @@ object ProotCommand {
         cwd: String,
         command: String?,
         env: Map<String, String>,
+        extraArgs: List<String> = emptyList(),
+        shell: String? = null,
         includeLibraryPath: Boolean = File(nativeLibDir, TALLOC_LIB).isFile,
     ): ProotLaunch {
         val guestCwd = validateGuestCwd(cwd)
+        require(extraArgs.none { it.contains('\u0000') }) { "PRoot argument contains a NUL byte" }
+        val guestShell = shell?.takeIf { it.isNotBlank() } ?: if (
+            RootfsInfo.guestFile(rootfsDir, "/bin/bash").let { it.isFile && it.canExecute() }
+        ) "/bin/bash" else "/bin/sh"
+        validateGuestCwd(guestShell)
         val argv = mutableListOf(
             File(nativeLibDir, EXEC_LIB).absolutePath,
             "--root-id",
             "--link2symlink",
             "--kill-on-exit",
+            *extraArgs.toTypedArray(),
             "-r",
             rootfsDir.absolutePath,
             "-w",
@@ -76,9 +84,9 @@ object ProotCommand {
         }
 
         if (command == null) {
-            argv += listOf("/bin/bash", "-l")
+            argv += listOf(guestShell, "-l")
         } else {
-            argv += listOf("/bin/bash", "-lc", BASH_EVAL, "kelivo", guestCwd, command)
+            argv += listOf(guestShell, "-lc", BASH_EVAL, "kelivo", guestCwd, command)
         }
 
         val processEnv = linkedMapOf(

@@ -94,6 +94,55 @@ void main() {
     );
   });
 
+  test(
+    'Debian sources and Alpine probes follow the installed system and version',
+    () async {
+      final scripts = <String>[];
+      final urls = <Uri>[];
+      final mirrors = service(
+        scripts: scripts,
+        client: MockClient((request) async {
+          urls.add(request.url);
+          return http.Response('', 200);
+        }),
+      );
+      await env.setState(
+        const EnvironmentState(
+          distro: 'debian',
+          version: '13',
+          codename: 'trixie',
+          arch: 'arm64',
+        ),
+      );
+      await mirrors.restoreOfficial(MirrorCategory.apt);
+      expect(scripts.last, contains('https://deb.debian.org/debian'));
+      expect(scripts.last, contains('trixie-security'));
+      expect(scripts.last, isNot(contains('ubuntu')));
+      await mirrors.detect(MirrorCategory.apt);
+      expect(
+        urls.every((uri) => uri.path.endsWith('/dists/trixie/Release')),
+        isTrue,
+      );
+      urls.clear();
+      await env.setState(
+        const EnvironmentState(
+          distro: 'alpine',
+          version: '3.24.1',
+          arch: 'amd64',
+        ),
+      );
+      await mirrors.detect(MirrorCategory.apk);
+      expect(
+        urls.every(
+          (uri) => uri.path.endsWith('/v3.24/main/x86_64/APKINDEX.tar.gz'),
+        ),
+        isTrue,
+      );
+      await mirrors.restoreOfficial(MirrorCategory.apk);
+      expect(scripts.last, contains('/v3.24/main'));
+    },
+  );
+
   test('detect then apply persists id, name, and guest script', () async {
     final scripts = <String>[];
     final client = MockClient((request) async {

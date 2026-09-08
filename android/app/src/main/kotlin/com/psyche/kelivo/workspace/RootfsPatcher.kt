@@ -16,6 +16,15 @@ object RootfsPatcher {
         arch: String,
         groupIds: List<Long> = readSupplementaryGids(),
     ) {
+        // Imported images may contain guest-absolute links. Never let host-side
+        // bootstrapping follow one into Android's filesystem.
+        val root = rootfsDir.canonicalFile.toPath()
+        for (path in listOf("etc", "etc/default", "etc/hostname", "etc/hosts", "etc/group",
+            "etc/default/locale", "tmp", "var/tmp", "root", "etc/apt/sources.list.d")) {
+            require(File(rootfsDir, path).canonicalFile.toPath().startsWith(root)) {
+                "rootfs patch path escapes destination: $path"
+            }
+        }
         val etc = File(rootfsDir, "etc")
         etc.mkdirs()
         writeResolvConf(etc, dnsServers)

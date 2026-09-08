@@ -5,18 +5,46 @@ class GuestScripts {
   static final RegExp _host = RegExp(r'^[A-Za-z0-9.-]+$');
   static final RegExp _token = RegExp(r'^[A-Za-z0-9._-]+$');
 
-  static String applyAptMirror(String base, String arch) {
+  static String applyAptMirror(
+    String base,
+    String arch, {
+    String distro = 'ubuntu',
+    String codename = 'noble',
+  }) {
     final url = _validatedHttpUrl(base);
     _requireToken(arch, 'arch');
-    return writeFile(
-      path: '/etc/apt/sources.list.d/ubuntu.sources',
-      body:
-          'Types: deb\n'
-          'URIs: $url\n'
-          'Suites: noble noble-updates noble-security\n'
-          'Components: main universe\n'
-          'Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg\n',
-    );
+    _requireToken(codename, 'codename');
+    // Ubuntu 22.04 and older/local Debian images use the legacy main list.
+    // Keep a backup so adding a deb822 source does not leave both active.
+    const legacy =
+        'set -e\n'
+        'if [ -f /etc/apt/sources.list ]; then\n'
+        '  mv /etc/apt/sources.list /etc/apt/sources.list.kelivo-bak\n'
+        'fi\n';
+    if (distro == 'debian') {
+      final security = Uri.parse(
+        url.endsWith('/') ? url : '$url/',
+      ).resolve('../debian-security/');
+      return legacy +
+          writeFile(
+            path: '/etc/apt/sources.list.d/debian.sources',
+            body:
+                'Types: deb\nURIs: $url\nSuites: $codename $codename-updates\n'
+                'Components: main\nSigned-By: /usr/share/keyrings/debian-archive-keyring.gpg\n\n'
+                'Types: deb\nURIs: $security\nSuites: $codename-security\n'
+                'Components: main\nSigned-By: /usr/share/keyrings/debian-archive-keyring.gpg\n',
+          );
+    }
+    return legacy +
+        writeFile(
+          path: '/etc/apt/sources.list.d/ubuntu.sources',
+          body:
+              'Types: deb\n'
+              'URIs: $url\n'
+              'Suites: $codename $codename-updates $codename-security\n'
+              'Components: main universe\n'
+              'Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg\n',
+        );
   }
 
   static String applyApkMirror(String base, String alpineBranch) {

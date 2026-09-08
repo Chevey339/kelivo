@@ -17038,7 +17038,7 @@ abstract class AppLocalizations {
   /// No description provided for @workspaceEnvInstallSubtitleAndroid.
   ///
   /// In en, this message translates to:
-  /// **'≈30 MB download, ≈150 MB on disk'**
+  /// **'Choose Ubuntu, Alpine, Debian, or import a local rootfs image.'**
   String get workspaceEnvInstallSubtitleAndroid;
 
   /// No description provided for @workspaceEnvInstallSubtitleIos.
@@ -17200,7 +17200,7 @@ abstract class AppLocalizations {
   /// No description provided for @workspaceEnvErrorInsufficientDiskHint.
   ///
   /// In en, this message translates to:
-  /// **'Free at least 600 MB and try again.'**
+  /// **'Free more storage for the selected image and try again.'**
   String get workspaceEnvErrorInsufficientDiskHint;
 
   /// No description provided for @workspaceEnvErrorNetwork.
@@ -19074,7 +19074,7 @@ abstract class AppLocalizations {
   /// No description provided for @workspaceEnvDownloadCustomDetail.
   ///
   /// In en, this message translates to:
-  /// **'Enter a release directory or a full .tar.gz URL. The image must match Ubuntu Base 24.04.3 and this device’s architecture.'**
+  /// **'Enter a release directory or a complete archive URL. The archive must match the selected system, version, and device architecture.'**
   String get workspaceEnvDownloadCustomDetail;
 
   /// No description provided for @workspaceEnvDownloadInvalidUrl.
@@ -19086,7 +19086,7 @@ abstract class AppLocalizations {
   /// No description provided for @workspaceEnvDownloadVerified.
   ///
   /// In en, this message translates to:
-  /// **'Every source is checked against the bundled official SHA-256. This choice does not change package sources.'**
+  /// **'Downloads are verified against the selected image’s official SHA-256. Package sources are configured separately.'**
   String get workspaceEnvDownloadVerified;
 
   /// No description provided for @workspaceEnvDownloadStart.
@@ -19466,6 +19466,108 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'A mount target under /mounts already contains local files. Choose a different mount name or move those files first. No files were removed.'**
   String get workspaceMountTargetOccupied;
+
+  /// No description provided for @workspaceEnvSystemImage.
+  ///
+  /// In en, this message translates to:
+  /// **'System image'**
+  String get workspaceEnvSystemImage;
+
+  /// No description provided for @workspaceEnvDistribution.
+  ///
+  /// In en, this message translates to:
+  /// **'Distribution'**
+  String get workspaceEnvDistribution;
+
+  /// No description provided for @workspaceEnvSystemVersion.
+  ///
+  /// In en, this message translates to:
+  /// **'Version'**
+  String get workspaceEnvSystemVersion;
+
+  /// No description provided for @workspaceEnvLocalImage.
+  ///
+  /// In en, this message translates to:
+  /// **'Local image'**
+  String get workspaceEnvLocalImage;
+
+  /// No description provided for @workspaceEnvChooseImage.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose rootfs archive'**
+  String get workspaceEnvChooseImage;
+
+  /// No description provided for @workspaceEnvLocalImageHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Import a root filesystem archive (.tar.gz, .tar.xz, or .tar), not an ISO or a disk image. It must match this device’s CPU architecture and contain /bin/sh. The system and version are detected after extraction.'**
+  String get workspaceEnvLocalImageHint;
+
+  /// No description provided for @workspaceEnvImportImage.
+  ///
+  /// In en, this message translates to:
+  /// **'Import image'**
+  String get workspaceEnvImportImage;
+
+  /// No description provided for @workspaceEnvInvalidImage.
+  ///
+  /// In en, this message translates to:
+  /// **'Select a valid rootfs archive for this device. It must contain an executable /bin/sh with the matching CPU architecture.'**
+  String get workspaceEnvInvalidImage;
+
+  /// No description provided for @workspaceEnvReplaceSystem.
+  ///
+  /// In en, this message translates to:
+  /// **'Replace system'**
+  String get workspaceEnvReplaceSystem;
+
+  /// No description provided for @workspaceEnvReplaceSystemHint.
+  ///
+  /// In en, this message translates to:
+  /// **'This replaces installed packages and files inside the current environment and stops its commands and terminal sessions. Workspaces, chat files, and external folders are kept. If preparing the new image fails, the current environment is preserved.'**
+  String get workspaceEnvReplaceSystemHint;
+
+  /// No description provided for @workspaceEnvProotOptions.
+  ///
+  /// In en, this message translates to:
+  /// **'PRoot options'**
+  String get workspaceEnvProotOptions;
+
+  /// No description provided for @workspaceEnvShellPath.
+  ///
+  /// In en, this message translates to:
+  /// **'Shell path'**
+  String get workspaceEnvShellPath;
+
+  /// No description provided for @workspaceEnvShellAutomatic.
+  ///
+  /// In en, this message translates to:
+  /// **'Automatic'**
+  String get workspaceEnvShellAutomatic;
+
+  /// No description provided for @workspaceEnvShellHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Leave empty to use /bin/bash when available, otherwise /bin/sh. A custom shell must use an absolute path inside the environment.'**
+  String get workspaceEnvShellHint;
+
+  /// No description provided for @workspaceEnvProotArguments.
+  ///
+  /// In en, this message translates to:
+  /// **'Extra PRoot arguments'**
+  String get workspaceEnvProotArguments;
+
+  /// No description provided for @workspaceEnvProotArgumentsHint.
+  ///
+  /// In en, this message translates to:
+  /// **'One argument per line, without shell quotes. For example, put -k and 5.10.0 on separate lines, or use --kernel-release=5.10.0. Changes apply to new commands and terminal sessions.'**
+  String get workspaceEnvProotArgumentsHint;
+
+  /// No description provided for @workspaceEnvProotInvalid.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter a valid absolute shell path and one PRoot argument per line.'**
+  String get workspaceEnvProotInvalid;
 }
 
 class _AppLocalizationsDelegate

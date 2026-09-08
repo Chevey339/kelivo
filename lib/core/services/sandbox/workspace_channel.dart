@@ -75,6 +75,8 @@ class WorkspaceChannel {
     required String cwd,
     Map<String, String> env = const <String, String>{},
     List<BindMount> binds = const <BindMount>[],
+    List<String> prootArguments = const [],
+    String? shell,
     required int cols,
     required int rows,
   }) async {
@@ -85,6 +87,8 @@ class WorkspaceChannel {
       'cwd': cwd,
       'env': env,
       'binds': [for (final bind in binds) bind.toMap()],
+      if (prootArguments.isNotEmpty) 'prootArguments': prootArguments,
+      if (shell != null && shell.isNotEmpty) 'shell': shell,
       'cols': cols,
       'rows': rows,
     });
@@ -149,6 +153,16 @@ class WorkspaceChannel {
       'destDir': destDir,
       'format': format,
     });
+  }
+
+  Future<Map<String, Object?>> inspectRootfs(String path, String arch) async =>
+      _asStringKeyedMap(
+        await _invoke('inspectRootfs', {'rootfsDir': path, 'arch': arch}),
+        'inspectRootfs',
+      );
+
+  Future<void> setEnvironmentBusy(bool busy) async {
+    await _invoke('setEnvironmentBusy', {'busy': busy});
   }
 
   Future<void> patchRootfs({
@@ -362,6 +376,8 @@ class ExecArgs {
     this.timeoutMs = 60000,
     this.env = const <String, String>{},
     this.binds = const <BindMount>[],
+    this.prootArguments = const [],
+    this.shell,
   });
 
   final String runId;
@@ -372,6 +388,8 @@ class ExecArgs {
   final int timeoutMs;
   final Map<String, String> env;
   final List<BindMount> binds;
+  final List<String> prootArguments;
+  final String? shell;
 
   Map<String, Object?> toMap() => {
     'runId': runId,
@@ -382,6 +400,8 @@ class ExecArgs {
     'timeoutMs': timeoutMs,
     'env': env,
     'binds': [for (final bind in binds) bind.toMap()],
+    if (prootArguments.isNotEmpty) 'prootArguments': prootArguments,
+    if (shell != null && shell!.isNotEmpty) 'shell': shell,
   };
 }
 

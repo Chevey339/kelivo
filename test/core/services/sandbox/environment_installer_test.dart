@@ -47,7 +47,7 @@ void main() {
 
   EnvironmentInstaller buildInstaller(http.Client client) {
     final source = RootfsSource(
-      checksums: {'arm64': digest, 'amd64': digest},
+      checksumOverrides: {'arm64': digest, 'amd64': digest},
       officialReleaseBase: _officialBase,
       cdimageReleaseBases: const [_officialBase],
     );
@@ -134,7 +134,7 @@ void main() {
       p.join(
         envDir.path,
         'downloads',
-        '${RootfsSource.tarballFileName('arm64')}.part',
+        '${const RootfsSource().tarballFileName('arm64')}.part',
       ),
     );
     await part.parent.create(recursive: true);
@@ -159,14 +159,14 @@ void main() {
         p.join(
           envDir.path,
           'downloads',
-          '${RootfsSource.tarballFileName('arm64')}.part',
+          '${const RootfsSource().tarballFileName('arm64')}.part',
         ),
       );
       await part.parent.create(recursive: true);
       await part.writeAsBytes(tarball);
-      await File('${part.path}.url').writeAsString(
-        '$_officialBase/${RootfsSource.tarballFileName('arm64')}',
-      );
+      await File(
+        '${part.path}.url',
+      ).writeAsString('${const RootfsSource().officialTarballUri('arm64')}');
       await env.setDownloadSource(RootfsDownloadSource.official);
       final installer = buildInstaller(
         MockClient((request) async {
@@ -200,20 +200,23 @@ void main() {
     final installer = buildInstaller(servingTarball());
     await installer.install();
     expect(env.state.phase, EnvironmentPhase.ready);
-    expect(env.state.version, kUbuntuBaseVersion);
+    expect(env.state.version, RootfsCatalog.defaultImage.version);
     expect(env.state.arch, 'arm64');
-    expect(env.state.distro, kUbuntuDistro);
+    expect(env.state.distro, RootfsCatalog.defaultImage.distro);
     expect(env.state.installedAt, isNotNull);
     expect(env.state.rootfsDir, installer.rootfsDir.path);
     expect(
       await File(
         p.join(installer.rootfsDir.path, kKelivoVersionFile),
       ).readAsString(),
-      'ubuntu 24.04.3 arm64\n',
+      'ubuntu 24.04.3 arm64 noble\n',
     );
     expect(workspace.keepScreenOnCalls, [true, false]);
     expect(workspace.patchArgs?['gids'], kAndroidNetworkGids);
-    expect(workspace.patchArgs?['ubuntuCodename'], kUbuntuCodename);
+    expect(
+      workspace.patchArgs?['ubuntuCodename'],
+      RootfsCatalog.defaultImage.codename,
+    );
     expect(workspace.patchArgs!.containsKey('aptMirrorBase'), isFalse);
     expect(workspace.patchArgs!.containsKey('aptMirrorBaseUrl'), isFalse);
   });
@@ -226,11 +229,7 @@ void main() {
     expect(env.state.phase, EnvironmentPhase.error);
     expect(env.state.errorMessage, EnvironmentError.checksumMismatch);
     final part = File(
-      p.join(
-        envDir.path,
-        'downloads',
-        'ubuntu-base-24.04.3-base-arm64.tar.gz.part',
-      ),
+      p.join(envDir.path, 'downloads', 'ubuntu-24.04.3-arm64.tar.gz.part'),
     );
     expect(await part.exists(), isFalse);
   });
@@ -238,17 +237,13 @@ void main() {
   test('resumes from an existing .part with HTTP 206', () async {
     workspace.freeBytes = 8 * 1024 * 1024 * 1024;
     final part = File(
-      p.join(
-        envDir.path,
-        'downloads',
-        'ubuntu-base-24.04.3-base-arm64.tar.gz.part',
-      ),
+      p.join(envDir.path, 'downloads', 'ubuntu-24.04.3-arm64.tar.gz.part'),
     );
     await part.create(recursive: true);
     await part.writeAsBytes(tarball.sublist(0, 4));
     await File(
       '${part.path}.url',
-    ).writeAsString('$_officialBase/${RootfsSource.tarballFileName('arm64')}');
+    ).writeAsString('${const RootfsSource().officialTarballUri('arm64')}');
     String? seenRange;
     final installer = buildInstaller(
       servingTarball(
@@ -262,27 +257,25 @@ void main() {
     await installer.install();
     expect(env.state.phase, EnvironmentPhase.ready);
     expect(seenRange, 'bytes=4-');
-    expect(await part.readAsBytes(), tarball);
+    expect(workspace.extractedBytes, tarball);
+    expect(await part.exists(), isFalse);
   });
 
   test('restarts when the server ignores Range and returns 200', () async {
     workspace.freeBytes = 8 * 1024 * 1024 * 1024;
     final part = File(
-      p.join(
-        envDir.path,
-        'downloads',
-        'ubuntu-base-24.04.3-base-arm64.tar.gz.part',
-      ),
+      p.join(envDir.path, 'downloads', 'ubuntu-24.04.3-arm64.tar.gz.part'),
     );
     await part.create(recursive: true);
     await part.writeAsBytes(const <int>[1, 2, 3, 4]);
     await File(
       '${part.path}.url',
-    ).writeAsString('$_officialBase/${RootfsSource.tarballFileName('arm64')}');
+    ).writeAsString('${const RootfsSource().officialTarballUri('arm64')}');
     final installer = buildInstaller(servingTarball(ignoreRange: true));
     await installer.install();
     expect(env.state.phase, EnvironmentPhase.ready);
-    expect(await part.readAsBytes(), tarball);
+    expect(workspace.extractedBytes, tarball);
+    expect(await part.exists(), isFalse);
   });
 
   test('insufficient disk', () async {
@@ -319,6 +312,131 @@ void main() {
     expect(env.state.errorMessage, EnvironmentError.unsupportedAbi);
   });
 
+  test(
+    'Alpine selects its image, checksum, package manager and smaller disk budget',
+    () async {
+      workspace.freeBytes = 100 * 1024 * 1024;
+      workspace.rootfsInfo = {
+        'distro': 'alpine',
+        'version': '3.24.1',
+        'codename': 'v3.24',
+        'arch': 'arm64',
+      };
+      await env.setRootfsSelection(
+        imageId: 'alpine-3.24.1',
+        source: RootfsDownloadSource.official,
+      );
+      final installer = buildInstaller(servingTarball());
+      await installer.install();
+      expect(env.state.phase, EnvironmentPhase.ready);
+      expect(env.state.distro, 'alpine');
+      expect(env.state.codename, 'v3.24');
+      expect(installer.mirrorCategories, contains(MirrorCategory.apk));
+      expect(installer.mirrorCategories, isNot(contains(MirrorCategory.apt)));
+      expect(workspace.busyCalls, [true, false]);
+    },
+  );
+
+  test(
+    'local xz import detects Debian without downloading and keeps the original archive',
+    () async {
+      final archive = await File(
+        p.join(envDir.path, 'local.tar.xz'),
+      ).writeAsBytes(tarball);
+      workspace.rootfsInfo = {
+        'distro': 'debian',
+        'version': '13',
+        'codename': 'trixie',
+        'arch': 'arm64',
+      };
+      await env.setRootfsSelection(
+        imageId: 'ubuntu-24.04.3',
+        source: RootfsDownloadSource.local,
+        localArchivePath: archive.path,
+      );
+      final installer = buildInstaller(
+        MockClient((_) => throw StateError('No HTTP expected')),
+      );
+      await installer.install();
+      expect(env.state.phase, EnvironmentPhase.ready);
+      expect(env.state.distro, 'debian');
+      expect(env.state.codename, 'trixie');
+      expect(env.state.version, '13');
+      expect(workspace.extractedFormat, 'tar.xz');
+      expect(await archive.readAsBytes(), tarball);
+      expect(workspace.patchArgs?['aptMirrorBaseUrl'], isNull);
+    },
+  );
+
+  for (final extractFailure in [true, false]) {
+    test(
+      'failed replacement preserves the installed rootfs, extract=$extractFailure',
+      () async {
+        final installer = buildInstaller(servingTarball());
+        await installer.install();
+        final original = await File(
+          p.join(installer.rootfsDir.path, 'keep.txt'),
+        ).writeAsString('user work');
+        workspace.rejectExtract = extractFailure;
+        workspace.rejectImage = !extractFailure;
+        await installer.install();
+        expect(env.state.phase, EnvironmentPhase.ready);
+        expect(
+          env.state.errorMessage,
+          extractFailure
+              ? EnvironmentError.extractFailed
+              : EnvironmentError.invalidRootfs,
+        );
+        expect(await original.readAsString(), 'user work');
+        expect(await installer.stagingRootfsDir.exists(), isFalse);
+        expect(workspace.busyCalls.last, false);
+      },
+    );
+  }
+
+  test(
+    'startup recovers the previous rootfs if replacement stopped between renames',
+    () async {
+      final previous = await Directory(
+        p.join(envDir.path, 'previous-rootfs'),
+      ).create();
+      await File(
+        p.join(previous.path, kKelivoVersionFile),
+      ).writeAsString('debian 13 arm64 trixie\n');
+      await File(p.join(previous.path, 'keep.txt')).writeAsString('old work');
+      await env.setState(
+        const EnvironmentState(phase: EnvironmentPhase.patching),
+      );
+      final installer = buildInstaller(servingTarball());
+      await installer.recoverInterruptedInstall();
+      expect(env.state.phase, EnvironmentPhase.ready);
+      expect(env.state.distro, 'debian');
+      expect(
+        await File(p.join(installer.rootfsDir.path, 'keep.txt')).readAsString(),
+        'old work',
+      );
+    },
+  );
+
+  test('local newer releases are not offered a downgrade', () async {
+    final installer = buildInstaller(servingTarball());
+    await installer.rootfsDir.create();
+    await File(
+      p.join(installer.rootfsDir.path, kKelivoVersionFile),
+    ).writeAsString('alpine 3.25.1 arm64 v3.25\n');
+    expect(await installer.checkForUpdate(), isFalse);
+    expect(env.state.availableVersion, isNull);
+  });
+
+  test('update check does not change the default download selection', () async {
+    final installer = buildInstaller(servingTarball());
+    await installer.install();
+    expect(env.state.version, '24.04.3');
+    expect(await installer.checkForUpdate(), isTrue);
+    expect(env.state.availableVersion, '24.04.4');
+    expect(env.rootfsImage.id, 'ubuntu-24.04.3');
+  });
+
   test('unsupported probe reports proot_missing', () async {
     workspace.probeSupported = false;
     workspace.probeReason = 'proot missing: /lib/libproot.so';
@@ -341,6 +459,17 @@ class _WorkspaceHarness {
   String probeAbi = 'arm64-v8a';
   bool probeSupported = true;
   String? probeReason;
+  bool rejectImage = false;
+  bool rejectExtract = false;
+  List<int>? extractedBytes;
+  String? extractedFormat;
+  final busyCalls = <bool>[];
+  Map<String, String> rootfsInfo = {
+    'distro': 'ubuntu',
+    'version': '24.04.3',
+    'codename': 'noble',
+    'arch': 'arm64',
+  };
   String Function(String path)? sha256Override;
   final List<bool> keepScreenOnCalls = <bool>[];
   Map<String, Object?>? patchArgs;
@@ -379,7 +508,15 @@ class _WorkspaceHarness {
           final path = (call.arguments as Map)['path'] as String;
           if (sha256Override != null) return sha256Override!(path);
           return sha256.convert(await File(path).readAsBytes()).toString();
+        case 'setEnvironmentBusy':
+          busyCalls.add((call.arguments as Map)['busy'] == true);
+          return null;
         case 'extractRootfs':
+          if (rejectExtract) throw PlatformException(code: 'extract_failed');
+          extractedBytes = await File(
+            (call.arguments as Map)['archivePath'] as String,
+          ).readAsBytes();
+          extractedFormat = (call.arguments as Map)['format'] as String;
           final dest = (call.arguments as Map)['destDir'] as String;
           await Directory(dest).create(recursive: true);
           sink?.success(<String, Object?>{
@@ -390,6 +527,9 @@ class _WorkspaceHarness {
             'currentEntry': '.',
           });
           return <String, Object?>{'ok': true};
+        case 'inspectRootfs':
+          if (rejectImage) throw PlatformException(code: 'invalid_rootfs');
+          return rootfsInfo;
         case 'patchRootfs':
           patchArgs = Map<String, Object?>.from(call.arguments as Map);
           return <String, Object?>{'ok': true};

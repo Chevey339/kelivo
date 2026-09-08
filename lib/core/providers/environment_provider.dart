@@ -10,11 +10,11 @@ import '../services/sandbox/rootfs_source.dart';
 class EnvironmentProvider extends ChangeNotifier {
   static const String stateKey = 'environment_state_v1';
   static const String mirrorsKey = 'environment_mirrors_v1';
-  static const String downloadSourceKey = 'environment_download_source_v1';
-  static const String downloadUrlKey = 'environment_download_url_v1';
   static const String diskUsageKey = 'environment_disk_usage_v1';
   static const String variablesKey = 'environment_variables_v1';
   static const String privacyModeKey = 'environment_privacy_mode_v1';
+  static const String rootfsSelectionKey = 'environment_rootfs_selection_v1';
+  static const String prootOptionsKey = 'environment_proot_options_v1';
 
   EnvironmentProvider({required this.preferences}) {
     loaded = _load();
@@ -107,21 +107,83 @@ class EnvironmentProvider extends ChangeNotifier {
   String _downloadUrl = '';
   RootfsDownloadSource get downloadSource => _downloadSource;
   String get downloadUrl => _downloadUrl;
+  String _rootfsImageId = RootfsCatalog.defaultImage.id;
+  String _localArchivePath = '';
+  String _prootShell = '';
+  List<String> _prootArguments = [];
+  RootfsImage get rootfsImage => RootfsCatalog.byId(_rootfsImageId);
+  String get localArchivePath => _localArchivePath;
+  String get prootShell => _prootShell;
+  List<String> get prootArguments => List.unmodifiable(_prootArguments);
+
+  Future<void> setRootfsSelection({
+    required String imageId,
+    required RootfsDownloadSource source,
+    String customUrl = '',
+    String localArchivePath = '',
+  }) async {
+    final image = RootfsCatalog.byId(imageId);
+    final resolver = RootfsSource(image: image);
+    if (!resolver.availableSources.contains(source)) {
+      throw const FormatException('Download source unavailable');
+    }
+    if (source == RootfsDownloadSource.custom) {
+      RootfsSource.customTarballUri(customUrl, 'arm64', image: image);
+    }
+    if (source == RootfsDownloadSource.local &&
+        RootfsSource.archiveFormat(localArchivePath) == null) {
+      throw const FormatException('Select a rootfs tar archive');
+    }
+    await preferences.setString(
+      rootfsSelectionKey,
+      jsonEncode({
+        'image': imageId,
+        'source': source.name,
+        'url': customUrl.trim(),
+        'archive': localArchivePath,
+      }),
+    );
+    _rootfsImageId = imageId;
+    _downloadSource = source;
+    _downloadUrl = customUrl.trim();
+    _localArchivePath = localArchivePath;
+    notifyListeners();
+  }
+
+  Future<void> setProotOptions({
+    required String shell,
+    required String arguments,
+  }) async {
+    final path = shell.trim();
+    final args = const LineSplitter()
+        .convert(arguments)
+        .map((line) => line.trim())
+        .where((line) => line.isNotEmpty)
+        .toList();
+    if ((path.isNotEmpty &&
+            (!path.startsWith('/') || path.split('/').contains('..'))) ||
+        path.contains('\u0000') ||
+        args.any((arg) => arg.contains('\u0000'))) {
+      throw const FormatException('Invalid PRoot options');
+    }
+    await preferences.setString(
+      prootOptionsKey,
+      jsonEncode({'shell': path, 'args': args}),
+    );
+    _prootShell = path;
+    _prootArguments = args;
+    notifyListeners();
+  }
 
   Future<void> setDownloadSource(
     RootfsDownloadSource source, {
     String? customUrl,
-  }) async {
-    final url = customUrl?.trim() ?? _downloadUrl;
-    if (source == RootfsDownloadSource.custom) {
-      RootfsSource.customTarballUri(url, 'arm64');
-    }
-    await preferences.setString(downloadUrlKey, url);
-    await preferences.setString(downloadSourceKey, source.name);
-    _downloadSource = source;
-    _downloadUrl = url;
-    notifyListeners();
-  }
+  }) => setRootfsSelection(
+    imageId: _rootfsImageId,
+    source: source,
+    customUrl: customUrl ?? _downloadUrl,
+    localArchivePath: _localArchivePath,
+  );
 
   late final Future<void> loaded;
 
@@ -168,13 +230,22 @@ class EnvironmentProvider extends ChangeNotifier {
         debugPrint('Failed to load environment variables');
       }
     }
-    final sourceName = preferences.getString(downloadSourceKey);
-    _downloadSource =
-        RootfsDownloadSource.values
-            .where((s) => s.name == sourceName)
-            .firstOrNull ??
-        RootfsDownloadSource.automatic;
-    _downloadUrl = preferences.getString(downloadUrlKey) ?? '';
+    final rootfs = preferences.getString(rootfsSelectionKey);
+    if (rootfs != null && rootfs.isNotEmpty) {
+      final data = jsonDecode(rootfs) as Map<String, dynamic>;
+      _rootfsImageId = data['image'] as String;
+      _downloadSource = RootfsDownloadSource.values.byName(
+        data['source'] as String,
+      );
+      _downloadUrl = data['url'] as String;
+      _localArchivePath = data['archive'] as String;
+    }
+    final proot = preferences.getString(prootOptionsKey);
+    if (proot != null && proot.isNotEmpty) {
+      final data = jsonDecode(proot) as Map<String, dynamic>;
+      _prootShell = data['shell'] as String;
+      _prootArguments = (data['args'] as List).cast<String>();
+    }
     final rawState = preferences.getString(stateKey);
     if (rawState != null && rawState.isNotEmpty) {
       try {

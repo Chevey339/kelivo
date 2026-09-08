@@ -6,6 +6,7 @@ import 'package:flutter/widgets.dart';
 import 'package:Kelivo/core/models/environment_state.dart';
 import 'package:Kelivo/core/services/sandbox/mirror_service.dart';
 import 'package:Kelivo/core/services/sandbox/mirror_speed_test.dart';
+import 'package:Kelivo/core/services/sandbox/rootfs_catalog.dart';
 import 'package:Kelivo/core/services/workspace/workspace_runtime.dart';
 import 'package:Kelivo/icons/lucide_adapter.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
@@ -30,7 +31,8 @@ bool workspaceEnvIsUbuntu({
   RuntimeStatus? status,
 }) {
   final engine = status?.engine;
-  return engine == 'proot' || state.distro == 'ubuntu';
+  return (engine == 'proot' && state.distro == null) ||
+      state.distro == 'ubuntu';
 }
 
 IconData workspaceEnvEngineIcon({
@@ -41,7 +43,8 @@ IconData workspaceEnvEngineIcon({
   if (desktopNative || workspaceEnvIsDesktopTarget()) {
     return Lucide.SquareTerminal;
   }
-  if (workspaceEnvIsUbuntu(state: state, status: status) ||
+  if (status?.engine == 'proot' ||
+      workspaceEnvIsUbuntu(state: state, status: status) ||
       workspaceEnvIsAlpine(state: state, status: status)) {
     return Lucide.Package;
   }
@@ -73,9 +76,23 @@ String workspaceEnvEngineLabel({
   if (workspaceEnvIsDesktopTarget()) {
     return l10n.workspaceEnvEngineLocalShell;
   }
+  if ((status?.engine == 'proot' ||
+          defaultTargetPlatform == TargetPlatform.android) &&
+      state.distro != null &&
+      state.distro != 'ubuntu') {
+    final name = state.distro == 'alpine'
+        ? 'Alpine'
+        : state.distro == 'debian'
+        ? 'Debian'
+        : state.distro!;
+    return '$name ${formatDistroVersion(state.version)} (PRoot)'.trim();
+  }
   if (workspaceEnvIsUbuntu(state: state, status: status)) {
     return l10n.workspaceEnvEngineUbuntu(
-      workspaceEnvDisplayVersion(state.version, fallback: '24.04'),
+      workspaceEnvDisplayVersion(
+        state.version,
+        fallback: RootfsCatalog.defaultImage.version,
+      ),
     );
   }
   if (workspaceEnvIsAlpine(state: state, status: status)) {
@@ -162,6 +179,8 @@ String workspaceEnvErrorMessage(AppLocalizations l10n, String? code) {
       return l10n.workspaceEnvErrorPatchFailed;
     case 'cancelled':
       return l10n.workspaceEnvErrorCancelled;
+    case 'invalid_rootfs':
+      return l10n.workspaceEnvInvalidImage;
     default:
       return l10n.workspaceEnvErrorGeneric;
   }

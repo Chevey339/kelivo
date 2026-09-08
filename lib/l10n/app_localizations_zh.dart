@@ -9066,7 +9066,8 @@ class AppLocalizationsZh extends AppLocalizations {
   String get workspaceEnvInstall => '安装';
 
   @override
-  String get workspaceEnvInstallSubtitleAndroid => '约 30 MB 下载，约 150 MB 磁盘空间';
+  String get workspaceEnvInstallSubtitleAndroid =>
+      '可选择 Ubuntu、Alpine、Debian，也可导入本地 rootfs 镜像。';
 
   @override
   String get workspaceEnvInstallSubtitleIos => '已内置，无需下载';
@@ -9157,7 +9158,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get workspaceEnvErrorInsufficientDisk => '存储空间不足，无法安装沙箱。';
 
   @override
-  String get workspaceEnvErrorInsufficientDiskHint => '请至少腾出 600 MB 后再试。';
+  String get workspaceEnvErrorInsufficientDiskHint => '请为所选镜像释放更多存储空间后重试。';
 
   @override
   String get workspaceEnvErrorNetwork => '下载失败，请检查网络后重试。';
@@ -10164,14 +10165,13 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get workspaceEnvDownloadCustomDetail =>
-      '填写镜像的发布目录或完整 .tar.gz 链接，文件须为对应设备架构的 Ubuntu Base 24.04.3。';
+      '填写镜像目录或完整下载链接，镜像需匹配所选系统、版本及设备架构。';
 
   @override
   String get workspaceEnvDownloadInvalidUrl => '请输入有效的 HTTP 或 HTTPS 链接。';
 
   @override
-  String get workspaceEnvDownloadVerified =>
-      '所有来源均使用内置的官方 SHA-256 校验。此选项不会更改软件包源。';
+  String get workspaceEnvDownloadVerified => '下载后会校验所选镜像的官方 SHA-256。软件包源可单独配置。';
 
   @override
   String get workspaceEnvDownloadStart => '下载并安装';
@@ -10374,6 +10374,62 @@ class AppLocalizationsZh extends AppLocalizations {
   @override
   String get workspaceMountTargetOccupied =>
       '/mounts 下的同名位置已有本地文件。请更换挂载名称，或先移走这些文件。原有文件未被删除。';
+
+  @override
+  String get workspaceEnvSystemImage => '系统镜像';
+
+  @override
+  String get workspaceEnvDistribution => '发行版';
+
+  @override
+  String get workspaceEnvSystemVersion => '版本';
+
+  @override
+  String get workspaceEnvLocalImage => '本地镜像';
+
+  @override
+  String get workspaceEnvChooseImage => '选择 rootfs 镜像文件';
+
+  @override
+  String get workspaceEnvLocalImageHint =>
+      '支持根文件系统压缩包（.tar.gz、.tar.xz、.tar），不支持 ISO 或磁盘镜像。镜像需匹配设备 CPU 架构并包含 /bin/sh，解压后自动识别系统和版本。';
+
+  @override
+  String get workspaceEnvImportImage => '导入镜像';
+
+  @override
+  String get workspaceEnvInvalidImage =>
+      '请选择适用于此设备的 rootfs 镜像，需包含可执行的 /bin/sh，且 CPU 架构匹配。';
+
+  @override
+  String get workspaceEnvReplaceSystem => '更换系统';
+
+  @override
+  String get workspaceEnvReplaceSystemHint =>
+      '更换会替换当前环境内的软件包和文件，并停止运行中的命令与终端会话。工作区、聊天文件和外部文件夹会保留。新镜像准备失败时保留原有环境。';
+
+  @override
+  String get workspaceEnvProotOptions => 'PRoot 配置';
+
+  @override
+  String get workspaceEnvShellPath => 'Shell 路径';
+
+  @override
+  String get workspaceEnvShellAutomatic => '自动选择';
+
+  @override
+  String get workspaceEnvShellHint =>
+      '留空时优先使用 /bin/bash，否则使用 /bin/sh。自定义 Shell 需填写环境内的绝对路径。';
+
+  @override
+  String get workspaceEnvProotArguments => '额外 PRoot 参数';
+
+  @override
+  String get workspaceEnvProotArgumentsHint =>
+      '每行填写一个参数，无需 Shell 引号。例如将 -k 和 5.10.0 分别放在两行，或使用 --kernel-release=5.10.0。配置对之后启动的命令和终端会话生效。';
+
+  @override
+  String get workspaceEnvProotInvalid => '请填写有效的 Shell 绝对路径，并将 PRoot 参数逐行填写。';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hans`).
@@ -19364,7 +19420,8 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get workspaceEnvInstall => '安装';
 
   @override
-  String get workspaceEnvInstallSubtitleAndroid => '约 30 MB 下载，约 150 MB 磁盘空间';
+  String get workspaceEnvInstallSubtitleAndroid =>
+      '可选择 Ubuntu、Alpine、Debian，也可导入本地 rootfs 镜像。';
 
   @override
   String get workspaceEnvInstallSubtitleIos => '已内置，无需下载';
@@ -19455,7 +19512,7 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get workspaceEnvErrorInsufficientDisk => '存储空间不足，无法安装沙箱。';
 
   @override
-  String get workspaceEnvErrorInsufficientDiskHint => '请至少腾出 600 MB 后再试。';
+  String get workspaceEnvErrorInsufficientDiskHint => '请为所选镜像释放更多存储空间后重试。';
 
   @override
   String get workspaceEnvErrorNetwork => '下载失败，请检查网络后重试。';
@@ -20462,14 +20519,13 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get workspaceEnvDownloadCustomDetail =>
-      '填写镜像的发布目录或完整 .tar.gz 链接，文件须为对应设备架构的 Ubuntu Base 24.04.3。';
+      '填写镜像目录或完整下载链接，镜像需匹配所选系统、版本及设备架构。';
 
   @override
   String get workspaceEnvDownloadInvalidUrl => '请输入有效的 HTTP 或 HTTPS 链接。';
 
   @override
-  String get workspaceEnvDownloadVerified =>
-      '所有来源均使用内置的官方 SHA-256 校验。此选项不会更改软件包源。';
+  String get workspaceEnvDownloadVerified => '下载后会校验所选镜像的官方 SHA-256。软件包源可单独配置。';
 
   @override
   String get workspaceEnvDownloadStart => '下载并安装';
@@ -20672,6 +20728,62 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   @override
   String get workspaceMountTargetOccupied =>
       '/mounts 下的同名位置已有本地文件。请更换挂载名称，或先移走这些文件。原有文件未被删除。';
+
+  @override
+  String get workspaceEnvSystemImage => '系统镜像';
+
+  @override
+  String get workspaceEnvDistribution => '发行版';
+
+  @override
+  String get workspaceEnvSystemVersion => '版本';
+
+  @override
+  String get workspaceEnvLocalImage => '本地镜像';
+
+  @override
+  String get workspaceEnvChooseImage => '选择 rootfs 镜像文件';
+
+  @override
+  String get workspaceEnvLocalImageHint =>
+      '支持根文件系统压缩包（.tar.gz、.tar.xz、.tar），不支持 ISO 或磁盘镜像。镜像需匹配设备 CPU 架构并包含 /bin/sh，解压后自动识别系统和版本。';
+
+  @override
+  String get workspaceEnvImportImage => '导入镜像';
+
+  @override
+  String get workspaceEnvInvalidImage =>
+      '请选择适用于此设备的 rootfs 镜像，需包含可执行的 /bin/sh，且 CPU 架构匹配。';
+
+  @override
+  String get workspaceEnvReplaceSystem => '更换系统';
+
+  @override
+  String get workspaceEnvReplaceSystemHint =>
+      '更换会替换当前环境内的软件包和文件，并停止运行中的命令与终端会话。工作区、聊天文件和外部文件夹会保留。新镜像准备失败时保留原有环境。';
+
+  @override
+  String get workspaceEnvProotOptions => 'PRoot 配置';
+
+  @override
+  String get workspaceEnvShellPath => 'Shell 路径';
+
+  @override
+  String get workspaceEnvShellAutomatic => '自动选择';
+
+  @override
+  String get workspaceEnvShellHint =>
+      '留空时优先使用 /bin/bash，否则使用 /bin/sh。自定义 Shell 需填写环境内的绝对路径。';
+
+  @override
+  String get workspaceEnvProotArguments => '额外 PRoot 参数';
+
+  @override
+  String get workspaceEnvProotArgumentsHint =>
+      '每行填写一个参数，无需 Shell 引号。例如将 -k 和 5.10.0 分别放在两行，或使用 --kernel-release=5.10.0。配置对之后启动的命令和终端会话生效。';
+
+  @override
+  String get workspaceEnvProotInvalid => '请填写有效的 Shell 绝对路径，并将 PRoot 参数逐行填写。';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hant`).
@@ -29737,7 +29849,8 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get workspaceEnvInstall => '安裝';
 
   @override
-  String get workspaceEnvInstallSubtitleAndroid => '約 30 MB 下載，約 150 MB 磁碟空間';
+  String get workspaceEnvInstallSubtitleAndroid =>
+      '可選擇 Ubuntu、Alpine、Debian，也可匯入本機 rootfs 映像。';
 
   @override
   String get workspaceEnvInstallSubtitleIos => '已內建，無需下載';
@@ -29828,7 +29941,7 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get workspaceEnvErrorInsufficientDisk => '儲存空間不足，無法安裝沙箱。';
 
   @override
-  String get workspaceEnvErrorInsufficientDiskHint => '請至少騰出 600 MB 後再試。';
+  String get workspaceEnvErrorInsufficientDiskHint => '請為所選映像釋放更多儲存空間後重試。';
 
   @override
   String get workspaceEnvErrorNetwork => '下載失敗，請檢查網路後重試。';
@@ -30836,14 +30949,14 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get workspaceEnvDownloadCustomDetail =>
-      '填寫鏡像的發佈目錄或完整 .tar.gz 連結，檔案須為對應裝置架構的 Ubuntu Base 24.04.3。';
+      '填寫映像目錄或完整下載連結，映像需符合所選系統、版本及裝置架構。';
 
   @override
   String get workspaceEnvDownloadInvalidUrl => '請輸入有效的 HTTP 或 HTTPS 連結。';
 
   @override
   String get workspaceEnvDownloadVerified =>
-      '所有來源均使用內建的官方 SHA-256 校驗。此選項不會更改軟體套件來源。';
+      '下載後會驗證所選映像的官方 SHA-256。軟體套件來源可另行設定。';
 
   @override
   String get workspaceEnvDownloadStart => '下載並安裝';
@@ -31046,4 +31159,60 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   @override
   String get workspaceMountTargetOccupied =>
       '/mounts 下的同名位置已有本機檔案。請更換掛載名稱，或先移走這些檔案。原有檔案未被刪除。';
+
+  @override
+  String get workspaceEnvSystemImage => '系統映像';
+
+  @override
+  String get workspaceEnvDistribution => '發行版';
+
+  @override
+  String get workspaceEnvSystemVersion => '版本';
+
+  @override
+  String get workspaceEnvLocalImage => '本機映像';
+
+  @override
+  String get workspaceEnvChooseImage => '選擇 rootfs 映像檔案';
+
+  @override
+  String get workspaceEnvLocalImageHint =>
+      '支援根檔案系統壓縮包（.tar.gz、.tar.xz、.tar），不支援 ISO 或磁碟映像。映像需符合裝置 CPU 架構並包含 /bin/sh，解壓後自動識別系統和版本。';
+
+  @override
+  String get workspaceEnvImportImage => '匯入映像';
+
+  @override
+  String get workspaceEnvInvalidImage =>
+      '請選擇適用於此裝置的 rootfs 映像，需包含可執行的 /bin/sh，且 CPU 架構相符。';
+
+  @override
+  String get workspaceEnvReplaceSystem => '更換系統';
+
+  @override
+  String get workspaceEnvReplaceSystemHint =>
+      '更換會取代目前環境內的軟體套件和檔案，並停止執行中的命令與終端工作階段。工作區、聊天檔案和外部資料夾會保留。新映像準備失敗時保留原有環境。';
+
+  @override
+  String get workspaceEnvProotOptions => 'PRoot 設定';
+
+  @override
+  String get workspaceEnvShellPath => 'Shell 路徑';
+
+  @override
+  String get workspaceEnvShellAutomatic => '自動選擇';
+
+  @override
+  String get workspaceEnvShellHint =>
+      '留空時優先使用 /bin/bash，否則使用 /bin/sh。自訂 Shell 需填寫環境內的絕對路徑。';
+
+  @override
+  String get workspaceEnvProotArguments => '額外 PRoot 參數';
+
+  @override
+  String get workspaceEnvProotArgumentsHint =>
+      '每行填寫一個參數，無需 Shell 引號。例如將 -k 和 5.10.0 分別放在兩行，或使用 --kernel-release=5.10.0。設定對之後啟動的命令和終端工作階段生效。';
+
+  @override
+  String get workspaceEnvProotInvalid => '請填寫有效的 Shell 絕對路徑，並將 PRoot 參數逐行填寫。';
 }

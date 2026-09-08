@@ -46,15 +46,20 @@ class EnvironmentDependencies extends ChangeNotifier {
   EnvironmentDependencies({
     required this.runtime,
     required this.env,
-    required this.alpine,
+    required bool alpine,
     required this.mirrors,
-  }) {
+  }) : _defaultAlpine = alpine {
     env.addListener(_environmentChanged);
   }
 
   final WorkspaceRuntime runtime;
   final EnvironmentProvider env;
-  final bool alpine;
+  final bool _defaultAlpine;
+  bool get alpine =>
+      env.state.distro == null ? _defaultAlpine : env.state.distro == 'alpine';
+  bool get supportsPackages =>
+      env.state.distro == null ||
+      {'ubuntu', 'debian', 'alpine'}.contains(env.state.distro);
   final MirrorService mirrors;
   MirrorCancelToken? _mirrorCancel;
   final Map<EnvironmentDependency, DependencyStatus> _statuses = {};
@@ -100,7 +105,11 @@ class EnvironmentDependencies extends ChangeNotifier {
   }
 
   Future<void> refresh() async {
-    if (busy || env.state.phase != EnvironmentPhase.ready) return;
+    if (busy ||
+        !supportsPackages ||
+        env.state.phase != EnvironmentPhase.ready) {
+      return;
+    }
     busy = true;
     _cancelled = false;
     failure = null;
@@ -118,7 +127,11 @@ class EnvironmentDependencies extends ChangeNotifier {
   }
 
   Future<void> install(EnvironmentDependency dependency) async {
-    if (busy || env.state.phase != EnvironmentPhase.ready) return;
+    if (busy ||
+        !supportsPackages ||
+        env.state.phase != EnvironmentPhase.ready) {
+      return;
+    }
     busy = true;
     _cancelled = false;
     installing = dependency;
@@ -144,10 +157,12 @@ class EnvironmentDependencies extends ChangeNotifier {
                 id: selection.mirrorId,
                 url: selection.selectedBaseUrl,
                 arch: env.state.arch ?? 'arm64',
+                distro: env.state.distro ?? 'ubuntu',
               )
             : MirrorService.officialEntry(
                 category,
                 arch: env.state.arch ?? 'arm64',
+                distro: env.state.distro ?? 'ubuntu',
               );
         if (entry == null) throw StateError('Unknown package source');
         await mirrors.applyEntry(

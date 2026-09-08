@@ -27,7 +27,7 @@ class ProotArgvTest {
             "/nativelib/libproot_exec.so --root-id --link2symlink --kill-on-exit " +
                 "-r /data/rootfs -w /workspace -b /host/files:/workspace " +
                 "-b /dev -b /proc -b /sys /usr/bin/env -i HOME=/root PATH=/bin LANG=C.UTF-8 " +
-                "/bin/bash -lc " + ProotCommand.BASH_EVAL + " kelivo /workspace echo hello"
+                "/bin/sh -lc " + ProotCommand.BASH_EVAL + " kelivo /workspace echo hello"
         assertEquals(golden, launch.argv.joinToString(" "))
         assertEquals("/data", launch.workingDirectory.absolutePath)
         assertEquals("/nativelib/libproot_loader.so", launch.processEnv["PROOT_LOADER"])
@@ -48,7 +48,7 @@ class ProotArgvTest {
             env = linkedMapOf("HOME" to "/root"),
             includeLibraryPath = false,
         )
-        assertEquals("/bin/bash", launch.argv[launch.argv.size - 2])
+        assertEquals("/bin/sh", launch.argv[launch.argv.size - 2])
         assertEquals("-l", launch.argv.last())
         assertEquals("HOME=/root", launch.argv[launch.argv.indexOf("-i") + 1])
         assertTrue(launch.argv.contains("TERM=xterm-256color"))
@@ -65,6 +65,7 @@ class ProotArgvTest {
             binds = emptyList(),
             cwd = "/",
             command = "/usr/bin/env",
+            shell = "/bin/bash",
             env = emptyMap(),
             includeLibraryPath = false,
         )

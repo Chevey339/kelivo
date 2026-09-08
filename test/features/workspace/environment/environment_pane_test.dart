@@ -166,6 +166,10 @@ void main() {
       expect(find.byKey(EnvironmentPane.installKey), findsOneWidget);
       expect(find.text(l10n.workspaceEnvInstallEnvironment), findsOneWidget);
       expect(
+        find.text(l10n.workspaceEnvEngineUbuntu('24.04.3')),
+        findsOneWidget,
+      );
+      expect(
         find.text(l10n.workspaceEnvInstallSubtitleAndroid),
         findsOneWidget,
       );

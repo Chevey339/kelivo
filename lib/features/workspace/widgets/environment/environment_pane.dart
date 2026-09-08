@@ -4,6 +4,8 @@ import 'package:Kelivo/core/services/sandbox/environment_installer.dart';
 import 'package:Kelivo/core/services/sandbox/workspace_channel.dart';
 import 'package:Kelivo/features/workspace/pages/external_mounts_page.dart';
 import 'package:Kelivo/features/workspace/pages/environment_download_page.dart';
+import 'package:Kelivo/features/workspace/pages/proot_options_page.dart';
+import 'package:Kelivo/features/workspace/widgets/files/workspace_prompts.dart';
 import 'package:Kelivo/features/workspace/pages/environment_variables_page.dart';
 import 'environment_dependencies_section.dart';
 import 'dart:async';
@@ -238,10 +240,33 @@ class _EnvironmentPaneState extends State<EnvironmentPane> {
           ),
         );
         if (confirmed != true || !mounted) return;
+        if (manager.env.state.phase == EnvironmentPhase.ready) {
+          final l10n = AppLocalizations.of(context)!;
+          final replace = await showWorkspaceConfirm(
+            context: context,
+            title: l10n.workspaceEnvReplaceSystem,
+            message: l10n.workspaceEnvReplaceSystemHint,
+            confirmLabel: l10n.workspaceEnvReplaceSystem,
+            destructive: true,
+          );
+          if (!replace || !mounted) return;
+        }
       }
       await manager.install();
       await _refreshRuntime();
       if (!mounted) return;
+      if (manager is EnvironmentInstaller &&
+          manager.env.state.phase == EnvironmentPhase.ready &&
+          manager.env.state.errorMessage != null) {
+        showAppSnackBar(
+          context,
+          message: workspaceEnvErrorMessage(
+            AppLocalizations.of(context)!,
+            manager.env.state.errorMessage,
+          ),
+          type: NotificationType.error,
+        );
+      }
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -452,7 +477,7 @@ class _EnvironmentPaneState extends State<EnvironmentPane> {
           onOpenCategory: (category) =>
               unawaited(openMirrorPage(context, category: category)),
         ),
-      if (dependencies != null)
+      if (dependencies != null && dependencies.supportsPackages)
         EnvironmentDependenciesSection(
           service: dependencies,
           enabled: ready && !_busy,
@@ -507,22 +532,31 @@ class _EnvironmentPaneState extends State<EnvironmentPane> {
         ),
       ],
       if (manager is EnvironmentInstaller) ...[
-        IosSectionHeader(text: l10n.workspaceEnvDownloadSource),
+        IosSectionHeader(text: l10n.workspaceEnvSystemImage),
         SectionCard(
           children: [
             IosNavRow(
               key: const ValueKey('environment-download-source'),
               icon: Lucide.Download,
-              label: environmentDownloadSourceLabel(
+              label: ready
+                  ? l10n.workspaceEnvReplaceSystem
+                  : l10n.workspaceEnvSystemImage,
+              subtitle: environmentDownloadSourceLabel(
                 l10n,
                 context.watch<EnvironmentProvider>().downloadSource,
               ),
+              onTap: busy ? null : () => unawaited(_install()),
+            ),
+            const IosRowDivider(),
+            IosNavRow(
+              key: const ValueKey('environment-proot-options'),
+              icon: Lucide.Terminal,
+              label: l10n.workspaceEnvProotOptions,
               onTap: busy
                   ? null
                   : () => Navigator.of(context).push(
-                      CupertinoPageRoute(
-                        builder: (_) =>
-                            EnvironmentDownloadPage(installer: manager),
+                      MaterialPageRoute<void>(
+                        builder: (_) => const ProotOptionsPage(),
                       ),
                     ),
             ),

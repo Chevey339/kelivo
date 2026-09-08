@@ -29,6 +29,7 @@ object RootfsExtractor {
         val input = when (format.lowercase(Locale.US)) {
             "tar.gz", "tgz" -> GZIPInputStream(raw)
             "tar.xz", "txz" -> XZInputStream(raw)
+            "tar" -> raw
             else -> {
                 raw.close()
                 throw IllegalArgumentException("unsupported rootfs format: $format")

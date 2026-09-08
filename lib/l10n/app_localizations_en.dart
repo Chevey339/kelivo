@@ -9467,7 +9467,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get workspaceEnvInstallSubtitleAndroid =>
-      '≈30 MB download, ≈150 MB on disk';
+      'Choose Ubuntu, Alpine, Debian, or import a local rootfs image.';
 
   @override
   String get workspaceEnvInstallSubtitleIos => 'Bundled, no download';
@@ -9563,7 +9563,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get workspaceEnvErrorInsufficientDiskHint =>
-      'Free at least 600 MB and try again.';
+      'Free more storage for the selected image and try again.';
 
   @override
   String get workspaceEnvErrorNetwork =>
@@ -10616,7 +10616,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get workspaceEnvDownloadCustomDetail =>
-      'Enter a release directory or a full .tar.gz URL. The image must match Ubuntu Base 24.04.3 and this device’s architecture.';
+      'Enter a release directory or a complete archive URL. The archive must match the selected system, version, and device architecture.';
 
   @override
   String get workspaceEnvDownloadInvalidUrl =>
@@ -10624,7 +10624,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get workspaceEnvDownloadVerified =>
-      'Every source is checked against the bundled official SHA-256. This choice does not change package sources.';
+      'Downloads are verified against the selected image’s official SHA-256. Package sources are configured separately.';
 
   @override
   String get workspaceEnvDownloadStart => 'Download and install';
@@ -10844,4 +10844,61 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get workspaceMountTargetOccupied =>
       'A mount target under /mounts already contains local files. Choose a different mount name or move those files first. No files were removed.';
+
+  @override
+  String get workspaceEnvSystemImage => 'System image';
+
+  @override
+  String get workspaceEnvDistribution => 'Distribution';
+
+  @override
+  String get workspaceEnvSystemVersion => 'Version';
+
+  @override
+  String get workspaceEnvLocalImage => 'Local image';
+
+  @override
+  String get workspaceEnvChooseImage => 'Choose rootfs archive';
+
+  @override
+  String get workspaceEnvLocalImageHint =>
+      'Import a root filesystem archive (.tar.gz, .tar.xz, or .tar), not an ISO or a disk image. It must match this device’s CPU architecture and contain /bin/sh. The system and version are detected after extraction.';
+
+  @override
+  String get workspaceEnvImportImage => 'Import image';
+
+  @override
+  String get workspaceEnvInvalidImage =>
+      'Select a valid rootfs archive for this device. It must contain an executable /bin/sh with the matching CPU architecture.';
+
+  @override
+  String get workspaceEnvReplaceSystem => 'Replace system';
+
+  @override
+  String get workspaceEnvReplaceSystemHint =>
+      'This replaces installed packages and files inside the current environment and stops its commands and terminal sessions. Workspaces, chat files, and external folders are kept. If preparing the new image fails, the current environment is preserved.';
+
+  @override
+  String get workspaceEnvProotOptions => 'PRoot options';
+
+  @override
+  String get workspaceEnvShellPath => 'Shell path';
+
+  @override
+  String get workspaceEnvShellAutomatic => 'Automatic';
+
+  @override
+  String get workspaceEnvShellHint =>
+      'Leave empty to use /bin/bash when available, otherwise /bin/sh. A custom shell must use an absolute path inside the environment.';
+
+  @override
+  String get workspaceEnvProotArguments => 'Extra PRoot arguments';
+
+  @override
+  String get workspaceEnvProotArgumentsHint =>
+      'One argument per line, without shell quotes. For example, put -k and 5.10.0 on separate lines, or use --kernel-release=5.10.0. Changes apply to new commands and terminal sessions.';
+
+  @override
+  String get workspaceEnvProotInvalid =>
+      'Enter a valid absolute shell path and one PRoot argument per line.';
 }

@@ -119,7 +119,7 @@ class _OptionList<T> extends StatelessWidget {
     return SectionCard(
       children: [
         for (int i = 0; i < items.length; i++) ...[
-          if (i > 0) const IosRowDivider(),
+          if (i > 0) IosRowDivider(indent: items[i].icon == null ? 12 : 54),
           IosNavRow(
             key: items[i].key,
             icon: items[i].icon,

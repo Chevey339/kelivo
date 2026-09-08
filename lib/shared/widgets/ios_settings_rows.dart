@@ -212,7 +212,9 @@ class IosSwitchRow extends StatelessWidget {
 /// Hairline between settings rows. Indent 54 = 12 pad + 36 icon + 12 gap.
 /// Matches Backup / World Book `_iosDivider`.
 class IosRowDivider extends StatelessWidget {
-  const IosRowDivider({super.key});
+  const IosRowDivider({super.key, this.indent = 54});
+
+  final double indent;
 
   @override
   Widget build(BuildContext context) {
@@ -220,7 +222,7 @@ class IosRowDivider extends StatelessWidget {
     return Divider(
       height: 6,
       thickness: 0.6,
-      indent: 54,
+      indent: indent,
       endIndent: 12,
       color: cs.outlineVariant.withValues(alpha: 0.18),
     );

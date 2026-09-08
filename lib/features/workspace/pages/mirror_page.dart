@@ -91,12 +91,14 @@ class _MirrorPageBodyState extends State<MirrorPageBody> {
         id: selection?.mirrorId,
         url: selection?.selectedBaseUrl,
         arch: env.state.arch ?? 'arm64',
+        distro: env.state.distro ?? 'ubuntu',
       );
       final entry = saved != null && !saved.official
           ? saved
           : MirrorService.entriesFor(
               widget.category,
               arch: env.state.arch ?? 'arm64',
+              distro: env.state.distro ?? 'ubuntu',
             ).firstWhere((entry) => !entry.official);
       await mirrors.applyEntry(widget.category, entry);
       if (!mounted) return;
@@ -180,6 +182,7 @@ class _MirrorPageBodyState extends State<MirrorPageBody> {
     final entries = MirrorService.entriesFor(
       widget.category,
       arch: env.state.arch ?? 'arm64',
+      distro: env.state.distro ?? 'ubuntu',
     );
     final selectedId =
         selection?.mirrorId ??
@@ -187,6 +190,7 @@ class _MirrorPageBodyState extends State<MirrorPageBody> {
           widget.category,
           url: selection?.selectedBaseUrl,
           arch: env.state.arch ?? 'arm64',
+          distro: env.state.distro ?? 'ubuntu',
         )?.id ??
         MirrorService.officialEntry(widget.category).id;
     final useMirror = selection?.useMirror ?? false;

@@ -108,6 +108,7 @@ void main() {
   });
 
   test('run maps stdout/stderr/exit and ignores other runIds', () async {
+    await env.setProotOptions(shell: '/bin/sh', arguments: '-k\n5.10.0');
     workspace.handler = (call) {
       if (call.method == 'exec') {
         workspace.emit(<String, Object?>{
@@ -171,6 +172,8 @@ void main() {
     expect(args['tmpDir'], tmpDir.path);
     expect(args['timeoutMs'], 12000);
     expect(args['env'], {'FOO': 'bar'});
+    expect(args['shell'], '/bin/sh');
+    expect(args['prootArguments'], ['-k', '5.10.0']);
     expect(args['binds'], [
       {'host': '/host', 'guest': '/mnt/host'},
     ]);
@@ -243,6 +246,7 @@ void main() {
   });
 
   test('openPty writes, resizes, closes, and maps exit', () async {
+    await env.setProotOptions(shell: '/bin/sh', arguments: '-k\n5.10.0');
     expect(runtime.supportsPty, isTrue);
     expect(runtime.supportsSystemTerminal, isFalse);
 
@@ -260,6 +264,8 @@ void main() {
     expect(open['tmpDir'], tmpDir.path);
     expect(open['cwd'], '/root');
     expect(open['env'], {'TERM': 'xterm'});
+    expect(open['shell'], '/bin/sh');
+    expect(open['prootArguments'], ['-k', '5.10.0']);
     expect(open['cols'], 80);
     expect(open['rows'], 24);
     expect(open['binds'], [

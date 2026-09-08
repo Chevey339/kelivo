@@ -26,8 +26,20 @@ class MirrorEntry {
 
   Uri get baseUri => Uri.parse(_trimSlash(baseUrl));
 
-  Uri probeUri(MirrorCategory category) {
+  Uri probeUri(
+    MirrorCategory category, {
+    String codename = 'noble',
+    String arch = 'arm64',
+    String branch = 'v3.21',
+  }) {
     final root = Uri.parse(_ensureSlash(baseUrl));
+    if (category == MirrorCategory.apt) {
+      return root.resolve('dists/$codename/Release');
+    }
+    if (category == MirrorCategory.apk) {
+      final abi = arch == 'amd64' ? 'x86_64' : 'aarch64';
+      return root.resolve('$branch/main/$abi/APKINDEX.tar.gz');
+    }
     return root.resolve(_probePath(category));
   }
 
@@ -153,11 +165,26 @@ class MirrorService {
   static List<MirrorEntry> entriesFor(
     MirrorCategory category, {
     String arch = 'arm64',
+    String distro = 'ubuntu',
   }) {
     switch (category) {
       case MirrorCategory.apk:
         return _apk;
       case MirrorCategory.apt:
+        if (distro == 'debian') {
+          return [
+            for (final entry in _apt)
+              MirrorEntry(
+                id: entry.id,
+                name: entry.name,
+                region: entry.region,
+                official: entry.official,
+                baseUrl: entry.official
+                    ? 'https://deb.debian.org/debian/'
+                    : entry.baseUrl.replaceFirst('/ubuntu-ports/', '/debian/'),
+              ),
+          ];
+        }
         if (arch != 'amd64') return _apt;
         return [
           for (final entry in _apt)
@@ -181,10 +208,12 @@ class MirrorService {
   static MirrorEntry officialEntry(
     MirrorCategory category, {
     String arch = 'arm64',
+    String distro = 'ubuntu',
   }) {
     return entriesFor(
       category,
       arch: arch,
+      distro: distro,
     ).firstWhere((entry) => entry.official);
   }
 
@@ -193,8 +222,9 @@ class MirrorService {
     String? id,
     String? url,
     String arch = 'arm64',
+    String distro = 'ubuntu',
   }) {
-    final entries = entriesFor(category, arch: arch);
+    final entries = entriesFor(category, arch: arch, distro: distro);
     if (id != null && id.isNotEmpty) {
       for (final entry in entries) {
         if (entry.id == id) return entry;
@@ -230,7 +260,7 @@ class MirrorService {
   }) {
     return _probeEntries(
       category,
-      entriesFor(category, arch: _arch),
+      entriesFor(category, arch: _arch, distro: _distro),
       timeout,
       cancelToken,
     );
@@ -278,7 +308,12 @@ class MirrorService {
     MirrorCancelToken? cancelToken,
   }) {
     final entry =
-        findEntry(category, url: base.toString(), arch: _arch) ??
+        findEntry(
+          category,
+          url: base.toString(),
+          arch: _arch,
+          distro: _distro,
+        ) ??
         MirrorEntry(
           id: base.host,
           name: base.host,
@@ -327,7 +362,7 @@ class MirrorService {
     MirrorCancelToken? cancelToken,
   }) {
     return _withCancel(cancelToken, () async {
-      final official = officialEntry(category, arch: _arch);
+      final official = officialEntry(category, arch: _arch, distro: _distro);
       final code = await _runGuest(_applyScript(category, official.baseUri));
       if (code != 0) throw StateError('guest mirror restore exited $code');
       await env.setMirror(
@@ -353,7 +388,8 @@ class MirrorService {
       final ordered = categories.toList();
       final total = ordered.fold<int>(
         0,
-        (sum, category) => sum + entriesFor(category).length,
+        (sum, category) =>
+            sum + entriesFor(category, arch: _arch, distro: _distro).length,
       );
       final collected = <MirrorCategory, List<MirrorProbeResult>>{};
       var done = 0;
@@ -467,7 +503,12 @@ class MirrorService {
     MirrorCancelToken? cancelToken,
   ) async {
     cancelToken?.throwIfCancelled();
-    final uri = entry.probeUri(category);
+    final uri = entry.probeUri(
+      category,
+      codename: _codename,
+      arch: _arch,
+      branch: _alpineBranch,
+    );
     final sw = Stopwatch()..start();
     try {
       try {
@@ -615,9 +656,14 @@ class MirrorService {
     final url = base.toString();
     switch (category) {
       case MirrorCategory.apt:
-        return GuestScripts.applyAptMirror(url, _arch);
+        return GuestScripts.applyAptMirror(
+          url,
+          _arch,
+          distro: _distro,
+          codename: _codename,
+        );
       case MirrorCategory.apk:
-        return GuestScripts.applyApkMirror(url, alpineBranch);
+        return GuestScripts.applyApkMirror(url, _alpineBranch);
       case MirrorCategory.pip:
         return GuestScripts.applyPipMirror(url);
       case MirrorCategory.npm:
@@ -626,6 +672,20 @@ class MirrorService {
   }
 
   String get _arch => env.state.arch ?? 'arm64';
+  String get _distro => env.state.distro ?? 'ubuntu';
+  String get _codename => env.state.codename?.isNotEmpty == true
+      ? env.state.codename!
+      : _distro == 'debian'
+      ? (env.state.version?.startsWith('13') == true ? 'trixie' : 'bookworm')
+      : env.state.version?.startsWith('22.04') == true
+      ? 'jammy'
+      : 'noble';
+  String get _alpineBranch {
+    final version = env.state.version?.replaceFirst('alpine-', '').split('.');
+    return version != null && version.length >= 2
+        ? 'v${version[0]}.${version[1]}'
+        : alpineBranch;
+  }
 
   static const List<MirrorEntry> _apk = [
     MirrorEntry(

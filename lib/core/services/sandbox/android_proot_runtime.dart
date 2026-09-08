@@ -8,7 +8,6 @@ import 'package:Kelivo/core/providers/environment_provider.dart';
 import 'package:Kelivo/core/services/sandbox/channel_command_run.dart';
 import 'package:Kelivo/core/services/sandbox/channel_pty_session.dart';
 import 'package:Kelivo/core/services/sandbox/environment_installer.dart';
-import 'package:Kelivo/core/services/sandbox/rootfs_source.dart';
 import 'package:Kelivo/core/services/sandbox/workspace_channel.dart';
 import 'package:Kelivo/core/services/workspace/workspace_runtime.dart';
 
@@ -96,6 +95,8 @@ class AndroidProotRuntime implements WorkspaceRuntime {
       binds: _binds(mounts),
       cols: cols,
       rows: rows,
+      prootArguments: this.env.prootArguments,
+      shell: this.env.prootShell,
     );
     return session;
   }
@@ -122,6 +123,8 @@ class AndroidProotRuntime implements WorkspaceRuntime {
       timeoutMs: request.timeout.inMilliseconds,
       env: request.env,
       binds: _binds(request.mounts),
+      prootArguments: env.prootArguments,
+      shell: env.prootShell,
     );
   }
 
@@ -136,11 +139,15 @@ class AndroidProotRuntime implements WorkspaceRuntime {
     ];
   }
 
-  /// Prefs can be empty after a reinstall while the Ubuntu rootfs is still on
+  /// Prefs can be empty after a reinstall while the rootfs is still on
   /// disk. Adopt that install so Settings and `shell` see `ready`.
   Future<void> _adoptOnDiskInstall() async {
     await env.loaded;
     if (env.state.phase == EnvironmentPhase.ready) return;
+    if (env.state.phase != EnvironmentPhase.notInstalled &&
+        env.state.phase != EnvironmentPhase.error) {
+      return;
+    }
     final versionFile = File(p.join(rootfsDir.path, kKelivoVersionFile));
     if (!await versionFile.exists()) return;
     final parts = (await versionFile.readAsString()).trim().split(
@@ -149,9 +156,10 @@ class AndroidProotRuntime implements WorkspaceRuntime {
     await env.setState(
       EnvironmentState(
         phase: EnvironmentPhase.ready,
-        distro: parts.isNotEmpty ? parts[0] : kUbuntuDistro,
-        version: parts.length > 1 ? parts[1] : kUbuntuBaseVersion,
+        distro: parts.isNotEmpty ? parts[0] : 'custom',
+        version: parts.length > 1 ? parts[1] : 'local',
         arch: parts.length > 2 ? parts[2] : 'arm64',
+        codename: parts.length > 3 ? parts[3] : null,
         installedAt: DateTime.now().toUtc(),
         rootfsDir: rootfsDir.path,
         lastMirrorBase: env.state.lastMirrorBase,

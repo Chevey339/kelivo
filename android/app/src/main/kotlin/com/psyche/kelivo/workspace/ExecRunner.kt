@@ -17,6 +17,8 @@ data class ExecRequest(
     val command: String,
     val env: Map<String, String>,
     val timeoutMs: Long,
+    val prootArguments: List<String> = emptyList(),
+    val shell: String? = null,
 )
 
 class ExecRunner(
@@ -37,6 +39,8 @@ class ExecRunner(
             cwd = request.cwd,
             command = request.command,
             env = request.env,
+            extraArgs = request.prootArguments,
+            shell = request.shell,
         )
         val builder = ProcessBuilder(launch.argv)
             .directory(launch.workingDirectory)
