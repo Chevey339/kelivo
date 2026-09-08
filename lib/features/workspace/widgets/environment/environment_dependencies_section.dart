@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:provider/provider.dart';
@@ -99,7 +98,7 @@ class EnvironmentDependenciesSection extends StatelessWidget {
                       enabled &&
                           (!service.busy || service.installing == dependency)
                       ? () => Navigator.of(context).push(
-                          CupertinoPageRoute<void>(
+                          MaterialPageRoute<void>(
                             builder: (_) => EnvironmentDependencyPage(
                               service: service,
                               dependency: dependency,

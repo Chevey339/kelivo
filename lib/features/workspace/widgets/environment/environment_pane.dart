@@ -1,4 +1,3 @@
-import 'package:flutter/cupertino.dart' show CupertinoPageRoute;
 import 'package:Kelivo/core/services/sandbox/environment_dependencies.dart';
 import 'package:Kelivo/core/services/sandbox/environment_installer.dart';
 import 'package:Kelivo/core/services/sandbox/workspace_channel.dart';
@@ -234,7 +233,7 @@ class _EnvironmentPaneState extends State<EnvironmentPane> {
     try {
       if (manager is EnvironmentInstaller) {
         final confirmed = await Navigator.of(context).push<bool>(
-          CupertinoPageRoute(
+          MaterialPageRoute<bool>(
             builder: (_) =>
                 EnvironmentDownloadPage(installer: manager, install: true),
           ),

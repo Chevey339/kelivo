@@ -1,4 +1,3 @@
-import 'package:flutter/cupertino.dart' show CupertinoPageRoute;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
@@ -35,7 +34,7 @@ Future<void> openEnvironmentVariablesPage(BuildContext context) {
   }
   return Navigator.of(
     context,
-  ).push<void>(CupertinoPageRoute(builder: (_) => page));
+  ).push<void>(MaterialPageRoute<void>(builder: (_) => page));
 }
 
 /// A shared settings list with platform-appropriate navigation chrome.
