@@ -18,6 +18,7 @@ class Assistant {
   static const int minMemoryOrganizeEveryNTurns = 1;
   static const int maxMemoryOrganizeEveryNTurns = 20;
   static const double defaultTemperature = 1.0;
+  static const double defaultGradientBackgroundPhase = 7.0;
   static const int minContextMessageSize = 1;
   static const int maxContextMessageSize = 4096;
   static const List<int> recentChatsSummaryMessageCountOptions = <int>[
@@ -54,6 +55,11 @@ class Assistant {
   /// master toggle is off so turning it back on restores the selection.
   final List<String> healthDataTypeIds;
   final String? background; // chat background (color/image ref)
+  final bool useGradientBackground;
+  final bool gradientBackgroundAnimated;
+  final double gradientBackgroundPhase;
+  final double gradientBackgroundOffsetX;
+  final double gradientBackgroundOffsetY;
   // Custom request overrides (per assistant)
   final List<Map<String, String>>
   customHeaders; // [{name:'X-Header', value:'v'}]
@@ -96,6 +102,11 @@ class Assistant {
     this.localToolIds = const <String>[],
     this.healthDataTypeIds = HealthDataTypeIds.defaultSelected,
     this.background,
+    this.useGradientBackground = false,
+    this.gradientBackgroundAnimated = true,
+    this.gradientBackgroundPhase = defaultGradientBackgroundPhase,
+    this.gradientBackgroundOffsetX = 0,
+    this.gradientBackgroundOffsetY = 0,
     this.customHeaders = const <Map<String, String>>[],
     this.customBody = const <Map<String, String>>[],
     this.enableMemory = false,
@@ -133,6 +144,11 @@ class Assistant {
     List<String>? localToolIds,
     List<String>? healthDataTypeIds,
     String? background,
+    bool? useGradientBackground,
+    bool? gradientBackgroundAnimated,
+    double? gradientBackgroundPhase,
+    double? gradientBackgroundOffsetX,
+    double? gradientBackgroundOffsetY,
     List<Map<String, String>>? customHeaders,
     List<Map<String, String>>? customBody,
     bool? enableMemory,
@@ -180,6 +196,16 @@ class Assistant {
       localToolIds: localToolIds ?? this.localToolIds,
       healthDataTypeIds: healthDataTypeIds ?? this.healthDataTypeIds,
       background: clearBackground ? null : (background ?? this.background),
+      useGradientBackground:
+          useGradientBackground ?? this.useGradientBackground,
+      gradientBackgroundAnimated:
+          gradientBackgroundAnimated ?? this.gradientBackgroundAnimated,
+      gradientBackgroundPhase:
+          gradientBackgroundPhase ?? this.gradientBackgroundPhase,
+      gradientBackgroundOffsetX:
+          gradientBackgroundOffsetX ?? this.gradientBackgroundOffsetX,
+      gradientBackgroundOffsetY:
+          gradientBackgroundOffsetY ?? this.gradientBackgroundOffsetY,
       customHeaders: customHeaders ?? this.customHeaders,
       customBody: customBody ?? this.customBody,
       enableMemory: enableMemory ?? this.enableMemory,
@@ -223,6 +249,11 @@ class Assistant {
     'localToolIds': localToolIds,
     'healthDataTypeIds': healthDataTypeIds,
     'background': background,
+    'useGradientBackground': useGradientBackground,
+    'gradientBackgroundAnimated': gradientBackgroundAnimated,
+    'gradientBackgroundPhase': gradientBackgroundPhase,
+    'gradientBackgroundOffsetX': gradientBackgroundOffsetX,
+    'gradientBackgroundOffsetY': gradientBackgroundOffsetY,
     'customHeaders': customHeaders,
     'customBody': customBody,
     'enableMemory': enableMemory,
@@ -237,6 +268,11 @@ class Assistant {
     'presetMessages': PresetMessage.encodeList(presetMessages),
     'regexRules': regexRules.map((e) => e.toJson()).toList(),
   };
+
+  static double _readGradientBackgroundPhase(Object? value) =>
+      value is num && value.isFinite && value >= 0
+      ? value.toDouble()
+      : defaultGradientBackgroundPhase;
 
   static Assistant fromJson(Map<String, dynamic> json) => Assistant(
     id: json['id'] as String,
@@ -264,6 +300,22 @@ class Assistant {
       json['healthDataTypeIds'],
     ),
     background: json['background'] as String?,
+    useGradientBackground: json['useGradientBackground'] as bool? ?? false,
+    gradientBackgroundAnimated:
+        json['gradientBackgroundAnimated'] as bool? ?? true,
+    gradientBackgroundPhase: _readGradientBackgroundPhase(
+      json['gradientBackgroundPhase'],
+    ),
+    gradientBackgroundOffsetX:
+        ((json['gradientBackgroundOffsetX'] as num?)?.toDouble() ?? 0).clamp(
+          -1.0,
+          1.0,
+        ),
+    gradientBackgroundOffsetY:
+        ((json['gradientBackgroundOffsetY'] as num?)?.toDouble() ?? 0).clamp(
+          -1.0,
+          1.0,
+        ),
     customHeaders: (() {
       final raw = json['customHeaders'];
       if (raw is List) {

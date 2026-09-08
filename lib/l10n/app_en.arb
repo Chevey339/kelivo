@@ -3907,5 +3907,12 @@
   "toolSchemaSettingsCancel": "Cancel",
   "healthDataSettingsCategoryReproductive": "Reproductive health",
   "healthDataSettingsTypeMenstrualFlowTitle": "Menstrual flow",
-  "healthDataSettingsTypeMenstrualFlowSubtitle": "Recorded menstrual flow and cycle starts in the past 90 days"
+  "healthDataSettingsTypeMenstrualFlowSubtitle": "Recorded menstrual flow and cycle starts in the past 90 days",
+  "assistantEditGradientBackgroundTitle": "Gradient background",
+  "assistantEditGradientStaticTitle": "Static mode",
+  "assistantEditGradientStaticDescription": "Saves power during long chats and streaming.",
+  "assistantEditGradientHorizontal": "Horizontal position",
+  "assistantEditGradientVertical": "Vertical position",
+  "assistantEditGradientPreview": "Preview",
+  "assistantEditGradientNextFrame": "Another frame"
 }

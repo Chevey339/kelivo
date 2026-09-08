@@ -3209,5 +3209,12 @@
   "toolSchemaSettingsCancel": "取消",
   "healthDataSettingsCategoryReproductive": "生殖健康",
   "healthDataSettingsTypeMenstrualFlowTitle": "经期记录",
-  "healthDataSettingsTypeMenstrualFlowSubtitle": "最近 90 天记录的经量与周期开始日期"
+  "healthDataSettingsTypeMenstrualFlowSubtitle": "最近 90 天记录的经量与周期开始日期",
+  "assistantEditGradientBackgroundTitle": "渐变背景",
+  "assistantEditGradientStaticTitle": "静态模式",
+  "assistantEditGradientStaticDescription": "更省电，适合长对话和持续输出。",
+  "assistantEditGradientHorizontal": "水平位置",
+  "assistantEditGradientVertical": "垂直位置",
+  "assistantEditGradientPreview": "预览",
+  "assistantEditGradientNextFrame": "换一帧"
 }

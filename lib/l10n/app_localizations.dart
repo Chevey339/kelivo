@@ -16242,6 +16242,48 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Recorded menstrual flow and cycle starts in the past 90 days'**
   String get healthDataSettingsTypeMenstrualFlowSubtitle;
+
+  /// No description provided for @assistantEditGradientBackgroundTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Gradient background'**
+  String get assistantEditGradientBackgroundTitle;
+
+  /// No description provided for @assistantEditGradientStaticTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Static mode'**
+  String get assistantEditGradientStaticTitle;
+
+  /// No description provided for @assistantEditGradientStaticDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Saves power during long chats and streaming.'**
+  String get assistantEditGradientStaticDescription;
+
+  /// No description provided for @assistantEditGradientHorizontal.
+  ///
+  /// In en, this message translates to:
+  /// **'Horizontal position'**
+  String get assistantEditGradientHorizontal;
+
+  /// No description provided for @assistantEditGradientVertical.
+  ///
+  /// In en, this message translates to:
+  /// **'Vertical position'**
+  String get assistantEditGradientVertical;
+
+  /// No description provided for @assistantEditGradientPreview.
+  ///
+  /// In en, this message translates to:
+  /// **'Preview'**
+  String get assistantEditGradientPreview;
+
+  /// No description provided for @assistantEditGradientNextFrame.
+  ///
+  /// In en, this message translates to:
+  /// **'Another frame'**
+  String get assistantEditGradientNextFrame;
 }
 
 class _AppLocalizationsDelegate
