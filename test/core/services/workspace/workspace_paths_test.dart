@@ -212,23 +212,21 @@ void main() {
   test(
     'resolveReal reclassifies a symlink that escapes the workspace',
     () async {
-      // /tmp (≠ Directory.systemTemp on macOS) is outside the zone roots.
-      final outsideDir = Directory('/tmp');
-      final outsideFile = File(
-        p.join(outsideDir.path, 'kelivo_ws_secret_${tmp.path.hashCode}.txt'),
-      );
+      // Keep the target outside every zone, including the host's temp zone.
+      final scratch = Directory(p.join(tmp.path, 'scratch'))..createSync();
+      final outsideFile = File(p.join(tmp.path, 'outside.txt'));
       await outsideFile.writeAsString('secret');
-      addTearDown(() async {
-        if (await outsideFile.exists()) await outsideFile.delete();
-      });
 
       final link = Link(p.join(workspace.path, 'escape'));
       await link.create(outsideFile.path);
 
-      final paths = WorkspacePaths.native(
-        workspaceHostRoot: workspace.path,
-        sessionHostDir: session.path,
-        skillsHostDir: skills.path,
+      final paths = IOOverrides.runZoned(
+        () => WorkspacePaths.native(
+          workspaceHostRoot: workspace.path,
+          sessionHostDir: session.path,
+          skillsHostDir: skills.path,
+        ),
+        getSystemTempDirectory: () => scratch,
       );
 
       final lexical = paths.resolve('escape', cwd: workspace.path);
@@ -242,10 +240,13 @@ void main() {
       );
 
       // Same escape through the sandboxed guest path.
-      final sandboxed = WorkspacePaths.sandboxed(
-        workspaceHostRoot: workspace.path,
-        sessionHostDir: session.path,
-        skillsHostDir: skills.path,
+      final sandboxed = IOOverrides.runZoned(
+        () => WorkspacePaths.sandboxed(
+          workspaceHostRoot: workspace.path,
+          sessionHostDir: session.path,
+          skillsHostDir: skills.path,
+        ),
+        getSystemTempDirectory: () => scratch,
       );
       final sandboxedLexical = sandboxed.resolve(
         '/workspace/escape',
