@@ -16,6 +16,7 @@ import 'package:Kelivo/utils/app_directories.dart';
 /// Machine-readable [EnvironmentState.errorMessage] codes for UI localization.
 abstract final class EnvironmentError {
   static const unsupportedAbi = 'unsupported_abi';
+  static const architectureMismatch = 'architecture_mismatch';
   static const prootMissing = 'proot_missing';
   static const insufficientDisk = 'insufficient_disk';
   static const network = 'network';
@@ -34,6 +35,38 @@ const List<int> kAndroidNetworkGids = <int>[3003, 9997];
 
 const int kMinFreeBytes = 600 * 1024 * 1024;
 const String kKelivoVersionFile = '.kelivo-version';
+
+/// APK ABI changes preserve app data, including the previous guest system.
+/// Reject an incompatible install without deleting it or changing its metadata.
+Future<bool> validateInstalledRootfsArchitecture({
+  required EnvironmentProvider env,
+  required Directory rootfsDir,
+  required String abi,
+}) async {
+  var installedArch = env.state.arch;
+  final marker = File(p.join(rootfsDir.path, kKelivoVersionFile));
+  if (await marker.exists()) {
+    final parts = (await marker.readAsString()).trim().split(RegExp(r'\s+'));
+    if (parts.length >= 3) installedArch = parts[2];
+  }
+  if (installedArch == null) return true;
+  final arch = RootfsSource.archForAbi(abi);
+  if (installedArch == arch) return true;
+  final error = arch == null
+      ? EnvironmentError.unsupportedAbi
+      : EnvironmentError.architectureMismatch;
+  if (env.state.phase != EnvironmentPhase.error ||
+      env.state.errorMessage != error) {
+    await env.setState(
+      env.state.copyWith(
+        phase: EnvironmentPhase.error,
+        errorMessage: error,
+        clearProgress: true,
+      ),
+    );
+  }
+  return false;
+}
 
 class EnvironmentInstaller implements EnvironmentManager {
   EnvironmentInstaller({
@@ -98,7 +131,9 @@ class EnvironmentInstaller implements EnvironmentManager {
     try {
       await env.loaded;
       await _resolveEnvDir();
-      _previousState = env.state.phase == EnvironmentPhase.ready
+      await _validateInstalledArchitecture();
+      _previousState =
+          await File(p.join(rootfsDir.path, kKelivoVersionFile)).exists()
           ? env.state
           : null;
       await channel.setEnvironmentBusy(true);
@@ -141,9 +176,11 @@ class EnvironmentInstaller implements EnvironmentManager {
   @override
   Future<void> repair() async {
     if (_installing) return;
+    await env.loaded;
     await _resolveEnvDir();
     _cancelled = false;
     try {
+      if (!await _validateInstalledArchitecture()) return;
       await _setPhase(
         env.state.copyWith(
           phase: EnvironmentPhase.patching,
@@ -217,6 +254,7 @@ class EnvironmentInstaller implements EnvironmentManager {
     await env.loaded;
     await _resolveEnvDir();
     if (await File(p.join(rootfsDir.path, kKelivoVersionFile)).exists()) {
+      if (!await _validateInstalledArchitecture()) return;
       if (env.state.phase != EnvironmentPhase.ready) {
         final parsed = await _readVersionFile();
         await _setPhase(
@@ -604,9 +642,9 @@ class EnvironmentInstaller implements EnvironmentManager {
   Future<void> _fail(String code) async {
     await _setPhase(
       (_previousState ?? env.state).copyWith(
-        phase: _previousState == null
-            ? EnvironmentPhase.error
-            : EnvironmentPhase.ready,
+        phase: _previousState?.phase == EnvironmentPhase.ready
+            ? EnvironmentPhase.ready
+            : EnvironmentPhase.error,
         errorMessage: code,
         clearProgress: true,
       ),
@@ -616,6 +654,15 @@ class EnvironmentInstaller implements EnvironmentManager {
   Future<void> _setPhase(EnvironmentState state) async {
     await env.setState(state);
     _onProgress?.call(state);
+  }
+
+  Future<bool> _validateInstalledArchitecture() async {
+    if (!await rootfsDir.exists()) return true;
+    return validateInstalledRootfsArchitecture(
+      env: env,
+      rootfsDir: rootfsDir,
+      abi: (await channel.probe()).abi,
+    );
   }
 
   /// Recover a process exit between the two directory renames on replacement.
@@ -642,6 +689,7 @@ class EnvironmentInstaller implements EnvironmentManager {
               ),
       );
     }
+    await _validateInstalledArchitecture();
   }
 
   Future<Directory> _resolveEnvDir() async {

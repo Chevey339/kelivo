@@ -3374,6 +3374,7 @@
   "workspaceEnvMirrorLatency": "{ms} ms",
   "workspaceEnvMirrorFailed": "{reason}",
   "workspaceEnvErrorUnsupportedAbi": "当前设备架构不受支持。",
+  "workspaceEnvErrorArchitectureMismatch": "已安装的沙盒架构与当前应用不匹配，请重新安装沙盒后使用。原沙盒文件已保留。",
   "workspaceEnvErrorProotMissing": "缺少 PRoot 可执行文件。",
   "workspaceEnvErrorInsufficientDisk": "存储空间不足，无法安装沙箱。",
   "workspaceEnvErrorInsufficientDiskHint": "请为所选镜像释放更多存储空间后重试。",

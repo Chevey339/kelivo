@@ -41,9 +41,15 @@ object RootfsInfo {
         val header = ByteArray(20)
         shell.inputStream().use { require(it.read(header) == header.size) { "invalid rootfs shell" } }
         require(header[0] == 0x7f.toByte() && String(header, 1, 3) == "ELF" &&
-            header[4] == 2.toByte() && header[5] == 1.toByte()) { "rootfs shell must be a 64-bit little-endian ELF" }
+            header[5] == 1.toByte()) { "rootfs shell must be a little-endian ELF" }
         val machine = (header[18].toInt() and 255) or ((header[19].toInt() and 255) shl 8)
-        require(machine == if (arch == "arm64") 183 else if (arch == "amd64") 62 else -1) {
+        val matches = when (arch) {
+            "armhf" -> header[4] == 1.toByte() && machine == 40
+            "arm64" -> header[4] == 2.toByte() && machine == 183
+            "amd64" -> header[4] == 2.toByte() && machine == 62
+            else -> false
+        }
+        require(matches) {
             "rootfs architecture does not match $arch"
         }
         val release = guestFile(root, "/etc/os-release")

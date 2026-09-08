@@ -143,6 +143,46 @@ void main() {
     },
   );
 
+  test(
+    'ARMv7 Alpine probes its own package index and Ubuntu uses ports',
+    () async {
+      final urls = <Uri>[];
+      final scripts = <String>[];
+      final mirrors = service(
+        scripts: scripts,
+        client: MockClient((request) async {
+          urls.add(request.url);
+          return http.Response('', 200);
+        }),
+      );
+      await env.setState(
+        const EnvironmentState(
+          distro: 'alpine',
+          version: '3.24.1',
+          arch: 'armhf',
+        ),
+      );
+      await mirrors.detect(MirrorCategory.apk);
+      expect(urls, isNotEmpty);
+      expect(
+        urls.every(
+          (uri) => uri.path.endsWith('/v3.24/main/armv7/APKINDEX.tar.gz'),
+        ),
+        isTrue,
+      );
+      await env.setState(
+        const EnvironmentState(
+          distro: 'ubuntu',
+          version: '24.04.3',
+          codename: 'noble',
+          arch: 'armhf',
+        ),
+      );
+      await mirrors.restoreOfficial(MirrorCategory.apt);
+      expect(scripts.single, contains('http://ports.ubuntu.com/ubuntu-ports'));
+    },
+  );
+
   test('detect then apply persists id, name, and guest script', () async {
     final scripts = <String>[];
     final client = MockClient((request) async {

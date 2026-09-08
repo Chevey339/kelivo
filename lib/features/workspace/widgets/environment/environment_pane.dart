@@ -239,7 +239,8 @@ class _EnvironmentPaneState extends State<EnvironmentPane> {
           ),
         );
         if (confirmed != true || !mounted) return;
-        if (manager.env.state.phase == EnvironmentPhase.ready) {
+        if (await manager.rootfsDir.exists()) {
+          if (!mounted) return;
           final l10n = AppLocalizations.of(context)!;
           final replace = await showWorkspaceConfirm(
             context: context,

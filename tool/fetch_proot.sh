@@ -37,6 +37,7 @@ SHMEM_VERSION="${SHMEM_VERSION:-0.7}"
 
 # termux-arch:android-abi
 ABIS=(
+  "arm:armeabi-v7a"
   "aarch64:arm64-v8a"
   "x86_64:x86_64"
 )

@@ -20,7 +20,7 @@ void main() {
     () {
       for (final image in RootfsCatalog.images) {
         final source = RootfsSource(image: image);
-        for (final arch in ['arm64', 'amd64']) {
+        for (final arch in ['armhf', 'arm64', 'amd64']) {
           expect(image.checksums[arch], matches(RegExp(r'^[a-f0-9]{64}$')));
           expect(source.officialTarballUri(arch).scheme, 'https');
           expect(image.cacheName(arch), contains(image.id));
@@ -45,7 +45,14 @@ void main() {
   test('ABI map and pinned hashes match the official 24.04.3 manifest', () {
     expect(RootfsSource.archForAbi('arm64-v8a'), 'arm64');
     expect(RootfsSource.archForAbi('x86_64'), 'amd64');
-    expect(RootfsSource.archForAbi('armeabi-v7a'), isNull);
+    expect(RootfsSource.archForAbi('armeabi-v7a'), 'armhf');
+    expect(RootfsSource.archForAbi('armhf'), 'armhf');
+    expect(RootfsSource.archForAbi('armeabi'), isNull);
+    expect(RootfsSource.archForAbi('x86'), isNull);
+    expect(
+      source.checksums['armhf'],
+      '747909a2f81d816fc6252f076757fcf6bd75a55f848a1c049ee79c0e88c0b9a0',
+    );
     expect(
       source.checksums['arm64'],
       '7b2dced6dd56ad5e4a813fa25c8de307b655fdabc6ea9213175a92c48dabb048',
@@ -76,6 +83,13 @@ void main() {
   test('custom directory follows ABI, full URLs preserve query parameters', () {
     expect(
       RootfsSource.customTarballUri(
+        'https://mirror.test/release/',
+        'armhf',
+      ).toString(),
+      'https://mirror.test/release/ubuntu-base-24.04.3-base-armhf.tar.gz',
+    );
+    expect(
+      RootfsSource.customTarballUri(
         ' https://mirror.test/release/ ',
         'amd64',
       ).toString(),
@@ -87,6 +101,14 @@ void main() {
         'arm64',
       ).toString(),
       'https://mirror.test/image.tar.gz?token=x%2Fy',
+    );
+  });
+
+  test('ARMv7 Alpine mirrors use armv7 archives', () {
+    const alpine = RootfsSource(image: RootfsCatalog.alpine324);
+    expect(
+      alpine.selectedUri(RootfsDownloadSource.tuna, '', 'armhf').toString(),
+      'https://mirrors.tuna.tsinghua.edu.cn/alpine/v3.24/releases/armv7/alpine-minirootfs-3.24.1-armv7.tar.gz',
     );
   });
   test('reject malformed, credential-bearing and non-HTTP custom sources', () {

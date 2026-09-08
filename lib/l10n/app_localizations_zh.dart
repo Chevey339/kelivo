@@ -9152,6 +9152,10 @@ class AppLocalizationsZh extends AppLocalizations {
   String get workspaceEnvErrorUnsupportedAbi => '当前设备架构不受支持。';
 
   @override
+  String get workspaceEnvErrorArchitectureMismatch =>
+      '已安装的沙盒架构与当前应用不匹配，请重新安装沙盒后使用。原沙盒文件已保留。';
+
+  @override
   String get workspaceEnvErrorProotMissing => '缺少 PRoot 可执行文件。';
 
   @override
@@ -19504,6 +19508,10 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get workspaceEnvErrorUnsupportedAbi => '当前设备架构不受支持。';
+
+  @override
+  String get workspaceEnvErrorArchitectureMismatch =>
+      '已安装的沙盒架构与当前应用不匹配，请重新安装沙盒后使用。原沙盒文件已保留。';
 
   @override
   String get workspaceEnvErrorProotMissing => '缺少 PRoot 可执行文件。';
@@ -29933,6 +29941,10 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get workspaceEnvErrorUnsupportedAbi => '目前裝置架構不受支援。';
+
+  @override
+  String get workspaceEnvErrorArchitectureMismatch =>
+      '已安裝的沙盒架構與目前應用程式不符，請重新安裝沙盒後使用。原沙盒檔案已保留。';
 
   @override
   String get workspaceEnvErrorProotMissing => '缺少 PRoot 執行檔。';

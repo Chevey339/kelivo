@@ -37,7 +37,11 @@ class MirrorEntry {
       return root.resolve('dists/$codename/Release');
     }
     if (category == MirrorCategory.apk) {
-      final abi = arch == 'amd64' ? 'x86_64' : 'aarch64';
+      final abi = switch (arch) {
+        'amd64' => 'x86_64',
+        'armhf' => 'armv7',
+        _ => 'aarch64',
+      };
       return root.resolve('$branch/main/$abi/APKINDEX.tar.gz');
     }
     return root.resolve(_probePath(category));

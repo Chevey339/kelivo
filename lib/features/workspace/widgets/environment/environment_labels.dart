@@ -165,6 +165,8 @@ String workspaceEnvErrorMessage(AppLocalizations l10n, String? code) {
   switch (code) {
     case 'unsupported_abi':
       return l10n.workspaceEnvErrorUnsupportedAbi;
+    case 'architecture_mismatch':
+      return l10n.workspaceEnvErrorArchitectureMismatch;
     case 'proot_missing':
       return l10n.workspaceEnvErrorProotMissing;
     case 'insufficient_disk':

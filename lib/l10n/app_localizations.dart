@@ -17185,6 +17185,12 @@ abstract class AppLocalizations {
   /// **'This device architecture is not supported.'**
   String get workspaceEnvErrorUnsupportedAbi;
 
+  /// No description provided for @workspaceEnvErrorArchitectureMismatch.
+  ///
+  /// In en, this message translates to:
+  /// **'The installed sandbox architecture does not match this app. Reinstall the sandbox to continue. Your existing sandbox files have been preserved.'**
+  String get workspaceEnvErrorArchitectureMismatch;
+
   /// No description provided for @workspaceEnvErrorProotMissing.
   ///
   /// In en, this message translates to:

@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -30,9 +32,10 @@ import '../../../support/business_test_harness.dart';
 import 'environment_test_fakes.dart';
 
 class _Installer extends EnvironmentInstaller {
-  _Installer(EnvironmentProvider env)
+  _Installer(EnvironmentProvider env, Directory directory)
     : super(
         env: env,
+        environmentDir: directory,
         channel: WorkspaceChannel(),
         source: const RootfsSource(),
         speedTest: MirrorSpeedTest(
@@ -110,7 +113,9 @@ void main() {
               alpine: alpine,
               mirrors: mirrors,
             );
-      installer = _Installer(env);
+      final directory = await Directory.systemTemp.createTemp('kelivo_env_ui_');
+      addTearDown(() => directory.delete(recursive: true));
+      installer = _Installer(env, directory);
     });
     tester.view.physicalSize = const Size(390, 844);
     tester.view.devicePixelRatio = 1;
@@ -260,9 +265,61 @@ void main() {
         () async => Future<void>.delayed(const Duration(milliseconds: 30)),
       );
       await tester.pumpAndSettle();
+      await tester.runAsync(
+        () async => Future<void>.delayed(const Duration(milliseconds: 30)),
+      );
+      await tester.pumpAndSettle();
       expect(installer.calls, 1);
       expect(installer.usedSource, RootfsDownloadSource.tuna);
       expect(mirrors.autoDetectCalls, 0);
+      expect(tester.takeException(), isNull);
+    },
+    variant: TargetPlatformVariant.only(TargetPlatform.android),
+  );
+
+  testWidgets(
+    'architecture mismatch retains replacement confirmation before reinstall',
+    (tester) async {
+      await setup(tester, ready: false);
+      await tester.runAsync(() async {
+        await installer.rootfsDir.create();
+        await File(
+          '${installer.rootfsDir.path}/keep.txt',
+        ).writeAsString('user data');
+        await env.setState(
+          const EnvironmentState(
+            phase: EnvironmentPhase.error,
+            errorMessage: EnvironmentError.architectureMismatch,
+          ),
+        );
+      });
+      await pump(tester, const Scaffold(body: EnvironmentPane()));
+      await tester.pumpAndSettle();
+      expect(find.textContaining('请重新安装沙盒后使用'), findsOneWidget);
+      await tester.tap(find.byKey(EnvironmentPane.retryKey));
+      await tester.pumpAndSettle();
+      final save = find.byKey(const ValueKey('download-source-save'));
+      await tester.ensureVisible(save);
+      await tester.tap(save);
+      await tester.runAsync(
+        () async => Future<void>.delayed(const Duration(milliseconds: 30)),
+      );
+      await tester.pumpAndSettle();
+      await tester.runAsync(
+        () async => Future<void>.delayed(const Duration(milliseconds: 30)),
+      );
+      await tester.pumpAndSettle();
+      expect(find.textContaining('更换会替换当前环境内的软件包和文件'), findsOneWidget);
+      expect(installer.calls, 0);
+      await tester.tap(find.text('取消').last);
+      await tester.pumpAndSettle();
+      expect(installer.calls, 0);
+      await tester.runAsync(() async {
+        expect(
+          await File('${installer.rootfsDir.path}/keep.txt').readAsString(),
+          'user data',
+        );
+      });
       expect(tester.takeException(), isNull);
     },
     variant: TargetPlatformVariant.only(TargetPlatform.android),

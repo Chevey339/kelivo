@@ -25,12 +25,10 @@ android {
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
-        ndk {
-            abiFilters += listOf("arm64-v8a", "x86_64")
-        }
+        // Flutter controls APK ABI filtering, including --split-per-abi.
         externalNativeBuild {
             cmake {
-                abiFilters += listOf("arm64-v8a", "x86_64")
+                abiFilters += listOf("armeabi-v7a", "arm64-v8a", "x86_64")
             }
         }
     }
@@ -89,6 +87,10 @@ flutter {
 }
 
 val requiredProotLibs = listOf(
+    "armeabi-v7a/libproot_exec.so",
+    "armeabi-v7a/libproot_loader.so",
+    "armeabi-v7a/libtalloc.so",
+    "armeabi-v7a/libandroid-shmem.so",
     "arm64-v8a/libproot_exec.so",
     "arm64-v8a/libproot_loader.so",
     "arm64-v8a/libtalloc.so",

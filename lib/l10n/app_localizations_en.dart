@@ -9555,6 +9555,10 @@ class AppLocalizationsEn extends AppLocalizations {
       'This device architecture is not supported.';
 
   @override
+  String get workspaceEnvErrorArchitectureMismatch =>
+      'The installed sandbox architecture does not match this app. Reinstall the sandbox to continue. Your existing sandbox files have been preserved.';
+
+  @override
   String get workspaceEnvErrorProotMissing => 'The PRoot binary is missing.';
 
   @override

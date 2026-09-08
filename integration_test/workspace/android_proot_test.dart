@@ -66,7 +66,7 @@ void main() {
       isTrue,
       reason: probe.reason ?? 'probe unsupported',
     );
-    expect(probe.abi, anyOf('arm64-v8a', 'arm64'));
+    expect(probe.abi, anyOf('armeabi-v7a', 'arm64-v8a', 'x86_64'));
     expect(probe.prootPath, isNotNull);
     expect(File(probe.prootPath!).existsSync(), isTrue);
   }, timeout: _suiteTimeout);

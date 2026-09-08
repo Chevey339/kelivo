@@ -47,7 +47,7 @@ void main() {
 
   EnvironmentInstaller buildInstaller(http.Client client) {
     final source = RootfsSource(
-      checksumOverrides: {'arm64': digest, 'amd64': digest},
+      checksumOverrides: {'armhf': digest, 'arm64': digest, 'amd64': digest},
       officialReleaseBase: _officialBase,
       cdimageReleaseBases: const [_officialBase],
     );
@@ -234,6 +234,31 @@ void main() {
     expect(await part.exists(), isFalse);
   });
 
+  test(
+    'ARMv7 installation downloads and persists an armhf environment',
+    () async {
+      workspace.probeAbi = 'armeabi-v7a';
+      workspace.rootfsInfo['arch'] = 'armhf';
+      await env.setDownloadSource(RootfsDownloadSource.official);
+      final requests = <http.BaseRequest>[];
+      final installer = buildInstaller(servingTarball(onRequest: requests.add));
+      await installer.install();
+      expect(env.state.phase, EnvironmentPhase.ready);
+      expect(env.state.arch, 'armhf');
+      expect(
+        requests.single.url.path,
+        endsWith('ubuntu-base-24.04.3-base-armhf.tar.gz'),
+      );
+      expect(workspace.patchArgs?['arch'], 'armhf');
+      expect(
+        await File(
+          p.join(installer.rootfsDir.path, kKelivoVersionFile),
+        ).readAsString(),
+        'ubuntu 24.04.3 armhf noble\n',
+      );
+    },
+  );
+
   test('resumes from an existing .part with HTTP 206', () async {
     workspace.freeBytes = 8 * 1024 * 1024 * 1024;
     final part = File(
@@ -305,12 +330,90 @@ void main() {
 
   test('unsupported ABI', () async {
     workspace.freeBytes = 8 * 1024 * 1024 * 1024;
-    workspace.probeAbi = 'armeabi-v7a';
+    workspace.probeAbi = 'x86';
     final installer = buildInstaller(servingTarball());
     await installer.install();
     expect(env.state.phase, EnvironmentPhase.error);
     expect(env.state.errorMessage, EnvironmentError.unsupportedAbi);
   });
+
+  for (final phase in [
+    EnvironmentPhase.ready,
+    EnvironmentPhase.notInstalled,
+    EnvironmentPhase.patching,
+  ]) {
+    for (final action in ['ensure', 'repair', 'recover']) {
+      test(
+        '$action rejects an incompatible installed rootfs from $phase',
+        () async {
+          final installer = buildInstaller(
+            MockClient((_) => throw StateError('No HTTP expected')),
+          );
+          await installer.rootfsDir.create();
+          final marker = await File(
+            p.join(installer.rootfsDir.path, kKelivoVersionFile),
+          ).writeAsString('ubuntu 24.04.3 arm64 noble\n');
+          final userFile = await File(
+            p.join(installer.rootfsDir.path, 'keep.txt'),
+          ).writeAsString('user data');
+          await env.setState(EnvironmentState(phase: phase));
+          workspace.probeAbi = 'armeabi-v7a';
+
+          switch (action) {
+            case 'ensure':
+              await installer.ensureInstalled();
+            case 'repair':
+              await installer.repair();
+            case 'recover':
+              await installer.recoverInterruptedInstall();
+          }
+
+          expect(env.state.phase, EnvironmentPhase.error);
+          expect(env.state.errorMessage, EnvironmentError.architectureMismatch);
+          expect(workspace.patchArgs, isNull);
+          expect(workspace.extractedBytes, isNull);
+          expect(await userFile.readAsString(), 'user data');
+          expect(await marker.readAsString(), 'ubuntu 24.04.3 arm64 noble\n');
+        },
+      );
+    }
+  }
+
+  for (final failReplacement in [false, true]) {
+    test(
+      'explicit reinstall after an ABI switch, failure=$failReplacement',
+      () async {
+        final installer = buildInstaller(servingTarball());
+        await installer.install();
+        final userFile = await File(
+          p.join(installer.rootfsDir.path, 'keep.txt'),
+        ).writeAsString('user data');
+        workspace.probeAbi = 'armeabi-v7a';
+        workspace.rootfsInfo['arch'] = 'armhf';
+        workspace.rejectExtract = failReplacement;
+        await installer.install();
+        expect(
+          env.state.phase,
+          failReplacement ? EnvironmentPhase.error : EnvironmentPhase.ready,
+        );
+        expect(env.state.arch, failReplacement ? 'arm64' : 'armhf');
+        if (failReplacement) {
+          expect(await userFile.readAsString(), 'user data');
+          await installer.ensureInstalled();
+          expect(env.state.phase, EnvironmentPhase.error);
+          expect(env.state.errorMessage, EnvironmentError.architectureMismatch);
+        } else {
+          expect(env.state.errorMessage, isNull);
+          expect(
+            await File(
+              p.join(installer.rootfsDir.path, kKelivoVersionFile),
+            ).readAsString(),
+            'ubuntu 24.04.3 armhf noble\n',
+          );
+        }
+      },
+    );
+  }
 
   test(
     'Alpine selects its image, checksum, package manager and smaller disk budget',

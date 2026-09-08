@@ -4243,6 +4243,7 @@
     }
   },
   "workspaceEnvErrorUnsupportedAbi": "This device architecture is not supported.",
+  "workspaceEnvErrorArchitectureMismatch": "The installed sandbox architecture does not match this app. Reinstall the sandbox to continue. Your existing sandbox files have been preserved.",
   "workspaceEnvErrorProotMissing": "The PRoot binary is missing.",
   "workspaceEnvErrorInsufficientDisk": "Not enough free storage to install the sandbox.",
   "workspaceEnvErrorInsufficientDiskHint": "Free more storage for the selected image and try again.",

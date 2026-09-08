@@ -5,6 +5,7 @@ import android.content.Intent
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
+import android.os.Process
 import android.os.StatFs
 import android.view.WindowManager
 import io.flutter.plugin.common.BinaryMessenger
@@ -17,6 +18,16 @@ class WorkspacePlugin(private val activity: Activity) {
     companion object {
         const val CHANNEL_NAME = "app.workspace"
         const val EVENT_CHANNEL_NAME = "app.workspace/events"
+
+        // A 32-bit APK can run on an ARM64 device. Match the app's native
+        // libraries, not the device's preferred ABI, when selecting a rootfs.
+        internal fun runtimeAbi(
+            is64Bit: Boolean = Process.is64Bit(),
+            abis: Array<String> = Build.SUPPORTED_ABIS,
+        ): String {
+            val supported = if (is64Bit) listOf("arm64-v8a", "x86_64") else listOf("armeabi-v7a")
+            return abis.firstOrNull { it in supported } ?: ""
+        }
     }
 
     private val executor = Executors.newCachedThreadPool()
@@ -141,7 +152,7 @@ class WorkspacePlugin(private val activity: Activity) {
         }
         return hashMapOf(
             "supported" to supported,
-            "abi" to (Build.SUPPORTED_ABIS.firstOrNull() ?: ""),
+            "abi" to runtimeAbi(),
             "prootPath" to proot.takeIf { it.isFile }?.absolutePath,
             "loaderPath" to loader.takeIf { it.isFile }?.absolutePath,
             "nativeLibDir" to nativeLibDir.absolutePath,

@@ -16,11 +16,14 @@ version below.
 Termux package: proot 5.1.107.92
 Pool: https://packages.termux.dev/apt/termux-main/pool/main/p/proot/
 
+  proot_5.1.107.92_arm.deb      →  jniLibs/armeabi-v7a/
   proot_5.1.107.92_aarch64.deb  →  jniLibs/arm64-v8a/
   proot_5.1.107.92_x86_64.deb   →  jniLibs/x86_64/
 
 SHA-256 of deployed files (also in tool/proot_checksums.txt):
 
+  efb41b19b15aaa13b4498cde3ca051fed8e2c39ae5d8d21f308c07934a0eb215  armeabi-v7a/libproot_exec.so
+  c64fcdc4e487ac6ec39955faf0049235258cbe284a6255797945817dd7c36198  armeabi-v7a/libproot_loader.so
   ea47e17da8e6ff4882c169c6508861e5b4be9227e477c6020f4f14facc85c10d  arm64-v8a/libproot_exec.so
   44ef39c1e1a18c09f6e4c4b5d6f8bba82d30596598bd155ec162d05c5122ff04  arm64-v8a/libproot_loader.so
   5c6b99c48ebb87580551afd654e49eb8d178fd45fef0b65397c99a1d901c417b  x86_64/libproot_exec.so
@@ -35,6 +38,7 @@ Termux package: libtalloc 2.4.3
 libtalloc.so so Android packages it, and the runtime copies it to
 libtalloc.so.2 on a writable LD_LIBRARY_PATH.)
 
+  3dcee54ca8c49689d1324269af92bc322cdbdadea801830cb7ff8516e74758c5  armeabi-v7a/libtalloc.so
   3c9b207c0a6ea2896b7523e03f55d9ab0d9e88baa115d4c32b84058ff4246fbb  arm64-v8a/libtalloc.so
   77be445f4ec245fff9c19e9874ebcf99618244cf48737f5fca938316daaa70da  x86_64/libtalloc.so
 
@@ -46,6 +50,7 @@ Termux package: libandroid-shmem 0.7
 Required by Termux proot 5.1.107.92 (DT_NEEDED libandroid-shmem.so).
 The older OpenMinis pin (proot 5.1.107-70) is no longer on the Termux pool.
 
+  ef35602fa6c8bca9081af1594fabeacbd98b6e8921dd6be54484291933b8040f  armeabi-v7a/libandroid-shmem.so
   84475798e07c8174dbbfaec70a827fdb02f19ffa69a589380c13e7507fd0e731  arm64-v8a/libandroid-shmem.so
   092926060298acd3778e6239033d7aef1280dcb59aebe021a3719612e6a3465f  x86_64/libandroid-shmem.so
 

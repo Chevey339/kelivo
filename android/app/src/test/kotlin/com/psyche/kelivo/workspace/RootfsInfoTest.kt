@@ -6,10 +6,10 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class RootfsInfoTest {
-    private fun image(root: File, machine: Int = 183) {
+    private fun image(root: File, machine: Int = 183, elfClass: Int = 2) {
         val header = ByteArray(20)
         header[0] = 0x7f; header[1] = 'E'.code.toByte(); header[2] = 'L'.code.toByte(); header[3] = 'F'.code.toByte()
-        header[4] = 2; header[5] = 1; header[18] = machine.toByte(); header[19] = (machine shr 8).toByte()
+        header[4] = elfClass.toByte(); header[5] = 1; header[18] = machine.toByte(); header[19] = (machine shr 8).toByte()
         File(root, "bin").mkdirs()
         File(root, "bin/busybox").apply { writeBytes(header); setExecutable(true) }
         Files.createSymbolicLink(File(root, "bin/sh").toPath(), File("/bin/busybox").toPath())
@@ -46,6 +46,25 @@ class RootfsInfoTest {
             Files.createSymbolicLink(File(root, "cycle").toPath(), File("cycle").toPath())
             assertThrows(IllegalArgumentException::class.java) { RootfsInfo.guestFile(root, "/cycle") }
             assertThrows(IllegalArgumentException::class.java) { RootfsInfo.guestFile(root, "/../../outside") }
+        } finally { root.deleteRecursively() }
+    }
+
+    @Test fun acceptsArm32RootfsAndRejectsMismatchedElfClass() {
+        val root = Files.createTempDirectory("rootfs-armhf-").toFile()
+        try {
+            image(root, machine = 40, elfClass = 1)
+            assertEquals("armhf", RootfsInfo.inspect(root, "armhf")["arch"])
+            assertThrows(IllegalArgumentException::class.java) { RootfsInfo.inspect(root, "arm64") }
+            assertThrows(IllegalArgumentException::class.java) { RootfsInfo.inspect(root, "amd64") }
+            val shell = File(root, "bin/busybox")
+            val header = shell.readBytes()
+            header[4] = 2
+            shell.writeBytes(header)
+            assertThrows(IllegalArgumentException::class.java) { RootfsInfo.inspect(root, "armhf") }
+            header[4] = 1
+            header[18] = 183.toByte()
+            shell.writeBytes(header)
+            assertThrows(IllegalArgumentException::class.java) { RootfsInfo.inspect(root, "arm64") }
         } finally { root.deleteRecursively() }
     }
 

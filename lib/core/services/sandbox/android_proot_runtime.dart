@@ -33,8 +33,12 @@ class AndroidProotRuntime implements WorkspaceRuntime {
 
   @override
   Future<RuntimeStatus> status() async {
-    await _adoptOnDiskInstall();
-    if (env.state.phase != EnvironmentPhase.ready ||
+    await env.loaded;
+    if (!{
+          EnvironmentPhase.ready,
+          EnvironmentPhase.notInstalled,
+          EnvironmentPhase.error,
+        }.contains(env.state.phase) ||
         !await rootfsDir.exists()) {
       return const RuntimeStatus(
         ready: false,
@@ -55,12 +59,34 @@ class AndroidProotRuntime implements WorkspaceRuntime {
         sandboxed: true,
       );
     }
+    if (!await validateInstalledRootfsArchitecture(
+      env: env,
+      rootfsDir: rootfsDir,
+      abi: probe.abi,
+    )) {
+      return RuntimeStatus(
+        ready: false,
+        reason: env.state.errorMessage,
+        engine: 'proot',
+        sandboxed: true,
+      );
+    }
+    await _adoptOnDiskInstall();
+    if (env.state.phase != EnvironmentPhase.ready) {
+      return const RuntimeStatus(
+        ready: false,
+        reason: 'environment_not_installed',
+        engine: 'proot',
+        sandboxed: true,
+      );
+    }
     return const RuntimeStatus(ready: true, engine: 'proot', sandboxed: true);
   }
 
   @override
-  Stream<CommandEvent> run(CommandRequest request) {
-    return runChannelCommand(
+  Stream<CommandEvent> run(CommandRequest request) async* {
+    await _requireReady();
+    yield* runChannelCommand(
       channel: channel,
       request: request,
       args: _execArgs(request),
@@ -80,6 +106,7 @@ class AndroidProotRuntime implements WorkspaceRuntime {
     required int cols,
     required int rows,
   }) async {
+    await _requireReady();
     // Unique per open, never a counter: the native session map lives on the
     // platform side and outlives the Dart isolate, so a hot restart would hand
     // out ids that are still registered there — iSH rejects the open, proot
@@ -99,6 +126,13 @@ class AndroidProotRuntime implements WorkspaceRuntime {
       shell: this.env.prootShell,
     );
     return session;
+  }
+
+  Future<void> _requireReady() async {
+    final current = await status();
+    if (!current.ready) {
+      throw StateError(current.reason ?? 'environment_not_installed');
+    }
   }
 
   @override

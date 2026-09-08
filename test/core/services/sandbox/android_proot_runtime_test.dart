@@ -6,6 +6,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:Kelivo/core/models/environment_state.dart';
 import 'package:Kelivo/core/providers/environment_provider.dart';
 import 'package:Kelivo/core/services/sandbox/android_proot_runtime.dart';
+import 'package:Kelivo/core/services/sandbox/environment_installer.dart';
 import 'package:Kelivo/core/services/sandbox/workspace_channel.dart';
 import 'package:Kelivo/core/services/workspace/workspace_runtime.dart';
 
@@ -26,6 +27,9 @@ void main() {
     workspace.install();
     env = EnvironmentProvider(preferences: createBusinessTestPreferences());
     await env.loaded;
+    await env.setState(
+      const EnvironmentState(phase: EnvironmentPhase.ready, arch: 'arm64'),
+    );
     rootfsDir = await Directory.systemTemp.createTemp('kelivo_proot_rootfs_');
     tmpDir = await Directory.systemTemp.createTemp('kelivo_proot_tmp_');
     runtime = AndroidProotRuntime(
@@ -43,6 +47,8 @@ void main() {
   });
 
   group('status', () {
+    setUp(() async => env.setState(const EnvironmentState()));
+
     test('not ready when environment phase is not ready', () async {
       final status = await runtime.status();
       expect(status.ready, isFalse);
@@ -107,9 +113,79 @@ void main() {
     });
   });
 
+  for (final (abi, installedArch) in [
+    ('armeabi-v7a', 'arm64'),
+    ('arm64-v8a', 'armhf'),
+  ]) {
+    for (final phase in [
+      EnvironmentPhase.ready,
+      EnvironmentPhase.notInstalled,
+      EnvironmentPhase.error,
+    ]) {
+      test('rejects $installedArch rootfs on $abi from $phase', () async {
+        workspace.probeResult['abi'] = abi;
+        await env.setState(EnvironmentState(phase: phase));
+        final marker = await File(
+          '${rootfsDir.path}/$kKelivoVersionFile',
+        ).writeAsString('ubuntu 24.04.3 $installedArch noble\n');
+        final userFile = await File(
+          '${rootfsDir.path}/keep.txt',
+        ).writeAsString('user data');
+
+        for (var i = 0; i < 2; i++) {
+          final status = await runtime.status();
+          expect(status.ready, isFalse);
+          expect(status.reason, EnvironmentError.architectureMismatch);
+          expect(env.state.phase, EnvironmentPhase.error);
+        }
+        await expectLater(
+          runtime.run(
+            const CommandRequest(runId: 'blocked', command: 'true', cwd: '/'),
+          ),
+          emitsError(isA<StateError>()),
+        );
+        await expectLater(
+          runtime.openPty(
+            mounts: const [],
+            cwd: '/',
+            env: const {},
+            cols: 80,
+            rows: 24,
+          ),
+          throwsStateError,
+        );
+        expect(workspace.methods, isNot(contains('exec')));
+        expect(workspace.methods, isNot(contains('ptyOpen')));
+        expect(await userFile.readAsString(), 'user data');
+        expect(
+          await marker.readAsString(),
+          'ubuntu 24.04.3 $installedArch noble\n',
+        );
+      });
+    }
+  }
+
+  test('adopts matching ARMv7 install after an architecture error', () async {
+    workspace.probeResult['abi'] = 'armeabi-v7a';
+    await env.setState(
+      const EnvironmentState(
+        phase: EnvironmentPhase.error,
+        arch: 'arm64',
+        errorMessage: EnvironmentError.architectureMismatch,
+      ),
+    );
+    await File(
+      '${rootfsDir.path}/$kKelivoVersionFile',
+    ).writeAsString('ubuntu 24.04.3 armhf noble\n');
+    expect((await runtime.status()).ready, isTrue);
+    expect(env.state.arch, 'armhf');
+    expect(env.state.errorMessage, isNull);
+  });
+
   test('run maps stdout/stderr/exit and ignores other runIds', () async {
     await env.setProotOptions(shell: '/bin/sh', arguments: '-k\n5.10.0');
     workspace.handler = (call) {
+      if (call.method == 'probe') return workspace.probeResult;
       if (call.method == 'exec') {
         workspace.emit(<String, Object?>{
           'type': 'stdout',
@@ -182,6 +258,7 @@ void main() {
   test('run maps cancelled, timedOut, and closes once', () async {
     var exitEmits = 0;
     workspace.handler = (call) {
+      if (call.method == 'probe') return workspace.probeResult;
       if (call.method == 'exec') {
         workspace.emit(<String, Object?>{
           'type': 'exit',
@@ -225,6 +302,7 @@ void main() {
 
   test('run errors when exec throws', () async {
     workspace.handler = (call) {
+      if (call.method == 'probe') return workspace.probeResult;
       if (call.method == 'exec') {
         throw PlatformException(code: 'workspace', message: 'boom');
       }

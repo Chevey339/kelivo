@@ -25,6 +25,7 @@ class RootfsSource {
   );
 
   static String? archForAbi(String abi) => switch (abi) {
+    'armeabi-v7a' || 'armhf' => 'armhf',
     'arm64-v8a' || 'arm64' => 'arm64',
     'x86_64' || 'amd64' => 'amd64',
     _ => null,
