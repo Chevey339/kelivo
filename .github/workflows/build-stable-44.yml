@@ -204,7 +204,7 @@ jobs:
 
       - name: 🧰 准备 iSH 沙箱产物
         run: |
-          brew install meson ninja llvm lld
+          brew install meson ninja llvm lld libarchive
           ios/sandbox/ensure_artifacts.sh
 
       - name: 🏗️ 构建 iOS (无签名)
