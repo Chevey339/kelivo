@@ -442,6 +442,63 @@ void main() {
       }
     });
 
+    test('remapped conversations retain session output files', () async {
+      final fixture = await _createSqliteBackupFixture(
+        root: root,
+        prefix: 'review-remap',
+        settings: {},
+        includeFiles: true,
+        extraEntries: {
+          'sessions/fixture-conversation/outputs/report.txt': 'backup output',
+        },
+      );
+      final chat = ChatService();
+      await chat.init();
+      try {
+        await chat.restoreConversation(
+          Conversation(
+            id: 'fixture-conversation',
+            title: 'Different local conversation',
+          ),
+          [],
+        );
+        final local = File(
+          '${root.path}/sessions/fixture-conversation/outputs/report.txt',
+        );
+        await local.parent.create(recursive: true);
+        await local.writeAsString('local output');
+        final sync = DataSync(
+          businessRepository: businessRepository,
+          chatService: chat,
+        );
+        await sync.restoreFromLocalFile(
+          fixture,
+          const WebDavConfig(includeChats: true, includeFiles: true),
+          mode: RestoreMode.merge,
+        );
+        final newId = sync
+            .lastMergeReport!
+            .remappedConversationIds['fixture-conversation'];
+        expect(newId, isNotNull);
+        expect(
+          await File(
+            '${root.path}/sessions/fixture-conversation/outputs/report.txt',
+          ).readAsString(),
+          'local output',
+        );
+        expect(
+          await File(
+            '${root.path}/sessions/$newId/outputs/report.txt',
+          ).readAsString(),
+          'backup output',
+          reason:
+              'Imported conversation $newId must be able to open its outputs',
+        );
+      } finally {
+        await chat.close();
+      }
+    });
+
     test(
       'packs files as deflated zip entries and removes staging files',
       () async {

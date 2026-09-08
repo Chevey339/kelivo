@@ -756,7 +756,10 @@ class WorkspaceToolStatusText extends StatelessWidget {
     ToolRun? liveRun = run;
     if (liveRun == null) {
       try {
-        liveRun = context.watch<ToolRunRegistry>().of(part.id);
+        liveRun = context.watch<ToolRunRegistry>().of(
+          part.id,
+          conversationId: conversationId,
+        );
       } on ProviderNotFoundException {
         liveRun = null;
       }
@@ -891,7 +894,10 @@ class WorkspaceToolCardBody extends StatelessWidget {
     ToolRun? liveRun = run;
     if (liveRun == null) {
       try {
-        liveRun = context.watch<ToolRunRegistry>().of(part.id);
+        liveRun = context.watch<ToolRunRegistry>().of(
+          part.id,
+          conversationId: conversationId,
+        );
       } on ProviderNotFoundException {
         liveRun = null;
       }

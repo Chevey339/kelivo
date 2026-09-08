@@ -127,6 +127,38 @@ void main() {
       expect(_singleExit(events).exitCode, 0);
     }, skip: !isUnix);
 
+    test(
+      'commands past eight seconds retain exit codes and requested timeouts',
+      () async {
+        final results = await Future.wait([
+          runtime
+              .run(
+                _req(
+                  runId: 'long-success',
+                  command: 'sleep 9; exit 3',
+                  cwd: tmp.path,
+                  timeout: const Duration(seconds: 20),
+                ),
+              )
+              .toList(),
+          runtime
+              .run(
+                _req(
+                  runId: 'long-timeout',
+                  command: 'sleep 30',
+                  cwd: tmp.path,
+                  timeout: const Duration(seconds: 9),
+                ),
+              )
+              .toList(),
+        ]).timeout(const Duration(seconds: 18));
+        expect(_singleExit(results[0]).exitCode, 3);
+        expect(_singleExit(results[0]).timedOut, isFalse);
+        expect(_singleExit(results[1]).timedOut, isTrue);
+      },
+      skip: !isUnix,
+    );
+
     test('timeout kills sleep 30 within ~1.5s and reports timedOut', () async {
       final watch = Stopwatch()..start();
       final events = await _collect(
@@ -180,6 +212,163 @@ void main() {
         isNot(0),
         reason: 'sleep 30 still alive: ${leftover.stdout}',
       );
+    }, skip: !isUnix);
+
+    test('cancel kills SIGTERM-ignoring children after reparenting', () async {
+      final childPids = <int>[];
+      addTearDown(() {
+        for (final pid in childPids) {
+          Process.killPid(pid, ProcessSignal.sigkill);
+        }
+      });
+      final ready = Completer<void>();
+      final events = runtime
+          .run(
+            _req(
+              runId: 'stubborn-tree',
+              command:
+                  r'''/bin/sh -c 'trap "" TERM; sleep 30 & printf "%s %s" "$$" "$!" > stubborn.pids; printf READY; wait; printf changed > after-stop.txt'; printf parentdone''',
+              cwd: tmp.path,
+              timeout: const Duration(seconds: 20),
+            ),
+          )
+          .map((event) {
+            if (event is CommandOutput &&
+                utf8.decode(event.bytes).contains('READY') &&
+                !ready.isCompleted) {
+              ready.complete();
+            }
+            return event;
+          })
+          .toList();
+      await ready.future.timeout(const Duration(seconds: 5));
+      childPids.addAll(
+        (await File(
+          '${tmp.path}/stubborn.pids',
+        ).readAsString()).split(' ').map(int.parse),
+      );
+      await Future.wait([
+        runtime.cancel('stubborn-tree'),
+        runtime.cancel('stubborn-tree'),
+      ]).timeout(const Duration(seconds: 5));
+      final exit = _singleExit(
+        await events.timeout(const Duration(seconds: 3)),
+      );
+      expect(exit.cancelled, isTrue);
+      expect(await File('${tmp.path}/after-stop.txt').exists(), isFalse);
+      for (final pid in childPids) {
+        final state = await Process.run('ps', ['-p', '$pid', '-o', 'stat=']);
+        final value = state.stdout.toString().trim();
+        expect(
+          value.isEmpty || value.startsWith('Z'),
+          isTrue,
+          reason: 'Child $pid survived cancellation: $value',
+        );
+      }
+    }, skip: !isUnix);
+
+    for (final cancel in [false, true]) {
+      test(
+        'background children stop after the shell exits (cancel=$cancel)',
+        () async {
+          int? childPid;
+          addTearDown(() {
+            if (childPid != null) {
+              Process.killPid(childPid, ProcessSignal.sigkill);
+            }
+          });
+          final ready = Completer<void>();
+          final events = <CommandEvent>[];
+          final runId = 'inherited-pipe-$cancel';
+          final watch = Stopwatch()..start();
+          final done = runtime
+              .run(
+                _req(
+                  runId: runId,
+                  command:
+                      r'''(sleep 1; printf changed > after-stop.txt) & printf "%s" "$!"''',
+                  cwd: tmp.path,
+                  timeout: Duration(milliseconds: cancel ? 10000 : 300),
+                ),
+              )
+              .map((event) {
+                events.add(event);
+                if (event is CommandOutput && !ready.isCompleted) {
+                  ready.complete();
+                }
+                return event;
+              })
+              .toList();
+          await ready.future.timeout(const Duration(seconds: 5));
+          childPid = int.parse(utf8.decode(_stdout(events)));
+          if (cancel) {
+            // Let the parent exit while its child retains stdout and stderr.
+            await Future<void>.delayed(const Duration(milliseconds: 150));
+            await runtime.cancel(runId);
+          }
+          await done.timeout(const Duration(seconds: 2));
+          expect(watch.elapsed, lessThan(const Duration(seconds: 2)));
+          final exit = _singleExit(events);
+          expect(exit.timedOut, !cancel);
+          expect(exit.cancelled, cancel);
+          final state = await Process.run('ps', [
+            '-p',
+            '$childPid',
+            '-o',
+            'stat=',
+          ]);
+          final value = state.stdout.toString().trim();
+          expect(
+            value.isEmpty || value.startsWith('Z'),
+            isTrue,
+            reason: 'Background child survived stopping the run: $value',
+          );
+          childPid = null;
+          await Future<void>.delayed(const Duration(milliseconds: 1100));
+          expect(await File('${tmp.path}/after-stop.txt').exists(), isFalse);
+        },
+        skip: !isUnix,
+      );
+    }
+
+    test('stopping a background group preserves another active run', () async {
+      final ready = Completer<void>();
+      final stopped = runtime
+          .run(
+            _req(
+              runId: 'stop-background',
+              command: '(sleep 2; printf changed > stopped.txt) & printf READY',
+              cwd: tmp.path,
+            ),
+          )
+          .map((event) {
+            if (event is CommandOutput &&
+                utf8.decode(event.bytes).contains('READY') &&
+                !ready.isCompleted) {
+              ready.complete();
+            }
+            return event;
+          })
+          .toList();
+      final preserved = _collect(
+        runtime,
+        _req(
+          runId: 'keep-background',
+          command: '(sleep 1; printf preserved > kept.txt) & wait; exit 3',
+          cwd: tmp.path,
+        ),
+      );
+      addTearDown(() async {
+        await runtime.cancel('stop-background');
+        await runtime.cancel('keep-background');
+      });
+      await ready.future.timeout(const Duration(seconds: 5));
+      await Future<void>.delayed(const Duration(milliseconds: 150));
+      await runtime.cancel('stop-background');
+      expect(_singleExit(await stopped).cancelled, isTrue);
+      expect(_singleExit(await preserved).exitCode, 3);
+      expect(await File('${tmp.path}/kept.txt').readAsString(), 'preserved');
+      expect(await File('${tmp.path}/stopped.txt').exists(), isFalse);
     }, skip: !isUnix);
 
     test('emits CommandExited exactly once', () async {

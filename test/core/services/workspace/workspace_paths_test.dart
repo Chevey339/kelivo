@@ -43,6 +43,7 @@ void main() {
         Mount(host: p.canonicalize(workspace.path), guest: '/workspace'),
         Mount(host: p.canonicalize(session.path), guest: '/chat'),
         Mount(host: p.canonicalize(skills.path), guest: '/skills'),
+        Mount(host: paths.tmpHostRoot, guest: '/tmp'),
       ]);
 
       final file = paths.resolve('src/main.dart', cwd: '/workspace');

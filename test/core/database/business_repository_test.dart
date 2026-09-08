@@ -7,6 +7,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:Kelivo/core/database/app_database.dart';
 import 'package:Kelivo/core/database/business_data.dart';
 import 'package:Kelivo/core/database/business_repository.dart';
+import 'package:Kelivo/core/database/extension_entity_store.dart';
 
 void main() {
   late AppDatabase database;
@@ -34,6 +35,40 @@ void main() {
             ? '{"id":"$id"}'
             : '{"id":"$id","assistantId":"$assistantId"}'),
     assistantId: assistantId,
+  );
+
+  test(
+    'extension entity CRUD stays within its kind and retains timestamp precision',
+    () async {
+      final extensions = ExtensionEntityStore(database);
+      await extensions.upsert('externalMounts', 'global', {'keep': true});
+      await repository.upsertEntity(
+        BusinessEntityKind.workspace,
+        row('same-id', 0),
+      );
+      await repository.upsertEntity(
+        BusinessEntityKind.skill,
+        row('same-id', 0),
+      );
+      final stored = await extensions.get('workspace', 'same-id');
+      expect(stored!.updatedAt.year, DateTime.now().toUtc().year);
+      expect(
+        await repository.readEntities(BusinessEntityKind.workspace),
+        hasLength(1),
+      );
+      expect(
+        await repository.readEntities(BusinessEntityKind.skill),
+        hasLength(1),
+      );
+      await repository.replaceEntities(BusinessEntityKind.workspace, [
+        row('next', 1),
+      ]);
+      expect(await extensions.get('workspace', 'same-id'), isNull);
+      expect(await extensions.get('skill', 'same-id'), isNotNull);
+      await repository.deleteEntity(BusinessEntityKind.skill, 'same-id');
+      expect(await extensions.get('workspace', 'next'), isNotNull);
+      expect(await extensions.get('externalMounts', 'global'), isNotNull);
+    },
   );
 
   test('entity CRUD reads in stable sort order', () async {

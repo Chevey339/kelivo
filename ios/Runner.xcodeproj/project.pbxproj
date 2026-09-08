@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		W5A0000000000000000E001 /* KelivoISHEnvironment.m in Sources */ = {isa = PBXBuildFile; fileRef = W5A0000000000000000E003 /* KelivoISHEnvironment.m */; };
+		W5A0000000000000000F001 /* KelivoISHFilesystem.m in Sources */ = {isa = PBXBuildFile; fileRef = W5A0000000000000000F003 /* KelivoISHFilesystem.m */; };
 		W5D0000000000000000F001 /* KelivoISHMountTarget.m in Sources */ = {isa = PBXBuildFile; fileRef = W5D0000000000000000F003 /* KelivoISHMountTarget.m */; };
 		A10000000000000000000001 /* KelivoGenerationActivityAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000010 /* KelivoGenerationActivityAttributes.swift */; };
 		A10000000000000000000002 /* KelivoGenerationActivityAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000010 /* KelivoGenerationActivityAttributes.swift */; };
@@ -98,8 +99,10 @@
 
 /* Begin PBXFileReference section */
 		W5A0000000000000000E002 /* KelivoISHEnvironment.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = KelivoISHEnvironment.h; sourceTree = "<group>"; };
+		W5A0000000000000000F002 /* KelivoISHFilesystem.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = KelivoISHFilesystem.h; sourceTree = "<group>"; };
 		W5D0000000000000000F002 /* KelivoISHMountTarget.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = KelivoISHMountTarget.h; sourceTree = "<group>"; };
 		W5A0000000000000000E003 /* KelivoISHEnvironment.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = KelivoISHEnvironment.m; sourceTree = "<group>"; };
+		W5A0000000000000000F003 /* KelivoISHFilesystem.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = KelivoISHFilesystem.m; sourceTree = "<group>"; };
 		W5D0000000000000000F003 /* KelivoISHMountTarget.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = KelivoISHMountTarget.m; sourceTree = "<group>"; };
 		A10000000000000000000010 /* KelivoGenerationActivityAttributes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KelivoGenerationActivityAttributes.swift; sourceTree = "<group>"; };
 		A10000000000000000000011 /* GenerationActivityExtension.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GenerationActivityExtension.swift; sourceTree = "<group>"; };
@@ -266,8 +269,10 @@
 				W5A0000000000000000000B9 /* WorkspaceBridging.h */,
 				W5A0000000000000000000BD /* KelivoISHCompat.h */,
 				W5A0000000000000000E002 /* KelivoISHEnvironment.h */,
+				W5A0000000000000000F002 /* KelivoISHFilesystem.h */,
 				W5D0000000000000000F002 /* KelivoISHMountTarget.h */,
 				W5A0000000000000000E003 /* KelivoISHEnvironment.m */,
+				W5A0000000000000000F003 /* KelivoISHFilesystem.m */,
 				W5D0000000000000000F003 /* KelivoISHMountTarget.m */,
 				W5A0000000000000000000B1 /* WorkspacePlugin.swift */,
 				W5D0000000000000000000B1 /* WorkspaceDirectoryAccess.swift */,
@@ -733,6 +738,7 @@
 				W5A0000000000000000000A3 /* KelivoISHKernel.m in Sources */,
 				W5A0000000000000000000A4 /* KelivoISHExecutor.m in Sources */,
 				W5A0000000000000000E001 /* KelivoISHEnvironment.m in Sources */,
+				W5A0000000000000000F001 /* KelivoISHFilesystem.m in Sources */,
 				W5D0000000000000000F001 /* KelivoISHMountTarget.m in Sources */,
 				W5A0000000000000000000A5 /* KelivoISHCrashGuards.c in Sources */,
 				82816D88DA05AE704751053C /* IncomingShareInbox.swift in Sources */,

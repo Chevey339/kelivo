@@ -14,10 +14,13 @@ class ToolRun extends ChangeNotifier {
     required this.toolCallId,
     required this.toolName,
     this.command,
+    String? runtimeRunId,
     DateTime? startedAt,
-  }) : startedAt = startedAt ?? DateTime.now();
+  }) : runtimeRunId = runtimeRunId ?? toolCallId,
+       startedAt = startedAt ?? DateTime.now();
 
   final String toolCallId;
+  final String runtimeRunId;
   final String toolName;
   final DateTime startedAt;
   final String? command;
@@ -113,37 +116,49 @@ class ToolRun extends ChangeNotifier {
 
 /// Process-lifetime registry of tool runs. Finished runs are kept until the
 /// cap of 200 entries; least-recently-used finished runs are evicted first.
+typedef _RunKey = (String?, String);
+
 class ToolRunRegistry extends ChangeNotifier {
   static const int maxEntries = 200;
 
-  final Map<String, ToolRun> _runs = <String, ToolRun>{};
-  final List<String> _lru = <String>[];
+  final Map<_RunKey, ToolRun> _runs = {};
+  final List<_RunKey> _lru = [];
 
-  ToolRun start(String toolCallId, String toolName, {String? command}) {
-    final existing = _runs.remove(toolCallId);
+  ToolRun start(
+    String toolCallId,
+    String toolName, {
+    String? command,
+    String? conversationId,
+    String? runtimeRunId,
+  }) {
+    final key = (conversationId, toolCallId);
+    final existing = _runs.remove(key);
     existing?.dispose();
-    _lru.remove(toolCallId);
+    _lru.remove(key);
     final run = ToolRun(
       toolCallId: toolCallId,
       toolName: toolName,
+      runtimeRunId: runtimeRunId,
       command: command,
     );
-    _runs[toolCallId] = run;
-    _lru.add(toolCallId);
+    _runs[key] = run;
+    _lru.add(key);
     _evictOverflow();
     notifyListeners();
     return run;
   }
 
-  ToolRun? of(String toolCallId) {
-    final run = _runs[toolCallId];
-    if (run != null) _touch(toolCallId);
+  ToolRun? of(String toolCallId, {String? conversationId}) {
+    final key = (conversationId, toolCallId);
+    final run = _runs[key];
+    if (run != null) _touch(key);
     return run;
   }
 
-  void evict(String toolCallId) {
-    final run = _runs.remove(toolCallId);
-    _lru.remove(toolCallId);
+  void evict(String toolCallId, {String? conversationId}) {
+    final key = (conversationId, toolCallId);
+    final run = _runs.remove(key);
+    _lru.remove(key);
     run?.dispose();
     notifyListeners();
   }
@@ -153,14 +168,14 @@ class ToolRunRegistry extends ChangeNotifier {
 
   Iterable<ToolRun> get all => _runs.values;
 
-  void _touch(String id) {
+  void _touch(_RunKey id) {
     _lru.remove(id);
     _lru.add(id);
   }
 
   void _evictOverflow() {
     while (_runs.length > maxEntries) {
-      String? victim;
+      _RunKey? victim;
       for (final id in _lru) {
         final run = _runs[id];
         if (run != null && run.status != ToolRunStatus.running) {

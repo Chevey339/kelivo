@@ -680,6 +680,22 @@ final class BusinessSettingsRouter {
           throw FormatException(kind.sourceKey);
         }
         return;
+      case BusinessEntityKind.workspace:
+        _validateKnownFields(
+          kind,
+          payload,
+          requiredStrings: const {'id', 'name'},
+        );
+        return;
+      case BusinessEntityKind.skill:
+        _validateKnownFields(
+          kind,
+          payload,
+          requiredStrings: const {'id', 'source', 'installedAt', 'updatedAt'},
+          booleans: const {'enabled'},
+          numbers: const {'useCount'},
+        );
+        return;
       case BusinessEntityKind.userProfileField:
         _validateKnownFields(
           kind,

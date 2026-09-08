@@ -47,7 +47,9 @@ Future<void> showWorkspaceToolDetail(
           children: [
             AppDialogHeader(
               title: title,
-              actions: [_HeaderCopyButton(part: part)],
+              actions: [
+                _HeaderCopyButton(part: part, conversationId: conversationId),
+              ],
             ),
             Expanded(
               child: WorkspaceToolDetailBody(
@@ -76,7 +78,9 @@ Future<void> showWorkspaceToolDetail(
 }
 
 class _HeaderCopyButton extends StatelessWidget {
-  const _HeaderCopyButton({required this.part});
+  const _HeaderCopyButton({required this.part, this.conversationId});
+
+  final String? conversationId;
 
   final WorkspaceToolPart part;
 
@@ -90,7 +94,7 @@ class _HeaderCopyButton extends StatelessWidget {
         semanticLabel: l10n.workspaceToolCopy,
         icon: Lucide.Copy,
         onTap: () async {
-          final text = _detailCopyText(context, part);
+          final text = _detailCopyText(context, part, conversationId);
           if (text.isEmpty) return;
           await Clipboard.setData(ClipboardData(text: text));
           if (!context.mounted) return;
@@ -105,10 +109,17 @@ class _HeaderCopyButton extends StatelessWidget {
   }
 }
 
-String _detailCopyText(BuildContext context, WorkspaceToolPart part) {
+String _detailCopyText(
+  BuildContext context,
+  WorkspaceToolPart part,
+  String? conversationId,
+) {
   ToolRun? run;
   try {
-    run = context.read<ToolRunRegistry>().of(part.id);
+    run = context.read<ToolRunRegistry>().of(
+      part.id,
+      conversationId: conversationId,
+    );
   } on ProviderNotFoundException {
     run = null;
   }
@@ -149,7 +160,7 @@ class WorkspaceToolDetailBody extends StatelessWidget {
     } on ProviderNotFoundException {
       registry = null;
     }
-    final run = registry?.of(part.id);
+    final run = registry?.of(part.id, conversationId: conversationId);
     final body = run == null
         ? _UnifiedDetail(
             part: part,
@@ -578,7 +589,7 @@ class _UnifiedDetailState extends State<_UnifiedDetail> {
               final runtime = maybeRead<WorkspaceRuntimeProvider>(
                 context,
               )?.runtime;
-              unawaited(runtime?.cancel(widget.part.id));
+              unawaited(runtime?.cancel(widget.run!.runtimeRunId));
             },
           ),
         ],

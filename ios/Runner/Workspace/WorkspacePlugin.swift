@@ -21,6 +21,7 @@ final class WorkspacePlugin: NSObject, FlutterStreamHandler {
   private var backgroundTaskLock = NSLock()
   private let directories: WorkspaceDirectoryAccess
   private var externalMounts: [[String: Any]] = []
+  private var externalMountsApplied = false
 
   private init(presenter: UIViewController) {
     directories = WorkspaceDirectoryAccess(presenter: presenter)
@@ -117,13 +118,15 @@ final class WorkspacePlugin: NSObject, FlutterStreamHandler {
           KelivoISHKernel.shared().ptyCloseAll()
           let error = KelivoISHKernel.shared().reconcileExternalBinds(mounts)
           if error < 0 {
-            _ = KelivoISHKernel.shared().reconcileExternalBinds(self.externalMounts)
+            let rollback = KelivoISHKernel.shared().reconcileExternalBinds(self.externalMounts)
+            self.externalMountsApplied = rollback >= 0 && KelivoISHKernel.shared().isBooted
             self.complete(result, Self.mountError(error))
             return
           }
           self.externalMounts = mounts
+          self.externalMountsApplied = KelivoISHKernel.shared().isBooted
         }
-        self.complete(result, nil)
+        self.complete(result, self.applyExternalMounts())
       }
     case "hasDirectoryStorageAccess", "requestDirectoryStorageAccess":
       result(true)
@@ -233,31 +236,8 @@ final class WorkspacePlugin: NSObject, FlutterStreamHandler {
   private func boot(result: @escaping FlutterResult) {
     queue.async { [weak self] in
       guard let self else { return }
-      let installer = RootfsInstaller.shared
-      if installer.needsRestart {
-        self.complete(
-          result,
-          FlutterError(
-            code: "needs_restart",
-            message: RootfsInstallerError.needsRestart.localizedDescription,
-            details: nil
-          )
-        )
-        return
-      }
-      if !installer.isInstalled {
-        self.complete(
-          result,
-          FlutterError(code: "rootfs_missing", message: "rootfs not installed", details: nil)
-        )
-        return
-      }
-      let err = KelivoISHKernel.shared().boot(withRootPath: installer.rootfsDir.path)
-      if err < 0 {
-        self.complete(
-          result,
-          FlutterError(code: "boot_failed", message: "iSH kernel boot failed: \(err)", details: nil)
-        )
+      if let error = self.ensureBooted() {
+        self.complete(result, error)
         return
       }
       self.complete(result, ["ok": true])
@@ -283,17 +263,10 @@ final class WorkspacePlugin: NSObject, FlutterStreamHandler {
         self.complete(result, error)
         return
       }
-      let mountErr = KelivoISHKernel.shared().reconcileBinds(self.commandBinds(binds))
-      if mountErr < 0 {
-        self.complete(
-          result,
-          Self.mountError(mountErr)
-        )
-        return
-      }
       let started = KelivoISHExecutor.startCommand(
         command,
         runId: runId,
+        binds: self.commandBinds(binds),
         cwd: cwd,
         env: env,
         timeoutMs: timeoutMs,
@@ -357,16 +330,9 @@ final class WorkspacePlugin: NSObject, FlutterStreamHandler {
         self.complete(result, error)
         return
       }
-      let mountErr = KelivoISHKernel.shared().reconcileBinds(self.commandBinds(binds))
-      if mountErr < 0 {
-        self.complete(
-          result,
-          Self.mountError(mountErr)
-        )
-        return
-      }
       let pid = KelivoISHKernel.shared().ptyOpenSession(
         sessionId,
+        binds: self.commandBinds(binds),
         cwd: cwd,
         env: env,
         cols: cols,
@@ -520,6 +486,15 @@ final class WorkspacePlugin: NSObject, FlutterStreamHandler {
         return FlutterError(code: "boot_failed", message: "iSH kernel boot failed: \(err)", details: nil)
       }
     }
+    return applyExternalMounts()
+  }
+
+  private func applyExternalMounts() -> FlutterError? {
+    let kernel = KelivoISHKernel.shared()
+    guard kernel.isBooted, !externalMountsApplied else { return nil }
+    let error = kernel.reconcileExternalBinds(externalMounts)
+    if error < 0 { return Self.mountError(error) }
+    externalMountsApplied = true
     return nil
   }
 
@@ -545,7 +520,7 @@ final class WorkspacePlugin: NSObject, FlutterStreamHandler {
   }
 
   private func commandBinds(_ binds: [[String: Any]]) -> [[String: Any]] {
-    binds.filter { !(($0["guest"] as? String)?.hasPrefix("/mounts/") ?? false) } + externalMounts
+    binds.filter { !(($0["guest"] as? String)?.hasPrefix("/mounts/") ?? false) }
   }
 
   private static func mountError(_ code: Int32) -> FlutterError {

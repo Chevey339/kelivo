@@ -37,7 +37,7 @@ void main() {
       expect(paths.toModelPath(resolved.hostPath), '$guest/note.txt');
       expect(paths.modelRoot, '/workspace');
       expect(paths.resolve('note.txt', cwd: guest).hostPath, resolved.hostPath);
-      expect(paths.mounts, hasLength(5));
+      expect(paths.mounts, hasLength(6));
       final result = await HostFileTools(paths).listDir('/mounts', depth: 2);
       expect(
         result.entries.map((e) => e.path),

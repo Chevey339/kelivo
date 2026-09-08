@@ -474,7 +474,12 @@ void main() {
 
   testWidgets('live tail updates from an injected ToolRun', (tester) async {
     final registry = ToolRunRegistry();
-    final run = registry.start('live-1', 'shell', command: 'echo hi');
+    final run = registry.start(
+      'live-1',
+      'shell',
+      command: 'echo hi',
+      conversationId: 'c1',
+    );
     await tester.pumpWidget(
       _harness(
         registry: registry,

@@ -63,6 +63,29 @@ void main() {
     expect(run.stderrSoFar, contains('err59'));
   });
 
+  test(
+    'identical provider tool IDs remain independent across conversations',
+    () {
+      final registry = ToolRunRegistry();
+      final a = registry.start(
+        'call-0',
+        'shell',
+        conversationId: 'a',
+        runtimeRunId: 'process-a',
+      );
+      final b = registry.start(
+        'call-0',
+        'shell',
+        conversationId: 'b',
+        runtimeRunId: 'process-b',
+      );
+      expect(registry.of('call-0', conversationId: 'a'), same(a));
+      expect(registry.of('call-0', conversationId: 'b'), same(b));
+      registry.evict('call-0', conversationId: 'a');
+      expect(registry.of('call-0', conversationId: 'b'), same(b));
+    },
+  );
+
   test('evicts the least-recently-used finished run at 200 entries', () {
     final registry = ToolRunRegistry();
     for (var i = 0; i < 200; i++) {

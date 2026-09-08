@@ -1,12 +1,15 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:path/path.dart' as p;
+import 'package:uuid/uuid.dart';
 
 import '../../../features/home/services/tool_approval_service.dart';
 import '../../../utils/app_directories.dart';
 import '../../../utils/mcp_structured_image.dart';
+import '../api/tool_call_cancellation.dart';
 import '../../models/workspace_binding.dart';
 import '../../models/external_mount.dart';
 import '../../models/environment_variable.dart';
@@ -472,7 +475,9 @@ class WorkspaceToolsService {
       );
     }
     try {
+      ToolCallCancellation.current?.throwIfCancelled();
       await ctx.paths.refreshExternalMounts();
+      ToolCallCancellation.current?.throwIfCancelled();
       switch (name) {
         case 'shell':
           return await _handleShell(
@@ -625,6 +630,8 @@ class WorkspaceToolsService {
     required Map<String, String> environment,
   }) async {
     const tool = 'shell';
+    final cancellation = ToolCallCancellation.current;
+    cancellation?.throwIfCancelled();
     final command = _stringArg(args, 'command');
     if (command.isEmpty) {
       return _errorResult(
@@ -688,7 +695,14 @@ class WorkspaceToolsService {
       ...environment,
     };
 
-    final run = registry.start(toolCallId, tool, command: command);
+    final runtimeRunId = const Uuid().v4();
+    final run = registry.start(
+      toolCallId,
+      tool,
+      command: command,
+      conversationId: conversationId ?? ctx.conversationId,
+      runtimeRunId: runtimeRunId,
+    );
     final stdoutBuf = BoundedStreamBuffer();
     final stderrBuf = BoundedStreamBuffer();
     final before = await FileSnapshot.snapshot([
@@ -698,10 +712,19 @@ class WorkspaceToolsService {
 
     CommandExited? exited;
     Object? executionError;
+    var executing = false;
     try {
+      cancellation?.throwIfCancelled();
+      executing = true;
+      unawaited(
+        cancellation?.cancelled.then((_) async {
+          if (executing) await runtime.cancel(runtimeRunId);
+        }),
+      );
       await for (final event in runtime.run(
         CommandRequest(
-          runId: toolCallId,
+          runId: runtimeRunId,
+          isCancelled: cancellation?.isCancelled,
           command: command,
           cwd: cwd,
           timeout: Duration(seconds: timeoutSeconds),
@@ -727,6 +750,7 @@ class WorkspaceToolsService {
     } catch (e) {
       executionError = e;
     } finally {
+      executing = false;
       // A failed or cancelled command may still have installed/updated files.
       // Refresh observers without turning a refresh failure into a tool error.
       try {
@@ -999,6 +1023,7 @@ class WorkspaceToolsService {
     try {
       final result = await HostFileTools(
         ctx.paths,
+        checkCancelled: ToolCallCancellation.current?.throwIfCancelled,
       ).writeFile(path, content, cwd: ctx.cwd);
       final link = linkFor(resolved, paths: ctx.paths);
       final body = <String, Object?>{
@@ -1077,13 +1102,17 @@ class WorkspaceToolsService {
     if (denied != null) return denied;
 
     try {
-      final result = await HostFileTools(ctx.paths).editFile(
-        path,
-        args['old_string']?.toString() ?? '',
-        args['new_string']?.toString() ?? '',
-        replaceAll: _boolArg(args, 'replace_all'),
-        cwd: ctx.cwd,
-      );
+      final result =
+          await HostFileTools(
+            ctx.paths,
+            checkCancelled: ToolCallCancellation.current?.throwIfCancelled,
+          ).editFile(
+            path,
+            args['old_string']?.toString() ?? '',
+            args['new_string']?.toString() ?? '',
+            replaceAll: _boolArg(args, 'replace_all'),
+            cwd: ctx.cwd,
+          );
       final link = linkFor(resolved, paths: ctx.paths);
       final body = <String, Object?>{
         'ok': true,
@@ -1311,6 +1340,7 @@ class WorkspaceToolsService {
     String? conversationId,
     String? path,
   }) async {
+    ToolCallCancellation.current?.throwIfCancelled();
     if (!needed) return null;
     if (approvalService == null) {
       return _deniedResult(
@@ -1350,11 +1380,13 @@ class WorkspaceToolsService {
     if (id == null || id.isEmpty) return;
     try {
       await updateConversationExtras?.call(id, (extras) {
+        final current = WorkspaceBinding.fromExtras(extras);
+        if (current.workspaceId != ctx.binding.workspaceId) return extras;
         return WorkspaceBinding(
-          workspaceId: ctx.binding.workspaceId,
-          cwd: ctx.binding.cwd,
+          workspaceId: current.workspaceId,
+          cwd: current.cwd,
           toolsUsed: true,
-          allowAll: ctx.binding.allowAll,
+          allowAll: current.allowAll,
         ).applyTo(extras);
       });
       await touchLastUsed?.call(ctx.workspace.id);

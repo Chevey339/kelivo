@@ -91,6 +91,7 @@ class WorkspacePaths {
       Mount(host: workspaceHostRoot, guest: guestWorkspace),
       Mount(host: sessionHostDir, guest: guestChat),
       Mount(host: skillsHostDir, guest: guestSkills),
+      Mount(host: tmpHostRoot, guest: guestTmp),
       ..._externalMounts,
     ];
   }

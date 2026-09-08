@@ -5099,6 +5099,14 @@ class ChatDatabaseRepository {
       ]);
       attached = true;
       return await _db.transaction(() async {
+        // These rows own the workspace references carried by imported chats.
+        // Device-local external folder grants are deliberately excluded.
+        await _db.customStatement(
+          "INSERT OR IGNORE INTO extension_entity_rows "
+          "(kind, id, sort_order, owner_id, payload, updated_at) "
+          "SELECT kind, id, sort_order, owner_id, payload, updated_at "
+          "FROM merge_source.extension_entity_rows WHERE kind IN ('workspace', 'skill');",
+        );
         final sourceRows = await _db
             .customSelect(
               'SELECT id FROM merge_source.conversation_rows ORDER BY id;',

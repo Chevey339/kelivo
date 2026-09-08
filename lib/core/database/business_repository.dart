@@ -225,7 +225,7 @@ final class BusinessRepository {
   Future<void> clearAll() async {
     await _database.transaction(() async {
       for (final kind in BusinessEntityKind.values) {
-        await _database.customStatement('DELETE FROM ${kind.tableName};');
+        await _clearEntities(kind);
       }
       await _database.customStatement('DELETE FROM preference_rows;');
     });
@@ -261,13 +261,19 @@ final class BusinessRepository {
     String? assistantId,
   }) async {
     final isMemory = kind == BusinessEntityKind.assistantMemory;
-    final filter = assistantId == null ? '' : ' WHERE assistant_id = ?';
+    final filter = kind.extensionKind != null
+        ? ' WHERE kind = ?'
+        : assistantId == null
+        ? ''
+        : ' WHERE assistant_id = ?';
     final rows = await _database
         .customSelect(
           'SELECT ${kind.idColumn} AS entity_id, sort_order, payload'
           '${isMemory ? ', assistant_id' : ''} FROM ${kind.tableName}'
           '$filter ORDER BY sort_order, ${kind.idColumn};',
-          variables: assistantId == null
+          variables: kind.extensionKind != null
+              ? <Variable<Object>>[Variable<String>(kind.extensionKind!)]
+              : assistantId == null
               ? const <Variable<Object>>[]
               : <Variable<Object>>[Variable<String>(assistantId)],
         )
@@ -284,11 +290,18 @@ final class BusinessRepository {
     );
   }
 
+  Future<void> _clearEntities(
+    BusinessEntityKind kind,
+  ) => _database.customStatement(
+    'DELETE FROM ${kind.tableName}${kind.extensionKind == null ? '' : ' WHERE kind = ?'};',
+    <Object?>[if (kind.extensionKind != null) kind.extensionKind],
+  );
+
   Future<void> _replaceEntities(
     BusinessEntityKind kind,
     List<BusinessEntityValue> rows,
   ) async {
-    await _database.customStatement('DELETE FROM ${kind.tableName};');
+    await _clearEntities(kind);
     final updatedAt = DateTime.now().toUtc().microsecondsSinceEpoch;
     for (final row in rows) {
       await _upsertEntity(kind, row, updatedAt: updatedAt);
@@ -300,6 +313,21 @@ final class BusinessRepository {
     BusinessEntityValue row, {
     required int updatedAt,
   }) {
+    if (kind.extensionKind != null) {
+      return _database.customStatement(
+        'INSERT INTO extension_entity_rows '
+        '(kind, id, sort_order, payload, updated_at) VALUES (?, ?, ?, ?, ?) '
+        'ON CONFLICT(kind, id) DO UPDATE SET sort_order = excluded.sort_order, '
+        'payload = excluded.payload, updated_at = excluded.updated_at;',
+        <Object?>[
+          kind.extensionKind,
+          row.id,
+          row.sortOrder,
+          row.payload,
+          updatedAt,
+        ],
+      );
+    }
     if (kind == BusinessEntityKind.assistantMemory) {
       return _database.customStatement(
         'INSERT INTO assistant_memory_rows '
@@ -423,8 +451,9 @@ WHERE id IN ($placeholders);
 
   Future<void> _deleteEntity(BusinessEntityKind kind, String id) =>
       _database.customStatement(
-        'DELETE FROM ${kind.tableName} WHERE ${kind.idColumn} = ?;',
-        <Object?>[id],
+        'DELETE FROM ${kind.tableName} WHERE ${kind.idColumn} = ?'
+        '${kind.extensionKind == null ? '' : ' AND kind = ?'};',
+        <Object?>[id, if (kind.extensionKind != null) kind.extensionKind],
       );
 
   Future<void> _replacePreferences(Map<String, Object> preferences) async {

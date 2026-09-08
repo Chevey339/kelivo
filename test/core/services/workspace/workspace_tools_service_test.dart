@@ -245,7 +245,7 @@ void main() {
       const secret = 'long-output-secret-token';
       final stdout = List.filled(1600, '$secret\n').join();
       final runtime = FakeWorkspaceRuntime();
-      runtime.enqueue('private-offload', [
+      runtime.enqueueNext([
         CommandOutput(
           OutputStreamKind.stdout,
           Uint8List.fromList(utf8.encode(stdout)),
@@ -305,7 +305,7 @@ void main() {
       'timed_out',
       'no_exit',
     ]) {
-      runtime.enqueue(status, [
+      runtime.enqueueNext([
         const CommandStarted(pid: 0),
         if (status != 'no_exit')
           CommandExited(

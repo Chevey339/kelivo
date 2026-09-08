@@ -111,9 +111,10 @@ class GrepResult {
 }
 
 class HostFileTools {
-  HostFileTools(this.paths);
+  HostFileTools(this.paths, {this.checkCancelled});
 
   final WorkspacePaths paths;
+  final void Function()? checkCancelled;
 
   static const int readCapBytes = 32 * 1024;
   static const int binaryProbeBytes = 8 * 1024;
@@ -167,36 +168,80 @@ class HostFileTools {
       await handle.close();
     }
 
-    final content = await file.readAsString();
-    final lines = const LineSplitter().convert(content);
     final start = (offset ?? 1) < 1 ? 1 : (offset ?? 1);
-    if (start > lines.length + 1) {
-      return const ReadFileResult(text: '');
-    }
-    final available = lines.length - (start - 1);
-    final take = limit == null
-        ? available
-        : (limit < available ? limit : available);
+    final pageLimit = limit == null ? null : (limit < 1 ? 1 : limit);
     final buffer = StringBuffer();
     var encodedBytes = 0;
-    var lastIncluded = start - 1;
-    for (var i = 0; i < take; i++) {
-      final lineNo = start + i;
-      final formatted =
-          '${lineNo.toString().padLeft(6)}|${lines[start - 1 + i]}\n';
-      final lineBytes = utf8.encode(formatted).length;
-      if (encodedBytes + lineBytes > readCapBytes && buffer.isNotEmpty) {
-        return ReadFileResult(text: buffer.toString(), nextOffset: lineNo);
+    var included = 0;
+    await for (final line in _readBoundedLines(file, start)) {
+      if (pageLimit != null && included >= pageLimit) {
+        return ReadFileResult(text: buffer.toString(), nextOffset: line.number);
       }
+      final prefix = '${line.number.toString().padLeft(6)}|';
+      final size = prefix.length + line.bytes.length + 1;
+      if (encodedBytes + size > readCapBytes && included > 0) {
+        return ReadFileResult(text: buffer.toString(), nextOffset: line.number);
+      }
+      const marker = ' [line truncated]';
+      final truncated = line.truncated || size > readCapBytes;
+      final maxContent =
+          readCapBytes - prefix.length - 1 - (truncated ? marker.length : 0);
+      var end = line.bytes.length.clamp(0, maxContent);
+      // Do not split a UTF-8 code point at the byte cap.
+      if (end < line.bytes.length) {
+        while (end > 0 && (line.bytes[end] & 0xc0) == 0x80) {
+          end--;
+        }
+      }
+      final text = utf8.decode(line.bytes.sublist(0, end));
+      final formatted = '$prefix$text${truncated ? marker : ''}\n';
       buffer.write(formatted);
-      encodedBytes += lineBytes;
-      lastIncluded = lineNo;
+      encodedBytes += utf8.encode(formatted).length;
+      included++;
     }
-    final more = lastIncluded < lines.length;
-    return ReadFileResult(
-      text: buffer.toString(),
-      nextOffset: more ? lastIncluded + 1 : null,
-    );
+    return ReadFileResult(text: buffer.toString());
+  }
+
+  /// Keeps at most one page of a line, even for minified or generated files.
+  /// Splits bytes before decoding so a single huge line cannot grow a decoder's
+  /// line buffer. Lines before the requested offset are scanned without storage.
+  static Stream<({int number, List<int> bytes, bool truncated})>
+  _readBoundedLines(File file, int start) async* {
+    var number = 1;
+    var bytes = <int>[];
+    var truncated = false;
+    var hasContent = false;
+    var afterCr = false;
+    await for (final chunk in file.openRead()) {
+      for (final byte in chunk) {
+        if (afterCr && byte == 10) {
+          afterCr = false;
+          continue;
+        }
+        afterCr = byte == 13;
+        if (byte == 10 || byte == 13) {
+          if (number >= start) {
+            yield (number: number, bytes: bytes, truncated: truncated);
+          }
+          number++;
+          bytes = <int>[];
+          truncated = false;
+          hasContent = false;
+        } else {
+          hasContent = true;
+          if (number >= start) {
+            if (bytes.length < readCapBytes) {
+              bytes.add(byte);
+            } else {
+              truncated = true;
+            }
+          }
+        }
+      }
+    }
+    if (hasContent && number >= start) {
+      yield (number: number, bytes: bytes, truncated: truncated);
+    }
   }
 
   Future<WriteFileResult> writeFile(
@@ -210,7 +255,9 @@ class HostFileTools {
     }
     final file = File(resolved.hostPath);
     final created = !await file.exists();
+    checkCancelled?.call();
     await file.parent.create(recursive: true);
+    checkCancelled?.call();
     await file.writeAsString(content);
     return WriteFileResult(
       bytes: utf8.encode(content).length,
@@ -244,6 +291,7 @@ class HostFileTools {
       throw HostFileException(outcome.message);
     }
     final applied = outcome as EditApplied;
+    checkCancelled?.call();
     await file.writeAsString(applied.updated);
     return EditFileResult(
       changed: original != applied.updated,

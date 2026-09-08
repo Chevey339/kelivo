@@ -2314,8 +2314,9 @@ class DataSync {
   /// without deleting anything already present, so files referenced by an
   /// untouched chat database survive.
   Future<void> _restoreAssetDirectoriesAdditive(
-    Directory payloadDirectory,
-  ) async {
+    Directory payloadDirectory, {
+    Map<String, String> remappedConversationIds = const {},
+  }) async {
     for (final name in _assetRootNames) {
       final src = Directory(p.join(payloadDirectory.path, name));
       if (!await src.exists()) continue;
@@ -2326,7 +2327,11 @@ class DataSync {
       for (final ent in src.listSync(recursive: true)) {
         if (ent is File) {
           final rel = p.relative(ent.path, from: src.path);
-          final targetFile = File(p.join(dst.path, rel));
+          final segments = p.split(rel);
+          if (name == 'sessions' && segments.length > 1) {
+            segments[0] = remappedConversationIds[segments[0]] ?? segments[0];
+          }
+          final targetFile = File(p.joinAll([dst.path, ...segments]));
           if (!await targetFile.exists()) {
             await _copyRestoredFile(ent, targetFile);
           }
@@ -3134,7 +3139,11 @@ class DataSync {
           }
         } else {
           // Merge mode: Only copy non-existing files
-          await _restoreAssetDirectoriesAdditive(restorePayloadDirectory);
+          await _restoreAssetDirectoriesAdditive(
+            restorePayloadDirectory,
+            remappedConversationIds:
+                _lastMergeReport?.remappedConversationIds ?? const {},
+          );
         }
       }
       // Legacy chats.json decodes before assets exist. After files land,

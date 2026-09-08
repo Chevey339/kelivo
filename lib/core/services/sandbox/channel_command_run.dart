@@ -22,11 +22,14 @@ Stream<CommandEvent> runChannelCommand({
   var began = false;
   var finished = false;
   var closing = false;
+  var execIssued = false;
+  final startupDone = Completer<void>();
 
   Future<void> finish() async {
     finished = true;
     if (closing) return;
     closing = true;
+    await startupDone.future;
     await subscription.cancel();
     if (began && after != null) {
       try {
@@ -76,7 +79,13 @@ Stream<CommandEvent> runChannelCommand({
     },
   );
 
-  controller.onCancel = finish;
+  controller.onCancel = () async {
+    if (!finished) {
+      finished = true;
+      if (execIssued) await channel.cancel(request.runId);
+    }
+    await finish();
+  };
 
   unawaited(() async {
     try {
@@ -84,12 +93,23 @@ Stream<CommandEvent> runChannelCommand({
         await before();
         began = true;
       }
+      if (finished || request.isCancelled?.call() == true) {
+        throw StateError('command_cancelled');
+      }
+      execIssued = true;
       await channel.exec(args);
+      // Cancellation may have reached native code before the queued exec was
+      // registered. Repeat it after the platform acknowledges startup.
+      if (finished || request.isCancelled?.call() == true) {
+        await channel.cancel(request.runId);
+      }
     } catch (error, stack) {
-      if (!controller.isClosed) {
+      if (!finished && !controller.isClosed) {
         controller.addError(error, stack);
       }
-      await finish();
+      unawaited(finish());
+    } finally {
+      startupDone.complete();
     }
   }());
 

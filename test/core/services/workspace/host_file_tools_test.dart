@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:flutter_test/flutter_test.dart';
@@ -53,6 +54,26 @@ void main() {
       );
       expect(page2.text, isNotNull);
       expect(page2.text!, startsWith(page1.nextOffset.toString().padLeft(6)));
+    },
+  );
+
+  test(
+    'oversized UTF-8 lines stay bounded and explicitly mark truncation',
+    () async {
+      File(
+        p.join(cwd, 'minified.txt'),
+      ).writeAsStringSync('${'😀中' * 20000}\r\nnext\rlast\n');
+      final first = await tools.readFile('minified.txt', cwd: cwd);
+      expect(
+        utf8.encode(first.text!).length,
+        lessThanOrEqualTo(HostFileTools.readCapBytes),
+      );
+      expect(first.text, contains('[line truncated]'));
+      expect(first.text, isNot(contains('�')));
+      expect(first.nextOffset, 2);
+      final rest = await tools.readFile('minified.txt', cwd: cwd, offset: 2);
+      expect(rest.text, '     2|next\n     3|last\n');
+      expect(rest.nextOffset, isNull);
     },
   );
 

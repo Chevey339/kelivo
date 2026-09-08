@@ -4,7 +4,7 @@
 //
 //  Objective-C wrapper around the embedded iSH-ARM64 kernel for the Kelivo
 //  Workspace sandbox. Boots exactly once per app process (become_first_process
-//  is irreversible). Host directories are exposed via fakefs bind mounts.
+//  is irreversible). Command roots use per-process fakefs path contexts.
 //
 
 #import <Foundation/Foundation.h>
@@ -43,8 +43,8 @@ typedef NS_ENUM(int, KelivoISHPtyOpenError) {
 /// Idempotent. Must be called from a background thread (becomes guest PID 1).
 - (int)bootWithRootPath:(NSString *)rootPath;
 
-/// For each {host, guest}, mount if absent and remount if the host changed.
-- (int)reconcileBinds:(NSArray<NSDictionary<NSString *, id> *> *)binds;
+/// On the spawn queue, obtain retained immutable mappings for a new task.
+- (uint64_t)filesystemContextForBinds:(NSArray<NSDictionary<NSString *, id> *> *)binds;
 - (int)reconcileExternalBinds:(NSArray<NSDictionary<NSString *, id> *> *)binds;
 
 - (int)bindMountPath:(NSString *)linuxPath toHostPath:(NSString *)hostPath readOnly:(BOOL)readOnly;
@@ -61,6 +61,7 @@ typedef NS_ENUM(int, KelivoISHPtyOpenError) {
 /// unregistered only once its guest process reports exit, so a reused id is
 /// refused rather than silently replacing the live session.
 - (int)ptyOpenSession:(NSString *)sessionId
+                binds:(NSArray<NSDictionary<NSString *, id> *> *)binds
                   cwd:(nullable NSString *)cwd
                   env:(nullable NSDictionary<NSString *, NSString *> *)env
                  cols:(int)cols

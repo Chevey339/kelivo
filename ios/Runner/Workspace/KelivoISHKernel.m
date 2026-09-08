@@ -11,6 +11,7 @@
 #import "KelivoISHCrashGuards.h"
 #import "KelivoISHExecutor.h"
 #import "KelivoISHEnvironment.h"
+#import "KelivoISHFilesystem.h"
 #import "KelivoISHCompat.h"
 
 @import SystemConfiguration;
@@ -97,6 +98,11 @@ static struct tty_driver_ops kelivo_pty_ops = {
 
 static struct tty_driver kelivo_pty_driver = {.ops = &kelivo_pty_ops};
 
+static bool kelivo_reverse_context_path(const char *host, char *out, size_t size) {
+    uint64_t context = current && current->group ? current->group->fs_context : 0;
+    return KelivoISHReversePath(host, context, out, size);
+}
+
 #pragma mark - Session / bind state
 
 @interface KelivoISHPtySession : NSObject
@@ -162,6 +168,7 @@ static int kelivo_pty_write(struct tty *tty, const void *buf, size_t len, bool b
     NSMutableDictionary<NSNumber *, KelivoISHPtySession *> *_ptyByPid;
     NSMutableDictionary<NSNumber *, KelivoISHPtySession *> *_ptyByTtyNum;
     NSLock *_ptyLock;
+    NSMutableSet<NSData *> *_filesystems;
 }
 
 - (void)dealloc {
@@ -184,6 +191,7 @@ static int kelivo_pty_write(struct tty *tty, const void *buf, size_t len, bool b
     self = [super init];
     if (self) {
         _isBooted = NO;
+        _filesystems = [NSMutableSet set];
         _spawnQueue = dispatch_queue_create("psyche.kelivo.workspace.ish.spawn", DISPATCH_QUEUE_SERIAL);
         _activeBinds = [NSMutableDictionary dictionary];
         _readOnlyBinds = [NSMutableDictionary dictionary];
@@ -253,6 +261,8 @@ static int kelivo_pty_write(struct tty *tty, const void *buf, size_t len, bool b
     [self mountDnsConfig];
     [self setUpUnixSocketPrefix];
 
+    fakefs_set_path_translate_hook(KelivoISHTranslatePath);
+    fakefs_set_path_reverse_hook(kelivo_reverse_context_path);
     exit_hook = kelivo_handle_process_exit;
 
     tty_drivers[TTY_CONSOLE_MAJOR] = &kelivo_console_driver;
@@ -538,6 +548,27 @@ static void KelivoDnsReachabilityChanged(SCNetworkReachabilityRef target,
     return err;
 }
 
+- (uint64_t)filesystemContextForBinds:(NSArray<NSDictionary<NSString *, id> *> *)binds {
+    NSData *data = KelivoISHCreateFilesystem(binds);
+    if (!data) return 0;
+    // Fork copies fs_context. Reclaim only contexts absent from the entire task
+    // table, rather than freeing a shell's mapping while its children still run.
+    NSMutableSet<NSNumber *> *live = [NSMutableSet set];
+    lock(&pids_lock);
+    for (int pid = 1; pid < MAX_PID; pid++) {
+        struct task *task = pid_get_task(pid);
+        if (task && !task->exiting && task->group) [live addObject:@(task->group->fs_context)];
+    }
+    unlock(&pids_lock);
+    for (NSData *old in [_filesystems copy]) {
+        if (![live containsObject:@((uint64_t)(uintptr_t)old.bytes)]) [_filesystems removeObject:old];
+    }
+    NSData *existing = [_filesystems member:data];
+    if (existing) data = existing;
+    else [_filesystems addObject:data];
+    return (uint64_t)(uintptr_t)data.bytes;
+}
+
 - (int)reconcileBinds:(NSArray<NSDictionary<NSString *, id> *> *)binds {
     if (!_isBooted) return -1;
     for (NSDictionary<NSString *, id> *bind in binds) {
@@ -590,6 +621,7 @@ static void KelivoDnsReachabilityChanged(SCNetworkReachabilityRef target,
 }
 
 - (int)ptyOpenSession:(NSString *)sessionId
+                binds:(NSArray<NSDictionary<NSString *, id> *> *)binds
                   cwd:(NSString *)cwd
                   env:(NSDictionary<NSString *, NSString *> *)env
                  cols:(int)cols
@@ -623,78 +655,86 @@ static void KelivoDnsReachabilityChanged(SCNetworkReachabilityRef target,
 
     __block int resultPid = -1;
     [self performOnSpawnQueue:^{
-        int err = become_new_init_child();
-        if (err < 0) {
-            resultPid = err;
-            return;
-        }
+        struct task *saved = current;
+        @try {
+            uint64_t filesystem = [self filesystemContextForBinds:binds];
+            if (!filesystem) { resultPid = -EINVAL; return; }
+            int err = become_new_init_child();
+            if (err < 0) {
+                resultPid = err;
+                return;
+            }
 
-        struct tty *tty = pty_open_fake(&kelivo_pty_driver);
-        if (IS_ERR(tty)) {
-            resultPid = (int)PTR_ERR(tty);
-            return;
-        }
-        struct winsize_ winsize = {
-            .row = rows > 0 ? rows : 24,
-            .col = cols > 0 ? cols : 80,
-            .xpixel = 0,
-            .ypixel = 0,
-        };
-        tty_set_winsize(tty, winsize);
+            current->group->fs_context = filesystem;
+            struct tty *tty = pty_open_fake(&kelivo_pty_driver);
+            if (IS_ERR(tty)) {
+                resultPid = (int)PTR_ERR(tty);
+                return;
+            }
+            struct winsize_ winsize = {
+                .row = rows > 0 ? rows : 24,
+                .col = cols > 0 ? cols : 80,
+                .xpixel = 0,
+                .ypixel = 0,
+            };
+            tty_set_winsize(tty, winsize);
 
-        NSString *stdioFile = [NSString stringWithFormat:@"/dev/pts/%d", tty->num];
-        err = create_stdio(stdioFile.fileSystemRepresentation, TTY_PSEUDO_SLAVE_MAJOR, tty->num);
-        if (err < 0) {
-            resultPid = err;
-            return;
-        }
+            NSString *stdioFile = [NSString stringWithFormat:@"/dev/pts/%d", tty->num];
+            err = create_stdio(stdioFile.fileSystemRepresentation, TTY_PSEUDO_SLAVE_MAJOR, tty->num);
+            if (err < 0) {
+                resultPid = err;
+                return;
+            }
 
-        if (cwd.length > 0) {
-            struct statbuf st;
-            int statErr = generic_statat(AT_PWD, cwd.UTF8String, &st, true);
-            if (statErr >= 0 && (st.mode & S_IFDIR)) {
-                struct fd *dir = generic_open(cwd.UTF8String, O_RDONLY_, 0);
-                if (!IS_ERR(dir)) {
-                    fs_chdir(current->fs, dir);
+            if (cwd.length > 0) {
+                struct statbuf st;
+                int statErr = generic_statat(AT_PWD, cwd.UTF8String, &st, true);
+                if (statErr >= 0 && (st.mode & S_IFDIR)) {
+                    struct fd *dir = generic_open(cwd.UTF8String, O_RDONLY_, 0);
+                    if (!IS_ERR(dir)) {
+                        fs_chdir(current->fs, dir);
+                    }
                 }
             }
+
+            BOOL useBash = [self guestFileExists:"/bin/bash"];
+            const char *execPath = useBash ? "/bin/bash" : "/bin/sh";
+            NSArray<NSString *> *argvArray = useBash ? @[ @"/bin/bash", @"-l" ] : @[ @"/bin/sh", @"-l" ];
+            char argv_buf[4096];
+            size_t pos = 0;
+            int argc = 0;
+            for (NSString *arg in argvArray) {
+                const char *s = arg.UTF8String;
+                size_t len = strlen(s) + 1;
+                if (pos + len >= sizeof(argv_buf) - 1) break;
+                memcpy(argv_buf + pos, s, len);
+                pos += len;
+                argc++;
+            }
+            argv_buf[pos] = '\0';
+
+            err = do_execve(execPath, argc, argv_buf, environmentData.bytes);
+            if (err < 0) {
+                resultPid = err;
+                return;
+            }
+
+            KelivoISHPtySession *session = [[KelivoISHPtySession alloc] init];
+            session.sessionId = sessionId;
+            session.pid = current->pid;
+            session.pgid = current->group->pgid;
+            session.tty = tty;
+            [_ptyLock lock];
+            self->_ptyBySession[sessionId] = session;
+            self->_ptyByPid[@(session.pid)] = session;
+            self->_ptyByTtyNum[@(tty->num)] = session;
+            [_ptyLock unlock];
+
+            resultPid = current->pid;
+            task_start(current);
+        } @finally {
+            current = saved;
         }
-
-        BOOL useBash = [self guestFileExists:"/bin/bash"];
-        const char *execPath = useBash ? "/bin/bash" : "/bin/sh";
-        NSArray<NSString *> *argvArray = useBash ? @[ @"/bin/bash", @"-l" ] : @[ @"/bin/sh", @"-l" ];
-        char argv_buf[4096];
-        size_t pos = 0;
-        int argc = 0;
-        for (NSString *arg in argvArray) {
-            const char *s = arg.UTF8String;
-            size_t len = strlen(s) + 1;
-            if (pos + len >= sizeof(argv_buf) - 1) break;
-            memcpy(argv_buf + pos, s, len);
-            pos += len;
-            argc++;
-        }
-        argv_buf[pos] = '\0';
-
-        err = do_execve(execPath, argc, argv_buf, environmentData.bytes);
-        if (err < 0) {
-            resultPid = err;
-            return;
-        }
-
-        KelivoISHPtySession *session = [[KelivoISHPtySession alloc] init];
-        session.sessionId = sessionId;
-        session.pid = current->pid;
-        session.pgid = current->group->pgid;
-        session.tty = tty;
-        [_ptyLock lock];
-        self->_ptyBySession[sessionId] = session;
-        self->_ptyByPid[@(session.pid)] = session;
-        self->_ptyByTtyNum[@(tty->num)] = session;
-        [_ptyLock unlock];
-
-        resultPid = current->pid;
-        task_start(current);
     }];
     return resultPid;
 }

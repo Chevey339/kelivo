@@ -45,6 +45,7 @@ class CommandRequest {
     this.timeout = const Duration(seconds: 60),
     this.env = const <String, String>{},
     this.mounts = const <Mount>[],
+    this.isCancelled,
   });
 
   final String runId;
@@ -56,6 +57,9 @@ class CommandRequest {
   final Duration timeout;
   final Map<String, String> env;
   final List<Mount> mounts;
+
+  /// Rechecked after asynchronous platform startup, before issuing exec.
+  final bool Function()? isCancelled;
 }
 
 sealed class CommandEvent {

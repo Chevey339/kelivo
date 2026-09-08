@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
@@ -12,6 +13,7 @@ import 'package:Kelivo/core/services/sandbox/environment_manager.dart';
 import 'package:Kelivo/core/services/sandbox/ios_ish_runtime.dart';
 import 'package:Kelivo/core/services/sandbox/workspace_channel.dart';
 import 'package:Kelivo/core/services/workspace/workspace_paths.dart';
+import 'package:Kelivo/core/services/workspace/host_file_tools.dart';
 import 'package:Kelivo/core/services/workspace/workspace_runtime.dart';
 import 'package:Kelivo/core/services/workspace/workspace_tools_service.dart';
 import 'package:Kelivo/utils/mcp_structured_image.dart';
@@ -115,6 +117,177 @@ void main() {
   }
 
   group('iOS iSH workspace', () {
+    iosTest('cold boot restores external mounts before commands', (
+      tester,
+    ) async {
+      final probe = await channel.probe();
+      expect(
+        probe.booted,
+        isFalse,
+        reason: 'Run this test in a fresh app process',
+      );
+      if (probe.installed != true) await manager.install();
+      final external = await Directory.systemTemp.createTemp(
+        'kelivo-cold-mount-',
+      );
+      await File(
+        p.join(external.path, 'identity'),
+      ).writeAsString('cold-mounted');
+      final binds = [
+        BindMount(
+          host: external.path,
+          guest: '/mounts/cold-start-test',
+          readOnly: true,
+        ),
+      ];
+      try {
+        await channel.setExternalMounts(binds);
+        await channel.setExternalMounts(binds);
+        // Exercise both boot entry points in separate fresh app runs.
+        if (!const bool.fromEnvironment('KELIVO_TEST_IMPLICIT_BOOT')) {
+          await channel.boot();
+        }
+        final first = await runCmd('cat /mounts/cold-start-test/identity');
+        expect(first.exit.exitCode, 0, reason: first.stderr);
+        expect(first.stdout, 'cold-mounted');
+        await channel.setExternalMounts(binds);
+        final denied = await runCmd(
+          'printf changed > /mounts/cold-start-test/identity',
+        );
+        expect(denied.exit.exitCode, isNot(0));
+        expect(
+          await File(p.join(external.path, 'identity')).readAsString(),
+          'cold-mounted',
+        );
+      } finally {
+        await channel.setExternalMounts([]);
+        await external.delete(recursive: true);
+      }
+    });
+
+    iosTest('independent command and PTY roots with shared tmp file tools', (
+      tester,
+    ) async {
+      if ((await channel.probe()).installed != true) await manager.install();
+      await channel.boot();
+      final secondRoot = await Directory.systemTemp.createTemp(
+        'kelivo_ish_second_',
+      );
+      final secondWorkspace = await Directory(
+        p.join(secondRoot.path, 'workspace'),
+      ).create();
+      final secondChat = await Directory(
+        p.join(secondRoot.path, 'chat'),
+      ).create();
+      final secondPaths = WorkspacePaths.sandboxed(
+        workspaceHostRoot: secondWorkspace.path,
+        sessionHostDir: secondChat.path,
+        skillsHostDir: skillsHost.path,
+      );
+      await File(
+        p.join(workspaceHost.path, 'identity'),
+      ).writeAsString('workspace-a');
+      await File(
+        p.join(secondWorkspace.path, 'identity'),
+      ).writeAsString('workspace-b');
+      final firstReady = Completer<void>();
+      // A real child process inherits A's context while B starts independently.
+      final first = runtime
+          .run(
+            CommandRequest(
+              runId: 'isolated-a',
+              command:
+                  "echo READY; (sleep 2; cat /workspace/identity > /chat/child.txt); pwd; cat identity",
+              cwd: '/workspace',
+              mounts: mounts,
+            ),
+          )
+          .map((event) {
+            if (event is CommandOutput &&
+                utf8.decode(event.bytes).contains('READY') &&
+                !firstReady.isCompleted) {
+              firstReady.complete();
+            }
+            return event;
+          })
+          .toList();
+      await firstReady.future.timeout(const Duration(seconds: 20));
+      final a = await runtime.openPty(
+        mounts: mounts,
+        cwd: '/workspace',
+        env: const {},
+        cols: 80,
+        rows: 24,
+      );
+      final b = await runtime.openPty(
+        mounts: secondPaths.mounts,
+        cwd: '/workspace',
+        env: const {},
+        cols: 80,
+        rows: 24,
+      );
+      final aOutput = a.output.listen((_) {});
+      final bOutput = b.output.listen((_) {});
+      try {
+        final second = await runCmd(
+          'pwd; cat identity; printf workspace-b > /chat/child.txt',
+          extraMounts: secondPaths.mounts,
+        );
+        expect(second.exit.exitCode, 0, reason: second.stderr);
+        expect(second.stdout, contains('/workspace'));
+        expect(second.stdout, contains('workspace-b'));
+        final firstEvents = await first.timeout(const Duration(seconds: 20));
+        expect(firstEvents.whereType<CommandExited>().single.exitCode, 0);
+        final firstText = firstEvents
+            .whereType<CommandOutput>()
+            .map((event) => utf8.decode(event.bytes))
+            .join();
+        expect(firstText, contains('/workspace'));
+        expect(firstText, contains('workspace-a'));
+        expect(
+          await File(p.join(sessionHost.path, 'child.txt')).readAsString(),
+          'workspace-a',
+        );
+        expect(
+          await File(p.join(secondChat.path, 'child.txt')).readAsString(),
+          'workspace-b',
+        );
+        await a.write(utf8.encode('cat identity > /chat/pty.txt\r'));
+        await b.write(utf8.encode('cat identity > /chat/pty.txt\r'));
+        final aFile = File(p.join(sessionHost.path, 'pty.txt'));
+        final bFile = File(p.join(secondChat.path, 'pty.txt'));
+        final deadline = DateTime.now().add(const Duration(seconds: 20));
+        while (!await aFile.exists() || !await bFile.exists()) {
+          if (DateTime.now().isAfter(deadline)) {
+            fail('PTY output did not reach its own chat');
+          }
+          await Future<void>.delayed(const Duration(milliseconds: 50));
+        }
+        expect(await aFile.readAsString(), 'workspace-a');
+        expect(await bFile.readAsString(), 'workspace-b');
+        final files = HostFileTools(secondPaths);
+        final guestTmp = '/tmp/${p.basename(secondRoot.path)}/shared.txt';
+        await files.writeFile(guestTmp, 'from-file-tool');
+        final tmpResult = await runCmd(
+          'cat $guestTmp; printf from-shell > $guestTmp',
+          extraMounts: secondPaths.mounts,
+        );
+        expect(tmpResult.exit.exitCode, 0, reason: tmpResult.stderr);
+        expect(tmpResult.stdout, contains('from-file-tool'));
+        expect((await files.readFile(guestTmp)).text, contains('from-shell'));
+      } finally {
+        await a.close();
+        await b.close();
+        await Future.wait([
+          a.exitCode,
+          b.exitCode,
+        ]).timeout(const Duration(seconds: 20));
+        await aOutput.cancel();
+        await bOutput.cancel();
+        await secondRoot.delete(recursive: true);
+      }
+    });
+
     iosTest('1. probe reports installed / version / needsRestart', (
       tester,
     ) async {

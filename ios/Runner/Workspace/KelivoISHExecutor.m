@@ -159,6 +159,7 @@ static dispatch_queue_t _readerQueue;
 
 + (BOOL)startCommand:(NSString *)command
                runId:(NSString *)runId
+               binds:(NSArray<NSDictionary<NSString *, id> *> *)binds
                  cwd:(NSString *)cwd
                  env:(NSDictionary<NSString *, NSString *> *)env
            timeoutMs:(NSInteger)timeoutMs
@@ -192,6 +193,7 @@ static dispatch_queue_t _readerQueue;
         }
         [self spawnCommand:command
                      runId:runId
+                     binds:binds
                        cwd:cwd
                        env:env
                    timeout:timeout
@@ -240,6 +242,7 @@ static dispatch_queue_t _readerQueue;
 
 + (void)spawnCommand:(NSString *)command
                runId:(NSString *)runId
+               binds:(NSArray<NSDictionary<NSString *, id> *> *)binds
                  cwd:(NSString *)cwd
                  env:(NSDictionary<NSString *, NSString *> *)env
              timeout:(NSTimeInterval)timeout
@@ -297,6 +300,12 @@ static dispatch_queue_t _readerQueue;
         return;
     }
 
+    uint64_t filesystem = [[KelivoISHKernel shared] filesystemContextForBinds:binds];
+    if (!filesystem) {
+        [ctx closePipeEnds];
+        fail(@"invalid filesystem bindings");
+        return;
+    }
     struct task *saved = current;
     int err = become_new_init_child();
     if (err < 0) {
@@ -306,6 +315,7 @@ static dispatch_queue_t _readerQueue;
         return;
     }
     struct task *task = current;
+    task->group->fs_context = filesystem;
 
     struct fd *stdin_fd = adhoc_fd_create(&realfs_fdops);
     if (stdin_fd) {

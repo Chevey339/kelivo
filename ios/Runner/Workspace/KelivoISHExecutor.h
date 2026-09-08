@@ -19,6 +19,7 @@ typedef void (^KelivoISHDoneHandler)(NSDictionary<NSString *, id> *result);
 /// with exitCode, timedOut, durationMs, cancelled, interrupted.
 + (BOOL)startCommand:(NSString *)command
                runId:(NSString *)runId
+               binds:(NSArray<NSDictionary<NSString *, id> *> *)binds
                  cwd:(nullable NSString *)cwd
                  env:(nullable NSDictionary<NSString *, NSString *> *)env
            timeoutMs:(NSInteger)timeoutMs

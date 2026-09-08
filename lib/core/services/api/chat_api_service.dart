@@ -23,6 +23,7 @@ import 'providers/openai_images.dart';
 import 'providers/openai_responses.dart';
 import 'providers/zhipu_layout_parsing.dart';
 import 'retry_policy.dart';
+import 'tool_call_cancellation.dart';
 import 'stream/retrying_stream.dart';
 import 'stream/stream_chunk_emit.dart';
 
@@ -169,6 +170,10 @@ class ChatApiService {
       explicitType: config.providerType,
     );
     final sessionToken = CancelToken();
+    final toolCancellation = ToolCallCancellation(
+      isCancelled: () => sessionToken.isCancelled,
+      cancelled: _whenCancelled(sessionToken),
+    );
     final rid = (requestId ?? '').trim();
     if (rid.isNotEmpty) {
       final prev = _activeCancelTokens.remove(rid);
@@ -234,7 +239,11 @@ class ChatApiService {
             topP: topP,
             maxTokens: maxTokens,
             tools: tools,
-            onToolCall: onToolCall,
+            onToolCall: onToolCall == null
+                ? null
+                : (name, args, {toolCallId}) => toolCancellation.run(
+                    () => onToolCall(name, args, toolCallId: toolCallId),
+                  ),
             extraHeaders: extraHeaders,
             extraBody: extraBody,
             stream: stream,

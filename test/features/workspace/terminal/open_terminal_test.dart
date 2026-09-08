@@ -127,15 +127,28 @@ void main() {
       manager.dispose();
     });
 
+    late Completer<void> sessionOpened;
+    void onSession() {
+      if (manager.sessions.isNotEmpty && !sessionOpened.isCompleted) {
+        sessionOpened.complete();
+      }
+    }
+
+    manager.addListener(onSession);
     final context = await pumpShell(
       tester,
       runtimeProvider: runtimeProvider,
       manager: manager,
     );
+    late Future<void> opening;
     // openTerminal awaits Navigator.push; do not wait for the route to pop.
     await tester.runAsync(() async {
-      unawaited(openTerminal(context, workspaceId: workspace.id));
-      await Future<void>.delayed(const Duration(milliseconds: 80));
+      sessionOpened = Completer<void>();
+      opening = openTerminal(context, workspaceId: workspace.id);
+      await sessionOpened.future.timeout(const Duration(seconds: 10));
+      // Let openTerminal resume from manager.open and enqueue the route.
+      await Future<void>.delayed(Duration.zero);
+      manager.removeListener(onSession);
     });
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 50));
@@ -146,6 +159,7 @@ void main() {
 
     tester.state<NavigatorState>(find.byType(Navigator)).pop();
     await tester.pump();
+    await tester.runAsync(() => opening);
   });
 
   testWidgets('genuinely not-ready status shows a snackbar', (tester) async {
