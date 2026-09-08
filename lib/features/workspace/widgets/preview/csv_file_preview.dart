@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
@@ -13,6 +12,7 @@ import 'package:Kelivo/theme/app_semantic_colors.dart';
 
 import 'code_file_preview.dart';
 import 'preview_states.dart';
+import 'preview_text_document.dart';
 
 const int kCsvPreviewMaxRows = 200;
 
@@ -28,7 +28,8 @@ class CsvFilePreview extends StatefulWidget {
 
 class CsvFilePreviewState extends State<CsvFilePreview> {
   bool _showSource = false;
-  String? _source;
+  PreviewTextDocument? _document;
+  int _loadGeneration = 0;
   Object? _error;
 
   @override
@@ -41,20 +42,30 @@ class CsvFilePreviewState extends State<CsvFilePreview> {
     }
   }
 
+  @override
+  void didUpdateWidget(covariant CsvFilePreview oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.file.path != widget.file.path) {
+      _loadGeneration++;
+      _document = null;
+      _error = null;
+      _showSource = false;
+      if (widget.autoLoad) unawaited(load());
+    }
+  }
+
   @visibleForTesting
   Future<void> load() async {
+    final generation = ++_loadGeneration;
     try {
-      final source = utf8.decode(
-        widget.file.readAsBytesSync(),
-        allowMalformed: true,
-      );
-      if (!mounted) return;
+      final document = await loadPreviewTextDocument(widget.file);
+      if (!mounted || generation != _loadGeneration) return;
       setState(() {
-        _source = source;
+        _document = document;
         _error = null;
       });
     } catch (e) {
-      if (!mounted) return;
+      if (!mounted || generation != _loadGeneration) return;
       setState(() => _error = e);
     }
   }
@@ -69,10 +80,18 @@ class CsvFilePreviewState extends State<CsvFilePreview> {
     if (_error != null) {
       return PreviewError(onRetry: () => unawaited(load()));
     }
-    final source = _source;
-    if (source == null) {
+    final document = _document;
+    if (document == null) {
       return const PreviewLoading();
     }
+    if (document.usesPlainText) {
+      return CodeFilePreview(
+        file: widget.file,
+        document: document,
+        language: 'csv',
+      );
+    }
+    final source = document.source!;
     return Column(
       children: [
         Padding(
@@ -96,7 +115,7 @@ class CsvFilePreviewState extends State<CsvFilePreview> {
           child: _showSource
               ? CodeFilePreview(
                   file: widget.file,
-                  autoLoad: widget.autoLoad,
+                  document: document,
                   language: 'csv',
                 )
               : source.trim().isEmpty

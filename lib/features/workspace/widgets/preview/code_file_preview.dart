@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:convert';
 import 'dart:io';
 import 'dart:math' as math;
 
@@ -14,16 +13,15 @@ import 'package:Kelivo/core/providers/settings_provider.dart';
 import 'package:Kelivo/core/services/haptics.dart';
 import 'package:Kelivo/icons/lucide_adapter.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
-import 'package:Kelivo/features/workspace/workspace_layout.dart';
 import 'package:Kelivo/shared/utils/format_bytes.dart';
 import 'package:Kelivo/shared/widgets/ios_tactile.dart';
-import 'package:Kelivo/shared/widgets/ios_tile_button.dart';
 import 'package:Kelivo/shared/widgets/snackbar.dart';
 import 'package:Kelivo/theme/app_font_weights.dart';
 
-import 'preview_actions.dart';
 import 'preview_file_type.dart';
+import 'paged_text_file_view.dart';
 import 'preview_states.dart';
+import 'preview_text_document.dart';
 
 export 'preview_file_type.dart'
     show highlightLanguageFor, languageForExtension, languageForPath;
@@ -46,16 +44,13 @@ class CodeFilePreview extends StatefulWidget {
   const CodeFilePreview({
     super.key,
     required this.file,
-    this.maxBytes = defaultMaxBytes,
+    this.document,
     this.showCopyButton = true,
     this.autoLoad = true,
     this.language,
   });
 
-  static const int defaultMaxBytes = 2 * 1024 * 1024;
-  static const Key tooLargeKey = ValueKey<String>(
-    'code-file-preview-too-large',
-  );
+  static const Key plainTextListKey = PagedTextFileView.listKey;
   static const Key lineCountKey = ValueKey<String>(
     'code-file-preview-line-count',
   );
@@ -72,7 +67,7 @@ class CodeFilePreview extends StatefulWidget {
   static const Key codeKey = ValueKey<String>('code-file-preview-code');
 
   final File file;
-  final int maxBytes;
+  final PreviewTextDocument? document;
   final bool showCopyButton;
   final bool autoLoad;
 
@@ -85,17 +80,20 @@ class CodeFilePreview extends StatefulWidget {
 
 class CodeFilePreviewState extends State<CodeFilePreview> {
   bool _loading = true;
-  bool _tooLarge = false;
   bool _failed = false;
   bool _wrap = false;
   double _fontSize = _kDefaultFontSize;
-  String _source = '';
-  int _fileSize = 0;
+  PreviewTextDocument? _document;
+  int _loadGeneration = 0;
+
+  bool _copying = false;
 
   @override
   void initState() {
     super.initState();
-    if (widget.autoLoad) {
+    _document = widget.document;
+    _loading = _document == null;
+    if (_loading && widget.autoLoad) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) unawaited(load());
       });
@@ -106,15 +104,12 @@ class CodeFilePreviewState extends State<CodeFilePreview> {
   void didUpdateWidget(covariant CodeFilePreview oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.file.path != widget.file.path ||
-        oldWidget.maxBytes != widget.maxBytes) {
-      setState(() {
-        _loading = true;
-        _tooLarge = false;
-        _failed = false;
-        _source = '';
-        _fileSize = 0;
-      });
-      if (widget.autoLoad) {
+        oldWidget.document != widget.document) {
+      _loadGeneration++;
+      _document = widget.document;
+      _loading = _document == null;
+      _failed = false;
+      if (_loading && widget.autoLoad) {
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (mounted) unawaited(load());
         });
@@ -124,44 +119,23 @@ class CodeFilePreviewState extends State<CodeFilePreview> {
 
   @visibleForTesting
   Future<void> load() async {
+    final generation = ++_loadGeneration;
     try {
-      final length = widget.file.lengthSync();
-      if (length > widget.maxBytes) {
-        if (!mounted) return;
-        setState(() {
-          _loading = false;
-          _tooLarge = true;
-          _failed = false;
-          _fileSize = length;
-        });
-        return;
-      }
-      final source = utf8.decode(
-        widget.file.readAsBytesSync(),
-        allowMalformed: true,
-      );
-      if (!mounted) return;
+      final document = await loadPreviewTextDocument(widget.file);
+      if (!mounted || generation != _loadGeneration) return;
       setState(() {
-        _source = source;
-        _fileSize = length;
+        _document = document;
         _loading = false;
-        _tooLarge = false;
         _failed = false;
       });
     } catch (_) {
-      if (!mounted) return;
+      if (!mounted || generation != _loadGeneration) return;
       setState(() {
-        _source = '';
+        _document = null;
         _loading = false;
-        _tooLarge = false;
         _failed = true;
       });
     }
-  }
-
-  List<String> get _lines {
-    if (_source.isEmpty) return const <String>[''];
-    return _source.split(RegExp(r'\r\n|\r|\n'));
   }
 
   String get _language {
@@ -179,13 +153,29 @@ class CodeFilePreviewState extends State<CodeFilePreview> {
   Future<void> _copySource() async {
     final l10n = AppLocalizations.of(context)!;
     Haptics.light();
-    await Clipboard.setData(ClipboardData(text: _source));
-    if (!mounted) return;
-    showAppSnackBar(
-      context,
-      message: l10n.chatMessageWidgetCopiedToClipboard,
-      type: NotificationType.success,
-    );
+    if (_copying) return;
+    final document = _document!;
+    setState(() => _copying = true);
+    try {
+      final source = await document.readSource();
+      if (!mounted || _document != document) return;
+      await Clipboard.setData(ClipboardData(text: source));
+      if (!mounted) return;
+      showAppSnackBar(
+        context,
+        message: l10n.chatMessageWidgetCopiedToClipboard,
+        type: NotificationType.success,
+      );
+    } catch (_) {
+      if (!mounted) return;
+      showAppSnackBar(
+        context,
+        message: l10n.workspacePreviewLoadError,
+        type: NotificationType.error,
+      );
+    } finally {
+      if (mounted) setState(() => _copying = false);
+    }
   }
 
   String _resolveCodeFont() {
@@ -210,12 +200,10 @@ class CodeFilePreviewState extends State<CodeFilePreview> {
     }
     final l10n = AppLocalizations.of(context)!;
     final cs = Theme.of(context).colorScheme;
-    if (_tooLarge) {
-      return _TooLargeState(file: widget.file);
-    }
+    final document = _document!;
 
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final lines = _lines;
+    final lines = document.lines;
     final theme = _transparentBgTheme(
       isDark ? atomOneDarkReasonableTheme : githubTheme,
     );
@@ -236,8 +224,9 @@ class CodeFilePreviewState extends State<CodeFilePreview> {
     );
     final bodyBg = cs.surfaceContainer.withValues(alpha: _kCodeBlockFillAlpha);
     final borderColor = _codeBlockBorderColor(cs, isDark);
-    final meta =
-        '${l10n.workspacePreviewLineCount(lines.length)} · ${formatBytes(_fileSize)}';
+    final meta = document.usesPlainText
+        ? formatBytes(document.byteLength)
+        : '${l10n.workspacePreviewLineCount(lines.length)} · ${formatBytes(document.byteLength)}';
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
@@ -295,17 +284,18 @@ class CodeFilePreviewState extends State<CodeFilePreview> {
                         ],
                       ),
                     ),
-                    _headerAction(
-                      context,
-                      key: CodeFilePreview.wrapToggleKey,
-                      icon: Lucide.WrapText,
-                      label: l10n.workspacePreviewWrap,
-                      color: _wrap ? cs.primary : null,
-                      onTap: () {
-                        Haptics.light();
-                        setState(() => _wrap = !_wrap);
-                      },
-                    ),
+                    if (!document.usesPlainText)
+                      _headerAction(
+                        context,
+                        key: CodeFilePreview.wrapToggleKey,
+                        icon: Lucide.WrapText,
+                        label: l10n.workspacePreviewWrap,
+                        color: _wrap ? cs.primary : null,
+                        onTap: () {
+                          Haptics.light();
+                          setState(() => _wrap = !_wrap);
+                        },
+                      ),
                     _headerAction(
                       context,
                       icon: Lucide.AArrowDown,
@@ -341,6 +331,7 @@ class CodeFilePreviewState extends State<CodeFilePreview> {
                         context,
                         icon: Lucide.Copy,
                         label: l10n.workspacePreviewCopy,
+                        enabled: !_copying,
                         onTap: () => unawaited(_copySource()),
                       ),
                   ],
@@ -349,14 +340,20 @@ class CodeFilePreviewState extends State<CodeFilePreview> {
               Expanded(
                 child: ColoredBox(
                   color: bodyBg,
-                  child: _SourceBody(
-                    lines: lines,
-                    language: language,
-                    theme: theme,
-                    textStyle: textStyle,
-                    gutterStyle: gutterStyle,
-                    wrap: _wrap,
-                  ),
+                  child: document.usesPlainText
+                      ? PagedTextFileView(
+                          key: ObjectKey(document),
+                          document: document,
+                          style: textStyle,
+                        )
+                      : _SourceBody(
+                          lines: lines,
+                          language: language,
+                          theme: theme,
+                          textStyle: textStyle,
+                          gutterStyle: gutterStyle,
+                          wrap: _wrap,
+                        ),
                 ),
               ),
             ],
@@ -390,89 +387,6 @@ class CodeFilePreviewState extends State<CodeFilePreview> {
         padding: const EdgeInsets.all(4),
         minSize: 44,
         color: resolved,
-      ),
-    );
-  }
-}
-
-class _TooLargeState extends StatelessWidget {
-  const _TooLargeState({required this.file});
-
-  final File file;
-
-  @override
-  Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context)!;
-    final cs = Theme.of(context).colorScheme;
-    final desktop = useDesktopWorkspaceLayout(context);
-    return Center(
-      key: CodeFilePreview.tooLargeKey,
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 360),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                l10n.workspacePreviewFileTooLarge,
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 14,
-                  color: cs.onSurface.withValues(alpha: 0.6),
-                ),
-              ),
-              const SizedBox(height: 16),
-              LayoutBuilder(
-                builder: (context, constraints) {
-                  final stacked = constraints.maxWidth < 340;
-                  final primary = IosTileButton(
-                    icon: desktop ? Lucide.FolderOpen : Lucide.ExternalLink,
-                    label: desktop
-                        ? revealInFileManagerLabel(l10n)
-                        : l10n.workspacePreviewOpen,
-                    backgroundColor: cs.primary,
-                    onTap: () {
-                      if (desktop) {
-                        unawaited(
-                          revealPreviewFileInFileManager(context, file),
-                        );
-                      } else {
-                        unawaited(openPreviewFileExternally(context, file));
-                      }
-                    },
-                  );
-                  final secondary = IosTileButton(
-                    icon: desktop ? Lucide.ExternalLink : Lucide.Share2,
-                    label: desktop
-                        ? l10n.workspacePreviewOpenInSystemApp
-                        : l10n.workspacePreviewShare,
-                    onTap: () {
-                      if (desktop) {
-                        unawaited(openPreviewFileExternally(context, file));
-                      } else {
-                        unawaited(sharePreviewFile(context, file));
-                      }
-                    },
-                  );
-                  if (stacked) {
-                    return Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [primary, const SizedBox(height: 8), secondary],
-                    );
-                  }
-                  return Row(
-                    children: [
-                      Expanded(child: primary),
-                      const SizedBox(width: 8),
-                      Expanded(child: secondary),
-                    ],
-                  );
-                },
-              ),
-            ],
-          ),
-        ),
       ),
     );
   }

@@ -6,6 +6,8 @@ import 'package:Kelivo/l10n/app_localizations.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:flutter/services.dart';
+import 'package:Kelivo/features/workspace/widgets/preview/preview_text_document.dart';
 import 'package:path/path.dart' as p;
 import 'package:provider/provider.dart';
 
@@ -66,22 +68,86 @@ void main() {
     expect(find.textContaining('4'), findsWidgets);
   });
 
-  testWidgets('code preview shows the large-file state', (tester) async {
+  testWidgets('code preview lazily displays files above the old size limit', (
+    tester,
+  ) async {
     final file = File(p.join(tempDir.path, 'huge.txt'))
-      ..writeAsStringSync('0123456789' * 20);
+      ..writeAsStringSync('0123456789' * (220 * 1024));
 
-    await tester.pumpWidget(
-      _app(CodeFilePreview(file: file, maxBytes: 16, autoLoad: false)),
-    );
+    await tester.pumpWidget(_app(CodeFilePreview(file: file, autoLoad: false)));
     await _loadPreview(tester);
 
-    expect(find.byKey(CodeFilePreview.tooLargeKey), findsOneWidget);
-    expect(
-      find.text(
-        'This file is too large to preview. Open it externally instead.',
-      ),
-      findsOneWidget,
+    expect(find.byKey(CodeFilePreview.plainTextListKey), findsOneWidget);
+    expect(find.byKey(CodeFilePreview.codeKey), findsNothing);
+    expect(find.byType(SelectableText).evaluate().length, lessThan(10));
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('long files reach the final chunk and copy the original source', (
+    tester,
+  ) async {
+    final source = '${'first 神谕 😀\r\n' * 32098}LAST-LINE\r\n';
+    final file = File(p.join(tempDir.path, 'long.txt'))
+      ..writeAsStringSync(source);
+    final document = (await tester.runAsync(
+      () => loadPreviewTextDocument(file),
+    ))!;
+    String? copied;
+    tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+      SystemChannels.platform,
+      (call) async {
+        if (call.method == 'Clipboard.setData') {
+          copied = (call.arguments as Map)['text'] as String;
+        }
+        return null;
+      },
     );
+    addTearDown(
+      () => tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+        SystemChannels.platform,
+        null,
+      ),
+    );
+    await tester.pumpWidget(
+      _app(CodeFilePreview(file: file, document: document)),
+    );
+    await tester.pump();
+
+    expect(document.source, isNull);
+    expect(find.byType(SelectableText).evaluate().length, lessThan(10));
+    expect(find.textContaining('LAST-LINE'), findsNothing);
+    final list = find.byKey(CodeFilePreview.plainTextListKey);
+    final scrollable = find
+        .descendant(of: list, matching: find.byType(Scrollable))
+        .first;
+    final position = tester.state<ScrollableState>(scrollable).position;
+    for (
+      var i = 0;
+      i < 8 && find.textContaining('LAST-LINE').evaluate().isEmpty;
+      i++
+    ) {
+      position.jumpTo(position.maxScrollExtent);
+      await tester.pump();
+      await tester.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 30)),
+      );
+      await tester.pump();
+    }
+    expect(find.textContaining('LAST-LINE'), findsOneWidget);
+    expect(find.byType(SelectableText).evaluate().length, lessThan(10));
+    expect(tester.takeException(), isNull);
+
+    await tester.tap(find.byTooltip('Copy'));
+    for (var i = 0; i < 100 && copied == null; i++) {
+      await tester.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 10)),
+      );
+      await tester.pump();
+    }
+    expect(copied, source);
+    await tester.pumpAndSettle();
+    await tester.pump(const Duration(seconds: 5));
+    await tester.pumpAndSettle();
   });
 
   testWidgets('code preview header shows the language and toggles wrap', (

@@ -12,6 +12,7 @@ import 'package:Kelivo/shared/widgets/segmented_tabs.dart';
 
 import 'code_file_preview.dart';
 import 'preview_states.dart';
+import 'preview_text_document.dart';
 
 class MarkdownFilePreview extends StatefulWidget {
   const MarkdownFilePreview({
@@ -29,7 +30,8 @@ class MarkdownFilePreview extends StatefulWidget {
 
 class MarkdownFilePreviewState extends State<MarkdownFilePreview> {
   bool _showSource = false;
-  String? _source;
+  PreviewTextDocument? _document;
+  int _loadGeneration = 0;
   Object? _error;
 
   @override
@@ -42,17 +44,30 @@ class MarkdownFilePreviewState extends State<MarkdownFilePreview> {
     }
   }
 
+  @override
+  void didUpdateWidget(covariant MarkdownFilePreview oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.file.path != widget.file.path) {
+      _loadGeneration++;
+      _document = null;
+      _error = null;
+      _showSource = false;
+      if (widget.autoLoad) unawaited(load());
+    }
+  }
+
   @visibleForTesting
   Future<void> load() async {
+    final generation = ++_loadGeneration;
     try {
-      final source = widget.file.readAsStringSync();
-      if (!mounted) return;
+      final document = await loadPreviewTextDocument(widget.file);
+      if (!mounted || generation != _loadGeneration) return;
       setState(() {
-        _source = source;
+        _document = document;
         _error = null;
       });
     } catch (e) {
-      if (!mounted) return;
+      if (!mounted || generation != _loadGeneration) return;
       setState(() => _error = e);
     }
   }
@@ -63,10 +78,18 @@ class MarkdownFilePreviewState extends State<MarkdownFilePreview> {
     if (_error != null) {
       return PreviewError(onRetry: () => unawaited(load()));
     }
-    final source = _source;
-    if (source == null) {
+    final document = _document;
+    if (document == null) {
       return const PreviewLoading();
     }
+    if (document.usesPlainText) {
+      return CodeFilePreview(
+        file: widget.file,
+        document: document,
+        language: 'text',
+      );
+    }
+    final source = document.source!;
     return Column(
       children: [
         Padding(
@@ -90,7 +113,7 @@ class MarkdownFilePreviewState extends State<MarkdownFilePreview> {
           child: _showSource
               ? CodeFilePreview(
                   file: widget.file,
-                  autoLoad: widget.autoLoad,
+                  document: document,
                   language: 'markdown',
                 )
               : source.trim().isEmpty

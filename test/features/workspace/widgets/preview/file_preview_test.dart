@@ -280,24 +280,21 @@ void main() {
     expect(find.textContaining('4'), findsWidgets);
   });
 
-  testWidgets('code preview shows the large-file state', (tester) async {
+  testWidgets('code preview lazily displays files above the old size limit', (
+    tester,
+  ) async {
     final file = File(p.join(tempDir.path, 'huge.txt'))
-      ..writeAsStringSync('0123456789' * 20);
+      ..writeAsStringSync('0123456789' * (220 * 1024));
 
     await tester.pumpWidget(
-      _previewHarness(
-        child: CodeFilePreview(file: file, maxBytes: 16, autoLoad: false),
-      ),
+      _previewHarness(child: CodeFilePreview(file: file, autoLoad: false)),
     );
     await _loadCodePreview(tester);
 
-    expect(find.byKey(CodeFilePreview.tooLargeKey), findsOneWidget);
-    expect(
-      find.text(
-        'This file is too large to preview. Open it externally instead.',
-      ),
-      findsOneWidget,
-    );
+    expect(find.byKey(CodeFilePreview.plainTextListKey), findsOneWidget);
+    expect(find.byKey(CodeFilePreview.codeKey), findsNothing);
+    expect(find.byType(SelectableText).evaluate().length, lessThan(10));
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets('showFilePreview opens markdown with a source/rendered toggle', (
@@ -328,6 +325,46 @@ void main() {
     await _loadMarkdownPreview(tester);
 
     expect(find.byType(MarkdownWithCodeHighlight), findsOneWidget);
+  });
+
+  testWidgets('large markdown bypasses parsing and uses lazy plain text', (
+    tester,
+  ) async {
+    final markdown = File(p.join(tempDir.path, 'long.md'))
+      ..writeAsStringSync(
+        '# Heading\n\n```json\n{"command":"example"}\n```\n' * 6500,
+      );
+    await tester.pumpWidget(
+      _previewHarness(
+        child: MarkdownFilePreview(file: markdown, autoLoad: false),
+      ),
+    );
+    await _loadMarkdownPreview(tester);
+
+    expect(find.byType(MarkdownWithCodeHighlight), findsNothing);
+    expect(find.byKey(CodeFilePreview.plainTextListKey), findsOneWidget);
+    expect(find.byType(SelectableText).evaluate().length, lessThan(10));
+    expect(find.text('Rendered'), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('large CSV uses complete plain text instead of a table', (
+    tester,
+  ) async {
+    final csv = File(p.join(tempDir.path, 'long.csv'))
+      ..writeAsStringSync('name,value\n' * 32000);
+    await tester.pumpWidget(
+      _previewHarness(child: CsvFilePreview(file: csv, autoLoad: false)),
+    );
+    await tester.pump();
+    final state = tester.state<CsvFilePreviewState>(
+      find.byType(CsvFilePreview),
+    );
+    await tester.runAsync(state.load);
+    await tester.pump();
+    expect(find.byKey(CodeFilePreview.plainTextListKey), findsOneWidget);
+    expect(find.byType(Table), findsNothing);
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets('showFilePreview opens unknown binaries as an info card', (
