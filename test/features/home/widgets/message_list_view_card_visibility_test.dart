@@ -32,6 +32,44 @@ void main() {
     SharedPreferences.setMockInitialValues({});
   });
 
+  for (final collapsed in [true, false]) {
+    testWidgets('inline tool thinking height follows collapse=$collapsed', (
+      tester,
+    ) async {
+      ChatMessage message(String id, int lines) => ChatMessage(
+        id: id,
+        role: 'assistant',
+        conversationId: 'conversation-1',
+        parts: [
+          TextPart(
+            '<thinking>${List.filled(lines, 'reasoning line').join('\n')}</thinking>',
+          ),
+          const ToolCallPart('{"id":"t1","name":"read_file","arguments":{}}'),
+          const TextPart('answer'),
+        ],
+      );
+      final short = await _estimateExtent(
+        tester,
+        message: message('short', 1),
+        collapseThinking: collapsed,
+      );
+      final shortHeight = tester.getSize(find.byType(ChatMessageWidget)).height;
+      final long = await _estimateExtent(
+        tester,
+        message: message('long', 120),
+        collapseThinking: collapsed,
+      );
+      final longHeight = tester.getSize(find.byType(ChatMessageWidget)).height;
+      if (collapsed) {
+        expect(longHeight, closeTo(shortHeight, 1));
+        expect(long, closeTo(short, 1));
+      } else {
+        expect(longHeight, greaterThan(shortHeight));
+        expect(long, greaterThan(short + 1000));
+      }
+    });
+  }
+
   testWidgets('height estimate strips hidden <think> content', (tester) async {
     final thinking = List.filled(120, 'long hidden reasoning line').join('\n');
     final tagged = '<think>$thinking</think>Short answer.';
@@ -1296,6 +1334,7 @@ Future<double> _estimateExtent(
   bool showToolResultSummary = false,
   bool hideToolResultImages = false,
   bool collapseThinkingSteps = false,
+  bool collapseThinking = true,
   bool wrapCodeBlocks = false,
   int? collapsedCodeLines,
   Assistant? assistant,
@@ -1304,6 +1343,7 @@ Future<double> _estimateExtent(
 }) async {
   final settings = SettingsProvider(createBusinessTestPreferences());
   await settings.loaded;
+  await settings.setAutoCollapseThinking(collapseThinking);
   await tester.pumpWidget(
     _CardVisibilityHarness(
       settings: settings,
@@ -1432,6 +1472,7 @@ class _CardVisibilityHarnessState extends State<_CardVisibilityHarness> {
             showToolResultSummary: widget.showToolResultSummary,
             hideToolResultImages: widget.hideToolResultImages,
             collapseThinkingSteps: widget.collapseThinkingSteps,
+            collapseThinking: widget.settings.autoCollapseThinking,
             wrapCodeBlocks: widget.wrapCodeBlocks,
             collapsedCodeLines: widget.collapsedCodeLines,
             assistant: widget.assistant,

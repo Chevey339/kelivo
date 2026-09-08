@@ -1,3 +1,5 @@
+import '../../../core/models/message_part.dart';
+
 class ThinkingTagParseResult {
   const ThinkingTagParseResult({
     required this.visibleContent,
@@ -57,7 +59,10 @@ class ThinkingTagParser {
   ///
   /// An unclosed think block at the end is a hidden range plus a thinking
   /// text so export can hide it or render it in the thinking section.
-  static ThinkingTagParseRanges parseWithRanges(String input) {
+  static ThinkingTagParseRanges parseWithRanges(
+    String input, {
+    bool includeUnclosed = true,
+  }) {
     final visible = StringBuffer();
     final thinkingTexts = <String>[];
     final hiddenRanges = <ThinkingTagHiddenRange>[];
@@ -80,6 +85,10 @@ class ThinkingTagParser {
       visible.write(input.substring(cursor, openStart));
 
       if (closeStart < 0) {
+        if (!includeUnclosed) {
+          visible.write(input.substring(openStart));
+          break;
+        }
         hiddenRanges.add(
           ThinkingTagHiddenRange(
             start: openStart,
@@ -111,6 +120,74 @@ class ThinkingTagParser {
       thinkingTexts: List.unmodifiable(thinkingTexts),
       hiddenRanges: List.unmodifiable(hiddenRanges),
     );
+  }
+
+  /// Walk text spans without moving intervening tools or attachments.
+  static void walkSlices(
+    List<MessagePart> parts,
+    String joined,
+    ThinkingTagParseRanges ranges, {
+    required void Function(String text) onVisible,
+    required void Function(int rangeIndex, String text) onThinking,
+    required void Function(MessagePart part) onOther,
+  }) {
+    var offset = 0;
+    var hiddenIndex = 0;
+    var pendingRangeIndex = -1;
+    final hiddenRanges = ranges.hiddenRanges;
+    final pendingThinking = StringBuffer();
+
+    void flushThinking() {
+      final thinking = pendingThinking.toString();
+      pendingThinking.clear();
+      if (thinking.isNotEmpty && pendingRangeIndex >= 0) {
+        onThinking(pendingRangeIndex, thinking);
+      }
+      pendingRangeIndex = -1;
+    }
+
+    for (final part in parts) {
+      if (part is! TextPart) {
+        flushThinking();
+        onOther(part);
+        continue;
+      }
+      final start = offset;
+      final end = offset + part.text.length;
+      var cursor = start;
+      while (cursor < end) {
+        if (hiddenIndex < hiddenRanges.length &&
+            hiddenRanges[hiddenIndex].start <= cursor &&
+            cursor < hiddenRanges[hiddenIndex].end) {
+          final range = hiddenRanges[hiddenIndex];
+          final sliceStart = cursor < range.bodyStart
+              ? range.bodyStart
+              : cursor;
+          final sliceEnd = range.bodyEnd < end ? range.bodyEnd : end;
+          if (sliceEnd > sliceStart) {
+            pendingRangeIndex = hiddenIndex;
+            pendingThinking.write(joined.substring(sliceStart, sliceEnd));
+          }
+          cursor = range.end < end ? range.end : end;
+          if (cursor >= range.end) {
+            hiddenIndex++;
+            flushThinking();
+          }
+          continue;
+        }
+        final visibleEnd = hiddenIndex < hiddenRanges.length
+            ? hiddenRanges[hiddenIndex].start
+            : end;
+        final sliceEnd = visibleEnd < end ? visibleEnd : end;
+        if (sliceEnd > cursor) {
+          flushThinking();
+          onVisible(joined.substring(cursor, sliceEnd));
+        }
+        cursor = sliceEnd;
+      }
+      offset = end;
+    }
+    flushThinking();
   }
 
   /// Visible characters of `[start, end)` after subtracting [hiddenRanges].

@@ -28,6 +28,101 @@ List<TimelineToolRef> _toolsIn(TimelineProjection projected) {
 }
 
 void main() {
+  for (final streaming in [false, true]) {
+    test('inline thinking keeps tool order (streaming=$streaming)', () {
+      final projected = projectAssistantTimeline(
+        parts: const [
+          TextPart('before<thinking>first'),
+          ToolCallPart('{"id":"t1","name":"read_file","arguments":{}}'),
+          TextPart('second</thinking>after<thought>third</thought>end'),
+        ],
+        liveTools: const [],
+        reasoningSegments: const [],
+        visualContent: 'beforeafterend',
+        partsArrivalOrdered: streaming,
+      );
+      expect(projected.fromParts, isTrue);
+      expect(projected.blocks.map((b) => b.isText ? b.text : 'thinking'), [
+        'before',
+        'thinking',
+        'after',
+        'thinking',
+        'end',
+      ]);
+      final steps = projected.blocks[1].steps;
+      expect(steps.map((s) => s.isReasoning ? s.reasoning!.text : s.tool!.id), [
+        'first',
+        't1',
+        'second',
+      ]);
+      expect(projected.blocks[3].steps.single.reasoning!.text, 'third');
+    });
+  }
+
+  test('split tags use inline overlay without changing stored parts', () {
+    const parts = [
+      TextPart('<thi'),
+      TextPart('nking>A'),
+      ToolCallPart('{"id":"t1","name":"read_file","arguments":{}}'),
+      TextPart('B</think'),
+      TextPart('ing>answer'),
+    ];
+    final projected = projectAssistantTimeline(
+      parts: parts,
+      liveTools: const [],
+      reasoningSegments: const [
+        TimelineReasoningRef(text: 'AB', expanded: false),
+      ],
+      visualContent: 'answer',
+      parseInlineThinking: true,
+    );
+    final steps = projected.blocks.first.steps;
+    expect(steps.map((s) => s.isReasoning ? s.reasoning!.text : s.tool!.id), [
+      'A',
+      't1',
+      'B',
+    ]);
+    for (final step in steps.where((s) => s.isReasoning)) {
+      expect(step.reasoningOverlayIndex, 0);
+      expect(step.reasoning!.expanded, isFalse);
+    }
+    expect(projected.blocks.last.text, 'answer');
+    expect((parts.first as TextPart).text, '<thi');
+  });
+
+  test('provider reasoning leaves literal thinking tags unchanged', () {
+    const literal = '<thinking>literal</thinking>answer';
+    final projected = projectAssistantTimeline(
+      parts: const [
+        ReasoningPart('provider reasoning'),
+        TextPart(literal),
+        ToolCallPart('{"id":"t1","name":"read_file","arguments":{}}'),
+      ],
+      liveTools: const [],
+      reasoningSegments: const [],
+      visualContent: literal,
+    );
+    expect(
+      projected.blocks[0].steps.single.reasoning!.text,
+      'provider reasoning',
+    );
+    expect(projected.blocks[1].text, literal);
+  });
+
+  test('unclosed thinking remains visible after a closed block', () {
+    final projected = projectAssistantTimeline(
+      parts: const [
+        TextPart('<think>done</think>visible<thinking>partial'),
+        ToolCallPart('{"id":"t1","name":"read_file","arguments":{}}'),
+      ],
+      liveTools: const [],
+      reasoningSegments: const [],
+      visualContent: 'visible<thinking>partial',
+    );
+    expect(projected.blocks[0].steps.single.reasoning!.text, 'done');
+    expect(projected.blocks[1].text, 'visible<thinking>partial');
+  });
+
   test('parseTimelineToolPayload does not synthesize string ids', () {
     final parsed = parseTimelineToolPayload(
       '{"id":"","name":"read_file","arguments":{}}',

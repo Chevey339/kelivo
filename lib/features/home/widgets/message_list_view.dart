@@ -851,6 +851,7 @@ class _MessageListViewState extends State<MessageListView> {
       toolCountAtSplit: toolCountAtSplit,
       transformText: _estimateVisualTransform,
       partsArrivalOrdered: message.isStreaming,
+      inlineThinkingExpanded: !settings.collapseThinking,
     );
     bool isPending(TimelineToolRef tool) => _isPendingApproval(
       conversationId: message.conversationId,

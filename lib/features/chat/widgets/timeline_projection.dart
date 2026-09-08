@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import '../../../core/models/message_part.dart';
+import '../utils/thinking_tag_parser.dart';
 import 'timeline_visibility.dart';
 
 /// A tool as the timeline projector sees it.
@@ -329,6 +330,10 @@ TimelineProjection projectAssistantTimeline({
   String Function(String text)? transformText,
   bool? renderFromParts,
   bool partsArrivalOrdered = false,
+  // True when reasoningSegments carries the synthesized inline-think overlay.
+  // Provider reasoning keeps tag-like text literal.
+  bool? parseInlineThinking,
+  bool inlineThinkingExpanded = true,
 }) {
   final usableSplits = contentSplitsAreUsable(
     contentSplitOffsets,
@@ -349,14 +354,39 @@ TimelineProjection projectAssistantTimeline({
         partsArrivalOrdered: partsArrivalOrdered,
       );
   if (fromParts) {
+    // Inline reasoning is only a substitute for absent provider reasoning.
+    final useInlineThinking =
+        (parseInlineThinking ?? reasoningSegments.isEmpty) &&
+        !parts.any((part) => part is ReasoningPart);
+    var displayParts = parts;
+    if (useInlineThinking) {
+      final joined = parts.whereType<TextPart>().map((p) => p.text).join();
+      final ranges = ThinkingTagParser.parseWithRanges(
+        joined,
+        includeUnclosed: false,
+      );
+      if (ranges.hiddenRanges.isNotEmpty) {
+        displayParts = <MessagePart>[];
+        ThinkingTagParser.walkSlices(
+          parts,
+          joined,
+          ranges,
+          onVisible: (text) => displayParts.add(TextPart(text)),
+          onThinking: (_, text) => displayParts.add(ReasoningPart(text)),
+          onOther: displayParts.add,
+        );
+      }
+    }
     return mergeLiveToolsIntoProjection(
       TimelineProjection(
         fromParts: true,
         partsArrivalOrdered: partsArrivalOrdered,
         blocks: _projectFromParts(
-          parts: parts,
+          parts: displayParts,
           reasoningSegments: reasoningSegments,
           transformText: transformText,
+          inlineThinking: useInlineThinking,
+          inlineThinkingExpanded: inlineThinkingExpanded,
         ),
       ),
       liveTools,
@@ -567,6 +597,8 @@ List<TimelineProjectedBlock> _projectFromParts({
   required List<MessagePart> parts,
   required List<TimelineReasoningRef> reasoningSegments,
   String Function(String text)? transformText,
+  bool inlineThinking = false,
+  bool inlineThinkingExpanded = true,
 }) {
   final blocks = <TimelineProjectedBlock>[];
   var pending = <TimelineProjectedStep>[];
@@ -606,8 +638,9 @@ List<TimelineProjectedBlock> _projectFromParts({
         );
       case ReasoningPart(:final text):
         if (text.isEmpty) continue;
-        final provided = reasoningIndex < reasoningSegments.length
-            ? reasoningSegments[reasoningIndex]
+        final overlayIndex = inlineThinking ? 0 : reasoningIndex;
+        final provided = overlayIndex < reasoningSegments.length
+            ? reasoningSegments[overlayIndex]
             : null;
         reasoningIndex++;
         pending.add(
@@ -615,7 +648,9 @@ List<TimelineProjectedBlock> _projectFromParts({
             sourceOrdinal: sourceOrdinal++,
             reasoning: TimelineReasoningRef(
               text: text,
-              expanded: provided?.expanded ?? true,
+              expanded:
+                  provided?.expanded ??
+                  (inlineThinking ? inlineThinkingExpanded : true),
               loading: provided?.loading ?? false,
               startAt: provided?.startAt,
               finishedAt: provided?.finishedAt,
@@ -623,7 +658,7 @@ List<TimelineProjectedBlock> _projectFromParts({
             ),
             reasoningCountAfter: ++reasoningCount,
             toolCountAfter: toolCount,
-            reasoningOverlayIndex: provided == null ? null : reasoningIndex - 1,
+            reasoningOverlayIndex: provided == null ? null : overlayIndex,
           ),
         );
       case ToolCallPart(:final payloadJson):

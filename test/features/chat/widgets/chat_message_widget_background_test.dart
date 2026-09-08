@@ -7,6 +7,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 
 import 'package:Kelivo/core/models/chat_message.dart';
+import 'package:Kelivo/core/models/message_part.dart';
 import 'package:Kelivo/core/providers/settings_provider.dart';
 import 'package:Kelivo/core/providers/tts_provider.dart';
 import 'package:Kelivo/core/services/api/providers/openai/chat_completions_decoder.dart';
@@ -1743,6 +1744,45 @@ void main() {
         expect(find.textContaining('query: other-args'), findsNothing);
       },
     );
+
+    testWidgets('inline thinking with a tool renders and toggles its card', (
+      tester,
+    ) async {
+      final settings = await _createSettings(
+        ChatMessageBackgroundStyle.defaultStyle,
+      );
+      await settings.setAutoCollapseThinking(false);
+      await tester.pumpWidget(
+        _buildHarness(
+          settings: settings,
+          child: ChatMessageWidget(
+            message: ChatMessage(
+              role: 'assistant',
+              parts: const [
+                TextPart('<thinking>inline reasoning</thinking>'),
+                ToolCallPart(
+                  '{"id":"t1","name":"get_time_info","arguments":{},"content":"ok"}',
+                ),
+                TextPart('Final answer'),
+              ],
+              conversationId: 'conversation-inline-tool',
+            ),
+            showModelIcon: false,
+          ),
+        ),
+      );
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
+      expect(find.text('Deep Thinking'), findsOneWidget);
+      expect(find.textContaining('inline reasoning'), findsOneWidget);
+      expect(find.textContaining('<thinking>'), findsNothing);
+      expect(find.textContaining('Final answer'), findsOneWidget);
+      await tester.tap(find.text('Deep Thinking'));
+      await tester.pumpAndSettle();
+      expect(find.textContaining('inline reasoning'), findsNothing);
+      expect(find.textContaining('Final answer'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
 
     testWidgets('closed legacy think block renders as thinking card', (
       tester,
