@@ -122,15 +122,9 @@ class DesktopProcessRuntime extends WorkspaceRuntime {
     }
     if (Platform.isWindows) {
       final args = isDir ? <String>[hostPath] : <String>['/select,$hostPath'];
-      final result = await Process.run('explorer', args);
-      if (result.exitCode != 0) {
-        throw ProcessException(
-          'explorer',
-          args,
-          result.stderr.toString(),
-          result.exitCode,
-        );
-      }
+      // Explorer can return a nonzero exit code after opening the location.
+      // Only a failure to start the process should fail this action.
+      await Process.start('explorer', args, mode: ProcessStartMode.detached);
       return;
     }
     throw UnsupportedError(
@@ -537,22 +531,24 @@ wait "$!" 2>/dev/null
     final wt = await _which('wt');
     if (wt != null) {
       try {
-        await Process.start(wt, [
-          '-d',
-          hostDir,
-        ], mode: ProcessStartMode.detached);
+        await Process.start(
+          wt,
+          ['-d', hostDir],
+          workingDirectory: hostDir,
+          mode: ProcessStartMode.detached,
+        );
         return;
       } catch (_) {}
     }
     final cmd = await _which('cmd') ?? 'cmd';
-    await Process.start(cmd, [
-      '/c',
-      'start',
-      '',
-      'cmd',
-      '/K',
-      'cd /d "$hostDir"',
-    ], mode: ProcessStartMode.detached);
+    // Inherit the directory instead of passing a quoted cd command through
+    // both Dart's Windows argument escaping and cmd's command parser.
+    await Process.start(
+      cmd,
+      ['/d', '/c', 'start', '', 'cmd', '/d'],
+      workingDirectory: hostDir,
+      mode: ProcessStartMode.detached,
+    );
   }
 
   Future<String?> _which(String name) async {

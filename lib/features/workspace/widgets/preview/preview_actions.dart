@@ -131,17 +131,10 @@ Future<void> revealPreviewFileInFileManager(
       return;
     }
     if (Platform.isWindows) {
-      final result = await Process.run('explorer', <String>[
+      // Explorer can return a nonzero exit code even when reveal succeeds.
+      await Process.start('explorer', <String>[
         '/select,$hostPath',
-      ]);
-      if (result.exitCode != 0) {
-        throw ProcessException(
-          'explorer',
-          <String>['/select,$hostPath'],
-          result.stderr.toString(),
-          result.exitCode,
-        );
-      }
+      ], mode: ProcessStartMode.detached);
       return;
     }
     throw UnsupportedError('Reveal is only supported on desktop');
