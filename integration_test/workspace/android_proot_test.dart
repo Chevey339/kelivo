@@ -19,7 +19,6 @@ import 'package:Kelivo/core/services/sandbox/environment_installer.dart';
 import 'package:Kelivo/core/services/sandbox/mirror_service.dart';
 import 'package:Kelivo/core/services/sandbox/mirror_speed_test.dart';
 import 'package:Kelivo/core/services/sandbox/mobile_workspace_bootstrap.dart';
-import 'package:Kelivo/core/services/sandbox/rootfs_source.dart';
 import 'package:Kelivo/core/services/sandbox/workspace_channel.dart';
 import 'package:Kelivo/core/services/workspace/workspace_paths.dart';
 import 'package:Kelivo/core/services/workspace/workspace_runtime.dart';
@@ -541,8 +540,8 @@ class _Harness {
         await env.setState(
           EnvironmentState(
             phase: EnvironmentPhase.ready,
-            distro: parsed.isNotEmpty ? parsed[0] : kUbuntuDistro,
-            version: parsed.length > 1 ? parsed[1] : kUbuntuBaseVersion,
+            distro: parsed.isNotEmpty ? parsed[0] : env.rootfsImage.distro,
+            version: parsed.length > 1 ? parsed[1] : env.rootfsImage.version,
             arch: parsed.length > 2 ? parsed[2] : 'arm64',
             installedAt: DateTime.now().toUtc(),
             rootfsDir: installer.rootfsDir.path,

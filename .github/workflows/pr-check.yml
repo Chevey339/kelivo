@@ -40,7 +40,7 @@ jobs:
             HEAD_SHA="${{ github.sha }}"
           fi
 
-          files="$(git diff --diff-filter=ACMR --name-only "$BASE_SHA" "$HEAD_SHA" -- | grep -E '^(lib|test)/.*\\.dart$' || true)"
+          files="$(git diff --diff-filter=ACMR --name-only "$BASE_SHA" "$HEAD_SHA" -- | grep -E '^(lib|test|integration_test)/.*\.dart$' || true)"
           if [ -z "$files" ]; then
             echo "No changed Dart files to format-check."
             exit 0
@@ -79,7 +79,7 @@ jobs:
             "desiredFileName.txt"
 
       - name: dart analyze (root package only)
-        run: dart analyze --fatal-infos lib test
+        run: dart analyze --fatal-infos lib test integration_test
 
       - name: flutter test
         run: flutter test

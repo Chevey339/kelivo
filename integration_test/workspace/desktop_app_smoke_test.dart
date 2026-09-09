@@ -16,7 +16,7 @@ import 'package:Kelivo/core/services/skills/skills_service.dart';
 import 'package:Kelivo/core/services/workspace/desktop_process_runtime.dart';
 import 'package:Kelivo/core/services/workspace/workspace_runtime.dart';
 import 'package:Kelivo/desktop/desktop_settings_page.dart';
-import 'package:Kelivo/desktop/workspace_popover.dart';
+import 'package:Kelivo/desktop/workspace_dialog.dart';
 import 'package:Kelivo/features/workspace/pages/workspaces_page.dart';
 import 'package:Kelivo/features/workspace/widgets/desktop_workspace_bar.dart';
 import 'package:Kelivo/features/workspace/widgets/environment/environment_pane.dart';
@@ -139,9 +139,8 @@ void main() {
                     final conversationListenable = ValueNotifier<String?>(
                       conversation.id,
                     );
-                    showDesktopWorkspacePopover(
+                    showDesktopWorkspaceDialog(
                       context,
-                      anchorKey: folderKey,
                       conversationListenable: conversationListenable,
                       conversationId: () => conversationListenable.value,
                     );

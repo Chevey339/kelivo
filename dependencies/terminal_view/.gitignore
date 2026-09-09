@@ -8,3 +8,8 @@ pubspec.lock
 
 # Golden-test output, regenerated on demand.
 failures/
+
+# Flutter build output and generated Android example files.
+build/
+/example/android/local.properties
+/example/android/app/src/main/java/io/flutter/plugins/GeneratedPluginRegistrant.java
