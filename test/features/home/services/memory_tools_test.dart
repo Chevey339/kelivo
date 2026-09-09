@@ -514,6 +514,160 @@ void main() {
   });
 
   group('memory_read', () {
+    Future<List<MemoryEntry>> seedMemories(int count) async {
+      final now = DateTime.utc(2026, 9, 8);
+      final entries = [
+        for (var i = 0; i < count; i++)
+          MemoryEntry(
+            id: 'mem_${i.toRadixString(16).padLeft(8, '0')}',
+            scope: MemoryScope.global,
+            type: MemoryType.workflow,
+            content: 'Memory entry $i',
+            createdAt: now,
+            updatedAt: now,
+          ),
+      ];
+      // Equal timestamps exercise the id tie-breaker used across pages.
+      await memoryRepository.writeAll(entries.reversed.toList());
+      return entries;
+    }
+
+    test('reads every entry beyond 100 using next_offset', () async {
+      final entries = await seedMemories(205);
+      final ids = <String>[];
+      var offset = 0;
+      for (final expectedCount in [100, 100, 5]) {
+        final page = decode(
+          (await call(MemoryTools.memoryRead, {
+            'limit': 200,
+            'offset': offset,
+          }))!,
+        );
+        expect(page['total'], 205);
+        expect(page['returned'], expectedCount);
+        expect(page['limit'], 100);
+        expect(page['offset'], offset);
+        final pageEntries = page['entries'] as List;
+        expect(pageEntries, hasLength(expectedCount));
+        ids.addAll(pageEntries.map((e) => e['id'] as String));
+        final hasMore = ids.length < 205;
+        expect(page['has_more'], hasMore);
+        expect(page['next_offset'], hasMore ? ids.length : null);
+        if (hasMore) offset = page['next_offset'] as int;
+      }
+      expect(ids, entries.map((e) => e.id).toList());
+    });
+
+    test(
+      'defaults to 50 entries and stops on an exact page boundary',
+      () async {
+        await seedMemories(100);
+        final first = decode((await call(MemoryTools.memoryRead, {}))!);
+        expect(first['offset'], 0);
+        expect(first['limit'], 50);
+        expect(first['returned'], 50);
+        expect(first['has_more'], isTrue);
+        expect(first['next_offset'], 50);
+        final last = decode(
+          (await call(MemoryTools.memoryRead, {
+            'offset': first['next_offset'],
+          }))!,
+        );
+        expect(last['returned'], 50);
+        expect(last['has_more'], isFalse);
+        expect(last['next_offset'], isNull);
+      },
+    );
+
+    test('empty and out-of-range pages have no next offset', () async {
+      final empty = decode((await call(MemoryTools.memoryRead, {}))!);
+      expect(empty['total'], 0);
+      expect(empty['entries'], isEmpty);
+      expect(empty['has_more'], isFalse);
+      expect(empty['next_offset'], isNull);
+
+      await seedMemories(3);
+      for (final offset in [3, 1000]) {
+        final page = decode(
+          (await call(MemoryTools.memoryRead, {'offset': offset}))!,
+        );
+        expect(page['total'], 3);
+        expect(page['returned'], 0);
+        expect(page['offset'], offset);
+        expect(page['entries'], isEmpty);
+        expect(page['has_more'], isFalse);
+        expect(page['next_offset'], isNull);
+      }
+    });
+
+    test('paginates after type, archive and assistant filtering', () async {
+      await seedAssistant('assistant-a');
+      await seedAssistant('assistant-b');
+      final entries = await seedMemories(6);
+      await memoryRepository.writeAll([
+        entries[0].copyWith(type: MemoryType.identity),
+        entries[1].copyWith(status: MemoryStatus.archived),
+        entries[2].copyWith(
+          scope: MemoryScope.assistant,
+          assistantId: 'assistant-b',
+        ),
+        entries[3],
+        entries[4],
+        entries[5].copyWith(
+          scope: MemoryScope.assistant,
+          assistantId: 'assistant-a',
+        ),
+      ]);
+      for (final includeArchived in [false, true]) {
+        final expectedIds = [
+          if (includeArchived) entries[1].id,
+          entries[3].id,
+          entries[4].id,
+          entries[5].id,
+        ];
+        for (var offset = 0; offset < expectedIds.length; offset++) {
+          final page = decode(
+            (await call(MemoryTools.memoryRead, {
+              'type': 'workflow',
+              'include_archived': includeArchived,
+              'offset': offset,
+              'limit': 1,
+            }))!,
+          );
+          expect(page['total'], expectedIds.length);
+          expect(page['returned'], 1);
+          expect((page['entries'] as List).single['id'], expectedIds[offset]);
+          final hasMore = offset + 1 < expectedIds.length;
+          expect(page['has_more'], hasMore);
+          expect(page['next_offset'], hasMore ? offset + 1 : null);
+        }
+      }
+    });
+
+    test('invalid offset returns tool_error', () async {
+      for (final offset in [-1, 1.5, 'invalid', true]) {
+        final page = decode(
+          (await call(MemoryTools.memoryRead, {'offset': offset}))!,
+        );
+        expect(page['type'], 'tool_error');
+        expect(page['error'], 'invalid_memory_offset');
+        expect(page['tool'], MemoryTools.memoryRead);
+      }
+    });
+
+    test('both language schemas expose pagination and continuation', () {
+      for (final lang in MemoryPromptLang.values) {
+        final definition = MemoryTools.catalogDefinitions(
+          lang,
+        ).firstWhere((d) => toolName(d) == MemoryTools.memoryRead);
+        expect(propsOf(definition)['offset']['type'], 'integer');
+        expect(propsOf(definition)['offset']['minimum'], 0);
+        final description = (definition['function'] as Map)['description'];
+        expect(description, contains('has_more'));
+        expect(description, contains('next_offset'));
+      }
+    });
+
     test('happy path returns total/returned/entries', () async {
       await memoryRepository.create(
         scope: MemoryScope.global,
