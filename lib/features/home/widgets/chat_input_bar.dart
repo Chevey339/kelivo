@@ -2708,6 +2708,7 @@ class _ChatInputBarState extends State<ChatInputBar>
                                             IosCardPress(
                                               onTap: onMove,
                                               haptics: false,
+                                              baseColor: Colors.transparent,
                                               borderRadius:
                                                   BorderRadius.circular(8),
                                               padding:
