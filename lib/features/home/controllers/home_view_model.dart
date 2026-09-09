@@ -171,8 +171,8 @@ class HomeViewModel extends ChangeNotifier {
   /// Called when streaming finishes (UI may show notification).
   void Function(String conversationId)? onStreamFinished;
 
-  /// Called when a successful assistant reply is finalized.
-  void Function(ChatMessage message)? onAssistantMessageFinished;
+  /// Completes once downstream work has taken over background execution.
+  FutureOr<void> Function(ChatMessage message)? onAssistantMessageFinished;
 
   /// Called to schedule inline image sanitization.
   void Function(String messageId, String content, {bool immediate})?
@@ -310,8 +310,8 @@ class HomeViewModel extends ChangeNotifier {
     onStreamFinished?.call(conversationId);
   }
 
-  void _onAssistantMessageFinished(ChatMessage message) {
-    onAssistantMessageFinished?.call(message);
+  Future<void> _onAssistantMessageFinished(ChatMessage message) async {
+    await onAssistantMessageFinished?.call(message);
     _onMaybeOrganizeMemory(message.conversationId);
   }
 

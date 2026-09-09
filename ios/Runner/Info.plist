@@ -44,11 +44,6 @@
 			</array>
 		</dict>
 	</array>
-	<key>BGTaskSchedulerPermittedIdentifiers</key>
-	<array>
-		<string>psyche.kelivo.background-generation.refresh</string>
-		<string>psyche.kelivo.background-generation.processing</string>
-	</array>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>ITSAppUsesNonExemptEncryption</key>
@@ -60,7 +55,9 @@
 	<key>NSHealthUpdateUsageDescription</key>
 	<string>Kelivo 不会写入健康数据。此说明仅用于满足系统对 HealthKit 的要求。 / Kelivo does not write health data. This description is required by HealthKit.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>Kelivo 需要获取您的位置，以便提供当前位置和天气信息。位置信息可能会发送给您选择的 AI 服务以生成回答。 / Kelivo needs your location to provide current location and weather. Location data may be sent to the AI provider you selected to generate answers.</string>
+	<string>Kelivo 可按您的选择使用定位提供天气或位置工具（工具定位可能发送给您选择的 AI 服务），也可在您开启辅助保活后，用低精度定位维持当前后台任务；保活坐标不会保存或发送。 / Kelivo uses location for location and weather tools you request (tool coordinates may be sent to your chosen AI provider), or coarse location to support current background tasks when you enable that option. Keep-alive coordinates are not stored or transmitted.</string>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>仅当您开启定位辅助保活且有后台任务时，Kelivo 使用低精度定位辅助执行，不保存或发送坐标。 / When you enable location-assisted execution, Kelivo uses coarse location only during current background tasks. These coordinates are not stored or transmitted.</string>
 	<key>NSRemindersFullAccessUsageDescription</key>
 	<string>Kelivo 需要访问提醒事项，以便在您确认后查询、创建和完成提醒。提醒内容可能会发送给您选择的 AI 服务以生成回答。 / Kelivo needs reminders access so it can query, create, and complete reminders after you confirm. Reminder content may be sent to the AI provider you selected to generate answers.</string>
 	<key>NSRemindersUsageDescription</key>
@@ -87,8 +84,8 @@
 	<true/>
 	<key>UIBackgroundModes</key>
 	<array>
-		<string>fetch</string>
-		<string>processing</string>
+		<string>audio</string>
+		<string>location</string>
 	</array>
 	<key>UIFileSharingEnabled</key>
 	<true/>

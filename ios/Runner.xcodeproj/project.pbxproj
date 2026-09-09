@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		BF9A3901DAAB4F128F61AA02 /* MobileBackgroundHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = BF9A3901DAAB4F128F61AA01 /* MobileBackgroundHandler.swift */; };
 		W5A0000000000000000E001 /* KelivoISHEnvironment.m in Sources */ = {isa = PBXBuildFile; fileRef = W5A0000000000000000E003 /* KelivoISHEnvironment.m */; };
 		W5A0000000000000000F001 /* KelivoISHFilesystem.m in Sources */ = {isa = PBXBuildFile; fileRef = W5A0000000000000000F003 /* KelivoISHFilesystem.m */; };
 		W5D0000000000000000F001 /* KelivoISHMountTarget.m in Sources */ = {isa = PBXBuildFile; fileRef = W5D0000000000000000F003 /* KelivoISHMountTarget.m */; };
@@ -98,6 +99,7 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		BF9A3901DAAB4F128F61AA01 /* MobileBackgroundHandler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileBackgroundHandler.swift; sourceTree = "<group>"; };
 		W5A0000000000000000E002 /* KelivoISHEnvironment.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = KelivoISHEnvironment.h; sourceTree = "<group>"; };
 		W5A0000000000000000F002 /* KelivoISHFilesystem.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = KelivoISHFilesystem.h; sourceTree = "<group>"; };
 		W5D0000000000000000F002 /* KelivoISHMountTarget.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = KelivoISHMountTarget.h; sourceTree = "<group>"; };
@@ -311,6 +313,7 @@
 				1498D2321E8E86230040F4C2 /* GeneratedPluginRegistrant.h */,
 				1498D2331E8E89220040F4C2 /* GeneratedPluginRegistrant.m */,
 				74858FAE1ED2DC5600515810 /* AppDelegate.swift */,
+				BF9A3901DAAB4F128F61AA01 /* MobileBackgroundHandler.swift */,
 				A10000000000000000000010 /* KelivoGenerationActivityAttributes.swift */,
 				A2DT00000000000000000020 /* DeviceTools */,
 				W5A0000000000000000000C1 /* Workspace */,
@@ -725,6 +728,7 @@
 			files = (
 				A10000000000000000000001 /* KelivoGenerationActivityAttributes.swift in Sources */,
 				74858FAF1ED2DC5600515810 /* AppDelegate.swift in Sources */,
+				BF9A3901DAAB4F128F61AA02 /* MobileBackgroundHandler.swift in Sources */,
 				A2DT00000000000000000001 /* DeviceLocalToolsHandler.swift in Sources */,
 				A2DT00000000000000000006 /* DeviceToolsSupport.swift in Sources */,
 				A2DT00000000000000000002 /* LocationToolHandler.swift in Sources */,

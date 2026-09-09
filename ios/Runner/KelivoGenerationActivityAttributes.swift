@@ -7,13 +7,14 @@ struct KelivoGenerationActivityAttributes: ActivityAttributes {
     var displayTitle: String
     var detail: String
     var tokenCount: Int
-    var tokenLabel: String
     var startedAt: Date
     var finishedAt: Date?
-    var elapsedSeconds: Int
-    var wavePhase: Int
-    var isFinished: Bool
+    var activeTaskCount: Int
+    var conversationId: String
+    var outcome: String
+    var staleMessage: String
   }
 
-  var title: String
+  // Immutable attributes contain no conversation title or other private text.
+  var groupId: String
 }

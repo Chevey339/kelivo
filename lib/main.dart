@@ -99,7 +99,7 @@ import 'dart:io'
         FileMode,
         Platform,
         stderr; // kept for global override usage inside provider
-import 'core/services/android_background.dart';
+import 'core/services/mobile_background.dart';
 import 'core/services/notification_service.dart';
 import 'features/home/controllers/chat_actions.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -155,7 +155,7 @@ Future<void> main() async {
       // independent of the current background-chat mode: an older completion
       // notification can still launch the app after the mode has changed.
       // Initialization does not request notification permission.
-      if (Platform.isAndroid) {
+      if (Platform.isAndroid || Platform.isIOS) {
         try {
           await NotificationService.ensureInitialized();
         } catch (_) {}
@@ -949,36 +949,6 @@ class MyApp extends StatelessWidget {
                 } catch (_) {}
               });
 
-              // Android-only: ensure background execution matches setting and prepare notifications if needed
-              WidgetsBinding.instance.addPostFrameCallback((_) async {
-                try {
-                  if (Platform.isAndroid) {
-                    final mode = settings.androidBackgroundChatMode;
-                    if (mode != AndroidBackgroundChatMode.off) {
-                      final l10n = AppLocalizations.of(context);
-                      if (l10n == null) return;
-                      // Enable only if currently disabled to avoid duplicate ROM prompts
-                      try {
-                        final already =
-                            await AndroidBackgroundManager.isEnabled();
-                        if (!already) {
-                          await AndroidBackgroundManager.ensureInitialized(
-                            notificationTitle:
-                                l10n.androidBackgroundNotificationTitle,
-                            notificationText:
-                                l10n.androidBackgroundNotificationText,
-                          );
-                          await AndroidBackgroundManager.setEnabled(true);
-                        }
-                      } catch (_) {}
-                      if (mode == AndroidBackgroundChatMode.onNotify) {
-                        await NotificationService.ensureAndroidNotificationsPermission();
-                      }
-                    }
-                  }
-                } catch (_) {}
-              });
-
               final useDyn = isAndroid && settings.useDynamicColor;
               final custom = settings.selectedCustomTheme;
               final palette =
@@ -1120,6 +1090,22 @@ class MyApp extends StatelessWidget {
                   // Desktop tray + close behaviour (minimize to tray) sync
                   final l10n = AppLocalizations.of(ctx);
                   if (l10n != null) {
+                    final backgroundSettings = ctx
+                        .watch<SettingsProvider>()
+                        .mobileBackground;
+                    WidgetsBinding.instance.addPostFrameCallback((_) {
+                      if (!ctx.mounted) return;
+                      final coordinator = MobileBackgroundCoordinator.instance;
+                      coordinator.pauseSpeech = () async {
+                        final tts = ctx.read<TtsProvider>();
+                        if (tts.playbackState.isActive || tts.isSpeaking) {
+                          await tts.pause();
+                        }
+                      };
+                      unawaited(
+                        coordinator.configure(backgroundSettings, l10n),
+                      );
+                    });
                     WidgetsBinding.instance.addPostFrameCallback((_) async {
                       try {
                         final isDesktop =

@@ -16,7 +16,14 @@ import io.flutter.plugin.common.MethodChannel
 import java.io.File
 
 /** SAF chooses the folder; direct filesystem access is required by Dart and PRoot. */
-class WorkspaceDirectoryAccess(private val activity: Activity) {
+class WorkspaceDirectoryAccess(private val context: Context) {
+    private var attachedActivity: Activity? = context as? Activity
+    fun attachActivity(activity: Activity) { attachedActivity = activity }
+    fun detachActivity(activity: Activity) {
+        if (attachedActivity !== activity) return
+        attachedActivity = null
+        dispose()
+    }
     companion object {
         private const val PICK_DIRECTORY = 4110
         private const val STORAGE_ACCESS = 4111
@@ -29,11 +36,15 @@ class WorkspaceDirectoryAccess(private val activity: Activity) {
     fun hasStorageAccess(): Boolean = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
         Environment.isExternalStorageManager()
     } else {
-        activity.checkSelfPermission(Manifest.permission.READ_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED &&
-            activity.checkSelfPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED
+        context.checkSelfPermission(Manifest.permission.READ_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED &&
+            context.checkSelfPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED
     }
 
     fun requestStorageAccess(result: MethodChannel.Result) {
+        val activity = attachedActivity ?: run {
+            result.error("foreground_activity_required", "Open Kelivo to grant storage access.", null)
+            return
+        }
         if (hasStorageAccess()) {
             result.success(true)
             return
@@ -46,7 +57,7 @@ class WorkspaceDirectoryAccess(private val activity: Activity) {
         try {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
                 val intent = Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION,
-                    Uri.parse("package:${activity.packageName}"))
+                    Uri.parse("package:${context.packageName}"))
                 try {
                     activity.startActivityForResult(intent, STORAGE_ACCESS)
                 } catch (_: ActivityNotFoundException) {
@@ -63,6 +74,10 @@ class WorkspaceDirectoryAccess(private val activity: Activity) {
     }
 
     fun pick(result: MethodChannel.Result) {
+        val activity = attachedActivity ?: run {
+            result.error("foreground_activity_required", "Open Kelivo to choose a folder.", null)
+            return
+        }
         if (!hasStorageAccess()) {
             result.error("external_storage_permission", "Storage access is required for mounting", null)
             return
@@ -106,7 +121,7 @@ class WorkspaceDirectoryAccess(private val activity: Activity) {
             val path = resolvePath(uri)
             val flags = (data?.flags ?: 0) and (Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
             require(flags and Intent.FLAG_GRANT_READ_URI_PERMISSION != 0) { "Read access was not granted" }
-            activity.contentResolver.takePersistableUriPermission(uri, flags)
+            context.contentResolver.takePersistableUriPermission(uri, flags)
             result.success(mapOf("path" to path, "token" to uri.toString()))
         } catch (error: Exception) {
             result.error("external_folder_unavailable", error.message, null)
@@ -125,7 +140,7 @@ class WorkspaceDirectoryAccess(private val activity: Activity) {
     fun resolve(token: String): Map<String, String> {
         check(hasStorageAccess()) { "Storage access was revoked" }
         val uri = Uri.parse(token)
-        check(activity.contentResolver.persistedUriPermissions.any { it.uri == uri && it.isReadPermission }) {
+        check(context.contentResolver.persistedUriPermissions.any { it.uri == uri && it.isReadPermission }) {
             "Folder access was revoked; select the folder again"
         }
         return mapOf("path" to resolvePath(uri), "token" to token)
@@ -133,10 +148,10 @@ class WorkspaceDirectoryAccess(private val activity: Activity) {
 
     fun release(token: String) {
         val uri = Uri.parse(token)
-        val permission = activity.contentResolver.persistedUriPermissions.firstOrNull { it.uri == uri } ?: return
+        val permission = context.contentResolver.persistedUriPermissions.firstOrNull { it.uri == uri } ?: return
         val flags = (if (permission.isReadPermission) Intent.FLAG_GRANT_READ_URI_PERMISSION else 0) or
             (if (permission.isWritePermission) Intent.FLAG_GRANT_WRITE_URI_PERMISSION else 0)
-        activity.contentResolver.releasePersistableUriPermission(uri, flags)
+        context.contentResolver.releasePersistableUriPermission(uri, flags)
     }
 
     private fun resolvePath(uri: Uri): String {
@@ -146,7 +161,7 @@ class WorkspaceDirectoryAccess(private val activity: Activity) {
         val root = if (volume.equals("primary", ignoreCase = true)) {
             Environment.getExternalStorageDirectory()
         } else {
-            val manager = activity.getSystemService(Context.STORAGE_SERVICE) as StorageManager
+            val manager = context.getSystemService(Context.STORAGE_SERVICE) as StorageManager
             val storage = manager.storageVolumes.firstOrNull { it.uuid?.equals(volume, ignoreCase = true) == true }
                 ?: throw IllegalArgumentException("Storage volume is unavailable")
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) storage.directory

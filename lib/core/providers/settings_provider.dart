@@ -1,3 +1,4 @@
+import '../models/mobile_background_settings.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -338,18 +339,7 @@ class SettingsProvider extends ChangeNotifier {
   static const String _desktopTopicPositionKey = 'desktop_topic_position_v1';
   static const String _desktopRightSidebarOpenKey =
       'desktop_right_sidebar_open_v1';
-  // Android background chat generation mode
-  static const String _androidBackgroundChatModeKey =
-      'android_background_chat_mode_v1';
-  // iOS background generation settings
-  static const String _iosBackgroundGenerationEnabledKey =
-      'ios_background_generation_enabled_v1';
-  static const String _iosBackgroundTaskRefreshEnabledKey =
-      'ios_background_task_refresh_enabled_v1';
-  static const String _iosLiveActivityEnabledKey =
-      'ios_live_activity_enabled_v1';
-  static const String _iosBackgroundNotificationsEnabledKey =
-      'ios_background_notifications_enabled_v1';
+  static const String _mobileBackgroundKey = 'mobile_background_settings_v1';
   // Fonts
   static const String _displayAppFontFamilyKey = 'display_app_font_family_v1';
   static const String _displayCodeFontFamilyKey = 'display_code_font_family_v1';
@@ -1374,37 +1364,16 @@ class SettingsProvider extends ChangeNotifier {
       await prefs.setString(_appLocaleKey, 'system');
     }
 
-    // Android background chat mode (Android only; default ON on first run)
-    try {
-      final rawBg = prefs.getString(_androidBackgroundChatModeKey);
-      if (rawBg == null) {
-        // Default to OFF to avoid permission prompts on first launch
-        _androidBackgroundChatMode = AndroidBackgroundChatMode.off;
-        await prefs.setString(_androidBackgroundChatModeKey, 'off');
-      } else {
-        switch (rawBg) {
-          case 'on_notify':
-            _androidBackgroundChatMode = AndroidBackgroundChatMode.onNotify;
-            break;
-          case 'on':
-            _androidBackgroundChatMode = AndroidBackgroundChatMode.on;
-            break;
-          case 'off':
-          default:
-            _androidBackgroundChatMode = AndroidBackgroundChatMode.off;
-        }
+    final backgroundJson = prefs.getString(_mobileBackgroundKey);
+    if (backgroundJson != null) {
+      try {
+        _mobileBackground = MobileBackgroundSettings.fromJson(
+          jsonDecode(backgroundJson) as Map<String, dynamic>,
+        );
+      } catch (_) {
+        _mobileBackground = const MobileBackgroundSettings();
       }
-    } catch (_) {
-      _androidBackgroundChatMode = AndroidBackgroundChatMode.off;
     }
-    _iosBackgroundGenerationEnabled =
-        prefs.getBool(_iosBackgroundGenerationEnabledKey) ?? false;
-    _iosBackgroundTaskRefreshEnabled =
-        prefs.getBool(_iosBackgroundTaskRefreshEnabledKey) ?? false;
-    _iosLiveActivityEnabled =
-        prefs.getBool(_iosLiveActivityEnabledKey) ?? false;
-    _iosBackgroundNotificationsEnabled =
-        prefs.getBool(_iosBackgroundNotificationsEnabledKey) ?? false;
 
     // load search settings
     final searchServicesStr = prefs.getString(_searchServicesKey);
@@ -3128,107 +3097,16 @@ class SettingsProvider extends ChangeNotifier {
     await prefs.setBool(_mobileAssistantDetailOutlineEnabledKey, enabled);
   }
 
-  // ===== Android background chat generation =====
-  AndroidBackgroundChatMode _androidBackgroundChatMode =
-      AndroidBackgroundChatMode.off;
-  AndroidBackgroundChatMode get androidBackgroundChatMode =>
-      _androidBackgroundChatMode;
-  Future<void> setAndroidBackgroundChatMode(
-    AndroidBackgroundChatMode mode,
-  ) async {
-    if (_androidBackgroundChatMode == mode) return;
-    _androidBackgroundChatMode = mode;
-    notifyListeners();
-    final prefs = _preferences;
-    final v = switch (mode) {
-      AndroidBackgroundChatMode.onNotify => 'on_notify',
-      AndroidBackgroundChatMode.on => 'on',
-      AndroidBackgroundChatMode.off => 'off',
-    };
-    await prefs.setString(_androidBackgroundChatModeKey, v);
-    // Best-effort: update Android background execution state immediately
-    try {
-      if (Platform.isAndroid) {
-        // Direct call; file is present in project and guards by Platform
-        // ignore: depend_on_referenced_packages
-        // ignore_for_file: unnecessary_import
-        // ignore: avoid_print
-        // Defer import here is not possible; rely on main.dart sync. This is a no-op placeholder.
-      }
-    } catch (_) {}
-  }
+  MobileBackgroundSettings _mobileBackground = const MobileBackgroundSettings();
+  MobileBackgroundSettings get mobileBackground => _mobileBackground;
 
-  // ===== iOS background chat generation =====
-  bool _iosBackgroundGenerationEnabled = false;
-  bool get iosBackgroundGenerationEnabled => _iosBackgroundGenerationEnabled;
-  Future<void> setIosBackgroundGenerationEnabled(bool v) async {
-    if (_iosBackgroundGenerationEnabled == v) return;
-    _iosBackgroundGenerationEnabled = v;
-    if (!v) {
-      _iosBackgroundTaskRefreshEnabled = false;
-      _iosLiveActivityEnabled = false;
-      _iosBackgroundNotificationsEnabled = false;
-    }
+  Future<void> setMobileBackground(MobileBackgroundSettings settings) async {
+    _mobileBackground = settings;
     notifyListeners();
-    final prefs = _preferences;
-    await prefs.setBool(
-      _iosBackgroundGenerationEnabledKey,
-      _iosBackgroundGenerationEnabled,
+    await _preferences.setString(
+      _mobileBackgroundKey,
+      jsonEncode(settings.toJson()),
     );
-    if (!v) {
-      await prefs.setBool(_iosBackgroundTaskRefreshEnabledKey, false);
-      await prefs.setBool(_iosLiveActivityEnabledKey, false);
-      await prefs.setBool(_iosBackgroundNotificationsEnabledKey, false);
-    }
-  }
-
-  bool _iosBackgroundTaskRefreshEnabled = false;
-  bool get iosBackgroundTaskRefreshEnabled => _iosBackgroundTaskRefreshEnabled;
-  Future<void> setIosBackgroundTaskRefreshEnabled(bool v) async {
-    if (_iosBackgroundTaskRefreshEnabled == v) return;
-    _iosBackgroundTaskRefreshEnabled = v;
-    if (v) _iosBackgroundGenerationEnabled = true;
-    notifyListeners();
-    final prefs = _preferences;
-    await prefs.setBool(
-      _iosBackgroundTaskRefreshEnabledKey,
-      _iosBackgroundTaskRefreshEnabled,
-    );
-    if (v) {
-      await prefs.setBool(_iosBackgroundGenerationEnabledKey, true);
-    }
-  }
-
-  bool _iosLiveActivityEnabled = false;
-  bool get iosLiveActivityEnabled => _iosLiveActivityEnabled;
-  Future<void> setIosLiveActivityEnabled(bool v) async {
-    if (_iosLiveActivityEnabled == v) return;
-    _iosLiveActivityEnabled = v;
-    if (v) _iosBackgroundGenerationEnabled = true;
-    notifyListeners();
-    final prefs = _preferences;
-    await prefs.setBool(_iosLiveActivityEnabledKey, _iosLiveActivityEnabled);
-    if (v) {
-      await prefs.setBool(_iosBackgroundGenerationEnabledKey, true);
-    }
-  }
-
-  bool _iosBackgroundNotificationsEnabled = false;
-  bool get iosBackgroundNotificationsEnabled =>
-      _iosBackgroundNotificationsEnabled;
-  Future<void> setIosBackgroundNotificationsEnabled(bool v) async {
-    if (_iosBackgroundNotificationsEnabled == v) return;
-    _iosBackgroundNotificationsEnabled = v;
-    if (v) _iosBackgroundGenerationEnabled = true;
-    notifyListeners();
-    final prefs = _preferences;
-    await prefs.setBool(
-      _iosBackgroundNotificationsEnabledKey,
-      _iosBackgroundNotificationsEnabled,
-    );
-    if (v) {
-      await prefs.setBool(_iosBackgroundGenerationEnabledKey, true);
-    }
   }
 
   void setDynamicColorSupported(bool v) {
@@ -5866,11 +5744,7 @@ Requirements:
     copy._newChatAfterDelete = _newChatAfterDelete;
     copy._longPasteAsFile = _longPasteAsFile;
     copy._longPasteAsFileThreshold = _longPasteAsFileThreshold;
-    copy._iosBackgroundGenerationEnabled = _iosBackgroundGenerationEnabled;
-    copy._iosBackgroundTaskRefreshEnabled = _iosBackgroundTaskRefreshEnabled;
-    copy._iosLiveActivityEnabled = _iosLiveActivityEnabled;
-    copy._iosBackgroundNotificationsEnabled =
-        _iosBackgroundNotificationsEnabled;
+    copy._mobileBackground = _mobileBackground;
     copy._desktopSendShortcut = _desktopSendShortcut;
     copy._desktopMessageNavButtonsMode = _desktopMessageNavButtonsMode;
     copy._chatFontScale = _chatFontScale;
@@ -6121,8 +5995,6 @@ enum ProviderKind { openai, google, claude }
 
 // Background rendering mode for chat message bubbles
 enum ChatMessageBackgroundStyle { defaultStyle, frosted, solid }
-
-enum AndroidBackgroundChatMode { off, on, onNotify }
 
 class ProviderConfig {
   static const _kelivoInPublicApiKey = 'kelivo';

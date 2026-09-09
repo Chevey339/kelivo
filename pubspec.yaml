@@ -112,7 +112,6 @@ dependencies:
   permission_handler: ^12.0.3
   flutter_tts:
     path: ./dependencies/flutter_tts
-  flutter_background: ^1.3.0+1
   flutter_local_notifications: ^17.2.3
   image: ^4.8.0
   downsize:

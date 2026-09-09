@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'dart:typed_data';
 
+import '../services/mobile_background.dart';
+
 import 'package:flutter/foundation.dart';
 
 import '../services/asr/asr_audio_capture.dart';
@@ -126,6 +128,29 @@ class AsrProvider extends ChangeNotifier {
     }
   }
 
+  String? _backgroundAudioOwner;
+
+  Future<bool> _claimCaptureAudio(int generation) async {
+    final owner = 'capture:$generation';
+    await MobileBackgroundCoordinator.instance.setAudioOwner(owner, true);
+    if (!_isCurrent(generation)) {
+      await MobileBackgroundCoordinator.instance.setAudioOwner(owner, false);
+      return false;
+    }
+    _backgroundAudioOwner = owner;
+    return true;
+  }
+
+  void _releaseSystemAudio() {
+    final owner = _backgroundAudioOwner;
+    _backgroundAudioOwner = null;
+    if (owner != null) {
+      unawaited(
+        MobileBackgroundCoordinator.instance.setAudioOwner(owner, false),
+      );
+    }
+  }
+
   Future<void> start(AsrServiceOptions options) async {
     _ensureNotDisposed();
     if (isActive) throw StateError('An ASR session is already active.');
@@ -152,6 +177,7 @@ class AsrProvider extends ChangeNotifier {
       }
 
       if (options is SystemAsrOptions) {
+        if (!await _claimCaptureAudio(generation)) return;
         final started = await _systemService.start(
           localeId: options.localeId.trim().isEmpty ? null : options.localeId,
           onTranscript: (text, _) {
@@ -167,11 +193,23 @@ class AsrProvider extends ChangeNotifier {
           onError: (asrError) {
             if (!_isCurrent(generation)) return;
             _fail(asrError.message);
-            unawaited(_systemService.cancel());
+            final owner = _backgroundAudioOwner;
+            _backgroundAudioOwner = null;
+            unawaited(
+              _systemService.cancel().whenComplete(() async {
+                if (owner != null) {
+                  await MobileBackgroundCoordinator.instance.setAudioOwner(
+                    owner,
+                    false,
+                  );
+                }
+              }),
+            );
             _activeService = null;
           },
           onDone: () {
             if (!_isCurrent(generation)) return;
+            _releaseSystemAudio();
             _state = AsrSessionState.idle;
             _activeService = null;
             _soundLevel = 0;
@@ -226,6 +264,10 @@ class AsrProvider extends ChangeNotifier {
       }
 
       final sampleRate = _sampleRateOf(options);
+      if (!await _claimCaptureAudio(generation)) {
+        await _cancelStaleCapture(capture);
+        return;
+      }
       final stream = await capture.start(sampleRate: sampleRate);
       if (!_isCurrent(generation)) {
         await _cancelStaleCapture(capture);
@@ -364,32 +406,43 @@ class AsrProvider extends ChangeNotifier {
     required bool cancelRemote,
     required bool cancelCapture,
   }) async {
-    final capture = _capture;
-    final cloud = _cloudSession;
-    _capture = null;
-    _cloudSession = null;
-    _localAudio = null;
-    _captureDone = null;
-    final captureSubscription = _captureSubscription;
-    final partialSubscription = _partialSubscription;
-    _captureSubscription = null;
-    _partialSubscription = null;
-    await captureSubscription?.cancel();
-    await partialSubscription?.cancel();
-    if (cancelRemote) {
-      try {
-        await cloud?.cancel();
-      } catch (_) {}
+    final audioOwner = _backgroundAudioOwner;
+    _backgroundAudioOwner = null;
+    try {
+      final capture = _capture;
+      final cloud = _cloudSession;
+      _capture = null;
+      _cloudSession = null;
+      _localAudio = null;
+      _captureDone = null;
+      final captureSubscription = _captureSubscription;
+      final partialSubscription = _partialSubscription;
+      _captureSubscription = null;
+      _partialSubscription = null;
+      await captureSubscription?.cancel();
+      await partialSubscription?.cancel();
+      if (cancelRemote) {
+        try {
+          await cloud?.cancel();
+        } catch (_) {}
+      }
+      if (capture != null) {
+        try {
+          if (cancelCapture) await capture.cancel();
+        } catch (_) {}
+        try {
+          await capture.dispose();
+        } catch (_) {}
+      }
+      _audioWriteTail = Future<void>.value();
+    } finally {
+      if (audioOwner != null) {
+        await MobileBackgroundCoordinator.instance.setAudioOwner(
+          audioOwner,
+          false,
+        );
+      }
     }
-    if (capture != null) {
-      try {
-        if (cancelCapture) await capture.cancel();
-      } catch (_) {}
-      try {
-        await capture.dispose();
-      } catch (_) {}
-    }
-    _audioWriteTail = Future<void>.value();
   }
 
   Future<void> _cancelStaleCapture(AsrAudioCapture capture) async {

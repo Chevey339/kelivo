@@ -4,160 +4,113 @@ import SwiftUI
 import WidgetKit
 
 @main
-struct GenerationActivityExtensionBundle: WidgetBundle {
-  var body: some Widget {
-    KelivoGenerationActivityWidget()
-  }
+struct GenerationActivityBundle: WidgetBundle {
+  var body: some Widget { GenerationActivityWidget() }
 }
 
-struct KelivoGenerationActivityWidget: Widget {
+struct GenerationActivityWidget: Widget {
   var body: some WidgetConfiguration {
     ActivityConfiguration(for: KelivoGenerationActivityAttributes.self) { context in
-      LockScreenLiveActivityView(context: context)
-        .activityBackgroundTint(Color(.systemBackground))
-        .activitySystemActionForegroundColor(.primary)
+      HStack(spacing: 12) {
+        Image(systemName: symbol(context.state, stale: activityIsStale(context)))
+          .font(.title2).foregroundStyle(activityIsStale(context) ? .orange : .blue)
+        VStack(alignment: .leading, spacing: 4) {
+          Text(context.state.displayTitle).font(.headline).lineLimit(1)
+          Text(activityIsStale(context) ? context.state.staleMessage : context.state.detail)
+            .font(.caption).foregroundStyle(.secondary).lineLimit(2)
+          if context.state.tokenCount > 0 {
+            Text("\(context.state.tokenCount) tokens").font(.caption2).foregroundStyle(.secondary)
+          }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        Spacer(minLength: 4)
+        GenerationElapsedTime(state: context.state).font(.caption.monospacedDigit())
+          .frame(width: 64, alignment: .trailing)
+      }
+      .padding(16)
+      .widgetURL(conversationURL(context.state.conversationId))
+      .activityBackgroundTint(Color(.secondarySystemBackground))
     } dynamicIsland: { context in
       DynamicIsland {
         DynamicIslandExpandedRegion(.leading) {
-          Label(
-            context.state.displayTitle,
-            systemImage: activitySymbolName(isFinished: context.state.isFinished)
-          )
-            .font(.caption)
-            .fontWeight(.semibold)
-            .lineLimit(1)
-            .minimumScaleFactor(0.82)
-            .padding(.leading, 10)
+          Image(systemName: symbol(context.state, stale: activityIsStale(context))).foregroundStyle(.blue)
+            .font(.title3)
         }
         DynamicIslandExpandedRegion(.trailing) {
-          ActivityElapsedText(context: context)
-            .frame(maxWidth: .infinity, alignment: .trailing)
-            .padding(.trailing, 10)
+          GenerationElapsedTime(state: context.state).font(.caption.monospacedDigit())
+            .frame(width: 64, alignment: .trailing)
         }
         DynamicIslandExpandedRegion(.bottom) {
-          VStack(spacing: 0) {
-            Spacer(minLength: 10)
-            HStack(alignment: .firstTextBaseline, spacing: 8) {
-              Text(context.state.detail)
-                .font(.caption2)
-                .lineLimit(1)
-                .minimumScaleFactor(0.72)
-                .foregroundStyle(.secondary)
-                .frame(maxWidth: .infinity, alignment: .leading)
-              if !context.state.tokenLabel.isEmpty {
-                Text(context.state.tokenLabel)
-                  .font(.caption2)
-                  .fontWeight(.semibold)
-                  .monospacedDigit()
-                  .foregroundStyle(.secondary)
-                  .lineLimit(1)
-                  .minimumScaleFactor(0.72)
-              }
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
+          VStack(alignment: .leading, spacing: 4) {
+            Text(context.state.displayTitle).font(.headline).lineLimit(1)
+            Text(activityIsStale(context) ? context.state.staleMessage : context.state.detail)
+              .font(.caption).foregroundStyle(.secondary).lineLimit(2)
           }
-          .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
-          .padding(.horizontal, 10)
-          .padding(.bottom, 1)
+          .frame(maxWidth: .infinity, alignment: .leading)
+          .padding(.top, 6)
+          .padding(.horizontal, 4)
+          .padding(.bottom, 10)
         }
       } compactLeading: {
-        Image(systemName: "sparkles")
+        Image(systemName: symbol(context.state, stale: activityIsStale(context))).foregroundStyle(.blue)
       } compactTrailing: {
-        if context.state.isFinished {
-          Image(systemName: "checkmark")
-            .font(.caption2)
-            .fontWeight(.semibold)
+        if context.state.activeTaskCount > 1 {
+          Text("\(context.state.activeTaskCount)").monospacedDigit()
         } else {
-          ActivityElapsedText(context: context)
+          GenerationElapsedTime(state: context.state).font(.caption2.monospacedDigit())
+            .frame(width: 48, alignment: .trailing)
         }
       } minimal: {
-        Image(systemName: activitySymbolName(isFinished: context.state.isFinished))
+        Image(systemName: symbol(context.state, stale: activityIsStale(context))).foregroundStyle(.blue)
       }
+      .widgetURL(conversationURL(context.state.conversationId))
+      .keylineTint(.blue)
+      .contentMargins(.horizontal, 20, for: .expanded)
     }
   }
 }
 
-private struct LockScreenLiveActivityView: View {
-  let context: ActivityViewContext<KelivoGenerationActivityAttributes>
+private func symbol(_ state: KelivoGenerationActivityAttributes.ContentState, stale: Bool) -> String {
+  if stale { return "exclamationmark.circle" }
+  switch state.outcome {
+  case "completed": return "checkmark.circle.fill"
+  case "failed", "interrupted": return "exclamationmark.circle.fill"
+  case "cancelled": return "stop.circle"
+  default: return "sparkles"
+  }
+}
+
+private func conversationURL(_ id: String) -> URL? {
+  var components = URLComponents()
+  components.scheme = "kelivo"
+  components.host = "conversation"
+  components.path = "/\(id)"
+  return components.url
+}
+
+private struct GenerationElapsedTime: View {
+  let state: KelivoGenerationActivityAttributes.ContentState
 
   var body: some View {
-    HStack(alignment: .center, spacing: 10) {
-      ZStack {
-        RoundedRectangle(cornerRadius: 10, style: .continuous)
-          .fill(Color.accentColor.opacity(0.16))
-        Image(systemName: activitySymbolName(isFinished: context.state.isFinished))
-          .font(.system(size: 15, weight: .semibold))
-          .foregroundStyle(Color.accentColor)
+    Group {
+      if let end = state.finishedAt {
+        let seconds = max(0, Int(end.timeIntervalSince(state.startedAt)))
+        Text(String(format: "%d:%02d", seconds / 60, seconds % 60))
+      } else {
+        // WidgetKit owns the timer; no per-second ActivityKit updates.
+        Text(timerInterval: state.startedAt...state.startedAt.addingTimeInterval(8 * 3600), countsDown: false)
       }
-      .frame(width: 34, height: 34)
-
-      VStack(alignment: .leading, spacing: 4) {
-        Text(context.state.displayTitle)
-          .font(.subheadline)
-          .fontWeight(.semibold)
-          .lineLimit(1)
-          .minimumScaleFactor(0.82)
-
-        Text(context.state.detail)
-          .font(.caption)
-          .lineLimit(1)
-          .minimumScaleFactor(0.82)
-          .foregroundStyle(.secondary)
-          .frame(maxWidth: .infinity, alignment: .leading)
-      }
-      .frame(maxWidth: .infinity, alignment: .leading)
-
-      VStack(alignment: .trailing, spacing: 4) {
-        ActivityElapsedText(context: context)
-
-        if !context.state.tokenLabel.isEmpty {
-          Text(context.state.tokenLabel)
-            .font(.caption2)
-            .fontWeight(.semibold)
-            .monospacedDigit()
-            .foregroundStyle(.secondary)
-            .lineLimit(1)
-            .minimumScaleFactor(0.72)
-            .padding(.horizontal, 9)
-            .padding(.vertical, 5)
-            .background(
-              Capsule(style: .continuous)
-                .fill(Color.secondary.opacity(0.12))
-            )
-        }
-      }
-      .frame(minWidth: 62, alignment: .trailing)
     }
-    .padding(.horizontal, 14)
-    .padding(.vertical, 10)
+    // Timer Text fills the offered width; frame alignment alone aligns its
+    // container, leaving the changing digits at the leading edge.
+    .multilineTextAlignment(.trailing)
+    .lineLimit(1)
+    .minimumScaleFactor(0.8)
+    .frame(maxWidth: .infinity, alignment: .trailing)
   }
 }
 
-private struct ActivityElapsedText: View {
-  let context: ActivityViewContext<KelivoGenerationActivityAttributes>
-
-  var body: some View {
-    Text(elapsedText(seconds: context.state.elapsedSeconds))
-      .font(.caption2)
-      .fontWeight(.semibold)
-      .monospacedDigit()
-      .foregroundStyle(.secondary)
-      .lineLimit(1)
-      .minimumScaleFactor(0.72)
-  }
-}
-
-private func activitySymbolName(isFinished: Bool) -> String {
-  isFinished ? "checkmark" : "sparkles"
-}
-
-private func elapsedText(seconds: Int) -> String {
-  let totalSeconds = max(0, seconds)
-  let hours = totalSeconds / 3600
-  let minutes = (totalSeconds % 3600) / 60
-  let seconds = totalSeconds % 60
-  if hours > 0 {
-    return String(format: "%d:%02d", hours, minutes)
-  }
-  return String(format: "%d:%02d", minutes, seconds)
+private func activityIsStale(_ context: ActivityViewContext<KelivoGenerationActivityAttributes>) -> Bool {
+  if #available(iOS 16.2, *) { return context.isStale }
+  return false
 }

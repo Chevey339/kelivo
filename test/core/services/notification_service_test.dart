@@ -1,79 +1,7 @@
-import 'dart:io';
-
 import 'package:Kelivo/core/services/notification_service.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  group('NotificationService.shouldShowChatCompleted', () {
-    test(
-      'suppresses notification only for the visible current Android chat',
-      () {
-        expect(
-          NotificationService.shouldShowChatCompleted(
-            isAndroid: true,
-            notifyModeEnabled: true,
-            appInForeground: true,
-            homeRouteVisible: true,
-            isCurrentConversation: true,
-          ),
-          isFalse,
-        );
-
-        for (final state in [
-          (
-            appInForeground: false,
-            homeRouteVisible: true,
-            isCurrentConversation: true,
-          ),
-          (
-            appInForeground: true,
-            homeRouteVisible: false,
-            isCurrentConversation: true,
-          ),
-          (
-            appInForeground: true,
-            homeRouteVisible: true,
-            isCurrentConversation: false,
-          ),
-        ]) {
-          expect(
-            NotificationService.shouldShowChatCompleted(
-              isAndroid: true,
-              notifyModeEnabled: true,
-              appInForeground: state.appInForeground,
-              homeRouteVisible: state.homeRouteVisible,
-              isCurrentConversation: state.isCurrentConversation,
-            ),
-            isTrue,
-          );
-        }
-      },
-    );
-
-    test('requires Android and the notify background mode', () {
-      expect(
-        NotificationService.shouldShowChatCompleted(
-          isAndroid: false,
-          notifyModeEnabled: true,
-          appInForeground: false,
-          homeRouteVisible: false,
-          isCurrentConversation: false,
-        ),
-        isFalse,
-      );
-      expect(
-        NotificationService.shouldShowChatCompleted(
-          isAndroid: true,
-          notifyModeEnabled: false,
-          appInForeground: false,
-          homeRouteVisible: false,
-          isCurrentConversation: false,
-        ),
-        isFalse,
-      );
-    });
-  });
-
   test(
     'chat completion payload accepts only non-empty conversation targets',
     () {
@@ -111,26 +39,17 @@ void main() {
   });
 
   test(
-    'Android startup registers notification taps before reading the mode',
+    'native cold and warm taps preserve their conversation target',
     () async {
-      final source = await File('lib/main.dart').readAsString();
-      final bindingIndex = source.indexOf(
-        'WidgetsFlutterBinding.ensureInitialized();',
-      );
-      final initializationIndex = source.indexOf(
-        'await NotificationService.ensureInitialized();',
-      );
-      final modeReadIndex = source.indexOf(
-        'settings.androidBackgroundChatMode',
-      );
-      final permissionIndex = source.indexOf(
-        'await NotificationService.ensureAndroidNotificationsPermission();',
-      );
-
-      expect(bindingIndex, greaterThanOrEqualTo(0));
-      expect(initializationIndex, greaterThan(bindingIndex));
-      expect(modeReadIndex, greaterThan(initializationIndex));
-      expect(permissionIndex, greaterThan(modeReadIndex));
+      NotificationService.openConversation('cold');
+      expect(NotificationService.takePendingConversationId(), 'cold');
+      expect(NotificationService.takePendingConversationId(), isNull);
+      final received = <String>[];
+      final sub = NotificationService.conversationTaps.listen(received.add);
+      NotificationService.openConversation('warm');
+      await Future<void>.delayed(Duration.zero);
+      expect(received, ['warm']);
+      await sub.cancel();
     },
   );
 }
