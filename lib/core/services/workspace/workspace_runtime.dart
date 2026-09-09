@@ -36,7 +36,8 @@ class Mount {
   String toString() => 'Mount(host: $host, guest: $guest)';
 }
 
-/// One-shot process request. Every `shell` call is a fresh process.
+/// Process request. Every `shell` call is a fresh process; protocol servers
+/// can keep stdin open and use Duration.zero for an unlimited lifetime.
 class CommandRequest {
   const CommandRequest({
     required this.runId,
@@ -46,10 +47,14 @@ class CommandRequest {
     this.env = const <String, String>{},
     this.mounts = const <Mount>[],
     this.isCancelled,
+    this.keepStdinOpen = false,
   });
 
   final String runId;
   final String command;
+
+  /// Keep a raw stdin pipe open for a persistent protocol process.
+  final bool keepStdinOpen;
 
   /// Resolved path in the runtime's vocabulary (guest path when sandboxed,
   /// host path when native).
@@ -148,6 +153,11 @@ abstract class WorkspaceRuntime {
       'Reveal in file manager is not supported by this runtime',
     );
   }
+}
+
+/// Runtime with a writable raw stdin pipe (separate from terminal/PTY input).
+abstract interface class WorkspaceStdioRuntime implements WorkspaceRuntime {
+  Future<void> writeStdin(String runId, Uint8List data);
 }
 
 /// Holds the process-wide [WorkspaceRuntime] once a later agent registers it.

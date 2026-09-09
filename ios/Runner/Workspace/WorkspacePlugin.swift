@@ -154,6 +154,19 @@ final class WorkspacePlugin: NSObject, FlutterStreamHandler {
       boot(result: result)
     case "exec":
       exec(call: call, result: result)
+    case "stdinWrite":
+      let args = call.arguments as? [String: Any] ?? [:]
+      guard let runId = args["runId"] as? String,
+        let data = args["data"] as? FlutterStandardTypedData else {
+        result(FlutterError(code: "bad_args", message: "runId and data required", details: nil))
+        return
+      }
+      DispatchQueue.global(qos: .userInitiated).async {
+        let ok = KelivoISHExecutor.writeStdin(data.data, runId: runId)
+        DispatchQueue.main.async {
+          result(ok ? nil : FlutterError(code: "stdin_closed", message: "process stdin unavailable", details: nil))
+        }
+      }
     case "cancel":
       cancel(call: call, result: result)
     case "ptyOpen":
@@ -270,6 +283,10 @@ final class WorkspacePlugin: NSObject, FlutterStreamHandler {
         cwd: cwd,
         env: env,
         timeoutMs: timeoutMs,
+        keepStdinOpen: args["keepStdinOpen"] as? Bool ?? false,
+        started: { [weak self] in
+          self?.emit(["type": "started", "runId": runId])
+        },
         chunk: { [weak self] id, isStderr, data in
           self?.emit([
             "type": isStderr ? "stderr" : "stdout",

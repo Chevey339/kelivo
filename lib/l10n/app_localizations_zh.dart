@@ -654,9 +654,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get mcpTransportTagHttp => 'HTTP';
 
   @override
-  String get mcpServerEditSheetStdioOnlyDesktop => 'STDIO 仅在桌面端可用';
-
-  @override
   String get mcpServerEditSheetStdioCommandLabel => '命令';
 
   @override
@@ -10720,6 +10717,12 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get backgroundOverlayReset => '恢复默认样式';
+
+  @override
+  String get mcpStdioEnvironmentRequired => '请先安装工作区运行环境，再使用移动端 STDIO。';
+
+  @override
+  String get mcpStdioAddArgument => '添加参数';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hans`).
@@ -11370,9 +11373,6 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get mcpTransportTagHttp => 'HTTP';
-
-  @override
-  String get mcpServerEditSheetStdioOnlyDesktop => 'STDIO 仅在桌面端可用';
 
   @override
   String get mcpServerEditSheetStdioCommandLabel => '命令';
@@ -21364,6 +21364,12 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get backgroundOverlayReset => '恢复默认样式';
+
+  @override
+  String get mcpStdioEnvironmentRequired => '请先安装工作区运行环境，再使用移动端 STDIO。';
+
+  @override
+  String get mcpStdioAddArgument => '添加参数';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hant`).
@@ -22014,9 +22020,6 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get mcpTransportTagHttp => 'HTTP';
-
-  @override
-  String get mcpServerEditSheetStdioOnlyDesktop => 'STDIO 僅在桌面端可用';
 
   @override
   String get mcpServerEditSheetStdioCommandLabel => '命令';
@@ -32087,4 +32090,10 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get backgroundOverlayReset => '恢復預設樣式';
+
+  @override
+  String get mcpStdioEnvironmentRequired => '請先安裝工作區執行環境，再使用行動版 STDIO。';
+
+  @override
+  String get mcpStdioAddArgument => '新增參數';
 }

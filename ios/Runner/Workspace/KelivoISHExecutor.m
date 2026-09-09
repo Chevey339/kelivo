@@ -28,6 +28,7 @@
 #include <poll.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/socket.h>
 
 static const NSTimeInterval kDrainGraceSeconds = 1.0;
 static const NSTimeInterval kKillGraceSeconds = 2.0;
@@ -38,6 +39,7 @@ static const NSTimeInterval kReaderJoinSeconds = 1.5;
 @interface KelivoISHRunContext : NSObject {
     int _stdoutReadEnd;
     int _stderrReadEnd;
+    int _stdinPipe[2];
     int _stdoutPipe[2];
     int _stderrPipe[2];
 }
@@ -58,21 +60,25 @@ static const NSTimeInterval kReaderJoinSeconds = 1.5;
 @property (atomic) BOOL stderrReaderDone;
 @property (atomic) BOOL stdoutAbort;
 @property (atomic) BOOL stderrAbort;
+- (int *)stdinPipe;
 - (int *)stdoutPipe;
 - (int *)stderrPipe;
 - (void)adoptReadEnd:(int)fd isStdErr:(BOOL)isStdErr;
 - (void)closeOwnedReadEnd:(BOOL)isStdErr;
+- (void)closeStdin;
 - (void)closePipeEnds;
 @end
 
 @implementation KelivoISHRunContext
 
+- (int *)stdinPipe { return _stdinPipe; }
 - (int *)stdoutPipe { return _stdoutPipe; }
 - (int *)stderrPipe { return _stderrPipe; }
 
 - (instancetype)init {
     if (self = [super init]) {
         _readersGroup = dispatch_group_create();
+        _stdinPipe[0] = _stdinPipe[1] = -1;
         _stdoutPipe[0] = _stdoutPipe[1] = -1;
         _stderrPipe[0] = _stderrPipe[1] = -1;
         _stdoutReadEnd = _stderrReadEnd = -1;
@@ -104,12 +110,28 @@ static const NSTimeInterval kReaderJoinSeconds = 1.5;
     if (fd >= 0) close(fd);
 }
 
-- (void)closePipeEnds {
+- (void)closeStdin {
     @synchronized (self) {
+        if (_stdinPipe[1] >= 0) {
+            // Wake a guest blocked in host read(), even when a writer owns a
+            // duplicate descriptor. Guest signals cannot interrupt realfs_read.
+            shutdown(_stdinPipe[1], SHUT_RDWR);
+            close(_stdinPipe[1]);
+            _stdinPipe[1] = -1;
+        }
+    }
+}
+
+- (void)closePipeEnds {
+    [self closeStdin];
+    @synchronized (self) {
+        if (_stdinPipe[0] >= 0) close(_stdinPipe[0]);
+        if (_stdinPipe[1] >= 0) close(_stdinPipe[1]);
         if (_stdoutPipe[0] >= 0) close(_stdoutPipe[0]);
         if (_stdoutPipe[1] >= 0) close(_stdoutPipe[1]);
         if (_stderrPipe[0] >= 0) close(_stderrPipe[0]);
         if (_stderrPipe[1] >= 0) close(_stderrPipe[1]);
+        _stdinPipe[0] = _stdinPipe[1] = -1;
         _stdoutPipe[0] = _stdoutPipe[1] = -1;
         _stderrPipe[0] = _stderrPipe[1] = -1;
     }
@@ -163,6 +185,8 @@ static dispatch_queue_t _readerQueue;
                  cwd:(NSString *)cwd
                  env:(NSDictionary<NSString *, NSString *> *)env
            timeoutMs:(NSInteger)timeoutMs
+       keepStdinOpen:(BOOL)keepStdinOpen
+             started:(void (^)(void))started
                chunk:(KelivoISHChunkHandler)chunk
                 done:(KelivoISHDoneHandler)done {
     if (runId.length == 0 || command.length == 0) return NO;
@@ -171,7 +195,7 @@ static dispatch_queue_t _readerQueue;
         [_queued addObject:runId];
     }
 
-    NSTimeInterval timeout = MAX(0.001, MIN((double)timeoutMs / 1000.0, 3600.0));
+    NSTimeInterval timeout = keepStdinOpen && timeoutMs == 0 ? 0 : MAX(0.001, MIN((double)timeoutMs / 1000.0, 3600.0));
     [[KelivoISHKernel shared] performOnSpawnQueue:^{
         BOOL early = NO;
         @synchronized (_byPid) {
@@ -197,10 +221,39 @@ static dispatch_queue_t _readerQueue;
                        cwd:cwd
                        env:env
                    timeout:timeout
+             keepStdinOpen:keepStdinOpen
+                   started:started
                      chunk:chunk
                       done:done];
     }];
     return YES;
+}
+
++ (BOOL)writeStdin:(NSData *)data runId:(NSString *)runId {
+    KelivoISHRunContext *ctx;
+    @synchronized (_byPid) { ctx = _byRunId[runId]; }
+    if (!ctx) return NO;
+    int fd;
+    @synchronized (ctx) {
+        fd = [ctx stdinPipe][1] >= 0 ? dup([ctx stdinPipe][1]) : -1;
+    }
+    if (fd < 0) return NO;
+    const char *bytes = data.bytes;
+    NSUInteger offset = 0;
+    NSDate *deadline = [NSDate dateWithTimeIntervalSinceNow:30];
+    while (offset < data.length && !ctx.cancelled && !ctx.exited && !ctx.didFinalize) {
+        ssize_t n = write(fd, bytes + offset, data.length - offset);
+        if (n > 0) { offset += (NSUInteger)n; continue; }
+        if (n < 0 && errno == EINTR) continue;
+        if (n < 0 && (errno == EAGAIN || errno == EWOULDBLOCK) && deadline.timeIntervalSinceNow > 0) {
+            struct pollfd pfd = {.fd = fd, .events = POLLOUT};
+            poll(&pfd, 1, 100);
+            continue;
+        }
+        break;
+    }
+    close(fd);
+    return offset == data.length;
 }
 
 + (BOOL)cancelRunId:(NSString *)runId {
@@ -217,6 +270,7 @@ static dispatch_queue_t _readerQueue;
             return NO;
         }
     }
+    [ctx closeStdin];
     if (ctx.guestPid > 1) {
         [self killGuestPid:ctx.guestPid groupId:ctx.guestPgid];
     }
@@ -234,6 +288,7 @@ static dispatch_queue_t _readerQueue;
         }
     }
     for (KelivoISHRunContext *ctx in active) {
+        [ctx closeStdin];
         if (ctx.guestPid > 1) {
             [self killGuestPid:ctx.guestPid groupId:ctx.guestPgid];
         }
@@ -246,6 +301,8 @@ static dispatch_queue_t _readerQueue;
                  cwd:(NSString *)cwd
                  env:(NSDictionary<NSString *, NSString *> *)env
              timeout:(NSTimeInterval)timeout
+       keepStdinOpen:(BOOL)keepStdinOpen
+             started:(void (^)(void))started
                chunk:(KelivoISHChunkHandler)chunk
                 done:(KelivoISHDoneHandler)done {
     void (^fail)(NSString *) = ^(NSString *reason) {
@@ -300,6 +357,17 @@ static dispatch_queue_t _readerQueue;
         return;
     }
 
+    if (keepStdinOpen) {
+        if (socketpair(AF_UNIX, SOCK_STREAM, 0, [ctx stdinPipe]) < 0) {
+            [ctx closePipeEnds];
+            fail(@"stdin socketpair failed");
+            return;
+        }
+        int noSigPipe = 1;
+        setsockopt([ctx stdinPipe][1], SOL_SOCKET, SO_NOSIGPIPE, &noSigPipe, sizeof(noSigPipe));
+        fcntl([ctx stdinPipe][1], F_SETFL, O_NONBLOCK);
+    }
+
     uint64_t filesystem = [[KelivoISHKernel shared] filesystemContextForBinds:binds];
     if (!filesystem) {
         [ctx closePipeEnds];
@@ -319,7 +387,7 @@ static dispatch_queue_t _readerQueue;
 
     struct fd *stdin_fd = adhoc_fd_create(&realfs_fdops);
     if (stdin_fd) {
-        int real_fd = open("/dev/null", O_RDONLY);
+        int real_fd = keepStdinOpen ? dup([ctx stdinPipe][0]) : open("/dev/null", O_RDONLY);
         if (real_fd < 0) {
             current = saved;
             [ctx closePipeEnds];
@@ -327,6 +395,11 @@ static dispatch_queue_t _readerQueue;
             return;
         }
         stdin_fd->real_fd = real_fd;
+        if (keepStdinOpen) {
+            // libuv selects its stdin reader using guest fstat(), which an
+            // ad-hoc descriptor otherwise reports as an unknown file type.
+            stdin_fd->stat.mode = S_IFIFO | 0600;
+        }
         task->files->files[0] = stdin_fd;
     }
 
@@ -340,6 +413,7 @@ static dispatch_queue_t _readerQueue;
             return;
         }
         stdout_fd->real_fd = real_fd;
+        stdout_fd->stat.mode = S_IFIFO | 0600;
         task->files->files[1] = stdout_fd;
     }
     struct fd *stderr_fd = adhoc_fd_create(&realfs_fdops);
@@ -352,7 +426,12 @@ static dispatch_queue_t _readerQueue;
             return;
         }
         stderr_fd->real_fd = real_fd;
+        stderr_fd->stat.mode = S_IFIFO | 0600;
         task->files->files[2] = stderr_fd;
+    }
+    if ([ctx stdinPipe][0] >= 0) {
+        close([ctx stdinPipe][0]);
+        [ctx stdinPipe][0] = -1;
     }
     close([ctx stdoutPipe][1]);
     close([ctx stderrPipe][1]);
@@ -420,6 +499,7 @@ static dispatch_queue_t _readerQueue;
 
     task_start(task);
     current = saved;
+    if (keepStdinOpen) started();
 
     int stdoutReadFd = [ctx stdoutPipe][0];
     int stderrReadFd = [ctx stderrPipe][0];
@@ -429,9 +509,11 @@ static dispatch_queue_t _readerQueue;
     [self startReaderForPipe:stderrReadFd context:ctx isStdErr:YES];
 
     if (ctx.cancelled) {
+        [ctx closeStdin];
         [self killGuestPid:ctx.guestPid groupId:ctx.guestPgid];
     }
 
+    if (timeout == 0) return;
     int capturedPid = ctx.guestPid;
     dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(timeout * NSEC_PER_SEC)),
                    dispatch_get_global_queue(QOS_CLASS_DEFAULT, 0), ^{
@@ -487,6 +569,8 @@ static dispatch_queue_t _readerQueue;
         [_byPid removeObjectForKey:@(ctx.guestPid)];
         [_byRunId removeObjectForKey:ctx.runId];
     }
+
+    [ctx closePipeEnds];
 
     NSInteger durationMs = (NSInteger)lround(-[ctx.startedAt timeIntervalSinceNow] * 1000.0);
     int code = (ctx.timedOut || ctx.cancelled || ctx.interrupted) ? -1 : ctx.exitCode;

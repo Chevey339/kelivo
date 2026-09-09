@@ -264,6 +264,10 @@ class _ConversationMcpSheet extends StatelessWidget {
                                                                 McpTransportType
                                                                     .sse
                                                             ? 'SSE'
+                                                            : s.transport ==
+                                                                  McpTransportType
+                                                                      .stdio
+                                                            ? l10n.mcpTransportTagStdio
                                                             : 'HTTP'),
                                                 ),
                                               ],

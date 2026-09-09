@@ -45,6 +45,10 @@ Stream<CommandEvent> runChannelCommand({
     (event) {
       if (event['runId']?.toString() != request.runId) return;
       switch (event['type']) {
+        case 'started':
+          if (!finished) {
+            controller.add(CommandStarted(pid: event['pid'] as int?));
+          }
         case 'stdout':
           if (!finished && !controller.isClosed) {
             controller.add(

@@ -56,6 +56,10 @@ class _McpServerEditSheetState extends State<_McpServerEditSheet>
   final _nameCtrl = TextEditingController();
   McpTransportType _transport = McpTransportType.http;
   final _urlCtrl = TextEditingController();
+  final _cmdCtrl = TextEditingController();
+  final List<TextEditingController> _args = [];
+  final _cwdCtrl = TextEditingController();
+  final List<_HeaderEntry> _env = [];
   final List<_HeaderEntry> _headers = [];
 
   @override
@@ -69,6 +73,19 @@ class _McpServerEditSheetState extends State<_McpServerEditSheet>
       _nameCtrl.text = server.name;
       _transport = server.transport;
       _urlCtrl.text = server.url;
+      _cmdCtrl.text = server.command ?? '';
+      _args.addAll(
+        server.args.map((argument) => TextEditingController(text: argument)),
+      );
+      _cwdCtrl.text = server.workingDirectory ?? '';
+      server.env.forEach(
+        (k, v) => _env.add(
+          _HeaderEntry(
+            TextEditingController(text: k),
+            TextEditingController(text: v),
+          ),
+        ),
+      );
       server.headers.forEach((k, v) {
         _headers.add(
           _HeaderEntry(
@@ -90,6 +107,14 @@ class _McpServerEditSheetState extends State<_McpServerEditSheet>
     _tab?.dispose();
     _nameCtrl.dispose();
     _urlCtrl.dispose();
+    _cmdCtrl.dispose();
+    for (final argument in _args) {
+      argument.dispose();
+    }
+    _cwdCtrl.dispose();
+    for (final entry in _env) {
+      entry.dispose();
+    }
     for (final h in _headers) {
       h.dispose();
     }
@@ -121,6 +146,8 @@ class _McpServerEditSheetState extends State<_McpServerEditSheet>
     required String label,
     required TextEditingController controller,
     String? hint,
+    int maxLines = 1,
+    bool literalInput = false,
   }) {
     final cs = Theme.of(context).colorScheme;
     return Column(
@@ -136,6 +163,15 @@ class _McpServerEditSheetState extends State<_McpServerEditSheet>
         const SizedBox(height: 6),
         TextField(
           controller: controller,
+          maxLines: maxLines,
+          autocorrect: !literalInput,
+          enableSuggestions: !literalInput,
+          smartDashesType: literalInput
+              ? SmartDashesType.disabled
+              : SmartDashesType.enabled,
+          smartQuotesType: literalInput
+              ? SmartQuotesType.disabled
+              : SmartQuotesType.enabled,
           decoration: InputDecoration(
             hintText: hint,
             filled: true,
@@ -170,15 +206,22 @@ class _McpServerEditSheetState extends State<_McpServerEditSheet>
 
   // Segmented choice bar (like top tabs), used for transport type
   Widget _transportPicker() {
-    final labels = ['Streamable HTTP', 'SSE'];
-    final idx = _transport == McpTransportType.http ? 0 : 1;
+    final types = [
+      McpTransportType.http,
+      McpTransportType.sse,
+      if (context.watch<McpProvider>().supportsStdio) McpTransportType.stdio,
+    ];
     return _SegChoiceBar(
-      labels: labels,
-      selectedIndex: idx,
-      onSelected: (i) => setState(
-        () =>
-            _transport = i == 0 ? McpTransportType.http : McpTransportType.sse,
-      ),
+      labels: [
+        for (final type in types)
+          switch (type) {
+            McpTransportType.http => 'Streamable HTTP',
+            McpTransportType.sse => 'SSE',
+            _ => AppLocalizations.of(context)!.mcpTransportOptionStdio,
+          },
+      ],
+      selectedIndex: types.indexOf(_transport),
+      onSelected: (i) => setState(() => _transport = types[i]),
     );
   }
 
@@ -255,32 +298,101 @@ class _McpServerEditSheetState extends State<_McpServerEditSheet>
               ),
             ),
           ],
-          _inputRow(
-            label: l10n.mcpServerEditSheetUrlLabel,
-            controller: _urlCtrl,
-            hint: _transport == McpTransportType.sse
-                ? 'http://localhost:3000/sse'
-                : 'http://localhost:3000',
-          ),
-          const SizedBox(height: 16),
-          Text(
-            l10n.mcpServerEditSheetCustomHeadersTitle,
-            style: TextStyle(fontSize: 13, fontWeight: AppFontWeights.semibold),
-          ),
-          const SizedBox(height: 8),
-          _headersEditor(),
+          if (_transport == McpTransportType.stdio) ...[
+            _inputRow(
+              label: l10n.mcpServerEditSheetStdioCommandLabel,
+              controller: _cmdCtrl,
+              literalInput: true,
+              hint: 'npx',
+            ),
+            const SizedBox(height: 10),
+            _argumentsEditor(),
+            const SizedBox(height: 10),
+            _inputRow(
+              label: l10n.mcpServerEditSheetStdioWorkingDirectoryLabel,
+              controller: _cwdCtrl,
+              literalInput: true,
+              hint: '/root',
+            ),
+            const SizedBox(height: 16),
+            Text(l10n.mcpServerEditSheetStdioEnvironmentTitle),
+            const SizedBox(height: 8),
+            _headersEditor(entries: _env, isStdio: true),
+          ] else ...[
+            _inputRow(
+              label: l10n.mcpServerEditSheetUrlLabel,
+              controller: _urlCtrl,
+              hint: _transport == McpTransportType.sse
+                  ? 'http://localhost:3000/sse'
+                  : 'http://localhost:3000',
+            ),
+            const SizedBox(height: 16),
+            Text(
+              l10n.mcpServerEditSheetCustomHeadersTitle,
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: AppFontWeights.semibold,
+              ),
+            ),
+            const SizedBox(height: 8),
+            _headersEditor(entries: _headers),
+          ],
         ],
       ],
     );
   }
 
-  Widget _headersEditor() {
+  Widget _argumentsEditor() {
+    final l10n = AppLocalizations.of(context)!;
+    final cs = Theme.of(context).colorScheme;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        for (var i = 0; i < _args.length; i++)
+          Padding(
+            key: ObjectKey(_args[i]),
+            padding: const EdgeInsets.only(bottom: 10),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: _inputRow(
+                    label:
+                        '${l10n.mcpServerEditSheetStdioArgumentsLabel} ${i + 1}',
+                    controller: _args[i],
+                    literalInput: true,
+                    maxLines: 3,
+                  ),
+                ),
+                _TactileIconButton(
+                  icon: Lucide.Trash,
+                  color: cs.error,
+                  semanticLabel: l10n.mcpServerEditSheetRemoveHeaderTooltip,
+                  onTap: () => setState(() => _args.removeAt(i).dispose()),
+                ),
+              ],
+            ),
+          ),
+        IosTileButton(
+          icon: Lucide.Plus,
+          label: l10n.mcpStdioAddArgument,
+          backgroundColor: cs.primary,
+          onTap: () => setState(() => _args.add(TextEditingController())),
+        ),
+      ],
+    );
+  }
+
+  Widget _headersEditor({
+    required List<_HeaderEntry> entries,
+    bool isStdio = false,
+  }) {
     final cs = Theme.of(context).colorScheme;
     final l10n = AppLocalizations.of(context)!;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        for (int i = 0; i < _headers.length; i++) ...[
+        for (int i = 0; i < entries.length; i++) ...[
           Container(
             margin: const EdgeInsets.only(bottom: 10),
             padding: const EdgeInsets.all(12),
@@ -295,15 +407,25 @@ class _McpServerEditSheetState extends State<_McpServerEditSheet>
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 _inputRow(
-                  label: l10n.mcpServerEditSheetHeaderNameLabel,
-                  controller: _headers[i].key,
-                  hint: l10n.mcpServerEditSheetHeaderNameHint,
+                  label: (isStdio
+                      ? l10n.mcpServerEditSheetStdioEnvNameLabel
+                      : l10n.mcpServerEditSheetHeaderNameLabel),
+                  controller: entries[i].key,
+                  literalInput: isStdio,
+                  hint: isStdio
+                      ? 'ENV_NAME'
+                      : l10n.mcpServerEditSheetHeaderNameHint,
                 ),
                 const SizedBox(height: 10),
                 _inputRow(
-                  label: l10n.mcpServerEditSheetHeaderValueLabel,
-                  controller: _headers[i].value,
-                  hint: l10n.mcpServerEditSheetHeaderValueHint,
+                  label: (isStdio
+                      ? l10n.mcpServerEditSheetStdioEnvValueLabel
+                      : l10n.mcpServerEditSheetHeaderValueLabel),
+                  controller: entries[i].value,
+                  literalInput: isStdio,
+                  hint: isStdio
+                      ? 'value'
+                      : l10n.mcpServerEditSheetHeaderValueHint,
                 ),
                 Align(
                   alignment: Alignment.centerRight,
@@ -311,7 +433,7 @@ class _McpServerEditSheetState extends State<_McpServerEditSheet>
                     icon: Lucide.Trash,
                     color: cs.error,
                     semanticLabel: l10n.mcpServerEditSheetRemoveHeaderTooltip,
-                    onTap: () => setState(() => _headers.removeAt(i)),
+                    onTap: () => setState(() => entries.removeAt(i).dispose()),
                   ),
                 ),
               ],
@@ -322,11 +444,13 @@ class _McpServerEditSheetState extends State<_McpServerEditSheet>
           alignment: Alignment.centerLeft,
           child: IosTileButton(
             icon: Lucide.Plus,
-            label: l10n.mcpServerEditSheetAddHeader,
+            label: (isStdio
+                ? l10n.mcpServerEditSheetStdioAddEnv
+                : l10n.mcpServerEditSheetAddHeader),
             backgroundColor: cs.primary,
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
             onTap: () => setState(
-              () => _headers.add(
+              () => entries.add(
                 _HeaderEntry(TextEditingController(), TextEditingController()),
               ),
             ),
@@ -346,6 +470,63 @@ class _McpServerEditSheetState extends State<_McpServerEditSheet>
       return;
     }
     final name = _nameCtrl.text.trim().isEmpty ? 'MCP' : _nameCtrl.text.trim();
+    if (_transport == McpTransportType.stdio) {
+      if (!mcp.supportsStdio) {
+        showAppSnackBar(
+          context,
+          message: AppLocalizations.of(context)!.mcpStdioEnvironmentRequired,
+          type: NotificationType.warning,
+        );
+        return;
+      }
+      final cmd = _cmdCtrl.text.trim();
+      if (cmd.isEmpty) {
+        showAppSnackBar(
+          context,
+          message: AppLocalizations.of(
+            context,
+          )!.mcpServerEditSheetStdioCommandRequired,
+          type: NotificationType.warning,
+        );
+        return;
+      }
+      final args = [for (final argument in _args) argument.text];
+      final env = <String, String>{
+        for (final e in _env)
+          if (e.key.text.trim().isNotEmpty) e.key.text.trim(): e.value.text,
+      };
+      final cwd = _cwdCtrl.text.trim();
+      if (isEdit) {
+        final old = mcp.getById(widget.serverId!)!;
+        final clearing = cwd.isEmpty;
+        await mcp.updateServerMetadata(
+          old.copyWith(
+            enabled: _enabled,
+            name: name,
+            transport: McpTransportType.stdio,
+            url: '',
+            headers: const {},
+            command: cmd,
+            args: args,
+            env: env,
+            workingDirectory: clearing ? null : cwd,
+            clearWorkingDirectory: clearing,
+          ),
+        );
+      } else {
+        await mcp.addServer(
+          enabled: _enabled,
+          name: name,
+          transport: McpTransportType.stdio,
+          command: cmd,
+          args: args,
+          env: env,
+          workingDirectory: cwd.isEmpty ? null : cwd,
+        );
+      }
+      if (mounted) Navigator.of(context).pop();
+      return;
+    }
     final url = _urlCtrl.text.trim();
     if (url.isEmpty) {
       final l10n = AppLocalizations.of(context)!;

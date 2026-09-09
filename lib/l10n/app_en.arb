@@ -284,7 +284,6 @@
   "mcpTransportTagInmemory": "Built-in",
   "mcpTransportTagSse": "SSE",
   "mcpTransportTagHttp": "HTTP",
-  "mcpServerEditSheetStdioOnlyDesktop": "STDIO is only available on desktop",
   "mcpServerEditSheetStdioCommandLabel": "Command",
   "mcpServerEditSheetStdioArgumentsLabel": "Arguments",
   "mcpServerEditSheetStdioWorkingDirectoryLabel": "Working Directory (optional)",
@@ -4922,5 +4921,7 @@
   "backgroundOverlayShowClose": "Show close button",
   "backgroundOverlayShowBackground": "Show background",
   "backgroundOverlayShowBorder": "Show border",
-  "backgroundOverlayReset": "Restore default appearance"
+  "backgroundOverlayReset": "Restore default appearance",
+  "mcpStdioEnvironmentRequired": "Install the workspace environment to use STDIO on mobile.",
+  "mcpStdioAddArgument": "Add Argument"
 }

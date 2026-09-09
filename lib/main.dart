@@ -687,9 +687,6 @@ class MyApp extends StatelessWidget {
               ChatService(existingRepository: databaseLease.chatRepository),
         ),
         ChangeNotifierProvider(create: (_) => McpToolService()),
-        ChangeNotifierProvider(
-          create: (_) => McpProvider(preferences: businessPreferences),
-        ),
         ChangeNotifierProvider(create: (_) => ToolApprovalService()),
         ChangeNotifierProvider(create: (_) => AskUserInteractionService()),
         ChangeNotifierProvider(
@@ -778,6 +775,13 @@ class MyApp extends StatelessWidget {
             );
             return provider;
           },
+        ),
+        ChangeNotifierProvider(
+          create: (ctx) => McpProvider(
+            preferences: businessPreferences,
+            workspaceRuntime: ctx.read<WorkspaceRuntimeProvider>(),
+            environment: ctx.read<EnvironmentProvider>(),
+          ),
         ),
         ProxyProvider<_WorkspaceStackHolder, EnvironmentManager?>(
           update: (_, extras, __) => extras.environmentManager,

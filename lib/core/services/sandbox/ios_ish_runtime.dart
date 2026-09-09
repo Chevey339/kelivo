@@ -1,4 +1,5 @@
 import 'package:uuid/uuid.dart';
+import 'package:flutter/foundation.dart';
 
 import 'package:Kelivo/core/services/sandbox/channel_command_run.dart';
 import 'package:Kelivo/core/services/sandbox/channel_pty_session.dart';
@@ -6,7 +7,7 @@ import 'package:Kelivo/core/services/sandbox/workspace_channel.dart';
 import 'package:Kelivo/core/services/workspace/workspace_runtime.dart';
 
 /// iOS iSH [WorkspaceRuntime] over [WorkspaceChannel].
-class IosIshRuntime implements WorkspaceRuntime {
+class IosIshRuntime implements WorkspaceStdioRuntime {
   IosIshRuntime({required this.channel});
 
   final WorkspaceChannel channel;
@@ -57,6 +58,7 @@ class IosIshRuntime implements WorkspaceRuntime {
         cwd: request.cwd,
         command: request.command,
         timeoutMs: request.timeout.inMilliseconds,
+        keepStdinOpen: request.keepStdinOpen,
         env: request.env,
         binds: [
           for (final mount in request.mounts)
@@ -71,6 +73,10 @@ class IosIshRuntime implements WorkspaceRuntime {
       after: channel.endBackgroundTask,
     );
   }
+
+  @override
+  Future<void> writeStdin(String runId, Uint8List data) =>
+      channel.stdinWrite(runId, data);
 
   @override
   Future<void> cancel(String runId) async {

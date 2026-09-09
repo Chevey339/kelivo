@@ -465,7 +465,6 @@
   "mcpTransportTagInmemory": "内置",
   "mcpTransportTagSse": "SSE",
   "mcpTransportTagHttp": "HTTP",
-  "mcpServerEditSheetStdioOnlyDesktop": "STDIO 仅在桌面端可用",
   "mcpServerEditSheetStdioCommandLabel": "命令",
   "mcpServerEditSheetStdioArgumentsLabel": "参数",
   "mcpServerEditSheetStdioWorkingDirectoryLabel": "工作目录（可选）",
@@ -3951,5 +3950,7 @@
   "backgroundOverlayShowClose": "显示关闭按钮",
   "backgroundOverlayShowBackground": "显示背景",
   "backgroundOverlayShowBorder": "显示边框",
-  "backgroundOverlayReset": "恢复默认样式"
+  "backgroundOverlayReset": "恢复默认样式",
+  "mcpStdioEnvironmentRequired": "请先安装工作区运行环境，再使用移动端 STDIO。",
+  "mcpStdioAddArgument": "添加参数"
 }

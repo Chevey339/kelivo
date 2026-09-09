@@ -17,6 +17,7 @@ data class ExecRequest(
     val command: String,
     val env: Map<String, String>,
     val timeoutMs: Long,
+    val keepStdinOpen: Boolean = false,
     val prootArguments: List<String> = emptyList(),
     val shell: String? = null,
 )
@@ -47,7 +48,7 @@ class ExecRunner(
             .redirectErrorStream(false)
         builder.environment().putAll(launch.processEnv)
         val process = builder.start()
-        try {
+        if (!request.keepStdinOpen) try {
             process.outputStream.close()
         } catch (_: Exception) {
         }
@@ -55,15 +56,21 @@ class ExecRunner(
         val running = Running(process)
         runs[request.runId] = running
         val startedAt = System.nanoTime()
+        if (request.keepStdinOpen) events.emit(mapOf("type" to "started", "runId" to request.runId))
 
-        Thread({ drain(process.inputStream, request.runId, "stdout") }, "ws-out-${request.runId}")
+        val stdoutReader = Thread({ drain(process.inputStream, request.runId, "stdout") }, "ws-out-${request.runId}")
             .apply { isDaemon = true; start() }
-        Thread({ drain(process.errorStream, request.runId, "stderr") }, "ws-err-${request.runId}")
+        val stderrReader = Thread({ drain(process.errorStream, request.runId, "stderr") }, "ws-err-${request.runId}")
             .apply { isDaemon = true; start() }
 
         Thread({
             val finished = try {
-                process.waitFor(request.timeoutMs.coerceAtLeast(1L), TimeUnit.MILLISECONDS)
+                if (request.keepStdinOpen && request.timeoutMs == 0L) {
+                    process.waitFor()
+                    true
+                } else {
+                    process.waitFor(request.timeoutMs.coerceAtLeast(1L), TimeUnit.MILLISECONDS)
+                }
             } catch (_: InterruptedException) {
                 Thread.currentThread().interrupt()
                 false
@@ -93,9 +100,22 @@ class ExecRunner(
             if (cancelled) {
                 payload["cancelled"] = true
             }
+            // Deliver the last protocol response before reporting process exit.
+            stdoutReader.join(1500)
+            stderrReader.join(1500)
+            try { process.outputStream.close() } catch (_: Exception) {}
             events.emit(payload)
             runs.remove(request.runId, running)
         }, "ws-wait-${request.runId}").apply { isDaemon = true; start() }
+    }
+
+    fun writeStdin(runId: String, data: ByteArray) {
+        val running = runs[runId] ?: error("process is not running")
+        synchronized(running) {
+            check(!running.cancelled.get()) { "process was cancelled" }
+            running.process.outputStream.write(data)
+            running.process.outputStream.flush()
+        }
     }
 
     fun cancel(runId: String): Boolean {

@@ -1330,12 +1330,6 @@ abstract class AppLocalizations {
   /// **'HTTP'**
   String get mcpTransportTagHttp;
 
-  /// No description provided for @mcpServerEditSheetStdioOnlyDesktop.
-  ///
-  /// In en, this message translates to:
-  /// **'STDIO is only available on desktop'**
-  String get mcpServerEditSheetStdioOnlyDesktop;
-
   /// No description provided for @mcpServerEditSheetStdioCommandLabel.
   ///
   /// In en, this message translates to:
@@ -20138,6 +20132,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Restore default appearance'**
   String get backgroundOverlayReset;
+
+  /// No description provided for @mcpStdioEnvironmentRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Install the workspace environment to use STDIO on mobile.'**
+  String get mcpStdioEnvironmentRequired;
+
+  /// No description provided for @mcpStdioAddArgument.
+  ///
+  /// In en, this message translates to:
+  /// **'Add Argument'**
+  String get mcpStdioAddArgument;
 }
 
 class _AppLocalizationsDelegate

@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:path/path.dart' as p;
 import 'package:uuid/uuid.dart';
+import 'package:flutter/foundation.dart';
 
 import 'package:Kelivo/core/models/environment_state.dart';
 import 'package:Kelivo/core/providers/environment_provider.dart';
@@ -12,7 +13,7 @@ import 'package:Kelivo/core/services/sandbox/workspace_channel.dart';
 import 'package:Kelivo/core/services/workspace/workspace_runtime.dart';
 
 /// Android proot [WorkspaceRuntime] over [WorkspaceChannel].
-class AndroidProotRuntime implements WorkspaceRuntime {
+class AndroidProotRuntime implements WorkspaceStdioRuntime {
   AndroidProotRuntime({
     required this.channel,
     required this.env,
@@ -94,6 +95,10 @@ class AndroidProotRuntime implements WorkspaceRuntime {
   }
 
   @override
+  Future<void> writeStdin(String runId, Uint8List data) =>
+      channel.stdinWrite(runId, data);
+
+  @override
   Future<void> cancel(String runId) async {
     await channel.cancel(runId);
   }
@@ -155,6 +160,7 @@ class AndroidProotRuntime implements WorkspaceRuntime {
       cwd: request.cwd,
       command: request.command,
       timeoutMs: request.timeout.inMilliseconds,
+      keepStdinOpen: request.keepStdinOpen,
       env: request.env,
       binds: _binds(request.mounts),
       prootArguments: env.prootArguments,

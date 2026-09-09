@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -20,6 +21,55 @@ void main() {
   });
 
   tearDown(() => workspace.dispose());
+
+  test(
+    'stdio forwards raw input and keeps a persistent command alive',
+    () async {
+      workspace.handler = (call) {
+        if (call.method == 'exec') {
+          workspace.emit({'type': 'started', 'runId': 'mcp'});
+        }
+        if (call.method == 'cancel') {
+          workspace.emit({'type': 'exit', 'runId': 'mcp', 'exitCode': -1});
+          return true;
+        }
+        return null;
+      };
+      final started = Completer<void>();
+      final subscription = runtime
+          .run(
+            const CommandRequest(
+              runId: 'mcp',
+              command: 'exec server',
+              cwd: '/root',
+              keepStdinOpen: true,
+              timeout: Duration.zero,
+            ),
+          )
+          .listen((event) {
+            if (event is CommandStarted) started.complete();
+          });
+      await started.future;
+      await runtime.writeStdin('mcp', Uint8List.fromList([123, 125, 10]));
+      expect(workspace.argsOf('exec')!['keepStdinOpen'], isTrue);
+      expect(workspace.argsOf('exec')!['timeoutMs'], 0);
+      expect(workspace.argsOf('stdinWrite'), {
+        'runId': 'mcp',
+        'data': [123, 125, 10],
+      });
+      await subscription.cancel();
+      expect(
+        workspace.methods,
+        containsAllInOrder([
+          'beginBackgroundTask',
+          'exec',
+          'stdinWrite',
+          'cancel',
+          'endBackgroundTask',
+        ]),
+      );
+    },
+  );
 
   group('status', () {
     test('not ready when probe is unsupported', () async {

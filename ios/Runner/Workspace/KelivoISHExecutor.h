@@ -23,8 +23,12 @@ typedef void (^KelivoISHDoneHandler)(NSDictionary<NSString *, id> *result);
                  cwd:(nullable NSString *)cwd
                  env:(nullable NSDictionary<NSString *, NSString *> *)env
            timeoutMs:(NSInteger)timeoutMs
+       keepStdinOpen:(BOOL)keepStdinOpen
+             started:(void (^)(void))started
                chunk:(KelivoISHChunkHandler)chunk
                 done:(KelivoISHDoneHandler)done;
+
++ (BOOL)writeStdin:(NSData *)data runId:(NSString *)runId;
 
 + (BOOL)cancelRunId:(NSString *)runId;
 + (void)cancelAllInterrupted:(BOOL)interrupted;

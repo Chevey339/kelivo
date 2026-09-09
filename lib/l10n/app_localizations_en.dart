@@ -665,10 +665,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get mcpTransportTagHttp => 'HTTP';
 
   @override
-  String get mcpServerEditSheetStdioOnlyDesktop =>
-      'STDIO is only available on desktop';
-
-  @override
   String get mcpServerEditSheetStdioCommandLabel => 'Command';
 
   @override
@@ -11198,4 +11194,11 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get backgroundOverlayReset => 'Restore default appearance';
+
+  @override
+  String get mcpStdioEnvironmentRequired =>
+      'Install the workspace environment to use STDIO on mobile.';
+
+  @override
+  String get mcpStdioAddArgument => 'Add Argument';
 }

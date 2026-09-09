@@ -372,6 +372,10 @@ class McpPage extends StatelessWidget {
                                                 : (s.transport ==
                                                           McpTransportType.sse
                                                       ? l10n.mcpTransportTagSse
+                                                      : s.transport ==
+                                                            McpTransportType
+                                                                .stdio
+                                                      ? l10n.mcpTransportTagStdio
                                                       : l10n.mcpTransportTagHttp),
                                           ),
                                           tagStyled(

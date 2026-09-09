@@ -63,6 +63,10 @@ class WorkspaceChannel {
     await _invoke('exec', args.toMap());
   }
 
+  Future<void> stdinWrite(String runId, Uint8List data) async {
+    await _invoke('stdinWrite', {'runId': runId, 'data': data});
+  }
+
   Future<bool> cancel(String runId) async {
     final raw = await _invoke('cancel', {'runId': runId});
     return raw == true;
@@ -374,6 +378,7 @@ class ExecArgs {
     required this.cwd,
     required this.command,
     this.timeoutMs = 60000,
+    this.keepStdinOpen = false,
     this.env = const <String, String>{},
     this.binds = const <BindMount>[],
     this.prootArguments = const [],
@@ -386,6 +391,7 @@ class ExecArgs {
   final String cwd;
   final String command;
   final int timeoutMs;
+  final bool keepStdinOpen;
   final Map<String, String> env;
   final List<BindMount> binds;
   final List<String> prootArguments;
@@ -398,6 +404,7 @@ class ExecArgs {
     'cwd': cwd,
     'command': command,
     'timeoutMs': timeoutMs,
+    if (keepStdinOpen) 'keepStdinOpen': true,
     'env': env,
     'binds': [for (final bind in binds) bind.toMap()],
     if (prootArguments.isNotEmpty) 'prootArguments': prootArguments,

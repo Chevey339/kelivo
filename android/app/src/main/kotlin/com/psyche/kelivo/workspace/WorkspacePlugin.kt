@@ -93,6 +93,11 @@ class WorkspacePlugin(private val context: Context) {
                         exec(asMap(call.arguments))
                         result.success(mapOf("started" to true))
                     }
+                    "stdinWrite" -> runAsync(result) {
+                        val args = asMap(call.arguments)
+                        execRunner.writeStdin(requiredString(args, "runId"), args["data"] as ByteArray)
+                        null
+                    }
                     "cancel" -> {
                         val runId = asMap(call.arguments)["runId"]?.toString().orEmpty()
                         result.success(runId.isNotEmpty() && execRunner.cancel(runId))
@@ -184,6 +189,7 @@ class WorkspacePlugin(private val context: Context) {
                 command = requiredString(args, "command"),
                 env = parseEnv(args["env"]),
                 timeoutMs = number(args["timeoutMs"], 60_000L),
+                keepStdinOpen = args["keepStdinOpen"] == true,
                 prootArguments = parseStringList(args["prootArguments"]),
                 shell = args["shell"]?.toString(),
             ),

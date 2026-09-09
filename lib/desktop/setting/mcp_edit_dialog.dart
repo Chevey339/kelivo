@@ -1,6 +1,4 @@
 import 'dart:math' as math;
-import 'package:flutter/foundation.dart'
-    show kIsWeb, defaultTargetPlatform, TargetPlatform;
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -53,7 +51,7 @@ class _DesktopMcpEditDialogState extends State<_DesktopMcpEditDialog>
   McpTransportType _transport = McpTransportType.http;
   final _urlCtrl = TextEditingController();
   final List<_HeaderEntry> _headers = [];
-  // STDIO fields (desktop only)
+  // STDIO fields
   final _cmdCtrl = TextEditingController();
   final _argsCtrl = TextEditingController(); // space-separated args
   final _cwdCtrl = TextEditingController();
@@ -126,12 +124,10 @@ class _DesktopMcpEditDialogState extends State<_DesktopMcpEditDialog>
           h.key.text.trim(): h.value.text.trim(),
     };
     if (_transport == McpTransportType.stdio) {
-      if (!_isDesktopPlatform()) {
+      if (!mcp.supportsStdio) {
         showAppSnackBar(
           context,
-          message: AppLocalizations.of(
-            context,
-          )!.mcpServerEditSheetStdioOnlyDesktop,
+          message: AppLocalizations.of(context)!.mcpStdioEnvironmentRequired,
           type: NotificationType.warning,
         );
         return;
@@ -328,7 +324,7 @@ class _DesktopMcpEditDialogState extends State<_DesktopMcpEditDialog>
           const SizedBox(height: 6),
           Builder(
             builder: (context) {
-              final isDesktop = _isDesktopPlatform();
+              final isDesktop = context.watch<McpProvider>().supportsStdio;
               final labels = isDesktop
                   ? ['Streamable HTTP', 'SSE', l10n.mcpTransportOptionStdio]
                   : ['Streamable HTTP', 'SSE'];
@@ -710,13 +706,6 @@ class _DesktopMcpEditDialogState extends State<_DesktopMcpEditDialog>
         const SizedBox(height: 8),
       ],
     );
-  }
-
-  bool _isDesktopPlatform() {
-    if (kIsWeb) return false;
-    return defaultTargetPlatform == TargetPlatform.windows ||
-        defaultTargetPlatform == TargetPlatform.macOS ||
-        defaultTargetPlatform == TargetPlatform.linux;
   }
 
   List<String> _parseArgs(String text) {
