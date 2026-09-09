@@ -85,6 +85,8 @@ class GoogleStreamDecoder implements StreamChunkDecoder {
   }
 
   String? finishReason;
+  bool _hasSeenPart = false;
+  bool _stopAfterPart = false;
   bool retryMalformedResponse = false;
   bool streamComplete = false;
 
@@ -123,6 +125,7 @@ class GoogleStreamDecoder implements StreamChunkDecoder {
 
   bool get canFinishNow =>
       finishReason != null &&
+      (finishReason != 'STOP' || _stopAfterPart) &&
       !retryMalformedResponse &&
       functionCalls.isEmpty &&
       (!expectImage || receivedImage);
@@ -279,6 +282,7 @@ class GoogleStreamDecoder implements StreamChunkDecoder {
 
       for (final p in parts) {
         if (p is! Map) continue;
+        _hasSeenPart = true;
         _parsePart(
           p,
           chunks,
@@ -288,7 +292,13 @@ class GoogleStreamDecoder implements StreamChunkDecoder {
       }
 
       final fr = cand['finishReason'];
-      if (fr is String && fr.isNotEmpty) finishReason = fr;
+      if (fr is String && fr.isNotEmpty) {
+        finishReason = fr;
+        // Some proxies send empty STOP frames before any parts. Only a new
+        // STOP received with or after a part may finish the stream; later
+        // parts must not make an earlier empty STOP eligible retroactively.
+        if (fr == 'STOP') _stopAfterPart = _hasSeenPart;
+      }
 
       final gm = cand['groundingMetadata'] ?? obj['groundingMetadata'];
       final cite = _parseCitations(gm);
