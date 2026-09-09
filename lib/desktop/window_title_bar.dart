@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:window_manager/window_manager.dart';
-import '../theme/app_semantic_colors.dart';
 
 /// A custom Windows title bar implemented in Flutter.
 ///
@@ -51,8 +50,9 @@ class _WindowTitleBarState extends State<WindowTitleBar> with WindowListener {
 
   @override
   Widget build(BuildContext context) {
-    final brightness = Theme.of(context).brightness;
-    final Color bg = context.appColors.surfaceCard;
+    final theme = Theme.of(context);
+    final brightness = theme.brightness;
+    final Color bg = theme.scaffoldBackgroundColor;
     return Container(
       height: 40,
       decoration: BoxDecoration(
