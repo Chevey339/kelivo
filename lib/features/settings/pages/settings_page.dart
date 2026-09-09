@@ -562,9 +562,7 @@ class _ChatStorageSummaryState extends State<_ChatStorageSummary> {
         if (snapshot.connectionState != ConnectionState.done) {
           return Text(l10n.settingsPageCalculating, style: style);
         }
-        final count = data?.totalFiles ?? 0;
-        final size = _fmtBytes(data?.totalBytes ?? 0);
-        return Text(l10n.settingsPageFilesCount(count, size), style: style);
+        return Text(_fmtBytes(data?.totalBytes ?? 0), style: style);
       },
     );
   }

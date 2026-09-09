@@ -916,8 +916,7 @@ class _StorageSpacePageState extends State<StorageSpacePage> {
                   context,
                   icon: _iconFor(report.categories[i].key),
                   label: _titleFor(report.categories[i].key, l10n),
-                  detailText:
-                      '${_fmtBytes(report.categories[i].stats.bytes)} · ${l10n.storageSpaceFilesCount(report.categories[i].stats.fileCount)}',
+                  detailText: _fmtBytes(report.categories[i].stats.bytes),
                   onTap: () => _openCategoryDetail(report.categories[i].key),
                 ),
                 if (i != report.categories.length - 1) _iosDivider(context),
@@ -1660,8 +1659,7 @@ class _CategoryDetail extends StatelessWidget {
     final cs = Theme.of(context).colorScheme;
     final l10n = AppLocalizations.of(context)!;
 
-    final subtitle =
-        '${fmtBytes(category.stats.bytes)} · ${l10n.storageSpaceFilesCount(category.stats.fileCount)}';
+    final subtitle = fmtBytes(category.stats.bytes);
     final bool safeToClear =
         category.key == StorageUsageCategoryKey.cache ||
         category.key == StorageUsageCategoryKey.logs ||
@@ -1920,7 +1918,7 @@ class _CategoryDetail extends StatelessWidget {
                                       ),
                                       const SizedBox(height: 2),
                                       Text(
-                                        '${fmtBytes(s.stats.bytes)} · ${l10n.storageSpaceFilesCount(s.stats.fileCount)}',
+                                        fmtBytes(s.stats.bytes),
                                         style: TextStyle(
                                           fontSize: 12,
                                           color: cs.onSurface.withValues(

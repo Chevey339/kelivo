@@ -87,11 +87,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get settingsPageCalculating => '统计中…';
 
   @override
-  String settingsPageFilesCount(int count, String size) {
-    return '共 $count 个文件 · $size';
-  }
-
-  @override
   String get storageSpacePageTitle => '存储空间';
 
   @override
@@ -177,11 +172,6 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get storageSpaceCategoryOther => '其他';
-
-  @override
-  String storageSpaceFilesCount(int count) {
-    return '$count 个文件';
-  }
 
   @override
   String get storageSpaceSafeToClearHint => '可安全清理，不影响聊天记录。';
@@ -10616,11 +10606,6 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get settingsPageCalculating => '统计中…';
 
   @override
-  String settingsPageFilesCount(int count, String size) {
-    return '共 $count 个文件 · $size';
-  }
-
-  @override
   String get storageSpacePageTitle => '存储空间';
 
   @override
@@ -10706,11 +10691,6 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get storageSpaceCategoryOther => '其他';
-
-  @override
-  String storageSpaceFilesCount(int count) {
-    return '$count 个文件';
-  }
 
   @override
   String get storageSpaceSafeToClearHint => '可安全清理，不影响聊天记录。';
@@ -21071,11 +21051,6 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get settingsPageCalculating => '統計中…';
 
   @override
-  String settingsPageFilesCount(int count, String size) {
-    return '共 $count 個檔案 · $size';
-  }
-
-  @override
   String get storageSpacePageTitle => '儲存空間';
 
   @override
@@ -21161,11 +21136,6 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get storageSpaceCategoryOther => '其他';
-
-  @override
-  String storageSpaceFilesCount(int count) {
-    return '$count 個檔案';
-  }
 
   @override
   String get storageSpaceSafeToClearHint => '可安全清理，不影響聊天記錄。';

@@ -72,7 +72,7 @@ void main() {
             ),
           );
           await tester.pumpAndSettle();
-          expect(find.text('6 B · 1 files'), findsOneWidget);
+          expect(find.text('6 B'), findsOneWidget);
           await tester.tap(
             find.byKey(const ValueKey('storage-content-conversation-a')),
           );

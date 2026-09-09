@@ -256,12 +256,6 @@ abstract class AppLocalizations {
   /// **'Calculating…'**
   String get settingsPageCalculating;
 
-  /// No description provided for @settingsPageFilesCount.
-  ///
-  /// In en, this message translates to:
-  /// **'{count} files · {size}'**
-  String settingsPageFilesCount(int count, String size);
-
   /// No description provided for @storageSpacePageTitle.
   ///
   /// In en, this message translates to:
@@ -423,12 +417,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Other'**
   String get storageSpaceCategoryOther;
-
-  /// No description provided for @storageSpaceFilesCount.
-  ///
-  /// In en, this message translates to:
-  /// **'{count} files'**
-  String storageSpaceFilesCount(int count);
 
   /// No description provided for @storageSpaceSafeToClearHint.
   ///

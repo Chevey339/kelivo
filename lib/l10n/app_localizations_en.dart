@@ -89,11 +89,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingsPageCalculating => 'Calculating…';
 
   @override
-  String settingsPageFilesCount(int count, String size) {
-    return '$count files · $size';
-  }
-
-  @override
   String get storageSpacePageTitle => 'Storage Space';
 
   @override
@@ -184,11 +179,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get storageSpaceCategoryOther => 'Other';
-
-  @override
-  String storageSpaceFilesCount(int count) {
-    return '$count files';
-  }
 
   @override
   String get storageSpaceSafeToClearHint =>

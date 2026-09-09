@@ -25,17 +25,6 @@
   "settingsPageBackup": "Backup",
   "settingsPageChatStorage": "Chat Storage",
   "settingsPageCalculating": "Calculating…",
-  "settingsPageFilesCount": "{count} files · {size}",
-  "@settingsPageFilesCount": {
-    "placeholders": {
-      "count": {
-        "type": "int"
-      },
-      "size": {
-        "type": "String"
-      }
-    }
-  },
   "storageSpacePageTitle": "Storage Space",
   "storageSpaceRefreshTooltip": "Refresh",
   "storageSpaceLoadFailed": "Failed to load storage usage",
@@ -77,14 +66,6 @@
   "storageSpaceCategoryCache": "Cache",
   "storageSpaceCategoryLogs": "Logs",
   "storageSpaceCategoryOther": "Other",
-  "storageSpaceFilesCount": "{count} files",
-  "@storageSpaceFilesCount": {
-    "placeholders": {
-      "count": {
-        "type": "int"
-      }
-    }
-  },
   "storageSpaceSafeToClearHint": "Safe to clear. This will not affect your chat history.",
   "storageSpaceLegacyChatDataHint": "These are retained Hive files from before the SQLite migration. Clearing them does not delete your current chat records.",
   "storageSpaceNotSafeToClearHint": "May affect your chat history. Delete with care.",

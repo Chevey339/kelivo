@@ -79,8 +79,7 @@ class StorageContentsList extends StatelessWidget {
             key: ValueKey('storage-content-${entry.id}'),
             icon: entry.isDirectory ? Lucide.Folder : Lucide.File,
             label: title,
-            subtitle:
-                '${fmtBytes(entry.stats.bytes)} · ${l10n.storageSpaceFilesCount(entry.stats.fileCount)}',
+            subtitle: fmtBytes(entry.stats.bytes),
             onTap: () => _open(context, entry, title),
           ),
         );
