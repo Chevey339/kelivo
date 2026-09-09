@@ -139,11 +139,25 @@ String resolveMediaAttachmentMime({
 }
 
 String resolveDocumentAttachmentMime(DocumentAttachment attachment) {
-  return resolveMediaAttachmentMime(
+  final mime = resolveMediaAttachmentMime(
     explicitMime: attachment.mime,
     fileName: attachment.fileName,
     path: attachment.path,
   );
+  if (!const {
+    '',
+    '*/*',
+    'application/octet-stream',
+    'binary/octet-stream',
+  }.contains(mime.split(';').first.trim())) {
+    return mime;
+  }
+  final name = attachment.fileName.toLowerCase();
+  if (name.endsWith('.pdf')) return 'application/pdf';
+  if (name.endsWith('.docx')) {
+    return 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+  }
+  return mime;
 }
 
 /// Parsed form of one `_kelivo_media_paths` entry (legacy [String] or map).

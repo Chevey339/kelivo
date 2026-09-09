@@ -386,6 +386,28 @@ Widget _settingsHarness({
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
+  test('soft breaks never split a surrogate pair', () {
+    // 17 ASCII units followed by an emoji: the 18th code unit is the high
+    // surrogate, so a naive break would land inside the pair.
+    final value = '${'a' * 17}\u{1F600}${'b' * 20}';
+    final softened = insertMarkdownSoftBreaksForTesting(value, every: 18);
+
+    expect(softened.replaceAll('\u200B', ''), value);
+    expect(softened.contains('\u200B'), isTrue);
+    for (var i = 0; i < softened.length; i++) {
+      final unit = softened.codeUnitAt(i);
+      if (unit >= 0xD800 && unit <= 0xDBFF) {
+        final next = softened.codeUnitAt(i + 1);
+        expect(next >= 0xDC00 && next <= 0xDFFF, isTrue);
+      }
+    }
+    // Building a paragraph is what threw before the fix.
+    expect(
+      () => (ui.ParagraphBuilder(ui.ParagraphStyle())..addText(softened)),
+      returnsNormally,
+    );
+  });
+
   test('markdown table CSV export escapes boundary cell values', () {
     final csv = markdownTableRowsToCsvForTesting([
       ['Name', 'Note', 'Multiline'],

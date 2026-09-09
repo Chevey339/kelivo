@@ -484,8 +484,8 @@ void main() {
     final imagePreviewsRect = tester.getRect(imagePreviewsFinder);
     final documentPreviewsRect = tester.getRect(documentPreviewsFinder);
     expect(
-      imagePreviewsRect.bottom,
-      lessThanOrEqualTo(documentPreviewsRect.top),
+      imagePreviewsRect.right,
+      lessThanOrEqualTo(documentPreviewsRect.left),
     );
 
     final imageRect = tester.getRect(find.byType(Image));

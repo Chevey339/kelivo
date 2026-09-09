@@ -7,6 +7,7 @@ import '../../../core/providers/settings_provider.dart';
 import '../../../core/services/api/chat_api_service.dart';
 import '../../../core/services/chat/chat_service.dart';
 import '../../../core/services/mcp/mcp_tool_service.dart';
+import '../../../core/services/workspace/workspace_tools_service.dart';
 import '../../../utils/assistant_regex.dart';
 import '../../../core/models/assistant_regex.dart';
 import '../services/message_builder_service.dart';
@@ -132,6 +133,7 @@ class GenerationController {
     String modelId,
     bool hasBuiltInSearch, {
     McpToolRouteSnapshot? mcpRouteSnapshot,
+    WorkspaceToolContext? workspaceContext,
   }) {
     return toolHandlerService.buildToolDefinitions(
       settings,
@@ -141,6 +143,7 @@ class GenerationController {
       hasBuiltInSearch,
       isToolModel: isToolModel,
       mcpRouteSnapshot: mcpRouteSnapshot,
+      workspaceContext: workspaceContext,
     );
   }
 
@@ -153,6 +156,7 @@ class GenerationController {
     AskUserInteractionService? askUserService,
     String? conversationId,
     McpToolRouteSnapshot? mcpRouteSnapshot,
+    WorkspaceToolContext? workspaceContext,
   }) {
     return toolHandlerService.buildToolCallHandler(
       settings,
@@ -161,6 +165,7 @@ class GenerationController {
       askUserService: askUserService,
       conversationId: conversationId,
       mcpRouteSnapshot: mcpRouteSnapshot,
+      workspaceContext: workspaceContext,
     );
   }
 

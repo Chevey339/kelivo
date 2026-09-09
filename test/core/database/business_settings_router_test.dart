@@ -591,6 +591,18 @@ void main() {
 
     test('accepts representative runtime payloads for every entity kind', () {
       final snapshot = BusinessSettingsRouter.normalizeAndRoute({
+        'workspaces_v1': jsonEncode([
+          {'id': 'workspace-1', 'name': 'Project'},
+        ]),
+        'skills_v1': jsonEncode([
+          {
+            'id': 'skill-1',
+            'source': 'file',
+            'enabled': false,
+            'installedAt': '2026-09-08T00:00:00Z',
+            'updatedAt': '2026-09-08T00:00:00Z',
+          },
+        ]),
         'assistants_v1': jsonEncode([
           {
             'id': 'assistant-1',

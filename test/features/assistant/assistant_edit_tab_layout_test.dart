@@ -4,16 +4,18 @@ import 'package:Kelivo/features/assistant/utils/assistant_edit_tab_layout.dart';
 
 void main() {
   group('assistant edit tab layout', () {
-    test('default order keeps MCP after regex replace', () {
+    test('default order puts tools before phrases and workspace last', () {
       expect(defaultAssistantEditTabIds, const [
         'basic',
         'prompts',
         'memory',
+        'localTools',
+        'skills',
+        'mcp',
         'quickPhrase',
         'custom',
         'regex',
-        'localTools',
-        'mcp',
+        'workspace',
       ]);
     });
 
@@ -24,6 +26,7 @@ void main() {
 
       expect(ordered.take(4), const ['mcp', 'basic', 'prompts', 'memory']);
       expect(ordered, containsAll(defaultAssistantEditTabIds));
+      expect(ordered.last, 'workspace');
     });
 
     test('ignores duplicate and unknown saved ids', () {
@@ -42,7 +45,7 @@ void main() {
         hiddenIds: const {'prompts', 'mcp'},
       );
 
-      expect(visible.take(3), const ['basic', 'memory', 'quickPhrase']);
+      expect(visible.take(3), const ['basic', 'memory', 'localTools']);
       expect(visible, isNot(contains('mcp')));
       expect(visible, isNot(contains('prompts')));
     });

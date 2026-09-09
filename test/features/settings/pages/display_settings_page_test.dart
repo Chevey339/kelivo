@@ -147,6 +147,17 @@ void main() {
       await tester.tap(find.text('Show Tool Cards'));
       await tester.pumpAndSettle();
       expect(settings.showToolCards, isFalse);
+      final producedFiles = find.text('Show Files Below Replies');
+      await tester.scrollUntilVisible(
+        producedFiles,
+        200,
+        scrollable: find.byType(Scrollable).first,
+      );
+      await tester.pumpAndSettle();
+      expect(settings.showProducedFiles, isTrue);
+      await tester.tap(producedFiles);
+      await tester.pumpAndSettle();
+      expect(settings.showProducedFiles, isFalse);
     },
   );
 

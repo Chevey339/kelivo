@@ -1,3 +1,6 @@
+import 'package:Kelivo/core/services/sandbox/workspace_channel.dart';
+import 'package:Kelivo/core/providers/external_mounts_provider.dart';
+import 'package:Kelivo/core/services/sandbox/environment_dependencies.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart'
     show debugPrint, kIsWeb, defaultTargetPlatform, TargetPlatform;
@@ -42,6 +45,22 @@ import 'core/services/memory/memory_repository.dart';
 import 'core/providers/s3_backup_provider.dart';
 import 'core/providers/backup_reminder_provider.dart';
 import 'core/providers/hotkey_provider.dart';
+import 'core/providers/workspace_provider.dart';
+import 'core/services/workspace/workspace_binding_actions.dart';
+import 'core/providers/environment_provider.dart';
+import 'features/workspace/pages/environment_page.dart';
+import 'features/workspace/pages/workspaces_page.dart';
+import 'features/workspace/terminal/open_terminal.dart';
+import 'features/workspace/widgets/files/conversation_files_panel.dart';
+import 'features/workspace/workspace_navigation.dart';
+import 'core/services/sandbox/environment_manager.dart';
+import 'core/services/sandbox/mirror_service.dart';
+import 'core/services/skills/skills_service.dart';
+import 'core/services/workspace/tool_run_registry.dart';
+import 'core/services/workspace/workspace_runtime.dart';
+import 'core/services/workspace/workspace_runtime_bootstrap.dart';
+import 'features/workspace/terminal/terminal_session_manager.dart';
+import 'core/database/extension_entity_store.dart';
 import 'core/database/database_installation_gate.dart';
 import 'core/database/app_database.dart';
 import 'core/database/business_migration_engine.dart';
@@ -89,8 +108,44 @@ final RouteObserver<ModalRoute<dynamic>> routeObserver =
     RouteObserver<ModalRoute<dynamic>>();
 bool _didCheckUpdates = false; // one-time update check flag
 bool _didEnsureAssistants = false; // ensure defaults after l10n ready
+bool _didWireWorkspace = false;
 AppLifecycleListener? _displayModeLifecycleListener;
 const MethodChannel _displayModeChannel = MethodChannel('app.display_mode');
+
+void _wireWorkspaceServices(BuildContext ctx) {
+  try {
+    final chat = ctx.read<ChatService>();
+    final workspaces = ctx.read<WorkspaceProvider>();
+    final assistants = ctx.read<AssistantProvider>();
+    chat.newConversationExtras = (assistantId) {
+      if (assistantId == null) {
+        return const <String, dynamic>{};
+      }
+      return workspaceExtrasForNewConversation(
+        assistant: assistants.getById(assistantId),
+        workspaceById: workspaces.byId,
+      );
+    };
+    WorkspaceNavigation.onOpenEnvironmentPage = openEnvironmentPage;
+    WorkspaceNavigation.onOpenTerminal = (navContext, {command}) {
+      openTerminal(
+        navContext,
+        conversationId: chat.currentConversationId,
+        command: command,
+      );
+    };
+    WorkspaceNavigation.onOpenWorkspaceFiles = (navContext, {path}) {
+      final id = chat.currentConversationId;
+      if (id != null) {
+        showConversationFilesPanel(navContext, conversationId: id);
+      } else {
+        Navigator.of(
+          navContext,
+        ).push(MaterialPageRoute<void>(builder: (_) => const WorkspacesPage()));
+      }
+    };
+  } catch (_) {}
+}
 
 Future<void> main() async {
   await runZoned(
@@ -578,6 +633,21 @@ class MigrationApp extends StatelessWidget {
   }
 }
 
+/// Holds [EnvironmentManager] / [MirrorService] until [createWorkspaceStack]
+/// finishes after the first frame.
+class _WorkspaceStackHolder extends ChangeNotifier {
+  EnvironmentManager? environmentManager;
+  MirrorService? mirrors;
+  EnvironmentDependencies? dependencies;
+
+  void apply(WorkspaceStack stack) {
+    environmentManager = stack.environmentManager;
+    mirrors = stack.mirrors;
+    dependencies = stack.dependencies;
+    notifyListeners();
+  }
+}
+
 class MyApp extends StatelessWidget {
   const MyApp({
     super.key,
@@ -662,6 +732,72 @@ class MyApp extends StatelessWidget {
             repository: MemoryRepository(businessPreferences),
             chatRepository: databaseLease.chatRepository,
           ),
+        ),
+        Provider<ExtensionEntityStore>.value(
+          value: databaseLease.extensionEntityStore,
+        ),
+        if (WorkspaceChannel.isSupportedPlatform)
+          ChangeNotifierProvider(
+            lazy: false,
+            create: (ctx) =>
+                ExternalMountsProvider(store: ctx.read<ExtensionEntityStore>()),
+          ),
+        ChangeNotifierProvider(
+          create: (ctx) => WorkspaceProvider(
+            store: ctx.read<ExtensionEntityStore>(),
+            assistants: ctx.read<AssistantProvider>(),
+          ),
+        ),
+        ChangeNotifierProvider(
+          create: (ctx) => SkillsService(
+            store: ctx.read<ExtensionEntityStore>(),
+            bundledAssets: rootBundle,
+          ),
+        ),
+        ChangeNotifierProvider(
+          create: (_) => EnvironmentProvider(preferences: businessPreferences),
+        ),
+        ChangeNotifierProvider(create: (_) => _WorkspaceStackHolder()),
+        ChangeNotifierProvider(
+          create: (ctx) {
+            final provider = WorkspaceRuntimeProvider();
+            final extras = ctx.read<_WorkspaceStackHolder>();
+            final env = ctx.read<EnvironmentProvider>();
+            unawaited(
+              (() async {
+                try {
+                  final stack = await createWorkspaceStack(env: env);
+                  applyWorkspaceStack(provider, stack);
+                  extras.apply(stack);
+                } catch (error, stackTrace) {
+                  debugPrint(
+                    'Failed to create workspace stack: $error\n$stackTrace',
+                  );
+                }
+              })(),
+            );
+            return provider;
+          },
+        ),
+        ProxyProvider<_WorkspaceStackHolder, EnvironmentManager?>(
+          update: (_, extras, __) => extras.environmentManager,
+        ),
+        ProxyProvider<_WorkspaceStackHolder, MirrorService?>(
+          update: (_, extras, __) => extras.mirrors,
+        ),
+        ListenableProxyProvider<
+          _WorkspaceStackHolder,
+          EnvironmentDependencies?
+        >(update: (_, extras, __) => extras.dependencies),
+        ChangeNotifierProvider(create: (_) => ToolRunRegistry()),
+        ChangeNotifierProvider(
+          create: (ctx) {
+            final environment = ctx.read<EnvironmentProvider>();
+            return TerminalSessionManager(
+              loadEnvironment: () async =>
+                  (await environment.loadExecutionConfig()).variables,
+            );
+          },
         ),
         Provider<MemoryPipelineService>(
           create: (ctx) {
@@ -972,6 +1108,12 @@ class MyApp extends StatelessWidget {
                           AppLocalizations.of(ctx)!.userProviderDefaultUserName,
                         );
                       } catch (_) {}
+                    });
+                  }
+                  if (!_didWireWorkspace) {
+                    _didWireWorkspace = true;
+                    WidgetsBinding.instance.addPostFrameCallback((_) {
+                      _wireWorkspaceServices(ctx);
                     });
                   }
 

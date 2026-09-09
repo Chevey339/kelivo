@@ -29,6 +29,7 @@ class FileUploadService {
     required this.mediaController,
     required this.isImageCropperEnabled,
     required this.getImageCompressConfig,
+    this.hasWorkspace,
   });
 
   /// 媒体控制器，用于添加图片和文件到输入栏
@@ -38,6 +39,62 @@ class FileUploadService {
   final BuildContext Function() getContext;
   final bool Function() isImageCropperEnabled;
   final ImageCompressConfig Function() getImageCompressConfig;
+  final bool Function()? hasWorkspace;
+
+  static const supportedExtensions = [
+    'png',
+    'jpg',
+    'jpeg',
+    'gif',
+    'webp',
+    'bmp',
+    'heic',
+    'heif',
+    'mp4',
+    'avi',
+    'mkv',
+    'mov',
+    'flv',
+    'wmv',
+    'mpeg',
+    'mpg',
+    'webm',
+    '3gp',
+    '3gpp',
+    'wav',
+    'mp3',
+    'pcm',
+    'pcm16',
+    'txt',
+    'md',
+    'json',
+    'js',
+    'pdf',
+    'docx',
+    'html',
+    'xml',
+    'py',
+    'java',
+    'kt',
+    'dart',
+    'ts',
+    'tsx',
+    'markdown',
+    'mdx',
+    'yml',
+    'yaml',
+  ];
+
+  static bool supportsWithoutWorkspace(DocumentAttachment file) {
+    final mime = resolveDocumentAttachmentMime(file);
+    return isImageMime(mime) ||
+        isAudioMime(mime) ||
+        isVideoMime(mime) ||
+        supportedExtensions.contains(
+          p.extension(file.fileName).replaceFirst('.', '').toLowerCase(),
+        ) ||
+        isSandboxDataFile(fileName: file.fileName, mime: file.mime);
+  }
 
   /// 复制选中的文件到应用上传目录
   ///
@@ -222,7 +279,11 @@ class FileUploadService {
     if (lower.endsWith('.json')) return 'application/json';
     if (lower.endsWith('.js')) return 'application/javascript';
     if (lower.endsWith('.txt') || lower.endsWith('.md')) return 'text/plain';
-    return 'text/plain';
+    return supportedExtensions.contains(
+          p.extension(lower).replaceFirst('.', ''),
+        )
+        ? 'text/plain'
+        : 'application/octet-stream';
   }
 
   /// 判断文件是否为图片（根据扩展名）
@@ -241,50 +302,12 @@ class FileUploadService {
   /// 选取文件（图片、视频、文档等）
   Future<void> onPickFiles() async {
     try {
+      final anyFile = hasWorkspace?.call() ?? false;
       final res = await FilePicker.platform.pickFiles(
         allowMultiple: true,
         withData: false,
-        type: FileType.custom,
-        allowedExtensions: const [
-          // images
-          'png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp', 'heic', 'heif',
-          // videos
-          'mp4',
-          'avi',
-          'mkv',
-          'mov',
-          'flv',
-          'wmv',
-          'mpeg',
-          'mpg',
-          'webm',
-          '3gp',
-          '3gpp',
-          // audio
-          'wav',
-          'mp3',
-          'pcm',
-          'pcm16',
-          // docs
-          'txt',
-          'md',
-          'json',
-          'js',
-          'pdf',
-          'docx',
-          'html',
-          'xml',
-          'py',
-          'java',
-          'kt',
-          'dart',
-          'ts',
-          'tsx',
-          'markdown',
-          'mdx',
-          'yml',
-          'yaml',
-        ],
+        type: anyFile ? FileType.any : FileType.custom,
+        allowedExtensions: anyFile ? null : supportedExtensions,
       );
       if (res == null || res.files.isEmpty) return;
       final docs = <DocumentAttachment>[];

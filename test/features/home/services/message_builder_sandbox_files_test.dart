@@ -16,6 +16,7 @@ import 'package:Kelivo/core/models/conversation.dart';
 import 'package:Kelivo/core/models/message_part.dart';
 import 'package:Kelivo/core/providers/settings_provider.dart';
 import 'package:Kelivo/core/services/chat/chat_service.dart';
+import 'package:Kelivo/core/services/workspace/workspace_session_sync.dart';
 import 'package:Kelivo/core/utils/multimodal_input_utils.dart';
 import 'package:Kelivo/features/home/services/message_builder_service.dart';
 
@@ -143,6 +144,54 @@ void main() {
     },
   );
 
+  test(
+    'local workspace sends paths instead of document contents or cloud uploads',
+    () async {
+      final s = await setUpService();
+      final apiMessages = s.service.buildApiMessages(
+        messages: [s.m],
+        versionSelections: const {},
+        currentConversation: Conversation(title: 'test'),
+      );
+      final attachments = {
+        for (final file in [csv, notes])
+          file.path: AttachmentInfo(
+            sourceUri: file.path,
+            name: file.uri.pathSegments.last,
+            size: await file.length(),
+            modelPath: '/chat/attachments/${file.uri.pathSegments.last}',
+          ),
+      };
+      expect(
+        s.service.hasPendingAttachmentWork(
+          apiMessages,
+          s.settings,
+          sourceMessages: [s.m],
+          workspaceAttachments: attachments,
+        ),
+        isFalse,
+      );
+      await s.service.processUserMessagesForApi(
+        apiMessages,
+        s.settings,
+        const Assistant(id: 'a1', name: 'test'),
+        sourceMessages: [s.m],
+        sandboxDataFiles: true,
+        workspaceAttachments: attachments,
+      );
+      final content = apiMessages.single['content'] as String;
+      expect(content, contains('/chat/attachments/sales.csv'));
+      expect(content, contains('/chat/attachments/notes.txt'));
+      expect(content, isNot(contains('region,amount')));
+      expect(content, isNot(contains('read me')));
+      expect(content, contains('analyse this'));
+      expect(
+        apiMessages.single.containsKey(multimodalInternalDocumentPathsKey),
+        isFalse,
+      );
+    },
+  );
+
   test('with a sandbox the data file stays out of the prompt', () async {
     final s = await setUpService();
     final apiMessages = s.service.buildApiMessages(
@@ -250,7 +299,10 @@ void main() {
       await database.close();
     });
 
-    Future<String> replay({required bool sandboxDataFiles}) async {
+    Future<String> replay({
+      required bool sandboxDataFiles,
+      Map<String, AttachmentInfo> workspaceAttachments = const {},
+    }) async {
       final apiMessages = service.buildApiMessages(
         messages: [stored],
         versionSelections: const {},
@@ -263,6 +315,7 @@ void main() {
         conversation: convo,
         sourceMessages: [stored],
         sandboxDataFiles: sandboxDataFiles,
+        workspaceAttachments: workspaceAttachments,
       );
       return apiMessages.single['content'] as String;
     }
@@ -290,5 +343,39 @@ void main() {
       expect(await replay(sandboxDataFiles: false), contains('region,amount'));
       expect(await replay(sandboxDataFiles: true), contains('region,amount'));
     });
+
+    test(
+      'binding and unbinding workspace does not freeze local paths into ordinary chat',
+      () async {
+        final local = {
+          csv.path: AttachmentInfo(
+            name: 'sales.csv',
+            sourceUri: csv.path,
+            size: await csv.length(),
+            modelPath: '/chat/attachments/sales.csv',
+          ),
+        };
+        expect(
+          await replay(sandboxDataFiles: false, workspaceAttachments: local),
+          contains('/chat/attachments/sales.csv'),
+        );
+        expect(await repo.getMessagePrompt(stored.id), isNull);
+        expect(
+          await replay(sandboxDataFiles: false),
+          contains('region,amount'),
+        );
+        final rebound = await replay(
+          sandboxDataFiles: false,
+          workspaceAttachments: local,
+        );
+        // Previously frozen ordinary prompts remain immutable; the workspace
+        // system prompt supplies file paths when binding existing history.
+        expect(rebound, contains('region,amount'));
+        expect(
+          await replay(sandboxDataFiles: false),
+          contains('region,amount'),
+        );
+      },
+    );
   });
 }

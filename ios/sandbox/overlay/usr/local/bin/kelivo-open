@@ -1,0 +1,48 @@
+#!/bin/sh
+# kelivo-open — Kelivo Workspace URL interceptor for iSH.
+#
+# Stands in for xdg-open / sensible-browser. Any argument is emitted to
+# stdout wrapped in an OSC 1337 escape sequence that the Kelivo host can
+# parse and route to a viewer:
+#
+# Protocol: ESC ] 1337 ; KelivoOpenURL = <url> BEL
+#   - ESC = 0x1B, BEL = 0x07
+#
+# Exit 0 when we emitted something so callers believe the viewer opened.
+
+set -e
+
+ESC=$(printf '\033')
+BEL=$(printf '\007')
+
+emit_marker() {
+    printf '%s]1337;KelivoOpenURL=%s%s\n' "$ESC" "$1" "$BEL"
+}
+
+emit() {
+    case "$1" in
+        http://*|https://*|about:*|file://*)
+            emit_marker "$1"
+            printf 'Opened in Kelivo: %s\n' "$1"
+            ;;
+        /*)
+            emit_marker "$1"
+            printf 'Opened in Kelivo: %s\n' "$1"
+            ;;
+        *)
+            printf 'kelivo-open: not a URL or absolute path, ignoring: %s\n' "$1" >&2
+            return 0
+            ;;
+    esac
+}
+
+if [ $# -eq 0 ]; then
+    echo "Usage: kelivo-open <url-or-path>" >&2
+    exit 1
+fi
+
+for arg in "$@"; do
+    emit "$arg"
+done
+
+exit 0

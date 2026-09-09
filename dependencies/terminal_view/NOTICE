@@ -1,0 +1,14 @@
+terminal_view
+Copyright (c) 2026 Termphin contributors
+
+This product is a fork of xterm.dart, taken at version 4.0.0.
+
+    xterm.dart
+    Copyright (c) 2020 xuty
+    https://github.com/TerminalStudio/xterm.dart
+    Licensed under the MIT License.
+
+The terminal parser, buffer and input handling originate there. The rendering
+path, the picture and paragraph caches, the write coalescing and the selection
+behaviour were reworked in this fork. Both the original and the fork are
+distributed under the MIT License; see LICENSE for the full text.

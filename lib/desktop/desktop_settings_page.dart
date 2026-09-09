@@ -51,6 +51,8 @@ import 'setting/default_model_pane.dart';
 import 'setting/search_services_pane.dart';
 import 'setting/tool_schemas_pane.dart';
 import 'setting/mcp_pane.dart';
+import 'setting/workspace_pane.dart';
+import 'setting/skills_settings_pane.dart';
 import 'setting/tts_services_pane.dart';
 import 'setting/memory_settings_pane.dart';
 import 'setting/quick_phrases_pane.dart';
@@ -104,6 +106,8 @@ enum _SettingsMenuItem {
   search,
   toolSchemas,
   mcp,
+  workspace,
+  skills,
   quickPhrases,
   instructionInjection,
   worldBook,
@@ -223,6 +227,14 @@ class _DesktopSettingsPageState extends State<DesktopSettingsPage> {
                           );
                         case _SettingsMenuItem.mcp:
                           return const DesktopMcpPane(key: ValueKey('mcp'));
+                        case _SettingsMenuItem.workspace:
+                          return const DesktopWorkspacePane(
+                            key: ValueKey('workspace'),
+                          );
+                        case _SettingsMenuItem.skills:
+                          return const DesktopSkillsSettingsPane(
+                            key: ValueKey('skills'),
+                          );
                         case _SettingsMenuItem.networkProxy:
                           return const DesktopNetworkProxyPane(
                             key: ValueKey('networkProxy'),
@@ -308,6 +320,16 @@ class _SettingsMenu extends StatelessWidget {
       ),
       (_SettingsMenuItem.search, lucide.Lucide.Earth, l10n.settingsPageSearch),
       (_SettingsMenuItem.mcp, lucide.Lucide.Terminal, l10n.settingsPageMcp),
+      (
+        _SettingsMenuItem.workspace,
+        lucide.Lucide.FolderCode,
+        l10n.workspaceDeskMenuWorkspace,
+      ),
+      (
+        _SettingsMenuItem.skills,
+        lucide.Lucide.WandSparkles,
+        l10n.workspaceDeskMenuSkills,
+      ),
       (
         _SettingsMenuItem.quickPhrases,
         lucide.Lucide.Zap,

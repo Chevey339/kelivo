@@ -1,0 +1,13 @@
+diff --git a/fs/fake.c b/fs/fake.c
+--- a/fs/fake.c
++++ b/fs/fake.c
+@@ -783,6 +783,9 @@ static int fakefs_stat(struct mount *mount, const char *path, struct statbuf *fake_s
+             return errno_map();
+         }
+         /* Copy basic fields from real stat */
++        /* Match realfs_fstat's device number so coreutils does not mistake
++         * a bind-mounted source for a file replaced between stat and open. */
++        fake_stat->dev = dev_fake_from_real(real_stat.st_dev);
+         fake_stat->size = real_stat.st_size;
+         fake_stat->nlink = real_stat.st_nlink;
+         fake_stat->atime = real_stat.st_atimespec.tv_sec;

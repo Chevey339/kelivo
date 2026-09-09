@@ -30,15 +30,30 @@ enum BusinessEntityKind {
   ),
   assistantTag(sourceKey: 'assistant_tags_v1', tableName: 'assistant_tag_rows'),
   memoryEntry(sourceKey: 'memory_entries_v1', tableName: 'memory_entry_rows'),
+  workspace(
+    sourceKey: 'workspaces_v1',
+    tableName: 'extension_entity_rows',
+    extensionKind: 'workspace',
+  ),
+  skill(
+    sourceKey: 'skills_v1',
+    tableName: 'extension_entity_rows',
+    extensionKind: 'skill',
+  ),
   userProfileField(
     sourceKey: 'user_profile_fields_v1',
     tableName: 'user_profile_field_rows',
   );
 
-  const BusinessEntityKind({required this.sourceKey, required this.tableName});
+  const BusinessEntityKind({
+    required this.sourceKey,
+    required this.tableName,
+    this.extensionKind,
+  });
 
   final String sourceKey;
   final String tableName;
+  final String? extensionKind;
 
   String get idColumn => this == provider ? 'provider_key' : 'id';
 }

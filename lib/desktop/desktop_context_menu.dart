@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'dart:ui' as ui;
+import '../icons/lucide_adapter.dart';
 import '../shared/widgets/ios_tactile.dart';
 import '../core/services/haptics.dart';
 import 'package:Kelivo/theme/app_font_weights.dart';
@@ -13,6 +14,7 @@ class DesktopContextMenuItem {
   final String label;
   final VoidCallback? onTap;
   final bool danger;
+  final bool checked;
 
   const DesktopContextMenuItem({
     this.icon,
@@ -20,6 +22,7 @@ class DesktopContextMenuItem {
     required this.label,
     this.onTap,
     this.danger = false,
+    this.checked = false,
   });
 }
 
@@ -119,6 +122,7 @@ Future<void> showDesktopContextMenuAt(
                                         svgAsset: it.svgAsset,
                                         label: it.label,
                                         danger: it.danger,
+                                        checked: it.checked,
                                         onTap: () {
                                           Navigator.of(ctx).pop();
                                           it.onTap?.call();
@@ -166,6 +170,9 @@ double _estimateMenuWidth(
     double width = 12 /*left*/ + tp.width + 12 /*right*/;
     if (it.icon != null || it.svgAsset != null) {
       width += 18 /*icon*/ + 10 /*gap*/;
+    }
+    if (it.checked) {
+      width += 8 /*gap*/ + 16 /*check*/;
     }
     if (width > maxText) maxText = width;
   }
@@ -238,12 +245,14 @@ class _GlassMenuItem extends StatefulWidget {
     required this.label,
     this.onTap,
     this.danger = false,
+    this.checked = false,
   });
   final IconData? icon;
   final String? svgAsset;
   final String label;
   final VoidCallback? onTap;
   final bool danger;
+  final bool checked;
 
   @override
   State<_GlassMenuItem> createState() => _GlassMenuItemState();
@@ -306,6 +315,10 @@ class _GlassMenuItemState extends State<_GlassMenuItem> {
                   ),
                 ),
               ),
+              if (widget.checked) ...[
+                const SizedBox(width: 8),
+                Icon(Lucide.Check, size: 16, color: cs.primary),
+              ],
             ],
           ),
         ),

@@ -27,7 +27,15 @@ final class RestoreWorkspaceLock {
     discardingRunFileName,
     archivingRunFileName,
   };
-  static const _assetRootNames = {'upload', 'images', 'avatars', 'fonts'};
+  static const _assetRootNames = {
+    'upload',
+    'images',
+    'avatars',
+    'fonts',
+    'skills',
+    'workspaces',
+    'sessions',
+  };
   static const _previousDirectoryNames = {'previous.pending', 'previous'};
   static final _runIdPattern = RegExp(r'^[a-f0-9]{32}$');
   static final _runDirectoryPattern = RegExp(r'^run_([a-f0-9]{32})$');

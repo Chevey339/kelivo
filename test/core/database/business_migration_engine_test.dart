@@ -275,6 +275,12 @@ void main() {
                     if (kind == BusinessEntityKind.searchService)
                       'type': 'bing_local',
                     if (kind == BusinessEntityKind.ttsService) 'kind': 'openai',
+                    if (kind == BusinessEntityKind.workspace) 'name': 'Project',
+                    if (kind == BusinessEntityKind.skill) ...{
+                      'source': 'file',
+                      'installedAt': '2026-09-08T00:00:00Z',
+                      'updatedAt': '2026-09-08T00:00:00Z',
+                    },
                     'opaque': kind.name,
                   },
               ]),

@@ -4,14 +4,21 @@ import 'app_database.dart';
 import 'business_repository.dart';
 import 'chat_database_observer.dart';
 import 'chat_database_repository.dart';
+import 'extension_entity_store.dart';
 
 final class ChatDatabaseLease {
-  ChatDatabaseLease._(this.repository, this.businessRepository, this._gateway);
+  ChatDatabaseLease._(
+    this.repository,
+    this.businessRepository,
+    this.extensionEntityStore,
+    this._gateway,
+  );
 
   /// Compatibility alias for existing chat-only callers.
   final ChatDatabaseRepository repository;
   ChatDatabaseRepository get chatRepository => repository;
   final BusinessRepository businessRepository;
+  final ExtensionEntityStore extensionEntityStore;
   final ChatDatabaseGateway _gateway;
   bool _released = false;
 
@@ -25,6 +32,7 @@ final class ChatDatabaseLease {
 typedef _DatabaseRepositories = ({
   ChatDatabaseRepository chat,
   BusinessRepository business,
+  ExtensionEntityStore extensionEntities,
 });
 
 final class ChatDatabaseGateway {
@@ -68,7 +76,12 @@ final class ChatDatabaseGateway {
     }
 
     _leaseCount++;
-    return ChatDatabaseLease._(repositories.chat, repositories.business, this);
+    return ChatDatabaseLease._(
+      repositories.chat,
+      repositories.business,
+      repositories.extensionEntities,
+      this,
+    );
   }
 
   Future<_DatabaseRepositories> _open(File databaseFile) async {
@@ -82,7 +95,11 @@ final class ChatDatabaseGateway {
       try {
         await chatRepository.ensureReady();
         await chatRepository.validateConnectionContract();
-        return (chat: chatRepository, business: BusinessRepository(database));
+        return (
+          chat: chatRepository,
+          business: BusinessRepository(database),
+          extensionEntities: ExtensionEntityStore(database),
+        );
       } catch (_) {
         await chatRepository.close();
         rethrow;

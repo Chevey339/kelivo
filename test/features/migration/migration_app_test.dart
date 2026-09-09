@@ -195,7 +195,14 @@ void main() {
             !service.temporaryBackup.existsSync(),
       );
     });
-    await tester.pump(const Duration(milliseconds: 300));
+    await tester.pump();
+    for (
+      var i = 0;
+      i < 20 && find.byIcon(Lucide.RotateCcw).evaluate().isEmpty;
+      i++
+    ) {
+      await tester.pump(const Duration(milliseconds: 50));
+    }
 
     expect(service.backupCalls, 1);
     expect(saveCalls, 1);

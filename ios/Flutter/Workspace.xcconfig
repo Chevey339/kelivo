@@ -1,0 +1,14 @@
+// iSH-ARM64 static libs for the Workspace Linux sandbox.
+// Included from Debug.xcconfig / Release.xcconfig so `pod install` and
+// `flutter build ios` keep the flags.
+//
+// Per-SDK slices: sandbox/build/iphoneos and sandbox/build/iphonesimulator.
+// Xcode sets PLATFORM_NAME to the current SDK name.
+//
+// iSH-ARM64's asbestos engine has guest-arm64 gadgets only for an aarch64
+// host. There is no gadgets-x86_64 pack, so the simulator slice is arm64-only.
+EXCLUDED_ARCHS[sdk=iphonesimulator*] = $(inherited) x86_64
+LIBRARY_SEARCH_PATHS = $(inherited) $(SRCROOT)/sandbox/build/$(PLATFORM_NAME)
+HEADER_SEARCH_PATHS = $(inherited) $(SRCROOT)/sandbox/build/include $(SRCROOT)/sandbox/build/include/ish
+OTHER_LDFLAGS = $(inherited) -ObjC -lish_emu -lish -lfakefs -lsqlite3
+GCC_PREPROCESSOR_DEFINITIONS = $(inherited) ISH_INTERNAL=1 GUEST_ARM64=1

@@ -454,6 +454,8 @@ void main() {
     await tester.tap(find.byType(TextField));
     await tester.pump();
 
+    final beforePaste = mediaController.draftMediaIdentity;
+
     await tester.runAsync(() async {
       tester
           .state<EditableTextState>(find.byType(EditableText))
@@ -468,6 +470,8 @@ void main() {
     });
 
     expect(mediaController.hasUnreadyImages, isTrue);
+    expect(mediaController.snapshotInput('').imagePaths, isEmpty);
+    expect(mediaController.draftMediaIdentity, isNot(equals(beforePaste)));
     await tester.tap(find.byIcon(Lucide.ArrowUp));
     await tester.pump();
     expect(submitted, isNull);

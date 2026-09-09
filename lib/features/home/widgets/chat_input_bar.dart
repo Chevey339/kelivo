@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import '../../../core/services/incoming_share_service.dart';
+import 'composer_attachment_card.dart';
 import 'dart:collection';
 import 'dart:ui' as ui;
 import 'dart:math' as math;
@@ -36,6 +38,10 @@ import '../../../desktop/desktop_context_menu.dart';
 import 'package:Kelivo/theme/app_font_weights.dart';
 
 class ChatInputBarController {
+  final shareImport = ValueNotifier<ShareImportProgress?>(null);
+  final sharedDraftAction = ValueNotifier<VoidCallback?>(null);
+  VoidCallback? cancelShareImport;
+
   _ChatInputBarState? _state;
   void _bind(_ChatInputBarState s) => _state = s;
   void _unbind(_ChatInputBarState s) {
@@ -43,8 +49,24 @@ class ChatInputBarController {
   }
 
   bool get allowImagesApiRouting => _state?._allowImagesApiRouting ?? true;
+  bool get isAttached => _state != null;
   bool get hasDraftMedia => _state?._hasDraftMedia ?? false;
   bool get hasUnreadyImages => _state?._hasUnreadyImages ?? false;
+
+  /// Snapshot for comparing media across an asynchronous draft handoff.
+  /// Unlike snapshotInput, this includes unready images and pending pastes.
+  /// Image identities stay stable when compression updates their paths.
+  List<Object> get draftMediaIdentity {
+    final state = _state;
+    if (state == null) return const [];
+    return [
+      state,
+      ...state._images,
+      ...state._docs,
+      for (final id in state._pendingImagePasteIds) ('imagePaste', id),
+      for (final id in state._pendingTextPasteIds) ('textPaste', id),
+    ];
+  }
 
   void addImages(List<String> paths) => _state?._addImages(paths);
   void enqueueImages(
@@ -98,8 +120,13 @@ class ChatInputBar extends StatefulWidget {
     this.onStop,
     this.onSelectModel,
     this.onLongPressSelectModel,
-    this.onOpenMcp,
-    this.onLongPressMcp,
+    this.onOpenTools,
+    this.onLongPressTools,
+    this.onOpenWorkspace,
+    this.showWorkspaceButton = false,
+    this.workspaceActive = false,
+    this.onOpenSkills,
+    this.skillsActive = false,
     this.onOpenSearch,
     this.onMore,
     this.onConfigureReasoning,
@@ -116,8 +143,8 @@ class ChatInputBar extends StatefulWidget {
     this.reasoningActive = false,
     this.reasoningBudget,
     this.supportsReasoning = true,
-    this.showMcpButton = false,
-    this.mcpActive = false,
+    this.showToolsButton = false,
+    this.toolsActive = false,
     this.showMiniMapButton = false,
     this.onOpenMiniMap,
     this.onPickCamera,
@@ -150,8 +177,13 @@ class ChatInputBar extends StatefulWidget {
   final VoidCallback? onStop;
   final VoidCallback? onSelectModel;
   final VoidCallback? onLongPressSelectModel;
-  final VoidCallback? onOpenMcp;
-  final VoidCallback? onLongPressMcp;
+  final VoidCallback? onOpenTools;
+  final VoidCallback? onLongPressTools;
+  final VoidCallback? onOpenWorkspace;
+  final bool showWorkspaceButton;
+  final bool workspaceActive;
+  final VoidCallback? onOpenSkills;
+  final bool skillsActive;
   final VoidCallback? onOpenSearch;
   final VoidCallback? onMore;
   final VoidCallback? onConfigureReasoning;
@@ -168,8 +200,8 @@ class ChatInputBar extends StatefulWidget {
   final bool reasoningActive;
   final int? reasoningBudget;
   final bool supportsReasoning;
-  final bool showMcpButton;
-  final bool mcpActive;
+  final bool showToolsButton;
+  final bool toolsActive;
   final bool showMiniMapButton;
   final VoidCallback? onOpenMiniMap;
   final VoidCallback? onPickCamera;
@@ -244,8 +276,6 @@ class _ChatInputBarState extends State<ChatInputBar>
   final GlobalKey _contextMgmtAnchorKey = GlobalKey(
     debugLabel: 'context-mgmt-anchor',
   );
-  static const double _documentPreviewHeight = 48;
-  static const double _imagePreviewHeight = 64;
   static const double _imageRemoveButtonSize = 18;
   // Suppress context menu briefly after app resume to avoid flickering
   bool _suppressContextMenu = false;
@@ -507,6 +537,7 @@ class _ChatInputBarState extends State<ChatInputBar>
   }
 
   void _clearDraft() {
+    widget.mediaController?.sharedDraftAction.value = null;
     setState(() {
       _draftReplacementRevision++;
       _controller.clear();
@@ -973,6 +1004,7 @@ class _ChatInputBarState extends State<ChatInputBar>
       if (result == ChatInputSubmissionResult.sent ||
           result == ChatInputSubmissionResult.queued) {
         if (_draftReplacementRevision != submittedDraftRevision) return;
+        widget.mediaController?.sharedDraftAction.value = null;
         _discardImageState(submittedImageIds);
         setState(() {});
         // Keep focus on desktop so user can continue typing
@@ -1918,22 +1950,60 @@ class _ChatInputBarState extends State<ChatInputBar>
           );
         }
 
-        // MCP button
-        if (widget.showMcpButton) {
+        if (widget.showWorkspaceButton) {
           actions.add(
             _OverflowAction(
               width: normalButtonW,
               builder: () => _CompactIconButton(
-                tooltip: l10n.chatInputBarMcpServersTooltip,
-                icon: Lucide.Hammer,
-                active: widget.mcpActive,
-                onTap: lockTap(widget.onOpenMcp),
-                onLongPress: lockTap(widget.onLongPressMcp),
+                tooltip: l10n.workspaceEntryTooltip,
+                icon: Lucide.FolderCode,
+                active: widget.workspaceActive,
+                onTap: lockTap(widget.onOpenWorkspace),
               ),
               menu: DesktopContextMenuItem(
-                icon: Lucide.Hammer,
-                label: l10n.chatInputBarMcpServersTooltip,
-                onTap: lockTap(widget.onOpenMcp),
+                icon: Lucide.FolderCode,
+                label: l10n.workspaceEntryTooltip,
+                onTap: lockTap(widget.onOpenWorkspace),
+              ),
+            ),
+          );
+        }
+
+        if (widget.onOpenSkills != null) {
+          actions.add(
+            _OverflowAction(
+              width: normalButtonW,
+              builder: () => _CompactIconButton(
+                tooltip: l10n.workspaceEntrySessionSkills,
+                icon: Lucide.WandSparkles,
+                active: widget.skillsActive,
+                onTap: lockTap(widget.onOpenSkills),
+              ),
+              menu: DesktopContextMenuItem(
+                icon: Lucide.WandSparkles,
+                label: l10n.workspaceEntrySessionSkills,
+                onTap: lockTap(widget.onOpenSkills),
+              ),
+            ),
+          );
+        }
+
+        // Tools button (local tools and MCP servers)
+        if (widget.showToolsButton) {
+          actions.add(
+            _OverflowAction(
+              width: normalButtonW,
+              builder: () => _CompactIconButton(
+                tooltip: l10n.chatInputBarToolsTooltip,
+                icon: Lucide.ToolCase,
+                active: widget.toolsActive,
+                onTap: lockTap(widget.onOpenTools),
+                onLongPress: lockTap(widget.onLongPressTools),
+              ),
+              menu: DesktopContextMenuItem(
+                icon: Lucide.ToolCase,
+                label: l10n.chatInputBarToolsTooltip,
+                onTap: lockTap(widget.onOpenTools),
               ),
             ),
           );
@@ -2314,16 +2384,140 @@ class _ChatInputBarState extends State<ChatInputBar>
     setState(() {});
   }
 
-  Widget _buildInlineAttachmentPreviews(BuildContext context, bool isDark) {
+  Widget _buildImageAttachmentPreview(
+    BuildContext context,
+    int idx,
+    bool isDark,
+  ) {
     final theme = Theme.of(context);
     final l10n = AppLocalizations.of(context)!;
-    final previewFill = theme.colorScheme.onSurface.withValues(
-      alpha: isDark ? 0.08 : 0.045,
+    final previewFill = theme.colorScheme.onSurface.withValues(alpha: 0.045);
+    final previewBorder = theme.colorScheme.onSurface.withValues(alpha: 0.07);
+    final image = _images[idx];
+    final processing = _processingImageIds.contains(image.id);
+    final failed = !processing && _failedImageIds.contains(image.id);
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        DecoratedBox(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: previewBorder, width: 1),
+          ),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(9),
+            child: processing
+                ? ColoredBox(
+                    color: theme.colorScheme.scrim,
+                    child: const SizedBox(width: 88, height: 88),
+                  )
+                : Image(
+                    image: ResizeImage(
+                      FileImage(File(image.path)),
+                      width: (88 * MediaQuery.devicePixelRatioOf(context))
+                          .ceil(),
+                      height: (88 * MediaQuery.devicePixelRatioOf(context))
+                          .ceil(),
+                      policy: ResizeImagePolicy.fit,
+                    ),
+                    width: 88,
+                    height: 88,
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, __, ___) => Container(
+                      width: 88,
+                      height: 88,
+                      color: previewFill,
+                      child: Icon(
+                        Icons.broken_image,
+                        color: theme.colorScheme.onSurface.withValues(
+                          alpha: 0.45,
+                        ),
+                      ),
+                    ),
+                  ),
+          ),
+        ),
+        Positioned.fill(
+          child: AnimatedSwitcher(
+            duration: const Duration(milliseconds: 180),
+            child: processing
+                ? IgnorePointer(
+                    key: ValueKey('chat-input-image-processing:${image.id}'),
+                    child: Tooltip(
+                      message: l10n.chatInputBarImageProcessing,
+                      child: Container(
+                        decoration: BoxDecoration(
+                          color: theme.colorScheme.scrim.withValues(
+                            alpha: 0.32,
+                          ),
+                          borderRadius: BorderRadius.circular(9),
+                        ),
+                        alignment: Alignment.center,
+                        child: const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            valueColor: AlwaysStoppedAnimation<Color>(
+                              Colors
+                                  .white, // color-gate: ignore (on scrim over photo)
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  )
+                : const SizedBox.shrink(key: ValueKey('image-idle')),
+          ),
+        ),
+        if (failed)
+          Positioned(
+            left: 4,
+            bottom: 4,
+            child: Container(
+              width: 16,
+              height: 16,
+              decoration: BoxDecoration(
+                color: theme.colorScheme.tertiary,
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                Icons.priority_high,
+                size: 12,
+                color: theme.colorScheme.onTertiary,
+              ),
+            ),
+          ),
+        Positioned(
+          right: 4,
+          top: 4,
+          child: IosCardPress(
+            key: ValueKey('chat-input-image-remove:$idx'),
+            haptics: false,
+            baseColor: theme.colorScheme.scrim.withValues(
+              alpha: isDark ? 0.50 : 0.46,
+            ),
+            pressedScale: 0.94,
+            borderRadius: BorderRadius.circular(_imageRemoveButtonSize / 2),
+            padding: EdgeInsets.zero,
+            duration: const Duration(milliseconds: 140),
+            onTap: () => _removeImageAt(idx),
+            child: const SizedBox(
+              width: _imageRemoveButtonSize,
+              height: _imageRemoveButtonSize,
+              child: Icon(
+                Icons.close,
+                size: 11,
+                color: Colors.white, // color-gate: ignore (on scrim over photo)
+              ),
+            ),
+          ),
+        ),
+      ],
     );
-    final previewBorder = isDark
-        ? theme.colorScheme.onSurface.withValues(alpha: 0.10)
-        : theme.colorScheme.outline.withValues(alpha: 0.13);
+  }
 
+  Widget _buildInlineAttachmentPreviews(BuildContext context, bool isDark) {
     return Padding(
       padding: const EdgeInsets.fromLTRB(
         AppSpacing.sm,
@@ -2331,204 +2525,36 @@ class _ChatInputBarState extends State<ChatInputBar>
         AppSpacing.sm,
         AppSpacing.xxs,
       ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          if (_images.isNotEmpty)
-            SizedBox(
-              key: const ValueKey('chat-input-image-previews'),
-              height: _imagePreviewHeight,
-              child: ListView.separated(
-                scrollDirection: Axis.horizontal,
-                itemCount: _images.length,
-                separatorBuilder: (_, __) => const SizedBox(width: 8),
-                itemBuilder: (context, idx) {
-                  final image = _images[idx];
-                  final processing = _processingImageIds.contains(image.id);
-                  final failed =
-                      !processing && _failedImageIds.contains(image.id);
-                  return Stack(
-                    clipBehavior: Clip.none,
-                    children: [
-                      DecoratedBox(
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(10),
-                          border: Border.all(color: previewBorder, width: 1),
-                        ),
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(9),
-                          child: processing
-                              ? ColoredBox(
-                                  color: theme.colorScheme.scrim,
-                                  child: const SizedBox(width: 64, height: 64),
-                                )
-                              : Image.file(
-                                  File(image.path),
-                                  width: 64,
-                                  height: 64,
-                                  fit: BoxFit.cover,
-                                  errorBuilder: (_, __, ___) => Container(
-                                    width: 64,
-                                    height: 64,
-                                    color: previewFill,
-                                    child: Icon(
-                                      Icons.broken_image,
-                                      color: theme.colorScheme.onSurface
-                                          .withValues(alpha: 0.45),
-                                    ),
-                                  ),
-                                ),
-                        ),
-                      ),
-                      Positioned.fill(
-                        child: AnimatedSwitcher(
-                          duration: const Duration(milliseconds: 180),
-                          child: processing
-                              ? IgnorePointer(
-                                  key: ValueKey(
-                                    'chat-input-image-processing:${image.id}',
-                                  ),
-                                  child: Tooltip(
-                                    message: l10n.chatInputBarImageProcessing,
-                                    child: Container(
-                                      decoration: BoxDecoration(
-                                        color: theme.colorScheme.scrim
-                                            .withValues(alpha: 0.32),
-                                        borderRadius: BorderRadius.circular(9),
-                                      ),
-                                      alignment: Alignment.center,
-                                      child: const SizedBox(
-                                        width: 20,
-                                        height: 20,
-                                        child: CircularProgressIndicator(
-                                          strokeWidth: 2,
-                                          valueColor: AlwaysStoppedAnimation<Color>(
-                                            Colors
-                                                .white, // color-gate: ignore (on scrim over photo)
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                )
-                              : const SizedBox.shrink(
-                                  key: ValueKey('image-idle'),
-                                ),
-                        ),
-                      ),
-                      if (failed)
-                        Positioned(
-                          left: 4,
-                          bottom: 4,
-                          child: Container(
-                            width: 16,
-                            height: 16,
-                            decoration: BoxDecoration(
-                              color: theme.colorScheme.tertiary,
-                              shape: BoxShape.circle,
-                            ),
-                            child: Icon(
-                              Icons.priority_high,
-                              size: 12,
-                              color: theme.colorScheme.onTertiary,
-                            ),
-                          ),
-                        ),
-                      Positioned(
-                        right: 4,
-                        top: 4,
-                        child: IosCardPress(
-                          key: ValueKey('chat-input-image-remove:$idx'),
-                          haptics: false,
-                          baseColor: theme.colorScheme.scrim.withValues(
-                            alpha: isDark ? 0.50 : 0.46,
-                          ),
-                          pressedScale: 0.94,
-                          borderRadius: BorderRadius.circular(
-                            _imageRemoveButtonSize / 2,
-                          ),
-                          padding: EdgeInsets.zero,
-                          duration: const Duration(milliseconds: 140),
-                          onTap: () => _removeImageAt(idx),
-                          child: const SizedBox(
-                            width: _imageRemoveButtonSize,
-                            height: _imageRemoveButtonSize,
-                            child: Icon(
-                              Icons.close,
-                              size: 11,
-                              color: Colors
-                                  .white, // color-gate: ignore (on scrim over photo)
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
-                  );
-                },
+      child: SizedBox(
+        height: ComposerAttachmentCard.heightFor(context),
+        child: ListView.separated(
+          scrollDirection: Axis.horizontal,
+          itemCount: _images.length + _docs.length,
+          separatorBuilder: (_, __) => const SizedBox(width: 8),
+          itemBuilder: (context, index) {
+            if (index < _images.length) {
+              return KeyedSubtree(
+                key: index == 0
+                    ? const ValueKey('chat-input-image-previews')
+                    : ValueKey(_images[index].id),
+                child: _buildImageAttachmentPreview(context, index, isDark),
+              );
+            }
+            final docIndex = index - _images.length;
+            final file = _docs[docIndex];
+            return KeyedSubtree(
+              key: docIndex == 0
+                  ? const ValueKey('chat-input-document-previews')
+                  : ValueKey(file.path),
+              child: ComposerAttachmentCard(
+                key: ValueKey(file.path),
+                file: file,
+                removeKey: ValueKey('chat-input-document-remove:$docIndex'),
+                onRemove: () => _removeDocumentAt(docIndex),
               ),
-            ),
-          if (_images.isNotEmpty && _docs.isNotEmpty)
-            const SizedBox(height: AppSpacing.xs),
-          if (_docs.isNotEmpty)
-            SizedBox(
-              key: const ValueKey('chat-input-document-previews'),
-              height: _documentPreviewHeight,
-              child: ListView.separated(
-                scrollDirection: Axis.horizontal,
-                itemCount: _docs.length,
-                separatorBuilder: (_, __) => const SizedBox(width: 8),
-                itemBuilder: (context, idx) {
-                  final d = _docs[idx];
-                  return Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 10,
-                      vertical: 8,
-                    ),
-                    decoration: BoxDecoration(
-                      color: previewFill,
-                      borderRadius: BorderRadius.circular(10),
-                      border: Border.all(color: previewBorder, width: 1),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          Icons.insert_drive_file,
-                          size: 18,
-                          color: theme.colorScheme.onSurface.withValues(
-                            alpha: 0.72,
-                          ),
-                        ),
-                        const SizedBox(width: 6),
-                        ConstrainedBox(
-                          constraints: const BoxConstraints(maxWidth: 180),
-                          child: Text(
-                            d.fileName,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              color: theme.colorScheme.onSurface,
-                              fontSize: 13,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 3),
-                        IosIconButton(
-                          key: ValueKey('chat-input-document-remove:$idx'),
-                          icon: Icons.close,
-                          size: 16,
-                          padding: const EdgeInsets.all(3),
-                          color: theme.colorScheme.onSurface.withValues(
-                            alpha: 0.58,
-                          ),
-                          onTap: () => _removeDocumentAt(idx),
-                        ),
-                      ],
-                    ),
-                  );
-                },
-              ),
-            ),
-        ],
+            );
+          },
+        ),
       ),
     );
   }
@@ -2561,9 +2587,7 @@ class _ChatInputBarState extends State<ChatInputBar>
     final double visibleHeight = size.height - viewInsets.bottom;
     final double attachmentPreviewHeight = (hasDocs || hasImages)
         ? AppSpacing.sm +
-              (hasImages ? _imagePreviewHeight : 0) +
-              (hasImages && hasDocs ? AppSpacing.xs : 0) +
-              (hasDocs ? _documentPreviewHeight : 0) +
+              ComposerAttachmentCard.heightFor(context) +
               AppSpacing.xxs
         : 0;
     const double baseChromeHeight = 120; // padding + action row + chrome buffer
@@ -2638,6 +2662,91 @@ class _ChatInputBarState extends State<ChatInputBar>
                       ),
                       child: Column(
                         children: [
+                          if (widget.mediaController != null) ...[
+                            ValueListenableBuilder<ShareImportProgress?>(
+                              valueListenable:
+                                  widget.mediaController!.shareImport,
+                              builder: (context, progress, _) =>
+                                  progress == null
+                                  ? const SizedBox.shrink()
+                                  : ComposerImportProgress(
+                                      progress: progress,
+                                      onCancel: () => widget
+                                          .mediaController!
+                                          .cancelShareImport
+                                          ?.call(),
+                                    ),
+                            ),
+                            if (isMobileLayout &&
+                                (hasText || hasDocs || hasImages))
+                              ValueListenableBuilder<VoidCallback?>(
+                                valueListenable:
+                                    widget.mediaController!.sharedDraftAction,
+                                builder: (context, onMove, _) => onMove == null
+                                    ? const SizedBox.shrink()
+                                    : Padding(
+                                        padding: const EdgeInsets.fromLTRB(
+                                          12,
+                                          8,
+                                          8,
+                                          0,
+                                        ),
+                                        child: Row(
+                                          children: [
+                                            Text(
+                                              AppLocalizations.of(
+                                                context,
+                                              )!.incomingShareTitle,
+                                              style: TextStyle(
+                                                fontSize: 12,
+                                                color: theme
+                                                    .colorScheme
+                                                    .onSurfaceVariant,
+                                              ),
+                                            ),
+                                            const Spacer(),
+                                            IosCardPress(
+                                              onTap: onMove,
+                                              haptics: false,
+                                              borderRadius:
+                                                  BorderRadius.circular(8),
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                    horizontal: 8,
+                                                    vertical: 6,
+                                                  ),
+                                              child: Row(
+                                                mainAxisSize: MainAxisSize.min,
+                                                children: [
+                                                  Text(
+                                                    AppLocalizations.of(
+                                                      context,
+                                                    )!.incomingShareMoveTo,
+                                                    style: TextStyle(
+                                                      fontSize: 12,
+                                                      color: theme
+                                                          .colorScheme
+                                                          .primary,
+                                                      fontWeight:
+                                                          AppFontWeights.medium,
+                                                    ),
+                                                  ),
+                                                  const SizedBox(width: 4),
+                                                  Icon(
+                                                    Lucide.ArrowRight,
+                                                    size: 14,
+                                                    color: theme
+                                                        .colorScheme
+                                                        .primary,
+                                                  ),
+                                                ],
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                              ),
+                          ],
                           if (hasDocs || hasImages)
                             _buildInlineAttachmentPreviews(context, isDark),
                           // Input field with expand/collapse button

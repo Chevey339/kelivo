@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:archive/archive_io.dart';
 import 'package:flutter/foundation.dart';
 import 'package:xml/xml.dart';
+import 'package:path/path.dart' as p;
 import 'package:syncfusion_flutter_pdf/pdf.dart';
 import '../../../utils/sandbox_path_resolver.dart';
 import '../../../utils/unicode_sanitizer.dart';
@@ -13,6 +14,13 @@ class _ExtractorParams {
   final String path;
   final String mime;
   _ExtractorParams(this.path, this.mime);
+}
+
+class AttachmentRequiresWorkspace implements Exception {
+  const AttachmentRequiresWorkspace(this.name);
+  final String name;
+  @override
+  String toString() => 'Attachment requires workspace file tools: $name';
 }
 
 class DocumentTextExtractor {
@@ -46,6 +54,13 @@ class DocumentTextExtractor {
     final mime = params.mime;
 
     try {
+      final source = File(path);
+      if (!source.existsSync()) return '[[File not found: $path]]';
+      // Receiving a file is independent of inlining it in a model request.
+      // Larger files remain available to workspace tools without a full read.
+      if (source.lengthSync() > 16 * 1024 * 1024) {
+        throw AttachmentRequiresWorkspace(p.basename(path));
+      }
       if (mime == 'application/pdf') {
         try {
           final file = File(path);
@@ -76,13 +91,35 @@ class DocumentTextExtractor {
         return _extractDocxSync(path);
       }
 
-      // Fallback: read as plain text
+      // Unknown types may be archives or executables. Probe a small prefix
+      // before deciding whether a text read is useful.
+      final probe = source.openSync();
+      try {
+        final prefix = probe.readSync(8192);
+        if (prefix.contains(0)) {
+          throw AttachmentRequiresWorkspace(p.basename(path));
+        }
+        final decoder = utf8.decoder.startChunkedConversion(
+          StringConversionSink.fromStringSink(StringBuffer()),
+        );
+        try {
+          decoder.add(prefix);
+          if (source.lengthSync() <= prefix.length) decoder.close();
+        } on FormatException {
+          throw AttachmentRequiresWorkspace(p.basename(path));
+        }
+      } finally {
+        probe.closeSync();
+      }
+      // Read only bounded, text-like files.
       final file = File(path);
       if (!file.existsSync()) return '[[File not found: $path]]';
       final bytes = file.readAsBytesSync();
       return UnicodeSanitizer.sanitize(
         utf8.decode(bytes, allowMalformed: true),
       );
+    } on AttachmentRequiresWorkspace {
+      rethrow;
     } catch (e) {
       return '[[Failed to read file: $e]]';
     }

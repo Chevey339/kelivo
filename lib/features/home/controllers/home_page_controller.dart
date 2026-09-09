@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:flutter/foundation.dart' show listEquals;
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:flutter/services.dart';
@@ -9,6 +10,8 @@ import '../../../core/models/chat_input_data.dart';
 import '../../../core/models/chat_message.dart';
 import '../../../core/models/message_part.dart';
 import '../../../core/models/conversation.dart';
+import '../../../core/models/workspace_binding.dart';
+import '../../../core/providers/workspace_provider.dart';
 import '../../../core/models/quick_phrase.dart';
 import '../../../core/models/assistant_regex.dart';
 import '../../../core/providers/assistant_provider.dart';
@@ -49,6 +52,7 @@ import '../services/translation_service.dart';
 import '../services/file_upload_service.dart';
 import '../utils/chat_layout_constants.dart';
 import '../widgets/chat_input_bar.dart';
+import '../widgets/share_destination_sheet.dart';
 import '../../model/widgets/model_select_sheet.dart';
 
 enum ChatSelectionMode { share, delete }
@@ -432,6 +436,7 @@ class HomePageController extends ChangeNotifier {
           _context.read<SettingsProvider>().imageCropperEnabled,
       getImageCompressConfig: () =>
           _context.read<SettingsProvider>().resolveImageCompressConfig(),
+      hasWorkspace: () => hasWorkspace,
     );
     _messageBuilderService = MessageBuilderService(
       chatService: _chatService,
@@ -902,12 +907,34 @@ class HomePageController extends ChangeNotifier {
   // Public Methods - Message Actions
   // ============================================================================
 
+  bool get hasWorkspace {
+    final provider = _context.read<WorkspaceProvider?>();
+    return provider != null &&
+        WorkspaceBinding.extrasHaveWorkspace(
+          currentConversation?.extras,
+          (id) => provider.byId(id) != null,
+        );
+  }
+
   Future<ChatInputSubmissionResult> sendMessage(ChatInputData input) async {
     final content = input.text.trim();
     if (content.isEmpty &&
         input.imagePaths.isEmpty &&
         input.documents.isEmpty) {
       return ChatInputSubmissionResult.rejected;
+    }
+    if (!hasWorkspace) {
+      for (final file in input.documents) {
+        if (FileUploadService.supportsWithoutWorkspace(file)) continue;
+        showAppSnackBar(
+          _context,
+          message: AppLocalizations.of(
+            _context,
+          )!.attachmentRequiresWorkspace(file.fileName),
+          type: NotificationType.warning,
+        );
+        return ChatInputSubmissionResult.rejected;
+      }
     }
     _warmupSerial++;
     final editState = _userMessageEditState;
@@ -1171,7 +1198,9 @@ class HomePageController extends ChangeNotifier {
     } catch (_) {}
   }
 
-  Future<void> createNewConversationAnimated() async {
+  Future<void> createNewConversationAnimated({
+    bool preserveDraft = false,
+  }) async {
     // Cancel any in-flight conversation switch fetch.
     _switchSerial++;
     _warmupSerial++;
@@ -1179,13 +1208,13 @@ class HomePageController extends ChangeNotifier {
     try {
       await _viewModel.flushCurrentConversationProgress();
     } catch (_) {}
-    _exitUserMessageEdit(clearDraft: true);
+    _exitUserMessageEdit(clearDraft: !preserveDraft);
     if (!isDesktopPlatform) {
       try {
         await _convoFadeController.reverse();
       } catch (_) {}
     }
-    await _createNewConversation();
+    await _createNewConversation(preserveDraft: preserveDraft);
     if (!isDesktopPlatform) {
       try {
         await WidgetsBinding.instance.endOfFrame;
@@ -1199,8 +1228,8 @@ class HomePageController extends ChangeNotifier {
     }
   }
 
-  Future<void> _createNewConversation() async {
-    _exitUserMessageEdit(clearDraft: true);
+  Future<void> _createNewConversation({bool preserveDraft = false}) async {
+    _exitUserMessageEdit(clearDraft: !preserveDraft);
     _translations.clear();
     final previousId = currentConversation?.id;
     await _viewModel.createNewConversation();
@@ -2443,6 +2472,111 @@ class HomePageController extends ChangeNotifier {
   Future<void> onPickPhotos() => _fileUploadService.onPickPhotos();
   Future<void> onPickCamera() => _fileUploadService.onPickCamera(_context);
   Future<void> onPickFiles() => _fileUploadService.onPickFiles();
+
+  Future<bool> confirmIncomingShare() async {
+    if (_inputController.text.isEmpty &&
+        !_mediaController.hasDraftMedia &&
+        !_mediaController.hasUnreadyImages) {
+      return true;
+    }
+    final l10n = AppLocalizations.of(_context)!;
+    return await showDialog<bool>(
+          context: _context,
+          builder: (context) => AlertDialog(
+            title: Text(l10n.incomingShareTitle),
+            content: Text(l10n.incomingShareReplaceDraft),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: Text(l10n.homePageCancel),
+              ),
+              TextButton(
+                onPressed: () => Navigator.pop(context, true),
+                child: Text(l10n.modelDetailSheetConfirmButton),
+              ),
+            ],
+          ),
+        ) ??
+        false;
+  }
+
+  Future<bool> openIncomingShareDraft(ChatInputData input) async {
+    final approvedText = _inputController.text;
+    final approvedMedia = _mediaController.draftMediaIdentity;
+    // Keep even an edited-message draft until the actual replacement below.
+    // Conversation creation and both animations may yield while it is edited.
+    await createNewConversationAnimated(preserveDraft: true);
+    await WidgetsBinding.instance.endOfFrame;
+    if (!_context.mounted || !_mediaController.isAttached) {
+      throw StateError('The chat composer is not ready');
+    }
+    if ((approvedText != _inputController.text ||
+            !listEquals(approvedMedia, _mediaController.draftMediaIdentity)) &&
+        !await confirmIncomingShare()) {
+      return false;
+    }
+    if (!_context.mounted || !_mediaController.isAttached) {
+      throw StateError('The chat composer is not ready');
+    }
+    // No more awaits between final confirmation and writing the new draft.
+    _mediaController.clearDraft();
+    _inputController.value = TextEditingValue(
+      text: input.text,
+      selection: TextSelection.collapsed(offset: input.text.length),
+    );
+    _mediaController.addFiles(input.documents);
+    _mediaController.enqueueImages(
+      input.imagePaths,
+      _context.read<SettingsProvider>().resolveImageCompressConfig(),
+      deleteSourcesAfterProcessing: true,
+    );
+    _mediaController.sharedDraftAction.value = () =>
+        unawaited(moveSharedDraft());
+    _inputFocus.requestFocus();
+    return true;
+  }
+
+  Future<bool> acceptIncomingShareDraft(ChatInputData input) async {
+    if (!_context.mounted || !await confirmIncomingShare()) return false;
+    if (!_context.mounted) return false;
+    return openIncomingShareDraft(input);
+  }
+
+  Future<void> moveSharedDraft() async {
+    final sourceId = currentConversation?.id;
+    final destination = await showShareDestinationSheet(
+      _context,
+      conversations: _context
+          .read<ChatService>()
+          .getAllConversations()
+          .where((conversation) => conversation.id != sourceId)
+          .toList(),
+    );
+    if (destination == null ||
+        !_context.mounted ||
+        currentConversation?.id != sourceId) {
+      return;
+    }
+    // The stable composer keeps its text, files and image-processing queue.
+    // Navigate only; never clear or recopy draft attachments during a move.
+    try {
+      if (destination.isEmpty) {
+        await createNewConversationAnimated();
+      } else {
+        await switchConversationAnimated(destination);
+      }
+    } catch (_) {
+      if (_context.mounted) {
+        showAppSnackBar(
+          _context,
+          message: AppLocalizations.of(_context)!.incomingShareMoveFailed,
+          type: NotificationType.error,
+        );
+      }
+    }
+    if (_context.mounted) _inputFocus.requestFocus();
+  }
+
   Future<void> onFilesDroppedDesktop(List<XFile> files) =>
       _fileUploadService.onFilesDroppedDesktop(files);
 

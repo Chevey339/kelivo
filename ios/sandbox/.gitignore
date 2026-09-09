@@ -1,0 +1,14 @@
+# iSH-ARM64 checkout (copied or cloned by build_ish.sh)
+/ish/
+
+# Meson/ninja outputs and copied static libs + headers
+# (build/iphoneos/, build/iphonesimulator/, build/fakefsify, build/include/)
+/build/
+
+# Generated Alpine fakefs zip and guest VDSO
+/resources/alpine-rootfs.zip
+/resources/libvdso.so.elf
+/resources/alpine-rootfs/
+
+# Download / extract cache for prepare_alpine_rootfs.sh
+/.cache/

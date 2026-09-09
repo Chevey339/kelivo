@@ -17,6 +17,7 @@ private let backgroundProcessingIdentifier = "psyche.kelivo.background-generatio
    private let mcpOAuthHandler = IosMcpOAuthHandler()
    private let deviceLocalToolsHandler = DeviceLocalToolsHandler()
    private let iosTranslationHandler = IosTranslationHandler()
+   private let incomingShareHandler = IosIncomingShareHandler()
 
   override func application(
     _ application: UIApplication,
@@ -25,6 +26,7 @@ private let backgroundProcessingIdentifier = "psyche.kelivo.background-generatio
     GeneratedPluginRegistrant.register(with: self)
     backgroundGenerationHandler.registerBackgroundTasks()
     if let controller = window?.rootViewController as? FlutterViewController {
+      incomingShareHandler.register(messenger: controller.binaryMessenger)
       let clipboardChannel = FlutterMethodChannel(name: "app.clipboard", binaryMessenger: controller.binaryMessenger)
       clipboardChannel.setMethodCallHandler { (call: FlutterMethodCall, result: @escaping FlutterResult) in
         if call.method == "getClipboardImages" {
@@ -79,6 +81,8 @@ private let backgroundProcessingIdentifier = "psyche.kelivo.background-generatio
        deviceToolsChannel.setMethodCallHandler { [weak self] call, result in
          self?.deviceLocalToolsHandler.handle(call: call, result: result)
        }
+
+      WorkspacePlugin.register(messenger: controller.binaryMessenger, presenter: controller)
 
       // Free space on the volume holding the app's data. Uses the "important
       // usage" capacity, which is what iOS will actually free up for data the
@@ -144,6 +148,7 @@ private let backgroundProcessingIdentifier = "psyche.kelivo.background-generatio
     open url: URL,
     options: [UIApplication.OpenURLOptionsKey: Any] = [:]
   ) -> Bool {
+    if incomingShareHandler.receiveFile(url) { return true }
     if url.scheme == "kelivo" && url.host == "oauth-return" {
       return true
     }

@@ -5,6 +5,7 @@ import 'package:flutter/widgets.dart';
 import 'package:provider/provider.dart';
 import '../../../core/models/assistant.dart';
 import '../../../core/providers/assistant_provider.dart';
+import '../../../core/providers/environment_provider.dart';
 import '../../../core/providers/mcp_provider.dart';
 import '../../../core/providers/memory_provider.dart';
 import '../../../core/providers/memory_provider_v2.dart';
@@ -18,6 +19,11 @@ import '../../../core/services/memory/memory_pipeline.dart';
 import '../../../core/services/memory/memory_tools.dart';
 import '../../../core/services/search/search_tool_service.dart';
 import '../../../core/services/tools/tool_schema_overrides.dart';
+import '../../../core/services/skills/skills_service.dart';
+import '../../../core/services/workspace/tool_run_registry.dart';
+import '../../../core/services/workspace/workspace_runtime.dart';
+import '../../../core/services/workspace/workspace_tools_service.dart';
+import '../../../core/providers/workspace_provider.dart';
 import 'ask_user_interaction_service.dart';
 import 'built_in_tool_names.dart';
 import 'local_tools_service.dart';
@@ -34,6 +40,35 @@ class ToolHandlerService {
 
   /// Build context (used for accessing providers)
   final BuildContext contextProvider;
+
+  WorkspaceToolsService _workspaceTools() {
+    try {
+      final chat = contextProvider.read<ChatService>();
+      final workspaces = contextProvider.read<WorkspaceProvider>();
+      Future<void> Function(String skillId)? onSkillRead;
+      Future<void> Function()? onShellCompleted;
+      try {
+        final skills = contextProvider.read<SkillsService>();
+        onSkillRead = skills.incrementUseCount;
+        onShellCompleted = skills.rescan;
+      } catch (_) {}
+      return WorkspaceToolsService(
+        registry: contextProvider.read<ToolRunRegistry>(),
+        runtimeProvider: contextProvider.read<WorkspaceRuntimeProvider>(),
+        updateConversationExtras: chat.updateConversationExtras,
+        touchLastUsed: workspaces.touchLastUsed,
+        onSkillRead: onSkillRead,
+        onShellCompleted: onShellCompleted,
+        loadEnvironment: contextProvider
+            .read<EnvironmentProvider?>()
+            ?.loadExecutionConfig,
+        isToolEnabled: (id, name) =>
+            workspaces.byId(id)?.isToolEnabled(name) ?? false,
+      );
+    } catch (_) {
+      return WorkspaceToolsService();
+    }
+  }
 
   // ============================================================================
   // Tool Schema Sanitization
@@ -233,6 +268,7 @@ class ToolHandlerService {
     bool hasBuiltInSearch, {
     required bool Function(String providerKey, String modelId) isToolModel,
     McpToolRouteSnapshot? mcpRouteSnapshot,
+    WorkspaceToolContext? workspaceContext,
   }) {
     final List<Map<String, dynamic>> toolDefs = <Map<String, dynamic>>[];
     final supportsTools = isToolModel(providerKey, modelId);
@@ -280,6 +316,10 @@ class ToolHandlerService {
       mcpRouteSnapshot: mcpRouteSnapshot,
     );
     toolDefs.addAll(mcpTools);
+
+    if (supportsTools && workspaceContext != null) {
+      toolDefs.addAll(_workspaceTools().buildToolDefinitions(workspaceContext));
+    }
 
     final overrides = settings.toolSchemaOverrides;
     if (overrides.isEmpty) return toolDefs;
@@ -364,6 +404,7 @@ class ToolHandlerService {
     AskUserInteractionService? askUserService,
     String? conversationId,
     McpToolRouteSnapshot? mcpRouteSnapshot,
+    WorkspaceToolContext? workspaceContext,
   }) {
     final mcp = contextProvider.read<McpProvider>();
     final toolSvc = contextProvider.read<McpToolService>();
@@ -425,8 +466,23 @@ class ToolHandlerService {
       );
     }
 
+    final workspaceTools = workspaceContext == null ? null : _workspaceTools();
+
     return (name, args, {toolCallId}) async {
       try {
+        if (workspaceContext != null &&
+            workspaceTools != null &&
+            WorkspaceToolsService.toolNames.contains(name)) {
+          return await workspaceTools.handle(
+            workspaceContext,
+            name,
+            args,
+            toolCallId: toolCallId ?? '',
+            approvalService: approvalService,
+            conversationId: conversationId,
+          );
+        }
+
         if (routes.containsExposedName(name)) {
           return await approveAndExecuteMcp(name, args, toolCallId: toolCallId);
         }

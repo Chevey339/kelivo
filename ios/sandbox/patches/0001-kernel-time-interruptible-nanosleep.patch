@@ -1,0 +1,102 @@
+diff --git a/kernel/time.c b/kernel/time.c
+index 1af608c..42ad4ad 100644
+--- a/kernel/time.c
++++ b/kernel/time.c
+@@ -10,8 +10,10 @@
+ #include "kernel/calls.h"
+ #include "kernel/errno.h"
+ #include "kernel/resource.h"
++#include "kernel/task.h"
+ #include "kernel/time.h"
+ #include "fs/poll.h"
++#include "util/sync.h"
+ 
+ #define TIMER_ABSTIME_ (1 << 0)
+ 
+@@ -192,6 +194,40 @@ uint_t sys_alarm(uint_t seconds) {
+     return seconds;
+ }
+ 
++/// Host `nanosleep` is not wired to iSH's `waiting_cond`, so `send_signal`
++/// (timeout / cancel) cannot wake a guest `sleep`. Wait on `current->pause`
++/// instead — the same interruptible path as pause(2) / sigsuspend.
++static int kelivo_sleep_interruptible(struct timespec *rel, struct timespec *rem) {
++    struct timespec start;
++    clock_gettime(CLOCK_MONOTONIC, &start);
++    lock(&current->general_lock);
++    current->blocking = true;
++    int err = wait_for(&current->pause, &current->general_lock, rel);
++    current->blocking = false;
++    unlock(&current->general_lock);
++    if (rem != NULL) {
++        rem->tv_sec = 0;
++        rem->tv_nsec = 0;
++        if (err == _EINTR) {
++            struct timespec now;
++            clock_gettime(CLOCK_MONOTONIC, &now);
++            long sec = rel->tv_sec - (now.tv_sec - start.tv_sec);
++            long nsec = rel->tv_nsec - (now.tv_nsec - start.tv_nsec);
++            if (nsec < 0) {
++                sec--;
++                nsec += 1000000000L;
++            }
++            if (sec < 0) {
++                sec = 0;
++                nsec = 0;
++            }
++            rem->tv_sec = sec;
++            rem->tv_nsec = nsec;
++        }
++    }
++    return err == _EINTR ? _EINTR : 0;
++}
++
+ dword_t sys_nanosleep(addr_t req_addr, addr_t rem_addr) {
+     struct timespec_ req_ts;
+     if (user_get(req_addr, req_ts))
+@@ -213,12 +249,17 @@ dword_t sys_nanosleep(addr_t req_addr, addr_t rem_addr) {
+     req.tv_sec = req_ts.sec;
+     req.tv_nsec = req_ts.nsec;
+     struct timespec rem;
+-    if (nanosleep(&req, &rem) < 0)
+-        return errno_map();
++    int err = kelivo_sleep_interruptible(&req, rem_addr != 0 ? &rem : NULL);
++    if (err < 0) {
++        if (rem_addr != 0) {
++            struct timespec_ rem_ts = {.sec = rem.tv_sec, .nsec = rem.tv_nsec};
++            if (user_put(rem_addr, rem_ts))
++                return _EFAULT;
++        }
++        return err;
++    }
+     if (rem_addr != 0) {
+-        struct timespec_ rem_ts;
+-        rem_ts.sec = rem.tv_sec;
+-        rem_ts.nsec = rem.tv_nsec;
++        struct timespec_ rem_ts = {.sec = 0, .nsec = 0};
+         if (user_put(rem_addr, rem_ts))
+             return _EFAULT;
+     }
+@@ -256,12 +297,17 @@ dword_t sys_clock_nanosleep(dword_t clock, dword_t flags, addr_t req_addr, addr_
+     }
+ 
+     struct timespec rem;
+-    if (nanosleep(&req, &rem) < 0)
+-        return errno_map();
++    int err = kelivo_sleep_interruptible(&req, rem_addr != 0 && !(flags & TIMER_ABSTIME_) ? &rem : NULL);
++    if (err < 0) {
++        if (rem_addr != 0 && !(flags & TIMER_ABSTIME_)) {
++            struct timespec_ rem_ts = {.sec = rem.tv_sec, .nsec = rem.tv_nsec};
++            if (user_put(rem_addr, rem_ts))
++                return _EFAULT;
++        }
++        return err;
++    }
+     if (rem_addr != 0 && !(flags & TIMER_ABSTIME_)) {
+-        struct timespec_ rem_ts;
+-        rem_ts.sec = rem.tv_sec;
+-        rem_ts.nsec = rem.tv_nsec;
++        struct timespec_ rem_ts = {.sec = 0, .nsec = 0};
+         if (user_put(rem_addr, rem_ts))
+             return _EFAULT;
+     }

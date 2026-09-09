@@ -103,6 +103,7 @@ class _ToolSchemaSettingsPageState extends State<ToolSchemaSettingsPage> {
       BuiltInToolGroup.search => l10n.toolSchemaSettingsGroupSearch,
       BuiltInToolGroup.memory => l10n.toolSchemaSettingsGroupMemory,
       BuiltInToolGroup.local => l10n.toolSchemaSettingsGroupLocal,
+      BuiltInToolGroup.workspace => l10n.workspacesTitle,
     };
     return [
       Padding(

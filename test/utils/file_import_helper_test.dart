@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:Kelivo/utils/file_import_helper.dart';
 import 'package:image_picker/image_picker.dart';
@@ -58,6 +59,20 @@ void main() {
 
     expect(reused, saved);
     expect(uploadDir.listSync().whereType<File>(), hasLength(1));
+  });
+
+  test('file import streams without calling readAsBytes', () async {
+    final source = await pickerCopy(
+      'app.apk',
+      'streamed bytes',
+      DateTime(2026),
+    );
+    final saved = await FileImportHelper.copyXFile(
+      _StreamOnlyFile(source.path),
+      uploadDir,
+    );
+    expect(saved, isNotNull);
+    expect(await File(saved!).readAsString(), 'streamed bytes');
   });
 
   test(
@@ -166,4 +181,11 @@ void main() {
     expect(reused, versioned);
     expect(uploadDir.listSync().whereType<File>(), hasLength(2));
   });
+}
+
+class _StreamOnlyFile extends XFile {
+  _StreamOnlyFile(super.path);
+  @override
+  Future<Uint8List> readAsBytes() =>
+      throw StateError('Must stream file imports');
 }

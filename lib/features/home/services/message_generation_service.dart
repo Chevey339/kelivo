@@ -1,15 +1,24 @@
+import 'package:Kelivo/core/providers/external_mounts_provider.dart';
 import 'dart:async';
 import 'package:flutter/widgets.dart';
+import 'package:provider/provider.dart';
 import '../../../core/models/assistant.dart';
 import '../../../core/models/chat_input_data.dart';
 import '../../../core/models/chat_message.dart';
 import '../../../core/models/message_part.dart';
 import '../../../core/models/conversation.dart';
+import '../../../core/models/skills_binding.dart';
 import '../../../core/providers/settings_provider.dart';
 import '../../../core/services/api/builtin_tools.dart';
 import '../../../core/services/api/chat_api_service.dart';
+import '../../../core/providers/workspace_provider.dart';
 import '../../../core/services/chat/chat_service.dart';
+import '../../../core/services/chat/document_text_extractor.dart';
+import '../../../l10n/app_localizations.dart';
 import '../../../core/services/logging/context_logger.dart';
+import '../../../core/services/skills/skills_service.dart';
+import '../../../core/services/workspace/workspace_runtime.dart';
+import '../../../core/services/workspace/workspace_tools_service.dart';
 import '../../../core/utils/multimodal_input_utils.dart';
 import '../../../utils/sandbox_path_resolver.dart';
 import '../../../utils/assistant_regex.dart';
@@ -114,6 +123,8 @@ class MessageGenerationService {
   }
 
   /// Prepare API messages with all injections applied.
+  /// [requiredAttachmentMessageId] identifies a new submission; retries and
+  /// historical context can legitimately reference attachments since removed.
   Future<PreparedGeneration> prepareApiMessagesWithInjections({
     required List<ChatMessage> messages,
     required Map<String, int> versionSelections,
@@ -126,6 +137,7 @@ class MessageGenerationService {
     ToolApprovalService? approvalService,
     AskUserInteractionService? askUserService,
     String? processingMessageId,
+    String? requiredAttachmentMessageId,
   }) async {
     final cfg = settings.getProviderConfig(providerKey);
     final kind = ProviderConfig.classify(
@@ -135,6 +147,14 @@ class MessageGenerationService {
     final includeToolMessages = switch (kind) {
       ProviderKind.openai || ProviderKind.claude || ProviderKind.google => true,
     };
+    WorkspaceProvider? workspaceProvider;
+    WorkspaceRuntimeProvider? runtimeProvider;
+    ExternalMountsProvider? externalMounts;
+    try {
+      workspaceProvider = contextProvider.read<WorkspaceProvider>();
+      runtimeProvider = contextProvider.read<WorkspaceRuntimeProvider>();
+      externalMounts = contextProvider.read<ExternalMountsProvider?>();
+    } catch (_) {}
 
     // Build API messages
     final apiMessages = messageBuilderService.buildApiMessages(
@@ -191,6 +211,53 @@ class MessageGenerationService {
       assistantId,
     );
 
+    WorkspaceToolContext? workspaceContext;
+    var workspaceAttachments = const <AttachmentInfo>[];
+    try {
+      if (workspaceProvider != null && runtimeProvider != null) {
+        workspaceContext = await WorkspaceToolsService.resolve(
+          externalMounts: externalMounts,
+          conversationId: currentConversation?.id,
+          workspaceProvider: workspaceProvider,
+          runtimeProvider: runtimeProvider,
+          chatService: chatService,
+        );
+      }
+      workspaceContext ??= await _skillsOnlyContext(
+        assistant: assistant,
+        conversation: currentConversation,
+      );
+      if (workspaceContext != null && !workspaceContext.skillsOnly) {
+        workspaceAttachments = await syncAttachments(
+          workspaceContext,
+          messages,
+          requiredMessageId: requiredAttachmentMessageId,
+        );
+      }
+      if (workspaceContext != null) {
+        await messageBuilderService.injectWorkspacePrompt(
+          apiMessages,
+          assistant,
+          conversationId: currentConversation?.id,
+          workspaceContext: workspaceContext,
+          attachments: workspaceAttachments,
+        );
+      }
+    } catch (e) {
+      if (workspaceContext != null && !workspaceContext.skillsOnly) {
+        // Let the existing generation error UI offer retry. Continuing here
+        // would silently send without the attachments the user selected.
+        rethrow;
+      }
+      debugPrint('Workspace prompt/attachments failed: $e');
+    }
+    await messageBuilderService.injectSkillsPrompt(
+      apiMessages,
+      assistant,
+      conversationId: currentConversation?.id,
+      workspaceContext: workspaceContext,
+    );
+
     // Single final trim after WorldBook TOP/BOTTOM/AT_DEPTH injections. OCR and
     // document extraction must run only on this retained set so images that will
     // not be sent are never processed (#769).
@@ -213,12 +280,25 @@ class MessageGenerationService {
       modelId,
       hasBuiltInSearch,
       mcpRouteSnapshot: mcpRouteSnapshot,
+      workspaceContext: workspaceContext,
     );
     final sandboxDataFiles = BuiltInToolsHelper.sendsDataFilesToSandbox(
       cfg: cfg,
       modelId: modelId,
       clientTools: toolDefs,
     );
+    final hasWorkspaceFileTools =
+        workspaceContext != null &&
+        !workspaceContext.skillsOnly &&
+        toolDefs.any((tool) {
+          final name = (tool['function'] as Map?)?['name'];
+          return (name == 'read_file' || name == 'shell') &&
+              workspaceContext!.workspace.isToolEnabled(name as String);
+        });
+    final localAttachments = <String, AttachmentInfo>{
+      if (hasWorkspaceFileTools)
+        for (final file in workspaceAttachments) file.sourceUri: file,
+    };
     final indicatorMessageId =
         processingMessageId != null &&
             messageBuilderService.hasPendingAttachmentWork(
@@ -227,6 +307,7 @@ class MessageGenerationService {
               conversation: currentConversation,
               sourceMessages: messages,
               sandboxDataFiles: sandboxDataFiles,
+              workspaceAttachments: localAttachments,
             )
         ? processingMessageId
         : null;
@@ -243,7 +324,16 @@ class MessageGenerationService {
             conversation: currentConversation,
             sourceMessages: messages,
             sandboxDataFiles: sandboxDataFiles,
+            workspaceAttachments: localAttachments,
           );
+    } on AttachmentRequiresWorkspace catch (e) {
+      if (!contextProvider.mounted) rethrow;
+      throw Exception(
+        AppLocalizations.of(
+              contextProvider,
+            )?.attachmentRequiresWorkspace(e.name) ??
+            e.toString(),
+      );
     } finally {
       if (indicatorMessageId != null) {
         onFileProcessingFinished?.call(indicatorMessageId);
@@ -271,6 +361,7 @@ class MessageGenerationService {
             askUserService: askUserService,
             conversationId: currentConversation?.id,
             mcpRouteSnapshot: mcpRouteSnapshot,
+            workspaceContext: workspaceContext,
           )
         : null;
 
@@ -804,5 +895,29 @@ class MessageGenerationService {
           .toList(growable: false),
       includeAudio: includeAudio,
     );
+  }
+
+  Future<WorkspaceToolContext?> _skillsOnlyContext({
+    required Assistant? assistant,
+    required Conversation? conversation,
+  }) async {
+    try {
+      final skillsService = contextProvider.read<SkillsService>();
+      await skillsService.loaded;
+      final override = conversation == null
+          ? null
+          : SkillsBinding.fromExtras(conversation.extras).skillIds;
+      final skills = skillsService.resolveForAssistant(
+        assistant,
+        conversationOverride: override,
+      );
+      if (skills.isEmpty) return null;
+      return WorkspaceToolContext.skillsOnly(
+        skillsHostDir: skillsService.skillsDirectory.path,
+        conversationId: conversation?.id,
+      );
+    } catch (_) {
+      return null;
+    }
   }
 }

@@ -5,6 +5,7 @@ import android.content.ActivityNotFoundException
 import android.net.Uri
 import android.content.Intent
 import android.os.Build
+import android.os.Bundle
 import android.os.ParcelFileDescriptor
 import android.os.StatFs
 import android.provider.DocumentsContract
@@ -14,6 +15,7 @@ import android.view.SurfaceHolder
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.android.FlutterSurfaceView
 import io.flutter.embedding.engine.FlutterEngine
+import com.psyche.kelivo.workspace.WorkspacePlugin
 import io.flutter.plugin.common.MethodChannel
 import java.io.File
 import java.io.FileInputStream
@@ -51,6 +53,20 @@ class MainActivity : FlutterActivity() {
      @Volatile private var writableFileState = WritableFileState.IDLE
      private val writableFileExecutor = Executors.newSingleThreadExecutor()
      private var deviceLocalToolsHandler: DeviceLocalToolsHandler? = null
+     private var workspacePlugin: WorkspacePlugin? = null
+    private var incomingShareHandler: IncomingShareHandler? = null
+    private var receivedShare = false
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        receivedShare = savedInstanceState?.getBoolean("kelivo.receivedShare") == true
+        if (!receivedShare) receivedShare = incomingShareHandler?.receive(intent) == true
+    }
+
+    override fun onSaveInstanceState(outState: Bundle) {
+        outState.putBoolean("kelivo.receivedShare", receivedShare)
+        super.onSaveInstanceState(outState)
+    }
 
     override fun onFlutterSurfaceViewCreated(flutterSurfaceView: FlutterSurfaceView) {
         super.onFlutterSurfaceViewCreated(flutterSurfaceView)
@@ -77,8 +93,12 @@ class MainActivity : FlutterActivity() {
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
          super.configureFlutterEngine(flutterEngine)
+        incomingShareHandler = IncomingShareHandler(this, flutterEngine.dartExecutor.binaryMessenger)
          McpOAuthHandler.configure(this, flutterEngine.dartExecutor.binaryMessenger)
          deviceLocalToolsHandler = DeviceLocalToolsHandler(this).also {
+             it.configure(flutterEngine.dartExecutor.binaryMessenger)
+         }
+         workspacePlugin = WorkspacePlugin(this).also {
              it.configure(flutterEngine.dartExecutor.binaryMessenger)
          }
         processTextChannel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, processTextChannelName)
@@ -165,6 +185,7 @@ class MainActivity : FlutterActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
+        receivedShare = incomingShareHandler?.receive(intent) == true
         val text = extractProcessText(intent) ?: return
         val ch = processTextChannel
         if (ch != null) {
@@ -189,6 +210,8 @@ class MainActivity : FlutterActivity() {
             }
         }
         writableFileExecutor.shutdown()
+        incomingShareHandler?.dispose()
+        workspacePlugin?.dispose()
         super.onDestroy()
     }
  
@@ -197,6 +220,7 @@ class MainActivity : FlutterActivity() {
          permissions: Array<out String>,
          grantResults: IntArray,
      ) {
+         if (workspacePlugin?.onRequestPermissionsResult(requestCode) == true) return
          if (deviceLocalToolsHandler?.onRequestPermissionsResult(requestCode, grantResults) == true) {
              return
          }
@@ -204,6 +228,7 @@ class MainActivity : FlutterActivity() {
      }
 
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        if (workspacePlugin?.onActivityResult(requestCode, resultCode, data) == true) return
         super.onActivityResult(requestCode, resultCode, data)
         if (requestCode != CREATE_DOCUMENT_REQUEST_CODE) {
             return

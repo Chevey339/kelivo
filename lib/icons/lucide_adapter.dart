@@ -77,6 +77,7 @@ class Lucide {
   static const IconData Languages = lucide.LucideIcons.languages;
   static const IconData User = lucide.LucideIcons.user;
   static const IconData Hammer = lucide.LucideIcons.hammer;
+  static const IconData ToolCase = lucide.LucideIcons.toolCase;
   static const IconData Brain = lucide.LucideIcons.brain;
   static const IconData Lightbulb = lucide.LucideIcons.lightbulb;
   static const IconData Check = lucide.LucideIcons.check;
@@ -95,6 +96,7 @@ class Lucide {
   static const IconData ClipboardCheck = lucide.LucideIcons.clipboardCheck;
   static const IconData ClipboardPen = lucide.LucideIcons.clipboardPen;
   static const IconData Sparkles = lucide.LucideIcons.sparkles;
+  static const IconData WandSparkles = lucide.LucideIcons.wandSparkles;
   static const IconData Phone = lucide.LucideIcons.phone;
   static const IconData Code = lucide.LucideIcons.code;
   static const IconData Hash = lucide.LucideIcons.hash;
@@ -196,6 +198,8 @@ class Lucide {
   static const IconData FileQuestion = lucide.LucideIcons.fileQuestionMark;
   static const IconData FileClock = lucide.LucideIcons.fileClock;
   static const IconData Folder = lucide.LucideIcons.folder;
+  static const IconData FolderCode = lucide.LucideIcons.folderCode;
+  static const IconData Lock = lucide.LucideIcons.lock;
   static const IconData CornerDownLeft = lucide.LucideIcons.cornerDownLeft;
   static const IconData package2 = lucide.LucideIcons.package2;
   static const IconData workflow = lucide.LucideIcons.workflow;
@@ -213,4 +217,28 @@ class Lucide {
   static const IconData Wind = lucide.LucideIcons.wind;
   static const IconData Syringe = lucide.LucideIcons.syringe;
   static const IconData Route = lucide.LucideIcons.route;
+  static const IconData FilePen = lucide.LucideIcons.filePen;
+  static const IconData FilePlus = lucide.LucideIcons.filePlus;
+  static const IconData FileSearch = lucide.LucideIcons.fileSearch;
+  static const IconData TextSearch = lucide.LucideIcons.textSearch;
+  static const IconData SquareTerminal = lucide.LucideIcons.squareTerminal;
+  static const IconData Gauge = lucide.LucideIcons.gauge;
+  static const IconData Package = lucide.LucideIcons.package;
+  static const IconData FileCode = lucide.LucideIcons.fileCode;
+  static const IconData FileSpreadsheet = lucide.LucideIcons.fileSpreadsheet;
+  static const IconData FileImage = lucide.LucideIcons.fileImage;
+  static const IconData FileArchive = lucide.LucideIcons.fileArchive;
+  static const IconData FileAudio = lucide.LucideIcons.fileAudio;
+  static const IconData FileVideo = lucide.LucideIcons.fileVideo;
+  static const IconData Presentation = lucide.LucideIcons.presentation;
+  static const IconData FileType = lucide.LucideIcons.fileType;
+  static const IconData Unlink = lucide.LucideIcons.unlink;
+  static const IconData FolderInput = lucide.LucideIcons.folderInput;
+  static const IconData FolderOutput = lucide.LucideIcons.folderOutput;
+  static const IconData ClipboardPaste = lucide.LucideIcons.clipboardPaste;
+  static const IconData FileUp = lucide.LucideIcons.fileUp;
+  static const IconData AArrowUp = lucide.LucideIcons.aArrowUp;
+  static const IconData AArrowDown = lucide.LucideIcons.aArrowDown;
+  static const IconData Braces = lucide.LucideIcons.braces;
+  static const IconData File = lucide.LucideIcons.file;
 }

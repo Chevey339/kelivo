@@ -707,6 +707,41 @@ void main() {
       );
     });
 
+    test('stages empty skills, workspaces, and sessions roots', () async {
+      final extracted = await _createExtractedBundle(root, includeFiles: true);
+      final staged = await RestoreBundleStaging.create(
+        appDataDirectory: root,
+        extractedDirectory: extracted,
+        includeChats: true,
+        includeFiles: true,
+        sourceManifestSha256: await _manifestSha256(extracted),
+      );
+
+      for (final rootName in const [
+        'upload',
+        'images',
+        'avatars',
+        'fonts',
+        'skills',
+        'workspaces',
+        'sessions',
+      ]) {
+        expect(
+          await Directory(
+            p.join(staged.payloadDirectory.path, rootName),
+          ).exists(),
+          isTrue,
+          reason: rootName,
+        );
+      }
+      expect(
+        await Directory(
+          p.join(staged.payloadDirectory.path, 'environment'),
+        ).exists(),
+        isFalse,
+      );
+    });
+
     test('requires every declared empty asset root on revalidation', () async {
       final extracted = await _createExtractedBundle(root, includeFiles: true);
       final staged = await RestoreBundleStaging.create(

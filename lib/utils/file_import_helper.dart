@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:crypto/crypto.dart';
 import 'package:path/path.dart' as p;
 import 'package:image_picker/image_picker.dart';
 import 'upload_dedupe.dart';
@@ -26,28 +27,41 @@ class FileImportHelper {
                 ? p.basename(xFile.path)
                 : DateTime.now().millisecondsSinceEpoch.toString());
 
-      final bytes = await xFile.readAsBytes();
-
-      final existing = await UploadDedupe.findIdentical(
-        targetDir,
-        bytes,
-        originalName,
-      );
-      if (existing != null) return existing;
-
-      final dest = await UploadDedupe.reserveUniqueFile(
-        targetDir,
-        originalName,
-      );
+      final staging = await targetDir.createTemp('.import-');
       try {
-        await dest.writeAsBytes(bytes, flush: true);
-      } catch (_) {
+        // File picking, paste and desktop drop can all carry large binaries.
+        // Keep both copying and duplicate detection bounded in memory.
+        final temp = File(p.join(staging.path, 'file'));
+        final output = await temp.open(mode: FileMode.write);
         try {
+          await for (final chunk in xFile.openRead()) {
+            await output.writeFrom(chunk);
+          }
+        } finally {
+          await output.close();
+        }
+        final digest = await sha256.bind(temp.openRead()).first;
+        final existing = await UploadDedupe.findIdenticalDigest(
+          targetDir,
+          await temp.length(),
+          digest.bytes,
+          originalName,
+        );
+        if (existing != null) return existing;
+        final dest = await UploadDedupe.reserveUniqueFile(
+          targetDir,
+          originalName,
+        );
+        try {
+          await temp.rename(dest.path);
+        } catch (_) {
           await dest.delete();
-        } catch (_) {}
-        rethrow;
+          rethrow;
+        }
+        return dest.path;
+      } finally {
+        await staging.delete(recursive: true);
       }
-      return dest.path;
     } catch (_) {
       return null;
     }
