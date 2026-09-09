@@ -410,6 +410,10 @@ class _DesktopMcpEditDialogState extends State<_DesktopMcpEditDialog>
             children: [
               for (int i = 0; i < _env.length; i++) ...[
                 SectionCard(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 10,
+                  ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -492,6 +496,10 @@ class _DesktopMcpEditDialogState extends State<_DesktopMcpEditDialog>
             children: [
               for (int i = 0; i < _headers.length; i++) ...[
                 SectionCard(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 10,
+                  ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -588,6 +596,7 @@ class _DesktopMcpEditDialogState extends State<_DesktopMcpEditDialog>
       children: [
         for (final tool in tools) ...[
           SectionCard(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [

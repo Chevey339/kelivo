@@ -37,6 +37,7 @@ class SectionCard extends StatelessWidget {
     this.variant = SectionCardVariant.standard,
     this.shadow,
     this.dividers = false,
+    this.crossAxisAlignment = CrossAxisAlignment.center,
   }) : assert(
          children != null || child != null,
          'Provide either children or child',
@@ -49,6 +50,7 @@ class SectionCard extends StatelessWidget {
   final SectionCardVariant variant;
   final List<BoxShadow>? shadow;
   final bool dividers;
+  final CrossAxisAlignment crossAxisAlignment;
 
   @override
   Widget build(BuildContext context) {
@@ -64,6 +66,7 @@ class SectionCard extends StatelessWidget {
             : const EdgeInsets.symmetric(vertical: 4));
     final body = children != null
         ? Column(
+            crossAxisAlignment: crossAxisAlignment,
             children: [
               for (int i = 0; i < children!.length; i++) ...[
                 if (dividers && i > 0)

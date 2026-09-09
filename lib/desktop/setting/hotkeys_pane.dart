@@ -66,6 +66,11 @@ class _DesktopHotkeysPaneState extends State<DesktopHotkeysPane> {
               const SliverToBoxAdapter(child: SizedBox(height: 6)),
               SliverToBoxAdapter(
                 child: SectionCard(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 8,
+                  ),
+                  radius: 16,
                   children: [
                     for (int i = 0; i < hk.items.length; i++) ...[
                       _HotkeyRow(item: hk.items[i]),

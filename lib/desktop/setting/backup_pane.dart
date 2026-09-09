@@ -307,6 +307,9 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
               // Backup management (applies to WebDAV and local import/export)
               SliverToBoxAdapter(
                 child: SectionCard(
+                  padding: const EdgeInsets.all(12),
+                  radius: 18,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     Padding(
                       padding: const EdgeInsets.only(bottom: 6),
@@ -373,6 +376,9 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
               // WebDAV settings card with left label right input, realtime save
               SliverToBoxAdapter(
                 child: SectionCard(
+                  padding: const EdgeInsets.all(12),
+                  radius: 18,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     Padding(
                       padding: const EdgeInsets.only(bottom: 6),
@@ -600,6 +606,9 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
               // S3 settings card with left label right input, realtime save
               SliverToBoxAdapter(
                 child: SectionCard(
+                  padding: const EdgeInsets.all(12),
+                  radius: 18,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     Padding(
                       padding: const EdgeInsets.only(bottom: 6),
@@ -897,6 +906,9 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
   ) {
     return SliverToBoxAdapter(
       child: SectionCard(
+        padding: const EdgeInsets.all(12),
+        radius: 18,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Row(
             children: [
@@ -1147,6 +1159,9 @@ class _LocalSnapshotDesktopSection extends StatelessWidget {
     final vm = context.watch<LocalSnapshotProvider>();
 
     return SectionCard(
+      padding: const EdgeInsets.all(12),
+      radius: 18,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Padding(
           padding: const EdgeInsets.only(bottom: 6),
@@ -1203,6 +1218,9 @@ class _BackupReminderDesktopSection extends StatelessWidget {
     final reminder = context.watch<BackupReminderProvider>();
 
     return SectionCard(
+      padding: const EdgeInsets.all(12),
+      radius: 18,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Padding(
           padding: const EdgeInsets.only(bottom: 6),
@@ -1993,7 +2011,6 @@ class _DeskIosButtonState extends State<_DeskIosButton> {
               vertical: widget.dense ? 8 : 12,
               horizontal: 12,
             ),
-            alignment: Alignment.center,
             decoration: BoxDecoration(
               color: bg,
               borderRadius: BorderRadius.circular(12),
@@ -2001,6 +2018,7 @@ class _DeskIosButtonState extends State<_DeskIosButton> {
             ),
             child: Text(
               widget.label,
+              textAlign: TextAlign.center,
               style: TextStyle(
                 color: textColor,
                 fontWeight: AppFontWeights.semibold,

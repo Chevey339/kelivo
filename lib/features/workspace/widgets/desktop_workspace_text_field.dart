@@ -11,6 +11,7 @@ class DesktopWorkspaceTextField extends StatelessWidget {
     this.label = '',
     this.hintText,
     this.leadingIcon,
+    this.borderRadius = 8,
     this.autofocus = false,
     this.enabled = true,
     this.onChanged,
@@ -21,6 +22,7 @@ class DesktopWorkspaceTextField extends StatelessWidget {
   final String label;
   final String? hintText;
   final IconData? leadingIcon;
+  final double borderRadius;
   final bool autofocus;
   final bool enabled;
   final ValueChanged<String>? onChanged;
@@ -36,7 +38,7 @@ class DesktopWorkspaceTextField extends StatelessWidget {
       color: cs.onSurface.withValues(alpha: enabled ? 0.9 : 0.45),
     );
     final border = OutlineInputBorder(
-      borderRadius: BorderRadius.circular(8),
+      borderRadius: BorderRadius.circular(borderRadius),
       borderSide: BorderSide.none,
     );
     return Column(

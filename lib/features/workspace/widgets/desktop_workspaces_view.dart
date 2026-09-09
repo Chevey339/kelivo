@@ -247,7 +247,7 @@ class _DesktopWorkspacesViewState extends State<DesktopWorkspacesView> {
                       SizedBox(
                         width: 244,
                         child: ColoredBox(
-                          color: cs.surfaceContainerLow.withValues(alpha: 0.5),
+                          color: Colors.transparent,
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.stretch,
                             children: [
@@ -266,6 +266,7 @@ class _DesktopWorkspacesViewState extends State<DesktopWorkspacesView> {
                                   controller: _search,
                                   hintText: l10n.workspaceDesktopSearch,
                                   leadingIcon: Lucide.Search,
+                                  borderRadius: 12,
                                   onChanged: (_) => setState(() {}),
                                 ),
                               ),
@@ -286,9 +287,9 @@ class _DesktopWorkspacesViewState extends State<DesktopWorkspacesView> {
                                     : ListView.builder(
                                         key: WorkspacesPane.listKey,
                                         padding: const EdgeInsets.fromLTRB(
-                                          8,
+                                          12,
                                           0,
-                                          8,
+                                          12,
                                           8,
                                         ),
                                         itemCount: filtered.length,
@@ -307,7 +308,7 @@ class _DesktopWorkspacesViewState extends State<DesktopWorkspacesView> {
                                                     )
                                                   : Colors.transparent,
                                               borderRadius:
-                                                  BorderRadius.circular(8),
+                                                  BorderRadius.circular(14),
                                               clipBehavior: Clip.antiAlias,
                                               child: InkWell(
                                                 splashFactory:

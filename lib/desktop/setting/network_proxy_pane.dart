@@ -116,6 +116,9 @@ class _DesktopNetworkProxyPaneState extends State<DesktopNetworkProxyPane> {
               ),
               const SizedBox(height: 10),
               SectionCard(
+                padding: const EdgeInsets.all(12),
+                radius: 18,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   Padding(
                     padding: const EdgeInsets.only(bottom: 6),
@@ -273,6 +276,9 @@ class _DesktopNetworkProxyPaneState extends State<DesktopNetworkProxyPane> {
 
               const SizedBox(height: 10),
               SectionCard(
+                padding: const EdgeInsets.all(12),
+                radius: 18,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   _ItemRow(
                     label: l10n.networkProxyTestHeader,
@@ -484,7 +490,6 @@ class _DeskIosButtonState extends State<_DeskIosButton> {
               vertical: widget.dense ? 8 : 12,
               horizontal: 12,
             ),
-            alignment: Alignment.center,
             decoration: BoxDecoration(
               color: bg,
               borderRadius: BorderRadius.circular(12),
@@ -492,6 +497,7 @@ class _DeskIosButtonState extends State<_DeskIosButton> {
             ),
             child: Text(
               widget.label,
+              textAlign: TextAlign.center,
               style: TextStyle(
                 color: textColor,
                 fontWeight: AppFontWeights.semibold,
