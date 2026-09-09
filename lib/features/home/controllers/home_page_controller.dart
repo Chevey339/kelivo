@@ -1,5 +1,5 @@
 import 'dart:async';
-import 'package:flutter/foundation.dart' show listEquals;
+import 'package:flutter/foundation.dart' show listEquals, defaultTargetPlatform;
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:flutter/services.dart';
@@ -25,6 +25,7 @@ import '../../../core/services/chat/chat_service.dart';
 import '../../../core/services/tts/tts_text_selection.dart';
 import '../../../core/services/haptics.dart';
 import '../../../core/services/notification_service.dart';
+import '../../../core/services/mobile_background.dart';
 import '../../../core/services/screen_wakelock.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../shared/widgets/snackbar.dart';
@@ -95,7 +96,6 @@ class HomePageController extends ChangeNotifier {
     required ChatInputBarController mediaController,
     required ScrollController scrollController,
     bool? isAndroidOverride,
-    ChatCompletionNotificationSender? chatCompletionNotificationSender,
   }) : this._(
          context,
          vsync,
@@ -106,9 +106,6 @@ class HomePageController extends ChangeNotifier {
          mediaController,
          scrollController,
          isAndroid: isAndroidOverride ?? PlatformUtils.isAndroid,
-         chatCompletionNotificationSender:
-             chatCompletionNotificationSender ??
-             NotificationService.showChatCompleted,
        );
 
   HomePageController._(
@@ -121,7 +118,6 @@ class HomePageController extends ChangeNotifier {
     this._mediaController,
     this._scrollController, {
     required this._isAndroid,
-    required this._chatCompletionNotificationSender,
   }) {
     _initialize();
   }
@@ -138,7 +134,6 @@ class HomePageController extends ChangeNotifier {
   final TextEditingController _inputController;
   final ChatInputBarController _mediaController;
   final bool _isAndroid;
-  final ChatCompletionNotificationSender _chatCompletionNotificationSender;
   ScrollController _scrollController;
 
   // ============================================================================
@@ -228,7 +223,6 @@ class HomePageController extends ChangeNotifier {
 
   // App and route visibility determine whether a completion notification
   // would add value or merely duplicate content already on screen.
-  bool _appInForeground = true;
   bool _homeRouteVisible = true;
   bool _chatInitialized = false;
   bool _openingNotificationConversation = false;
@@ -686,7 +680,9 @@ class HomePageController extends ChangeNotifier {
   }
 
   void _setupNotificationActions() {
-    if (!_isAndroid) return;
+    if (!_isAndroid && defaultTargetPlatform != TargetPlatform.iOS) return;
+    MobileBackgroundCoordinator.instance.visibleConversation =
+        _visibleBackgroundConversation;
     _notificationTapSub = NotificationService.conversationTaps.listen(
       _handleNotificationConversationTap,
     );
@@ -697,8 +693,21 @@ class HomePageController extends ChangeNotifier {
     }
   }
 
+  String? _visibleBackgroundConversation() =>
+      _context.mounted && _homeRouteVisible ? currentConversation?.id : null;
+
   void _handleNotificationConversationTap(String conversationId) {
     _pendingNotificationConversationId = conversationId;
+    if (_context.mounted) {
+      final homeRoute = ModalRoute.of(_context);
+      if (homeRoute != null && !homeRoute.isCurrent) {
+        Navigator.of(_context).popUntil(
+          (route) =>
+              route == homeRoute ||
+              route.popDisposition == RoutePopDisposition.doNotPop,
+        );
+      }
+    }
     unawaited(_openPendingNotificationConversation());
   }
 
@@ -1767,54 +1776,17 @@ class HomePageController extends ChangeNotifier {
     }
   }
 
-  void _handleAssistantMessageFinished(ChatMessage message) {
+  Future<void> _handleAssistantMessageFinished(ChatMessage message) async {
     if (!_context.mounted || message.role != 'assistant') return;
     final settings = _context.read<SettingsProvider>();
-    final shouldNotify = NotificationService.shouldShowChatCompleted(
-      isAndroid: _isAndroid,
-      notifyModeEnabled:
-          settings.androidBackgroundChatMode ==
-          AndroidBackgroundChatMode.onNotify,
-      appInForeground: _appInForeground,
-      homeRouteVisible: _homeRouteVisible,
-      isCurrentConversation: currentConversation?.id == message.conversationId,
-    );
-    if (shouldNotify) {
-      final l10n = AppLocalizations.of(_context)!;
-      unawaited(
-        _showChatCompletedNotification(
-          conversationId: message.conversationId,
-          title: l10n.notificationChatCompletedTitle,
-          body: l10n.notificationChatCompletedBody,
-        ),
-      );
-    }
-
     if (settings.ttsAutoPlayAssistantReplies) {
-      unawaited(_speakAssistantMessage(message, autoPlay: true));
-    }
-  }
-
-  Future<void> _showChatCompletedNotification({
-    required String conversationId,
-    required String title,
-    required String body,
-  }) async {
-    try {
-      await _chatCompletionNotificationSender(
-        conversationId: conversationId,
-        title: title,
-        body: body,
-      );
-    } catch (error) {
-      debugPrint('Failed to show chat completion notification: $error');
+      await _speakAssistantMessage(message, autoPlay: true);
     }
   }
 
   @visibleForTesting
-  void debugHandleAssistantMessageFinished(ChatMessage message) {
-    _handleAssistantMessageFinished(message);
-  }
+  Future<void> debugHandleAssistantMessageFinished(ChatMessage message) =>
+      _handleAssistantMessageFinished(message);
 
   Future<void> speakMessage(ChatMessage message) async {
     await _speakAssistantMessage(message, autoPlay: false);
@@ -1849,7 +1821,9 @@ class HomePageController extends ChangeNotifier {
       mode: sp.ttsTextSelectionMode,
     );
     if (text.trim().isEmpty) return;
-    await tts.speak(text);
+    // Automatic narration acknowledges preparation, so ChatActions can release
+    // generation resources while the independent speech session keeps running.
+    await tts.speak(text, waitForCompletion: !autoPlay);
   }
 
   void shareMessage(int messageIndex, List<ChatMessage> messageList) {
@@ -2821,7 +2795,6 @@ class HomePageController extends ChangeNotifier {
   // ============================================================================
 
   void onAppLifecycleStateChanged(AppLifecycleState state) {
-    _appInForeground = (state == AppLifecycleState.resumed);
     if (state == AppLifecycleState.resumed) {
       ScreenWakelock.reassert();
     }
@@ -2955,6 +2928,10 @@ class HomePageController extends ChangeNotifier {
 
   @override
   void dispose() {
+    final background = MobileBackgroundCoordinator.instance;
+    if (background.visibleConversation == _visibleBackgroundConversation) {
+      background.visibleConversation = null;
+    }
     _viewModel.resetFileProcessingIndicator();
     _viewModel.onBackgroundTaskError = null;
     _ocrService.onError = null;

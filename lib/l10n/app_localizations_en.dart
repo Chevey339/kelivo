@@ -1059,27 +1059,10 @@ class AppLocalizationsEn extends AppLocalizations {
       'Background Generation (iOS)';
 
   @override
-  String get iosBackgroundSettingsPageTitle => 'iOS Background Generation';
-
-  @override
   String get iosBackgroundStatusOn => 'On';
 
   @override
   String get iosBackgroundStatusOff => 'Off';
-
-  @override
-  String get iosBackgroundGenerationEnableTitle => 'Background Generation';
-
-  @override
-  String get iosBackgroundGenerationEnableSubtitle =>
-      'Use iOS background time to keep the current reply running after the app leaves the foreground.';
-
-  @override
-  String get iosBackgroundTaskRefreshTitle => 'Background Task Recovery';
-
-  @override
-  String get iosBackgroundTaskRefreshSubtitle =>
-      'Ask iOS for refresh and processing opportunities when system conditions allow.';
 
   @override
   String get iosLiveActivityTitle => 'Live Activity';
@@ -1089,109 +1072,11 @@ class AppLocalizationsEn extends AppLocalizations {
       'Show background replies on the Lock Screen and Dynamic Island when supported.';
 
   @override
-  String get iosBackgroundNotificationsTitle => 'Task Notifications';
-
-  @override
-  String get iosBackgroundNotificationsSubtitle =>
-      'Send a local notification when a background reply completes or is interrupted.';
-
-  @override
-  String get iosBackgroundLimitNoticeTitle => 'iOS may still suspend work';
-
-  @override
-  String get iosBackgroundLimitNoticeBody =>
-      'These options use Apple-supported background time, BackgroundTasks, notifications, and Live Activities. They improve continuity but cannot force iOS to keep Kelivo running forever.';
-
-  @override
-  String get iosBackgroundUnsupportedLiveActivity =>
-      'Requires iOS 16.1 or later and Live Activities enabled in Settings.';
-
-  @override
-  String get iosBackgroundNativeStatusTitle => 'System status';
-
-  @override
-  String get iosBackgroundNativeStatusUnavailable =>
-      'Unavailable until running on iOS';
-
-  @override
-  String get iosBackgroundLiveActivityAvailable => 'Live Activities available';
-
-  @override
-  String get iosBackgroundLiveActivityUnavailable =>
-      'Live Activities unavailable';
-
-  @override
-  String get iosBackgroundNotificationsAuthorized => 'Notifications allowed';
-
-  @override
-  String get iosBackgroundNotificationsNotAuthorized =>
-      'Notifications not allowed';
-
-  @override
-  String get iosBackgroundGenerationActiveTitle => 'Kelivo is generating';
-
-  @override
-  String get iosBackgroundGenerationActiveDetail =>
-      'The assistant is replying in the background';
-
-  @override
-  String get iosBackgroundGenerationStreamingDetail =>
-      'Receiving assistant response';
-
-  @override
-  String iosBackgroundGenerationTokenCount(int count) {
-    return '$count tokens';
-  }
-
-  @override
-  String get iosBackgroundGenerationCompleteTitle => 'Generation complete';
-
-  @override
-  String get iosBackgroundGenerationCompleteDetail =>
-      'Assistant reply is ready';
-
-  @override
-  String get iosBackgroundGenerationInterruptedTitle =>
-      'Generation interrupted';
-
-  @override
-  String get iosBackgroundGenerationInterruptedDetail =>
-      'The background reply stopped before completion';
-
-  @override
-  String get iosBackgroundGenerationCancelledDetail => 'Generation stopped';
-
-  @override
-  String get androidBackgroundStatusOn => 'On';
-
-  @override
-  String get androidBackgroundStatusOff => 'Off';
-
-  @override
-  String get androidBackgroundStatusOther => 'On and notify';
-
-  @override
-  String get androidBackgroundOptionOn => 'On';
-
-  @override
-  String get androidBackgroundOptionOnNotify => 'On and notify when done';
-
-  @override
-  String get androidBackgroundOptionOff => 'Off';
-
-  @override
   String get notificationChatCompletedTitle => 'Generation complete';
 
   @override
   String get notificationChatCompletedBody =>
       'Assistant reply has been generated';
-
-  @override
-  String get androidBackgroundNotificationTitle => 'Kelivo is running';
-
-  @override
-  String get androidBackgroundNotificationText =>
-      'Keeping chat generation alive in background';
 
   @override
   String get assistantEditEmojiDialogTitle => 'Choose Emoji';
@@ -10996,4 +10881,321 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get assistantEditGradientNextFrame => 'Another frame';
+
+  @override
+  String get backgroundSettingsTitle => 'Background tasks';
+
+  @override
+  String get backgroundTaskTitle => 'Kelivo task';
+
+  @override
+  String get backgroundCompleted => 'Generation complete';
+
+  @override
+  String get backgroundFailed =>
+      'Generation failed. Open the chat for details.';
+
+  @override
+  String get backgroundCancelled => 'Generation cancelled';
+
+  @override
+  String get backgroundInterrupted =>
+      'Background generation was interrupted. Open the chat to continue.';
+
+  @override
+  String get backgroundRequesting => 'Connecting';
+
+  @override
+  String get backgroundGenerating => 'Generating reply';
+
+  @override
+  String get backgroundThinking => 'Thinking';
+
+  @override
+  String get backgroundToolRunning => 'Running tool';
+
+  @override
+  String get backgroundRetrying => 'Waiting to retry';
+
+  @override
+  String get backgroundWorking => 'Working';
+
+  @override
+  String get backgroundTasks => 'Tasks';
+
+  @override
+  String get backgroundStopTasks => 'Stop tasks';
+
+  @override
+  String get backgroundOpenChat => 'Open chat';
+
+  @override
+  String get backgroundAndroidEnabled => 'Background generation';
+
+  @override
+  String get backgroundAndroidEnabledDetail =>
+      'Keep current tasks running when locked, in the background, or removed from recent apps. A system notification is required while tasks run.';
+
+  @override
+  String get backgroundIosEnabled => 'Enhanced background execution';
+
+  @override
+  String get backgroundIosEnabledDetail =>
+      'Request time to finish current tasks. Enable location or silent audio separately for additional background support.';
+
+  @override
+  String get backgroundNotifications => 'Task notifications';
+
+  @override
+  String get backgroundNotificationsDetail =>
+      'Notify when a task completes or fails outside the chat you are viewing. Does not control Android’s required ongoing notification.';
+
+  @override
+  String get backgroundPrivacy => 'Task status privacy';
+
+  @override
+  String get backgroundPrivacyDetail =>
+      'Hide conversation titles and tool details in notifications and live status. Only generic status, task count and elapsed time are shown.';
+
+  @override
+  String get backgroundLiveActivities => 'Live Activities';
+
+  @override
+  String get backgroundLiveActivitiesDetail =>
+      'Show current tasks on the Lock Screen and Dynamic Island. Availability and visibility depend on the system.';
+
+  @override
+  String get backgroundOverlay => 'Floating task status';
+
+  @override
+  String get backgroundOverlayDetail =>
+      'Show a draggable task capsule over other apps. Tap it to open the chat; closing it only hides the capsule.';
+
+  @override
+  String get backgroundLiveUpdates => 'Live Updates';
+
+  @override
+  String get backgroundLiveUpdatesDetail =>
+      'Use Android 16 Live Updates on supported devices. A promoted notification takes priority over the floating capsule.';
+
+  @override
+  String get backgroundLocation => 'Location-assisted execution';
+
+  @override
+  String get backgroundLocationDetail =>
+      'Use coarse location updates during background tasks. Coordinates are not stored or sent to AI services. Requires enhanced background execution and location permission.';
+
+  @override
+  String get backgroundSilentAudio => 'Silent audio keep-alive';
+
+  @override
+  String get backgroundSilentAudioDetail =>
+      'Play silent audio while background tasks run. Yields to recording and speech playback. Requires enhanced background execution; no microphone permission is needed.';
+
+  @override
+  String get backgroundSpeech => 'Background read-aloud';
+
+  @override
+  String get backgroundSpeechDetail =>
+      'Continue system and network read-aloud when locked or in the background. When disabled, moving to the background pauses speech.';
+
+  @override
+  String get backgroundFinishVisibility => 'Completed status duration';
+
+  @override
+  String get backgroundFinishImmediately => 'Immediately dismiss';
+
+  @override
+  String get backgroundFinishOneMinute => '1 minute';
+
+  @override
+  String get backgroundFinishFiveMinutes => '5 minutes';
+
+  @override
+  String get backgroundFinishUntilForeground => 'Until returning to the app';
+
+  @override
+  String get backgroundFinishVisibilityDetail =>
+      'Applies to the Android capsule and iOS Lock Screen completion card. Returning to the app clears completed status; the maximum is 15 minutes. Cancellation dismisses immediately.';
+
+  @override
+  String get backgroundOverlayIcon => 'Floating icon';
+
+  @override
+  String get backgroundIconDefault => 'Kelivo icon';
+
+  @override
+  String get backgroundIconImage => 'Choose image';
+
+  @override
+  String get backgroundIconEmoji => 'Choose Emoji';
+
+  @override
+  String get backgroundPermissionsTitle => 'Permissions and system settings';
+
+  @override
+  String get backgroundNotificationsPermission => 'Notification permission';
+
+  @override
+  String get backgroundBatteryOptimization => 'Battery optimization';
+
+  @override
+  String get backgroundBatteryOptimizationDetail =>
+      'Allow unrestricted battery usage for more reliable background work.';
+
+  @override
+  String get backgroundAutostart => 'Autostart and background usage';
+
+  @override
+  String get backgroundAutostartDetail =>
+      'Check your device’s autostart and background restrictions manually. Android does not provide a reliable permission query for these vendor settings.';
+
+  @override
+  String get backgroundLocationPermission => 'Location permission';
+
+  @override
+  String get backgroundLocationAlways => 'Allow location in the background';
+
+  @override
+  String get backgroundLocationAlwaysDetail =>
+      'You can grant Always access for background location. Permission is requested only when you choose this action.';
+
+  @override
+  String get backgroundSystemSettings => 'App system settings';
+
+  @override
+  String get backgroundPermissionGranted => 'Allowed';
+
+  @override
+  String get backgroundPermissionDenied => 'Not allowed';
+
+  @override
+  String get backgroundPermissionLimited => 'While using the app';
+
+  @override
+  String get backgroundPermissionUnknown => 'Check manually';
+
+  @override
+  String get backgroundPermissionNotDetermined => 'Not requested';
+
+  @override
+  String get backgroundRuntimeTitle => 'Current status';
+
+  @override
+  String get backgroundRuntimeActive => 'Running';
+
+  @override
+  String get backgroundRuntimeIdle => 'Inactive';
+
+  @override
+  String get backgroundLocationActive => 'Background location';
+
+  @override
+  String get backgroundAudioActive => 'Silent audio';
+
+  @override
+  String get backgroundActivityActive => 'Live Activity';
+
+  @override
+  String get backgroundOverlayActive => 'Floating window';
+
+  @override
+  String get backgroundLastError => 'Last interruption or error';
+
+  @override
+  String get backgroundNoError => 'None recorded';
+
+  @override
+  String get backgroundUnsupported =>
+      'Unavailable on this device or disabled in system settings';
+
+  @override
+  String get backgroundIosLimit =>
+      'iOS controls background execution. Live Activities alone do not keep the app running. Force-quitting can stop generation and delay removal of live status until the app opens again.';
+
+  @override
+  String get backgroundAndroidLimit =>
+      'Check notification, battery and vendor background settings if tasks stop. Force stop and system process termination can still interrupt generation.';
+
+  @override
+  String get backgroundStale =>
+      'Status has not updated. Open the app to check.';
+
+  @override
+  String get backgroundIconError =>
+      'Unable to import this image. Please choose another image.';
+
+  @override
+  String get backgroundNotificationChannels => 'Notification channels';
+
+  @override
+  String get backgroundCompletionChannel => 'Completion notification channel';
+
+  @override
+  String get backgroundOngoingChannel => 'Running task notification channel';
+
+  @override
+  String get backgroundOverlayAppearance => 'Floating window appearance';
+
+  @override
+  String get backgroundOverlayAppearanceDetail =>
+      'Size, artwork, progress ring and visible content';
+
+  @override
+  String get backgroundOverlayPreviewHint =>
+      'Drag to move · Tap to open chat · Hold to dismiss';
+
+  @override
+  String get backgroundOverlayCard => 'Card';
+
+  @override
+  String get backgroundOverlayCircle => 'Circular icon';
+
+  @override
+  String get backgroundOverlaySize => 'Size and shape';
+
+  @override
+  String get backgroundOverlayWidth => 'Width';
+
+  @override
+  String get backgroundOverlayHeight => 'Height';
+
+  @override
+  String get backgroundOverlayCornerRadius => 'Corner radius';
+
+  @override
+  String get backgroundOverlayIconSize => 'Icon size';
+
+  @override
+  String get backgroundOverlayProgressSize => 'Progress ring diameter';
+
+  @override
+  String get backgroundOverlayProgressStroke => 'Progress ring thickness';
+
+  @override
+  String get backgroundOverlayContent => 'Visible content';
+
+  @override
+  String get backgroundOverlayShowProgress => 'Show progress ring';
+
+  @override
+  String get backgroundOverlayShowTitle => 'Show title';
+
+  @override
+  String get backgroundOverlayShowSubtitle => 'Show subtitle';
+
+  @override
+  String get backgroundOverlayShowTime => 'Show elapsed time';
+
+  @override
+  String get backgroundOverlayShowClose => 'Show close button';
+
+  @override
+  String get backgroundOverlayShowBackground => 'Show background';
+
+  @override
+  String get backgroundOverlayShowBorder => 'Show border';
+
+  @override
+  String get backgroundOverlayReset => 'Restore default appearance';
 }

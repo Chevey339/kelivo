@@ -278,6 +278,64 @@ void main() {
 
   group('HomePageController conversation switch pipeline', () {
     testWidgets(
+      'notification tap closes settings and opens the saved conversation',
+      (tester) async {
+        // FakeAsync cannot advance to a frame while idle tasks continuously
+        // reschedule zero-delay timers during the route-pop animation.
+        final previousStrategy = tester.binding.schedulingStrategy;
+        tester.binding.schedulingStrategy =
+            ({required priority, required scheduler}) => true;
+        addTearDown(() => tester.binding.schedulingStrategy = previousStrategy);
+        await runAsMobile(() async {
+          final service = _ControlledChatService({
+            'conv-a': [_message('conv-a', 0)],
+            'conv-b': [_message('conv-b', 0)],
+          });
+          final controller = await pumpHarness(tester, service);
+          await switchAndSettle(tester, controller, service, 'conv-a');
+          controller.debugSetChatInitialized();
+          final navigator = tester.state<NavigatorState>(
+            find.byType(Navigator),
+          );
+          unawaited(
+            navigator
+                .push<void>(
+                  MaterialPageRoute(
+                    builder: (_) => const Scaffold(body: Text('Settings page')),
+                  ),
+                )
+                .then((_) => controller.onDidPopNext()),
+          );
+          controller.onDidPushNext();
+          await tester.pumpAndSettle();
+          expect(find.text('Settings page'), findsOneWidget);
+          controller.debugHandleNotificationConversationTap('conv-b');
+          for (var i = 0; i < 40 && service.pageRequests.length < 2; i++) {
+            await tester.pump(const Duration(milliseconds: 10));
+          }
+          expect(service.pageRequests, hasLength(2));
+          service.completePage(
+            service.pageRequests.last,
+            service.messagesOf('conv-b'),
+            startIndex: 0,
+          );
+          for (
+            var i = 0;
+            i < 40 &&
+                (controller.currentConversation?.id != 'conv-b' ||
+                    controller.convoFadeController.value != 1.0 ||
+                    find.text('Settings page').evaluate().isNotEmpty);
+            i++
+          ) {
+            await tester.pump(const Duration(milliseconds: 100));
+          }
+          expect(find.text('Settings page'), findsNothing);
+          expect(controller.currentConversation?.id, 'conv-b');
+        });
+      },
+    );
+
+    testWidgets(
       'notification target waits until the Home route is visible again',
       (tester) async {
         await runAsMobile(() async {

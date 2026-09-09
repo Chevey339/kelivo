@@ -2,6 +2,7 @@ package com.psyche.kelivo.workspace
 
 import android.app.Activity
 import android.content.Intent
+import android.content.Context
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
@@ -14,7 +15,17 @@ import io.flutter.plugin.common.MethodChannel
 import java.io.File
 import java.util.concurrent.Executors
 
-class WorkspacePlugin(private val activity: Activity) {
+class WorkspacePlugin(private val context: Context) {
+    private var attachedActivity: Activity? = null
+    fun attachActivity(activity: Activity) {
+        attachedActivity = activity
+        directories.attachActivity(activity)
+    }
+    fun detachActivity(activity: Activity) {
+        if (attachedActivity !== activity) return
+        attachedActivity = null
+        directories.detachActivity(activity)
+    }
     companion object {
         const val CHANNEL_NAME = "app.workspace"
         const val EVENT_CHANNEL_NAME = "app.workspace/events"
@@ -35,7 +46,7 @@ class WorkspacePlugin(private val activity: Activity) {
     private val events = WorkspaceEvents()
     private val execRunner = ExecRunner(events)
     private val ptySessions = PtySessions(events)
-    private val directories = WorkspaceDirectoryAccess(activity)
+    private val directories = WorkspaceDirectoryAccess(context)
     private var externalMounts = emptyList<BindMount>()
     private var environmentBusy = false
 
@@ -137,7 +148,7 @@ class WorkspacePlugin(private val activity: Activity) {
         directories.onRequestPermissionsResult(requestCode)
 
     private fun probe(): Map<String, Any?> {
-        val nativeLibDir = File(activity.applicationInfo.nativeLibraryDir)
+        val nativeLibDir = File(context.applicationInfo.nativeLibraryDir)
         val proot = File(nativeLibDir, ProotCommand.EXEC_LIB)
         val loader = File(nativeLibDir, ProotCommand.LOADER_LIB)
         if (proot.isFile) proot.setExecutable(true, false)
@@ -165,7 +176,7 @@ class WorkspacePlugin(private val activity: Activity) {
         execRunner.start(
             ExecRequest(
                 runId = runId,
-                nativeLibDir = File(activity.applicationInfo.nativeLibraryDir),
+                nativeLibDir = File(context.applicationInfo.nativeLibraryDir),
                 rootfsDir = File(requiredString(args, "rootfsDir")),
                 tmpDir = File(requiredString(args, "tmpDir")),
                 binds = commandBinds(args),
@@ -182,7 +193,7 @@ class WorkspacePlugin(private val activity: Activity) {
     private fun ptyOpen(args: Map<*, *>): Int {
         return ptySessions.open(
             sessionId = requiredString(args, "sessionId"),
-            nativeLibDir = File(activity.applicationInfo.nativeLibraryDir),
+            nativeLibDir = File(context.applicationInfo.nativeLibraryDir),
             rootfsDir = File(requiredString(args, "rootfsDir")),
             tmpDir = File(requiredString(args, "tmpDir")),
             binds = commandBinds(args),
@@ -265,7 +276,7 @@ class WorkspacePlugin(private val activity: Activity) {
     }
 
     private fun keepScreenOn(enabled: Boolean) {
-        val window = activity.window ?: return
+        val window = attachedActivity?.window ?: return
         if (enabled) {
             window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         } else {

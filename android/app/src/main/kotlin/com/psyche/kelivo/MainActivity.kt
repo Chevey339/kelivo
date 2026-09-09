@@ -17,12 +17,32 @@ import io.flutter.embedding.android.FlutterSurfaceView
 import io.flutter.embedding.engine.FlutterEngine
 import com.psyche.kelivo.workspace.WorkspacePlugin
 import io.flutter.plugin.common.MethodChannel
+import com.dexterous.flutterlocalnotifications.FlutterLocalNotificationsPlugin
 import java.io.File
 import java.io.FileInputStream
 import java.io.OutputStream
 import java.util.concurrent.Executors
 
 class MainActivity : FlutterActivity() {
+    private val kelivo get() = application as KelivoApplication
+    private var reusedEngine = false
+
+    override fun provideFlutterEngine(context: android.content.Context): FlutterEngine {
+        reusedEngine = kelivo.hasEngine
+        return kelivo.engine
+    }
+    override fun shouldDestroyEngineWithHost(): Boolean = false
+
+    override fun onStart() {
+        super.onStart()
+        kelivo.backgroundRuntime.setForeground(true)
+    }
+
+    override fun onStop() {
+        kelivo.backgroundRuntime.setForeground(false)
+        super.onStop()
+    }
+
     private companion object {
         const val CREATE_DOCUMENT_REQUEST_CODE = 4107
         const val TAG = "MainActivity"
@@ -59,6 +79,11 @@ class MainActivity : FlutterActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        forwardCachedProcessTextLaunch(reusedEngine, savedInstanceState, intent, processTextChannel)
+        (kelivo.engine.plugins.get(FlutterLocalNotificationsPlugin::class.java) as? FlutterLocalNotificationsPlugin)?.let {
+            forwardCachedNotificationLaunch(reusedEngine, savedInstanceState, intent, it)
+        }
+        kelivo.backgroundRuntime.receiveConversation(intent)
         receivedShare = savedInstanceState?.getBoolean("kelivo.receivedShare") == true
         if (!receivedShare) receivedShare = incomingShareHandler?.receive(intent) == true
     }
@@ -95,17 +120,14 @@ class MainActivity : FlutterActivity() {
          super.configureFlutterEngine(flutterEngine)
         incomingShareHandler = IncomingShareHandler(this, flutterEngine.dartExecutor.binaryMessenger)
          McpOAuthHandler.configure(this, flutterEngine.dartExecutor.binaryMessenger)
-         deviceLocalToolsHandler = DeviceLocalToolsHandler(this).also {
-             it.configure(flutterEngine.dartExecutor.binaryMessenger)
-         }
-         workspacePlugin = WorkspacePlugin(this).also {
-             it.configure(flutterEngine.dartExecutor.binaryMessenger)
-         }
+         kelivo.backgroundRuntime.attachActivity(this)
+         deviceLocalToolsHandler = kelivo.deviceTools.also { it.attachActivity(this) }
+         workspacePlugin = kelivo.workspace.also { it.attachActivity(this) }
         processTextChannel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, processTextChannelName)
         processTextChannel?.setMethodCallHandler { call, result ->
             when (call.method) {
                 "getInitialText" -> {
-                    val text = pendingProcessText ?: extractProcessText(intent)
+                    val text = pendingProcessText ?: takeProcessText(intent)
                     pendingProcessText = null
                     result.success(text)
                 }
@@ -137,7 +159,6 @@ class MainActivity : FlutterActivity() {
                 else -> result.notImplemented()
             }
         }
-        pendingProcessText = extractProcessText(intent)
     }
 
     private fun requestNativeHighRefreshRate(): Boolean {
@@ -184,9 +205,10 @@ class MainActivity : FlutterActivity() {
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
+        kelivo.backgroundRuntime.receiveConversation(intent)
         setIntent(intent)
         receivedShare = incomingShareHandler?.receive(intent) == true
-        val text = extractProcessText(intent) ?: return
+        val text = takeProcessText(intent) ?: return
         val ch = processTextChannel
         if (ch != null) {
             ch.invokeMethod("onProcessText", text)
@@ -196,7 +218,17 @@ class MainActivity : FlutterActivity() {
     }
 
     override fun onDestroy() {
-        deviceLocalToolsHandler?.dispose()
+        deviceLocalToolsHandler?.detachActivity(this)
+        kelivo.backgroundRuntime.detachActivity(this)
+        McpOAuthHandler.detachActivity(this)
+        processTextChannel?.setMethodCallHandler(null)
+        fileSaveChannel?.setMethodCallHandler(null)
+        deviceStorageChannel?.setMethodCallHandler(null)
+        displayModeChannel?.setMethodCallHandler(null)
+        pendingSaveResult?.error("cancelled", "The file picker was closed.", null)
+        pendingSaveResult = null
+        pendingSaveSourcePath = null
+        flutterSurfaceView = null
         val stream = pendingWritableStream
         val uri = pendingWritableUri
         if (stream != null && uri != null) {
@@ -211,7 +243,7 @@ class MainActivity : FlutterActivity() {
         }
         writableFileExecutor.shutdown()
         incomingShareHandler?.dispose()
-        workspacePlugin?.dispose()
+        workspacePlugin?.detachActivity(this)
         super.onDestroy()
     }
  
@@ -221,6 +253,7 @@ class MainActivity : FlutterActivity() {
          grantResults: IntArray,
      ) {
          if (workspacePlugin?.onRequestPermissionsResult(requestCode) == true) return
+        if (kelivo.backgroundRuntime.permissionResult(requestCode)) return
          if (deviceLocalToolsHandler?.onRequestPermissionsResult(requestCode, grantResults) == true) {
              return
          }
@@ -236,12 +269,6 @@ class MainActivity : FlutterActivity() {
 
         val destUri = if (resultCode == Activity.RESULT_OK) data?.data else null
         handleSaveDestination(destUri)
-    }
-
-    private fun extractProcessText(intent: Intent?): String? {
-        if (intent?.action != Intent.ACTION_PROCESS_TEXT) return null
-        val text = intent.getCharSequenceExtra(Intent.EXTRA_PROCESS_TEXT)?.toString()
-        return text?.trim()?.takeIf { it.isNotEmpty() }
     }
 
     private fun handleSaveFileFromPath(arguments: Any?, result: MethodChannel.Result) {
@@ -473,5 +500,42 @@ class MainActivity : FlutterActivity() {
                 }
             }
         }.start()
+    }
+}
+
+/** Cold launches are read by HomePage; a retained HomePage instead needs an
+ * event when Android creates its replacement Activity. Consume the extra so
+ * restoring that Activity or querying initial text cannot deliver it twice. */
+internal fun forwardCachedProcessTextLaunch(
+    reusedEngine: Boolean,
+    savedState: Bundle?,
+    intent: Intent,
+    channel: MethodChannel?,
+) {
+    if (reusedEngine && savedState == null && channel != null &&
+        intent.flags and Intent.FLAG_ACTIVITY_LAUNCHED_FROM_HISTORY == 0) {
+        takeProcessText(intent)?.let { channel.invokeMethod("onProcessText", it) }
+    }
+}
+
+internal fun takeProcessText(intent: Intent?): String? {
+    if (intent?.action != Intent.ACTION_PROCESS_TEXT) return null
+    val text = intent.getCharSequenceExtra(Intent.EXTRA_PROCESS_TEXT)?.toString()
+    intent.removeExtra(Intent.EXTRA_PROCESS_TEXT)
+    return text?.trim()?.takeIf { it.isNotEmpty() }
+}
+
+/** The notifications plugin queries cold launches once from Dart. A new
+ * Activity on an existing engine needs its new notification Intent forwarded,
+ * because onAttachedToActivity does not deliver a normal notification tap. */
+internal fun forwardCachedNotificationLaunch(
+    reusedEngine: Boolean,
+    savedState: Bundle?,
+    intent: Intent,
+    plugin: FlutterLocalNotificationsPlugin,
+) {
+    if (reusedEngine && savedState == null &&
+        intent.flags and Intent.FLAG_ACTIVITY_LAUNCHED_FROM_HISTORY == 0) {
+        plugin.onNewIntent(intent)
     }
 }

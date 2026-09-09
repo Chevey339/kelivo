@@ -1026,26 +1026,10 @@ class AppLocalizationsZh extends AppLocalizations {
   String get displaySettingsPageIosBackgroundChatTitle => 'iOS 后台生成';
 
   @override
-  String get iosBackgroundSettingsPageTitle => 'iOS 后台生成';
-
-  @override
   String get iosBackgroundStatusOn => '开启';
 
   @override
   String get iosBackgroundStatusOff => '关闭';
-
-  @override
-  String get iosBackgroundGenerationEnableTitle => '后台生成';
-
-  @override
-  String get iosBackgroundGenerationEnableSubtitle =>
-      'App 离开前台后，使用 iOS 分配的后台时间继续当前回复。';
-
-  @override
-  String get iosBackgroundTaskRefreshTitle => '后台任务恢复';
-
-  @override
-  String get iosBackgroundTaskRefreshSubtitle => '在系统条件允许时，向 iOS 请求刷新和处理机会。';
 
   @override
   String get iosLiveActivityTitle => '实时活动';
@@ -1054,98 +1038,10 @@ class AppLocalizationsZh extends AppLocalizations {
   String get iosLiveActivitySubtitle => '支持时在锁屏和灵动岛显示后台回复状态。';
 
   @override
-  String get iosBackgroundNotificationsTitle => '任务通知';
-
-  @override
-  String get iosBackgroundNotificationsSubtitle => '后台回复完成或中断时发送本地通知。';
-
-  @override
-  String get iosBackgroundLimitNoticeTitle => 'iOS 仍可能暂停任务';
-
-  @override
-  String get iosBackgroundLimitNoticeBody =>
-      '这些选项使用 Apple 支持的后台时间、BackgroundTasks、通知和实时活动。它们能提升连续性，但不能强制 iOS 永久保持 Kelivo 运行。';
-
-  @override
-  String get iosBackgroundUnsupportedLiveActivity =>
-      '需要 iOS 16.1 或更高版本，并在系统设置中允许实时活动。';
-
-  @override
-  String get iosBackgroundNativeStatusTitle => '系统状态';
-
-  @override
-  String get iosBackgroundNativeStatusUnavailable => '需要在 iOS 上运行后查看';
-
-  @override
-  String get iosBackgroundLiveActivityAvailable => '实时活动可用';
-
-  @override
-  String get iosBackgroundLiveActivityUnavailable => '实时活动不可用';
-
-  @override
-  String get iosBackgroundNotificationsAuthorized => '通知已允许';
-
-  @override
-  String get iosBackgroundNotificationsNotAuthorized => '通知未允许';
-
-  @override
-  String get iosBackgroundGenerationActiveTitle => 'Kelivo 正在生成';
-
-  @override
-  String get iosBackgroundGenerationActiveDetail => '助手正在后台回复';
-
-  @override
-  String get iosBackgroundGenerationStreamingDetail => '正在接收助手回复';
-
-  @override
-  String iosBackgroundGenerationTokenCount(int count) {
-    return '$count tokens';
-  }
-
-  @override
-  String get iosBackgroundGenerationCompleteTitle => '生成完成';
-
-  @override
-  String get iosBackgroundGenerationCompleteDetail => '助手回复已准备好';
-
-  @override
-  String get iosBackgroundGenerationInterruptedTitle => '生成已中断';
-
-  @override
-  String get iosBackgroundGenerationInterruptedDetail => '后台回复在完成前停止';
-
-  @override
-  String get iosBackgroundGenerationCancelledDetail => '生成已停止';
-
-  @override
-  String get androidBackgroundStatusOn => '开启';
-
-  @override
-  String get androidBackgroundStatusOff => '关闭';
-
-  @override
-  String get androidBackgroundStatusOther => '开启并通知';
-
-  @override
-  String get androidBackgroundOptionOn => '开启';
-
-  @override
-  String get androidBackgroundOptionOnNotify => '开启并在生成完时发送消息';
-
-  @override
-  String get androidBackgroundOptionOff => '关闭';
-
-  @override
   String get notificationChatCompletedTitle => '生成完成';
 
   @override
   String get notificationChatCompletedBody => '助手回复已生成';
-
-  @override
-  String get androidBackgroundNotificationTitle => 'Kelivo 正在运行';
-
-  @override
-  String get androidBackgroundNotificationText => '后台保持聊天生成';
 
   @override
   String get assistantEditEmojiDialogTitle => '选择表情';
@@ -10521,6 +10417,309 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get assistantEditGradientNextFrame => '换一帧';
+
+  @override
+  String get backgroundSettingsTitle => '后台任务';
+
+  @override
+  String get backgroundTaskTitle => 'Kelivo 任务';
+
+  @override
+  String get backgroundCompleted => '生成完成';
+
+  @override
+  String get backgroundFailed => '生成失败，请打开会话查看详情。';
+
+  @override
+  String get backgroundCancelled => '生成已取消';
+
+  @override
+  String get backgroundInterrupted => '后台生成已中断，请打开会话继续。';
+
+  @override
+  String get backgroundRequesting => '正在请求';
+
+  @override
+  String get backgroundGenerating => '正在生成回复';
+
+  @override
+  String get backgroundThinking => '正在思考';
+
+  @override
+  String get backgroundToolRunning => '正在执行工具';
+
+  @override
+  String get backgroundRetrying => '等待重试';
+
+  @override
+  String get backgroundWorking => '正在处理';
+
+  @override
+  String get backgroundTasks => '任务';
+
+  @override
+  String get backgroundStopTasks => '停止任务';
+
+  @override
+  String get backgroundOpenChat => '打开会话';
+
+  @override
+  String get backgroundAndroidEnabled => '后台生成';
+
+  @override
+  String get backgroundAndroidEnabledDetail =>
+      '在锁屏、切到后台或划掉最近任务后继续当前生成。任务运行期间会显示系统常驻通知。';
+
+  @override
+  String get backgroundIosEnabled => '增强后台运行';
+
+  @override
+  String get backgroundIosEnabledDetail => '为当前任务申请后台执行时间。可另外开启定位或静音音频辅助保活。';
+
+  @override
+  String get backgroundNotifications => '任务通知';
+
+  @override
+  String get backgroundNotificationsDetail =>
+      '在当前查看的会话之外完成或失败时通知。此开关不控制 Android 必需的常驻通知。';
+
+  @override
+  String get backgroundPrivacy => '任务状态隐私';
+
+  @override
+  String get backgroundPrivacyDetail => '在通知和实时状态中隐藏会话标题及工具详情，仅显示通用状态、任务数量和耗时。';
+
+  @override
+  String get backgroundLiveActivities => '实时活动';
+
+  @override
+  String get backgroundLiveActivitiesDetail => '在锁屏和灵动岛显示当前任务，是否可用及展示位置由系统决定。';
+
+  @override
+  String get backgroundOverlay => '任务悬浮窗';
+
+  @override
+  String get backgroundOverlayDetail => '在其他应用上显示可拖动的任务悬浮窗。点击进入会话；关闭按钮仅隐藏悬浮窗。';
+
+  @override
+  String get backgroundLiveUpdates => '实时通知 / 灵动岛';
+
+  @override
+  String get backgroundLiveUpdatesDetail =>
+      '在支持的设备上使用 Android 16 实时通知。系统成功展示实时通知时优先于悬浮窗。';
+
+  @override
+  String get backgroundLocation => '定位辅助保活';
+
+  @override
+  String get backgroundLocationDetail =>
+      '在后台任务期间使用低精度定位辅助运行，不保存坐标或发送给 AI 服务。需要开启增强后台运行并授权定位。';
+
+  @override
+  String get backgroundSilentAudio => '静音音频保活';
+
+  @override
+  String get backgroundSilentAudioDetail =>
+      '后台任务运行时播放静音音频，并让位于录音和朗读。需要开启增强后台运行，无需麦克风权限。';
+
+  @override
+  String get backgroundSpeech => '后台朗读';
+
+  @override
+  String get backgroundSpeechDetail => '锁屏或切到后台时继续系统及网络朗读。关闭时，切到后台会暂停朗读。';
+
+  @override
+  String get backgroundFinishVisibility => '完成状态保留时间';
+
+  @override
+  String get backgroundFinishImmediately => '立即收起';
+
+  @override
+  String get backgroundFinishOneMinute => '1 分钟';
+
+  @override
+  String get backgroundFinishFiveMinutes => '5 分钟';
+
+  @override
+  String get backgroundFinishUntilForeground => '回到应用时收起';
+
+  @override
+  String get backgroundFinishVisibilityDetail =>
+      '用于 Android 悬浮窗和 iOS 锁屏完成卡片。回到应用时清理完成状态，最长保留 15 分钟；取消任务立即收起。';
+
+  @override
+  String get backgroundOverlayIcon => '悬浮窗图标';
+
+  @override
+  String get backgroundIconDefault => 'Kelivo 图标';
+
+  @override
+  String get backgroundIconImage => '选择图片';
+
+  @override
+  String get backgroundIconEmoji => '选择 Emoji';
+
+  @override
+  String get backgroundPermissionsTitle => '权限与系统设置';
+
+  @override
+  String get backgroundNotificationsPermission => '通知权限';
+
+  @override
+  String get backgroundBatteryOptimization => '电池优化';
+
+  @override
+  String get backgroundBatteryOptimizationDetail => '允许不受限制地使用电池可改善后台运行。';
+
+  @override
+  String get backgroundAutostart => '自启动与后台运行';
+
+  @override
+  String get backgroundAutostartDetail =>
+      '请手动检查设备的自启动和后台限制。Android 无法可靠查询这些厂商设置的授权状态。';
+
+  @override
+  String get backgroundLocationPermission => '定位权限';
+
+  @override
+  String get backgroundLocationAlways => '允许持续后台定位';
+
+  @override
+  String get backgroundLocationAlwaysDetail => '可进一步授予“始终允许”定位权限，仅在点击此入口时申请。';
+
+  @override
+  String get backgroundSystemSettings => '应用系统设置';
+
+  @override
+  String get backgroundPermissionGranted => '已允许';
+
+  @override
+  String get backgroundPermissionDenied => '未允许';
+
+  @override
+  String get backgroundPermissionLimited => '使用应用期间';
+
+  @override
+  String get backgroundPermissionUnknown => '需手动检查';
+
+  @override
+  String get backgroundPermissionNotDetermined => '尚未申请';
+
+  @override
+  String get backgroundRuntimeTitle => '当前状态';
+
+  @override
+  String get backgroundRuntimeActive => '正在运行';
+
+  @override
+  String get backgroundRuntimeIdle => '未运行';
+
+  @override
+  String get backgroundLocationActive => '后台定位';
+
+  @override
+  String get backgroundAudioActive => '静音音频';
+
+  @override
+  String get backgroundActivityActive => '实时活动';
+
+  @override
+  String get backgroundOverlayActive => '悬浮窗';
+
+  @override
+  String get backgroundLastError => '最近中断或错误';
+
+  @override
+  String get backgroundNoError => '暂无记录';
+
+  @override
+  String get backgroundUnsupported => '当前设备不支持或系统设置未允许';
+
+  @override
+  String get backgroundIosLimit =>
+      '后台执行由 iOS 控制，实时活动本身不能保活。强退可能停止生成，实时状态可能要等再次打开应用后才能清理。';
+
+  @override
+  String get backgroundAndroidLimit =>
+      '如任务中断，请检查通知、电池及厂商后台设置。系统强行停止或终止进程仍可能中断生成。';
+
+  @override
+  String get backgroundStale => '状态暂未更新，请打开应用查看。';
+
+  @override
+  String get backgroundIconError => '无法导入此图片，请选择其他图片。';
+
+  @override
+  String get backgroundNotificationChannels => '通知渠道';
+
+  @override
+  String get backgroundCompletionChannel => '任务完成通知渠道';
+
+  @override
+  String get backgroundOngoingChannel => '任务运行通知渠道';
+
+  @override
+  String get backgroundOverlayAppearance => '悬浮窗外观';
+
+  @override
+  String get backgroundOverlayAppearanceDetail => '调整尺寸、图标、进度环和显示内容';
+
+  @override
+  String get backgroundOverlayPreviewHint => '拖动可移动 · 点击进入会话 · 长按可收起';
+
+  @override
+  String get backgroundOverlayCard => '信息卡片';
+
+  @override
+  String get backgroundOverlayCircle => '圆形图标';
+
+  @override
+  String get backgroundOverlaySize => '尺寸与形状';
+
+  @override
+  String get backgroundOverlayWidth => '宽度';
+
+  @override
+  String get backgroundOverlayHeight => '高度';
+
+  @override
+  String get backgroundOverlayCornerRadius => '圆角';
+
+  @override
+  String get backgroundOverlayIconSize => '图标大小';
+
+  @override
+  String get backgroundOverlayProgressSize => '进度环直径';
+
+  @override
+  String get backgroundOverlayProgressStroke => '进度环粗细';
+
+  @override
+  String get backgroundOverlayContent => '显示内容';
+
+  @override
+  String get backgroundOverlayShowProgress => '显示进度环';
+
+  @override
+  String get backgroundOverlayShowTitle => '显示标题';
+
+  @override
+  String get backgroundOverlayShowSubtitle => '显示副标题';
+
+  @override
+  String get backgroundOverlayShowTime => '显示耗时';
+
+  @override
+  String get backgroundOverlayShowClose => '显示关闭按钮';
+
+  @override
+  String get backgroundOverlayShowBackground => '显示背景';
+
+  @override
+  String get backgroundOverlayShowBorder => '显示边框';
+
+  @override
+  String get backgroundOverlayReset => '恢复默认样式';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hans`).
@@ -11545,26 +11744,10 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get displaySettingsPageIosBackgroundChatTitle => 'iOS 后台生成';
 
   @override
-  String get iosBackgroundSettingsPageTitle => 'iOS 后台生成';
-
-  @override
   String get iosBackgroundStatusOn => '开启';
 
   @override
   String get iosBackgroundStatusOff => '关闭';
-
-  @override
-  String get iosBackgroundGenerationEnableTitle => '后台生成';
-
-  @override
-  String get iosBackgroundGenerationEnableSubtitle =>
-      'App 离开前台后，使用 iOS 分配的后台时间继续当前回复。';
-
-  @override
-  String get iosBackgroundTaskRefreshTitle => '后台任务恢复';
-
-  @override
-  String get iosBackgroundTaskRefreshSubtitle => '在系统条件允许时，向 iOS 请求刷新和处理机会。';
 
   @override
   String get iosLiveActivityTitle => '实时活动';
@@ -11573,98 +11756,10 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get iosLiveActivitySubtitle => '支持时在锁屏和灵动岛显示后台回复状态。';
 
   @override
-  String get iosBackgroundNotificationsTitle => '任务通知';
-
-  @override
-  String get iosBackgroundNotificationsSubtitle => '后台回复完成或中断时发送本地通知。';
-
-  @override
-  String get iosBackgroundLimitNoticeTitle => 'iOS 仍可能暂停任务';
-
-  @override
-  String get iosBackgroundLimitNoticeBody =>
-      '这些选项使用 Apple 支持的后台时间、BackgroundTasks、通知和实时活动。它们能提升连续性，但不能强制 iOS 永久保持 Kelivo 运行。';
-
-  @override
-  String get iosBackgroundUnsupportedLiveActivity =>
-      '需要 iOS 16.1 或更高版本，并在系统设置中允许实时活动。';
-
-  @override
-  String get iosBackgroundNativeStatusTitle => '系统状态';
-
-  @override
-  String get iosBackgroundNativeStatusUnavailable => '需要在 iOS 上运行后查看';
-
-  @override
-  String get iosBackgroundLiveActivityAvailable => '实时活动可用';
-
-  @override
-  String get iosBackgroundLiveActivityUnavailable => '实时活动不可用';
-
-  @override
-  String get iosBackgroundNotificationsAuthorized => '通知已允许';
-
-  @override
-  String get iosBackgroundNotificationsNotAuthorized => '通知未允许';
-
-  @override
-  String get iosBackgroundGenerationActiveTitle => 'Kelivo 正在生成';
-
-  @override
-  String get iosBackgroundGenerationActiveDetail => '助手正在后台回复';
-
-  @override
-  String get iosBackgroundGenerationStreamingDetail => '正在接收助手回复';
-
-  @override
-  String iosBackgroundGenerationTokenCount(int count) {
-    return '$count tokens';
-  }
-
-  @override
-  String get iosBackgroundGenerationCompleteTitle => '生成完成';
-
-  @override
-  String get iosBackgroundGenerationCompleteDetail => '助手回复已准备好';
-
-  @override
-  String get iosBackgroundGenerationInterruptedTitle => '生成已中断';
-
-  @override
-  String get iosBackgroundGenerationInterruptedDetail => '后台回复在完成前停止';
-
-  @override
-  String get iosBackgroundGenerationCancelledDetail => '生成已停止';
-
-  @override
-  String get androidBackgroundStatusOn => '开启';
-
-  @override
-  String get androidBackgroundStatusOff => '关闭';
-
-  @override
-  String get androidBackgroundStatusOther => '开启并通知';
-
-  @override
-  String get androidBackgroundOptionOn => '开启';
-
-  @override
-  String get androidBackgroundOptionOnNotify => '开启并在生成完时通知';
-
-  @override
-  String get androidBackgroundOptionOff => '关闭';
-
-  @override
   String get notificationChatCompletedTitle => '生成完成';
 
   @override
   String get notificationChatCompletedBody => '助手回复已生成';
-
-  @override
-  String get androidBackgroundNotificationTitle => 'Kelivo 正在运行';
-
-  @override
-  String get androidBackgroundNotificationText => '后台保持聊天生成';
 
   @override
   String get assistantEditEmojiDialogTitle => '选择表情';
@@ -20966,6 +21061,309 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get assistantEditGradientNextFrame => '换一帧';
+
+  @override
+  String get backgroundSettingsTitle => '后台任务';
+
+  @override
+  String get backgroundTaskTitle => 'Kelivo 任务';
+
+  @override
+  String get backgroundCompleted => '生成完成';
+
+  @override
+  String get backgroundFailed => '生成失败，请打开会话查看详情。';
+
+  @override
+  String get backgroundCancelled => '生成已取消';
+
+  @override
+  String get backgroundInterrupted => '后台生成已中断，请打开会话继续。';
+
+  @override
+  String get backgroundRequesting => '正在请求';
+
+  @override
+  String get backgroundGenerating => '正在生成回复';
+
+  @override
+  String get backgroundThinking => '正在思考';
+
+  @override
+  String get backgroundToolRunning => '正在执行工具';
+
+  @override
+  String get backgroundRetrying => '等待重试';
+
+  @override
+  String get backgroundWorking => '正在处理';
+
+  @override
+  String get backgroundTasks => '任务';
+
+  @override
+  String get backgroundStopTasks => '停止任务';
+
+  @override
+  String get backgroundOpenChat => '打开会话';
+
+  @override
+  String get backgroundAndroidEnabled => '后台生成';
+
+  @override
+  String get backgroundAndroidEnabledDetail =>
+      '在锁屏、切到后台或划掉最近任务后继续当前生成。任务运行期间会显示系统常驻通知。';
+
+  @override
+  String get backgroundIosEnabled => '增强后台运行';
+
+  @override
+  String get backgroundIosEnabledDetail => '为当前任务申请后台执行时间。可另外开启定位或静音音频辅助保活。';
+
+  @override
+  String get backgroundNotifications => '任务通知';
+
+  @override
+  String get backgroundNotificationsDetail =>
+      '在当前查看的会话之外完成或失败时通知。此开关不控制 Android 必需的常驻通知。';
+
+  @override
+  String get backgroundPrivacy => '任务状态隐私';
+
+  @override
+  String get backgroundPrivacyDetail => '在通知和实时状态中隐藏会话标题及工具详情，仅显示通用状态、任务数量和耗时。';
+
+  @override
+  String get backgroundLiveActivities => '实时活动';
+
+  @override
+  String get backgroundLiveActivitiesDetail => '在锁屏和灵动岛显示当前任务，是否可用及展示位置由系统决定。';
+
+  @override
+  String get backgroundOverlay => '任务悬浮窗';
+
+  @override
+  String get backgroundOverlayDetail => '在其他应用上显示可拖动的任务悬浮窗。点击进入会话；关闭按钮仅隐藏悬浮窗。';
+
+  @override
+  String get backgroundLiveUpdates => '实时通知 / 灵动岛';
+
+  @override
+  String get backgroundLiveUpdatesDetail =>
+      '在支持的设备上使用 Android 16 实时通知。系统成功展示实时通知时优先于悬浮窗。';
+
+  @override
+  String get backgroundLocation => '定位辅助保活';
+
+  @override
+  String get backgroundLocationDetail =>
+      '在后台任务期间使用低精度定位辅助运行，不保存坐标或发送给 AI 服务。需要开启增强后台运行并授权定位。';
+
+  @override
+  String get backgroundSilentAudio => '静音音频保活';
+
+  @override
+  String get backgroundSilentAudioDetail =>
+      '后台任务运行时播放静音音频，并让位于录音和朗读。需要开启增强后台运行，无需麦克风权限。';
+
+  @override
+  String get backgroundSpeech => '后台朗读';
+
+  @override
+  String get backgroundSpeechDetail => '锁屏或切到后台时继续系统及网络朗读。关闭时，切到后台会暂停朗读。';
+
+  @override
+  String get backgroundFinishVisibility => '完成状态保留时间';
+
+  @override
+  String get backgroundFinishImmediately => '立即收起';
+
+  @override
+  String get backgroundFinishOneMinute => '1 分钟';
+
+  @override
+  String get backgroundFinishFiveMinutes => '5 分钟';
+
+  @override
+  String get backgroundFinishUntilForeground => '回到应用时收起';
+
+  @override
+  String get backgroundFinishVisibilityDetail =>
+      '用于 Android 悬浮窗和 iOS 锁屏完成卡片。回到应用时清理完成状态，最长保留 15 分钟；取消任务立即收起。';
+
+  @override
+  String get backgroundOverlayIcon => '悬浮窗图标';
+
+  @override
+  String get backgroundIconDefault => 'Kelivo 图标';
+
+  @override
+  String get backgroundIconImage => '选择图片';
+
+  @override
+  String get backgroundIconEmoji => '选择 Emoji';
+
+  @override
+  String get backgroundPermissionsTitle => '权限与系统设置';
+
+  @override
+  String get backgroundNotificationsPermission => '通知权限';
+
+  @override
+  String get backgroundBatteryOptimization => '电池优化';
+
+  @override
+  String get backgroundBatteryOptimizationDetail => '允许不受限制地使用电池可改善后台运行。';
+
+  @override
+  String get backgroundAutostart => '自启动与后台运行';
+
+  @override
+  String get backgroundAutostartDetail =>
+      '请手动检查设备的自启动和后台限制。Android 无法可靠查询这些厂商设置的授权状态。';
+
+  @override
+  String get backgroundLocationPermission => '定位权限';
+
+  @override
+  String get backgroundLocationAlways => '允许持续后台定位';
+
+  @override
+  String get backgroundLocationAlwaysDetail => '可进一步授予“始终允许”定位权限，仅在点击此入口时申请。';
+
+  @override
+  String get backgroundSystemSettings => '应用系统设置';
+
+  @override
+  String get backgroundPermissionGranted => '已允许';
+
+  @override
+  String get backgroundPermissionDenied => '未允许';
+
+  @override
+  String get backgroundPermissionLimited => '使用应用期间';
+
+  @override
+  String get backgroundPermissionUnknown => '需手动检查';
+
+  @override
+  String get backgroundPermissionNotDetermined => '尚未申请';
+
+  @override
+  String get backgroundRuntimeTitle => '当前状态';
+
+  @override
+  String get backgroundRuntimeActive => '正在运行';
+
+  @override
+  String get backgroundRuntimeIdle => '未运行';
+
+  @override
+  String get backgroundLocationActive => '后台定位';
+
+  @override
+  String get backgroundAudioActive => '静音音频';
+
+  @override
+  String get backgroundActivityActive => '实时活动';
+
+  @override
+  String get backgroundOverlayActive => '悬浮窗';
+
+  @override
+  String get backgroundLastError => '最近中断或错误';
+
+  @override
+  String get backgroundNoError => '暂无记录';
+
+  @override
+  String get backgroundUnsupported => '当前设备不支持或系统设置未允许';
+
+  @override
+  String get backgroundIosLimit =>
+      '后台执行由 iOS 控制，实时活动本身不能保活。强退可能停止生成，实时状态可能要等再次打开应用后才能清理。';
+
+  @override
+  String get backgroundAndroidLimit =>
+      '如任务中断，请检查通知、电池及厂商后台设置。系统强行停止或终止进程仍可能中断生成。';
+
+  @override
+  String get backgroundStale => '状态暂未更新，请打开应用查看。';
+
+  @override
+  String get backgroundIconError => '无法导入此图片，请选择其他图片。';
+
+  @override
+  String get backgroundNotificationChannels => '通知渠道';
+
+  @override
+  String get backgroundCompletionChannel => '任务完成通知渠道';
+
+  @override
+  String get backgroundOngoingChannel => '任务运行通知渠道';
+
+  @override
+  String get backgroundOverlayAppearance => '悬浮窗外观';
+
+  @override
+  String get backgroundOverlayAppearanceDetail => '调整尺寸、图标、进度环和显示内容';
+
+  @override
+  String get backgroundOverlayPreviewHint => '拖动可移动 · 点击进入会话 · 长按可收起';
+
+  @override
+  String get backgroundOverlayCard => '信息卡片';
+
+  @override
+  String get backgroundOverlayCircle => '圆形图标';
+
+  @override
+  String get backgroundOverlaySize => '尺寸与形状';
+
+  @override
+  String get backgroundOverlayWidth => '宽度';
+
+  @override
+  String get backgroundOverlayHeight => '高度';
+
+  @override
+  String get backgroundOverlayCornerRadius => '圆角';
+
+  @override
+  String get backgroundOverlayIconSize => '图标大小';
+
+  @override
+  String get backgroundOverlayProgressSize => '进度环直径';
+
+  @override
+  String get backgroundOverlayProgressStroke => '进度环粗细';
+
+  @override
+  String get backgroundOverlayContent => '显示内容';
+
+  @override
+  String get backgroundOverlayShowProgress => '显示进度环';
+
+  @override
+  String get backgroundOverlayShowTitle => '显示标题';
+
+  @override
+  String get backgroundOverlayShowSubtitle => '显示副标题';
+
+  @override
+  String get backgroundOverlayShowTime => '显示耗时';
+
+  @override
+  String get backgroundOverlayShowClose => '显示关闭按钮';
+
+  @override
+  String get backgroundOverlayShowBackground => '显示背景';
+
+  @override
+  String get backgroundOverlayShowBorder => '显示边框';
+
+  @override
+  String get backgroundOverlayReset => '恢复默认样式';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hant`).
@@ -21990,26 +22388,10 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get displaySettingsPageIosBackgroundChatTitle => 'iOS 後台生成';
 
   @override
-  String get iosBackgroundSettingsPageTitle => 'iOS 後台生成';
-
-  @override
   String get iosBackgroundStatusOn => '開啟';
 
   @override
   String get iosBackgroundStatusOff => '關閉';
-
-  @override
-  String get iosBackgroundGenerationEnableTitle => '後台生成';
-
-  @override
-  String get iosBackgroundGenerationEnableSubtitle =>
-      'App 離開前台後，使用 iOS 分配的後台時間繼續目前回覆。';
-
-  @override
-  String get iosBackgroundTaskRefreshTitle => '後台任務恢復';
-
-  @override
-  String get iosBackgroundTaskRefreshSubtitle => '在系統條件允許時，向 iOS 請求重新整理和處理機會。';
 
   @override
   String get iosLiveActivityTitle => '即時活動';
@@ -22018,98 +22400,10 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get iosLiveActivitySubtitle => '支援時在鎖定畫面和動態島顯示後台回覆狀態。';
 
   @override
-  String get iosBackgroundNotificationsTitle => '任務通知';
-
-  @override
-  String get iosBackgroundNotificationsSubtitle => '後台回覆完成或中斷時發送本機通知。';
-
-  @override
-  String get iosBackgroundLimitNoticeTitle => 'iOS 仍可能暫停任務';
-
-  @override
-  String get iosBackgroundLimitNoticeBody =>
-      '這些選項使用 Apple 支援的後台時間、BackgroundTasks、通知和即時活動。它們能提升連續性，但不能強制 iOS 永久保持 Kelivo 運行。';
-
-  @override
-  String get iosBackgroundUnsupportedLiveActivity =>
-      '需要 iOS 16.1 或更高版本，並在系統設定中允許即時活動。';
-
-  @override
-  String get iosBackgroundNativeStatusTitle => '系統狀態';
-
-  @override
-  String get iosBackgroundNativeStatusUnavailable => '需要在 iOS 上運行後查看';
-
-  @override
-  String get iosBackgroundLiveActivityAvailable => '即時活動可用';
-
-  @override
-  String get iosBackgroundLiveActivityUnavailable => '即時活動不可用';
-
-  @override
-  String get iosBackgroundNotificationsAuthorized => '通知已允許';
-
-  @override
-  String get iosBackgroundNotificationsNotAuthorized => '通知未允許';
-
-  @override
-  String get iosBackgroundGenerationActiveTitle => 'Kelivo 正在生成';
-
-  @override
-  String get iosBackgroundGenerationActiveDetail => '助理正在後台回覆';
-
-  @override
-  String get iosBackgroundGenerationStreamingDetail => '正在接收助理回覆';
-
-  @override
-  String iosBackgroundGenerationTokenCount(int count) {
-    return '$count tokens';
-  }
-
-  @override
-  String get iosBackgroundGenerationCompleteTitle => '生成完成';
-
-  @override
-  String get iosBackgroundGenerationCompleteDetail => '助理回覆已準備好';
-
-  @override
-  String get iosBackgroundGenerationInterruptedTitle => '生成已中斷';
-
-  @override
-  String get iosBackgroundGenerationInterruptedDetail => '後台回覆在完成前停止';
-
-  @override
-  String get iosBackgroundGenerationCancelledDetail => '生成已停止';
-
-  @override
-  String get androidBackgroundStatusOn => '開啟';
-
-  @override
-  String get androidBackgroundStatusOff => '關閉';
-
-  @override
-  String get androidBackgroundStatusOther => '關閉並發送消息';
-
-  @override
-  String get androidBackgroundOptionOn => '開啟';
-
-  @override
-  String get androidBackgroundOptionOnNotify => '開啟並在生成完時發送消息';
-
-  @override
-  String get androidBackgroundOptionOff => '關閉';
-
-  @override
   String get notificationChatCompletedTitle => '生成完成';
 
   @override
   String get notificationChatCompletedBody => '助手回覆已生成';
-
-  @override
-  String get androidBackgroundNotificationTitle => 'Kelivo 正在運行';
-
-  @override
-  String get androidBackgroundNotificationText => '後台保持聊天生成';
 
   @override
   String get assistantEditEmojiDialogTitle => '選擇表情';
@@ -31488,4 +31782,309 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get assistantEditGradientNextFrame => '換一幀';
+
+  @override
+  String get backgroundSettingsTitle => '背景任務';
+
+  @override
+  String get backgroundTaskTitle => 'Kelivo 任務';
+
+  @override
+  String get backgroundCompleted => '生成完成';
+
+  @override
+  String get backgroundFailed => '生成失敗，請開啟對話查看詳情。';
+
+  @override
+  String get backgroundCancelled => '生成已取消';
+
+  @override
+  String get backgroundInterrupted => '背景生成已中斷，請開啟對話繼續。';
+
+  @override
+  String get backgroundRequesting => '正在請求';
+
+  @override
+  String get backgroundGenerating => '正在生成回覆';
+
+  @override
+  String get backgroundThinking => '正在思考';
+
+  @override
+  String get backgroundToolRunning => '正在執行工具';
+
+  @override
+  String get backgroundRetrying => '等待重試';
+
+  @override
+  String get backgroundWorking => '正在處理';
+
+  @override
+  String get backgroundTasks => '任務';
+
+  @override
+  String get backgroundStopTasks => '停止任務';
+
+  @override
+  String get backgroundOpenChat => '開啟對話';
+
+  @override
+  String get backgroundAndroidEnabled => '背景生成';
+
+  @override
+  String get backgroundAndroidEnabledDetail =>
+      '在鎖定螢幕、切到背景或劃掉最近任務後繼續目前的生成。任務執行期間會顯示系統常駐通知。';
+
+  @override
+  String get backgroundIosEnabled => '增強背景執行';
+
+  @override
+  String get backgroundIosEnabledDetail => '為目前任務申請背景執行時間。可另外開啟定位或靜音音訊輔助保活。';
+
+  @override
+  String get backgroundNotifications => '任務通知';
+
+  @override
+  String get backgroundNotificationsDetail =>
+      '在目前查看的對話之外完成或失敗時通知。此開關不控制 Android 必需的常駐通知。';
+
+  @override
+  String get backgroundPrivacy => '任務狀態隱私';
+
+  @override
+  String get backgroundPrivacyDetail => '在通知和即時狀態中隱藏對話標題及工具詳情，僅顯示通用狀態、任務數量和耗時。';
+
+  @override
+  String get backgroundLiveActivities => '即時動態';
+
+  @override
+  String get backgroundLiveActivitiesDetail =>
+      '在鎖定畫面和動態島顯示目前任務，是否可用及展示位置由系統決定。';
+
+  @override
+  String get backgroundOverlay => '任務懸浮視窗';
+
+  @override
+  String get backgroundOverlayDetail =>
+      '在其他應用程式上顯示可拖動的任務懸浮視窗。點擊進入對話；關閉按鈕僅隱藏懸浮視窗。';
+
+  @override
+  String get backgroundLiveUpdates => '即時通知 / 動態島';
+
+  @override
+  String get backgroundLiveUpdatesDetail =>
+      '在支援的裝置上使用 Android 16 即時通知。系統成功展示即時通知時優先於懸浮視窗。';
+
+  @override
+  String get backgroundLocation => '定位輔助保活';
+
+  @override
+  String get backgroundLocationDetail =>
+      '在背景任務期間使用低精度定位輔助執行，不儲存座標或傳送給 AI 服務。需要開啟增強背景執行並授權定位。';
+
+  @override
+  String get backgroundSilentAudio => '靜音音訊保活';
+
+  @override
+  String get backgroundSilentAudioDetail =>
+      '背景任務執行時播放靜音音訊，並讓位於錄音和朗讀。需要開啟增強背景執行，無需麥克風權限。';
+
+  @override
+  String get backgroundSpeech => '背景朗讀';
+
+  @override
+  String get backgroundSpeechDetail => '鎖定螢幕或切到背景時繼續系統及網路朗讀。關閉時，切到背景會暫停朗讀。';
+
+  @override
+  String get backgroundFinishVisibility => '完成狀態保留時間';
+
+  @override
+  String get backgroundFinishImmediately => '立即收起';
+
+  @override
+  String get backgroundFinishOneMinute => '1 分鐘';
+
+  @override
+  String get backgroundFinishFiveMinutes => '5 分鐘';
+
+  @override
+  String get backgroundFinishUntilForeground => '回到應用程式時收起';
+
+  @override
+  String get backgroundFinishVisibilityDetail =>
+      '用於 Android 懸浮視窗和 iOS 鎖定畫面完成卡片。回到應用程式時清理完成狀態，最長保留 15 分鐘；取消任務立即收起。';
+
+  @override
+  String get backgroundOverlayIcon => '懸浮視窗圖示';
+
+  @override
+  String get backgroundIconDefault => 'Kelivo 圖示';
+
+  @override
+  String get backgroundIconImage => '選擇圖片';
+
+  @override
+  String get backgroundIconEmoji => '選擇 Emoji';
+
+  @override
+  String get backgroundPermissionsTitle => '權限與系統設定';
+
+  @override
+  String get backgroundNotificationsPermission => '通知權限';
+
+  @override
+  String get backgroundBatteryOptimization => '電池最佳化';
+
+  @override
+  String get backgroundBatteryOptimizationDetail => '允許不受限制地使用電池可改善背景執行。';
+
+  @override
+  String get backgroundAutostart => '自動啟動與背景執行';
+
+  @override
+  String get backgroundAutostartDetail =>
+      '請手動檢查裝置的自動啟動和背景限制。Android 無法可靠查詢這些廠商設定的授權狀態。';
+
+  @override
+  String get backgroundLocationPermission => '定位權限';
+
+  @override
+  String get backgroundLocationAlways => '允許持續背景定位';
+
+  @override
+  String get backgroundLocationAlwaysDetail => '可進一步授予「永遠允許」定位權限，僅在點擊此入口時申請。';
+
+  @override
+  String get backgroundSystemSettings => '應用程式系統設定';
+
+  @override
+  String get backgroundPermissionGranted => '已允許';
+
+  @override
+  String get backgroundPermissionDenied => '未允許';
+
+  @override
+  String get backgroundPermissionLimited => '使用應用程式期間';
+
+  @override
+  String get backgroundPermissionUnknown => '需手動檢查';
+
+  @override
+  String get backgroundPermissionNotDetermined => '尚未申請';
+
+  @override
+  String get backgroundRuntimeTitle => '目前狀態';
+
+  @override
+  String get backgroundRuntimeActive => '正在執行';
+
+  @override
+  String get backgroundRuntimeIdle => '未執行';
+
+  @override
+  String get backgroundLocationActive => '背景定位';
+
+  @override
+  String get backgroundAudioActive => '靜音音訊';
+
+  @override
+  String get backgroundActivityActive => '即時動態';
+
+  @override
+  String get backgroundOverlayActive => '懸浮視窗';
+
+  @override
+  String get backgroundLastError => '最近中斷或錯誤';
+
+  @override
+  String get backgroundNoError => '暫無紀錄';
+
+  @override
+  String get backgroundUnsupported => '目前裝置不支援或系統設定未允許';
+
+  @override
+  String get backgroundIosLimit =>
+      '背景執行由 iOS 控制，即時動態本身無法保活。強制結束可能停止生成，即時狀態可能要等再次開啟應用程式後才能清理。';
+
+  @override
+  String get backgroundAndroidLimit =>
+      '如任務中斷，請檢查通知、電池及廠商背景設定。系統強制停止或終止程序仍可能中斷生成。';
+
+  @override
+  String get backgroundStale => '狀態暫未更新，請開啟應用程式查看。';
+
+  @override
+  String get backgroundIconError => '無法匯入此圖片，請選擇其他圖片。';
+
+  @override
+  String get backgroundNotificationChannels => '通知管道';
+
+  @override
+  String get backgroundCompletionChannel => '任務完成通知頻道';
+
+  @override
+  String get backgroundOngoingChannel => '任務執行通知頻道';
+
+  @override
+  String get backgroundOverlayAppearance => '懸浮窗外觀';
+
+  @override
+  String get backgroundOverlayAppearanceDetail => '調整尺寸、圖示、進度環和顯示內容';
+
+  @override
+  String get backgroundOverlayPreviewHint => '拖曳可移動 · 點擊進入對話 · 長按可收起';
+
+  @override
+  String get backgroundOverlayCard => '資訊卡片';
+
+  @override
+  String get backgroundOverlayCircle => '圓形圖示';
+
+  @override
+  String get backgroundOverlaySize => '尺寸與形狀';
+
+  @override
+  String get backgroundOverlayWidth => '寬度';
+
+  @override
+  String get backgroundOverlayHeight => '高度';
+
+  @override
+  String get backgroundOverlayCornerRadius => '圓角';
+
+  @override
+  String get backgroundOverlayIconSize => '圖示大小';
+
+  @override
+  String get backgroundOverlayProgressSize => '進度環直徑';
+
+  @override
+  String get backgroundOverlayProgressStroke => '進度環粗細';
+
+  @override
+  String get backgroundOverlayContent => '顯示內容';
+
+  @override
+  String get backgroundOverlayShowProgress => '顯示進度環';
+
+  @override
+  String get backgroundOverlayShowTitle => '顯示標題';
+
+  @override
+  String get backgroundOverlayShowSubtitle => '顯示副標題';
+
+  @override
+  String get backgroundOverlayShowTime => '顯示耗時';
+
+  @override
+  String get backgroundOverlayShowClose => '顯示關閉按鈕';
+
+  @override
+  String get backgroundOverlayShowBackground => '顯示背景';
+
+  @override
+  String get backgroundOverlayShowBorder => '顯示邊框';
+
+  @override
+  String get backgroundOverlayReset => '恢復預設樣式';
 }

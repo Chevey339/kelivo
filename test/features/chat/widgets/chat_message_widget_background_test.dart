@@ -98,7 +98,11 @@ class _RecordingTtsProvider extends TtsProvider {
   bool get isAvailable => true;
 
   @override
-  Future<void> speak(String text, {bool flush = true}) async {
+  Future<void> speak(
+    String text, {
+    bool flush = true,
+    bool waitForCompletion = true,
+  }) async {
     spokenTexts.add(text);
   }
 }

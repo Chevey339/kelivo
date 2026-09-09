@@ -2062,12 +2062,6 @@ abstract class AppLocalizations {
   /// **'Background Generation (iOS)'**
   String get displaySettingsPageIosBackgroundChatTitle;
 
-  /// No description provided for @iosBackgroundSettingsPageTitle.
-  ///
-  /// In en, this message translates to:
-  /// **'iOS Background Generation'**
-  String get iosBackgroundSettingsPageTitle;
-
   /// No description provided for @iosBackgroundStatusOn.
   ///
   /// In en, this message translates to:
@@ -2079,30 +2073,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Off'**
   String get iosBackgroundStatusOff;
-
-  /// No description provided for @iosBackgroundGenerationEnableTitle.
-  ///
-  /// In en, this message translates to:
-  /// **'Background Generation'**
-  String get iosBackgroundGenerationEnableTitle;
-
-  /// No description provided for @iosBackgroundGenerationEnableSubtitle.
-  ///
-  /// In en, this message translates to:
-  /// **'Use iOS background time to keep the current reply running after the app leaves the foreground.'**
-  String get iosBackgroundGenerationEnableSubtitle;
-
-  /// No description provided for @iosBackgroundTaskRefreshTitle.
-  ///
-  /// In en, this message translates to:
-  /// **'Background Task Recovery'**
-  String get iosBackgroundTaskRefreshTitle;
-
-  /// No description provided for @iosBackgroundTaskRefreshSubtitle.
-  ///
-  /// In en, this message translates to:
-  /// **'Ask iOS for refresh and processing opportunities when system conditions allow.'**
-  String get iosBackgroundTaskRefreshSubtitle;
 
   /// No description provided for @iosLiveActivityTitle.
   ///
@@ -2116,162 +2086,6 @@ abstract class AppLocalizations {
   /// **'Show background replies on the Lock Screen and Dynamic Island when supported.'**
   String get iosLiveActivitySubtitle;
 
-  /// No description provided for @iosBackgroundNotificationsTitle.
-  ///
-  /// In en, this message translates to:
-  /// **'Task Notifications'**
-  String get iosBackgroundNotificationsTitle;
-
-  /// No description provided for @iosBackgroundNotificationsSubtitle.
-  ///
-  /// In en, this message translates to:
-  /// **'Send a local notification when a background reply completes or is interrupted.'**
-  String get iosBackgroundNotificationsSubtitle;
-
-  /// No description provided for @iosBackgroundLimitNoticeTitle.
-  ///
-  /// In en, this message translates to:
-  /// **'iOS may still suspend work'**
-  String get iosBackgroundLimitNoticeTitle;
-
-  /// No description provided for @iosBackgroundLimitNoticeBody.
-  ///
-  /// In en, this message translates to:
-  /// **'These options use Apple-supported background time, BackgroundTasks, notifications, and Live Activities. They improve continuity but cannot force iOS to keep Kelivo running forever.'**
-  String get iosBackgroundLimitNoticeBody;
-
-  /// No description provided for @iosBackgroundUnsupportedLiveActivity.
-  ///
-  /// In en, this message translates to:
-  /// **'Requires iOS 16.1 or later and Live Activities enabled in Settings.'**
-  String get iosBackgroundUnsupportedLiveActivity;
-
-  /// No description provided for @iosBackgroundNativeStatusTitle.
-  ///
-  /// In en, this message translates to:
-  /// **'System status'**
-  String get iosBackgroundNativeStatusTitle;
-
-  /// No description provided for @iosBackgroundNativeStatusUnavailable.
-  ///
-  /// In en, this message translates to:
-  /// **'Unavailable until running on iOS'**
-  String get iosBackgroundNativeStatusUnavailable;
-
-  /// No description provided for @iosBackgroundLiveActivityAvailable.
-  ///
-  /// In en, this message translates to:
-  /// **'Live Activities available'**
-  String get iosBackgroundLiveActivityAvailable;
-
-  /// No description provided for @iosBackgroundLiveActivityUnavailable.
-  ///
-  /// In en, this message translates to:
-  /// **'Live Activities unavailable'**
-  String get iosBackgroundLiveActivityUnavailable;
-
-  /// No description provided for @iosBackgroundNotificationsAuthorized.
-  ///
-  /// In en, this message translates to:
-  /// **'Notifications allowed'**
-  String get iosBackgroundNotificationsAuthorized;
-
-  /// No description provided for @iosBackgroundNotificationsNotAuthorized.
-  ///
-  /// In en, this message translates to:
-  /// **'Notifications not allowed'**
-  String get iosBackgroundNotificationsNotAuthorized;
-
-  /// No description provided for @iosBackgroundGenerationActiveTitle.
-  ///
-  /// In en, this message translates to:
-  /// **'Kelivo is generating'**
-  String get iosBackgroundGenerationActiveTitle;
-
-  /// No description provided for @iosBackgroundGenerationActiveDetail.
-  ///
-  /// In en, this message translates to:
-  /// **'The assistant is replying in the background'**
-  String get iosBackgroundGenerationActiveDetail;
-
-  /// No description provided for @iosBackgroundGenerationStreamingDetail.
-  ///
-  /// In en, this message translates to:
-  /// **'Receiving assistant response'**
-  String get iosBackgroundGenerationStreamingDetail;
-
-  /// No description provided for @iosBackgroundGenerationTokenCount.
-  ///
-  /// In en, this message translates to:
-  /// **'{count} tokens'**
-  String iosBackgroundGenerationTokenCount(int count);
-
-  /// No description provided for @iosBackgroundGenerationCompleteTitle.
-  ///
-  /// In en, this message translates to:
-  /// **'Generation complete'**
-  String get iosBackgroundGenerationCompleteTitle;
-
-  /// No description provided for @iosBackgroundGenerationCompleteDetail.
-  ///
-  /// In en, this message translates to:
-  /// **'Assistant reply is ready'**
-  String get iosBackgroundGenerationCompleteDetail;
-
-  /// No description provided for @iosBackgroundGenerationInterruptedTitle.
-  ///
-  /// In en, this message translates to:
-  /// **'Generation interrupted'**
-  String get iosBackgroundGenerationInterruptedTitle;
-
-  /// No description provided for @iosBackgroundGenerationInterruptedDetail.
-  ///
-  /// In en, this message translates to:
-  /// **'The background reply stopped before completion'**
-  String get iosBackgroundGenerationInterruptedDetail;
-
-  /// No description provided for @iosBackgroundGenerationCancelledDetail.
-  ///
-  /// In en, this message translates to:
-  /// **'Generation stopped'**
-  String get iosBackgroundGenerationCancelledDetail;
-
-  /// No description provided for @androidBackgroundStatusOn.
-  ///
-  /// In en, this message translates to:
-  /// **'On'**
-  String get androidBackgroundStatusOn;
-
-  /// No description provided for @androidBackgroundStatusOff.
-  ///
-  /// In en, this message translates to:
-  /// **'Off'**
-  String get androidBackgroundStatusOff;
-
-  /// No description provided for @androidBackgroundStatusOther.
-  ///
-  /// In en, this message translates to:
-  /// **'On and notify'**
-  String get androidBackgroundStatusOther;
-
-  /// No description provided for @androidBackgroundOptionOn.
-  ///
-  /// In en, this message translates to:
-  /// **'On'**
-  String get androidBackgroundOptionOn;
-
-  /// No description provided for @androidBackgroundOptionOnNotify.
-  ///
-  /// In en, this message translates to:
-  /// **'On and notify when done'**
-  String get androidBackgroundOptionOnNotify;
-
-  /// No description provided for @androidBackgroundOptionOff.
-  ///
-  /// In en, this message translates to:
-  /// **'Off'**
-  String get androidBackgroundOptionOff;
-
   /// No description provided for @notificationChatCompletedTitle.
   ///
   /// In en, this message translates to:
@@ -2283,18 +2097,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Assistant reply has been generated'**
   String get notificationChatCompletedBody;
-
-  /// No description provided for @androidBackgroundNotificationTitle.
-  ///
-  /// In en, this message translates to:
-  /// **'Kelivo is running'**
-  String get androidBackgroundNotificationTitle;
-
-  /// No description provided for @androidBackgroundNotificationText.
-  ///
-  /// In en, this message translates to:
-  /// **'Keeping chat generation alive in background'**
-  String get androidBackgroundNotificationText;
 
   /// No description provided for @assistantEditEmojiDialogTitle.
   ///
@@ -19748,6 +19550,594 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Another frame'**
   String get assistantEditGradientNextFrame;
+
+  /// No description provided for @backgroundSettingsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Background tasks'**
+  String get backgroundSettingsTitle;
+
+  /// No description provided for @backgroundTaskTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Kelivo task'**
+  String get backgroundTaskTitle;
+
+  /// No description provided for @backgroundCompleted.
+  ///
+  /// In en, this message translates to:
+  /// **'Generation complete'**
+  String get backgroundCompleted;
+
+  /// No description provided for @backgroundFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Generation failed. Open the chat for details.'**
+  String get backgroundFailed;
+
+  /// No description provided for @backgroundCancelled.
+  ///
+  /// In en, this message translates to:
+  /// **'Generation cancelled'**
+  String get backgroundCancelled;
+
+  /// No description provided for @backgroundInterrupted.
+  ///
+  /// In en, this message translates to:
+  /// **'Background generation was interrupted. Open the chat to continue.'**
+  String get backgroundInterrupted;
+
+  /// No description provided for @backgroundRequesting.
+  ///
+  /// In en, this message translates to:
+  /// **'Connecting'**
+  String get backgroundRequesting;
+
+  /// No description provided for @backgroundGenerating.
+  ///
+  /// In en, this message translates to:
+  /// **'Generating reply'**
+  String get backgroundGenerating;
+
+  /// No description provided for @backgroundThinking.
+  ///
+  /// In en, this message translates to:
+  /// **'Thinking'**
+  String get backgroundThinking;
+
+  /// No description provided for @backgroundToolRunning.
+  ///
+  /// In en, this message translates to:
+  /// **'Running tool'**
+  String get backgroundToolRunning;
+
+  /// No description provided for @backgroundRetrying.
+  ///
+  /// In en, this message translates to:
+  /// **'Waiting to retry'**
+  String get backgroundRetrying;
+
+  /// No description provided for @backgroundWorking.
+  ///
+  /// In en, this message translates to:
+  /// **'Working'**
+  String get backgroundWorking;
+
+  /// No description provided for @backgroundTasks.
+  ///
+  /// In en, this message translates to:
+  /// **'Tasks'**
+  String get backgroundTasks;
+
+  /// No description provided for @backgroundStopTasks.
+  ///
+  /// In en, this message translates to:
+  /// **'Stop tasks'**
+  String get backgroundStopTasks;
+
+  /// No description provided for @backgroundOpenChat.
+  ///
+  /// In en, this message translates to:
+  /// **'Open chat'**
+  String get backgroundOpenChat;
+
+  /// No description provided for @backgroundAndroidEnabled.
+  ///
+  /// In en, this message translates to:
+  /// **'Background generation'**
+  String get backgroundAndroidEnabled;
+
+  /// No description provided for @backgroundAndroidEnabledDetail.
+  ///
+  /// In en, this message translates to:
+  /// **'Keep current tasks running when locked, in the background, or removed from recent apps. A system notification is required while tasks run.'**
+  String get backgroundAndroidEnabledDetail;
+
+  /// No description provided for @backgroundIosEnabled.
+  ///
+  /// In en, this message translates to:
+  /// **'Enhanced background execution'**
+  String get backgroundIosEnabled;
+
+  /// No description provided for @backgroundIosEnabledDetail.
+  ///
+  /// In en, this message translates to:
+  /// **'Request time to finish current tasks. Enable location or silent audio separately for additional background support.'**
+  String get backgroundIosEnabledDetail;
+
+  /// No description provided for @backgroundNotifications.
+  ///
+  /// In en, this message translates to:
+  /// **'Task notifications'**
+  String get backgroundNotifications;
+
+  /// No description provided for @backgroundNotificationsDetail.
+  ///
+  /// In en, this message translates to:
+  /// **'Notify when a task completes or fails outside the chat you are viewing. Does not control Android’s required ongoing notification.'**
+  String get backgroundNotificationsDetail;
+
+  /// No description provided for @backgroundPrivacy.
+  ///
+  /// In en, this message translates to:
+  /// **'Task status privacy'**
+  String get backgroundPrivacy;
+
+  /// No description provided for @backgroundPrivacyDetail.
+  ///
+  /// In en, this message translates to:
+  /// **'Hide conversation titles and tool details in notifications and live status. Only generic status, task count and elapsed time are shown.'**
+  String get backgroundPrivacyDetail;
+
+  /// No description provided for @backgroundLiveActivities.
+  ///
+  /// In en, this message translates to:
+  /// **'Live Activities'**
+  String get backgroundLiveActivities;
+
+  /// No description provided for @backgroundLiveActivitiesDetail.
+  ///
+  /// In en, this message translates to:
+  /// **'Show current tasks on the Lock Screen and Dynamic Island. Availability and visibility depend on the system.'**
+  String get backgroundLiveActivitiesDetail;
+
+  /// No description provided for @backgroundOverlay.
+  ///
+  /// In en, this message translates to:
+  /// **'Floating task status'**
+  String get backgroundOverlay;
+
+  /// No description provided for @backgroundOverlayDetail.
+  ///
+  /// In en, this message translates to:
+  /// **'Show a draggable task capsule over other apps. Tap it to open the chat; closing it only hides the capsule.'**
+  String get backgroundOverlayDetail;
+
+  /// No description provided for @backgroundLiveUpdates.
+  ///
+  /// In en, this message translates to:
+  /// **'Live Updates'**
+  String get backgroundLiveUpdates;
+
+  /// No description provided for @backgroundLiveUpdatesDetail.
+  ///
+  /// In en, this message translates to:
+  /// **'Use Android 16 Live Updates on supported devices. A promoted notification takes priority over the floating capsule.'**
+  String get backgroundLiveUpdatesDetail;
+
+  /// No description provided for @backgroundLocation.
+  ///
+  /// In en, this message translates to:
+  /// **'Location-assisted execution'**
+  String get backgroundLocation;
+
+  /// No description provided for @backgroundLocationDetail.
+  ///
+  /// In en, this message translates to:
+  /// **'Use coarse location updates during background tasks. Coordinates are not stored or sent to AI services. Requires enhanced background execution and location permission.'**
+  String get backgroundLocationDetail;
+
+  /// No description provided for @backgroundSilentAudio.
+  ///
+  /// In en, this message translates to:
+  /// **'Silent audio keep-alive'**
+  String get backgroundSilentAudio;
+
+  /// No description provided for @backgroundSilentAudioDetail.
+  ///
+  /// In en, this message translates to:
+  /// **'Play silent audio while background tasks run. Yields to recording and speech playback. Requires enhanced background execution; no microphone permission is needed.'**
+  String get backgroundSilentAudioDetail;
+
+  /// No description provided for @backgroundSpeech.
+  ///
+  /// In en, this message translates to:
+  /// **'Background read-aloud'**
+  String get backgroundSpeech;
+
+  /// No description provided for @backgroundSpeechDetail.
+  ///
+  /// In en, this message translates to:
+  /// **'Continue system and network read-aloud when locked or in the background. When disabled, moving to the background pauses speech.'**
+  String get backgroundSpeechDetail;
+
+  /// No description provided for @backgroundFinishVisibility.
+  ///
+  /// In en, this message translates to:
+  /// **'Completed status duration'**
+  String get backgroundFinishVisibility;
+
+  /// No description provided for @backgroundFinishImmediately.
+  ///
+  /// In en, this message translates to:
+  /// **'Immediately dismiss'**
+  String get backgroundFinishImmediately;
+
+  /// No description provided for @backgroundFinishOneMinute.
+  ///
+  /// In en, this message translates to:
+  /// **'1 minute'**
+  String get backgroundFinishOneMinute;
+
+  /// No description provided for @backgroundFinishFiveMinutes.
+  ///
+  /// In en, this message translates to:
+  /// **'5 minutes'**
+  String get backgroundFinishFiveMinutes;
+
+  /// No description provided for @backgroundFinishUntilForeground.
+  ///
+  /// In en, this message translates to:
+  /// **'Until returning to the app'**
+  String get backgroundFinishUntilForeground;
+
+  /// No description provided for @backgroundFinishVisibilityDetail.
+  ///
+  /// In en, this message translates to:
+  /// **'Applies to the Android capsule and iOS Lock Screen completion card. Returning to the app clears completed status; the maximum is 15 minutes. Cancellation dismisses immediately.'**
+  String get backgroundFinishVisibilityDetail;
+
+  /// No description provided for @backgroundOverlayIcon.
+  ///
+  /// In en, this message translates to:
+  /// **'Floating icon'**
+  String get backgroundOverlayIcon;
+
+  /// No description provided for @backgroundIconDefault.
+  ///
+  /// In en, this message translates to:
+  /// **'Kelivo icon'**
+  String get backgroundIconDefault;
+
+  /// No description provided for @backgroundIconImage.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose image'**
+  String get backgroundIconImage;
+
+  /// No description provided for @backgroundIconEmoji.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose Emoji'**
+  String get backgroundIconEmoji;
+
+  /// No description provided for @backgroundPermissionsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Permissions and system settings'**
+  String get backgroundPermissionsTitle;
+
+  /// No description provided for @backgroundNotificationsPermission.
+  ///
+  /// In en, this message translates to:
+  /// **'Notification permission'**
+  String get backgroundNotificationsPermission;
+
+  /// No description provided for @backgroundBatteryOptimization.
+  ///
+  /// In en, this message translates to:
+  /// **'Battery optimization'**
+  String get backgroundBatteryOptimization;
+
+  /// No description provided for @backgroundBatteryOptimizationDetail.
+  ///
+  /// In en, this message translates to:
+  /// **'Allow unrestricted battery usage for more reliable background work.'**
+  String get backgroundBatteryOptimizationDetail;
+
+  /// No description provided for @backgroundAutostart.
+  ///
+  /// In en, this message translates to:
+  /// **'Autostart and background usage'**
+  String get backgroundAutostart;
+
+  /// No description provided for @backgroundAutostartDetail.
+  ///
+  /// In en, this message translates to:
+  /// **'Check your device’s autostart and background restrictions manually. Android does not provide a reliable permission query for these vendor settings.'**
+  String get backgroundAutostartDetail;
+
+  /// No description provided for @backgroundLocationPermission.
+  ///
+  /// In en, this message translates to:
+  /// **'Location permission'**
+  String get backgroundLocationPermission;
+
+  /// No description provided for @backgroundLocationAlways.
+  ///
+  /// In en, this message translates to:
+  /// **'Allow location in the background'**
+  String get backgroundLocationAlways;
+
+  /// No description provided for @backgroundLocationAlwaysDetail.
+  ///
+  /// In en, this message translates to:
+  /// **'You can grant Always access for background location. Permission is requested only when you choose this action.'**
+  String get backgroundLocationAlwaysDetail;
+
+  /// No description provided for @backgroundSystemSettings.
+  ///
+  /// In en, this message translates to:
+  /// **'App system settings'**
+  String get backgroundSystemSettings;
+
+  /// No description provided for @backgroundPermissionGranted.
+  ///
+  /// In en, this message translates to:
+  /// **'Allowed'**
+  String get backgroundPermissionGranted;
+
+  /// No description provided for @backgroundPermissionDenied.
+  ///
+  /// In en, this message translates to:
+  /// **'Not allowed'**
+  String get backgroundPermissionDenied;
+
+  /// No description provided for @backgroundPermissionLimited.
+  ///
+  /// In en, this message translates to:
+  /// **'While using the app'**
+  String get backgroundPermissionLimited;
+
+  /// No description provided for @backgroundPermissionUnknown.
+  ///
+  /// In en, this message translates to:
+  /// **'Check manually'**
+  String get backgroundPermissionUnknown;
+
+  /// No description provided for @backgroundPermissionNotDetermined.
+  ///
+  /// In en, this message translates to:
+  /// **'Not requested'**
+  String get backgroundPermissionNotDetermined;
+
+  /// No description provided for @backgroundRuntimeTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Current status'**
+  String get backgroundRuntimeTitle;
+
+  /// No description provided for @backgroundRuntimeActive.
+  ///
+  /// In en, this message translates to:
+  /// **'Running'**
+  String get backgroundRuntimeActive;
+
+  /// No description provided for @backgroundRuntimeIdle.
+  ///
+  /// In en, this message translates to:
+  /// **'Inactive'**
+  String get backgroundRuntimeIdle;
+
+  /// No description provided for @backgroundLocationActive.
+  ///
+  /// In en, this message translates to:
+  /// **'Background location'**
+  String get backgroundLocationActive;
+
+  /// No description provided for @backgroundAudioActive.
+  ///
+  /// In en, this message translates to:
+  /// **'Silent audio'**
+  String get backgroundAudioActive;
+
+  /// No description provided for @backgroundActivityActive.
+  ///
+  /// In en, this message translates to:
+  /// **'Live Activity'**
+  String get backgroundActivityActive;
+
+  /// No description provided for @backgroundOverlayActive.
+  ///
+  /// In en, this message translates to:
+  /// **'Floating window'**
+  String get backgroundOverlayActive;
+
+  /// No description provided for @backgroundLastError.
+  ///
+  /// In en, this message translates to:
+  /// **'Last interruption or error'**
+  String get backgroundLastError;
+
+  /// No description provided for @backgroundNoError.
+  ///
+  /// In en, this message translates to:
+  /// **'None recorded'**
+  String get backgroundNoError;
+
+  /// No description provided for @backgroundUnsupported.
+  ///
+  /// In en, this message translates to:
+  /// **'Unavailable on this device or disabled in system settings'**
+  String get backgroundUnsupported;
+
+  /// No description provided for @backgroundIosLimit.
+  ///
+  /// In en, this message translates to:
+  /// **'iOS controls background execution. Live Activities alone do not keep the app running. Force-quitting can stop generation and delay removal of live status until the app opens again.'**
+  String get backgroundIosLimit;
+
+  /// No description provided for @backgroundAndroidLimit.
+  ///
+  /// In en, this message translates to:
+  /// **'Check notification, battery and vendor background settings if tasks stop. Force stop and system process termination can still interrupt generation.'**
+  String get backgroundAndroidLimit;
+
+  /// No description provided for @backgroundStale.
+  ///
+  /// In en, this message translates to:
+  /// **'Status has not updated. Open the app to check.'**
+  String get backgroundStale;
+
+  /// No description provided for @backgroundIconError.
+  ///
+  /// In en, this message translates to:
+  /// **'Unable to import this image. Please choose another image.'**
+  String get backgroundIconError;
+
+  /// No description provided for @backgroundNotificationChannels.
+  ///
+  /// In en, this message translates to:
+  /// **'Notification channels'**
+  String get backgroundNotificationChannels;
+
+  /// No description provided for @backgroundCompletionChannel.
+  ///
+  /// In en, this message translates to:
+  /// **'Completion notification channel'**
+  String get backgroundCompletionChannel;
+
+  /// No description provided for @backgroundOngoingChannel.
+  ///
+  /// In en, this message translates to:
+  /// **'Running task notification channel'**
+  String get backgroundOngoingChannel;
+
+  /// No description provided for @backgroundOverlayAppearance.
+  ///
+  /// In en, this message translates to:
+  /// **'Floating window appearance'**
+  String get backgroundOverlayAppearance;
+
+  /// No description provided for @backgroundOverlayAppearanceDetail.
+  ///
+  /// In en, this message translates to:
+  /// **'Size, artwork, progress ring and visible content'**
+  String get backgroundOverlayAppearanceDetail;
+
+  /// No description provided for @backgroundOverlayPreviewHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Drag to move · Tap to open chat · Hold to dismiss'**
+  String get backgroundOverlayPreviewHint;
+
+  /// No description provided for @backgroundOverlayCard.
+  ///
+  /// In en, this message translates to:
+  /// **'Card'**
+  String get backgroundOverlayCard;
+
+  /// No description provided for @backgroundOverlayCircle.
+  ///
+  /// In en, this message translates to:
+  /// **'Circular icon'**
+  String get backgroundOverlayCircle;
+
+  /// No description provided for @backgroundOverlaySize.
+  ///
+  /// In en, this message translates to:
+  /// **'Size and shape'**
+  String get backgroundOverlaySize;
+
+  /// No description provided for @backgroundOverlayWidth.
+  ///
+  /// In en, this message translates to:
+  /// **'Width'**
+  String get backgroundOverlayWidth;
+
+  /// No description provided for @backgroundOverlayHeight.
+  ///
+  /// In en, this message translates to:
+  /// **'Height'**
+  String get backgroundOverlayHeight;
+
+  /// No description provided for @backgroundOverlayCornerRadius.
+  ///
+  /// In en, this message translates to:
+  /// **'Corner radius'**
+  String get backgroundOverlayCornerRadius;
+
+  /// No description provided for @backgroundOverlayIconSize.
+  ///
+  /// In en, this message translates to:
+  /// **'Icon size'**
+  String get backgroundOverlayIconSize;
+
+  /// No description provided for @backgroundOverlayProgressSize.
+  ///
+  /// In en, this message translates to:
+  /// **'Progress ring diameter'**
+  String get backgroundOverlayProgressSize;
+
+  /// No description provided for @backgroundOverlayProgressStroke.
+  ///
+  /// In en, this message translates to:
+  /// **'Progress ring thickness'**
+  String get backgroundOverlayProgressStroke;
+
+  /// No description provided for @backgroundOverlayContent.
+  ///
+  /// In en, this message translates to:
+  /// **'Visible content'**
+  String get backgroundOverlayContent;
+
+  /// No description provided for @backgroundOverlayShowProgress.
+  ///
+  /// In en, this message translates to:
+  /// **'Show progress ring'**
+  String get backgroundOverlayShowProgress;
+
+  /// No description provided for @backgroundOverlayShowTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Show title'**
+  String get backgroundOverlayShowTitle;
+
+  /// No description provided for @backgroundOverlayShowSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Show subtitle'**
+  String get backgroundOverlayShowSubtitle;
+
+  /// No description provided for @backgroundOverlayShowTime.
+  ///
+  /// In en, this message translates to:
+  /// **'Show elapsed time'**
+  String get backgroundOverlayShowTime;
+
+  /// No description provided for @backgroundOverlayShowClose.
+  ///
+  /// In en, this message translates to:
+  /// **'Show close button'**
+  String get backgroundOverlayShowClose;
+
+  /// No description provided for @backgroundOverlayShowBackground.
+  ///
+  /// In en, this message translates to:
+  /// **'Show background'**
+  String get backgroundOverlayShowBackground;
+
+  /// No description provided for @backgroundOverlayShowBorder.
+  ///
+  /// In en, this message translates to:
+  /// **'Show border'**
+  String get backgroundOverlayShowBorder;
+
+  /// No description provided for @backgroundOverlayReset.
+  ///
+  /// In en, this message translates to:
+  /// **'Restore default appearance'**
+  String get backgroundOverlayReset;
 }
 
 class _AppLocalizationsDelegate
