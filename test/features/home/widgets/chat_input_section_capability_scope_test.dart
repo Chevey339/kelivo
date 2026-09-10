@@ -57,6 +57,7 @@ void main() {
     WidgetTester tester, {
     required AssistantProvider assistants,
     required bool isConversationOverride,
+    VoidCallback? onOpenContext,
   }) async {
     final settings = SettingsProvider(preferences);
     await tester.pumpWidget(
@@ -89,6 +90,7 @@ void main() {
               // The model in play supports neither tools nor reasoning, which
               // is what triggers the enforcement under test.
               isToolModel: (_, _) => false,
+              onOpenContext: onOpenContext,
               isReasoningModel: (_, _) => false,
               isReasoningEnabled: (_) => true,
             ),
@@ -119,7 +121,7 @@ void main() {
     );
   });
 
-  testWidgets('the assistant\'s own model still disables what it cannot do', (
+  testWidgets('the assistant\'s own model also retains configured tools', (
     tester,
   ) async {
     final assistants = await loadAssistantWithMcp(tester);
@@ -130,6 +132,23 @@ void main() {
       isConversationOverride: false,
     );
 
-    expect(assistants.currentAssistant?.mcpServerIds, isEmpty);
+    expect(assistants.currentAssistant?.mcpServerIds, const ['server-1']);
+  });
+  testWidgets('context entry is usable even when the model has no tools', (
+    tester,
+  ) async {
+    final assistants = await loadAssistantWithMcp(tester);
+    var opened = false;
+    await pumpComposer(
+      tester,
+      assistants: assistants,
+      isConversationOverride: false,
+      onOpenContext: () => opened = true,
+    );
+    final entry = find.byTooltip('Context');
+    expect(entry, findsOneWidget);
+    await tester.tap(entry);
+    await tester.pump();
+    expect(opened, isTrue);
   });
 }

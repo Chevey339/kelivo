@@ -20,10 +20,8 @@ import 'package:Kelivo/core/services/memory/memory_pipeline.dart';
 import 'package:Kelivo/core/services/memory/memory_repository.dart';
 import 'package:Kelivo/core/services/tts/tts_playback_models.dart';
 import 'package:Kelivo/features/assistant/pages/assistant_settings_edit_page.dart';
-import 'package:Kelivo/icons/lucide_adapter.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
 import 'package:Kelivo/shared/widgets/ios_switch.dart';
-import 'package:Kelivo/shared/widgets/ios_tactile.dart';
 
 class _FakeTtsProvider extends ChangeNotifier implements TtsProvider {
   @override
@@ -52,11 +50,6 @@ class _FakePathProviderPlatform extends PathProviderPlatform {
 }
 
 const _assistantId = 'assistant-prompt-time-test';
-
-const _warningEn =
-    'Using time variables in the system prompt makes the beginning of every request different';
-
-const _formatExample = '<current_time>Mon 2026-08-08 14:30:05</current_time>';
 
 Future<
   ({
@@ -201,172 +194,116 @@ Finder _systemPromptField() {
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
-  testWidgets('time-variable warning appears for each cur_* token', (
+  Future<AssistantProvider> open(
+    WidgetTester tester, {
+    String prompt = '',
+    bool enabled = false,
+  }) async {
+    final bundle = await _createAssistantProvider(
+      tester,
+      systemPrompt: prompt,
+      appendCurrentTimeToUserMessage: enabled,
+    );
+    _setLargeSurface(tester);
+    await tester.pumpWidget(
+      _buildHarness(
+        assistantProvider: bundle.assistantProvider,
+        chatService: bundle.chatService,
+        memoryV2: bundle.memoryV2,
+        pipeline: bundle.pipeline,
+        child: const AssistantSettingsEditPage(assistantId: _assistantId),
+      ),
+    );
+    await _openPromptsTab(tester);
+    return bundle.assistantProvider;
+  }
+
+  testWidgets('context options are visible while templates start folded', (
     tester,
   ) async {
-    for (final token in ['{cur_date}', '{cur_time}', '{cur_datetime}']) {
-      final bundle = await _createAssistantProvider(
-        tester,
-        systemPrompt: 'Hello $token',
+    final provider = await open(tester);
+    expect(find.text('Built-in context'), findsOneWidget);
+    expect(find.text('Custom instructions'), findsOneWidget);
+    expect(find.textContaining('refreshed when sending'), findsOneWidget);
+    expect(find.textContaining('get_time_info'), findsOneWidget);
+    for (final id in ['time', 'locale', 'model']) {
+      final toggle = tester.widget<IosSwitch>(
+        find.byKey(ValueKey('runtime-context-$id')),
       );
-      final assistantProvider = bundle.assistantProvider;
-      _setLargeSurface(tester);
-      await tester.pumpWidget(
-        _buildHarness(
-          assistantProvider: assistantProvider,
-          chatService: bundle.chatService,
-          memoryV2: bundle.memoryV2,
-          pipeline: bundle.pipeline,
-          child: const AssistantSettingsEditPage(assistantId: _assistantId),
-        ),
-      );
-      await _openPromptsTab(tester);
-
-      expect(find.textContaining(_warningEn), findsOneWidget);
-      await tester.pumpWidget(const SizedBox.shrink());
+      expect(toggle.value, isFalse);
+      toggle.onChanged!(true);
       await tester.pump();
+      await tester.pump(const Duration(milliseconds: 100));
     }
-  });
-
-  testWidgets('time-variable warning does not appear for timezone or none', (
-    tester,
-  ) async {
-    for (final prompt in ['timezone is {timezone}', 'plain system prompt']) {
-      final bundle = await _createAssistantProvider(
-        tester,
-        systemPrompt: prompt,
-      );
-      final assistantProvider = bundle.assistantProvider;
-      _setLargeSurface(tester);
-      await tester.pumpWidget(
-        _buildHarness(
-          assistantProvider: assistantProvider,
-          chatService: bundle.chatService,
-          memoryV2: bundle.memoryV2,
-          pipeline: bundle.pipeline,
-          child: const AssistantSettingsEditPage(assistantId: _assistantId),
-        ),
-      );
-      await _openPromptsTab(tester);
-
-      expect(find.textContaining(_warningEn), findsNothing);
-      await tester.pumpWidget(const SizedBox.shrink());
-      await tester.pump();
-    }
+    final assistant = provider.getById(_assistantId)!;
+    expect(assistant.appendCurrentTimeToUserMessage, isTrue);
+    expect(assistant.includeAppLocaleInContext, isTrue);
+    expect(assistant.includeModelInfoInContext, isTrue);
+    expect(find.text('Available variables:'), findsNothing);
+    await tester.tap(find.text('Advanced · variables and message templates'));
+    await tester.pump();
+    expect(find.text('Available variables:'), findsWidgets);
   });
 
   testWidgets(
-    'time-variable warning updates live while editing system prompt',
+    'time conflict is non-blocking and never rewrites custom instructions',
     (tester) async {
-      final bundle = await _createAssistantProvider(tester);
-      final assistantProvider = bundle.assistantProvider;
-      _setLargeSurface(tester);
-      await tester.pumpWidget(
-        _buildHarness(
-          assistantProvider: assistantProvider,
-          chatService: bundle.chatService,
-          memoryV2: bundle.memoryV2,
-          pipeline: bundle.pipeline,
-          child: const AssistantSettingsEditPage(assistantId: _assistantId),
-        ),
+      const prompt = 'Current: {cur_datetime}';
+      final provider = await open(tester, prompt: prompt);
+      expect(
+        find.byKey(const ValueKey('runtime-context-time-warning')),
+        findsNothing,
       );
-      await _openPromptsTab(tester);
-
-      expect(find.textContaining(_warningEn), findsNothing);
-
-      await tester.enterText(_systemPromptField(), 'now is {cur_time}');
+      tester
+          .widget<IosSwitch>(find.byKey(const ValueKey('runtime-context-time')))
+          .onChanged!(true);
       await tester.pump();
-      expect(find.textContaining(_warningEn), findsOneWidget);
-
-      await tester.enterText(_systemPromptField(), 'stable {timezone}');
+      await tester.pump(const Duration(milliseconds: 100));
+      expect(find.byType(AlertDialog), findsNothing);
+      expect(
+        provider.getById(_assistantId)!.appendCurrentTimeToUserMessage,
+        isTrue,
+      );
+      expect(provider.getById(_assistantId)!.systemPrompt, prompt);
+      expect(
+        find.byKey(const ValueKey('runtime-context-time-warning')),
+        findsOneWidget,
+      );
+      await tester.enterText(_systemPromptField(), 'Stable instructions');
       await tester.pump();
-      expect(find.textContaining(_warningEn), findsNothing);
+      await tester.pump(const Duration(milliseconds: 100));
+      expect(
+        find.byKey(const ValueKey('runtime-context-time-warning')),
+        findsNothing,
+      );
     },
   );
 
-  testWidgets('append current time switch persists on assistant', (
+  testWidgets('existing time choice is retained and new choices remain off', (
     tester,
   ) async {
-    final bundle = await _createAssistantProvider(tester);
-    final assistantProvider = bundle.assistantProvider;
-    _setLargeSurface(tester);
-    await tester.pumpWidget(
-      _buildHarness(
-        assistantProvider: assistantProvider,
-        chatService: bundle.chatService,
-        memoryV2: bundle.memoryV2,
-        pipeline: bundle.pipeline,
-        child: const AssistantSettingsEditPage(assistantId: _assistantId),
-      ),
-    );
-    await _openPromptsTab(tester);
-
+    await open(tester, enabled: true);
     expect(
-      assistantProvider.getById(_assistantId)!.appendCurrentTimeToUserMessage,
-      isFalse,
-    );
-
-    expect(find.text('Append current time'), findsOneWidget);
-    final appendRow = find.ancestor(
-      of: find.text('Append current time'),
-      matching: find.byWidgetPredicate(
-        (widget) =>
-            widget is Padding &&
-            widget.padding ==
-                const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-      ),
-    );
-    final sw = tester.widget<IosSwitch>(
-      find.descendant(of: appendRow, matching: find.byType(IosSwitch)),
-    );
-    expect(sw.value, isFalse);
-    sw.onChanged!(true);
-    await tester.pump();
-    for (var i = 0; i < 40; i++) {
-      if (assistantProvider
-          .getById(_assistantId)!
-          .appendCurrentTimeToUserMessage) {
-        break;
-      }
-      await tester.pump(const Duration(milliseconds: 50));
-    }
-
-    expect(
-      assistantProvider.getById(_assistantId)!.appendCurrentTimeToUserMessage,
+      tester
+          .widget<IosSwitch>(find.byKey(const ValueKey('runtime-context-time')))
+          .value,
       isTrue,
     );
-  });
-
-  testWidgets('append current time info dialog shows format example', (
-    tester,
-  ) async {
-    final bundle = await _createAssistantProvider(tester);
-    final assistantProvider = bundle.assistantProvider;
-    _setLargeSurface(tester);
-    await tester.pumpWidget(
-      _buildHarness(
-        assistantProvider: assistantProvider,
-        chatService: bundle.chatService,
-        memoryV2: bundle.memoryV2,
-        pipeline: bundle.pipeline,
-        child: const AssistantSettingsEditPage(assistantId: _assistantId),
-      ),
+    expect(
+      tester
+          .widget<IosSwitch>(
+            find.byKey(const ValueKey('runtime-context-locale')),
+          )
+          .value,
+      isFalse,
     );
-    await _openPromptsTab(tester);
-
-    final infoButton = tester.widget<IosIconButton>(
-      find.byWidgetPredicate(
-        (widget) =>
-            widget is IosIconButton &&
-            widget.icon == Lucide.BadgeInfo &&
-            widget.semanticLabel == 'Appended time format',
-      ),
+    expect(
+      tester
+          .widget<IosSwitch>(
+            find.byKey(const ValueKey('runtime-context-model')),
+          )
+          .value,
+      isFalse,
     );
-    infoButton.onTap!();
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 200));
-
-    expect(find.text('Appended time format'), findsWidgets);
-    expect(find.textContaining(_formatExample), findsOneWidget);
   });
 }

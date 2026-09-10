@@ -1,3 +1,4 @@
+import 'package:Kelivo/core/services/workspace/workspace_runtime.dart';
 import 'dart:io';
 
 import 'package:flutter/widgets.dart';
@@ -43,6 +44,11 @@ void main() {
         kind: WorkspaceKind.managed,
         createdAt: DateTime.utc(2026, 1, 1),
         updatedAt: DateTime.utc(2026, 1, 1),
+      ),
+      runtimeStatus: const RuntimeStatus(
+        ready: true,
+        engine: 'process',
+        sandboxed: false,
       ),
       binding: const WorkspaceBinding(workspaceId: 'ws1'),
       paths: WorkspacePaths.native(

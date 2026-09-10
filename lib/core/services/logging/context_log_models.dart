@@ -17,6 +17,9 @@ enum ContextSource {
   chatHistory,
   toolCall,
   toolResult,
+  runtimeContext,
+  workspace,
+  skills,
 }
 
 extension ContextSourceWire on ContextSource {
@@ -225,9 +228,8 @@ String extractApiMessageText(dynamic content) {
   return content.toString();
 }
 
-/// Replace inlined `data:...;base64,...` payloads with a short placeholder.
-String truncateBase64DataUris(String text) =>
-    LogPayloadElider.elideDataUris(text);
+/// Elide binary data URIs and large typed base64 JSON values in inspection only.
+String elideContextPayload(String text) => LogPayloadElider.elide(text);
 
 ContextSource inferContextSource(Map<String, dynamic> message) {
   final role = (message['role'] ?? '').toString();
@@ -255,7 +257,7 @@ List<ContextSegment> segmentsFromTaggedMessage(Map<String, dynamic> message) {
 
   final tags = ContextSegmentTags.read(message);
   if (tags.isEmpty) {
-    final text = truncateBase64DataUris(content);
+    final text = elideContextPayload(content);
     return [
       ContextSegment(
         source: inferContextSource(message),
@@ -281,7 +283,7 @@ List<ContextSegment> segmentsFromTaggedMessage(Map<String, dynamic> message) {
       slice = content.substring(offset, end);
       offset = end;
     }
-    final text = truncateBase64DataUris(slice);
+    final text = elideContextPayload(slice);
     out.add(
       ContextSegment(
         source: source,

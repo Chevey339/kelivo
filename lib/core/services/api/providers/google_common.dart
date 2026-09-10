@@ -29,42 +29,6 @@ import 'google_vertex.dart';
 ///
 /// Gemini 3: built-in tools can coexist with function_declarations (MCP).
 /// Gemini 2.x and below: code_execution is exclusive; search/url_context exclude MCP.
-List<Map<String, dynamic>> _buildGeminiToolsArray({
-  required Set<String> builtIns,
-  required bool allowCoexistence,
-  List<Map<String, dynamic>>? geminiTools,
-}) {
-  final toolsArr = <Map<String, dynamic>>[];
-  if (allowCoexistence) {
-    if (builtIns.contains(BuiltInToolNames.codeExecution)) {
-      toolsArr.add({'code_execution': {}});
-    }
-    if (builtIns.contains(BuiltInToolNames.search)) {
-      toolsArr.add({'google_search': {}});
-    }
-    if (builtIns.contains(BuiltInToolNames.urlContext)) {
-      toolsArr.add({'url_context': {}});
-    }
-    if (geminiTools != null) {
-      toolsArr.addAll(geminiTools);
-    }
-  } else {
-    if (builtIns.contains(BuiltInToolNames.codeExecution)) {
-      toolsArr.add({'code_execution': {}});
-    } else if (builtIns.contains(BuiltInToolNames.search) ||
-        builtIns.contains(BuiltInToolNames.urlContext)) {
-      if (builtIns.contains(BuiltInToolNames.search)) {
-        toolsArr.add({'google_search': {}});
-      }
-      if (builtIns.contains(BuiltInToolNames.urlContext)) {
-        toolsArr.add({'url_context': {}});
-      }
-    } else if (geminiTools != null) {
-      toolsArr.addAll(geminiTools);
-    }
-  }
-  return toolsArr;
-}
 
 bool _isGemma4Model(String modelId) {
   return RegExp(
@@ -707,7 +671,7 @@ Stream<StreamChunk> sendGoogleStream(
       assistantHeaders: extraHeaders,
     );
 
-    final toolsArr = _buildGeminiToolsArray(
+    final toolsArr = buildGeminiToolsArray(
       builtIns: builtIns,
       allowCoexistence: isGemini3,
       geminiTools: geminiTools,
@@ -1170,7 +1134,7 @@ Stream<StreamChunk> sendGoogleStream(
       ];
     }
   }
-  final toolsArr = _buildGeminiToolsArray(
+  final toolsArr = buildGeminiToolsArray(
     builtIns: builtIns,
     allowCoexistence: isGemini3,
     geminiTools: geminiTools,

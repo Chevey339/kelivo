@@ -2515,62 +2515,8 @@ abstract class AppLocalizations {
   /// No description provided for @assistantEditPromptTimeVarWarning.
   ///
   /// In en, this message translates to:
-  /// **'Using time variables in the system prompt makes the beginning of every request different, so prompt caching cannot hit and both cost and time-to-first-token go up. If the model needs to know the current time, use the \"Append current time\" switch below.'**
+  /// **'Time variables change the system prompt between requests. Built-in current time can be enabled above without editing your instructions.'**
   String get assistantEditPromptTimeVarWarning;
-
-  /// No description provided for @assistantEditPromptAppendTimeTitle.
-  ///
-  /// In en, this message translates to:
-  /// **'Append current time'**
-  String get assistantEditPromptAppendTimeTitle;
-
-  /// No description provided for @assistantEditPromptAppendTimeSubtitle.
-  ///
-  /// In en, this message translates to:
-  /// **'Append the send time to the end of each user message. Time stays at the end of the request, so prompt caching is unaffected.'**
-  String get assistantEditPromptAppendTimeSubtitle;
-
-  /// No description provided for @assistantEditPromptAppendTimeInfoTitle.
-  ///
-  /// In en, this message translates to:
-  /// **'Appended time format'**
-  String get assistantEditPromptAppendTimeInfoTitle;
-
-  /// No description provided for @assistantEditPromptAppendTimeInfoBody.
-  ///
-  /// In en, this message translates to:
-  /// **'When enabled, a blank line and then the following tag are appended at the end of each user message:\n\n{example}\n\nThe timestamp is that message’s own send time, so it stays stable when you retry.'**
-  String assistantEditPromptAppendTimeInfoBody(String example);
-
-  /// No description provided for @assistantEditPromptAppendTimeInfoClose.
-  ///
-  /// In en, this message translates to:
-  /// **'Got it'**
-  String get assistantEditPromptAppendTimeInfoClose;
-
-  /// No description provided for @assistantEditPromptTimeVarDialogTitle.
-  ///
-  /// In en, this message translates to:
-  /// **'System prompt contains time variables'**
-  String get assistantEditPromptTimeVarDialogTitle;
-
-  /// No description provided for @assistantEditPromptTimeVarDialogBody.
-  ///
-  /// In en, this message translates to:
-  /// **'Your system prompt uses {variables}. The system prompt is re-rendered on every request, so time variables make the beginning of every request different and prompt caching cannot hit. Consider removing these variables and using \"Append current time\" instead — it puts the time at the end of the request and does not affect the prefix.'**
-  String assistantEditPromptTimeVarDialogBody(String variables);
-
-  /// No description provided for @assistantEditPromptTimeVarDialogRemove.
-  ///
-  /// In en, this message translates to:
-  /// **'Go remove'**
-  String get assistantEditPromptTimeVarDialogRemove;
-
-  /// No description provided for @assistantEditPromptTimeVarDialogKeep.
-  ///
-  /// In en, this message translates to:
-  /// **'Enable anyway'**
-  String get assistantEditPromptTimeVarDialogKeep;
 
   /// No description provided for @codeBlockPreviewButton.
   ///
@@ -20192,6 +20138,264 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Import'**
   String get mcpImportConfirm;
+
+  /// No description provided for @harnessTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Context'**
+  String get harnessTitle;
+
+  /// No description provided for @harnessBuiltInContext.
+  ///
+  /// In en, this message translates to:
+  /// **'Built-in context'**
+  String get harnessBuiltInContext;
+
+  /// No description provided for @harnessAssistantScope.
+  ///
+  /// In en, this message translates to:
+  /// **'Applies to this assistant. Changes take effect on the next generation.'**
+  String get harnessAssistantScope;
+
+  /// No description provided for @harnessTime.
+  ///
+  /// In en, this message translates to:
+  /// **'Current time and timezone'**
+  String get harnessTime;
+
+  /// No description provided for @harnessTimeDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Preview only · refreshed when sending. The get_time_info tool is configured separately.'**
+  String get harnessTimeDescription;
+
+  /// No description provided for @harnessLocale.
+  ///
+  /// In en, this message translates to:
+  /// **'App language'**
+  String get harnessLocale;
+
+  /// No description provided for @harnessLocaleDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Provides the UI language without enforcing a response language.'**
+  String get harnessLocaleDescription;
+
+  /// No description provided for @harnessModel.
+  ///
+  /// In en, this message translates to:
+  /// **'Model information'**
+  String get harnessModel;
+
+  /// No description provided for @harnessModelDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Configured model name and request ID, not verified server identity.'**
+  String get harnessModelDescription;
+
+  /// No description provided for @harnessRequestOnly.
+  ///
+  /// In en, this message translates to:
+  /// **'Added only to the current request, outside your system prompt. Not saved in chat messages or exports.'**
+  String get harnessRequestOnly;
+
+  /// No description provided for @harnessTimeConflict.
+  ///
+  /// In en, this message translates to:
+  /// **'Your custom prompt also contains time variables. Both will be sent; your text is kept unchanged.'**
+  String get harnessTimeConflict;
+
+  /// No description provided for @harnessCustomInstructions.
+  ///
+  /// In en, this message translates to:
+  /// **'Custom instructions'**
+  String get harnessCustomInstructions;
+
+  /// No description provided for @harnessAdvanced.
+  ///
+  /// In en, this message translates to:
+  /// **'Advanced · variables and message templates'**
+  String get harnessAdvanced;
+
+  /// No description provided for @harnessCurrentConfiguration.
+  ///
+  /// In en, this message translates to:
+  /// **'Current configuration'**
+  String get harnessCurrentConfiguration;
+
+  /// No description provided for @harnessLatestRequest.
+  ///
+  /// In en, this message translates to:
+  /// **'Latest prepared request'**
+  String get harnessLatestRequest;
+
+  /// No description provided for @harnessPreparedOnly.
+  ///
+  /// In en, this message translates to:
+  /// **'App-assembled context, not the final provider wire payload. Counts are estimates, not billed usage. Later tool rounds are not included.'**
+  String get harnessPreparedOnly;
+
+  /// No description provided for @harnessNoSnapshot.
+  ///
+  /// In en, this message translates to:
+  /// **'No request snapshot in this session. Sending a message creates one; opening this panel sends nothing.'**
+  String get harnessNoSnapshot;
+
+  /// No description provided for @harnessDetails.
+  ///
+  /// In en, this message translates to:
+  /// **'Context details'**
+  String get harnessDetails;
+
+  /// No description provided for @harnessToolsEstimate.
+  ///
+  /// In en, this message translates to:
+  /// **'Tool schema tokens (estimated)'**
+  String get harnessToolsEstimate;
+
+  /// No description provided for @harnessClientTools.
+  ///
+  /// In en, this message translates to:
+  /// **'Client tools'**
+  String get harnessClientTools;
+
+  /// No description provided for @harnessNativeTools.
+  ///
+  /// In en, this message translates to:
+  /// **'Provider-native tools'**
+  String get harnessNativeTools;
+
+  /// No description provided for @harnessOff.
+  ///
+  /// In en, this message translates to:
+  /// **'Off'**
+  String get harnessOff;
+
+  /// No description provided for @harnessAvailable.
+  ///
+  /// In en, this message translates to:
+  /// **'Available'**
+  String get harnessAvailable;
+
+  /// No description provided for @harnessUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'Configured but unavailable'**
+  String get harnessUnavailable;
+
+  /// No description provided for @harnessNotConfigured.
+  ///
+  /// In en, this message translates to:
+  /// **'Not configured'**
+  String get harnessNotConfigured;
+
+  /// No description provided for @harnessToolsUnsupported.
+  ///
+  /// In en, this message translates to:
+  /// **'The selected model does not support client tools'**
+  String get harnessToolsUnsupported;
+
+  /// No description provided for @harnessNativeExclusive.
+  ///
+  /// In en, this message translates to:
+  /// **'The selected native tools exclude client tools on this model'**
+  String get harnessNativeExclusive;
+
+  /// No description provided for @harnessPlatformUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'Not available on this platform'**
+  String get harnessPlatformUnavailable;
+
+  /// No description provided for @harnessMcpDisconnected.
+  ///
+  /// In en, this message translates to:
+  /// **'Selected servers are disconnected or have no enabled tools'**
+  String get harnessMcpDisconnected;
+
+  /// No description provided for @harnessSkillReadUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'The read_file tool is disabled'**
+  String get harnessSkillReadUnavailable;
+
+  /// No description provided for @harnessWorkspaceUnready.
+  ///
+  /// In en, this message translates to:
+  /// **'Shell environment is not ready; file tools are checked separately'**
+  String get harnessWorkspaceUnready;
+
+  /// No description provided for @harnessReadinessPending.
+  ///
+  /// In en, this message translates to:
+  /// **'Readiness will be checked when preparing a request'**
+  String get harnessReadinessPending;
+
+  /// No description provided for @harnessMemory.
+  ///
+  /// In en, this message translates to:
+  /// **'Memory and past chats'**
+  String get harnessMemory;
+
+  /// No description provided for @harnessMemoryReadOnly.
+  ///
+  /// In en, this message translates to:
+  /// **'Memory context enabled; memory tools unavailable this round'**
+  String get harnessMemoryReadOnly;
+
+  /// No description provided for @harnessSearch.
+  ///
+  /// In en, this message translates to:
+  /// **'Search'**
+  String get harnessSearch;
+
+  /// No description provided for @harnessLocalTools.
+  ///
+  /// In en, this message translates to:
+  /// **'Local tools'**
+  String get harnessLocalTools;
+
+  /// No description provided for @harnessSkills.
+  ///
+  /// In en, this message translates to:
+  /// **'Skills'**
+  String get harnessSkills;
+
+  /// No description provided for @harnessWorkspace.
+  ///
+  /// In en, this message translates to:
+  /// **'Workspace'**
+  String get harnessWorkspace;
+
+  /// No description provided for @harnessClose.
+  ///
+  /// In en, this message translates to:
+  /// **'Close context'**
+  String get harnessClose;
+
+  /// No description provided for @harnessNotInjected.
+  ///
+  /// In en, this message translates to:
+  /// **'Not injected'**
+  String get harnessNotInjected;
+
+  /// No description provided for @harnessFullRequest.
+  ///
+  /// In en, this message translates to:
+  /// **'View full request context'**
+  String get harnessFullRequest;
+
+  /// No description provided for @harnessPreviewHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Preview of system instructions and current-turn context. Full history is loaded on demand.'**
+  String get harnessPreviewHint;
+
+  /// No description provided for @harnessPartial.
+  ///
+  /// In en, this message translates to:
+  /// **'Partly available'**
+  String get harnessPartial;
 }
 
 class _AppLocalizationsDelegate

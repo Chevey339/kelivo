@@ -121,6 +121,7 @@ class ChatInputBar extends StatefulWidget {
     this.onSelectModel,
     this.onLongPressSelectModel,
     this.onOpenTools,
+    this.onOpenContext,
     this.onLongPressTools,
     this.onOpenWorkspace,
     this.showWorkspaceButton = false,
@@ -178,6 +179,7 @@ class ChatInputBar extends StatefulWidget {
   final VoidCallback? onSelectModel;
   final VoidCallback? onLongPressSelectModel;
   final VoidCallback? onOpenTools;
+  final VoidCallback? onOpenContext;
   final VoidCallback? onLongPressTools;
   final VoidCallback? onOpenWorkspace;
   final bool showWorkspaceButton;
@@ -1983,6 +1985,24 @@ class _ChatInputBarState extends State<ChatInputBar>
                 icon: Lucide.WandSparkles,
                 label: l10n.workspaceEntrySessionSkills,
                 onTap: lockTap(widget.onOpenSkills),
+              ),
+            ),
+          );
+        }
+
+        if (widget.onOpenContext != null) {
+          actions.add(
+            _OverflowAction(
+              width: normalButtonW,
+              builder: () => _CompactIconButton(
+                tooltip: l10n.harnessTitle,
+                icon: Lucide.Layers,
+                onTap: widget.onOpenContext,
+              ),
+              menu: DesktopContextMenuItem(
+                icon: Lucide.Layers,
+                label: l10n.harnessTitle,
+                onTap: widget.onOpenContext,
               ),
             ),
           );

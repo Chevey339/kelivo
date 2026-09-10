@@ -362,30 +362,7 @@
   "assistantEditVariableRole": "助手",
   "assistantEditVariableMessage": "内容",
   "assistantEditPreviewTitle": "预览",
-  "assistantEditPromptTimeVarWarning": "在系统提示词中使用时间变量会让每一轮请求的开头都不同，Prompt 缓存无法命中，费用和首字延迟都会上升。需要让模型知道当前时间时，请改用下方的「追加当前时间」开关。",
-  "assistantEditPromptAppendTimeTitle": "追加当前时间",
-  "assistantEditPromptAppendTimeSubtitle": "在每条用户消息末尾追加发送时刻。时间在请求末尾，不影响 Prompt 缓存。",
-  "assistantEditPromptAppendTimeInfoTitle": "追加时间格式",
-  "assistantEditPromptAppendTimeInfoBody": "开启后，会在每条用户消息末尾先空一行，再追加如下标签：\n\n{example}\n\n时间取该消息自己的发送时刻，重试时保持不变。",
-  "@assistantEditPromptAppendTimeInfoBody": {
-    "placeholders": {
-      "example": {
-        "type": "String"
-      }
-    }
-  },
-  "assistantEditPromptAppendTimeInfoClose": "知道了",
-  "assistantEditPromptTimeVarDialogTitle": "系统提示词中含时间变量",
-  "assistantEditPromptTimeVarDialogBody": "你的系统提示词里用了 {variables}。系统提示词每次请求都会重新渲染，含时间变量会让每一轮请求的开头都不同，Prompt 缓存无法命中。建议移除这些变量，改用「追加当前时间」——它把时间放在请求末尾，不影响前缀。",
-  "@assistantEditPromptTimeVarDialogBody": {
-    "placeholders": {
-      "variables": {
-        "type": "String"
-      }
-    }
-  },
-  "assistantEditPromptTimeVarDialogRemove": "去移除",
-  "assistantEditPromptTimeVarDialogKeep": "仍然开启",
+  "assistantEditPromptTimeVarWarning": "时间变量会让每次请求的系统提示词改变。可在上方开启内置当前时间，无需修改自定义指令。",
   "codeBlockPreviewButton": "预览",
   "codeBlockSaveAsButton": "另存为文件",
   "codeBlockCollapseButton": "折叠",
@@ -3984,5 +3961,48 @@
   "mcpImportJsonHint": "粘贴 Claude Desktop 或 Cursor 的 MCP 配置，预览后添加服务器，不覆盖现有配置。",
   "mcpImportPaste": "从剪贴板粘贴",
   "mcpImportPreview": "预览",
-  "mcpImportConfirm": "导入"
+  "mcpImportConfirm": "导入",
+  "harnessTitle": "上下文",
+  "harnessBuiltInContext": "内置上下文",
+  "harnessAssistantScope": "作用于当前助手，下次生成生效。",
+  "harnessTime": "当前时间与时区",
+  "harnessTimeDescription": "仅供预览，实际发送时刷新。get_time_info 工具单独配置。",
+  "harnessLocale": "应用语言",
+  "harnessLocaleDescription": "提供应用界面语言，不强制回复语言。",
+  "harnessModel": "模型信息",
+  "harnessModelDescription": "当前配置的模型名称与请求 ID，不代表已验证的服务端模型身份。",
+  "harnessRequestOnly": "仅附加到当前请求，不修改自定义系统提示词，不保存到聊天消息或导出内容。",
+  "harnessTimeConflict": "自定义提示词中也包含时间变量，两者都会发送；保留你的原文，不自动删除。",
+  "harnessCustomInstructions": "自定义指令",
+  "harnessAdvanced": "高级设置 · 变量与消息模板",
+  "harnessCurrentConfiguration": "当前配置",
+  "harnessLatestRequest": "最近请求准备快照",
+  "harnessPreparedOnly": "应用组装的上下文，不等于 provider 最终请求体。用量为估算，不是计费用量；不包含后续工具轮次。",
+  "harnessNoSnapshot": "本次运行中暂无请求快照。发送消息后生成；打开此面板不会发送请求。",
+  "harnessDetails": "展开上下文详情",
+  "harnessToolsEstimate": "工具定义 token（估算）",
+  "harnessClientTools": "客户端工具",
+  "harnessNativeTools": "模型服务原生工具",
+  "harnessOff": "已关闭",
+  "harnessAvailable": "可用",
+  "harnessUnavailable": "已配置但本轮不可用",
+  "harnessNotConfigured": "尚未配置",
+  "harnessToolsUnsupported": "当前模型不支持客户端工具",
+  "harnessNativeExclusive": "此模型启用的原生工具与客户端工具互斥",
+  "harnessPlatformUnavailable": "当前平台暂不可用",
+  "harnessMcpDisconnected": "所选服务尚未连接或没有已启用的工具",
+  "harnessSkillReadUnavailable": "read_file 工具已关闭",
+  "harnessWorkspaceUnready": "Shell 环境未就绪；文件工具单独检查",
+  "harnessReadinessPending": "准备请求时检查运行状态",
+  "harnessMemory": "记忆与历史对话",
+  "harnessMemoryReadOnly": "记忆上下文已开启；本轮记忆工具不可用",
+  "harnessSearch": "搜索",
+  "harnessLocalTools": "本地工具",
+  "harnessSkills": "Skills",
+  "harnessWorkspace": "工作区",
+  "harnessClose": "关闭上下文面板",
+  "harnessNotInjected": "未注入",
+  "harnessFullRequest": "查看完整请求上下文",
+  "harnessPreviewHint": "预览系统指令与本轮上下文；完整历史按需查看。",
+  "harnessPartial": "部分可用"
 }

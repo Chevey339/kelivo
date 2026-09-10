@@ -1255,39 +1255,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get assistantEditPromptTimeVarWarning =>
-      '在系统提示词中使用时间变量会让每一轮请求的开头都不同，Prompt 缓存无法命中，费用和首字延迟都会上升。需要让模型知道当前时间时，请改用下方的「追加当前时间」开关。';
-
-  @override
-  String get assistantEditPromptAppendTimeTitle => '追加当前时间';
-
-  @override
-  String get assistantEditPromptAppendTimeSubtitle =>
-      '在每条用户消息末尾追加发送时刻。时间在请求末尾，不影响 Prompt 缓存。';
-
-  @override
-  String get assistantEditPromptAppendTimeInfoTitle => '追加时间格式';
-
-  @override
-  String assistantEditPromptAppendTimeInfoBody(String example) {
-    return '开启后，会在每条用户消息末尾先空一行，再追加如下标签：\n\n$example\n\n时间取该消息自己的发送时刻，重试时保持不变。';
-  }
-
-  @override
-  String get assistantEditPromptAppendTimeInfoClose => '知道了';
-
-  @override
-  String get assistantEditPromptTimeVarDialogTitle => '系统提示词中含时间变量';
-
-  @override
-  String assistantEditPromptTimeVarDialogBody(String variables) {
-    return '你的系统提示词里用了 $variables。系统提示词每次请求都会重新渲染，含时间变量会让每一轮请求的开头都不同，Prompt 缓存无法命中。建议移除这些变量，改用「追加当前时间」——它把时间放在请求末尾，不影响前缀。';
-  }
-
-  @override
-  String get assistantEditPromptTimeVarDialogRemove => '去移除';
-
-  @override
-  String get assistantEditPromptTimeVarDialogKeep => '仍然开启';
+      '时间变量会让每次请求的系统提示词改变。可在上方开启内置当前时间，无需修改自定义指令。';
 
   @override
   String get codeBlockPreviewButton => '预览';
@@ -10748,6 +10716,136 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get mcpImportConfirm => '导入';
+
+  @override
+  String get harnessTitle => '上下文';
+
+  @override
+  String get harnessBuiltInContext => '内置上下文';
+
+  @override
+  String get harnessAssistantScope => '作用于当前助手，下次生成生效。';
+
+  @override
+  String get harnessTime => '当前时间与时区';
+
+  @override
+  String get harnessTimeDescription => '仅供预览，实际发送时刷新。get_time_info 工具单独配置。';
+
+  @override
+  String get harnessLocale => '应用语言';
+
+  @override
+  String get harnessLocaleDescription => '提供应用界面语言，不强制回复语言。';
+
+  @override
+  String get harnessModel => '模型信息';
+
+  @override
+  String get harnessModelDescription => '当前配置的模型名称与请求 ID，不代表已验证的服务端模型身份。';
+
+  @override
+  String get harnessRequestOnly => '仅附加到当前请求，不修改自定义系统提示词，不保存到聊天消息或导出内容。';
+
+  @override
+  String get harnessTimeConflict => '自定义提示词中也包含时间变量，两者都会发送；保留你的原文，不自动删除。';
+
+  @override
+  String get harnessCustomInstructions => '自定义指令';
+
+  @override
+  String get harnessAdvanced => '高级设置 · 变量与消息模板';
+
+  @override
+  String get harnessCurrentConfiguration => '当前配置';
+
+  @override
+  String get harnessLatestRequest => '最近请求准备快照';
+
+  @override
+  String get harnessPreparedOnly =>
+      '应用组装的上下文，不等于 provider 最终请求体。用量为估算，不是计费用量；不包含后续工具轮次。';
+
+  @override
+  String get harnessNoSnapshot => '本次运行中暂无请求快照。发送消息后生成；打开此面板不会发送请求。';
+
+  @override
+  String get harnessDetails => '展开上下文详情';
+
+  @override
+  String get harnessToolsEstimate => '工具定义 token（估算）';
+
+  @override
+  String get harnessClientTools => '客户端工具';
+
+  @override
+  String get harnessNativeTools => '模型服务原生工具';
+
+  @override
+  String get harnessOff => '已关闭';
+
+  @override
+  String get harnessAvailable => '可用';
+
+  @override
+  String get harnessUnavailable => '已配置但本轮不可用';
+
+  @override
+  String get harnessNotConfigured => '尚未配置';
+
+  @override
+  String get harnessToolsUnsupported => '当前模型不支持客户端工具';
+
+  @override
+  String get harnessNativeExclusive => '此模型启用的原生工具与客户端工具互斥';
+
+  @override
+  String get harnessPlatformUnavailable => '当前平台暂不可用';
+
+  @override
+  String get harnessMcpDisconnected => '所选服务尚未连接或没有已启用的工具';
+
+  @override
+  String get harnessSkillReadUnavailable => 'read_file 工具已关闭';
+
+  @override
+  String get harnessWorkspaceUnready => 'Shell 环境未就绪；文件工具单独检查';
+
+  @override
+  String get harnessReadinessPending => '准备请求时检查运行状态';
+
+  @override
+  String get harnessMemory => '记忆与历史对话';
+
+  @override
+  String get harnessMemoryReadOnly => '记忆上下文已开启；本轮记忆工具不可用';
+
+  @override
+  String get harnessSearch => '搜索';
+
+  @override
+  String get harnessLocalTools => '本地工具';
+
+  @override
+  String get harnessSkills => 'Skills';
+
+  @override
+  String get harnessWorkspace => '工作区';
+
+  @override
+  String get harnessClose => '关闭上下文面板';
+
+  @override
+  String get harnessNotInjected => '未注入';
+
+  @override
+  String get harnessFullRequest => '查看完整请求上下文';
+
+  @override
+  String get harnessPreviewHint => '预览系统指令与本轮上下文；完整历史按需查看。';
+
+  @override
+  String get harnessPartial => '部分可用';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hans`).
@@ -12001,39 +12099,7 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get assistantEditPromptTimeVarWarning =>
-      '在系统提示词中使用时间变量会让每一轮请求的开头都不同，Prompt 缓存无法命中，费用和首字延迟都会上升。需要让模型知道当前时间时，请改用下方的「追加当前时间」开关。';
-
-  @override
-  String get assistantEditPromptAppendTimeTitle => '追加当前时间';
-
-  @override
-  String get assistantEditPromptAppendTimeSubtitle =>
-      '在每条用户消息末尾追加发送时刻。时间在请求末尾，不影响 Prompt 缓存。';
-
-  @override
-  String get assistantEditPromptAppendTimeInfoTitle => '追加时间格式';
-
-  @override
-  String assistantEditPromptAppendTimeInfoBody(String example) {
-    return '开启后，会在每条用户消息末尾先空一行，再追加如下标签：\n\n$example\n\n时间取该消息自己的发送时刻，重试时保持不变。';
-  }
-
-  @override
-  String get assistantEditPromptAppendTimeInfoClose => '知道了';
-
-  @override
-  String get assistantEditPromptTimeVarDialogTitle => '系统提示词中含时间变量';
-
-  @override
-  String assistantEditPromptTimeVarDialogBody(String variables) {
-    return '你的系统提示词里用了 $variables。系统提示词每次请求都会重新渲染，含时间变量会让每一轮请求的开头都不同，Prompt 缓存无法命中。建议移除这些变量，改用「追加当前时间」——它把时间放在请求末尾，不影响前缀。';
-  }
-
-  @override
-  String get assistantEditPromptTimeVarDialogRemove => '去移除';
-
-  @override
-  String get assistantEditPromptTimeVarDialogKeep => '仍然开启';
+      '时间变量会让每次请求的系统提示词改变。可在上方开启内置当前时间，无需修改自定义指令。';
 
   @override
   String get codeBlockPreviewButton => '预览';
@@ -21420,6 +21486,136 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get mcpImportConfirm => '导入';
+
+  @override
+  String get harnessTitle => '上下文';
+
+  @override
+  String get harnessBuiltInContext => '内置上下文';
+
+  @override
+  String get harnessAssistantScope => '作用于当前助手，下次生成生效。';
+
+  @override
+  String get harnessTime => '当前时间与时区';
+
+  @override
+  String get harnessTimeDescription => '仅供预览，实际发送时刷新。get_time_info 工具单独配置。';
+
+  @override
+  String get harnessLocale => '应用语言';
+
+  @override
+  String get harnessLocaleDescription => '提供应用界面语言，不强制回复语言。';
+
+  @override
+  String get harnessModel => '模型信息';
+
+  @override
+  String get harnessModelDescription => '当前配置的模型名称与请求 ID，不代表已验证的服务端模型身份。';
+
+  @override
+  String get harnessRequestOnly => '仅附加到当前请求，不修改自定义系统提示词，不保存到聊天消息或导出内容。';
+
+  @override
+  String get harnessTimeConflict => '自定义提示词中也包含时间变量，两者都会发送；保留你的原文，不自动删除。';
+
+  @override
+  String get harnessCustomInstructions => '自定义指令';
+
+  @override
+  String get harnessAdvanced => '高级设置 · 变量与消息模板';
+
+  @override
+  String get harnessCurrentConfiguration => '当前配置';
+
+  @override
+  String get harnessLatestRequest => '最近请求准备快照';
+
+  @override
+  String get harnessPreparedOnly =>
+      '应用组装的上下文，不等于 provider 最终请求体。用量为估算，不是计费用量；不包含后续工具轮次。';
+
+  @override
+  String get harnessNoSnapshot => '本次运行中暂无请求快照。发送消息后生成；打开此面板不会发送请求。';
+
+  @override
+  String get harnessDetails => '展开上下文详情';
+
+  @override
+  String get harnessToolsEstimate => '工具定义 token（估算）';
+
+  @override
+  String get harnessClientTools => '客户端工具';
+
+  @override
+  String get harnessNativeTools => '模型服务原生工具';
+
+  @override
+  String get harnessOff => '已关闭';
+
+  @override
+  String get harnessAvailable => '可用';
+
+  @override
+  String get harnessUnavailable => '已配置但本轮不可用';
+
+  @override
+  String get harnessNotConfigured => '尚未配置';
+
+  @override
+  String get harnessToolsUnsupported => '当前模型不支持客户端工具';
+
+  @override
+  String get harnessNativeExclusive => '此模型启用的原生工具与客户端工具互斥';
+
+  @override
+  String get harnessPlatformUnavailable => '当前平台暂不可用';
+
+  @override
+  String get harnessMcpDisconnected => '所选服务尚未连接或没有已启用的工具';
+
+  @override
+  String get harnessSkillReadUnavailable => 'read_file 工具已关闭';
+
+  @override
+  String get harnessWorkspaceUnready => 'Shell 环境未就绪；文件工具单独检查';
+
+  @override
+  String get harnessReadinessPending => '准备请求时检查运行状态';
+
+  @override
+  String get harnessMemory => '记忆与历史对话';
+
+  @override
+  String get harnessMemoryReadOnly => '记忆上下文已开启；本轮记忆工具不可用';
+
+  @override
+  String get harnessSearch => '搜索';
+
+  @override
+  String get harnessLocalTools => '本地工具';
+
+  @override
+  String get harnessSkills => 'Skills';
+
+  @override
+  String get harnessWorkspace => '工作区';
+
+  @override
+  String get harnessClose => '关闭上下文面板';
+
+  @override
+  String get harnessNotInjected => '未注入';
+
+  @override
+  String get harnessFullRequest => '查看完整请求上下文';
+
+  @override
+  String get harnessPreviewHint => '预览系统指令与本轮上下文；完整历史按需查看。';
+
+  @override
+  String get harnessPartial => '部分可用';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hant`).
@@ -22673,39 +22869,7 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get assistantEditPromptTimeVarWarning =>
-      '在系統提示詞中使用時間變數會讓每一輪請求的開頭都不同，Prompt 快取無法命中，費用和首字延遲都會上升。需要讓模型知道當前時間時，請改用下方的「追加當前時間」開關。';
-
-  @override
-  String get assistantEditPromptAppendTimeTitle => '追加當前時間';
-
-  @override
-  String get assistantEditPromptAppendTimeSubtitle =>
-      '在每條使用者訊息末尾追加傳送時刻。時間在請求末尾，不影響 Prompt 快取。';
-
-  @override
-  String get assistantEditPromptAppendTimeInfoTitle => '追加時間格式';
-
-  @override
-  String assistantEditPromptAppendTimeInfoBody(String example) {
-    return '開啟後，會在每條使用者訊息末尾先空一行，再追加如下標籤：\n\n$example\n\n時間取該訊息自己的傳送時刻，重試時保持不變。';
-  }
-
-  @override
-  String get assistantEditPromptAppendTimeInfoClose => '知道了';
-
-  @override
-  String get assistantEditPromptTimeVarDialogTitle => '系統提示詞中含時間變數';
-
-  @override
-  String assistantEditPromptTimeVarDialogBody(String variables) {
-    return '你的系統提示詞裡用了 $variables。系統提示詞每次請求都會重新渲染，含時間變數會讓每一輪請求的開頭都不同，Prompt 快取無法命中。建議移除這些變數，改用「追加當前時間」——它把時間放在請求末尾，不影響前綴。';
-  }
-
-  @override
-  String get assistantEditPromptTimeVarDialogRemove => '去移除';
-
-  @override
-  String get assistantEditPromptTimeVarDialogKeep => '仍然開啟';
+      '時間變數會讓每次請求的系統提示詞改變。可在上方啟用內建目前時間，無需修改自訂指令。';
 
   @override
   String get codeBlockPreviewButton => '預覽';
@@ -32171,4 +32335,134 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get mcpImportConfirm => '匯入';
+
+  @override
+  String get harnessTitle => '上下文';
+
+  @override
+  String get harnessBuiltInContext => '內建上下文';
+
+  @override
+  String get harnessAssistantScope => '套用至目前助手，下次生成生效。';
+
+  @override
+  String get harnessTime => '目前時間與時區';
+
+  @override
+  String get harnessTimeDescription => '僅供預覽，實際傳送時更新。get_time_info 工具另行設定。';
+
+  @override
+  String get harnessLocale => '應用程式語言';
+
+  @override
+  String get harnessLocaleDescription => '提供介面語言，不強制回覆語言。';
+
+  @override
+  String get harnessModel => '模型資訊';
+
+  @override
+  String get harnessModelDescription => '目前設定的模型名稱與請求 ID，不代表已驗證的伺服器模型身分。';
+
+  @override
+  String get harnessRequestOnly => '僅附加到目前請求，不修改自訂系統提示詞，不儲存至聊天訊息或匯出內容。';
+
+  @override
+  String get harnessTimeConflict => '自訂提示詞也包含時間變數，兩者都會傳送；保留你的原文，不會自動刪除。';
+
+  @override
+  String get harnessCustomInstructions => '自訂指令';
+
+  @override
+  String get harnessAdvanced => '進階設定 · 變數與訊息範本';
+
+  @override
+  String get harnessCurrentConfiguration => '目前設定';
+
+  @override
+  String get harnessLatestRequest => '最近請求準備快照';
+
+  @override
+  String get harnessPreparedOnly =>
+      '應用程式組裝的上下文，不等於 provider 最終請求內容。用量為估算而非計費用量；不包含後續工具輪次。';
+
+  @override
+  String get harnessNoSnapshot => '本次執行中尚無請求快照。傳送訊息後產生；開啟此面板不會傳送請求。';
+
+  @override
+  String get harnessDetails => '展開上下文詳情';
+
+  @override
+  String get harnessToolsEstimate => '工具定義 token（估算）';
+
+  @override
+  String get harnessClientTools => '用戶端工具';
+
+  @override
+  String get harnessNativeTools => '模型服務原生工具';
+
+  @override
+  String get harnessOff => '已關閉';
+
+  @override
+  String get harnessAvailable => '可用';
+
+  @override
+  String get harnessUnavailable => '已設定但本輪不可用';
+
+  @override
+  String get harnessNotConfigured => '尚未設定';
+
+  @override
+  String get harnessToolsUnsupported => '目前模型不支援用戶端工具';
+
+  @override
+  String get harnessNativeExclusive => '此模型啟用的原生工具與用戶端工具互斥';
+
+  @override
+  String get harnessPlatformUnavailable => '目前平台暫不可用';
+
+  @override
+  String get harnessMcpDisconnected => '所選服務尚未連線或沒有已啟用的工具';
+
+  @override
+  String get harnessSkillReadUnavailable => 'read_file 工具已關閉';
+
+  @override
+  String get harnessWorkspaceUnready => 'Shell 環境尚未就緒；檔案工具另行檢查';
+
+  @override
+  String get harnessReadinessPending => '準備請求時檢查執行狀態';
+
+  @override
+  String get harnessMemory => '記憶與歷史對話';
+
+  @override
+  String get harnessMemoryReadOnly => '記憶上下文已啟用；本輪記憶工具不可用';
+
+  @override
+  String get harnessSearch => '搜尋';
+
+  @override
+  String get harnessLocalTools => '本機工具';
+
+  @override
+  String get harnessSkills => 'Skills';
+
+  @override
+  String get harnessWorkspace => '工作區';
+
+  @override
+  String get harnessClose => '關閉上下文面板';
+
+  @override
+  String get harnessNotInjected => '未注入';
+
+  @override
+  String get harnessFullRequest => '檢視完整請求上下文';
+
+  @override
+  String get harnessPreviewHint => '預覽系統指令與本輪上下文；完整歷史按需檢視。';
+
+  @override
+  String get harnessPartial => '部分可用';
 }

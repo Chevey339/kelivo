@@ -26,6 +26,7 @@ import '../../models/conversation.dart';
 import '../../models/workspace_binding.dart';
 import '../../../utils/sandbox_path_resolver.dart';
 import '../../../utils/app_directories.dart';
+import 'prepared_context_store.dart';
 
 final class LoadedTimelineSlot {
   const LoadedTimelineSlot({required this.identity, required this.message});
@@ -63,6 +64,19 @@ final class LoadedTimelinePage {
 typedef AssetContentHash = Future<String> Function(File file);
 
 class ChatService extends ChangeNotifier {
+  final preparedContexts = PreparedContextStore();
+  bool _acceptPreparedContexts = true;
+
+  void recordPreparedContext(PreparedContextSnapshot snapshot) {
+    final id = snapshot.context.conversationId;
+    if (!_acceptPreparedContexts ||
+        _discardedTemporaryConversationIds.contains(id) ||
+        getConversation(id) == null) {
+      return;
+    }
+    preparedContexts.record(snapshot);
+  }
+
   ChatService({
     ChatDatabaseGateway? databaseGateway,
     ChatDatabaseRepository? existingRepository,
@@ -298,6 +312,7 @@ class ChatService extends ChangeNotifier {
       await _resetStaleStreamingFlags();
 
       _initialized = true;
+      _acceptPreparedContexts = true;
       notifyListeners();
       late final Future<void> postStartupMaintenance;
       postStartupMaintenance = _runAssetReferenceMaintenance(appDataDir)
@@ -323,6 +338,8 @@ class ChatService extends ChangeNotifier {
   }
 
   Future<void> close() async {
+    _acceptPreparedContexts = false;
+    preparedContexts.clear();
     final initialization = _initFuture;
     if (initialization != null) {
       try {
@@ -369,6 +386,7 @@ class ChatService extends ChangeNotifier {
     if (_initialized || _initFuture != null) {
       unawaited(close());
     }
+    preparedContexts.dispose();
     super.dispose();
   }
 
@@ -1928,6 +1946,7 @@ class ChatService extends ChangeNotifier {
 
   void _discardTemporaryConversation(String? id) {
     if (id == null || !_temporaryConversationIds.remove(id)) return;
+    preparedContexts.remove(id);
     _rememberDiscardedTemporaryConversation(id);
     final messages = _messagesCache[id] ?? const <ChatMessage>[];
     for (final message in messages) {
@@ -1970,6 +1989,7 @@ class ChatService extends ChangeNotifier {
 
   Future<bool> _deleteDraftConversation(String id) async {
     if (!_draftConversations.containsKey(id)) return false;
+    preparedContexts.remove(id);
 
     _draftConversations.remove(id);
     if (_temporaryConversationIds.remove(id)) {
@@ -1995,6 +2015,7 @@ class ChatService extends ChangeNotifier {
     if (conversation == null) return false;
 
     await _repo.deleteConversation(id);
+    preparedContexts.remove(id);
     _conversationsCache.remove(id);
     // Stop any deferred/in-flight order backfill before clearing caches so a
     // late getMessageIds cannot resurrect order/count for a deleted id.
@@ -2549,6 +2570,7 @@ class ChatService extends ChangeNotifier {
   }
 
   Future<void> _resetAfterOverwriteRestore() async {
+    preparedContexts.clear();
     for (final id in _temporaryConversationIds) {
       _rememberDiscardedTemporaryConversation(id);
     }
@@ -4193,6 +4215,7 @@ class ChatService extends ChangeNotifier {
     if (!_initialized) await init();
 
     await _repo.clearAllData();
+    preparedContexts.clear();
     for (final id in _temporaryConversationIds) {
       _rememberDiscardedTemporaryConversation(id);
     }

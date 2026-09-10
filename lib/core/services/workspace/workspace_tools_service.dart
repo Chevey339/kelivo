@@ -173,16 +173,15 @@ class WorkspaceToolsService {
       ];
     }
     return definitions(
-          vocab: _pathVocab(ctx.paths),
-          outputHint: ctx.paths.sandboxed
-              ? '${WorkspacePaths.guestChat}/outputs/<id>.txt'
-              : '${ctx.paths.sessionHostDir}/outputs/<id>.txt',
-        )
-        .where(
-          (definition) =>
-              _enabled(ctx, (definition['function'] as Map)['name'] as String),
-        )
-        .toList();
+      vocab: _pathVocab(ctx.paths),
+      outputHint: ctx.paths.sandboxed
+          ? '${WorkspacePaths.guestChat}/outputs/<id>.txt'
+          : '${ctx.paths.sessionHostDir}/outputs/<id>.txt',
+    ).where((definition) {
+      final name = (definition['function'] as Map)['name'] as String;
+      return _enabled(ctx, name) &&
+          (name != 'shell' || ctx.runtimeStatus?.ready == true);
+    }).toList();
   }
 
   /// Shared schemas for execution and the ungated description editor.
@@ -336,8 +335,13 @@ class WorkspaceToolsService {
     WorkspaceToolContext ctx, {
     List<AttachmentInfo> attachments = const [],
     Iterable<String> environmentVariableNames = const [],
+    Set<String>? availableToolNames,
   }) {
     if (ctx.skillsOnly) return '';
+    bool enabled(String name) =>
+        availableToolNames?.contains(name) ??
+        (ctx.workspace.isToolEnabled(name) &&
+            (name != 'shell' || ctx.runtimeStatus?.ready == true));
     final paths = ctx.paths;
     final workspace = paths.sandboxed
         ? WorkspacePaths.guestWorkspace
@@ -381,11 +385,9 @@ class WorkspaceToolsService {
     buf
       ..writeln('- $tmp — scratch (writable, ephemeral)')
       ..writeln('cwd: ${ctx.cwd}')
-      ..writeln(
-        'Enabled tools: ${toolNames.where(ctx.workspace.isToolEnabled).join(', ')}',
-      )
+      ..writeln('Enabled tools: ${toolNames.where(enabled).join(', ')}')
       ..writeln();
-    if (ctx.workspace.isToolEnabled('shell')) {
+    if (enabled('shell')) {
       buf.writeln(
         'shell is one-shot: a fresh non-interactive sh -lc each call. '
         'No cd or env persists. Chain with &&. Use non-interactive flags (-y). '
@@ -399,9 +401,8 @@ class WorkspaceToolsService {
         );
       }
     }
-    if (ctx.workspace.isToolEnabled('read_file') &&
-        ctx.workspace.isToolEnabled('edit_file')) {
-      if (ctx.workspace.isToolEnabled('write_file')) {
+    if (enabled('read_file') && enabled('edit_file')) {
+      if (enabled('write_file')) {
         buf.writeln(
           'Prefer read_file, edit_file, and write_file over cat/sed.',
         );

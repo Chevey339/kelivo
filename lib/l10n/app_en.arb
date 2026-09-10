@@ -502,30 +502,7 @@
   "assistantEditVariableRole": "Role",
   "assistantEditVariableMessage": "Message",
   "assistantEditPreviewTitle": "Preview",
-  "assistantEditPromptTimeVarWarning": "Using time variables in the system prompt makes the beginning of every request different, so prompt caching cannot hit and both cost and time-to-first-token go up. If the model needs to know the current time, use the \"Append current time\" switch below.",
-  "assistantEditPromptAppendTimeTitle": "Append current time",
-  "assistantEditPromptAppendTimeSubtitle": "Append the send time to the end of each user message. Time stays at the end of the request, so prompt caching is unaffected.",
-  "assistantEditPromptAppendTimeInfoTitle": "Appended time format",
-  "assistantEditPromptAppendTimeInfoBody": "When enabled, a blank line and then the following tag are appended at the end of each user message:\n\n{example}\n\nThe timestamp is that message’s own send time, so it stays stable when you retry.",
-  "@assistantEditPromptAppendTimeInfoBody": {
-    "placeholders": {
-      "example": {
-        "type": "String"
-      }
-    }
-  },
-  "assistantEditPromptAppendTimeInfoClose": "Got it",
-  "assistantEditPromptTimeVarDialogTitle": "System prompt contains time variables",
-  "assistantEditPromptTimeVarDialogBody": "Your system prompt uses {variables}. The system prompt is re-rendered on every request, so time variables make the beginning of every request different and prompt caching cannot hit. Consider removing these variables and using \"Append current time\" instead — it puts the time at the end of the request and does not affect the prefix.",
-  "@assistantEditPromptTimeVarDialogBody": {
-    "placeholders": {
-      "variables": {
-        "type": "String"
-      }
-    }
-  },
-  "assistantEditPromptTimeVarDialogRemove": "Go remove",
-  "assistantEditPromptTimeVarDialogKeep": "Enable anyway",
+  "assistantEditPromptTimeVarWarning": "Time variables change the system prompt between requests. Built-in current time can be enabled above without editing your instructions.",
   "codeBlockPreviewButton": "Preview",
   "codeBlockSaveAsButton": "Save as file",
   "codeBlockCollapseButton": "Collapse",
@@ -4931,5 +4908,48 @@
   "mcpImportJsonHint": "Paste a Claude Desktop or Cursor MCP configuration. Preview and add servers without replacing existing ones.",
   "mcpImportPaste": "Paste from Clipboard",
   "mcpImportPreview": "Preview",
-  "mcpImportConfirm": "Import"
+  "mcpImportConfirm": "Import",
+  "harnessTitle": "Context",
+  "harnessBuiltInContext": "Built-in context",
+  "harnessAssistantScope": "Applies to this assistant. Changes take effect on the next generation.",
+  "harnessTime": "Current time and timezone",
+  "harnessTimeDescription": "Preview only · refreshed when sending. The get_time_info tool is configured separately.",
+  "harnessLocale": "App language",
+  "harnessLocaleDescription": "Provides the UI language without enforcing a response language.",
+  "harnessModel": "Model information",
+  "harnessModelDescription": "Configured model name and request ID, not verified server identity.",
+  "harnessRequestOnly": "Added only to the current request, outside your system prompt. Not saved in chat messages or exports.",
+  "harnessTimeConflict": "Your custom prompt also contains time variables. Both will be sent; your text is kept unchanged.",
+  "harnessCustomInstructions": "Custom instructions",
+  "harnessAdvanced": "Advanced · variables and message templates",
+  "harnessCurrentConfiguration": "Current configuration",
+  "harnessLatestRequest": "Latest prepared request",
+  "harnessPreparedOnly": "App-assembled context, not the final provider wire payload. Counts are estimates, not billed usage. Later tool rounds are not included.",
+  "harnessNoSnapshot": "No request snapshot in this session. Sending a message creates one; opening this panel sends nothing.",
+  "harnessDetails": "Context details",
+  "harnessToolsEstimate": "Tool schema tokens (estimated)",
+  "harnessClientTools": "Client tools",
+  "harnessNativeTools": "Provider-native tools",
+  "harnessOff": "Off",
+  "harnessAvailable": "Available",
+  "harnessUnavailable": "Configured but unavailable",
+  "harnessNotConfigured": "Not configured",
+  "harnessToolsUnsupported": "The selected model does not support client tools",
+  "harnessNativeExclusive": "The selected native tools exclude client tools on this model",
+  "harnessPlatformUnavailable": "Not available on this platform",
+  "harnessMcpDisconnected": "Selected servers are disconnected or have no enabled tools",
+  "harnessSkillReadUnavailable": "The read_file tool is disabled",
+  "harnessWorkspaceUnready": "Shell environment is not ready; file tools are checked separately",
+  "harnessReadinessPending": "Readiness will be checked when preparing a request",
+  "harnessMemory": "Memory and past chats",
+  "harnessMemoryReadOnly": "Memory context enabled; memory tools unavailable this round",
+  "harnessSearch": "Search",
+  "harnessLocalTools": "Local tools",
+  "harnessSkills": "Skills",
+  "harnessWorkspace": "Workspace",
+  "harnessClose": "Close context",
+  "harnessNotInjected": "Not injected",
+  "harnessFullRequest": "View full request context",
+  "harnessPreviewHint": "Preview of system instructions and current-turn context. Full history is loaded on demand.",
+  "harnessPartial": "Partly available"
 }
