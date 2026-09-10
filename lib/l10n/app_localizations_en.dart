@@ -1139,6 +1139,18 @@ class AppLocalizationsEn extends AppLocalizations {
   String get multiKeyPageDetect => 'Detect';
 
   @override
+  String get multiKeyPageQueryBalance => 'Query Balances';
+
+  @override
+  String get multiKeyPageBalanceDisabled =>
+      'Enable balance query in Balance settings first';
+
+  @override
+  String multiKeyPageBalanceQueriedSnackbar(int n) {
+    return 'Queried balance for $n keys';
+  }
+
+  @override
   String get multiKeyPageAdd => 'Add';
 
   @override
