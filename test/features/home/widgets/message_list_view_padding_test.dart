@@ -339,13 +339,14 @@ void main() {
         ..expanded = false,
     };
     streamingNotifier.getNotifier(messageId);
+    final settings = SettingsProvider(createBusinessTestPreferences());
+    await settings.loaded;
+    await settings.setShowCollapsedReasoningPreview(false);
 
     await tester.pumpWidget(
       MultiProvider(
         providers: [
-          ChangeNotifierProvider.value(
-            value: SettingsProvider(createBusinessTestPreferences()),
-          ),
+          ChangeNotifierProvider.value(value: settings),
           ChangeNotifierProvider.value(
             value: AssistantProvider(
               preferences: createBusinessTestPreferences(),
