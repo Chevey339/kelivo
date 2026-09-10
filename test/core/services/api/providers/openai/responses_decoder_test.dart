@@ -11,6 +11,22 @@ import 'package:flutter_test/flutter_test.dart';
 SseEvent _event(Map<String, dynamic> data) => SseEvent(data: jsonEncode(data));
 
 void main() {
+  test('reads OAuth Responses summary parts from non-stream output', () {
+    expect(
+      responsesReasoningText([
+        {
+          'type': 'reasoning',
+          'content': const [],
+          'summary': [
+            {'type': 'summary_text', 'text': 'Compare the tenths place.'},
+            {'type': 'summary_text', 'text': 'Choose the larger value.'},
+          ],
+        },
+      ]),
+      'Compare the tenths place.Choose the larger value.',
+    );
+  });
+
   test('streams text and reasoning and completes without Finish', () {
     final decoder = ResponsesStreamDecoder();
     final reasoning = decoder.accept(
@@ -42,6 +58,49 @@ void main() {
     expect(decoder.usage!.cachedTokens, 2);
     expect(decoder.onClosed(), isEmpty);
   });
+
+  test(
+    'decodes summary done events and keeps encrypted reasoning for replay',
+    () {
+      final decoder = ResponsesStreamDecoder();
+      decoder.accept(
+        _event({
+          'type': 'response.output_item.added',
+          'output_index': 0,
+          'item': {
+            'id': 'rs_1',
+            'type': 'reasoning',
+            'content': const [],
+            'summary': const [],
+            'encrypted_content': 'cipher',
+          },
+        }),
+      );
+
+      final done = decoder.accept(
+        _event({
+          'type': 'response.reasoning_summary_text.done',
+          'item_id': 'rs_1',
+          'output_index': 0,
+          'summary_index': 0,
+          'text': 'Current reasoning step',
+        }),
+      );
+      expect(
+        done.chunks.whereType<ReasoningDelta>().single.text,
+        'Current reasoning step',
+      );
+
+      decoder.accept(
+        _event({
+          'type': 'response.completed',
+          'response': {'output': const []},
+        }),
+      );
+      expect(decoder.outputItems.single['type'], 'reasoning');
+      expect(decoder.outputItems.single['encrypted_content'], 'cipher');
+    },
+  );
 
   test('assembles indexed function calls and citations', () {
     final decoder = ResponsesStreamDecoder();

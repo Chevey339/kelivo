@@ -89,6 +89,10 @@ class ResponsesStreamDecoder implements StreamChunkDecoder {
   final Map<int, String> _imageIdsByIndex = <int, String>{};
   final Set<String> _openImageIds = <String>{};
   final Set<String> _endedImageIds = <String>{};
+  final Map<int, Map<String, dynamic>> _outputItemsByIndex =
+      <int, Map<String, dynamic>>{};
+  final Map<String, int> _outputItemIndexesById = <String, int>{};
+  final Map<String, String> _reasoningTextByKey = <String, String>{};
   final Set<String> _openServerToolIds = <String>{};
   final Set<String> _endedServerToolIds = <String>{};
   final Set<String> _seenCitationUrls = <String>{};
@@ -192,13 +196,41 @@ class ResponsesStreamDecoder implements StreamChunkDecoder {
         type == 'response.reasoning_text.delta') {
       final delta = obj['delta'];
       if (delta is String && delta.isNotEmpty) {
-        chunks.add(ReasoningDelta(id: _ids.reasoning(), text: delta));
+        chunks.addAll(
+          _emitReasoningText(
+            obj,
+            delta,
+            isSummary: type == 'response.reasoning_summary_text.delta',
+          ),
+        );
+      }
+      return;
+    }
+    if (type == 'response.reasoning_summary_text.done' ||
+        type == 'response.reasoning_text.done') {
+      final text = obj['text'];
+      if (text is String && text.isNotEmpty) {
+        chunks.addAll(
+          _emitReasoningText(
+            obj,
+            text,
+            isSummary: type == 'response.reasoning_summary_text.done',
+            isFinal: true,
+          ),
+        );
       }
       return;
     }
     if (type == 'response.output_item.added') {
       final item = obj['item'];
       final idx = (obj['output_index'] ?? 0) as int;
+      if (item is Map) {
+        _rememberOutputItem(idx, item);
+        if (item['type'] == 'reasoning') {
+          chunks.addAll(_emitReasoningItem(item));
+          return;
+        }
+      }
       if (item is Map && (item['type'] ?? '') == 'function_call') {
         final callId = (item['call_id'] ?? '').toString();
         final name = (item['name'] ?? '').toString();
@@ -265,6 +297,13 @@ class ResponsesStreamDecoder implements StreamChunkDecoder {
     if (type == 'response.output_item.done') {
       final item = obj['item'];
       final idx = (obj['output_index'] ?? 0) as int;
+      if (item is Map) {
+        _rememberOutputItem(idx, item);
+        if (item['type'] == 'reasoning') {
+          chunks.addAll(_emitReasoningItem(item));
+          return;
+        }
+      }
       if (item is Map && (item['type'] ?? '') == 'function_call') {
         final args = (item['arguments'] ?? '').toString();
         final entry = toolCallsByIndex.putIfAbsent(
@@ -390,10 +429,16 @@ class ResponsesStreamDecoder implements StreamChunkDecoder {
       final output = response['output'];
       outputItems = const <Map<String, dynamic>>[];
       if (output is List) {
-        outputItems = [
-          for (final it in output)
-            if (it is Map) it.cast<String, dynamic>(),
-        ];
+        final terminalItems = <Map<String, dynamic>>[];
+        for (var index = 0; index < output.length; index++) {
+          final rawItem = output[index];
+          if (rawItem is! Map) continue;
+          final item = Map<String, dynamic>.from(rawItem);
+          _rememberOutputItem(index, item);
+          terminalItems.add(item);
+        }
+        final hasTerminalItems = terminalItems.isNotEmpty;
+        outputItems = hasTerminalItems ? terminalItems : _capturedOutputItems();
         try {
           _collectCitations(output);
           _collectCompletedImages(output);
@@ -401,7 +446,11 @@ class ResponsesStreamDecoder implements StreamChunkDecoder {
         _emitCollectedImages(chunks);
         _emitCollectedCitations(chunks);
         for (final item in outputItems) {
-          if (_isResponsesServerTool(item['type']) &&
+          if (item['type'] == 'reasoning') {
+            chunks.addAll(_emitReasoningItem(item));
+          }
+          if (hasTerminalItems &&
+              _isResponsesServerTool(item['type']) &&
               !_endedServerToolIds.contains((item['id'] ?? '').toString())) {
             chunks.addAll(
               _endServerTool(
@@ -420,6 +469,102 @@ class ResponsesStreamDecoder implements StreamChunkDecoder {
         : ServerToolStatus.completed;
     chunks.addAll(_closeOpenSeries(serverStatus: status));
     completed = true;
+  }
+
+  void _rememberOutputItem(int index, Map item) {
+    final copied = Map<String, dynamic>.from(item);
+    _outputItemsByIndex[index] = copied;
+    final itemId = (copied['id'] ?? '').toString();
+    if (itemId.isNotEmpty) _outputItemIndexesById[itemId] = index;
+  }
+
+  List<Map<String, dynamic>> _capturedOutputItems() {
+    final indexes = _outputItemsByIndex.keys.toList()..sort();
+    return [for (final index in indexes) _outputItemsByIndex[index]!];
+  }
+
+  List<StreamChunk> _emitReasoningItem(Map item) {
+    final text = _reasoningTextFromValue(
+      _reasoningTextFromValue(item['content']).isNotEmpty
+          ? item['content']
+          : item['summary'],
+    );
+    if (text.isEmpty) return const <StreamChunk>[];
+    final itemId = (item['id'] ?? '').toString();
+    final obj = <String, dynamic>{
+      'item_id': item['id'],
+      if (_outputItemIndexesById[itemId] != null)
+        'output_index': _outputItemIndexesById[itemId],
+      'summary_index': 0,
+      'type': item['summary'] is List
+          ? 'response.reasoning_summary_text.done'
+          : 'response.reasoning_text.done',
+    };
+    return _emitReasoningText(
+      obj,
+      text,
+      isSummary: item['summary'] is List,
+      isFinal: true,
+    );
+  }
+
+  List<StreamChunk> _emitReasoningText(
+    Map<String, dynamic> obj,
+    String text, {
+    required bool isSummary,
+    bool isFinal = false,
+  }) {
+    final key = _reasoningKey(obj, isSummary: isSummary);
+    final previous = _reasoningTextByKey[key] ?? '';
+    var delta = text;
+    if (isFinal) {
+      if (text == previous || previous.startsWith(text)) {
+        return const <StreamChunk>[];
+      }
+      if (text.startsWith(previous)) {
+        delta = text.substring(previous.length);
+      }
+    }
+    if (delta.isEmpty) return const <StreamChunk>[];
+    _reasoningTextByKey[key] = '$previous$delta';
+    return <StreamChunk>[
+      ReasoningDelta(
+        id: _ids.reasoning(),
+        text: delta,
+        reasoningType: isSummary
+            ? ReasoningType.summaryText
+            : ReasoningType.reasoningText,
+      ),
+    ];
+  }
+
+  String _reasoningKey(Map<String, dynamic> obj, {required bool isSummary}) {
+    final itemId = (obj['item_id'] ?? '').toString();
+    final outputIndex = (obj['output_index'] ?? '').toString();
+    final summaryIndex = (obj['summary_index'] ?? '').toString();
+    return '${isSummary ? 'summary' : 'reasoning'}:$itemId:$outputIndex:$summaryIndex';
+  }
+
+  String _reasoningTextFromValue(dynamic raw) {
+    if (raw is String) return raw;
+    if (raw is List) {
+      final buffer = StringBuffer();
+      for (final item in raw) {
+        buffer.write(_reasoningTextFromValue(item));
+      }
+      return buffer.toString();
+    }
+    if (raw is Map) {
+      for (final key in const <String>['text', 'summary', 'content']) {
+        final value = raw[key];
+        if (value is String) return value;
+        if (value is List) {
+          final nested = _reasoningTextFromValue(value);
+          if (nested.isNotEmpty) return nested;
+        }
+      }
+    }
+    return '';
   }
 
   void _collectCitations(List<dynamic> output) {

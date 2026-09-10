@@ -4402,6 +4402,14 @@ class AppLocalizationsZh extends AppLocalizations {
       '思考完成后自动折叠，保持界面简洁';
 
   @override
+  String get displaySettingsPageShowCollapsedReasoningPreviewTitle =>
+      '折叠时显示当前思考';
+
+  @override
+  String get displaySettingsPageShowCollapsedReasoningPreviewSubtitle =>
+      '思考卡片折叠时显示最新内容，并以动画更新。';
+
+  @override
   String get displaySettingsPageCollapseThinkingStepsTitle => '折叠思考步骤';
 
   @override
@@ -15155,6 +15163,14 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
       '思考完成后自动折叠，保持界面简洁';
 
   @override
+  String get displaySettingsPageShowCollapsedReasoningPreviewTitle =>
+      '折叠时显示当前思考';
+
+  @override
+  String get displaySettingsPageShowCollapsedReasoningPreviewSubtitle =>
+      '思考卡片折叠时显示最新内容，并以动画更新。';
+
+  @override
   String get displaySettingsPageCollapseThinkingStepsTitle => '折叠思考步骤';
 
   @override
@@ -25831,6 +25847,14 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   @override
   String get displaySettingsPageAutoCollapseThinkingSubtitle =>
       '思考完成後自動折疊，保持介面簡潔';
+
+  @override
+  String get displaySettingsPageShowCollapsedReasoningPreviewTitle =>
+      '摺疊時顯示目前思考';
+
+  @override
+  String get displaySettingsPageShowCollapsedReasoningPreviewSubtitle =>
+      '思考卡片摺疊時顯示最新內容，並以動畫更新。';
 
   @override
   String get displaySettingsPageCollapseThinkingStepsTitle => '折疊思考步驟';

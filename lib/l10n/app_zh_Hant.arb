@@ -1588,6 +1588,8 @@
   "displaySettingsPageShowToolCardsSubtitle": "關閉後，聊天中不再顯示工具呼叫卡片",
   "displaySettingsPageAutoCollapseThinkingTitle": "自動折疊思考",
   "displaySettingsPageAutoCollapseThinkingSubtitle": "思考完成後自動折疊，保持介面簡潔",
+  "displaySettingsPageShowCollapsedReasoningPreviewTitle": "摺疊時顯示目前思考",
+  "displaySettingsPageShowCollapsedReasoningPreviewSubtitle": "思考卡片摺疊時顯示最新內容，並以動畫更新。",
   "displaySettingsPageCollapseThinkingStepsTitle": "折疊思考步驟",
   "displaySettingsPageCollapseThinkingStepsSubtitle": "預設只顯示最新步驟，展開後查看全部",
   "displaySettingsPageShowToolResultSummaryTitle": "顯示工具結果摘要",
