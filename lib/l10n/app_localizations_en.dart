@@ -1294,40 +1294,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get assistantEditPromptTimeVarWarning =>
-      'Using time variables in the system prompt makes the beginning of every request different, so prompt caching cannot hit and both cost and time-to-first-token go up. If the model needs to know the current time, use the \"Append current time\" switch below.';
-
-  @override
-  String get assistantEditPromptAppendTimeTitle => 'Append current time';
-
-  @override
-  String get assistantEditPromptAppendTimeSubtitle =>
-      'Append the send time to the end of each user message. Time stays at the end of the request, so prompt caching is unaffected.';
-
-  @override
-  String get assistantEditPromptAppendTimeInfoTitle => 'Appended time format';
-
-  @override
-  String assistantEditPromptAppendTimeInfoBody(String example) {
-    return 'When enabled, a blank line and then the following tag are appended at the end of each user message:\n\n$example\n\nThe timestamp is that message’s own send time, so it stays stable when you retry.';
-  }
-
-  @override
-  String get assistantEditPromptAppendTimeInfoClose => 'Got it';
-
-  @override
-  String get assistantEditPromptTimeVarDialogTitle =>
-      'System prompt contains time variables';
-
-  @override
-  String assistantEditPromptTimeVarDialogBody(String variables) {
-    return 'Your system prompt uses $variables. The system prompt is re-rendered on every request, so time variables make the beginning of every request different and prompt caching cannot hit. Consider removing these variables and using \"Append current time\" instead — it puts the time at the end of the request and does not affect the prefix.';
-  }
-
-  @override
-  String get assistantEditPromptTimeVarDialogRemove => 'Go remove';
-
-  @override
-  String get assistantEditPromptTimeVarDialogKeep => 'Enable anyway';
+      'Time variables change the system prompt between requests. Built-in current time can be enabled above without editing your instructions.';
 
   @override
   String get codeBlockPreviewButton => 'Preview';
@@ -11230,4 +11197,148 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get mcpImportConfirm => 'Import';
+
+  @override
+  String get harnessTitle => 'Context';
+
+  @override
+  String get harnessBuiltInContext => 'Built-in context';
+
+  @override
+  String get harnessAssistantScope =>
+      'Applies to this assistant. Changes take effect on the next generation.';
+
+  @override
+  String get harnessTime => 'Current time and timezone';
+
+  @override
+  String get harnessTimeDescription =>
+      'Preview only · refreshed when sending. The get_time_info tool is configured separately.';
+
+  @override
+  String get harnessLocale => 'App language';
+
+  @override
+  String get harnessLocaleDescription =>
+      'Provides the UI language without enforcing a response language.';
+
+  @override
+  String get harnessModel => 'Model information';
+
+  @override
+  String get harnessModelDescription =>
+      'Configured model name and request ID, not verified server identity.';
+
+  @override
+  String get harnessRequestOnly =>
+      'Added only to the current request, outside your system prompt. Not saved in chat messages or exports.';
+
+  @override
+  String get harnessTimeConflict =>
+      'Your custom prompt also contains time variables. Both will be sent; your text is kept unchanged.';
+
+  @override
+  String get harnessCustomInstructions => 'Custom instructions';
+
+  @override
+  String get harnessAdvanced => 'Advanced · variables and message templates';
+
+  @override
+  String get harnessCurrentConfiguration => 'Current configuration';
+
+  @override
+  String get harnessLatestRequest => 'Latest prepared request';
+
+  @override
+  String get harnessPreparedOnly =>
+      'App-assembled context, not the final provider wire payload. Counts are estimates, not billed usage. Later tool rounds are not included.';
+
+  @override
+  String get harnessNoSnapshot =>
+      'No request snapshot in this session. Sending a message creates one; opening this panel sends nothing.';
+
+  @override
+  String get harnessDetails => 'Context details';
+
+  @override
+  String get harnessToolsEstimate => 'Tool schema tokens (estimated)';
+
+  @override
+  String get harnessClientTools => 'Client tools';
+
+  @override
+  String get harnessNativeTools => 'Provider-native tools';
+
+  @override
+  String get harnessOff => 'Off';
+
+  @override
+  String get harnessAvailable => 'Available';
+
+  @override
+  String get harnessUnavailable => 'Configured but unavailable';
+
+  @override
+  String get harnessNotConfigured => 'Not configured';
+
+  @override
+  String get harnessToolsUnsupported =>
+      'The selected model does not support client tools';
+
+  @override
+  String get harnessNativeExclusive =>
+      'The selected native tools exclude client tools on this model';
+
+  @override
+  String get harnessPlatformUnavailable => 'Not available on this platform';
+
+  @override
+  String get harnessMcpDisconnected =>
+      'Selected servers are disconnected or have no enabled tools';
+
+  @override
+  String get harnessSkillReadUnavailable => 'The read_file tool is disabled';
+
+  @override
+  String get harnessWorkspaceUnready =>
+      'Shell environment is not ready; file tools are checked separately';
+
+  @override
+  String get harnessReadinessPending =>
+      'Readiness will be checked when preparing a request';
+
+  @override
+  String get harnessMemory => 'Memory and past chats';
+
+  @override
+  String get harnessMemoryReadOnly =>
+      'Memory context enabled; memory tools unavailable this round';
+
+  @override
+  String get harnessSearch => 'Search';
+
+  @override
+  String get harnessLocalTools => 'Local tools';
+
+  @override
+  String get harnessSkills => 'Skills';
+
+  @override
+  String get harnessWorkspace => 'Workspace';
+
+  @override
+  String get harnessClose => 'Close context';
+
+  @override
+  String get harnessNotInjected => 'Not injected';
+
+  @override
+  String get harnessFullRequest => 'View full request context';
+
+  @override
+  String get harnessPreviewHint =>
+      'Preview of system instructions and current-turn context. Full history is loaded on demand.';
+
+  @override
+  String get harnessPartial => 'Partly available';
 }

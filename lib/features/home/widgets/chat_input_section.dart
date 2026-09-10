@@ -55,6 +55,7 @@ class ChatInputSection extends StatelessWidget {
     this.onSelectModel,
     this.onLongPressSelectModel,
     this.onOpenTools,
+    this.onOpenContext,
     this.onLongPressTools,
     this.onOpenWorkspace,
     this.onOpenSkills,
@@ -99,6 +100,7 @@ class ChatInputSection extends StatelessWidget {
   final VoidCallback? onSelectModel;
   final VoidCallback? onLongPressSelectModel;
   final VoidCallback? onOpenTools;
+  final VoidCallback? onOpenContext;
   final VoidCallback? onLongPressTools;
   final VoidCallback? onOpenWorkspace;
   final VoidCallback? onOpenSkills;
@@ -151,9 +153,8 @@ class ChatInputSection extends StatelessWidget {
     final pk = chatModelProviderKey;
     final mid = chatModelId;
 
-    // Enforce model capabilities: disable MCP selection if model doesn't
-    // support tools. Skipped while the conversation overrides the model —
-    // these writes land on the assistant and would leak across conversations.
+    // Reasoning enforcement is skipped for per-conversation model overrides.
+    // Tool selections are retained even when the current model lacks tools.
     if (!chatModelIsConversationOverride) {
       _enforceModelCapabilities(context, settings, ap, a, pk, mid);
     }
@@ -177,6 +178,7 @@ class ChatInputSection extends StatelessWidget {
       onLongPressSelectModel: onLongPressSelectModel,
       conversationId: conversationId,
       onOpenTools: onOpenTools,
+      onOpenContext: onOpenContext,
       onLongPressTools: onLongPressTools,
       onOpenWorkspace: onOpenWorkspace,
       showWorkspaceButton: showWorkspaceButton,
@@ -327,15 +329,8 @@ class ChatInputSection extends StatelessWidget {
   ) {
     if (pk == null || mid == null) return;
 
-    final supportsTools = isToolModel(pk, mid);
-    if (!supportsTools && (a?.mcpServerIds.isNotEmpty ?? false)) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        final aa = ap.currentAssistant;
-        if (aa != null && aa.mcpServerIds.isNotEmpty) {
-          ap.updateAssistant(aa.copyWith(mcpServerIds: const <String>[]));
-        }
-      });
-    }
+    // Tool availability is request-scoped. Never erase the assistant's MCP
+    // selections just because one selected model does not support tools.
 
     final supportsReasoning = isReasoningModel(pk, mid);
     if (!supportsReasoning && a != null) {

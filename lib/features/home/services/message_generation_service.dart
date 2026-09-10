@@ -1,3 +1,4 @@
+import '../../../core/models/workspace_binding.dart';
 import 'package:Kelivo/core/providers/external_mounts_provider.dart';
 import 'dart:async';
 import 'package:flutter/widgets.dart';
@@ -13,6 +14,10 @@ import '../../../core/services/api/builtin_tools.dart';
 import '../../../core/services/api/chat_api_service.dart';
 import '../../../core/providers/workspace_provider.dart';
 import '../../../core/services/chat/chat_service.dart';
+import '../../../core/services/chat/runtime_context.dart';
+import '../../../core/services/chat/prepared_context_store.dart';
+import '../../../core/services/logging/context_log_models.dart';
+import '../../../core/services/api/generation/generation_capabilities.dart';
 import '../../../core/services/chat/document_text_extractor.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../core/services/logging/context_logger.dart';
@@ -66,6 +71,7 @@ class PreparedGeneration {
   final ToolCallHandler? onToolCall;
   final bool hasBuiltInSearch;
   final List<String> lastUserImagePaths;
+  final PreparedContextSnapshot? contextSnapshot;
 
   PreparedGeneration({
     required this.apiMessages,
@@ -73,6 +79,7 @@ class PreparedGeneration {
     this.onToolCall,
     required this.hasBuiltInSearch,
     required this.lastUserImagePaths,
+    this.contextSnapshot,
   });
 }
 
@@ -92,13 +99,15 @@ class MessageGenerationService {
     required this.generationController,
     required this.streamController,
     required this.contextProvider,
-  });
+    DateTime Function()? clock,
+  }) : clock = clock ?? DateTime.now;
 
   final ChatService chatService;
   final MessageBuilderService messageBuilderService;
   final GenerationController generationController;
   final stream_ctrl.StreamController streamController;
   final BuildContext contextProvider;
+  final DateTime Function() clock;
 
   // Callbacks for UI updates (set by home_page)
   OnMessagesChanged? onMessagesChanged;
@@ -139,6 +148,9 @@ class MessageGenerationService {
     String? processingMessageId,
     String? requiredAttachmentMessageId,
   }) async {
+    final appLocale = assistant?.includeAppLocaleInContext == true
+        ? Localizations.localeOf(contextProvider).toLanguageTag()
+        : '';
     final cfg = settings.getProviderConfig(providerKey);
     final kind = ProviderConfig.classify(
       providerKey,
@@ -180,37 +192,7 @@ class MessageGenerationService {
       }
     }
 
-    // Inject prompts first so WorldBook can scan the full untrimmed history
-    // (same keyword trigger range as before OCR-after-trim). Document/OCR work
-    // runs only after the single final context trim below.
-    messageBuilderService.injectSystemPrompt(apiMessages, assistant, modelId);
-    await messageBuilderService.injectMemoryAndRecentChats(
-      apiMessages,
-      assistant,
-      settings: settings,
-      currentConversationId: currentConversation?.id,
-    );
-
-    final hasBuiltInSearch = messageBuilderService.hasBuiltInSearch(
-      settings,
-      providerKey,
-      modelId,
-    );
-    messageBuilderService.injectSearchPrompt(
-      apiMessages,
-      settings,
-      assistant,
-      hasBuiltInSearch,
-    );
-    await messageBuilderService.injectInstructionPrompts(
-      apiMessages,
-      assistantId,
-    );
-    await messageBuilderService.injectWorldBookPrompts(
-      apiMessages,
-      assistantId,
-    );
-
+    final issues = <ContextPreparationIssue>[];
     WorkspaceToolContext? workspaceContext;
     var workspaceAttachments = const <AttachmentInfo>[];
     try {
@@ -221,6 +203,17 @@ class MessageGenerationService {
           workspaceProvider: workspaceProvider,
           runtimeProvider: runtimeProvider,
           chatService: chatService,
+        );
+      }
+      if (workspaceContext == null &&
+          WorkspaceBinding.fromExtras(
+            currentConversation?.extras ?? const {},
+          ).isBound) {
+        issues.add(
+          const ContextPreparationIssue(
+            ContextSource.workspace,
+            'workspaceUnavailable',
+          ),
         );
       }
       workspaceContext ??= await _skillsOnlyContext(
@@ -234,28 +227,91 @@ class MessageGenerationService {
           requiredMessageId: requiredAttachmentMessageId,
         );
       }
-      if (workspaceContext != null) {
-        await messageBuilderService.injectWorkspacePrompt(
-          apiMessages,
-          assistant,
-          conversationId: currentConversation?.id,
-          workspaceContext: workspaceContext,
-          attachments: workspaceAttachments,
-        );
-      }
     } catch (e) {
       if (workspaceContext != null && !workspaceContext.skillsOnly) {
         // Let the existing generation error UI offer retry. Continuing here
         // would silently send without the attachments the user selected.
         rethrow;
       }
-      debugPrint('Workspace prompt/attachments failed: $e');
+      issues.add(
+        ContextPreparationIssue(
+          ContextSource.workspace,
+          e.runtimeType.toString(),
+        ),
+      );
+    }
+    final hasBuiltInSearch = messageBuilderService.hasBuiltInSearch(
+      settings,
+      providerKey,
+      modelId,
+    );
+    final mcpRouteSnapshot = generationController.captureMcpToolRoutes(
+      assistant,
+    );
+    final configuredToolDefs = generationController.buildToolDefinitions(
+      settings,
+      assistant,
+      providerKey,
+      modelId,
+      hasBuiltInSearch,
+      mcpRouteSnapshot: mcpRouteSnapshot,
+      workspaceContext: workspaceContext,
+    );
+    final capabilities = GenerationCapabilities.resolve(
+      config: cfg,
+      modelId: modelId,
+      clientTools: configuredToolDefs,
+    );
+    final toolDefs = capabilities.clientTools;
+    final availableToolNames = capabilities.toolNames;
+    // Inject prompts first so WorldBook can scan the full untrimmed history
+    // (same keyword trigger range as before OCR-after-trim). Document/OCR work
+    // runs only after the single final context trim below.
+    messageBuilderService.injectSystemPrompt(apiMessages, assistant, modelId);
+    await messageBuilderService.injectMemoryAndRecentChats(
+      apiMessages,
+      assistant,
+      settings: settings,
+      currentConversationId: currentConversation?.id,
+      availableToolNames: availableToolNames,
+      issues: issues,
+    );
+
+    if (availableToolNames.contains('search_web')) {
+      messageBuilderService.injectSearchPrompt(
+        apiMessages,
+        settings,
+        assistant,
+        hasBuiltInSearch,
+      );
+    }
+    await messageBuilderService.injectInstructionPrompts(
+      apiMessages,
+      assistantId,
+    );
+    await messageBuilderService.injectWorldBookPrompts(
+      apiMessages,
+      assistantId,
+    );
+
+    if (workspaceContext != null) {
+      await messageBuilderService.injectWorkspacePrompt(
+        apiMessages,
+        assistant,
+        conversationId: currentConversation?.id,
+        workspaceContext: workspaceContext,
+        attachments: workspaceAttachments,
+        availableToolNames: availableToolNames,
+        issues: issues,
+      );
     }
     await messageBuilderService.injectSkillsPrompt(
       apiMessages,
       assistant,
       conversationId: currentConversation?.id,
       workspaceContext: workspaceContext,
+      availableToolNames: availableToolNames,
+      issues: issues,
     );
 
     // Single final trim after WorldBook TOP/BOTTOM/AT_DEPTH injections. OCR and
@@ -270,18 +326,6 @@ class MessageGenerationService {
     // reads, memory injection, templating) must never show the bar.
     // Tools are assembled first: whether a data file is read into the prompt
     // or left for the sandbox depends on which tools go with it.
-    final mcpRouteSnapshot = generationController.captureMcpToolRoutes(
-      assistant,
-    );
-    final toolDefs = generationController.buildToolDefinitions(
-      settings,
-      assistant,
-      providerKey,
-      modelId,
-      hasBuiltInSearch,
-      mcpRouteSnapshot: mcpRouteSnapshot,
-      workspaceContext: workspaceContext,
-    );
     final sandboxDataFiles = BuiltInToolsHelper.sendsDataFilesToSandbox(
       cfg: cfg,
       modelId: modelId,
@@ -341,16 +385,33 @@ class MessageGenerationService {
     }
 
     await messageBuilderService.inlineLocalImages(apiMessages);
-    if (ContextLogger.enabled) {
-      final providerName = cfg.name.trim();
-      ContextLogger.logPrepared(
+    final now = clock();
+    final runtimeContext = RuntimeContextSnapshot.capture(
+      assistant: assistant,
+      now: now,
+      appLocale: appLocale,
+      modelName: displayNameForModel(cfg, modelId),
+      modelId: BuiltInToolNames.effectiveModelId(cfg: cfg, modelId: modelId),
+    );
+    injectRuntimeContext(apiMessages, runtimeContext);
+    final snapshot = PreparedContextSnapshot(
+      generationId:
+          processingMessageId ??
+          '${currentConversation?.id}:${now.microsecondsSinceEpoch}',
+      context: ContextLogger.buildSnapshot(
         apiMessages: apiMessages,
         conversationId: currentConversation?.id ?? '',
         assistantName: assistant?.name ?? '',
-        provider: providerName.isNotEmpty ? providerName : providerKey,
+        provider: cfg.name.trim().isNotEmpty ? cfg.name : providerKey,
         model: modelId,
-      );
-    }
+        timestamp: now,
+      ),
+      tools: toolDefs,
+      nativeTools: capabilities.nativeTools,
+      issues: List.unmodifiable(issues),
+    );
+    chatService.recordPreparedContext(snapshot);
+    ContextLogger.logSnapshot(snapshot.context);
     messageBuilderService.stripInternalRevisionIds(apiMessages);
 
     final onToolCall = toolDefs.isNotEmpty
@@ -371,6 +432,7 @@ class MessageGenerationService {
       onToolCall: onToolCall,
       hasBuiltInSearch: hasBuiltInSearch,
       lastUserImagePaths: lastUserImagePaths,
+      contextSnapshot: snapshot,
     );
   }
 

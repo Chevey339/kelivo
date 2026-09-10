@@ -1096,3 +1096,40 @@ class BuiltInToolsState {
   bool get anyGeminiToolActive =>
       codeExecutionActive || urlContextActive || youtubeActive;
 }
+
+List<Map<String, dynamic>> buildGeminiToolsArray({
+  required Set<String> builtIns,
+  required bool allowCoexistence,
+  List<Map<String, dynamic>>? geminiTools,
+}) {
+  final toolsArr = <Map<String, dynamic>>[];
+  if (allowCoexistence) {
+    if (builtIns.contains(BuiltInToolNames.codeExecution)) {
+      toolsArr.add({'code_execution': {}});
+    }
+    if (builtIns.contains(BuiltInToolNames.search)) {
+      toolsArr.add({'google_search': {}});
+    }
+    if (builtIns.contains(BuiltInToolNames.urlContext)) {
+      toolsArr.add({'url_context': {}});
+    }
+    if (geminiTools != null) {
+      toolsArr.addAll(geminiTools);
+    }
+  } else {
+    if (builtIns.contains(BuiltInToolNames.codeExecution)) {
+      toolsArr.add({'code_execution': {}});
+    } else if (builtIns.contains(BuiltInToolNames.search) ||
+        builtIns.contains(BuiltInToolNames.urlContext)) {
+      if (builtIns.contains(BuiltInToolNames.search)) {
+        toolsArr.add({'google_search': {}});
+      }
+      if (builtIns.contains(BuiltInToolNames.urlContext)) {
+        toolsArr.add({'url_context': {}});
+      }
+    } else if (geminiTools != null) {
+      toolsArr.addAll(geminiTools);
+    }
+  }
+  return toolsArr;
+}

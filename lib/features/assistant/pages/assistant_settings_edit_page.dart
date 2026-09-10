@@ -13,7 +13,6 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:http/http.dart' as http;
 import 'package:image_picker/image_picker.dart';
 import '../../../core/services/chat/prompt_transformer.dart';
-import '../../../core/services/memory/memory_prompts.dart';
 import 'package:provider/provider.dart';
 import 'package:syncfusion_flutter_core/theme.dart';
 import 'package:syncfusion_flutter_sliders/sliders.dart';
@@ -63,6 +62,7 @@ import '../../../utils/brand_assets.dart';
 import '../../../utils/platform_utils.dart';
 import '../../../utils/sandbox_path_resolver.dart';
 import '../utils/assistant_edit_tab_layout.dart';
+import '../widgets/runtime_context_settings_card.dart';
 import 'assistant_regex_tab.dart';
 import 'assistant_settings_edit_skills_tab.dart';
 import 'assistant_settings_edit_workspace_tab.dart';
@@ -274,7 +274,12 @@ Future<int?> _showContextMessageInputDialog(
 }
 
 class AssistantSettingsEditPage extends StatefulWidget {
-  const AssistantSettingsEditPage({super.key, required this.assistantId});
+  const AssistantSettingsEditPage({
+    super.key,
+    required this.assistantId,
+    this.initialTab,
+  });
+  final String? initialTab;
   final String assistantId;
 
   @override
@@ -285,6 +290,7 @@ class AssistantSettingsEditPage extends StatefulWidget {
 class _AssistantSettingsEditPageState extends State<AssistantSettingsEditPage>
     with TickerProviderStateMixin {
   late TabController _tabController;
+  bool _initialTabApplied = false;
 
   @override
   void initState() {
@@ -306,9 +312,10 @@ class _AssistantSettingsEditPageState extends State<AssistantSettingsEditPage>
     if (mounted) setState(() {});
   }
 
-  void _syncTabController(int length) {
-    if (_tabController.length == length) return;
-    final nextIndex = math.min(_tabController.index, length - 1);
+  void _syncTabController(int length, {int? initialIndex}) {
+    if (_tabController.length == length && initialIndex == null) return;
+    final nextIndex =
+        initialIndex ?? math.min(_tabController.index, length - 1);
     _tabController.removeListener(_handleTabChanged);
     _tabController.dispose();
     _tabController = TabController(
@@ -347,10 +354,24 @@ class _AssistantSettingsEditPageState extends State<AssistantSettingsEditPage>
     }
 
     final allTabs = _assistantEditTabSpecs(context, assistant.id);
-    final visibleTabs = _visibleAssistantEditTabs(allTabs, settings);
-    final useOutline = settings.mobileAssistantDetailOutlineEnabled;
+    final visibleTabs = [..._visibleAssistantEditTabs(allTabs, settings)];
+    final requestedTabs = allTabs.where((tab) => tab.id == widget.initialTab);
+    if (requestedTabs.isNotEmpty &&
+        !visibleTabs.any((tab) => tab.id == widget.initialTab)) {
+      visibleTabs.insert(0, requestedTabs.first);
+    }
+    final useOutline =
+        settings.mobileAssistantDetailOutlineEnabled &&
+        widget.initialTab == null;
     if (!useOutline) {
-      _syncTabController(visibleTabs.length);
+      final initial = !_initialTabApplied
+          ? visibleTabs.indexWhere((tab) => tab.id == widget.initialTab)
+          : -1;
+      _syncTabController(
+        visibleTabs.length,
+        initialIndex: initial >= 0 ? initial : null,
+      );
+      _initialTabApplied = true;
     }
 
     return Scaffold(

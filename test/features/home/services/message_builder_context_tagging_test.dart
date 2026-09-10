@@ -72,29 +72,28 @@ void main() {
     await ContextLogger.setEnabled(false);
   });
 
-  test(
-    'logger disabled leaves _kelivo_ctx_segments off buildApiMessages and injects',
-    () {
-      final service = _service();
-      final apiMessages = service.buildApiMessages(
-        messages: [
-          _message(id: 'u1', role: 'user', content: 'hello'),
-          _message(id: 'a1', role: 'assistant', content: 'hi'),
-        ],
-        versionSelections: const {},
-        currentConversation: Conversation(title: 'test'),
-      );
+  test('logger disabled still records provenance for in-memory inspection', () {
+    final service = _service();
+    final apiMessages = service.buildApiMessages(
+      messages: [
+        _message(id: 'u1', role: 'user', content: 'hello'),
+        _message(id: 'a1', role: 'assistant', content: 'hi'),
+      ],
+      versionSelections: const {},
+      currentConversation: Conversation(title: 'test'),
+    );
 
-      service.injectSearchPrompt(
-        apiMessages,
-        SettingsProvider(createBusinessTestPreferences()),
-        const Assistant(id: 'a1', name: 'A', searchEnabled: true),
-        false,
-      );
+    service.injectSearchPrompt(
+      apiMessages,
+      SettingsProvider(createBusinessTestPreferences()),
+      const Assistant(id: 'a1', name: 'A', searchEnabled: true),
+      false,
+    );
 
-      expect(_hasSegmentsKey(apiMessages), isFalse);
-    },
-  );
+    expect(_hasSegmentsKey(apiMessages), isTrue);
+    service.stripInternalRevisionIds(apiMessages);
+    expect(_hasSegmentsKey(apiMessages), isFalse);
+  });
 
   test(
     'enabled buildApiMessages tags chatHistory, toolCall, and toolResult',

@@ -84,21 +84,7 @@ ModelDisplayInfo getModelDisplayInfo(
   final cfg = settings.getProviderConfig(providerKey);
   final providerName = cfg.name.isNotEmpty ? cfg.name : providerKey;
 
-  // Extract model display name from overrides or use raw modelId
-  String modelDisplay = modelId;
-  final ov = cfg.modelOverrides[modelId] as Map?;
-  if (ov != null) {
-    // Priority: override name > apiModelId > api_model_id > raw modelId
-    final overrideName = (ov['name'] as String?)?.trim();
-    if (overrideName != null && overrideName.isNotEmpty) {
-      modelDisplay = overrideName;
-    } else {
-      final apiId = (ov['apiModelId'] ?? ov['api_model_id'])?.toString().trim();
-      if (apiId != null && apiId.isNotEmpty) {
-        modelDisplay = apiId;
-      }
-    }
-  }
+  final modelDisplay = displayNameForModel(cfg, modelId);
 
   return ModelDisplayInfo(
     providerName: providerName,
@@ -134,4 +120,25 @@ ProviderConfig? getActiveProviderConfig(
   ).providerKey;
   if (providerKey == null) return null;
   return settings.getProviderConfig(providerKey);
+}
+
+/// Display label for an already-resolved request target; shared by the UI and harness.
+String displayNameForModel(ProviderConfig cfg, String modelId) {
+  // Extract model display name from overrides or use raw modelId
+  String modelDisplay = modelId;
+  final ov = cfg.modelOverrides[modelId] as Map?;
+  if (ov != null) {
+    // Priority: override name > apiModelId > api_model_id > raw modelId
+    final overrideName = (ov['name'] as String?)?.trim();
+    if (overrideName != null && overrideName.isNotEmpty) {
+      modelDisplay = overrideName;
+    } else {
+      final apiId = (ov['apiModelId'] ?? ov['api_model_id'])?.toString().trim();
+      if (apiId != null && apiId.isNotEmpty) {
+        modelDisplay = apiId;
+      }
+    }
+  }
+
+  return modelDisplay;
 }

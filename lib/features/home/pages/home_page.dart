@@ -1,3 +1,5 @@
+import '../../workspace/widgets/skills/conversation_skills_sheet.dart';
+import '../../chat/widgets/chat_context_inspector.dart';
 import 'dart:async';
 import 'dart:io' show Platform;
 import 'package:flutter/material.dart';
@@ -1522,6 +1524,47 @@ class _HomePageState extends State<HomePage>
           anchorKey: _inputBarKey,
           conversationId: id,
           assistant: assistant,
+        );
+      },
+      onOpenContext: () {
+        final assistant = context.read<AssistantProvider>().currentAssistant;
+        if (assistant == null) return;
+        _controller.dismissKeyboard();
+        showChatContextInspector(
+          context,
+          assistantId: assistant.id,
+          conversationId: _controller.currentConversation?.id,
+          isToolModel: _controller.isToolModel,
+          onManageSearch: _openSearchSettings,
+          onManageWorkspace: () {
+            if (PlatformUtils.isDesktop) {
+              showDesktopWorkspaceDialog(
+                context,
+                conversationListenable: _controller,
+                conversationId: () => _controller.currentConversation?.id,
+                assistantId: assistant.id,
+              );
+            } else {
+              showChatToolsSheet(
+                context,
+                assistantId: assistant.id,
+                conversationId: _controller.currentConversation?.id,
+              );
+            }
+          },
+          onManageSkills: () async {
+            final id = await ensureConversationId(
+              context,
+              conversationId: _controller.currentConversation?.id,
+              assistantId: assistant.id,
+            );
+            if (id == null || !context.mounted) return;
+            await showConversationSkillsSheet(
+              context,
+              conversationId: id,
+              assistant: assistant,
+            );
+          },
         );
       },
       onOpenTools: () {

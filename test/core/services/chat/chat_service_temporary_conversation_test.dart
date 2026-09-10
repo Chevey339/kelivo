@@ -1,3 +1,5 @@
+import 'package:Kelivo/core/services/chat/prepared_context_store.dart';
+import 'package:Kelivo/core/services/logging/context_logger.dart';
 import 'package:Kelivo/core/models/message_part.dart';
 import 'package:Kelivo/core/models/chat_message.dart';
 import 'package:Kelivo/core/models/conversation.dart';
@@ -67,6 +69,48 @@ void main() {
     services.add(service);
     return service;
   }
+
+  test(
+    'context snapshots expire with temporary and deleted conversations',
+    () async {
+      final service = createService();
+      await service.init();
+      PreparedContextSnapshot snapshot(Conversation conversation) =>
+          PreparedContextSnapshot(
+            generationId: 'generation',
+            tools: [],
+            context: ContextLogger.buildSnapshot(
+              apiMessages: [],
+              conversationId: conversation.id,
+              assistantName: 'A',
+              provider: 'P',
+              model: 'M',
+            ),
+          );
+      final temporary = await service.createDraftConversation(
+        title: 'Temporary',
+        temporary: true,
+      );
+      final first = snapshot(temporary);
+      service.recordPreparedContext(first);
+      expect(service.preparedContexts.forConversation(temporary.id), isNotNull);
+      final persisted = await service.createConversation(title: 'Persistent');
+      expect(service.preparedContexts.forConversation(temporary.id), isNull);
+      service.recordPreparedContext(first);
+      expect(service.preparedContexts.forConversation(temporary.id), isNull);
+      await service.addMessage(
+        conversationId: persisted.id,
+        role: 'user',
+        content: 'hello',
+      );
+      final second = snapshot(persisted);
+      service.recordPreparedContext(second);
+      await service.deleteConversation(persisted.id);
+      expect(service.preparedContexts.forConversation(persisted.id), isNull);
+      service.recordPreparedContext(second);
+      expect(service.preparedContexts.forConversation(persisted.id), isNull);
+    },
+  );
 
   test('cold init clears every stale streaming flag', () async {
     final first = createService();

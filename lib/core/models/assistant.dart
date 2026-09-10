@@ -81,6 +81,8 @@ class Assistant {
   final int
   recentChatsSummaryMessageCount; // refresh summary after N new messages
   final bool appendCurrentTimeToUserMessage;
+  final bool includeAppLocaleInContext;
+  final bool includeModelInfoInContext;
   // Preset conversation messages (ordered)
   final List<PresetMessage> presetMessages;
   // Regex replacement rules
@@ -126,6 +128,8 @@ class Assistant {
     this.generateConversationSummary = false,
     this.recentChatsSummaryMessageCount = defaultRecentChatsSummaryMessageCount,
     this.appendCurrentTimeToUserMessage = false,
+    this.includeAppLocaleInContext = false,
+    this.includeModelInfoInContext = false,
     this.presetMessages = const <PresetMessage>[],
     this.regexRules = const <AssistantRegex>[],
   });
@@ -170,6 +174,8 @@ class Assistant {
     bool? generateConversationSummary,
     int? recentChatsSummaryMessageCount,
     bool? appendCurrentTimeToUserMessage,
+    bool? includeAppLocaleInContext,
+    bool? includeModelInfoInContext,
     List<PresetMessage>? presetMessages,
     List<AssistantRegex>? regexRules,
     bool clearChatModel = false,
@@ -238,6 +244,10 @@ class Assistant {
           recentChatsSummaryMessageCount ?? this.recentChatsSummaryMessageCount,
       appendCurrentTimeToUserMessage:
           appendCurrentTimeToUserMessage ?? this.appendCurrentTimeToUserMessage,
+      includeAppLocaleInContext:
+          includeAppLocaleInContext ?? this.includeAppLocaleInContext,
+      includeModelInfoInContext:
+          includeModelInfoInContext ?? this.includeModelInfoInContext,
       presetMessages: presetMessages ?? this.presetMessages,
       regexRules: regexRules ?? this.regexRules,
     );
@@ -283,6 +293,8 @@ class Assistant {
     'generateConversationSummary': generateConversationSummary,
     'recentChatsSummaryMessageCount': recentChatsSummaryMessageCount,
     'appendCurrentTimeToUserMessage': appendCurrentTimeToUserMessage,
+    'includeAppLocaleInContext': includeAppLocaleInContext,
+    'includeModelInfoInContext': includeModelInfoInContext,
     'presetMessages': PresetMessage.encodeList(presetMessages),
     'regexRules': regexRules.map((e) => e.toJson()).toList(),
   };
@@ -401,6 +413,10 @@ class Assistant {
     })(),
     appendCurrentTimeToUserMessage:
         json['appendCurrentTimeToUserMessage'] as bool? ?? false,
+    includeAppLocaleInContext:
+        json['includeAppLocaleInContext'] as bool? ?? false,
+    includeModelInfoInContext:
+        json['includeModelInfoInContext'] as bool? ?? false,
     presetMessages: (() {
       try {
         return PresetMessage.decodeList(json['presetMessages']);

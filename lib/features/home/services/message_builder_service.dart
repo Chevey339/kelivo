@@ -23,7 +23,7 @@ import '../../../utils/mcp_structured_image.dart';
 import '../../../utils/sandbox_path_resolver.dart';
 import '../../../core/services/chat/prompt_transformer.dart';
 import '../../../core/services/logging/context_log_models.dart';
-import '../../../core/services/logging/context_logger.dart';
+import '../../../core/services/chat/prepared_context_store.dart';
 import '../../../core/services/memory/memory_block_builder.dart';
 import '../../../core/services/memory/memory_prompts.dart';
 import '../../../core/models/skills_binding.dart';
@@ -317,7 +317,7 @@ class MessageBuilderService {
               // assistant message as well would replay the same reasoning
               // twice, which OpenRouter/Anthropic reject. Only the final
               // assistant message below carries them.
-              if (ContextLogger.enabled) {
+              {
                 ContextSegmentTags.replaceWithSingle(
                   assistantToolMessage,
                   source: ContextSource.toolCall,
@@ -386,7 +386,7 @@ class MessageBuilderService {
       if (reasoningDetails != null) {
         message['reasoning_details'] = reasoningDetails;
       }
-      if (ContextLogger.enabled) {
+      {
         ContextSegmentTags.replaceWithSingle(
           message,
           source: ContextSource.chatHistory,
@@ -1032,7 +1032,7 @@ class MessageBuilderService {
         final carriesSnapshot =
             existing.carriesMemorySnapshot && sendPayload == existing.payload;
         if (carriesSnapshot) snapshotRevisionIds.add(revisionId);
-        if (ContextLogger.enabled) {
+        {
           _tagFrozenUserPrompt(
             apiMessages[i],
             payload: sendPayload,
@@ -1146,15 +1146,12 @@ class MessageBuilderService {
             ? '{{ message }}'
             : (assistant?.messageTemplate ?? '{{ message }}');
         final now = chatMessage?.timestamp ?? DateTime.now();
-        var content = PromptTransformer.applyMessageTemplate(
+        final content = PromptTransformer.applyMessageTemplate(
           templ,
           role: 'user',
           message: processedBody,
           now: now,
         );
-        if (assistant?.appendCurrentTimeToUserMessage == true) {
-          content = '$content\n\n${MemoryPrompts.formatCurrentTimeTag(now)}';
-        }
         apiMessages[i]['content'] = content;
       }
     }
@@ -1263,7 +1260,7 @@ class MessageBuilderService {
         if (wanted == null || wanted == split.prefix) continue;
         final refreshed = '$wanted${split.rest}';
         message['content'] = refreshed;
-        if (ContextLogger.enabled) {
+        {
           _tagFrozenUserPrompt(
             message,
             payload: refreshed,
@@ -1273,7 +1270,7 @@ class MessageBuilderService {
         continue;
       }
       message['content'] = split.rest;
-      if (ContextLogger.enabled) {
+      {
         ContextSegmentTags.replaceWithSingle(
           message,
           source: ContextSource.chatHistory,
@@ -1368,12 +1365,9 @@ class MessageBuilderService {
       message: processedUserBody,
       now: message.timestamp,
     );
-    final timeSuffix = (assistant?.appendCurrentTimeToUserMessage ?? false)
-        ? '\n\n${MemoryPrompts.formatCurrentTimeTag(message.timestamp)}'
-        : '';
-    final finalContent = '${memory.prefix}$templated$timeSuffix';
+    final finalContent = '${memory.prefix}$templated';
 
-    if (ContextLogger.enabled) {
+    {
       for (final apiMessage in apiMessages) {
         if ((apiMessage[internalRevisionIdKey] ?? '').toString() !=
             message.id) {
@@ -1624,7 +1618,7 @@ class MessageBuilderService {
         vars,
       );
       final sysMessage = <String, dynamic>{'role': 'system', 'content': sys};
-      if (ContextLogger.enabled) {
+      {
         ContextSegmentTags.replaceWithSingle(
           sysMessage,
           source: ContextSource.systemPrompt,
@@ -1648,6 +1642,8 @@ class MessageBuilderService {
     Assistant? assistant, {
     SettingsProvider? settings,
     String? currentConversationId,
+    Set<String>? availableToolNames,
+    List<ContextPreparationIssue>? issues,
   }) async {
     try {
       if (assistant == null) return;
@@ -1657,6 +1653,7 @@ class MessageBuilderService {
           assistant,
           settings: settings,
           currentConversationId: currentConversationId,
+          availableToolNames: availableToolNames,
         );
         return;
       }
@@ -1664,7 +1661,10 @@ class MessageBuilderService {
       // allowPastConversationRecall alone, so its rules cannot ride along with
       // the long-term memory rules or the tool ships without instructions.
       final wantsMemoryRules = assistant.enableMemory;
-      final wantsRecallRules = assistant.allowPastConversationRecall;
+      final wantsRecallRules =
+          assistant.allowPastConversationRecall &&
+          (availableToolNames == null ||
+              availableToolNames.contains('chat_search'));
       if (!wantsMemoryRules && !wantsRecallRules) return;
 
       final resolved = settings ?? contextProvider.read<SettingsProvider>();
@@ -1674,7 +1674,15 @@ class MessageBuilderService {
         final rules = lang == MemoryPromptLang.zh
             ? resolved.memoryRulesPromptZh
             : resolved.memoryRulesPromptEn;
-        buf.write(rules.trim());
+        buf.write(
+          availableToolNames == null
+              ? rules.trim()
+              : MemoryPrompts.forAvailableTools(
+                  rules,
+                  lang,
+                  availableToolNames,
+                ),
+        );
       }
       if (wantsRecallRules) {
         if (buf.isNotEmpty) buf.write('\n\n');
@@ -1685,7 +1693,14 @@ class MessageBuilderService {
         buf.toString(),
         source: ContextSource.memoryRules,
       );
-    } catch (_) {}
+    } catch (error) {
+      issues?.add(
+        ContextPreparationIssue(
+          ContextSource.memoryRules,
+          error.runtimeType.toString(),
+        ),
+      );
+    }
   }
 
   Future<void> _injectLegacyMemoryAndRecentChats(
@@ -1693,6 +1708,7 @@ class MessageBuilderService {
     Assistant assistant, {
     SettingsProvider? settings,
     String? currentConversationId,
+    Set<String>? availableToolNames,
   }) async {
     if (assistant.enableMemory) {
       final resolved = settings ?? contextProvider.read<SettingsProvider>();
@@ -1716,12 +1732,29 @@ class MessageBuilderService {
       final template = resolved.resolvedMemoryPromptLang == MemoryPromptLang.zh
           ? resolved.legacyMemoryPromptZh
           : resolved.legacyMemoryPromptEn;
-      buf.writeln(
-        template.replaceAll(
-          MemoryPrompts.legacyCurrentTimePlaceholder,
-          currentHour,
-        ),
-      );
+      const operations = {'create_memory', 'edit_memory', 'delete_memory'};
+      final builtInTemplate =
+          template.trim() == MemoryPrompts.legacyRulesZh ||
+          template.trim() == MemoryPrompts.legacyRulesEn;
+      if (availableToolNames != null &&
+          builtInTemplate &&
+          !availableToolNames.containsAll(operations)) {
+        final available = operations
+            .where(availableToolNames.contains)
+            .join(', ');
+        buf.writeln(
+          resolved.resolvedMemoryPromptLang == MemoryPromptLang.zh
+              ? '这些记录是应用提供的历史记忆。仅使用工具定义中列出的操作。本轮可用记忆工具：${available.isEmpty ? "无" : available}。'
+              : 'These records are app-provided historical memory. Use only operations in the tool definitions. Memory tools in this request: ${available.isEmpty ? "none" : available}.',
+        );
+      } else {
+        buf.writeln(
+          template.replaceAll(
+            MemoryPrompts.legacyCurrentTimePlaceholder,
+            currentHour,
+          ),
+        );
+      }
       _appendToSystemMessage(
         apiMessages,
         buf.toString(),
@@ -1819,6 +1852,8 @@ class MessageBuilderService {
     String? conversationId,
     WorkspaceToolContext? workspaceContext,
     List<AttachmentInfo> attachments = const [],
+    Set<String>? availableToolNames,
+    List<ContextPreparationIssue>? issues,
   }) async {
     try {
       final environmentProvider = contextProvider.read<EnvironmentProvider?>();
@@ -1837,14 +1872,22 @@ class MessageBuilderService {
         ctx,
         attachments: attachments,
         environmentVariableNames: environment?.variables.keys ?? const [],
+        availableToolNames: availableToolNames,
       );
       if (fragment.trim().isEmpty) return;
       _appendToSystemMessage(
         apiMessages,
         fragment,
-        source: ContextSource.instructionInjection,
+        source: ContextSource.workspace,
       );
-    } catch (_) {}
+    } catch (error) {
+      issues?.add(
+        ContextPreparationIssue(
+          ContextSource.workspace,
+          error.runtimeType.toString(),
+        ),
+      );
+    }
   }
 
   /// Inject the `<available_skills>` list after the workspace prompt.
@@ -1853,6 +1896,8 @@ class MessageBuilderService {
     Assistant? assistant, {
     String? conversationId,
     WorkspaceToolContext? workspaceContext,
+    Set<String>? availableToolNames,
+    List<ContextPreparationIssue>? issues,
   }) async {
     try {
       final skillsService = contextProvider.read<SkillsService>();
@@ -1869,8 +1914,18 @@ class MessageBuilderService {
         conversationOverride: override,
       );
       if (skills.isEmpty) return;
-      final skillsModelRoot =
-          workspaceContext?.paths.modelSkillsDir ?? '/skills';
+      if (workspaceContext == null ||
+          (availableToolNames != null &&
+              !availableToolNames.contains('read_file'))) {
+        issues?.add(
+          const ContextPreparationIssue(
+            ContextSource.skills,
+            'toolUnavailable',
+          ),
+        );
+        return;
+      }
+      final skillsModelRoot = workspaceContext.paths.modelSkillsDir;
       final fragment = buildAvailableSkillsFragment(
         skills,
         skillsModelRoot: skillsModelRoot,
@@ -1879,9 +1934,16 @@ class MessageBuilderService {
       _appendToSystemMessage(
         apiMessages,
         fragment,
-        source: ContextSource.instructionInjection,
+        source: ContextSource.skills,
       );
-    } catch (_) {}
+    } catch (error) {
+      issues?.add(
+        ContextPreparationIssue(
+          ContextSource.skills,
+          error.runtimeType.toString(),
+        ),
+      );
+    }
   }
 
   /// Inject world book (lorebook) entries into apiMessages.
@@ -2011,7 +2073,7 @@ class MessageBuilderService {
                   'role': 'user',
                   'content': wrapSystemTag(merged),
                 };
-          if (ContextLogger.enabled) {
+          {
             ContextSegmentTags.replaceWithSingle(
               message,
               source: ContextSource.worldBook,
@@ -2069,7 +2131,7 @@ class MessageBuilderService {
             sb.write(afterContent);
           }
           apiMessages[systemIndex]['content'] = sb.toString();
-          if (ContextLogger.enabled) {
+          {
             final sysMsg = apiMessages[systemIndex];
             if (beforeContent.isNotEmpty) {
               ContextSegmentTags.prepend(
@@ -2106,7 +2168,7 @@ class MessageBuilderService {
               'role': 'system',
               'content': sb.toString(),
             };
-            if (ContextLogger.enabled) {
+            {
               if (beforeContent.isNotEmpty && afterContent.isNotEmpty) {
                 ContextSegmentTags.write(created, [
                   ContextSegmentTags.item(
@@ -2227,7 +2289,7 @@ class MessageBuilderService {
     if (apiMessages.isNotEmpty && apiMessages.first['role'] == 'system') {
       apiMessages[0]['content'] =
           '${(apiMessages[0]['content'] ?? '') as String}\n\n$content';
-      if (ContextLogger.enabled && source != null) {
+      if (source != null) {
         ContextSegmentTags.append(
           apiMessages[0],
           source: source,
@@ -2236,7 +2298,7 @@ class MessageBuilderService {
       }
     } else {
       final message = <String, dynamic>{'role': 'system', 'content': content};
-      if (ContextLogger.enabled && source != null) {
+      if (source != null) {
         ContextSegmentTags.append(
           message,
           source: source,

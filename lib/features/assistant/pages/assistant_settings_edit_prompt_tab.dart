@@ -15,6 +15,7 @@ class _PromptTabState extends State<_PromptTab> {
   late final FocusNode _tmplFocus;
   late final TextEditingController _presetCtrl;
   bool _showPresetInput = false;
+  bool _advancedExpanded = false;
   String _presetRole = 'user';
   final GlobalKey _presetHeaderKey = GlobalKey(debugLabel: 'presetHeader');
 
@@ -201,83 +202,12 @@ class _PromptTabState extends State<_PromptTab> {
     await _applySystemPromptChange(next);
   }
 
-  Future<void> _onAppendCurrentTimeChanged(Assistant a, bool enabled) async {
-    if (enabled) {
-      final hits = MemoryPrompts.detectTimeVariablesInSystemPrompt(
-        _sysCtrl.text,
-      );
-      if (hits.isNotEmpty) {
-        final keep = await _showTimeVarEnableDialog(context, hits);
-        if (!mounted) return;
-        if (keep != true) {
-          if (keep == false) {
-            Future.microtask(() => _sysFocus.requestFocus());
-          }
-          return;
-        }
-      }
-    }
-    await context.read<AssistantProvider>().updateAssistant(
-      a.copyWith(appendCurrentTimeToUserMessage: enabled),
-    );
-  }
-
-  Future<bool?> _showTimeVarEnableDialog(
-    BuildContext context,
-    List<String> hits,
-  ) {
-    final l10n = AppLocalizations.of(context)!;
-    final cs = Theme.of(context).colorScheme;
-    final variables = hits.join(', ');
-    return showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(l10n.assistantEditPromptTimeVarDialogTitle),
-        content: Text(l10n.assistantEditPromptTimeVarDialogBody(variables)),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(false),
-            child: Text(l10n.assistantEditPromptTimeVarDialogRemove),
-          ),
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(true),
-            child: Text(
-              l10n.assistantEditPromptTimeVarDialogKeep,
-              style: TextStyle(color: cs.primary),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Future<void> _showAppendCurrentTimeInfoDialog(BuildContext context) {
-    final l10n = AppLocalizations.of(context)!;
-    const example = '<current_time>Mon 2026-08-08 14:30:05</current_time>';
-    return showDialog<void>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(l10n.assistantEditPromptAppendTimeInfoTitle),
-        content: Text(l10n.assistantEditPromptAppendTimeInfoBody(example)),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(),
-            child: Text(l10n.assistantEditPromptAppendTimeInfoClose),
-          ),
-        ],
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
     final cs = Theme.of(context).colorScheme;
     final ap = context.watch<AssistantProvider>();
     final a = ap.getById(widget.assistantId)!;
-    final timeVarsInPrompt = MemoryPrompts.detectTimeVariablesInSystemPrompt(
-      _sysCtrl.text,
-    );
 
     // Sample preview for message template
     final now = DateTime.now();
@@ -312,7 +242,7 @@ class _PromptTabState extends State<_PromptTab> {
               children: [
                 Expanded(
                   child: Text(
-                    l10n.assistantEditSystemPromptTitle,
+                    l10n.harnessCustomInstructions,
                     style: TextStyle(
                       fontSize: 15,
                       fontWeight: AppFontWeights.emphasis,
@@ -326,12 +256,12 @@ class _PromptTabState extends State<_PromptTab> {
                   minSize: 38,
                   color: cs.primary,
                   onTap: _openSystemPromptEditor,
-                  semanticLabel: l10n.assistantEditSystemPromptTitle,
+                  semanticLabel: l10n.harnessCustomInstructions,
                 ),
                 const SizedBox(width: 4),
                 _IosButton(
                   label: l10n.assistantEditSystemPromptImportButton,
-                  icon: Icons.file_open,
+                  icon: Lucide.Upload,
                   dense: true,
                   neutral: false,
                   onTap: _importSystemPrompt,
@@ -373,95 +303,60 @@ class _PromptTabState extends State<_PromptTab> {
                 contentPadding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
               ),
             ),
-            const SizedBox(height: 8),
-            Text(
-              l10n.assistantEditAvailableVariables,
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: AppFontWeights.semibold,
-              ),
-            ),
-            const SizedBox(height: 4),
-            _VarExplainList(
-              items: [
-                (l10n.assistantEditVariableDate, '{cur_date}'),
-                (l10n.assistantEditVariableTime, '{cur_time}'),
-                (l10n.assistantEditVariableDatetime, '{cur_datetime}'),
-                (l10n.assistantEditVariableModelId, '{model_id}'),
-                (l10n.assistantEditVariableModelName, '{model_name}'),
-                (l10n.assistantEditVariableLocale, '{locale}'),
-                (l10n.assistantEditVariableTimezone, '{timezone}'),
-                (l10n.assistantEditVariableSystemVersion, '{system_version}'),
-                (l10n.assistantEditVariableDeviceInfo, '{device_info}'),
-                (l10n.assistantEditVariableBatteryLevel, '{battery_level}'),
-                (l10n.assistantEditVariableNickname, '{nickname}'),
-                (l10n.assistantEditVariableAssistantName, '{assistant_name}'),
-              ],
-              cacheWarningVars: const {
-                '{cur_date}',
-                '{cur_time}',
-                '{cur_datetime}',
-              },
-              cacheWarningTooltip: l10n.assistantEditPromptTimeVarWarning,
-              onTapVar: (v) {
-                _insertAtCursor(_sysCtrl, v);
-                setState(() {});
-                context.read<AssistantProvider>().updateAssistant(
-                  a.copyWith(systemPrompt: _sysCtrl.text),
-                );
-                // Restore focus to the input to keep cursor active
-                Future.microtask(() => _sysFocus.requestFocus());
-              },
-            ),
-            AnimatedSize(
-              duration: const Duration(milliseconds: 180),
-              curve: Curves.easeOutCubic,
-              alignment: Alignment.topCenter,
-              child: timeVarsInPrompt.isEmpty
-                  ? const SizedBox.shrink()
-                  : Padding(
-                      padding: const EdgeInsets.only(top: 10),
-                      child: Material(
-                        color: cs.errorContainer.withValues(alpha: 0.30),
-                        borderRadius: BorderRadius.circular(12),
-                        child: Padding(
-                          padding: const EdgeInsets.all(12),
-                          child: Row(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Icon(
-                                Lucide.TriangleAlert,
-                                size: 18,
-                                color: cs.error,
-                              ),
-                              const SizedBox(width: 8),
-                              Expanded(
-                                child: Text(
-                                  l10n.assistantEditPromptTimeVarWarning,
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    height: 1.35,
-                                    color: cs.onSurface.withValues(alpha: 0.8),
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-            ),
           ],
         ),
       ),
     );
 
-    final appendTimeCard = SectionCard(
+    final variablesCard = SectionCard(
       children: [
-        _AppendCurrentTimeRow(
-          value: a.appendCurrentTimeToUserMessage,
-          onChanged: (enabled) => _onAppendCurrentTimeChanged(a, enabled),
-          onInfoTap: () => _showAppendCurrentTimeInfoDialog(context),
+        Padding(
+          padding: const EdgeInsets.all(12),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const SizedBox(height: 8),
+              Text(
+                l10n.assistantEditAvailableVariables,
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: AppFontWeights.semibold,
+                ),
+              ),
+              const SizedBox(height: 4),
+              _VarExplainList(
+                items: [
+                  (l10n.assistantEditVariableDate, '{cur_date}'),
+                  (l10n.assistantEditVariableTime, '{cur_time}'),
+                  (l10n.assistantEditVariableDatetime, '{cur_datetime}'),
+                  (l10n.assistantEditVariableModelId, '{model_id}'),
+                  (l10n.assistantEditVariableModelName, '{model_name}'),
+                  (l10n.assistantEditVariableLocale, '{locale}'),
+                  (l10n.assistantEditVariableTimezone, '{timezone}'),
+                  (l10n.assistantEditVariableSystemVersion, '{system_version}'),
+                  (l10n.assistantEditVariableDeviceInfo, '{device_info}'),
+                  (l10n.assistantEditVariableBatteryLevel, '{battery_level}'),
+                  (l10n.assistantEditVariableNickname, '{nickname}'),
+                  (l10n.assistantEditVariableAssistantName, '{assistant_name}'),
+                ],
+                cacheWarningVars: const {
+                  '{cur_date}',
+                  '{cur_time}',
+                  '{cur_datetime}',
+                },
+                cacheWarningTooltip: l10n.assistantEditPromptTimeVarWarning,
+                onTapVar: (v) {
+                  _insertAtCursor(_sysCtrl, v);
+                  setState(() {});
+                  context.read<AssistantProvider>().updateAssistant(
+                    a.copyWith(systemPrompt: _sysCtrl.text),
+                  );
+                  // Restore focus to the input to keep cursor active
+                  Future.microtask(() => _sysFocus.requestFocus());
+                },
+              ),
+            ],
+          ),
         ),
       ],
     );
@@ -900,105 +795,28 @@ class _PromptTabState extends State<_PromptTab> {
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 20),
       children: [
+        RuntimeContextSettingsCard(
+          assistant: a,
+          onChanged: (next) => ap.updateAssistant(next),
+        ),
+        const SizedBox(height: 12),
         sysCard,
         const SizedBox(height: 12),
-        appendTimeCard,
-        const SizedBox(height: 12),
-        tmplCard,
-        const SizedBox(height: 12),
-        presetCard(),
-      ],
-    );
-  }
-}
-
-class _AppendCurrentTimeRow extends StatelessWidget {
-  const _AppendCurrentTimeRow({
-    required this.value,
-    required this.onChanged,
-    required this.onInfoTap,
-  });
-
-  final bool value;
-  final ValueChanged<bool> onChanged;
-  final VoidCallback onInfoTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context)!;
-    final cs = Theme.of(context).colorScheme;
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: [
-          Expanded(
-            child: _TactileRow(
-              onTap: () => onChanged(!value),
-              builder: (pressed) {
-                final baseColor = cs.onSurface.withValues(alpha: 0.9);
-                return _AnimatedPressColor(
-                  pressed: pressed,
-                  base: baseColor,
-                  builder: (color) {
-                    return Row(
-                      crossAxisAlignment: CrossAxisAlignment.center,
-                      children: [
-                        SizedBox(
-                          width: 36,
-                          child: Icon(
-                            Lucide.clock,
-                            size: 20,
-                            color: value ? cs.primary : color,
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                l10n.assistantEditPromptAppendTimeTitle,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: TextStyle(
-                                  fontSize: 15,
-                                  color: color,
-                                  fontWeight: AppFontWeights.semibold,
-                                ),
-                              ),
-                              const SizedBox(height: 3),
-                              Text(
-                                l10n.assistantEditPromptAppendTimeSubtitle,
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  height: 1.25,
-                                  color: cs.onSurface.withValues(alpha: 0.62),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    );
-                  },
-                );
-              },
-            ),
-          ),
-          IosIconButton(
-            icon: Lucide.BadgeInfo,
-            size: 16,
-            padding: const EdgeInsets.all(6),
-            minSize: 32,
-            color: cs.onSurface.withValues(alpha: 0.55),
-            semanticLabel: l10n.assistantEditPromptAppendTimeInfoTitle,
-            onTap: onInfoTap,
-          ),
-          const SizedBox(width: 4),
-          IosSwitch(value: value, onChanged: onChanged),
+        _HoverPillButton(
+          icon: _advancedExpanded ? Lucide.ChevronUp : Lucide.ChevronDown,
+          color: cs.primary,
+          label: l10n.harnessAdvanced,
+          onTap: () => setState(() => _advancedExpanded = !_advancedExpanded),
+        ),
+        if (_advancedExpanded) ...[
+          const SizedBox(height: 12),
+          variablesCard,
+          const SizedBox(height: 12),
+          tmplCard,
+          const SizedBox(height: 12),
+          presetCard(),
         ],
-      ),
+      ],
     );
   }
 }
@@ -1323,7 +1141,7 @@ class _SystemPromptDesktopDialogState
                       children: [
                         Expanded(
                           child: Text(
-                            l10n.assistantEditSystemPromptTitle,
+                            l10n.harnessCustomInstructions,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: TextStyle(

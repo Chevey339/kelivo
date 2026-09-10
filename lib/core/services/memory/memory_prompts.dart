@@ -1,11 +1,57 @@
 /// Memory prompt language for model-facing contracts (not UI l10n / ARB).
 enum MemoryPromptLang { zh, en }
 
-/// Built-in default prompt templates and pure time helpers for the memory system.
+/// Built-in default prompt templates for the memory system.
 ///
 /// These strings are model contracts and must NOT go through ARB (§16.2).
 abstract final class MemoryPrompts {
   MemoryPrompts._();
+
+  /// Keep custom instructions intact. Built-in rules describe only tools that
+  /// accompany this request (temporary chats, for example, omit write tools).
+  static String forAvailableTools(
+    String template,
+    MemoryPromptLang lang,
+    Set<String> tools,
+  ) {
+    if (template.trim() != rulesZh && template.trim() != rulesEn) {
+      return template.trim();
+    }
+    if (tools.containsAll({
+      'memory_search_profile',
+      'memory_update',
+      'memory_edit',
+      'memory_delete',
+    })) {
+      return template.trim();
+    }
+    final zh = lang == MemoryPromptLang.zh;
+    return [
+      zh ? '## 长期记忆' : '## Long-term memory',
+      zh
+          ? '<user_profile> 和 <user_memory> 是应用提供的历史记忆，不是用户本轮说的话。条目日期是最后更新日期；(assistant) 标记助手专属记忆。summary 块只展示部分条目，空标签表示没有记忆。<user_memory_update> 替换先前的快照。'
+          : '<user_profile> and <user_memory> are app-provided historical memory, not the current user turn. Entry dates are last-update dates; (assistant) marks assistant-specific entries. Summary blocks contain only some entries; empty tags mean no memory. <user_memory_update> replaces the earlier snapshot.',
+      zh
+          ? '称呼优先使用 preferred_name；缺失时不要猜测，也不要使用其他人的名字。'
+          : 'Use preferred_name when present; otherwise do not guess or use another person’s name.',
+      if (tools.contains('memory_search_profile'))
+        zh
+            ? '需要更多记忆时使用 memory_search_profile。'
+            : 'Use memory_search_profile when more memory is needed.',
+      if (tools.contains('memory_update'))
+        zh
+            ? '用户明确提供跨对话仍有用的稳定事实时，用 memory_update 写入第三人称陈述。不要写入临时信息、未确认推断或可从聊天记录查到的事实。'
+            : 'Use memory_update for explicit, stable user facts useful across conversations, written in third person. Do not store transient information, unconfirmed inferences or facts retrievable from chat history.',
+      if (tools.contains('memory_edit'))
+        zh
+            ? '用 memory_edit 更正用户指出的错误记忆。'
+            : 'Use memory_edit to correct memories the user identifies as wrong.',
+      if (tools.contains('memory_delete'))
+        zh
+            ? '用 memory_delete 归档应删除的记忆。'
+            : 'Use memory_delete to archive memories that should be removed.',
+    ].join('\n\n');
+  }
 
   // ── §11.2 / §11.3 memory rules ───────────────────────────────────────────
 
@@ -481,44 +527,6 @@ Input:
   static const String moreHintZh = '[更多内容请使用 memory_search_profile 查询]';
   static const String moreHintEn =
       '[More entries exist. Use memory_search_profile to look them up.]';
-
-  // ── §9.1 / §9.3 time helpers ─────────────────────────────────────────────
-
-  static const List<String> _weekdayAbbrev = [
-    'Mon',
-    'Tue',
-    'Wed',
-    'Thu',
-    'Fri',
-    'Sat',
-    'Sun',
-  ];
-
-  /// Wraps [timestamp] as `<current_time>EEE yyyy-MM-dd HH:mm:ss</current_time>`
-  /// in the local timezone, without a UTC offset (§9.1).
-  ///
-  /// Four-digit year avoids `yy-MM-dd` / `dd-MM-yy` ambiguity (e.g. 22–26).
-  static String formatCurrentTimeTag(DateTime timestamp) {
-    final local = timestamp.isUtc ? timestamp.toLocal() : timestamp;
-    final eee = _weekdayAbbrev[local.weekday - 1];
-    final yyyy = local.year.toString();
-    final mm = local.month.toString().padLeft(2, '0');
-    final dd = local.day.toString().padLeft(2, '0');
-    final hh = local.hour.toString().padLeft(2, '0');
-    final min = local.minute.toString().padLeft(2, '0');
-    final ss = local.second.toString().padLeft(2, '0');
-    return '<current_time>$eee $yyyy-$mm-$dd $hh:$min:$ss</current_time>';
-  }
-
-  /// Returns which of `{cur_date}`, `{cur_time}`, `{cur_datetime}` occur in
-  /// [systemPrompt], in that fixed order. `{timezone}` etc. are ignored (§9.3).
-  static List<String> detectTimeVariablesInSystemPrompt(String systemPrompt) {
-    const candidates = ['{cur_date}', '{cur_time}', '{cur_datetime}'];
-    return [
-      for (final token in candidates)
-        if (systemPrompt.contains(token)) token,
-    ];
-  }
 
   static String rulesFor(MemoryPromptLang lang) =>
       lang == MemoryPromptLang.zh ? rulesZh : rulesEn;

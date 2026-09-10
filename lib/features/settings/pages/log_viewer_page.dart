@@ -870,7 +870,7 @@ class _ContextLogFilePageState extends State<_ContextLogFilePage> {
                         Navigator.of(context).push(
                           MaterialPageRoute(
                             builder: (_) =>
-                                _ContextSnapshotDetailPage(snapshot: snapshot),
+                                ContextSnapshotDetailPage(snapshot: snapshot),
                           ),
                         );
                       },
@@ -1207,7 +1207,7 @@ class _ContextCompositionLegend extends StatelessWidget {
               ),
               const SizedBox(width: 6),
               Text(
-                _contextSourceLabel(l10n, entry.key),
+                contextSourceLabel(l10n, entry.key),
                 style: TextStyle(
                   fontSize: 12,
                   color: cs.onSurface.withValues(alpha: 0.72),
@@ -1228,8 +1228,8 @@ class _ContextCompositionLegend extends StatelessWidget {
   }
 }
 
-class _ContextSnapshotDetailPage extends StatelessWidget {
-  const _ContextSnapshotDetailPage({required this.snapshot});
+class ContextSnapshotDetailPage extends StatelessWidget {
+  const ContextSnapshotDetailPage({super.key, required this.snapshot});
 
   final ContextLogSnapshot snapshot;
 
@@ -1309,7 +1309,7 @@ class _ContextSnapshotDetailPage extends StatelessWidget {
             padding: EdgeInsets.only(
               bottom: index == snapshot.messages.length ? 0 : 14,
             ),
-            child: _ContextMessageGroup(message: message),
+            child: ContextMessageGroup(message: message),
           );
         },
       ),
@@ -1343,8 +1343,8 @@ class _ContextInfoCard extends StatelessWidget {
   }
 }
 
-class _ContextMessageGroup extends StatelessWidget {
-  const _ContextMessageGroup({required this.message});
+class ContextMessageGroup extends StatelessWidget {
+  const ContextMessageGroup({super.key, required this.message});
 
   final ContextLogMessage message;
 
@@ -1482,7 +1482,7 @@ class _ContextSegmentBlockState extends State<_ContextSegmentBlock> {
                 ),
                 const SizedBox(width: 8),
                 Text(
-                  _contextSourceLabel(l10n, widget.segment.source),
+                  contextSourceLabel(l10n, widget.segment.source),
                   style: TextStyle(
                     fontSize: 12.5,
                     fontWeight: AppFontWeights.emphasis,
@@ -2008,6 +2008,9 @@ Color _contextSourceColor(BuildContext context, ContextSource source) {
   final cs = Theme.of(context).colorScheme;
   final colors = context.appColors;
   switch (source) {
+    case ContextSource.runtimeContext:
+    case ContextSource.workspace:
+    case ContextSource.skills:
     case ContextSource.systemPrompt:
       return cs.primary;
     case ContextSource.memoryRules:
@@ -2027,8 +2030,14 @@ Color _contextSourceColor(BuildContext context, ContextSource source) {
   }
 }
 
-String _contextSourceLabel(AppLocalizations l10n, ContextSource source) {
+String contextSourceLabel(AppLocalizations l10n, ContextSource source) {
   switch (source) {
+    case ContextSource.runtimeContext:
+      return l10n.harnessBuiltInContext;
+    case ContextSource.workspace:
+      return l10n.harnessWorkspace;
+    case ContextSource.skills:
+      return l10n.harnessSkills;
     case ContextSource.systemPrompt:
       return l10n.contextLogSourceSystemPrompt;
     case ContextSource.memoryRules:

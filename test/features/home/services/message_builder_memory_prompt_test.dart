@@ -749,8 +749,44 @@ void main() {
         expect(second, first);
         expect(retry, first);
         expect(first, contains('hello world'));
-        expect(first, contains(MemoryPrompts.formatCurrentTimeTag(ts)));
+        expect(first, isNot(contains('<current_time>')));
+        expect(first, isNot(contains('<runtime_context>')));
         expect(first, contains('<user_memory type="identity">'));
+      },
+    );
+
+    test(
+      'old frozen time tags remain historical text and are not rewritten',
+      () async {
+        await seedAssistant('assistant-1');
+        final conversation = await seedConversation('conv-1');
+        final message = await seedUserMessage(
+          id: 'u1',
+          conversationId: 'conv-1',
+          content: 'hello',
+        );
+        const frozen =
+            'hello\n\n<current_time>Fri 2026-08-07 14:03:22</current_time>';
+        await chatRepository.putMessagePrompt(
+          revisionId: message.id,
+          conversationId: conversation.id,
+          payload: frozen,
+          carriesMemorySnapshot: false,
+        );
+        final service = buildService(messages: [message]);
+        final result = await service.resolvePromptContent(
+          message: message,
+          processedUserBody: 'hello',
+          assistant: assistant.copyWith(appendCurrentTimeToUserMessage: false),
+          conversation: conversation,
+          settings: settings,
+          apiMessages: [],
+        );
+        expect(result, frozen);
+        expect(
+          (await chatRepository.getMessagePrompt(message.id))!.payload,
+          frozen,
+        );
       },
     );
 
