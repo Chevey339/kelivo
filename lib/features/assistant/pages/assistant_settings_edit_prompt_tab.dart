@@ -251,9 +251,15 @@ class _PromptTabState extends State<_PromptTab> {
     );
   }
 
-  Future<void> _showAppendCurrentTimeInfoDialog(BuildContext context) {
+  Future<void> _showAppendCurrentTimeInfoDialog(
+    BuildContext context,
+    Assistant assistant,
+  ) {
     final l10n = AppLocalizations.of(context)!;
-    const example = '<current_time>Mon 2026-08-08 14:30:05</current_time>';
+    final example = MemoryPrompts.formatCurrentTimeTag(
+      DateTime(2026, 8, 8, 14, 30, 5),
+      useIso8601: assistant.useIso8601TimeFormat,
+    );
     return showDialog<void>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -461,8 +467,21 @@ class _PromptTabState extends State<_PromptTab> {
         _AppendCurrentTimeRow(
           value: a.appendCurrentTimeToUserMessage,
           onChanged: (enabled) => _onAppendCurrentTimeChanged(a, enabled),
-          onInfoTap: () => _showAppendCurrentTimeInfoDialog(context),
+          onInfoTap: () => _showAppendCurrentTimeInfoDialog(context, a),
         ),
+        if (a.appendCurrentTimeToUserMessage) ...[
+          _iosDivider(context),
+          _iosSwitchRow(
+            context,
+            icon: Lucide.clock,
+            label: l10n.assistantEditPromptIso8601Title,
+            subtitle: l10n.assistantEditPromptIso8601Subtitle,
+            value: a.useIso8601TimeFormat,
+            onChanged: (value) => context
+                .read<AssistantProvider>()
+                .updateAssistant(a.copyWith(useIso8601TimeFormat: value)),
+          ),
+        ],
       ],
     );
 

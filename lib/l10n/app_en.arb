@@ -503,6 +503,8 @@
   "assistantEditVariableMessage": "Message",
   "assistantEditPreviewTitle": "Preview",
   "assistantEditPromptTimeVarWarning": "Using time variables in the system prompt makes the beginning of every request different, so prompt caching cannot hit and both cost and time-to-first-token go up. If the model needs to know the current time, use the \"Append current time\" switch below.",
+  "assistantEditPromptIso8601Title": "Use ISO 8601 format",
+  "assistantEditPromptIso8601Subtitle": "Include the time zone offset, e.g. 2026-08-08T14:30:05+08:00",
   "assistantEditPromptAppendTimeTitle": "Append current time",
   "assistantEditPromptAppendTimeSubtitle": "Append the send time to the end of each user message. Time stays at the end of the request, so prompt caching is unaffected.",
   "assistantEditPromptAppendTimeInfoTitle": "Appended time format",

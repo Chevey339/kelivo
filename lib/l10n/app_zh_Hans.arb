@@ -363,6 +363,8 @@
   "assistantEditVariableMessage": "内容",
   "assistantEditPreviewTitle": "预览",
   "assistantEditPromptTimeVarWarning": "在系统提示词中使用时间变量会让每一轮请求的开头都不同，Prompt 缓存无法命中，费用和首字延迟都会上升。需要让模型知道当前时间时，请改用下方的「追加当前时间」开关。",
+  "assistantEditPromptIso8601Title": "使用 ISO 8601 格式",
+  "assistantEditPromptIso8601Subtitle": "包含时区偏移，例如 2026-08-08T14:30:05+08:00",
   "assistantEditPromptAppendTimeTitle": "追加当前时间",
   "assistantEditPromptAppendTimeSubtitle": "在每条用户消息末尾追加发送时刻。时间在请求末尾，不影响 Prompt 缓存。",
   "assistantEditPromptAppendTimeInfoTitle": "追加时间格式",

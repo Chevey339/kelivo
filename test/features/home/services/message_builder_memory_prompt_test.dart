@@ -693,66 +693,118 @@ void main() {
     );
   });
 
+  for (final hasConversation in [false, true]) {
+    for (final appendTime in [false, true]) {
+      test(
+        'API time format: conversation=$hasConversation, append=$appendTime',
+        () async {
+          await seedAssistant('assistant-1');
+          final conversation = await seedConversation('conv-time');
+          final timestamp = DateTime(2026, 9, 10, 14, 30, 5);
+          final message = await seedUserMessage(
+            id: 'u-time',
+            conversationId: conversation.id,
+            content: 'hello',
+            timestamp: timestamp,
+          );
+          final apiMessages = <Map<String, dynamic>>[
+            {
+              'role': 'user',
+              'content': 'hello',
+              MessageBuilderService.internalRevisionIdKey: message.id,
+            },
+          ];
+          await buildService().processUserMessagesForApi(
+            apiMessages,
+            settings,
+            assistant.copyWith(
+              enableMemory: false,
+              appendCurrentTimeToUserMessage: appendTime,
+              useIso8601TimeFormat: true,
+            ),
+            conversation: hasConversation ? conversation : null,
+            sourceMessages: [message],
+          );
+          final expected = appendTime
+              ? 'hello\n\n${MemoryPrompts.formatCurrentTimeTag(timestamp, useIso8601: true)}'
+              : 'hello';
+          expect(apiMessages.single['content'], expected);
+        },
+      );
+    }
+  }
+
   group('§18.4 item 29 — promptContent immutability', () {
-    test(
-      'building the same message twice returns identical bytes; retry matches',
-      () async {
-        await seedAssistant('assistant-1');
-        await putEntry(id: 'mem_01', content: 'User likes Flutter.');
+    for (final iso8601 in [false, true]) {
+      test(
+        'time format ISO=$iso8601 stays frozen across retries and format changes',
+        () async {
+          await seedAssistant('assistant-1');
+          await putEntry(id: 'mem_01', content: 'User likes Flutter.');
 
-        final ts = DateTime(2026, 8, 7, 14, 3, 22);
-        final conversation = await seedConversation('conv-1');
-        final message = await seedUserMessage(
-          id: 'u1',
-          conversationId: 'conv-1',
-          content: 'hello world',
-          timestamp: ts,
-        );
-        final service = buildService(messages: [message]);
-        final apiMessages = <Map<String, dynamic>>[
-          {
-            'role': 'user',
-            'content': 'hello world',
-            MessageBuilderService.internalRevisionIdKey: 'u1',
-          },
-        ];
+          final ts = DateTime(2026, 8, 7, 14, 3, 22);
+          final conversation = await seedConversation('conv-1');
+          final message = await seedUserMessage(
+            id: 'u1',
+            conversationId: 'conv-1',
+            content: 'hello world',
+            timestamp: ts,
+          );
+          final service = buildService(messages: [message]);
+          final apiMessages = <Map<String, dynamic>>[
+            {
+              'role': 'user',
+              'content': 'hello world',
+              MessageBuilderService.internalRevisionIdKey: 'u1',
+            },
+          ];
 
-        final first = await service.resolvePromptContent(
-          message: message,
-          processedUserBody: 'hello world',
-          assistant: assistant.copyWith(appendCurrentTimeToUserMessage: true),
-          conversation: conversation,
-          settings: settings,
-          apiMessages: apiMessages,
-        );
-        final second = await service.resolvePromptContent(
-          message: message,
-          processedUserBody: 'hello world CHANGED',
-          assistant: assistant.copyWith(
-            appendCurrentTimeToUserMessage: true,
-            messageTemplate: 'IGNORE {{ message }}',
-          ),
-          conversation: conversation,
-          settings: settings,
-          apiMessages: apiMessages,
-        );
-        // Retry path: same frozen row.
-        final retry = await service.resolvePromptContent(
-          message: message,
-          processedUserBody: 'retry body',
-          assistant: assistant,
-          conversation: conversation,
-          settings: settings,
-          apiMessages: apiMessages,
-        );
+          final first = await service.resolvePromptContent(
+            message: message,
+            processedUserBody: 'hello world',
+            assistant: assistant.copyWith(
+              appendCurrentTimeToUserMessage: true,
+              useIso8601TimeFormat: iso8601,
+            ),
+            conversation: conversation,
+            settings: settings,
+            apiMessages: apiMessages,
+          );
+          final second = await service.resolvePromptContent(
+            message: message,
+            processedUserBody: 'hello world CHANGED',
+            assistant: assistant.copyWith(
+              appendCurrentTimeToUserMessage: true,
+              messageTemplate: 'IGNORE {{ message }}',
+              useIso8601TimeFormat: !iso8601,
+            ),
+            conversation: conversation,
+            settings: settings,
+            apiMessages: apiMessages,
+          );
+          // Retry path: same frozen row.
+          final retry = await service.resolvePromptContent(
+            message: message,
+            processedUserBody: 'retry body',
+            assistant: assistant,
+            conversation: conversation,
+            settings: settings,
+            apiMessages: apiMessages,
+          );
 
-        expect(second, first);
-        expect(retry, first);
-        expect(first, contains('hello world'));
-        expect(first, contains(MemoryPrompts.formatCurrentTimeTag(ts)));
-        expect(first, contains('<user_memory type="identity">'));
-      },
-    );
+          expect(second, first);
+          expect(retry, first);
+          expect(first, contains('hello world'));
+          expect(
+            first,
+            contains(
+              MemoryPrompts.formatCurrentTimeTag(ts, useIso8601: iso8601),
+            ),
+          );
+          expect(first, contains('<user_memory type="identity">'));
+        },
+      );
+    }
 
     test(
       'first message of a fresh conversation gets the snapshot even when the '

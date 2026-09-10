@@ -81,6 +81,7 @@ class Assistant {
   final int
   recentChatsSummaryMessageCount; // refresh summary after N new messages
   final bool appendCurrentTimeToUserMessage;
+  final bool useIso8601TimeFormat;
   // Preset conversation messages (ordered)
   final List<PresetMessage> presetMessages;
   // Regex replacement rules
@@ -126,6 +127,7 @@ class Assistant {
     this.generateConversationSummary = false,
     this.recentChatsSummaryMessageCount = defaultRecentChatsSummaryMessageCount,
     this.appendCurrentTimeToUserMessage = false,
+    this.useIso8601TimeFormat = false,
     this.presetMessages = const <PresetMessage>[],
     this.regexRules = const <AssistantRegex>[],
   });
@@ -170,6 +172,7 @@ class Assistant {
     bool? generateConversationSummary,
     int? recentChatsSummaryMessageCount,
     bool? appendCurrentTimeToUserMessage,
+    bool? useIso8601TimeFormat,
     List<PresetMessage>? presetMessages,
     List<AssistantRegex>? regexRules,
     bool clearChatModel = false,
@@ -238,6 +241,7 @@ class Assistant {
           recentChatsSummaryMessageCount ?? this.recentChatsSummaryMessageCount,
       appendCurrentTimeToUserMessage:
           appendCurrentTimeToUserMessage ?? this.appendCurrentTimeToUserMessage,
+      useIso8601TimeFormat: useIso8601TimeFormat ?? this.useIso8601TimeFormat,
       presetMessages: presetMessages ?? this.presetMessages,
       regexRules: regexRules ?? this.regexRules,
     );
@@ -283,6 +287,7 @@ class Assistant {
     'generateConversationSummary': generateConversationSummary,
     'recentChatsSummaryMessageCount': recentChatsSummaryMessageCount,
     'appendCurrentTimeToUserMessage': appendCurrentTimeToUserMessage,
+    'useIso8601TimeFormat': useIso8601TimeFormat,
     'presetMessages': PresetMessage.encodeList(presetMessages),
     'regexRules': regexRules.map((e) => e.toJson()).toList(),
   };
@@ -401,6 +406,7 @@ class Assistant {
     })(),
     appendCurrentTimeToUserMessage:
         json['appendCurrentTimeToUserMessage'] as bool? ?? false,
+    useIso8601TimeFormat: json['useIso8601TimeFormat'] as bool? ?? false,
     presetMessages: (() {
       try {
         return PresetMessage.decodeList(json['presetMessages']);

@@ -2518,6 +2518,18 @@ abstract class AppLocalizations {
   /// **'Using time variables in the system prompt makes the beginning of every request different, so prompt caching cannot hit and both cost and time-to-first-token go up. If the model needs to know the current time, use the \"Append current time\" switch below.'**
   String get assistantEditPromptTimeVarWarning;
 
+  /// No description provided for @assistantEditPromptIso8601Title.
+  ///
+  /// In en, this message translates to:
+  /// **'Use ISO 8601 format'**
+  String get assistantEditPromptIso8601Title;
+
+  /// No description provided for @assistantEditPromptIso8601Subtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Include the time zone offset, e.g. 2026-08-08T14:30:05+08:00'**
+  String get assistantEditPromptIso8601Subtitle;
+
   /// No description provided for @assistantEditPromptAppendTimeTitle.
   ///
   /// In en, this message translates to:

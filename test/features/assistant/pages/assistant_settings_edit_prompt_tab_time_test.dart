@@ -1,4 +1,7 @@
 import 'dart:io';
+import 'dart:ui' as ui;
+import 'package:flutter/rendering.dart';
+import 'package:flutter/services.dart';
 import "../../../support/business_test_harness.dart";
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -24,6 +27,7 @@ import 'package:Kelivo/icons/lucide_adapter.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
 import 'package:Kelivo/shared/widgets/ios_switch.dart';
 import 'package:Kelivo/shared/widgets/ios_tactile.dart';
+import 'package:Kelivo/shared/widgets/section_card.dart';
 
 class _FakeTtsProvider extends ChangeNotifier implements TtsProvider {
   @override
@@ -56,7 +60,7 @@ const _assistantId = 'assistant-prompt-time-test';
 const _warningEn =
     'Using time variables in the system prompt makes the beginning of every request different';
 
-const _formatExample = '<current_time>Mon 2026-08-08 14:30:05</current_time>';
+const _formatExample = '<current_time>Sat 2026-08-08 14:30:05</current_time>';
 
 Future<
   ({
@@ -143,6 +147,7 @@ Widget _buildHarness({
   required MemoryProviderV2 memoryV2,
   required MemoryPipelineService pipeline,
   required Widget child,
+  Brightness brightness = Brightness.light,
 }) {
   return MultiProvider(
     providers: [
@@ -167,6 +172,12 @@ Widget _buildHarness({
       ChangeNotifierProvider<TtsProvider>(create: (_) => _FakeTtsProvider()),
     ],
     child: MaterialApp(
+      theme: ThemeData(
+        brightness: brightness,
+        fontFamily: Platform.environment['KELIVO_TIME_SCREENSHOTS'] == null
+            ? null
+            : 'PromptTimePreview',
+      ),
       locale: const Locale('en'),
       localizationsDelegates: AppLocalizations.localizationsDelegates,
       supportedLocales: AppLocalizations.supportedLocales,
@@ -200,6 +211,20 @@ Finder _systemPromptField() {
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+  setUpAll(() async {
+    if (Platform.environment['KELIVO_TIME_SCREENSHOTS'] == null) return;
+    final bytes = await File(
+      'dependencies/gpt_markdown/lib/fonts/JetBrainsMono-Regular.ttf',
+    ).readAsBytes();
+    await (FontLoader(
+      'PromptTimePreview',
+    )..addFont(Future.value(bytes.buffer.asByteData()))).load();
+    final icons = FontLoader('packages/lucide_icons_flutter/Lucide');
+    icons.addFont(
+      rootBundle.load('packages/lucide_icons_flutter/assets/lucide.ttf'),
+    );
+    await icons.load();
+  });
 
   testWidgets('time-variable warning appears for each cur_* token', (
     tester,
@@ -307,6 +332,7 @@ void main() {
     );
 
     expect(find.text('Append current time'), findsOneWidget);
+    expect(find.text('Use ISO 8601 format'), findsNothing);
     final appendRow = find.ancestor(
       of: find.text('Append current time'),
       matching: find.byWidgetPredicate(
@@ -336,6 +362,139 @@ void main() {
       isTrue,
     );
   });
+
+  for (final size in [const Size(390, 844), const Size(1100, 900)]) {
+    for (final brightness in Brightness.values) {
+      testWidgets(
+        'ISO format persists and its card renders at $size in $brightness',
+        (tester) async {
+          final bundle = await _createAssistantProvider(
+            tester,
+            appendCurrentTimeToUserMessage: true,
+          );
+          final provider = bundle.assistantProvider;
+          tester.view.physicalSize = const Size(1100, 900);
+          tester.view.devicePixelRatio = 1;
+          addTearDown(tester.view.resetPhysicalSize);
+          addTearDown(tester.view.resetDevicePixelRatio);
+          final boundaryKey = GlobalKey();
+          await tester.pumpWidget(
+            _buildHarness(
+              assistantProvider: provider,
+              chatService: bundle.chatService,
+              memoryV2: bundle.memoryV2,
+              pipeline: bundle.pipeline,
+              brightness: brightness,
+              child: RepaintBoundary(
+                key: boundaryKey,
+                child: const AssistantSettingsEditPage(
+                  assistantId: _assistantId,
+                ),
+              ),
+            ),
+          );
+          await _openPromptsTab(tester);
+          final toggle = find.byWidgetPredicate(
+            (w) => w is IosSwitch && w.semanticLabel == 'Use ISO 8601 format',
+          );
+          await tester.ensureVisible(toggle);
+          await tester.pumpAndSettle();
+          expect(tester.widget<IosSwitch>(toggle).value, isFalse);
+          await tester.tap(toggle);
+          await tester.pumpAndSettle();
+          expect(provider.getById(_assistantId)!.useIso8601TimeFormat, isTrue);
+          final saved = Assistant.decodeList(
+            provider.preferences.getString('assistants_v1')!,
+          ).single;
+          expect(saved.useIso8601TimeFormat, isTrue);
+          expect(tester.takeException(), isNull);
+
+          final info = find.byWidgetPredicate(
+            (w) =>
+                w is IosIconButton && w.semanticLabel == 'Appended time format',
+          );
+          await tester.ensureVisible(info);
+          await tester.tap(info);
+          await tester.pumpAndSettle();
+          expect(
+            find.textContaining('<current_time>2026-08-08T14:30:05'),
+            findsOneWidget,
+          );
+          await tester.tap(find.text('Got it'));
+          await tester.pumpAndSettle();
+
+          await provider.updateAssistant(
+            provider
+                .getById(_assistantId)!
+                .copyWith(appendCurrentTimeToUserMessage: false),
+          );
+          await tester.pumpAndSettle();
+          expect(toggle, findsNothing);
+          expect(provider.getById(_assistantId)!.useIso8601TimeFormat, isTrue);
+          await provider.updateAssistant(
+            provider
+                .getById(_assistantId)!
+                .copyWith(appendCurrentTimeToUserMessage: true),
+          );
+          await tester.pumpAndSettle();
+          expect(tester.widget<IosSwitch>(toggle).value, isTrue);
+          await tester.ensureVisible(toggle);
+          await tester.tap(toggle);
+          await tester.pumpAndSettle();
+          expect(provider.getById(_assistantId)!.useIso8601TimeFormat, isFalse);
+
+          // Isolate this card so unrelated settings do not affect narrow layout checks.
+          final card = tester.widget<SectionCard>(
+            find.ancestor(of: toggle, matching: find.byType(SectionCard)),
+          );
+          tester.view.physicalSize = size;
+          await tester.pumpWidget(
+            _buildHarness(
+              assistantProvider: provider,
+              chatService: bundle.chatService,
+              memoryV2: bundle.memoryV2,
+              pipeline: bundle.pipeline,
+              brightness: brightness,
+              child: RepaintBoundary(
+                key: boundaryKey,
+                child: Scaffold(
+                  body: Center(
+                    child: Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: SingleChildScrollView(child: card),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          );
+          await tester.pumpAndSettle();
+          expect(tester.takeException(), isNull);
+          final cardRect = tester.getRect(find.byType(SectionCard));
+          final switchRect = tester.getRect(toggle);
+          expect(cardRect.contains(switchRect.topLeft), isTrue);
+          expect(cardRect.contains(switchRect.bottomRight), isTrue);
+          final screenshotDir = Platform.environment['KELIVO_TIME_SCREENSHOTS'];
+          if (screenshotDir != null) {
+            await tester.runAsync(() async {
+              final boundary =
+                  boundaryKey.currentContext!.findRenderObject()!
+                      as RenderRepaintBoundary;
+              final image = await boundary.toImage();
+              final bytes = await image.toByteData(
+                format: ui.ImageByteFormat.png,
+              );
+              await Directory(screenshotDir).create(recursive: true);
+              await File(
+                '$screenshotDir/time-${size.width.toInt()}-${brightness.name}.png',
+              ).writeAsBytes(bytes!.buffer.asUint8List());
+              image.dispose();
+            });
+          }
+        },
+      );
+    }
+  }
 
   testWidgets('append current time info dialog shows format example', (
     tester,
