@@ -116,6 +116,12 @@ if [ ! -s "$RESOURCES_DIR/libvdso.so.elf" ]; then
     need_ish=1
 fi
 
+for file in manifest.plist files/lib/wasm-polyfill.js files/lib/fetch-polyfill.js; do
+    if [ ! -s "$RESOURCES_DIR/RootfsPatch.bundle/$file" ]; then
+        need_ish=1
+    fi
+done
+
 need_rootfs=0
 if [ ! -s "$ZIP_PATH" ]; then
     need_rootfs=1
@@ -147,6 +153,9 @@ stamp_outputs() {
     [ -x "$BUILD_DIR/fakefsify" ] && stamp+=("$BUILD_DIR/fakefsify")
     [ -f "$BUILD_DIR/include/ish/cpu-offsets.h" ] && stamp+=("$BUILD_DIR/include/ish/cpu-offsets.h")
     [ -s "$ZIP_PATH" ] && stamp+=("$ZIP_PATH")
+    for file in manifest.plist files/lib/wasm-polyfill.js files/lib/fetch-polyfill.js; do
+        [ -s "$RESOURCES_DIR/RootfsPatch.bundle/$file" ] && stamp+=("$RESOURCES_DIR/RootfsPatch.bundle/$file")
+    done
     if [ "${#stamp[@]}" -gt 0 ]; then
         touch "${stamp[@]}"
     fi

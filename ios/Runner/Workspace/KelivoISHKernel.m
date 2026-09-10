@@ -252,6 +252,7 @@ static int kelivo_pty_write(struct tty *tty, const void *buf, size_t len, bool b
     current->thread = pthread_self();
 
     [self createDeviceNodes];
+    [self applyRootfsPatchBundle];
     [self applyBundleOverlay];
     [self ensureGuestDirs:@[@"/workspace", @"/chat", @"/skills", @"/mounts"]];
 
@@ -296,6 +297,23 @@ static int kelivo_pty_write(struct tty *tty, const void *buf, size_t len, bool b
 - (void)ensureGuestDirs:(NSArray<NSString *> *)dirs {
     for (NSString *dir in dirs) {
         generic_mkdirat(AT_PWD, dir.fileSystemRepresentation, 0755);
+    }
+}
+
+/// Apply iSH's Node compatibility scripts on every cold boot, including to
+/// existing environments. Use the guest VFS so fakefs metadata stays in sync.
+/// No installed-version marker: a failed write is retried on the next boot.
+- (void)applyRootfsPatchBundle {
+    NSURL *bundleURL = [[NSBundle mainBundle] URLForResource:@"RootfsPatch" withExtension:@"bundle"];
+    NSDictionary *manifest = bundleURL == nil ? nil :
+        [NSDictionary dictionaryWithContentsOfURL:[bundleURL URLByAppendingPathComponent:@"manifest.plist"]];
+    if (manifest == nil) {
+        NSLog(@"KelivoISHKernel: RootfsPatch manifest missing from bundle");
+        return;
+    }
+    for (NSDictionary *entry in manifest[@"files"]) {
+        [self writeGuestFile:entry[@"dst"]
+                fromHostURL:[bundleURL URLByAppendingPathComponent:entry[@"src"]]];
     }
 }
 

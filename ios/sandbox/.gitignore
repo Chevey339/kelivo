@@ -12,3 +12,6 @@
 
 # Download / extract cache for prepare_alpine_rootfs.sh
 /.cache/
+
+# Compatibility overlay copied from the pinned iSH source
+/resources/RootfsPatch.bundle/

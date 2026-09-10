@@ -18,7 +18,8 @@ between the GPL and Apple App Store terms of service.
 Kelivo itself is licensed under the GNU Affero General Public License v3,
 which is compatible with (and a superset of) the GPLv3 terms above.
 Corresponding source for iSH-ARM64 is available from the upstream
-repository linked above.
+repository linked above. The bundled RootfsPatch.bundle compatibility scripts
+are copied unchanged from app/RootfsPatch.bundle at that same pinned revision.
 
 The iOS kernel / executor / crash-guard integration in
 ios/Runner/Workspace/ is adapted from:

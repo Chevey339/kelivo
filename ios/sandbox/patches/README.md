@@ -20,3 +20,18 @@ in `build_ish.sh` so local and CI builds use the same source.
 - `0004-kernel-node-random-seed.patch` — keep Node's emulation flags but
   randomize its seed per exec, so `--predictable` does not make concurrent npm
   processes reuse cache temporary filenames. Explicit seeds remain respected.
+
+## Rootfs compatibility overlay
+
+`RootfsPatch.bundle` is copied unchanged from the same pinned iSH source by
+`build_ish.sh` and bundled as an iOS resource. It is separate from these kernel
+patches. On every cold boot, `KelivoISHKernel` applies its manifest through the
+guest VFS before launching processes, including in existing environments.
+Kelivo's own `overlay/` is applied afterward. No environment reset is required.
+
+The bundle provides `/lib/wasm-polyfill.js` and `/lib/fetch-polyfill.js`, which
+iSH's Node exec path preloads. The WebAssembly shim implements undici's llhttp
+HTTP parser in JavaScript; it is not a general WebAssembly engine or a browser.
+Run the opt-in `MCP_STDIO_NODE_SMOKE` checks in
+`integration_test/workspace/mcp_stdio_ios_test.dart` on a prepared, disposable
+simulator (or use `--no-uninstall` to preserve an existing app's data).

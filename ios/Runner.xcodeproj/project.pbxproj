@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		W5A0000000000000000000E1 /* RootfsPatch.bundle in Resources */ = {isa = PBXBuildFile; fileRef = W5A0000000000000000000E2 /* RootfsPatch.bundle */; };
 		BF9A3901DAAB4F128F61AA02 /* MobileBackgroundHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = BF9A3901DAAB4F128F61AA01 /* MobileBackgroundHandler.swift */; };
 		W5A0000000000000000E001 /* KelivoISHEnvironment.m in Sources */ = {isa = PBXBuildFile; fileRef = W5A0000000000000000E003 /* KelivoISHEnvironment.m */; };
 		W5A0000000000000000F001 /* KelivoISHFilesystem.m in Sources */ = {isa = PBXBuildFile; fileRef = W5A0000000000000000F003 /* KelivoISHFilesystem.m */; };
@@ -99,6 +100,7 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		W5A0000000000000000000E2 /* RootfsPatch.bundle */ = {isa = PBXFileReference; lastKnownFileType = wrapper.cfbundle; name = RootfsPatch.bundle; path = sandbox/resources/RootfsPatch.bundle; sourceTree = SOURCE_ROOT; };
 		BF9A3901DAAB4F128F61AA01 /* MobileBackgroundHandler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileBackgroundHandler.swift; sourceTree = "<group>"; };
 		W5A0000000000000000E002 /* KelivoISHEnvironment.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = KelivoISHEnvironment.h; sourceTree = "<group>"; };
 		W5A0000000000000000F002 /* KelivoISHFilesystem.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = KelivoISHFilesystem.h; sourceTree = "<group>"; };
@@ -320,6 +322,7 @@
 				74858FAD1ED2DC5600515810 /* Runner-Bridging-Header.h */,
 				W5A0000000000000000000BA /* alpine-rootfs.zip */,
 				W5A0000000000000000000BB /* overlay */,
+				W5A0000000000000000000E2 /* RootfsPatch.bundle */,
 				W5A0000000000000000000BC /* VERSION */,
 			);
 			path = Runner;
@@ -549,6 +552,7 @@
 				97C146FC1CF9000F007C117D /* Main.storyboard in Resources */,
 				W5A0000000000000000000A6 /* alpine-rootfs.zip in Resources */,
 				W5A0000000000000000000A7 /* overlay in Resources */,
+				W5A0000000000000000000E1 /* RootfsPatch.bundle in Resources */,
 				W5A0000000000000000000A8 /* VERSION in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -676,6 +680,9 @@
 				"$(SRCROOT)/sandbox/build/include/ish/cpu-offsets.h",
 				"$(SRCROOT)/sandbox/resources/alpine-rootfs.zip",
 				"$(SRCROOT)/sandbox/resources/libvdso.so.elf",
+				"$(SRCROOT)/sandbox/resources/RootfsPatch.bundle/manifest.plist",
+				"$(SRCROOT)/sandbox/resources/RootfsPatch.bundle/files/lib/wasm-polyfill.js",
+				"$(SRCROOT)/sandbox/resources/RootfsPatch.bundle/files/lib/fetch-polyfill.js",
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;

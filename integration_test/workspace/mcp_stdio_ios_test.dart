@@ -41,6 +41,43 @@ void main() {
     skip:
         !Platform.isIOS || !const bool.fromEnvironment('MCP_STDIO_NODE_SMOKE'),
   );
+  testWidgets(
+    'bundled Node overlay supports fetch without native WebAssembly',
+    (tester) async {
+      final runtime = IosIshRuntime(channel: WorkspaceChannel());
+      final output = StringBuffer();
+      await for (final event in runtime.run(
+        const CommandRequest(
+          runId: 'node-fetch-overlay-regression',
+          cwd: '/root',
+          command: r'''node -e '
+const http = require("http");
+const server = http.createServer((req, res) => {
+  const body = "kelivo overlay ok";
+  res.writeHead(200, {"Content-Type": "text/plain", "Content-Length": Buffer.byteLength(body)});
+  res.end(body);
+});
+server.listen(0, "127.0.0.1", async () => {
+  try {
+    const response = await fetch("http://127.0.0.1:" + server.address().port);
+    console.log(response.status + ":" + await response.text());
+  } catch (error) { console.error(error); process.exitCode = 1; }
+  finally { server.closeAllConnections(); server.close(); }
+});'
+''',
+          timeout: Duration(seconds: 60),
+        ),
+      )) {
+        if (event is CommandOutput && event.kind == OutputStreamKind.stdout) {
+          output.write(utf8.decode(event.bytes));
+        }
+        if (event is CommandExited) expect(event.exitCode, 0);
+      }
+      expect(output.toString().trim(), '200:kelivo overlay ok');
+    },
+    skip:
+        !Platform.isIOS || !const bool.fromEnvironment('MCP_STDIO_NODE_SMOKE'),
+  );
   // Opt in on a simulator with uv and the server dependencies installed:
   // --no-uninstall --dart-define=MCP_STDIO_UVX_SMOKE=true
   testWidgets(

@@ -516,6 +516,11 @@ main() {
     copy_headers "$headers_from"
     build_vdso_once
     build_fakefsify
+    # Keep the compatibility scripts exactly aligned with the pinned iSH.
+    local patch_bundle="$ISH_DIR/app/RootfsPatch.bundle"
+    [ -s "$patch_bundle/manifest.plist" ] || log_error "RootfsPatch manifest missing"
+    mkdir -p "$OUTPUT_RESOURCES/RootfsPatch.bundle"
+    rsync -a --delete "$patch_bundle/" "$OUTPUT_RESOURCES/RootfsPatch.bundle/"
     for sdk in $sdks; do
         printf '%s\n' "$fingerprint" > "$(sdk_output_dir "$sdk")/.kelivo-ish-build"
     done
