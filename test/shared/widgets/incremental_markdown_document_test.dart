@@ -95,6 +95,82 @@ void main() {
     expect(blocks[1].text, contains('\$\$'));
   });
 
+  test('bare equation environments preserve blanks and the next paragraph', () {
+    for (final name in const ['equation', 'equation*', 'align', 'gather']) {
+      final equation = '\\begin{$name}\na + b\n\nc + d\n\\end{$name}';
+      final blocks = IncrementalMarkdownDocument().update(
+        'before\n\n$equation\n\nafter',
+      );
+      expect(blocks, hasLength(3), reason: name);
+      expect(blocks[1].text, equation);
+      expect(blocks.last.text, 'after');
+    }
+  });
+
+  test('CommonMark indented code is not retained as a bare environment', () {
+    for (final indent in const ['    ', '\t', ' \t', '   \t']) {
+      final source =
+          '$indent\\begin{equation}\n\n'
+          'outside\n\n'
+          'after';
+      final blocks = IncrementalMarkdownDocument().update(source);
+      expect(blocks, hasLength(3), reason: 'indent ${indent.codeUnits}');
+      expect(blocks.first.text, '$indent\\begin{equation}');
+      expect(blocks[1].text, 'outside');
+      expect(blocks.last.text, 'after');
+    }
+  });
+
+  test('streamed bare environments keep blanks until the matching end', () {
+    final document = IncrementalMarkdownDocument();
+    const prefix = '\\begin{equation}\na\n\nb\n';
+    for (var end = 1; end <= prefix.length; end++) {
+      final blocks = document.update(prefix.substring(0, end));
+      expect(blocks, hasLength(1));
+      expect(blocks.single.stable, isFalse);
+    }
+
+    const source = '$prefix\\end{equation}\n\nafter';
+    final blocks = document.update(source);
+    expect(blocks, hasLength(2));
+    expect(blocks.first.text, '$prefix\\end{equation}');
+    expect(blocks.first.stable, isTrue);
+    expect(blocks.last.text, 'after');
+  });
+
+  test('a streamed TeX-commented environment closer releases later blocks', () {
+    final document = IncrementalMarkdownDocument();
+    var source = '\\begin{equation}\na\n\nb\n\\end{equation}';
+    for (final chunk in const ['%', ' comment', '\n', '\n', 'after']) {
+      source += chunk;
+      document.update(source);
+    }
+    expect(document.blocks, hasLength(2));
+    expect(document.blocks.first.text, endsWith(r'\end{equation}% comment'));
+    expect(document.blocks.first.stable, isTrue);
+    expect(document.blocks.last.text, 'after');
+  });
+
+  test('inline environment examples do not retain later paragraphs', () {
+    final blocks = IncrementalMarkdownDocument().update(
+      'Use `\\begin{equation}`.\n\nfirst\n\nsecond',
+    );
+    expect(blocks, hasLength(3));
+    expect(blocks.last.text, 'second');
+  });
+
+  test('nested environments stay in one block through the outer closer', () {
+    final document = IncrementalMarkdownDocument();
+    const source = '\\begin{pmatrix}\n\\begin{pmatrix}a\\end{pmatrix}\n\n';
+    final pending = document.update(source);
+    expect(pending, hasLength(1));
+    expect(pending.single.stable, isFalse);
+    final complete = document.update('$source& b\n\\end{pmatrix}\n\nafter');
+    expect(complete, hasLength(2));
+    expect(complete.first.text, contains(source));
+    expect(complete.last.text, 'after');
+  });
+
   test(
     'blank lines inside bracket display math do not split source blocks',
     () {
@@ -214,6 +290,44 @@ void main() {
 
   test('math-dense splitter scans stay linear one-shot and chunked', () {
     _expectDocumentLinearScan((_) => '\$\$\nx\n\$\$\n\n', chunks: 80);
+  });
+
+  test('splitter resumes an unclosed outer environment pairing linearly', () {
+    final document = IncrementalMarkdownDocument();
+    var source = '\\begin{pmatrix}\n';
+    debugResetMarkdownScanVisits();
+    document.update(source);
+    for (var i = 0; i < 1000; i++) {
+      source += '\\begin{pmatrix}x\\end{pmatrix}\n';
+      document.update(source);
+    }
+    expect(source.length, 30016);
+    expect(document.blocks, hasLength(1));
+    expect(document.blocks.single.stable, isFalse);
+    expect(
+      debugMarkdownScanVisits,
+      lessThanOrEqualTo(source.length * debugMarkdownScanVisitBudgetFactor),
+    );
+    source += '\\end{pmatrix}%';
+    final comment = List.filled(
+      40,
+      r'\begin{pmatrix}\end{pmatrix}$$\[\]',
+    ).join().substring(0, 1000);
+    for (final unit in comment.codeUnits) {
+      source += String.fromCharCode(unit);
+      final scan = document.update(source);
+      expect(scan, hasLength(1));
+      expect(scan.single.text, source);
+    }
+    expect(
+      debugMarkdownScanVisits,
+      lessThanOrEqualTo(source.length * debugMarkdownScanVisitBudgetFactor),
+    );
+    source += '\n\nafter';
+    final complete = document.update(source);
+    expect(complete, hasLength(2));
+    expect(complete.first.stable, isTrue);
+    expect(complete.last.text, 'after');
   });
 
   test('fence-dense splitter scans stay linear one-shot and chunked', () {

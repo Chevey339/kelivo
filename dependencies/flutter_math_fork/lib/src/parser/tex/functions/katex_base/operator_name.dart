@@ -28,9 +28,14 @@ const _operatorNameEntries = {
       FunctionSpec(numArgs: 1, handler: _operatorNameHandler),
 };
 GreenNode _operatorNameHandler(TexParser parser, FunctionContext context) {
+  var starred = context.funcName == '\\operatorname*';
+  parser.consumeSpaces();
+  if (!starred && parser.fetch().text == '*') {
+    starred = true;
+    parser.consume();
+  }
   var name = parser.parseArgNode(mode: null, optional: false)!;
-  final scripts =
-      parser.parseScripts(allowLimits: context.funcName == '\\operatorname*');
+  final scripts = parser.parseScripts(allowLimits: starred);
   parser.consumeSpaces();
   final body =
       parser.parseAtom(context.breakOnTokenText) ?? EquationRowNode.empty();
@@ -42,31 +47,12 @@ GreenNode _operatorNameHandler(TexParser parser, FunctionContext context) {
     ),
   );
 
-  if (!scripts.empty) {
-    if (scripts.limits == true) {
-      name = scripts.superscript != null
-          ? OverNode(
-              base: name.wrapWithEquationRow(),
-              above: scripts.superscript!,
-            )
-          : name;
-      name = scripts.subscript != null
-          ? UnderNode(
-              base: name.wrapWithEquationRow(),
-              below: scripts.subscript!,
-            )
-          : name;
-    } else {
-      name = MultiscriptsNode(
-        base: name.wrapWithEquationRow(),
-        sub: scripts.subscript,
-        sup: scripts.superscript,
-      );
-    }
-  }
-
-  return FunctionNode(
+  return OperatorNameNode(
     functionName: name.wrapWithEquationRow(),
     argument: body.wrapWithEquationRow(),
+    lowerLimit: scripts.subscript,
+    upperLimit: scripts.superscript,
+    limits: scripts.limits,
+    limitsInDisplayStyle: starred,
   );
 }
