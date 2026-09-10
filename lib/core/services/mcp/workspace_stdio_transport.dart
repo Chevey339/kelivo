@@ -23,6 +23,33 @@ class WorkspaceStdioTransport implements ClientTransport {
   Future<void> _writes = Future<void>.value();
   bool _closing = false;
   Future<void>? _outputFinished;
+  static const _stderrLimit = 16 * 1024;
+  final _stderr = <int>[];
+  Object? _failure;
+  int? _exitCode;
+
+  /// Keep diagnostics separate from stdout, which is exclusively MCP JSON.
+  String describeError(Object error) {
+    final reason = _exitCode == null
+        ? (_failure ?? error).toString()
+        : 'STDIO process exited (code $_exitCode)';
+    final stderr = utf8.decode(_stderr, allowMalformed: true).trim();
+    return stderr.isEmpty ? reason : '$reason\n\n$stderr';
+  }
+
+  bool get failed => _failure != null || _exitCode != null;
+
+  void _recordStderr(List<int> bytes) {
+    if (bytes.length >= _stderrLimit) {
+      _stderr
+        ..clear()
+        ..addAll(bytes.skip(bytes.length - _stderrLimit));
+    } else {
+      final excess = _stderr.length + bytes.length - _stderrLimit;
+      if (excess > 0) _stderr.removeRange(0, excess);
+      _stderr.addAll(bytes);
+    }
+  }
 
   static Future<WorkspaceStdioTransport> start({
     required WorkspaceStdioRuntime runtime,
@@ -48,11 +75,13 @@ class WorkspaceStdioTransport implements ClientTransport {
             try {
               transport._messages.add(jsonDecode(line));
             } catch (error, stack) {
+              transport._failure = error;
               transport._messages.addError(error, stack);
               transport.close();
             }
           },
           onError: (Object error, StackTrace stack) {
+            transport._failure = error;
             transport._messages.addError(error, stack);
             transport.close();
           },
@@ -79,16 +108,18 @@ class WorkspaceStdioTransport implements ClientTransport {
                 }
               case CommandOutput(kind: OutputStreamKind.stdout):
                 if (!transport._closing) transport._stdout.add(event.bytes);
-              case CommandOutput():
-                break;
+              case CommandOutput(kind: OutputStreamKind.stderr):
+                transport._recordStderr(event.bytes);
               case CommandExited():
+                transport._exitCode = event.exitCode;
                 transport._failStartup(
-                  StateError('STDIO process exited (${event.exitCode})'),
+                  StateError(transport.describeError('STDIO process exited')),
                 );
                 unawaited(transport._finishOutput());
             }
           },
           onError: (Object error, StackTrace stack) {
+            transport._failure = error;
             transport._failStartup(error, stack);
             transport.close();
           },
@@ -141,7 +172,8 @@ class WorkspaceStdioTransport implements ClientTransport {
       if (_closing) throw StateError('STDIO transport closed');
       await _runtime.writeStdin(_runId, bytes);
     });
-    _writes = write.catchError((Object _) {
+    _writes = write.catchError((Object error) {
+      _failure ??= error;
       close();
     });
     return TransportSendOperation(write, cancel: () => cancelled = true);

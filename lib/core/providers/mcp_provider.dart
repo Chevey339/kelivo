@@ -7,6 +7,7 @@ import '../services/mcp/kelivo_fetch/kelivo_fetch_server.dart';
 import '../services/mcp/mcp_oauth_service.dart';
 import '../services/mcp/stdio_command_resolver.dart';
 import '../services/mcp/workspace_stdio_transport.dart';
+import '../services/mcp/workspace_stdio_command.dart';
 import '../services/workspace/workspace_runtime.dart';
 import '../models/environment_state.dart';
 import 'environment_provider.dart';
@@ -815,6 +816,28 @@ class McpProvider extends ChangeNotifier {
     }
   }
 
+  /// Adds a validated import in one write, preserving existing connections.
+  Future<void> importServers(List<McpServerConfig> imported) async {
+    if (imported.isEmpty) return;
+    await _serializeServerMutation(() async {
+      final ids = _servers.map((server) => server.id).toSet();
+      for (final server in imported) {
+        if (!ids.add(server.id)) {
+          throw const FormatException('Duplicate MCP server ID');
+        }
+      }
+      await _persistServers([..._servers, ...imported]);
+      _servers = [..._servers, ...imported];
+      for (final server in imported) {
+        _connections[server.id] = _ServerConnection();
+      }
+      _notify();
+    });
+    for (final server in imported.where((server) => server.enabled)) {
+      unawaited(connect(server.id));
+    }
+  }
+
   McpServerConfig? getById(String id) {
     for (final s in _servers) {
       if (s.id == id) return s;
@@ -1344,6 +1367,7 @@ class McpProvider extends ChangeNotifier {
     bool retryUnauthorized = true,
   }) async {
     mcp.Client? client;
+    WorkspaceStdioTransport? workspaceTransport;
     final startedAt = DateTime.now();
     try {
       server = await _withFreshOAuth(server, state);
@@ -1371,6 +1395,15 @@ class McpProvider extends ChangeNotifier {
           throw StateError('Workspace environment is not ready');
         }
         final config = await environment!.loadExecutionConfig();
+        await requireWorkspaceStdioCommand(
+          runtime: runtime,
+          command: server.command ?? '',
+          cwd: server.workingDirectory ?? '/root',
+          environment: {...config.variables, ...server.env},
+          timeout: _requestTimeout,
+          isCancelled: () =>
+              _disposed || state.generation != generation || !supportsStdio,
+        );
         final transport = await WorkspaceStdioTransport.start(
           runtime: runtime,
           command: server.command ?? '',
@@ -1380,8 +1413,19 @@ class McpProvider extends ChangeNotifier {
           startupTimeout: _requestTimeout,
           isCancelled: () => _disposed || state.generation != generation,
         );
+        workspaceTransport = transport;
         client = mcp.McpClient.createClient(clientConfig);
-        await client.connect(transport);
+        // Package launchers can install dependencies before initialize is
+        // answered. Keep this separate from the user's tool-call timeout.
+        const installTimeout = Duration(minutes: 2);
+        client.setRequestTimeout(
+          _requestTimeout > installTimeout ? _requestTimeout : installTimeout,
+        );
+        try {
+          await client.connect(transport);
+        } finally {
+          client.setRequestTimeout(_requestTimeout);
+        }
       } else {
         final transportConfig = await _transportConfig(server);
         final result = await mcp.McpClient.createAndConnect(
@@ -1408,7 +1452,13 @@ class McpProvider extends ChangeNotifier {
       state.error = null;
       _finishScopeUpgrade(state, 'connect');
       _clearCooldownAfterSuccess(state, startedAt);
-      _attachClient(id, state, connectedClient, generation);
+      _attachClient(
+        id,
+        state,
+        connectedClient,
+        generation,
+        workspaceTransport: workspaceTransport,
+      );
       _notify();
       return true;
     } catch (error) {
@@ -1449,7 +1499,9 @@ class McpProvider extends ChangeNotifier {
         _enterCooldown(state, effectiveError.retryAfter);
       }
       state.status = McpStatus.error;
-      state.error = effectiveError.toString();
+      state.error =
+          workspaceTransport?.describeError(effectiveError) ??
+          effectiveError.toString();
       _notify();
       return false;
     }
@@ -1720,8 +1772,9 @@ class McpProvider extends ChangeNotifier {
     String id,
     _ServerConnection state,
     mcp.Client client,
-    int generation,
-  ) {
+    int generation, {
+    WorkspaceStdioTransport? workspaceTransport,
+  }) {
     client.onDisconnect.listen((_) {
       if (_disposed ||
           state.generation != generation ||
@@ -1729,8 +1782,11 @@ class McpProvider extends ChangeNotifier {
         return;
       }
       state.client = null;
-      state.status = McpStatus.idle;
-      state.error = null;
+      final failed = workspaceTransport?.failed == true;
+      state.status = failed ? McpStatus.error : McpStatus.idle;
+      state.error = failed
+          ? workspaceTransport!.describeError('STDIO transport disconnected')
+          : null;
       _notify();
     });
     client.onError.listen((error) {

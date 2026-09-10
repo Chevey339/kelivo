@@ -1097,7 +1097,6 @@
   "mcpServerEditSheetEnabledLabel": "是否啟用",
   "mcpServerEditSheetNameLabel": "名稱",
   "mcpServerEditSheetTransportLabel": "傳輸類型",
-  "mcpServerEditSheetSseRetryHint": "如果SSE連線失敗，請多試幾次",
   "mcpServerEditSheetUrlLabel": "伺服器地址",
   "mcpServerEditSheetCustomHeadersTitle": "自訂請求標頭",
   "mcpServerEditSheetHeaderNameLabel": "請求標頭名稱",
@@ -3976,5 +3975,14 @@
   "backgroundOverlayShowBorder": "顯示邊框",
   "backgroundOverlayReset": "恢復預設樣式",
   "mcpStdioEnvironmentRequired": "請先安裝工作區執行環境，再使用行動版 STDIO。",
-  "mcpStdioAddArgument": "新增參數"
+  "mcpArgumentsHint": "用空格分隔參數，包含空格的內容用引號包裹；空參數寫成 ''。",
+  "mcpArgumentsInvalid": "請檢查參數中的引號是否閉合、結尾是否有未完成的跳脫。",
+  "mcpImportEnvironment": "從環境匯入",
+  "mcpEnvironmentEmpty": "尚無環境變數，請先在環境設定中新增。",
+  "mcpEnvironmentHint": "預設繼承執行環境的變數，匯入後可為此伺服器個別修改。",
+  "mcpImportJson": "匯入 JSON",
+  "mcpImportJsonHint": "貼上 Claude Desktop 或 Cursor 的 MCP 設定，預覽後新增伺服器，不覆蓋現有設定。",
+  "mcpImportPaste": "從剪貼簿貼上",
+  "mcpImportPreview": "預覽",
+  "mcpImportConfirm": "匯入"
 }

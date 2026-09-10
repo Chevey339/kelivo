@@ -15,6 +15,104 @@ import '../../support/fake_workspace_runtime.dart';
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
+  test(
+    'package startup can outlast tool timeout, which is restored after connect',
+    () async {
+      debugDefaultTargetPlatformOverride = TargetPlatform.android;
+      final harness = await BusinessTestHarness.create();
+      final environment = EnvironmentProvider(preferences: harness.preferences);
+      await environment.loaded;
+      await environment.setState(
+        const EnvironmentState(phase: EnvironmentPhase.ready),
+      );
+      final runtime = _McpRuntime(
+        holdFirstInitialization: true,
+        stallToolCalls: true,
+      );
+      final runtimeProvider = WorkspaceRuntimeProvider()..register(runtime);
+      await runtimeProvider.refresh();
+      final provider = McpProvider(
+        preferences: harness.preferences,
+        workspaceRuntime: runtimeProvider,
+        environment: environment,
+      );
+      addTearDown(() async {
+        provider.dispose();
+        runtimeProvider.dispose();
+        environment.dispose();
+        await harness.close();
+        debugDefaultTargetPlatformOverride = null;
+      });
+      await provider.updateRequestTimeout(const Duration(milliseconds: 20));
+      await provider.replaceAllFromJson(
+        jsonEncode({
+          'mcpServers': {
+            'guest': {'command': 'server'},
+          },
+        }),
+      );
+      await runtime.initializationStarted.future;
+      await Future<void>.delayed(const Duration(milliseconds: 60));
+      expect(provider.statusFor('guest'), McpStatus.connecting);
+      runtime.releaseInitialization.complete();
+      await _waitFor(() => provider.isConnected('guest'));
+      final result = await provider
+          .callTool('guest', 'slow', {})
+          .timeout(const Duration(seconds: 1));
+      expect(
+        result!.content.single.toJson()['text'],
+        contains('Request timed out: tools/call'),
+      );
+      expect(provider.requestTimeout, const Duration(milliseconds: 20));
+    },
+  );
+
+  for (final duringInitialization in [true, false]) {
+    test(
+      'stdio exit keeps diagnostics (initializing=$duringInitialization)',
+      () async {
+        debugDefaultTargetPlatformOverride = TargetPlatform.android;
+        final harness = await BusinessTestHarness.create();
+        final environment = EnvironmentProvider(
+          preferences: harness.preferences,
+        );
+        await environment.loaded;
+        await environment.setState(
+          const EnvironmentState(phase: EnvironmentPhase.ready),
+        );
+        final runtime = _McpRuntime(failInitialization: duringInitialization);
+        final runtimeProvider = WorkspaceRuntimeProvider()..register(runtime);
+        await runtimeProvider.refresh();
+        final provider = McpProvider(
+          preferences: harness.preferences,
+          workspaceRuntime: runtimeProvider,
+          environment: environment,
+        );
+        addTearDown(() async {
+          provider.dispose();
+          runtimeProvider.dispose();
+          environment.dispose();
+          await harness.close();
+          debugDefaultTargetPlatformOverride = null;
+        });
+        await provider.replaceAllFromJson(
+          jsonEncode({
+            'mcpServers': {
+              'guest': {'command': 'server'},
+            },
+          }),
+        );
+        if (!duringInitialization) {
+          await _waitFor(() => provider.isConnected('guest'));
+          runtime.failProcess(runtime.requests.single.runId);
+        }
+        await _waitFor(() => provider.statusFor('guest') == McpStatus.error);
+        expect(provider.errorFor('guest'), contains('code 1'));
+        expect(provider.errorFor('guest'), contains('Package not found'));
+      },
+    );
+  }
+
   for (final disableBeforeCleanup in [false, true]) {
     test(
       'environment recovery waits for initializing stdio (disabled=$disableBeforeCleanup)',
@@ -157,14 +255,31 @@ Future<void> _waitFor(bool Function() predicate) async {
 
 class _McpRuntime extends FakeWorkspaceRuntime
     implements WorkspaceStdioRuntime {
-  _McpRuntime({this.holdFirstInitialization = false});
+  _McpRuntime({
+    this.holdFirstInitialization = false,
+    this.failInitialization = false,
+    this.stallToolCalls = false,
+  });
   final bool holdFirstInitialization;
+  final bool failInitialization;
+  final bool stallToolCalls;
   final initializationStarted = Completer<void>();
   final releaseInitialization = Completer<void>();
   final events = <String, StreamController<CommandEvent>>{};
   bool cancelled = false;
   @override
   Stream<CommandEvent> run(CommandRequest request) {
+    if (!request.keepStdinOpen) {
+      return Stream.value(
+        const CommandExited(
+          exitCode: 0,
+          timedOut: false,
+          cancelled: false,
+          interrupted: false,
+          duration: Duration.zero,
+        ),
+      );
+    }
     requests.add(request);
     final stream = StreamController<CommandEvent>();
     events[request.runId] = stream;
@@ -176,7 +291,12 @@ class _McpRuntime extends FakeWorkspaceRuntime
   Future<void> writeStdin(String runId, Uint8List data) async {
     final request = jsonDecode(utf8.decode(data)) as Map<String, dynamic>;
     if (!request.containsKey('id')) return;
+    if (stallToolCalls && request['method'] == 'tools/call') return;
     if (request['method'] == 'initialize' && runId == requests.first.runId) {
+      if (failInitialization) {
+        failProcess(runId);
+        return;
+      }
       if (!initializationStarted.isCompleted) initializationStarted.complete();
       if (holdFirstInitialization) await releaseInitialization.future;
     }
@@ -195,6 +315,24 @@ class _McpRuntime extends FakeWorkspaceRuntime
             '${jsonEncode({'jsonrpc': '2.0', 'id': request['id'], 'result': result})}\n',
           ),
         ),
+      ),
+    );
+  }
+
+  void failProcess(String runId) {
+    events[runId]!.add(
+      CommandOutput(
+        OutputStreamKind.stderr,
+        Uint8List.fromList(utf8.encode('Package not found\n')),
+      ),
+    );
+    events[runId]!.add(
+      const CommandExited(
+        exitCode: 1,
+        timedOut: false,
+        cancelled: false,
+        interrupted: false,
+        duration: Duration.zero,
       ),
     );
   }

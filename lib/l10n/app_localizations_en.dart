@@ -3159,9 +3159,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get mcpServerEditSheetTransportLabel => 'Transport';
 
   @override
-  String get mcpServerEditSheetSseRetryHint => 'If SSE fails, try a few times';
-
-  @override
   String get mcpServerEditSheetUrlLabel => 'Server URL';
 
   @override
@@ -11200,5 +11197,37 @@ class AppLocalizationsEn extends AppLocalizations {
       'Install the workspace environment to use STDIO on mobile.';
 
   @override
-  String get mcpStdioAddArgument => 'Add Argument';
+  String get mcpArgumentsHint =>
+      'Separate arguments with spaces; quote values containing spaces. Use \'\' for an empty argument.';
+
+  @override
+  String get mcpArgumentsInvalid =>
+      'Check for an unclosed quote or trailing escape in arguments.';
+
+  @override
+  String get mcpImportEnvironment => 'Import from Environment';
+
+  @override
+  String get mcpEnvironmentEmpty =>
+      'No environment variables. Add them in Environment settings.';
+
+  @override
+  String get mcpEnvironmentHint =>
+      'Inherits environment variables. Import a variable to customize its value for this server.';
+
+  @override
+  String get mcpImportJson => 'Import JSON';
+
+  @override
+  String get mcpImportJsonHint =>
+      'Paste a Claude Desktop or Cursor MCP configuration. Preview and add servers without replacing existing ones.';
+
+  @override
+  String get mcpImportPaste => 'Paste from Clipboard';
+
+  @override
+  String get mcpImportPreview => 'Preview';
+
+  @override
+  String get mcpImportConfirm => 'Import';
 }

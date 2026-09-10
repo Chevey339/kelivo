@@ -5878,12 +5878,6 @@ abstract class AppLocalizations {
   /// **'Transport'**
   String get mcpServerEditSheetTransportLabel;
 
-  /// No description provided for @mcpServerEditSheetSseRetryHint.
-  ///
-  /// In en, this message translates to:
-  /// **'If SSE fails, try a few times'**
-  String get mcpServerEditSheetSseRetryHint;
-
   /// No description provided for @mcpServerEditSheetUrlLabel.
   ///
   /// In en, this message translates to:
@@ -20139,11 +20133,65 @@ abstract class AppLocalizations {
   /// **'Install the workspace environment to use STDIO on mobile.'**
   String get mcpStdioEnvironmentRequired;
 
-  /// No description provided for @mcpStdioAddArgument.
+  /// No description provided for @mcpArgumentsHint.
   ///
   /// In en, this message translates to:
-  /// **'Add Argument'**
-  String get mcpStdioAddArgument;
+  /// **'Separate arguments with spaces; quote values containing spaces. Use \'\' for an empty argument.'**
+  String get mcpArgumentsHint;
+
+  /// No description provided for @mcpArgumentsInvalid.
+  ///
+  /// In en, this message translates to:
+  /// **'Check for an unclosed quote or trailing escape in arguments.'**
+  String get mcpArgumentsInvalid;
+
+  /// No description provided for @mcpImportEnvironment.
+  ///
+  /// In en, this message translates to:
+  /// **'Import from Environment'**
+  String get mcpImportEnvironment;
+
+  /// No description provided for @mcpEnvironmentEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No environment variables. Add them in Environment settings.'**
+  String get mcpEnvironmentEmpty;
+
+  /// No description provided for @mcpEnvironmentHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Inherits environment variables. Import a variable to customize its value for this server.'**
+  String get mcpEnvironmentHint;
+
+  /// No description provided for @mcpImportJson.
+  ///
+  /// In en, this message translates to:
+  /// **'Import JSON'**
+  String get mcpImportJson;
+
+  /// No description provided for @mcpImportJsonHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Paste a Claude Desktop or Cursor MCP configuration. Preview and add servers without replacing existing ones.'**
+  String get mcpImportJsonHint;
+
+  /// No description provided for @mcpImportPaste.
+  ///
+  /// In en, this message translates to:
+  /// **'Paste from Clipboard'**
+  String get mcpImportPaste;
+
+  /// No description provided for @mcpImportPreview.
+  ///
+  /// In en, this message translates to:
+  /// **'Preview'**
+  String get mcpImportPreview;
+
+  /// No description provided for @mcpImportConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Import'**
+  String get mcpImportConfirm;
 }
 
 class _AppLocalizationsDelegate

@@ -661,6 +661,8 @@
 				"$(SRCROOT)/sandbox/build_ish.sh",
 				"$(SRCROOT)/sandbox/patches/0001-kernel-time-interruptible-nanosleep.patch",
 				"$(SRCROOT)/sandbox/patches/0002-fs-fake-bind-stat-device.patch",
+				"$(SRCROOT)/sandbox/patches/0003-kernel-host-managed-lifetime.patch",
+				"$(SRCROOT)/sandbox/patches/0004-kernel-node-random-seed.patch",
 				"$(SRCROOT)/sandbox/prepare_alpine_rootfs.sh",
 				"$(SRCROOT)/sandbox/resources/VERSION",
 			);

@@ -1,0 +1,34 @@
+--- a/kernel/task.h
++++ b/kernel/task.h
+@@ -232,3 +232,7 @@
++    // Persistent host-managed services may legitimately wait indefinitely.
++    // Inherited on fork by tgroup_copy; cancellation still uses signals.
++    bool host_managed_lifetime;
++
+     // for everything in this struct not locked by something else
+     lock_t lock;
+ };
+--- a/fs/poll.c
++++ b/fs/poll.c
+@@ -408,7 +408,8 @@
+             //   - pid 1 (init): legitimately idles, killing halts the system
+             //   - processes with a controlling TTY: interactive shells idle
+             //     waiting for user input and must not be killed
+-            if (current->pid != 1 && current->group->tty == NULL) {
++            if (current->pid != 1 && current->group->tty == NULL &&
++                    !current->group->host_managed_lifetime) {
+                 struct timespec _now;
+                 clock_gettime(CLOCK_MONOTONIC, &_now);
+                 uint64_t now_ns = (uint64_t)_now.tv_sec * 1000000000ULL + _now.tv_nsec;
+--- a/kernel/futex.c
++++ b/kernel/futex.c
+@@ -273,7 +273,8 @@
+                 }
+             }
+             // Safety valve: continuous infinite futex stall > 180s.
+-            if (timeout == NULL && stall_count >= 1800) { // 1800 * 100ms = 180s
++            if (timeout == NULL && stall_count >= 1800 &&
++                    !current->group->host_managed_lifetime) { // 1800 * 100ms = 180s
+                 bool has_live_children = false;
+                 int live = 0;
+                 lock(&pids_lock);

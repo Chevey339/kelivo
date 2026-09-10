@@ -1,6 +1,9 @@
 import 'dart:convert';
 
 import 'package:Kelivo/core/providers/mcp_provider.dart';
+import 'package:Kelivo/core/providers/environment_provider.dart';
+import 'package:Kelivo/core/models/environment_variable.dart';
+import 'package:Kelivo/core/services/mcp/stdio_arguments.dart';
 import 'package:Kelivo/core/providers/settings_provider.dart';
 import 'package:Kelivo/features/mcp/widgets/mcp_server_edit_sheet.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
@@ -23,7 +26,13 @@ void main() {
         environment: {'SERVER_FLAGS': value},
         workingDirectory: cwd,
       );
-      for (final text in ['sh', '--yes', script, cwd, 'SERVER_FLAGS', value]) {
+      for (final text in [
+        'sh',
+        StdioArguments.format(['--yes', script]),
+        cwd,
+        'SERVER_FLAGS',
+        value,
+      ]) {
         final field = _fieldWithText(text);
         await tester.ensureVisible(field);
         await tester.showKeyboard(field);
@@ -75,27 +84,59 @@ void main() {
   );
 
   testWidgets(
-    'arguments can be removed, edited across lines, and added empty',
+    'space separated arguments preserve quotes, empty strings and scripts',
     (tester) async {
-      final provider = await _openEditor(tester, ['remove', 'keep', 'last']);
-      final remove = find
-          .byWidgetPredicate(
-            (widget) =>
-                widget is Semantics && widget.properties.label == 'Remove',
-          )
-          .first;
-      await tester.ensureVisible(remove);
-      await tester.tap(remove);
+      final provider = await _openEditor(tester, ['--yes']);
+      final field = _fieldWithText('--yes');
+      await tester.ensureVisible(field);
+      await tester.enterText(
+        field,
+        "--yes \"two words\" '' \"line one\nline two\"",
+      );
+      await tester.tap(find.text('Save'));
       await tester.pumpAndSettle();
-      const script = 'line one\nline two\n';
-      await tester.ensureVisible(_fieldWithText('keep'));
-      await tester.enterText(_fieldWithText('keep'), script);
-      await tester.ensureVisible(find.text('Add Argument'));
-      await tester.tap(find.text('Add Argument'));
+      expect(provider.getById('guest')!.args, [
+        '--yes',
+        'two words',
+        '',
+        'line one\nline two',
+      ]);
+      await tester.pumpWidget(const SizedBox.shrink());
+    },
+    variant: TargetPlatformVariant.only(TargetPlatform.macOS),
+  );
+
+  testWidgets(
+    'unclosed argument quotes prevent saving',
+    (tester) async {
+      final provider = await _openEditor(tester, ['--yes']);
+      await tester.enterText(_fieldWithText('--yes'), '"unterminated');
+      await tester.tap(find.text('Save'));
+      await tester.pumpAndSettle();
+      expect(provider.getById('guest')!.args, ['--yes']);
+      expect(
+        find.text(
+          'Check for an unclosed quote or trailing escape in arguments.',
+        ),
+        findsOneWidget,
+      );
+      await tester.pumpWidget(const SizedBox.shrink());
+    },
+    variant: TargetPlatformVariant.only(TargetPlatform.macOS),
+  );
+
+  testWidgets(
+    'imports an environment variable into the server override',
+    (tester) async {
+      final provider = await _openEditor(tester, []);
+      await tester.ensureVisible(find.text('Import from Environment'));
+      await tester.tap(find.text('Import from Environment'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('API_TOKEN'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Save'));
       await tester.pumpAndSettle();
-      expect(provider.getById('guest')!.args, [script, 'last', '']);
+      expect(provider.getById('guest')!.env, {'API_TOKEN': 'test-token'});
       await tester.pumpWidget(const SizedBox.shrink());
     },
     variant: TargetPlatformVariant.only(TargetPlatform.macOS),
@@ -118,6 +159,12 @@ Future<McpProvider> _openEditor(
   final harness = await createBusinessTestHarness();
   final provider = McpProvider(preferences: harness.preferences);
   final settings = SettingsProvider(harness.preferences);
+  final env = EnvironmentProvider(preferences: harness.preferences);
+  await env.loaded;
+  await env.saveVariable(
+    const EnvironmentVariable(name: 'API_TOKEN', value: 'test-token'),
+  );
+  addTearDown(env.dispose);
   addTearDown(provider.dispose);
   addTearDown(settings.dispose);
   await provider.replaceAllFromJson(
@@ -139,6 +186,7 @@ Future<McpProvider> _openEditor(
       providers: [
         ChangeNotifierProvider.value(value: provider),
         ChangeNotifierProvider.value(value: settings),
+        ChangeNotifierProvider.value(value: env),
       ],
       child: MaterialApp(
         locale: const Locale('en'),

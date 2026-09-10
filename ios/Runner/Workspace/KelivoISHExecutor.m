@@ -11,6 +11,7 @@
 #import "KelivoISHKernel.h"
 #import "KelivoISHEnvironment.h"
 #import "KelivoISHCompat.h"
+#import "KelivoISHStdin.h"
 
 #include "ish/kernel/init.h"
 #include "ish/kernel/calls.h"
@@ -28,7 +29,6 @@
 #include <poll.h>
 #include <stdlib.h>
 #include <string.h>
-#include <sys/socket.h>
 
 static const NSTimeInterval kDrainGraceSeconds = 1.0;
 static const NSTimeInterval kKillGraceSeconds = 2.0;
@@ -358,14 +358,11 @@ static dispatch_queue_t _readerQueue;
     }
 
     if (keepStdinOpen) {
-        if (socketpair(AF_UNIX, SOCK_STREAM, 0, [ctx stdinPipe]) < 0) {
+        if (KelivoISHCreateStdinPipe([ctx stdinPipe]) < 0) {
             [ctx closePipeEnds];
-            fail(@"stdin socketpair failed");
+            fail(@"stdin pipe failed");
             return;
         }
-        int noSigPipe = 1;
-        setsockopt([ctx stdinPipe][1], SOL_SOCKET, SO_NOSIGPIPE, &noSigPipe, sizeof(noSigPipe));
-        fcntl([ctx stdinPipe][1], F_SETFL, O_NONBLOCK);
     }
 
     uint64_t filesystem = [[KelivoISHKernel shared] filesystemContextForBinds:binds];
@@ -384,6 +381,7 @@ static dispatch_queue_t _readerQueue;
     }
     struct task *task = current;
     task->group->fs_context = filesystem;
+    task->group->host_managed_lifetime = keepStdinOpen && timeout == 0;
 
     struct fd *stdin_fd = adhoc_fd_create(&realfs_fdops);
     if (stdin_fd) {

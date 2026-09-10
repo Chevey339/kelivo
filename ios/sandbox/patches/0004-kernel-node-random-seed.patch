@@ -1,0 +1,32 @@
+--- a/kernel/exec.c
++++ b/kernel/exec.c
+@@ -945,6 +945,29 @@
+             size_t inject_count = 0;
+             for (size_t i = 0; i < sizeof(inject_args_base)/sizeof(inject_args_base[0]); i++)
+                 inject_args[inject_count++] = inject_args_base[i];
++            // --predictable otherwise fixes Math.random() to the same seed
++            // in every Node process. npm uses it for unique-slug cache paths,
++            // so concurrent npx installs collide with EEXIST. Preserve the
++            // emulation flags, but give each exec its own entropy unless the
++            // caller explicitly requested a deterministic seed.
++            bool has_random_seed = false;
++            for (char *q = argv; *q != '\0'; q += strlen(q) + 1) {
++                if (strncmp(q, "--random-seed=", 14) == 0 ||
++                    strcmp(q, "--random-seed") == 0)
++                    has_random_seed = true;
++            }
++            char random_seed_arg[48];
++            if (!has_random_seed) {
++                dword_t seed;
++                if (get_random((char *)&seed, sizeof(seed)) != 0) {
++                    err = _EIO;
++                    goto err_free_envp;
++                }
++                seed &= 0x7fffffff;
++                if (seed == 0) seed = 1;
++                snprintf(random_seed_arg, sizeof(random_seed_arg), "--random-seed=%u", seed);
++                inject_args[inject_count++] = random_seed_arg;
++            }
+             for (size_t i = 0; i < sizeof(optional_requires)/sizeof(optional_requires[0]); i++) {
+                 // Extract path after "--require="
+                 const char *path = optional_requires[i] + 10; // strlen("--require=")

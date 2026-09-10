@@ -6,7 +6,10 @@ import '../../../icons/lucide_adapter.dart';
 import '../../../core/providers/mcp_provider.dart';
 import '../widgets/mcp_server_edit_sheet.dart';
 import '../widgets/mcp_json_edit_sheet.dart';
+import '../widgets/mcp_json_import.dart';
 import '../widgets/mcp_timeout_sheet.dart';
+import '../widgets/mcp_error_details_sheet.dart';
+import '../../../shared/widgets/form_sheet.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../shared/widgets/snackbar.dart';
 import '../../../core/services/haptics.dart';
@@ -44,107 +47,18 @@ class McpPage extends StatelessWidget {
       String? message,
       String name,
     ) async {
-      final cs = Theme.of(context).colorScheme;
-      final l10n = AppLocalizations.of(context)!;
-      await showModalBottomSheet<void>(
-        context: context,
-        backgroundColor: context.overlaySurface,
-        shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      await showFormSheet<void>(
+        context,
+        builder: (sheetContext) => McpErrorDetailsSheet(
+          serverName: name,
+          message: message,
+          onReconnect: () async {
+            await mcp.reconnect(serverId);
+            if (mcp.isConnected(serverId) && sheetContext.mounted) {
+              Navigator.of(sheetContext).pop();
+            }
+          },
         ),
-        builder: (ctx) {
-          return SafeArea(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(16, 16, 16, 20),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    l10n.mcpPageErrorDialogTitle,
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: AppFontWeights.emphasis,
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    name,
-                    style: TextStyle(
-                      color: cs.onSurface.withValues(alpha: 0.7),
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: context.appColors.surfaceFill,
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(
-                        color: cs.outlineVariant.withValues(alpha: 0.2),
-                      ),
-                    ),
-                    child: Text(
-                      message?.isNotEmpty == true
-                          ? message!
-                          : l10n.mcpPageErrorNoDetails,
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: OutlinedButton.icon(
-                          onPressed: () => Navigator.of(ctx).maybePop(),
-                          icon: Icon(Lucide.X, size: 16, color: cs.primary),
-                          label: Text(
-                            l10n.mcpPageClose,
-                            style: TextStyle(color: cs.primary),
-                          ),
-                          style: OutlinedButton.styleFrom(
-                            minimumSize: const Size.fromHeight(44),
-                            backgroundColor: context.appColors.surfaceFill,
-                            side: BorderSide(
-                              color: cs.outlineVariant.withValues(alpha: 0.35),
-                            ),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: ElevatedButton.icon(
-                          onPressed: () async {
-                            final mcpProvider = ctx.read<McpProvider>();
-                            await mcpProvider.reconnect(serverId);
-                            if (mcpProvider.isConnected(serverId) &&
-                                ctx.mounted) {
-                              Navigator.of(ctx).pop();
-                            }
-                          },
-                          icon: const Icon(Lucide.RefreshCw, size: 18),
-                          label: Text(l10n.mcpPageReconnect),
-                          style: ElevatedButton.styleFrom(
-                            minimumSize: const Size.fromHeight(44),
-                            backgroundColor: cs.primary,
-                            foregroundColor: cs.onPrimary,
-                            elevation: 0,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          );
-        },
       );
     }
 
@@ -170,6 +84,16 @@ class McpPage extends StatelessWidget {
               onTap: () async {
                 await showMcpTimeoutSheet(context);
               },
+            ),
+          ),
+          const SizedBox(width: 12),
+          Tooltip(
+            message: l10n.mcpImportJson,
+            child: _TactileIconButton(
+              icon: Lucide.Download,
+              color: cs.onSurface,
+              size: 22,
+              onTap: () => showMcpJsonImport(context),
             ),
           ),
           const SizedBox(width: 12),

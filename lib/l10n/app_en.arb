@@ -1424,7 +1424,6 @@
   "mcpServerEditSheetEnabledLabel": "Enabled",
   "mcpServerEditSheetNameLabel": "Name",
   "mcpServerEditSheetTransportLabel": "Transport",
-  "mcpServerEditSheetSseRetryHint": "If SSE fails, try a few times",
   "mcpServerEditSheetUrlLabel": "Server URL",
   "mcpServerEditSheetCustomHeadersTitle": "Custom Headers",
   "mcpServerEditSheetHeaderNameLabel": "Header Name",
@@ -4923,5 +4922,14 @@
   "backgroundOverlayShowBorder": "Show border",
   "backgroundOverlayReset": "Restore default appearance",
   "mcpStdioEnvironmentRequired": "Install the workspace environment to use STDIO on mobile.",
-  "mcpStdioAddArgument": "Add Argument"
+  "mcpArgumentsHint": "Separate arguments with spaces; quote values containing spaces. Use '' for an empty argument.",
+  "mcpArgumentsInvalid": "Check for an unclosed quote or trailing escape in arguments.",
+  "mcpImportEnvironment": "Import from Environment",
+  "mcpEnvironmentEmpty": "No environment variables. Add them in Environment settings.",
+  "mcpEnvironmentHint": "Inherits environment variables. Import a variable to customize its value for this server.",
+  "mcpImportJson": "Import JSON",
+  "mcpImportJsonHint": "Paste a Claude Desktop or Cursor MCP configuration. Preview and add servers without replacing existing ones.",
+  "mcpImportPaste": "Paste from Clipboard",
+  "mcpImportPreview": "Preview",
+  "mcpImportConfirm": "Import"
 }

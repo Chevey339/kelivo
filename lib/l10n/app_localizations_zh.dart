@@ -3059,9 +3059,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get mcpServerEditSheetTransportLabel => '传输类型';
 
   @override
-  String get mcpServerEditSheetSseRetryHint => '如果SSE连接失败，请多试几次';
-
-  @override
   String get mcpServerEditSheetUrlLabel => '服务器地址';
 
   @override
@@ -10722,7 +10719,35 @@ class AppLocalizationsZh extends AppLocalizations {
   String get mcpStdioEnvironmentRequired => '请先安装工作区运行环境，再使用移动端 STDIO。';
 
   @override
-  String get mcpStdioAddArgument => '添加参数';
+  String get mcpArgumentsHint => '用空格分隔参数，包含空格的内容用引号包裹；空参数写成 \'\'。';
+
+  @override
+  String get mcpArgumentsInvalid => '请检查参数中的引号是否闭合、末尾是否有未完成的转义。';
+
+  @override
+  String get mcpImportEnvironment => '从环境导入';
+
+  @override
+  String get mcpEnvironmentEmpty => '还没有环境变量，请先在环境设置中添加。';
+
+  @override
+  String get mcpEnvironmentHint => '默认继承运行环境的变量，导入后可为此服务器单独修改。';
+
+  @override
+  String get mcpImportJson => '导入 JSON';
+
+  @override
+  String get mcpImportJsonHint =>
+      '粘贴 Claude Desktop 或 Cursor 的 MCP 配置，预览后添加服务器，不覆盖现有配置。';
+
+  @override
+  String get mcpImportPaste => '从剪贴板粘贴';
+
+  @override
+  String get mcpImportPreview => '预览';
+
+  @override
+  String get mcpImportConfirm => '导入';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hans`).
@@ -13778,9 +13803,6 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get mcpServerEditSheetTransportLabel => '传输类型';
-
-  @override
-  String get mcpServerEditSheetSseRetryHint => '如果SSE连接失败，请多试几次';
 
   @override
   String get mcpServerEditSheetUrlLabel => '服务器地址';
@@ -21369,7 +21391,35 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get mcpStdioEnvironmentRequired => '请先安装工作区运行环境，再使用移动端 STDIO。';
 
   @override
-  String get mcpStdioAddArgument => '添加参数';
+  String get mcpArgumentsHint => '用空格分隔参数，包含空格的内容用引号包裹；空参数写成 \'\'。';
+
+  @override
+  String get mcpArgumentsInvalid => '请检查参数中的引号是否闭合、末尾是否有未完成的转义。';
+
+  @override
+  String get mcpImportEnvironment => '从环境导入';
+
+  @override
+  String get mcpEnvironmentEmpty => '还没有环境变量，请先在环境设置中添加。';
+
+  @override
+  String get mcpEnvironmentHint => '默认继承运行环境的变量，导入后可为此服务器单独修改。';
+
+  @override
+  String get mcpImportJson => '导入 JSON';
+
+  @override
+  String get mcpImportJsonHint =>
+      '粘贴 Claude Desktop 或 Cursor 的 MCP 配置，预览后添加服务器，不覆盖现有配置。';
+
+  @override
+  String get mcpImportPaste => '从剪贴板粘贴';
+
+  @override
+  String get mcpImportPreview => '预览';
+
+  @override
+  String get mcpImportConfirm => '导入';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hant`).
@@ -24425,9 +24475,6 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get mcpServerEditSheetTransportLabel => '傳輸類型';
-
-  @override
-  String get mcpServerEditSheetSseRetryHint => '如果SSE連線失敗，請多試幾次';
 
   @override
   String get mcpServerEditSheetUrlLabel => '伺服器地址';
@@ -32095,5 +32142,33 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get mcpStdioEnvironmentRequired => '請先安裝工作區執行環境，再使用行動版 STDIO。';
 
   @override
-  String get mcpStdioAddArgument => '新增參數';
+  String get mcpArgumentsHint => '用空格分隔參數，包含空格的內容用引號包裹；空參數寫成 \'\'。';
+
+  @override
+  String get mcpArgumentsInvalid => '請檢查參數中的引號是否閉合、結尾是否有未完成的跳脫。';
+
+  @override
+  String get mcpImportEnvironment => '從環境匯入';
+
+  @override
+  String get mcpEnvironmentEmpty => '尚無環境變數，請先在環境設定中新增。';
+
+  @override
+  String get mcpEnvironmentHint => '預設繼承執行環境的變數，匯入後可為此伺服器個別修改。';
+
+  @override
+  String get mcpImportJson => '匯入 JSON';
+
+  @override
+  String get mcpImportJsonHint =>
+      '貼上 Claude Desktop 或 Cursor 的 MCP 設定，預覽後新增伺服器，不覆蓋現有設定。';
+
+  @override
+  String get mcpImportPaste => '從剪貼簿貼上';
+
+  @override
+  String get mcpImportPreview => '預覽';
+
+  @override
+  String get mcpImportConfirm => '匯入';
 }

@@ -6,6 +6,7 @@ import '../../l10n/app_localizations.dart';
 import '../../core/providers/mcp_provider.dart';
 import '../../shared/widgets/snackbar.dart';
 import 'mcp_edit_dialog.dart' show showDesktopMcpEditDialog;
+import '../../features/mcp/widgets/mcp_json_import.dart';
 import 'mcp_json_edit_dialog.dart' show showDesktopMcpJsonEditDialog;
 import 'mcp_timeout_dialog.dart' show showDesktopMcpTimeoutDialog;
 import '../../theme/app_font_weights.dart';
@@ -54,6 +55,15 @@ class DesktopMcpPane extends StatelessWidget {
                           onTap: () async {
                             await showDesktopMcpTimeoutDialog(context);
                           },
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      Tooltip(
+                        message: l10n.mcpImportJson,
+                        child: _SmallIconBtn(
+                          icon: lucide.Lucide.Download,
+                          onTap: () =>
+                              showMcpJsonImport(context, desktop: true),
                         ),
                       ),
                       const SizedBox(width: 6),

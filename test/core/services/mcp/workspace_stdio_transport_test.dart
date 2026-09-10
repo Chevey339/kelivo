@@ -46,6 +46,51 @@ class StdioTestRuntime extends FakeWorkspaceRuntime
 }
 
 void main() {
+  test('retains bounded stderr and reports the process exit code', () async {
+    final runtime = StdioTestRuntime();
+    final transport = await WorkspaceStdioTransport.start(
+      runtime: runtime,
+      command: 'server',
+    );
+    runtime.output('x' * 20000, stderr: true);
+    runtime.output('\nPackage not found\n', stderr: true);
+    runtime.events.add(
+      const CommandExited(
+        exitCode: 1,
+        timedOut: false,
+        cancelled: false,
+        interrupted: false,
+        duration: Duration.zero,
+      ),
+    );
+    await transport.onClose;
+    final error = transport.describeError('Transport disconnected');
+    expect(error, contains('code 1'));
+    expect(error, endsWith('Package not found'));
+    expect(error.length, lessThan(16500));
+    expect(transport.failed, isTrue);
+  });
+
+  test(
+    'timeout diagnostics preserve stderr without treating logs as JSON',
+    () async {
+      final runtime = StdioTestRuntime();
+      final transport = await WorkspaceStdioTransport.start(
+        runtime: runtime,
+        command: 'server',
+      );
+      runtime.output('Downloading dependencies\n', stderr: true);
+      await Future<void>.delayed(Duration.zero);
+      expect(
+        transport.describeError(TimeoutException('initialize')),
+        contains('Downloading dependencies'),
+      );
+      expect(transport.failed, isFalse);
+      transport.close();
+      await transport.onClose;
+    },
+  );
+
   test(
     'preserves argv, cwd, env and decodes split UTF-8 without stderr',
     () async {

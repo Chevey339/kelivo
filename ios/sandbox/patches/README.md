@@ -14,3 +14,9 @@ in `build_ish.sh` so local and CI builds use the same source.
   device number from `stat` and `fstat`, so GNU `cp` can copy files in
   `/workspace` without reporting that the source was replaced while copying.
   The upstream pin fixes hook-routed mounts but leaves static mounts affected.
+- `0003-kernel-host-managed-lifetime.patch` — persistent STDIO services and
+  their children are exempt from the poll (60s) and futex (180s) idle-exit
+  heuristics. The host still cancels them explicitly with signals.
+- `0004-kernel-node-random-seed.patch` — keep Node's emulation flags but
+  randomize its seed per exec, so `--predictable` does not make concurrent npm
+  processes reuse cache temporary filenames. Explicit seeds remain respected.

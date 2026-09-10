@@ -361,9 +361,13 @@ build_fakefsify() {
 
     mkdir -p "$BUILD_DIR"
     cd "$ISH_DIR"
+    # Xcode exports the iOS SDK into script phases. This executable runs on
+    # the Mac, so both Meson's compiler probe and ninja must use the host SDK.
+    local host_sdk
+    host_sdk="$(xcrun --sdk macosx --show-sdk-path)"
     if [ ! -f "$BUILD_DIR/build.ninja" ]; then
         log_info "Configuring native meson build (host fakefsify)..."
-        meson setup "$BUILD_DIR" \
+        env -u IPHONEOS_DEPLOYMENT_TARGET SDKROOT="$host_sdk" meson setup "$BUILD_DIR" \
             --buildtype=release \
             -Dlog="" \
             -Dkernel=ish \
@@ -371,7 +375,7 @@ build_fakefsify() {
             -Dguest_arch=arm64
     fi
     log_info "Building host fakefsify..."
-    ninja -C "$BUILD_DIR" tools/fakefsify
+    env -u IPHONEOS_DEPLOYMENT_TARGET SDKROOT="$host_sdk" ninja -C "$BUILD_DIR" tools/fakefsify
     mkdir -p "$OUTPUT_DIR"
     cp "$BUILD_DIR/tools/fakefsify" "$OUTPUT_DIR/fakefsify"
     cd "$SCRIPT_DIR"

@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import '../../../core/services/mcp/stdio_arguments.dart';
+import '../../../shared/widgets/ios_form_text_field.dart';
+import 'mcp_environment_picker.dart';
 import 'package:provider/provider.dart';
 import '../../../core/providers/settings_provider.dart';
 import 'dart:math' as math;
@@ -57,7 +60,8 @@ class _McpServerEditSheetState extends State<_McpServerEditSheet>
   McpTransportType _transport = McpTransportType.http;
   final _urlCtrl = TextEditingController();
   final _cmdCtrl = TextEditingController();
-  final List<TextEditingController> _args = [];
+  final _argsCtrl = TextEditingController();
+  String? _argsError;
   final _cwdCtrl = TextEditingController();
   final List<_HeaderEntry> _env = [];
   final List<_HeaderEntry> _headers = [];
@@ -74,9 +78,7 @@ class _McpServerEditSheetState extends State<_McpServerEditSheet>
       _transport = server.transport;
       _urlCtrl.text = server.url;
       _cmdCtrl.text = server.command ?? '';
-      _args.addAll(
-        server.args.map((argument) => TextEditingController(text: argument)),
-      );
+      _argsCtrl.text = StdioArguments.format(server.args);
       _cwdCtrl.text = server.workingDirectory ?? '';
       server.env.forEach(
         (k, v) => _env.add(
@@ -108,9 +110,7 @@ class _McpServerEditSheetState extends State<_McpServerEditSheet>
     _nameCtrl.dispose();
     _urlCtrl.dispose();
     _cmdCtrl.dispose();
-    for (final argument in _args) {
-      argument.dispose();
-    }
+    _argsCtrl.dispose();
     _cwdCtrl.dispose();
     for (final entry in _env) {
       entry.dispose();
@@ -149,58 +149,16 @@ class _McpServerEditSheetState extends State<_McpServerEditSheet>
     int maxLines = 1,
     bool literalInput = false,
   }) {
-    final cs = Theme.of(context).colorScheme;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          label,
-          style: TextStyle(
-            fontSize: 13,
-            color: cs.onSurface.withValues(alpha: 0.8),
-          ),
-        ),
-        const SizedBox(height: 6),
-        TextField(
-          controller: controller,
-          maxLines: maxLines,
-          autocorrect: !literalInput,
-          enableSuggestions: !literalInput,
-          smartDashesType: literalInput
-              ? SmartDashesType.disabled
-              : SmartDashesType.enabled,
-          smartQuotesType: literalInput
-              ? SmartQuotesType.disabled
-              : SmartQuotesType.enabled,
-          decoration: InputDecoration(
-            hintText: hint,
-            filled: true,
-            // Match provider sheet input background
-            fillColor: context.appColors.surfaceCard,
-            // Match provider sheet border styles
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide(
-                color: cs.outlineVariant.withValues(alpha: 0.4),
-              ),
-            ),
-            enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide(
-                color: cs.outlineVariant.withValues(alpha: 0.4),
-              ),
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide(color: cs.primary.withValues(alpha: 0.5)),
-            ),
-            contentPadding: const EdgeInsets.symmetric(
-              horizontal: 12,
-              vertical: 12,
-            ),
-          ),
-        ),
-      ],
+    return IosFormTextField(
+      label: label,
+      controller: controller,
+      hintText: hint,
+      inlineLabel: false,
+      maxLines: maxLines,
+      minLines: 1,
+      outerPadding: EdgeInsets.zero,
+      autocorrect: !literalInput,
+      enableSuggestions: !literalInput,
     );
   }
 
@@ -215,7 +173,7 @@ class _McpServerEditSheetState extends State<_McpServerEditSheet>
       labels: [
         for (final type in types)
           switch (type) {
-            McpTransportType.http => 'Streamable HTTP',
+            McpTransportType.http => 'HTTP',
             McpTransportType.sse => 'SSE',
             _ => AppLocalizations.of(context)!.mcpTransportOptionStdio,
           },
@@ -286,18 +244,6 @@ class _McpServerEditSheetState extends State<_McpServerEditSheet>
           const SizedBox(height: 6),
           _transportPicker(),
           const SizedBox(height: 10),
-          if (_transport == McpTransportType.sse) ...[
-            Padding(
-              padding: const EdgeInsets.only(bottom: 4),
-              child: Text(
-                l10n.mcpServerEditSheetSseRetryHint,
-                style: TextStyle(
-                  fontSize: 12,
-                  color: cs.onSurface.withValues(alpha: 0.7),
-                ),
-              ),
-            ),
-          ],
           if (_transport == McpTransportType.stdio) ...[
             _inputRow(
               label: l10n.mcpServerEditSheetStdioCommandLabel,
@@ -317,7 +263,18 @@ class _McpServerEditSheetState extends State<_McpServerEditSheet>
             const SizedBox(height: 16),
             Text(l10n.mcpServerEditSheetStdioEnvironmentTitle),
             const SizedBox(height: 8),
+            Text(
+              l10n.mcpEnvironmentHint,
+              style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant),
+            ),
+            const SizedBox(height: 8),
             _headersEditor(entries: _env, isStdio: true),
+            const SizedBox(height: 8),
+            IosTileButton(
+              icon: Lucide.Download,
+              label: l10n.mcpImportEnvironment,
+              onTap: _importEnvironment,
+            ),
           ] else ...[
             _inputRow(
               label: l10n.mcpServerEditSheetUrlLabel,
@@ -344,43 +301,48 @@ class _McpServerEditSheetState extends State<_McpServerEditSheet>
 
   Widget _argumentsEditor() {
     final l10n = AppLocalizations.of(context)!;
-    final cs = Theme.of(context).colorScheme;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        for (var i = 0; i < _args.length; i++)
-          Padding(
-            key: ObjectKey(_args[i]),
-            padding: const EdgeInsets.only(bottom: 10),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Expanded(
-                  child: _inputRow(
-                    label:
-                        '${l10n.mcpServerEditSheetStdioArgumentsLabel} ${i + 1}',
-                    controller: _args[i],
-                    literalInput: true,
-                    maxLines: 3,
-                  ),
-                ),
-                _TactileIconButton(
-                  icon: Lucide.Trash,
-                  color: cs.error,
-                  semanticLabel: l10n.mcpServerEditSheetRemoveHeaderTooltip,
-                  onTap: () => setState(() => _args.removeAt(i).dispose()),
-                ),
-              ],
-            ),
+        _inputRow(
+          label: l10n.mcpServerEditSheetStdioArgumentsLabel,
+          controller: _argsCtrl,
+          hint: '-y @modelcontextprotocol/server-filesystem',
+          maxLines: 4,
+          literalInput: true,
+        ),
+        const SizedBox(height: 6),
+        Text(
+          _argsError ?? l10n.mcpArgumentsHint,
+          style: TextStyle(
+            fontSize: 12,
+            color: _argsError == null
+                ? Theme.of(context).colorScheme.onSurfaceVariant
+                : Theme.of(context).colorScheme.error,
           ),
-        IosTileButton(
-          icon: Lucide.Plus,
-          label: l10n.mcpStdioAddArgument,
-          backgroundColor: cs.primary,
-          onTap: () => setState(() => _args.add(TextEditingController())),
         ),
       ],
     );
+  }
+
+  Future<void> _importEnvironment() async {
+    final variable = await pickMcpEnvironmentVariable(context);
+    if (variable == null || !mounted) return;
+    setState(() {
+      final index = _env.indexWhere(
+        (entry) => entry.key.text.trim() == variable.name,
+      );
+      if (index < 0) {
+        _env.add(
+          _HeaderEntry(
+            TextEditingController(text: variable.name),
+            TextEditingController(text: variable.value),
+          ),
+        );
+      } else {
+        _env[index].value.text = variable.value;
+      }
+    });
   }
 
   Widget _headersEditor({
@@ -490,7 +452,16 @@ class _McpServerEditSheetState extends State<_McpServerEditSheet>
         );
         return;
       }
-      final args = [for (final argument in _args) argument.text];
+      final List<String> args;
+      try {
+        args = StdioArguments.parse(_argsCtrl.text);
+      } on FormatException {
+        setState(
+          () => _argsError = AppLocalizations.of(context)!.mcpArgumentsInvalid,
+        );
+        return;
+      }
+      setState(() => _argsError = null);
       final env = <String, String>{
         for (final e in _env)
           if (e.key.text.trim().isNotEmpty) e.key.text.trim(): e.value.text,
@@ -580,7 +551,7 @@ class _McpServerEditSheetState extends State<_McpServerEditSheet>
         ),
         child: DraggableScrollableSheet(
           expand: false,
-          initialChildSize: isEdit ? 0.85 : 0.6,
+          initialChildSize: 0.85,
           maxChildSize: 0.9,
           minChildSize: 0.5,
           builder: (c, controller) => Column(
