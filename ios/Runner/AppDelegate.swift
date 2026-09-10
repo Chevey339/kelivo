@@ -144,7 +144,7 @@
     options: [UIApplication.OpenURLOptionsKey: Any] = [:]
   ) -> Bool {
     if backgroundGenerationHandler.receive(url) { return true }
-    if incomingShareHandler.receiveFile(url) { return true }
+    if incomingShareHandler.receive(url) { return true }
     if url.scheme == "kelivo" && url.host == "oauth-return" {
       return true
     }

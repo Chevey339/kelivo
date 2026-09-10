@@ -14,6 +14,73 @@ private final class BackgroundTestMessenger: NSObject, FlutterBinaryMessenger {
   func cleanUpConnection(_ connection: FlutterBinaryMessengerConnection) {}
 }
 
+private final class IncomingShareTestMessenger: NSObject, FlutterBinaryMessenger {
+  var calls: [FlutterMethodCall] = []
+
+  func send(onChannel channel: String, message: Data?) {
+    if channel == "app.incoming_share", let message {
+      calls.append(FlutterStandardMethodCodec.sharedInstance().decodeMethodCall(message))
+    }
+  }
+  func send(onChannel channel: String, message: Data?, binaryReply callback: FlutterBinaryReply?) {
+    send(onChannel: channel, message: message)
+    callback?(nil)
+  }
+  func setMessageHandlerOnChannel(_ channel: String, binaryMessageHandler handler: FlutterBinaryMessageHandler?) -> FlutterBinaryMessengerConnection { 0 }
+  func cleanUpConnection(_ connection: FlutterBinaryMessengerConnection) {}
+}
+
+class IncomingShareHandlerTests: XCTestCase {
+  func testShareTextIsPreservedAlongsideFileAndImageAttachments() {
+    for type in ["public.file-url", "public.png"] {
+      let item = NSExtensionItem()
+      item.attributedContentText = NSAttributedString(string: "请总结这份文件")
+      item.attachments = [NSItemProvider(item: NSData(), typeIdentifier: type)]
+
+      XCTAssertEqual(IncomingShareInbox.textContents(in: [item]), ["请总结这份文件"])
+      XCTAssertEqual(item.attachments?.count, 1)
+    }
+  }
+
+  func testShareTextKeepsItemOrderAndSkipsMissingOrEmptyText() {
+    let items = ["第一段", nil, "", "第二段"].map { text in
+      let item = NSExtensionItem()
+      item.attributedContentText = text.map { NSAttributedString(string: $0) }
+      return item
+    }
+
+    XCTAssertEqual(IncomingShareInbox.textContents(in: items), ["第一段", "第二段"])
+  }
+
+  @MainActor
+  func testShareHandoffWakesFlutterWithoutImportingTheActivationURL() {
+    let messenger = IncomingShareTestMessenger()
+    let handler = IosIncomingShareHandler()
+    handler.register(messenger: messenger)
+
+    XCTAssertTrue(handler.receive(IncomingShareInbox.activationURL))
+    XCTAssertEqual(messenger.calls.map { $0.method }, ["changed"])
+    XCTAssertNil(messenger.calls.first?.arguments)
+  }
+
+  @MainActor
+  func testShareHandoffIsAcceptedBeforeFlutterRegisters() {
+    let handler = IosIncomingShareHandler()
+    XCTAssertTrue(handler.receive(IncomingShareInbox.activationURL))
+  }
+
+  @MainActor
+  func testOtherDeepLinksDoNotTriggerShareImport() {
+    let messenger = IncomingShareTestMessenger()
+    let handler = IosIncomingShareHandler()
+    handler.register(messenger: messenger)
+    for url in ["kelivo://oauth-return", "kelivo://conversation/chat", "https://share", "kelivo://share/file"] {
+      XCTAssertFalse(handler.receive(URL(string: url)!))
+    }
+    XCTAssertTrue(messenger.calls.isEmpty)
+  }
+}
+
 class RunnerTests: XCTestCase {
 
   @MainActor

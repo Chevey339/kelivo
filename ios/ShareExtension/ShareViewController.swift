@@ -1,49 +1,67 @@
-import Social
 import UIKit
 import UniformTypeIdentifiers
 
-final class ShareViewController: SLComposeServiceViewController {
-  private var saving = false
+final class ShareViewController: UIViewController {
+  private var started = false
+  private var finished = false
   private var importTask: Task<Void, Never>?
-  private var copyControl = ShareCopyControl()
-  private var statusDetail = ""
+  private let copyControl = ShareCopyControl()
+  private let statusLabel = UILabel()
+  private let cancelButton = UIButton(type: .system)
+  private let spinner = UIActivityIndicatorView(style: .large)
 
-  override func configurationItems() -> [Any]! {
-    guard saving else { return [] }
-    let item = SLComposeSheetConfigurationItem()!
-    item.title = label("importing")
-    item.value = statusDetail
-    return [item]
+  override func viewDidLoad() {
+    super.viewDidLoad()
+    isModalInPresentation = true
+    view.backgroundColor = .systemBackground
+
+    statusLabel.text = label("importing")
+    statusLabel.font = .preferredFont(forTextStyle: .body)
+    statusLabel.textAlignment = .center
+    statusLabel.numberOfLines = 0
+    cancelButton.setTitle(label("cancel"), for: .normal)
+    cancelButton.addTarget(self, action: #selector(cancelImport), for: .touchUpInside)
+    spinner.startAnimating()
+    let stack = UIStackView(arrangedSubviews: [spinner, statusLabel, cancelButton])
+    stack.axis = .vertical
+    stack.alignment = .center
+    stack.spacing = 16
+    stack.translatesAutoresizingMaskIntoConstraints = false
+    view.addSubview(stack)
+    NSLayoutConstraint.activate([
+      stack.centerXAnchor.constraint(equalTo: view.centerXAnchor),
+      stack.centerYAnchor.constraint(equalTo: view.centerYAnchor),
+      stack.leadingAnchor.constraint(greaterThanOrEqualTo: view.layoutMarginsGuide.leadingAnchor),
+      stack.trailingAnchor.constraint(lessThanOrEqualTo: view.layoutMarginsGuide.trailingAnchor),
+    ])
   }
 
   private func report(_ bytes: Int, total: Int?, index: Int) {
     DispatchQueue.main.async {
+      guard !self.finished, self.cancelButton.isEnabled else { return }
       let size = ByteCountFormatter.string(fromByteCount: Int64(bytes), countStyle: .file)
       let percent = total.flatMap { $0 > 0 ? " · \(min(100, bytes * 100 / $0))%" : nil } ?? ""
-      self.statusDetail = "\(index + 1) · \(size)\(percent)"
-      self.reloadConfigurationItems()
+      self.statusLabel.text = "\(self.label("importing"))\n\(index + 1) · \(size)\(percent)"
     }
   }
 
   override func viewDidAppear(_ animated: Bool) {
     super.viewDidAppear(animated)
-    navigationController?.navigationBar.topItem?.rightBarButtonItem?.title = label("saveDraft")
+    // Wait until the responder chain is attached before attempting the handoff.
+    guard !started else { return }
+    started = true
+    importAndOpenApp()
   }
 
-  override func isContentValid() -> Bool { !saving }
-
-  override func didSelectCancel() {
+  @objc private func cancelImport() {
+    guard !finished else { return }
+    finished = true
     copyControl.cancel()
     importTask?.cancel()
-    super.didSelectCancel()
+    extensionContext?.cancelRequest(withError: NSError(domain: NSCocoaErrorDomain, code: NSUserCancelledError))
   }
 
-  override func didSelectPost() {
-    guard !saving else { return }
-    saving = true
-    copyControl = ShareCopyControl()
-    validateContent()
-    let composeText = contentText ?? ""
+  private func importAndOpenApp() {
     let items = extensionContext?.inputItems.compactMap { $0 as? NSExtensionItem } ?? []
     let providers = items.flatMap { $0.attachments ?? [] }
     importTask = Task {
@@ -51,7 +69,7 @@ final class ShareViewController: SLComposeServiceViewController {
       do {
         let delivery = try IncomingShareInbox.createDelivery()
         directory = delivery
-        var texts = composeText.isEmpty ? [] : [composeText]
+        var texts = IncomingShareInbox.textContents(in: items)
         var files = [[String: Any]]()
         var failed = max(0, providers.count - IncomingShareInbox.maxFiles)
         for (index, provider) in providers.prefix(IncomingShareInbox.maxFiles).enumerated() {
@@ -71,10 +89,8 @@ final class ShareViewController: SLComposeServiceViewController {
               let text = (value as? URL)?.absoluteString ?? (value as? String) ?? ""
               if !text.isEmpty && !texts.contains(where: { $0.contains(text) }) { texts.append(text) }
             } else if provider.hasItemConformingToTypeIdentifier(UTType.plainText.identifier) {
-              if composeText.isEmpty {
-                let value = try await loadItem(provider, type: UTType.plainText.identifier)
-                if let text = value as? String, !texts.contains(text) { texts.append(text) }
-              }
+              let value = try await loadItem(provider, type: UTType.plainText.identifier)
+              if let text = value as? String, !texts.contains(text) { texts.append(text) }
             } else if let type = provider.registeredTypeIdentifiers.first(where: { UTType($0)?.conforms(to: .data) == true }) {
               let file = try await loadFile(provider, type: type, directory: delivery, index: index)
               files.append(file)
@@ -90,21 +106,57 @@ final class ShareViewController: SLComposeServiceViewController {
           throw IncomingShareInbox.InboxError.empty
         }
         try IncomingShareInbox.save(directory: delivery, text: text, files: files, failedFiles: failed)
-        let alert = UIAlertController(title: label("saved"), message: label(failed == 0 ? "savedMessage" : "partialMessage"), preferredStyle: .alert)
-        alert.addAction(UIAlertAction(title: label("done"), style: .default) { _ in
-          self.extensionContext?.completeRequest(returningItems: nil)
-        })
-        present(alert, animated: true)
+        // Publish the complete delivery before waking Flutter. Do not delete it
+        // if opening fails: the next app launch can still consume the inbox.
+        cancelButton.isEnabled = false
+        statusLabel.text = label("opening")
+        openApp(failedFiles: failed)
       } catch {
         if let directory { try? FileManager.default.removeItem(at: directory) }
-        if Task.isCancelled { return }
-        saving = false
-        validateContent()
-        let alert = UIAlertController(title: label("failed"), message: label("failedMessage"), preferredStyle: .alert)
-        alert.addAction(UIAlertAction(title: label("done"), style: .default))
-        present(alert, animated: true)
+        if Task.isCancelled || copyControl.isCancelled { return }
+        showCompletion(title: "failed", message: "failedMessage")
       }
     }
+  }
+
+  private func openApp(failedFiles: Int) {
+    // Share extensions have no supported containing-app open API. Like OpenMinis,
+    // use the application in the responder chain and the modern open method
+    // (the deprecated openURL: selector fails on iOS 18 and later).
+    var responder: UIResponder? = self
+    while let current = responder {
+      if let application = current as? UIApplication {
+        application.open(IncomingShareInbox.activationURL, options: [:]) { [weak self] opened in
+          guard let self, !self.finished else { return }
+          if opened { self.completeRequest() }
+          else { self.showSavedMessage(failedFiles: failedFiles) }
+        }
+        return
+      }
+      responder = current.next
+    }
+    showSavedMessage(failedFiles: failedFiles)
+  }
+
+  private func showSavedMessage(failedFiles: Int) {
+    showCompletion(title: "saved", message: failedFiles == 0 ? "savedMessage" : "partialMessage")
+  }
+
+  private func showCompletion(title: String, message: String) {
+    spinner.stopAnimating()
+    cancelButton.isEnabled = false
+    statusLabel.text = label(title)
+    let alert = UIAlertController(title: label(title), message: label(message), preferredStyle: .alert)
+    alert.addAction(UIAlertAction(title: label("done"), style: .default) { _ in
+      self.completeRequest()
+    })
+    present(alert, animated: true)
+  }
+
+  private func completeRequest() {
+    guard !finished else { return }
+    finished = true
+    extensionContext?.completeRequest(returningItems: nil)
   }
 
   private func label(_ key: String) -> String { NSLocalizedString(key, comment: "Incoming share") }

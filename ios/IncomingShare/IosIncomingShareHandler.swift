@@ -33,7 +33,13 @@ final class IosIncomingShareHandler {
     }
   }
 
-  func receiveFile(_ url: URL) -> Bool {
+  func receive(_ url: URL) -> Bool {
+    if url == IncomingShareInbox.activationURL {
+      // The extension already committed its App Group inbox. This also wakes an
+      // active Flutter view; cold starts read the same inbox during initialization.
+      channel?.invokeMethod("changed", arguments: nil)
+      return true
+    }
     guard IncomingShareInbox.acceptsApplicationURL(url) else { return false }
     // Hold the grant before returning from the application open-URL callback.
     let scoped = url.startAccessingSecurityScopedResource()

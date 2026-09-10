@@ -4,9 +4,15 @@ import UniformTypeIdentifiers
 /// Shared by the app and its Share extension. Only completed inbox manifests
 /// become visible to the app; each delivery owns a separate directory.
 enum IncomingShareInbox {
+  static let activationURL = URL(string: "kelivo://share")!
   static let maxFiles = 32
 
   enum InboxError: Error { case unavailable, invalidFile, cancelled, empty }
+
+  static func textContents(in items: [NSExtensionItem]) -> [String] {
+    // An item can carry both a caption and attachments.
+    items.compactMap { $0.attributedContentText?.string }.filter { !$0.isEmpty }
+  }
 
   static func acceptsApplicationURL(_ url: URL) -> Bool {
     guard url.isFileURL else { return false }
