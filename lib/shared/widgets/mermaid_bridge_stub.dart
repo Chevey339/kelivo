@@ -8,6 +8,7 @@ import 'package:flutter/services.dart' show rootBundle;
 import 'package:webview_flutter/webview_flutter.dart';
 import 'package:webview_windows/webview_windows.dart' as winweb;
 import 'mermaid_cache.dart';
+import '../../utils/svg_preview_html.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:image_gallery_saver_plus/image_gallery_saver_plus.dart';
@@ -26,12 +27,14 @@ class MermaidViewHandle {
 class _MermaidInlineWindowsView extends StatefulWidget {
   final String code;
   final bool dark;
+  final bool isSvg;
   final Map<String, String>? themeVars;
   const _MermaidInlineWindowsView({
     super.key,
     required this.code,
     required this.dark,
     this.themeVars,
+    this.isSvg = false,
   });
 
   @override
@@ -140,7 +143,9 @@ class _MermaidInlineWindowsViewState extends State<_MermaidInlineWindowsView> {
 
   Future<void> _loadHtml() async {
     try {
-      final mermaidJs = await rootBundle.loadString('assets/mermaid.min.js');
+      final mermaidJs = widget.isSvg
+          ? ''
+          : await rootBundle.loadString('assets/mermaid.min.js');
       final html = _buildWindowsHtml(
         widget.code,
         widget.dark,
@@ -219,6 +224,7 @@ class _MermaidInlineWindowsViewState extends State<_MermaidInlineWindowsView> {
     String mermaidJs,
     Map<String, String>? themeVars,
   ) {
+    if (widget.isSvg) return buildSvgPreviewHtml(code);
     final bg = dark ? '#212121' : '#f8f8f8';
     final fg = dark ? '#eaeaea' : '#222222';
     final escaped = code
@@ -366,6 +372,7 @@ MermaidViewHandle? createMermaidView(
   bool dark, {
   Map<String, String>? themeVars,
   GlobalKey? viewKey,
+  bool isSvg = false,
 }) {
   // Windows: use webview_windows with messaging for height + export.
   if (Platform.isWindows) {
@@ -375,6 +382,7 @@ MermaidViewHandle? createMermaidView(
       code: code,
       dark: dark,
       themeVars: themeVars,
+      isSvg: isSvg,
     );
     Future<bool> doExport() async {
       try {
@@ -428,6 +436,7 @@ MermaidViewHandle? createMermaidView(
     code: code,
     dark: dark,
     themeVars: themeVars,
+    isSvg: isSvg,
   );
   Future<bool> doExport() async {
     try {
@@ -461,12 +470,14 @@ MermaidViewHandle? createMermaidView(
 class _MermaidInlineWebView extends StatefulWidget {
   final String code;
   final bool dark;
+  final bool isSvg;
   final Map<String, String>? themeVars;
   const _MermaidInlineWebView({
     super.key,
     required this.code,
     required this.dark,
     this.themeVars,
+    this.isSvg = false,
   });
 
   @override
@@ -552,7 +563,9 @@ class _MermaidInlineWebViewState extends State<_MermaidInlineWebView> {
 
   Future<void> _loadHtml() async {
     // Load mermaid script from assets and inline it to avoid external requests.
-    final mermaidJs = await rootBundle.loadString('assets/mermaid.min.js');
+    final mermaidJs = widget.isSvg
+        ? ''
+        : await rootBundle.loadString('assets/mermaid.min.js');
     final html = _buildHtml(
       widget.code,
       widget.dark,
@@ -570,6 +583,7 @@ class _MermaidInlineWebViewState extends State<_MermaidInlineWebView> {
     String mermaidJs,
     Map<String, String>? themeVars,
   ) {
+    if (widget.isSvg) return buildSvgPreviewHtml(code);
     final bg = dark ? '#212121' : '#f8f8f8';
     final fg = dark ? '#eaeaea' : '#222222';
     final escaped = code

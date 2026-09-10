@@ -386,6 +386,72 @@ Widget _settingsHarness({
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
+  for (final language in ['SVG', 'xml']) {
+    for (final streaming in [false, true]) {
+      testWidgets(
+        '$language displays an inline image and switches to source ($streaming)',
+        (tester) async {
+          MermaidImageCache.clear();
+          addTearDown(MermaidImageCache.clear);
+          addTearDown(() => debugMermaidBitmapRenderOverride = null);
+          const source = '<svg viewBox="0 0 20 20"><circle r="5" /></svg>';
+          String? rendered;
+          debugMermaidBitmapRenderOverride = (code, dark, vars) async {
+            rendered = code;
+            return MermaidBitmapRenderResult.success(
+              Uint8List.fromList(_transparentPngBytes),
+            );
+          };
+          await tester.pumpWidget(
+            _markdownHarness(
+              '```$language\n$source\n```',
+              width: 320,
+              streaming: streaming,
+            ),
+          );
+          await tester.pump(const Duration(milliseconds: 400));
+          await tester.pumpAndSettle();
+          final context = tester.element(
+            find.byType(MarkdownWithCodeHighlight),
+          );
+          final l10n = AppLocalizations.of(context)!;
+          expect(rendered?.trim(), source);
+          expect(find.byType(Image), findsOneWidget);
+          expect(find.byTooltip(l10n.codeBlockPreviewButton), findsNothing);
+          await tester.tap(find.text(l10n.mermaidCodeTab));
+          await tester.pumpAndSettle();
+          final code = tester.widget<SelectableHighlightView>(
+            find.byType(SelectableHighlightView),
+          );
+          expect(code.source.trim(), source);
+          expect(code.language, 'xml');
+          await tester.tap(find.text(l10n.mermaidImageTab));
+          await tester.pumpAndSettle();
+          await tester.tap(find.byType(Image));
+          await tester.pumpAndSettle();
+          expect(find.byType(ImageViewerPage), findsOneWidget);
+          expect(tester.takeException(), isNull);
+        },
+      );
+    }
+  }
+
+  testWidgets('ordinary XML keeps its source without a graphical preview', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      _markdownHarness('```xml\n<config><name>Kelivo</name></config>\n```'),
+    );
+    await tester.pump();
+    expect(find.byType(SelectableHighlightView), findsOneWidget);
+    expect(find.byType(Image), findsNothing);
+    final context = tester.element(find.byType(MarkdownWithCodeHighlight));
+    expect(
+      find.byTooltip(AppLocalizations.of(context)!.codeBlockPreviewButton),
+      findsNothing,
+    );
+  });
+
   test('soft breaks never split a surrogate pair', () {
     // 17 ASCII units followed by an emoji: the 18th code unit is the high
     // surrogate, so a naive break would land inside the pair.

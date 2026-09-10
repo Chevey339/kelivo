@@ -27,7 +27,9 @@ MermaidViewHandle? createMermaidView(
   bool dark, {
   Map<String, String>? themeVars,
   GlobalKey? viewKey,
+  bool isSvg = false,
 }) {
+  if (isSvg) return null;
   final container = html.DivElement()
     ..style.width = '100%'
     ..style.height =

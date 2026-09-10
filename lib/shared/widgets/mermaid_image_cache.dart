@@ -2,6 +2,19 @@ import 'dart:typed_data';
 
 import '../cache/byte_lru_cache.dart';
 
+String diagramImageCacheKey(
+  String code,
+  bool isDark,
+  Map<String, String> themeVars, {
+  bool isSvg = false,
+}) {
+  final entries = themeVars.entries.toList()
+    ..sort((a, b) => a.key.compareTo(b.key));
+  final themeSig = entries.map((e) => '${e.key}=${e.value}').join('&');
+  final source = code.replaceAll('\r\n', '\n').replaceAll('\r', '\n').trim();
+  return '${isDark ? 'dark' : 'light'}|$themeSig|${isSvg ? 'svg\n' : ''}$source';
+}
+
 class MermaidImageCache {
   static int _maxBytes = 24 << 20;
   static ByteLruCache<String, Uint8List> _cache = _newCache();

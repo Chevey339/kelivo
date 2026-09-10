@@ -1,22 +1,52 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'mermaid_bridge.dart';
 import 'mermaid_image_cache.dart';
+import 'markdown_line_lexer.dart';
+import '../../utils/svg_preview_html.dart';
 
-RegExp mermaidFenceExp = RegExp(
-  r"```\s*mermaid\s*\n([\s\S]*?)\n```",
-  multiLine: true,
-);
+typedef DiagramCode = ({String code, bool isSvg});
 
-List<String> extractMermaidCodes(String md) {
-  final List<String> out = [];
-  for (final m in mermaidFenceExp.allMatches(md)) {
-    final body = (m.group(1) ?? '').trim();
-    if (body.isNotEmpty) out.add(body);
+List<DiagramCode> extractDiagramCodes(String markdown) {
+  final diagrams = <DiagramCode>[];
+  final lexer = MarkdownLineLexer();
+  final body = StringBuffer();
+  var language = '';
+
+  void addDiagram() {
+    final code = body.toString().trim();
+    if (code.isEmpty) return;
+    final isSvg = isSvgCodeBlock(language, code);
+    if (language == 'mermaid' || isSvg) {
+      diagrams.add((code: code, isSvg: isSvg));
+    }
   }
-  return out;
+
+  for (final line in const LineSplitter().convert(markdown)) {
+    final wasFenced = lexer.fenced;
+    lexer.consumeFence(line);
+    if (!wasFenced && lexer.fenced) {
+      final opening = line.trimLeft();
+      var end = 0;
+      while (end < opening.length && opening[end] == opening[0]) {
+        end++;
+      }
+      language = opening.substring(end).trim().toLowerCase();
+      body.clear();
+    } else if (wasFenced && !lexer.fenced) {
+      addDiagram();
+    } else if (wasFenced) {
+      body.writeln(line);
+    }
+  }
+  if (lexer.fenced) addDiagram();
+  return diagrams;
 }
+
+@visibleForTesting
+MermaidViewHandle? Function(DiagramCode diagram)? debugDiagramExportViewFactory;
 
 Map<String, String> buildThemeVarsFromColorScheme(ColorScheme cs) {
   String hex(Color c) {
@@ -64,19 +94,24 @@ Map<String, String> buildThemeVarsFromColorScheme(ColorScheme cs) {
   };
 }
 
-Future<void> preRenderMermaidCodesForExport(
+Future<void> preRenderDiagramCodesForExport(
   BuildContext context,
-  List<String> codes,
+  List<DiagramCode> codes,
 ) async {
   if (codes.isEmpty) return;
   final cs = Theme.of(context).colorScheme;
   final isDark = Theme.of(context).brightness == Brightness.dark;
   final themeVars = buildThemeVarsFromColorScheme(cs);
 
-  // De-dup codes and skip those already cached
+  String cacheKey(DiagramCode diagram) => diagramImageCacheKey(
+    diagram.code,
+    isDark,
+    themeVars,
+    isSvg: diagram.isSvg,
+  );
   final distinct = codes
       .toSet()
-      .where((c) => MermaidImageCache.get(c) == null)
+      .where((c) => MermaidImageCache.get(cacheKey(c)) == null)
       .toList();
   if (distinct.isEmpty) return;
 
@@ -84,14 +119,19 @@ Future<void> preRenderMermaidCodesForExport(
   if (overlay == null) return;
 
   // Sequentially render codes with a single offscreen overlay to avoid heavy composites
-  for (final code in distinct) {
+  for (final diagram in distinct) {
+    if (!context.mounted) return;
     final key = GlobalKey();
-    final handle = createMermaidView(
-      code,
-      isDark,
-      themeVars: themeVars,
-      viewKey: key,
-    );
+    final factory = debugDiagramExportViewFactory;
+    final handle = factory != null
+        ? factory(diagram)
+        : createMermaidView(
+            diagram.code,
+            isDark,
+            themeVars: themeVars,
+            viewKey: key,
+            isSvg: diagram.isSvg,
+          );
     if (handle == null) continue;
     final ready = Completer<void>();
     late OverlayEntry entry;
@@ -126,7 +166,7 @@ Future<void> preRenderMermaidCodesForExport(
           await Future<void>.delayed(const Duration(milliseconds: 200));
         }
         if (bytes != null && bytes.isNotEmpty) {
-          MermaidImageCache.put(code, bytes);
+          MermaidImageCache.put(cacheKey(diagram), bytes);
         }
       }
     } finally {

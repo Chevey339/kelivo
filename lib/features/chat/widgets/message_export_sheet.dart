@@ -30,7 +30,7 @@ import '../../../utils/mcp_structured_image.dart';
 import '../../../utils/sandbox_path_resolver.dart';
 import '../../../shared/widgets/markdown_with_highlight.dart';
 import '../../../shared/widgets/export_capture_scope.dart';
-import '../../../shared/widgets/mermaid_exporter.dart';
+import '../../../shared/widgets/diagram_exporter.dart';
 import '../../../shared/widgets/snackbar.dart';
 import '../../../shared/widgets/ios_tactile.dart';
 import '../../../shared/widgets/ios_switch.dart';
@@ -967,10 +967,10 @@ Future<File?> _renderAndSaveMessageImage(
   final title =
       chatService.getConversation(message.conversationId)?.title ??
       l10n.messageExportSheetDefaultTitle;
-  // Pre-render mermaid diagrams to images for export
+  // Pre-render Mermaid and SVG diagrams to images for export
   try {
-    final codes = extractMermaidCodes(message.content);
-    await preRenderMermaidCodesForExport(context, codes);
+    final codes = extractDiagramCodes(message.content);
+    await preRenderDiagramCodesForExport(context, codes);
   } catch (_) {}
 
   final bool isDesktop =
@@ -1010,13 +1010,13 @@ Future<File?> _renderAndSaveChatImage(
   final cs = theme.colorScheme;
   final settings = context.read<SettingsProvider>();
   final l10n = AppLocalizations.of(context)!;
-  // Pre-render all mermaid diagrams found in selected messages
+  // Pre-render all Mermaid and SVG diagrams found in selected messages
   try {
     final codes = messages
-        .map((m) => extractMermaidCodes(m.content))
+        .map((m) => extractDiagramCodes(m.content))
         .expand((e) => e)
         .toList();
-    await preRenderMermaidCodesForExport(context, codes);
+    await preRenderDiagramCodesForExport(context, codes);
   } catch (_) {}
 
   final bool isDesktop =

@@ -21,6 +21,7 @@ import 'package:image_gallery_saver_plus/image_gallery_saver_plus.dart';
 import 'package:super_clipboard/super_clipboard.dart';
 import '../../utils/sandbox_path_resolver.dart';
 import '../../utils/clipboard_images.dart';
+import '../../utils/svg_preview_html.dart';
 import '../../features/chat/pages/image_viewer_page.dart';
 import '../../features/chat/pages/html_preview_page.dart';
 import 'snackbar.dart';
@@ -28,6 +29,7 @@ import 'ios_tactile.dart';
 import 'mermaid_bridge.dart';
 import 'export_capture_scope.dart';
 import 'mermaid_image_cache.dart';
+import 'diagram_exporter.dart';
 import 'plantuml_block.dart';
 import 'package:path/path.dart' as p;
 import 'package:Kelivo/l10n/app_localizations.dart';
@@ -609,10 +611,12 @@ class _MarkdownWithCodeHighlightState extends State<MarkdownWithCodeHighlight> {
         codeBuilder: (ctx, name, code, closed) {
           final lang = name.trim();
           final restoredCode = _unmaskHtmlTagStartsInsideFencedCode(code);
-          if (lang.toLowerCase() == 'mermaid') {
-            return _MermaidBlock(
+          if (lang.toLowerCase() == 'mermaid' ||
+              isSvgCodeBlock(lang, restoredCode)) {
+            return _DiagramBlock(
               code: restoredCode,
               streaming: widget.streaming && !closed,
+              isSvg: lang.toLowerCase() != 'mermaid',
             );
           } else if (lang.toLowerCase() == 'plantuml') {
             return PlantUMLBlock(code: restoredCode);
@@ -3151,17 +3155,6 @@ String _codeBlockStateKey(String language, String code) {
   return '$normalizedLanguage|$anchor';
 }
 
-String _mermaidCacheKey(
-  String code,
-  bool isDark,
-  Map<String, String> themeVars,
-) {
-  final entries = themeVars.entries.toList()
-    ..sort((a, b) => a.key.compareTo(b.key));
-  final themeSig = entries.map((e) => '${e.key}=${e.value}').join('&');
-  return '${isDark ? 'dark' : 'light'}|$themeSig|$code';
-}
-
 enum MermaidBitmapRenderStatus { success, failed, unsupported }
 
 class MermaidBitmapRenderResult {
@@ -4257,18 +4250,23 @@ String _csvCell(String value) {
   return '"${value.replaceAll('"', '""')}"';
 }
 
-class _MermaidBlock extends StatefulWidget {
+class _DiagramBlock extends StatefulWidget {
   final String code;
   final bool streaming;
-  const _MermaidBlock({required this.code, required this.streaming});
+  final bool isSvg;
+  const _DiagramBlock({
+    required this.code,
+    required this.streaming,
+    this.isSvg = false,
+  });
 
   @override
-  State<_MermaidBlock> createState() => _MermaidBlockState();
+  State<_DiagramBlock> createState() => _DiagramBlockState();
 }
 
 enum _MermaidTab { image, code }
 
-class _MermaidBlockState extends State<_MermaidBlock> {
+class _DiagramBlockState extends State<_DiagramBlock> {
   static const Duration _streamingBitmapRenderDelay = Duration(
     milliseconds: 360,
   );
@@ -4287,6 +4285,9 @@ class _MermaidBlockState extends State<_MermaidBlock> {
   bool _suppressBitmapLoading = false;
   final Set<String> _failedBitmapRenderKeys = <String>{};
 
+  String _cacheKey(String code, bool dark, Map<String, String> vars) =>
+      diagramImageCacheKey(code, dark, vars, isSvg: widget.isSvg);
+
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
@@ -4295,56 +4296,15 @@ class _MermaidBlockState extends State<_MermaidBlock> {
 
     final mermaidColors = _MermaidBlockColors.resolve(isDark);
 
-    // Build theme variables mapping for Mermaid from Material ColorScheme
-    String hex(Color c) {
-      final v = c.toARGB32();
-      final r = (v >> 16) & 0xFF;
-      final g = (v >> 8) & 0xFF;
-      final b = v & 0xFF;
-      return '#'
-              '${r.toRadixString(16).padLeft(2, '0')}'
-              '${g.toRadixString(16).padLeft(2, '0')}'
-              '${b.toRadixString(16).padLeft(2, '0')}'
-          .toUpperCase();
-    }
-
-    final themeVars = <String, String>{
-      'primaryColor': hex(cs.primary),
-      'primaryTextColor': hex(cs.onPrimary),
-      'primaryBorderColor': hex(cs.primary),
-      'secondaryColor': hex(cs.secondary),
-      'secondaryTextColor': hex(cs.onSecondary),
-      'secondaryBorderColor': hex(cs.secondary),
-      'tertiaryColor': hex(cs.tertiary),
-      'tertiaryTextColor': hex(cs.onTertiary),
-      'tertiaryBorderColor': hex(cs.tertiary),
-      'background': hex(cs.surface),
-      'mainBkg': hex(cs.primaryContainer),
-      'secondBkg': hex(cs.secondaryContainer),
-      'lineColor': hex(cs.onSurface),
-      'textColor': hex(cs.onSurface),
-      'nodeBkg': hex(cs.surface),
-      'nodeBorder': hex(cs.primary),
-      'clusterBkg': hex(cs.surface),
-      'clusterBorder': hex(cs.primary),
-      'actorBorder': hex(cs.primary),
-      'actorBkg': hex(cs.surface),
-      'actorTextColor': hex(cs.onSurface),
-      'actorLineColor': hex(cs.primary),
-      'taskBorderColor': hex(cs.primary),
-      'taskBkgColor': hex(cs.primary),
-      'taskTextLightColor': hex(cs.onPrimary),
-      'taskTextDarkColor': hex(cs.onSurface),
-      'labelColor': hex(cs.onSurface),
-      'errorBkgColor': hex(cs.error),
-      'errorTextColor': hex(cs.onError),
-    };
+    final themeVars = buildThemeVarsFromColorScheme(cs);
 
     final exporting = ExportCaptureScope.of(context);
-    final cacheKey = _mermaidCacheKey(widget.code, isDark, themeVars);
+    final cacheKey = _cacheKey(widget.code, isDark, themeVars);
     final themedCachedBytes = MermaidImageCache.get(cacheKey);
-    final legacyCachedBytes = MermaidImageCache.get(widget.code);
-    final prefixCachedBytes = widget.streaming
+    final legacyCachedBytes = widget.isSvg
+        ? null
+        : MermaidImageCache.get(widget.code);
+    final prefixCachedBytes = widget.streaming && !widget.isSvg
         ? _findCachedStreamingMermaidPrefix(
             widget.code,
             isDark: isDark,
@@ -4580,7 +4540,7 @@ class _MermaidBlockState extends State<_MermaidBlock> {
   Widget _buildMermaidCodeView(BuildContext context, bool isDark) {
     final codeView = SelectableHighlightView(
       widget.code,
-      language: 'plaintext',
+      language: widget.isSvg ? 'xml' : 'plaintext',
       theme: _transparentBgTheme(
         isDark ? atomOneDarkReasonableTheme : githubTheme,
       ),
@@ -4624,7 +4584,7 @@ class _MermaidBlockState extends State<_MermaidBlock> {
   }
 
   @override
-  void didUpdateWidget(covariant _MermaidBlock oldWidget) {
+  void didUpdateWidget(covariant _DiagramBlock oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.code != widget.code ||
         oldWidget.streaming != widget.streaming) {
@@ -4673,7 +4633,7 @@ class _MermaidBlockState extends State<_MermaidBlock> {
     required Map<String, String> themeVars,
   }) async {
     final code = widget.code;
-    final cacheKey = _mermaidCacheKey(code, isDark, themeVars);
+    final cacheKey = _cacheKey(code, isDark, themeVars);
     if (MermaidImageCache.get(cacheKey) != null) return;
     final renderOverride = debugMermaidBitmapRenderOverride;
     final overlay = renderOverride == null ? Overlay.maybeOf(context) : null;
@@ -4740,6 +4700,7 @@ class _MermaidBlockState extends State<_MermaidBlock> {
       isDark,
       themeVars: themeVars,
       viewKey: renderKey,
+      isSvg: widget.isSvg,
     );
     if (handle == null) return MermaidBitmapRenderResult.unsupported();
 
@@ -4782,7 +4743,7 @@ class _MermaidBlockState extends State<_MermaidBlock> {
       final candidate = lines.take(end).join('\n').trimRight();
       if (candidate.isEmpty) continue;
       final themed = MermaidImageCache.get(
-        _mermaidCacheKey(candidate, isDark, themeVars),
+        _cacheKey(candidate, isDark, themeVars),
       );
       final legacy = MermaidImageCache.get(candidate);
       final bytes = themed ?? legacy;
@@ -4884,7 +4845,9 @@ class _MermaidBlockState extends State<_MermaidBlock> {
   Future<bool> _saveCachedMermaidPng(Uint8List bytes) async {
     try {
       final l10n = AppLocalizations.of(context)!;
-      final suggested = 'mermaid_${DateTime.now().millisecondsSinceEpoch}.png';
+      final prefix = widget.isSvg ? 'svg' : 'mermaid';
+      final suggested =
+          '${prefix}_${DateTime.now().millisecondsSinceEpoch}.png';
       if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
         final savePath = await FilePicker.platform.saveFile(
           dialogTitle: l10n.backupPageExportToFile,
@@ -4900,7 +4863,7 @@ class _MermaidBlockState extends State<_MermaidBlock> {
       final result = await ImageGallerySaverPlus.saveImage(
         bytes,
         quality: 100,
-        name: 'kelivo-mermaid-${DateTime.now().millisecondsSinceEpoch}',
+        name: 'kelivo-$prefix-${DateTime.now().millisecondsSinceEpoch}',
       );
       if (result is Map) {
         final isSuccess =
@@ -5216,8 +5179,12 @@ class FencedCodeBlockMd extends BlockMd {
     final closed = m.group(4) != null;
     final langLower = lang.toLowerCase();
     final isStreamingFence = streaming && !closed;
-    if (langLower == 'mermaid') {
-      return _MermaidBlock(code: code, streaming: isStreamingFence);
+    if (langLower == 'mermaid' || isSvgCodeBlock(lang, code)) {
+      return _DiagramBlock(
+        code: code,
+        streaming: isStreamingFence,
+        isSvg: langLower != 'mermaid',
+      );
     } else if (langLower == 'plantuml') {
       return PlantUMLBlock(code: code);
     }
