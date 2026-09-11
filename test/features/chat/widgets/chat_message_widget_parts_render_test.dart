@@ -116,6 +116,39 @@ void main() {
     );
   });
 
+  testWidgets('collapsed reasoning preview is only visible while loading', (
+    tester,
+  ) async {
+    Widget message({required bool loading}) => _buildHarness(
+      child: ChatMessageWidget(
+        message: ChatMessage(
+          id: 'reasoning-preview-lifecycle',
+          role: 'assistant',
+          content: loading ? '' : 'FINAL_ANSWER',
+          conversationId: 'c1',
+          isStreaming: loading,
+        ),
+        showModelIcon: false,
+        reasoningSegments: [
+          ReasoningSegment(
+            text: 'CURRENT_REASONING_SUMMARY',
+            expanded: false,
+            loading: loading,
+          ),
+        ],
+      ),
+    );
+
+    await tester.pumpWidget(message(loading: true));
+    await tester.pump();
+    expect(find.textContaining('CURRENT_REASONING_SUMMARY'), findsOneWidget);
+
+    await tester.pumpWidget(message(loading: false));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('CURRENT_REASONING_SUMMARY'), findsNothing);
+    expect(find.textContaining('FINAL_ANSWER'), findsOneWidget);
+  });
+
   testWidgets(
     'empty timeline with ToolCallPart falls back to parts when splits exist',
     (tester) async {

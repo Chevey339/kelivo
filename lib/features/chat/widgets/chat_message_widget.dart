@@ -5156,7 +5156,7 @@ class _ChainOfThoughtReasoningStepState
     Widget? content;
     if (state == _ReasoningStepState.expanded) {
       content = SelectionArea(child: reasoningContent(display));
-    } else if (showCollapsedReasoningPreview) {
+    } else if (showCollapsedReasoningPreview && widget.step.loading) {
       content = SelectionArea(
         child: _AnimatedReasoningPreview(
           text: display,
@@ -5196,9 +5196,8 @@ class _ChainOfThoughtReasoningStepState
             )
           : null,
       content: content,
-      contentVisible: showCollapsedReasoningPreview
-          ? display.isNotEmpty || widget.step.loading
-          : state != _ReasoningStepState.collapsed,
+      contentVisible:
+          state == _ReasoningStepState.expanded || widget.step.loading,
       expectContent: true,
     );
   }
@@ -7045,8 +7044,8 @@ class _ReasoningSectionState extends State<_ReasoningSection> {
     // Android-like surface style
     final curve = const Cubic(0.2, 0.8, 0.2, 1);
 
-    // Build a compact header; the current summary is rendered below it when
-    // the card is collapsed.
+    // Build a compact header; while reasoning is active, the current summary
+    // is rendered below it when the card is collapsed.
     Widget header = IosCardPress(
       borderRadius: BorderRadius.circular(12),
       baseColor: Colors.transparent,
@@ -7146,7 +7145,7 @@ class _ReasoningSectionState extends State<_ReasoningSection> {
         padding: const EdgeInsets.fromLTRB(8, 2, 8, 6),
         child: SelectionArea(child: reasoningContent(display)),
       );
-    } else if (showCollapsedReasoningPreview) {
+    } else if (showCollapsedReasoningPreview && isLoading) {
       body = Padding(
         padding: const EdgeInsets.fromLTRB(8, 2, 8, 6),
         child: SelectionArea(

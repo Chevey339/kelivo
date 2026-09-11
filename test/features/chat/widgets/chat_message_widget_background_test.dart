@@ -1783,12 +1783,12 @@ void main() {
       expect(find.textContaining('Final answer'), findsOneWidget);
       await tester.tap(find.text('Deep Thinking'));
       await tester.pumpAndSettle();
-      final collapsedPreview = tester.widget<Text>(
-        find.textContaining('inline reasoning'),
-      );
-      expect(collapsedPreview.maxLines, 2);
-      expect(collapsedPreview.overflow, TextOverflow.ellipsis);
+      expect(find.textContaining('inline reasoning'), findsNothing);
       expect(find.textContaining('Final answer'), findsOneWidget);
+
+      await tester.tap(find.text('Deep Thinking'));
+      await tester.pumpAndSettle();
+      expect(find.textContaining('inline reasoning'), findsOneWidget);
       expect(tester.takeException(), isNull);
     });
 
