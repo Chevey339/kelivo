@@ -20,7 +20,7 @@ class ModelRegistry {
   // every Qwen 3.7 Max id is multimodal.
   static final RegExp vision = RegExp(
     // GPT family incl. 4o, 4.1, 5 (exclude gpt-5-chat), and OpenAI o* series
-    r'(gpt-4o|gpt-4\.1|gpt-5(?!-chat)|gpt-6|o\d|gemini|claude|kimi-k2([-.])(?:5|6|7)|kimi-k3(?:$|[/_:@.-])|muse-spark-1(?:$|[/_:@.-])|doubao.+(?:1([-.])(?:6|8)|seed-2|seed-evolving)|grok-4|step-3|intern-s1|minimax-m3(?:$|[/_:@])|mimo-v2(?:-omni(?:$|[/_:@])|\.5(?:$|[/_:@]))|sensenova-6\.7-flash-lite|deepseek.+vision)',
+    r'(gpt-4o|gpt-4\.1|gpt-5(?!-chat)|gpt-6|o\d|gemini|claude|kimi-k2([-.])(?:5|6|7)|kimi-k3(?:$|[/_:@.-])|muse-spark-1(?:$|[/_:@.-])|doubao.+(?:1([-.])(?:6|8)|seed-2|seed-evolving)|grok-4|step-3|intern-s1|minimax-m3(?:$|[/_:@])|mimo-v2(?:-omni(?:$|[/_:@])|\.5(?:$|[/_:@]))|sensenova-6\.7-flash-lite)',
     caseSensitive: false,
   );
   // Tool-using models
@@ -30,7 +30,7 @@ class ModelRegistry {
             r'qwen-?3|doubao.+(?:1([-.])(?:6|8)|seed-2|seed-evolving)|grok-4|kimi-k2|'
             r'kimi-k3(?:$|[/_:@.-])|muse-spark-1(?:$|[/_:@.-])|'
             r'step-3|intern-s1|glm-4([-.])(?:5|6|7)|glm-5|minimax-(?:m2|m3)|'
-            r'deepseek-(?:r1|v3|chat|v3\.1|v3\.2|v4)|'
+            r'deepseek-(?:r1|v3|chat|v3\.1|v3\.2|v4|flash)|'
             r'deepseek-reasoner|'
             r'mimo-v2|'
             r'sensenova-6\.7-flash-lite|'
@@ -48,7 +48,7 @@ class ModelRegistry {
             r'qwen-?3|doubao.+(?:1([-.])(?:6|8)|seed-2|seed-evolving)|grok-4|kimi-k2|'
             r'kimi-k3(?:$|[/_:@.-])|muse-spark-1(?:$|[/_:@.-])|'
             r'step-3|intern-s1|glm-4([-.])(?:5|6|7)|glm-5|minimax-(?:m2|m3)|'
-            r'deepseek-(?:r1|v3\.1|v3\.2|v4)|'
+            r'deepseek-(?:r1|v3\.1|v3\.2|v4|flash)|'
             r'deepseek-reasoner|'
             r'mimo-v2|'
             r'laguna'
@@ -85,6 +85,16 @@ class ModelRegistry {
   static bool _isGlmVisionModel(String id) {
     return RegExp(
       r'(^|[/_:@])glm-5\.3-flash(?:$|[-.])',
+      caseSensitive: false,
+    ).hasMatch(id);
+  }
+
+  /// DeepSeek V4.1 Flash (`deepseek-flash`) is native multimodal.
+  /// Retired Flash IDs temporarily route to it and inherit image input.
+  /// `deepseek-v4-pro` stays text-only until that SKU is retired.
+  static bool _isDeepSeekVisionModel(String id) {
+    return RegExp(
+      r'(^|[/_:@])(?:deepseek-flash|deepseek-v4-flash)(?:$|[/_:@.-])',
       caseSensitive: false,
     ).hasMatch(id);
   }
@@ -145,7 +155,8 @@ class ModelRegistry {
     }
     if (vision.hasMatch(id) ||
         _isQwenVisionModel(id) ||
-        _isGlmVisionModel(id)) {
+        _isGlmVisionModel(id) ||
+        _isDeepSeekVisionModel(id)) {
       if (!inMods.contains(Modality.image)) inMods.add(Modality.image);
     }
     if (tool.hasMatch(id) && !ab.contains(ModelAbility.tool)) {
