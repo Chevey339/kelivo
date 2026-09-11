@@ -16,6 +16,7 @@ import org.robolectric.RuntimeEnvironment
 import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 import java.nio.ByteBuffer
+import java.time.LocalDate
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [28], application = KelivoApplication::class)
@@ -92,5 +93,37 @@ class ScheduledTasksTest {
         m.call("finish", mapOf("runId" to "stale", "status" to "completed"))
         assertTrue(app.backgroundRuntime.shouldRunService())
         assertEquals("running", stored().getJSONArray("runs").getJSONObject(0).getString("status"))
+    }
+    @Test fun oneTimeAlarmIsConsumedBeforeExecutionAndDoesNotReturnAfterRestart() {
+        val m = setup()
+        m.call("save", task() + mapOf("onceDate" to LocalDate.now().plusDays(1).toString()))
+        val due = stored().getLong("nextRunAt")
+        app.scheduledTasks.fire("a", due)
+        app.scheduledTasks.fire("a", due)
+        assertFalse(stored().getBoolean("enabled"))
+        assertTrue(stored().getBoolean("exhausted"))
+        assertTrue(stored().isNull("nextRunAt"))
+        assertEquals(1, stored().getJSONArray("runs").length())
+        val run = stored().getJSONArray("runs").getJSONObject(0)
+        m.call("finish", mapOf("runId" to run.getString("id"), "status" to "completed"))
+        assertFalse(app.backgroundRuntime.shouldRunService())
+        ScheduledTasks(app).rescheduleAll()
+        assertFalse(stored().getBoolean("enabled"))
+        assertTrue(stored().isNull("nextRunAt"))
+        assertTrue(shadowOf(app.getSystemService(AlarmManager::class.java)).scheduledAlarms.isEmpty())
+    }
+    @Test fun executionConfigurationSurvivesSchedulingAndManualRun() {
+        val m = setup()
+        m.call("save", task() + mapOf(
+            "mode" to "regenerate", "prompt" to "", "conversationId" to "chat", "messageId" to "question",
+            "modelProvider" to "provider", "modelId" to "model",
+            "startDate" to LocalDate.now().plusDays(1).toString(), "endDate" to LocalDate.now().plusDays(10).toString(),
+        ))
+        val due = stored().getLong("nextRunAt")
+        m.call("runNow", mapOf("id" to "a"))
+        assertEquals(due, stored().getLong("nextRunAt"))
+        assertEquals("chat", stored().getString("conversationId"))
+        assertEquals("question", stored().getString("messageId"))
+        assertEquals("model", stored().getString("modelId"))
     }
 }

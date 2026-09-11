@@ -14,6 +14,7 @@ import io.flutter.plugin.common.BinaryMessenger
 import io.flutter.plugin.common.MethodChannel
 import org.json.JSONArray
 import org.json.JSONObject
+import java.time.LocalDate
 import java.util.UUID
 
 /** Native storage is the single owner: alarms also work without a Dart isolate. */
@@ -111,10 +112,25 @@ class ScheduledTasks(private val app: KelivoApplication) {
     private fun validate(task: JSONObject) {
         require(task.getString("id").length in 1..128)
         require(task.getString("name").trim().length in 1..200)
-        require(task.getString("prompt").trim().length in 1..32000)
+        val mode = task.optString("mode", "newChat")
+        require(mode in setOf("newChat", "followUp", "regenerate"))
+        require(task.optString("prompt").trim().length in (if (mode == "regenerate") 0 else 1)..32000)
         require(task.getString("assistantId").isNotBlank())
-        ScheduleTime.next(task.getInt("hour"), task.getInt("minute"), days(task), System.currentTimeMillis())
+        if (mode != "newChat") require(!task.isNull("conversationId") && task.getString("conversationId").isNotBlank())
+        if (mode == "regenerate") require(!task.isNull("messageId") && task.getString("messageId").isNotBlank())
+        require(task.isNull("modelProvider") == task.isNull("modelId"))
+        if (!task.isNull("modelId")) {
+            require(task.getString("modelProvider").isNotBlank() && task.getString("modelId").isNotBlank())
+        }
+        val next = next(task, System.currentTimeMillis())
+        require(!task.getBoolean("enabled") || next != null) { "schedule_ended" }
     }
+    private fun date(task: JSONObject, key: String): LocalDate? =
+        if (task.isNull(key)) null else LocalDate.parse(task.getString(key))
+    private fun next(task: JSONObject, after: Long): Long? = ScheduleTime.next(
+        task.getInt("hour"), task.getInt("minute"), days(task), after,
+        onceDate = date(task, "onceDate"), startDate = date(task, "startDate"), endDate = date(task, "endDate"),
+    )
     private fun days(task: JSONObject): Set<Int> = task.getJSONArray("weekdays").let { list ->
         (0 until list.length()).map { list.getInt(it) }.toSet()
     }
@@ -138,12 +154,17 @@ class ScheduledTasks(private val app: KelivoApplication) {
         return PendingIntent.getBroadcast(app, 0, intent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
     }
-    private fun arm(task: JSONObject) {
+    private fun arm(task: JSONObject, after: Long = System.currentTimeMillis()) {
         val id = task.getString("id")
         alarms.cancel(pendingIntent(id, 0))
         task.put("nextRunAt", JSONObject.NULL)
+        val next = next(task, after)
+        task.put("exhausted", next == null)
+        if (next == null) {
+            task.put("enabled", false)
+            return
+        }
         if (!task.getBoolean("enabled") || !permitted()) return
-        val next = ScheduleTime.next(task.getInt("hour"), task.getInt("minute"), days(task), System.currentTimeMillis())
         alarms.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, next, pendingIntent(id, next))
         task.put("nextRunAt", next)
     }
@@ -157,9 +178,9 @@ class ScheduledTasks(private val app: KelivoApplication) {
     fun fire(id: String, dueAt: Long) {
         val task = get(id) ?: return
         if (!task.optBoolean("enabled") || dueAt == 0L || task.optLong("nextRunAt") != dueAt) return
-        // Consume this occurrence and arm tomorrow before any execution.
+        // Consume this occurrence before execution, including one-time schedules.
         try {
-            arm(task)
+            arm(task, maxOf(System.currentTimeMillis(), dueAt))
             persist(task)
             start(task)
         } catch (error: RuntimeException) {

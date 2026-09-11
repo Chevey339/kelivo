@@ -20262,7 +20262,7 @@ abstract class AppLocalizations {
   /// No description provided for @scheduledTasksDescription.
   ///
   /// In en, this message translates to:
-  /// **'Run a prompt automatically at a local time. Each run creates a new conversation using the selected assistant.'**
+  /// **'Run tasks automatically at your chosen time: start a new chat, follow up, or run a question again.'**
   String get scheduledTasksDescription;
 
   /// No description provided for @scheduledTasksEmpty.
@@ -20394,7 +20394,7 @@ abstract class AppLocalizations {
   /// No description provided for @scheduledTasksExecutionDetail.
   ///
   /// In en, this message translates to:
-  /// **'Uses the assistant’s current model, tools and workspace. Runs stop after 10 minutes or when user input or tool approval is needed. Results are saved in chats.'**
+  /// **'Results are saved in chats. A completion notification previews the reply and opens the conversation when tapped. Runs stop after 10 minutes or when user input or tool approval is needed.'**
   String get scheduledTasksExecutionDetail;
 
   /// No description provided for @scheduledTasksRunNow.
@@ -20484,7 +20484,7 @@ abstract class AppLocalizations {
   /// No description provided for @scheduledTasksInvalid.
   ///
   /// In en, this message translates to:
-  /// **'Enter a name, prompt, assistant, valid time and at least one day.'**
+  /// **'Enter a name, prompt and assistant, and select at least one day for a custom schedule.'**
   String get scheduledTasksInvalid;
 
   /// No description provided for @scheduledTasksLoading.
@@ -20516,6 +20516,210 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Android stopped the previous run.'**
   String get scheduledTasksProcessTerminated;
+
+  /// No description provided for @scheduledTasksOnce.
+  ///
+  /// In en, this message translates to:
+  /// **'Once'**
+  String get scheduledTasksOnce;
+
+  /// No description provided for @scheduledTasksCustom.
+  ///
+  /// In en, this message translates to:
+  /// **'Custom'**
+  String get scheduledTasksCustom;
+
+  /// No description provided for @scheduledTasksExecution.
+  ///
+  /// In en, this message translates to:
+  /// **'Task'**
+  String get scheduledTasksExecution;
+
+  /// No description provided for @scheduledTasksMode.
+  ///
+  /// In en, this message translates to:
+  /// **'Action'**
+  String get scheduledTasksMode;
+
+  /// No description provided for @scheduledTasksNewChat.
+  ///
+  /// In en, this message translates to:
+  /// **'New chat'**
+  String get scheduledTasksNewChat;
+
+  /// No description provided for @scheduledTasksFollowUp.
+  ///
+  /// In en, this message translates to:
+  /// **'Follow up'**
+  String get scheduledTasksFollowUp;
+
+  /// No description provided for @scheduledTasksRegenerate.
+  ///
+  /// In en, this message translates to:
+  /// **'Run again'**
+  String get scheduledTasksRegenerate;
+
+  /// No description provided for @scheduledTasksChat.
+  ///
+  /// In en, this message translates to:
+  /// **'Conversation'**
+  String get scheduledTasksChat;
+
+  /// No description provided for @scheduledTasksChooseChat.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose a conversation'**
+  String get scheduledTasksChooseChat;
+
+  /// No description provided for @scheduledTasksMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Question to run again'**
+  String get scheduledTasksMessage;
+
+  /// No description provided for @scheduledTasksChooseMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose a question'**
+  String get scheduledTasksChooseMessage;
+
+  /// No description provided for @scheduledTasksAttachmentMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Message with attachments'**
+  String get scheduledTasksAttachmentMessage;
+
+  /// No description provided for @scheduledTasksModel.
+  ///
+  /// In en, this message translates to:
+  /// **'Model'**
+  String get scheduledTasksModel;
+
+  /// No description provided for @scheduledTasksChooseModel.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose a model'**
+  String get scheduledTasksChooseModel;
+
+  /// No description provided for @scheduledTasksModelDefault.
+  ///
+  /// In en, this message translates to:
+  /// **'Use the conversation or assistant model'**
+  String get scheduledTasksModelDefault;
+
+  /// No description provided for @scheduledTasksSchedule.
+  ///
+  /// In en, this message translates to:
+  /// **'Schedule'**
+  String get scheduledTasksSchedule;
+
+  /// No description provided for @scheduledTasksActiveWindow.
+  ///
+  /// In en, this message translates to:
+  /// **'Active dates'**
+  String get scheduledTasksActiveWindow;
+
+  /// No description provided for @scheduledTasksStartDate.
+  ///
+  /// In en, this message translates to:
+  /// **'Start date'**
+  String get scheduledTasksStartDate;
+
+  /// No description provided for @scheduledTasksEndDate.
+  ///
+  /// In en, this message translates to:
+  /// **'End date'**
+  String get scheduledTasksEndDate;
+
+  /// No description provided for @scheduledTasksActiveWindowDetail.
+  ///
+  /// In en, this message translates to:
+  /// **'Runs only within these dates, including the end date. Leave a date unset for no limit.'**
+  String get scheduledTasksActiveWindowDetail;
+
+  /// No description provided for @scheduledTasksDate.
+  ///
+  /// In en, this message translates to:
+  /// **'Date'**
+  String get scheduledTasksDate;
+
+  /// No description provided for @scheduledTasksDateUnrestricted.
+  ///
+  /// In en, this message translates to:
+  /// **'No limit'**
+  String get scheduledTasksDateUnrestricted;
+
+  /// No description provided for @scheduledTasksClear.
+  ///
+  /// In en, this message translates to:
+  /// **'Clear'**
+  String get scheduledTasksClear;
+
+  /// No description provided for @scheduledTasksSearch.
+  ///
+  /// In en, this message translates to:
+  /// **'Search'**
+  String get scheduledTasksSearch;
+
+  /// No description provided for @scheduledTasksNoTargets.
+  ///
+  /// In en, this message translates to:
+  /// **'No matching items for this assistant'**
+  String get scheduledTasksNoTargets;
+
+  /// No description provided for @scheduledTasksFutureDate.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose a future execution date and time.'**
+  String get scheduledTasksFutureDate;
+
+  /// No description provided for @scheduledTasksDateRangeInvalid.
+  ///
+  /// In en, this message translates to:
+  /// **'The end date must be on or after the start date.'**
+  String get scheduledTasksDateRangeInvalid;
+
+  /// No description provided for @scheduledTasksRegenerateDetail.
+  ///
+  /// In en, this message translates to:
+  /// **'Generates another answer to the selected question using its original context. Existing answers and later messages are kept.'**
+  String get scheduledTasksRegenerateDetail;
+
+  /// No description provided for @scheduledTasksSaving.
+  ///
+  /// In en, this message translates to:
+  /// **'Saving…'**
+  String get scheduledTasksSaving;
+
+  /// No description provided for @scheduledTasksFinished.
+  ///
+  /// In en, this message translates to:
+  /// **'Schedule ended'**
+  String get scheduledTasksFinished;
+
+  /// No description provided for @scheduledTasksModelMissing.
+  ///
+  /// In en, this message translates to:
+  /// **'The selected model is unavailable. Edit this task to choose another model.'**
+  String get scheduledTasksModelMissing;
+
+  /// No description provided for @scheduledTasksChatMissing.
+  ///
+  /// In en, this message translates to:
+  /// **'The conversation is unavailable or belongs to another assistant.'**
+  String get scheduledTasksChatMissing;
+
+  /// No description provided for @scheduledTasksMessageMissing.
+  ///
+  /// In en, this message translates to:
+  /// **'The selected question is no longer available.'**
+  String get scheduledTasksMessageMissing;
+
+  /// No description provided for @scheduledTasksChatBusy.
+  ///
+  /// In en, this message translates to:
+  /// **'This conversation is generating a reply. The scheduled run was skipped.'**
+  String get scheduledTasksChatBusy;
 }
 
 class _AppLocalizationsDelegate

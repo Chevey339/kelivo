@@ -2441,7 +2441,8 @@ class ChatDatabaseRepository {
   ///
   /// Version collapsing, truncate-index application, tail limiting, and part
   /// hydration intentionally happen in one SQL statement so a large
-  /// conversation is never materialized merely to discard its prefix.
+  /// conversation is never materialized merely to discard its prefix. A reset
+  /// after the requested revision does not apply to that earlier turn.
   Future<List<ChatMessage>> getSelectedContextMessages(
     String conversationId, {
     required int truncateIndex,
@@ -2519,7 +2520,8 @@ class ChatDatabaseRepository {
                   selected.logical_index
                 )
                 ELSE selected.logical_index
-              END AS logical_index
+              END AS logical_index,
+              selected.logical_index AS target_index
               FROM target
               JOIN ordered selected ON selected.group_id = target.group_id
             ),
@@ -2527,7 +2529,9 @@ class ChatDatabaseRepository {
               SELECT revision_id, logical_index
               FROM ordered
               WHERE logical_index >= CASE
-                WHEN ? >= 0 AND ? <= total_count THEN ?
+                WHEN ? >= 0 AND ? <= total_count
+                  AND (NOT EXISTS (SELECT 1 FROM cutoff)
+                    OR ? <= (SELECT target_index FROM cutoff)) THEN ?
                 ELSE 0
               END
                 AND (
@@ -2557,6 +2561,7 @@ class ChatDatabaseRepository {
               Variable<String>(conversationId),
               Variable<String>(throughRevisionId ?? ''),
               Variable<bool>(includeFollowingAssistant),
+              Variable<int>(truncateIndex),
               Variable<int>(truncateIndex),
               Variable<int>(truncateIndex),
               Variable<int>(truncateIndex),

@@ -4895,14 +4895,22 @@ class _ChainOfThoughtReasoningStepState
   Timer? _elapsedTimer;
   final ScrollController _scroll = ScrollController();
   bool _hasOverflow = false;
+  bool? _localExpanded;
 
   _ReasoningStepState get _stepState {
+    // Persisted parts can outnumber the timing/interaction metadata (for
+    // example after a background tool round). The content still needs a toggle.
+    final expanded =
+        (_ChainOfThoughtActions.toggleOf(context, widget.sourceIndex) == null
+            ? _localExpanded
+            : null) ??
+        widget.step.expanded;
     if (widget.step.loading) {
-      return widget.step.expanded
+      return expanded
           ? _ReasoningStepState.expanded
           : _ReasoningStepState.preview;
     }
-    return widget.step.expanded
+    return expanded
         ? _ReasoningStepState.expanded
         : _ReasoningStepState.collapsed;
   }
@@ -5084,28 +5092,31 @@ class _ChainOfThoughtReasoningStepState
       content = SelectionArea(child: reasoningContent(display));
     }
 
-    final hasToggle =
-        _ChainOfThoughtActions.toggleOf(context, widget.sourceIndex) != null;
     return _TimelineStepShell(
       icon: icon,
       label: label,
       isFirst: widget.isFirst,
       isLast: widget.isLast,
-      onTap: hasToggle
-          ? () => _ChainOfThoughtActions.toggleOf(
-              context,
-              widget.sourceIndex,
-            )?.call()
-          : null,
-      indicator: hasToggle
-          ? Icon(
-              state == _ReasoningStepState.expanded
-                  ? Lucide.ChevronUp
-                  : Lucide.ChevronDown,
-              size: 16,
-              color: fg.muted,
-            )
-          : null,
+      onTap: () {
+        final toggle = _ChainOfThoughtActions.toggleOf(
+          context,
+          widget.sourceIndex,
+        );
+        if (toggle != null) {
+          toggle();
+        } else {
+          setState(() {
+            _localExpanded = !(_localExpanded ?? widget.step.expanded);
+          });
+        }
+      },
+      indicator: Icon(
+        state == _ReasoningStepState.expanded
+            ? Lucide.ChevronUp
+            : Lucide.ChevronDown,
+        size: 16,
+        color: fg.muted,
+      ),
       content: content,
       contentVisible: state != _ReasoningStepState.collapsed,
       expectContent: true,
