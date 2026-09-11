@@ -54,6 +54,7 @@ import 'timeline_projection.dart';
 import 'timeline_visibility.dart';
 import 'citation_sources_sheet.dart';
 import 'chat_surface.dart';
+import 'collapsible_user_text.dart';
 import 'chat_suggestion_bubbles.dart';
 import 'token_display_widget.dart';
 import 'screen_time_tool_ui.dart';
@@ -1062,6 +1063,9 @@ class ChatMessageWidget extends StatefulWidget {
   final bool? showToolCards;
   final void Function(String imageKey, double aspectRatio)? onInlineImageAspect;
 
+  /// Off for exports, which must render the whole user message.
+  final bool collapseLongUserText;
+
   const ChatMessageWidget({
     super.key,
     required this.message,
@@ -1108,6 +1112,7 @@ class ChatMessageWidget extends StatefulWidget {
     this.showThinkingCards,
     this.showToolCards,
     this.onInlineImageAspect,
+    this.collapseLongUserText = true,
   });
 
   @override
@@ -1733,6 +1738,7 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
             bool showName,
             bool showTimestamp,
             bool enableMarkdown,
+            int collapseChars,
           })
         >(
           (s) => (
@@ -1740,6 +1746,9 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
             showName: s.showUserName,
             showTimestamp: s.showUserTimestamp,
             enableMarkdown: s.enableUserMarkdown,
+            collapseChars: s.collapseLongUserMessages
+                ? s.collapseLongUserMessageChars
+                : 0,
           ),
         );
     // Attachments come from structured parts only. Literal marker-like text
@@ -1768,6 +1777,9 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
                 context,
                 visualText,
                 userMessageSettings.enableMarkdown,
+                widget.collapseLongUserText
+                    ? userMessageSettings.collapseChars
+                    : 0,
               ),
             ),
           )
@@ -2043,10 +2055,14 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
     } catch (_) {}
   }
 
+  /// Number of text lines kept visible when a long user message is collapsed.
+  static const int _collapsedUserTextLines = 9;
+
   Widget _buildUserTextContent(
     BuildContext context,
     String visualText,
     bool enableUserMarkdown,
+    int collapseChars,
   ) {
     final bool isDesktop =
         defaultTargetPlatform == TargetPlatform.macOS ||
@@ -2075,12 +2091,24 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
       );
     }
 
-    return isDesktop
-        ? SelectionArea(
-            key: ValueKey('user_${widget.message.id}'),
-            child: content,
-          )
-        : content;
+    if (isDesktop) {
+      content = SelectionArea(
+        key: ValueKey('user_${widget.message.id}'),
+        child: content,
+      );
+    }
+
+    if (collapseChars > 0 && visualText.length > collapseChars) {
+      final lineHeight =
+          MediaQuery.textScalerOf(context).scale(baseUser) * 1.45;
+      content = CollapsibleUserText(
+        key: ValueKey('user-collapse:${widget.message.id}'),
+        collapsedHeight: lineHeight * _collapsedUserTextLines,
+        child: content,
+      );
+    }
+
+    return content;
   }
 
   /// Attachment previews in [parts] ordinal order (not images-then-files).

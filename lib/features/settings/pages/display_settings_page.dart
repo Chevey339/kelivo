@@ -1664,7 +1664,18 @@ class RenderingSettingsPage extends StatelessWidget {
               ),
               if (sp.autoCollapseCodeBlock) ...[
                 _iosDivider(context),
-                const _AutoCollapseCodeBlockLinesRow(),
+                _NumberFieldRow(
+                  icon: Lucide.ListOrdered,
+                  label:
+                      l10n.displaySettingsPageAutoCollapseCodeBlockLinesTitle,
+                  unit: l10n.displaySettingsPageAutoCollapseCodeBlockLinesUnit,
+                  value: sp.autoCollapseCodeBlockLines,
+                  min: 1,
+                  max: 999,
+                  onChanged: (v) => context
+                      .read<SettingsProvider>()
+                      .setAutoCollapseCodeBlockLines(v),
+                ),
               ],
               if (Platform.isAndroid || Platform.isIOS) ...[
                 _iosDivider(context),
@@ -1686,25 +1697,37 @@ class RenderingSettingsPage extends StatelessWidget {
   }
 }
 
-class _AutoCollapseCodeBlockLinesRow extends StatefulWidget {
-  const _AutoCollapseCodeBlockLinesRow();
+class _NumberFieldRow extends StatefulWidget {
+  const _NumberFieldRow({
+    required this.icon,
+    required this.label,
+    required this.unit,
+    required this.value,
+    required this.min,
+    required this.max,
+    required this.onChanged,
+  });
+
+  final IconData icon;
+  final String label;
+  final String unit;
+  final int value;
+  final int min;
+  final int max;
+  final ValueChanged<int> onChanged;
+
   @override
-  State<_AutoCollapseCodeBlockLinesRow> createState() =>
-      _AutoCollapseCodeBlockLinesRowState();
+  State<_NumberFieldRow> createState() => _NumberFieldRowState();
 }
 
-class _AutoCollapseCodeBlockLinesRowState
-    extends State<_AutoCollapseCodeBlockLinesRow> {
+class _NumberFieldRowState extends State<_NumberFieldRow> {
   late final TextEditingController _controller;
   late final FocusNode _focusNode;
 
   @override
   void initState() {
     super.initState();
-    final sp = context.read<SettingsProvider>();
-    _controller = TextEditingController(
-      text: '${sp.autoCollapseCodeBlockLines}',
-    );
+    _controller = TextEditingController(text: '${widget.value}');
     _focusNode = FocusNode()
       ..addListener(() {
         if (!_focusNode.hasFocus) _commit();
@@ -1719,11 +1742,9 @@ class _AutoCollapseCodeBlockLinesRowState
   }
 
   void _commit() {
-    final sp = context.read<SettingsProvider>();
-    final raw = _controller.text.trim();
-    final parsed = int.tryParse(raw) ?? sp.autoCollapseCodeBlockLines;
-    final next = parsed.clamp(1, 999);
-    sp.setAutoCollapseCodeBlockLines(next);
+    final parsed = int.tryParse(_controller.text.trim()) ?? widget.value;
+    final next = parsed.clamp(widget.min, widget.max);
+    widget.onChanged(next);
     final text = '$next';
     if (_controller.text != text) {
       _controller.value = _controller.value.copyWith(
@@ -1735,13 +1756,11 @@ class _AutoCollapseCodeBlockLinesRowState
 
   @override
   Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context)!;
     final cs = Theme.of(context).colorScheme;
-    final sp = context.watch<SettingsProvider>();
 
     // Keep controller in sync when not editing
     if (!_focusNode.hasFocus) {
-      final t = '${sp.autoCollapseCodeBlockLines}';
+      final t = '${widget.value}';
       if (_controller.text != t) _controller.text = t;
     }
 
@@ -1764,12 +1783,12 @@ class _AutoCollapseCodeBlockLinesRowState
         children: [
           SizedBox(
             width: 36,
-            child: Icon(Lucide.ListOrdered, size: 20, color: baseColor),
+            child: Icon(widget.icon, size: 20, color: baseColor),
           ),
           const SizedBox(width: 12),
           Expanded(
             child: Text(
-              l10n.displaySettingsPageAutoCollapseCodeBlockLinesTitle,
+              widget.label,
               style: TextStyle(fontSize: 15, color: baseColor),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
@@ -1802,7 +1821,7 @@ class _AutoCollapseCodeBlockLinesRowState
           ),
           const SizedBox(width: 8),
           Text(
-            l10n.displaySettingsPageAutoCollapseCodeBlockLinesUnit,
+            widget.unit,
             style: TextStyle(
               fontSize: 13,
               color: cs.onSurface.withValues(alpha: 0.6),
@@ -1886,6 +1905,33 @@ class BehaviorStartupSettingsPage extends StatelessWidget {
                     .read<SettingsProvider>()
                     .setInsertSuggestionOnTapOnly(v),
               ),
+              _iosDivider(context),
+              _iosSwitchRow(
+                context,
+                icon: Lucide.FoldVertical,
+                label: l10n.displaySettingsPageCollapseLongUserMessagesTitle,
+                tip: l10n.displaySettingsPageCollapseLongUserMessagesSubtitle,
+                value: sp.collapseLongUserMessages,
+                onChanged: (v) => context
+                    .read<SettingsProvider>()
+                    .setCollapseLongUserMessages(v),
+              ),
+              if (sp.collapseLongUserMessages) ...[
+                _iosDivider(context),
+                _NumberFieldRow(
+                  icon: Lucide.ListOrdered,
+                  label: l10n
+                      .displaySettingsPageCollapseLongUserMessagesCharsTitle,
+                  unit:
+                      l10n.displaySettingsPageCollapseLongUserMessagesCharsUnit,
+                  value: sp.collapseLongUserMessageChars,
+                  min: SettingsProvider.minCollapseLongUserMessageChars,
+                  max: SettingsProvider.maxCollapseLongUserMessageChars,
+                  onChanged: (v) => context
+                      .read<SettingsProvider>()
+                      .setCollapseLongUserMessageChars(v),
+                ),
+              ],
               _iosDivider(context),
               _iosSwitchRow(
                 context,
