@@ -1,3 +1,5 @@
+import 'package:Kelivo/core/database/chat_database_repository.dart';
+import 'package:Kelivo/core/models/chat_message.dart';
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
@@ -120,6 +122,152 @@ void main() {
       expect(harness.viewModel.toolSnapshots, isEmpty);
     });
   });
+
+  for (final mode in ScheduledTaskMode.values) {
+    testWidgets('${mode.name} uses the selected target and task model', (
+      tester,
+    ) async {
+      final harness = await mount(tester);
+      await tester.runAsync(() async {
+        harness.server.releaseTools.complete();
+        await harness.settings.setProviderConfig(
+          'task-provider',
+          ProviderConfig(
+            id: 'task-provider',
+            enabled: true,
+            name: 'Task provider',
+            apiKey: '',
+            baseUrl: '',
+            models: const ['task-model'],
+          ),
+        );
+        final conversation = Conversation(
+          id: 'existing',
+          title: 'Existing chat',
+          assistantId: 'assistant',
+        );
+        harness.chat.existing[conversation.id] = conversation;
+        await harness.chat.repository.putConversation(conversation);
+        await harness.chat.repository.putMessage(
+          ChatMessage(
+            id: 'question',
+            conversationId: conversation.id,
+            role: 'user',
+            content: 'Original question',
+          ),
+        );
+        final task = ScheduledTask(
+          id: 'task',
+          name: 'Daily task',
+          prompt: mode == ScheduledTaskMode.regenerate
+              ? ''
+              : 'Follow-up prompt',
+          assistantId: 'assistant',
+          hour: 8,
+          minute: 0,
+          mode: mode,
+          conversationId: mode == ScheduledTaskMode.newChat
+              ? null
+              : conversation.id,
+          messageId: mode == ScheduledTaskMode.regenerate ? 'question' : null,
+          modelProvider: 'task-provider',
+          modelId: 'task-model',
+        );
+        expect(await harness.run(null, task), isA<_RequestCaptured>());
+        final request = harness.viewModel.requests.single;
+        expect(request.assistantId, 'assistant');
+        expect(request.model, (
+          providerKey: 'task-provider',
+          modelId: 'task-model',
+        ));
+        expect(
+          request.messageId,
+          mode == ScheduledTaskMode.regenerate ? 'question' : null,
+        );
+        expect(
+          request.prompt,
+          mode == ScheduledTaskMode.regenerate ? null : 'Follow-up prompt',
+        );
+        expect(
+          harness.chat.created.length,
+          mode == ScheduledTaskMode.newChat ? 1 : 0,
+        );
+        if (mode != ScheduledTaskMode.newChat) {
+          expect(request.conversationId, conversation.id);
+        }
+        expect(conversation.chatModelId, isNull);
+        expect(harness.assistants.getById('assistant')!.chatModelId, isNull);
+      });
+    });
+  }
+
+  testWidgets('busy target does not acquire a cancellation callback', (
+    tester,
+  ) async {
+    final harness = await mount(tester);
+    await tester.runAsync(() async {
+      harness.server.releaseTools.complete();
+      harness.viewModel.busy = true;
+      harness.chat.existing['existing'] = Conversation(
+        id: 'existing',
+        title: 'Chat',
+        assistantId: 'assistant',
+      );
+      final cancellation = ScheduledRunCancellation();
+      final task = ScheduledTask(
+        id: 'task',
+        name: 'Task',
+        prompt: 'Prompt',
+        assistantId: 'assistant',
+        hour: 8,
+        minute: 0,
+        mode: ScheduledTaskMode.followUp,
+        conversationId: 'existing',
+      );
+      expect(
+        await harness.run(cancellation, task),
+        isA<StateError>().having((e) => e.message, 'message', 'in_flight'),
+      );
+      expect(cancellation.onCancel, isNull);
+      expect(harness.chat.created, isEmpty);
+    });
+  });
+
+  testWidgets('missing or moved conversations fail before starting a request', (
+    tester,
+  ) async {
+    final harness = await mount(tester);
+    await tester.runAsync(() async {
+      harness.server.releaseTools.complete();
+      harness.chat.existing['moved'] = Conversation(
+        id: 'moved',
+        title: 'Moved chat',
+        assistantId: 'other',
+      );
+      for (final id in ['missing', 'moved']) {
+        final task = ScheduledTask(
+          id: 'task',
+          name: 'Task',
+          prompt: 'Prompt',
+          assistantId: 'assistant',
+          hour: 8,
+          minute: 0,
+          mode: ScheduledTaskMode.followUp,
+          conversationId: id,
+        );
+        expect(
+          await harness.run(null, task),
+          isA<StateError>().having(
+            (e) => e.message,
+            'message',
+            'conversation_missing',
+          ),
+        );
+      }
+      expect(harness.viewModel.requests, isEmpty);
+      expect(harness.chat.created, isEmpty);
+    });
+  });
 }
 
 class _RunnerHarness {
@@ -142,7 +290,9 @@ class _RunnerHarness {
   late final WorkspaceProvider workspaces;
   late final WorldBookProvider books;
   late final _RecordingViewModel viewModel;
-  final chat = _RecordingChatService();
+  late final chat = _RecordingChatService(
+    ChatDatabaseRepository(storage.database),
+  );
   final approvals = ToolApprovalService();
   final questions = AskUserInteractionService();
   late BuildContext context;
@@ -219,19 +369,23 @@ class _RunnerHarness {
     ),
   );
 
-  Future<Object> run([ScheduledRunCancellation? cancellation]) async {
+  Future<Object> run([
+    ScheduledRunCancellation? cancellation,
+    ScheduledTask? task,
+  ]) async {
     try {
       return await runScheduledTask(
         context,
         viewModel,
-        const ScheduledTask(
-          id: 'task',
-          name: 'Daily task',
-          prompt: 'Use my tools',
-          assistantId: 'assistant',
-          hour: 8,
-          minute: 0,
-        ),
+        task ??
+            const ScheduledTask(
+              id: 'task',
+              name: 'Daily task',
+              prompt: 'Use my tools',
+              assistantId: 'assistant',
+              hour: 8,
+              minute: 0,
+            ),
         cancellation ?? ScheduledRunCancellation(),
         (_) async {},
       );
@@ -258,7 +412,16 @@ class _RunnerHarness {
 }
 
 class _RecordingChatService extends ChatService {
+  _RecordingChatService(this.repository);
+  final ChatDatabaseRepository repository;
+  final existing = <String, Conversation>{};
   final created = <Conversation>[];
+
+  @override
+  ChatDatabaseRepository get chatRepositoryOrNull => repository;
+
+  @override
+  Conversation? getConversation(String id) => existing[id];
 
   @override
   Future<void> init() async {}
@@ -283,13 +446,52 @@ class _RecordingViewModel extends Fake implements HomeViewModel {
   final McpProvider mcpProvider;
   final AssistantProvider assistants;
   final toolSnapshots = <List<String>>[];
+  final requests =
+      <
+        ({
+          String conversationId,
+          String? messageId,
+          String? prompt,
+          String assistantId,
+          ({String providerKey, String modelId})? model,
+        })
+      >[];
+  bool busy = false;
+
+  @override
+  Future<ChatActionResult> regenerateScheduledMessage({
+    required ChatMessage message,
+    required Conversation conversation,
+    required Assistant assistant,
+    ({String providerKey, String modelId})? modelOverride,
+    ValueChanged<String>? onGenerationStarted,
+  }) async {
+    requests.add((
+      conversationId: conversation.id,
+      messageId: message.id,
+      prompt: null,
+      assistantId: assistant.id,
+      model: modelOverride,
+    ));
+    throw _RequestCaptured();
+  }
 
   @override
   Future<ChatActionResult> sendScheduledMessage({
     required ChatInputData input,
     required Conversation conversation,
     required Assistant assistant,
+    ({String providerKey, String modelId})? modelOverride,
+    ValueChanged<String>? onGenerationStarted,
   }) async {
+    requests.add((
+      conversationId: conversation.id,
+      messageId: null,
+      prompt: input.text,
+      assistantId: assistant.id,
+      model: modelOverride,
+    ));
+    if (busy) return ChatActionResult.inFlight();
     final tools = McpToolService();
     toolSnapshots.add(
       tools

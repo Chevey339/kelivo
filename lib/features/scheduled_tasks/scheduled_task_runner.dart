@@ -3,6 +3,8 @@ import 'package:flutter/widgets.dart';
 import 'package:provider/provider.dart';
 import '../../core/database/generation_run.dart';
 import '../../core/models/chat_input_data.dart';
+import '../../core/models/conversation.dart';
+import '../../core/models/workspace_binding.dart';
 import '../../core/models/scheduled_task.dart';
 import '../../core/providers/assistant_provider.dart';
 import '../../core/providers/settings_provider.dart';
@@ -44,13 +46,33 @@ Future<Map<String, Object?>> runScheduledTask(
   cancellation.check();
   final assistant = assistants.getById(task.assistantId);
   if (assistant == null) throw StateError('assistant_missing');
-  final workspaceId = assistant.defaultWorkspaceId;
+  Conversation? targetConversation;
+  if (task.mode != ScheduledTaskMode.newChat) {
+    targetConversation = chat.getConversation(task.conversationId ?? '');
+    if (targetConversation == null ||
+        chat.isTemporaryConversation(targetConversation.id) ||
+        targetConversation.assistantId != assistant.id) {
+      throw StateError('conversation_missing');
+    }
+  }
+  final workspaceId = targetConversation == null
+      ? assistant.defaultWorkspaceId
+      : WorkspaceBinding.fromExtras(targetConversation.extras).workspaceId;
   if (workspaceId != null) {
     if (workspaces.byId(workspaceId) == null) {
       throw StateError('workspace_missing');
     }
     if (mcp.workspaceRuntime?.lastStatus?.ready != true) {
       throw StateError('workspace_unavailable');
+    }
+  }
+  final modelOverride = task.modelProvider != null && task.modelId != null
+      ? (providerKey: task.modelProvider!, modelId: task.modelId!)
+      : null;
+  if (modelOverride != null) {
+    final config = settings.getProviderConfig(modelOverride.providerKey);
+    if (!config.enabled || !config.models.contains(modelOverride.modelId)) {
+      throw StateError('model_missing');
     }
   }
   for (final id in assistant.mcpServerIds) {
@@ -67,20 +89,55 @@ Future<Map<String, Object?>> runScheduledTask(
     }
   }
   cancellation.check();
-  final conversation = await chat.createConversation(
-    title: task.name,
-    assistantId: assistant.id,
-    activate: false,
-  );
-  cancellation.onCancel = () =>
-      ChatActions.cancelActiveGenerationFor(conversation.id);
+  if (targetConversation != null &&
+      chat.getConversation(targetConversation.id)?.assistantId !=
+          assistant.id) {
+    throw StateError('conversation_missing');
+  }
+  final conversation =
+      targetConversation ??
+      await chat.createConversation(
+        title: task.name,
+        assistantId: assistant.id,
+        activate: false,
+      );
   await onConversation(conversation.id);
   cancellation.check();
-  final result = await viewModel.sendScheduledMessage(
-    input: ChatInputData(text: task.prompt),
-    conversation: conversation,
-    assistant: assistant,
-  );
+  void onStarted(String messageId) {
+    cancellation.onCancel = () => ChatActions.cancelActiveGenerationFor(
+      conversation.id,
+      expectedMessageId: messageId,
+    );
+    if (cancellation.cancelled) unawaited(cancellation.cancel());
+  }
+
+  final ChatActionResult result;
+  if (task.mode == ScheduledTaskMode.regenerate) {
+    final message = await chat.chatRepositoryOrNull?.getMessage(
+      task.messageId ?? '',
+    );
+    cancellation.check();
+    if (message == null ||
+        message.conversationId != conversation.id ||
+        message.role != 'user') {
+      throw StateError('message_missing');
+    }
+    result = await viewModel.regenerateScheduledMessage(
+      message: message,
+      conversation: conversation,
+      assistant: assistant,
+      modelOverride: modelOverride,
+      onGenerationStarted: onStarted,
+    );
+  } else {
+    result = await viewModel.sendScheduledMessage(
+      input: ChatInputData(text: task.prompt),
+      conversation: conversation,
+      assistant: assistant,
+      modelOverride: modelOverride,
+      onGenerationStarted: onStarted,
+    );
+  }
   if (cancellation.cancelled) await cancellation.cancel();
   cancellation.check();
   if (!result.success) {

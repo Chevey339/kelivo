@@ -7,6 +7,7 @@ import 'package:flutter/widgets.dart';
 
 import '../../l10n/app_localizations.dart';
 import '../models/mobile_background_settings.dart';
+import '../providers/settings_provider.dart';
 import 'notification_service.dart';
 
 enum BackgroundTaskPhase { requesting, generating, thinking, tool, retrying }
@@ -28,6 +29,7 @@ class _BackgroundTask {
     required this.title,
     required this.cancel,
     required this.startedAt,
+    required this.scheduled,
   });
 
   final String id;
@@ -35,6 +37,7 @@ class _BackgroundTask {
   final String title;
   final Future<void> Function() cancel;
   final DateTime startedAt;
+  final bool scheduled;
   BackgroundTaskPhase phase = BackgroundTaskPhase.requesting;
   String toolName = '';
   int tokens = 0;
@@ -85,7 +88,6 @@ class MobileBackgroundCoordinator extends ChangeNotifier
     if (!supported || _initialized) return;
     _initialized = true;
     _foreground =
-        WidgetsBinding.instance.lifecycleState == null ||
         WidgetsBinding.instance.lifecycleState == AppLifecycleState.resumed;
     WidgetsBinding.instance.addObserver(this);
     _channel.setMethodCallHandler(_handleNativeCall);
@@ -95,6 +97,16 @@ class MobileBackgroundCoordinator extends ChangeNotifier
       );
       if (pending != null) NotificationService.openConversation(pending);
     });
+  }
+
+  /// Settings can finish loading after the last frame before going background.
+  /// Read them after loading, without requiring another widget rebuild.
+  Future<void> configureFromSettings(
+    SettingsProvider settings,
+    AppLocalizations l10n,
+  ) async {
+    await settings.loaded;
+    await configure(settings.mobileBackground, l10n);
   }
 
   Future<void> configure(
@@ -122,6 +134,7 @@ class MobileBackgroundCoordinator extends ChangeNotifier
     required String conversationId,
     required String title,
     required Future<void> Function() cancel,
+    bool scheduled = false,
   }) async {
     if (!supported || _tasks.containsKey(id)) return;
     _tasks[id] = _BackgroundTask(
@@ -130,6 +143,7 @@ class MobileBackgroundCoordinator extends ChangeNotifier
       title: title,
       cancel: cancel,
       startedAt: DateTime.now(),
+      scheduled: scheduled,
     );
     await initialize();
     await _sync();
@@ -156,6 +170,7 @@ class MobileBackgroundCoordinator extends ChangeNotifier
     String id,
     BackgroundTaskOutcome outcome, {
     bool resultPersisted = true,
+    String? replyPreview,
   }) async {
     final task = _tasks.remove(id);
     if (task == null) return;
@@ -172,7 +187,7 @@ class MobileBackgroundCoordinator extends ChangeNotifier
     await _enqueue(() async {
       final l10n = _l10n;
       if (resultPersisted &&
-          _settings.notificationsEnabled &&
+          (_settings.notificationsEnabled || task.scheduled) &&
           outcome != BackgroundTaskOutcome.cancelled &&
           !(_foreground &&
               visibleConversation?.call() == task.conversationId)) {
@@ -182,7 +197,13 @@ class MobileBackgroundCoordinator extends ChangeNotifier
             title: _settings.privacyMode || task.title.trim().isEmpty
                 ? (l10n?.backgroundTaskTitle ?? 'Kelivo')
                 : task.title,
-            body: _outcomeText(outcome),
+            body:
+                task.scheduled &&
+                    !_settings.privacyMode &&
+                    outcome == BackgroundTaskOutcome.completed &&
+                    replyPreview?.trim().isNotEmpty == true
+                ? replyPreview!.trim().characters.take(200).toString()
+                : _outcomeText(outcome),
           );
         } catch (error) {
           _recordError(error);

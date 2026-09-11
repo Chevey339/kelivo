@@ -2,18 +2,17 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
-import 'package:uuid/uuid.dart';
-import '../../../core/models/assistant.dart';
 import '../../../core/models/scheduled_task.dart';
 import '../../../core/providers/assistant_provider.dart';
+import '../../../core/services/chat/chat_service.dart';
+import '../widgets/scheduled_tasks_scaffold.dart';
+import 'scheduled_task_editor_page.dart';
 import '../../../core/services/notification_service.dart';
 import '../../../core/services/scheduled_tasks_service.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../shared/widgets/form_sheet.dart';
-import '../../../shared/widgets/ios_form_text_field.dart';
 import '../../../shared/widgets/ios_settings_rows.dart';
-import '../../../shared/widgets/ios_tactile.dart';
 import '../../../shared/widgets/ios_tile_button.dart';
 import '../../../shared/widgets/option_sheet.dart';
 import '../../../shared/widgets/section_card.dart';
@@ -22,6 +21,7 @@ import '../widgets/scheduled_task_tile.dart';
 import '../../settings/pages/mobile_background_settings_page.dart';
 
 String _repeatLabel(ScheduledTask task, AppLocalizations l) {
+  if (task.onceDate != null) return scheduledRepeatLabel(task.repeat, l);
   if (task.weekdays.length == 7) return l.scheduledTasksEveryDay;
   if (task.weekdays.length == 5 && task.weekdays.every((d) => d <= 5)) {
     return l.scheduledTasksWeekdays;
@@ -36,8 +36,14 @@ String _date(DateTime date, AppLocalizations l) =>
 
 /// Android-only screen. Controls use Kelivo's shared iOS/R3 components.
 class ScheduledTasksPage extends StatefulWidget {
-  const ScheduledTasksPage({super.key, this.service});
+  const ScheduledTasksPage({
+    super.key,
+    this.service,
+    this.requestNotificationsPermission =
+        NotificationService.ensureAndroidNotificationsPermission,
+  });
   final ScheduledTasksService? service;
+  final Future<bool> Function() requestNotificationsPermission;
   @override
   State<ScheduledTasksPage> createState() => _ScheduledTasksPageState();
 }
@@ -87,15 +93,25 @@ class _ScheduledTasksPageState extends State<ScheduledTasksPage>
     final assistants = context.read<AssistantProvider>();
     await assistants.loaded;
     if (!mounted) return;
-    await showFormSheet<void>(
-      context,
-      builder: (_) => ScheduledTaskEditor(
-        task: task,
-        assistants: assistants.assistants,
-        initialAssistantId: assistants.currentAssistant?.id,
-        onSave: (value) => service.save(value),
+    await context.read<ChatService>().init();
+    if (!mounted) return;
+    await Navigator.of(context).push<void>(
+      MaterialPageRoute(
+        builder: (_) => ScheduledTaskEditorPage(
+          task: task,
+          assistants: assistants.assistants,
+          initialAssistantId: assistants.currentAssistant?.id,
+          onSave: _save,
+        ),
       ),
     );
+  }
+
+  Future<void> _save(ScheduledTask task, {bool? enabled}) async {
+    if (enabled ?? task.enabled) {
+      await widget.requestNotificationsPermission();
+    }
+    await service.save(task, enabled: enabled);
   }
 
   Future<void> _details(ScheduledTask original) async {
@@ -132,7 +148,10 @@ class _ScheduledTasksPageState extends State<ScheduledTasksPage>
     if (!mounted) return;
     switch (action) {
       case 'run':
-        await _perform(() => service.runNow(original.id));
+        await _perform(() async {
+          await widget.requestNotificationsPermission();
+          await service.runNow(original.id);
+        });
       case 'edit':
         await _edit(original);
       case 'delete':
@@ -224,6 +243,14 @@ class _ScheduledTasksPageState extends State<ScheduledTasksPage>
     if (value.contains('assistant_missing')) {
       return l.scheduledTasksAssistantMissing;
     }
+    if (value.contains('conversation_missing')) {
+      return l.scheduledTasksChatMissing;
+    }
+    if (value.contains('message_missing')) {
+      return l.scheduledTasksMessageMissing;
+    }
+    if (value.contains('model_missing')) return l.scheduledTasksModelMissing;
+    if (value.contains('in_flight')) return l.scheduledTasksChatBusy;
     return value;
   }
 
@@ -231,331 +258,104 @@ class _ScheduledTasksPageState extends State<ScheduledTasksPage>
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context)!;
     final cs = Theme.of(context).colorScheme;
-    return DefaultTextStyle(
-      style: Theme.of(context).textTheme.bodyMedium!,
-      child: ColoredBox(
-        color: cs.surface,
-        child: SafeArea(
-          child: Column(
-            children: [
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                child: Row(
-                  children: [
-                    IosIconButton(
-                      icon: LucideIcons.arrowLeft,
-                      semanticLabel: l.settingsPageBackButton,
-                      onTap: () => Navigator.maybePop(context),
-                    ),
-                    Expanded(
-                      child: Text(
-                        l.scheduledTasksTitle,
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.w600,
-                          color: cs.onSurface,
-                        ),
-                      ),
-                    ),
-                    IosIconButton(
-                      icon: LucideIcons.plus,
-                      semanticLabel: l.scheduledTasksAdd,
-                      onTap: _edit,
-                    ),
-                  ],
+    return ScheduledTasksScaffold(
+      title: l.scheduledTasksTitle,
+      actionIcon: LucideIcons.plus,
+      actionLabel: l.scheduledTasksAdd,
+      onAction: _edit,
+      child: ListView(
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+        children: [
+          if (service.error != null) IosSectionFooter(text: service.error!),
+          if (!service.loaded) IosSectionFooter(text: l.scheduledTasksLoading),
+          if (service.loaded && !service.exactAlarms) ...[
+            SectionCard(
+              children: [
+                IosNavRow(
+                  icon: LucideIcons.alarmClock,
+                  label: l.scheduledTasksPermission,
+                  subtitle: l.scheduledTasksPermissionDetail,
+                  subtitleMaxLines: null,
+                  detailText: l.scheduledTasksPermissionAction,
+                  onTap: () => _perform(service.requestPermission),
                 ),
+              ],
+            ),
+            const SizedBox(height: 20),
+          ],
+          if (service.loaded && service.tasks.isEmpty) ...[
+            const SizedBox(height: 36),
+            Icon(
+              LucideIcons.clock,
+              size: 44,
+              color: cs.onSurface.withValues(alpha: .4),
+            ),
+            const SizedBox(height: 20),
+            Text(
+              l.scheduledTasksEmpty,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.w600,
+                color: cs.onSurface,
               ),
-              Expanded(
-                child: ListView(
-                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
-                  children: [
-                    if (service.error != null)
-                      IosSectionFooter(text: service.error!),
-                    if (!service.loaded)
-                      IosSectionFooter(text: l.scheduledTasksLoading),
-                    if (service.loaded && !service.exactAlarms) ...[
-                      SectionCard(
-                        children: [
-                          IosNavRow(
-                            icon: LucideIcons.alarmClock,
-                            label: l.scheduledTasksPermission,
-                            subtitle: l.scheduledTasksPermissionDetail,
-                            subtitleMaxLines: null,
-                            detailText: l.scheduledTasksPermissionAction,
-                            onTap: () => _perform(service.requestPermission),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 20),
-                    ],
-                    if (service.loaded && service.tasks.isEmpty) ...[
-                      const SizedBox(height: 36),
-                      Icon(
-                        LucideIcons.clock,
-                        size: 44,
-                        color: cs.onSurface.withValues(alpha: .4),
-                      ),
-                      const SizedBox(height: 20),
-                      Text(
-                        l.scheduledTasksEmpty,
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.w600,
-                          color: cs.onSurface,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      IosSectionFooter(text: l.scheduledTasksEmptyDetail),
-                      const SizedBox(height: 20),
-                      IosTileButton(
-                        label: l.scheduledTasksAdd,
-                        icon: LucideIcons.plus,
-                        onTap: _edit,
-                      ),
-                      const SizedBox(height: 40),
-                    ],
-                    for (final task in service.tasks) ...[
-                      ScheduledTaskTile(
-                        name: task.name,
-                        time: task.timeLabel,
-                        repeat: _repeatLabel(task, l),
-                        detail: task.running
-                            ? l.scheduledTasksRunning
-                            : !task.enabled
-                            ? l.scheduledTasksPaused
-                            : !service.exactAlarms
-                            ? l.scheduledTasksWaitingPermission
-                            : task.nextRunAt == null
-                            ? l.scheduledTasksWaitingPermission
-                            : l.scheduledTasksNextRun(
-                                _date(task.nextRunAt!, l),
-                              ),
-                        enabled: task.enabled,
-                        running: task.running,
-                        onTap: () => _details(task),
-                        onChanged: (enabled) => _perform(
-                          () => service.save(task, enabled: enabled),
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                    ],
-                    IosSectionFooter(text: l.scheduledTasksDescription),
-                    SectionCard(
-                      children: [
-                        IosNavRow(
-                          icon: LucideIcons.battery,
-                          label: l.backgroundSettingsTitle,
-                          onTap: () => Navigator.of(context).push(
-                            MaterialPageRoute(
-                              builder: (_) =>
-                                  const MobileBackgroundSettingsPage(),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    IosSectionFooter(text: l.scheduledTasksReliability),
-                  ],
+            ),
+            const SizedBox(height: 8),
+            IosSectionFooter(text: l.scheduledTasksEmptyDetail),
+            const SizedBox(height: 20),
+            IosTileButton(
+              label: l.scheduledTasksAdd,
+              icon: LucideIcons.plus,
+              onTap: _edit,
+            ),
+            const SizedBox(height: 40),
+          ],
+          for (final task in service.tasks) ...[
+            ScheduledTaskTile(
+              name: task.name,
+              time: task.timeLabel,
+              repeat: _repeatLabel(task, l),
+              detail: task.running
+                  ? l.scheduledTasksRunning
+                  : task.exhausted
+                  ? l.scheduledTasksFinished
+                  : !task.enabled
+                  ? l.scheduledTasksPaused
+                  : !service.exactAlarms
+                  ? l.scheduledTasksWaitingPermission
+                  : task.nextRunAt == null
+                  ? l.scheduledTasksWaitingPermission
+                  : l.scheduledTasksNextRun(_date(task.nextRunAt!, l)),
+              enabled: task.enabled,
+              running: task.running,
+              onTap: () => _details(task),
+              onChanged: (enabled) =>
+                  _perform(() => _save(task, enabled: enabled)),
+            ),
+            const SizedBox(height: 12),
+          ],
+          IosSectionFooter(
+            key: const ValueKey('scheduled-tasks-description'),
+            text: l.scheduledTasksDescription,
+          ),
+          const SizedBox(height: 24),
+          SectionCard(
+            key: const ValueKey('scheduled-tasks-background-settings'),
+            children: [
+              IosNavRow(
+                icon: LucideIcons.battery,
+                label: l.backgroundSettingsTitle,
+                onTap: () => Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => const MobileBackgroundSettingsPage(),
+                  ),
                 ),
               ),
             ],
           ),
-        ),
+          IosSectionFooter(text: l.scheduledTasksReliability),
+        ],
       ),
-    );
-  }
-}
-
-class ScheduledTaskEditor extends StatefulWidget {
-  const ScheduledTaskEditor({
-    super.key,
-    this.task,
-    required this.assistants,
-    this.initialAssistantId,
-    required this.onSave,
-  });
-  final ScheduledTask? task;
-  final List<Assistant> assistants;
-  final String? initialAssistantId;
-  final Future<void> Function(ScheduledTask) onSave;
-  @override
-  State<ScheduledTaskEditor> createState() => _ScheduledTaskEditorState();
-}
-
-class _ScheduledTaskEditorState extends State<ScheduledTaskEditor> {
-  late final name = TextEditingController(text: widget.task?.name);
-  late final prompt = TextEditingController(text: widget.task?.prompt);
-  late final time = TextEditingController(
-    text: widget.task?.timeLabel ?? '08:00',
-  );
-  late String? assistantId =
-      widget.task?.assistantId ?? widget.initialAssistantId;
-  late final days = {
-    ...widget.task?.weekdays ?? [1, 2, 3, 4, 5, 6, 7],
-  };
-  late bool enabled = widget.task?.enabled ?? true;
-  bool busy = false;
-  String? error;
-  @override
-  void dispose() {
-    name.dispose();
-    prompt.dispose();
-    time.dispose();
-    super.dispose();
-  }
-
-  Future<void> _save() async {
-    final l = AppLocalizations.of(context)!;
-    final match = RegExp(r'^(\d{1,2}):(\d{2})$').firstMatch(time.text.trim());
-    final hour = match == null ? -1 : int.parse(match[1]!);
-    final minute = match == null ? -1 : int.parse(match[2]!);
-    if (name.text.trim().isEmpty ||
-        name.text.trim().length > 200 ||
-        prompt.text.trim().isEmpty ||
-        prompt.text.trim().length > 32000 ||
-        !widget.assistants.any((a) => a.id == assistantId) ||
-        hour < 0 ||
-        hour > 23 ||
-        minute < 0 ||
-        minute > 59 ||
-        days.isEmpty) {
-      setState(() => error = l.scheduledTasksInvalid);
-      return;
-    }
-    setState(() {
-      busy = true;
-      error = null;
-    });
-    try {
-      await widget.onSave(
-        ScheduledTask(
-          id: widget.task?.id ?? const Uuid().v4(),
-          name: name.text.trim(),
-          prompt: prompt.text.trim(),
-          assistantId: assistantId!,
-          hour: hour,
-          minute: minute,
-          weekdays: days.toList()..sort(),
-          enabled: enabled,
-        ),
-      );
-      if (mounted) Navigator.pop(context);
-    } catch (e) {
-      if (mounted) setState(() => error = e.toString());
-    } finally {
-      if (mounted) setState(() => busy = false);
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final l = AppLocalizations.of(context)!;
-    final assistant = widget.assistants
-        .where((a) => a.id == assistantId)
-        .firstOrNull;
-    return FormSheet(
-      title: widget.task == null ? l.scheduledTasksAdd : l.scheduledTasksEdit,
-      actions: FormSheetActions(
-        cancelLabel: l.scheduledTasksCancel,
-        confirmLabel: l.scheduledTasksSave,
-        onCancel: () => Navigator.pop(context),
-        onConfirm: busy ? null : _save,
-        busy: busy,
-      ),
-      children: [
-        IosFormTextField(
-          label: l.scheduledTasksName,
-          hintText: l.scheduledTasksNameHint,
-          controller: name,
-          inlineLabel: false,
-        ),
-        IosFormTextField(
-          label: l.scheduledTasksPrompt,
-          hintText: l.scheduledTasksPromptHint,
-          controller: prompt,
-          inlineLabel: false,
-          maxLines: 5,
-          minLines: 3,
-        ),
-        SectionCard(
-          children: [
-            IosNavRow(
-              icon: LucideIcons.bot,
-              label: l.scheduledTasksAssistant,
-              subtitle: assistant?.name ?? l.scheduledTasksChooseAssistant,
-              onTap: () async {
-                final id = await showOptionSheet<String>(
-                  context,
-                  title: l.scheduledTasksChooseAssistant,
-                  selected: assistantId,
-                  items: widget.assistants
-                      .map(
-                        (a) => OptionSheetItem(
-                          value: a.id,
-                          label: a.name,
-                          icon: LucideIcons.bot,
-                        ),
-                      )
-                      .toList(),
-                );
-                if (id != null && mounted) setState(() => assistantId = id);
-              },
-            ),
-            const IosRowDivider(),
-            IosFormTextField(
-              label: l.scheduledTasksTime,
-              hintText: l.scheduledTasksTimeHint,
-              controller: time,
-              fieldWidth: 110,
-              keyboardType: TextInputType.datetime,
-              textAlign: TextAlign.center,
-            ),
-          ],
-        ),
-        IosSectionHeader(text: l.scheduledTasksRepeat),
-        SectionCard(
-          children: [
-            Padding(
-              padding: const EdgeInsets.all(12),
-              child: Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: [
-                  for (int d = 1; d <= 7; d++)
-                    Semantics(
-                      selected: days.contains(d),
-                      button: true,
-                      child: IosTileButton(
-                        label: DateFormat.E(
-                          l.localeName,
-                        ).format(DateTime(2024, 1, d)),
-                        icon: days.contains(d)
-                            ? LucideIcons.check
-                            : LucideIcons.minus,
-                        backgroundColor: days.contains(d)
-                            ? Theme.of(context).colorScheme.primary
-                            : null,
-                        onTap: () => setState(() {
-                          if (!days.remove(d)) days.add(d);
-                        }),
-                      ),
-                    ),
-                ],
-              ),
-            ),
-            const IosRowDivider(indent: 12),
-            IosSwitchRow(
-              label: l.scheduledTasksEnabled,
-              value: enabled,
-              onChanged: (v) => setState(() => enabled = v),
-            ),
-          ],
-        ),
-        IosSectionFooter(text: l.scheduledTasksExecutionDetail),
-        if (error != null) IosSectionFooter(text: error!),
-      ],
     );
   }
 }

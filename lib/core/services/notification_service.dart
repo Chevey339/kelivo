@@ -143,7 +143,9 @@ class NotificationService {
           category: AndroidNotificationCategory.message,
           visibility: NotificationVisibility.public,
           ticker: 'Kelivo',
-          styleInformation: const DefaultStyleInformation(true, true),
+          styleInformation: BigTextStyleInformation(
+            body ?? 'Assistant reply has been generated',
+          ),
         ),
         iOS: const DarwinNotificationDetails(
           presentAlert: true,

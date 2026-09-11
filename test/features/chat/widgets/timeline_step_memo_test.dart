@@ -547,70 +547,81 @@ void main() {
     );
   });
 
-  testWidgets('reasoning without toggle is not pressable', (tester) async {
-    tester.view.physicalSize = const Size(1170, 2000);
-    tester.view.devicePixelRatio = 3;
-    addTearDown(tester.view.reset);
+  testWidgets(
+    'reasoning without timing metadata starts collapsed and toggles',
+    (tester) async {
+      tester.view.physicalSize = const Size(1170, 2000);
+      tester.view.devicePixelRatio = 3;
+      addTearDown(tester.view.reset);
 
-    await tester.pumpWidget(
-      MultiProvider(
-        providers: [
-          ChangeNotifierProvider(
-            create: (_) => SettingsProvider(createBusinessTestPreferences()),
-          ),
-          ChangeNotifierProvider(
-            create: (_) =>
-                AssistantProvider(preferences: createBusinessTestPreferences()),
-          ),
-          ChangeNotifierProvider(
-            create: (_) =>
-                TtsProvider(preferences: createBusinessTestPreferences()),
-          ),
-          ChangeNotifierProvider(
-            create: (_) =>
-                UserProvider(preferences: createBusinessTestPreferences()),
-          ),
-          ChangeNotifierProvider(create: (_) => AskUserInteractionService()),
-          ChangeNotifierProvider(create: (_) => ToolApprovalService()),
-        ],
-        child: MaterialApp(
-          locale: const Locale('en'),
-          localizationsDelegates: AppLocalizations.localizationsDelegates,
-          supportedLocales: AppLocalizations.supportedLocales,
-          home: Scaffold(
-            body: ChatMessageWidget(
-              message: ChatMessage(
-                id: 'imported-reasoning',
-                role: 'assistant',
-                conversationId: 'c1',
-                parts: const [ReasoningPart('imported plan')],
+      await tester.pumpWidget(
+        MultiProvider(
+          providers: [
+            ChangeNotifierProvider(
+              create: (_) => SettingsProvider(createBusinessTestPreferences()),
+            ),
+            ChangeNotifierProvider(
+              create: (_) => AssistantProvider(
+                preferences: createBusinessTestPreferences(),
               ),
-              showModelIcon: false,
+            ),
+            ChangeNotifierProvider(
+              create: (_) =>
+                  TtsProvider(preferences: createBusinessTestPreferences()),
+            ),
+            ChangeNotifierProvider(
+              create: (_) =>
+                  UserProvider(preferences: createBusinessTestPreferences()),
+            ),
+            ChangeNotifierProvider(create: (_) => AskUserInteractionService()),
+            ChangeNotifierProvider(create: (_) => ToolApprovalService()),
+          ],
+          child: MaterialApp(
+            locale: const Locale('en'),
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
+            home: Scaffold(
+              body: ChatMessageWidget(
+                message: ChatMessage(
+                  id: 'imported-reasoning',
+                  role: 'assistant',
+                  conversationId: 'c1',
+                  parts: const [ReasoningPart('imported plan')],
+                ),
+                showModelIcon: false,
+              ),
             ),
           ),
         ),
-      ),
-    );
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 300));
+      );
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
 
-    final press = tester.widget<IosCardPress>(
-      find.descendant(
-        of: find.byKey(
-          const ValueKey('chatMessageTimelineStepShell:true:true'),
+      final press = tester.widget<IosCardPress>(
+        find.descendant(
+          of: find.byKey(
+            const ValueKey('chatMessageTimelineStepShell:true:true'),
+          ),
+          matching: find.byType(IosCardPress),
         ),
-        matching: find.byType(IosCardPress),
-      ),
-    );
-    expect(press.onTap, isNull);
-    final region = tester.widget<MouseRegion>(
-      find.descendant(
-        of: find.byType(IosCardPress).first,
-        matching: find.byType(MouseRegion),
-      ),
-    );
-    expect(region.cursor, isNot(SystemMouseCursors.click));
-  });
+      );
+      expect(press.onTap, isNotNull);
+      expect(find.text('imported plan'), findsNothing);
+      await tester.tap(find.text('Deep Thinking'));
+      await tester.pumpAndSettle();
+      expect(find.text('imported plan'), findsOneWidget);
+      await tester.tap(find.text('Deep Thinking'));
+      await tester.pumpAndSettle();
+      expect(find.text('imported plan'), findsNothing);
+      final region = tester.widget<MouseRegion>(
+        find.descendant(
+          of: find.byType(IosCardPress).first,
+          matching: find.byType(MouseRegion),
+        ),
+      );
+      expect(region.cursor, SystemMouseCursors.click);
+    },
+  );
 
   testWidgets('empty-id tools separated by body keep distinct live tools', (
     tester,

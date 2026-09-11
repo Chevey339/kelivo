@@ -191,10 +191,19 @@ void main() {
 
       final started = await _waitFor<CommandStarted>(events);
       expect(started.pid, isNotNull);
+      var childPids = <int>[];
       await _waitUntil(() async {
         final result = await Process.run('pgrep', ['-P', '${started.pid}']);
+        if (result.exitCode == 0) {
+          childPids = (result.stdout as String)
+              .trim()
+              .split(RegExp(r'\s+'))
+              .map(int.parse)
+              .toList();
+        }
         return result.exitCode == 0;
       });
+      expect(childPids, isNotEmpty);
 
       await runtime.cancel(request.runId);
       await done.future.timeout(const Duration(seconds: 4));
@@ -206,12 +215,21 @@ void main() {
       await Future<void>.delayed(const Duration(milliseconds: 200));
       final children = await Process.run('pgrep', ['-P', '${started.pid}']);
       expect(children.exitCode, isNot(0));
-      final leftover = await Process.run('pgrep', ['-f', r'[s]leep 30']);
-      expect(
-        leftover.exitCode,
-        isNot(0),
-        reason: 'sleep 30 still alive: ${leftover.stdout}',
-      );
+      // Check the captured PIDs even if cancellation reparented them. A global
+      // command-name search also matches unrelated tasks running on the host.
+      for (final childPid in childPids) {
+        final leftover = await Process.run('ps', [
+          '-p',
+          '$childPid',
+          '-o',
+          'pid=',
+        ]);
+        expect(
+          leftover.exitCode,
+          isNot(0),
+          reason: 'child $childPid still alive after cancellation',
+        );
+      }
     }, skip: !isUnix);
 
     test('cancel kills SIGTERM-ignoring children after reparenting', () async {

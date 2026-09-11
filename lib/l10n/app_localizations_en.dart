@@ -11297,7 +11297,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get scheduledTasksDescription =>
-      'Run a prompt automatically at a local time. Each run creates a new conversation using the selected assistant.';
+      'Run tasks automatically at your chosen time: start a new chat, follow up, or run a question again.';
 
   @override
   String get scheduledTasksEmpty => 'Your day, on a schedule';
@@ -11368,7 +11368,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get scheduledTasksExecutionDetail =>
-      'Uses the assistant’s current model, tools and workspace. Runs stop after 10 minutes or when user input or tool approval is needed. Results are saved in chats.';
+      'Results are saved in chats. A completion notification previews the reply and opens the conversation when tapped. Runs stop after 10 minutes or when user input or tool approval is needed.';
 
   @override
   String get scheduledTasksRunNow => 'Run now';
@@ -11417,7 +11417,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get scheduledTasksInvalid =>
-      'Enter a name, prompt, assistant, valid time and at least one day.';
+      'Enter a name, prompt and assistant, and select at least one day for a custom schedule.';
 
   @override
   String get scheduledTasksLoading => 'Loading…';
@@ -11435,4 +11435,115 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get scheduledTasksProcessTerminated =>
       'Android stopped the previous run.';
+
+  @override
+  String get scheduledTasksOnce => 'Once';
+
+  @override
+  String get scheduledTasksCustom => 'Custom';
+
+  @override
+  String get scheduledTasksExecution => 'Task';
+
+  @override
+  String get scheduledTasksMode => 'Action';
+
+  @override
+  String get scheduledTasksNewChat => 'New chat';
+
+  @override
+  String get scheduledTasksFollowUp => 'Follow up';
+
+  @override
+  String get scheduledTasksRegenerate => 'Run again';
+
+  @override
+  String get scheduledTasksChat => 'Conversation';
+
+  @override
+  String get scheduledTasksChooseChat => 'Choose a conversation';
+
+  @override
+  String get scheduledTasksMessage => 'Question to run again';
+
+  @override
+  String get scheduledTasksChooseMessage => 'Choose a question';
+
+  @override
+  String get scheduledTasksAttachmentMessage => 'Message with attachments';
+
+  @override
+  String get scheduledTasksModel => 'Model';
+
+  @override
+  String get scheduledTasksChooseModel => 'Choose a model';
+
+  @override
+  String get scheduledTasksModelDefault =>
+      'Use the conversation or assistant model';
+
+  @override
+  String get scheduledTasksSchedule => 'Schedule';
+
+  @override
+  String get scheduledTasksActiveWindow => 'Active dates';
+
+  @override
+  String get scheduledTasksStartDate => 'Start date';
+
+  @override
+  String get scheduledTasksEndDate => 'End date';
+
+  @override
+  String get scheduledTasksActiveWindowDetail =>
+      'Runs only within these dates, including the end date. Leave a date unset for no limit.';
+
+  @override
+  String get scheduledTasksDate => 'Date';
+
+  @override
+  String get scheduledTasksDateUnrestricted => 'No limit';
+
+  @override
+  String get scheduledTasksClear => 'Clear';
+
+  @override
+  String get scheduledTasksSearch => 'Search';
+
+  @override
+  String get scheduledTasksNoTargets => 'No matching items for this assistant';
+
+  @override
+  String get scheduledTasksFutureDate =>
+      'Choose a future execution date and time.';
+
+  @override
+  String get scheduledTasksDateRangeInvalid =>
+      'The end date must be on or after the start date.';
+
+  @override
+  String get scheduledTasksRegenerateDetail =>
+      'Generates another answer to the selected question using its original context. Existing answers and later messages are kept.';
+
+  @override
+  String get scheduledTasksSaving => 'Saving…';
+
+  @override
+  String get scheduledTasksFinished => 'Schedule ended';
+
+  @override
+  String get scheduledTasksModelMissing =>
+      'The selected model is unavailable. Edit this task to choose another model.';
+
+  @override
+  String get scheduledTasksChatMissing =>
+      'The conversation is unavailable or belongs to another assistant.';
+
+  @override
+  String get scheduledTasksMessageMissing =>
+      'The selected question is no longer available.';
+
+  @override
+  String get scheduledTasksChatBusy =>
+      'This conversation is generating a reply. The scheduled run was skipped.';
 }

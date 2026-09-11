@@ -1102,9 +1102,7 @@ class MyApp extends StatelessWidget {
                   // Desktop tray + close behaviour (minimize to tray) sync
                   final l10n = AppLocalizations.of(ctx);
                   if (l10n != null) {
-                    final backgroundSettings = ctx
-                        .watch<SettingsProvider>()
-                        .mobileBackground;
+                    final backgroundSettings = ctx.watch<SettingsProvider>();
                     WidgetsBinding.instance.addPostFrameCallback((_) {
                       if (!ctx.mounted) return;
                       final coordinator = MobileBackgroundCoordinator.instance;
@@ -1115,7 +1113,10 @@ class MyApp extends StatelessWidget {
                         }
                       };
                       unawaited(
-                        coordinator.configure(backgroundSettings, l10n),
+                        coordinator.configureFromSettings(
+                          backgroundSettings,
+                          l10n,
+                        ),
                       );
                     });
                     WidgetsBinding.instance.addPostFrameCallback((_) async {
