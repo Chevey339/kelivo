@@ -1533,7 +1533,11 @@ class WorkspaceToolsService {
     final modelBase = p.posix.basename(
       resolved.modelPath.replaceAll('\\', '/'),
     );
-    if (base != 'SKILL.md' && modelBase != 'SKILL.md') return;
+    // Windows path canonicalization lowercases SKILL.md along with its parents.
+    if (base.toLowerCase() != 'skill.md' &&
+        modelBase.toLowerCase() != 'skill.md') {
+      return;
+    }
     final skillId = _skillIdUnderSkillsRoot(ctx, resolved);
     if (skillId == null || skillId.isEmpty) return;
     try {
