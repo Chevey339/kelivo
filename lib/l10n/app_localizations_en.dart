@@ -11270,4 +11270,148 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get startupRecoverySnapshotReady =>
       'The snapshot is ready. Restart Kelivo to complete the restore.';
+
+  @override
+  String get scheduledTasksTitle => 'Scheduled tasks';
+
+  @override
+  String get scheduledTasksDescription =>
+      'Run a prompt automatically at a local time. Each run creates a new conversation using the selected assistant.';
+
+  @override
+  String get scheduledTasksEmpty => 'Your day, on a schedule';
+
+  @override
+  String get scheduledTasksEmptyDetail =>
+      'Add a task for a morning briefing, a daily review, or anything you want to run regularly.';
+
+  @override
+  String get scheduledTasksAdd => 'Add task';
+
+  @override
+  String get scheduledTasksEdit => 'Edit task';
+
+  @override
+  String get scheduledTasksName => 'Name';
+
+  @override
+  String get scheduledTasksNameHint => 'Morning briefing';
+
+  @override
+  String get scheduledTasksPrompt => 'Prompt';
+
+  @override
+  String get scheduledTasksPromptHint =>
+      'What would you like your assistant to do?';
+
+  @override
+  String get scheduledTasksAssistant => 'Assistant';
+
+  @override
+  String get scheduledTasksChooseAssistant => 'Choose an assistant';
+
+  @override
+  String get scheduledTasksAssistantMissing => 'Assistant unavailable';
+
+  @override
+  String get scheduledTasksTime => 'Time';
+
+  @override
+  String get scheduledTasksTimeHint => '24-hour time, e.g. 08:00';
+
+  @override
+  String get scheduledTasksRepeat => 'Repeat';
+
+  @override
+  String get scheduledTasksEveryDay => 'Every day';
+
+  @override
+  String get scheduledTasksWeekdays => 'Weekdays';
+
+  @override
+  String get scheduledTasksEnabled => 'Enabled';
+
+  @override
+  String get scheduledTasksPermission => 'Alarms & reminders';
+
+  @override
+  String get scheduledTasksPermissionDetail =>
+      'Allow exact alarms to run tasks at your chosen time. Enabled tasks will wait until permission is granted.';
+
+  @override
+  String get scheduledTasksPermissionAction => 'Allow';
+
+  @override
+  String get scheduledTasksReliability =>
+      'Keep Kelivo unrestricted in battery settings for more reliable execution. Force stopping the app cancels alarms until you reopen it. Missed runs are skipped; tasks follow the device time zone.';
+
+  @override
+  String get scheduledTasksExecutionDetail =>
+      'Uses the assistant’s current model, tools and workspace. Runs stop after 10 minutes or when user input or tool approval is needed. Results are saved in chats.';
+
+  @override
+  String get scheduledTasksRunNow => 'Run now';
+
+  @override
+  String get scheduledTasksHistory => 'Run history';
+
+  @override
+  String get scheduledTasksNoRuns => 'No runs yet';
+
+  @override
+  String get scheduledTasksRunning => 'Running';
+
+  @override
+  String get scheduledTasksCompleted => 'Completed';
+
+  @override
+  String get scheduledTasksFailed => 'Failed';
+
+  @override
+  String get scheduledTasksInterrupted => 'Interrupted';
+
+  @override
+  String get scheduledTasksPaused => 'Paused';
+
+  @override
+  String get scheduledTasksWaitingPermission => 'Waiting for permission';
+
+  @override
+  String scheduledTasksNextRun(String time) {
+    return 'Next: $time';
+  }
+
+  @override
+  String get scheduledTasksDelete => 'Delete task';
+
+  @override
+  String get scheduledTasksDeleteDetail =>
+      'Delete this schedule and its run history? Conversations already created will be kept.';
+
+  @override
+  String get scheduledTasksSave => 'Save';
+
+  @override
+  String get scheduledTasksCancel => 'Cancel';
+
+  @override
+  String get scheduledTasksInvalid =>
+      'Enter a name, prompt, assistant, valid time and at least one day.';
+
+  @override
+  String get scheduledTasksLoading => 'Loading…';
+
+  @override
+  String get scheduledTasksOpenChat => 'View conversation';
+
+  @override
+  String get scheduledTasksNeedsInput =>
+      'Stopped because user input or tool approval was required. Open the conversation to continue.';
+
+  @override
+  String get scheduledTasksTimeout => 'The execution time limit was reached.';
+
+  @override
+  String get scheduledTasksProcessTerminated =>
+      'Android stopped the previous run.';
 }

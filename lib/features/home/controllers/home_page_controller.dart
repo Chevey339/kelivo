@@ -1,3 +1,5 @@
+import '../../../core/services/scheduled_tasks_service.dart';
+import '../../scheduled_tasks/scheduled_task_runner.dart';
 import 'dart:async';
 import 'package:flutter/foundation.dart' show listEquals, defaultTargetPlatform;
 import 'package:flutter/material.dart';
@@ -237,6 +239,9 @@ class HomePageController extends ChangeNotifier {
 
   // Drawer state
   double _lastDrawerValue = 0.0;
+
+  /// Reveal a conversation opened from a notification or scheduled run history.
+  VoidCallback? onRevealConversation;
 
   // Desktop global-search mode
   bool _isGlobalSearchMode = false;
@@ -729,6 +734,7 @@ class HomePageController extends ChangeNotifier {
           _pendingNotificationConversationId = conversationId;
           break;
         }
+        onRevealConversation?.call();
         await switchConversationAnimated(conversationId);
       }
     } catch (error) {
@@ -830,6 +836,19 @@ class HomePageController extends ChangeNotifier {
         }
       }
       _chatInitialized = true;
+      if (defaultTargetPlatform == TargetPlatform.android) {
+        unawaited(
+          ScheduledTasksService.instance.attach(
+            (task, cancellation, onConversation) => runScheduledTask(
+              _context,
+              _viewModel,
+              task,
+              cancellation,
+              onConversation,
+            ),
+          ),
+        );
+      }
     } finally {
       _startupConversationPending = false;
       notifyListeners();

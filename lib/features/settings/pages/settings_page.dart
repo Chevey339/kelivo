@@ -1,3 +1,6 @@
+import 'package:flutter/foundation.dart' show defaultTargetPlatform;
+import 'package:lucide_icons_flutter/lucide_icons.dart';
+import '../../scheduled_tasks/pages/scheduled_tasks_page.dart';
 import 'package:flutter/material.dart';
 import '../../../l10n/app_localizations.dart';
 import 'package:provider/provider.dart';
@@ -268,6 +271,19 @@ class SettingsPage extends StatelessWidget {
                 },
               ),
               _iosDivider(context),
+              if (defaultTargetPlatform == TargetPlatform.android) ...[
+                _iosNavRow(
+                  context,
+                  icon: LucideIcons.clock,
+                  label: l10n.scheduledTasksTitle,
+                  onTap: () => Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => const ScheduledTasksPage(),
+                    ),
+                  ),
+                ),
+                _iosDivider(context),
+              ],
               _iosNavRow(
                 context,
                 icon: Lucide.WandSparkles,

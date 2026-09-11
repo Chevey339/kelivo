@@ -20252,6 +20252,270 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'The snapshot is ready. Restart Kelivo to complete the restore.'**
   String get startupRecoverySnapshotReady;
+
+  /// No description provided for @scheduledTasksTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Scheduled tasks'**
+  String get scheduledTasksTitle;
+
+  /// No description provided for @scheduledTasksDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Run a prompt automatically at a local time. Each run creates a new conversation using the selected assistant.'**
+  String get scheduledTasksDescription;
+
+  /// No description provided for @scheduledTasksEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'Your day, on a schedule'**
+  String get scheduledTasksEmpty;
+
+  /// No description provided for @scheduledTasksEmptyDetail.
+  ///
+  /// In en, this message translates to:
+  /// **'Add a task for a morning briefing, a daily review, or anything you want to run regularly.'**
+  String get scheduledTasksEmptyDetail;
+
+  /// No description provided for @scheduledTasksAdd.
+  ///
+  /// In en, this message translates to:
+  /// **'Add task'**
+  String get scheduledTasksAdd;
+
+  /// No description provided for @scheduledTasksEdit.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit task'**
+  String get scheduledTasksEdit;
+
+  /// No description provided for @scheduledTasksName.
+  ///
+  /// In en, this message translates to:
+  /// **'Name'**
+  String get scheduledTasksName;
+
+  /// No description provided for @scheduledTasksNameHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Morning briefing'**
+  String get scheduledTasksNameHint;
+
+  /// No description provided for @scheduledTasksPrompt.
+  ///
+  /// In en, this message translates to:
+  /// **'Prompt'**
+  String get scheduledTasksPrompt;
+
+  /// No description provided for @scheduledTasksPromptHint.
+  ///
+  /// In en, this message translates to:
+  /// **'What would you like your assistant to do?'**
+  String get scheduledTasksPromptHint;
+
+  /// No description provided for @scheduledTasksAssistant.
+  ///
+  /// In en, this message translates to:
+  /// **'Assistant'**
+  String get scheduledTasksAssistant;
+
+  /// No description provided for @scheduledTasksChooseAssistant.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose an assistant'**
+  String get scheduledTasksChooseAssistant;
+
+  /// No description provided for @scheduledTasksAssistantMissing.
+  ///
+  /// In en, this message translates to:
+  /// **'Assistant unavailable'**
+  String get scheduledTasksAssistantMissing;
+
+  /// No description provided for @scheduledTasksTime.
+  ///
+  /// In en, this message translates to:
+  /// **'Time'**
+  String get scheduledTasksTime;
+
+  /// No description provided for @scheduledTasksTimeHint.
+  ///
+  /// In en, this message translates to:
+  /// **'24-hour time, e.g. 08:00'**
+  String get scheduledTasksTimeHint;
+
+  /// No description provided for @scheduledTasksRepeat.
+  ///
+  /// In en, this message translates to:
+  /// **'Repeat'**
+  String get scheduledTasksRepeat;
+
+  /// No description provided for @scheduledTasksEveryDay.
+  ///
+  /// In en, this message translates to:
+  /// **'Every day'**
+  String get scheduledTasksEveryDay;
+
+  /// No description provided for @scheduledTasksWeekdays.
+  ///
+  /// In en, this message translates to:
+  /// **'Weekdays'**
+  String get scheduledTasksWeekdays;
+
+  /// No description provided for @scheduledTasksEnabled.
+  ///
+  /// In en, this message translates to:
+  /// **'Enabled'**
+  String get scheduledTasksEnabled;
+
+  /// No description provided for @scheduledTasksPermission.
+  ///
+  /// In en, this message translates to:
+  /// **'Alarms & reminders'**
+  String get scheduledTasksPermission;
+
+  /// No description provided for @scheduledTasksPermissionDetail.
+  ///
+  /// In en, this message translates to:
+  /// **'Allow exact alarms to run tasks at your chosen time. Enabled tasks will wait until permission is granted.'**
+  String get scheduledTasksPermissionDetail;
+
+  /// No description provided for @scheduledTasksPermissionAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Allow'**
+  String get scheduledTasksPermissionAction;
+
+  /// No description provided for @scheduledTasksReliability.
+  ///
+  /// In en, this message translates to:
+  /// **'Keep Kelivo unrestricted in battery settings for more reliable execution. Force stopping the app cancels alarms until you reopen it. Missed runs are skipped; tasks follow the device time zone.'**
+  String get scheduledTasksReliability;
+
+  /// No description provided for @scheduledTasksExecutionDetail.
+  ///
+  /// In en, this message translates to:
+  /// **'Uses the assistant’s current model, tools and workspace. Runs stop after 10 minutes or when user input or tool approval is needed. Results are saved in chats.'**
+  String get scheduledTasksExecutionDetail;
+
+  /// No description provided for @scheduledTasksRunNow.
+  ///
+  /// In en, this message translates to:
+  /// **'Run now'**
+  String get scheduledTasksRunNow;
+
+  /// No description provided for @scheduledTasksHistory.
+  ///
+  /// In en, this message translates to:
+  /// **'Run history'**
+  String get scheduledTasksHistory;
+
+  /// No description provided for @scheduledTasksNoRuns.
+  ///
+  /// In en, this message translates to:
+  /// **'No runs yet'**
+  String get scheduledTasksNoRuns;
+
+  /// No description provided for @scheduledTasksRunning.
+  ///
+  /// In en, this message translates to:
+  /// **'Running'**
+  String get scheduledTasksRunning;
+
+  /// No description provided for @scheduledTasksCompleted.
+  ///
+  /// In en, this message translates to:
+  /// **'Completed'**
+  String get scheduledTasksCompleted;
+
+  /// No description provided for @scheduledTasksFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed'**
+  String get scheduledTasksFailed;
+
+  /// No description provided for @scheduledTasksInterrupted.
+  ///
+  /// In en, this message translates to:
+  /// **'Interrupted'**
+  String get scheduledTasksInterrupted;
+
+  /// No description provided for @scheduledTasksPaused.
+  ///
+  /// In en, this message translates to:
+  /// **'Paused'**
+  String get scheduledTasksPaused;
+
+  /// No description provided for @scheduledTasksWaitingPermission.
+  ///
+  /// In en, this message translates to:
+  /// **'Waiting for permission'**
+  String get scheduledTasksWaitingPermission;
+
+  /// No description provided for @scheduledTasksNextRun.
+  ///
+  /// In en, this message translates to:
+  /// **'Next: {time}'**
+  String scheduledTasksNextRun(String time);
+
+  /// No description provided for @scheduledTasksDelete.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete task'**
+  String get scheduledTasksDelete;
+
+  /// No description provided for @scheduledTasksDeleteDetail.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete this schedule and its run history? Conversations already created will be kept.'**
+  String get scheduledTasksDeleteDetail;
+
+  /// No description provided for @scheduledTasksSave.
+  ///
+  /// In en, this message translates to:
+  /// **'Save'**
+  String get scheduledTasksSave;
+
+  /// No description provided for @scheduledTasksCancel.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel'**
+  String get scheduledTasksCancel;
+
+  /// No description provided for @scheduledTasksInvalid.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter a name, prompt, assistant, valid time and at least one day.'**
+  String get scheduledTasksInvalid;
+
+  /// No description provided for @scheduledTasksLoading.
+  ///
+  /// In en, this message translates to:
+  /// **'Loading…'**
+  String get scheduledTasksLoading;
+
+  /// No description provided for @scheduledTasksOpenChat.
+  ///
+  /// In en, this message translates to:
+  /// **'View conversation'**
+  String get scheduledTasksOpenChat;
+
+  /// No description provided for @scheduledTasksNeedsInput.
+  ///
+  /// In en, this message translates to:
+  /// **'Stopped because user input or tool approval was required. Open the conversation to continue.'**
+  String get scheduledTasksNeedsInput;
+
+  /// No description provided for @scheduledTasksTimeout.
+  ///
+  /// In en, this message translates to:
+  /// **'The execution time limit was reached.'**
+  String get scheduledTasksTimeout;
+
+  /// No description provided for @scheduledTasksProcessTerminated.
+  ///
+  /// In en, this message translates to:
+  /// **'Android stopped the previous run.'**
+  String get scheduledTasksProcessTerminated;
 }
 
 class _AppLocalizationsDelegate

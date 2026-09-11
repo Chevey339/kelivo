@@ -77,6 +77,32 @@ void main() {
     expect(binding.cwd, 'src');
   });
 
+  test(
+    'background creation preserves the active temporary draft and workspace',
+    () async {
+      final service = createService();
+      await service.init();
+      final draft = await service.createDraftConversation(
+        temporary: true,
+        title: 'Unsent draft',
+      );
+      service.newConversationExtras = (id) => bindingExtras('workspace-$id');
+      final taskChat = await service.createConversation(
+        title: 'Scheduled',
+        assistantId: 'task-assistant',
+        activate: false,
+      );
+      expect(service.currentConversationId, draft.id);
+      expect(service.getConversation(draft.id), isNotNull);
+      expect(service.isTemporaryConversation(draft.id), isTrue);
+      expect(service.getConversation(taskChat.id), isNotNull);
+      expect(
+        WorkspaceBinding.fromExtras(taskChat.extras).workspaceId,
+        'workspace-task-assistant',
+      );
+    },
+  );
+
   test('newConversationExtras is applied on createDraftConversation', () async {
     final service = createService();
     service.newConversationExtras = (_) => bindingExtras('ws-draft');

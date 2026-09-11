@@ -10786,6 +10786,143 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get startupRecoverySnapshotReady => '快照已准备好，请重启 Kelivo 完成恢复。';
+
+  @override
+  String get scheduledTasksTitle => '定时任务';
+
+  @override
+  String get scheduledTasksDescription => '在指定时间自动执行提示词，每次使用所选助手创建一条新对话。';
+
+  @override
+  String get scheduledTasksEmpty => '把任务交给时间';
+
+  @override
+  String get scheduledTasksEmptyDetail => '晨间简报、每日复盘，或任何希望定期完成的事。';
+
+  @override
+  String get scheduledTasksAdd => '添加任务';
+
+  @override
+  String get scheduledTasksEdit => '编辑任务';
+
+  @override
+  String get scheduledTasksName => '任务名称';
+
+  @override
+  String get scheduledTasksNameHint => '晨间简报';
+
+  @override
+  String get scheduledTasksPrompt => '任务内容';
+
+  @override
+  String get scheduledTasksPromptHint => '希望助手为你完成什么？';
+
+  @override
+  String get scheduledTasksAssistant => '执行助手';
+
+  @override
+  String get scheduledTasksChooseAssistant => '选择助手';
+
+  @override
+  String get scheduledTasksAssistantMissing => '助手已不存在';
+
+  @override
+  String get scheduledTasksTime => '执行时间';
+
+  @override
+  String get scheduledTasksTimeHint => '24 小时制，例如 08:00';
+
+  @override
+  String get scheduledTasksRepeat => '重复';
+
+  @override
+  String get scheduledTasksEveryDay => '每天';
+
+  @override
+  String get scheduledTasksWeekdays => '工作日';
+
+  @override
+  String get scheduledTasksEnabled => '启用任务';
+
+  @override
+  String get scheduledTasksPermission => '闹钟和提醒';
+
+  @override
+  String get scheduledTasksPermissionDetail =>
+      '允许设置闹钟，才能按指定时间执行。未授权时，已启用的任务会等待授权。';
+
+  @override
+  String get scheduledTasksPermissionAction => '去授权';
+
+  @override
+  String get scheduledTasksReliability =>
+      '建议在电池设置中允许 Kelivo 后台运行。强行停止后需重新打开应用。错过的任务不会补跑，执行时间跟随设备时区。';
+
+  @override
+  String get scheduledTasksExecutionDetail =>
+      '沿用助手当前的模型、工具和工作区。运行超过 10 分钟，或需要用户回答、工具确认时会停止。结果保存在对话中。';
+
+  @override
+  String get scheduledTasksRunNow => '立即运行';
+
+  @override
+  String get scheduledTasksHistory => '执行记录';
+
+  @override
+  String get scheduledTasksNoRuns => '尚无执行记录';
+
+  @override
+  String get scheduledTasksRunning => '正在运行';
+
+  @override
+  String get scheduledTasksCompleted => '已完成';
+
+  @override
+  String get scheduledTasksFailed => '执行失败';
+
+  @override
+  String get scheduledTasksInterrupted => '已中断';
+
+  @override
+  String get scheduledTasksPaused => '已暂停';
+
+  @override
+  String get scheduledTasksWaitingPermission => '等待授权';
+
+  @override
+  String scheduledTasksNextRun(String time) {
+    return '下次：$time';
+  }
+
+  @override
+  String get scheduledTasksDelete => '删除任务';
+
+  @override
+  String get scheduledTasksDeleteDetail => '删除此任务及执行记录？已经生成的对话会保留。';
+
+  @override
+  String get scheduledTasksSave => '保存';
+
+  @override
+  String get scheduledTasksCancel => '取消';
+
+  @override
+  String get scheduledTasksInvalid => '请填写名称、任务内容、助手、有效时间，并至少选择一天。';
+
+  @override
+  String get scheduledTasksLoading => '正在加载…';
+
+  @override
+  String get scheduledTasksOpenChat => '查看对话';
+
+  @override
+  String get scheduledTasksNeedsInput => '任务需要用户回答或工具确认，已停止。可打开对话继续。';
+
+  @override
+  String get scheduledTasksTimeout => '已达到执行时限。';
+
+  @override
+  String get scheduledTasksProcessTerminated => '上次执行被系统终止。';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hans`).
@@ -21496,6 +21633,143 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get startupRecoverySnapshotReady => '快照已准备好，请重启 Kelivo 完成恢复。';
+
+  @override
+  String get scheduledTasksTitle => '定时任务';
+
+  @override
+  String get scheduledTasksDescription => '在指定时间自动执行提示词，每次使用所选助手创建一条新对话。';
+
+  @override
+  String get scheduledTasksEmpty => '把任务交给时间';
+
+  @override
+  String get scheduledTasksEmptyDetail => '晨间简报、每日复盘，或任何希望定期完成的事。';
+
+  @override
+  String get scheduledTasksAdd => '添加任务';
+
+  @override
+  String get scheduledTasksEdit => '编辑任务';
+
+  @override
+  String get scheduledTasksName => '任务名称';
+
+  @override
+  String get scheduledTasksNameHint => '晨间简报';
+
+  @override
+  String get scheduledTasksPrompt => '任务内容';
+
+  @override
+  String get scheduledTasksPromptHint => '希望助手为你完成什么？';
+
+  @override
+  String get scheduledTasksAssistant => '执行助手';
+
+  @override
+  String get scheduledTasksChooseAssistant => '选择助手';
+
+  @override
+  String get scheduledTasksAssistantMissing => '助手已不存在';
+
+  @override
+  String get scheduledTasksTime => '执行时间';
+
+  @override
+  String get scheduledTasksTimeHint => '24 小时制，例如 08:00';
+
+  @override
+  String get scheduledTasksRepeat => '重复';
+
+  @override
+  String get scheduledTasksEveryDay => '每天';
+
+  @override
+  String get scheduledTasksWeekdays => '工作日';
+
+  @override
+  String get scheduledTasksEnabled => '启用任务';
+
+  @override
+  String get scheduledTasksPermission => '闹钟和提醒';
+
+  @override
+  String get scheduledTasksPermissionDetail =>
+      '允许设置闹钟，才能按指定时间执行。未授权时，已启用的任务会等待授权。';
+
+  @override
+  String get scheduledTasksPermissionAction => '去授权';
+
+  @override
+  String get scheduledTasksReliability =>
+      '建议在电池设置中允许 Kelivo 后台运行。强行停止后需重新打开应用。错过的任务不会补跑，执行时间跟随设备时区。';
+
+  @override
+  String get scheduledTasksExecutionDetail =>
+      '沿用助手当前的模型、工具和工作区。运行超过 10 分钟，或需要用户回答、工具确认时会停止。结果保存在对话中。';
+
+  @override
+  String get scheduledTasksRunNow => '立即运行';
+
+  @override
+  String get scheduledTasksHistory => '执行记录';
+
+  @override
+  String get scheduledTasksNoRuns => '尚无执行记录';
+
+  @override
+  String get scheduledTasksRunning => '正在运行';
+
+  @override
+  String get scheduledTasksCompleted => '已完成';
+
+  @override
+  String get scheduledTasksFailed => '执行失败';
+
+  @override
+  String get scheduledTasksInterrupted => '已中断';
+
+  @override
+  String get scheduledTasksPaused => '已暂停';
+
+  @override
+  String get scheduledTasksWaitingPermission => '等待授权';
+
+  @override
+  String scheduledTasksNextRun(String time) {
+    return '下次：$time';
+  }
+
+  @override
+  String get scheduledTasksDelete => '删除任务';
+
+  @override
+  String get scheduledTasksDeleteDetail => '删除此任务及执行记录？已经生成的对话会保留。';
+
+  @override
+  String get scheduledTasksSave => '保存';
+
+  @override
+  String get scheduledTasksCancel => '取消';
+
+  @override
+  String get scheduledTasksInvalid => '请填写名称、任务内容、助手、有效时间，并至少选择一天。';
+
+  @override
+  String get scheduledTasksLoading => '正在加载…';
+
+  @override
+  String get scheduledTasksOpenChat => '查看对话';
+
+  @override
+  String get scheduledTasksNeedsInput => '任务需要用户回答或工具确认，已停止。可打开对话继续。';
+
+  @override
+  String get scheduledTasksTimeout => '已达到执行时限。';
+
+  @override
+  String get scheduledTasksProcessTerminated => '上次执行被系统终止。';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hant`).
@@ -32285,4 +32559,141 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get startupRecoverySnapshotReady => '快照已準備好，請重新啟動 Kelivo 完成還原。';
+
+  @override
+  String get scheduledTasksTitle => '定時任務';
+
+  @override
+  String get scheduledTasksDescription => '在指定時間自動執行提示詞，每次使用所選助手建立一條新對話。';
+
+  @override
+  String get scheduledTasksEmpty => '把任務交給時間';
+
+  @override
+  String get scheduledTasksEmptyDetail => '晨間簡報、每日回顧，或任何希望定期完成的事。';
+
+  @override
+  String get scheduledTasksAdd => '新增任務';
+
+  @override
+  String get scheduledTasksEdit => '編輯任務';
+
+  @override
+  String get scheduledTasksName => '任務名稱';
+
+  @override
+  String get scheduledTasksNameHint => '晨間簡報';
+
+  @override
+  String get scheduledTasksPrompt => '任務內容';
+
+  @override
+  String get scheduledTasksPromptHint => '希望助手為你完成什麼？';
+
+  @override
+  String get scheduledTasksAssistant => '執行助手';
+
+  @override
+  String get scheduledTasksChooseAssistant => '選擇助手';
+
+  @override
+  String get scheduledTasksAssistantMissing => '助手已不存在';
+
+  @override
+  String get scheduledTasksTime => '執行時間';
+
+  @override
+  String get scheduledTasksTimeHint => '24 小時制，例如 08:00';
+
+  @override
+  String get scheduledTasksRepeat => '重複';
+
+  @override
+  String get scheduledTasksEveryDay => '每天';
+
+  @override
+  String get scheduledTasksWeekdays => '工作日';
+
+  @override
+  String get scheduledTasksEnabled => '啟用任務';
+
+  @override
+  String get scheduledTasksPermission => '鬧鐘和提醒';
+
+  @override
+  String get scheduledTasksPermissionDetail =>
+      '允許設定鬧鐘，才能按指定時間執行。未授權時，已啟用的任務會等待授權。';
+
+  @override
+  String get scheduledTasksPermissionAction => '前往授權';
+
+  @override
+  String get scheduledTasksReliability =>
+      '建議在電池設定中允許 Kelivo 背景執行。強制停止後需重新開啟應用程式。錯過的任務不會補跑，執行時間跟隨裝置時區。';
+
+  @override
+  String get scheduledTasksExecutionDetail =>
+      '沿用助手目前的模型、工具和工作區。執行超過 10 分鐘，或需要使用者回答、工具確認時會停止。結果儲存在對話中。';
+
+  @override
+  String get scheduledTasksRunNow => '立即執行';
+
+  @override
+  String get scheduledTasksHistory => '執行紀錄';
+
+  @override
+  String get scheduledTasksNoRuns => '尚無執行紀錄';
+
+  @override
+  String get scheduledTasksRunning => '正在執行';
+
+  @override
+  String get scheduledTasksCompleted => '已完成';
+
+  @override
+  String get scheduledTasksFailed => '執行失敗';
+
+  @override
+  String get scheduledTasksInterrupted => '已中斷';
+
+  @override
+  String get scheduledTasksPaused => '已暫停';
+
+  @override
+  String get scheduledTasksWaitingPermission => '等待授權';
+
+  @override
+  String scheduledTasksNextRun(String time) {
+    return '下次：$time';
+  }
+
+  @override
+  String get scheduledTasksDelete => '刪除任務';
+
+  @override
+  String get scheduledTasksDeleteDetail => '刪除此任務及執行紀錄？已經產生的對話會保留。';
+
+  @override
+  String get scheduledTasksSave => '儲存';
+
+  @override
+  String get scheduledTasksCancel => '取消';
+
+  @override
+  String get scheduledTasksInvalid => '請填寫名稱、任務內容、助手、有效時間，並至少選擇一天。';
+
+  @override
+  String get scheduledTasksLoading => '正在載入…';
+
+  @override
+  String get scheduledTasksOpenChat => '查看對話';
+
+  @override
+  String get scheduledTasksNeedsInput => '任務需要使用者回答或工具確認，已停止。可開啟對話繼續。';
+
+  @override
+  String get scheduledTasksTimeout => '已達到執行時限。';
+
+  @override
+  String get scheduledTasksProcessTerminated => '上次執行被系統終止。';
 }

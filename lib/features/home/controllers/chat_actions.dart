@@ -105,15 +105,23 @@ class ChatActionResult {
   final bool success;
   final String? errorMessage;
   final ChatMessage? assistantMessage;
+  final String? generationRunId;
 
   ChatActionResult({
     required this.success,
     this.errorMessage,
     this.assistantMessage,
+    this.generationRunId,
   });
 
-  factory ChatActionResult.success(ChatMessage assistantMessage) =>
-      ChatActionResult(success: true, assistantMessage: assistantMessage);
+  factory ChatActionResult.success(
+    ChatMessage assistantMessage, {
+    String? generationRunId,
+  }) => ChatActionResult(
+    success: true,
+    assistantMessage: assistantMessage,
+    generationRunId: generationRunId,
+  );
 
   factory ChatActionResult.error(String message) =>
       ChatActionResult(success: false, errorMessage: message);
@@ -1101,6 +1109,7 @@ class ChatActions {
   Future<ChatActionResult> sendMessage({
     required ChatInputData input,
     required Conversation conversation,
+    Assistant? assistantOverride,
   }) async {
     final claimToken = ++_sendInFlightClaimSerial;
     if (isSendInFlight(conversation.id)) {
@@ -1111,6 +1120,7 @@ class ChatActions {
       return await _sendMessageClaimed(
         input: input,
         conversation: conversation,
+        assistantOverride: assistantOverride,
       );
     } finally {
       if (_sendInFlightClaims[conversation.id] == claimToken) {
@@ -1122,6 +1132,7 @@ class ChatActions {
   Future<ChatActionResult> _sendMessageClaimed({
     required ChatInputData input,
     required Conversation conversation,
+    Assistant? assistantOverride,
   }) async {
     final content = input.text.trim();
     if (content.isEmpty &&
@@ -1146,7 +1157,7 @@ class ChatActions {
     } catch (e) {
       return ChatActionResult.error(e.toString());
     }
-    final assistant = assistantProvider.currentAssistant;
+    final assistant = assistantOverride ?? assistantProvider.currentAssistant;
     final assistantId = assistant?.id;
     final modelConfig = messageGenerationService.getModelConfig(
       settings,
@@ -1160,7 +1171,8 @@ class ChatActions {
     final providerKey = modelConfig.providerKey!;
     final modelId = modelConfig.modelId!;
 
-    if (chatController.hasMoreAfter) {
+    if (chatController.currentConversation?.id == conversation.id &&
+        chatController.hasMoreAfter) {
       final loaded = await chatController.loadEndWindow();
       if (loaded) {
         viewModel.restoreMessageUiState();
@@ -1214,7 +1226,9 @@ class ChatActions {
       viewModel.restoreMessageUiState();
     }
     onMessagesChanged?.call();
-    onSendPairAppended?.call();
+    if (chatController.currentConversation?.id == conversation.id) {
+      onSendPairAppended?.call();
+    }
 
     // The send pair is visible and owned by the loading guard from here on, so
     // the caller is released now: the composer must not keep its attachments
@@ -1236,7 +1250,10 @@ class ChatActions {
         askUserService: askUserService,
       ),
     );
-    return ChatActionResult.success(assistantMessage);
+    return ChatActionResult.success(
+      assistantMessage,
+      generationRunId: generationRunId,
+    );
   }
 
   Future<void> _runSendGeneration({

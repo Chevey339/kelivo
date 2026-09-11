@@ -281,6 +281,7 @@ class MessageGenerationService {
       hasBuiltInSearch,
       mcpRouteSnapshot: mcpRouteSnapshot,
       workspaceContext: workspaceContext,
+      conversationId: currentConversation?.id,
     );
     final sandboxDataFiles = BuiltInToolsHelper.sendsDataFilesToSandbox(
       cfg: cfg,

@@ -769,19 +769,18 @@ class MyApp extends StatelessWidget {
             final provider = WorkspaceRuntimeProvider();
             final extras = ctx.read<_WorkspaceStackHolder>();
             final env = ctx.read<EnvironmentProvider>();
-            unawaited(
-              (() async {
-                try {
-                  final stack = await createWorkspaceStack(env: env);
-                  applyWorkspaceStack(provider, stack);
-                  extras.apply(stack);
-                } catch (error, stackTrace) {
-                  debugPrint(
-                    'Failed to create workspace stack: $error\n$stackTrace',
-                  );
-                }
-              })(),
-            );
+            provider.initialization = (() async {
+              try {
+                final stack = await createWorkspaceStack(env: env);
+                applyWorkspaceStack(provider, stack);
+                extras.apply(stack);
+              } catch (error, stackTrace) {
+                debugPrint(
+                  'Failed to create workspace stack: $error\n$stackTrace',
+                );
+              }
+            })();
+            unawaited(provider.initialization);
             return provider;
           },
         ),

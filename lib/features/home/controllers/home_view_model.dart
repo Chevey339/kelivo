@@ -359,6 +359,16 @@ class HomeViewModel extends ChangeNotifier {
   // ============================================================================
 
   /// Send a new message or queue it if the current conversation is busy.
+  Future<ChatActionResult> sendScheduledMessage({
+    required ChatInputData input,
+    required Conversation conversation,
+    required Assistant assistant,
+  }) => _chatActions.sendMessage(
+    input: input,
+    conversation: conversation,
+    assistantOverride: assistant,
+  );
+
   Future<ChatInputSubmissionResult> sendMessage(ChatInputData input) async {
     final content = input.text.trim();
     if (content.isEmpty &&

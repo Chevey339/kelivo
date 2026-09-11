@@ -739,6 +739,7 @@ class _HomePageState extends State<HomePage>
       scrollController: _scrollController,
     );
 
+    _controller.onRevealConversation = () => _drawerController.jumpTo(0);
     _controller.addListener(_onControllerChanged);
     _drawerController.addListener(_onDrawerValueChanged);
 

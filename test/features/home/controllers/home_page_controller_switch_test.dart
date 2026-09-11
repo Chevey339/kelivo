@@ -292,6 +292,8 @@ void main() {
             'conv-b': [_message('conv-b', 0)],
           });
           final controller = await pumpHarness(tester, service);
+          var revealed = false;
+          controller.onRevealConversation = () => revealed = true;
           await switchAndSettle(tester, controller, service, 'conv-a');
           controller.debugSetChatInitialized();
           final navigator = tester.state<NavigatorState>(
@@ -331,6 +333,7 @@ void main() {
           }
           expect(find.text('Settings page'), findsNothing);
           expect(controller.currentConversation?.id, 'conv-b');
+          expect(revealed, isTrue);
         });
       },
     );

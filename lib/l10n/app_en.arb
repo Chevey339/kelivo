@@ -4962,5 +4962,56 @@
         "type": "String"
       }
     }
+  },
+  "scheduledTasksTitle": "Scheduled tasks",
+  "scheduledTasksDescription": "Run a prompt automatically at a local time. Each run creates a new conversation using the selected assistant.",
+  "scheduledTasksEmpty": "Your day, on a schedule",
+  "scheduledTasksEmptyDetail": "Add a task for a morning briefing, a daily review, or anything you want to run regularly.",
+  "scheduledTasksAdd": "Add task",
+  "scheduledTasksEdit": "Edit task",
+  "scheduledTasksName": "Name",
+  "scheduledTasksNameHint": "Morning briefing",
+  "scheduledTasksPrompt": "Prompt",
+  "scheduledTasksPromptHint": "What would you like your assistant to do?",
+  "scheduledTasksAssistant": "Assistant",
+  "scheduledTasksChooseAssistant": "Choose an assistant",
+  "scheduledTasksAssistantMissing": "Assistant unavailable",
+  "scheduledTasksTime": "Time",
+  "scheduledTasksTimeHint": "24-hour time, e.g. 08:00",
+  "scheduledTasksRepeat": "Repeat",
+  "scheduledTasksEveryDay": "Every day",
+  "scheduledTasksWeekdays": "Weekdays",
+  "scheduledTasksEnabled": "Enabled",
+  "scheduledTasksPermission": "Alarms & reminders",
+  "scheduledTasksPermissionDetail": "Allow exact alarms to run tasks at your chosen time. Enabled tasks will wait until permission is granted.",
+  "scheduledTasksPermissionAction": "Allow",
+  "scheduledTasksReliability": "Keep Kelivo unrestricted in battery settings for more reliable execution. Force stopping the app cancels alarms until you reopen it. Missed runs are skipped; tasks follow the device time zone.",
+  "scheduledTasksExecutionDetail": "Uses the assistant’s current model, tools and workspace. Runs stop after 10 minutes or when user input or tool approval is needed. Results are saved in chats.",
+  "scheduledTasksRunNow": "Run now",
+  "scheduledTasksHistory": "Run history",
+  "scheduledTasksNoRuns": "No runs yet",
+  "scheduledTasksRunning": "Running",
+  "scheduledTasksCompleted": "Completed",
+  "scheduledTasksFailed": "Failed",
+  "scheduledTasksInterrupted": "Interrupted",
+  "scheduledTasksPaused": "Paused",
+  "scheduledTasksWaitingPermission": "Waiting for permission",
+  "scheduledTasksNextRun": "Next: {time}",
+  "scheduledTasksDelete": "Delete task",
+  "scheduledTasksDeleteDetail": "Delete this schedule and its run history? Conversations already created will be kept.",
+  "scheduledTasksSave": "Save",
+  "scheduledTasksCancel": "Cancel",
+  "scheduledTasksInvalid": "Enter a name, prompt, assistant, valid time and at least one day.",
+  "scheduledTasksLoading": "Loading…",
+  "scheduledTasksOpenChat": "View conversation",
+  "scheduledTasksNeedsInput": "Stopped because user input or tool approval was required. Open the conversation to continue.",
+  "scheduledTasksTimeout": "The execution time limit was reached.",
+  "scheduledTasksProcessTerminated": "Android stopped the previous run.",
+  "@scheduledTasksNextRun": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
   }
 }
