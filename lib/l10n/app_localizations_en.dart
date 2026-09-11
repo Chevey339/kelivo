@@ -545,8 +545,13 @@ class AppLocalizationsEn extends AppLocalizations {
   String get homePageClearContext => 'Clear Context';
 
   @override
-  String homePageClearContextWithCount(String actual, String configured) {
-    return 'Clear Context ($actual/$configured)';
+  String contextMessageCount(int count) {
+    return '$count messages';
+  }
+
+  @override
+  String contextMessageCountLimited(int actual, int configured) {
+    return '$actual/$configured messages';
   }
 
   @override

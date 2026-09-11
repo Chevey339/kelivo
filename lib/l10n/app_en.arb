@@ -229,14 +229,22 @@
   "languageSelectSheetTitle": "Select Translation Language",
   "languageSelectSheetClearButton": "Clear Translation",
   "homePageClearContext": "Clear Context",
-  "homePageClearContextWithCount": "Clear Context ({actual}/{configured})",
-  "@homePageClearContextWithCount": {
+  "contextMessageCount": "{count} messages",
+  "@contextMessageCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "contextMessageCountLimited": "{actual}/{configured} messages",
+  "@contextMessageCountLimited": {
     "placeholders": {
       "actual": {
-        "type": "String"
+        "type": "int"
       },
       "configured": {
-        "type": "String"
+        "type": "int"
       }
     }
   },

@@ -536,8 +536,13 @@ class AppLocalizationsZh extends AppLocalizations {
   String get homePageClearContext => '清空上下文';
 
   @override
-  String homePageClearContextWithCount(String actual, String configured) {
-    return '清空上下文 ($actual/$configured)';
+  String contextMessageCount(int count) {
+    return '$count 条消息';
+  }
+
+  @override
+  String contextMessageCountLimited(int actual, int configured) {
+    return '$actual/$configured 条消息';
   }
 
   @override
@@ -11289,8 +11294,13 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get homePageClearContext => '清空上下文';
 
   @override
-  String homePageClearContextWithCount(String actual, String configured) {
-    return '清空上下文 ($actual/$configured)';
+  String contextMessageCount(int count) {
+    return '$count 条消息';
+  }
+
+  @override
+  String contextMessageCountLimited(int actual, int configured) {
+    return '$actual/$configured 条消息';
   }
 
   @override
@@ -21968,8 +21978,13 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get homePageClearContext => '清空上下文';
 
   @override
-  String homePageClearContextWithCount(String actual, String configured) {
-    return '清空上下文 ($actual/$configured)';
+  String contextMessageCount(int count) {
+    return '$count 則訊息';
+  }
+
+  @override
+  String contextMessageCountLimited(int actual, int configured) {
+    return '$actual/$configured 則訊息';
   }
 
   @override

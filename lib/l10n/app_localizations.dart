@@ -1102,11 +1102,17 @@ abstract class AppLocalizations {
   /// **'Clear Context'**
   String get homePageClearContext;
 
-  /// No description provided for @homePageClearContextWithCount.
+  /// No description provided for @contextMessageCount.
   ///
   /// In en, this message translates to:
-  /// **'Clear Context ({actual}/{configured})'**
-  String homePageClearContextWithCount(String actual, String configured);
+  /// **'{count} messages'**
+  String contextMessageCount(int count);
+
+  /// No description provided for @contextMessageCountLimited.
+  ///
+  /// In en, this message translates to:
+  /// **'{actual}/{configured} messages'**
+  String contextMessageCountLimited(int actual, int configured);
 
   /// No description provided for @homePageDefaultAssistant.
   ///

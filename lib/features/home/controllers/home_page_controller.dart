@@ -2752,13 +2752,14 @@ class HomePageController extends ChangeNotifier {
 
   String titleForLocale() => _titleForLocale(_context);
 
-  String clearContextLabel() {
+  /// Trailing label for the context management sheet, e.g. "12 messages".
+  String contextMessageCountLabel() {
     final l10n = AppLocalizations.of(_context)!;
-    return _viewModel.getClearContextLabel(
-      (actual, configured) =>
-          l10n.homePageClearContextWithCount(actual, configured),
-      l10n.homePageClearContext,
-    );
+    final count = _viewModel.getContextMessageCount();
+    final configured = count.configured;
+    return configured == null
+        ? l10n.contextMessageCount(count.actual)
+        : l10n.contextMessageCountLimited(count.actual, configured);
   }
 
   String? currentStreamingMessageId() {

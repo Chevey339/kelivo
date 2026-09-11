@@ -1949,7 +1949,7 @@ class _HomePageState extends State<HomePage>
         return SafeArea(
           top: false,
           child: ContextManagementSheet(
-            clearLabel: _controller.clearContextLabel(),
+            messageCountLabel: _controller.contextMessageCountLabel(),
             onCompress: () async {
               await Navigator.of(ctx).maybePop();
               if (!mounted) return;
