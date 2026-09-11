@@ -28,6 +28,7 @@ import '../migration/legacy_record_sanitizer.dart';
 import '../../utils/multimodal_input_utils.dart';
 import '../../../utils/app_directories.dart';
 import '../../../utils/sandbox_path_resolver.dart';
+import '../../database/backup_portability.dart';
 import 'backup_settings_validator.dart';
 import 'restore_bundle_preparation.dart';
 import 'restore_workspace_lock.dart';
@@ -664,6 +665,7 @@ class DataSync {
           ),
         );
         snapshotInfo = await snapshotDatabase(databaseFile);
+        await _sanitizeBackupDatabase(databaseFile);
       }
 
       final packageInfo = await PackageInfo.fromPlatform();
@@ -2508,12 +2510,14 @@ class DataSync {
       }
       geminiThoughtSigs[entry.key.toString()] = entry.value as String;
     }
-    final conversations = (chats['conversations'] as List)
-        .map(
-          (entry) =>
-              Conversation.fromJson((entry as Map).cast<String, dynamic>()),
-        )
-        .toList();
+    final conversations = (chats['conversations'] as List).map((entry) {
+      final conversation = Conversation.fromJson(
+        (entry as Map).cast<String, dynamic>(),
+      );
+      return conversation.copyWith(
+        extras: {...conversation.extras}..remove('workspace.allowAll'),
+      );
+    }).toList();
 
     // Import boundary for legacy chats.json: promote marker-bearing content
     // into structured parts only when the raw JSON lacks a `parts` list.
@@ -2928,7 +2932,7 @@ class DataSync {
   static Future<({String settingsJson, Map<String, List<String>> entityRowIds})>
   exportBusinessSettingsFrom(BusinessRepository repository) async {
     final exported = BusinessSettingsRouter.exportSnapshotWithRowIds(
-      await repository.readSnapshot(),
+      BackupPortability.portable(await repository.readSnapshot()),
     );
     final settings = Map<String, Object>.from(exported.settings);
     settings.removeWhere((key, _) => BackupSettingsValidator.shouldIgnore(key));
@@ -2937,6 +2941,16 @@ class DataSync {
       settingsJson: jsonEncode(settings),
       entityRowIds: exported.entityRowIds,
     );
+  }
+
+  static Future<void> _sanitizeBackupDatabase(File file) async {
+    final database = AppDatabase.open(file: file);
+    try {
+      await BackupPortability.sanitizeDatabase(database);
+    } finally {
+      await database.close();
+    }
+    await ChatDatabaseRepository.normalizeSnapshotJournal(file);
   }
 
   /// Reads a backup file's manifest and reports what restoring it would mean.
@@ -3127,6 +3141,9 @@ class DataSync {
           return;
         }
         if (restoreChats) {
+          await _sanitizeBackupDatabase(
+            File(p.join(extractDir.path, _databaseEntryName)),
+          );
           beginNonCancellableCommit();
           _lastMergeReport = await chatService.mergeDatabaseSnapshot(
             File(p.join(extractDir.path, _databaseEntryName)),

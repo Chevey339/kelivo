@@ -12,6 +12,7 @@ import 'package:path_provider_platform_interface/path_provider_platform_interfac
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:Kelivo/core/database/app_database.dart';
+import 'package:Kelivo/core/database/extension_entity_store.dart';
 import 'package:Kelivo/core/database/database_installation_gate.dart';
 import 'package:Kelivo/core/database/startup_recovery_service.dart';
 import 'package:Kelivo/core/database/business_preferences.dart';
@@ -454,6 +455,90 @@ void main() {
         await root.delete(recursive: true);
       }
     });
+
+    test(
+      'database export strips device state from both archive payloads',
+      () async {
+        final sourceFile = File(p.join(root.path, 'source.sqlite'));
+        final source = AppDatabase.open(file: sourceFile);
+        try {
+          await BusinessPreferences(
+            BusinessRepository(source),
+          ).setString('environment_state_v1', 'source-installed');
+          final store = ExtensionEntityStore(source);
+          await store.upsert('externalMounts', 'global', {
+            'bookmark': 'source-bookmark',
+          });
+          for (final kind in ['linked', 'managed']) {
+            await store.upsert('workspace', kind, {
+              'id': kind,
+              'kind': kind,
+              'hostPath': '/source/$kind',
+            });
+          }
+        } finally {
+          await source.close();
+        }
+        final sync = DataSync(
+          businessRepository: businessRepository,
+          chatService: ChatService(),
+        );
+        final backup = await sync.prepareBackupFileFromDatabase(sourceFile);
+        addTearDown(() => DataSync.cleanupTemporaryBackupFile(backup));
+        final input = InputFileStream(backup.path);
+        final archive = ZipDecoder().decodeStream(input);
+        final snapshotFile = File(p.join(root.path, 'exported.sqlite'));
+        try {
+          final settings =
+              jsonDecode(
+                    utf8.decode(
+                      archive.findFile('settings.json')!.readBytes()!,
+                    ),
+                  )
+                  as Map;
+          expect(settings, isNot(contains('environment_state_v1')));
+          expect(
+            (jsonDecode(settings['workspaces_v1'] as String) as List)
+                .single['id'],
+            'managed',
+          );
+          await snapshotFile.writeAsBytes(
+            archive.findFile('database/kelivo.db')!.readBytes()!,
+          );
+        } finally {
+          archive.clear();
+          input.closeSync();
+        }
+        final snapshot = AppDatabase.open(file: snapshotFile);
+        try {
+          expect(
+            await BusinessRepository(snapshot).preferenceSnapshot(),
+            isNot(contains('environment_state_v1')),
+          );
+          final store = ExtensionEntityStore(snapshot);
+          expect(await store.get('externalMounts', 'global'), isNull);
+          expect(await store.get('workspace', 'linked'), isNull);
+          expect(await store.get('workspace', 'managed'), isNotNull);
+        } finally {
+          await snapshot.close();
+        }
+        final original = AppDatabase.open(file: sourceFile);
+        try {
+          expect(
+            (await BusinessRepository(
+              original,
+            ).preferenceSnapshot())['environment_state_v1'],
+            'source-installed',
+          );
+          expect(
+            await ExtensionEntityStore(original).get('workspace', 'linked'),
+            isNotNull,
+          );
+        } finally {
+          await original.close();
+        }
+      },
+    );
 
     test(
       'startup snapshot restores a missing database with its old receipt',

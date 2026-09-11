@@ -1,3 +1,4 @@
+import 'backup_portability.dart';
 import 'business_repository.dart';
 import 'business_settings_merger.dart';
 import 'business_settings_router.dart';
@@ -8,7 +9,9 @@ final class BusinessRestoreService {
   final BusinessRepository _repository;
 
   Future<Map<String, Object>> exportSettings() async =>
-      BusinessSettingsRouter.exportSnapshot(await _repository.readSnapshot());
+      BusinessSettingsRouter.exportSnapshot(
+        BackupPortability.portable(await _repository.readSnapshot()),
+      );
 
   Future<void> overwrite(
     Map<String, Object?> imported, {
@@ -16,15 +19,20 @@ final class BusinessRestoreService {
     Map<String, Object?>? entityRowIds,
     bool assumePreV3EmbeddingMigrationWhenVersionMissing = false,
   }) async {
-    final replacement = BusinessSettingsRouter.normalizeAndRoute(
-      imported,
-      preserveExplicitEmptyInstructionList:
-          preserveExplicitEmptyInstructionList,
-      entityRowIds: entityRowIds,
-      assumePreV3EmbeddingMigrationWhenVersionMissing:
-          assumePreV3EmbeddingMigrationWhenVersionMissing,
+    final replacement = BackupPortability.portable(
+      BusinessSettingsRouter.normalizeAndRoute(
+        _portablePreferences(imported),
+        preserveExplicitEmptyInstructionList:
+            preserveExplicitEmptyInstructionList,
+        entityRowIds: entityRowIds,
+        assumePreV3EmbeddingMigrationWhenVersionMissing:
+            assumePreV3EmbeddingMigrationWhenVersionMissing,
+      ),
     );
-    await _repository.replaceSnapshot(replacement, writeReceipt: true);
+    await _repository.transformSnapshot(
+      (current) => BackupPortability.preserveDeviceState(replacement, current),
+      writeReceipt: true,
+    );
   }
 
   Future<void> merge(
@@ -36,13 +44,15 @@ final class BusinessRestoreService {
     // Validate and normalize before opening the write transaction. The
     // transaction then merges those immutable imported rows with its current
     // snapshot, preserving both sides' database identities.
-    final incoming = BusinessSettingsRouter.normalizeAndRoute(
-      imported,
-      preserveExplicitEmptyInstructionList:
-          preserveExplicitEmptyInstructionList,
-      entityRowIds: entityRowIds,
-      assumePreV3EmbeddingMigrationWhenVersionMissing:
-          assumePreV3EmbeddingMigrationWhenVersionMissing,
+    final incoming = BackupPortability.portable(
+      BusinessSettingsRouter.normalizeAndRoute(
+        _portablePreferences(imported),
+        preserveExplicitEmptyInstructionList:
+            preserveExplicitEmptyInstructionList,
+        entityRowIds: entityRowIds,
+        assumePreV3EmbeddingMigrationWhenVersionMissing:
+            assumePreV3EmbeddingMigrationWhenVersionMissing,
+      ),
     );
     await _repository.transformSnapshot((current) {
       return BusinessSettingsMerger.mergeSnapshots(
@@ -52,4 +62,11 @@ final class BusinessRestoreService {
       );
     }, writeReceipt: true);
   }
+
+  static Map<String, Object?> _portablePreferences(
+    Map<String, Object?> values,
+  ) => {...values}
+    ..removeWhere(
+      (key, _) => BackupPortability.devicePreferenceKeys.contains(key),
+    );
 }

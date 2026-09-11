@@ -9,6 +9,8 @@ import 'package:flutter/foundation.dart';
 import 'package:path/path.dart' as p;
 
 import '../../database/app_database.dart';
+import '../../database/backup_portability.dart';
+import '../../database/extension_entity_store.dart';
 import '../../database/schema_migrations.dart';
 import '../../database/business_repository.dart';
 import '../../database/business_restore_service.dart';
@@ -250,6 +252,10 @@ final class RestoreBundleStaging {
 
       final databaseInfo = await _replaceCandidateBusinessSettings(
         databaseFile: stagedDatabaseFile,
+        // Startup recovery must not open the missing or damaged live database.
+        deviceDatabasePath: useExistingLocalAttachments
+            ? null
+            : p.join(appDataDirectory.path, AppDatabase.databaseFileName),
         settings: settings,
         entityRowIds: businessEntityRowIds,
         preserveExplicitEmptyInstructionList: businessEntityRowIds == null,
@@ -900,6 +906,7 @@ final class RestoreBundleStaging {
 
   static Future<ChatDatabaseSnapshotInfo> _replaceCandidateBusinessSettings({
     required File databaseFile,
+    required String? deviceDatabasePath,
     required Map<String, dynamic> settings,
     required Map<String, Object?>? entityRowIds,
     required bool preserveExplicitEmptyInstructionList,
@@ -918,6 +925,7 @@ final class RestoreBundleStaging {
           body: _prepareCandidateDatabaseInIsolate,
           payload: _CandidateDbIsolateArgs(
             databasePath: databaseFile.path,
+            deviceDatabasePath: deviceDatabasePath,
             settings: settings,
             entityRowIds: entityRowIds,
             preserveExplicitEmptyInstructionList:
@@ -1040,12 +1048,40 @@ final class RestoreBundleStaging {
     }
     final database = AppDatabase.open(file: databaseFile);
     try {
+      await BackupPortability.sanitizeDatabase(database);
       await BusinessRestoreService(BusinessRepository(database)).overwrite(
         args.settings,
         entityRowIds: args.entityRowIds,
         preserveExplicitEmptyInstructionList:
             args.preserveExplicitEmptyInstructionList,
       );
+      final devicePath = args.deviceDatabasePath;
+      if (devicePath != null && await File(devicePath).exists()) {
+        final localDatabase = AppDatabase.open(file: File(devicePath));
+        try {
+          final local = await BusinessRepository(localDatabase).readSnapshot();
+          await BusinessRepository(database).transformSnapshot(
+            (incoming) =>
+                BackupPortability.preserveDeviceState(incoming, local),
+            writeReceipt: true,
+          );
+          final mounts = await ExtensionEntityStore(
+            localDatabase,
+          ).listByKind('externalMounts');
+          final targetStore = ExtensionEntityStore(database);
+          for (final mount in mounts) {
+            await targetStore.upsert(
+              mount.kind,
+              mount.id,
+              mount.payload,
+              sortOrder: mount.sortOrder,
+              ownerId: mount.ownerId,
+            );
+          }
+        } finally {
+          await localDatabase.close();
+        }
+      }
     } finally {
       await database.close();
     }
@@ -1341,6 +1377,7 @@ final class _ValidateCandidateArgs {
 final class _CandidateDbIsolateArgs {
   const _CandidateDbIsolateArgs({
     required this.databasePath,
+    required this.deviceDatabasePath,
     required this.settings,
     required this.entityRowIds,
     required this.preserveExplicitEmptyInstructionList,
@@ -1352,6 +1389,7 @@ final class _CandidateDbIsolateArgs {
   });
 
   final String databasePath;
+  final String? deviceDatabasePath;
   final Map<String, dynamic> settings;
   final Map<String, Object?>? entityRowIds;
   final bool preserveExplicitEmptyInstructionList;
