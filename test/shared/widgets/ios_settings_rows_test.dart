@@ -86,6 +86,38 @@ void main() {
     expect(find.byIcon(Lucide.Check), findsOneWidget);
   });
 
+  testWidgets('IosSwitchRow with icon shares the 36-wide slot with IosNavRow', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: Column(
+            children: [
+              const IosNavRow(icon: Lucide.Timer, label: 'Keep status'),
+              IosSwitchRow(
+                icon: Lucide.MapPin,
+                label: 'Location',
+                subtitle: 'Coarse updates while a task is running',
+                value: true,
+                onChanged: (_) {},
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+
+    expect(
+      tester.getTopLeft(find.byIcon(Lucide.Timer)).dx,
+      tester.getTopLeft(find.byIcon(Lucide.MapPin)).dx,
+    );
+    expect(
+      tester.getTopLeft(find.text('Keep status')).dx,
+      tester.getTopLeft(find.text('Location')).dx,
+    );
+  });
+
   testWidgets('IosSwitchRow without icon aligns with IosNavRow without icon', (
     tester,
   ) async {
@@ -138,5 +170,29 @@ void main() {
     expect(caption.style?.fontSize, 12);
     expect(caption.style?.color, onSurface.withValues(alpha: 0.55));
     expect(find.text('Extract text'), findsOneWidget);
+  });
+
+  testWidgets('IosNavRow subtitle can wrap when max lines is open', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      wrap(
+        const SizedBox(
+          width: 240,
+          child: IosNavRow(
+            icon: Lucide.Battery,
+            label: 'Battery',
+            subtitle: 'A long explanation that must wrap onto another line',
+            subtitleMaxLines: null,
+          ),
+        ),
+      ),
+    );
+
+    final subtitle = tester.widget<Text>(
+      find.text('A long explanation that must wrap onto another line'),
+    );
+    expect(subtitle.maxLines, isNull);
+    expect(subtitle.overflow, TextOverflow.visible);
   });
 }
