@@ -10760,6 +10760,32 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get mcpImportConfirm => '导入';
+
+  @override
+  String get startupRecoverySnapshotTitle => '从数据库快照恢复';
+
+  @override
+  String get startupRecoverySnapshotBody =>
+      '即使数据库无法打开，也可以选择本机快照恢复聊天和设置。请勿卸载 Kelivo，卸载会一并删除这些快照。';
+
+  @override
+  String get startupRecoverySnapshotEmpty => '未在本机找到数据库快照。请先导出数据，再尝试其他恢复操作。';
+
+  @override
+  String get startupRecoverySnapshotButton => '选择快照恢复';
+
+  @override
+  String startupRecoverySnapshotConfirm(String when) {
+    return '将聊天和设置恢复到 $when 的快照？快照之后的更改不会包含在内。现有附件文件和快照会保留，Kelivo 将重启以完成恢复。';
+  }
+
+  @override
+  String startupRecoverySnapshotFailed(String reason) {
+    return '无法准备快照恢复：$reason';
+  }
+
+  @override
+  String get startupRecoverySnapshotReady => '快照已准备好，请重启 Kelivo 完成恢复。';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hans`).
@@ -21444,6 +21470,32 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get mcpImportConfirm => '导入';
+
+  @override
+  String get startupRecoverySnapshotTitle => '从数据库快照恢复';
+
+  @override
+  String get startupRecoverySnapshotBody =>
+      '即使数据库无法打开，也可以选择本机快照恢复聊天和设置。请勿卸载 Kelivo，卸载会一并删除这些快照。';
+
+  @override
+  String get startupRecoverySnapshotEmpty => '未在本机找到数据库快照。请先导出数据，再尝试其他恢复操作。';
+
+  @override
+  String get startupRecoverySnapshotButton => '选择快照恢复';
+
+  @override
+  String startupRecoverySnapshotConfirm(String when) {
+    return '将聊天和设置恢复到 $when 的快照？快照之后的更改不会包含在内。现有附件文件和快照会保留，Kelivo 将重启以完成恢复。';
+  }
+
+  @override
+  String startupRecoverySnapshotFailed(String reason) {
+    return '无法准备快照恢复：$reason';
+  }
+
+  @override
+  String get startupRecoverySnapshotReady => '快照已准备好，请重启 Kelivo 完成恢复。';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hant`).
@@ -32207,4 +32259,30 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get mcpImportConfirm => '匯入';
+
+  @override
+  String get startupRecoverySnapshotTitle => '從資料庫快照還原';
+
+  @override
+  String get startupRecoverySnapshotBody =>
+      '即使資料庫無法開啟，也可以選擇本機快照還原聊天和設定。請勿解除安裝 Kelivo，解除安裝會一併刪除這些快照。';
+
+  @override
+  String get startupRecoverySnapshotEmpty => '未在本機找到資料庫快照。請先匯出資料，再嘗試其他還原操作。';
+
+  @override
+  String get startupRecoverySnapshotButton => '選擇快照還原';
+
+  @override
+  String startupRecoverySnapshotConfirm(String when) {
+    return '將聊天和設定還原到 $when 的快照？快照之後的變更不會包含在內。現有附件檔案和快照會保留，Kelivo 將重新啟動以完成還原。';
+  }
+
+  @override
+  String startupRecoverySnapshotFailed(String reason) {
+    return '無法準備快照還原：$reason';
+  }
+
+  @override
+  String get startupRecoverySnapshotReady => '快照已準備好，請重新啟動 Kelivo 完成還原。';
 }

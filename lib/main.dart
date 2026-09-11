@@ -164,6 +164,7 @@ Future<void> main() async {
       _initializeAndroidDisplayMode();
       final appDataDirectory = await AppDirectories.getAppDataDirectory();
       final RestoreReceipt? restoreOutcome;
+      RestoreBusinessLease? businessLease;
       // A restore large enough to take seconds would otherwise spend all of
       // them before the first frame, which is indistinguishable from a hang.
       // Only paint when there is actually work waiting: an ordinary launch
@@ -180,7 +181,7 @@ Future<void> main() async {
       try {
         // The lease remains process-owned through its internal registry until
         // process exit, preventing another instance from racing business I/O.
-        final businessLease = await RestoreBusinessLease.acquire(
+        businessLease = await RestoreBusinessLease.acquire(
           appDataDirectory: appDataDirectory,
         );
         restoreOutcome =
@@ -203,6 +204,7 @@ Future<void> main() async {
               stackTrace: stackTrace,
             ),
             appDataDirectory: appDataDirectory,
+            businessLease: businessLease,
           ),
         );
         return;
@@ -314,6 +316,7 @@ Future<void> main() async {
                 stackTrace: stackTrace,
               ),
               appDataDirectory: appDataDirectory,
+              businessLease: businessLease,
             ),
           );
           return;
@@ -524,10 +527,15 @@ class _RestoreProgressApp extends StatelessWidget {
 }
 
 class _RestoreFailureApp extends StatelessWidget {
-  const _RestoreFailureApp({required this.report, this.appDataDirectory});
+  const _RestoreFailureApp({
+    required this.report,
+    this.appDataDirectory,
+    this.businessLease,
+  });
 
   final StartupFailureReport report;
   final Directory? appDataDirectory;
+  final RestoreBusinessLease? businessLease;
 
   @override
   Widget build(BuildContext context) {
@@ -545,6 +553,7 @@ class _RestoreFailureApp extends StatelessWidget {
               report: report,
               restart: PlatformUtils.restartApp,
               appDataDirectory: appDataDirectory,
+              businessLease: businessLease,
             ),
     );
   }

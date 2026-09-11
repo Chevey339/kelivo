@@ -30,6 +30,8 @@ import '../../../utils/app_directories.dart';
 import '../../../utils/sandbox_path_resolver.dart';
 import 'backup_settings_validator.dart';
 import 'restore_bundle_preparation.dart';
+import 'restore_workspace_lock.dart';
+import 'restore_business_lease.dart';
 import 'temporary_restore_file.dart';
 import 'backup_cancel_token.dart';
 import 'backup_isolate_runner.dart';
@@ -337,6 +339,100 @@ class DataSync {
     onProgress: onProgress,
     cancelToken: cancelToken,
   );
+
+  /// Prepares a local snapshot without opening the live database or providers.
+  /// The normal startup gate installs the durable candidate on restart, keeping
+  /// the previous data for rollback. The source archive is never modified.
+  static Future<void> prepareStartupSnapshotRestore({
+    required Directory appDataDirectory,
+    required File snapshot,
+    RestoreBusinessLease? businessLease,
+    BackupProgressSink? onProgress,
+  }) async {
+    final ownedLease = businessLease == null
+        ? await RestoreBusinessLease.acquire(appDataDirectory: appDataDirectory)
+        : null;
+    final lease = businessLease ?? ownedLease!;
+    Directory? extractDir;
+    Object? restoreError;
+    try {
+      final expectedLeasePath = p.join(
+        appDataDirectory.absolute.path,
+        RestoreBusinessLease.leaseDirectoryName,
+        RestoreBusinessLease.lockFileName,
+      );
+      if (lease.isClosed ||
+          !p.equals(lease.lockFile.absolute.path, expectedLeasePath)) {
+        throw StateError('restore_startup_business_lease');
+      }
+      extractDir = await Directory.systemTemp.createTemp(
+        'kelivo-startup-snapshot-',
+      );
+      registerLiveTempPath(extractDir.path);
+      await runBackupIsolate<void, _BackupExtractArgs>(
+        body: _extractZipInIsolate,
+        payload: _BackupExtractArgs(
+          zipPath: snapshot.path,
+          extractDirPath: extractDir.path,
+        ),
+        onProgress: onProgress,
+      );
+      final info =
+          await runBackupIsolate<_VersionedBackupInfo, _BackupPreflightArgs>(
+            body: _preflightVersionedBackupInIsolate,
+            payload: _BackupPreflightArgs(
+              manifestPath: p.join(extractDir.path, _manifestEntryName),
+              extractDirPath: extractDir.path,
+              allowUnverifiedForwardCompatible: false,
+            ),
+            onProgress: onProgress,
+          );
+      if (!info.includeChats) {
+        throw const FormatException('restore_preparation_database_required');
+      }
+      final settings = await runBackupIsolate<Map<String, dynamic>, String>(
+        body: _readSettingsJsonInIsolate,
+        payload: p.join(extractDir.path, 'settings.json'),
+        onProgress: onProgress,
+      );
+      BackupSettingsValidator.normalizeAndValidate(settings);
+      final workspaceLock = RestoreWorkspaceLock(
+        appDataDirectory: appDataDirectory,
+      );
+      await workspaceLock.synchronized(
+        workspaceLock.beginSnapshotRecoveryWhileLocked,
+      );
+      await RestoreBundlePreparation.prepare(
+        appDataDirectory: appDataDirectory,
+        extractedDirectory: extractDir,
+        sourceManifestSha256: info.normalizedManifestSha256,
+        bundleIncludesChats: info.includeChats,
+        bundleIncludesFiles: info.includeFiles,
+        restoreChats: true,
+        restoreFiles: false,
+        useExistingLocalAttachments: true,
+        validatedSettings: settings,
+        onProgress: onProgress,
+      );
+      await workspaceLock.synchronized(
+        workspaceLock.finishSnapshotRecoveryWhileLocked,
+      );
+    } catch (error) {
+      restoreError = error;
+      rethrow;
+    } finally {
+      try {
+        if (extractDir != null) {
+          await deleteTempDirectoryWhenIsolateSafe(
+            extractDir,
+            error: restoreError,
+          );
+        }
+      } finally {
+        await ownedLease?.close();
+      }
+    }
+  }
 
   // ===== WebDAV helpers =====
   Uri _collectionUri(WebDavConfig cfg) {

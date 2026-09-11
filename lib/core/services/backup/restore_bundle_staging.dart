@@ -113,6 +113,7 @@ final class RestoreBundleStaging {
     required Directory extractedDirectory,
     required bool includeChats,
     required bool includeFiles,
+    bool useExistingLocalAttachments = false,
     bool? sourceIncludesChats,
     bool? sourceIncludesFiles,
     required String sourceManifestSha256,
@@ -255,6 +256,9 @@ final class RestoreBundleStaging {
         expectedDatabaseInfo: declaredDatabaseInfo,
         durability: resolvedDurability,
         recomputeAttachmentsUnavailable: !includeFiles,
+        localSnapshotAppDataPath: useExistingLocalAttachments
+            ? appDataDirectory.path
+            : null,
         onProgress: onProgress,
         cancelToken: cancelToken,
       );
@@ -902,6 +906,7 @@ final class RestoreBundleStaging {
     required ChatDatabaseSnapshotInfo expectedDatabaseInfo,
     required RestoreDurability durability,
     required bool recomputeAttachmentsUnavailable,
+    String? localSnapshotAppDataPath,
     BackupProgressSink? onProgress,
     BackupCancelToken? cancelToken,
   }) async {
@@ -919,6 +924,7 @@ final class RestoreBundleStaging {
                 preserveExplicitEmptyInstructionList,
             expectedDatabaseInfo: expectedDatabaseInfo,
             recomputeAttachmentsUnavailable: recomputeAttachmentsUnavailable,
+            localSnapshotAppDataPath: localSnapshotAppDataPath,
             stallMs: debugCandidateDbStallMs,
             hangSeconds: debugCandidateDbHangSeconds,
           ),
@@ -1053,6 +1059,9 @@ final class RestoreBundleStaging {
       await ChatDatabaseRepository.recomputeAttachmentAvailabilityOnDatabaseFile(
         databaseFile: databaseFile,
         filesRestored: false,
+        localSnapshotAppDataDirectory: args.localSnapshotAppDataPath == null
+            ? null
+            : Directory(args.localSnapshotAppDataPath!),
       );
     }
     ctx.throwIfCancelled();
@@ -1337,6 +1346,7 @@ final class _CandidateDbIsolateArgs {
     required this.preserveExplicitEmptyInstructionList,
     required this.expectedDatabaseInfo,
     required this.recomputeAttachmentsUnavailable,
+    required this.localSnapshotAppDataPath,
     required this.stallMs,
     required this.hangSeconds,
   });
@@ -1347,6 +1357,7 @@ final class _CandidateDbIsolateArgs {
   final bool preserveExplicitEmptyInstructionList;
   final ChatDatabaseSnapshotInfo expectedDatabaseInfo;
   final bool recomputeAttachmentsUnavailable;
+  final String? localSnapshotAppDataPath;
   final int stallMs;
   final int hangSeconds;
 }

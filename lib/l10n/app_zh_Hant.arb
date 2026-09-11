@@ -3987,5 +3987,26 @@
   "mcpImportJsonHint": "貼上 Claude Desktop 或 Cursor 的 MCP 設定，預覽後新增伺服器，不覆蓋現有設定。",
   "mcpImportPaste": "從剪貼簿貼上",
   "mcpImportPreview": "預覽",
-  "mcpImportConfirm": "匯入"
+  "mcpImportConfirm": "匯入",
+  "startupRecoverySnapshotTitle": "從資料庫快照還原",
+  "startupRecoverySnapshotBody": "即使資料庫無法開啟，也可以選擇本機快照還原聊天和設定。請勿解除安裝 Kelivo，解除安裝會一併刪除這些快照。",
+  "startupRecoverySnapshotEmpty": "未在本機找到資料庫快照。請先匯出資料，再嘗試其他還原操作。",
+  "startupRecoverySnapshotButton": "選擇快照還原",
+  "startupRecoverySnapshotConfirm": "將聊天和設定還原到 {when} 的快照？快照之後的變更不會包含在內。現有附件檔案和快照會保留，Kelivo 將重新啟動以完成還原。",
+  "startupRecoverySnapshotFailed": "無法準備快照還原：{reason}",
+  "startupRecoverySnapshotReady": "快照已準備好，請重新啟動 Kelivo 完成還原。",
+  "@startupRecoverySnapshotConfirm": {
+    "placeholders": {
+      "when": {
+        "type": "String"
+      }
+    }
+  },
+  "@startupRecoverySnapshotFailed": {
+    "placeholders": {
+      "reason": {
+        "type": "String"
+      }
+    }
+  }
 }

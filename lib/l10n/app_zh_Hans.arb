@@ -3963,5 +3963,26 @@
   "mcpImportJsonHint": "粘贴 Claude Desktop 或 Cursor 的 MCP 配置，预览后添加服务器，不覆盖现有配置。",
   "mcpImportPaste": "从剪贴板粘贴",
   "mcpImportPreview": "预览",
-  "mcpImportConfirm": "导入"
+  "mcpImportConfirm": "导入",
+  "startupRecoverySnapshotTitle": "从数据库快照恢复",
+  "startupRecoverySnapshotBody": "即使数据库无法打开，也可以选择本机快照恢复聊天和设置。请勿卸载 Kelivo，卸载会一并删除这些快照。",
+  "startupRecoverySnapshotEmpty": "未在本机找到数据库快照。请先导出数据，再尝试其他恢复操作。",
+  "startupRecoverySnapshotButton": "选择快照恢复",
+  "startupRecoverySnapshotConfirm": "将聊天和设置恢复到 {when} 的快照？快照之后的更改不会包含在内。现有附件文件和快照会保留，Kelivo 将重启以完成恢复。",
+  "startupRecoverySnapshotFailed": "无法准备快照恢复：{reason}",
+  "startupRecoverySnapshotReady": "快照已准备好，请重启 Kelivo 完成恢复。",
+  "@startupRecoverySnapshotConfirm": {
+    "placeholders": {
+      "when": {
+        "type": "String"
+      }
+    }
+  },
+  "@startupRecoverySnapshotFailed": {
+    "placeholders": {
+      "reason": {
+        "type": "String"
+      }
+    }
+  }
 }

@@ -4941,5 +4941,26 @@
   "mcpImportJsonHint": "Paste a Claude Desktop or Cursor MCP configuration. Preview and add servers without replacing existing ones.",
   "mcpImportPaste": "Paste from Clipboard",
   "mcpImportPreview": "Preview",
-  "mcpImportConfirm": "Import"
+  "mcpImportConfirm": "Import",
+  "startupRecoverySnapshotTitle": "Restore from a database snapshot",
+  "startupRecoverySnapshotBody": "Choose a snapshot on this device to recover your chats and settings, even when the database cannot open. Do not uninstall Kelivo: uninstalling also removes these snapshots.",
+  "startupRecoverySnapshotEmpty": "No database snapshots were found on this device. Export your data before trying other recovery actions.",
+  "startupRecoverySnapshotButton": "Choose a snapshot",
+  "startupRecoverySnapshotConfirm": "Restore chats and settings from {when}? Changes made after this snapshot will not be included. Existing attachment files and the snapshot will be kept. Kelivo will restart to complete the restore.",
+  "startupRecoverySnapshotFailed": "Could not prepare the snapshot restore: {reason}",
+  "startupRecoverySnapshotReady": "The snapshot is ready. Restart Kelivo to complete the restore.",
+  "@startupRecoverySnapshotConfirm": {
+    "placeholders": {
+      "when": {
+        "type": "String"
+      }
+    }
+  },
+  "@startupRecoverySnapshotFailed": {
+    "placeholders": {
+      "reason": {
+        "type": "String"
+      }
+    }
+  }
 }

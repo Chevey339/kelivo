@@ -237,6 +237,79 @@ final class DatabaseInstallationGate {
     return updated;
   }
 
+  /// Reconciles installation metadata with a committed, verified restore.
+  /// Must run under the startup business/workspace leases before archiving the
+  /// terminal run. It never changes database bytes, so interrupted terminal
+  /// revalidation can still compare the database with the candidate hash.
+  static Future<void> reconcileCommittedRestore({
+    required Directory appDataDirectory,
+    required RestoreDurability durability,
+  }) async {
+    final info = ChatDatabaseRepository.inspectInstalledDatabase(
+      File(p.join(appDataDirectory.path, AppDatabase.databaseFileName)),
+    );
+    var receipts = <({File file, DatabaseInstallationReceipt receipt})>[];
+    try {
+      receipts = await _readReceipts(appDataDirectory);
+    } on FormatException {
+      // Preserve the malformed metadata below instead of trusting or deleting it.
+    }
+    if (info.databaseId != null &&
+        receipts.length == 1 &&
+        receipts.single.receipt.databaseId == info.databaseId) {
+      return;
+    }
+    final files = await appDataDirectory.list(followLinks: false).where((
+      entity,
+    ) {
+      final name = p.basename(entity.path);
+      return name.startsWith(_receiptPrefix) && name.endsWith(_receiptSuffix);
+    }).toList();
+    for (final file in files) {
+      if (await FileSystemEntity.type(file.path, followLinks: false) !=
+          FileSystemEntityType.file) {
+        throw StateError('database_installation_receipt_type');
+      }
+    }
+    if (files.isNotEmpty) {
+      final archive = await appDataDirectory.createTemp(
+        '.kelivo_installation_receipts_',
+      );
+      await durability.restrictDirectory(archive);
+      await durability.syncDirectory(appDataDirectory, fullBarrier: true);
+      for (final file in files) {
+        await durability.renameAndSync(
+          source: file,
+          targetPath: p.join(archive.path, p.basename(file.path)),
+        );
+      }
+    }
+    // An older snapshot may have no identity. With the old receipts safely
+    // removed, normal admission will assign one even after another cold start.
+    // Assigning it here would invalidate the pending terminal run's hash.
+    final databaseId = info.databaseId;
+    if (databaseId == null) return;
+    final installationIds = receipts
+        .map((entry) => entry.receipt.installationId)
+        .toSet();
+    final receipt = DatabaseInstallationReceipt(
+      installationId: installationIds.length == 1
+          ? installationIds.single
+          : const Uuid().v4(),
+      databaseId: databaseId,
+    );
+    await _publishReceipt(
+      File(
+        p.join(
+          appDataDirectory.path,
+          '$_receiptPrefix$databaseId$_receiptSuffix',
+        ),
+      ),
+      receipt,
+      durability: durability,
+    );
+  }
+
   /// Maps a startup admission failure to the strongest safe recovery route.
   ///
   /// Automatic rebuild is the only route that runs unattended, so it is the
@@ -537,11 +610,26 @@ final class DatabaseInstallationGate {
     }
   }
 
+  /// Preserves unreadable live files before installing a validated snapshot.
+  /// The caller must hold the business/workspace leases and have a durable
+  /// restore candidate. Unlike automatic rebuilds, this never prunes evidence.
+  static Future<void> preserveFailedDatabaseForRestore({
+    required Directory appDataDirectory,
+    required RestoreDurability durability,
+  }) async {
+    await _displaceDatabaseFamily(
+      File(p.join(appDataDirectory.path, AppDatabase.databaseFileName)),
+      durability: durability,
+      prune: false,
+    );
+  }
+
   /// Renames the database family aside. Returns the new base path, or null
   /// when there was nothing to move.
   static Future<String?> _displaceDatabaseFamily(
     File databaseFile, {
     required RestoreDurability durability,
+    bool prune = true,
   }) async {
     // Zero-padded so a lexical sort of the stamps is a chronological one.
     final stamp = DateTime.now()
@@ -563,11 +651,13 @@ final class DatabaseInstallationGate {
       );
       displaced = base;
     }
-    await _pruneDisplacedGenerations(
-      databaseFile.parent,
-      keep: _maximumDisplacedGenerations,
-      durability: durability,
-    );
+    if (prune) {
+      await _pruneDisplacedGenerations(
+        databaseFile.parent,
+        keep: _maximumDisplacedGenerations,
+        durability: durability,
+      );
+    }
     return displaced;
   }
 

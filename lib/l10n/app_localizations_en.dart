@@ -11242,4 +11242,32 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get mcpImportConfirm => 'Import';
+
+  @override
+  String get startupRecoverySnapshotTitle => 'Restore from a database snapshot';
+
+  @override
+  String get startupRecoverySnapshotBody =>
+      'Choose a snapshot on this device to recover your chats and settings, even when the database cannot open. Do not uninstall Kelivo: uninstalling also removes these snapshots.';
+
+  @override
+  String get startupRecoverySnapshotEmpty =>
+      'No database snapshots were found on this device. Export your data before trying other recovery actions.';
+
+  @override
+  String get startupRecoverySnapshotButton => 'Choose a snapshot';
+
+  @override
+  String startupRecoverySnapshotConfirm(String when) {
+    return 'Restore chats and settings from $when? Changes made after this snapshot will not be included. Existing attachment files and the snapshot will be kept. Kelivo will restart to complete the restore.';
+  }
+
+  @override
+  String startupRecoverySnapshotFailed(String reason) {
+    return 'Could not prepare the snapshot restore: $reason';
+  }
+
+  @override
+  String get startupRecoverySnapshotReady =>
+      'The snapshot is ready. Restart Kelivo to complete the restore.';
 }

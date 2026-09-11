@@ -9,6 +9,8 @@ import 'package:share_plus/share_plus.dart';
 import '../../core/database/startup_failure_report.dart';
 import '../../core/database/startup_recovery_service.dart';
 import '../../core/services/backup/local_copy_catalog.dart';
+import '../../core/services/backup/data_sync.dart';
+import '../../core/services/backup/restore_business_lease.dart';
 import '../../icons/lucide_adapter.dart';
 import '../../l10n/app_localizations.dart';
 
@@ -37,9 +39,11 @@ class RestoreFailureScreen extends StatefulWidget {
     required this.restart,
     this.appDataDirectory,
     this.appVersionLoader,
+    this.businessLease,
   });
 
   final StartupFailureReport report;
+  final RestoreBusinessLease? businessLease;
   final Future<void> Function() restart;
 
   /// Overridable so widget tests do not have to wait on a platform channel.
@@ -59,6 +63,9 @@ class _RestoreFailureScreenState extends State<RestoreFailureScreen> {
   bool _collectingDiagnostics = true;
   File? _savedReport;
 
+  bool _snapshotPrepared = false;
+  bool _restoringSnapshot = false;
+  String? _snapshotError;
   bool _restarting = false;
   bool _restartFailed = false;
   bool _copied = false;
@@ -308,6 +315,97 @@ class _RestoreFailureScreenState extends State<RestoreFailureScreen> {
     }
   }
 
+  Future<void> _restoreSnapshot() async {
+    final directory = widget.appDataDirectory;
+    if (directory == null || _busy || _snapshotPrepared) return;
+    final l10n = AppLocalizations.of(context)!;
+    final snapshots = _localCopies.where((copy) => copy.isArchive).toList();
+    final selected = await showDialog<LocalCopy>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(l10n.startupRecoverySnapshotTitle),
+        content: SizedBox(
+          width: 420,
+          child: ListView.separated(
+            shrinkWrap: true,
+            itemCount: snapshots.length,
+            separatorBuilder: (_, _) => const Divider(height: 1),
+            itemBuilder: (context, index) {
+              final copy = snapshots[index];
+              return ListTile(
+                contentPadding: EdgeInsets.zero,
+                title: Text(_localCopyDate(copy)),
+                subtitle: Text(
+                  l10n.localSnapshotCopyContents(
+                    copy.conversationCount!,
+                    copy.messageCount!,
+                  ),
+                ),
+                trailing: const Icon(Lucide.ChevronRight, size: 18),
+                onTap: () => Navigator.of(context).pop(copy),
+              );
+            },
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: Text(l10n.startupRecoveryResetDialogCancel),
+          ),
+        ],
+      ),
+    );
+    if (selected == null || !mounted) return;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(l10n.localSnapshotRestoreTitle),
+        content: Text(
+          l10n.startupRecoverySnapshotConfirm(_localCopyDate(selected)),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: Text(l10n.startupRecoveryResetDialogCancel),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: Text(l10n.localSnapshotActionRestore),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted || _busy) return;
+    setState(() {
+      _recoveryBusy = true;
+      _restoringSnapshot = true;
+      _snapshotError = null;
+      _recoveryMessage = null;
+    });
+    try {
+      await DataSync.prepareStartupSnapshotRestore(
+        appDataDirectory: directory,
+        snapshot: selected.file,
+        businessLease: widget.businessLease,
+      );
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _recoveryBusy = false;
+        _restoringSnapshot = false;
+        _snapshotError = l10n.startupRecoverySnapshotFailed('$error');
+      });
+      return;
+    }
+    if (!mounted) return;
+    setState(() {
+      _snapshotPrepared = true;
+      _restoringSnapshot = false;
+    });
+    _finishRecovery(l10n.startupRecoverySnapshotReady);
+    await _restart();
+  }
+
   Future<void> _resetAndRestart() async {
     final directory = widget.appDataDirectory;
     if (directory == null || _busy) return;
@@ -323,7 +421,10 @@ class _RestoreFailureScreenState extends State<RestoreFailureScreen> {
       _restartFailed = false;
     });
     try {
-      await StartupRecoveryService.reset(appDataDirectory: directory);
+      await StartupRecoveryService.reset(
+        appDataDirectory: directory,
+        businessLease: widget.businessLease,
+      );
       await widget.restart();
       if (!mounted) return;
       setState(() {
@@ -385,6 +486,41 @@ class _RestoreFailureScreenState extends State<RestoreFailureScreen> {
                       : l10n.backupRestoreFailureContent,
                 ),
                 const SizedBox(height: 24),
+                if (showRecoveryActions) ...[
+                  _Section(
+                    icon: Lucide.History,
+                    title: l10n.startupRecoverySnapshotTitle,
+                    description: _collectingDiagnostics
+                        ? l10n.startupRecoveryBusy
+                        : _localCopies.any((copy) => copy.isArchive)
+                        ? l10n.startupRecoverySnapshotBody
+                        : l10n.startupRecoverySnapshotEmpty,
+                    children: [
+                      if (_localCopies.any((copy) => copy.isArchive))
+                        _ActionTile(
+                          icon: Lucide.RotateCcw,
+                          label: _restoringSnapshot
+                              ? l10n.localSnapshotRestorePreparing
+                              : l10n.startupRecoverySnapshotButton,
+                          onPressed: _busy || _snapshotPrepared
+                              ? null
+                              : _restoreSnapshot,
+                          emphasized: true,
+                        ),
+                      if (_restoringSnapshot) ...[
+                        const SizedBox(height: 12),
+                        const LinearProgressIndicator(),
+                      ],
+                      if (_snapshotError != null) ...[
+                        const SizedBox(height: 12),
+                        _Notice(text: _snapshotError!, isError: true),
+                      ],
+                      if (_snapshotPrepared)
+                        Text(l10n.startupRecoverySnapshotReady),
+                    ],
+                  ),
+                  const SizedBox(height: 20),
+                ],
                 _DiagnosticsCard(
                   report: _report,
                   collecting: _collectingDiagnostics,
@@ -455,14 +591,16 @@ class _RestoreFailureScreenState extends State<RestoreFailureScreen> {
                       _ActionTile(
                         icon: Lucide.RotateCcw,
                         label: l10n.startupRecoveryRepairButton,
-                        onPressed: _busy ? null : _repairAndRestart,
+                        onPressed: _busy || _snapshotPrepared
+                            ? null
+                            : _repairAndRestart,
                       ),
                     ],
                   ),
                   const SizedBox(height: 16),
                   _DangerZone(
                     expanded: _dangerExpanded,
-                    busy: _busy,
+                    busy: _busy || _snapshotPrepared,
                     localCopies: _localCopies,
                     onToggle: () =>
                         setState(() => _dangerExpanded = !_dangerExpanded),
@@ -805,10 +943,12 @@ class _Section extends StatelessWidget {
             children: [
               Icon(icon, size: 16, color: colors.onSurfaceVariant),
               const SizedBox(width: 8),
-              Text(
-                title,
-                style: textTheme.labelLarge?.copyWith(
-                  fontWeight: FontWeight.w600,
+              Expanded(
+                child: Text(
+                  title,
+                  style: textTheme.labelLarge?.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
               ),
             ],

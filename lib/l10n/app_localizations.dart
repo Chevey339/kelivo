@@ -20210,6 +20210,48 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Import'**
   String get mcpImportConfirm;
+
+  /// No description provided for @startupRecoverySnapshotTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Restore from a database snapshot'**
+  String get startupRecoverySnapshotTitle;
+
+  /// No description provided for @startupRecoverySnapshotBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose a snapshot on this device to recover your chats and settings, even when the database cannot open. Do not uninstall Kelivo: uninstalling also removes these snapshots.'**
+  String get startupRecoverySnapshotBody;
+
+  /// No description provided for @startupRecoverySnapshotEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No database snapshots were found on this device. Export your data before trying other recovery actions.'**
+  String get startupRecoverySnapshotEmpty;
+
+  /// No description provided for @startupRecoverySnapshotButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose a snapshot'**
+  String get startupRecoverySnapshotButton;
+
+  /// No description provided for @startupRecoverySnapshotConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Restore chats and settings from {when}? Changes made after this snapshot will not be included. Existing attachment files and the snapshot will be kept. Kelivo will restart to complete the restore.'**
+  String startupRecoverySnapshotConfirm(String when);
+
+  /// No description provided for @startupRecoverySnapshotFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not prepare the snapshot restore: {reason}'**
+  String startupRecoverySnapshotFailed(String reason);
+
+  /// No description provided for @startupRecoverySnapshotReady.
+  ///
+  /// In en, this message translates to:
+  /// **'The snapshot is ready. Restart Kelivo to complete the restore.'**
+  String get startupRecoverySnapshotReady;
 }
 
 class _AppLocalizationsDelegate
