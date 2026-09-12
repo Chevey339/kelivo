@@ -12,6 +12,8 @@ import 'package:Kelivo/features/model/widgets/model_select_sheet.dart';
 import 'package:Kelivo/icons/lucide_adapter.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
 import 'package:Kelivo/shared/widgets/ios_tactile.dart';
+import 'package:Kelivo/theme/app_semantic_colors.dart';
+import 'package:Kelivo/theme/theme_factory.dart';
 
 ProviderConfig _providerConfig(String key, String name, List<String> models) {
   return ProviderConfig(
@@ -86,6 +88,7 @@ Future<SettingsProvider> _settingsWithLongSingleProvider(
 Future<void> _pumpModelSelector(
   WidgetTester tester, {
   required SettingsProvider settings,
+  ThemeData? theme,
   String? limitProviderKey,
   String? initialProviderKey,
   String? initialModelId,
@@ -100,6 +103,7 @@ Future<void> _pumpModelSelector(
         ),
       ],
       child: MaterialApp(
+        theme: theme,
         localizationsDelegates: AppLocalizations.localizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
         home: Scaffold(
@@ -154,6 +158,20 @@ bool _hasInvisibleAncestor(WidgetTester tester, Finder finder) {
     return !hidden;
   });
   return hidden;
+}
+
+/// Fill of a painted surface inside the sheet, whichever widget paints it.
+Color _surfaceColor(WidgetTester tester, String key) {
+  final widget = tester.widget(find.byKey(ValueKey(key)));
+  if (widget is Container) {
+    final decoration = widget.decoration;
+    return decoration is BoxDecoration ? decoration.color! : widget.color!;
+  }
+  if (widget is DecoratedBox) {
+    return (widget.decoration as BoxDecoration).color!;
+  }
+  if (widget is ColoredBox) return widget.color;
+  throw StateError('$key does not paint a surface');
 }
 
 Future<void> _dismissModelSelector(WidgetTester tester) async {
@@ -535,4 +553,63 @@ void main() {
     },
     timeout: const Timeout(Duration(seconds: 20)),
   );
+
+  for (final layered in const [false, true]) {
+    testWidgets(
+      'mobile model selector paints every surface with the sheet colour '
+      '(layered surfaces ${layered ? 'on' : 'off'})',
+      (tester) async {
+        debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
+        tester.view.physicalSize = const Size(390, 844);
+        tester.view.devicePixelRatio = 1;
+        try {
+          final settings = await _settingsWithProviders(tester);
+          await _pumpModelSelector(
+            tester,
+            settings: settings,
+            theme: layered
+                ? buildLightThemeForScheme(
+                    ColorScheme.fromSeed(seedColor: const Color(0xFF4D5C92)),
+                    layeredSurfaces: true,
+                  )
+                : null,
+          );
+          await tester.pumpAndSettle(const Duration(milliseconds: 100));
+
+          final sheetContext = tester.element(find.byType(BottomSheet));
+          final sheetSurface = sheetContext.overlaySurface;
+          final cardLayer = sheetContext.appColors.surfaceCard;
+          expect(
+            sheetSurface,
+            layered ? equals(cardLayer) : isNot(cardLayer),
+            reason:
+                'The sheet must sit on the layer this mode selects, or the '
+                'surface assertions below cannot fail.',
+          );
+
+          for (final key in const [
+            'model-selector-header',
+            'model-selector-list',
+            'model-selector-bottom-tabs',
+            'model-selector-sticky-provider',
+            'model-selector-top-seam-cover',
+          ]) {
+            expect(
+              _surfaceColor(tester, key),
+              sheetSurface,
+              reason:
+                  '$key must follow the sheet surface, or the SafeArea bottom '
+                  'inset shows a different shade underneath the list.',
+            );
+          }
+        } finally {
+          await _dismissModelSelector(tester);
+          debugDefaultTargetPlatformOverride = null;
+          tester.view.resetPhysicalSize();
+          tester.view.resetDevicePixelRatio();
+        }
+      },
+      timeout: const Timeout(Duration(seconds: 20)),
+    );
+  }
 }

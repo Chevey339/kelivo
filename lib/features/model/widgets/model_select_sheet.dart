@@ -24,6 +24,7 @@ import '../../provider/widgets/provider_avatar.dart';
 import '../../provider/widgets/provider_balance_badge.dart';
 import '../../../core/services/model_override_resolver.dart';
 import '../../../theme/app_font_weights.dart';
+import 'package:Kelivo/shared/widgets/section_card.dart';
 import 'package:Kelivo/theme/app_semantic_colors.dart';
 
 class ModelSelection {
@@ -906,8 +907,9 @@ class _ModelSelectSheetState extends State<_ModelSelectSheet> {
               children: [
                 // Fixed header section with rounded corners
                 Container(
+                  key: const ValueKey('model-selector-header'),
                   decoration: BoxDecoration(
-                    color: context.appColors.surfaceCard,
+                    color: context.overlaySurface,
                     borderRadius: const BorderRadius.vertical(
                       top: Radius.circular(20),
                     ),
@@ -1035,9 +1037,9 @@ class _ModelSelectSheetState extends State<_ModelSelectSheet> {
                 // Scrollable content
                 Expanded(
                   child: Container(
-                    color: context
-                        .appColors
-                        .surfaceCard, // Ensure background color continuity
+                    key: const ValueKey('model-selector-list'),
+                    // Ensure background color continuity
+                    color: context.overlaySurface,
                     child: _isLoading
                         ? const Center(child: CircularProgressIndicator())
                         : _buildContent(context),
@@ -1045,9 +1047,9 @@ class _ModelSelectSheetState extends State<_ModelSelectSheet> {
                 ),
                 // Fixed bottom tabs
                 Container(
-                  color: context
-                      .appColors
-                      .surfaceCard, // Ensure background color continuity
+                  key: const ValueKey('model-selector-bottom-tabs'),
+                  // Ensure background color continuity
+                  color: context.overlaySurface,
                   child: _buildBottomTabs(context),
                 ),
               ],
@@ -1190,7 +1192,7 @@ class _ModelSelectSheetState extends State<_ModelSelectSheet> {
                 right: 0,
                 child: ColoredBox(
                   key: const ValueKey('model-selector-top-seam-cover'),
-                  color: Theme.of(context).colorScheme.surface,
+                  color: context.overlaySurface,
                   child: const SizedBox(height: 1),
                 ),
               ),
@@ -1256,7 +1258,7 @@ class _ModelSelectSheetState extends State<_ModelSelectSheet> {
       right: 0,
       child: DecoratedBox(
         key: const ValueKey('model-selector-sticky-provider'),
-        decoration: BoxDecoration(color: context.appColors.surfaceCard),
+        decoration: BoxDecoration(color: context.overlaySurface),
         child: SizedBox(
           height: _stickyProviderHeaderHeight + 1,
           child: ClipRect(
@@ -1427,7 +1429,7 @@ class _ModelSelectSheetState extends State<_ModelSelectSheet> {
         ? (isDark
               ? cs.primary.withValues(alpha: 0.12)
               : cs.primary.withValues(alpha: 0.08))
-        : context.appColors.surfaceCard;
+        : sheetTileColor(context);
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       child: RepaintBoundary(
@@ -1648,7 +1650,7 @@ class _ProviderChipState extends State<_ProviderChip> {
         ? (isDark
               ? cs.primary.withValues(alpha: 0.08)
               : cs.primary.withValues(alpha: 0.05))
-        : context.appColors.surfaceCard;
+        : sheetTileColor(context);
     final Color overlay = cs.onSurface.withValues(alpha: isDark ? 0.06 : 0.05);
     final Color bg = _pressed ? Color.alphaBlend(overlay, baseBg) : baseBg;
     // Slightly stronger border when selected; keep label color unchanged for subtlety
@@ -2134,7 +2136,7 @@ class _DesktopModelSelectDialogBodyState
           maxHeight: 560,
         ),
         child: Material(
-          color: context.appColors.surfaceCard,
+          color: context.overlaySurface,
           elevation: 0,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(16),
@@ -2153,7 +2155,7 @@ class _DesktopModelSelectDialogBodyState
                 // Body
                 Expanded(
                   child: Container(
-                    color: context.appColors.surfaceCard,
+                    color: context.overlaySurface,
                     child: Column(
                       children: [
                         Padding(
@@ -2396,7 +2398,7 @@ class _DesktopModelSelectDialogBodyState
         ? (isDark
               ? cs.primary.withValues(alpha: 0.12)
               : cs.primary.withValues(alpha: 0.08))
-        : context.appColors.surfaceCard;
+        : sheetTileColor(context);
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
