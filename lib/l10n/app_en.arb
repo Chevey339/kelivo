@@ -5053,5 +5053,8 @@
   "scheduledTasksModelMissing": "The selected model is unavailable. Edit this task to choose another model.",
   "scheduledTasksChatMissing": "The conversation is unavailable or belongs to another assistant.",
   "scheduledTasksMessageMissing": "The selected question is no longer available.",
-  "scheduledTasksChatBusy": "This conversation is generating a reply. The scheduled run was skipped."
+  "scheduledTasksChatBusy": "This conversation is generating a reply. The scheduled run was skipped.",
+  "scheduledTasksDesktopEmpty": "No scheduled tasks",
+  "scheduledTasksDesktopReliability": "Tasks run only while Kelivo is running, including when minimized or in the system tray. Missed times are skipped after quitting or computer sleep. Kelivo will not start automatically.",
+  "scheduledTasksDesktopExecutionDetail": "Results are saved in chats. Open them from the task’s run history. Runs stop after 10 minutes or when user input or tool approval is needed."
 }

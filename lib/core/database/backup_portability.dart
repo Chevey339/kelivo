@@ -9,6 +9,7 @@ final class BackupPortability {
   BackupPortability._();
 
   static const devicePreferenceKeys = {
+    'desktop_scheduled_tasks_v1',
     'environment_state_v1',
     'environment_disk_usage_v1',
     'environment_rootfs_selection_v1',

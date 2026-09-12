@@ -7,6 +7,10 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:provider/provider.dart';
 import 'package:uuid/uuid.dart';
 
+import '../../../desktop/widgets/desktop_scheduled_task_form.dart';
+import '../../../desktop/widgets/desktop_select_dropdown.dart';
+import '../../../shared/widgets/ios_switch.dart';
+import '../../workspace/widgets/desktop_workspace_text_field.dart';
 import '../../../core/models/assistant.dart';
 import '../../../core/models/conversation.dart';
 import '../../../core/models/scheduled_task.dart';
@@ -237,6 +241,10 @@ class _ScheduledTaskEditorPageState extends State<ScheduledTaskEditorPage> {
       ],
     );
     if (!mounted || value == null) return;
+    _setRepeat(value);
+  }
+
+  void _setRepeat(ScheduledTaskRepeat value) {
     setState(() {
       repeat = value;
       if (value == ScheduledTaskRepeat.daily) days = {1, 2, 3, 4, 5, 6, 7};
@@ -375,7 +383,8 @@ class _ScheduledTaskEditorPageState extends State<ScheduledTaskEditorPage> {
     } catch (e) {
       if (mounted) {
         _showError(
-          e is PlatformException && e.message == 'schedule_ended'
+          e is PlatformException && e.message == 'schedule_ended' ||
+                  e is StateError && e.message == 'schedule_ended'
               ? l.scheduledTasksFutureDate
               : e.toString(),
         );
@@ -410,20 +419,21 @@ class _ScheduledTaskEditorPageState extends State<ScheduledTaskEditorPage> {
     );
   }
 
+  ModelDisplayInfo _modelDisplay(SettingsProvider settings) =>
+      getModelDisplayInfo(
+        settings,
+        assistant: modelId == null
+            ? assistant
+            : assistant?.copyWith(
+                chatModelProvider: modelProvider,
+                chatModelId: modelId,
+              ),
+        conversation: modelId != null || mode == ScheduledTaskMode.newChat
+            ? null
+            : conversation,
+      );
   List<Widget> _taskFields(AppLocalizations l) {
-    final settings = context.watch<SettingsProvider>();
-    final display = getModelDisplayInfo(
-      settings,
-      assistant: modelId == null
-          ? assistant
-          : assistant?.copyWith(
-              chatModelProvider: modelProvider,
-              chatModelId: modelId,
-            ),
-      conversation: modelId != null || mode == ScheduledTaskMode.newChat
-          ? null
-          : conversation,
-    );
+    final display = _modelDisplay(context.watch<SettingsProvider>());
     return [
       SectionCard(
         children: [
@@ -592,7 +602,14 @@ class _ScheduledTaskEditorPageState extends State<ScheduledTaskEditorPage> {
         ),
       ],
     ),
-    IosSectionFooter(text: l.scheduledTasksExecutionDetail),
+    IosSectionFooter(
+      text: switch (Theme.of(context).platform) {
+        TargetPlatform.macOS ||
+        TargetPlatform.windows ||
+        TargetPlatform.linux => l.scheduledTasksDesktopExecutionDetail,
+        _ => l.scheduledTasksExecutionDetail,
+      },
+    ),
   ];
 
   Widget _mobileLayout(AppLocalizations l) => Column(
@@ -600,7 +617,7 @@ class _ScheduledTaskEditorPageState extends State<ScheduledTaskEditorPage> {
     children: [..._taskFields(l), ..._scheduleFields(l, first: false)],
   );
 
-  Widget _desktopLayout(AppLocalizations l) => Row(
+  Widget _tabletLayout(AppLocalizations l) => Row(
     crossAxisAlignment: CrossAxisAlignment.start,
     children: [
       Expanded(
@@ -618,6 +635,273 @@ class _ScheduledTaskEditorPageState extends State<ScheduledTaskEditorPage> {
       ),
     ],
   );
+
+  bool get _desktop => switch (Theme.of(context).platform) {
+    TargetPlatform.macOS ||
+    TargetPlatform.windows ||
+    TargetPlatform.linux => true,
+    _ => false,
+  };
+
+  Widget _desktopDate(
+    String label,
+    DateTime? date,
+    ValueChanged<DateTime?> setDate, {
+    bool clearable = true,
+  }) {
+    final l = AppLocalizations.of(context)!;
+    return DesktopScheduledTaskRow(
+      label: label,
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Flexible(
+            child: DesktopScheduledTaskPicker(
+              label: date == null
+                  ? l.scheduledTasksDateUnrestricted
+                  : DateFormat.yMMMd(l.localeName).format(date),
+              leading: const Icon(LucideIcons.calendar, size: 16),
+              onTap: () =>
+                  _perform(() => _pickDate(date, (value) => setDate(value))),
+            ),
+          ),
+          if (clearable && date != null) ...[
+            const SizedBox(width: 4),
+            IosIconButton(
+              icon: LucideIcons.x,
+              size: 16,
+              semanticLabel: '${l.scheduledTasksClear} $label',
+              tooltip: l.scheduledTasksClear,
+              onTap: () => setState(() => setDate(null)),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _desktopHelp(String text) => Padding(
+    padding: const EdgeInsets.fromLTRB(12, 0, 12, 16),
+    child: Text(
+      text,
+      style: TextStyle(
+        fontSize: 12,
+        height: 1.5,
+        color: Theme.of(context).colorScheme.onSurface.withValues(alpha: .6),
+      ),
+    ),
+  );
+
+  Widget _desktopLayout(AppLocalizations l) {
+    final display = _modelDisplay(context.watch<SettingsProvider>());
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        DesktopScheduledTaskSection(
+          children: [
+            DesktopScheduledTaskRow(
+              label: l.scheduledTasksName,
+              expandControl: true,
+              child: DesktopWorkspaceTextField(
+                key: const ValueKey('scheduled-task-name'),
+                fillColor: Theme.of(context).colorScheme.surfaceContainerHigh,
+                borderColor: Theme.of(
+                  context,
+                ).colorScheme.outlineVariant.withValues(alpha: .18),
+                controller: name,
+                hintText: l.scheduledTasksNameHint,
+                borderRadius: 10,
+              ),
+            ),
+            DesktopScheduledTaskRow(
+              label: l.scheduledTasksAssistant,
+              child: DesktopScheduledTaskPicker(
+                label: assistant?.name ?? l.scheduledTasksChooseAssistant,
+                leading: AssistantAvatar(assistant: assistant, size: 22),
+                onTap: () => _perform(_pickAssistant),
+              ),
+            ),
+            DesktopScheduledTaskRow(
+              label: l.scheduledTasksMode,
+              child: DesktopSelectDropdown<ScheduledTaskMode>(
+                key: const ValueKey('scheduled-task-mode'),
+                minWidth: 240,
+                minHeight: 36,
+                maxLabelWidth: 194,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 6,
+                ),
+                triggerFillColor: Theme.of(
+                  context,
+                ).colorScheme.surfaceContainerHigh,
+                value: mode,
+                options: [
+                  for (final value in ScheduledTaskMode.values)
+                    DesktopSelectOption(
+                      value: value,
+                      label: scheduledModeLabel(value, l),
+                    ),
+                ],
+                onSelected: (value) => setState(() => mode = value),
+              ),
+            ),
+            if (mode != ScheduledTaskMode.newChat)
+              DesktopScheduledTaskRow(
+                label: l.scheduledTasksChat,
+                child: DesktopScheduledTaskPicker(
+                  label: conversation?.title ?? l.scheduledTasksChooseChat,
+                  onTap: () => _perform(_pickConversation),
+                ),
+              ),
+            if (mode == ScheduledTaskMode.regenerate)
+              DesktopScheduledTaskRow(
+                label: l.scheduledTasksMessage,
+                child: DesktopScheduledTaskPicker(
+                  label: messagePreview ?? l.scheduledTasksChooseMessage,
+                  enabled: conversationId != null,
+                  onTap: () => _perform(_pickMessage),
+                ),
+              ),
+            DesktopScheduledTaskRow(
+              label: l.scheduledTasksModel,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  DesktopScheduledTaskPicker(
+                    label: display.modelDisplay ?? l.scheduledTasksChooseModel,
+                    leading: display.isConfigured
+                        ? CurrentModelIcon(
+                            providerKey: display.providerKey,
+                            modelId: display.modelId,
+                            size: 20,
+                          )
+                        : const Icon(LucideIcons.box, size: 18),
+                    onTap: () => _perform(_pickModel),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    modelId == null
+                        ? l.scheduledTasksModelDefault
+                        : display.providerName ?? '',
+                    textAlign: TextAlign.end,
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Theme.of(
+                        context,
+                      ).colorScheme.onSurface.withValues(alpha: .6),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            if (mode != ScheduledTaskMode.regenerate)
+              DesktopScheduledTaskRow(
+                label: l.scheduledTasksPrompt,
+                expandControl: true,
+                child: DesktopWorkspaceTextField(
+                  key: const ValueKey('scheduled-task-prompt'),
+                  fillColor: Theme.of(context).colorScheme.surfaceContainerHigh,
+                  borderColor: Theme.of(
+                    context,
+                  ).colorScheme.outlineVariant.withValues(alpha: .18),
+                  controller: prompt,
+                  hintText: l.scheduledTasksPromptHint,
+                  minLines: 4,
+                  maxLines: 8,
+                  borderRadius: 10,
+                ),
+              ),
+          ],
+        ),
+        if (mode == ScheduledTaskMode.regenerate)
+          _desktopHelp(l.scheduledTasksRegenerateDetail),
+        DesktopScheduledTaskSection(
+          children: [
+            DesktopScheduledTaskRow(
+              label: l.scheduledTasksTime,
+              child: DesktopScheduledTaskPicker(
+                key: const ValueKey('scheduled-task-time'),
+                label: TimeOfDay(
+                  hour: minutes ~/ 60,
+                  minute: minutes % 60,
+                ).format(context),
+                leading: const Icon(LucideIcons.clock, size: 16),
+                onTap: () => _perform(_pickTime),
+              ),
+            ),
+            DesktopScheduledTaskRow(
+              label: l.scheduledTasksRepeat,
+              child: DesktopSelectDropdown<ScheduledTaskRepeat>(
+                key: const ValueKey('scheduled-task-repeat'),
+                minWidth: 240,
+                minHeight: 36,
+                maxLabelWidth: 194,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 6,
+                ),
+                triggerFillColor: Theme.of(
+                  context,
+                ).colorScheme.surfaceContainerHigh,
+                value: repeat,
+                options: [
+                  for (final value in ScheduledTaskRepeat.values)
+                    DesktopSelectOption(
+                      value: value,
+                      label: scheduledRepeatLabel(value, l),
+                    ),
+                ],
+                onSelected: _setRepeat,
+              ),
+            ),
+            if (repeat == ScheduledTaskRepeat.custom)
+              DesktopScheduledTaskRow(
+                label: l.scheduledTasksCustom,
+                expandControl: true,
+                child: ScheduledWeekdaySelector(
+                  days: days,
+                  onChanged: (value) => setState(() => days = value),
+                ),
+              ),
+            if (repeat == ScheduledTaskRepeat.once)
+              _desktopDate(
+                l.scheduledTasksDate,
+                onceDate,
+                (value) => onceDate = value,
+                clearable: false,
+              ),
+            if (repeat != ScheduledTaskRepeat.once) ...[
+              _desktopDate(
+                l.scheduledTasksStartDate,
+                startDate,
+                (value) => startDate = value,
+              ),
+              _desktopDate(
+                l.scheduledTasksEndDate,
+                endDate,
+                (value) => endDate = value,
+              ),
+            ],
+          ],
+        ),
+        if (repeat != ScheduledTaskRepeat.once)
+          _desktopHelp(l.scheduledTasksActiveWindowDetail),
+        DesktopScheduledTaskSection(
+          children: [
+            DesktopScheduledTaskRow(
+              label: l.scheduledTasksEnabled,
+              child: IosSwitch(
+                value: enabled,
+                onChanged: (value) => setState(() => enabled = value),
+              ),
+            ),
+          ],
+        ),
+        _desktopHelp(l.scheduledTasksDesktopExecutionDetail),
+      ],
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -651,10 +935,16 @@ class _ScheduledTaskEditorPageState extends State<ScheduledTaskEditorPage> {
             alignment: Alignment.topCenter,
             child: ConstrainedBox(
               constraints: BoxConstraints(
-                maxWidth: ResponsiveHelper.isDesktop(context) ? 1080 : 640,
+                maxWidth: _desktop
+                    ? 960
+                    : ResponsiveHelper.isDesktop(context)
+                    ? 1080
+                    : 640,
               ),
-              child: ResponsiveHelper.isDesktop(context)
+              child: _desktop
                   ? _desktopLayout(l)
+                  : ResponsiveHelper.isDesktop(context)
+                  ? _tabletLayout(l)
                   : _mobileLayout(l),
             ),
           ),

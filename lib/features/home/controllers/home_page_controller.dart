@@ -685,7 +685,15 @@ class HomePageController extends ChangeNotifier {
   }
 
   void _setupNotificationActions() {
-    if (!_isAndroid && defaultTargetPlatform != TargetPlatform.iOS) return;
+    if (!_isAndroid &&
+        !const {
+          TargetPlatform.iOS,
+          TargetPlatform.macOS,
+          TargetPlatform.windows,
+          TargetPlatform.linux,
+        }.contains(defaultTargetPlatform)) {
+      return;
+    }
     MobileBackgroundCoordinator.instance.visibleConversation =
         _visibleBackgroundConversation;
     _notificationTapSub = NotificationService.conversationTaps.listen(
@@ -836,18 +844,16 @@ class HomePageController extends ChangeNotifier {
         }
       }
       _chatInitialized = true;
-      if (defaultTargetPlatform == TargetPlatform.android) {
-        unawaited(
-          ScheduledTasksService.instance.attach(
+      if (ScheduledTasksService.supported) {
+        final executor = _scheduledExecutor =
             (task, cancellation, onConversation) => runScheduledTask(
               _context,
               _viewModel,
               task,
               cancellation,
               onConversation,
-            ),
-          ),
-        );
+            );
+        unawaited(ScheduledTasksService.instance.attach(executor));
       }
     } finally {
       _startupConversationPending = false;
@@ -2946,8 +2952,13 @@ class HomePageController extends ChangeNotifier {
   // Disposal
   // ============================================================================
 
+  ScheduledTaskExecutor? _scheduledExecutor;
+
   @override
   void dispose() {
+    if (_scheduledExecutor case final executor?) {
+      ScheduledTasksService.instance.detach(executor);
+    }
     final background = MobileBackgroundCoordinator.instance;
     if (background.visibleConversation == _visibleBackgroundConversation) {
       background.visibleConversation = null;

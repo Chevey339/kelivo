@@ -4,6 +4,7 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../../../l10n/app_localizations.dart';
 import '../../../shared/widgets/ios_tactile.dart';
+import '../../../theme/app_font_weights.dart';
 
 /// Matches Settings' themed navigation bar using the app's own controls.
 class ScheduledTasksScaffold extends StatelessWidget {
@@ -14,6 +15,7 @@ class ScheduledTasksScaffold extends StatelessWidget {
     this.actionIcon,
     this.actionLabel,
     this.onAction,
+    this.embedded = false,
   });
 
   final String title;
@@ -21,10 +23,20 @@ class ScheduledTasksScaffold extends StatelessWidget {
   final IconData? actionIcon;
   final String? actionLabel;
   final VoidCallback? onAction;
+  final bool embedded;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    if (embedded ||
+        switch (Theme.of(context).platform) {
+          TargetPlatform.macOS ||
+          TargetPlatform.windows ||
+          TargetPlatform.linux => true,
+          _ => false,
+        }) {
+      return _desktopLayout(context);
+    }
     final bar = theme.appBarTheme;
     final dark = theme.brightness == Brightness.dark;
     final overlay =
@@ -106,6 +118,67 @@ class ScheduledTasksScaffold extends StatelessWidget {
                   child: child,
                 ),
               ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _desktopLayout(BuildContext context) {
+    final theme = Theme.of(context);
+    return Material(
+      color: theme.scaffoldBackgroundColor,
+      child: Align(
+        alignment: Alignment.topCenter,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 992),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+                child: SizedBox(
+                  height: 36,
+                  child: Row(
+                    children: [
+                      if (!embedded) ...[
+                        IosIconButton(
+                          icon: LucideIcons.arrowLeft,
+                          semanticLabel: AppLocalizations.of(
+                            context,
+                          )!.settingsPageBackButton,
+                          onTap: () => Navigator.maybePop(context),
+                        ),
+                        const SizedBox(width: 8),
+                      ],
+                      Expanded(
+                        child: Text(
+                          title,
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: AppFontWeights.regular,
+                            color: theme.colorScheme.onSurface.withValues(
+                              alpha: .9,
+                            ),
+                          ),
+                        ),
+                      ),
+                      if (actionIcon != null)
+                        IosIconButton(
+                          key: const ValueKey('scheduled-tasks-action'),
+                          icon: actionIcon,
+                          semanticLabel: actionLabel,
+                          tooltip: actionLabel,
+                          minSize: 32,
+                          enabled: onAction != null,
+                          onTap: onAction,
+                        ),
+                    ],
+                  ),
+                ),
+              ),
+              Expanded(child: child),
             ],
           ),
         ),

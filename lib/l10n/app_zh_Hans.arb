@@ -4068,5 +4068,8 @@
   "scheduledTasksModelMissing": "所选模型已不可用，请编辑任务重新选择。",
   "scheduledTasksChatMissing": "目标聊天已不存在或已移至其他助手。",
   "scheduledTasksMessageMissing": "所选问题已不存在，请重新选择。",
-  "scheduledTasksChatBusy": "此聊天正在生成回答，本次任务已跳过。"
+  "scheduledTasksChatBusy": "此聊天正在生成回答，本次任务已跳过。",
+  "scheduledTasksDesktopEmpty": "暂无定时任务",
+  "scheduledTasksDesktopReliability": "仅在 Kelivo 运行时执行，最小化或驻留托盘时也会继续。退出或电脑休眠期间错过的任务不会补运行，也不会自动启动应用。",
+  "scheduledTasksDesktopExecutionDetail": "结果保存在对话中，可从任务的运行记录打开。单次最多运行 10 分钟；需要用户回答或工具确认时会停止。"
 }

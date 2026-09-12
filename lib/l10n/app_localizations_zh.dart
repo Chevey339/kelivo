@@ -11047,6 +11047,17 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get scheduledTasksChatBusy => '此聊天正在生成回答，本次任务已跳过。';
+
+  @override
+  String get scheduledTasksDesktopEmpty => '暂无定时任务';
+
+  @override
+  String get scheduledTasksDesktopReliability =>
+      '仅在 Kelivo 运行时执行，最小化或驻留托盘时也会继续。退出或电脑休眠期间错过的任务不会补运行，也不会自动启动应用。';
+
+  @override
+  String get scheduledTasksDesktopExecutionDetail =>
+      '结果保存在对话中，可从任务的运行记录打开。单次最多运行 10 分钟；需要用户回答或工具确认时会停止。';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hans`).
@@ -22018,6 +22029,17 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get scheduledTasksChatBusy => '此聊天正在生成回答，本次任务已跳过。';
+
+  @override
+  String get scheduledTasksDesktopEmpty => '暂无定时任务';
+
+  @override
+  String get scheduledTasksDesktopReliability =>
+      '仅在 Kelivo 运行时执行，最小化或驻留托盘时也会继续。退出或电脑休眠期间错过的任务不会补运行，也不会自动启动应用。';
+
+  @override
+  String get scheduledTasksDesktopExecutionDetail =>
+      '结果保存在对话中，可从任务的运行记录打开。单次最多运行 10 分钟；需要用户回答或工具确认时会停止。';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hant`).
@@ -33068,4 +33090,15 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get scheduledTasksChatBusy => '此聊天正在產生回答，本次任務已略過。';
+
+  @override
+  String get scheduledTasksDesktopEmpty => '尚無排程任務';
+
+  @override
+  String get scheduledTasksDesktopReliability =>
+      '僅在 Kelivo 執行時運作，最小化或常駐系統匣時也會繼續。結束或電腦休眠期間錯過的任務不會補執行，也不會自動啟動應用程式。';
+
+  @override
+  String get scheduledTasksDesktopExecutionDetail =>
+      '結果儲存在對話中，可從任務的執行記錄開啟。單次最多執行 10 分鐘；需要使用者回答或工具確認時會停止。';
 }

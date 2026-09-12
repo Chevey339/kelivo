@@ -49,6 +49,33 @@ class ScheduledTask {
   String get timeLabel =>
       '${hour.toString().padLeft(2, '0')}:${minute.toString().padLeft(2, '0')}';
 
+  ScheduledTask withState({
+    required DateTime? nextRunAt,
+    bool? enabled,
+    bool? exhausted,
+    List<ScheduledTaskRun>? runs,
+  }) => ScheduledTask(
+    id: id,
+    name: name,
+    prompt: prompt,
+    assistantId: assistantId,
+    hour: hour,
+    minute: minute,
+    weekdays: weekdays,
+    enabled: enabled ?? this.enabled,
+    nextRunAt: nextRunAt,
+    exhausted: exhausted ?? this.exhausted,
+    runs: runs ?? this.runs,
+    mode: mode,
+    conversationId: conversationId,
+    messageId: messageId,
+    modelProvider: modelProvider,
+    modelId: modelId,
+    onceDate: onceDate,
+    startDate: startDate,
+    endDate: endDate,
+  );
+
   factory ScheduledTask.fromJson(Map<String, dynamic> json) => ScheduledTask(
     id: json['id'] as String,
     name: json['name'] as String,
@@ -96,6 +123,13 @@ class ScheduledTask {
     'endDate': dateKey(endDate),
   };
 
+  Map<String, dynamic> toStoredJson() => {
+    ...toJson(),
+    'nextRunAt': nextRunAt?.millisecondsSinceEpoch,
+    'exhausted': exhausted,
+    'runs': runs.map((run) => run.toJson()).toList(),
+  };
+
   static DateTime? _parseDate(dynamic value) =>
       value == null ? null : DateTime.parse(value as String);
 
@@ -119,6 +153,16 @@ class ScheduledTaskRun {
   final String id, status;
   final DateTime startedAt;
   final String? conversationId, preview, error;
+
+  Map<String, dynamic> toJson() => {
+    'id': id,
+    'startedAt': startedAt.millisecondsSinceEpoch,
+    'status': status,
+    'conversationId': conversationId,
+    'preview': preview,
+    'error': error,
+  };
+
   factory ScheduledTaskRun.fromJson(Map<String, dynamic> json) =>
       ScheduledTaskRun(
         id: json['id'] as String,

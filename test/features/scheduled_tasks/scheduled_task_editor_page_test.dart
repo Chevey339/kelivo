@@ -20,6 +20,7 @@ import 'package:Kelivo/shared/widgets/ios_tactile.dart';
 import 'package:Kelivo/theme/palettes.dart';
 import 'package:Kelivo/theme/theme_factory.dart';
 import 'package:flutter/material.dart';
+import 'package:Kelivo/desktop/widgets/desktop_scheduled_task_form.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -496,7 +497,18 @@ void main() {
       addTearDown(tester.view.resetDevicePixelRatio);
       await tester.pumpWidget(app(editor()));
       await tester.pumpAndSettle();
-      await tapRow(tester, 'Start date');
+      final row = find.ancestor(
+        of: find.text('Start date'),
+        matching: find.byType(DesktopScheduledTaskRow),
+      );
+      final picker = find.descendant(
+        of: row,
+        matching: find.byType(DesktopScheduledTaskPicker),
+      );
+      await tester.ensureVisible(picker);
+      await tester.pumpAndSettle();
+      await tester.tap(picker);
+      await tester.pumpAndSettle();
       expect(find.byType(BottomSheet), findsNothing);
       expect(find.byType(Dialog), findsOneWidget);
       expect(

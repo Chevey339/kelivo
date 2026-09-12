@@ -20756,6 +20756,24 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'This conversation is generating a reply. The scheduled run was skipped.'**
   String get scheduledTasksChatBusy;
+
+  /// No description provided for @scheduledTasksDesktopEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No scheduled tasks'**
+  String get scheduledTasksDesktopEmpty;
+
+  /// No description provided for @scheduledTasksDesktopReliability.
+  ///
+  /// In en, this message translates to:
+  /// **'Tasks run only while Kelivo is running, including when minimized or in the system tray. Missed times are skipped after quitting or computer sleep. Kelivo will not start automatically.'**
+  String get scheduledTasksDesktopReliability;
+
+  /// No description provided for @scheduledTasksDesktopExecutionDetail.
+  ///
+  /// In en, this message translates to:
+  /// **'Results are saved in chats. Open them from the task’s run history. Runs stop after 10 minutes or when user input or tool approval is needed.'**
+  String get scheduledTasksDesktopExecutionDetail;
 }
 
 class _AppLocalizationsDelegate

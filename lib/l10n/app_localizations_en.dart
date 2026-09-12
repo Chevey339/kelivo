@@ -11546,4 +11546,15 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get scheduledTasksChatBusy =>
       'This conversation is generating a reply. The scheduled run was skipped.';
+
+  @override
+  String get scheduledTasksDesktopEmpty => 'No scheduled tasks';
+
+  @override
+  String get scheduledTasksDesktopReliability =>
+      'Tasks run only while Kelivo is running, including when minimized or in the system tray. Missed times are skipped after quitting or computer sleep. Kelivo will not start automatically.';
+
+  @override
+  String get scheduledTasksDesktopExecutionDetail =>
+      'Results are saved in chats. Open them from the task’s run history. Runs stop after 10 minutes or when user input or tool approval is needed.';
 }

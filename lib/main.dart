@@ -1,3 +1,4 @@
+import 'core/services/scheduled_tasks_service.dart';
 import 'package:Kelivo/core/services/sandbox/workspace_channel.dart';
 import 'package:Kelivo/core/providers/external_mounts_provider.dart';
 import 'package:Kelivo/core/services/sandbox/environment_dependencies.dart';
@@ -324,6 +325,7 @@ Future<void> main() async {
       }
       // Desktop exit hook: drain queued preference writes before process exit.
       _installExitFlush(businessPreferences);
+      ScheduledTasksService.configureDesktop(businessPreferences);
       // Best-effort trim of archived restore runs after a few cold starts.
       unawaited(_pruneRestoreArchive(appDataDirectory));
       // Enable edge-to-edge to allow content under system bars (Android)
