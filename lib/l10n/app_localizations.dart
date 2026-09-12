@@ -8416,7 +8416,7 @@ abstract class AppLocalizations {
   /// No description provided for @displaySettingsPageShowCollapsedReasoningPreviewSubtitle.
   ///
   /// In en, this message translates to:
-  /// **'Show the latest thought with animation while a thinking card is collapsed.'**
+  /// **'Show the latest thought with animation while a thinking card is collapsed'**
   String get displaySettingsPageShowCollapsedReasoningPreviewSubtitle;
 
   /// No description provided for @displaySettingsPageCollapseThinkingStepsTitle.

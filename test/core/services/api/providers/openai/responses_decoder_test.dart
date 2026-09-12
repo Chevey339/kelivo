@@ -609,4 +609,125 @@ void main() {
     expect(second.usage!.totalTokens, 120);
     expect(silent.chunks.whereType<Usage>(), isEmpty);
   });
+
+  test('keeps one copy when a reasoning item carries content and summary', () {
+    final decoder = ResponsesStreamDecoder();
+    final streamed = decoder.accept(
+      _event({
+        'type': 'response.reasoning_text.delta',
+        'item_id': 'rs_mixed',
+        'output_index': 0,
+        'summary_index': 0,
+        'delta': 'Visible reasoning',
+      }),
+    );
+    final completed = decoder.accept(
+      _event({
+        'type': 'response.completed',
+        'response': {
+          'output': [
+            {
+              'id': 'rs_mixed',
+              'type': 'reasoning',
+              'content': const [
+                {'type': 'reasoning_text', 'text': 'Visible reasoning'},
+              ],
+              'summary': const [
+                {'type': 'summary_text', 'text': 'Summary text'},
+              ],
+            },
+          ],
+        },
+      }),
+    );
+
+    final texts = <String>[
+      ...streamed.chunks.whereType<ReasoningDelta>().map((c) => c.text),
+      ...completed.chunks.whereType<ReasoningDelta>().map((c) => c.text),
+    ];
+    expect(texts.join(), 'Visible reasoning');
+  });
+
+  test('dedupes a summary-only terminal item against reasoning deltas', () {
+    final decoder = ResponsesStreamDecoder();
+    final streamed = decoder.accept(
+      _event({
+        'type': 'response.reasoning_text.delta',
+        'item_id': 'rs_namespace',
+        'output_index': 0,
+        'summary_index': 0,
+        'delta': 'Streamed as reasoning text',
+      }),
+    );
+    final completed = decoder.accept(
+      _event({
+        'type': 'response.completed',
+        'response': {
+          'output': [
+            {
+              'id': 'rs_namespace',
+              'type': 'reasoning',
+              'content': const [],
+              'summary': const [
+                {'type': 'summary_text', 'text': 'Streamed as reasoning text'},
+              ],
+            },
+          ],
+        },
+      }),
+    );
+
+    final texts = <String>[
+      ...streamed.chunks.whereType<ReasoningDelta>().map((c) => c.text),
+      ...completed.chunks.whereType<ReasoningDelta>().map((c) => c.text),
+    ];
+    expect(texts.join(), 'Streamed as reasoning text');
+  });
+
+  test('dedupes multi-part summary deltas against the terminal item', () {
+    final decoder = ResponsesStreamDecoder();
+    final first = decoder.accept(
+      _event({
+        'type': 'response.reasoning_summary_text.delta',
+        'item_id': 'rs_parts',
+        'output_index': 0,
+        'summary_index': 0,
+        'delta': 'First part. ',
+      }),
+    );
+    final second = decoder.accept(
+      _event({
+        'type': 'response.reasoning_summary_text.delta',
+        'item_id': 'rs_parts',
+        'output_index': 0,
+        'summary_index': 1,
+        'delta': 'Second part.',
+      }),
+    );
+    final completed = decoder.accept(
+      _event({
+        'type': 'response.completed',
+        'response': {
+          'output': [
+            {
+              'id': 'rs_parts',
+              'type': 'reasoning',
+              'content': const [],
+              'summary': const [
+                {'type': 'summary_text', 'text': 'First part. '},
+                {'type': 'summary_text', 'text': 'Second part.'},
+              ],
+            },
+          ],
+        },
+      }),
+    );
+
+    final texts = <String>[
+      ...first.chunks.whereType<ReasoningDelta>().map((c) => c.text),
+      ...second.chunks.whereType<ReasoningDelta>().map((c) => c.text),
+      ...completed.chunks.whereType<ReasoningDelta>().map((c) => c.text),
+    ];
+    expect(texts.join(), 'First part. Second part.');
+  });
 }

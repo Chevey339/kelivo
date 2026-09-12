@@ -93,6 +93,12 @@ class ResponsesStreamDecoder implements StreamChunkDecoder {
       <int, Map<String, dynamic>>{};
   final Map<String, int> _outputItemIndexesById = <String, int>{};
   final Map<String, String> _reasoningTextByKey = <String, String>{};
+  // Everything already streamed for a reasoning item (across namespaces and
+  // summary parts) plus the namespace that carried it, so a terminal item can
+  // be deduped even when it exposes the same text under another field or
+  // concatenates several summary parts.
+  final Map<String, String> _reasoningStreamedByItemId = <String, String>{};
+  final Map<String, bool> _reasoningIsSummaryByItemId = <String, bool>{};
   final Set<String> _openServerToolIds = <String>{};
   final Set<String> _endedServerToolIds = <String>{};
   final Set<String> _seenCitationUrls = <String>{};
@@ -484,26 +490,52 @@ class ResponsesStreamDecoder implements StreamChunkDecoder {
   }
 
   List<StreamChunk> _emitReasoningItem(Map item) {
-    final text = _reasoningTextFromValue(
-      _reasoningTextFromValue(item['content']).isNotEmpty
-          ? item['content']
-          : item['summary'],
-    );
+    final contentText = _reasoningTextFromValue(item['content']);
+    final text = contentText.isNotEmpty
+        ? contentText
+        : _reasoningTextFromValue(item['summary']);
     if (text.isEmpty) return const <StreamChunk>[];
     final itemId = (item['id'] ?? '').toString();
+
+    // A terminal item repeats everything that was streamed for it, possibly
+    // across several summary parts and under a different field than the delta
+    // events used. Compare against the aggregated stream for this item and
+    // only emit what is still missing.
+    final streamed = _reasoningStreamedByItemId[itemId] ?? '';
+    if (streamed.isNotEmpty) {
+      if (text == streamed || streamed.startsWith(text)) {
+        return const <StreamChunk>[];
+      }
+      final delta = text.startsWith(streamed)
+          ? text.substring(streamed.length)
+          : text;
+      if (delta.isEmpty) return const <StreamChunk>[];
+      _reasoningStreamedByItemId[itemId] = text;
+      return <StreamChunk>[
+        ReasoningDelta(
+          id: _ids.reasoning(),
+          text: delta,
+          reasoningType:
+              (_reasoningIsSummaryByItemId[itemId] ?? contentText.isEmpty)
+              ? ReasoningType.summaryText
+              : ReasoningType.reasoningText,
+        ),
+      ];
+    }
+
     final obj = <String, dynamic>{
       'item_id': item['id'],
       if (_outputItemIndexesById[itemId] != null)
         'output_index': _outputItemIndexesById[itemId],
       'summary_index': 0,
-      'type': item['summary'] is List
+      'type': contentText.isEmpty
           ? 'response.reasoning_summary_text.done'
           : 'response.reasoning_text.done',
     };
     return _emitReasoningText(
       obj,
       text,
-      isSummary: item['summary'] is List,
+      isSummary: contentText.isEmpty,
       isFinal: true,
     );
   }
@@ -527,6 +559,14 @@ class ResponsesStreamDecoder implements StreamChunkDecoder {
     }
     if (delta.isEmpty) return const <StreamChunk>[];
     _reasoningTextByKey[key] = '$previous$delta';
+    if (!isFinal) {
+      final itemId = (obj['item_id'] ?? '').toString();
+      if (itemId.isNotEmpty) {
+        _reasoningStreamedByItemId[itemId] =
+            '${_reasoningStreamedByItemId[itemId] ?? ''}$delta';
+        _reasoningIsSummaryByItemId[itemId] = isSummary;
+      }
+    }
     return <StreamChunk>[
       ReasoningDelta(
         id: _ids.reasoning(),
