@@ -281,6 +281,7 @@ class MessageGenerationService {
       hasBuiltInSearch,
       mcpRouteSnapshot: mcpRouteSnapshot,
       workspaceContext: workspaceContext,
+      conversationId: currentConversation?.id,
     );
     final sandboxDataFiles = BuiltInToolsHelper.sendsDataFilesToSandbox(
       cfg: cfg,
@@ -595,6 +596,7 @@ class MessageGenerationService {
     required bool enableReasoning,
     required bool generateTitleOnFinish,
     String? generationRunId,
+    bool scheduled = false,
   }) {
     final bool ocrActive =
         settings.ocrEnabled &&
@@ -624,6 +626,7 @@ class MessageGenerationService {
       ocrActive: ocrActive,
       generateTitleOnFinish: generateTitleOnFinish,
       generationRunId: generationRunId,
+      scheduled: scheduled,
     );
   }
 

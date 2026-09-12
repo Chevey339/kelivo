@@ -38,6 +38,7 @@ final class BusinessKeyRegistry {
   };
 
   static const preferenceKeys = <String>{
+    'desktop_scheduled_tasks_v1',
     'current_assistant_id_v1',
     'selected_model_v1',
     'per_chat_model_enabled_v1',

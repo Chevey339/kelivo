@@ -2961,6 +2961,7 @@ class _ExportedMessageCard extends StatelessWidget {
             SizedBox(height: isDesktop ? 10.0 : 12.0),
             ChatMessageWidget(
               message: messageForExport,
+              collapseLongUserText: false,
               modelIcon:
                   (!useAssistAvatar &&
                       message.role == 'assistant' &&

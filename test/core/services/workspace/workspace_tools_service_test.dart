@@ -1002,27 +1002,60 @@ void main() {
     }
   });
 
-  test(
-    'native skill reads report the skill ID without path separators',
-    () async {
-      final skillFile = File(p.join(skillsDir.path, 'skill-id', 'SKILL.md'));
-      await skillFile.parent.create();
-      await skillFile.writeAsString('Skill instructions');
-      final readIds = <String>[];
-      final tools = WorkspaceToolsService(
-        onSkillRead: (id) async {
-          readIds.add(id);
-        },
-      );
-      final result = metaOf(
-        await tools.handle(ctx(), 'read_file', {
-          'path': skillFile.path,
-        }, toolCallId: 'read-skill'),
-      );
-      expect(result.status, 'ok');
-      expect(readIds, ['skill-id']);
-    },
-  );
+  for (final sandboxed in [false, true]) {
+    for (final filename in ['SKILL.md', 'skill.md', 'Skill.MD', 'notes.md']) {
+      test('skill reads recognize $filename (sandboxed=$sandboxed)', () async {
+        final skillFile = File(p.join(skillsDir.path, 'skill-id', filename));
+        await skillFile.parent.create();
+        await skillFile.writeAsString('Skill instructions');
+        final readIds = <String>[];
+        final tools = WorkspaceToolsService(
+          onSkillRead: (id) async {
+            readIds.add(id);
+          },
+        );
+        for (var i = 0; i < 2; i++) {
+          final result = metaOf(
+            await tools.handle(ctx(sandboxed: sandboxed), 'read_file', {
+              'path': sandboxed ? '/skills/skill-id/$filename' : skillFile.path,
+            }, toolCallId: 'read-skill-$i'),
+          );
+          expect(result.status, 'ok');
+        }
+        expect(
+          readIds,
+          filename == 'notes.md' ? isEmpty : ['skill-id', 'skill-id'],
+        );
+      });
+    }
+    test(
+      'failed and non-skill reads are not counted (sandboxed=$sandboxed)',
+      () async {
+        final workspaceFile = File(p.join(workspaceDir.path, 'SKILL.md'));
+        await workspaceFile.writeAsString('Workspace documentation');
+        final readIds = <String>[];
+        final tools = WorkspaceToolsService(
+          onSkillRead: (id) async => readIds.add(id),
+        );
+        final context = ctx(sandboxed: sandboxed);
+        final outside = metaOf(
+          await tools.handle(context, 'read_file', {
+            'path': sandboxed ? '/workspace/SKILL.md' : workspaceFile.path,
+          }, toolCallId: 'outside-skill'),
+        );
+        expect(outside.status, 'ok');
+        final missing = metaOf(
+          await tools.handle(context, 'read_file', {
+            'path': sandboxed
+                ? '/skills/missing/skill.md'
+                : p.join(skillsDir.path, 'missing', 'skill.md'),
+          }, toolCallId: 'missing-skill'),
+        );
+        expect(missing.status, 'error');
+        expect(readIds, isEmpty);
+      },
+    );
+  }
 
   test('runtime failures still report files already written', () async {
     for (final throwError in [true, false]) {

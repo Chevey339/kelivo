@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:Kelivo/shared/widgets/ios_time_picker.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 
@@ -1240,8 +1241,9 @@ class _BackupReminderDesktopSection extends StatelessWidget {
                 await provider.setEnabled(false);
                 return;
               }
-              final minutes = await showBackupReminderTimePicker(
+              final minutes = await showIosTimePicker(
                 context,
+                title: AppLocalizations.of(context)!.backupReminderTimeTitle,
                 initialMinutes: provider.reminderMinutesOfDay,
               );
               if (minutes == null) return;
@@ -1271,8 +1273,9 @@ class _BackupReminderDesktopSection extends StatelessWidget {
               dense: true,
               onTap: () async {
                 final provider = context.read<BackupReminderProvider>();
-                final minutes = await showBackupReminderTimePicker(
+                final minutes = await showIosTimePicker(
                   context,
+                  title: AppLocalizations.of(context)!.backupReminderTimeTitle,
                   initialMinutes: provider.reminderMinutesOfDay,
                 );
                 if (minutes == null) return;
@@ -1343,7 +1346,10 @@ class _FrequencyDropdown extends StatelessWidget {
         if (!context.mounted) return;
         if (days == null) return;
         var minutes = provider.reminderMinutesOfDay;
-        minutes ??= await showBackupReminderTimePicker(context);
+        minutes ??= await showIosTimePicker(
+          context,
+          title: AppLocalizations.of(context)!.backupReminderTimeTitle,
+        );
         if (!context.mounted) return;
         if (minutes == null) return;
         await provider.saveSchedule(

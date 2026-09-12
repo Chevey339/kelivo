@@ -11,6 +11,7 @@ import 'package:Kelivo/core/models/conversation.dart';
 import 'package:Kelivo/core/providers/assistant_provider.dart';
 import 'package:Kelivo/core/providers/settings_provider.dart';
 import 'package:Kelivo/core/services/chat/chat_service.dart';
+import 'package:Kelivo/core/services/notification_service.dart';
 import 'package:Kelivo/features/home/controllers/home_page_controller.dart';
 import 'package:Kelivo/features/home/controllers/scroll_controller.dart';
 import 'package:Kelivo/features/home/widgets/chat_input_bar.dart';
@@ -278,6 +279,41 @@ void main() {
 
   group('HomePageController conversation switch pipeline', () {
     testWidgets(
+      'desktop task history opens the saved conversation through the bus',
+      (tester) async {
+        await runAsDesktop(() async {
+          final service = _ControlledChatService({
+            'conv-a': [_message('conv-a', 0)],
+            'conv-b': [_message('conv-b', 0)],
+          });
+          final controller = await pumpHarness(tester, service);
+          await switchAndSettle(tester, controller, service, 'conv-a');
+          controller.debugSetChatInitialized();
+          NotificationService.openConversation('conv-b');
+          for (var i = 0; i < 40 && service.pageRequests.length < 2; i++) {
+            await tester.pump(const Duration(milliseconds: 10));
+          }
+          expect(service.pageRequests, hasLength(2));
+          service.completePage(
+            service.pageRequests.last,
+            service.messagesOf('conv-b'),
+            startIndex: 0,
+          );
+          for (
+            var i = 0;
+            i < 40 && controller.currentConversation?.id != 'conv-b';
+            i++
+          ) {
+            await tester.pump(const Duration(milliseconds: 10));
+          }
+          expect(controller.currentConversation?.id, 'conv-b');
+          expect(tester.takeException(), isNull);
+          await tester.pumpWidget(const SizedBox());
+        });
+      },
+    );
+
+    testWidgets(
       'notification tap closes settings and opens the saved conversation',
       (tester) async {
         // FakeAsync cannot advance to a frame while idle tasks continuously
@@ -292,6 +328,8 @@ void main() {
             'conv-b': [_message('conv-b', 0)],
           });
           final controller = await pumpHarness(tester, service);
+          var revealed = false;
+          controller.onRevealConversation = () => revealed = true;
           await switchAndSettle(tester, controller, service, 'conv-a');
           controller.debugSetChatInitialized();
           final navigator = tester.state<NavigatorState>(
@@ -331,6 +369,7 @@ void main() {
           }
           expect(find.text('Settings page'), findsNothing);
           expect(controller.currentConversation?.id, 'conv-b');
+          expect(revealed, isTrue);
         });
       },
     );

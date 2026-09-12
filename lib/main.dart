@@ -1,3 +1,4 @@
+import 'core/services/scheduled_tasks_service.dart';
 import 'package:Kelivo/core/services/sandbox/workspace_channel.dart';
 import 'package:Kelivo/core/providers/external_mounts_provider.dart';
 import 'package:Kelivo/core/services/sandbox/environment_dependencies.dart';
@@ -164,6 +165,7 @@ Future<void> main() async {
       _initializeAndroidDisplayMode();
       final appDataDirectory = await AppDirectories.getAppDataDirectory();
       final RestoreReceipt? restoreOutcome;
+      RestoreBusinessLease? businessLease;
       // A restore large enough to take seconds would otherwise spend all of
       // them before the first frame, which is indistinguishable from a hang.
       // Only paint when there is actually work waiting: an ordinary launch
@@ -180,7 +182,7 @@ Future<void> main() async {
       try {
         // The lease remains process-owned through its internal registry until
         // process exit, preventing another instance from racing business I/O.
-        final businessLease = await RestoreBusinessLease.acquire(
+        businessLease = await RestoreBusinessLease.acquire(
           appDataDirectory: appDataDirectory,
         );
         restoreOutcome =
@@ -203,6 +205,7 @@ Future<void> main() async {
               stackTrace: stackTrace,
             ),
             appDataDirectory: appDataDirectory,
+            businessLease: businessLease,
           ),
         );
         return;
@@ -314,6 +317,7 @@ Future<void> main() async {
                 stackTrace: stackTrace,
               ),
               appDataDirectory: appDataDirectory,
+              businessLease: businessLease,
             ),
           );
           return;
@@ -321,6 +325,7 @@ Future<void> main() async {
       }
       // Desktop exit hook: drain queued preference writes before process exit.
       _installExitFlush(businessPreferences);
+      ScheduledTasksService.configureDesktop(businessPreferences);
       // Best-effort trim of archived restore runs after a few cold starts.
       unawaited(_pruneRestoreArchive(appDataDirectory));
       // Enable edge-to-edge to allow content under system bars (Android)
@@ -524,10 +529,15 @@ class _RestoreProgressApp extends StatelessWidget {
 }
 
 class _RestoreFailureApp extends StatelessWidget {
-  const _RestoreFailureApp({required this.report, this.appDataDirectory});
+  const _RestoreFailureApp({
+    required this.report,
+    this.appDataDirectory,
+    this.businessLease,
+  });
 
   final StartupFailureReport report;
   final Directory? appDataDirectory;
+  final RestoreBusinessLease? businessLease;
 
   @override
   Widget build(BuildContext context) {
@@ -545,6 +555,7 @@ class _RestoreFailureApp extends StatelessWidget {
               report: report,
               restart: PlatformUtils.restartApp,
               appDataDirectory: appDataDirectory,
+              businessLease: businessLease,
             ),
     );
   }
@@ -760,19 +771,18 @@ class MyApp extends StatelessWidget {
             final provider = WorkspaceRuntimeProvider();
             final extras = ctx.read<_WorkspaceStackHolder>();
             final env = ctx.read<EnvironmentProvider>();
-            unawaited(
-              (() async {
-                try {
-                  final stack = await createWorkspaceStack(env: env);
-                  applyWorkspaceStack(provider, stack);
-                  extras.apply(stack);
-                } catch (error, stackTrace) {
-                  debugPrint(
-                    'Failed to create workspace stack: $error\n$stackTrace',
-                  );
-                }
-              })(),
-            );
+            provider.initialization = (() async {
+              try {
+                final stack = await createWorkspaceStack(env: env);
+                applyWorkspaceStack(provider, stack);
+                extras.apply(stack);
+              } catch (error, stackTrace) {
+                debugPrint(
+                  'Failed to create workspace stack: $error\n$stackTrace',
+                );
+              }
+            })();
+            unawaited(provider.initialization);
             return provider;
           },
         ),
@@ -1094,9 +1104,7 @@ class MyApp extends StatelessWidget {
                   // Desktop tray + close behaviour (minimize to tray) sync
                   final l10n = AppLocalizations.of(ctx);
                   if (l10n != null) {
-                    final backgroundSettings = ctx
-                        .watch<SettingsProvider>()
-                        .mobileBackground;
+                    final backgroundSettings = ctx.watch<SettingsProvider>();
                     WidgetsBinding.instance.addPostFrameCallback((_) {
                       if (!ctx.mounted) return;
                       final coordinator = MobileBackgroundCoordinator.instance;
@@ -1107,7 +1115,10 @@ class MyApp extends StatelessWidget {
                         }
                       };
                       unawaited(
-                        coordinator.configure(backgroundSettings, l10n),
+                        coordinator.configureFromSettings(
+                          backgroundSettings,
+                          l10n,
+                        ),
                       );
                     });
                     WidgetsBinding.instance.addPostFrameCallback((_) async {

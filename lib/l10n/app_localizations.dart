@@ -1102,11 +1102,17 @@ abstract class AppLocalizations {
   /// **'Clear Context'**
   String get homePageClearContext;
 
-  /// No description provided for @homePageClearContextWithCount.
+  /// No description provided for @contextMessageCount.
   ///
   /// In en, this message translates to:
-  /// **'Clear Context ({actual}/{configured})'**
-  String homePageClearContextWithCount(String actual, String configured);
+  /// **'{count} messages'**
+  String contextMessageCount(int count);
+
+  /// No description provided for @contextMessageCountLimited.
+  ///
+  /// In en, this message translates to:
+  /// **'{actual}/{configured} messages'**
+  String contextMessageCountLimited(int actual, int configured);
 
   /// No description provided for @homePageDefaultAssistant.
   ///
@@ -5001,6 +5007,42 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'lines'**
   String get displaySettingsPageAutoCollapseCodeBlockLinesUnit;
+
+  /// No description provided for @displaySettingsPageCollapseLongUserMessagesTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Collapse Long Messages'**
+  String get displaySettingsPageCollapseLongUserMessagesTitle;
+
+  /// No description provided for @displaySettingsPageCollapseLongUserMessagesSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Fold user messages past the threshold behind an expand button'**
+  String get displaySettingsPageCollapseLongUserMessagesSubtitle;
+
+  /// No description provided for @displaySettingsPageCollapseLongUserMessagesCharsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Collapse threshold'**
+  String get displaySettingsPageCollapseLongUserMessagesCharsTitle;
+
+  /// No description provided for @displaySettingsPageCollapseLongUserMessagesCharsUnit.
+  ///
+  /// In en, this message translates to:
+  /// **'chars'**
+  String get displaySettingsPageCollapseLongUserMessagesCharsUnit;
+
+  /// No description provided for @chatMessageExpandLongText.
+  ///
+  /// In en, this message translates to:
+  /// **'Expand'**
+  String get chatMessageExpandLongText;
+
+  /// No description provided for @chatMessageCollapseLongText.
+  ///
+  /// In en, this message translates to:
+  /// **'Collapse'**
+  String get chatMessageCollapseLongText;
 
   /// No description provided for @messageExportSheetFormatTitle.
   ///
@@ -20216,6 +20258,534 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Import'**
   String get mcpImportConfirm;
+
+  /// No description provided for @startupRecoverySnapshotTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Restore from a database snapshot'**
+  String get startupRecoverySnapshotTitle;
+
+  /// No description provided for @startupRecoverySnapshotBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose a snapshot on this device to recover your chats and settings, even when the database cannot open. Do not uninstall Kelivo: uninstalling also removes these snapshots.'**
+  String get startupRecoverySnapshotBody;
+
+  /// No description provided for @startupRecoverySnapshotEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No database snapshots were found on this device. Export your data before trying other recovery actions.'**
+  String get startupRecoverySnapshotEmpty;
+
+  /// No description provided for @startupRecoverySnapshotButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose a snapshot'**
+  String get startupRecoverySnapshotButton;
+
+  /// No description provided for @startupRecoverySnapshotConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Restore chats and settings from {when}? Changes made after this snapshot will not be included. Existing attachment files and the snapshot will be kept. Kelivo will restart to complete the restore.'**
+  String startupRecoverySnapshotConfirm(String when);
+
+  /// No description provided for @startupRecoverySnapshotFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not prepare the snapshot restore: {reason}'**
+  String startupRecoverySnapshotFailed(String reason);
+
+  /// No description provided for @startupRecoverySnapshotReady.
+  ///
+  /// In en, this message translates to:
+  /// **'The snapshot is ready. Restart Kelivo to complete the restore.'**
+  String get startupRecoverySnapshotReady;
+
+  /// No description provided for @scheduledTasksTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Scheduled tasks'**
+  String get scheduledTasksTitle;
+
+  /// No description provided for @scheduledTasksDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Run tasks automatically at your chosen time: start a new chat, follow up, or run a question again.'**
+  String get scheduledTasksDescription;
+
+  /// No description provided for @scheduledTasksEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'Your day, on a schedule'**
+  String get scheduledTasksEmpty;
+
+  /// No description provided for @scheduledTasksEmptyDetail.
+  ///
+  /// In en, this message translates to:
+  /// **'Add a task for a morning briefing, a daily review, or anything you want to run regularly.'**
+  String get scheduledTasksEmptyDetail;
+
+  /// No description provided for @scheduledTasksAdd.
+  ///
+  /// In en, this message translates to:
+  /// **'Add task'**
+  String get scheduledTasksAdd;
+
+  /// No description provided for @scheduledTasksEdit.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit task'**
+  String get scheduledTasksEdit;
+
+  /// No description provided for @scheduledTasksName.
+  ///
+  /// In en, this message translates to:
+  /// **'Name'**
+  String get scheduledTasksName;
+
+  /// No description provided for @scheduledTasksNameHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Morning briefing'**
+  String get scheduledTasksNameHint;
+
+  /// No description provided for @scheduledTasksPrompt.
+  ///
+  /// In en, this message translates to:
+  /// **'Prompt'**
+  String get scheduledTasksPrompt;
+
+  /// No description provided for @scheduledTasksPromptHint.
+  ///
+  /// In en, this message translates to:
+  /// **'What would you like your assistant to do?'**
+  String get scheduledTasksPromptHint;
+
+  /// No description provided for @scheduledTasksAssistant.
+  ///
+  /// In en, this message translates to:
+  /// **'Assistant'**
+  String get scheduledTasksAssistant;
+
+  /// No description provided for @scheduledTasksChooseAssistant.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose an assistant'**
+  String get scheduledTasksChooseAssistant;
+
+  /// No description provided for @scheduledTasksAssistantMissing.
+  ///
+  /// In en, this message translates to:
+  /// **'Assistant unavailable'**
+  String get scheduledTasksAssistantMissing;
+
+  /// No description provided for @scheduledTasksTime.
+  ///
+  /// In en, this message translates to:
+  /// **'Time'**
+  String get scheduledTasksTime;
+
+  /// No description provided for @scheduledTasksTimeHint.
+  ///
+  /// In en, this message translates to:
+  /// **'24-hour time, e.g. 08:00'**
+  String get scheduledTasksTimeHint;
+
+  /// No description provided for @scheduledTasksRepeat.
+  ///
+  /// In en, this message translates to:
+  /// **'Repeat'**
+  String get scheduledTasksRepeat;
+
+  /// No description provided for @scheduledTasksEveryDay.
+  ///
+  /// In en, this message translates to:
+  /// **'Every day'**
+  String get scheduledTasksEveryDay;
+
+  /// No description provided for @scheduledTasksWeekdays.
+  ///
+  /// In en, this message translates to:
+  /// **'Weekdays'**
+  String get scheduledTasksWeekdays;
+
+  /// No description provided for @scheduledTasksEnabled.
+  ///
+  /// In en, this message translates to:
+  /// **'Enabled'**
+  String get scheduledTasksEnabled;
+
+  /// No description provided for @scheduledTasksPermission.
+  ///
+  /// In en, this message translates to:
+  /// **'Alarms & reminders'**
+  String get scheduledTasksPermission;
+
+  /// No description provided for @scheduledTasksPermissionDetail.
+  ///
+  /// In en, this message translates to:
+  /// **'Allow exact alarms to run tasks at your chosen time. Enabled tasks will wait until permission is granted.'**
+  String get scheduledTasksPermissionDetail;
+
+  /// No description provided for @scheduledTasksPermissionAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Allow'**
+  String get scheduledTasksPermissionAction;
+
+  /// No description provided for @scheduledTasksReliability.
+  ///
+  /// In en, this message translates to:
+  /// **'Keep Kelivo unrestricted in battery settings for more reliable execution. Force stopping the app cancels alarms until you reopen it. Missed runs are skipped; tasks follow the device time zone.'**
+  String get scheduledTasksReliability;
+
+  /// No description provided for @scheduledTasksExecutionDetail.
+  ///
+  /// In en, this message translates to:
+  /// **'Results are saved in chats. A completion notification previews the reply and opens the conversation when tapped. Runs stop after 10 minutes or when user input or tool approval is needed.'**
+  String get scheduledTasksExecutionDetail;
+
+  /// No description provided for @scheduledTasksRunNow.
+  ///
+  /// In en, this message translates to:
+  /// **'Run now'**
+  String get scheduledTasksRunNow;
+
+  /// No description provided for @scheduledTasksHistory.
+  ///
+  /// In en, this message translates to:
+  /// **'Run history'**
+  String get scheduledTasksHistory;
+
+  /// No description provided for @scheduledTasksNoRuns.
+  ///
+  /// In en, this message translates to:
+  /// **'No runs yet'**
+  String get scheduledTasksNoRuns;
+
+  /// No description provided for @scheduledTasksRunning.
+  ///
+  /// In en, this message translates to:
+  /// **'Running'**
+  String get scheduledTasksRunning;
+
+  /// No description provided for @scheduledTasksCompleted.
+  ///
+  /// In en, this message translates to:
+  /// **'Completed'**
+  String get scheduledTasksCompleted;
+
+  /// No description provided for @scheduledTasksFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed'**
+  String get scheduledTasksFailed;
+
+  /// No description provided for @scheduledTasksInterrupted.
+  ///
+  /// In en, this message translates to:
+  /// **'Interrupted'**
+  String get scheduledTasksInterrupted;
+
+  /// No description provided for @scheduledTasksPaused.
+  ///
+  /// In en, this message translates to:
+  /// **'Paused'**
+  String get scheduledTasksPaused;
+
+  /// No description provided for @scheduledTasksWaitingPermission.
+  ///
+  /// In en, this message translates to:
+  /// **'Waiting for permission'**
+  String get scheduledTasksWaitingPermission;
+
+  /// No description provided for @scheduledTasksNextRun.
+  ///
+  /// In en, this message translates to:
+  /// **'Next: {time}'**
+  String scheduledTasksNextRun(String time);
+
+  /// No description provided for @scheduledTasksDelete.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete task'**
+  String get scheduledTasksDelete;
+
+  /// No description provided for @scheduledTasksDeleteDetail.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete this schedule and its run history? Conversations already created will be kept.'**
+  String get scheduledTasksDeleteDetail;
+
+  /// No description provided for @scheduledTasksSave.
+  ///
+  /// In en, this message translates to:
+  /// **'Save'**
+  String get scheduledTasksSave;
+
+  /// No description provided for @scheduledTasksCancel.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel'**
+  String get scheduledTasksCancel;
+
+  /// No description provided for @scheduledTasksInvalid.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter a name, prompt and assistant, and select at least one day for a custom schedule.'**
+  String get scheduledTasksInvalid;
+
+  /// No description provided for @scheduledTasksLoading.
+  ///
+  /// In en, this message translates to:
+  /// **'Loading…'**
+  String get scheduledTasksLoading;
+
+  /// No description provided for @scheduledTasksOpenChat.
+  ///
+  /// In en, this message translates to:
+  /// **'View conversation'**
+  String get scheduledTasksOpenChat;
+
+  /// No description provided for @scheduledTasksNeedsInput.
+  ///
+  /// In en, this message translates to:
+  /// **'Stopped because user input or tool approval was required. Open the conversation to continue.'**
+  String get scheduledTasksNeedsInput;
+
+  /// No description provided for @scheduledTasksTimeout.
+  ///
+  /// In en, this message translates to:
+  /// **'The execution time limit was reached.'**
+  String get scheduledTasksTimeout;
+
+  /// No description provided for @scheduledTasksProcessTerminated.
+  ///
+  /// In en, this message translates to:
+  /// **'Android stopped the previous run.'**
+  String get scheduledTasksProcessTerminated;
+
+  /// No description provided for @scheduledTasksOnce.
+  ///
+  /// In en, this message translates to:
+  /// **'Once'**
+  String get scheduledTasksOnce;
+
+  /// No description provided for @scheduledTasksCustom.
+  ///
+  /// In en, this message translates to:
+  /// **'Custom'**
+  String get scheduledTasksCustom;
+
+  /// No description provided for @scheduledTasksExecution.
+  ///
+  /// In en, this message translates to:
+  /// **'Task'**
+  String get scheduledTasksExecution;
+
+  /// No description provided for @scheduledTasksMode.
+  ///
+  /// In en, this message translates to:
+  /// **'Action'**
+  String get scheduledTasksMode;
+
+  /// No description provided for @scheduledTasksNewChat.
+  ///
+  /// In en, this message translates to:
+  /// **'New chat'**
+  String get scheduledTasksNewChat;
+
+  /// No description provided for @scheduledTasksFollowUp.
+  ///
+  /// In en, this message translates to:
+  /// **'Follow up'**
+  String get scheduledTasksFollowUp;
+
+  /// No description provided for @scheduledTasksRegenerate.
+  ///
+  /// In en, this message translates to:
+  /// **'Run again'**
+  String get scheduledTasksRegenerate;
+
+  /// No description provided for @scheduledTasksChat.
+  ///
+  /// In en, this message translates to:
+  /// **'Conversation'**
+  String get scheduledTasksChat;
+
+  /// No description provided for @scheduledTasksChooseChat.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose a conversation'**
+  String get scheduledTasksChooseChat;
+
+  /// No description provided for @scheduledTasksMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Question to run again'**
+  String get scheduledTasksMessage;
+
+  /// No description provided for @scheduledTasksChooseMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose a question'**
+  String get scheduledTasksChooseMessage;
+
+  /// No description provided for @scheduledTasksAttachmentMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Message with attachments'**
+  String get scheduledTasksAttachmentMessage;
+
+  /// No description provided for @scheduledTasksModel.
+  ///
+  /// In en, this message translates to:
+  /// **'Model'**
+  String get scheduledTasksModel;
+
+  /// No description provided for @scheduledTasksChooseModel.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose a model'**
+  String get scheduledTasksChooseModel;
+
+  /// No description provided for @scheduledTasksModelDefault.
+  ///
+  /// In en, this message translates to:
+  /// **'Use the conversation or assistant model'**
+  String get scheduledTasksModelDefault;
+
+  /// No description provided for @scheduledTasksSchedule.
+  ///
+  /// In en, this message translates to:
+  /// **'Schedule'**
+  String get scheduledTasksSchedule;
+
+  /// No description provided for @scheduledTasksActiveWindow.
+  ///
+  /// In en, this message translates to:
+  /// **'Active dates'**
+  String get scheduledTasksActiveWindow;
+
+  /// No description provided for @scheduledTasksStartDate.
+  ///
+  /// In en, this message translates to:
+  /// **'Start date'**
+  String get scheduledTasksStartDate;
+
+  /// No description provided for @scheduledTasksEndDate.
+  ///
+  /// In en, this message translates to:
+  /// **'End date'**
+  String get scheduledTasksEndDate;
+
+  /// No description provided for @scheduledTasksActiveWindowDetail.
+  ///
+  /// In en, this message translates to:
+  /// **'Runs only within these dates, including the end date. Leave a date unset for no limit.'**
+  String get scheduledTasksActiveWindowDetail;
+
+  /// No description provided for @scheduledTasksDate.
+  ///
+  /// In en, this message translates to:
+  /// **'Date'**
+  String get scheduledTasksDate;
+
+  /// No description provided for @scheduledTasksDateUnrestricted.
+  ///
+  /// In en, this message translates to:
+  /// **'No limit'**
+  String get scheduledTasksDateUnrestricted;
+
+  /// No description provided for @scheduledTasksClear.
+  ///
+  /// In en, this message translates to:
+  /// **'Clear'**
+  String get scheduledTasksClear;
+
+  /// No description provided for @scheduledTasksSearch.
+  ///
+  /// In en, this message translates to:
+  /// **'Search'**
+  String get scheduledTasksSearch;
+
+  /// No description provided for @scheduledTasksNoTargets.
+  ///
+  /// In en, this message translates to:
+  /// **'No matching items for this assistant'**
+  String get scheduledTasksNoTargets;
+
+  /// No description provided for @scheduledTasksFutureDate.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose a future execution date and time.'**
+  String get scheduledTasksFutureDate;
+
+  /// No description provided for @scheduledTasksDateRangeInvalid.
+  ///
+  /// In en, this message translates to:
+  /// **'The end date must be on or after the start date.'**
+  String get scheduledTasksDateRangeInvalid;
+
+  /// No description provided for @scheduledTasksRegenerateDetail.
+  ///
+  /// In en, this message translates to:
+  /// **'Generates another answer to the selected question using its original context. Existing answers and later messages are kept.'**
+  String get scheduledTasksRegenerateDetail;
+
+  /// No description provided for @scheduledTasksSaving.
+  ///
+  /// In en, this message translates to:
+  /// **'Saving…'**
+  String get scheduledTasksSaving;
+
+  /// No description provided for @scheduledTasksFinished.
+  ///
+  /// In en, this message translates to:
+  /// **'Schedule ended'**
+  String get scheduledTasksFinished;
+
+  /// No description provided for @scheduledTasksModelMissing.
+  ///
+  /// In en, this message translates to:
+  /// **'The selected model is unavailable. Edit this task to choose another model.'**
+  String get scheduledTasksModelMissing;
+
+  /// No description provided for @scheduledTasksChatMissing.
+  ///
+  /// In en, this message translates to:
+  /// **'The conversation is unavailable or belongs to another assistant.'**
+  String get scheduledTasksChatMissing;
+
+  /// No description provided for @scheduledTasksMessageMissing.
+  ///
+  /// In en, this message translates to:
+  /// **'The selected question is no longer available.'**
+  String get scheduledTasksMessageMissing;
+
+  /// No description provided for @scheduledTasksChatBusy.
+  ///
+  /// In en, this message translates to:
+  /// **'This conversation is generating a reply. The scheduled run was skipped.'**
+  String get scheduledTasksChatBusy;
+
+  /// No description provided for @scheduledTasksDesktopEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No scheduled tasks'**
+  String get scheduledTasksDesktopEmpty;
+
+  /// No description provided for @scheduledTasksDesktopReliability.
+  ///
+  /// In en, this message translates to:
+  /// **'Tasks run only while Kelivo is running, including when minimized or in the system tray. Missed times are skipped after quitting or computer sleep. Kelivo will not start automatically.'**
+  String get scheduledTasksDesktopReliability;
+
+  /// No description provided for @scheduledTasksDesktopExecutionDetail.
+  ///
+  /// In en, this message translates to:
+  /// **'Results are saved in chats. Open them from the task’s run history. Runs stop after 10 minutes or when user input or tool approval is needed.'**
+  String get scheduledTasksDesktopExecutionDetail;
 }
 
 class _AppLocalizationsDelegate

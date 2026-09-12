@@ -134,6 +134,7 @@ class GenerationController {
     bool hasBuiltInSearch, {
     McpToolRouteSnapshot? mcpRouteSnapshot,
     WorkspaceToolContext? workspaceContext,
+    String? conversationId,
   }) {
     return toolHandlerService.buildToolDefinitions(
       settings,
@@ -144,6 +145,7 @@ class GenerationController {
       isToolModel: isToolModel,
       mcpRouteSnapshot: mcpRouteSnapshot,
       workspaceContext: workspaceContext,
+      conversationId: conversationId,
     );
   }
 

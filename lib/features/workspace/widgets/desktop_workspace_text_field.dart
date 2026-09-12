@@ -16,6 +16,10 @@ class DesktopWorkspaceTextField extends StatelessWidget {
     this.enabled = true,
     this.onChanged,
     this.onSubmitted,
+    this.minLines,
+    this.maxLines = 1,
+    this.fillColor,
+    this.borderColor,
   });
 
   final TextEditingController controller;
@@ -27,6 +31,10 @@ class DesktopWorkspaceTextField extends StatelessWidget {
   final bool enabled;
   final ValueChanged<String>? onChanged;
   final ValueChanged<String>? onSubmitted;
+  final int? minLines;
+  final int maxLines;
+  final Color? fillColor;
+  final Color? borderColor;
 
   @override
   Widget build(BuildContext context) {
@@ -39,7 +47,9 @@ class DesktopWorkspaceTextField extends StatelessWidget {
     );
     final border = OutlineInputBorder(
       borderRadius: BorderRadius.circular(borderRadius),
-      borderSide: BorderSide.none,
+      borderSide: borderColor == null
+          ? BorderSide.none
+          : BorderSide(color: borderColor!),
     );
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -57,22 +67,27 @@ class DesktopWorkspaceTextField extends StatelessWidget {
           const SizedBox(height: 8),
         ],
         SizedBox(
-          height: 36,
+          height: maxLines == 1 ? 36 : null,
           child: TextField(
             controller: controller,
             autofocus: autofocus,
             enabled: enabled,
-            maxLines: 1,
-            textAlignVertical: TextAlignVertical.center,
+            minLines: minLines,
+            maxLines: maxLines,
+            textAlignVertical: maxLines == 1
+                ? TextAlignVertical.center
+                : TextAlignVertical.top,
             style: style,
             onChanged: onChanged,
             onSubmitted: onSubmitted,
-            textInputAction: TextInputAction.done,
+            textInputAction: maxLines == 1
+                ? TextInputAction.done
+                : TextInputAction.newline,
             decoration: InputDecoration(
               isDense: false,
               isCollapsed: false,
               filled: true,
-              fillColor: context.appColors.surfaceFill,
+              fillColor: fillColor ?? context.appColors.surfaceFill,
               hintText: hintText,
               hintStyle: style.copyWith(
                 color: cs.onSurface.withValues(alpha: 0.4),
@@ -85,7 +100,10 @@ class DesktopWorkspaceTextField extends StatelessWidget {
                       color: cs.onSurface.withValues(alpha: 0.42),
                     ),
               prefixIconConstraints: const BoxConstraints(minWidth: 34),
-              contentPadding: const EdgeInsets.symmetric(horizontal: 10),
+              contentPadding: EdgeInsets.symmetric(
+                horizontal: 10,
+                vertical: maxLines == 1 ? 0 : 10,
+              ),
               border: border,
               enabledBorder: border,
               disabledBorder: border,

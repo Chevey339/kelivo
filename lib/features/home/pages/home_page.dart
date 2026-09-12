@@ -739,6 +739,7 @@ class _HomePageState extends State<HomePage>
       scrollController: _scrollController,
     );
 
+    _controller.onRevealConversation = () => _drawerController.jumpTo(0);
     _controller.addListener(_onControllerChanged);
     _drawerController.addListener(_onDrawerValueChanged);
 
@@ -1949,7 +1950,7 @@ class _HomePageState extends State<HomePage>
         return SafeArea(
           top: false,
           child: ContextManagementSheet(
-            clearLabel: _controller.clearContextLabel(),
+            messageCountLabel: _controller.contextMessageCountLabel(),
             onCompress: () async {
               await Navigator.of(ctx).maybePop();
               if (!mounted) return;

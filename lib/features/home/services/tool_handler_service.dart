@@ -247,13 +247,12 @@ class ToolHandlerService {
   /// - MCP tools (from selected servers for the assistant)
   /// Whether the chat being generated is a throwaway one.
   ///
-  /// Tool definitions are built without a conversation id, so this reads the
-  /// active conversation the same way the tool handler does.
-  bool _isTemporaryConversation() {
+  /// Scheduled sends can target a different conversation from the visible one.
+  bool _isTemporaryConversation(String? conversationId) {
     try {
       final chatService = contextProvider.read<ChatService>();
       return chatService.isTemporaryConversation(
-        chatService.currentConversationId,
+        conversationId ?? chatService.currentConversationId,
       );
     } catch (_) {
       return false;
@@ -269,6 +268,7 @@ class ToolHandlerService {
     required bool Function(String providerKey, String modelId) isToolModel,
     McpToolRouteSnapshot? mcpRouteSnapshot,
     WorkspaceToolContext? workspaceContext,
+    String? conversationId,
   }) {
     final List<Map<String, dynamic>> toolDefs = <Map<String, dynamic>>[];
     final supportsTools = isToolModel(providerKey, modelId);
@@ -294,7 +294,7 @@ class ToolHandlerService {
           writeScope: assistant.memoryWriteScope,
           enableMemory: assistant.enableMemory,
           allowPastConversationRecall: assistant.allowPastConversationRecall,
-          allowMemoryWrites: !_isTemporaryConversation(),
+          allowMemoryWrites: !_isTemporaryConversation(conversationId),
         ),
       );
     }

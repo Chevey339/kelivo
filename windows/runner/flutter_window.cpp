@@ -1,6 +1,7 @@
 #include "flutter_window.h"
 
 #include <optional>
+#include <chrono>
 #include <fstream>
 #include <vector>
 #include <string>
@@ -34,6 +35,23 @@ bool FlutterWindow::OnCreate() {
   }
   RegisterPlugins(flutter_controller_->engine());
   SetChildContent(flutter_controller_->view()->GetNativeWindow());
+
+  auto power_channel = std::make_unique<flutter::MethodChannel<flutter::EncodableValue>>(
+      flutter_controller_->engine()->messenger(), "app.desktop_power",
+      &flutter::StandardMethodCodec::GetInstance());
+  power_channel->SetMethodCallHandler(
+      [this](const flutter::MethodCall<flutter::EncodableValue>& call,
+             std::unique_ptr<flutter::MethodResult<flutter::EncodableValue>> result) {
+        if (call.method_name() != "state") {
+          result->NotImplemented();
+          return;
+        }
+        result->Success(flutter::EncodableMap{
+            {flutter::EncodableValue("sleeping"), flutter::EncodableValue(system_sleeping_)},
+            {flutter::EncodableValue("lastWakeAt"), flutter::EncodableValue(last_system_wake_at_)},
+        });
+      });
+
 
   // Method channel for clipboard images.
   auto channel = std::make_shared<flutter::MethodChannel<flutter::EncodableValue>>(
@@ -294,6 +312,16 @@ LRESULT
 FlutterWindow::MessageHandler(HWND hwnd, UINT const message,
                               WPARAM const wparam,
                               LPARAM const lparam) noexcept {
+  // Record power changes before a plugin can consume the window message.
+  if (message == WM_POWERBROADCAST) {
+    if (wparam == PBT_APMSUSPEND) {
+      system_sleeping_ = true;
+    } else if (wparam == PBT_APMRESUMEAUTOMATIC) {
+      system_sleeping_ = false;
+      last_system_wake_at_ = std::chrono::duration_cast<std::chrono::milliseconds>(
+          std::chrono::system_clock::now().time_since_epoch()).count();
+    }
+  }
   // Give Flutter, including plugins, an opportunity to handle window messages.
   if (flutter_controller_) {
     std::optional<LRESULT> result =
@@ -304,6 +332,8 @@ FlutterWindow::MessageHandler(HWND hwnd, UINT const message,
   }
 
   switch (message) {
+    case WM_POWERBROADCAST:
+      return TRUE;
     case WM_FONTCHANGE:
       flutter_controller_->engine()->ReloadSystemFonts();
       break;

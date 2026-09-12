@@ -188,13 +188,27 @@ class ResponsesStreamDecoder implements StreamChunkDecoder {
     return _closeOpenSeries();
   }
 
+  /// Text series id for one `message` output item.
+  ///
+  /// A hosted tool (built-in search) can split one response into several
+  /// `message` items. A sticky id merges them all into the first [TextPart],
+  /// so the tool card lands after the whole answer instead of between the two
+  /// halves it actually interrupted. Keying on `output_index` keeps each item
+  /// its own part, and the parts stay in arrival order.
+  String _textSeriesId(Map<String, dynamic> obj) =>
+      _ids.indexed('text', _readInt(obj['output_index']));
+
+  /// Reasoning series id for one `reasoning` output item. See [_textSeriesId].
+  String _reasoningSeriesId(Map<String, dynamic> obj) =>
+      _ids.indexed('reasoning', _readInt(obj['output_index']));
+
   void _parseEvent(Map<String, dynamic> obj, List<StreamChunk> chunks) {
     final type = obj['type'];
     if (type == 'response.output_text.delta') {
       final delta = obj['delta'];
       if (delta is String && delta.isNotEmpty) {
         approxCompletionChars += delta.length;
-        chunks.add(TextDelta(id: _ids.text(), text: delta));
+        chunks.add(TextDelta(id: _textSeriesId(obj), text: delta));
       }
       return;
     }
@@ -496,6 +510,15 @@ class ResponsesStreamDecoder implements StreamChunkDecoder {
         : _reasoningTextFromValue(item['summary']);
     if (text.isEmpty) return const <StreamChunk>[];
     final itemId = (item['id'] ?? '').toString();
+    final obj = <String, dynamic>{
+      'item_id': item['id'],
+      if (_outputItemIndexesById[itemId] != null)
+        'output_index': _outputItemIndexesById[itemId],
+      'summary_index': 0,
+      'type': contentText.isEmpty
+          ? 'response.reasoning_summary_text.done'
+          : 'response.reasoning_text.done',
+    };
 
     // A terminal item repeats everything that was streamed for it, possibly
     // across several summary parts and under a different field than the delta
@@ -513,7 +536,7 @@ class ResponsesStreamDecoder implements StreamChunkDecoder {
       _reasoningStreamedByItemId[itemId] = text;
       return <StreamChunk>[
         ReasoningDelta(
-          id: _ids.reasoning(),
+          id: _reasoningSeriesId(obj),
           text: delta,
           reasoningType:
               (_reasoningIsSummaryByItemId[itemId] ?? contentText.isEmpty)
@@ -523,15 +546,6 @@ class ResponsesStreamDecoder implements StreamChunkDecoder {
       ];
     }
 
-    final obj = <String, dynamic>{
-      'item_id': item['id'],
-      if (_outputItemIndexesById[itemId] != null)
-        'output_index': _outputItemIndexesById[itemId],
-      'summary_index': 0,
-      'type': contentText.isEmpty
-          ? 'response.reasoning_summary_text.done'
-          : 'response.reasoning_text.done',
-    };
     return _emitReasoningText(
       obj,
       text,
@@ -569,7 +583,7 @@ class ResponsesStreamDecoder implements StreamChunkDecoder {
     }
     return <StreamChunk>[
       ReasoningDelta(
-        id: _ids.reasoning(),
+        id: _reasoningSeriesId(obj),
         text: delta,
         reasoningType: isSummary
             ? ReasoningType.summaryText

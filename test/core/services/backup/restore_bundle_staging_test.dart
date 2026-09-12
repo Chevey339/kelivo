@@ -12,6 +12,9 @@ import 'package:sqlite3/sqlite3.dart'
     show sqlite3, OpenMode, SqliteException;
 
 import 'package:Kelivo/core/database/app_database.dart';
+import 'package:Kelivo/core/database/business_preferences.dart';
+import 'package:Kelivo/core/database/business_repository.dart';
+import 'package:Kelivo/core/database/extension_entity_store.dart';
 import 'package:Kelivo/core/database/chat_database_repository.dart';
 import 'package:Kelivo/core/services/backup/backup_cancel_token.dart';
 import 'package:Kelivo/core/services/backup/backup_task_progress.dart';
@@ -34,12 +37,14 @@ Future<Directory> _createExtractedBundle(
   bool validDatabase = true,
   bool includeFiles = false,
   bool includeSettings = true,
+  Map<String, Object?> settingsData = const {'theme': 'dark'},
+  Future<void> Function(AppDatabase)? seedDatabase,
 }) async {
   final extracted = Directory(p.join(root.path, 'extracted'));
   await extracted.create(recursive: true);
   final settings = File(p.join(extracted.path, 'settings.json'));
   if (includeSettings) {
-    await settings.writeAsString(jsonEncode({'theme': 'dark'}), flush: true);
+    await settings.writeAsString(jsonEncode(settingsData), flush: true);
   }
   final database = File(p.join(extracted.path, 'database', 'kelivo.db'));
   ChatDatabaseSnapshotInfo? databaseInfo;
@@ -49,6 +54,7 @@ Future<Directory> _createExtractedBundle(
       final appDatabase = AppDatabase.open(file: database);
       try {
         await appDatabase.customSelect('SELECT 1;').get();
+        await seedDatabase?.call(appDatabase);
       } finally {
         await appDatabase.close();
       }
@@ -298,6 +304,99 @@ void main() {
         check.close();
       }
     });
+
+    for (final hasLocalEnvironment in [false, true]) {
+      test(
+        'staging restores only target device state (installed: $hasLocalEnvironment)',
+        () async {
+          Future<void> seed(AppDatabase database, String prefix) async {
+            await BusinessPreferences(
+              BusinessRepository(database),
+            ).setString('environment_state_v1', '$prefix-installed');
+            final store = ExtensionEntityStore(database);
+            await store.upsert('workspace', '$prefix-linked', {
+              'id': '$prefix-linked',
+              'kind': 'linked',
+              'hostPath': '/$prefix/folder',
+            });
+            await store.upsert('externalMounts', 'global', {
+              'bookmark': '$prefix-bookmark',
+            });
+          }
+
+          if (hasLocalEnvironment) {
+            final local = AppDatabase.open(
+              file: File(p.join(root.path, AppDatabase.databaseFileName)),
+            );
+            try {
+              await seed(local, 'target');
+            } finally {
+              await local.close();
+            }
+          }
+          final extracted = await _createExtractedBundle(
+            root,
+            settingsData: {
+              'environment_state_v1': 'source-installed',
+              'workspaces_v1': jsonEncode([
+                {
+                  'id': 'source-linked',
+                  'name': 'Source linked',
+                  'kind': 'linked',
+                  'hostPath': '/source/folder',
+                },
+                {'id': 'managed', 'name': 'Managed', 'kind': 'managed'},
+              ]),
+            },
+            seedDatabase: (database) => seed(database, 'source'),
+          );
+          final staged = await RestoreBundleStaging.create(
+            appDataDirectory: root,
+            extractedDirectory: extracted,
+            includeChats: true,
+            includeFiles: false,
+            sourceManifestSha256: await _manifestSha256(extracted),
+          );
+          await RestoreBundleStaging.validateExistingCandidate(
+            candidateDirectory: staged.payloadDirectory,
+            expectedManifestSha256: staged.candidateManifestSha256,
+          );
+          final candidate = AppDatabase.open(
+            file: File(
+              p.join(staged.payloadDirectory.path, 'database', 'kelivo.db'),
+            ),
+          );
+          try {
+            final prefs = await BusinessRepository(
+              candidate,
+            ).preferenceSnapshot();
+            expect(
+              prefs['environment_state_v1'],
+              hasLocalEnvironment ? 'target-installed' : null,
+            );
+            final store = ExtensionEntityStore(candidate);
+            expect(await store.get('workspace', 'source-linked'), isNull);
+            expect(await store.get('workspace', 'managed'), isNotNull);
+            expect(
+              (await store.get(
+                'workspace',
+                'target-linked',
+              ))?.payload['hostPath'],
+              hasLocalEnvironment ? '/target/folder' : null,
+            );
+            expect(
+              (await store.get(
+                'externalMounts',
+                'global',
+              ))?.payload['bookmark'],
+              hasLocalEnvironment ? 'target-bookmark' : null,
+            );
+          } finally {
+            await candidate.close();
+          }
+        },
+      );
+    }
 
     test('binds a normalized candidate to a strict run identity', () async {
       final extracted = await _createExtractedBundle(root);

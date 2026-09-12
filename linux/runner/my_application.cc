@@ -11,6 +11,9 @@
 struct _MyApplication {
   GtkApplication parent_instance;
   char** dart_entrypoint_arguments;
+  GDBusProxy* power_proxy;
+  gboolean system_sleeping;
+  gint64 last_system_wake_at;
 };
 
 G_DEFINE_TYPE(MyApplication, my_application, GTK_TYPE_APPLICATION)
@@ -98,6 +101,54 @@ static void my_application_activate(GApplication* application) {
   gtk_container_add(GTK_CONTAINER(window), GTK_WIDGET(view));
 
   fl_register_plugins(FL_PLUGIN_REGISTRY(view));
+
+  // logind reports system suspend/hibernate, independently of Flutter focus.
+  if (self->power_proxy == nullptr) {
+    self->power_proxy = g_dbus_proxy_new_for_bus_sync(
+        G_BUS_TYPE_SYSTEM, G_DBUS_PROXY_FLAGS_DO_NOT_AUTO_START, nullptr,
+        "org.freedesktop.login1", "/org/freedesktop/login1",
+        "org.freedesktop.login1.Manager", nullptr, nullptr);
+    if (self->power_proxy != nullptr) {
+      g_autoptr(GVariant) sleeping = g_dbus_proxy_get_cached_property(
+          self->power_proxy, "PreparingForSleep");
+      self->system_sleeping = sleeping != nullptr && g_variant_get_boolean(sleeping);
+      g_signal_connect(self->power_proxy, "g-signal", G_CALLBACK(+[](
+          GDBusProxy*, const gchar*, const gchar* signal, GVariant* parameters, gpointer data) {
+        auto* self = MY_APPLICATION(data);
+        if (g_strcmp0(signal, "PrepareForSleep") != 0) return;
+        g_variant_get(parameters, "(b)", &self->system_sleeping);
+        if (!self->system_sleeping) self->last_system_wake_at = g_get_real_time() / 1000;
+      }), self);
+    }
+  }
+  g_autoptr(FlStandardMethodCodec) power_codec = fl_standard_method_codec_new();
+  g_autoptr(FlMethodChannel) power_channel = fl_method_channel_new(
+      fl_engine_get_binary_messenger(fl_view_get_engine(view)),
+      "app.desktop_power", FL_METHOD_CODEC(power_codec));
+  fl_method_channel_set_method_call_handler(power_channel,
+      [](FlMethodChannel*, FlMethodCall* call, gpointer data) {
+        auto* self = MY_APPLICATION(data);
+        if (g_strcmp0(fl_method_call_get_name(call), "state") != 0) {
+          g_autoptr(FlMethodResponse) response = FL_METHOD_RESPONSE(
+              fl_method_not_implemented_response_new());
+          fl_method_call_respond(call, response, nullptr);
+          return;
+        }
+        g_autofree gchar* owner = self->power_proxy == nullptr ? nullptr
+            : g_dbus_proxy_get_name_owner(self->power_proxy);
+        if (owner == nullptr) {
+          g_autoptr(FlMethodResponse) response = FL_METHOD_RESPONSE(
+              fl_method_error_response_new("power_monitor_unavailable",
+                                           "System sleep monitor is unavailable", nullptr));
+          fl_method_call_respond(call, response, nullptr);
+          return;
+        }
+        g_autoptr(FlValue) state = fl_value_new_map();
+        fl_value_set_string_take(state, "sleeping", fl_value_new_bool(self->system_sleeping));
+        fl_value_set_string_take(state, "lastWakeAt", fl_value_new_int(self->last_system_wake_at));
+        fl_method_call_respond_success(call, state, nullptr);
+      }, self, nullptr);
+
 
   gtk_widget_grab_focus(GTK_WIDGET(view));
 
@@ -232,6 +283,10 @@ static void my_application_shutdown(GApplication* application) {
 // Implements GObject::dispose.
 static void my_application_dispose(GObject* object) {
   MyApplication* self = MY_APPLICATION(object);
+  if (self->power_proxy != nullptr) {
+    g_signal_handlers_disconnect_by_data(self->power_proxy, self);
+    g_clear_object(&self->power_proxy);
+  }
   g_clear_pointer(&self->dart_entrypoint_arguments, g_strfreev);
   G_OBJECT_CLASS(my_application_parent_class)->dispose(object);
 }

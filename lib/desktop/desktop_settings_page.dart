@@ -59,6 +59,8 @@ import 'setting/quick_phrases_pane.dart';
 import 'setting/instruction_injection_pane.dart';
 import 'setting/world_book_pane.dart';
 import 'setting/backup_pane.dart';
+import 'setting/scheduled_tasks_pane.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart' show LucideIcons;
 import 'setting/hotkeys_pane.dart';
 import 'setting/network_proxy_pane.dart';
 import 'setting/auto_retry_pane.dart';
@@ -115,6 +117,7 @@ enum _SettingsMenuItem {
   tts,
   networkProxy,
   backup,
+  scheduledTasks,
   hotkeys,
   stats,
   about,
@@ -243,6 +246,10 @@ class _DesktopSettingsPageState extends State<DesktopSettingsPage> {
                           return const DesktopBackupPane(
                             key: ValueKey('backup'),
                           );
+                        case _SettingsMenuItem.scheduledTasks:
+                          return const DesktopScheduledTasksPane(
+                            key: ValueKey('scheduledTasks'),
+                          );
                         case _SettingsMenuItem.hotkeys:
                           return const DesktopHotkeysPane(
                             key: ValueKey('hotkeys'),
@@ -356,6 +363,11 @@ class _SettingsMenu extends StatelessWidget {
         _SettingsMenuItem.backup,
         lucide.Lucide.Database,
         l10n.settingsPageBackup,
+      ),
+      (
+        _SettingsMenuItem.scheduledTasks,
+        LucideIcons.clock,
+        l10n.scheduledTasksTitle,
       ),
       (
         _SettingsMenuItem.hotkeys,

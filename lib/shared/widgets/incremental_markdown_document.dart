@@ -37,6 +37,7 @@ final class IncrementalMarkdownDocument {
   final MarkdownLineLexer _lexer = MarkdownLineLexer();
   final MarkdownDisplayMathScanner _mathScanner = MarkdownDisplayMathScanner();
   int _rescannedCodeUnits = 0;
+  bool _lastUpdateAppended = true;
   int _scanCursor = 0;
   int _lineStart = 0;
   int _blockStart = 0;
@@ -47,13 +48,23 @@ final class IncrementalMarkdownDocument {
   List<IncrementalMarkdownBlock> get blocks => _blocks;
   int get rescannedCodeUnits => _rescannedCodeUnits;
 
+  /// The last source retained its previous prefix. Blocks at the same start
+  /// offset therefore retain their prefix too (apart from trailing whitespace).
+  bool get lastUpdateAppended => _lastUpdateAppended;
+
   /// Whether [_source] is still the caller's raw string. False after a CR
   /// forced a normalized copy.
   bool get debugReusesCallerSource => identical(_source, _rawSource);
 
-  List<IncrementalMarkdownBlock> update(String source) {
-    if (source == _rawSource) return _blocks;
-    if (!source.startsWith(_rawSource)) {
+  /// [appendOnly] may be supplied when the owner already compared this exact
+  /// source with the preceding update. Omit it for independently rewritten text.
+  List<IncrementalMarkdownBlock> update(String source, {bool? appendOnly}) {
+    if (source == _rawSource) {
+      _lastUpdateAppended = true;
+      return _blocks;
+    }
+    _lastUpdateAppended = appendOnly ?? source.startsWith(_rawSource);
+    if (!_lastUpdateAppended) {
       _stableBlocks.clear();
       _scanCursor = 0;
       _lineStart = 0;
@@ -146,7 +157,8 @@ final class IncrementalMarkdownDocument {
   }
 
   void _scanCompletedLines() {
-    final mathScan = _mathScanner.synchronize(_source);
+    // update already validated the prefix and reset both scanners on edits.
+    final mathScan = _mathScanner.synchronize(_source, appendOnly: true);
     while (_scanCursor < _source.length) {
       final newline = _source.indexOf('\n', _scanCursor);
       if (newline < 0) {

@@ -281,7 +281,10 @@ abstract class BuiltInToolsHelper {
   }
 
   static bool isDeepSeekResponsesBuiltInSearchSupportedModel(String? modelId) {
-    return _normalizedModelId(modelId).startsWith('deepseek-v4-');
+    return RegExp(
+      r'(^|[/_:@])(?:deepseek-v4-|deepseek-flash(?:$|[-.]))',
+      caseSensitive: false,
+    ).hasMatch(_normalizedModelId(modelId));
   }
 
   static bool isDashScopeChatBuiltInSearchSupportedModel(String? modelId) {

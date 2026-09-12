@@ -1,3 +1,5 @@
+import '../../../core/services/scheduled_tasks_service.dart';
+import '../../scheduled_tasks/scheduled_task_runner.dart';
 import 'dart:async';
 import 'package:flutter/foundation.dart' show listEquals, defaultTargetPlatform;
 import 'package:flutter/material.dart';
@@ -237,6 +239,9 @@ class HomePageController extends ChangeNotifier {
 
   // Drawer state
   double _lastDrawerValue = 0.0;
+
+  /// Reveal a conversation opened from a notification or scheduled run history.
+  VoidCallback? onRevealConversation;
 
   // Desktop global-search mode
   bool _isGlobalSearchMode = false;
@@ -680,7 +685,15 @@ class HomePageController extends ChangeNotifier {
   }
 
   void _setupNotificationActions() {
-    if (!_isAndroid && defaultTargetPlatform != TargetPlatform.iOS) return;
+    if (!_isAndroid &&
+        !const {
+          TargetPlatform.iOS,
+          TargetPlatform.macOS,
+          TargetPlatform.windows,
+          TargetPlatform.linux,
+        }.contains(defaultTargetPlatform)) {
+      return;
+    }
     MobileBackgroundCoordinator.instance.visibleConversation =
         _visibleBackgroundConversation;
     _notificationTapSub = NotificationService.conversationTaps.listen(
@@ -729,6 +742,7 @@ class HomePageController extends ChangeNotifier {
           _pendingNotificationConversationId = conversationId;
           break;
         }
+        onRevealConversation?.call();
         await switchConversationAnimated(conversationId);
       }
     } catch (error) {
@@ -830,6 +844,17 @@ class HomePageController extends ChangeNotifier {
         }
       }
       _chatInitialized = true;
+      if (ScheduledTasksService.supported) {
+        final executor = _scheduledExecutor =
+            (task, cancellation, onConversation) => runScheduledTask(
+              _context,
+              _viewModel,
+              task,
+              cancellation,
+              onConversation,
+            );
+        unawaited(ScheduledTasksService.instance.attach(executor));
+      }
     } finally {
       _startupConversationPending = false;
       notifyListeners();
@@ -2752,13 +2777,14 @@ class HomePageController extends ChangeNotifier {
 
   String titleForLocale() => _titleForLocale(_context);
 
-  String clearContextLabel() {
+  /// Trailing label for the context management sheet, e.g. "12 messages".
+  String contextMessageCountLabel() {
     final l10n = AppLocalizations.of(_context)!;
-    return _viewModel.getClearContextLabel(
-      (actual, configured) =>
-          l10n.homePageClearContextWithCount(actual, configured),
-      l10n.homePageClearContext,
-    );
+    final count = _viewModel.getContextMessageCount();
+    final configured = count.configured;
+    return configured == null
+        ? l10n.contextMessageCount(count.actual)
+        : l10n.contextMessageCountLimited(count.actual, configured);
   }
 
   String? currentStreamingMessageId() {
@@ -2926,8 +2952,13 @@ class HomePageController extends ChangeNotifier {
   // Disposal
   // ============================================================================
 
+  ScheduledTaskExecutor? _scheduledExecutor;
+
   @override
   void dispose() {
+    if (_scheduledExecutor case final executor?) {
+      ScheduledTasksService.instance.detach(executor);
+    }
     final background = MobileBackgroundCoordinator.instance;
     if (background.visibleConversation == _visibleBackgroundConversation) {
       background.visibleConversation = null;

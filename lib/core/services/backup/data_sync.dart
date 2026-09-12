@@ -28,8 +28,11 @@ import '../migration/legacy_record_sanitizer.dart';
 import '../../utils/multimodal_input_utils.dart';
 import '../../../utils/app_directories.dart';
 import '../../../utils/sandbox_path_resolver.dart';
+import '../../database/backup_portability.dart';
 import 'backup_settings_validator.dart';
 import 'restore_bundle_preparation.dart';
+import 'restore_workspace_lock.dart';
+import 'restore_business_lease.dart';
 import 'temporary_restore_file.dart';
 import 'backup_cancel_token.dart';
 import 'backup_isolate_runner.dart';
@@ -338,6 +341,100 @@ class DataSync {
     cancelToken: cancelToken,
   );
 
+  /// Prepares a local snapshot without opening the live database or providers.
+  /// The normal startup gate installs the durable candidate on restart, keeping
+  /// the previous data for rollback. The source archive is never modified.
+  static Future<void> prepareStartupSnapshotRestore({
+    required Directory appDataDirectory,
+    required File snapshot,
+    RestoreBusinessLease? businessLease,
+    BackupProgressSink? onProgress,
+  }) async {
+    final ownedLease = businessLease == null
+        ? await RestoreBusinessLease.acquire(appDataDirectory: appDataDirectory)
+        : null;
+    final lease = businessLease ?? ownedLease!;
+    Directory? extractDir;
+    Object? restoreError;
+    try {
+      final expectedLeasePath = p.join(
+        appDataDirectory.absolute.path,
+        RestoreBusinessLease.leaseDirectoryName,
+        RestoreBusinessLease.lockFileName,
+      );
+      if (lease.isClosed ||
+          !p.equals(lease.lockFile.absolute.path, expectedLeasePath)) {
+        throw StateError('restore_startup_business_lease');
+      }
+      extractDir = await Directory.systemTemp.createTemp(
+        'kelivo-startup-snapshot-',
+      );
+      registerLiveTempPath(extractDir.path);
+      await runBackupIsolate<void, _BackupExtractArgs>(
+        body: _extractZipInIsolate,
+        payload: _BackupExtractArgs(
+          zipPath: snapshot.path,
+          extractDirPath: extractDir.path,
+        ),
+        onProgress: onProgress,
+      );
+      final info =
+          await runBackupIsolate<_VersionedBackupInfo, _BackupPreflightArgs>(
+            body: _preflightVersionedBackupInIsolate,
+            payload: _BackupPreflightArgs(
+              manifestPath: p.join(extractDir.path, _manifestEntryName),
+              extractDirPath: extractDir.path,
+              allowUnverifiedForwardCompatible: false,
+            ),
+            onProgress: onProgress,
+          );
+      if (!info.includeChats) {
+        throw const FormatException('restore_preparation_database_required');
+      }
+      final settings = await runBackupIsolate<Map<String, dynamic>, String>(
+        body: _readSettingsJsonInIsolate,
+        payload: p.join(extractDir.path, 'settings.json'),
+        onProgress: onProgress,
+      );
+      BackupSettingsValidator.normalizeAndValidate(settings);
+      final workspaceLock = RestoreWorkspaceLock(
+        appDataDirectory: appDataDirectory,
+      );
+      await workspaceLock.synchronized(
+        workspaceLock.beginSnapshotRecoveryWhileLocked,
+      );
+      await RestoreBundlePreparation.prepare(
+        appDataDirectory: appDataDirectory,
+        extractedDirectory: extractDir,
+        sourceManifestSha256: info.normalizedManifestSha256,
+        bundleIncludesChats: info.includeChats,
+        bundleIncludesFiles: info.includeFiles,
+        restoreChats: true,
+        restoreFiles: false,
+        useExistingLocalAttachments: true,
+        validatedSettings: settings,
+        onProgress: onProgress,
+      );
+      await workspaceLock.synchronized(
+        workspaceLock.finishSnapshotRecoveryWhileLocked,
+      );
+    } catch (error) {
+      restoreError = error;
+      rethrow;
+    } finally {
+      try {
+        if (extractDir != null) {
+          await deleteTempDirectoryWhenIsolateSafe(
+            extractDir,
+            error: restoreError,
+          );
+        }
+      } finally {
+        await ownedLease?.close();
+      }
+    }
+  }
+
   // ===== WebDAV helpers =====
   Uri _collectionUri(WebDavConfig cfg) {
     String base = cfg.url.trim();
@@ -568,6 +665,7 @@ class DataSync {
           ),
         );
         snapshotInfo = await snapshotDatabase(databaseFile);
+        await _sanitizeBackupDatabase(databaseFile);
       }
 
       final packageInfo = await PackageInfo.fromPlatform();
@@ -2412,12 +2510,14 @@ class DataSync {
       }
       geminiThoughtSigs[entry.key.toString()] = entry.value as String;
     }
-    final conversations = (chats['conversations'] as List)
-        .map(
-          (entry) =>
-              Conversation.fromJson((entry as Map).cast<String, dynamic>()),
-        )
-        .toList();
+    final conversations = (chats['conversations'] as List).map((entry) {
+      final conversation = Conversation.fromJson(
+        (entry as Map).cast<String, dynamic>(),
+      );
+      return conversation.copyWith(
+        extras: {...conversation.extras}..remove('workspace.allowAll'),
+      );
+    }).toList();
 
     // Import boundary for legacy chats.json: promote marker-bearing content
     // into structured parts only when the raw JSON lacks a `parts` list.
@@ -2832,7 +2932,7 @@ class DataSync {
   static Future<({String settingsJson, Map<String, List<String>> entityRowIds})>
   exportBusinessSettingsFrom(BusinessRepository repository) async {
     final exported = BusinessSettingsRouter.exportSnapshotWithRowIds(
-      await repository.readSnapshot(),
+      BackupPortability.portable(await repository.readSnapshot()),
     );
     final settings = Map<String, Object>.from(exported.settings);
     settings.removeWhere((key, _) => BackupSettingsValidator.shouldIgnore(key));
@@ -2841,6 +2941,16 @@ class DataSync {
       settingsJson: jsonEncode(settings),
       entityRowIds: exported.entityRowIds,
     );
+  }
+
+  static Future<void> _sanitizeBackupDatabase(File file) async {
+    final database = AppDatabase.open(file: file);
+    try {
+      await BackupPortability.sanitizeDatabase(database);
+    } finally {
+      await database.close();
+    }
+    await ChatDatabaseRepository.normalizeSnapshotJournal(file);
   }
 
   /// Reads a backup file's manifest and reports what restoring it would mean.
@@ -3031,6 +3141,9 @@ class DataSync {
           return;
         }
         if (restoreChats) {
+          await _sanitizeBackupDatabase(
+            File(p.join(extractDir.path, _databaseEntryName)),
+          );
           beginNonCancellableCommit();
           _lastMergeReport = await chatService.mergeDatabaseSnapshot(
             File(p.join(extractDir.path, _databaseEntryName)),

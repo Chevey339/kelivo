@@ -23,6 +23,7 @@ import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
 import com.psyche.kelivo.MainActivity
+import com.psyche.kelivo.KelivoApplication
 import com.psyche.kelivo.R
 import io.flutter.plugin.common.BinaryMessenger
 import io.flutter.plugin.common.MethodChannel
@@ -82,7 +83,21 @@ class BackgroundRuntime(private val context: Context) {
     fun enabled(key: String) = settings[key] == true
     fun label(key: String, default: String) = labels[key] as? String ?: default
     fun setting(key: String) = settings[key]
-    fun shouldRunService() = enabled("androidEnabled") && tasks.isNotEmpty() && !blocked
+    private val scheduledRuns = mutableSetOf<String>()
+    val hasScheduledRuns get() = scheduledRuns.isNotEmpty()
+    fun shouldRunService() = ((enabled("androidEnabled") && tasks.isNotEmpty()) || hasScheduledRuns) && !blocked
+
+    fun beginScheduledRun(id: String) {
+        scheduledRuns.add(id)
+        blocked = false
+        reconcileService()
+        if (blocked) (context as KelivoApplication).scheduledTasks.stopAll("foreground_service_start_failed")
+    }
+
+    fun endScheduledRun(id: String) {
+        scheduledRuns.remove(id)
+        reconcileService()
+    }
 
     fun configure(messenger: BinaryMessenger) {
         channel = MethodChannel(messenger, "app.mobile_background").also { channel ->
@@ -119,8 +134,8 @@ class BackgroundRuntime(private val context: Context) {
         }
         // A new process cannot resume an old HTTP stream. Never restore an
         // ongoing notification or overlay from persisted task metadata.
-        context.getSystemService(NotificationManager::class.java)?.cancel(NOTIFICATION_ID)
-        if (prefs.getBoolean("service_was_active", false)) {
+        if (service == null && !serviceStarting) context.getSystemService(NotificationManager::class.java)?.cancel(NOTIFICATION_ID)
+        if (service == null && prefs.getBoolean("service_was_active", false)) {
             recordError("previous_process_terminated")
             prefs.edit().putBoolean("service_was_active", false).apply()
         }
@@ -205,6 +220,7 @@ class BackgroundRuntime(private val context: Context) {
         val ids = tasks.map { it.id }
         blocked = true
         if (reason != null) recordError(reason)
+        (context as? KelivoApplication)?.scheduledTasks?.stopAll(reason ?: "cancelled")
         channel?.invokeMethod(if (reason == null) "cancelTasks" else "interrupted",
             mapOf("ids" to ids, "reason" to reason))
         overlay.dismissAll()
@@ -315,6 +331,7 @@ class BackgroundRuntime(private val context: Context) {
         blocked = true
         serviceStarting = false
         recordError(message)
+        (context as? KelivoApplication)?.scheduledTasks?.stopAll(message)
         channel?.invokeMethod("statusChanged", null)
     }
 

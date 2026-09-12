@@ -38,6 +38,13 @@ class MainActivity : FlutterActivity() {
         kelivo.backgroundRuntime.setForeground(true)
     }
 
+    override fun onPostResume() {
+        super.onPostResume()
+        // A headless engine may have sent SystemChrome settings before its
+        // Activity/PlatformPlugin existed. Apply the window policy on attach.
+        applyEdgeToEdgeSystemBars(window)
+    }
+
     override fun onStop() {
         kelivo.backgroundRuntime.setForeground(false)
         super.onStop()

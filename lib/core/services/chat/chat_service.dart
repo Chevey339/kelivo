@@ -1859,9 +1859,10 @@ class ChatService extends ChangeNotifier {
   Future<Conversation> createConversation({
     String? title,
     String? assistantId,
+    bool activate = true,
   }) async {
     if (!_initialized) await init();
-    _discardTemporaryConversation(_currentConversationId);
+    if (activate) _discardTemporaryConversation(_currentConversationId);
 
     final conversation = Conversation(
       title: title ?? _defaultConversationTitle,
@@ -1870,7 +1871,7 @@ class ChatService extends ChangeNotifier {
     );
 
     await _saveConversation(conversation);
-    _currentConversationId = conversation.id;
+    if (activate) _currentConversationId = conversation.id;
     _enforceMessageCacheLimits();
     _bumpConversationListRevision();
     notifyListeners();

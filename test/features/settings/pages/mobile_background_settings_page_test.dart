@@ -2,6 +2,7 @@ import 'package:Kelivo/core/providers/settings_provider.dart';
 import 'package:Kelivo/core/services/mobile_background.dart';
 import 'package:Kelivo/features/settings/pages/mobile_background_settings_page.dart';
 import 'package:Kelivo/features/settings/pages/background_overlay_settings_page.dart';
+import 'package:Kelivo/icons/lucide_adapter.dart';
 import 'package:Kelivo/shared/widgets/form_sheet.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
 import 'package:Kelivo/shared/widgets/ios_switch.dart';
@@ -139,6 +140,17 @@ void main() {
       );
     },
   );
+
+  testWidgets('iOS toggle and completion icons share the same leading slot', (
+    tester,
+  ) async {
+    await show(tester, TargetPlatform.iOS);
+    final locationIcon = find.byIcon(Lucide.MapPin).first;
+    final timerIcon = find.byIcon(Lucide.Timer);
+    await tester.scrollUntilVisible(timerIcon, 250);
+    await tester.pumpAndSettle();
+    expect(tester.getTopLeft(timerIcon).dx, tester.getTopLeft(locationIcon).dx);
+  });
 
   testWidgets(
     'small screen can reach controls and persist completion choice without overflow',

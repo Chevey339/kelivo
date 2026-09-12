@@ -297,6 +297,10 @@ class SettingsProvider extends ChangeNotifier {
       'display_auto_collapse_code_block_v1';
   static const String _displayAutoCollapseCodeBlockLinesKey =
       'display_auto_collapse_code_block_lines_v1';
+  static const String _displayCollapseLongUserMessagesKey =
+      'display_collapse_long_user_messages_v1';
+  static const String _displayCollapseLongUserMessageCharsKey =
+      'display_collapse_long_user_message_chars_v1';
   static const String _displayDesktopAutoSwitchTopicsKey =
       'display_desktop_auto_switch_topics_v1';
   static const String _displayDesktopShowTrayKey =
@@ -1251,6 +1255,15 @@ class SettingsProvider extends ChangeNotifier {
           1,
           999,
         );
+    _collapseLongUserMessages =
+        prefs.getBool(_displayCollapseLongUserMessagesKey) ?? false;
+    _collapseLongUserMessageChars =
+        (prefs.getInt(_displayCollapseLongUserMessageCharsKey) ??
+                defaultCollapseLongUserMessageChars)
+            .clamp(
+              minCollapseLongUserMessageChars,
+              maxCollapseLongUserMessageChars,
+            );
     _desktopAutoSwitchTopics =
         prefs.getBool(_displayDesktopAutoSwitchTopicsKey) ?? false;
     // Desktop: tray settings (default enabled on desktop platforms)
@@ -5278,6 +5291,35 @@ Requirements:
     await prefs.setInt(_displayAutoCollapseCodeBlockLinesKey, next);
   }
 
+  // Display: collapse over-long user messages behind an expand toggle
+  bool _collapseLongUserMessages = false;
+  bool get collapseLongUserMessages => _collapseLongUserMessages;
+  Future<void> setCollapseLongUserMessages(bool v) async {
+    if (_collapseLongUserMessages == v) return;
+    _collapseLongUserMessages = v;
+    notifyListeners();
+    final prefs = _preferences;
+    await prefs.setBool(_displayCollapseLongUserMessagesKey, v);
+  }
+
+  // Display: user message collapse threshold (characters)
+  static const int defaultCollapseLongUserMessageChars = 500;
+  static const int minCollapseLongUserMessageChars = 50;
+  static const int maxCollapseLongUserMessageChars = 100000;
+  int _collapseLongUserMessageChars = defaultCollapseLongUserMessageChars;
+  int get collapseLongUserMessageChars => _collapseLongUserMessageChars;
+  Future<void> setCollapseLongUserMessageChars(int v) async {
+    final next = v.clamp(
+      minCollapseLongUserMessageChars,
+      maxCollapseLongUserMessageChars,
+    );
+    if (_collapseLongUserMessageChars == next) return;
+    _collapseLongUserMessageChars = next;
+    notifyListeners();
+    final prefs = _preferences;
+    await prefs.setInt(_displayCollapseLongUserMessageCharsKey, next);
+  }
+
   // Desktop-only: auto switch to Topics tab when changing assistant
   bool _desktopAutoSwitchTopics = false;
   bool get desktopAutoSwitchTopics => _desktopAutoSwitchTopics;
@@ -5774,6 +5816,8 @@ Requirements:
     copy._showChatListDate = _showChatListDate;
     copy._autoCollapseCodeBlock = _autoCollapseCodeBlock;
     copy._autoCollapseCodeBlockLines = _autoCollapseCodeBlockLines;
+    copy._collapseLongUserMessages = _collapseLongUserMessages;
+    copy._collapseLongUserMessageChars = _collapseLongUserMessageChars;
     copy._desktopAutoSwitchTopics = _desktopAutoSwitchTopics;
     copy._desktopShowTray = _desktopShowTray;
     copy._desktopMinimizeToTrayOnClose = _desktopMinimizeToTrayOnClose;

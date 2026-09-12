@@ -33,6 +33,29 @@ void main() {
     SharedPreferences.setMockInitialValues({});
   });
 
+  testWidgets('untracked tool-round reasoning starts with collapsed height', (
+    tester,
+  ) async {
+    ChatMessage message(String id, int lines) => ChatMessage(
+      id: id,
+      role: 'assistant',
+      conversationId: 'conversation-1',
+      parts: [
+        const ReasoningPart('first thought'),
+        const ToolCallPart('{"id":"t1","name":"read_file","arguments":{}}'),
+        ReasoningPart(List.filled(lines, 'second thought').join('\n')),
+        const TextPart('answer'),
+      ],
+    );
+    final short = await _estimateExtent(tester, message: message('short', 1));
+    final shortHeight = tester.getSize(find.byType(ChatMessageWidget)).height;
+    final long = await _estimateExtent(tester, message: message('long', 120));
+    final longHeight = tester.getSize(find.byType(ChatMessageWidget)).height;
+    expect(find.textContaining('second thought'), findsNothing);
+    expect(longHeight, closeTo(shortHeight, 1));
+    expect(long, closeTo(short, 1));
+  });
+
   for (final collapsed in [true, false]) {
     testWidgets('inline tool thinking height follows collapse=$collapsed', (
       tester,

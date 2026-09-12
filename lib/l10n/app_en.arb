@@ -229,14 +229,22 @@
   "languageSelectSheetTitle": "Select Translation Language",
   "languageSelectSheetClearButton": "Clear Translation",
   "homePageClearContext": "Clear Context",
-  "homePageClearContextWithCount": "Clear Context ({actual}/{configured})",
-  "@homePageClearContextWithCount": {
+  "contextMessageCount": "{count} messages",
+  "@contextMessageCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "contextMessageCountLimited": "{actual}/{configured} messages",
+  "@contextMessageCountLimited": {
     "placeholders": {
       "actual": {
-        "type": "String"
+        "type": "int"
       },
       "configured": {
-        "type": "String"
+        "type": "int"
       }
     }
   },
@@ -1192,6 +1200,12 @@
   "displaySettingsPageAutoCollapseCodeBlockTitle": "Auto-collapse Code Blocks",
   "displaySettingsPageAutoCollapseCodeBlockLinesTitle": "Auto-collapse threshold",
   "displaySettingsPageAutoCollapseCodeBlockLinesUnit": "lines",
+  "displaySettingsPageCollapseLongUserMessagesTitle": "Collapse Long Messages",
+  "displaySettingsPageCollapseLongUserMessagesSubtitle": "Fold user messages past the threshold behind an expand button",
+  "displaySettingsPageCollapseLongUserMessagesCharsTitle": "Collapse threshold",
+  "displaySettingsPageCollapseLongUserMessagesCharsUnit": "chars",
+  "chatMessageExpandLongText": "Expand",
+  "chatMessageCollapseLongText": "Collapse",
   "messageExportSheetFormatTitle": "Export Format",
   "messageExportSheetMarkdown": "Markdown",
   "messageExportSheetSingleMarkdownSubtitle": "Export this message as a Markdown file",
@@ -4935,5 +4949,114 @@
   "mcpImportJsonHint": "Paste a Claude Desktop or Cursor MCP configuration. Preview and add servers without replacing existing ones.",
   "mcpImportPaste": "Paste from Clipboard",
   "mcpImportPreview": "Preview",
-  "mcpImportConfirm": "Import"
+  "mcpImportConfirm": "Import",
+  "startupRecoverySnapshotTitle": "Restore from a database snapshot",
+  "startupRecoverySnapshotBody": "Choose a snapshot on this device to recover your chats and settings, even when the database cannot open. Do not uninstall Kelivo: uninstalling also removes these snapshots.",
+  "startupRecoverySnapshotEmpty": "No database snapshots were found on this device. Export your data before trying other recovery actions.",
+  "startupRecoverySnapshotButton": "Choose a snapshot",
+  "startupRecoverySnapshotConfirm": "Restore chats and settings from {when}? Changes made after this snapshot will not be included. Existing attachment files and the snapshot will be kept. Kelivo will restart to complete the restore.",
+  "startupRecoverySnapshotFailed": "Could not prepare the snapshot restore: {reason}",
+  "startupRecoverySnapshotReady": "The snapshot is ready. Restart Kelivo to complete the restore.",
+  "@startupRecoverySnapshotConfirm": {
+    "placeholders": {
+      "when": {
+        "type": "String"
+      }
+    }
+  },
+  "@startupRecoverySnapshotFailed": {
+    "placeholders": {
+      "reason": {
+        "type": "String"
+      }
+    }
+  },
+  "scheduledTasksTitle": "Scheduled tasks",
+  "scheduledTasksDescription": "Run tasks automatically at your chosen time: start a new chat, follow up, or run a question again.",
+  "scheduledTasksEmpty": "Your day, on a schedule",
+  "scheduledTasksEmptyDetail": "Add a task for a morning briefing, a daily review, or anything you want to run regularly.",
+  "scheduledTasksAdd": "Add task",
+  "scheduledTasksEdit": "Edit task",
+  "scheduledTasksName": "Name",
+  "scheduledTasksNameHint": "Morning briefing",
+  "scheduledTasksPrompt": "Prompt",
+  "scheduledTasksPromptHint": "What would you like your assistant to do?",
+  "scheduledTasksAssistant": "Assistant",
+  "scheduledTasksChooseAssistant": "Choose an assistant",
+  "scheduledTasksAssistantMissing": "Assistant unavailable",
+  "scheduledTasksTime": "Time",
+  "scheduledTasksTimeHint": "24-hour time, e.g. 08:00",
+  "scheduledTasksRepeat": "Repeat",
+  "scheduledTasksEveryDay": "Every day",
+  "scheduledTasksWeekdays": "Weekdays",
+  "scheduledTasksEnabled": "Enabled",
+  "scheduledTasksPermission": "Alarms & reminders",
+  "scheduledTasksPermissionDetail": "Allow exact alarms to run tasks at your chosen time. Enabled tasks will wait until permission is granted.",
+  "scheduledTasksPermissionAction": "Allow",
+  "scheduledTasksReliability": "Keep Kelivo unrestricted in battery settings for more reliable execution. Force stopping the app cancels alarms until you reopen it. Missed runs are skipped; tasks follow the device time zone.",
+  "scheduledTasksExecutionDetail": "Results are saved in chats. A completion notification previews the reply and opens the conversation when tapped. Runs stop after 10 minutes or when user input or tool approval is needed.",
+  "scheduledTasksRunNow": "Run now",
+  "scheduledTasksHistory": "Run history",
+  "scheduledTasksNoRuns": "No runs yet",
+  "scheduledTasksRunning": "Running",
+  "scheduledTasksCompleted": "Completed",
+  "scheduledTasksFailed": "Failed",
+  "scheduledTasksInterrupted": "Interrupted",
+  "scheduledTasksPaused": "Paused",
+  "scheduledTasksWaitingPermission": "Waiting for permission",
+  "scheduledTasksNextRun": "Next: {time}",
+  "scheduledTasksDelete": "Delete task",
+  "scheduledTasksDeleteDetail": "Delete this schedule and its run history? Conversations already created will be kept.",
+  "scheduledTasksSave": "Save",
+  "scheduledTasksCancel": "Cancel",
+  "scheduledTasksInvalid": "Enter a name, prompt and assistant, and select at least one day for a custom schedule.",
+  "scheduledTasksLoading": "Loading…",
+  "scheduledTasksOpenChat": "View conversation",
+  "scheduledTasksNeedsInput": "Stopped because user input or tool approval was required. Open the conversation to continue.",
+  "scheduledTasksTimeout": "The execution time limit was reached.",
+  "scheduledTasksProcessTerminated": "Android stopped the previous run.",
+  "@scheduledTasksNextRun": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "scheduledTasksOnce": "Once",
+  "scheduledTasksCustom": "Custom",
+  "scheduledTasksExecution": "Task",
+  "scheduledTasksMode": "Action",
+  "scheduledTasksNewChat": "New chat",
+  "scheduledTasksFollowUp": "Follow up",
+  "scheduledTasksRegenerate": "Run again",
+  "scheduledTasksChat": "Conversation",
+  "scheduledTasksChooseChat": "Choose a conversation",
+  "scheduledTasksMessage": "Question to run again",
+  "scheduledTasksChooseMessage": "Choose a question",
+  "scheduledTasksAttachmentMessage": "Message with attachments",
+  "scheduledTasksModel": "Model",
+  "scheduledTasksChooseModel": "Choose a model",
+  "scheduledTasksModelDefault": "Use the conversation or assistant model",
+  "scheduledTasksSchedule": "Schedule",
+  "scheduledTasksActiveWindow": "Active dates",
+  "scheduledTasksStartDate": "Start date",
+  "scheduledTasksEndDate": "End date",
+  "scheduledTasksActiveWindowDetail": "Runs only within these dates, including the end date. Leave a date unset for no limit.",
+  "scheduledTasksDate": "Date",
+  "scheduledTasksDateUnrestricted": "No limit",
+  "scheduledTasksClear": "Clear",
+  "scheduledTasksSearch": "Search",
+  "scheduledTasksNoTargets": "No matching items for this assistant",
+  "scheduledTasksFutureDate": "Choose a future execution date and time.",
+  "scheduledTasksDateRangeInvalid": "The end date must be on or after the start date.",
+  "scheduledTasksRegenerateDetail": "Generates another answer to the selected question using its original context. Existing answers and later messages are kept.",
+  "scheduledTasksSaving": "Saving…",
+  "scheduledTasksFinished": "Schedule ended",
+  "scheduledTasksModelMissing": "The selected model is unavailable. Edit this task to choose another model.",
+  "scheduledTasksChatMissing": "The conversation is unavailable or belongs to another assistant.",
+  "scheduledTasksMessageMissing": "The selected question is no longer available.",
+  "scheduledTasksChatBusy": "This conversation is generating a reply. The scheduled run was skipped.",
+  "scheduledTasksDesktopEmpty": "No scheduled tasks",
+  "scheduledTasksDesktopReliability": "Tasks run only while Kelivo is running, including when minimized or in the system tray. Missed times are skipped after quitting or computer sleep. Kelivo will not start automatically.",
+  "scheduledTasksDesktopExecutionDetail": "Results are saved in chats. Open them from the task’s run history. Runs stop after 10 minutes or when user input or tool approval is needed."
 }

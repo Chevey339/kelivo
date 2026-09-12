@@ -48,7 +48,7 @@ class _ServerConnection {
   McpStatus status = McpStatus.idle;
   String? error;
   _Cooldown? cooldown;
-  Future<void>? refreshFuture;
+  Future<bool>? refreshFuture;
   Future<McpOAuthState?>? oauthRefreshFuture;
   Future<mcp.Client?>? oauthRecoveryFuture;
   List<String> oauthChallenges = const [];
@@ -337,6 +337,7 @@ class McpProvider extends ChangeNotifier {
   );
 
   final BusinessPreferences preferences;
+  late final Future<void> loaded;
   final McpOAuthService _oauthService;
   final bool _ownsOAuthService;
   final Map<String, _ServerConnection> _connections = {};
@@ -388,7 +389,8 @@ class McpProvider extends ChangeNotifier {
     _stdioWasAvailable = supportsStdio;
     workspaceRuntime?.addListener(_onEnvironmentChanged);
     environment?.addListener(_onEnvironmentChanged);
-    unawaited(_serializeServerMutation(_load));
+    loaded = _serializeServerMutation(_load);
+    unawaited(loaded);
   }
 
   List<McpServerConfig> get servers => List.unmodifiable(
@@ -2285,9 +2287,11 @@ class McpProvider extends ChangeNotifier {
     return const [];
   }
 
-  Future<void> refreshTools(String id) {
+  /// Returns whether discovery completed successfully and updated the cache.
+  /// A successful discovery may return an empty tool list.
+  Future<bool> refreshTools(String id) {
     final state = _connections[id];
-    if (state?.client == null || _disposed) return Future<void>.value();
+    if (state?.client == null || _disposed) return Future<bool>.value(false);
     state!.refreshDirty = true;
     final active = state.refreshFuture;
     if (active != null) return active;
@@ -2303,7 +2307,7 @@ class McpProvider extends ChangeNotifier {
     });
   }
 
-  Future<void> _drainToolRefresh(String id, _ServerConnection state) async {
+  Future<bool> _drainToolRefresh(String id, _ServerConnection state) async {
     var sessionRecoveries = 0;
     while (state.refreshDirty && !_disposed) {
       state.refreshDirty = false;
@@ -2320,8 +2324,9 @@ class McpProvider extends ChangeNotifier {
         state.refreshDirty = true;
         continue;
       }
-      if (outcome != _ToolRefreshOutcome.success) return;
+      if (outcome != _ToolRefreshOutcome.success) return false;
     }
+    return !_disposed && isConnected(id);
   }
 
   Future<_ToolRefreshOutcome> _refreshToolsOnce(
