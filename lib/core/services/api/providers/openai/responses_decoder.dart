@@ -178,13 +178,27 @@ class ResponsesStreamDecoder implements StreamChunkDecoder {
     return _closeOpenSeries();
   }
 
+  /// Text series id for one `message` output item.
+  ///
+  /// A hosted tool (built-in search) can split one response into several
+  /// `message` items. A sticky id merges them all into the first [TextPart],
+  /// so the tool card lands after the whole answer instead of between the two
+  /// halves it actually interrupted. Keying on `output_index` keeps each item
+  /// its own part, and the parts stay in arrival order.
+  String _textSeriesId(Map<String, dynamic> obj) =>
+      _ids.indexed('text', _readInt(obj['output_index']));
+
+  /// Reasoning series id for one `reasoning` output item. See [_textSeriesId].
+  String _reasoningSeriesId(Map<String, dynamic> obj) =>
+      _ids.indexed('reasoning', _readInt(obj['output_index']));
+
   void _parseEvent(Map<String, dynamic> obj, List<StreamChunk> chunks) {
     final type = obj['type'];
     if (type == 'response.output_text.delta') {
       final delta = obj['delta'];
       if (delta is String && delta.isNotEmpty) {
         approxCompletionChars += delta.length;
-        chunks.add(TextDelta(id: _ids.text(), text: delta));
+        chunks.add(TextDelta(id: _textSeriesId(obj), text: delta));
       }
       return;
     }
@@ -192,7 +206,7 @@ class ResponsesStreamDecoder implements StreamChunkDecoder {
         type == 'response.reasoning_text.delta') {
       final delta = obj['delta'];
       if (delta is String && delta.isNotEmpty) {
-        chunks.add(ReasoningDelta(id: _ids.reasoning(), text: delta));
+        chunks.add(ReasoningDelta(id: _reasoningSeriesId(obj), text: delta));
       }
       return;
     }
