@@ -4457,9 +4457,9 @@ class _ChainOfThoughtCardState extends State<_ChainOfThoughtCard> {
     required double textScale,
     required bool hasToggle,
   }) {
-    return Object.hash(
+    return (
       'reasoning',
-      identityHashCode(step.text),
+      step.text,
       step.expanded,
       step.loading,
       step.startAt,

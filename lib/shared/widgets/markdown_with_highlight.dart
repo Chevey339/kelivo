@@ -43,7 +43,11 @@ import '../../features/workspace/workspace_file_navigation.dart';
 import 'package:Kelivo/desktop/html_preview_dialog.dart';
 import '../cache/byte_lru_cache.dart';
 import 'incremental_markdown_document.dart';
+import 'markdown_block_list.dart';
+import 'streaming_rich_text.dart';
+import 'streaming_code_fence.dart';
 import 'markdown_line_lexer.dart';
+import 'markdown_source_scan.dart';
 
 // Inline math is parsed on the UI thread. Bound the lookahead window so a long
 // line with many unmatched openers cannot trigger repeated whole-line scans.
@@ -139,6 +143,17 @@ class _MarkdownWithCodeHighlightState extends State<MarkdownWithCodeHighlight> {
   Timer? _renderDebounce;
   final IncrementalMarkdownDocument _incrementalDocument =
       IncrementalMarkdownDocument();
+  final _codeFenceParser = StreamingCodeFenceParser();
+  final _separatorCache = Expando<(bool, bool, bool)>();
+  String? _liveBlockSource;
+  String? _liveBlockNormalized;
+  (bool, bool)? _liveBlockOptions;
+  String? _metadataSource;
+  final _sourceScan = MarkdownSourceScan();
+  bool? _metadataAppended;
+  String _sanitizedText = '';
+  List<String> _imageUrls = const [];
+  List<String> _documentCitationIds = const [];
   static final ByteLruCache<String, String> _normalizedBlockCache =
       ByteLruCache<String, String>(
         maxBytes: 4 << 20,
@@ -187,9 +202,50 @@ class _MarkdownWithCodeHighlightState extends State<MarkdownWithCodeHighlight> {
   Widget build(BuildContext context) {
     final settings = context.watch<SettingsProvider>();
     final cs = Theme.of(context).colorScheme;
-    final sanitizedText = _sanitizeImageLinks(_renderText);
-    final imageUrls = _extractImageUrls(sanitizedText);
+    if (!identical(_metadataSource, _renderText)) {
+      final previousSanitizationUnchanged = identical(
+        _metadataSource,
+        _sanitizedText,
+      );
+      _sourceScan.update(_renderText);
+      _metadataSource = _renderText;
+      if (_sourceScan.hasBrackets) {
+        _sanitizedText = _sanitizeImageLinks(_renderText);
+        _imageUrls = _extractImageUrls(_sanitizedText);
+        _documentCitationIds = _citationIds(_sanitizedText);
+      } else {
+        _sanitizedText = _renderText;
+        _imageUrls = _documentCitationIds = const [];
+      }
+      // Image URL rewriting can change an earlier prefix as a link closes.
+      // Share the prefix proof only when both inputs reached the splitter raw.
+      _metadataAppended =
+          previousSanitizationUnchanged &&
+              identical(_sanitizedText, _renderText)
+          ? _sourceScan.appended
+          : null;
+    }
+    final sanitizedText = _sanitizedText;
+    final imageUrls = _imageUrls;
     String normalize(String source, {required bool streaming}) {
+      if (!_sourceScan.needsPreprocessing) return source;
+      if (streaming) {
+        final options = (
+          settings.enableMathRendering,
+          settings.enableDollarLatex,
+        );
+        if (_liveBlockSource == source && _liveBlockOptions == options) {
+          return _liveBlockNormalized!;
+        }
+        _liveBlockSource = source;
+        _liveBlockOptions = options;
+        return _liveBlockNormalized = _preprocessFences(
+          source,
+          enableMath: options.$1,
+          enableDollarLatex: options.$2,
+          streaming: true,
+        );
+      }
       final cacheKey =
           '${settings.enableMathRendering}:${settings.enableDollarLatex}:$streaming:$source';
       final cached = _normalizedBlockCache.get(cacheKey);
@@ -209,10 +265,19 @@ class _MarkdownWithCodeHighlightState extends State<MarkdownWithCodeHighlight> {
     final useIncrementalBlocks =
         widget.streaming || _incrementalDocument.blocks.isNotEmpty;
     final sourceBlocks = useIncrementalBlocks
-        ? _incrementalDocument.update(sanitizedText)
+        ? _incrementalDocument.update(
+            sanitizedText,
+            appendOnly: _metadataAppended,
+          )
         : const <IncrementalMarkdownBlock>[];
+    final sourceAppended = _incrementalDocument.lastUpdateAppended;
+    final wholeFence = useIncrementalBlocks
+        ? null
+        : _codeFenceParser.update(sanitizedText.trimRight());
     final normalized = useIncrementalBlocks
         ? null
+        : wholeFence != null
+        ? sanitizedText
         : normalize(sanitizedText, streaming: widget.streaming);
     // Base text style (can be overridden by caller)
     final inkColor = _markdownInkColor(context);
@@ -326,11 +391,15 @@ class _MarkdownWithCodeHighlightState extends State<MarkdownWithCodeHighlight> {
     // this signature (theme colors, math flags, fonts, font metrics, streaming
     // mode), otherwise a theme/settings change would keep stale rendering.
     final documentRevision =
-        '${_imageRevision(imageUrls)}\u0002${_citationRevision(sanitizedText, widget.citationIndexResolver)}';
+        '${_imageRevision(imageUrls)}\u0002${_citationRevision(_documentCitationIds, widget.citationIndexResolver)}';
     final themeSignature =
         '${Theme.of(context).brightness.index}-${cs.surface.toARGB32()}-${inkColor.toARGB32()}-${cs.primary.toARGB32()}-${cs.outlineVariant.toARGB32()}-${settings.enableMathRendering}-${settings.enableDollarLatex}-${widget.streaming}-${baseTextStyle?.fontSize}-${baseTextStyle?.height}-${baseTextStyle?.letterSpacing}-${baseTextStyle?.fontFamily}-$codeFontFamily-$appFontFamily-$documentRevision';
 
-    Widget buildMarkdown(String markdown, Key key) {
+    Widget buildMarkdown(
+      String markdown,
+      Key key, {
+      StreamingCodeFence? fence,
+    }) {
       final detailsRegistry = MarkdownDetailsRegistry(
         enableMath: settings.enableMathRendering,
       );
@@ -342,8 +411,32 @@ class _MarkdownWithCodeHighlightState extends State<MarkdownWithCodeHighlight> {
         // Disable built-in $...$ LaTeX so our custom scrollable handlers take over
         useDollarSignsForLatex: false,
         onLinkTap: (url, title) => _handleLinkTap(context, url),
-        preprocessBlocks: detailsRegistry.rewrite,
+        preprocessBlocks: _sourceScan.hasHtml ? detailsRegistry.rewrite : null,
+        newlinesNormalized: !_sourceScan.hasCarriageReturns,
         generation: themeSignature,
+        textBuilder: (text) => StreamingRichText(text: text),
+        streaming: widget.streaming,
+        spanBuilder: fence == null
+            ? null
+            : (ctx, config) => [
+                WidgetSpan(
+                  alignment: PlaceholderAlignment.baseline,
+                  baseline: TextBaseline.alphabetic,
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Flexible(
+                        child: _buildFencedContent(
+                          fence.language,
+                          _unmaskHtmlTagStartsInsideFencedCode(fence.code),
+                          widget.streaming && !fence.closed,
+                          fence.closed,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
         components: [DetailsHtmlMd(detailsRegistry), ...components],
         inlineComponents: inlineComponents,
         imageBuilder: (ctx, url, width, height) {
@@ -631,48 +724,75 @@ class _MarkdownWithCodeHighlightState extends State<MarkdownWithCodeHighlight> {
       );
     }
 
-    final blockContents = useIncrementalBlocks
-        ? [
-            for (final block in sourceBlocks)
-              normalize(
-                block.text,
-                streaming: widget.streaming && !block.stable,
-              ),
-          ]
-        : const <String>[];
+    bool swallowsSeparator(IncrementalMarkdownBlock block) {
+      final cached = _separatorCache[block];
+      if (cached != null &&
+          cached.$1 == settings.enableMathRendering &&
+          cached.$2 == settings.enableDollarLatex) {
+        return cached.$3;
+      }
+      final result = _swallowsTrailingBlankLine(
+        normalize(block.text, streaming: widget.streaming && !block.stable),
+        mathEnabled: settings.enableMathRendering,
+      );
+      _separatorCache[block] = (
+        settings.enableMathRendering,
+        settings.enableDollarLatex,
+        result,
+      );
+      return result;
+    }
+
     final markdownWidget = useIncrementalBlocks
-        ? _MarkdownBlockColumn(
-            children: [
-              for (var i = 0; i < blockContents.length; i++) ...[
-                // Rendering the document as one string keeps the blank run
-                // between two blocks as a real line box. Rendering block by
-                // block drops it, so a long reply is laid out tighter while it
-                // streams compared with a freshly loaded completed reply. Put
-                // the line back so both paths agree — unless the preceding
-                // block's renderer eats the run.
-                if (i > 0 &&
-                    !_swallowsTrailingBlankLine(
-                      blockContents[i - 1],
-                      mathEnabled: settings.enableMathRendering,
-                    ))
-                  _MarkdownBlockSeparator(style: baseTextStyle),
-                _CachedMarkdownBlock(
-                  key: ValueKey(
-                    'markdown-source-block-${sourceBlocks[i].start}',
+        ? MarkdownBlockList(
+            blocks: sourceBlocks,
+            signature: themeSignature,
+            itemBuilder: (_, i) {
+              final block = sourceBlocks[i];
+              final fence = _codeFenceParser.update(
+                block.text.trimRight(),
+                sourceStart: block.start,
+                appendOnly: sourceAppended,
+              );
+              if (fence != null) {
+                _separatorCache[block] = (
+                  settings.enableMathRendering,
+                  settings.enableDollarLatex,
+                  false,
+                );
+              }
+              final content = fence != null
+                  ? block.text
+                  : normalize(
+                      block.text,
+                      streaming: widget.streaming && !block.stable,
+                    );
+              final previous = i > 0 ? sourceBlocks[i - 1] : null;
+              return Column(
+                key: ValueKey('markdown-source-block-${block.start}'),
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if (previous != null && !swallowsSeparator(previous))
+                    _MarkdownBlockSeparator(style: baseTextStyle),
+                  _CachedMarkdownBlock(
+                    source: block.text,
+                    content: content,
+                    signature: themeSignature,
+                    appendOnly: sourceAppended,
+                    builder: (markdown, key) =>
+                        buildMarkdown(markdown, key, fence: fence),
                   ),
-                  source: sourceBlocks[i].text,
-                  content: blockContents[i],
-                  signature: themeSignature,
-                  builder: buildMarkdown,
-                ),
-              ],
-            ],
+                ],
+              );
+            },
           )
         : _CachedMarkdownBlock(
             source: sanitizedText,
             content: normalized!,
             signature: themeSignature,
-            builder: buildMarkdown,
+            builder: (markdown, key) =>
+                buildMarkdown(markdown, key, fence: wholeFence),
           );
 
     final result = appFontFamily.isEmpty
@@ -845,17 +965,18 @@ typedef _MarkdownBlockBuilder = Widget Function(String content, Key key);
 
 class _CachedMarkdownBlock extends StatefulWidget {
   const _CachedMarkdownBlock({
-    super.key,
     required this.source,
     required this.content,
     required this.signature,
     required this.builder,
+    this.appendOnly = false,
   });
 
   final String source;
   final String content;
   final String signature;
   final _MarkdownBlockBuilder builder;
+  final bool appendOnly;
 
   @override
   State<_CachedMarkdownBlock> createState() => _CachedMarkdownBlockState();
@@ -879,6 +1000,7 @@ class _CachedMarkdownBlockState extends State<_CachedMarkdownBlock> {
   Key _parseIdentity(String content) {
     final previous = _identityContent;
     if (previous != null &&
+        !widget.appendOnly &&
         (content.length < previous.length || !content.startsWith(previous))) {
       _identityEpoch++;
     }
@@ -1011,35 +1133,6 @@ class _MarkdownBlockSeparator extends StatelessWidget {
   }
 }
 
-class _MarkdownBlockColumn extends StatelessWidget {
-  const _MarkdownBlockColumn({required this.children});
-
-  final List<Widget> children;
-
-  @override
-  Widget build(BuildContext context) {
-    // Let loose-width bubbles hug their content; tight parent constraints
-    // still make the column fill the available width.
-    final column = Column(
-      mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: children,
-    );
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        if (!constraints.hasBoundedHeight) return column;
-        return OverflowBox(
-          alignment: Alignment.topCenter,
-          fit: OverflowBoxFit.deferToChild,
-          minHeight: 0,
-          maxHeight: double.infinity,
-          child: column,
-        );
-      },
-    );
-  }
-}
-
 String _displayLanguage(BuildContext context, String? raw) {
   final zh = _isZh(context);
   final t = raw?.trim();
@@ -1125,6 +1218,10 @@ String _preprocessFences(
   required bool enableDollarLatex,
   bool streaming = false,
 }) {
+  // None of the rewrites below can start without one of these markers. Plain
+  // prose, including bold/italic text, should not make dozens of full scans on
+  // every streamed character. Citation rewrites all begin with '['.
+  if (!_preprocessMarker.hasMatch(input)) return input;
   // Normalize newlines the same way GptMarkdown does before it parses.
   var out = input.replaceAll('\r\n', '\n').replaceAll('\r', '\n');
   out = _maskBlockquoteFenceMarkers(out);
@@ -1313,7 +1410,10 @@ String _preprocessFences(
   return out;
 }
 
+final _preprocessMarker = RegExp(r'[`~$\\<\r#\[\]\-|>]');
+
 String _maskHtmlTagStartsInsideFencedCode(String input) {
+  if (!input.contains('<')) return input;
   return input.replaceAllMapped(
     RegExp(r'</?(?:details|summary)\b', caseSensitive: false),
     (match) => '$_fencedHtmlTagStartMask${match[0]!.substring(1)}',
@@ -1405,10 +1505,12 @@ class _CitationRef {
 }
 
 String _maskBlockquoteFenceMarkers(String input) {
+  if (!input.contains('>')) return input;
   final lines = input.split('\n');
   var inTopLevelFence = false;
   String? topLevelFence;
   String? topLevelFenceMarker;
+  RegExp? topLevelClose;
 
   for (var i = 0; i < lines.length; i++) {
     final line = lines[i];
@@ -1417,9 +1519,7 @@ String _maskBlockquoteFenceMarkers(String input) {
       final closeMarker = topLevelFenceMarker;
       if (closeFence != null &&
           closeMarker != null &&
-          RegExp(
-            '^[ \\t]*${RegExp.escape(closeFence)}${RegExp.escape(closeMarker)}*[ \\t]*\$',
-          ).hasMatch(line)) {
+          topLevelClose!.hasMatch(line)) {
         inTopLevelFence = false;
         topLevelFence = null;
         topLevelFenceMarker = null;
@@ -1434,6 +1534,9 @@ String _maskBlockquoteFenceMarkers(String input) {
       inTopLevelFence = true;
       topLevelFence = topLevelOpen.group(1)!;
       topLevelFenceMarker = topLevelOpen.group(2)!;
+      topLevelClose = RegExp(
+        '^[ \\t]*${RegExp.escape(topLevelFence)}${RegExp.escape(topLevelFenceMarker)}*[ \\t]*\$',
+      );
       continue;
     }
 
@@ -2427,6 +2530,7 @@ String _insertSoftBreaks(String value, {required int every}) {
 }
 
 List<String> _extractImageUrls(String md) {
+  if (!_imageStart.hasMatch(md)) return const [];
   final re = RegExp(r"!\[[^\]]*\]\(([^)\s]+)\)");
   return re
       .allMatches(md)
@@ -2443,8 +2547,7 @@ int _imageRevision(List<String> urls) =>
 /// Citation cache key from the actual `(id, resolvedIndex)` pairs. Callback
 /// identity is ignored: a new closure over the same map must not rebuild,
 /// and a map update through a stable closure must.
-int _citationRevision(String md, String? Function(String id)? resolver) {
-  final ids = _citationIds(md);
+int _citationRevision(List<String> ids, String? Function(String id)? resolver) {
   var hash = ids.length;
   for (final id in ids) {
     hash = Object.hash(hash, id, resolver?.call(id));
@@ -2453,6 +2556,9 @@ int _citationRevision(String md, String? Function(String id)? resolver) {
 }
 
 List<String> _citationIds(String md) {
+  // Single-character searches use the VM's fast string search. A one-character
+  // RegExp instead walks CJK strings in the regexp interpreter.
+  if (!md.contains('[')) return const [];
   final ids = <String>[];
   void addId(String id) {
     if (id.isNotEmpty) ids.add(id);
@@ -2485,6 +2591,7 @@ List<String> _citationIds(String md) {
 }
 
 String _sanitizeImageLinks(String input) {
+  if (!_imageStart.hasMatch(input)) return input;
   final re = RegExp(r'!\[([^\]]*)\]\(([^)]+)\)', multiLine: true);
   return input.replaceAllMapped(re, (m) {
     final alt = m.group(1) ?? '';
@@ -2528,6 +2635,10 @@ String _sanitizeImageLinks(String input) {
     return '![$alt]($safeUrl)';
   });
 }
+
+// String.indexOf(String) tries every position in Dart on two-byte strings.
+// The regex engine's literal search avoids that hot loop on long CJK replies.
+final _imageStart = RegExp(r'!\[');
 
 ImageProvider? _imageProviderFor(String src) {
   if (src.startsWith('http://') || src.startsWith('https://')) {
@@ -3055,18 +3166,21 @@ class _VirtualizedCodeView extends StatefulWidget {
 
 class _VirtualizedCodeViewState extends State<_VirtualizedCodeView> {
   static const int _linesPerChunk = 200;
-  late List<String> _chunks;
+  static final _lineBreak = RegExp(r'\r\n|\r|\n');
+  final _chunks = <String>[];
+  String _chunkSource = '';
+  int _lastChunkStart = 0;
 
   @override
   void initState() {
     super.initState();
-    _chunks = _chunkLines(widget.code);
+    _updateChunks(widget.code);
   }
 
   @override
   void didUpdateWidget(covariant _VirtualizedCodeView oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.code != widget.code) _chunks = _chunkLines(widget.code);
+    if (oldWidget.code != widget.code) _updateChunks(widget.code);
   }
 
   @override
@@ -3097,12 +3211,38 @@ class _VirtualizedCodeViewState extends State<_VirtualizedCodeView> {
     );
   }
 
-  static List<String> _chunkLines(String code) {
-    final lines = code.split(RegExp(r'\r\n|\r|\n'));
-    return [
-      for (var start = 0; start < lines.length; start += _linesPerChunk)
-        lines.skip(start).take(_linesPerChunk).join('\n'),
-    ];
+  void _updateChunks(String code) {
+    var start = 0;
+    if (_chunks.isNotEmpty && code.startsWith(_chunkSource)) {
+      start = _lastChunkStart;
+      _chunks.removeLast();
+      if (start == _chunkSource.length &&
+          _chunkSource.endsWith('\r') &&
+          code.length > start &&
+          code.codeUnitAt(start) == 0x0a) {
+        start++;
+      }
+    } else {
+      _chunks.clear();
+    }
+    String slice(int end) {
+      final value = code.substring(start, end);
+      return value.contains('\r')
+          ? value.replaceAll('\r\n', '\n').replaceAll('\r', '\n')
+          : value;
+    }
+
+    var lines = 0;
+    for (final match in _lineBreak.allMatches(code, start)) {
+      if (++lines == _linesPerChunk) {
+        _chunks.add(slice(match.start));
+        start = match.end;
+        lines = 0;
+      }
+    }
+    _chunks.add(slice(code.length));
+    _lastChunkStart = start;
+    _chunkSource = code;
   }
 }
 
@@ -3148,10 +3288,20 @@ Color _codeBlockBorderColor(ColorScheme cs, bool isDark) {
 
 String _codeBlockStateKey(String language, String code) {
   final normalizedLanguage = language.trim().toLowerCase();
-  final normalizedCode = code.trimLeft().replaceAll(RegExp(r'\s+'), ' ');
-  final anchor = normalizedCode.length <= 16
-      ? normalizedCode
-      : normalizedCode.substring(0, 16);
+  final source = code.trimLeft();
+  final prefix = StringBuffer();
+  var whitespace = false;
+  for (var i = 0; i < source.length && prefix.length < 16; i++) {
+    final unit = source.codeUnitAt(i);
+    if (_isWhitespace(unit)) {
+      if (!whitespace) prefix.write(' ');
+      whitespace = true;
+    } else {
+      prefix.writeCharCode(unit);
+      whitespace = false;
+    }
+  }
+  final anchor = prefix.toString();
   return '$normalizedLanguage|$anchor';
 }
 
@@ -5177,24 +5327,33 @@ class FencedCodeBlockMd extends BlockMd {
       m.group(4) ?? m.group(5) ?? '',
     );
     final closed = m.group(4) != null;
-    final langLower = lang.toLowerCase();
     final isStreamingFence = streaming && !closed;
-    if (langLower == 'mermaid' || isSvgCodeBlock(lang, code)) {
-      return _DiagramBlock(
-        code: code,
-        streaming: isStreamingFence,
-        isSvg: langLower != 'mermaid',
-      );
-    } else if (langLower == 'plantuml') {
-      return PlantUMLBlock(code: code);
-    }
-    return _CollapsibleCodeBlock(
-      language: lang,
+    return _buildFencedContent(lang, code, isStreamingFence, closed);
+  }
+}
+
+Widget _buildFencedContent(
+  String lang,
+  String code,
+  bool isStreamingFence,
+  bool closed,
+) {
+  final langLower = lang.toLowerCase();
+  if (langLower == 'mermaid' || isSvgCodeBlock(lang, code)) {
+    return _DiagramBlock(
       code: code,
       streaming: isStreamingFence,
-      closed: closed,
+      isSvg: langLower != 'mermaid',
     );
+  } else if (langLower == 'plantuml') {
+    return PlantUMLBlock(code: code);
   }
+  return _CollapsibleCodeBlock(
+    language: lang,
+    code: code,
+    streaming: isStreamingFence,
+    closed: closed,
+  );
 }
 
 /// Scrollable LaTeX block to prevent overflow when equations are very wide
@@ -6248,6 +6407,8 @@ class _SelectableHighlightViewState extends State<SelectableHighlightView> {
 
   late List<TextSpan> _codeTextSpans;
   bool _iosTranslationAvailable = false;
+  Widget? _selectable;
+  String _selectedCode = '';
 
   @override
   void initState() {
@@ -6269,6 +6430,7 @@ class _SelectableHighlightViewState extends State<SelectableHighlightView> {
       return;
     }
     _codeTextSpans = _highlightSource();
+    _selectable = null;
   }
 
   List<TextSpan> _highlightSource() {
@@ -6384,14 +6546,53 @@ class _SelectableHighlightViewState extends State<SelectableHighlightView> {
 
   @override
   Widget build(BuildContext context) {
-    return SelectableText.rich(
-      TextSpan(
-        style: widget.textStyle,
-        children: _codeTextSpans.isEmpty
-            ? [TextSpan(text: widget.source)]
-            : _codeTextSpans,
-      ),
-      contextMenuBuilder: _buildSelectionContextMenu,
+    final span = TextSpan(
+      style: widget.textStyle,
+      children: _codeTextSpans.isEmpty
+          ? [TextSpan(text: widget.source)]
+          : _codeTextSpans,
+    );
+    return _selectable ??= widget.source.length > 2048
+        ? SelectionArea(
+            onSelectionChanged: (selection) =>
+                _selectedCode = selection?.plainText ?? '',
+            contextMenuBuilder: _buildChunkSelectionContextMenu,
+            // SelectableText reserves its 2px cursor plus RenderEditable's 1px
+            // caret gap, even when read-only. Keep the same wrapping and width.
+            child: Padding(
+              padding: const EdgeInsets.only(right: 3),
+              child: StreamingRichText(text: Text.rich(span)),
+            ),
+          )
+        : SelectableText.rich(
+            span,
+            contextMenuBuilder: _buildSelectionContextMenu,
+          );
+  }
+
+  Widget _buildChunkSelectionContextMenu(
+    BuildContext context,
+    SelectableRegionState region,
+  ) {
+    final anchors = region.contextMenuAnchors;
+    final selectedText = _selectedCode;
+    return AdaptiveTextSelectionToolbar.buttonItems(
+      anchors: anchors,
+      buttonItems: [
+        ...region.contextMenuButtonItems,
+        if (_iosTranslationAvailable && selectedText.trim().isNotEmpty)
+          ContextMenuButtonItem(
+            label: AppLocalizations.of(
+              context,
+            )!.chatMessageWidgetTranslateTooltip,
+            onPressed: () {
+              region.hideToolbar();
+              unawaited(
+                _presentIosTranslation(selectedText, anchors.primaryAnchor),
+              );
+            },
+          ),
+      ],
     );
   }
 }
