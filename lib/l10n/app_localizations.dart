@@ -8449,6 +8449,18 @@ abstract class AppLocalizations {
   /// **'Collapse reasoning after finish'**
   String get displaySettingsPageAutoCollapseThinkingSubtitle;
 
+  /// No description provided for @displaySettingsPageShowCollapsedReasoningPreviewTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Show Current Thought When Collapsed'**
+  String get displaySettingsPageShowCollapsedReasoningPreviewTitle;
+
+  /// No description provided for @displaySettingsPageShowCollapsedReasoningPreviewSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Show the latest thought with animation while a thinking card is collapsed'**
+  String get displaySettingsPageShowCollapsedReasoningPreviewSubtitle;
+
   /// No description provided for @displaySettingsPageCollapseThinkingStepsTitle.
   ///
   /// In en, this message translates to:

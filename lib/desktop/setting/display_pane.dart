@@ -116,6 +116,8 @@ class _DisplaySettingsBody extends StatelessWidget {
                   _RowDivider(),
                   _ToggleRowAutoCollapseThinking(),
                   _RowDivider(),
+                  _ToggleRowCollapsedReasoningPreview(),
+                  _RowDivider(),
                   _ToggleRowCollapseThinkingSteps(),
                   _RowDivider(),
                   _ToggleRowShowToolResultSummary(),
@@ -2585,6 +2587,22 @@ class _ToggleRowAutoCollapseThinking extends StatelessWidget {
       value: sp.autoCollapseThinking,
       onChanged: (v) =>
           context.read<SettingsProvider>().setAutoCollapseThinking(v),
+    );
+  }
+}
+
+class _ToggleRowCollapsedReasoningPreview extends StatelessWidget {
+  const _ToggleRowCollapsedReasoningPreview();
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    final sp = context.watch<SettingsProvider>();
+    return _ToggleRow(
+      label: l10n.displaySettingsPageShowCollapsedReasoningPreviewTitle,
+      tip: l10n.displaySettingsPageShowCollapsedReasoningPreviewSubtitle,
+      value: sp.showCollapsedReasoningPreview,
+      onChanged: (v) =>
+          context.read<SettingsProvider>().setShowCollapsedReasoningPreview(v),
     );
   }
 }

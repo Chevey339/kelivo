@@ -160,22 +160,37 @@ String responsesReasoningText(dynamic rawOutput) {
   final buffer = StringBuffer();
   for (final item in rawOutput) {
     if (item is! Map || item['type'] != 'reasoning') continue;
-    final content = item['content'];
-    if (content is String) {
-      buffer.write(content);
-      continue;
+    // OpenAI-compatible gateways commonly put visible reasoning in
+    // `summary`, while the full reasoning item only contains encrypted
+    // content. Prefer content when it is available, and fall back to the
+    // summary array used by OAuth/Codex-style Responses implementations.
+    final content = _responsesReasoningValue(item['content']);
+    final summary = _responsesReasoningValue(item['summary']);
+    buffer.write(content.isNotEmpty ? content : summary);
+  }
+  return buffer.toString();
+}
+
+String _responsesReasoningValue(dynamic raw) {
+  if (raw is String) return raw;
+  if (raw is List) {
+    final buffer = StringBuffer();
+    for (final item in raw) {
+      buffer.write(_responsesReasoningValue(item));
     }
-    if (content is! List) continue;
-    for (final part in content) {
-      if (part is String) {
-        buffer.write(part);
-      } else if (part is Map &&
-          (part['type'] == 'reasoning_text' || part['type'] == 'text')) {
-        buffer.write((part['text'] ?? part['content'] ?? '').toString());
+    return buffer.toString();
+  }
+  if (raw is Map) {
+    for (final key in const <String>['text', 'summary', 'content']) {
+      final value = raw[key];
+      if (value is String) return value;
+      if (value is List) {
+        final nested = _responsesReasoningValue(value);
+        if (nested.isNotEmpty) return nested;
       }
     }
   }
-  return buffer.toString();
+  return '';
 }
 
 Stream<StreamChunk> runOpenAIResponsesToolFollowUps({
