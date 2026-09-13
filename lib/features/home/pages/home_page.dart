@@ -1857,15 +1857,34 @@ class _HomePageState extends State<HomePage>
     final items = provider.items;
     if (items.isEmpty) return;
 
+    final scoped =
+        context
+            .read<AssistantProvider>()
+            .currentAssistant
+            ?.allowConversationPromptInjection ??
+        false;
+    final scopeId = scoped
+        ? await ensureConversationId(
+            context,
+            conversationId: _controller.currentConversation?.id,
+            assistantId: assistantId,
+          )
+        : null;
+    if (!mounted || (scoped && scopeId == null)) return;
     if (isDesktop) {
       await showDesktopInstructionInjectionPopover(
         context,
         anchorKey: _inputBarKey,
         items: items,
         assistantId: assistantId,
+        conversationId: scopeId,
       );
     } else {
-      await showInstructionInjectionSheet(context, assistantId: assistantId);
+      await showInstructionInjectionSheet(
+        context,
+        assistantId: assistantId,
+        conversationId: scopeId,
+      );
     }
   }
 
@@ -1878,15 +1897,34 @@ class _HomePageState extends State<HomePage>
     final books = provider.books;
     if (books.isEmpty) return;
 
+    final scoped =
+        context
+            .read<AssistantProvider>()
+            .currentAssistant
+            ?.allowConversationPromptInjection ??
+        false;
+    final scopeId = scoped
+        ? await ensureConversationId(
+            context,
+            conversationId: _controller.currentConversation?.id,
+            assistantId: assistantId,
+          )
+        : null;
+    if (!mounted || (scoped && scopeId == null)) return;
     if (isDesktop) {
       await showDesktopWorldBookPopover(
         context,
         anchorKey: _inputBarKey,
         books: books,
         assistantId: assistantId,
+        conversationId: scopeId,
       );
     } else {
-      await showWorldBookSheet(context, assistantId: assistantId);
+      await showWorldBookSheet(
+        context,
+        assistantId: assistantId,
+        conversationId: scopeId,
+      );
     }
   }
 

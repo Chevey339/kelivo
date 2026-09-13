@@ -921,6 +921,28 @@ class _PromptTabState extends State<_PromptTab> {
       children: [
         sysCard,
         const SizedBox(height: 12),
+        SectionCard(
+          dividers: true,
+          children: [
+            _ConversationPromptOption(
+              title: l10n.assistantConversationSystemPromptTitle,
+              subtitle: l10n.assistantConversationSystemPromptHint,
+              value: a.allowConversationSystemPrompt,
+              onChanged: (value) => ap.updateAssistant(
+                a.copyWith(allowConversationSystemPrompt: value),
+              ),
+            ),
+            _ConversationPromptOption(
+              title: l10n.assistantConversationInjectionTitle,
+              subtitle: l10n.assistantConversationInjectionHint,
+              value: a.allowConversationPromptInjection,
+              onChanged: (value) => ap.updateAssistant(
+                a.copyWith(allowConversationPromptInjection: value),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
         appendTimeCard,
         const SizedBox(height: 12),
         tmplCard,
@@ -1744,4 +1766,53 @@ class _VarExplainList extends StatelessWidget {
       ],
     );
   }
+}
+
+class _ConversationPromptOption extends StatelessWidget {
+  const _ConversationPromptOption({
+    required this.title,
+    required this.subtitle,
+    required this.value,
+    required this.onChanged,
+  });
+  final String title;
+  final String subtitle;
+  final bool value;
+  final ValueChanged<bool> onChanged;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+    child: Row(
+      children: [
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title,
+                style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: AppFontWeights.semibold,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                subtitle,
+                style: TextStyle(
+                  fontSize: 12,
+                  height: 1.3,
+                  color: Theme.of(
+                    context,
+                  ).colorScheme.onSurface.withValues(alpha: 0.6),
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(width: 12),
+        IosSwitch(value: value, onChanged: onChanged),
+      ],
+    ),
+  );
 }

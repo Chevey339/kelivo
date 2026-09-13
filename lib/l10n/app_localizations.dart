@@ -20774,6 +20774,102 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Results are saved in chats. Open them from the task’s run history. Runs stop after 10 minutes or when user input or tool approval is needed.'**
   String get scheduledTasksDesktopExecutionDetail;
+
+  /// No description provided for @worldBookStickyLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Sticky (messages)'**
+  String get worldBookStickyLabel;
+
+  /// No description provided for @worldBookStickyHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Keep this entry active for N messages after triggering. Repeated matches do not extend it. 0 disables this effect.'**
+  String get worldBookStickyHint;
+
+  /// No description provided for @worldBookCooldownLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Cooldown (messages)'**
+  String get worldBookCooldownLabel;
+
+  /// No description provided for @worldBookCooldownHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Prevent reactivation for N messages after triggering or after sticky ends. 0 disables this effect.'**
+  String get worldBookCooldownHint;
+
+  /// No description provided for @worldBookDelayLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Delay (messages)'**
+  String get worldBookDelayLabel;
+
+  /// No description provided for @worldBookDelayHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Allow activation only after the conversation has at least N messages. Count individual messages, not exchanges. 0 disables this effect.'**
+  String get worldBookDelayHint;
+
+  /// No description provided for @worldBookDragToReorder.
+  ///
+  /// In en, this message translates to:
+  /// **'Drag to reorder'**
+  String get worldBookDragToReorder;
+
+  /// No description provided for @worldBookEnabledCount.
+  ///
+  /// In en, this message translates to:
+  /// **'{enabled}/{total} enabled'**
+  String worldBookEnabledCount(int enabled, int total);
+
+  /// No description provided for @assistantConversationSystemPromptTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Per-conversation system prompt'**
+  String get assistantConversationSystemPromptTitle;
+
+  /// No description provided for @assistantConversationSystemPromptHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Allow each conversation to override this assistant’s system prompt.'**
+  String get assistantConversationSystemPromptHint;
+
+  /// No description provided for @assistantConversationInjectionTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Per-conversation prompt injections'**
+  String get assistantConversationInjectionTitle;
+
+  /// No description provided for @assistantConversationInjectionHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose prompt injections and world books separately for each conversation. New conversations start with none selected.'**
+  String get assistantConversationInjectionHint;
+
+  /// No description provided for @conversationSystemPromptTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Conversation system prompt'**
+  String get conversationSystemPromptTitle;
+
+  /// No description provided for @conversationSystemPromptHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Override the assistant’s system prompt for this conversation. Clear it to use the assistant’s prompt again.'**
+  String get conversationSystemPromptHint;
+
+  /// No description provided for @conversationSystemPromptClear.
+  ///
+  /// In en, this message translates to:
+  /// **'Clear'**
+  String get conversationSystemPromptClear;
+
+  /// No description provided for @conversationPromptScope.
+  ///
+  /// In en, this message translates to:
+  /// **'This conversation'**
+  String get conversationPromptScope;
 }
 
 class _AppLocalizationsDelegate

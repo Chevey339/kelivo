@@ -13,6 +13,8 @@ import '../../../core/models/conversation.dart';
 import '../../../core/models/instruction_injection.dart';
 import '../../../core/models/memory_entry.dart';
 import '../../../core/models/world_book.dart';
+import '../../../core/models/conversation_prompt_settings.dart';
+import '../../../core/services/world_book_activation.dart';
 import '../../../core/providers/memory_provider.dart';
 import '../../../core/providers/environment_provider.dart';
 import '../../../core/providers/settings_provider.dart';
@@ -1618,20 +1620,21 @@ class MessageBuilderService {
   void injectSystemPrompt(
     List<Map<String, dynamic>> apiMessages,
     Assistant? assistant,
-    String modelId,
-  ) {
-    if ((assistant?.systemPrompt.trim().isNotEmpty ?? false)) {
+    String modelId, {
+    Conversation? conversation,
+  }) {
+    final prompt = ConversationPromptSettings.fromExtras(
+      conversation?.extras ?? const {},
+    ).effectiveSystemPrompt(assistant);
+    if (assistant != null && prompt.trim().isNotEmpty) {
       final vars = PromptTransformer.buildPlaceholders(
         context: contextProvider,
-        assistant: assistant!,
+        assistant: assistant,
         modelId: modelId,
         modelName: modelId,
         userNickname: contextProvider.read<UserProvider>().name,
       );
-      final sys = PromptTransformer.replacePlaceholders(
-        assistant.systemPrompt,
-        vars,
-      );
+      final sys = PromptTransformer.replacePlaceholders(prompt, vars);
       final sysMessage = <String, dynamic>{'role': 'system', 'content': sys};
       if (ContextLogger.enabled) {
         ContextSegmentTags.replaceWithSingle(
@@ -1797,14 +1800,21 @@ class MessageBuilderService {
   /// Inject instruction injection prompts into apiMessages.
   Future<void> injectInstructionPrompts(
     List<Map<String, dynamic>> apiMessages,
-    String? assistantId,
-  ) async {
+    String? assistantId, {
+    Conversation? conversation,
+    bool conversationScoped = false,
+  }) async {
     try {
       List<InstructionInjection> actives = const <InstructionInjection>[];
       try {
         final ip = contextProvider.read<InstructionInjectionProvider>();
         await ip.initialize();
-        actives = ip.activesFor(assistantId);
+        final ids = conversationScoped
+            ? ConversationPromptSettings.fromExtras(
+                conversation?.extras ?? const {},
+              ).instructionIds
+            : ip.activeIdsFor(assistantId);
+        actives = ip.items.where((item) => ids.contains(item.id)).toList();
       } catch (_) {}
       final prompts = actives
           .map((e) => e.prompt.trim())
@@ -1896,8 +1906,11 @@ class MessageBuilderService {
   /// Inject world book (lorebook) entries into apiMessages.
   Future<void> injectWorldBookPrompts(
     List<Map<String, dynamic>> apiMessages,
-    String? assistantId,
-  ) async {
+    String? assistantId, {
+    Conversation? conversation,
+    bool conversationScoped = false,
+    List<ChatMessage>? sourceMessages,
+  }) async {
     try {
       List<WorldBook> all = const <WorldBook>[];
       List<String> activeBookIds = const <String>[];
@@ -1906,89 +1919,96 @@ class MessageBuilderService {
         final wb = contextProvider.read<WorldBookProvider>();
         await wb.initialize();
         all = wb.books;
-        activeBookIds = wb.activeBookIdsFor(assistantId);
+        activeBookIds = conversationScoped
+            ? ConversationPromptSettings.fromExtras(
+                conversation?.extras ?? const {},
+              ).worldBookIds
+            : wb.activeBookIdsFor(assistantId);
       } catch (_) {}
-
-      if (all.isEmpty || activeBookIds.isEmpty) return;
 
       final activeSet = activeBookIds.toSet();
       final books = all
           .where((b) => b.enabled && activeSet.contains(b.id))
           .toList(growable: false);
-      if (books.isEmpty) return;
-
-      String extractContextForDepth(int scanDepth) {
-        final depth = scanDepth <= 0 ? 1 : scanDepth;
-        final parts = <String>[];
-        for (
-          int i = apiMessages.length - 1;
-          i >= 0 && parts.length < depth;
-          i--
-        ) {
-          final role = (apiMessages[i]['role'] ?? '').toString();
-          if (role != 'user' && role != 'assistant') continue;
-          final content = (apiMessages[i]['content'] ?? '').toString().trim();
-          if (content.isEmpty) continue;
-          parts.add(content);
+      final latest = conversation == null
+          ? null
+          : chatService.getConversation(conversation.id) ?? conversation;
+      final rawState = latest?.extras[WorldBookActivation.extrasKey];
+      final previous = rawState is Map
+          ? Map<String, dynamic>.from(rawState)
+          : <String, dynamic>{};
+      bool isChatMessage(ChatMessage message) =>
+          (message.role == 'user' || message.role == 'assistant') &&
+          (!message.isStreaming ||
+              message.content.trim().isNotEmpty ||
+              message.parts.any((part) => part is! TextPart));
+      var historyMessages = sourceMessages?.where(isChatMessage).toList();
+      final usesTiming = books.any(
+        (book) => book.entries.any(
+          (entry) =>
+              entry.enabled &&
+              (entry.sticky > 0 || entry.cooldown > 0 || entry.delay > 0),
+        ),
+      );
+      // Generation can hand us a bounded context window. Timers count the whole
+      // selected conversation through this request's last message, including on
+      // regeneration; future messages and the empty reply placeholder do not count.
+      if (usesTiming &&
+          conversation != null &&
+          historyMessages != null &&
+          historyMessages.isNotEmpty &&
+          chatService.initialized) {
+        final fullHistory = await chatService.loadSelectedContextMessages(
+          conversation.id,
+          truncateIndex: -1,
+          limit: await chatService.resolveMessageCount(conversation.id),
+          throughRevisionId: historyMessages.last.id,
+        );
+        if (fullHistory.isNotEmpty) {
+          historyMessages = fullHistory.where(isChatMessage).toList();
         }
-        return parts.reversed.join('\n');
       }
-
-      bool isTriggered(WorldBookEntry entry, String context) {
-        if (!entry.enabled) return false;
-        if (entry.constantActive) return true;
-        if (entry.keywords.isEmpty) return false;
-
-        for (final raw in entry.keywords) {
-          final keyword = raw.trim();
-          if (keyword.isEmpty) continue;
-
-          if (entry.useRegex) {
-            try {
-              final re = RegExp(keyword, caseSensitive: entry.caseSensitive);
-              if (re.hasMatch(context)) return true;
-            } catch (_) {}
+      final result = WorldBookActivation.evaluate(
+        books: books,
+        scanMessages: apiMessages,
+        history: historyMessages == null
+            ? [
+                for (final message in apiMessages)
+                  if ((message['role'] == 'user' ||
+                          message['role'] == 'assistant') &&
+                      message['tool_calls'] == null &&
+                      (message['content'] ?? '').toString().trim().isNotEmpty)
+                    {'role': message['role'], 'content': message['content']},
+              ]
+            : [
+                for (final message in historyMessages)
+                  {
+                    'role': message.role,
+                    'content': message.content,
+                    'attachments': [
+                      for (final part in message.parts)
+                        if (part is ImagePart || part is FilePart)
+                          part.encodePayload(),
+                    ],
+                  },
+              ],
+        previous: previous,
+      );
+      if (conversation != null &&
+          ((result.state['effects'] as Map).isNotEmpty ||
+              previous.isNotEmpty)) {
+        await chatService.updateConversationExtras(conversation.id, (extras) {
+          final next = Map<String, dynamic>.from(extras);
+          if ((result.state['effects'] as Map).isEmpty) {
+            next.remove(WorldBookActivation.extrasKey);
           } else {
-            if (entry.caseSensitive) {
-              if (context.contains(keyword)) return true;
-            } else {
-              if (context.toLowerCase().contains(keyword.toLowerCase())) {
-                return true;
-              }
-            }
+            next[WorldBookActivation.extrasKey] = result.state;
           }
-        }
-        return false;
+          return next;
+        });
       }
-
-      final contextCache = <int, String>{};
-      final triggered = <({WorldBookEntry entry, int seq})>[];
-      int seq = 0;
-
-      for (final book in books) {
-        for (final entry in book.entries) {
-          final depth = (entry.scanDepth <= 0 ? 1 : entry.scanDepth)
-              .clamp(1, 200)
-              .toInt();
-          final ctx = contextCache.putIfAbsent(
-            depth,
-            () => extractContextForDepth(depth),
-          );
-          if (isTriggered(entry, ctx)) {
-            triggered.add((entry: entry, seq: seq));
-          }
-          seq++;
-        }
-      }
-
+      final triggered = result.entries;
       if (triggered.isEmpty) return;
-
-      triggered.sort((a, b) {
-        final pa = a.entry.priority;
-        final pb = b.entry.priority;
-        if (pb != pa) return pb.compareTo(pa);
-        return a.seq.compareTo(b.seq);
-      });
 
       String wrapSystemTag(String content) => '<system>\n$content\n</system>';
 
@@ -2045,9 +2065,7 @@ class MessageBuilderService {
 
       final byPosition = <WorldBookInjectionPosition, List<WorldBookEntry>>{};
       for (final t in triggered) {
-        byPosition
-            .putIfAbsent(t.entry.position, () => <WorldBookEntry>[])
-            .add(t.entry);
+        byPosition.putIfAbsent(t.position, () => <WorldBookEntry>[]).add(t);
       }
 
       // BEFORE/AFTER_SYSTEM_PROMPT: merge into system message.

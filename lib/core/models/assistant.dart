@@ -47,6 +47,8 @@ class Assistant {
   thinkingBudget; // null = use global/default; 0=off; >0 tokens budget
   final int? maxTokens; // null = unlimited
   final String systemPrompt;
+  final bool allowConversationSystemPrompt;
+  final bool allowConversationPromptInjection;
   final String messageTemplate; // e.g. "{{ message }}"
   final bool searchEnabled; // per-assistant external web search switch
   final List<String> mcpServerIds; // bound MCP server IDs
@@ -103,6 +105,8 @@ class Assistant {
     this.thinkingBudget,
     this.maxTokens,
     this.systemPrompt = '',
+    this.allowConversationSystemPrompt = false,
+    this.allowConversationPromptInjection = false,
     this.messageTemplate = '{{ message }}',
     this.searchEnabled = false,
     this.mcpServerIds = const <String>[],
@@ -148,6 +152,8 @@ class Assistant {
     int? thinkingBudget,
     int? maxTokens,
     String? systemPrompt,
+    bool? allowConversationSystemPrompt,
+    bool? allowConversationPromptInjection,
     String? messageTemplate,
     bool? searchEnabled,
     List<String>? mcpServerIds,
@@ -205,6 +211,11 @@ class Assistant {
           : (thinkingBudget ?? this.thinkingBudget),
       maxTokens: clearMaxTokens ? null : (maxTokens ?? this.maxTokens),
       systemPrompt: systemPrompt ?? this.systemPrompt,
+      allowConversationSystemPrompt:
+          allowConversationSystemPrompt ?? this.allowConversationSystemPrompt,
+      allowConversationPromptInjection:
+          allowConversationPromptInjection ??
+          this.allowConversationPromptInjection,
       messageTemplate: messageTemplate ?? this.messageTemplate,
       searchEnabled: searchEnabled ?? this.searchEnabled,
       mcpServerIds: mcpServerIds ?? this.mcpServerIds,
@@ -263,6 +274,8 @@ class Assistant {
     'thinkingBudget': thinkingBudget,
     'maxTokens': maxTokens,
     'systemPrompt': systemPrompt,
+    'allowConversationSystemPrompt': allowConversationSystemPrompt,
+    'allowConversationPromptInjection': allowConversationPromptInjection,
     'messageTemplate': messageTemplate,
     'searchEnabled': searchEnabled,
     'mcpServerIds': mcpServerIds,
@@ -313,6 +326,10 @@ class Assistant {
     thinkingBudget: (json['thinkingBudget'] as num?)?.toInt(),
     maxTokens: (json['maxTokens'] as num?)?.toInt(),
     systemPrompt: (json['systemPrompt'] as String?) ?? '',
+    allowConversationSystemPrompt:
+        (json['allowConversationSystemPrompt'] as bool?) ?? false,
+    allowConversationPromptInjection:
+        (json['allowConversationPromptInjection'] as bool?) ?? false,
     messageTemplate: (json['messageTemplate'] as String?) ?? '{{ message }}',
     searchEnabled: json['searchEnabled'] as bool? ?? false,
     mcpServerIds:

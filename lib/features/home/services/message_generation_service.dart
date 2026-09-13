@@ -180,10 +180,20 @@ class MessageGenerationService {
       }
     }
 
+    final promptConversation = currentConversation == null
+        ? null
+        : chatService.getConversation(currentConversation.id) ??
+              currentConversation;
+
     // Inject prompts first so WorldBook can scan the full untrimmed history
     // (same keyword trigger range as before OCR-after-trim). Document/OCR work
     // runs only after the single final context trim below.
-    messageBuilderService.injectSystemPrompt(apiMessages, assistant, modelId);
+    messageBuilderService.injectSystemPrompt(
+      apiMessages,
+      assistant,
+      modelId,
+      conversation: promptConversation,
+    );
     await messageBuilderService.injectMemoryAndRecentChats(
       apiMessages,
       assistant,
@@ -205,10 +215,18 @@ class MessageGenerationService {
     await messageBuilderService.injectInstructionPrompts(
       apiMessages,
       assistantId,
+      conversation: promptConversation,
+      conversationScoped: assistant?.allowConversationPromptInjection ?? false,
     );
     await messageBuilderService.injectWorldBookPrompts(
       apiMessages,
       assistantId,
+      conversation: promptConversation,
+      conversationScoped: assistant?.allowConversationPromptInjection ?? false,
+      sourceMessages: messageBuilderService.collapseVersions(
+        messages,
+        versionSelections,
+      ),
     );
 
     WorkspaceToolContext? workspaceContext;

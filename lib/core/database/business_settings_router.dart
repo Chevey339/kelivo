@@ -507,6 +507,8 @@ final class BusinessSettingsRouter {
             'generateConversationSummary',
             'appendCurrentTimeToUserMessage',
             'useIso8601TimeFormat',
+            'allowConversationSystemPrompt',
+            'allowConversationPromptInjection',
           },
           numbers: const {
             'temperature',
@@ -922,7 +924,14 @@ final class BusinessSettingsRouter {
           'caseSensitive',
           'constantActive',
         },
-        integers: const {'priority', 'injectDepth', 'scanDepth'},
+        integers: const {
+          'priority',
+          'injectDepth',
+          'scanDepth',
+          'sticky',
+          'cooldown',
+          'delay',
+        },
         lists: const {'keywords'},
       );
     }

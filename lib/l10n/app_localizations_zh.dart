@@ -11058,6 +11058,57 @@ class AppLocalizationsZh extends AppLocalizations {
   @override
   String get scheduledTasksDesktopExecutionDetail =>
       '结果保存在对话中，可从任务的运行记录打开。单次最多运行 10 分钟；需要用户回答或工具确认时会停止。';
+
+  @override
+  String get worldBookStickyLabel => '粘滞（消息数）';
+
+  @override
+  String get worldBookStickyHint => '触发后在后续 N 条消息中保持激活，重复命中不延长。0 表示关闭。';
+
+  @override
+  String get worldBookCooldownLabel => '冷却（消息数）';
+
+  @override
+  String get worldBookCooldownHint => '触发后（或粘滞结束后）N 条消息内不再触发。0 表示关闭。';
+
+  @override
+  String get worldBookDelayLabel => '延迟（消息数）';
+
+  @override
+  String get worldBookDelayHint => '对话至少有 N 条消息时才允许触发。按单条消息计数，不是对话轮数。0 表示关闭。';
+
+  @override
+  String get worldBookDragToReorder => '拖动调整顺序';
+
+  @override
+  String worldBookEnabledCount(int enabled, int total) {
+    return '已启用 $enabled/$total';
+  }
+
+  @override
+  String get assistantConversationSystemPromptTitle => '独立对话系统提示';
+
+  @override
+  String get assistantConversationSystemPromptHint => '允许每个对话单独设置系统提示词。';
+
+  @override
+  String get assistantConversationInjectionTitle => '独立对话提示词注入';
+
+  @override
+  String get assistantConversationInjectionHint =>
+      '每个对话单独选择提示词注入和世界书，新对话默认不选中。';
+
+  @override
+  String get conversationSystemPromptTitle => '对话系统提示';
+
+  @override
+  String get conversationSystemPromptHint => '仅覆盖当前对话的助手系统提示词，清空后恢复使用助手提示词。';
+
+  @override
+  String get conversationSystemPromptClear => '清空';
+
+  @override
+  String get conversationPromptScope => '仅当前对话';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hans`).
@@ -22040,6 +22091,57 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   @override
   String get scheduledTasksDesktopExecutionDetail =>
       '结果保存在对话中，可从任务的运行记录打开。单次最多运行 10 分钟；需要用户回答或工具确认时会停止。';
+
+  @override
+  String get worldBookStickyLabel => '粘滞（消息数）';
+
+  @override
+  String get worldBookStickyHint => '触发后在后续 N 条消息中保持激活，重复命中不延长。0 表示关闭。';
+
+  @override
+  String get worldBookCooldownLabel => '冷却（消息数）';
+
+  @override
+  String get worldBookCooldownHint => '触发后（或粘滞结束后）N 条消息内不再触发。0 表示关闭。';
+
+  @override
+  String get worldBookDelayLabel => '延迟（消息数）';
+
+  @override
+  String get worldBookDelayHint => '对话至少有 N 条消息时才允许触发。按单条消息计数，不是对话轮数。0 表示关闭。';
+
+  @override
+  String get worldBookDragToReorder => '拖动调整顺序';
+
+  @override
+  String worldBookEnabledCount(int enabled, int total) {
+    return '已启用 $enabled/$total';
+  }
+
+  @override
+  String get assistantConversationSystemPromptTitle => '独立对话系统提示';
+
+  @override
+  String get assistantConversationSystemPromptHint => '允许每个对话单独设置系统提示词。';
+
+  @override
+  String get assistantConversationInjectionTitle => '独立对话提示词注入';
+
+  @override
+  String get assistantConversationInjectionHint =>
+      '每个对话单独选择提示词注入和世界书，新对话默认不选中。';
+
+  @override
+  String get conversationSystemPromptTitle => '对话系统提示';
+
+  @override
+  String get conversationSystemPromptHint => '仅覆盖当前对话的助手系统提示词，清空后恢复使用助手提示词。';
+
+  @override
+  String get conversationSystemPromptClear => '清空';
+
+  @override
+  String get conversationPromptScope => '仅当前对话';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hant`).
@@ -33101,4 +33203,55 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   @override
   String get scheduledTasksDesktopExecutionDetail =>
       '結果儲存在對話中，可從任務的執行記錄開啟。單次最多執行 10 分鐘；需要使用者回答或工具確認時會停止。';
+
+  @override
+  String get worldBookStickyLabel => '黏滯（訊息數）';
+
+  @override
+  String get worldBookStickyHint => '觸發後在後續 N 則訊息中保持啟用，重複命中不延長。0 表示關閉。';
+
+  @override
+  String get worldBookCooldownLabel => '冷卻（訊息數）';
+
+  @override
+  String get worldBookCooldownHint => '觸發後（或黏滯結束後）N 則訊息內不再觸發。0 表示關閉。';
+
+  @override
+  String get worldBookDelayLabel => '延遲（訊息數）';
+
+  @override
+  String get worldBookDelayHint => '對話至少有 N 則訊息時才允許觸發。按單則訊息計數，不是對話輪數。0 表示關閉。';
+
+  @override
+  String get worldBookDragToReorder => '拖曳調整順序';
+
+  @override
+  String worldBookEnabledCount(int enabled, int total) {
+    return '已啟用 $enabled/$total';
+  }
+
+  @override
+  String get assistantConversationSystemPromptTitle => '獨立對話系統提示';
+
+  @override
+  String get assistantConversationSystemPromptHint => '允許每個對話單獨設定系統提示詞。';
+
+  @override
+  String get assistantConversationInjectionTitle => '獨立對話提示詞注入';
+
+  @override
+  String get assistantConversationInjectionHint =>
+      '每個對話單獨選擇提示詞注入和世界書，新對話預設不選取。';
+
+  @override
+  String get conversationSystemPromptTitle => '對話系統提示';
+
+  @override
+  String get conversationSystemPromptHint => '僅覆蓋目前對話的助理系統提示詞，清空後恢復使用助理提示詞。';
+
+  @override
+  String get conversationSystemPromptClear => '清空';
+
+  @override
+  String get conversationPromptScope => '僅目前對話';
 }

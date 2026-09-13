@@ -4071,5 +4071,31 @@
   "scheduledTasksChatBusy": "此聊天正在生成回答，本次任务已跳过。",
   "scheduledTasksDesktopEmpty": "暂无定时任务",
   "scheduledTasksDesktopReliability": "仅在 Kelivo 运行时执行，最小化或驻留托盘时也会继续。退出或电脑休眠期间错过的任务不会补运行，也不会自动启动应用。",
-  "scheduledTasksDesktopExecutionDetail": "结果保存在对话中，可从任务的运行记录打开。单次最多运行 10 分钟；需要用户回答或工具确认时会停止。"
+  "scheduledTasksDesktopExecutionDetail": "结果保存在对话中，可从任务的运行记录打开。单次最多运行 10 分钟；需要用户回答或工具确认时会停止。",
+  "worldBookStickyLabel": "粘滞（消息数）",
+  "worldBookStickyHint": "触发后在后续 N 条消息中保持激活，重复命中不延长。0 表示关闭。",
+  "worldBookCooldownLabel": "冷却（消息数）",
+  "worldBookCooldownHint": "触发后（或粘滞结束后）N 条消息内不再触发。0 表示关闭。",
+  "worldBookDelayLabel": "延迟（消息数）",
+  "worldBookDelayHint": "对话至少有 N 条消息时才允许触发。按单条消息计数，不是对话轮数。0 表示关闭。",
+  "worldBookDragToReorder": "拖动调整顺序",
+  "worldBookEnabledCount": "已启用 {enabled}/{total}",
+  "assistantConversationSystemPromptTitle": "独立对话系统提示",
+  "assistantConversationSystemPromptHint": "允许每个对话单独设置系统提示词。",
+  "assistantConversationInjectionTitle": "独立对话提示词注入",
+  "assistantConversationInjectionHint": "每个对话单独选择提示词注入和世界书，新对话默认不选中。",
+  "conversationSystemPromptTitle": "对话系统提示",
+  "conversationSystemPromptHint": "仅覆盖当前对话的助手系统提示词，清空后恢复使用助手提示词。",
+  "conversationSystemPromptClear": "清空",
+  "conversationPromptScope": "仅当前对话",
+  "@worldBookEnabledCount": {
+    "placeholders": {
+      "enabled": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  }
 }

@@ -226,6 +226,47 @@ void main() {
     await icons.load();
   });
 
+  testWidgets(
+    'conversation prompt switches persist independently on the assistant',
+    (tester) async {
+      final bundle = await _createAssistantProvider(tester);
+      _setLargeSurface(tester);
+      await tester.pumpWidget(
+        _buildHarness(
+          assistantProvider: bundle.assistantProvider,
+          chatService: bundle.chatService,
+          memoryV2: bundle.memoryV2,
+          pipeline: bundle.pipeline,
+          child: const AssistantSettingsEditPage(assistantId: _assistantId),
+        ),
+      );
+      await _openPromptsTab(tester);
+      for (final title in [
+        'Per-conversation system prompt',
+        'Per-conversation prompt injections',
+      ]) {
+        final row = find
+            .ancestor(of: find.text(title), matching: find.byType(Row))
+            .first;
+        await tester.ensureVisible(row);
+        await tester.pumpAndSettle();
+        await tester.tap(
+          find.descendant(of: row, matching: find.byType(IosSwitch)),
+        );
+        await tester.pumpAndSettle();
+      }
+      final assistant = bundle.assistantProvider.getById(_assistantId)!;
+      expect(assistant.allowConversationSystemPrompt, isTrue);
+      expect(assistant.allowConversationPromptInjection, isTrue);
+      final saved = Assistant.decodeList(
+        bundle.assistantProvider.preferences.getString('assistants_v1')!,
+      );
+      expect(saved.single.allowConversationSystemPrompt, isTrue);
+      expect(saved.single.allowConversationPromptInjection, isTrue);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
   testWidgets('time-variable warning appears for each cur_* token', (
     tester,
   ) async {

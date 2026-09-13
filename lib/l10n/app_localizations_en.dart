@@ -11557,4 +11557,62 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get scheduledTasksDesktopExecutionDetail =>
       'Results are saved in chats. Open them from the task’s run history. Runs stop after 10 minutes or when user input or tool approval is needed.';
+
+  @override
+  String get worldBookStickyLabel => 'Sticky (messages)';
+
+  @override
+  String get worldBookStickyHint =>
+      'Keep this entry active for N messages after triggering. Repeated matches do not extend it. 0 disables this effect.';
+
+  @override
+  String get worldBookCooldownLabel => 'Cooldown (messages)';
+
+  @override
+  String get worldBookCooldownHint =>
+      'Prevent reactivation for N messages after triggering or after sticky ends. 0 disables this effect.';
+
+  @override
+  String get worldBookDelayLabel => 'Delay (messages)';
+
+  @override
+  String get worldBookDelayHint =>
+      'Allow activation only after the conversation has at least N messages. Count individual messages, not exchanges. 0 disables this effect.';
+
+  @override
+  String get worldBookDragToReorder => 'Drag to reorder';
+
+  @override
+  String worldBookEnabledCount(int enabled, int total) {
+    return '$enabled/$total enabled';
+  }
+
+  @override
+  String get assistantConversationSystemPromptTitle =>
+      'Per-conversation system prompt';
+
+  @override
+  String get assistantConversationSystemPromptHint =>
+      'Allow each conversation to override this assistant’s system prompt.';
+
+  @override
+  String get assistantConversationInjectionTitle =>
+      'Per-conversation prompt injections';
+
+  @override
+  String get assistantConversationInjectionHint =>
+      'Choose prompt injections and world books separately for each conversation. New conversations start with none selected.';
+
+  @override
+  String get conversationSystemPromptTitle => 'Conversation system prompt';
+
+  @override
+  String get conversationSystemPromptHint =>
+      'Override the assistant’s system prompt for this conversation. Clear it to use the assistant’s prompt again.';
+
+  @override
+  String get conversationSystemPromptClear => 'Clear';
+
+  @override
+  String get conversationPromptScope => 'This conversation';
 }

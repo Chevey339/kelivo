@@ -5,6 +5,10 @@ import 'package:Kelivo/core/database/app_database.dart';
 import 'package:Kelivo/core/database/extension_entity_store.dart';
 import 'package:Kelivo/core/models/assistant.dart';
 import 'package:Kelivo/core/models/conversation.dart';
+import 'package:Kelivo/core/models/conversation_prompt_settings.dart';
+import 'package:Kelivo/core/models/instruction_injection.dart';
+import 'package:Kelivo/core/models/skills_binding.dart';
+import 'package:Kelivo/core/models/world_book.dart';
 import 'package:Kelivo/core/providers/assistant_provider.dart';
 import 'package:Kelivo/core/providers/environment_provider.dart';
 import 'package:Kelivo/core/providers/instruction_injection_provider.dart';
@@ -16,6 +20,8 @@ import 'package:Kelivo/core/services/sandbox/environment_manager.dart';
 import 'package:Kelivo/core/services/skills/skills_service.dart';
 import 'package:Kelivo/core/services/workspace/workspace_runtime.dart';
 import 'package:Kelivo/features/chat/widgets/bottom_tools_sheet.dart';
+import 'package:Kelivo/features/chat/widgets/tools_sheet_row.dart';
+import 'package:Kelivo/icons/lucide_adapter.dart';
 import 'package:Kelivo/features/workspace/pages/skills_page.dart';
 import 'package:Kelivo/features/workspace/widgets/skills/conversation_skills_sheet.dart';
 import 'package:Kelivo/features/workspace/widgets/workspace_section.dart';
@@ -231,4 +237,113 @@ void main() {
 
     expect(find.byType(SkillsPage), findsOneWidget);
   });
+
+  Future<String> seedSelections(WidgetTester tester) async {
+    return (await tester.runAsync(() async {
+      await worldBooks.initialize();
+      await worldBooks.addBook(const WorldBook(id: 'book1', name: 'Book 1'));
+      await worldBooks.addBook(const WorldBook(id: 'book2', name: 'Book 2'));
+      await worldBooks.setActiveBookIds(['book1'], assistantId: assistantId);
+      await injections.initialize();
+      await injections.clear();
+      await injections.addMany(const [
+        InstructionInjection(id: 'i1', title: 'First', prompt: 'First'),
+        InstructionInjection(id: 'i2', title: 'Second', prompt: 'Second'),
+      ]);
+      await injections.setActiveIds(['i1'], assistantId: assistantId);
+      final skill = await skills.importFromText('''
+---
+name: menu-count-test
+description: Test skill selection counts.
+---
+Use for the menu test.
+''');
+      await skills.setEnabled(skill.record.id, true);
+      await assistants.updateAssistant(
+        assistants.getById(assistantId)!.copyWith(skillIds: [skill.record.id]),
+      );
+      return skill.record.id;
+    }))!;
+  }
+
+  void expectTrailing(WidgetTester tester, String label, String? count) {
+    final row = find.byWidgetPredicate(
+      (widget) => widget is ToolsSheetRow && widget.label == label,
+    );
+    expect(row, findsOneWidget);
+    final trailing = tester.widget<ToolsSheetRow>(row).trailing;
+    if (count == null) {
+      expect(trailing, isA<Icon>());
+      expect((trailing! as Icon).icon, Lucide.ChevronRight);
+    } else {
+      expect(trailing, isA<Text>());
+      expect((trailing! as Text).data, count);
+      final number = find.descendant(of: row, matching: find.text(count));
+      expect(
+        tester.getRect(number).right,
+        closeTo(tester.getRect(row).right - 12, 1),
+      );
+    }
+  }
+
+  testWidgets(
+    'shows active counts in place of chevrons and restores them when cleared',
+    (tester) async {
+      await seedSelections(tester);
+      final l10n = await pumpSheet(tester);
+      await tester.pumpAndSettle();
+      expectTrailing(
+        tester,
+        l10n.workspaceEntrySessionSkills,
+        '1/${skills.skills.length}',
+      );
+      expectTrailing(tester, l10n.instructionInjectionTitle, '1/2');
+      expectTrailing(tester, l10n.worldBookTitle, '1/2');
+
+      await tester.runAsync(() async {
+        await assistants.updateAssistant(
+          assistants.getById(assistantId)!.copyWith(skillIds: []),
+        );
+        await injections.setActiveIds([], assistantId: assistantId);
+        await worldBooks.setActiveBookIds([], assistantId: assistantId);
+      });
+      await tester.pumpAndSettle();
+      expectTrailing(tester, l10n.workspaceEntrySessionSkills, null);
+      expectTrailing(tester, l10n.instructionInjectionTitle, null);
+      expectTrailing(tester, l10n.worldBookTitle, null);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'counts the conversation selections instead of the assistant defaults',
+    (tester) async {
+      await seedSelections(tester);
+      await tester.runAsync(
+        () => assistants.updateAssistant(
+          assistants
+              .getById(assistantId)!
+              .copyWith(allowConversationPromptInjection: true),
+        ),
+      );
+      final l10n = await pumpSheet(
+        tester,
+        conversation: Conversation(
+          id: 'scoped',
+          title: 'Chat',
+          assistantId: assistantId,
+          extras: {
+            SkillsBinding.keyIds: <String>[],
+            ConversationPromptSettings.instructionIdsKey: ['i1', 'i2'],
+            ConversationPromptSettings.worldBookIdsKey: ['book2'],
+          },
+        ),
+      );
+      await tester.pumpAndSettle();
+      expectTrailing(tester, l10n.workspaceEntrySessionSkills, null);
+      expectTrailing(tester, l10n.instructionInjectionTitle, '2/2');
+      expectTrailing(tester, l10n.worldBookTitle, '1/2');
+      expect(tester.takeException(), isNull);
+    },
+  );
 }

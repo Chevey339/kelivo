@@ -5056,5 +5056,31 @@
   "scheduledTasksChatBusy": "This conversation is generating a reply. The scheduled run was skipped.",
   "scheduledTasksDesktopEmpty": "No scheduled tasks",
   "scheduledTasksDesktopReliability": "Tasks run only while Kelivo is running, including when minimized or in the system tray. Missed times are skipped after quitting or computer sleep. Kelivo will not start automatically.",
-  "scheduledTasksDesktopExecutionDetail": "Results are saved in chats. Open them from the task’s run history. Runs stop after 10 minutes or when user input or tool approval is needed."
+  "scheduledTasksDesktopExecutionDetail": "Results are saved in chats. Open them from the task’s run history. Runs stop after 10 minutes or when user input or tool approval is needed.",
+  "worldBookStickyLabel": "Sticky (messages)",
+  "worldBookStickyHint": "Keep this entry active for N messages after triggering. Repeated matches do not extend it. 0 disables this effect.",
+  "worldBookCooldownLabel": "Cooldown (messages)",
+  "worldBookCooldownHint": "Prevent reactivation for N messages after triggering or after sticky ends. 0 disables this effect.",
+  "worldBookDelayLabel": "Delay (messages)",
+  "worldBookDelayHint": "Allow activation only after the conversation has at least N messages. Count individual messages, not exchanges. 0 disables this effect.",
+  "worldBookDragToReorder": "Drag to reorder",
+  "worldBookEnabledCount": "{enabled}/{total} enabled",
+  "assistantConversationSystemPromptTitle": "Per-conversation system prompt",
+  "assistantConversationSystemPromptHint": "Allow each conversation to override this assistant’s system prompt.",
+  "assistantConversationInjectionTitle": "Per-conversation prompt injections",
+  "assistantConversationInjectionHint": "Choose prompt injections and world books separately for each conversation. New conversations start with none selected.",
+  "conversationSystemPromptTitle": "Conversation system prompt",
+  "conversationSystemPromptHint": "Override the assistant’s system prompt for this conversation. Clear it to use the assistant’s prompt again.",
+  "conversationSystemPromptClear": "Clear",
+  "conversationPromptScope": "This conversation",
+  "@worldBookEnabledCount": {
+    "placeholders": {
+      "enabled": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  }
 }
