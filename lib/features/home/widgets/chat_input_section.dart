@@ -1,5 +1,4 @@
 import 'package:Kelivo/features/chat/utils/prompt_injection_selection.dart';
-import 'conversation_system_prompt_button.dart';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
@@ -256,18 +255,11 @@ class ChatInputSection extends StatelessWidget {
       inputBackgroundOpacityDark: settings.chatInputBackgroundOpacityDark,
     );
 
-    final showPrompt = a?.allowConversationSystemPrompt == true && !isLoading;
-    if ((!showEnvChip || !workspaceBound) && !showPrompt) return bar;
+    if (!showEnvChip || !workspaceBound) return bar;
     return Column(
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        if (showPrompt)
-          ConversationSystemPromptButton(
-            key: ValueKey('prompt-${a!.id}-$conversationId'),
-            assistantId: a.id,
-            conversationId: conversationId,
-          ),
         if (showEnvChip && workspaceBound)
           Padding(
             padding: const EdgeInsets.fromLTRB(

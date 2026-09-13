@@ -5069,12 +5069,13 @@
   "worldBookDragToReorder": "Drag to reorder",
   "worldBookEnabledCount": "{enabled}/{total} enabled",
   "assistantConversationSystemPromptTitle": "Per-conversation system prompt",
-  "assistantConversationSystemPromptHint": "Allow each conversation to override this assistant’s system prompt.",
-  "assistantConversationInjectionTitle": "Per-conversation prompt injections",
-  "assistantConversationInjectionHint": "Choose prompt injections and world books separately for each conversation. New conversations start with none selected.",
+  "assistantConversationSystemPromptHint": "Allow each conversation to use its own system prompt.",
+  "assistantConversationInjectionTitle": "Per-conversation instruction injections",
+  "assistantConversationInjectionHint": "Choose instruction injections and world books for each conversation. None selected by default.",
   "conversationSystemPromptTitle": "Conversation system prompt",
-  "conversationSystemPromptHint": "Override the assistant’s system prompt for this conversation. Clear it to use the assistant’s prompt again.",
-  "conversationSystemPromptClear": "Clear",
+  "conversationSystemPromptHint": "Applies only to this conversation. Leave blank to use the assistant’s system prompt.",
+  "conversationSystemPromptClear": "Use assistant prompt",
+  "conversationSystemPromptPlaceholder": "Write a system prompt for this conversation…",
   "conversationPromptScope": "This conversation",
   "@worldBookEnabledCount": {
     "placeholders": {

@@ -11604,25 +11604,29 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get assistantConversationSystemPromptHint =>
-      'Allow each conversation to override this assistant’s system prompt.';
+      'Allow each conversation to use its own system prompt.';
 
   @override
   String get assistantConversationInjectionTitle =>
-      'Per-conversation prompt injections';
+      'Per-conversation instruction injections';
 
   @override
   String get assistantConversationInjectionHint =>
-      'Choose prompt injections and world books separately for each conversation. New conversations start with none selected.';
+      'Choose instruction injections and world books for each conversation. None selected by default.';
 
   @override
   String get conversationSystemPromptTitle => 'Conversation system prompt';
 
   @override
   String get conversationSystemPromptHint =>
-      'Override the assistant’s system prompt for this conversation. Clear it to use the assistant’s prompt again.';
+      'Applies only to this conversation. Leave blank to use the assistant’s system prompt.';
 
   @override
-  String get conversationSystemPromptClear => 'Clear';
+  String get conversationSystemPromptClear => 'Use assistant prompt';
+
+  @override
+  String get conversationSystemPromptPlaceholder =>
+      'Write a system prompt for this conversation…';
 
   @override
   String get conversationPromptScope => 'This conversation';

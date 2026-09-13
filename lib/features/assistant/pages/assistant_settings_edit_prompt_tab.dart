@@ -925,6 +925,7 @@ class _PromptTabState extends State<_PromptTab> {
           dividers: true,
           children: [
             _ConversationPromptOption(
+              icon: Lucide.FileText,
               title: l10n.assistantConversationSystemPromptTitle,
               subtitle: l10n.assistantConversationSystemPromptHint,
               value: a.allowConversationSystemPrompt,
@@ -933,6 +934,7 @@ class _PromptTabState extends State<_PromptTab> {
               ),
             ),
             _ConversationPromptOption(
+              icon: Lucide.Layers,
               title: l10n.assistantConversationInjectionTitle,
               subtitle: l10n.assistantConversationInjectionHint,
               value: a.allowConversationPromptInjection,
@@ -1770,21 +1772,39 @@ class _VarExplainList extends StatelessWidget {
 
 class _ConversationPromptOption extends StatelessWidget {
   const _ConversationPromptOption({
+    required this.icon,
     required this.title,
     required this.subtitle,
     required this.value,
     required this.onChanged,
   });
+  final IconData icon;
   final String title;
   final String subtitle;
   final bool value;
   final ValueChanged<bool> onChanged;
 
   @override
-  Widget build(BuildContext context) => Padding(
+  Widget build(BuildContext context) => IosCardPress(
+    baseColor: Colors.transparent,
+    borderRadius: BorderRadius.zero,
+    pressedScale: 1,
+    haptics: false,
+    onTap: () => onChanged(!value),
     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
     child: Row(
       children: [
+        SizedBox(
+          width: 36,
+          child: Icon(
+            icon,
+            size: 20,
+            color: value
+                ? Theme.of(context).colorScheme.primary
+                : Theme.of(context).colorScheme.onSurfaceVariant,
+          ),
+        ),
+        const SizedBox(width: 12),
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -1811,7 +1831,7 @@ class _ConversationPromptOption extends StatelessWidget {
           ),
         ),
         const SizedBox(width: 12),
-        IosSwitch(value: value, onChanged: onChanged),
+        IosSwitch(value: value, onChanged: onChanged, semanticLabel: title),
       ],
     ),
   );

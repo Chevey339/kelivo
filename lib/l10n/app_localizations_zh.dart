@@ -11100,23 +11100,25 @@ class AppLocalizationsZh extends AppLocalizations {
   String get assistantConversationSystemPromptTitle => '独立对话系统提示';
 
   @override
-  String get assistantConversationSystemPromptHint => '允许每个对话单独设置系统提示词。';
+  String get assistantConversationSystemPromptHint => '允许每个对话设置自己的系统提示词。';
 
   @override
-  String get assistantConversationInjectionTitle => '独立对话提示词注入';
+  String get assistantConversationInjectionTitle => '独立对话指令注入';
 
   @override
-  String get assistantConversationInjectionHint =>
-      '每个对话单独选择提示词注入和世界书，新对话默认不选中。';
+  String get assistantConversationInjectionHint => '每个对话单独选择指令注入和世界书，默认不选中。';
 
   @override
-  String get conversationSystemPromptTitle => '对话系统提示';
+  String get conversationSystemPromptTitle => '对话系统提示词';
 
   @override
-  String get conversationSystemPromptHint => '仅覆盖当前对话的助手系统提示词，清空后恢复使用助手提示词。';
+  String get conversationSystemPromptHint => '仅对当前对话生效，留空时使用助手的系统提示词。';
 
   @override
-  String get conversationSystemPromptClear => '清空';
+  String get conversationSystemPromptClear => '恢复助手提示词';
+
+  @override
+  String get conversationSystemPromptPlaceholder => '为这个对话编写系统提示词…';
 
   @override
   String get conversationPromptScope => '仅当前对话';
@@ -22144,23 +22146,25 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get assistantConversationSystemPromptTitle => '独立对话系统提示';
 
   @override
-  String get assistantConversationSystemPromptHint => '允许每个对话单独设置系统提示词。';
+  String get assistantConversationSystemPromptHint => '允许每个对话设置自己的系统提示词。';
 
   @override
-  String get assistantConversationInjectionTitle => '独立对话提示词注入';
+  String get assistantConversationInjectionTitle => '独立对话指令注入';
 
   @override
-  String get assistantConversationInjectionHint =>
-      '每个对话单独选择提示词注入和世界书，新对话默认不选中。';
+  String get assistantConversationInjectionHint => '每个对话单独选择指令注入和世界书，默认不选中。';
 
   @override
-  String get conversationSystemPromptTitle => '对话系统提示';
+  String get conversationSystemPromptTitle => '对话系统提示词';
 
   @override
-  String get conversationSystemPromptHint => '仅覆盖当前对话的助手系统提示词，清空后恢复使用助手提示词。';
+  String get conversationSystemPromptHint => '仅对当前对话生效，留空时使用助手的系统提示词。';
 
   @override
-  String get conversationSystemPromptClear => '清空';
+  String get conversationSystemPromptClear => '恢复助手提示词';
+
+  @override
+  String get conversationSystemPromptPlaceholder => '为这个对话编写系统提示词…';
 
   @override
   String get conversationPromptScope => '仅当前对话';
@@ -33267,23 +33271,25 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get assistantConversationSystemPromptTitle => '獨立對話系統提示';
 
   @override
-  String get assistantConversationSystemPromptHint => '允許每個對話單獨設定系統提示詞。';
+  String get assistantConversationSystemPromptHint => '允許每個對話設定自己的系統提示詞。';
 
   @override
-  String get assistantConversationInjectionTitle => '獨立對話提示詞注入';
+  String get assistantConversationInjectionTitle => '獨立對話指令注入';
 
   @override
-  String get assistantConversationInjectionHint =>
-      '每個對話單獨選擇提示詞注入和世界書，新對話預設不選取。';
+  String get assistantConversationInjectionHint => '每個對話單獨選擇指令注入和世界書，預設不選取。';
 
   @override
-  String get conversationSystemPromptTitle => '對話系統提示';
+  String get conversationSystemPromptTitle => '對話系統提示詞';
 
   @override
-  String get conversationSystemPromptHint => '僅覆蓋目前對話的助理系統提示詞，清空後恢復使用助理提示詞。';
+  String get conversationSystemPromptHint => '僅對目前對話生效，留空時使用助理的系統提示詞。';
 
   @override
-  String get conversationSystemPromptClear => '清空';
+  String get conversationSystemPromptClear => '恢復助理提示詞';
+
+  @override
+  String get conversationSystemPromptPlaceholder => '為這個對話編寫系統提示詞…';
 
   @override
   String get conversationPromptScope => '僅目前對話';

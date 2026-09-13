@@ -243,7 +243,7 @@ void main() {
       await _openPromptsTab(tester);
       for (final title in [
         'Per-conversation system prompt',
-        'Per-conversation prompt injections',
+        'Per-conversation instruction injections',
       ]) {
         final row = find
             .ancestor(of: find.text(title), matching: find.byType(Row))

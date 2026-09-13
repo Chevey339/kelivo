@@ -20850,19 +20850,19 @@ abstract class AppLocalizations {
   /// No description provided for @assistantConversationSystemPromptHint.
   ///
   /// In en, this message translates to:
-  /// **'Allow each conversation to override this assistant’s system prompt.'**
+  /// **'Allow each conversation to use its own system prompt.'**
   String get assistantConversationSystemPromptHint;
 
   /// No description provided for @assistantConversationInjectionTitle.
   ///
   /// In en, this message translates to:
-  /// **'Per-conversation prompt injections'**
+  /// **'Per-conversation instruction injections'**
   String get assistantConversationInjectionTitle;
 
   /// No description provided for @assistantConversationInjectionHint.
   ///
   /// In en, this message translates to:
-  /// **'Choose prompt injections and world books separately for each conversation. New conversations start with none selected.'**
+  /// **'Choose instruction injections and world books for each conversation. None selected by default.'**
   String get assistantConversationInjectionHint;
 
   /// No description provided for @conversationSystemPromptTitle.
@@ -20874,14 +20874,20 @@ abstract class AppLocalizations {
   /// No description provided for @conversationSystemPromptHint.
   ///
   /// In en, this message translates to:
-  /// **'Override the assistant’s system prompt for this conversation. Clear it to use the assistant’s prompt again.'**
+  /// **'Applies only to this conversation. Leave blank to use the assistant’s system prompt.'**
   String get conversationSystemPromptHint;
 
   /// No description provided for @conversationSystemPromptClear.
   ///
   /// In en, this message translates to:
-  /// **'Clear'**
+  /// **'Use assistant prompt'**
   String get conversationSystemPromptClear;
+
+  /// No description provided for @conversationSystemPromptPlaceholder.
+  ///
+  /// In en, this message translates to:
+  /// **'Write a system prompt for this conversation…'**
+  String get conversationSystemPromptPlaceholder;
 
   /// No description provided for @conversationPromptScope.
   ///

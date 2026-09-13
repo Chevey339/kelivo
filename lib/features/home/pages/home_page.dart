@@ -58,6 +58,7 @@ import '../widgets/learning_prompt_sheet.dart';
 import '../widgets/scroll_nav_buttons.dart';
 import '../widgets/message_list_view.dart';
 import '../widgets/chat_input_section.dart';
+import '../widgets/conversation_system_prompt_button.dart';
 import '../widgets/chat_input_overlay_layout.dart';
 import '../widgets/chat_selection_app_bar.dart';
 import '../widgets/chat_selection_delete_bar.dart';
@@ -82,10 +83,12 @@ class _TemporaryConversationEmptyState extends StatelessWidget {
   const _TemporaryConversationEmptyState({
     required this.topContentPadding,
     required this.bottomContentPadding,
+    this.footer,
   });
 
   final double topContentPadding;
   final double bottomContentPadding;
+  final Widget? footer;
 
   @override
   Widget build(BuildContext context) {
@@ -121,6 +124,10 @@ class _TemporaryConversationEmptyState extends StatelessWidget {
                   fontWeight: AppFontWeights.medium,
                 ),
               ),
+              if (footer != null) ...[
+                const SizedBox(height: 16),
+                SizedBox(height: 48, child: footer),
+              ],
             ],
           ),
         ),
@@ -1352,18 +1359,30 @@ class _HomePageState extends State<HomePage>
     required double bottomContentPadding,
     required EdgeInsetsGeometry dividerPadding,
   }) {
+    final assistant = context.watch<AssistantProvider>().currentAssistant;
+    final footer =
+        assistant?.allowConversationSystemPrompt == true &&
+            !_controller.isCurrentConversationLoading &&
+            !_controller.selecting
+        ? ConversationSystemPromptButton(
+            assistantId: assistant!.id,
+            conversationId: _controller.currentConversation?.id,
+            backgroundImageActive: _assistantBackgroundActive(context),
+          )
+        : null;
     if (_controller.isTemporaryConversation &&
         _controller.chatController.collapsedMessages.isEmpty) {
       return _TemporaryConversationEmptyState(
         topContentPadding: topContentPadding,
         bottomContentPadding: bottomContentPadding,
+        footer: footer,
       );
     }
 
     final settings = context.watch<SettingsProvider>();
     final suggestionsEnabled = settings.isSuggestionGenerationEnabled;
-    final assistant = context.watch<AssistantProvider>().currentAssistant;
     return MessageListView(
+      footer: footer,
       processingFilesMessageId: _controller.processingFilesMessageId,
       scrollController: _scrollController,
       listController: _controller.scrollCtrl.messageListController,

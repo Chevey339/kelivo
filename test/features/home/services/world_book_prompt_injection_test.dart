@@ -384,7 +384,7 @@ void main() {
           find.byKey(const ValueKey('conversation-system-prompt-button')),
         );
         await tester.pumpAndSettle();
-        await tester.tap(find.text('Clear'));
+        await tester.tap(find.text('Use assistant prompt'));
         await tester.pumpAndSettle();
         await tester.runAsync(() async {
           final saved = await repository.getConversation('one');

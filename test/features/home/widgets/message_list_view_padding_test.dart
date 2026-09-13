@@ -28,6 +28,85 @@ void main() {
     SharedPreferences.setMockInitialValues({});
   });
 
+  testWidgets(
+    'conversation footer follows the final message and scrolls away with history',
+    (tester) async {
+      final key = GlobalKey<_PrependingMessageListHarnessState>();
+      await tester.pumpWidget(
+        _PrependingMessageListHarness(key: key, showFooter: true),
+      );
+      await tester.pumpAndSettle();
+      final state = key.currentState!;
+      final footer = find.byKey(const ValueKey('conversation-footer'));
+      expect(state.listController.numberOfItems, state.messages.length);
+      expect(footer.hitTestable(), findsNothing);
+
+      Future<void> revealTail() async {
+        state.listController.jumpToItem(
+          index: state.messages.length - 1,
+          scrollController: state.scrollController,
+          alignment: 1,
+        );
+        await tester.pumpAndSettle();
+      }
+
+      await revealTail();
+      expect(footer.hitTestable(), findsOneWidget);
+      state.replaceMessages([
+        ...state.messages,
+        ChatMessage(
+          id: 'new-tail',
+          role: 'user',
+          content: 'Next message',
+          conversationId: 'conversation-1',
+        ),
+      ]);
+      await tester.pumpAndSettle();
+      await revealTail();
+      expect(footer, findsOneWidget);
+      expect(
+        tester.getTopLeft(footer).dy,
+        greaterThan(
+          tester.getTopLeft(find.byKey(const ValueKey('new-tail'))).dy,
+        ),
+      );
+      expect(state.listController.numberOfItems, state.messages.length);
+
+      state.scrollController.jumpTo(0);
+      await tester.pumpAndSettle();
+      expect(footer.hitTestable(), findsNothing);
+      state.replaceMessages([]);
+      await tester.pumpAndSettle();
+      expect(footer.hitTestable(), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'conversation footer is hidden until the actual end of a paged history',
+    (tester) async {
+      final key = GlobalKey<_PrependingMessageListHarnessState>();
+      await tester.pumpWidget(
+        _PrependingMessageListHarness(
+          key: key,
+          showFooter: true,
+          hasMoreAfter: true,
+        ),
+      );
+      await tester.pumpAndSettle();
+      final state = key.currentState!;
+      state.listController.jumpToItem(
+        index: state.messages.length - 1,
+        scrollController: state.scrollController,
+        alignment: 1,
+      );
+      await tester.pumpAndSettle();
+      expect(find.byKey(const ValueKey('conversation-footer')), findsNothing);
+      expect(state.listController.numberOfItems, state.messages.length);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
   testWidgets('macOS 消息列表滚动不主动清除文本选区焦点', (tester) async {
     debugDefaultTargetPlatformOverride = TargetPlatform.macOS;
     final scrollController = ScrollController();
@@ -1183,9 +1262,13 @@ class _PrependingMessageListHarness extends StatefulWidget {
   const _PrependingMessageListHarness({
     super.key,
     this.initialReasoning = const <String, stream_ctrl.ReasoningData>{},
+    this.showFooter = false,
+    this.hasMoreAfter = false,
   });
 
   final Map<String, stream_ctrl.ReasoningData> initialReasoning;
+  final bool showFooter;
+  final bool hasMoreAfter;
 
   @override
   State<_PrependingMessageListHarness> createState() =>
@@ -1227,6 +1310,10 @@ class _PrependingMessageListHarnessState
         ...messages,
       ];
     });
+  }
+
+  void replaceMessages(List<ChatMessage> next) {
+    setState(() => messages = next);
   }
 
   void editMessageAboveAnchor() {
@@ -1330,6 +1417,15 @@ class _PrependingMessageListHarnessState
             dividerPadding: EdgeInsets.zero,
             processingFilesMessageId: processingFilesMessageId,
             removingSlotIds: removingSlotIds,
+            hasMoreAfter: widget.hasMoreAfter,
+            footer: widget.showFooter
+                ? const Center(
+                    child: Text(
+                      'Conversation prompt',
+                      key: ValueKey('conversation-footer'),
+                    ),
+                  )
+                : null,
           ),
         ),
       ),
