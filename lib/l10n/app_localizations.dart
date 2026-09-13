@@ -1354,6 +1354,24 @@ abstract class AppLocalizations {
   /// **'Working Directory (optional)'**
   String get mcpServerEditSheetStdioWorkingDirectoryLabel;
 
+  /// No description provided for @mcpWorkspaceBindingLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Bind workspace (optional)'**
+  String get mcpWorkspaceBindingLabel;
+
+  /// No description provided for @mcpWorkspaceBindingHint.
+  ///
+  /// In en, this message translates to:
+  /// **'The server can access this workspace at /workspace. Leave Working Directory empty to start there. The binding stays fixed when you switch chats.'**
+  String get mcpWorkspaceBindingHint;
+
+  /// No description provided for @mcpWorkspaceBindingMobileOnly.
+  ///
+  /// In en, this message translates to:
+  /// **'Workspace binding is available in the mobile Linux environment. Unbind it to run this server on desktop.'**
+  String get mcpWorkspaceBindingMobileOnly;
+
   /// No description provided for @mcpServerEditSheetStdioEnvironmentTitle.
   ///
   /// In en, this message translates to:

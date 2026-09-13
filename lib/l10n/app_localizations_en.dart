@@ -680,6 +680,17 @@ class AppLocalizationsEn extends AppLocalizations {
       'Working Directory (optional)';
 
   @override
+  String get mcpWorkspaceBindingLabel => 'Bind workspace (optional)';
+
+  @override
+  String get mcpWorkspaceBindingHint =>
+      'The server can access this workspace at /workspace. Leave Working Directory empty to start there. The binding stays fixed when you switch chats.';
+
+  @override
+  String get mcpWorkspaceBindingMobileOnly =>
+      'Workspace binding is available in the mobile Linux environment. Unbind it to run this server on desktop.';
+
+  @override
   String get mcpServerEditSheetStdioEnvironmentTitle => 'Environment';
 
   @override

@@ -3,6 +3,7 @@ import '../../core/services/mcp/stdio_arguments.dart';
 import '../../features/mcp/widgets/mcp_environment_picker.dart';
 
 import 'package:flutter/material.dart';
+import '../../features/mcp/widgets/mcp_workspace_binding_field.dart';
 import 'package:provider/provider.dart';
 
 import '../../icons/lucide_adapter.dart' as lucide;
@@ -57,6 +58,7 @@ class _DesktopMcpEditDialogState extends State<_DesktopMcpEditDialog>
   final _cmdCtrl = TextEditingController();
   final _argsCtrl = TextEditingController(); // space-separated args
   final _cwdCtrl = TextEditingController();
+  String? _workspaceId;
   final List<_HeaderEntry> _env = [];
 
   @override
@@ -80,6 +82,7 @@ class _DesktopMcpEditDialogState extends State<_DesktopMcpEditDialog>
         _cmdCtrl.text = server.command ?? '';
         _argsCtrl.text = StdioArguments.format(server.args);
         _cwdCtrl.text = server.workingDirectory ?? '';
+        _workspaceId = server.workspaceId;
         server.env.forEach((k, v) {
           _env.add(
             _HeaderEntry(
@@ -177,6 +180,8 @@ class _DesktopMcpEditDialogState extends State<_DesktopMcpEditDialog>
             env: env,
             workingDirectory: clearing ? null : cwd,
             clearWorkingDirectory: clearing,
+            workspaceId: _workspaceId,
+            clearWorkspace: _workspaceId == null,
           ),
         );
       } else {
@@ -188,6 +193,7 @@ class _DesktopMcpEditDialogState extends State<_DesktopMcpEditDialog>
           args: args,
           env: env,
           workingDirectory: cwd.isEmpty ? null : cwd,
+          workspaceId: _workspaceId,
         );
       }
     } else {
@@ -209,6 +215,7 @@ class _DesktopMcpEditDialogState extends State<_DesktopMcpEditDialog>
             transport: _transport,
             url: url,
             headers: headers,
+            clearWorkspace: true,
           ),
         );
       } else {
@@ -377,6 +384,10 @@ class _DesktopMcpEditDialogState extends State<_DesktopMcpEditDialog>
             bold: true,
           ),
         if (!isBuiltin && _transport == McpTransportType.stdio) ...[
+          McpWorkspaceBindingField(
+            workspaceId: _workspaceId,
+            onChanged: (id) => setState(() => _workspaceId = id),
+          ),
           _labeledField(
             label: l10n.mcpServerEditSheetStdioCommandLabel,
             controller: _cmdCtrl,

@@ -791,6 +791,7 @@ class MyApp extends StatelessWidget {
             preferences: businessPreferences,
             workspaceRuntime: ctx.read<WorkspaceRuntimeProvider>(),
             environment: ctx.read<EnvironmentProvider>(),
+            workspaces: ctx.read<WorkspaceProvider>(),
           ),
         ),
         ProxyProvider<_WorkspaceStackHolder, EnvironmentManager?>(

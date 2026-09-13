@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../../core/services/mcp/stdio_arguments.dart';
 import '../../../shared/widgets/ios_form_text_field.dart';
 import 'mcp_environment_picker.dart';
+import 'mcp_workspace_binding_field.dart';
 import 'package:provider/provider.dart';
 import '../../../core/providers/settings_provider.dart';
 import 'dart:math' as math;
@@ -63,6 +64,7 @@ class _McpServerEditSheetState extends State<_McpServerEditSheet>
   final _argsCtrl = TextEditingController();
   String? _argsError;
   final _cwdCtrl = TextEditingController();
+  String? _workspaceId;
   final List<_HeaderEntry> _env = [];
   final List<_HeaderEntry> _headers = [];
 
@@ -80,6 +82,7 @@ class _McpServerEditSheetState extends State<_McpServerEditSheet>
       _cmdCtrl.text = server.command ?? '';
       _argsCtrl.text = StdioArguments.format(server.args);
       _cwdCtrl.text = server.workingDirectory ?? '';
+      _workspaceId = server.workspaceId;
       server.env.forEach(
         (k, v) => _env.add(
           _HeaderEntry(
@@ -245,6 +248,10 @@ class _McpServerEditSheetState extends State<_McpServerEditSheet>
           _transportPicker(),
           const SizedBox(height: 10),
           if (_transport == McpTransportType.stdio) ...[
+            McpWorkspaceBindingField(
+              workspaceId: _workspaceId,
+              onChanged: (id) => setState(() => _workspaceId = id),
+            ),
             _inputRow(
               label: l10n.mcpServerEditSheetStdioCommandLabel,
               controller: _cmdCtrl,
@@ -258,7 +265,7 @@ class _McpServerEditSheetState extends State<_McpServerEditSheet>
               label: l10n.mcpServerEditSheetStdioWorkingDirectoryLabel,
               controller: _cwdCtrl,
               literalInput: true,
-              hint: '/root',
+              hint: _workspaceId == null ? '/root' : '/workspace',
             ),
             const SizedBox(height: 16),
             Text(l10n.mcpServerEditSheetStdioEnvironmentTitle),
@@ -482,6 +489,8 @@ class _McpServerEditSheetState extends State<_McpServerEditSheet>
             env: env,
             workingDirectory: clearing ? null : cwd,
             clearWorkingDirectory: clearing,
+            workspaceId: _workspaceId,
+            clearWorkspace: _workspaceId == null,
           ),
         );
       } else {
@@ -493,6 +502,7 @@ class _McpServerEditSheetState extends State<_McpServerEditSheet>
           args: args,
           env: env,
           workingDirectory: cwd.isEmpty ? null : cwd,
+          workspaceId: _workspaceId,
         );
       }
       if (mounted) Navigator.of(context).pop();
@@ -522,6 +532,7 @@ class _McpServerEditSheetState extends State<_McpServerEditSheet>
           transport: _transport,
           url: url,
           headers: headers,
+          clearWorkspace: true,
         ),
       );
     } else {
