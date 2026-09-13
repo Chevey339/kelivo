@@ -280,13 +280,6 @@ abstract class BuiltInToolsHelper {
     return (Uri.tryParse(raw)?.host.toLowerCase() ?? '') == 'api.anthropic.com';
   }
 
-  static bool isDeepSeekResponsesBuiltInSearchSupportedModel(String? modelId) {
-    return RegExp(
-      r'(^|[/_:@])(?:deepseek-v4-|deepseek-flash(?:$|[-.]))',
-      caseSensitive: false,
-    ).hasMatch(_normalizedModelId(modelId));
-  }
-
   static bool isDashScopeChatBuiltInSearchSupportedModel(String? modelId) {
     final m = _normalizedModelId(modelId);
     return _matchesExactOrSnapshot(
@@ -508,11 +501,6 @@ abstract class BuiltInToolsHelper {
           if (isOpenAIResponsesBuiltInSearchSupportedModel(upstreamModelId)) {
             return true;
           }
-          if (isDeepSeekProvider(cfg)) {
-            return isDeepSeekResponsesBuiltInSearchSupportedModel(
-              upstreamModelId,
-            );
-          }
           if (isDashScopeProvider(cfg)) {
             return isDashScopeResponsesBuiltInSearchSupportedModel(
               upstreamModelId,
@@ -603,8 +591,6 @@ abstract class BuiltInToolsHelper {
 
     final supportsSearch =
         isOpenAIResponsesBuiltInSearchSupportedModel(upstreamModelId) ||
-        (isDeepSeekProvider(cfg) &&
-            isDeepSeekResponsesBuiltInSearchSupportedModel(upstreamModelId)) ||
         (isDashScopeProvider(cfg) &&
             isDashScopeResponsesBuiltInSearchSupportedModel(upstreamModelId)) ||
         (isArkProvider(cfg) &&
