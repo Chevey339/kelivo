@@ -6,34 +6,49 @@ import 'package:crypto/crypto.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 
-import 'mcp_oauth_callback_types.dart';
+import 'oauth_callback_types.dart';
 
-const _mobileOAuthChannel = MethodChannel('app.mcp_oauth');
+const _mobileOAuthChannel = MethodChannel('app.oauth');
 
-Future<McpOAuthCallback> openMcpOAuthCallback(Uri authorizationServer) async {
+Future<OAuthCallback> openOAuthCallback(
+  Uri authorizationServer, {
+  Uri? loopbackRedirect,
+}) async {
+  if (loopbackRedirect != null) {
+    if (loopbackRedirect.scheme != "http" ||
+        !{"localhost", "127.0.0.1"}.contains(loopbackRedirect.host)) {
+      throw ArgumentError.value(loopbackRedirect, "loopbackRedirect");
+    }
+    final server = await HttpServer.bind(
+      InternetAddress.loopbackIPv4,
+      loopbackRedirect.port,
+    );
+    return _IoOAuthCallback(server, redirectUri: loopbackRedirect);
+  }
   if (Platform.isAndroid) {
-    return _AndroidMcpOAuthCallback(authorizationServer);
+    return _AndroidOAuthCallback(authorizationServer);
   }
   if (Platform.isIOS) {
-    return _IosMcpOAuthCallback(authorizationServer);
+    return _IosOAuthCallback(authorizationServer);
   }
   final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
-  return _IoMcpOAuthCallback(server);
+  return _IoOAuthCallback(server);
 }
 
 @visibleForTesting
-McpOAuthCallback createAndroidMcpOAuthCallbackForTesting(
-  Uri authorizationServer,
-) => _AndroidMcpOAuthCallback(authorizationServer);
+OAuthCallback createAndroidOAuthCallbackForTesting(Uri authorizationServer) =>
+    _AndroidOAuthCallback(authorizationServer);
 
 String _authorizationServerHash(Uri authorizationServer) => base64UrlEncode(
   sha256.convert(utf8.encode(authorizationServer.toString())).bytes,
 ).replaceAll('=', '');
 
-final class _AndroidMcpOAuthCallback implements McpOAuthCallback {
-  _AndroidMcpOAuthCallback(Uri authorizationServer)
+final class _AndroidOAuthCallback implements OAuthCallback {
+  _AndroidOAuthCallback(Uri authorizationServer)
     : redirectUri = Uri(
         scheme: 'psyche.kelivo',
+        // This URI is registered with authorization servers; sharing the
+        // callback implementation must not rename the registered redirect.
         host: 'mcp-oauth-callback',
         path: '/${_authorizationServerHash(authorizationServer)}',
       );
@@ -45,7 +60,7 @@ final class _AndroidMcpOAuthCallback implements McpOAuthCallback {
   Future<Uri> authorize(
     Uri authorizationUrl,
     Duration timeout,
-    McpOAuthUrlLauncher launchAuthorizationUrl,
+    OAuthUrlLauncher launchAuthorizationUrl,
   ) async {
     try {
       final value = await _mobileOAuthChannel
@@ -55,7 +70,7 @@ final class _AndroidMcpOAuthCallback implements McpOAuthCallback {
           })
           .timeout(timeout);
       if (value == null) {
-        throw const McpOAuthCallbackException(
+        throw const OAuthCallbackException(
           'authorization session returned no callback URL',
         );
       }
@@ -64,7 +79,7 @@ final class _AndroidMcpOAuthCallback implements McpOAuthCallback {
       await _mobileOAuthChannel.invokeMethod<void>('cancel');
       rethrow;
     } on PlatformException catch (error) {
-      throw McpOAuthCallbackException(
+      throw OAuthCallbackException(
         error.message ?? 'authorization session failed',
         cancelled: error.code == 'authorization_cancelled',
       );
@@ -80,8 +95,8 @@ final class _AndroidMcpOAuthCallback implements McpOAuthCallback {
   Future<void> close() => _mobileOAuthChannel.invokeMethod<void>('cancel');
 }
 
-final class _IosMcpOAuthCallback implements McpOAuthCallback {
-  _IosMcpOAuthCallback(Uri authorizationServer)
+final class _IosOAuthCallback implements OAuthCallback {
+  _IosOAuthCallback(Uri authorizationServer)
     : redirectUri = Uri(
         scheme: 'psyche.kelivo',
         path:
@@ -95,7 +110,7 @@ final class _IosMcpOAuthCallback implements McpOAuthCallback {
   Future<Uri> authorize(
     Uri authorizationUrl,
     Duration timeout,
-    McpOAuthUrlLauncher launchAuthorizationUrl,
+    OAuthUrlLauncher launchAuthorizationUrl,
   ) async {
     try {
       final value = await _mobileOAuthChannel
@@ -105,7 +120,7 @@ final class _IosMcpOAuthCallback implements McpOAuthCallback {
           })
           .timeout(timeout);
       if (value == null) {
-        throw const McpOAuthCallbackException(
+        throw const OAuthCallbackException(
           'authorization session returned no callback URL',
         );
       }
@@ -114,7 +129,7 @@ final class _IosMcpOAuthCallback implements McpOAuthCallback {
       await _mobileOAuthChannel.invokeMethod<void>('cancel');
       rethrow;
     } on PlatformException catch (error) {
-      throw McpOAuthCallbackException(
+      throw OAuthCallbackException(
         error.message ?? 'authorization session failed',
         cancelled: error.code == 'authorization_cancelled',
       );
@@ -130,15 +145,18 @@ final class _IosMcpOAuthCallback implements McpOAuthCallback {
   Future<void> close() => _mobileOAuthChannel.invokeMethod<void>('cancel');
 }
 
-final class _IoMcpOAuthCallback implements McpOAuthCallback {
-  _IoMcpOAuthCallback(HttpServer server)
+final class _IoOAuthCallback implements OAuthCallback {
+  _IoOAuthCallback(HttpServer server, {Uri? redirectUri})
     : _server = server,
-      _redirectUri = Uri(
-        scheme: 'http',
-        host: InternetAddress.loopbackIPv4.address,
-        port: server.port,
-        path: '/oauth/callback',
-      ) {
+      _redirectUri =
+          redirectUri ??
+          Uri(
+            scheme: 'http',
+            host: InternetAddress.loopbackIPv4.address,
+            port: server.port,
+            path: '/oauth/callback',
+          ) {
+    _callback.future.ignore();
     _subscription = _server.listen(_handleRequest);
   }
 
@@ -155,10 +173,10 @@ final class _IoMcpOAuthCallback implements McpOAuthCallback {
   Future<Uri> authorize(
     Uri authorizationUrl,
     Duration timeout,
-    McpOAuthUrlLauncher launchAuthorizationUrl,
+    OAuthUrlLauncher launchAuthorizationUrl,
   ) async {
     if (!await launchAuthorizationUrl(authorizationUrl)) {
-      throw const McpOAuthCallbackException(
+      throw const OAuthCallbackException(
         'could not open the authorization URL',
       );
     }
@@ -193,6 +211,14 @@ final class _IoMcpOAuthCallback implements McpOAuthCallback {
   Future<void> close() async {
     if (_closed) return;
     _closed = true;
+    if (!_callback.isCompleted) {
+      _callback.completeError(
+        const OAuthCallbackException(
+          'authorization cancelled',
+          cancelled: true,
+        ),
+      );
+    }
     await _subscription.cancel();
     await _server.close(force: true);
   }

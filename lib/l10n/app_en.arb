@@ -5086,5 +5086,123 @@
         "type": "int"
       }
     }
-  }
+  },
+  "oauthAccountsTab": "Accounts",
+  "oauthLogin": "Log in",
+  "oauthLoginTo": "Log in to {provider}",
+  "@oauthLoginTo": {
+    "placeholders": {
+      "provider": {
+        "type": "String"
+      }
+    }
+  },
+  "oauthConnected": "Connected",
+  "oauthNotConnected": "Not connected",
+  "oauthWaiting": "Waiting for {provider} authorization",
+  "@oauthWaiting": {
+    "placeholders": {
+      "provider": {
+        "type": "String"
+      }
+    }
+  },
+  "oauthCancel": "Cancel authorization",
+  "oauthOpenBrowser": "Open authorization page",
+  "oauthCopyCode": "Copy code",
+  "oauthCodeHint": "Enter this code on the authorization page",
+  "oauthDeviceHint": "Enable device code login in your ChatGPT security settings or workspace permissions first.",
+  "oauthDeviceLogin": "Use device code",
+  "oauthDetails": "View account details",
+  "oauthConnectAnother": "Connect another account",
+  "oauthRelogin": "Log in again",
+  "oauthNeedsLogin": "Login required",
+  "oauthExpired": "{provider} login has expired",
+  "@oauthExpired": {
+    "placeholders": {
+      "provider": {
+        "type": "String"
+      }
+    }
+  },
+  "oauthLoginRestored": "Logged in. Use the message retry button to send again.",
+  "oauthLogout": "Log out",
+  "oauthLogoutDescription": "Remove this account’s saved credentials from this device",
+  "oauthRefreshing": "Refreshing authorization…",
+  "oauthRefreshUsage": "Refresh usage",
+  "oauthUsageDetails": "Usage details",
+  "oauthUsageUnavailable": "Usage is currently unavailable",
+  "oauthLastUpdated": "Updated {time}",
+  "@oauthLastUpdated": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "oauthSyncModels": "Sync",
+  "oauthSyncing": "Syncing models…",
+  "oauthModelsHint": "Available models are synced from your account.",
+  "oauthNoModels": "Sync models to start chatting",
+  "oauthConnection": "Connection",
+  "oauthConnectionInfo": "Connection details",
+  "oauthEndpoint": "Endpoint",
+  "oauthScope": "Authorization scope",
+  "oauthAccountId": "Account ID",
+  "oauthTokenExpiry": "Token expires",
+  "oauthName": "Provider name",
+  "oauthEnabledHint": "Show these models in the model picker",
+  "oauthNetwork": "Network proxy",
+  "oauthFollowGlobal": "Follow global settings",
+  "oauthCustomRequest": "Custom request",
+  "oauthWeekly": "Weekly window",
+  "oauthMonthly": "Monthly window",
+  "oauthTotal": "Total quota",
+  "oauthHours": "{count} hour window",
+  "@oauthHours": {
+    "placeholders": {
+      "count": {
+        "type": "String"
+      }
+    }
+  },
+  "oauthMinutes": "{count} minute window",
+  "@oauthMinutes": {
+    "placeholders": {
+      "count": {
+        "type": "String"
+      }
+    }
+  },
+  "oauthDays": "{count} day window",
+  "@oauthDays": {
+    "placeholders": {
+      "count": {
+        "type": "String"
+      }
+    }
+  },
+  "oauthWindow": "Usage window",
+  "oauthResetsAt": "Resets {time}",
+  "@oauthResetsAt": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "oauthNetworkError": "Could not connect. Check your network and try again.",
+  "oauthInvalidResponse": "Authorization did not complete. Please try again.",
+  "oauthTimeout": "Authorization timed out. Please try again.",
+  "oauthDenied": "Authorization was not granted. Please try again.",
+  "oauthSaving": "Connecting account…",
+  "oauthQuotaExceeded": "This account has no available quota.",
+  "oauthRateLimited": "Too many requests. Please try again later.",
+  "oauthPermissionDenied": "This account cannot access this resource.",
+  "oauthRequestFailed": "The provider could not complete the request.",
+  "oauthQuotaAvailable": "Quota is available",
+  "oauthSavedResets": "Available usage resets: {count}",
+  "@oauthSavedResets": { "placeholders": { "count": { "type": "String" } } },
+  "oauthPrimaryWindow": "Primary window",
+  "oauthSecondaryWindow": "Secondary window"
 }

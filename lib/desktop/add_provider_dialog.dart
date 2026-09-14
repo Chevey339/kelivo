@@ -1,3 +1,4 @@
+import '../features/provider/widgets/oauth_login_panel.dart';
 import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
@@ -41,7 +42,17 @@ class _AddProviderDialogBody extends StatefulWidget {
 
 class _AddProviderDialogBodyState extends State<_AddProviderDialogBody>
     with SingleTickerProviderStateMixin {
-  late final TabController _tab = TabController(length: 3, vsync: this);
+  late final TabController _tab = TabController(length: 4, vsync: this);
+
+  @override
+  void initState() {
+    super.initState();
+    _tab.addListener(_onTabChanged);
+  }
+
+  void _onTabChanged() {
+    if (mounted) setState(() {});
+  }
 
   // OpenAI
   bool _openaiEnabled = true;
@@ -85,6 +96,7 @@ class _AddProviderDialogBodyState extends State<_AddProviderDialogBody>
 
   @override
   void dispose() {
+    _tab.removeListener(_onTabChanged);
     _tab.dispose();
     _openaiName.dispose();
     _openaiKey.dispose();
@@ -376,7 +388,7 @@ class _AddProviderDialogBodyState extends State<_AddProviderDialogBody>
                   padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
                   child: _SmallSegTabBar(
                     controller: _tab,
-                    tabs: const ['OpenAI', 'Google', 'Claude'],
+                    tabs: ['OpenAI', 'Google', 'Claude', l10n.oauthAccountsTab],
                   ),
                 ),
                 // Body
@@ -393,8 +405,13 @@ class _AddProviderDialogBodyState extends State<_AddProviderDialogBody>
                               _openaiForm(l10n)
                             else if (idx == 1)
                               _googleForm(l10n)
+                            else if (idx == 2)
+                              _claudeForm(l10n)
                             else
-                              _claudeForm(l10n),
+                              OAuthLoginPanel(
+                                onViewDetails: (id) =>
+                                    Navigator.of(context).pop(id),
+                              ),
                             const SizedBox(height: 20),
                           ],
                         );
@@ -403,19 +420,20 @@ class _AddProviderDialogBodyState extends State<_AddProviderDialogBody>
                   ),
                 ),
                 // Footer
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
-                  child: Row(
-                    children: [
-                      const Spacer(),
-                      _PrimaryDeskButton(
-                        icon: lucide.Lucide.Plus,
-                        label: l10n.addProviderSheetAddButton,
-                        onTap: _onAdd,
-                      ),
-                    ],
+                if (_tab.index < 3)
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+                    child: Row(
+                      children: [
+                        const Spacer(),
+                        _PrimaryDeskButton(
+                          icon: lucide.Lucide.Plus,
+                          label: l10n.addProviderSheetAddButton,
+                          onTap: _onAdd,
+                        ),
+                      ],
+                    ),
                   ),
-                ),
               ],
             ),
           ),

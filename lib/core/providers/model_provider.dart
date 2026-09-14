@@ -1,3 +1,4 @@
+import '../services/auth/provider_oauth_service.dart';
 export '../models/model_types.dart';
 
 import 'dart:convert';
@@ -447,6 +448,7 @@ class ProviderManager {
   }
 
   static Future<List<ModelInfo>> listModels(ProviderConfig cfg) {
+    if (cfg.isOAuth) return ProviderOAuthService.instance.models(cfg);
     return forConfig(cfg).listModels(cfg);
   }
 
@@ -455,11 +457,21 @@ class ProviderManager {
     String modelId, {
     bool useStream = false,
   }) async {
+    cfg = await ProviderOAuthService.instance.resolve(cfg);
+    if (cfg.oauthProvider == OAuthProvider.chatgpt) useStream = true;
+    if (cfg.oauthProvider == OAuthProvider.kimi &&
+        (cfg.modelOverrides[modelId] as Map?)?['oauthProtocol'] ==
+            'anthropic') {
+      cfg = cfg.copyWith(providerType: ProviderKind.claude);
+    }
     final kind = ProviderConfig.classify(
       cfg.id,
       explicitType: cfg.providerType,
     );
-    final client = _Http.clientFor(cfg);
+    final client = ProviderOAuthService.instance.authenticatedClient(
+      _Http.clientFor(cfg),
+      cfg,
+    );
     try {
       if (kind == ProviderKind.openai) {
         final base = cfg.baseUrl.endsWith('/')
@@ -513,6 +525,7 @@ class ProviderManager {
         final headers = <String, String>{
           'Authorization': 'Bearer $apiKey',
           'Content-Type': 'application/json',
+          ...?providerSessionHeaders(cfg),
         };
         headers.addAll(_customHeaders(cfg, modelId));
         final res = await client.post(

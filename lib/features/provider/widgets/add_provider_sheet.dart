@@ -1,3 +1,5 @@
+import 'oauth_login_panel.dart';
+import '../pages/oauth_provider_detail_page.dart';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:math' as math;
@@ -34,7 +36,7 @@ class _AddProviderSheet extends StatefulWidget {
 
 class _AddProviderSheetState extends State<_AddProviderSheet>
     with SingleTickerProviderStateMixin {
-  late final TabController _tab = TabController(length: 3, vsync: this);
+  late final TabController _tab = TabController(length: 4, vsync: this);
 
   @override
   void initState() {
@@ -492,7 +494,7 @@ class _AddProviderSheetState extends State<_AddProviderSheet>
                 padding: const EdgeInsets.symmetric(horizontal: 16),
                 child: _SegTabBar(
                   controller: _tab,
-                  tabs: const ['OpenAI', 'Google', 'Claude'],
+                  tabs: ['OpenAI', 'Google', 'Claude', l10n.oauthAccountsTab],
                 ),
               ),
               const SizedBox(height: 12),
@@ -511,6 +513,11 @@ class _AddProviderSheetState extends State<_AddProviderSheet>
                               if (idx == 0) _openaiForm(l10n),
                               if (idx == 1) _googleForm(l10n),
                               if (idx == 2) _claudeForm(l10n),
+                              if (idx == 3)
+                                OAuthLoginPanel(
+                                  onViewDetails: (id) =>
+                                      showOAuthProviderDetails(context, id),
+                                ),
                             ],
                           );
                         },
@@ -520,20 +527,21 @@ class _AddProviderSheetState extends State<_AddProviderSheet>
                   ),
                 ),
               ),
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 0, 16, 14),
-                child: SizedBox(
-                  width: double.infinity,
-                  child: IosTileButton(
-                    icon: Lucide.Plus,
-                    label: l10n.addProviderSheetAddButton,
-                    backgroundColor: cs.primary,
-                    // No need to set foreground/border; component tints background lightly,
-                    // uses theme color for text, and draws a subtle same-hue border.
-                    onTap: _onAdd,
+              if (_tab.index < 3)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 14),
+                  child: SizedBox(
+                    width: double.infinity,
+                    child: IosTileButton(
+                      icon: Lucide.Plus,
+                      label: l10n.addProviderSheetAddButton,
+                      backgroundColor: cs.primary,
+                      // No need to set foreground/border; component tints background lightly,
+                      // uses theme color for text, and draws a subtle same-hue border.
+                      onTap: _onAdd,
+                    ),
                   ),
                 ),
-              ),
             ],
           ),
         ),
@@ -636,7 +644,7 @@ class _SegTabBar extends StatelessWidget {
     const double outerHeight = 44;
     const double innerPadding = 4;
     const double gap = 6;
-    const double minSegWidth = 88;
+    const double minSegWidth = 76;
     final double pillRadius = 18;
     final double innerRadius = ((pillRadius - innerPadding).clamp(
       0.0,

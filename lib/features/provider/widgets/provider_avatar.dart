@@ -1,3 +1,4 @@
+import '../../../theme/app_semantic_colors.dart';
 import 'dart:io' show File;
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
@@ -123,7 +124,7 @@ class ProviderAvatar extends StatelessWidget {
       );
     }
 
-    final child = Container(
+    final portrait = Container(
       width: size,
       height: size,
       decoration: BoxDecoration(
@@ -136,6 +137,34 @@ class ProviderAvatar extends StatelessWidget {
       child: avatar,
     );
 
+    final child = cfg.isOAuth
+        ? Stack(
+            clipBehavior: Clip.none,
+            children: [
+              portrait,
+              Positioned(
+                right: -1,
+                bottom: -1,
+                child: Container(
+                  width: size < 30 ? 7 : 10,
+                  height: size < 30 ? 7 : 10,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color:
+                        cfg.oauthCredentials == null ||
+                            cfg.oauthCredentials!.requiresLogin
+                        ? cs.error
+                        : context.appColors.success,
+                    border: Border.all(
+                      color: Theme.of(context).scaffoldBackgroundColor,
+                      width: 1.5,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          )
+        : portrait;
     if (onTap == null) return child;
 
     return InkWell(

@@ -2,6 +2,8 @@ import 'dart:async';
 
 import 'package:Kelivo/core/database/generation_run.dart';
 import 'package:Kelivo/core/models/chat_message.dart';
+import 'package:Kelivo/core/models/message_part.dart';
+import 'package:Kelivo/core/models/provider_oauth.dart';
 import 'package:Kelivo/core/models/mobile_background_settings.dart';
 import 'package:Kelivo/core/services/mobile_background.dart';
 import 'package:Kelivo/core/providers/settings_provider.dart';
@@ -26,6 +28,8 @@ class _ThrowingFinalizeChatService extends ChatService {
   _ThrowingFinalizeChatService({this.failCompletion = true});
   final bool failCompletion;
   final terminalStates = <GenerationRunState>[];
+  ChatMessage? lastMessage;
+  String? lastErrorCode;
 
   @override
   Future<GenerationRun?> finalizeGenerationRunSilent({
@@ -39,6 +43,8 @@ class _ThrowingFinalizeChatService extends ChatService {
     String? errorCode,
   }) async {
     terminalStates.add(terminalState);
+    lastMessage = message;
+    lastErrorCode = errorCode;
     if (failCompletion && terminalState == GenerationRunState.completed) {
       throw StateError('persist failed');
     }
@@ -104,6 +110,93 @@ class _ThrowingFinalizeChatService extends ChatService {
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
   SharedPreferences.setMockInitialValues(const {});
+
+  testWidgets('OAuth 失效保留部分回复并持久化恢复入口，不触发普通错误提示', (tester) async {
+    final service = _ThrowingFinalizeChatService(failCompletion: false);
+    final settings = SettingsProvider(createBusinessTestPreferences());
+    final background = MobileBackgroundCoordinator(
+      platform: TargetPlatform.linux,
+    );
+    addTearDown(background.dispose);
+    addTearDown(settings.dispose);
+    final errors = <String>[];
+    late ChatActions actions;
+    await tester.pumpWidget(
+      MultiProvider(
+        providers: [
+          ChangeNotifierProvider<SettingsProvider>.value(value: settings),
+          ChangeNotifierProvider<ChatService>.value(value: service),
+        ],
+        child: MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: Builder(
+            builder: (context) {
+              actions = _actionsFor(
+                context,
+                service,
+                settings,
+                background,
+              ).actions;
+              actions.onStreamError = errors.add;
+              return const SizedBox.shrink();
+            },
+          ),
+        ),
+      ),
+    );
+    final state = StreamingState(
+      GenerationContext(
+        assistantMessage: ChatMessage(
+          id: 'assistant-1',
+          role: 'assistant',
+          content: '',
+          providerId: 'account',
+          conversationId: 'conversation-1',
+          isStreaming: true,
+        ),
+        apiMessages: const [],
+        userImagePaths: const [],
+        allowImagesApiRouting: false,
+        providerKey: 'account',
+        modelId: 'test',
+        assistant: null,
+        settings: settings,
+        config: ProviderConfig(
+          id: 'account',
+          enabled: true,
+          name: 'ChatGPT',
+          apiKey: '',
+          baseUrl: '',
+        ),
+        toolDefs: const [],
+        supportsReasoning: false,
+        enableReasoning: false,
+        streamOutput: true,
+      ),
+    );
+    state.fullContentRaw = 'Partial reply';
+    await actions.debugHandleStreamError(
+      const ProviderOAuthException(
+        ProviderOAuthFailure.loginRequired,
+        providerId: 'account',
+      ),
+      state,
+    );
+    expect(state.terminalPersisted, true);
+    expect(service.lastErrorCode, 'oauth_login_required');
+    expect(service.terminalStates, [GenerationRunState.failed]);
+    expect(service.lastMessage!.content, 'Partial reply');
+    expect(
+      service.lastMessage!.parts
+          .whereType<ProviderAuthErrorPart>()
+          .single
+          .providerId,
+      'account',
+    );
+    expect(service.lastMessage!.isStreaming, false);
+    expect(errors, isEmpty);
+  });
 
   testWidgets('终态写库失败仍走 failed 收尾并通知 onStreamError', (tester) async {
     final service = _ThrowingFinalizeChatService();

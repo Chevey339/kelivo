@@ -1,3 +1,4 @@
+import 'oauth_provider_detail_page.dart';
 import 'dart:async';
 import 'package:flutter/material.dart';
 import '../../../icons/lucide_adapter.dart';
@@ -1227,10 +1228,17 @@ class _ProviderRow extends StatelessWidget {
     final enabled = cfg.enabled;
     final l10n = AppLocalizations.of(context)!;
 
-    final statusBg = enabled
+    final needsLogin =
+        cfg.isOAuth &&
+        (cfg.oauthCredentials == null || cfg.oauthCredentials!.requiresLogin);
+    final statusBg = needsLogin
+        ? cs.error.withValues(alpha: .12)
+        : enabled
         ? context.appColors.success.withValues(alpha: 0.12)
         : context.appColors.warning.withValues(alpha: 0.15);
-    final statusFg = enabled
+    final statusFg = needsLogin
+        ? cs.error
+        : enabled
         ? context.appColors.success
         : context.appColors.warning;
 
@@ -1242,10 +1250,12 @@ class _ProviderRow extends StatelessWidget {
         } else {
           Navigator.of(context).push(
             MaterialPageRoute(
-              builder: (_) => ProviderDetailPage(
-                keyName: provider.keyName,
-                displayName: provider.name,
-              ),
+              builder: (_) => cfg.isOAuth
+                  ? OAuthProviderDetailPage(providerId: provider.keyName)
+                  : ProviderDetailPage(
+                      keyName: provider.keyName,
+                      displayName: provider.name,
+                    ),
             ),
           );
         }
@@ -1324,7 +1334,9 @@ class _ProviderRow extends StatelessWidget {
                         borderRadius: BorderRadius.circular(999),
                       ),
                       child: Text(
-                        enabled
+                        needsLogin
+                            ? l10n.oauthNeedsLogin
+                            : enabled
                             ? l10n.providersPageEnabledStatus
                             : l10n.providersPageDisabledStatus,
                         style: TextStyle(fontSize: 11, color: statusFg),

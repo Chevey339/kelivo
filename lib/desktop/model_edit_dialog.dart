@@ -815,6 +815,7 @@ class _ModelEditDialogBodyState extends State<_ModelEditDialogBody>
         : prevKey;
     final bool isEmbedding = _type == ModelType.embedding;
     ov[key] = {
+      ...modelSyncMetadata(prev),
       'apiModelId': apiModelId,
       'name': _nameCtrl.text.trim(),
       'type': _type == ModelType.chat ? 'chat' : 'embedding',

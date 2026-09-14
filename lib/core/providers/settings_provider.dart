@@ -1,3 +1,4 @@
+import '../services/auth/provider_oauth_service.dart';
 import '../models/mobile_background_settings.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -749,6 +750,7 @@ class SettingsProvider extends ChangeNotifier {
   int get appLaunchCount => _appLaunchCount;
 
   SettingsProvider(this._preferences) {
+    ProviderOAuthService.instance.bind(this);
     _appLocaleTag = _readAppLocaleTag(_preferences);
     _loaded = _load();
   }
@@ -3038,6 +3040,7 @@ class SettingsProvider extends ChangeNotifier {
 
   @override
   void dispose() {
+    ProviderOAuthService.instance.unbind(this);
     _toolSchemaOverridePersistTimer?.cancel();
     _toolSchemaOverridePersistTimer = null;
     if (_toolSchemaOverridePersistDirty) {
@@ -6047,6 +6050,10 @@ class ProviderConfig {
   final bool enabled;
   final String name;
   final String apiKey;
+  final OAuthProvider? oauthProvider;
+  final ProviderOAuthCredentials? oauthCredentials;
+  final DateTime? oauthModelsSyncedAt;
+  bool get isOAuth => oauthProvider != null;
   final String baseUrl;
   final ProviderKind?
   providerType; // Explicit provider type to avoid misclassification
@@ -6146,6 +6153,9 @@ class ProviderConfig {
     required this.enabled,
     required this.name,
     required this.apiKey,
+    this.oauthProvider,
+    this.oauthCredentials,
+    this.oauthModelsSyncedAt,
     required this.baseUrl,
     this.providerType,
     this.chatPath,
@@ -6185,6 +6195,9 @@ class ProviderConfig {
     bool? enabled,
     String? name,
     String? apiKey,
+    OAuthProvider? oauthProvider,
+    Object? oauthCredentials = _sentinel,
+    DateTime? oauthModelsSyncedAt,
     String? baseUrl,
     ProviderKind? providerType,
     String? chatPath,
@@ -6219,6 +6232,11 @@ class ProviderConfig {
     enabled: enabled ?? this.enabled,
     name: name ?? this.name,
     apiKey: apiKey ?? this.apiKey,
+    oauthProvider: oauthProvider ?? this.oauthProvider,
+    oauthCredentials: identical(oauthCredentials, _sentinel)
+        ? this.oauthCredentials
+        : oauthCredentials as ProviderOAuthCredentials?,
+    oauthModelsSyncedAt: oauthModelsSyncedAt ?? this.oauthModelsSyncedAt,
     baseUrl: baseUrl ?? this.baseUrl,
     providerType: providerType ?? this.providerType,
     chatPath: chatPath ?? this.chatPath,
@@ -6262,6 +6280,11 @@ class ProviderConfig {
     'enabled': enabled,
     'name': name,
     'apiKey': apiKey,
+    if (oauthProvider != null) 'oauthProvider': oauthProvider!.name,
+    if (oauthCredentials != null)
+      'oauthCredentials': oauthCredentials!.toJson(),
+    if (oauthModelsSyncedAt != null)
+      'oauthModelsSyncedAt': oauthModelsSyncedAt!.toIso8601String(),
     'baseUrl': baseUrl,
     'providerType': providerType?.name,
     'chatPath': chatPath,
@@ -6300,6 +6323,17 @@ class ProviderConfig {
     enabled: json['enabled'] as bool? ?? true,
     name: json['name'] as String? ?? '',
     apiKey: _apiKeyFromJson(json),
+    oauthProvider: json['oauthProvider'] == null
+        ? null
+        : OAuthProvider.values.byName(json['oauthProvider'] as String),
+    oauthCredentials: json['oauthCredentials'] is Map
+        ? ProviderOAuthCredentials.fromJson(
+            (json['oauthCredentials'] as Map).cast<String, dynamic>(),
+          )
+        : null,
+    oauthModelsSyncedAt: DateTime.tryParse(
+      json['oauthModelsSyncedAt'] as String? ?? '',
+    ),
     baseUrl: json['baseUrl'] as String? ?? '',
     providerType: json['providerType'] != null
         ? ProviderKind.values.firstWhere(

@@ -5,7 +5,7 @@ import android.app.ActivityManager
 import android.content.Intent
 import android.os.Bundle
 
-class McpOAuthCallbackActivity : Activity() {
+class OAuthCallbackActivity : Activity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         handleCallback(intent)
@@ -18,7 +18,7 @@ class McpOAuthCallbackActivity : Activity() {
     }
 
     private fun handleCallback(intent: Intent?) {
-        val delivered = intent?.data?.let(McpOAuthHandler::handleCallback) == true
+        val delivered = intent?.data?.let(OAuthHandler::handleCallback) == true
         val mainTask = if (delivered) findMainTask() else null
         if (mainTask != null) {
             mainTask.startActivity(

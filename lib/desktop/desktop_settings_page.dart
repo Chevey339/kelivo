@@ -1,3 +1,4 @@
+import '../features/provider/pages/oauth_provider_detail_page.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:provider/provider.dart';

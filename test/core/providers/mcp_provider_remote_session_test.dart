@@ -3,7 +3,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:Kelivo/core/providers/mcp_provider.dart';
-import 'package:Kelivo/core/services/mcp/mcp_oauth_callback.dart';
+import 'package:Kelivo/core/services/auth/oauth_callback.dart';
 import 'package:Kelivo/core/services/mcp/mcp_oauth_service.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -1379,7 +1379,7 @@ Future<void> _waitUntil(
   }
 }
 
-final class _FakeOAuthCallback implements McpOAuthCallback {
+final class _FakeOAuthCallback implements OAuthCallback {
   final Completer<Uri> _callback = Completer<Uri>();
 
   @override
@@ -1393,10 +1393,10 @@ final class _FakeOAuthCallback implements McpOAuthCallback {
   Future<Uri> authorize(
     Uri authorizationUrl,
     Duration timeout,
-    McpOAuthUrlLauncher launchAuthorizationUrl,
+    OAuthUrlLauncher launchAuthorizationUrl,
   ) async {
     if (!await launchAuthorizationUrl(authorizationUrl)) {
-      throw const McpOAuthCallbackException('launch failed');
+      throw const OAuthCallbackException('launch failed');
     }
     return waitForCallback(timeout);
   }

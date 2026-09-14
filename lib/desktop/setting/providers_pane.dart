@@ -214,6 +214,9 @@ class _DesktopProvidersBodyState extends State<_DesktopProvidersBody> {
       name: item.name,
       keyName: item.key,
       enabled: enabled,
+      needsLogin:
+          cfg.isOAuth &&
+          (cfg.oauthCredentials == null || cfg.oauthCredentials!.requiresLogin),
       selected: selected,
       background: bg,
       onTap: () => setState(() => _selectedKey = item.key),
@@ -354,6 +357,12 @@ class _DesktopProvidersBodyState extends State<_DesktopProvidersBody> {
     final selectedKey = _selectedKey;
     final rightPane = selectedKey == null
         ? const SizedBox()
+        : settings.getProviderConfig(selectedKey).isOAuth
+        ? OAuthProviderDetailPage(
+            key: ValueKey(selectedKey),
+            providerId: selectedKey,
+            embedded: true,
+          )
         : _DesktopProviderDetailPane(
             key: _detailKey,
             providerKey: selectedKey,
@@ -6034,6 +6043,7 @@ class _DesktopProviderShareDialog extends StatefulWidget {
 class _DesktopProviderShareDialogState
     extends State<_DesktopProviderShareDialog> {
   late final String _code;
+  late final bool _isOAuth;
   final GlobalKey _qrKey = GlobalKey();
   bool _copyingQr = false;
 
@@ -6048,6 +6058,7 @@ class _DesktopProviderShareDialogState
           defaultName: widget.displayName,
         );
     _code = encodeProviderConfig(cfg);
+    _isOAuth = cfg.isOAuth;
   }
 
   Future<void> _copyText() async {
@@ -6162,32 +6173,33 @@ class _DesktopProviderShareDialogState
                 ),
               ),
               const SizedBox(height: 12),
-              Center(
-                child: RepaintBoundary(
-                  key: _qrKey,
-                  child: Container(
-                    padding: const EdgeInsets.all(10),
-                    decoration: BoxDecoration(
-                      color:
-                          Colors.white, // color-gate: ignore (QR scannability)
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(
-                        color: cs.outlineVariant.withValues(alpha: 0.2),
+              if (!_isOAuth)
+                Center(
+                  child: RepaintBoundary(
+                    key: _qrKey,
+                    child: Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: Colors
+                            .white, // color-gate: ignore (QR scannability)
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: cs.outlineVariant.withValues(alpha: 0.2),
+                        ),
                       ),
-                    ),
-                    child: SizedBox.square(
-                      dimension: 180,
-                      child: PrettyQrView.data(
-                        data: _code,
-                        errorCorrectLevel: QrErrorCorrectLevel.M,
-                        decoration: const PrettyQrDecoration(
-                          shape: PrettyQrSmoothSymbol(roundFactor: 1),
+                      child: SizedBox.square(
+                        dimension: 180,
+                        child: PrettyQrView.data(
+                          data: _code,
+                          errorCorrectLevel: QrErrorCorrectLevel.M,
+                          decoration: const PrettyQrDecoration(
+                            shape: PrettyQrSmoothSymbol(roundFactor: 1),
+                          ),
                         ),
                       ),
                     ),
                   ),
                 ),
-              ),
               const SizedBox(height: 12),
               Container(
                 padding: const EdgeInsets.all(12),
@@ -6223,18 +6235,19 @@ class _DesktopProviderShareDialogState
                     onTap: _copyText,
                   ),
                   const SizedBox(width: 10),
-                  _DialogActionButton(
-                    icon: _copyingQr
-                        ? const SizedBox(
-                            width: 16,
-                            height: 16,
-                            child: CupertinoActivityIndicator(radius: 8),
-                          )
-                        : const Icon(Icons.qr_code_2, size: 18),
-                    label: l10n.desktopProviderShareCopyQr,
-                    filled: true,
-                    onTap: _copyingQr ? null : _copyQr,
-                  ),
+                  if (!_isOAuth)
+                    _DialogActionButton(
+                      icon: _copyingQr
+                          ? const SizedBox(
+                              width: 16,
+                              height: 16,
+                              child: CupertinoActivityIndicator(radius: 8),
+                            )
+                          : const Icon(Icons.qr_code_2, size: 18),
+                      label: l10n.desktopProviderShareCopyQr,
+                      filled: true,
+                      onTap: _copyingQr ? null : _copyQr,
+                    ),
                 ],
               ),
             ],
@@ -6389,6 +6402,7 @@ class _ProviderListRow extends StatefulWidget {
     required this.name,
     required this.keyName,
     required this.enabled,
+    this.needsLogin = false,
     required this.selected,
     required this.background,
     required this.onTap,
@@ -6399,6 +6413,7 @@ class _ProviderListRow extends StatefulWidget {
   final String name;
   final String keyName;
   final bool enabled;
+  final bool needsLogin;
   final bool selected;
   final Color background;
   final VoidCallback onTap;
@@ -6488,7 +6503,9 @@ class _ProviderListRowState extends State<_ProviderListRow> {
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                 decoration: BoxDecoration(
                   color:
-                      (widget.enabled
+                      (widget.needsLogin
+                              ? Theme.of(context).colorScheme.error
+                              : widget.enabled
                               ? context.appColors.success
                               : context.appColors.warning)
                           .withValues(alpha: 0.12),
@@ -6496,14 +6513,18 @@ class _ProviderListRowState extends State<_ProviderListRow> {
                   // No border for left list status
                 ),
                 child: Text(
-                  widget.enabled
+                  widget.needsLogin
+                      ? AppLocalizations.of(context)!.oauthNeedsLogin
+                      : widget.enabled
                       ? AppLocalizations.of(context)!.providersPageEnabledStatus
                       : AppLocalizations.of(
                           context,
                         )!.providersPageDisabledStatus,
                   style: TextStyle(
                     fontSize: 11,
-                    color: widget.enabled
+                    color: widget.needsLogin
+                        ? Theme.of(context).colorScheme.error
+                        : widget.enabled
                         ? context.appColors.success
                         : context.appColors.warning,
                     fontWeight: AppFontWeights.emphasis,

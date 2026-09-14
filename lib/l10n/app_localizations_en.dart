@@ -11629,4 +11629,213 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get conversationPromptScope => 'This conversation';
+
+  @override
+  String get oauthAccountsTab => 'Accounts';
+
+  @override
+  String get oauthLogin => 'Log in';
+
+  @override
+  String oauthLoginTo(String provider) {
+    return 'Log in to $provider';
+  }
+
+  @override
+  String get oauthConnected => 'Connected';
+
+  @override
+  String get oauthNotConnected => 'Not connected';
+
+  @override
+  String oauthWaiting(String provider) {
+    return 'Waiting for $provider authorization';
+  }
+
+  @override
+  String get oauthCancel => 'Cancel authorization';
+
+  @override
+  String get oauthOpenBrowser => 'Open authorization page';
+
+  @override
+  String get oauthCopyCode => 'Copy code';
+
+  @override
+  String get oauthCodeHint => 'Enter this code on the authorization page';
+
+  @override
+  String get oauthDeviceHint =>
+      'Enable device code login in your ChatGPT security settings or workspace permissions first.';
+
+  @override
+  String get oauthDeviceLogin => 'Use device code';
+
+  @override
+  String get oauthDetails => 'View account details';
+
+  @override
+  String get oauthConnectAnother => 'Connect another account';
+
+  @override
+  String get oauthRelogin => 'Log in again';
+
+  @override
+  String get oauthNeedsLogin => 'Login required';
+
+  @override
+  String oauthExpired(String provider) {
+    return '$provider login has expired';
+  }
+
+  @override
+  String get oauthLoginRestored =>
+      'Logged in. Use the message retry button to send again.';
+
+  @override
+  String get oauthLogout => 'Log out';
+
+  @override
+  String get oauthLogoutDescription =>
+      'Remove this account’s saved credentials from this device';
+
+  @override
+  String get oauthRefreshing => 'Refreshing authorization…';
+
+  @override
+  String get oauthRefreshUsage => 'Refresh usage';
+
+  @override
+  String get oauthUsageDetails => 'Usage details';
+
+  @override
+  String get oauthUsageUnavailable => 'Usage is currently unavailable';
+
+  @override
+  String oauthLastUpdated(String time) {
+    return 'Updated $time';
+  }
+
+  @override
+  String get oauthSyncModels => 'Sync';
+
+  @override
+  String get oauthSyncing => 'Syncing models…';
+
+  @override
+  String get oauthModelsHint =>
+      'Available models are synced from your account.';
+
+  @override
+  String get oauthNoModels => 'Sync models to start chatting';
+
+  @override
+  String get oauthConnection => 'Connection';
+
+  @override
+  String get oauthConnectionInfo => 'Connection details';
+
+  @override
+  String get oauthEndpoint => 'Endpoint';
+
+  @override
+  String get oauthScope => 'Authorization scope';
+
+  @override
+  String get oauthAccountId => 'Account ID';
+
+  @override
+  String get oauthTokenExpiry => 'Token expires';
+
+  @override
+  String get oauthName => 'Provider name';
+
+  @override
+  String get oauthEnabledHint => 'Show these models in the model picker';
+
+  @override
+  String get oauthNetwork => 'Network proxy';
+
+  @override
+  String get oauthFollowGlobal => 'Follow global settings';
+
+  @override
+  String get oauthCustomRequest => 'Custom request';
+
+  @override
+  String get oauthWeekly => 'Weekly window';
+
+  @override
+  String get oauthMonthly => 'Monthly window';
+
+  @override
+  String get oauthTotal => 'Total quota';
+
+  @override
+  String oauthHours(String count) {
+    return '$count hour window';
+  }
+
+  @override
+  String oauthMinutes(String count) {
+    return '$count minute window';
+  }
+
+  @override
+  String oauthDays(String count) {
+    return '$count day window';
+  }
+
+  @override
+  String get oauthWindow => 'Usage window';
+
+  @override
+  String oauthResetsAt(String time) {
+    return 'Resets $time';
+  }
+
+  @override
+  String get oauthNetworkError =>
+      'Could not connect. Check your network and try again.';
+
+  @override
+  String get oauthInvalidResponse =>
+      'Authorization did not complete. Please try again.';
+
+  @override
+  String get oauthTimeout => 'Authorization timed out. Please try again.';
+
+  @override
+  String get oauthDenied => 'Authorization was not granted. Please try again.';
+
+  @override
+  String get oauthSaving => 'Connecting account…';
+
+  @override
+  String get oauthQuotaExceeded => 'This account has no available quota.';
+
+  @override
+  String get oauthRateLimited => 'Too many requests. Please try again later.';
+
+  @override
+  String get oauthPermissionDenied =>
+      'This account cannot access this resource.';
+
+  @override
+  String get oauthRequestFailed =>
+      'The provider could not complete the request.';
+
+  @override
+  String get oauthQuotaAvailable => 'Quota is available';
+
+  @override
+  String oauthSavedResets(String count) {
+    return 'Available usage resets: $count';
+  }
+
+  @override
+  String get oauthPrimaryWindow => 'Primary window';
+
+  @override
+  String get oauthSecondaryWindow => 'Secondary window';
 }

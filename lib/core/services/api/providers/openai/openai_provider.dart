@@ -1,3 +1,4 @@
+import '../../../../models/provider_oauth.dart';
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
@@ -134,10 +135,19 @@ Stream<StreamChunk> sendOpenAIStream(
   final bool canImageInput = effectiveInfo.input.contains(Modality.image);
 
   final effort = openAIEffortForBudget(thinkingBudget, upstreamModelId);
+  final modelMetadata = config.modelOverrides[modelId];
   final info = OpenAIProviderInfo(
     host: Uri.tryParse(config.baseUrl)?.host.toLowerCase() ?? '',
     providerId: config.id.toLowerCase(),
     upstreamModelId: upstreamModelId,
+    // Kimi Code can advertise opaque IDs such as k3. Its declared protocol and
+    // thinking capability apply even when the ID has no kimi-* prefix.
+    isKimiCodeThinkingModel:
+        config.oauthProvider == OAuthProvider.kimi &&
+        config.useResponseApi != true &&
+        modelMetadata is Map &&
+        modelMetadata['oauthProtocol'] == 'openai' &&
+        (isReasoning || modelMetadata['oauthThinkingRequired'] == true),
   );
   final bool allowRemoteImages =
       canImageInput &&
@@ -149,10 +159,11 @@ Stream<StreamChunk> sendOpenAIStream(
   final reasoningDetailsAllowSnapshots =
       !BuiltInToolsHelper.isOpenRouterProvider(config);
   final bool needsReasoningEcho =
-      info.needsReasoningEcho &&
-      (isReasoning ||
-          info.isKimiCodingModel ||
-          (info.isDeepSeek && tools?.isNotEmpty == true));
+      info.isKimiCodeThinkingModel ||
+      (info.needsReasoningEcho &&
+          (isReasoning ||
+              info.isKimiCodingModel ||
+              (info.isDeepSeek && tools?.isNotEmpty == true)));
   void setMaxTokens(Map<String, dynamic> map) {
     if (maxTokens != null) map[info.completionTokensKey] = maxTokens;
   }
@@ -672,6 +683,13 @@ Stream<StreamChunk> sendOpenAIStream(
     body,
     info: info,
     upstreamModelId: upstreamModelId,
+    isReasoning: isReasoning,
+    thinkingBudget: thinkingBudget,
+  );
+  applyKimiCodeChatThinking(
+    body,
+    config: config,
+    modelId: modelId,
     isReasoning: isReasoning,
     thinkingBudget: thinkingBudget,
   );
@@ -1195,6 +1213,8 @@ Stream<StreamChunk> sendOpenAIStream(
           return;
         }
       }
+    } on ProviderOAuthException {
+      rethrow;
     } on HttpException {
       // In-band error frames raised inside this block (follow-up tool-call
       // streams call throwIfInBandStreamError in here) and failed follow-up

@@ -13,6 +13,10 @@ import 'package:Kelivo/theme/app_font_weights.dart';
 import 'package:Kelivo/theme/app_semantic_colors.dart';
 
 String encodeProviderConfig(ProviderConfig cfg) {
+  if (cfg.isOAuth) {
+    final data = {'type': 'oauth', 'config': cfg.toJson()};
+    return 'ai-provider:v1:${base64Encode(utf8.encode(jsonEncode(data)))}';
+  }
   String type;
   final kind = ProviderConfig.classify(cfg.id, explicitType: cfg.providerType);
   switch (kind) {
@@ -114,30 +118,31 @@ Future<void> showShareProviderSheet(
                   child: ListView(
                     controller: sc,
                     children: [
-                      Center(
-                        child: Container(
-                          padding: const EdgeInsets.all(10),
-                          decoration: BoxDecoration(
-                            // Always use white background to ensure visibility in dark mode
-                            color: Colors
-                                .white, // color-gate: ignore (QR scannability)
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(
-                              color: cs.outlineVariant.withValues(alpha: 0.2),
+                      if (!cfg.isOAuth)
+                        Center(
+                          child: Container(
+                            padding: const EdgeInsets.all(10),
+                            decoration: BoxDecoration(
+                              // Always use white background to ensure visibility in dark mode
+                              color: Colors
+                                  .white, // color-gate: ignore (QR scannability)
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(
+                                color: cs.outlineVariant.withValues(alpha: 0.2),
+                              ),
                             ),
-                          ),
-                          child: SizedBox.square(
-                            dimension: 180,
-                            child: PrettyQrView.data(
-                              data: code,
-                              errorCorrectLevel: QrErrorCorrectLevel.M,
-                              decoration: const PrettyQrDecoration(
-                                shape: PrettyQrSmoothSymbol(roundFactor: 1),
+                            child: SizedBox.square(
+                              dimension: 180,
+                              child: PrettyQrView.data(
+                                data: code,
+                                errorCorrectLevel: QrErrorCorrectLevel.M,
+                                decoration: const PrettyQrDecoration(
+                                  shape: PrettyQrSmoothSymbol(roundFactor: 1),
+                                ),
                               ),
                             ),
                           ),
                         ),
-                      ),
                       const SizedBox(height: 14),
                       // Show non-selectable text; use the copy button to copy
                       Text(

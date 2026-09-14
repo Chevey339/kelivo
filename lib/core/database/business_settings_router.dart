@@ -541,6 +541,8 @@ final class BusinessSettingsRouter {
             'id',
             'name',
             'apiKey',
+            'oauthProvider',
+            'oauthModelsSyncedAt',
             'baseUrl',
             'chatPath',
             'location',
@@ -568,7 +570,7 @@ final class BusinessSettingsRouter {
             'claudePromptCachingEnabled',
           },
           lists: const {'models', 'apiKeys', 'customHeaders', 'customBody'},
-          maps: const {'modelOverrides', 'keyManagement'},
+          maps: const {'modelOverrides', 'keyManagement', 'oauthCredentials'},
         );
         _validateProviderChildren(kind, payload);
         return;
@@ -803,6 +805,30 @@ final class BusinessSettingsRouter {
     BusinessEntityKind kind,
     Map<String, Object?> payload,
   ) {
+    final oauthProvider = payload['oauthProvider'];
+    if (oauthProvider != null &&
+        !{'chatgpt', 'grok', 'kimi'}.contains(oauthProvider)) {
+      throw const FormatException('Invalid OAuth provider');
+    }
+    final credentials = payload['oauthCredentials'];
+    if (credentials is Map) {
+      _validateKnownFields(
+        kind,
+        _stringKeyedMap(credentials),
+        requiredStrings: const {
+          'accessToken',
+          'refreshToken',
+          'expiresAt',
+          'sessionId',
+        },
+        strings: const {'email', 'accountId', 'plan', 'deviceId'},
+        booleans: const {'requiresLogin'},
+      );
+      if (oauthProvider == null ||
+          DateTime.tryParse(credentials['expiresAt'] as String) == null) {
+        throw const FormatException('Invalid OAuth credentials');
+      }
+    }
     for (final child in _mappedObjects(payload['apiKeys'])) {
       _validateKnownFields(
         kind,

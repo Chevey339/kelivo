@@ -87,7 +87,7 @@
             </intent-filter>
         </activity>
         <activity
-            android:name=".McpOAuthCallbackActivity"
+            android:name=".OAuthCallbackActivity"
             android:excludeFromRecents="true"
             android:exported="true"
             android:launchMode="singleTask"

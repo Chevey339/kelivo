@@ -1,3 +1,4 @@
+import '../../models/provider_oauth.dart';
 import 'dart:convert';
 import 'dart:io';
 
@@ -560,6 +561,20 @@ Map<String, dynamic>? claudeThinkingConfig(
   int? budget, {
   ProviderConfig? config,
 }) {
+  if (config?.oauthProvider == OAuthProvider.kimi) {
+    final metadata = _modelOverride(config!, modelId);
+    if (!isClaudeReasoningEnabled(budget) &&
+        metadata['oauthThinkingRequired'] != true) {
+      return {'type': 'disabled'};
+    }
+    if (metadata['oauthThinkingMode'] == 'adaptive') {
+      return {'type': 'adaptive'};
+    }
+    return {
+      'type': 'enabled',
+      'budget_tokens': budget != null && budget > 0 ? budget : 2048,
+    };
+  }
   if (_isClaudeThinkingAlwaysOnModel(modelId)) {
     return <String, dynamic>{'type': 'adaptive', 'display': 'summarized'};
   }
@@ -583,6 +598,19 @@ Map<String, dynamic>? claudeOutputConfig(
   int? budget, {
   ProviderConfig? config,
 }) {
+  if (config?.oauthProvider == OAuthProvider.kimi) {
+    final metadata = _modelOverride(config!, modelId);
+    if (metadata['oauthThinkingMode'] != 'adaptive') return null;
+    var effort = _claudeEffortForBudget(budget);
+    if (effort == 'auto') return null;
+    if (effort == 'off') {
+      if (metadata['oauthThinkingRequired'] != true) return null;
+      effort = 'low';
+    }
+    return {
+      'effort': {'xhigh', 'max'}.contains(effort) ? 'high' : effort,
+    };
+  }
   if (_isClaudeThinkingAlwaysOnModel(modelId)) {
     // Adaptive thinking cannot be disabled. Omitting effort defaults to high,
     // so UI "off" must send the lowest legal level instead.

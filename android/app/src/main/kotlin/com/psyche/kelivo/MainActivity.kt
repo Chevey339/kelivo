@@ -126,7 +126,7 @@ class MainActivity : FlutterActivity() {
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
          super.configureFlutterEngine(flutterEngine)
         incomingShareHandler = IncomingShareHandler(this, flutterEngine.dartExecutor.binaryMessenger)
-         McpOAuthHandler.configure(this, flutterEngine.dartExecutor.binaryMessenger)
+         OAuthHandler.configure(this, flutterEngine.dartExecutor.binaryMessenger)
          kelivo.backgroundRuntime.attachActivity(this)
          deviceLocalToolsHandler = kelivo.deviceTools.also { it.attachActivity(this) }
          workspacePlugin = kelivo.workspace.also { it.attachActivity(this) }
@@ -227,7 +227,7 @@ class MainActivity : FlutterActivity() {
     override fun onDestroy() {
         deviceLocalToolsHandler?.detachActivity(this)
         kelivo.backgroundRuntime.detachActivity(this)
-        McpOAuthHandler.detachActivity(this)
+        OAuthHandler.detachActivity(this)
         processTextChannel?.setMethodCallHandler(null)
         fileSaveChannel?.setMethodCallHandler(null)
         deviceStorageChannel?.setMethodCallHandler(null)

@@ -10,8 +10,8 @@ import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
 import java.lang.ref.WeakReference
 
-internal object McpOAuthHandler {
-    private const val CHANNEL_NAME = "app.mcp_oauth"
+internal object OAuthHandler {
+    private const val CHANNEL_NAME = "app.oauth"
     private const val CALLBACK_SCHEME = "psyche.kelivo"
     private const val CALLBACK_HOST = "mcp-oauth-callback"
 

@@ -1,3 +1,4 @@
+import '../../../../models/provider_oauth.dart';
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
@@ -303,6 +304,8 @@ Stream<StreamChunk> runOpenAIResponsesToolFollowUps({
           final errorBody = await resp2.stream.bytesToString();
           throw HttpException('HTTP ${resp2.statusCode}: $errorBody');
         }
+      } on ProviderOAuthException {
+        rethrow;
       } on HttpException {
         rethrow;
       } catch (e) {

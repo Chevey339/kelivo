@@ -10,7 +10,7 @@
 @objc class AppDelegate: FlutterAppDelegate {
    private let fileSaveHandler = NativeFileSaveHandler()
    private let backgroundGenerationHandler = MobileBackgroundHandler()
-   private let mcpOAuthHandler = IosMcpOAuthHandler()
+   private let oauthHandler = IosOAuthHandler()
    private let deviceLocalToolsHandler = DeviceLocalToolsHandler()
    private let iosTranslationHandler = IosTranslationHandler()
    private let incomingShareHandler = IosIncomingShareHandler()
@@ -60,10 +60,10 @@
 
       backgroundGenerationHandler.configure(messenger: controller.binaryMessenger)
 
-      let mcpOAuthChannel = FlutterMethodChannel(name: "app.mcp_oauth", binaryMessenger: controller.binaryMessenger)
-      mcpOAuthHandler.presentationAnchor = window
-      mcpOAuthChannel.setMethodCallHandler { [weak self] call, result in
-        self?.mcpOAuthHandler.handle(call: call, result: result)
+      let oauthChannel = FlutterMethodChannel(name: "app.oauth", binaryMessenger: controller.binaryMessenger)
+      oauthHandler.presentationAnchor = window
+      oauthChannel.setMethodCallHandler { [weak self] call, result in
+        self?.oauthHandler.handle(call: call, result: result)
       }
 
       let iosTranslationChannel = FlutterMethodChannel(name: "app.ios_translation", binaryMessenger: controller.binaryMessenger)
@@ -250,7 +250,7 @@ private struct NativeTranslationPresenter: View {
   }
 }
 
-private final class IosMcpOAuthHandler: NSObject, ASWebAuthenticationPresentationContextProviding {
+private final class IosOAuthHandler: NSObject, ASWebAuthenticationPresentationContextProviding {
   weak var presentationAnchor: UIWindow?
   private var session: ASWebAuthenticationSession?
 

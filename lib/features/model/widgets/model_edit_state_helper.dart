@@ -3,6 +3,19 @@ import '../../../core/providers/settings_provider.dart';
 import '../../../core/services/api/builtin_tools.dart';
 import '../../../l10n/app_localizations.dart';
 
+/// Catalog metadata is not editable in the model form. Read it from the latest
+/// override at save time so a catalog refresh during editing is preserved too.
+Map<String, dynamic> modelSyncMetadata(Map<String, dynamic> override) => {
+  for (final key in const [
+    'oauthProtocol',
+    'oauthThinkingMode',
+    'oauthThinkingRequired',
+    'oauthThinkingEfforts',
+    'oauthThinkingDefaultEffort',
+  ])
+    if (override.containsKey(key)) key: override[key],
+};
+
 class ModelTypeSwitchResult {
   const ModelTypeSwitchResult({
     required this.input,

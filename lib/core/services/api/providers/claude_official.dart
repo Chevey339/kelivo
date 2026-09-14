@@ -1,3 +1,4 @@
+import '../../../models/provider_oauth.dart';
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
@@ -337,22 +338,28 @@ Stream<StreamChunk> sendClaudeStream(
         thinkingBudget,
         topP,
       );
+      final thinkingModelId = config.oauthProvider == OAuthProvider.kimi
+          ? modelId
+          : upstreamModelId;
       final thinking = isReasoning
           ? claudeThinkingConfig(
-              upstreamModelId,
+              thinkingModelId,
               thinkingBudget,
               config: config,
             )
           : null;
       final outputConfig = isReasoning
-          ? claudeOutputConfig(upstreamModelId, thinkingBudget, config: config)
+          ? claudeOutputConfig(thinkingModelId, thinkingBudget, config: config)
           : null;
 
       // Prepare request body per round
       final body = <String, dynamic>{
         'model': upstreamModelId,
         'max_tokens':
-            maxTokens ?? _defaultClaudeMaxOutputTokens(upstreamModelId),
+            maxTokens ??
+            (config.oauthProvider == OAuthProvider.kimi
+                ? 32000
+                : _defaultClaudeMaxOutputTokens(upstreamModelId)),
         'messages': convo,
         'stream': stream,
         if (systemPrompt.isNotEmpty) 'system': systemPrompt,

@@ -1,3 +1,4 @@
+import 'package:uuid/uuid.dart';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -146,6 +147,14 @@ _ImportResult _decodeSingle(BuildContext context, String s) {
   final jsonStr = utf8.decode(base64Decode(base64Str));
   final obj = jsonDecode(jsonStr) as Map<String, dynamic>;
   final type = (obj['type'] ?? '').toString();
+  if (type == 'oauth') {
+    final config = ProviderConfig.fromJson(
+      (obj['config'] as Map).cast<String, dynamic>(),
+    );
+    if (!config.isOAuth) throw const FormatException('Missing OAuth provider');
+    final key = 'oauth_${config.oauthProvider!.name}_${const Uuid().v4()}';
+    return _ImportResult(key, config.copyWith(id: key));
+  }
   final name = (obj['name'] ?? '').toString();
   final apiKey = (obj['apiKey'] ?? '').toString();
   final baseUrl = (obj['baseUrl'] ?? '').toString();
