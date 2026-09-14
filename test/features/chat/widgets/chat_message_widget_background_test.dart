@@ -1785,6 +1785,10 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.textContaining('inline reasoning'), findsNothing);
       expect(find.textContaining('Final answer'), findsOneWidget);
+
+      await tester.tap(find.text('Deep Thinking'));
+      await tester.pumpAndSettle();
+      expect(find.textContaining('inline reasoning'), findsOneWidget);
       expect(tester.takeException(), isNull);
     });
 

@@ -1869,6 +1869,19 @@ class BehaviorStartupSettingsPage extends StatelessWidget {
               _iosDivider(context),
               _iosSwitchRow(
                 context,
+                icon: Lucide.Activity,
+                label:
+                    l10n.displaySettingsPageShowCollapsedReasoningPreviewTitle,
+                tip: l10n
+                    .displaySettingsPageShowCollapsedReasoningPreviewSubtitle,
+                value: sp.showCollapsedReasoningPreview,
+                onChanged: (v) => context
+                    .read<SettingsProvider>()
+                    .setShowCollapsedReasoningPreview(v),
+              ),
+              _iosDivider(context),
+              _iosSwitchRow(
+                context,
                 icon: Lucide.ListTree,
                 label: l10n.displaySettingsPageCollapseThinkingStepsTitle,
                 value: sp.collapseThinkingSteps,
