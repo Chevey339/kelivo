@@ -427,6 +427,101 @@ void main() {
 
   group('shell', () {
     test(
+      'normalizes progress before output limits and shares the result',
+      () async {
+        final runtime = FakeWorkspaceRuntime();
+        runtime.enqueueNext([
+          CommandOutput(
+            OutputStreamKind.stdout,
+            utf8.encode('header\r\n${'\rdownloading 1234567890' * 10000}'),
+          ),
+          CommandOutput(OutputStreamKind.stderr, utf8.encode('10%\r')),
+          CommandOutput(
+            OutputStreamKind.stdout,
+            utf8.encode('\r\x1b[32m完成 😀'),
+          ),
+          CommandOutput(OutputStreamKind.stderr, utf8.encode('100%\r')),
+          CommandOutput(OutputStreamKind.stdout, utf8.encode('\x1b[0m\r')),
+          CommandOutput(OutputStreamKind.stderr, utf8.encode('\n')),
+          const CommandExited(
+            exitCode: 0,
+            timedOut: false,
+            cancelled: false,
+            interrupted: false,
+            duration: Duration.zero,
+          ),
+        ]);
+        final tools = service(runtime: runtime);
+        final result = await tools.handle(ctx(), 'shell', {
+          'command': 'download',
+        }, toolCallId: 'progress');
+        final payload = jsonOf(result);
+        final meta = metaOf(result);
+        final run = registry.of('progress', conversationId: 'conv-1')!;
+        expect(payload['stdout'], 'header\n完成 😀');
+        expect(payload['stderr'], '100%\n');
+        expect(payload['truncated'], isNot(true));
+        expect(payload['output_file'], isNull);
+        expect(meta.stdoutPreview, payload['stdout']);
+        expect(meta.stderrPreview, payload['stderr']);
+        expect(run.stdoutSoFar, payload['stdout']);
+        expect(run.stderrSoFar, payload['stderr']);
+        expect(run.tailLines, ['header', '完成 😀', '100%']);
+        expect(run.totalBytes, greaterThan(128 * 1024));
+        expect(run.stdoutTruncated, isFalse);
+      },
+    );
+
+    test(
+      'offloaded shell text is normalized while file contents stay intact',
+      () async {
+        final log = '${'log line\n' * 5000}10%\r100%';
+        final runtime = FakeWorkspaceRuntime();
+        runtime.enqueueNext([
+          CommandOutput(OutputStreamKind.stdout, utf8.encode(log)),
+          CommandOutput(
+            OutputStreamKind.stderr,
+            utf8.encode('\x1b[31merror\x1b[0m\r\n'),
+          ),
+          const CommandExited(
+            exitCode: 1,
+            timedOut: false,
+            cancelled: false,
+            interrupted: false,
+            duration: Duration.zero,
+          ),
+        ]);
+        final tools = service(runtime: runtime);
+        final context = ctx();
+        final result = await tools.handle(context, 'shell', {
+          'command': 'download',
+        }, toolCallId: 'progress-log');
+        final stored = await File(
+          jsonOf(result)['output_file'] as String,
+        ).readAsString();
+        expect(stored, contains('${'log line\n' * 5000}100%'));
+        expect(stored, contains('error\n'));
+        expect(stored, isNot(contains('\r')));
+        expect(stored, isNot(contains('\x1b')));
+        expect(metaOf(result).stdoutPreview, endsWith('100%'));
+        expect(metaOf(result).stderrPreview, 'error\n');
+
+        const rawFile = '10%\r50%\r100%';
+        await File(p.join(workspaceDir.path, 'raw.txt')).writeAsString(rawFile);
+        final read = await tools.handle(context, 'read_file', {
+          'path': 'raw.txt',
+        }, toolCallId: 'read-raw');
+        expect(
+          await File(p.join(workspaceDir.path, 'raw.txt')).readAsString(),
+          rawFile,
+        );
+        for (final frame in ['10%', '50%', '100%']) {
+          expect(client(read).content, contains(frame));
+        }
+      },
+    );
+
+    test(
       'happy path prints stdout and exit 0',
       skip: canRunReal ? false : 'needs /bin/sh',
       () async {

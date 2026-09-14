@@ -126,18 +126,24 @@ String _detailCopyText(
   final meta = workspaceMetadataFrom(part.metadata);
   final command = workspaceCommandOf(part, meta: meta, run: run);
   final path = workspacePathOf(part, meta: meta);
-  final stdout = (run?.stdoutSoFar.isNotEmpty == true)
-      ? run!.stdoutSoFar
+  final isShell = part.toolName == 'shell';
+  final stdout = isShell
+      ? workspaceShellOutput(meta: meta, run: run)
       : (meta?.stdoutPreview ?? part.content ?? '');
+  final stderr = isShell
+      ? workspaceShellOutput(meta: meta, run: run, stderr: true)
+      : '';
   final error = workspaceErrorMessage(part, meta) ?? '';
   final diff = meta?.diff ?? '';
-  final buf = StringBuffer();
-  if (command.isNotEmpty) buf.writeln(command);
-  if (path.isNotEmpty && path != command) buf.writeln(path);
-  if (stdout.isNotEmpty) buf.writeln(stdout);
-  if (diff.isNotEmpty) buf.writeln(diff);
-  if (error.isNotEmpty) buf.writeln(error);
-  return buf.toString().trim();
+  final text = [
+    if (command.isNotEmpty) command,
+    if (path.isNotEmpty && path != command) path,
+    if (stdout.isNotEmpty) stdout,
+    if (stderr.isNotEmpty) stderr,
+    if (diff.isNotEmpty) diff,
+    if (error.isNotEmpty) error,
+  ].join('\n');
+  return isShell ? text : text.trim();
 }
 
 class WorkspaceToolDetailBody extends StatelessWidget {
@@ -265,17 +271,10 @@ class _UnifiedDetailState extends State<_UnifiedDetail> {
   bool get _running =>
       widget.run != null && widget.run!.status == ToolRunStatus.running;
 
-  String get _stdout {
-    final live = widget.run?.stdoutSoFar ?? '';
-    if (live.isNotEmpty) return live;
-    return _meta?.stdoutPreview ?? '';
-  }
+  String get _stdout => workspaceShellOutput(meta: _meta, run: widget.run);
 
-  String get _stderr {
-    final live = widget.run?.stderrSoFar ?? '';
-    if (live.isNotEmpty) return live;
-    return _meta?.stderrPreview ?? '';
-  }
+  String get _stderr =>
+      workspaceShellOutput(meta: _meta, run: widget.run, stderr: true);
 
   String get _textResult {
     if (widget.part.toolName == 'shell') return '';

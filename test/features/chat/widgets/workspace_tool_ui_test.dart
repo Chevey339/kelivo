@@ -97,6 +97,36 @@ Finder get _timelineIconColumn =>
     find.byKey(const ValueKey('chatMessageTimelineIconColumn:true:true'));
 
 void main() {
+  test(
+    'stored shell tail folds stdout and stderr while file previews retain frames',
+    () {
+      const meta = WorkspaceToolMetadata(
+        tool: 'shell',
+        status: 'ok',
+        stdoutPreview: '10%\r\x1b[32m100%\x1b[0m',
+        stderrPreview: 'warning\rfixed',
+      );
+      expect(
+        workspaceOutputTailLines(
+          part: const WorkspaceToolPart(id: 'progress', toolName: 'shell'),
+          meta: meta,
+        ),
+        ['100%', 'fixed'],
+      );
+      expect(
+        workspaceOutputTailLines(
+          part: const WorkspaceToolPart(id: 'read', toolName: 'read_file'),
+          meta: const WorkspaceToolMetadata(
+            tool: 'read_file',
+            status: 'ok',
+            stdoutPreview: '10%\r100%',
+          ),
+        ),
+        ['10%', '100%'],
+      );
+    },
+  );
+
   TestWidgetsFlutterBinding.ensureInitialized();
 
   tearDown(() {

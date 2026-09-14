@@ -1,9 +1,8 @@
 import 'dart:async';
-import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
 
-import 'output_buffer.dart';
+import 'shell_output_buffer.dart';
 
 enum ToolRunStatus { running, succeeded, failed, cancelled, timedOut }
 
@@ -29,16 +28,22 @@ class ToolRun extends ChangeNotifier {
   int? exitCode;
   int totalBytes = 0;
 
-  final BoundedStreamBuffer _stdout = BoundedStreamBuffer();
-  final BoundedStreamBuffer _stderr = BoundedStreamBuffer();
-  final List<String> _tailLines = <String>[];
-  String _lineCarry = '';
+  late final ShellOutputBuffer _stdout = ShellOutputBuffer(
+    onLine: (line) => _updateTail(line, stderr: false, complete: true),
+  );
+  late final ShellOutputBuffer _stderr = ShellOutputBuffer(
+    onLine: (line) => _updateTail(line, stderr: true, complete: true),
+  );
+  final List<_TailLine> _tailLines = [];
+  _TailLine? _stdoutTail;
+  _TailLine? _stderrTail;
   Timer? _notifyTimer;
 
   static const int maxTailLines = 200;
   static const Duration notifyInterval = Duration(milliseconds: 50);
 
-  List<String> get tailLines => List<String>.unmodifiable(_tailLines);
+  List<String> get tailLines =>
+      List<String>.unmodifiable(_tailLines.map((line) => line.text));
 
   String get stdoutSoFar => _stdout.text;
 
@@ -49,21 +54,23 @@ class ToolRun extends ChangeNotifier {
   bool get stderrTruncated => _stderr.truncated;
 
   void appendStdout(Uint8List bytes) {
-    _stdout.add(bytes);
+    final emittedText = _stdout.add(bytes);
     totalBytes += bytes.length;
-    _feedTail(bytes);
+    if (emittedText) _updatePendingTail(stderr: false);
     _scheduleNotify();
   }
 
   void appendStderr(Uint8List bytes) {
-    _stderr.add(bytes);
+    final emittedText = _stderr.add(bytes);
     totalBytes += bytes.length;
-    _feedTail(bytes);
+    if (emittedText) _updatePendingTail(stderr: true);
     _scheduleNotify();
   }
 
   void complete({required ToolRunStatus status, int? exitCode}) {
-    _flushCarry();
+    // Only newly decoded text can bring an evicted progress line back.
+    if (_stdout.close()) _updatePendingTail(stderr: false);
+    if (_stderr.close()) _updatePendingTail(stderr: true);
     _notifyTimer?.cancel();
     _notifyTimer = null;
     this.status = status;
@@ -71,31 +78,32 @@ class ToolRun extends ChangeNotifier {
     notifyListeners();
   }
 
-  void _feedTail(List<int> bytes) {
-    final chunk = utf8.decode(bytes, allowMalformed: true);
-    final data = '$_lineCarry$chunk';
-    final parts = const LineSplitter().convert(data);
-    final endedWithNewline = data.endsWith('\n');
-    if (!endedWithNewline && parts.isNotEmpty) {
-      _lineCarry = parts.removeLast();
+  void _updatePendingTail({required bool stderr}) {
+    final line = (stderr ? _stderr : _stdout).currentLine;
+    if (line.isNotEmpty) _updateTail(line, stderr: stderr, complete: false);
+  }
+
+  void _updateTail(
+    String text, {
+    required bool stderr,
+    required bool complete,
+  }) {
+    var line = stderr ? _stderrTail : _stdoutTail;
+    if (line == null) {
+      line = _TailLine(text);
+      _tailLines.add(line);
+      if (_tailLines.length > maxTailLines) {
+        final removed = _tailLines.removeAt(0);
+        if (identical(removed, _stdoutTail)) _stdoutTail = null;
+        if (identical(removed, _stderrTail)) _stderrTail = null;
+      }
     } else {
-      _lineCarry = '';
+      line.text = text;
     }
-    for (final line in parts) {
-      _pushTail(line);
-    }
-  }
-
-  void _flushCarry() {
-    if (_lineCarry.isEmpty) return;
-    _pushTail(_lineCarry);
-    _lineCarry = '';
-  }
-
-  void _pushTail(String line) {
-    _tailLines.add(line);
-    if (_tailLines.length > maxTailLines) {
-      _tailLines.removeAt(0);
+    if (stderr) {
+      _stderrTail = complete ? null : line;
+    } else {
+      _stdoutTail = complete ? null : line;
     }
   }
 
@@ -112,6 +120,12 @@ class ToolRun extends ChangeNotifier {
     _notifyTimer = null;
     super.dispose();
   }
+}
+
+class _TailLine {
+  _TailLine(this.text);
+
+  String text;
 }
 
 /// Process-lifetime registry of tool runs. Finished runs are kept until the

@@ -1,3 +1,4 @@
+import 'dart:collection';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
@@ -13,7 +14,7 @@ class BoundedStreamBuffer {
   final int maxBytes;
   final int _half;
   final BytesBuilder _head = BytesBuilder(copy: true);
-  final List<int> _tail = <int>[];
+  final ListQueue<int> _tail = ListQueue<int>();
   bool _truncated = false;
   int _totalBytes = 0;
 
@@ -39,8 +40,8 @@ class BoundedStreamBuffer {
   }
 
   void _trimTail() {
-    if (_tail.length > _half) {
-      _tail.removeRange(0, _tail.length - _half);
+    while (_tail.length > _half) {
+      _tail.removeFirst();
     }
   }
 
@@ -69,7 +70,7 @@ class BoundedStreamBuffer {
       dropTrailing: true,
     );
     final tail = _decodeUtf8(
-      Uint8List.fromList(_tail),
+      Uint8List.fromList(_tail.toList(growable: false)),
       dropLeading: true,
       dropTrailing: false,
     );

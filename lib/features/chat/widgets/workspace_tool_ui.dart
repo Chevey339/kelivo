@@ -9,6 +9,7 @@ import 'package:provider/provider.dart';
 import 'package:Kelivo/core/models/workspace_binding.dart';
 import 'package:Kelivo/core/providers/settings_provider.dart';
 import 'package:Kelivo/core/services/chat/chat_service.dart';
+import 'package:Kelivo/core/services/workspace/shell_output_buffer.dart';
 import 'package:Kelivo/core/services/workspace/tool_run_registry.dart';
 import 'package:Kelivo/core/services/workspace/workspace_tools_service.dart';
 import 'package:Kelivo/features/home/services/tool_approval_service.dart';
@@ -250,12 +251,28 @@ List<String> workspaceOutputTailLines({
   WorkspaceToolMetadata? meta,
   ToolRun? run,
 }) {
-  if (run != null && run.tailLines.isNotEmpty) {
+  if (run != null) {
     return run.tailLines;
   }
-  final preview = meta?.stdoutPreview ?? '';
+  final preview = part.toolName == 'shell'
+      ? [
+          workspaceShellOutput(meta: meta),
+          workspaceShellOutput(meta: meta, stderr: true),
+        ].where((text) => text.isNotEmpty).join('\n')
+      : meta?.stdoutPreview ?? '';
   if (preview.isNotEmpty) return const LineSplitter().convert(preview);
   return const <String>[];
+}
+
+String workspaceShellOutput({
+  WorkspaceToolMetadata? meta,
+  ToolRun? run,
+  bool stderr = false,
+}) {
+  if (run != null) return stderr ? run.stderrSoFar : run.stdoutSoFar;
+  return ShellOutputBuffer.normalize(
+    (stderr ? meta?.stderrPreview : meta?.stdoutPreview) ?? '',
+  );
 }
 
 Color _workspaceQuietFill(BuildContext context) {
