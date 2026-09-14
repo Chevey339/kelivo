@@ -59,11 +59,17 @@ class _ProviderNetworkPageState extends State<ProviderNetworkPage> {
     final l10n = AppLocalizations.of(context)!;
     return Scaffold(
       appBar: AppBar(
-        leading: IconButton(
-          icon: Icon(Lucide.ArrowLeft, size: 22),
-          onPressed: () => Navigator.of(context).maybePop(),
+        leading: IosIconButton(
+          icon: Lucide.ArrowLeft,
+          size: 22,
+          minSize: 44,
+          semanticLabel: l10n.settingsPageBackButton,
+          onTap: () => Navigator.of(context).maybePop(),
         ),
-        title: Text(l10n.providerDetailPageNetworkTab),
+        title: Text(
+          l10n.providerDetailPageNetworkTab,
+          style: const TextStyle(fontSize: 16),
+        ),
       ),
       body: ListView(
         padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
@@ -317,7 +323,7 @@ class _ProxyTypeSheetField extends StatelessWidget {
               ),
             ),
             Icon(
-              Icons.keyboard_arrow_down_rounded,
+              Lucide.ChevronDown,
               size: 18,
               color: cs.onSurface.withValues(alpha: 0.55),
             ),
@@ -368,8 +374,7 @@ class _ProxyTypeSheetField extends StatelessWidget {
                     ),
                   ),
                 ),
-                if (selected)
-                  Icon(Icons.check_rounded, size: 18, color: cs.primary),
+                if (selected) Icon(Lucide.Check, size: 18, color: cs.primary),
               ],
             ),
           ),

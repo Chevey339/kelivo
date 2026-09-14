@@ -33,12 +33,17 @@ class ProviderCustomRequestPage extends StatelessWidget {
         leading: Padding(
           padding: const EdgeInsets.only(left: 8),
           child: IosIconButton(
-            icon: Lucide.ChevronLeft,
+            icon: Lucide.ArrowLeft,
+            size: 22,
+            semanticLabel: l10n.settingsPageBackButton,
             minSize: 44,
             onTap: () => Navigator.of(context).maybePop(),
           ),
         ),
-        title: Text(l10n.providerDetailPageCustomRequestTitle),
+        title: Text(
+          l10n.providerDetailPageCustomRequestTitle,
+          style: const TextStyle(fontSize: 16),
+        ),
       ),
       body: ListView(
         padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),

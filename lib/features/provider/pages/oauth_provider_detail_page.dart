@@ -1,11 +1,11 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
 import '../../../core/providers/settings_provider.dart';
 import '../../../core/services/auth/provider_oauth_service.dart';
-import '../../../desktop/model_edit_dialog.dart';
+import '../../../desktop/desktop_settings_page.dart'
+    show DesktopProviderDetailPane;
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../shared/responsive/screen_type_helper.dart';
@@ -13,14 +13,15 @@ import '../../../shared/widgets/ios_form_text_field.dart';
 import '../../../shared/widgets/ios_settings_rows.dart';
 import '../../../shared/widgets/ios_switch.dart';
 import '../../../shared/widgets/ios_tactile.dart';
-import '../../../shared/widgets/ios_tile_button.dart';
 import '../../../shared/widgets/section_card.dart';
 import '../../../theme/app_font_weights.dart';
 import '../../model/widgets/model_detail_sheet.dart';
 import '../widgets/oauth_account_card.dart';
 import '../widgets/oauth_login_panel.dart';
 import '../widgets/provider_avatar.dart';
-import '../widgets/provider_custom_request_editor.dart';
+import '../widgets/oauth_connection_info.dart';
+import 'provider_network_page.dart';
+import 'provider_custom_request_page.dart';
 
 Future<void> showOAuthProviderDetails(
   BuildContext context,
@@ -77,11 +78,13 @@ class OAuthProviderDetailPage extends StatefulWidget {
     this.embedded = false,
     this.startLogin = false,
     this.service,
+    this.desktopPaneKey,
   });
   final String providerId;
   final bool embedded;
   final bool startLogin;
   final ProviderOAuthService? service;
+  final Key? desktopPaneKey;
 
   @override
   State<OAuthProviderDetailPage> createState() =>
@@ -97,8 +100,6 @@ class _OAuthProviderDetailPageState extends State<OAuthProviderDetailPage> {
   bool _loadingUsage = false;
   bool _syncing = false;
   bool _connection = false;
-  bool _network = false;
-  bool _custom = false;
   Object? _usageError;
   Object? _modelError;
 
@@ -159,6 +160,94 @@ class _OAuthProviderDetailPageState extends State<OAuthProviderDetailPage> {
     }
   }
 
+  Widget _account(ProviderConfig config) {
+    final credentials = config.oauthCredentials;
+    if (_login || credentials == null) {
+      return OAuthLoginPanel(
+        autoStart: _login,
+        provider: config.oauthProvider,
+        providerId: config.id,
+        service: _service,
+        onConnected: (_) {
+          setState(() => _login = false);
+          unawaited(_refreshUsage());
+        },
+      );
+    }
+    return OAuthAccountCard(
+      avatar: ProviderAvatar(
+        providerKey: config.id,
+        displayName: config.name,
+        size: 42,
+      ),
+      name: config.name,
+      email: credentials.email,
+      plan: credentials.plan,
+      usage: _service.cachedUsage(config),
+      refreshing: _service.isRefreshing(config.id),
+      expired: credentials.requiresLogin,
+      loadingUsage: _loadingUsage,
+      usageError: _usageError == null
+          ? null
+          : oauthErrorText(context, _usageError!),
+      showDetails: _usageDetails,
+      onDetails: () => setState(() => _usageDetails = !_usageDetails),
+      onRefresh: _refreshUsage,
+      onLogin: () => setState(() => _login = true),
+    );
+  }
+
+  Widget _modelStatus(ProviderConfig config) {
+    final l = AppLocalizations.of(context)!;
+    final cs = Theme.of(context).colorScheme;
+    return Padding(
+      padding: const EdgeInsets.only(top: 9),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (_modelError != null)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: Text(
+                oauthErrorText(context, _modelError!),
+                style: TextStyle(fontSize: 13, color: cs.error),
+              ),
+            ),
+          Text(
+            '${l.oauthModelsHint}${config.oauthModelsSyncedAt == null ? '' : '\n${l.oauthLastUpdated(oauthDisplayTime(context, config.oauthModelsSyncedAt!))}'}',
+            style: TextStyle(
+              fontSize: 12,
+              height: 1.5,
+              color: cs.onSurface.withValues(alpha: .5),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _logout(String id) async {
+    await _service.logout(id);
+    if (mounted) setState(() => _login = false);
+  }
+
+  void _openPage(Widget page) {
+    Navigator.of(context).push<void>(
+      PageRouteBuilder(
+        pageBuilder: (_, _, _) => page,
+        transitionsBuilder: (_, animation, _, child) => SlideTransition(
+          position: animation.drive(
+            Tween(
+              begin: const Offset(1, 0),
+              end: Offset.zero,
+            ).chain(CurveTween(curve: Curves.easeOutCubic)),
+          ),
+          child: child,
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final settings = context.watch<SettingsProvider>();
@@ -166,417 +255,273 @@ class _OAuthProviderDetailPageState extends State<OAuthProviderDetailPage> {
     if (config == null || !config.isOAuth) return const SizedBox.shrink();
     final l = AppLocalizations.of(context)!;
     final cs = Theme.of(context).colorScheme;
-    final credentials = config.oauthCredentials;
-    final needsLogin = credentials == null || credentials.requiresLogin;
-    final body = ListenableBuilder(
+    final desktop = widget.embedded || ResponsiveHelper.isDesktop(context);
+    final needsLogin =
+        config.oauthCredentials == null ||
+        config.oauthCredentials!.requiresLogin;
+    return ListenableBuilder(
       listenable: _service,
-      builder: (context, _) => ListView(
-        padding: EdgeInsets.fromLTRB(
-          widget.embedded ? 20 : 16,
-          12,
-          widget.embedded ? 20 : 16,
-          28 + MediaQuery.viewInsetsOf(context).bottom,
-        ),
-        children: [
-          if (_login || credentials == null)
-            OAuthLoginPanel(
-              autoStart: _login,
-              provider: config.oauthProvider,
-              providerId: config.id,
-              onConnected: (_) {
-                setState(() => _login = false);
-                unawaited(_refreshUsage());
-              },
-            )
-          else
-            OAuthAccountCard(
-              avatar: ProviderAvatar(
-                providerKey: config.id,
-                displayName: config.name,
-                size: 42,
-              ),
-              name: config.name,
-              email: credentials.email,
-              plan: credentials.plan,
-              usage: _service.cachedUsage(config),
-              refreshing: _service.isRefreshing(config.id),
-              expired: needsLogin,
-              loadingUsage: _loadingUsage,
-              usageError: _usageError == null
+      builder: (context, _) {
+        if (desktop) {
+          return Material(
+            color: Theme.of(context).scaffoldBackgroundColor,
+            child: DesktopProviderDetailPane(
+              key: widget.desktopPaneKey ?? ValueKey(config.id),
+              providerKey: config.id,
+              displayName: config.name,
+              oauthAccount: _account(config),
+              syncingModels: _syncing,
+              onSyncModels: needsLogin ? null : _syncModels,
+              onClose: widget.embedded
                   ? null
-                  : oauthErrorText(context, _usageError!),
-              showDetails: _usageDetails,
-              onDetails: () => setState(() => _usageDetails = !_usageDetails),
-              onRefresh: _refreshUsage,
-              onLogin: () => setState(() => _login = true),
-            ),
-          const SizedBox(height: 20),
-          SectionCard(
-            children: [
-              if (_editingName)
-                IosFormTextField(
-                  label: l.oauthName,
-                  controller: _name,
-                  onChanged: (value) {
-                    if (value.trim().isNotEmpty) {
-                      settings.setProviderConfig(
-                        config.id,
-                        settings.providerConfigs[config.id]!.copyWith(
-                          name: value.trim(),
-                        ),
-                      );
-                    }
-                  },
-                ),
-              IosNavRow(
-                label: l.addProviderSheetEnabledLabel,
-                subtitle: l.oauthEnabledHint,
-                trailing: IosSwitch(
-                  value: config.enabled,
-                  onChanged: (value) => settings.setProviderConfig(
-                    config.id,
-                    settings.providerConfigs[config.id]!.copyWith(
-                      enabled: value,
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 22),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 4),
-            child: Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    '${l.providerDetailPageModelsTab}  ${config.models.length}',
-                    style: TextStyle(
-                      fontSize: 13,
-                      color: cs.onSurface.withValues(alpha: .6),
-                    ),
-                  ),
-                ),
-                IosTileButton(
-                  label: _syncing ? l.oauthSyncing : l.oauthSyncModels,
-                  icon: LucideIcons.refreshCw,
-                  enabled: !_syncing && !needsLogin,
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 10,
-                    vertical: 6,
-                  ),
-                  onTap: _syncModels,
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 10),
-          if (_modelError != null)
-            Padding(
-              padding: const EdgeInsets.only(bottom: 10),
-              child: Text(
-                oauthErrorText(context, _modelError!),
-                style: TextStyle(fontSize: 13, color: cs.error),
-              ),
-            ),
-          SectionCard(
-            children: [
-              if (config.models.isEmpty)
-                Padding(
-                  padding: const EdgeInsets.all(20),
-                  child: Text(
-                    l.oauthNoModels,
-                    style: TextStyle(
-                      fontSize: 13,
-                      color: cs.onSurface.withValues(alpha: .5),
-                    ),
-                  ),
-                )
-              else
-                for (final model in config.models)
-                  IosNavRow(
-                    label:
-                        (config.modelOverrides[model] as Map?)?['name']
-                            as String? ??
-                        model,
-                    subtitle: model,
-                    onTap: () {
-                      if (ResponsiveHelper.isDesktop(context) ||
-                          widget.embedded) {
-                        showDesktopModelEditDialog(
-                          context,
-                          providerKey: config.id,
-                          modelId: model,
-                        );
-                      } else {
-                        showModelDetailSheet(
-                          context,
-                          providerKey: config.id,
-                          modelId: model,
-                        );
-                      }
-                    },
-                  ),
-            ],
-          ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(4, 9, 4, 0),
-            child: Text(
-              '${l.oauthModelsHint}${config.oauthModelsSyncedAt == null ? '' : '\n${l.oauthLastUpdated(oauthDisplayTime(context, config.oauthModelsSyncedAt!))}'}',
-              style: TextStyle(
-                fontSize: 12,
-                height: 1.5,
-                color: cs.onSurface.withValues(alpha: .5),
-              ),
-            ),
-          ),
-          const SizedBox(height: 22),
-          Padding(
-            padding: const EdgeInsets.only(left: 4, bottom: 10),
-            child: Text(
-              l.oauthConnection,
-              style: TextStyle(
-                fontSize: 13,
-                color: cs.onSurface.withValues(alpha: .6),
-              ),
-            ),
-          ),
-          SectionCard(
-            children: [
-              IosNavRow(
-                icon: LucideIcons.info,
-                label: l.oauthConnectionInfo,
-                onTap: () => setState(() => _connection = !_connection),
-                trailing: Icon(
-                  _connection ? LucideIcons.chevronUp : LucideIcons.chevronDown,
-                  size: 16,
-                  color: cs.onSurface.withValues(alpha: .4),
-                ),
-              ),
-              if (_connection) ...[
-                _copyRow(l.oauthEndpoint, config.oauthProvider!.baseUrl),
-                if (config.oauthProvider!.scope.isNotEmpty)
-                  _copyRow(l.oauthScope, config.oauthProvider!.scope),
-                if (credentials?.accountId case final id?)
-                  _copyRow(l.oauthAccountId, id),
-                if (credentials != null)
-                  _copyRow(
-                    l.oauthTokenExpiry,
-                    oauthDisplayTime(context, credentials.expiresAt),
-                  ),
-              ],
-              IosNavRow(
-                icon: LucideIcons.network,
-                label: l.oauthNetwork,
-                subtitle: config.proxyEnabled == true
-                    ? config.proxyHost
-                    : l.oauthFollowGlobal,
-                onTap: () => setState(() => _network = !_network),
-              ),
-              if (_network)
-                _OAuthNetworkEditor(key: ValueKey(config.id), config: config),
-              IosNavRow(
-                icon: LucideIcons.slidersHorizontal,
-                label: l.oauthCustomRequest,
-                detailText:
-                    '${config.customHeaders.length + config.customBody.length}',
-                onTap: () => setState(() => _custom = !_custom),
-              ),
-              if (_custom)
-                Padding(
-                  padding: const EdgeInsets.all(12),
-                  child: ProviderCustomRequestEditor(
-                    showHeader: false,
-                    headers: config.customHeaders,
-                    body: config.customBody,
-                    onHeadersChanged: (rows) => settings.setProviderConfig(
-                      config.id,
-                      settings.providerConfigs[config.id]!.copyWith(
-                        customHeaders: rows,
-                      ),
-                    ),
-                    onBodyChanged: (rows) => settings.setProviderConfig(
-                      config.id,
-                      settings.providerConfigs[config.id]!.copyWith(
-                        customBody: rows,
-                      ),
-                    ),
-                  ),
-                ),
-            ],
-          ),
-          if (credentials != null) ...[
-            const SizedBox(height: 24),
-            SectionCard(
-              children: [
-                IosNavRow(
-                  icon: LucideIcons.logOut,
-                  label: l.oauthLogout,
-                  subtitle: l.oauthLogoutDescription,
-                  subtitleMaxLines: null,
-                  destructive: true,
-                  onTap: () async {
-                    await _service.logout(config.id);
-                    if (mounted) setState(() => _login = false);
-                  },
-                ),
-              ],
-            ),
-          ],
-        ],
-      ),
-    );
-    final header = Padding(
-      padding: const EdgeInsets.fromLTRB(8, 8, 16, 4),
-      child: Row(
-        children: [
-          if (!widget.embedded)
-            IosIconButton(
-              icon: LucideIcons.chevronLeft,
-              minSize: 44,
-              onTap: () => Navigator.of(context).pop(),
-            ),
-          if (widget.embedded) const SizedBox(width: 12),
-          Expanded(
-            child: Text(
-              config.name,
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: AppFontWeights.semibold,
-              ),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-          ),
-          IosIconButton(
-            icon: LucideIcons.pencil,
-            semanticLabel: l.oauthName,
-            onTap: () => setState(() => _editingName = !_editingName),
-          ),
-        ],
-      ),
-    );
-    return Material(
-      color: Theme.of(context).scaffoldBackgroundColor,
-      child: widget.embedded
-          ? Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                header,
-                Expanded(child: body),
-              ],
-            )
-          : SafeArea(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
+                  : () => Navigator.of(context).maybePop(),
+              oauthFooter: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  header,
-                  Expanded(child: body),
+                  _modelStatus(config),
+                  if (config.oauthCredentials != null) ...[
+                    const SizedBox(height: 20),
+                    IosIconButton(
+                      semanticLabel: l.oauthLogout,
+                      color: cs.error,
+                      minSize: 32,
+                      builder: (color) => Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(LucideIcons.logOut, size: 16, color: color),
+                          const SizedBox(width: 8),
+                          Text(
+                            l.oauthLogout,
+                            style: TextStyle(fontSize: 13, color: color),
+                          ),
+                        ],
+                      ),
+                      onTap: () => _logout(config.id),
+                    ),
+                  ],
                 ],
               ),
             ),
-    );
-  }
-
-  Widget _copyRow(String label, String value) => IosNavRow(
-    label: label,
-    subtitle: value,
-    subtitleMaxLines: null,
-    trailing: const Icon(LucideIcons.copy, size: 14),
-    onTap: () => Clipboard.setData(ClipboardData(text: value)),
-  );
-}
-
-class _OAuthNetworkEditor extends StatefulWidget {
-  const _OAuthNetworkEditor({super.key, required this.config});
-  final ProviderConfig config;
-  @override
-  State<_OAuthNetworkEditor> createState() => _OAuthNetworkEditorState();
-}
-
-class _OAuthNetworkEditorState extends State<_OAuthNetworkEditor> {
-  late final _host = TextEditingController(text: widget.config.proxyHost);
-  late final _port = TextEditingController(
-    text: widget.config.proxyPort ?? '8080',
-  );
-  late final _username = TextEditingController(
-    text: widget.config.proxyUsername,
-  );
-  late final _password = TextEditingController(
-    text: widget.config.proxyPassword,
-  );
-  @override
-  void dispose() {
-    for (final controller in [_host, _port, _username, _password]) {
-      controller.dispose();
-    }
-    super.dispose();
-  }
-
-  void _save({bool? enabled, String? type}) {
-    final settings = context.read<SettingsProvider>();
-    final config = settings.providerConfigs[widget.config.id];
-    if (config == null) return;
-    unawaited(
-      settings.setProviderConfig(
-        config.id,
-        config.copyWith(
-          proxyEnabled: enabled,
-          proxyType: type,
-          proxyHost: _host.text.trim(),
-          proxyPort: _port.text.trim(),
-          proxyUsername: _username.text,
-          proxyPassword: _password.text,
-        ),
-      ),
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final l = AppLocalizations.of(context)!;
-    final config = widget.config;
-    return Column(
-      children: [
-        IosNavRow(
-          label: l.providerDetailPageEnableProxyTitle,
-          trailing: IosSwitch(
-            value: config.proxyEnabled == true,
-            onChanged: (value) => _save(enabled: value),
+          );
+        }
+        return Material(
+          color: Theme.of(context).scaffoldBackgroundColor,
+          child: SafeArea(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                SizedBox(
+                  height: 56,
+                  child: Row(
+                    children: [
+                      IosIconButton(
+                        icon: LucideIcons.arrowLeft,
+                        size: 22,
+                        minSize: 56,
+                        semanticLabel: l.settingsPageBackButton,
+                        tooltip: l.settingsPageBackButton,
+                        onTap: () => Navigator.of(context).maybePop(),
+                      ),
+                      ProviderAvatar(
+                        providerKey: config.id,
+                        displayName: config.name,
+                        size: 24,
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          config.name,
+                          style: const TextStyle(fontSize: 16),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      IosIconButton(
+                        icon: LucideIcons.pencil,
+                        size: 22,
+                        minSize: 48,
+                        semanticLabel: l.oauthName,
+                        onTap: () =>
+                            setState(() => _editingName = !_editingName),
+                      ),
+                      const SizedBox(width: 4),
+                    ],
+                  ),
+                ),
+                Expanded(
+                  child: ListView(
+                    padding: EdgeInsets.fromLTRB(
+                      16,
+                      12,
+                      16,
+                      28 + MediaQuery.viewInsetsOf(context).bottom,
+                    ),
+                    children: [
+                      _account(config),
+                      const SizedBox(height: 20),
+                      SectionCard(
+                        children: [
+                          if (_editingName)
+                            IosFormTextField(
+                              label: l.oauthName,
+                              controller: _name,
+                              onChanged: (value) {
+                                if (value.trim().isNotEmpty) {
+                                  settings.setProviderConfig(
+                                    config.id,
+                                    settings.providerConfigs[config.id]!
+                                        .copyWith(name: value.trim()),
+                                  );
+                                }
+                              },
+                            ),
+                          IosNavRow(
+                            label: l.addProviderSheetEnabledLabel,
+                            subtitle: l.oauthEnabledHint,
+                            trailing: IosSwitch(
+                              value: config.enabled,
+                              onChanged: (value) => settings.setProviderConfig(
+                                config.id,
+                                settings.providerConfigs[config.id]!.copyWith(
+                                  enabled: value,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 18),
+                      Row(
+                        children: [
+                          Text(
+                            l.providerDetailPageModelsTitle,
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: AppFontWeights.emphasis,
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            '${config.models.length}',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: cs.onSurface.withValues(alpha: .55),
+                            ),
+                          ),
+                          const Spacer(),
+                          IosIconButton(
+                            key: const ValueKey('oauth-sync-models'),
+                            icon: _syncing
+                                ? LucideIcons.loader
+                                : LucideIcons.refreshCw,
+                            size: 20,
+                            minSize: 44,
+                            tooltip: _syncing
+                                ? l.oauthSyncing
+                                : l.oauthSyncModels,
+                            semanticLabel: _syncing
+                                ? l.oauthSyncing
+                                : l.oauthSyncModels,
+                            enabled: !_syncing && !needsLogin,
+                            onTap: _syncModels,
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 6),
+                      SectionCard(
+                        children: [
+                          if (config.models.isEmpty)
+                            Padding(
+                              padding: const EdgeInsets.all(20),
+                              child: Text(
+                                l.oauthNoModels,
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  color: cs.onSurface.withValues(alpha: .5),
+                                ),
+                              ),
+                            ),
+                          for (final model in config.models)
+                            IosNavRow(
+                              label:
+                                  (config.modelOverrides[model]
+                                          as Map?)?['name']
+                                      as String? ??
+                                  model,
+                              subtitle:
+                                  (config.modelOverrides[model]
+                                          as Map?)?['name'] ==
+                                      null
+                                  ? null
+                                  : model,
+                              onTap: () => showModelDetailSheet(
+                                context,
+                                providerKey: config.id,
+                                modelId: model,
+                              ),
+                            ),
+                        ],
+                      ),
+                      _modelStatus(config),
+                      const SizedBox(height: 22),
+                      SectionCard(
+                        children: [
+                          IosNavRow(
+                            label: l.oauthConnectionInfo,
+                            onTap: () =>
+                                setState(() => _connection = !_connection),
+                            trailing: Icon(
+                              _connection
+                                  ? LucideIcons.chevronUp
+                                  : LucideIcons.chevronDown,
+                              size: 16,
+                              color: cs.onSurface.withValues(alpha: .9),
+                            ),
+                          ),
+                          if (_connection) OAuthConnectionInfo(config: config),
+                          IosNavRow(
+                            label: l.providerDetailPageNetworkTab,
+                            onTap: () => _openPage(
+                              ProviderNetworkPage(
+                                providerKey: config.id,
+                                providerDisplayName: config.name,
+                              ),
+                            ),
+                          ),
+                          IosNavRow(
+                            label: l.providerDetailPageCustomRequestTitle,
+                            onTap: () => _openPage(
+                              ProviderCustomRequestPage(
+                                providerKey: config.id,
+                                providerDisplayName: config.name,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      if (config.oauthCredentials != null) ...[
+                        const SizedBox(height: 24),
+                        SectionCard(
+                          children: [
+                            IosNavRow(
+                              icon: LucideIcons.logOut,
+                              label: l.oauthLogout,
+                              subtitle: l.oauthLogoutDescription,
+                              subtitleMaxLines: null,
+                              destructive: true,
+                              onTap: () => _logout(config.id),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              ],
+            ),
           ),
-        ),
-        if (config.proxyEnabled == true) ...[
-          IosNavRow(
-            label: l.networkProxyType,
-            detailText: ProviderConfig.resolveProxyType(
-              config.proxyType,
-            ).toUpperCase(),
-            onTap: () =>
-                _save(type: config.proxyType == 'socks5' ? 'http' : 'socks5'),
-          ),
-          IosFormTextField(
-            label: l.networkProxyServerHost,
-            controller: _host,
-            onChanged: (_) => _save(),
-          ),
-          IosFormTextField(
-            label: l.networkProxyPort,
-            controller: _port,
-            keyboardType: TextInputType.number,
-            onChanged: (_) => _save(),
-          ),
-          IosFormTextField(
-            label: l.networkProxyUsername,
-            controller: _username,
-            onChanged: (_) => _save(),
-          ),
-          IosFormTextField(
-            label: l.networkProxyPassword,
-            controller: _password,
-            onChanged: (_) => _save(),
-          ),
-        ],
-      ],
+        );
+      },
     );
   }
 }
