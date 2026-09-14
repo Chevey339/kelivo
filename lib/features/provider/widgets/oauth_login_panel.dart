@@ -49,8 +49,10 @@ class OAuthLoginPanel extends StatefulWidget {
     this.onConnected,
     this.onViewDetails,
     this.autoStart = false,
+    this.service,
   });
   final bool autoStart;
+  final ProviderOAuthService? service;
   final OAuthProvider? provider;
   final String? providerId;
   final ValueChanged<ProviderConfig>? onConnected;
@@ -61,11 +63,15 @@ class OAuthLoginPanel extends StatefulWidget {
 }
 
 class _OAuthLoginPanelState extends State<OAuthLoginPanel> {
+  ProviderOAuthService get _service =>
+      widget.service ?? ProviderOAuthService.instance;
   OAuthCancellation? _cancellation;
   OAuthProvider? _active;
   OAuthLoginPrompt? _prompt;
   ProviderConfig? _connected;
   Object? _error;
+  bool _browserLogin = false;
+  bool _switchingToDeviceCode = false;
 
   @override
   void initState() {
@@ -86,52 +92,78 @@ class _OAuthLoginPanelState extends State<OAuthLoginPanel> {
   Future<void> _login(OAuthProvider provider, {bool? deviceCode}) async {
     if (_active != null) return;
     final cancellation = OAuthCancellation();
+    final useDeviceCode = deviceCode ?? provider != OAuthProvider.chatgpt;
     setState(() {
       _active = provider;
+      _browserLogin = provider == OAuthProvider.chatgpt && !useDeviceCode;
       _error = null;
       _prompt = null;
       _cancellation = cancellation;
     });
     try {
-      final connected = await ProviderOAuthService.instance.login(
+      final connected = await _service.login(
         provider: provider,
         providerId: widget.providerId,
         cancellation: cancellation,
-        deviceCode:
-            deviceCode ??
-            (Platform.isAndroid ||
-                Platform.isIOS ||
-                provider != OAuthProvider.chatgpt),
+        deviceCode: useDeviceCode,
         onPrompt: (value) {
           if (mounted && identical(cancellation, _cancellation)) {
             setState(() => _prompt = value);
           }
         },
       );
-      if (!mounted) return;
+      if (!mounted || cancellation.isCancelled) return;
       setState(() => _connected = connected);
       widget.onConnected?.call(connected);
       unawaited(_sync(connected));
     } catch (error) {
-      if (mounted && !cancellation.isCancelled) setState(() => _error = error);
+      if (mounted &&
+          !cancellation.isCancelled &&
+          !(error is ProviderOAuthException &&
+              error.kind == ProviderOAuthFailure.cancelled)) {
+        setState(() => _error = error);
+      }
     } finally {
       if (mounted && identical(cancellation, _cancellation)) {
+        final switchToDeviceCode = _switchingToDeviceCode;
         setState(() {
           _active = null;
           _cancellation = null;
+          _switchingToDeviceCode = false;
         });
+        if (switchToDeviceCode) {
+          unawaited(_login(OAuthProvider.chatgpt, deviceCode: true));
+        }
       }
     }
   }
 
+  void _useDeviceCode() {
+    if (_switchingToDeviceCode) return;
+    if (_active == null) {
+      unawaited(_login(OAuthProvider.chatgpt, deviceCode: true));
+      return;
+    }
+    setState(() => _switchingToDeviceCode = true);
+    _cancellation?.cancel();
+  }
+
+  void _cancel() {
+    setState(() {
+      _browserLogin = false;
+      _switchingToDeviceCode = false;
+    });
+    _cancellation?.cancel();
+  }
+
   Future<void> _sync(ProviderConfig config) async {
     try {
-      await ProviderOAuthService.instance.syncModels(config.id);
+      await _service.syncModels(config.id);
     } catch (error) {
       if (mounted) setState(() => _error = error);
     }
     try {
-      await ProviderOAuthService.instance.fetchUsage(config);
+      await _service.fetchUsage(config);
     } catch (_) {
       /* Usage can be retried from the account page. */
     }
@@ -198,7 +230,9 @@ class _OAuthLoginPanelState extends State<OAuthLoginPanel> {
                   ),
                 ),
             ],
-            if (_prompt != null)
+            if (_prompt != null &&
+                (!_prompt!.browserAuthorization ||
+                    !(Platform.isAndroid || Platform.isIOS)))
               IosTileButton(
                 label: l.oauthOpenBrowser,
                 icon: LucideIcons.externalLink,
@@ -208,11 +242,20 @@ class _OAuthLoginPanelState extends State<OAuthLoginPanel> {
                 ),
               ),
             const SizedBox(height: 12),
+            if (_browserLogin) ...[
+              IosTileButton(
+                label: l.oauthDeviceLogin,
+                icon: LucideIcons.keyRound,
+                enabled: !_switchingToDeviceCode,
+                onTap: _useDeviceCode,
+              ),
+              const SizedBox(height: 12),
+            ],
             IosTileButton(
               label: l.oauthCancel,
               icon: LucideIcons.x,
               foregroundColor: cs.error,
-              onTap: () => _cancellation?.cancel(),
+              onTap: _cancel,
             ),
           ],
         ),
@@ -266,6 +309,7 @@ class _OAuthLoginPanelState extends State<OAuthLoginPanel> {
                 onTap: () => setState(() {
                   _connected = null;
                   _error = null;
+                  _browserLogin = false;
                 }),
               ),
             ],
@@ -342,16 +386,16 @@ class _OAuthLoginPanelState extends State<OAuthLoginPanel> {
             style: TextStyle(color: cs.error),
             textAlign: TextAlign.center,
           ),
-          if (!(Platform.isAndroid || Platform.isIOS) &&
-              (widget.provider == OAuthProvider.chatgpt ||
-                  widget.provider == null)) ...[
-            const SizedBox(height: 12),
-            IosTileButton(
+        ],
+        if (_browserLogin) ...[
+          const SizedBox(height: 12),
+          Center(
+            child: IosTileButton(
               label: l.oauthDeviceLogin,
               icon: LucideIcons.keyRound,
-              onTap: () => _login(OAuthProvider.chatgpt, deviceCode: true),
+              onTap: _useDeviceCode,
             ),
-          ],
+          ),
         ],
       ],
     );

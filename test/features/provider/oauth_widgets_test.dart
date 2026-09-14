@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
@@ -10,6 +11,7 @@ import 'package:Kelivo/core/providers/settings_provider.dart';
 import 'package:Kelivo/features/provider/pages/oauth_provider_detail_page.dart';
 import 'package:Kelivo/features/provider/widgets/add_provider_sheet.dart';
 import 'package:Kelivo/features/provider/widgets/oauth_account_card.dart';
+import 'package:Kelivo/features/provider/widgets/oauth_login_panel.dart';
 import 'package:Kelivo/features/provider/widgets/oauth_message_recovery.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
 import 'package:Kelivo/shared/widgets/ios_tile_button.dart';
@@ -22,6 +24,62 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:provider/provider.dart';
 
 import '../../support/business_test_harness.dart';
+
+class _LoginChoiceService extends ProviderOAuthService {
+  _LoginChoiceService({this.browserFailure = ProviderOAuthFailure.network});
+
+  final ProviderOAuthFailure? browserFailure;
+  final methods = <bool>[];
+  final browserCancelled = Completer<void>();
+  final browserCleanup = Completer<void>();
+  void Function(OAuthLoginPrompt)? browserPrompt;
+
+  @override
+  Future<ProviderConfig> login({
+    required OAuthProvider provider,
+    required OAuthCancellation cancellation,
+    required void Function(OAuthLoginPrompt) onPrompt,
+    String? providerId,
+    bool deviceCode = true,
+    Future<bool> Function(Uri)? launcher,
+  }) async {
+    methods.add(deviceCode);
+    if (!deviceCode) {
+      if (browserFailure case final failure?) {
+        throw ProviderOAuthException(failure);
+      }
+      browserPrompt = onPrompt;
+      onPrompt(
+        OAuthLoginPrompt(
+          url: Uri.parse('https://auth.openai.com/oauth/authorize'),
+          browserAuthorization: true,
+        ),
+      );
+      await cancellation.whenCancelled;
+      browserCancelled.complete();
+      await browserCleanup.future;
+      // A result that arrives after cancellation must not finish the panel.
+      return ProviderConfig(
+        id: 'old-browser-result',
+        name: 'ChatGPT',
+        enabled: true,
+        apiKey: '',
+        baseUrl: OAuthProvider.chatgpt.baseUrl,
+        providerType: ProviderKind.openai,
+        oauthProvider: OAuthProvider.chatgpt,
+      );
+    }
+    onPrompt(
+      OAuthLoginPrompt(
+        url: Uri.parse('https://auth.openai.com/codex/device'),
+        userCode: 'TEST-CODE',
+      ),
+    );
+    await cancellation.whenCancelled;
+    cancellation.check();
+    throw StateError('unreachable');
+  }
+}
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -264,11 +322,174 @@ void main() {
       expect(find.text('Grok'), findsOneWidget);
       expect(find.text('Kimi Code'), findsNWidgets(2));
       expect(find.text('Log in'), findsNWidgets(3));
+      expect(find.text('Use device code'), findsNothing);
       expect(find.text('API Key'), findsNothing);
       expect(tester.takeException(), isNull);
       await snapshot(tester, key, 'oauth-add-accounts');
     },
   );
+
+  for (final brightness in Brightness.values) {
+    testWidgets(
+      'browser failure can switch to device code in ${brightness.name}',
+      (tester) async {
+        tester.view.physicalSize = const Size(320, 740);
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetDevicePixelRatio);
+        final service = _LoginChoiceService();
+        addTearDown(service.dispose);
+        final key = GlobalKey();
+        await tester.pumpWidget(
+          app(
+            RepaintBoundary(
+              key: key,
+              child: Padding(
+                padding: const EdgeInsets.all(12),
+                child: OAuthLoginPanel(
+                  provider: OAuthProvider.chatgpt,
+                  service: service,
+                ),
+              ),
+            ),
+            brightness: brightness,
+          ),
+        );
+        await tester.pumpAndSettle();
+        expect(find.text('Use device code'), findsNothing);
+        await tester.tap(find.text('Log in'));
+        await tester.pumpAndSettle();
+        expect(service.methods, [false]);
+        expect(find.text('Use device code'), findsOneWidget);
+        expect(tester.takeException(), isNull);
+        await snapshot(
+          tester,
+          key,
+          'oauth-browser-fallback-${brightness.name}',
+        );
+        await tester.tap(find.text('Use device code'));
+        await tester.pumpAndSettle();
+        expect(service.methods, [false, true]);
+        expect(find.text('TEST-CODE'), findsOneWidget);
+        await tester.tap(find.text('Cancel authorization'));
+        await tester.pumpAndSettle();
+        expect(find.text('Use device code'), findsNothing);
+        expect(find.text('TEST-CODE'), findsNothing);
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
+
+  testWidgets(
+    'waiting browser login switches only after cancellation settles and ignores its late result',
+    (tester) async {
+      tester.view.physicalSize = const Size(320, 740);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      final service = _LoginChoiceService(browserFailure: null);
+      addTearDown(service.dispose);
+      var connected = 0;
+      final key = GlobalKey();
+      await tester.pumpWidget(
+        app(
+          RepaintBoundary(
+            key: key,
+            child: OAuthLoginPanel(
+              provider: OAuthProvider.chatgpt,
+              service: service,
+              onConnected: (_) => connected++,
+            ),
+          ),
+        ),
+      );
+      await tester.tap(find.text('Log in'));
+      await tester.pumpAndSettle();
+      expect(find.text('Use device code'), findsOneWidget);
+      await snapshot(tester, key, 'oauth-browser-waiting');
+      await tester.tap(find.text('Use device code'));
+      await tester.pumpAndSettle();
+      expect(service.browserCancelled.isCompleted, true);
+      expect(service.methods, [false]);
+      await tester.tap(find.text('Use device code'));
+      await tester.pumpAndSettle();
+      expect(service.methods, [false]);
+
+      service.browserCleanup.complete();
+      await tester.pumpAndSettle();
+      expect(service.methods, [false, true]);
+      expect(find.text('TEST-CODE'), findsOneWidget);
+      expect(find.text('Use device code'), findsNothing);
+      expect(connected, 0);
+      service.browserPrompt!(
+        OAuthLoginPrompt(
+          url: Uri.parse('https://auth.openai.com/oauth/authorize'),
+          userCode: 'OLD-CODE',
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('TEST-CODE'), findsOneWidget);
+      expect(find.text('OLD-CODE'), findsNothing);
+      await tester.tap(find.text('Cancel authorization'));
+      await tester.pumpAndSettle();
+      expect(find.text('Use device code'), findsNothing);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  for (final leavePage in [false, true]) {
+    testWidgets(
+      '${leavePage ? 'leaving the page' : 'cancelling'} while switching does not start device login',
+      (tester) async {
+        final service = _LoginChoiceService(browserFailure: null);
+        addTearDown(service.dispose);
+        await tester.pumpWidget(
+          app(
+            OAuthLoginPanel(provider: OAuthProvider.chatgpt, service: service),
+          ),
+        );
+        await tester.tap(find.text('Log in'));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('Use device code'));
+        await tester.pumpAndSettle();
+        if (leavePage) {
+          await tester.pumpWidget(app(const SizedBox.shrink()));
+        } else {
+          await tester.tap(find.text('Cancel authorization'));
+        }
+        service.browserCleanup.complete();
+        await tester.pumpAndSettle();
+        expect(service.methods, [false]);
+        expect(find.text('TEST-CODE'), findsNothing);
+        expect(find.text('Use device code'), findsNothing);
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
+
+  testWidgets('closing the native browser still offers device login', (
+    tester,
+  ) async {
+    final service = _LoginChoiceService(
+      browserFailure: ProviderOAuthFailure.cancelled,
+    );
+    addTearDown(service.dispose);
+    await tester.pumpWidget(
+      app(OAuthLoginPanel(provider: OAuthProvider.chatgpt, service: service)),
+    );
+    expect(find.text('Use device code'), findsNothing);
+    await tester.tap(find.text('Log in'));
+    await tester.pumpAndSettle();
+    expect(find.text('Use device code'), findsOneWidget);
+    await tester.tap(find.text('Use device code'));
+    await tester.pumpAndSettle();
+    expect(service.methods, [false, true]);
+    expect(find.text('TEST-CODE'), findsOneWidget);
+    await tester.tap(find.text('Cancel authorization'));
+    await tester.pumpAndSettle();
+    expect(find.text('Use device code'), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
 
   testWidgets(
     'OAuth detail is separate from API key forms and reveals a copyable endpoint',

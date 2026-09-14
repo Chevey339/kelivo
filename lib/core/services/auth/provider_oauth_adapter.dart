@@ -4,6 +4,7 @@ import 'dart:io';
 
 import 'package:http/http.dart' as http;
 import 'package:uuid/uuid.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../models/provider_oauth.dart';
 import '../logging/log_redactor.dart';
@@ -14,9 +15,14 @@ import 'oauth_pkce.dart';
 const codexClientVersion = '0.153.0';
 
 class OAuthLoginPrompt {
-  const OAuthLoginPrompt({required this.url, this.userCode});
+  const OAuthLoginPrompt({
+    required this.url,
+    this.userCode,
+    this.browserAuthorization = false,
+  });
   final Uri url;
   final String? userCode;
+  final bool browserAuthorization;
 }
 
 typedef OAuthPromptHandler = Future<void> Function(OAuthLoginPrompt prompt);
@@ -186,6 +192,7 @@ abstract class ProviderOAuthAdapter {
     OAuthCancellation cancellation,
     OAuthPromptHandler onPrompt, {
     bool deviceCode = true,
+    OAuthUrlLauncher? launcher,
   });
 
   Future<String> tokenEndpoint(OAuthWire wire) async => provider.tokenEndpoint;
@@ -426,9 +433,16 @@ class ChatGptOAuthAdapter extends ProviderOAuthAdapter {
     OAuthCancellation cancellation,
     OAuthPromptHandler onPrompt, {
     bool deviceCode = true,
+    OAuthUrlLauncher? launcher,
   }) async {
-    if (!deviceCode && !(Platform.isIOS || Platform.isAndroid)) {
-      return _browserLogin(wire, cancellation, onPrompt);
+    if (!deviceCode) {
+      return _browserLogin(
+        wire,
+        cancellation,
+        onPrompt,
+        launcher ??
+            (uri) => launchUrl(uri, mode: LaunchMode.externalApplication),
+      );
     }
     final init = await wire.request(
       'https://auth.openai.com/api/accounts/deviceauth/usercode',
@@ -494,12 +508,14 @@ class ChatGptOAuthAdapter extends ProviderOAuthAdapter {
     OAuthWire wire,
     OAuthCancellation cancellation,
     OAuthPromptHandler onPrompt,
+    OAuthUrlLauncher launcher,
   ) async {
     final redirect = Uri.parse('http://localhost:1455/auth/callback');
     final callback = await openOAuthCallback(
       Uri.parse('https://auth.openai.com'),
       loopbackRedirect: redirect,
     );
+    unawaited(cancellation.whenCancelled.then((_) => callback.close()));
     try {
       final verifier = oauthRandomString(32);
       final state = oauthRandomString(24);
@@ -516,9 +532,10 @@ class ChatGptOAuthAdapter extends ProviderOAuthAdapter {
         'originator': 'kelivo',
       });
       cancellation.check();
-      await onPrompt(OAuthLoginPrompt(url: url));
+      await onPrompt(OAuthLoginPrompt(url: url, browserAuthorization: true));
+      cancellation.check();
       final received = await Future.any<Uri>([
-        callback.waitForCallback(const Duration(minutes: 10)),
+        callback.authorize(url, const Duration(minutes: 10), launcher),
         cancellation.whenCancelled.then(
           (_) => throw const ProviderOAuthException(
             ProviderOAuthFailure.cancelled,
@@ -536,6 +553,14 @@ class ChatGptOAuthAdapter extends ProviderOAuthAdapter {
         throw const ProviderOAuthException(ProviderOAuthFailure.denied);
       }
       return await _exchange(wire, code, verifier, redirect.toString());
+    } on OAuthCallbackException catch (error) {
+      throw ProviderOAuthException(
+        error.cancelled
+            ? ProviderOAuthFailure.cancelled
+            : ProviderOAuthFailure.invalidResponse,
+      );
+    } on TimeoutException {
+      throw const ProviderOAuthException(ProviderOAuthFailure.timeout);
     } finally {
       await callback.close();
     }
@@ -679,6 +704,7 @@ class GrokOAuthAdapter extends ProviderOAuthAdapter {
     OAuthCancellation cancellation,
     OAuthPromptHandler onPrompt, {
     bool deviceCode = true,
+    OAuthUrlLauncher? launcher,
   }) async {
     var value = await deviceLogin(
       wire,
@@ -762,6 +788,7 @@ class KimiOAuthAdapter extends ProviderOAuthAdapter {
     OAuthCancellation cancellation,
     OAuthPromptHandler onPrompt, {
     bool deviceCode = true,
+    OAuthUrlLauncher? launcher,
   }) => deviceLogin(
     wire,
     cancellation,
