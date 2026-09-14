@@ -14,6 +14,8 @@ import 'package:Kelivo/core/services/chat/chat_service.dart';
 import 'package:Kelivo/core/services/notification_service.dart';
 import 'package:Kelivo/features/home/controllers/home_page_controller.dart';
 import 'package:Kelivo/features/home/controllers/scroll_controller.dart';
+import 'package:Kelivo/features/home/controllers/stream_controller.dart'
+    show ReasoningData, ReasoningSegmentData;
 import 'package:Kelivo/features/home/widgets/chat_input_bar.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
 
@@ -275,6 +277,120 @@ void main() {
       startIndex: 0,
     );
     await pumpUntilDone(tester, [future]);
+  }
+
+  for (final platform in [TargetPlatform.windows, TargetPlatform.android]) {
+    for (final temporary in [false, true]) {
+      testWidgets(
+        '$platform new conversation (temporary=$temporary) preserves ongoing reasoning',
+        (tester) async {
+          debugDefaultTargetPlatformOverride = platform;
+          try {
+            final startAt = DateTime.now().subtract(
+              const Duration(seconds: 10),
+            );
+            final message = _message('conv-a', 1).copyWith(
+              isStreaming: true,
+              reasoningText: 'thinking',
+              reasoningStartAt: startAt,
+            );
+            final service = _ControlledChatService({
+              'conv-a': [_message('conv-a', 0), message],
+              'empty': [],
+            });
+            final controller = await pumpHarness(tester, service);
+            await switchAndSettle(tester, controller, service, 'conv-a');
+            controller.debugViewModel.debugChatActions.debugTrackActiveMessage(
+              message,
+            );
+            final reasoning = ReasoningData()
+              ..text = 'thinking'
+              ..startAt = startAt;
+            final segment = ReasoningSegmentData()
+              ..text = 'thinking'
+              ..startAt = startAt;
+            controller.reasoning[message.id] = reasoning;
+            controller.reasoningSegments[message.id] = [segment];
+            final notifier = controller.streamingContentNotifier.getNotifier(
+              message.id,
+            );
+            controller.streamingContentNotifier.updateReasoning(
+              message.id,
+              reasoningText: reasoning.text,
+              reasoningStartAt: startAt,
+            );
+
+            if (temporary) {
+              // The temporary toggle is available only in an empty chat.
+              await switchAndSettle(tester, controller, service, 'empty');
+              await controller.toggleTemporaryConversation();
+            } else {
+              await pumpUntilDone(tester, [
+                controller.createNewConversationAnimated(),
+              ]);
+            }
+            expect(controller.messages, isEmpty);
+            expect(controller.currentConversation?.id, isNot('conv-a'));
+            expect(controller.reasoning[message.id], same(reasoning));
+            expect(
+              controller.reasoningSegments[message.id]?.single,
+              same(segment),
+            );
+            expect(
+              controller.streamingContentNotifier.getNotifier(message.id),
+              same(notifier),
+            );
+
+            await switchAndSettle(tester, controller, service, 'conv-a');
+            expect(controller.reasoning[message.id]?.text, 'thinking');
+            expect(controller.reasoning[message.id]?.startAt, startAt);
+            expect(controller.reasoning[message.id]?.finishedAt, isNull);
+            expect(notifier.value.reasoningStartAt, startAt);
+            expect(notifier.value.reasoningFinishedAt, isNull);
+            await tester.pumpWidget(const SizedBox());
+          } finally {
+            debugDefaultTargetPlatformOverride = null;
+          }
+        },
+      );
+    }
+  }
+
+  for (final temporary in [false, true]) {
+    testWidgets(
+      'new chat releases completed reasoning (temporary=$temporary)',
+      (tester) async {
+        await runAsDesktop(() async {
+          final service = _ControlledChatService({
+            'empty': [],
+            for (var i = 0; i < 5; i++)
+              'done-$i': [
+                _message('done-$i', 1).copyWith(
+                  reasoningText: 'r' * 100000,
+                  reasoningStartAt: DateTime(2026),
+                  reasoningFinishedAt: DateTime(2026, 1, 1, 0, 1),
+                ),
+              ],
+          });
+          final controller = await pumpHarness(tester, service);
+          for (var i = 0; i < 5; i++) {
+            await switchAndSettle(tester, controller, service, 'done-$i');
+            expect(controller.reasoning, hasLength(1));
+            if (temporary) {
+              await switchAndSettle(tester, controller, service, 'empty');
+              await controller.toggleTemporaryConversation();
+            } else {
+              await pumpUntilDone(tester, [
+                controller.createNewConversationAnimated(),
+              ]);
+            }
+            expect(controller.reasoning, isEmpty);
+          }
+          await tester.pump(const Duration(milliseconds: 200));
+          await tester.pumpWidget(const SizedBox());
+        });
+      },
+    );
   }
 
   group('HomePageController conversation switch pipeline', () {

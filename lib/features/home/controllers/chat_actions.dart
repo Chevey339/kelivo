@@ -407,8 +407,18 @@ class ChatActions {
   String? activeStreamingMessageId(String conversationId) =>
       _activeAssistantMessages[conversationId]?.id;
 
+  /// Includes preparing, finishing and cancelling runs until their final
+  /// checkpoint is handled, even after the streaming UI has stopped.
+  Set<String> get activeStreamingMessageIds =>
+      _activeAssistantMessages.messageIds;
+
+  @visibleForTesting
+  void debugTrackActiveMessage(ChatMessage message) {
+    _activeAssistantMessages.put(message);
+  }
+
   /// Rebuild retry countdown UI from surviving [StreamingState] after the
-  /// streaming notifier was wiped (new/temporary conversation).
+  /// streaming notifier was explicitly cleared.
   void restoreRetryUi(String conversationId) {
     for (final state in _streamingStates.values) {
       if (state.conversationId != conversationId) continue;

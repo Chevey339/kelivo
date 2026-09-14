@@ -1030,7 +1030,9 @@ class HomeViewModel extends ChangeNotifier {
     );
 
     _chatController.setDraftConversation(conversation);
-    _streamController.clearAllState();
+    _streamController.clearAllState(
+      keepMessageIds: _chatActions.activeStreamingMessageIds,
+    );
     notifyListeners();
 
     // Inject assistant preset messages into new conversation (ordered)
@@ -1090,7 +1092,9 @@ class HomeViewModel extends ChangeNotifier {
     );
 
     _chatController.setDraftConversation(conversation);
-    _streamController.clearAllState();
+    _streamController.clearAllState(
+      keepMessageIds: _chatActions.activeStreamingMessageIds,
+    );
     notifyListeners();
     onScrollToBottom?.call();
   }

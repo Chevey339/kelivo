@@ -239,23 +239,24 @@ class StreamController {
     _cleanupStreamTimers(messageId);
   }
 
-  /// Clear all state maps (for new conversation).
-  void clearAllState() {
-    _reasoning.clear();
-    _reasoningSegments.clear();
-    _contentSplits.clear();
-    _toolParts.clear();
-    _reasoningDetails.clear();
-    _decodedReasoningPayloads.clear();
-    _restoredUiMessageIds.clear();
-    _cancelAllTimers();
-    streamingContentNotifier.clear();
+  /// Clear cached UI state while preserving any runs still owned by ChatActions.
+  void clearAllState({Set<String> keepMessageIds = const {}}) {
+    bool discard(String id) => !keepMessageIds.contains(id);
+    _reasoning.removeWhere((id, _) => discard(id));
+    _reasoningSegments.removeWhere((id, _) => discard(id));
+    _contentSplits.removeWhere((id, _) => discard(id));
+    _toolParts.removeWhere((id, _) => discard(id));
+    _reasoningDetails.removeWhere((id, _) => discard(id));
+    _decodedReasoningPayloads.removeWhere((id, _) => discard(id));
+    _restoredUiMessageIds.removeWhere(discard);
+    _cancelAllTimers(keepMessageIds: keepMessageIds);
+    streamingContentNotifier.clear(keepMessageIds: keepMessageIds);
   }
 
   /// Re-apply in-bubble retry UI after [clearAllState] / conversation switch.
   ///
   /// [RetryStatus] on a still-alive [StreamingState] is the source of truth;
-  /// the notifier is wiped when creating a new/temporary chat.
+  /// it can rebuild a notifier that was explicitly cleared.
   /// Finished messages must not be re-marked streaming.
   void restoreRetryStatus(String messageId, RetryStatus? status) {
     if (status == null) return;
@@ -688,18 +689,18 @@ class StreamController {
     streamingContentNotifier.removeNotifier(messageId);
   }
 
-  /// Cancel all throttle timers.
-  void _cancelAllTimers() {
-    for (final timer in _streamThrottleTimers.values) {
+  /// Cancel timers except those belonging to retained generation runs.
+  void _cancelAllTimers({Set<String> keepMessageIds = const {}}) {
+    bool discardTimer(String id, Timer? timer) {
+      if (keepMessageIds.contains(id)) return false;
       timer?.cancel();
+      return true;
     }
-    _streamThrottleTimers.clear();
-    _streamSmoothStates.clear();
-    for (final timer in _inlineImageSanitizeTimers.values) {
-      timer?.cancel();
-    }
-    _inlineImageSanitizeTimers.clear();
-    _inlineImageSanitizing.clear();
+
+    _streamThrottleTimers.removeWhere(discardTimer);
+    _streamSmoothStates.removeWhere((id, _) => !keepMessageIds.contains(id));
+    _inlineImageSanitizeTimers.removeWhere(discardTimer);
+    _inlineImageSanitizing.removeWhere((id) => !keepMessageIds.contains(id));
   }
 
   // ============================================================================
@@ -874,8 +875,8 @@ class StreamController {
         loading: true,
       ),
     );
+    _toolParts[messageId] = dedupeToolPartsList(existing);
     if (getCurrentConversationId() == conversationId) {
-      _toolParts[messageId] = dedupeToolPartsList(existing);
       streamingContentNotifier.notifyToolPartsUpdated(
         messageId,
         contentSplitOffsets: state.contentSplitOffsets,
@@ -978,8 +979,8 @@ class StreamController {
         metadata: result.metadata,
       );
     } catch (_) {}
+    _toolParts[messageId] = dedupeToolPartsList(parts);
     if (getCurrentConversationId() == conversationId) {
-      _toolParts[messageId] = dedupeToolPartsList(parts);
       final splits = _contentSplits[messageId];
       streamingContentNotifier.notifyToolPartsUpdated(
         messageId,

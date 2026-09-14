@@ -205,6 +205,54 @@ void main() {
     expect(controller.reasoningPayloadDecodeCount, 2);
   });
 
+  test('clearAllState only releases messages outside the active runs', () {
+    final controller = buildController();
+    addTearDown(controller.dispose);
+    final active = buildAssistantMessage(controller, reasoningText: 'live');
+    final completed = buildAssistantMessage(
+      controller,
+      id: 'completed',
+      reasoningText: 'done',
+    );
+    for (final message in [active, completed]) {
+      restore(controller, message);
+      controller.streamingContentNotifier.getNotifier(message.id);
+    }
+    final liveReasoning = controller.getReasoningData(active.id);
+    final notifier = controller.streamingContentNotifier.getNotifier(active.id);
+    controller.markStreamingStarted(active.id);
+    // A stopped UI can still have a pending final checkpoint/cancellation.
+    controller.markStreamingEnded(active.id);
+    controller.clearAllState(keepMessageIds: {active.id});
+
+    expect(controller.getReasoningData(active.id), same(liveReasoning));
+    expect(controller.getReasoningSegments(active.id), hasLength(1));
+    expect(controller.getContentSplitData(active.id), isNotNull);
+    expect(controller.getToolParts(active.id), hasLength(1));
+    expect(controller.reasoningDetails[active.id], isNotNull);
+    expect(
+      controller.streamingContentNotifier.getNotifier(active.id),
+      same(notifier),
+    );
+    expect(controller.getReasoningData(completed.id), isNull);
+    expect(controller.getReasoningSegments(completed.id), isNull);
+    expect(controller.getContentSplitData(completed.id), isNull);
+    expect(controller.getToolParts(completed.id), isNull);
+    expect(controller.reasoningDetails[completed.id], isNull);
+    expect(
+      controller.streamingContentNotifier.hasNotifier(completed.id),
+      isFalse,
+    );
+
+    restore(controller, active);
+    expect(controller.reasoningPayloadDecodeCount, 2);
+    restore(controller, completed);
+    expect(controller.reasoningPayloadDecodeCount, 3);
+    controller.clearAllState();
+    expect(controller.getReasoningData(active.id), isNull);
+    expect(controller.streamingContentNotifier.hasNotifier(active.id), isFalse);
+  });
+
   test(
     'retry status survives clearAllState when restored from StreamingState',
     () {
