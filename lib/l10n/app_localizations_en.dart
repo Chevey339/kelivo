@@ -9759,6 +9759,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get workspaceEntryChange => 'Change';
 
   @override
+  String get workspaceEntrySetAssistantDefault => 'Set as assistant default';
+
+  @override
   String get workspaceEntryLocked => 'Locked';
 
   @override
@@ -10378,10 +10381,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String workspaceBindingSetAssistantDefault(String assistant) {
     return 'Set as default workspace for “$assistant”';
   }
-
-  @override
-  String get workspaceUnbindHint =>
-      'Unbound this conversation; change the assistant\'s default workspace in assistant settings';
 
   @override
   String get storageSpaceCategoryWorkspaceFiles => 'Workspace files';

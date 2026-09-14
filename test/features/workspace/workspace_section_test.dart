@@ -25,6 +25,7 @@ import 'package:Kelivo/shared/widgets/snackbar.dart';
 import 'package:drift/native.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:path/path.dart' as p;
 // ignore: depend_on_referenced_packages
@@ -182,6 +183,7 @@ void main() {
   Future<AppLocalizations> pumpSection(
     WidgetTester tester, {
     required _FakeChatService chat,
+    AssistantProvider? assistants,
   }) async {
     tester.view.physicalSize = const Size(800, 1600);
     tester.view.devicePixelRatio = 1.0;
@@ -197,10 +199,14 @@ void main() {
             create: (_) => WorkspaceRuntimeProvider(),
           ),
           ChangeNotifierProvider<EnvironmentProvider>.value(value: environment),
-          ChangeNotifierProvider(
-            create: (_) =>
-                AssistantProvider(preferences: createBusinessTestPreferences()),
-          ),
+          if (assistants != null)
+            ChangeNotifierProvider<AssistantProvider>.value(value: assistants)
+          else
+            ChangeNotifierProvider(
+              create: (_) => AssistantProvider(
+                preferences: createBusinessTestPreferences(),
+              ),
+            ),
           Provider<EnvironmentManager?>.value(value: null),
         ],
         child: MaterialApp(
@@ -228,6 +234,33 @@ void main() {
     );
     await tester.pump();
     return AppLocalizations.of(tester.element(find.byType(Scaffold)))!;
+  }
+
+  /// An assistant named 'Coder', optionally defaulting to [defaultWorkspaceId].
+  ///
+  /// The provider is built inside [WidgetTester.runAsync]; loading it from the
+  /// fake-async zone never completes.
+  Future<(AssistantProvider, String)> createAssistant(
+    WidgetTester tester, {
+    String? defaultWorkspaceId,
+  }) async {
+    final created = await tester.runAsync(() async {
+      final assistants = AssistantProvider(
+        preferences: createBusinessTestPreferences(),
+      );
+      await assistants.loaded;
+      final id = await assistants.addAssistant(name: 'Coder');
+      if (defaultWorkspaceId != null) {
+        await assistants.updateAssistant(
+          assistants
+              .getById(id)!
+              .copyWith(defaultWorkspaceId: defaultWorkspaceId),
+        );
+      }
+      return (assistants, id);
+    });
+    if (created == null) fail('assistant create failed');
+    return created;
   }
 
   testWidgets('desktop workspace launcher can create and bind a workspace', (
@@ -555,7 +588,7 @@ void main() {
       ),
       findsOneWidget,
     );
-    expect(find.text(l10n.workspaceUnbindHint), findsNothing);
+    expect(find.text(l10n.workspaceEntrySetAssistantDefault), findsNothing);
     expect(find.text(l10n.workspaceEntryChange), findsOneWidget);
     final unbind = tester.widget<Text>(find.text(l10n.workspaceEntryUnbind));
     expect(
@@ -567,35 +600,90 @@ void main() {
     debugDefaultTargetPlatformOverride = null;
   });
 
-  testWidgets('unbind shows past-tense hint snackbar', (tester) async {
+  testWidgets('menu sets the bound workspace as the assistant default', (
+    tester,
+  ) async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
+    addTearDown(() => debugDefaultTargetPlatformOverride = null);
+    // Saving the assistant needs real async turns, which would also deliver
+    // the menu's haptic calls to a plugin tests don't have.
+    const haptics = MethodChannel('haptic_feedback');
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(haptics, (_) async => true);
+    addTearDown(
+      () => TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(haptics, null),
+    );
+
+    final workspace = await tester.runAsync(
+      () => workspaces.create(name: 'Desk'),
+    );
+    if (workspace == null) fail('workspace create failed');
+    final (assistants, assistantId) = await createAssistant(tester);
+    final chat = _FakeChatService(
+      Conversation(
+        title: 'Chat',
+        assistantId: assistantId,
+        extras: WorkspaceBinding(workspaceId: workspace.id).applyTo({}),
+      ),
+    );
+    final l10n = await pumpSection(tester, chat: chat, assistants: assistants);
+
+    await tester.tap(find.byKey(WorkspaceSection.nameKey));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text(l10n.workspaceEntrySetAssistantDefault));
+    await tester.pump();
+    await tester.runAsync(
+      () => Future<void>.delayed(const Duration(milliseconds: 100)),
+    );
+    await tester.pump(const Duration(milliseconds: 400));
+
+    expect(assistants.getById(assistantId)!.defaultWorkspaceId, workspace.id);
+    expect(
+      find.text(l10n.workspaceBindingSetAssistantDefault('Coder')),
+      findsOneWidget,
+    );
+    await tester.pump(const Duration(seconds: 4));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(WorkspaceSection.nameKey));
+    await tester.pumpAndSettle();
+    expect(find.text(l10n.workspaceEntrySetAssistantDefault), findsNothing);
+    debugDefaultTargetPlatformOverride = null;
+  });
+
+  testWidgets('unbind clears only the conversation binding', (tester) async {
     debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
     addTearDown(() => debugDefaultTargetPlatformOverride = null);
 
     final workspace = await tester.runAsync(
-      () => workspaces.create(name: 'Snack'),
+      () => workspaces.create(name: 'Desk'),
     );
     if (workspace == null) fail('workspace create failed');
+    final (assistants, assistantId) = await createAssistant(
+      tester,
+      defaultWorkspaceId: workspace.id,
+    );
     final chat = _FakeChatService(
       Conversation(
         title: 'Chat',
+        assistantId: assistantId,
         extras: WorkspaceBinding(workspaceId: workspace.id).applyTo({}),
       ),
     );
-    final l10n = await pumpSection(tester, chat: chat);
+    final l10n = await pumpSection(tester, chat: chat, assistants: assistants);
 
     await tester.tap(find.byKey(WorkspaceSection.nameKey));
     await tester.pumpAndSettle();
+    expect(find.text(l10n.workspaceEntrySetAssistantDefault), findsNothing);
     await tester.tap(find.text(l10n.workspaceEntryUnbind));
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 400));
+    await tester.pumpAndSettle();
 
-    expect(find.text(l10n.workspaceUnbindHint), findsOneWidget);
     expect(
       WorkspaceBinding.fromExtras(chat.conversation!.extras).isBound,
       isFalse,
     );
-    await tester.pump(const Duration(seconds: 4));
-    await tester.pumpAndSettle();
+    expect(assistants.getById(assistantId)!.defaultWorkspaceId, workspace.id);
     debugDefaultTargetPlatformOverride = null;
   });
 

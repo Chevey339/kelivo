@@ -4329,6 +4329,7 @@
   "workspaceEntryBind": "Bind workspace",
   "workspaceEntryUnbind": "Unbind",
   "workspaceEntryChange": "Change",
+  "workspaceEntrySetAssistantDefault": "Set as assistant default",
   "workspaceEntryLocked": "Locked",
   "workspaceEntryChangeConfirmTitle": "Change workspace?",
   "workspaceEntryUnbindConfirmTitle": "Unbind?",
@@ -4674,7 +4675,6 @@
       }
     }
   },
-  "workspaceUnbindHint": "Unbound this conversation; change the assistant's default workspace in assistant settings",
   "storageSpaceCategoryWorkspaceFiles": "Workspace files",
   "storageSpaceCategoryWorkspaceFilesHint": "Files stored in managed workspaces.",
   "storageSpaceCategorySandboxEnvironment": "Sandbox environment",

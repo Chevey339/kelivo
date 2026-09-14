@@ -9354,6 +9354,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get workspaceEntryChange => '更换';
 
   @override
+  String get workspaceEntrySetAssistantDefault => '设为助手默认工作区';
+
+  @override
   String get workspaceEntryLocked => '已锁定';
 
   @override
@@ -9952,9 +9955,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String workspaceBindingSetAssistantDefault(String assistant) {
     return '已设为「$assistant」的默认工作区';
   }
-
-  @override
-  String get workspaceUnbindHint => '已解绑本对话；助手默认工作区可在助手设置中修改';
 
   @override
   String get storageSpaceCategoryWorkspaceFiles => '工作区文件';
@@ -20400,6 +20400,9 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get workspaceEntryChange => '更换';
 
   @override
+  String get workspaceEntrySetAssistantDefault => '设为助手默认工作区';
+
+  @override
   String get workspaceEntryLocked => '已锁定';
 
   @override
@@ -20998,9 +21001,6 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String workspaceBindingSetAssistantDefault(String assistant) {
     return '已设为「$assistant」的默认工作区';
   }
-
-  @override
-  String get workspaceUnbindHint => '已解绑本对话；助手默认工作区可在助手设置中修改';
 
   @override
   String get storageSpaceCategoryWorkspaceFiles => '工作区文件';
@@ -31522,6 +31522,9 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get workspaceEntryChange => '更換';
 
   @override
+  String get workspaceEntrySetAssistantDefault => '設為助手預設工作區';
+
+  @override
   String get workspaceEntryLocked => '已鎖定';
 
   @override
@@ -32120,9 +32123,6 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String workspaceBindingSetAssistantDefault(String assistant) {
     return '已設為「$assistant」的預設工作區';
   }
-
-  @override
-  String get workspaceUnbindHint => '已解除綁定本對話；助手預設工作區可在助手設定中修改';
 
   @override
   String get storageSpaceCategoryWorkspaceFiles => '工作區檔案';

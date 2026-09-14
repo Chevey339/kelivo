@@ -101,83 +101,24 @@ void main() {
     );
   }
 
-  test(
-    'bind writes extras and sets assistant default when different',
-    () async {
-      final conversation = await chat.createConversation(
-        title: 'Chat',
-        assistantId: 'asst-1',
-      );
-      final workspace = sampleWorkspace('ws-new');
-      final actions = WorkspaceBindingActions(
-        chat: chat,
-        assistants: assistants,
-      );
-
-      final result = await actions.bind(
-        conversationId: conversation.id,
-        workspace: workspace,
-      );
-
-      expect(result.assistantDefaultChanged, isTrue);
-      expect(result.assistantName, 'Alpha');
-      final extras = chat.getConversation(conversation.id)!.extras;
-      final binding = WorkspaceBinding.fromExtras(extras);
-      expect(binding.workspaceId, 'ws-new');
-      expect(binding.cwd, 'src');
-      expect(assistants.getById('asst-1')!.defaultWorkspaceId, 'ws-new');
-      expect(assistants.getById('asst-2')!.defaultWorkspaceId, 'ws-keep');
-    },
-  );
-
-  test('bind does not report a change when default is already equal', () async {
-    await assistants.updateAssistant(
-      assistants.getById('asst-1')!.copyWith(defaultWorkspaceId: 'ws-same'),
-    );
+  test('bind writes only the conversation binding', () async {
     final conversation = await chat.createConversation(
       title: 'Chat',
-      assistantId: 'asst-1',
+      assistantId: 'asst-2',
     );
-    final actions = WorkspaceBindingActions(chat: chat, assistants: assistants);
 
-    final result = await actions.bind(
+    await bindConversationWorkspace(
+      chat,
       conversationId: conversation.id,
-      workspace: sampleWorkspace('ws-same', cwd: 'lib'),
+      workspace: sampleWorkspace('ws-new'),
     );
 
-    expect(result.assistantDefaultChanged, isFalse);
-    expect(assistants.getById('asst-1')!.defaultWorkspaceId, 'ws-same');
-    expect(
-      WorkspaceBinding.fromExtras(
-        chat.getConversation(conversation.id)!.extras,
-      ).cwd,
-      'lib',
+    final binding = WorkspaceBinding.fromExtras(
+      chat.getConversation(conversation.id)!.extras,
     );
-  });
-
-  test('unbind clears extras and leaves the assistant untouched', () async {
-    await assistants.updateAssistant(
-      assistants.getById('asst-1')!.copyWith(defaultWorkspaceId: 'ws-bound'),
-    );
-    final conversation = await chat.createConversation(
-      title: 'Chat',
-      assistantId: 'asst-1',
-    );
-    final actions = WorkspaceBindingActions(chat: chat, assistants: assistants);
-    await actions.bind(
-      conversationId: conversation.id,
-      workspace: sampleWorkspace('ws-bound'),
-    );
-
-    await actions.unbind(conversationId: conversation.id);
-
-    expect(
-      WorkspaceBinding.fromExtras(
-        chat.getConversation(conversation.id)!.extras,
-      ).isBound,
-      isFalse,
-    );
-    expect(assistants.getById('asst-1')!.defaultWorkspaceId, 'ws-bound');
+    expect(binding.workspaceId, 'ws-new');
+    expect(binding.cwd, 'src');
+    expect(assistants.getById('asst-2')!.defaultWorkspaceId, 'ws-keep');
   });
 
   test('deleting a workspace clears matching assistant defaults', () async {
@@ -193,27 +134,6 @@ void main() {
 
     expect(assistants.getById('asst-1')!.defaultWorkspaceId, isNull);
     expect(assistants.getById('asst-2')!.defaultWorkspaceId, isNull);
-  });
-
-  test('conversation without an assistant binds without error', () async {
-    final conversation = await chat.createConversation(title: 'Orphan');
-    expect(conversation.assistantId, isNull);
-    final actions = WorkspaceBindingActions(chat: chat, assistants: assistants);
-
-    final result = await actions.bind(
-      conversationId: conversation.id,
-      workspace: sampleWorkspace('ws-orphan'),
-    );
-
-    expect(result.assistantDefaultChanged, isFalse);
-    expect(
-      WorkspaceBinding.fromExtras(
-        chat.getConversation(conversation.id)!.extras,
-      ).workspaceId,
-      'ws-orphan',
-    );
-    expect(assistants.getById('asst-1')!.defaultWorkspaceId, isNull);
-    expect(assistants.getById('asst-2')!.defaultWorkspaceId, 'ws-keep');
   });
 
   test('new assistants default to no workspace', () async {

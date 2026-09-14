@@ -1,7 +1,9 @@
 import 'dart:async';
 
+import 'package:Kelivo/core/models/assistant.dart';
 import 'package:Kelivo/core/models/workspace.dart';
 import 'package:Kelivo/core/models/workspace_binding.dart';
+import 'package:Kelivo/core/providers/assistant_provider.dart';
 import 'package:Kelivo/core/providers/environment_provider.dart';
 import 'package:Kelivo/core/providers/workspace_provider.dart';
 import 'package:Kelivo/core/services/chat/chat_service.dart';
@@ -50,6 +52,9 @@ class WorkspaceSection extends StatefulWidget {
   static const Key bindKey = ValueKey<String>('workspace-section-bind');
   static const Key changeKey = ValueKey<String>('workspace-section-change');
   static const Key unbindKey = ValueKey<String>('workspace-section-unbind');
+  static const Key setAssistantDefaultKey = ValueKey<String>(
+    'workspace-section-set-assistant-default',
+  );
   static const Key cwdKey = ValueKey<String>('workspace-section-cwd');
   static const Key cwdErrorKey = ValueKey<String>(
     'workspace-section-cwd-error',
@@ -118,7 +123,7 @@ class _WorkspaceSectionState extends State<WorkspaceSection> {
     final id = await _ensureConversationId();
     if (id == null || !mounted) return;
     await bindConversationWorkspace(
-      context,
+      context.read<ChatService>(),
       conversationId: id,
       workspace: workspace,
     );
@@ -126,10 +131,39 @@ class _WorkspaceSectionState extends State<WorkspaceSection> {
     unawaited(provider.touchLastUsed(workspace.id));
   }
 
-  Future<void> _unbind() async {
-    final id = await _ensureConversationId();
-    if (id == null || !mounted) return;
-    await unbindConversationWorkspace(context, conversationId: id);
+  Future<void> _unbind() => _writeBinding(const WorkspaceBinding());
+
+  /// The assistant this conversation belongs to, if it still exists.
+  Assistant? _conversationAssistant() {
+    final id = _conversationId;
+    if (id == null) return null;
+    final assistantId = context
+        .read<ChatService>()
+        .getConversation(id)
+        ?.assistantId;
+    if (assistantId == null || assistantId.isEmpty) return null;
+    return context.read<AssistantProvider>().getById(assistantId);
+  }
+
+  /// Sets [workspace] as the assistant's default for new conversations.
+  Future<void> _setAssistantDefault(
+    String assistantId,
+    Workspace workspace,
+  ) async {
+    final assistants = context.read<AssistantProvider>();
+    final assistant = assistants.getById(assistantId);
+    if (assistant == null) return;
+    await assistants.updateAssistant(
+      assistant.copyWith(defaultWorkspaceId: workspace.id),
+    );
+    if (!mounted) return;
+    showAppSnackBar(
+      context,
+      message: AppLocalizations.of(
+        context,
+      )!.workspaceBindingSetAssistantDefault(assistant.name),
+      type: NotificationType.success,
+    );
   }
 
   Future<void> _pickWorkspace({String? selectedId}) async {
@@ -212,6 +246,7 @@ class _WorkspaceSectionState extends State<WorkspaceSection> {
   ) {
     Haptics.light();
     final l10n = AppLocalizations.of(context)!;
+    final assistant = _conversationAssistant();
     final box = buttonContext.findRenderObject() as RenderBox?;
     final anchor = box == null
         ? Offset.zero
@@ -236,6 +271,14 @@ class _WorkspaceSectionState extends State<WorkspaceSection> {
               ),
             ),
           ),
+          if (assistant != null && assistant.defaultWorkspaceId != workspace.id)
+            ActionSheetItem(
+              key: WorkspaceSection.setAssistantDefaultKey,
+              icon: Lucide.Bot,
+              label: l10n.workspaceEntrySetAssistantDefault,
+              onTap: () =>
+                  unawaited(_setAssistantDefault(assistant.id, workspace)),
+            ),
           ActionSheetItem(
             key: WorkspaceSection.unbindKey,
             icon: Lucide.Unlink,

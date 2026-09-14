@@ -17561,6 +17561,12 @@ abstract class AppLocalizations {
   /// **'Change'**
   String get workspaceEntryChange;
 
+  /// No description provided for @workspaceEntrySetAssistantDefault.
+  ///
+  /// In en, this message translates to:
+  /// **'Set as assistant default'**
+  String get workspaceEntrySetAssistantDefault;
+
   /// No description provided for @workspaceEntryLocked.
   ///
   /// In en, this message translates to:
@@ -18662,12 +18668,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Set as default workspace for “{assistant}”'**
   String workspaceBindingSetAssistantDefault(String assistant);
-
-  /// No description provided for @workspaceUnbindHint.
-  ///
-  /// In en, this message translates to:
-  /// **'Unbound this conversation; change the assistant\'s default workspace in assistant settings'**
-  String get workspaceUnbindHint;
 
   /// No description provided for @storageSpaceCategoryWorkspaceFiles.
   ///
