@@ -132,8 +132,6 @@ Stream<StreamChunk> sendOpenAIStream(
   final isReasoning = effectiveInfo.abilities.contains(ModelAbility.reasoning);
   final wantsImageOutput = effectiveInfo.output.contains(Modality.image);
   final bool canImageInput = effectiveInfo.input.contains(Modality.image);
-  final bool allowRemoteImages =
-      canImageInput && !isKimiK3Model(upstreamModelId);
 
   final effort = openAIEffortForBudget(thinkingBudget, upstreamModelId);
   final info = OpenAIProviderInfo(
@@ -141,6 +139,10 @@ Stream<StreamChunk> sendOpenAIStream(
     providerId: config.id.toLowerCase(),
     upstreamModelId: upstreamModelId,
   );
+  final bool allowRemoteImages =
+      canImageInput &&
+      !isKimiK3Model(upstreamModelId) &&
+      !info.isKimiCodeK3Model;
   // OpenRouter documents delta-style `reasoning_details` chunks that must be
   // concatenated in order, so cumulative-snapshot detection is disabled for
   // it; other providers may resend the full array-so-far with each chunk.
@@ -148,7 +150,9 @@ Stream<StreamChunk> sendOpenAIStream(
       !BuiltInToolsHelper.isOpenRouterProvider(config);
   final bool needsReasoningEcho =
       info.needsReasoningEcho &&
-      (isReasoning || (info.isDeepSeek && tools?.isNotEmpty == true));
+      (isReasoning ||
+          info.isKimiCodingModel ||
+          (info.isDeepSeek && tools?.isNotEmpty == true));
   void setMaxTokens(Map<String, dynamic> map) {
     if (maxTokens != null) map[info.completionTokensKey] = maxTokens;
   }
@@ -599,6 +603,7 @@ Stream<StreamChunk> sendOpenAIStream(
     if (info.isKimiThinkingModel) {
       normalizeMoonshotKimiChatBody(
         body,
+        info: info,
         upstreamModelId: upstreamModelId,
         isReasoning: isReasoning,
         thinkingBudget: thinkingBudget,
@@ -665,6 +670,7 @@ Stream<StreamChunk> sendOpenAIStream(
   );
   normalizeMoonshotKimiChatBody(
     body,
+    info: info,
     upstreamModelId: upstreamModelId,
     isReasoning: isReasoning,
     thinkingBudget: thinkingBudget,

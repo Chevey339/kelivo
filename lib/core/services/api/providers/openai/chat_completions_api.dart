@@ -846,6 +846,7 @@ Stream<StreamChunk> runOpenAIChatCompletionsToolFollowUps({
       );
       normalizeMoonshotKimiChatBody(
         body2,
+        info: info,
         upstreamModelId: upstreamModelId,
         isReasoning: isReasoning,
         thinkingBudget: thinkingBudget,

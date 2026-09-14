@@ -12,6 +12,7 @@ import '../services/custom_request_merger.dart';
 import 'package:Kelivo/secrets/fallback.dart';
 import '../services/api/google_service_account_auth.dart';
 import '../models/model_types.dart';
+import '../utils/kimi_model_compat.dart';
 
 class ModelRegistry {
   // Updated model groups to reflect new series
@@ -114,6 +115,8 @@ class ModelRegistry {
 
   static ModelInfo infer(ModelInfo base) {
     final id = base.id.toLowerCase();
+    final isKimiCode =
+        isKimiCodeK3Alias(id) || isKimiForCodingModel(id) || isKimiK28Model(id);
     final inMods = <Modality>[...base.input];
     final outMods = <Modality>[...base.output];
     final ab = <ModelAbility>[...base.abilities];
@@ -154,15 +157,17 @@ class ModelRegistry {
       return base.copyWith(input: inMods, output: outMods, abilities: ab);
     }
     if (vision.hasMatch(id) ||
+        isKimiCode ||
         _isQwenVisionModel(id) ||
         _isGlmVisionModel(id) ||
         _isDeepSeekVisionModel(id)) {
       if (!inMods.contains(Modality.image)) inMods.add(Modality.image);
     }
-    if (tool.hasMatch(id) && !ab.contains(ModelAbility.tool)) {
+    if ((tool.hasMatch(id) || isKimiCode) && !ab.contains(ModelAbility.tool)) {
       ab.add(ModelAbility.tool);
     }
-    if (reasoning.hasMatch(id) && !ab.contains(ModelAbility.reasoning)) {
+    if ((reasoning.hasMatch(id) || isKimiCode) &&
+        !ab.contains(ModelAbility.reasoning)) {
       ab.add(ModelAbility.reasoning);
     }
     return base.copyWith(input: inMods, output: outMods, abilities: ab);

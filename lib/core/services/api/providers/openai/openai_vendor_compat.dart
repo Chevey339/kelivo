@@ -4,6 +4,7 @@ import 'dart:io';
 import '../../../../models/token_usage.dart';
 import '../../../../providers/settings_provider.dart';
 import '../../../../utils/openai_model_compat.dart';
+import '../../../../utils/kimi_model_compat.dart';
 import '../../builtin_tools.dart';
 import '../../chat_api_helpers.dart';
 
@@ -218,8 +219,56 @@ void normalizeMoonshotKimiChatBody(
   Map<String, dynamic> body, {
   required String upstreamModelId,
   required bool isReasoning,
+  required OpenAIProviderInfo info,
   int? thinkingBudget,
 }) {
+  if (info.isKimiCodingModel) {
+    if (upstreamModelId.trim().toLowerCase() == 'k3-256k') {
+      final messages = body['messages'];
+      if (messages is List &&
+          messages.whereType<Map>().any((message) {
+            final content = message['content'];
+            return content is List &&
+                content.whereType<Map>().any(
+                  (part) => part['type'] == 'video_url',
+                );
+          })) {
+        throw UnsupportedError(
+          'Kimi Code k3-256k does not support video input.',
+        );
+      }
+    }
+    _removeMoonshotKimiUnsupportedSamplingParams(body);
+    if (isKimiCodeHighSpeedModel(upstreamModelId)) {
+      body.remove('reasoning_effort');
+      body.remove('thinking');
+      return;
+    }
+    if (!isReasoning) {
+      body.remove('thinking');
+      body.remove('reasoning_effort');
+      return;
+    }
+    final rawEffort = body['reasoning_effort'];
+    final effort = rawEffort is String && rawEffort.trim().isNotEmpty
+        ? openAINormalizeReasoningEffort(rawEffort, upstreamModelId)
+        : 'auto';
+    final thinking = body['thinking'];
+    final thinkingType = thinking is Map ? thinking['type'] : null;
+    if (thinkingType == 'disabled' ||
+        (effort == 'none' && thinkingType != 'enabled')) {
+      body['thinking'] = {'type': 'disabled'};
+      body.remove('reasoning_effort');
+    } else {
+      body.remove('thinking');
+      if (effort == 'auto' || effort == 'none') {
+        body.remove('reasoning_effort');
+      } else {
+        body['reasoning_effort'] = effort;
+      }
+    }
+    return;
+  }
   if (!_isKimiThinkingModel(upstreamModelId)) return;
 
   if (isKimiK3Model(upstreamModelId)) {
@@ -523,6 +572,24 @@ class OpenAIProviderInfo {
       host.contains('intern') ||
       host.contains('chat.intern-ai.org.cn');
   bool get isKimiThinkingModel => _isKimiThinkingModel(upstreamModelId);
+  bool get isKimiCodeK3Model =>
+      isKimiCodingModel && isKimiCodeK3Alias(upstreamModelId);
+  bool get isKimiCodingModel {
+    if (isKimiForCodingModel(upstreamModelId) ||
+        isKimiK28Model(upstreamModelId)) {
+      return true;
+    }
+    // Coding uses short K3 aliases. Require provider identity so unrelated
+    // models named k3 do not inherit Kimi's preserved-thinking contract.
+    final isKimiProvider =
+        host == 'api.kimi.com' ||
+        host == 'api.moonshot.ai' ||
+        host == 'api.moonshot.cn' ||
+        providerId.contains('kimi') ||
+        providerId.contains('moonshot');
+    return isKimiProvider && isKimiCodeK3Alias(upstreamModelId);
+  }
+
   bool get supportsGoogleOpenAIThoughtSignatures {
     final normalizedModelId = upstreamModelId.toLowerCase();
     final isGoogleApiHost =
@@ -536,9 +603,11 @@ class OpenAIProviderInfo {
       isDeepSeek ||
       isMimo ||
       isZhipu ||
+      isKimiCodingModel ||
       isKimiThinkingModel;
   ReasoningContentReplayPolicy get reasoningContentReplayPolicy {
     if (usesPoolsideThinking ||
+        isKimiCodingModel ||
         _isKimiPreservedThinkingModel(upstreamModelId)) {
       return ReasoningContentReplayPolicy.all;
     }
