@@ -9934,6 +9934,11 @@ class AppLocalizationsZh extends AppLocalizations {
   String get skillsDetailBodyEmpty => '还没有技能正文';
 
   @override
+  String skillsDetailBodyTooLarge(String size) {
+    return '文件较大，暂不支持预览（$size）。';
+  }
+
+  @override
   String get workspaceEnvSizeTimeout => '计算超时';
 
   @override
@@ -21179,6 +21184,11 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get skillsDetailBodyEmpty => '还没有技能正文';
+
+  @override
+  String skillsDetailBodyTooLarge(String size) {
+    return '文件较大，暂不支持预览（$size）。';
+  }
 
   @override
   String get workspaceEnvSizeTimeout => '计算超时';
@@ -32502,6 +32512,11 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get skillsDetailBodyEmpty => '還沒有技能正文';
+
+  @override
+  String skillsDetailBodyTooLarge(String size) {
+    return '檔案較大，暫不支援預覽（$size）。';
+  }
 
   @override
   String get workspaceEnvSizeTimeout => '計算逾時';

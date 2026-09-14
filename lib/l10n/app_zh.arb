@@ -3724,6 +3724,7 @@
   "workspaceEnvSelectionNamed": "{name} · {region}",
   "workspaceFilesEmptyPickerHint": "点「新建文件夹」添加子文件夹",
   "skillsDetailBodyEmpty": "还没有技能正文",
+  "skillsDetailBodyTooLarge": "文件较大，暂不支持预览（{size}）。",
   "workspaceEnvSizeTimeout": "计算超时",
   "workspaceEnvInfoCopied": "已复制环境信息",
   "workspacePreviewEmptyFile": "文件为空",

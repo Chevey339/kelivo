@@ -3724,6 +3724,7 @@
   "workspaceEnvSelectionNamed": "{name} · {region}",
   "workspaceFilesEmptyPickerHint": "點「新增資料夾」新增子資料夾",
   "skillsDetailBodyEmpty": "還沒有技能正文",
+  "skillsDetailBodyTooLarge": "檔案較大，暫不支援預覽（{size}）。",
   "workspaceEnvSizeTimeout": "計算逾時",
   "workspaceEnvInfoCopied": "已複製環境資訊",
   "workspacePreviewEmptyFile": "檔案為空",

@@ -1,5 +1,7 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:Kelivo/core/services/haptics.dart';
 import 'package:Kelivo/core/services/skills/skills_service.dart';
@@ -7,11 +9,13 @@ import 'package:Kelivo/desktop/menu_anchor.dart';
 import 'package:Kelivo/features/settings/widgets/custom_theme_widgets.dart';
 import 'package:Kelivo/features/workspace/widgets/files/file_browser.dart';
 import 'package:Kelivo/features/workspace/widgets/files/workspace_prompts.dart';
+import 'package:Kelivo/features/workspace/widgets/preview/preview_states.dart';
 import 'package:Kelivo/features/workspace/widgets/skills/skill_import.dart';
 import 'package:Kelivo/features/workspace/widgets/skills/skill_labels.dart';
 import 'package:Kelivo/icons/lucide_adapter.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
 import 'package:Kelivo/features/workspace/workspace_layout.dart';
+import 'package:Kelivo/shared/utils/format_bytes.dart';
 import 'package:Kelivo/shared/utils/save_file_picker.dart';
 import 'package:Kelivo/shared/widgets/action_sheet.dart';
 import 'package:Kelivo/shared/widgets/ios_switch.dart';
@@ -195,7 +199,10 @@ class SkillDetailView extends StatelessWidget {
       );
     }
     final current = skill;
-    final body = _SkillDetailBody(skill: current);
+    final body = _SkillDetailBody(
+      key: ValueKey(current.skillMdPath),
+      skill: current,
+    );
 
     if (dialog) {
       return Column(
@@ -309,28 +316,98 @@ String skillDetailMarkdownBody(String raw) {
   return SkillFrontmatter.parse(raw).body.trim();
 }
 
-class _SkillDetailBody extends StatelessWidget {
-  const _SkillDetailBody({required this.skill});
+class _SkillDetailBody extends StatefulWidget {
+  const _SkillDetailBody({super.key, required this.skill});
 
   final Skill skill;
+
+  @override
+  State<_SkillDetailBody> createState() => _SkillDetailBodyState();
+}
+
+class _SkillDetailBodyState extends State<_SkillDetailBody> {
+  static const _previewMaxBytes = 100 * 1024;
+
+  (int, DateTime, DateTime)? _fileVersion;
+  int _loadGeneration = 0;
+  bool _loading = true;
+  bool _missing = false;
+  String? _body;
+  int? _largeFileBytes;
+
+  Skill get skill => widget.skill;
+
+  @override
+  void initState() {
+    super.initState();
+    unawaited(_loadBody());
+  }
+
+  @override
+  void didUpdateWidget(covariant _SkillDetailBody oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // A rescan can discover file edits without changing Skill metadata.
+    unawaited(_loadBody());
+  }
+
+  Future<void> _loadBody() async {
+    final generation = ++_loadGeneration;
+    try {
+      final file = File(skill.skillMdPath);
+      final stat = await file.stat();
+      if (!mounted || generation != _loadGeneration) return;
+      if (stat.type != FileSystemEntityType.file) {
+        throw FileSystemException('Skill file is not available', file.path);
+      }
+      final version = (stat.size, stat.modified, stat.changed);
+      // Metadata-only changes may replace Skill without changing its file.
+      if (_fileVersion == version) return;
+
+      String? body;
+      int? largeFileBytes;
+      if (stat.size > _previewMaxBytes) {
+        largeFileBytes = stat.size;
+      } else {
+        // Bound the read too, in case the file grows after the size check.
+        final bytes = BytesBuilder(copy: false);
+        await for (final chunk in file.openRead(0, _previewMaxBytes + 1)) {
+          bytes.add(chunk);
+        }
+        if (bytes.length > _previewMaxBytes) {
+          final currentSize = await file.length();
+          largeFileBytes = currentSize > bytes.length
+              ? currentSize
+              : bytes.length;
+        } else {
+          body = skillDetailMarkdownBody(utf8.decode(bytes.takeBytes()));
+        }
+      }
+      if (!mounted || generation != _loadGeneration) return;
+      setState(() {
+        _fileVersion = version;
+        _loading = false;
+        _missing = false;
+        _body = body;
+        _largeFileBytes = largeFileBytes;
+      });
+    } catch (_) {
+      if (!mounted || generation != _loadGeneration) return;
+      setState(() {
+        _fileVersion = null;
+        _loading = false;
+        _missing = true;
+        _body = null;
+        _largeFileBytes = null;
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
     final cs = Theme.of(context).colorScheme;
-    var missing = false;
-    String? body;
-    try {
-      final md = File(skill.skillMdPath);
-      if (md.existsSync()) {
-        body = skillDetailMarkdownBody(md.readAsStringSync());
-      } else {
-        missing = true;
-      }
-    } catch (_) {
-      missing = true;
-    }
-
+    final body = _body;
+    final largeFileBytes = _largeFileBytes;
     final description = skill.description.trim();
 
     return ListView(
@@ -390,7 +467,13 @@ class _SkillDetailBody extends StatelessWidget {
             ],
           ),
         ),
-        if (missing)
+        if (_loading)
+          const Padding(
+            key: SkillsKeys.bodyLoading,
+            padding: EdgeInsets.symmetric(vertical: 48),
+            child: PreviewLoading(),
+          )
+        else if (_missing)
           Padding(
             padding: const EdgeInsets.symmetric(vertical: 24),
             child: Center(
@@ -400,8 +483,16 @@ class _SkillDetailBody extends StatelessWidget {
               ),
             ),
           )
+        else if (largeFileBytes != null)
+          _SkillBodyHint(
+            key: SkillsKeys.bodyTooLarge,
+            label: l10n.skillsDetailBodyTooLarge(formatBytes(largeFileBytes)),
+          )
         else if (body == null || body.isEmpty)
-          _SkillBodyEmpty(label: l10n.skillsDetailBodyEmpty)
+          _SkillBodyHint(
+            key: SkillsKeys.bodyEmpty,
+            label: l10n.skillsDetailBodyEmpty,
+          )
         else
           SectionCard(
             padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
@@ -415,8 +506,8 @@ class _SkillDetailBody extends StatelessWidget {
   }
 }
 
-class _SkillBodyEmpty extends StatelessWidget {
-  const _SkillBodyEmpty({required this.label});
+class _SkillBodyHint extends StatelessWidget {
+  const _SkillBodyHint({super.key, required this.label});
 
   final String label;
 
@@ -424,7 +515,6 @@ class _SkillBodyEmpty extends StatelessWidget {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     return Padding(
-      key: SkillsKeys.bodyEmpty,
       padding: const EdgeInsets.symmetric(vertical: 48, horizontal: 24),
       child: Column(
         children: [

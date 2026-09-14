@@ -18627,6 +18627,12 @@ abstract class AppLocalizations {
   /// **'No skill body yet'**
   String get skillsDetailBodyEmpty;
 
+  /// No description provided for @skillsDetailBodyTooLarge.
+  ///
+  /// In en, this message translates to:
+  /// **'This file is too large to preview ({size}).'**
+  String skillsDetailBodyTooLarge(String size);
+
   /// No description provided for @workspaceEnvSizeTimeout.
   ///
   /// In en, this message translates to:

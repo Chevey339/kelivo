@@ -4661,6 +4661,14 @@
   },
   "workspaceFilesEmptyPickerHint": "Use New folder to add a subfolder",
   "skillsDetailBodyEmpty": "No skill body yet",
+  "skillsDetailBodyTooLarge": "This file is too large to preview ({size}).",
+  "@skillsDetailBodyTooLarge": {
+    "placeholders": {
+      "size": {
+        "type": "String"
+      }
+    }
+  },
   "workspaceEnvSizeTimeout": "Timed out",
   "workspaceEnvInfoCopied": "Environment info copied",
   "workspacePreviewEmptyFile": "This file is empty",

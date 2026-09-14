@@ -10360,6 +10360,11 @@ class AppLocalizationsEn extends AppLocalizations {
   String get skillsDetailBodyEmpty => 'No skill body yet';
 
   @override
+  String skillsDetailBodyTooLarge(String size) {
+    return 'This file is too large to preview ($size).';
+  }
+
+  @override
   String get workspaceEnvSizeTimeout => 'Timed out';
 
   @override
