@@ -130,21 +130,26 @@ class ProviderOAuthService extends ChangeNotifier {
     }
 
     unawaited(cancellation.whenCancelled.then((_) => close()));
+    final launch =
+        launcher ??
+        (Uri uri) => launchUrl(uri, mode: LaunchMode.externalApplication);
     try {
       final credentials = await Future.any<ProviderOAuthCredentials>([
-        ProviderOAuthAdapter.forProvider(
-          provider,
-        ).login(OAuthWire(client), cancellation, (prompt) async {
-          cancellation.check();
-          onPrompt(prompt);
-          // The visible link remains available when automatic browser opening fails.
-          try {
-            await (launcher ??
-                (uri) => launchUrl(uri, mode: LaunchMode.externalApplication))(
-              prompt.url,
-            );
-          } catch (_) {}
-        }, deviceCode: deviceCode),
+        ProviderOAuthAdapter.forProvider(provider).login(
+          OAuthWire(client),
+          cancellation,
+          (prompt) async {
+            cancellation.check();
+            onPrompt(prompt);
+            if (prompt.browserAuthorization) return;
+            // The visible link remains available when automatic browser opening fails.
+            try {
+              await launch(prompt.url);
+            } catch (_) {}
+          },
+          deviceCode: deviceCode,
+          launcher: launch,
+        ),
         cancellation.whenCancelled.then(
           (_) => throw const ProviderOAuthException(
             ProviderOAuthFailure.cancelled,

@@ -7,6 +7,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 
 import 'oauth_callback_types.dart';
+import 'oauth_pkce.dart';
 
 const _mobileOAuthChannel = MethodChannel('app.oauth');
 
@@ -23,7 +24,15 @@ Future<OAuthCallback> openOAuthCallback(
       InternetAddress.loopbackIPv4,
       loopbackRedirect.port,
     );
-    return _IoOAuthCallback(server, redirectUri: loopbackRedirect);
+    return _IoOAuthCallback(
+      server,
+      redirectUri: loopbackRedirect,
+      mobileCallback: Platform.isAndroid
+          ? _AndroidOAuthCallback(authorizationServer)
+          : Platform.isIOS
+          ? _IosOAuthCallback(authorizationServer)
+          : null,
+    );
   }
   if (Platform.isAndroid) {
     return _AndroidOAuthCallback(authorizationServer);
@@ -38,6 +47,14 @@ Future<OAuthCallback> openOAuthCallback(
 @visibleForTesting
 OAuthCallback createAndroidOAuthCallbackForTesting(Uri authorizationServer) =>
     _AndroidOAuthCallback(authorizationServer);
+
+@visibleForTesting
+Future<OAuthCallback> createMobileLoopbackOAuthCallbackForTesting(
+  OAuthCallback mobileCallback,
+) async => _IoOAuthCallback(
+  await HttpServer.bind(InternetAddress.loopbackIPv4, 0),
+  mobileCallback: mobileCallback,
+);
 
 String _authorizationServerHash(Uri authorizationServer) => base64UrlEncode(
   sha256.convert(utf8.encode(authorizationServer.toString())).bytes,
@@ -55,6 +72,7 @@ final class _AndroidOAuthCallback implements OAuthCallback {
 
   @override
   final Uri redirectUri;
+  final String _sessionId = oauthRandomString(24);
 
   @override
   Future<Uri> authorize(
@@ -67,6 +85,7 @@ final class _AndroidOAuthCallback implements OAuthCallback {
           .invokeMethod<String>('authenticate', {
             'url': authorizationUrl.toString(),
             'redirectUri': redirectUri.toString(),
+            'sessionId': _sessionId,
           })
           .timeout(timeout);
       if (value == null) {
@@ -76,7 +95,7 @@ final class _AndroidOAuthCallback implements OAuthCallback {
       }
       return Uri.parse(value);
     } on TimeoutException {
-      await _mobileOAuthChannel.invokeMethod<void>('cancel');
+      await close();
       rethrow;
     } on PlatformException catch (error) {
       throw OAuthCallbackException(
@@ -92,7 +111,9 @@ final class _AndroidOAuthCallback implements OAuthCallback {
   }
 
   @override
-  Future<void> close() => _mobileOAuthChannel.invokeMethod<void>('cancel');
+  Future<void> close() => _mobileOAuthChannel.invokeMethod<void>('cancel', {
+    'sessionId': _sessionId,
+  });
 }
 
 final class _IosOAuthCallback implements OAuthCallback {
@@ -105,6 +126,7 @@ final class _IosOAuthCallback implements OAuthCallback {
 
   @override
   final Uri redirectUri;
+  final String _sessionId = oauthRandomString(24);
 
   @override
   Future<Uri> authorize(
@@ -117,6 +139,7 @@ final class _IosOAuthCallback implements OAuthCallback {
           .invokeMethod<String>('authenticate', {
             'url': authorizationUrl.toString(),
             'callbackScheme': redirectUri.scheme,
+            'sessionId': _sessionId,
           })
           .timeout(timeout);
       if (value == null) {
@@ -126,7 +149,7 @@ final class _IosOAuthCallback implements OAuthCallback {
       }
       return Uri.parse(value);
     } on TimeoutException {
-      await _mobileOAuthChannel.invokeMethod<void>('cancel');
+      await close();
       rethrow;
     } on PlatformException catch (error) {
       throw OAuthCallbackException(
@@ -142,11 +165,13 @@ final class _IosOAuthCallback implements OAuthCallback {
   }
 
   @override
-  Future<void> close() => _mobileOAuthChannel.invokeMethod<void>('cancel');
+  Future<void> close() => _mobileOAuthChannel.invokeMethod<void>('cancel', {
+    'sessionId': _sessionId,
+  });
 }
 
 final class _IoOAuthCallback implements OAuthCallback {
-  _IoOAuthCallback(HttpServer server, {Uri? redirectUri})
+  _IoOAuthCallback(HttpServer server, {Uri? redirectUri, this.mobileCallback})
     : _server = server,
       _redirectUri =
           redirectUri ??
@@ -162,6 +187,8 @@ final class _IoOAuthCallback implements OAuthCallback {
 
   final HttpServer _server;
   final Uri _redirectUri;
+  final OAuthCallback? mobileCallback;
+  String? _state;
   final Completer<Uri> _callback = Completer<Uri>();
   late final StreamSubscription<HttpRequest> _subscription;
   bool _closed = false;
@@ -175,6 +202,31 @@ final class _IoOAuthCallback implements OAuthCallback {
     Duration timeout,
     OAuthUrlLauncher launchAuthorizationUrl,
   ) async {
+    if (mobileCallback case final mobile?) {
+      final states = authorizationUrl.queryParametersAll['state'];
+      if (states == null || states.length != 1 || states.single.isEmpty) {
+        throw const OAuthCallbackException('authorization state is required');
+      }
+      _state = states.single;
+      // The provider returns to its registered loopback URL. That local page
+      // redirects to the native callback to dismiss the browser and resume us.
+      final results = await Future.wait([
+        waitForCallback(timeout),
+        mobile.authorize(authorizationUrl, timeout, launchAuthorizationUrl),
+      ], eagerError: true);
+      final native = results[1];
+      final expected = mobile.redirectUri;
+      if (native.scheme != expected.scheme ||
+          native.host != expected.host ||
+          native.port != expected.port ||
+          native.path != expected.path ||
+          native.hasFragment ||
+          native.queryParametersAll['state']?.length != 1 ||
+          native.queryParameters['state'] != _state) {
+        throw const OAuthCallbackException('authorization callback mismatch');
+      }
+      return results.first;
+    }
     if (!await launchAuthorizationUrl(authorizationUrl)) {
       throw const OAuthCallbackException(
         'could not open the authorization URL',
@@ -192,6 +244,38 @@ final class _IoOAuthCallback implements OAuthCallback {
       request.response
         ..statusCode = HttpStatus.notFound
         ..write('Not Found');
+      await request.response.close();
+      return;
+    }
+
+    if (mobileCallback case final mobile?) {
+      final params = request.uri.queryParametersAll;
+      final codes = params['code'];
+      final errors = params['error'];
+      final validResult =
+          (codes?.length == 1 && codes!.single.isNotEmpty && errors == null) ||
+          (errors?.length == 1 && errors!.single.isNotEmpty && codes == null);
+      if (_closed || _callback.isCompleted) {
+        request.response.statusCode = HttpStatus.gone;
+      } else if (request.method != 'GET' ||
+          _state == null ||
+          params['state']?.length != 1 ||
+          params['state']?.single != _state ||
+          !validResult) {
+        request.response.statusCode = HttpStatus.badRequest;
+      } else {
+        // Keep the authorization code on the loopback connection. The custom
+        // URI only signals completion of this particular browser session.
+        request.response
+          ..statusCode = HttpStatus.found
+          ..headers.set(HttpHeaders.cacheControlHeader, 'no-store')
+          ..headers.set('Referrer-Policy', 'no-referrer')
+          ..headers.set(
+            HttpHeaders.locationHeader,
+            mobile.redirectUri.replace(queryParameters: {'state': _state!}),
+          );
+        _callback.complete(redirectUri.replace(query: request.uri.query));
+      }
       await request.response.close();
       return;
     }
@@ -219,8 +303,12 @@ final class _IoOAuthCallback implements OAuthCallback {
         ),
       );
     }
-    await _subscription.cancel();
-    await _server.close(force: true);
+    try {
+      await mobileCallback?.close();
+    } finally {
+      await _subscription.cancel();
+      await _server.close(force: true);
+    }
   }
 }
 
