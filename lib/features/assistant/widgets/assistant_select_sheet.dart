@@ -12,10 +12,12 @@ import '../../../shared/widgets/ios_tactile.dart';
 import '../../../core/services/haptics.dart';
 import '../../../shared/widgets/emoji_text.dart';
 import '../../../utils/avatar_cache.dart';
+import '../../../utils/avatar_scale.dart';
 import '../../../utils/sandbox_path_resolver.dart';
 import '../../../theme/app_font_weights.dart';
 import 'package:Kelivo/theme/app_semantic_colors.dart';
 import '../../../shared/widgets/section_card.dart';
+import '../../../utils/ui_scale.dart';
 
 // Show an assistant picker for moving a topic.
 // - Mobile: bottom sheet
@@ -112,10 +114,10 @@ Future<String?> showAssistantMoveSelector(
               behavior: HitTestBehavior.translucent,
               onTap: () {},
               child: ConstrainedBox(
-                constraints: const BoxConstraints(
-                  maxWidth: 560,
-                  minWidth: 420,
-                  maxHeight: 560,
+                constraints: BoxConstraints(
+                  maxWidth: scaledDim(context, 560),
+                  minWidth: scaledDim(context, 420),
+                  maxHeight: scaledDim(context, 560),
                 ),
                 child: DecoratedBox(
                   decoration: ShapeDecoration(
@@ -136,7 +138,7 @@ Future<String?> showAssistantMoveSelector(
                       children: [
                         // Header (no divider below)
                         SizedBox(
-                          height: 48,
+                          height: scaledDim(context, 48),
                           child: Padding(
                             padding: const EdgeInsets.symmetric(horizontal: 12),
                             child: Row(
@@ -210,8 +212,8 @@ Widget _assistantAvatar(BuildContext context, Assistant a, {double size = 28}) {
             return ClipOval(
               child: Image(
                 image: FileImage(File(p)),
-                width: size,
-                height: size,
+                width: scaledAvatarSize(context, size),
+                height: scaledAvatarSize(context, size),
                 fit: BoxFit.cover,
               ),
             );
@@ -219,10 +221,11 @@ Widget _assistantAvatar(BuildContext context, Assistant a, {double size = 28}) {
           return ClipOval(
             child: Image.network(
               av,
-              width: size,
-              height: size,
+              width: scaledAvatarSize(context, size),
+              height: scaledAvatarSize(context, size),
               fit: BoxFit.cover,
-              errorBuilder: (c, e, s) => _assistantInitial(cs, a.name, size),
+              errorBuilder: (c, e, s) =>
+                  _assistantInitial(context, cs, a.name, size),
             ),
           );
         },
@@ -234,16 +237,16 @@ Widget _assistantAvatar(BuildContext context, Assistant a, {double size = 28}) {
         return ClipOval(
           child: Image(
             image: FileImage(f),
-            width: size,
-            height: size,
+            width: scaledAvatarSize(context, size),
+            height: scaledAvatarSize(context, size),
             fit: BoxFit.cover,
           ),
         );
       }
     } else {
       return Container(
-        width: size,
-        height: size,
+        width: scaledAvatarSize(context, size),
+        height: scaledAvatarSize(context, size),
         decoration: BoxDecoration(
           color: cs.primary.withValues(alpha: 0.15),
           shape: BoxShape.circle,
@@ -257,25 +260,33 @@ Widget _assistantAvatar(BuildContext context, Assistant a, {double size = 28}) {
       );
     }
   }
-  return _assistantInitial(cs, a.name, size);
+  return _assistantInitial(context, cs, a.name, size);
 }
 
-Widget _assistantInitial(ColorScheme cs, String name, double size) {
+Widget _assistantInitial(
+  BuildContext context,
+  ColorScheme cs,
+  String name,
+  double size,
+) {
   final letter = name.trim().isNotEmpty ? name.trim()[0] : '?';
   return Container(
-    width: size,
-    height: size,
+    width: scaledAvatarSize(context, size),
+    height: scaledAvatarSize(context, size),
     decoration: BoxDecoration(
       color: cs.primary.withValues(alpha: 0.15),
       shape: BoxShape.circle,
     ),
     alignment: Alignment.center,
-    child: Text(
-      letter,
-      style: TextStyle(
-        color: cs.primary,
-        fontSize: size * 0.42,
-        fontWeight: AppFontWeights.emphasis,
+    child: Transform.translate(
+      offset: Offset(0, avatarInitialNudgeY(context, size)),
+      child: Text(
+        letter,
+        style: TextStyle(
+          color: cs.primary,
+          fontSize: size * 0.42,
+          fontWeight: AppFontWeights.emphasis,
+        ),
       ),
     ),
   );
@@ -285,7 +296,7 @@ Widget _assistantRow(BuildContext context, Assistant a) {
   return Padding(
     padding: const EdgeInsets.symmetric(vertical: 4),
     child: SizedBox(
-      height: 48,
+      height: scaledDim(context, 48),
       child: IosCardPress(
         borderRadius: BorderRadius.circular(14),
         baseColor: sheetTileColor(context),
@@ -379,7 +390,7 @@ class _DeskAssistantRowState extends State<_DeskAssistantRow> {
         behavior: HitTestBehavior.opaque,
         onTap: () => widget.onTap(widget.assistant.id),
         child: Container(
-          height: 44,
+          height: scaledDim(context, 44),
           padding: const EdgeInsets.symmetric(horizontal: 10),
           decoration: BoxDecoration(
             color: bg,

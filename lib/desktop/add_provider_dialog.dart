@@ -11,6 +11,7 @@ import '../icons/lucide_adapter.dart' as lucide;
 import '../core/providers/settings_provider.dart';
 import '../theme/app_font_weights.dart';
 import 'package:Kelivo/theme/app_semantic_colors.dart';
+import '../utils/ui_scale.dart';
 
 Future<String?> showDesktopAddProviderDialog(BuildContext context) async {
   String? result;
@@ -337,10 +338,10 @@ class _AddProviderDialogBodyState extends State<_AddProviderDialogBody>
     final l10n = AppLocalizations.of(context)!;
     return Center(
       child: ConstrainedBox(
-        constraints: const BoxConstraints(
-          minWidth: 580,
-          maxWidth: 700,
-          maxHeight: 640,
+        constraints: BoxConstraints(
+          minWidth: scaledDim(context, 580),
+          maxWidth: scaledDim(context, 700),
+          maxHeight: scaledDim(context, 640),
         ),
         child: Material(
           color: context.overlaySurface,
@@ -355,7 +356,7 @@ class _AddProviderDialogBodyState extends State<_AddProviderDialogBody>
               children: [
                 // Header
                 Container(
-                  height: 52,
+                  height: scaledDim(context, 52),
                   color: context.overlaySurface,
                   padding: const EdgeInsets.fromLTRB(16, 10, 8, 0),
                   child: Row(

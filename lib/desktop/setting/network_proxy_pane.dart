@@ -12,6 +12,7 @@ import '../../l10n/app_localizations.dart';
 import '../../core/providers/settings_provider.dart';
 import 'package:Kelivo/theme/app_semantic_colors.dart';
 import 'package:Kelivo/shared/widgets/section_card.dart';
+import '../../utils/ui_scale.dart';
 
 class DesktopNetworkProxyPane extends StatefulWidget {
   const DesktopNetworkProxyPane({super.key});
@@ -97,11 +98,11 @@ class _DesktopNetworkProxyPaneState extends State<DesktopNetworkProxyPane> {
       child: Padding(
         padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
         child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 960),
+          constraints: BoxConstraints(maxWidth: scaledDim(context, 960)),
           child: ListView(
             children: [
               SizedBox(
-                height: 36,
+                height: scaledDim(context, 36),
                 child: Align(
                   alignment: Alignment.centerLeft,
                   child: Text(
@@ -154,7 +155,7 @@ class _DesktopNetworkProxyPaneState extends State<DesktopNetworkProxyPane> {
                   _ItemRow(
                     label: l10n.networkProxyType,
                     trailing: SizedBox(
-                      width: 220,
+                      width: scaledDim(context, 220),
                       child: _ProxyTypeDropdown(
                         value: _type,
                         onChanged: (v) async {
@@ -171,9 +172,9 @@ class _DesktopNetworkProxyPaneState extends State<DesktopNetworkProxyPane> {
                   _ItemRow(
                     label: l10n.networkProxyServerHost,
                     trailing: ConstrainedBox(
-                      constraints: const BoxConstraints(
-                        minWidth: 140,
-                        maxWidth: 420,
+                      constraints: BoxConstraints(
+                        minWidth: scaledDim(context, 140),
+                        maxWidth: scaledDim(context, 420),
                       ),
                       child: TextField(
                         controller: _hostCtl,
@@ -189,9 +190,9 @@ class _DesktopNetworkProxyPaneState extends State<DesktopNetworkProxyPane> {
                   _ItemRow(
                     label: l10n.networkProxyPort,
                     trailing: ConstrainedBox(
-                      constraints: const BoxConstraints(
-                        minWidth: 140,
-                        maxWidth: 420,
+                      constraints: BoxConstraints(
+                        minWidth: scaledDim(context, 140),
+                        maxWidth: scaledDim(context, 420),
                       ),
                       child: TextField(
                         controller: _portCtl,
@@ -208,9 +209,9 @@ class _DesktopNetworkProxyPaneState extends State<DesktopNetworkProxyPane> {
                   _ItemRow(
                     label: l10n.networkProxyUsername,
                     trailing: ConstrainedBox(
-                      constraints: const BoxConstraints(
-                        minWidth: 140,
-                        maxWidth: 420,
+                      constraints: BoxConstraints(
+                        minWidth: scaledDim(context, 140),
+                        maxWidth: scaledDim(context, 420),
                       ),
                       child: TextField(
                         controller: _userCtl,
@@ -226,9 +227,9 @@ class _DesktopNetworkProxyPaneState extends State<DesktopNetworkProxyPane> {
                   _ItemRow(
                     label: l10n.networkProxyPassword,
                     trailing: ConstrainedBox(
-                      constraints: const BoxConstraints(
-                        minWidth: 140,
-                        maxWidth: 420,
+                      constraints: BoxConstraints(
+                        minWidth: scaledDim(context, 140),
+                        maxWidth: scaledDim(context, 420),
                       ),
                       child: TextField(
                         controller: _passCtl,
@@ -245,9 +246,9 @@ class _DesktopNetworkProxyPaneState extends State<DesktopNetworkProxyPane> {
                   _ItemRow(
                     label: l10n.networkProxyBypassLabel,
                     trailing: ConstrainedBox(
-                      constraints: const BoxConstraints(
-                        minWidth: 140,
-                        maxWidth: 420,
+                      constraints: BoxConstraints(
+                        minWidth: scaledDim(context, 140),
+                        maxWidth: scaledDim(context, 420),
                       ),
                       child: TextField(
                         controller: _bypassCtl,
@@ -283,9 +284,9 @@ class _DesktopNetworkProxyPaneState extends State<DesktopNetworkProxyPane> {
                   _ItemRow(
                     label: l10n.networkProxyTestHeader,
                     trailing: ConstrainedBox(
-                      constraints: const BoxConstraints(
-                        minWidth: 140,
-                        maxWidth: 420,
+                      constraints: BoxConstraints(
+                        minWidth: scaledDim(context, 140),
+                        maxWidth: scaledDim(context, 420),
                       ),
                       child: TextField(
                         controller: _testUrlCtl,
@@ -419,20 +420,39 @@ class _ItemRow extends StatelessWidget {
     final cs = Theme.of(context).colorScheme;
     return Padding(
       padding: EdgeInsets.symmetric(horizontal: 12, vertical: vpad),
-      child: Row(
-        children: [
-          Expanded(
-            child: Text(
-              label,
-              style: TextStyle(
-                fontSize: 14,
-                color: cs.onSurface.withValues(alpha: 0.88),
+      child: LayoutBuilder(
+        builder: (context, cons) {
+          // At large UI font scales the trailing control's scaled width can
+          // eat the whole row (the card itself is window-limited), squeezing
+          // the label into vertical wrapping. Reserve a scaled minimum for
+          // the label and cap the trailing with the remainder.
+          final labelMin = scaledDim(context, 96);
+          final trailFloor = scaledDim(context, 140);
+          final trailCap = cons.maxWidth - labelMin - 12;
+          return Row(
+            children: [
+              Expanded(
+                child: Text(
+                  label,
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: cs.onSurface.withValues(alpha: 0.88),
+                  ),
+                ),
               ),
-            ),
-          ),
-          const SizedBox(width: 12),
-          Align(alignment: Alignment.centerRight, child: trailing),
-        ],
+              const SizedBox(width: 12),
+              Align(
+                alignment: Alignment.centerRight,
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(
+                    maxWidth: trailCap > trailFloor ? trailCap : trailFloor,
+                  ),
+                  child: trailing,
+                ),
+              ),
+            ],
+          );
+        },
       ),
     );
   }
@@ -642,7 +662,10 @@ class _ProxyTypeDropdownState extends State<_ProxyTypeDropdown> {
             duration: const Duration(milliseconds: 120),
             curve: Curves.easeOutCubic,
             padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 4),
-            constraints: const BoxConstraints(minWidth: 150, minHeight: 40),
+            constraints: BoxConstraints(
+              minWidth: scaledDim(context, 150),
+              minHeight: 40,
+            ),
             decoration: BoxDecoration(
               color: Theme.of(context).colorScheme.surfaceContainerHigh,
               borderRadius: BorderRadius.circular(10),
@@ -664,7 +687,9 @@ class _ProxyTypeDropdownState extends State<_ProxyTypeDropdown> {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     ConstrainedBox(
-                      constraints: const BoxConstraints(maxWidth: 240),
+                      constraints: BoxConstraints(
+                        maxWidth: scaledDim(context, 240),
+                      ),
                       child: Text(
                         labelOf(selected),
                         overflow: TextOverflow.ellipsis,
@@ -725,7 +750,7 @@ class _ProxyTypeOverlay extends StatelessWidget {
       color: Colors.transparent,
       child: Container(
         width: width,
-        constraints: const BoxConstraints(maxWidth: 280),
+        constraints: BoxConstraints(maxWidth: scaledDim(context, 280)),
         decoration: BoxDecoration(
           color: backgroundColor,
           borderRadius: BorderRadius.circular(10),

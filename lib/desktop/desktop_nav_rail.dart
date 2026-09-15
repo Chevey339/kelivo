@@ -9,6 +9,7 @@ import 'user_profile_dialog.dart';
 import '../icons/lucide_adapter.dart' as lucide;
 import '../utils/sandbox_path_resolver.dart';
 import '../theme/app_font_weights.dart';
+import '../utils/avatar_scale.dart';
 
 /// A compact left rail for desktop with avatar, primary actions, and bottom system toggles.
 class DesktopNavRail extends StatelessWidget {
@@ -121,8 +122,8 @@ class _UserAvatarButtonState extends State<_UserAvatarButton> {
     final value = up.avatarValue;
     if (type == 'emoji' && value != null && value.isNotEmpty) {
       avatar = Container(
-        width: 36,
-        height: 36,
+        width: scaledAvatarSize(context, 36),
+        height: scaledAvatarSize(context, 36),
         decoration: BoxDecoration(
           color: cs.primary.withValues(alpha: 0.15),
           shape: BoxShape.circle,
@@ -134,11 +135,11 @@ class _UserAvatarButtonState extends State<_UserAvatarButton> {
       avatar = ClipOval(
         child: Image.network(
           value,
-          width: 36,
-          height: 36,
+          width: scaledAvatarSize(context, 36),
+          height: scaledAvatarSize(context, 36),
           fit: BoxFit.cover,
           errorBuilder: (_, __, ___) {
-            return _initialAvatar(up.name, cs);
+            return _initialAvatar(context, up.name, cs);
           },
         ),
       );
@@ -150,16 +151,16 @@ class _UserAvatarButtonState extends State<_UserAvatarButton> {
         avatar = ClipOval(
           child: Image(
             image: FileImage(f),
-            width: 36,
-            height: 36,
+            width: scaledAvatarSize(context, 36),
+            height: scaledAvatarSize(context, 36),
             fit: BoxFit.cover,
           ),
         );
       } else {
-        avatar = _initialAvatar(up.name, cs);
+        avatar = _initialAvatar(context, up.name, cs);
       }
     } else {
-      avatar = _initialAvatar(up.name, cs);
+      avatar = _initialAvatar(context, up.name, cs);
     }
 
     return Padding(
@@ -173,28 +174,31 @@ class _UserAvatarButtonState extends State<_UserAvatarButton> {
           // Also open dialog on right-click for consistency
           showUserProfileDialog(context);
         },
-        child: _HoverCircle(size: 42, child: avatar),
+        child: _HoverCircle(size: scaledAvatarSize(context, 42), child: avatar),
       ),
     );
   }
 
-  Widget _initialAvatar(String name, ColorScheme cs) {
+  Widget _initialAvatar(BuildContext context, String name, ColorScheme cs) {
     final letter = name.isNotEmpty ? name.characters.first : '?';
     return Container(
-      width: 36,
-      height: 36,
+      width: scaledAvatarSize(context, 36),
+      height: scaledAvatarSize(context, 36),
       decoration: BoxDecoration(
         color: cs.primary.withValues(alpha: 0.15),
         shape: BoxShape.circle,
       ),
       alignment: Alignment.center,
-      child: Text(
-        letter,
-        style: TextStyle(
-          color: cs.primary,
-          fontWeight: AppFontWeights.emphasis,
-          decoration: TextDecoration.none,
-          fontSize: 36 * 0.44, // keep initial scaled to avatar size
+      child: Transform.translate(
+        offset: Offset(0, avatarInitialNudgeY(context, 36)),
+        child: Text(
+          letter,
+          style: TextStyle(
+            color: cs.primary,
+            fontWeight: AppFontWeights.emphasis,
+            decoration: TextDecoration.none,
+            fontSize: 36 * 0.44, // keep initial scaled to avatar size
+          ),
         ),
       ),
     );

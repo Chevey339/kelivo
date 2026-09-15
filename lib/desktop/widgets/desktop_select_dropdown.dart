@@ -109,11 +109,16 @@ class _DesktopSelectDropdownState<T> extends State<DesktopSelectDropdown<T>> {
     final triggerSize = rb.size;
     final triggerWidth = triggerSize.width;
     final hasSubtitles = widget.options.any(_optionHasSubtitle);
-    var overlayWidth = triggerWidth;
+    // Menu grows with the ambient UI font scale: +24 for the check icon and
+    // gutters, and the subtitle variant's 360/440 clamps scale as well.
+    var overlayWidth =
+        triggerWidth + MediaQuery.textScalerOf(context).scale(24.0);
     var overlayDx = 0.0;
     if (hasSubtitles) {
-      overlayWidth = triggerWidth < 360 ? 360.0 : triggerWidth;
-      if (overlayWidth > 440) overlayWidth = 440.0;
+      final minW = MediaQuery.textScalerOf(context).scale(360.0);
+      final maxW = MediaQuery.textScalerOf(context).scale(440.0);
+      final target = triggerWidth < minW ? minW : triggerWidth;
+      overlayWidth = target > maxW ? maxW : target;
       overlayDx = triggerWidth - overlayWidth;
     }
 

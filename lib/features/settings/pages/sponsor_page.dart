@@ -9,6 +9,7 @@ import '../../../l10n/app_localizations.dart';
 import '../../../core/services/haptics.dart';
 import 'package:Kelivo/theme/app_font_weights.dart';
 import 'package:Kelivo/shared/widgets/section_card.dart';
+import '../../../utils/ui_scale.dart';
 
 class SponsorPage extends StatefulWidget {
   const SponsorPage({super.key});
@@ -250,7 +251,7 @@ class _SponsorTile extends StatelessWidget {
         ),
         const SizedBox(height: 6),
         SizedBox(
-          height: 18,
+          height: scaledDim(context, 18),
           child: Text(
             s.name,
             maxLines: 1,

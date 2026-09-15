@@ -13,6 +13,7 @@ import '../../l10n/app_localizations.dart';
 import 'ios_tactile.dart';
 import '../../theme/app_font_weights.dart';
 import 'snackbar.dart';
+import '../../utils/ui_scale.dart';
 
 const Duration _ttsFloatingSurfaceAnimationDuration = Duration(
   milliseconds: 220,
@@ -481,8 +482,8 @@ class _SpeedButton extends StatelessWidget {
     return Tooltip(
       message: tooltip,
       child: SizedBox(
-        width: 44,
-        height: 32,
+        width: scaledDim(context, 44),
+        height: scaledDim(context, 32),
         child: IosCardPress(
           onTap: onTap,
           borderRadius: BorderRadius.circular(999),

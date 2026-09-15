@@ -8,6 +8,7 @@ import 'package:Kelivo/shared/widgets/ios_tactile.dart';
 import 'package:Kelivo/shared/widgets/section_card.dart';
 import 'package:Kelivo/theme/app_font_weights.dart';
 import 'package:Kelivo/theme/app_semantic_colors.dart';
+import '../../utils/ui_scale.dart';
 
 /// One row in [showMobileActionSheet] / [showAdaptiveActionMenu].
 ///
@@ -154,7 +155,7 @@ class _ActionTile extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: SizedBox(
-        height: 48,
+        height: scaledDim(context, 48),
         child: IosCardPress(
           key: item.key,
           borderRadius: BorderRadius.circular(14),

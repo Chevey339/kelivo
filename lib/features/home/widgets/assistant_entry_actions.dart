@@ -18,6 +18,7 @@ import '../../assistant/pages/tags_manager_page.dart';
 import '../../assistant/widgets/tags_manager_dialog.dart';
 import 'package:Kelivo/theme/app_font_weights.dart';
 import 'package:Kelivo/theme/app_semantic_colors.dart';
+import '../../../utils/ui_scale.dart';
 
 class AssistantEntryActions {
   const AssistantEntryActions._();
@@ -176,7 +177,7 @@ class AssistantEntryActions {
           return Padding(
             padding: const EdgeInsets.symmetric(vertical: 4),
             child: SizedBox(
-              height: 48,
+              height: scaledDim(context, 48),
               child: IosCardPress(
                 borderRadius: BorderRadius.circular(14),
                 baseColor: sheetTileColor(sheetContext),

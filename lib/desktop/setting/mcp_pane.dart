@@ -12,6 +12,7 @@ import 'mcp_json_edit_dialog.dart' show showDesktopMcpJsonEditDialog;
 import 'mcp_timeout_dialog.dart' show showDesktopMcpTimeoutDialog;
 import '../../theme/app_font_weights.dart';
 import 'package:Kelivo/theme/app_semantic_colors.dart';
+import '../../utils/ui_scale.dart';
 
 class DesktopMcpPane extends StatelessWidget {
   const DesktopMcpPane({super.key});
@@ -28,12 +29,12 @@ class DesktopMcpPane extends StatelessWidget {
       child: Padding(
         padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
         child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 960),
+          constraints: BoxConstraints(maxWidth: scaledDim(context, 960)),
           child: CustomScrollView(
             slivers: [
               SliverToBoxAdapter(
                 child: SizedBox(
-                  height: 36,
+                  height: scaledDim(context, 36),
                   child: Row(
                     children: [
                       Expanded(
@@ -302,7 +303,7 @@ class _ServerCardState extends State<_ServerCard> {
             border: Border.all(color: borderColor, width: 1.0),
           ),
           padding: const EdgeInsets.all(14),
-          constraints: const BoxConstraints(minHeight: 64),
+          constraints: BoxConstraints(minHeight: scaledDim(context, 64)),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
@@ -523,7 +524,7 @@ Future<void> _showErrorDetails(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
         child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 640),
+          constraints: BoxConstraints(maxWidth: scaledDim(context, 640)),
           child: Padding(
             padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
             child: Column(
@@ -614,7 +615,7 @@ Future<bool?> _confirmDelete(BuildContext context) async {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
         child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 360),
+          constraints: BoxConstraints(maxWidth: scaledDim(context, 360)),
           child: Padding(
             padding: const EdgeInsets.fromLTRB(16, 14, 16, 12),
             child: Column(

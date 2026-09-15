@@ -23,6 +23,7 @@ import 'package:Kelivo/shared/widgets/ios_tactile.dart';
 import 'package:Kelivo/shared/widgets/ios_tile_button.dart';
 import 'package:Kelivo/shared/widgets/section_card.dart';
 import 'package:Kelivo/shared/widgets/snackbar.dart';
+import '../../../utils/ui_scale.dart';
 
 String _mountError(AppLocalizations l10n, Object error) {
   if (error is WorkspaceChannelException) {
@@ -140,7 +141,7 @@ class _ExternalMountsPageState extends State<ExternalMountsPage> {
       body: Align(
         alignment: Alignment.topCenter,
         child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 900),
+          constraints: BoxConstraints(maxWidth: scaledDim(context, 900)),
           child: FutureBuilder<void>(
             future: provider.loaded,
             builder: (context, snapshot) {

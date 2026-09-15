@@ -11,6 +11,7 @@ import '../core/models/conversation.dart';
 import '../theme/app_font_weights.dart';
 import '../features/home/controllers/chat_actions.dart';
 import 'package:Kelivo/theme/app_semantic_colors.dart';
+import '../utils/ui_scale.dart';
 
 Future<String?> showChatHistoryDesktopDialog(
   BuildContext context, {
@@ -72,10 +73,10 @@ class _ChatHistoryDesktopDialogState extends State<_ChatHistoryDesktopDialog> {
       insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: ConstrainedBox(
-        constraints: const BoxConstraints(
-          maxWidth: 560,
-          minWidth: 420,
-          maxHeight: 640,
+        constraints: BoxConstraints(
+          maxWidth: scaledDim(context, 560),
+          minWidth: scaledDim(context, 420),
+          maxHeight: scaledDim(context, 640),
         ),
         child: ClipRRect(
           borderRadius: BorderRadius.circular(16),

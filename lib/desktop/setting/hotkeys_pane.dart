@@ -8,6 +8,7 @@ import '../../shared/widgets/ios_switch.dart';
 import '../../core/providers/hotkey_provider.dart';
 import 'package:Kelivo/theme/app_font_weights.dart';
 import 'package:Kelivo/shared/widgets/section_card.dart';
+import '../../utils/ui_scale.dart';
 
 class DesktopHotkeysPane extends StatefulWidget {
   const DesktopHotkeysPane({super.key});
@@ -27,12 +28,12 @@ class _DesktopHotkeysPaneState extends State<DesktopHotkeysPane> {
       child: Padding(
         padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
         child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 960),
+          constraints: BoxConstraints(maxWidth: scaledDim(context, 960)),
           child: CustomScrollView(
             slivers: [
               SliverToBoxAdapter(
                 child: SizedBox(
-                  height: 36,
+                  height: scaledDim(context, 36),
                   child: Row(
                     children: [
                       Expanded(
@@ -320,7 +321,7 @@ class _ShortcutEditorState extends State<_ShortcutEditor> {
         onTap: widget.onTap,
         behavior: HitTestBehavior.opaque,
         child: Container(
-          height: 36,
+          height: scaledDim(context, 36),
           padding: const EdgeInsets.symmetric(horizontal: 12),
           decoration: BoxDecoration(
             color: bg,

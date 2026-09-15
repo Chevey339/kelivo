@@ -10,6 +10,7 @@ import '../../l10n/app_localizations.dart';
 import '../../core/providers/settings_provider.dart';
 import '../../theme/app_font_weights.dart';
 import 'package:Kelivo/theme/app_semantic_colors.dart';
+import '../../utils/ui_scale.dart';
 
 Future<void> showDesktopMcpJsonEditDialog(BuildContext context) async {
   await showDialog<void>(
@@ -92,15 +93,18 @@ class _DesktopMcpJsonEditDialogState extends State<_DesktopMcpJsonEditDialog> {
 
     final codeFontFamily = resolveCodeFont();
     return ConstrainedBox(
-      constraints: const BoxConstraints(maxWidth: 860, maxHeight: 720),
+      constraints: BoxConstraints(
+        maxWidth: scaledDim(context, 860),
+        maxHeight: scaledDim(context, 720),
+      ),
       child: SizedBox(
-        width: 860,
-        height: 720,
+        width: scaledDim(context, 860),
+        height: scaledDim(context, 720),
         child: Column(
           children: [
             // Header bar
             SizedBox(
-              height: 52,
+              height: scaledDim(context, 52),
               child: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 12),
                 child: Row(

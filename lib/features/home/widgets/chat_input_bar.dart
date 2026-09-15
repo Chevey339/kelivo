@@ -50,6 +50,7 @@ import '../services/context_usage_service.dart';
 import 'package:Kelivo/theme/app_font_weights.dart';
 import '../../../core/models/composer_draft.dart';
 import '../../../core/database/composer_draft_store.dart';
+import '../../../utils/ui_scale.dart';
 
 class ChatInputBarController {
   ChatInputBarController();
@@ -4238,9 +4239,9 @@ class _ImageModePill extends StatelessWidget {
               border: Border.all(color: border),
             ),
             child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 172),
+              constraints: BoxConstraints(maxWidth: scaledDim(context, 172)),
               child: SizedBox(
-                height: 24,
+                height: scaledDim(context, 24),
                 child: Padding(
                   padding: const EdgeInsetsDirectional.only(start: 9, end: 3),
                   child: Row(

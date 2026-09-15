@@ -168,9 +168,10 @@ class _RankBody extends StatelessWidget {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
     final cs = Theme.of(context).colorScheme;
+    final ts = MediaQuery.textScalerOf(context);
     if (items.isEmpty) {
       return SizedBox(
-        height: 132,
+        height: ts.scale(132.0),
         child: Center(
           child: Text(
             l10n.statsPageEmptyTitle,
@@ -250,12 +251,15 @@ class _RankRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
+    final ts = MediaQuery.textScalerOf(context);
     final ratio = maxValue <= 0 ? 0.0 : item.value / maxValue;
     final widthFactor = (0.36 + ratio * 0.64).clamp(0.36, 1.0);
     final fillColor = context.appColors.surfaceFill;
     final leading = leadingBuilder?.call(context, item);
 
-    final rowHeight = item.cost == null ? 34.0 : 42.0;
+    // Rows grow when a cost line is present; scale both cases so the fixed
+    // height budget tracks the ambient text scaler.
+    final rowHeight = ts.scale(item.cost == null ? 34.0 : 42.0);
     return Row(
       children: [
         Expanded(
@@ -283,14 +287,14 @@ class _RankRow extends StatelessWidget {
                       children: [
                         if (leading != null)
                           SizedBox(
-                            width: 24,
-                            height: 24,
+                            width: ts.scale(24.0),
+                            height: ts.scale(24.0),
                             child: Center(child: leading),
                           )
                         else if (icon != null)
                           Icon(
                             icon,
-                            size: 15,
+                            size: ts.scale(15.0),
                             color: cs.onSurface.withValues(alpha: 0.58),
                           ),
                         const SizedBox(width: 7),
@@ -316,7 +320,7 @@ class _RankRow extends StatelessWidget {
         ),
         const SizedBox(width: 10),
         SizedBox(
-          width: item.cost == null ? 52 : 80,
+          width: ts.scale(item.cost == null ? 52.0 : 80.0),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.end,
             mainAxisSize: MainAxisSize.min,
