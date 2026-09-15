@@ -157,7 +157,7 @@ void main() {
           baseUrl: 'https://api.deepseek.com/anthropic',
         ),
       );
-      expect(defaults.dialect, ReasoningDialect.anthropicAdaptiveEffort);
+      expect(defaults.dialect, ReasoningDialect.anthropicEffort);
       expect(defaults.levels, const [
         ReasoningLevel.low,
         ReasoningLevel.high,

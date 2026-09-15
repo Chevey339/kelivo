@@ -15,6 +15,7 @@ enum ReasoningDialect {
   openrouterReasoning,
   anthropicBudget,
   anthropicAdaptiveEffort,
+  anthropicEffort,
   geminiThinkingBudget,
   geminiThinkingLevel,
   qwenEnableThinking,

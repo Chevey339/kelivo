@@ -53,7 +53,7 @@ class VendorDefaults {
 
     if (kind == ProviderKind.claude && ProviderConfig.isDeepSeekConfig(cfg)) {
       return VendorDefaults(
-        dialect: ReasoningDialect.anthropicAdaptiveEffort,
+        dialect: ReasoningDialect.anthropicEffort,
         levels: const [
           ReasoningLevel.low,
           ReasoningLevel.high,
