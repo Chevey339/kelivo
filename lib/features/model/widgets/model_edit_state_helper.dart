@@ -6,13 +6,7 @@ import '../../../l10n/app_localizations.dart';
 /// Catalog metadata is not editable in the model form. Read it from the latest
 /// override at save time so a catalog refresh during editing is preserved too.
 Map<String, dynamic> modelSyncMetadata(Map<String, dynamic> override) => {
-  for (final key in const [
-    'oauthProtocol',
-    'oauthThinkingMode',
-    'oauthThinkingRequired',
-    'oauthThinkingEfforts',
-    'oauthThinkingDefaultEffort',
-  ])
+  for (final key in const ['oauthProtocol', 'reasoning'])
     if (override.containsKey(key)) key: override[key],
 };
 

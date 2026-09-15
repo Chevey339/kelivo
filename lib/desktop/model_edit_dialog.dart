@@ -127,6 +127,7 @@ class _ModelEditDialogBodyState extends State<_ModelEditDialogBody>
     // tools, 2 for others
     _showBuiltinToolsTab = BuiltInToolsHelper.modelSettingsToolNames(
       cfg,
+      modelId: widget.modelId,
     ).isNotEmpty;
     _tabCtrl = TabController(length: _showBuiltinToolsTab ? 3 : 2, vsync: this);
     _tabCtrl.addListener(() {
@@ -802,6 +803,7 @@ class _ModelEditDialogBodyState extends State<_ModelEditDialogBody>
       // keys count too, or saving drops what they hold.
       current: BuiltInToolNames.parseFromOverride(prev),
       selected: _builtInTools,
+      modelId: widget.modelId,
     );
     final builtInTools = BuiltInToolNames.orderedForStorage(builtInSet);
 

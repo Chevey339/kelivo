@@ -105,10 +105,9 @@
     ]
   },
   "agnes-image-1": {
-    "type": "chat",
+    "type": "image",
     "input": [
-      "text",
-      "image"
+      "text"
     ],
     "output": [
       "text",
@@ -517,7 +516,7 @@
     "abilities": []
   },
   "chatgpt-image-latest": {
-    "type": "chat",
+    "type": "image",
     "input": [
       "text",
       "image"
@@ -1089,9 +1088,10 @@
     "abilities": []
   },
   "dall-e-2": {
-    "type": "chat",
+    "type": "image",
     "input": [
-      "text"
+      "text",
+      "image"
     ],
     "output": [
       "text"
@@ -1099,7 +1099,7 @@
     "abilities": []
   },
   "dall-e-3": {
-    "type": "chat",
+    "type": "image",
     "input": [
       "text"
     ],
@@ -1850,8 +1850,7 @@
       "text"
     ],
     "abilities": [
-      "tool",
-      "reasoning"
+      "tool"
     ]
   },
   "gemini-2.5-flash-tts": {
@@ -1864,8 +1863,7 @@
       "text"
     ],
     "abilities": [
-      "tool",
-      "reasoning"
+      "tool"
     ]
   },
   "gemini-2.5-pro": {
@@ -1892,8 +1890,7 @@
       "text"
     ],
     "abilities": [
-      "tool",
-      "reasoning"
+      "tool"
     ]
   },
   "gemini-2.5-pro-tts": {
@@ -1906,8 +1903,7 @@
       "text"
     ],
     "abilities": [
-      "tool",
-      "reasoning"
+      "tool"
     ]
   },
   "gemini-3-flash-preview": {
@@ -1948,7 +1944,9 @@
       "text",
       "image"
     ],
-    "abilities": []
+    "abilities": [
+      "reasoning"
+    ]
   },
   "gemini-3-pro-image-preview": {
     "type": "chat",
@@ -1960,7 +1958,9 @@
       "text",
       "image"
     ],
-    "abilities": []
+    "abilities": [
+      "reasoning"
+    ]
   },
   "gemini-3.1-flash-image": {
     "type": "chat",
@@ -1972,7 +1972,9 @@
       "text",
       "image"
     ],
-    "abilities": []
+    "abilities": [
+      "reasoning"
+    ]
   },
   "gemini-3.1-flash-image-preview": {
     "type": "chat",
@@ -1984,7 +1986,9 @@
       "text",
       "image"
     ],
-    "abilities": []
+    "abilities": [
+      "reasoning"
+    ]
   },
   "gemini-3.1-flash-lite": {
     "type": "chat",
@@ -2010,7 +2014,9 @@
       "text",
       "image"
     ],
-    "abilities": []
+    "abilities": [
+      "reasoning"
+    ]
   },
   "gemini-3.1-flash-lite-preview": {
     "type": "chat",
@@ -2577,7 +2583,9 @@
       "text",
       "image"
     ],
-    "abilities": []
+    "abilities": [
+      "reasoning"
+    ]
   },
   "google/gemini-3-pro-image-preview": {
     "type": "chat",
@@ -2589,7 +2597,9 @@
       "text",
       "image"
     ],
-    "abilities": []
+    "abilities": [
+      "reasoning"
+    ]
   },
   "google/gemini-3.1-flash-image": {
     "type": "chat",
@@ -2601,7 +2611,9 @@
       "text",
       "image"
     ],
-    "abilities": []
+    "abilities": [
+      "reasoning"
+    ]
   },
   "google/gemini-3.1-flash-image-preview": {
     "type": "chat",
@@ -2613,7 +2625,9 @@
       "text",
       "image"
     ],
-    "abilities": []
+    "abilities": [
+      "reasoning"
+    ]
   },
   "google/gemini-3.1-flash-lite": {
     "type": "chat",
@@ -2639,7 +2653,9 @@
       "text",
       "image"
     ],
-    "abilities": []
+    "abilities": [
+      "reasoning"
+    ]
   },
   "google/gemini-3.1-flash-lite-preview": {
     "type": "chat",
@@ -3438,7 +3454,7 @@
     ]
   },
   "gpt-image-1": {
-    "type": "chat",
+    "type": "image",
     "input": [
       "text",
       "image"
@@ -3450,7 +3466,7 @@
     "abilities": []
   },
   "gpt-image-1-mini": {
-    "type": "chat",
+    "type": "image",
     "input": [
       "text",
       "image"
@@ -3462,7 +3478,7 @@
     "abilities": []
   },
   "gpt-image-1.5": {
-    "type": "chat",
+    "type": "image",
     "input": [
       "text",
       "image"
@@ -3474,7 +3490,7 @@
     "abilities": []
   },
   "gpt-image-2": {
-    "type": "chat",
+    "type": "image",
     "input": [
       "text",
       "image"
@@ -7865,7 +7881,7 @@
     ]
   },
   "sensenova-u1-fast": {
-    "type": "chat",
+    "type": "image",
     "input": [
       "text"
     ],

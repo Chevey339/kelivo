@@ -5,23 +5,26 @@ import 'dart:io';
 
 import 'package:http/http.dart' as http;
 
+import '../../../../models/model_spec.dart';
 import '../../../../models/token_usage.dart';
 import '../../../../providers/model_provider.dart';
 import '../../../../providers/settings_provider.dart';
 import '../../../../utils/multimodal_input_utils.dart';
 import '../../../../../utils/sandbox_path_resolver.dart';
+import '../../../model_spec/model_spec_resolver.dart';
+import '../../../model_spec/vendor_defaults.dart';
 import '../../builtin_tools.dart';
 import '../../chat_api_helpers.dart';
-import '../../../model_spec/model_spec_resolver.dart';
 import '../../generation/tool_loop_runner.dart';
 import '../../kimi_formula_search.dart';
+import '../../reasoning/reasoning_dialects.dart';
 import '../../stream/sse_framing.dart';
 import '../../stream/stream_chunk.dart';
 import '../../stream/stream_chunk_emit.dart';
 import '../../stream/stream_chunk_ids.dart';
 import 'chat_completions_api.dart';
 import 'chat_completions_decoder.dart';
-import 'openai_vendor_compat.dart';
+import 'openai_request_shaping.dart';
 import 'responses_api.dart';
 import 'responses_decoder.dart';
 
@@ -126,47 +129,22 @@ Stream<StreamChunk> sendOpenAIStream(
         ).where((name) => name == BuiltInToolNames.search)
       : null;
   final url = _openAICompatibleUrl(config);
-  // Claude models served through OpenAI-compatible proxies require signed
-  // thinking blocks; unsigned reasoning echoes are stripped before sending.
-  final isClaudeUpstream = upstreamModelId.toLowerCase().contains('claude');
 
-  final effectiveInfo = ModelSpecResolver.instance.spec(config, modelId);
-  final isReasoning = effectiveInfo.abilities.contains(ModelAbility.reasoning);
-  final wantsImageOutput = effectiveInfo.output.contains(Modality.image);
-  final bool canImageInput = effectiveInfo.input.contains(Modality.image);
-
-  final effort = openAIEffortForBudget(thinkingBudget, upstreamModelId);
-  final modelMetadata = config.modelOverrides[modelId];
-  final info = OpenAIProviderInfo(
-    host: Uri.tryParse(config.baseUrl)?.host.toLowerCase() ?? '',
-    providerId: config.id.toLowerCase(),
-    upstreamModelId: upstreamModelId,
-    // Kimi Code can advertise opaque IDs such as k3. Its declared protocol and
-    // thinking capability apply even when the ID has no kimi-* prefix.
-    isKimiCodeThinkingModel:
-        config.oauthProvider == OAuthProvider.kimi &&
-        config.useResponseApi != true &&
-        modelMetadata is Map &&
-        modelMetadata['oauthProtocol'] == 'openai' &&
-        (isReasoning || modelMetadata['oauthThinkingRequired'] == true),
-  );
+  final spec = ModelSpecResolver.instance.spec(config, modelId);
+  final wantsImageOutput = spec.output.contains(Modality.image);
+  final bool canImageInput = spec.input.contains(Modality.image);
+  final vendor = VendorDefaults.forProvider(config);
   final bool allowRemoteImages =
-      canImageInput &&
-      !isKimiK3Model(upstreamModelId) &&
-      !info.isKimiCodeK3Model;
+      canImageInput && !disallowsRemoteImageUrls(upstreamModelId);
   // OpenRouter documents delta-style `reasoning_details` chunks that must be
   // concatenated in order, so cumulative-snapshot detection is disabled for
   // it; other providers may resend the full array-so-far with each chunk.
   final reasoningDetailsAllowSnapshots =
       !BuiltInToolsHelper.isOpenRouterProvider(config);
   final bool needsReasoningEcho =
-      info.isKimiCodeThinkingModel ||
-      (info.needsReasoningEcho &&
-          (isReasoning ||
-              info.isKimiCodingModel ||
-              (info.isDeepSeek && tools?.isNotEmpty == true)));
+      spec.reasoning.replay != ReasoningReplayPolicy.none;
   void setMaxTokens(Map<String, dynamic> map) {
-    if (maxTokens != null) map[info.completionTokensKey] = maxTokens;
+    if (maxTokens != null) map[vendor.maxTokensKey] = maxTokens;
   }
 
   // Kimi K3 Formula web-search: fetch tool decls, then fiber-execute calls.
@@ -179,7 +157,6 @@ Stream<StreamChunk> sendOpenAIStream(
   ).contains(BuiltInToolNames.search);
   if (config.useResponseApi != true &&
       BuiltInToolsHelper.isMoonshotProvider(config) &&
-      BuiltInToolsHelper.isKimiK3Model(upstreamModelId) &&
       builtInSearchEnabled) {
     try {
       kimiFormulaTools = await KimiFormulaSearch.fetchTools(
@@ -521,20 +498,7 @@ Stream<StreamChunk> sendOpenAIStream(
       if (maxTokens != null) 'max_output_tokens': maxTokens,
       if (toolList.isNotEmpty) 'tools': toResponsesToolsFormat(toolList),
       if (toolList.isNotEmpty) 'tool_choice': 'auto',
-      if (isReasoning && effort != 'off')
-        'reasoning': {
-          'summary': 'auto',
-          if (effort != 'auto') 'effort': effort,
-        },
     };
-    applyCompatibleResponsesReasoning(
-      body,
-      config: config,
-      modelId: modelId,
-      upstreamModelId: upstreamModelId,
-      isReasoning: isReasoning,
-      thinkingBudget: thinkingBudget,
-    );
     // OpenAI-compatible native search can optionally expose source details.
     // OpenRouter rejects the `include` parameter, so skip it there.
     if (!BuiltInToolsHelper.isDashScopeProvider(config) &&
@@ -582,11 +546,8 @@ Stream<StreamChunk> sendOpenAIStream(
       userMediaPaths: userImagePaths,
       canImageInput: canImageInput,
       allowRemoteImages: allowRemoteImages,
-      reasoningContentReplayPolicy: info.reasoningContentReplayPolicy,
-      supportsGoogleOpenAIThoughtSignatures:
-          info.supportsGoogleOpenAIThoughtSignatures,
-      stripReasoningContent: isClaudeUpstream,
-      normalizeReasoningDetails: isClaudeUpstream,
+      reasoningReplay: spec.reasoning.replay,
+      replayField: spec.reasoning.replayField,
       skipImageParsing: skipImageParsing,
     );
     body = {
@@ -595,32 +556,11 @@ Stream<StreamChunk> sendOpenAIStream(
       'stream': stream,
       if (temperature != null) 'temperature': temperature,
       if (topP != null) 'top_p': topP,
-      if (isReasoning && effort != 'off' && effort != 'auto')
-        'reasoning_effort': effort,
       if (tools != null && tools.isNotEmpty)
         'tools': cleanToolsForCompatibility(tools),
       if (tools != null && tools.isNotEmpty) 'tool_choice': 'auto',
     };
     setMaxTokens(body);
-  }
-
-  // Vendor-specific reasoning knobs for chat-completions compatible hosts
-  if (config.useResponseApi != true) {
-    applyVendorReasoningKnobs(
-      body,
-      info: info,
-      isReasoning: isReasoning,
-      thinkingBudget: thinkingBudget,
-    );
-    if (info.isKimiThinkingModel) {
-      normalizeMoonshotKimiChatBody(
-        body,
-        info: info,
-        upstreamModelId: upstreamModelId,
-        isReasoning: isReasoning,
-        thinkingBudget: thinkingBudget,
-      );
-    }
   }
 
   final request = http.Request('POST', url);
@@ -635,12 +575,7 @@ Stream<StreamChunk> sendOpenAIStream(
     assistantHeaders: extraHeaders,
   );
   request.headers.addAll(headers);
-  maybeAddStreamingUsageOptions(
-    body,
-    stream: stream,
-    config: config,
-    host: info.host,
-  );
+  maybeAddStreamingUsageOptions(body, stream: stream, config: config);
   if (config.useResponseApi != true) {
     formulaToolNames.addAll(
       KimiFormulaSearch.mergeTools(body, kimiFormulaTools),
@@ -657,12 +592,6 @@ Stream<StreamChunk> sendOpenAIStream(
   if (extraBodyCfg.isNotEmpty) {
     body.addAll(extraBodyCfg);
   }
-  applyPoolsideThinkingIfNeeded(
-    body,
-    info: info,
-    isReasoning: isReasoning,
-    thinkingBudget: thinkingBudget,
-  );
   // Built-in tools run after the custom body and merge by type so custom
   // function tools and provider server tools coexist.
   if (config.useResponseApi != true) {
@@ -674,25 +603,13 @@ Stream<StreamChunk> sendOpenAIStream(
       configuredTools: configuredBuiltInTools,
     );
   }
-  sanitizeOpenAIGpt5SamplingParams(
+  applyOpenAIResolvedRequest(
     body,
-    upstreamModelId,
-    fallbackEffort: effort,
-    isOpenRouter: info.isOpenRouter,
-  );
-  normalizeMoonshotKimiChatBody(
-    body,
-    info: info,
-    upstreamModelId: upstreamModelId,
-    isReasoning: isReasoning,
+    spec: spec,
     thinkingBudget: thinkingBudget,
-  );
-  applyKimiCodeChatThinking(
-    body,
-    config: config,
-    modelId: modelId,
-    isReasoning: isReasoning,
-    thinkingBudget: thinkingBudget,
+    transport: config.useResponseApi == true
+        ? ReasoningTransport.responses
+        : ReasoningTransport.chatCompletions,
   );
   request.body = jsonEncode(body);
 
@@ -815,7 +732,7 @@ Stream<StreamChunk> sendOpenAIStream(
           modelId: modelId,
           upstreamModelId: upstreamModelId,
           url: url,
-          info: info,
+          spec: spec,
           messages: messages,
           requestBody: body,
           firstObj: lastObj,
@@ -825,7 +742,6 @@ Stream<StreamChunk> sendOpenAIStream(
           canImageInput: canImageInput,
           allowRemoteImages: allowRemoteImages,
           skipImageParsing: skipImageParsing,
-          isClaudeUpstream: isClaudeUpstream,
           needsReasoningEcho: needsReasoningEcho,
           extraHeaders: extraHeaders,
           initialUsage: firstUsage,
@@ -998,7 +914,7 @@ Stream<StreamChunk> sendOpenAIStream(
             modelId: modelId,
             upstreamModelId: upstreamModelId,
             url: url,
-            info: info,
+            spec: spec,
             initialInput: responsesInitialInput,
             firstOutputItems: lastResponseOutputItems,
             initialCalls: callInfos,
@@ -1011,8 +927,6 @@ Stream<StreamChunk> sendOpenAIStream(
             temperature: temperature,
             topP: topP,
             maxTokens: maxTokens,
-            isReasoning: isReasoning,
-            effort: effort,
             thinkingBudget: thinkingBudget,
             initialUsage: usage,
             streamRound: streamRound,
@@ -1057,7 +971,7 @@ Stream<StreamChunk> sendOpenAIStream(
               modelId: modelId,
               upstreamModelId: upstreamModelId,
               url: url,
-              info: info,
+              spec: spec,
               messages: messages,
               firstToolAcc: toolAcc,
               firstAssistantContent: assistantContentBuffer,
@@ -1070,9 +984,6 @@ Stream<StreamChunk> sendOpenAIStream(
               canImageInput: canImageInput,
               allowRemoteImages: allowRemoteImages,
               skipImageParsing: skipImageParsing,
-              isClaudeUpstream: isClaudeUpstream,
-              isReasoning: isReasoning,
-              effort: effort,
               thinkingBudget: thinkingBudget,
               temperature: temperature,
               topP: topP,
@@ -1124,7 +1035,7 @@ Stream<StreamChunk> sendOpenAIStream(
           modelId: modelId,
           upstreamModelId: upstreamModelId,
           url: url,
-          info: info,
+          spec: spec,
           messages: messages,
           firstToolAcc: toolAcc,
           firstAssistantContent: assistantContentBuffer,
@@ -1137,9 +1048,6 @@ Stream<StreamChunk> sendOpenAIStream(
           canImageInput: canImageInput,
           allowRemoteImages: allowRemoteImages,
           skipImageParsing: skipImageParsing,
-          isClaudeUpstream: isClaudeUpstream,
-          isReasoning: isReasoning,
-          effort: effort,
           thinkingBudget: thinkingBudget,
           temperature: temperature,
           topP: topP,
@@ -1178,7 +1086,7 @@ Stream<StreamChunk> sendOpenAIStream(
             modelId: modelId,
             upstreamModelId: upstreamModelId,
             url: url,
-            info: info,
+            spec: spec,
             messages: messages,
             firstToolAcc: toolAcc,
             firstAssistantContent: assistantContentBuffer,
@@ -1191,9 +1099,6 @@ Stream<StreamChunk> sendOpenAIStream(
             canImageInput: canImageInput,
             allowRemoteImages: allowRemoteImages,
             skipImageParsing: skipImageParsing,
-            isClaudeUpstream: isClaudeUpstream,
-            isReasoning: isReasoning,
-            effort: effort,
             thinkingBudget: thinkingBudget,
             temperature: temperature,
             topP: topP,

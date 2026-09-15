@@ -2,9 +2,11 @@ import 'package:flutter/widgets.dart';
 import 'package:provider/provider.dart';
 import '../../../core/models/assistant.dart';
 import '../../../core/models/chat_message.dart';
+import '../../../core/models/model_spec.dart';
 import '../../../core/providers/settings_provider.dart';
 import '../../../core/services/model_spec/model_spec_resolver.dart';
 import '../../../core/services/api/chat_api_service.dart';
+import '../../../core/services/api/reasoning/reasoning_dialects.dart';
 import '../../../core/services/chat/chat_service.dart';
 import '../../../core/services/mcp/mcp_tool_service.dart';
 import '../../../core/services/workspace/workspace_tools_service.dart';
@@ -85,9 +87,7 @@ class GenerationController {
   }
 
   bool isReasoningEnabled(int? budget) {
-    if (budget == null) return true; // treat null as default/auto -> enabled
-    if (budget == -1) return true; // auto
-    return budget >= 1024;
+    return levelForLegacyBudget(budget) != ReasoningLevel.off;
   }
 
   // ============================================================================

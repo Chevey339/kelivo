@@ -700,8 +700,11 @@ void main() {
       modelOverrides: {
         'grok-4.20-0309-reasoning': {
           'oauthProtocol': 'openai',
-          'oauthThinkingMode': 'forced',
           'abilities': ['tool', 'reasoning'],
+          'reasoning': {
+            'dialect': 'openaiResponsesReasoning',
+            'levels': ['low', 'high'],
+          },
         },
       },
       oauthCredentials: ProviderOAuthCredentials(
@@ -1007,17 +1010,20 @@ void main() {
 
   const anthropicMetadata = <String, dynamic>{
     'oauthProtocol': 'anthropic',
-    'oauthThinkingMode': 'enabled',
-    'oauthThinkingRequired': true,
-    'oauthThinkingEfforts': <String>[],
-    'oauthThinkingDefaultEffort': null,
+    'reasoning': {
+      'dialect': 'anthropicBudget',
+      'levels': ['low', 'medium', 'high'],
+      'canDisable': false,
+    },
   };
   const openaiMetadata = <String, dynamic>{
     'oauthProtocol': 'openai',
-    'oauthThinkingMode': 'adaptive',
-    'oauthThinkingRequired': false,
-    'oauthThinkingEfforts': ['low', 'high'],
-    'oauthThinkingDefaultEffort': 'high',
+    'reasoning': {
+      'dialect': 'kimiThinking',
+      'levels': ['low', 'high'],
+      'canDisable': true,
+      'defaultLevel': 'high',
+    },
   };
 
   void expectMetadata(Map saved, Map<String, dynamic> metadata) {

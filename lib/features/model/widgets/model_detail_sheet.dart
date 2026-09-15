@@ -120,6 +120,7 @@ class _ModelDetailSheetState extends State<_ModelDetailSheet>
     // tools, 2 for others
     _showBuiltinToolsTab = BuiltInToolsHelper.modelSettingsToolNames(
       cfg,
+      modelId: widget.modelId,
     ).isNotEmpty;
     _tabCtrl = TabController(length: _showBuiltinToolsTab ? 3 : 2, vsync: this);
     _tabCtrl.addListener(() {
@@ -761,6 +762,7 @@ class _ModelDetailSheetState extends State<_ModelDetailSheet>
       // keys count too, or saving drops what they hold.
       current: BuiltInToolNames.parseFromOverride(prev),
       selected: _builtInTools,
+      modelId: widget.modelId,
     );
     final builtInTools = BuiltInToolNames.orderedForStorage(builtInSet);
     // Decide which logical key to use for this instance

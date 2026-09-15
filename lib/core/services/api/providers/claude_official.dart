@@ -7,13 +7,13 @@ import 'dart:io';
 import 'package:http/http.dart' as http;
 
 import '../../../models/token_usage.dart';
-import '../../../providers/model_provider.dart';
 import '../../../providers/settings_provider.dart';
 import '../../../utils/multimodal_input_utils.dart';
 import '../../../../utils/mcp_structured_image.dart';
 import '../builtin_tools.dart';
 import '../chat_api_helpers.dart';
 import '../../model_spec/model_spec_resolver.dart';
+import '../reasoning/reasoning_dialects.dart';
 import '../generation/tool_loop_runner.dart';
 import '../stream/sse_framing.dart';
 import '../stream/stream_chunk.dart';
@@ -29,17 +29,6 @@ export 'claude/claude_history.dart'
         normalizeClaudeImageMime,
         isClaudeSupportedImageMime,
         claudeToolResultContent;
-
-int _defaultClaudeMaxOutputTokens(String modelId) {
-  final lower = modelId.trim().toLowerCase();
-  if (RegExp(
-    r'claude-(?:fable-5|mythos-5|opus-(?:5|4-8)|sonnet-5)(?:$|[._:@/-])',
-    caseSensitive: false,
-  ).hasMatch(lower)) {
-    return 128000;
-  }
-  return 64000;
-}
 
 Stream<StreamChunk> sendClaudeStream(
   http.Client client,
@@ -67,10 +56,6 @@ Stream<StreamChunk> sendClaudeStream(
       : config.baseUrl;
   final url = Uri.parse('$base/messages');
 
-  final isReasoning = ModelSpecResolver.instance
-      .spec(config, modelId)
-      .abilities
-      .contains(ModelAbility.reasoning);
   final skipRedactedThinkingBlocks = BuiltInToolsHelper.isOpenRouterProvider(
     config,
   );
@@ -331,37 +316,10 @@ Stream<StreamChunk> sendClaudeStream(
   yield* runProviderToolRounds(
     retryRound: retryRound,
     sendRound: () async* {
-      final omitSamplingParams = claudeShouldOmitSamplingParams(
-        upstreamModelId,
-        thinkingBudget,
-      );
-      final compatibleTopP = claudeCompatibleTopP(
-        upstreamModelId,
-        thinkingBudget,
-        topP,
-      );
-      final thinkingModelId = config.oauthProvider == OAuthProvider.kimi
-          ? modelId
-          : upstreamModelId;
-      final thinking = isReasoning
-          ? claudeThinkingConfig(
-              thinkingModelId,
-              thinkingBudget,
-              config: config,
-            )
-          : null;
-      final outputConfig = isReasoning
-          ? claudeOutputConfig(thinkingModelId, thinkingBudget, config: config)
-          : null;
-
-      // Prepare request body per round
+      final spec = ModelSpecResolver.instance.spec(config, modelId);
       final body = <String, dynamic>{
         'model': upstreamModelId,
-        'max_tokens':
-            maxTokens ??
-            (config.oauthProvider == OAuthProvider.kimi
-                ? 32000
-                : _defaultClaudeMaxOutputTokens(upstreamModelId)),
+        'max_tokens': maxTokens ?? spec.maxOutput ?? 64000,
         'messages': convo,
         'stream': stream,
         if (systemPrompt.isNotEmpty) 'system': systemPrompt,
@@ -369,21 +327,34 @@ Stream<StreamChunk> sendClaudeStream(
           'cache_control': ProviderConfig.claudePromptCacheControl(
             config.claudePromptCachingTtl,
           ),
-        if (!omitSamplingParams &&
-            !isClaudeReasoningEnabled(thinkingBudget) &&
-            temperature != null)
-          'temperature': temperature,
-        if (compatibleTopP != null) 'top_p': compatibleTopP,
+        if (temperature != null) 'temperature': temperature,
+        if (topP != null) 'top_p': topP,
         if (allTools.isNotEmpty) 'tools': allTools,
         if (allTools.isNotEmpty) 'tool_choice': {'type': 'auto'},
-        if (thinking != null) 'thinking': thinking,
-        if (outputConfig != null) 'output_config': outputConfig,
         if (hasCodeExecution && container != null) 'container': container!.id,
       };
       final extraClaude = customBody(config, modelId, assistantBody: extraBody);
       if (extraClaude.isNotEmpty) {
         body.addAll(extraClaude);
       }
+      final request = ReasoningRequest(
+        levelForLegacyBudget(thinkingBudget),
+        budgetTokens: (thinkingBudget ?? 0) > 0 ? thinkingBudget : null,
+      );
+      applyReasoning(
+        body,
+        spec,
+        request,
+        transport: ReasoningTransport.anthropicMessages,
+      );
+      final resolution = resolveReasoning(spec, request);
+      applySamplingPolicy(
+        body,
+        spec,
+        resolution,
+        transport: ReasoningTransport.anthropicMessages,
+      );
+      applyAnthropicMessagesProtocolConstraints(body);
 
       http.Request buildRequest() {
         final request = http.Request('POST', url);

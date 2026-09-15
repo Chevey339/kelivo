@@ -148,6 +148,46 @@ void main() {
       );
     });
 
+    test('Claude kind ignores OpenRouter host dialect', () {
+      final defaults = VendorDefaults.forProvider(
+        _cfg(
+          id: 'OpenRouterAnthropic',
+          kind: ProviderKind.claude,
+          baseUrl: 'https://openrouter.ai/api/v1',
+        ),
+      );
+      expect(defaults.dialect, isNull);
+      expect(defaults.protocolDefault, ReasoningDialect.anthropicBudget);
+    });
+
+    test('Kimi Anthropic protocol uses a budget ladder', () {
+      final byHost = VendorDefaults.forProvider(
+        _cfg(
+          id: 'Kimi',
+          kind: ProviderKind.claude,
+          baseUrl: 'https://api.kimi.com/coding/v1',
+        ),
+      );
+      expect(byHost.dialect, ReasoningDialect.anthropicBudget);
+      expect(byHost.levels, const [
+        ReasoningLevel.low,
+        ReasoningLevel.medium,
+        ReasoningLevel.high,
+      ]);
+      expect(byHost.canDisable, isTrue);
+
+      final byOauth = VendorDefaults.forProvider(
+        _cfg(
+          id: 'KimiOAuth',
+          kind: ProviderKind.claude,
+          baseUrl: 'https://example.com/v1',
+          oauth: OAuthProvider.kimi,
+        ),
+      );
+      expect(byOauth.dialect, ReasoningDialect.anthropicBudget);
+      expect(byOauth.canDisable, isTrue);
+    });
+
     test('DeepSeek Claude-compatible host overrides the ladder', () {
       final defaults = VendorDefaults.forProvider(
         _cfg(

@@ -82,6 +82,54 @@ void main() {
         expect(guess.type, ModelType.image, reason: id);
       }
     });
+
+    test('only dall-e-2 and gpt-image families accept image input', () {
+      expect(ModelDefaultsGuesser.guess('dall-e-2').input, [
+        Modality.text,
+        Modality.image,
+      ]);
+      expect(ModelDefaultsGuesser.guess('dall-e-3').input, [Modality.text]);
+      expect(ModelDefaultsGuesser.guess('agnes-image-1').input, [
+        Modality.text,
+      ]);
+      expect(ModelDefaultsGuesser.guess('sensenova-u1-fast').input, [
+        Modality.text,
+      ]);
+      expect(
+        ModelDefaultsGuesser.guess('gpt-image-1').input,
+        contains(Modality.image),
+      );
+    });
+  });
+
+  group('Kimi Code ids', () {
+    test('aliases infer image, tool and reasoning', () {
+      for (final id in const [
+        'k3',
+        'k3-256k',
+        'kimi-for-coding',
+        'kimi-for-coding-highspeed',
+        'moonshotai/kimi-for-coding:fast',
+        'kimi-k2.8',
+        'moonshotai/kimi-k2.8-preview',
+      ]) {
+        final model = ModelDefaultsGuesser.guess(id);
+        expect(model.input, [Modality.text, Modality.image], reason: id);
+        expect(
+          model.abilities,
+          containsAll([ModelAbility.tool, ModelAbility.reasoning]),
+          reason: id,
+        );
+      }
+    });
+
+    test('near-miss ids stay text-only without those abilities', () {
+      for (final id in const ['k30', 'my-k3', 'kimi-for-coding-other']) {
+        final model = ModelDefaultsGuesser.guess(id);
+        expect(model.abilities, isEmpty, reason: id);
+        expect(model.input, [Modality.text], reason: id);
+      }
+    });
   });
 
   group('embedding', () {
@@ -258,16 +306,36 @@ void main() {
       expectHit(
         'claude-3-5-sonnet',
         dialect: ReasoningDialect.anthropicBudget,
-        levels: const [],
+        levels: const [
+          ReasoningLevel.low,
+          ReasoningLevel.medium,
+          ReasoningLevel.high,
+        ],
         canDisable: true,
-        maxOutput: 64000,
+        maxOutput: 8192,
       );
       expectHit(
         'claude-3-haiku@20240307',
         dialect: ReasoningDialect.anthropicBudget,
-        levels: const [],
+        levels: const [
+          ReasoningLevel.low,
+          ReasoningLevel.medium,
+          ReasoningLevel.high,
+        ],
         canDisable: true,
         maxOutput: 8000,
+      );
+      expectHit(
+        'claude-sonnet-4-6@20260101',
+        dialect: ReasoningDialect.anthropicAdaptiveEffort,
+        levels: const [
+          ReasoningLevel.low,
+          ReasoningLevel.medium,
+          ReasoningLevel.high,
+          ReasoningLevel.max,
+        ],
+        canDisable: true,
+        maxOutput: 128000,
       );
       expectHit(
         'claude-opus-4-8',
@@ -298,6 +366,7 @@ void main() {
         levels: const [ReasoningLevel.low, ReasoningLevel.high],
         canDisable: false,
         sampling: SamplingPolicy.never,
+        replay: ReasoningReplayPolicy.all,
       );
       expectHit(
         'gemini-3.1-pro-preview',
@@ -309,6 +378,7 @@ void main() {
         ],
         canDisable: false,
         sampling: SamplingPolicy.never,
+        replay: ReasoningReplayPolicy.all,
       );
       expectHit(
         'gemini-3.6-flash',
@@ -322,6 +392,7 @@ void main() {
         canDisable: false,
         sampling: SamplingPolicy.never,
         maxOutput: 65536,
+        replay: ReasoningReplayPolicy.all,
       );
       expectHit(
         'gemini-3.7-flash',
@@ -334,6 +405,7 @@ void main() {
         canDisable: false,
         sampling: SamplingPolicy.never,
         maxOutput: 65536,
+        replay: ReasoningReplayPolicy.all,
       );
       expectHit(
         'gemini-3.1-flash-image',
@@ -341,6 +413,27 @@ void main() {
         levels: const [ReasoningLevel.minimal, ReasoningLevel.high],
         canDisable: false,
         sampling: SamplingPolicy.never,
+        replay: ReasoningReplayPolicy.all,
+      );
+      expectHit(
+        'gemini-3.1-flash-tts-preview',
+        dialect: ReasoningDialect.none,
+        levels: const [],
+        canDisable: true,
+        replay: ReasoningReplayPolicy.all,
+      );
+      expectHit(
+        'gemini-3-pro-image-preview',
+        dialect: ReasoningDialect.none,
+        levels: const [],
+        canDisable: true,
+        replay: ReasoningReplayPolicy.all,
+      );
+      expect(
+        ModelDefaultsGuesser.guess(
+          'gemini-3.1-flash-tts-preview',
+        ).abilities.contains(ModelAbility.reasoning),
+        isTrue,
       );
       expectHit(
         'gemini-2.5-flash',
@@ -363,6 +456,7 @@ void main() {
         levels: const [],
         canDisable: true,
         sampling: SamplingPolicy.never,
+        maxOutput: 32000,
         replay: ReasoningReplayPolicy.toolTurns,
         replayField: ReasoningReplayField.reasoningContent,
       );
@@ -371,6 +465,7 @@ void main() {
         dialect: ReasoningDialect.kimiThinking,
         levels: const [],
         canDisable: true,
+        maxOutput: 32000,
         replay: ReasoningReplayPolicy.toolTurns,
         replayField: ReasoningReplayField.reasoningContent,
       );
@@ -380,6 +475,7 @@ void main() {
         levels: const [],
         canDisable: false,
         sampling: SamplingPolicy.never,
+        maxOutput: 32000,
         replay: ReasoningReplayPolicy.toolTurns,
         replayField: ReasoningReplayField.reasoningContent,
       );
@@ -389,6 +485,7 @@ void main() {
         levels: const [],
         canDisable: false,
         sampling: SamplingPolicy.never,
+        maxOutput: 32000,
         replay: ReasoningReplayPolicy.all,
         replayField: ReasoningReplayField.reasoningContent,
       );
@@ -402,6 +499,7 @@ void main() {
         ],
         canDisable: false,
         sampling: SamplingPolicy.never,
+        maxOutput: 32000,
         replay: ReasoningReplayPolicy.all,
         replayField: ReasoningReplayField.reasoningContent,
       );
@@ -414,6 +512,7 @@ void main() {
           ReasoningLevel.max,
         ],
         canDisable: true,
+        maxOutput: 32000,
         replay: ReasoningReplayPolicy.all,
         replayField: ReasoningReplayField.reasoningContent,
       );
@@ -426,6 +525,7 @@ void main() {
           ReasoningLevel.max,
         ],
         canDisable: true,
+        maxOutput: 32000,
         replay: ReasoningReplayPolicy.all,
         replayField: ReasoningReplayField.reasoningContent,
       );
@@ -434,6 +534,7 @@ void main() {
         dialect: ReasoningDialect.kimiThinking,
         levels: const [],
         canDisable: true,
+        maxOutput: 32000,
         replay: ReasoningReplayPolicy.all,
         replayField: ReasoningReplayField.reasoningContent,
       );

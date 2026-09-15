@@ -5,7 +5,6 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'package:Kelivo/core/providers/settings_provider.dart';
 import 'package:Kelivo/core/services/api/chat_api_service.dart';
-import 'package:Kelivo/core/utils/openai_model_compat.dart';
 import 'support/collect_generation.dart';
 
 ProviderConfig _mimoConfig(String baseUrl) {
@@ -27,12 +26,6 @@ Future<Map<String, dynamic>> _readJsonBody(HttpRequest request) async {
 
 void main() {
   group('Xiaomi MiMo Responses compatibility', () {
-    test('normalizes reasoning efforts to the documented values', () {
-      expect(openAINormalizeReasoningEffort('off', 'mimo-v2.5-pro'), 'none');
-      expect(openAINormalizeReasoningEffort('xhigh', 'mimo-v2.5-pro'), 'high');
-      expect(openAINormalizeReasoningEffort('max', 'xiaomi/mimo-v2.5'), 'high');
-    });
-
     test('streams reasoning text and cached token usage', () async {
       late Map<String, dynamic> requestBody;
       final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
@@ -85,6 +78,8 @@ void main() {
       ).toList();
 
       expect(requestBody['reasoning'], {'effort': 'low'});
+      expect(requestBody.containsKey('thinking'), isFalse);
+      expect(requestBody.containsKey('reasoning_effort'), isFalse);
       expect(chunks.joinedReasoning, '先比较两个小数。');
       expect(chunks.joinedContent, contains('9.8 更大。'));
       expect(chunks.isGenerationDone, isTrue);
@@ -153,6 +148,7 @@ void main() {
         ).toList();
 
         expect(requestBody.containsKey('reasoning'), isFalse);
+        expect(requestBody.containsKey('thinking'), isFalse);
         expect(chunks.joinedContent, '这是答案。');
         expect(chunks.joinedReasoning, '先分析问题。');
         expect(chunks.lastUsage?.cachedTokens, 32);
@@ -203,6 +199,8 @@ void main() {
 
       expect(chunks.isGenerationDone, isTrue);
       expect(requestBody['reasoning'], {'effort': 'none'});
+      expect(requestBody.containsKey('thinking'), isFalse);
+      expect(requestBody.containsKey('reasoning_effort'), isFalse);
     });
   });
 }

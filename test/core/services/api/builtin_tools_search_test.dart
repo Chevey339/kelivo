@@ -1,166 +1,292 @@
+import 'package:Kelivo/core/models/provider_oauth.dart';
 import 'package:Kelivo/core/providers/settings_provider.dart';
 import 'package:Kelivo/core/services/api/builtin_tools.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 ProviderConfig _cfg({
+  required String id,
   required String baseUrl,
-  required bool useResponseApi,
-  required String modelId,
+  required ProviderKind kind,
+  bool useResponseApi = false,
+  String modelId = 'gpt-4o',
+  List<String> builtInTools = const [BuiltInToolNames.search],
+  OAuthProvider? oauthProvider,
+  String? name,
 }) {
   return ProviderConfig(
-    id: 'Test',
+    id: id,
     enabled: true,
-    name: 'Test',
+    name: name ?? id,
     apiKey: 'k',
     baseUrl: baseUrl,
-    providerType: ProviderKind.openai,
+    providerType: kind,
     useResponseApi: useResponseApi,
+    oauthProvider: oauthProvider,
     modelOverrides: {
-      modelId: {
-        'builtInTools': [BuiltInToolNames.search],
-      },
+      modelId: {'builtInTools': builtInTools},
     },
   );
 }
 
 void main() {
-  group('Built-in search tools', () {
-    test('enables official Qwen 3.7 / 3.8 search SKUs', () {
-      expect(
-        BuiltInToolsHelper.isDashScopeResponsesBuiltInSearchSupportedModel(
-          'qwen3.7-plus',
-        ),
-        isTrue,
-      );
-      expect(
-        BuiltInToolsHelper.isDashScopeResponsesBuiltInSearchSupportedModel(
-          'qwen3.7-max',
-        ),
-        isTrue,
-      );
-      expect(
-        BuiltInToolsHelper.isDashScopeResponsesBuiltInSearchSupportedModel(
-          'qwen3.7-flash',
-        ),
-        isTrue,
-      );
-      expect(
-        BuiltInToolsHelper.isDashScopeResponsesBuiltInSearchSupportedModel(
-          'qwen3.8-max-preview',
-        ),
-        isTrue,
-      );
-      expect(
-        BuiltInToolsHelper.isDashScopeResponsesBuiltInSearchSupportedModel(
-          'qwen3.8-max',
-        ),
-        isTrue,
-      );
-      expect(
-        BuiltInToolsHelper.isDashScopeResponsesBuiltInSearchSupportedModel(
-          'qwen3.8-max-0902',
-        ),
-        isTrue,
-      );
-      expect(
-        BuiltInToolsHelper.isDashScopeResponsesBuiltInSearchSupportedModel(
-          'qwen3.8-flash',
-        ),
-        isTrue,
-      );
-      expect(
-        BuiltInToolsHelper.isDashScopeChatBuiltInSearchSupportedModel(
-          'qwen3.8-flash',
-        ),
-        isTrue,
-      );
-      expect(
-        BuiltInToolsHelper.isOpenAIResponsesBuiltInSearchSupportedModel(
-          'gpt-6-astra',
-        ),
-        isTrue,
-      );
-    });
+  group('supportsBuiltInSearchForModel is provider-level', () {
+    const cases =
+        <
+          ({
+            String name,
+            String id,
+            String baseUrl,
+            ProviderKind kind,
+            bool useResponseApi,
+            String modelId,
+            OAuthProvider? oauth,
+            String? providerName,
+            bool expected,
+          })
+        >[
+          (
+            name: 'Google chat',
+            id: 'Gemini',
+            baseUrl: 'https://generativelanguage.googleapis.com',
+            kind: ProviderKind.google,
+            useResponseApi: false,
+            modelId: 'gemini-3-flash',
+            oauth: null,
+            providerName: null,
+            expected: true,
+          ),
+          (
+            name: 'Google image model',
+            id: 'Gemini',
+            baseUrl: 'https://generativelanguage.googleapis.com',
+            kind: ProviderKind.google,
+            useResponseApi: false,
+            modelId: 'dall-e-3',
+            oauth: null,
+            providerName: null,
+            expected: false,
+          ),
+          (
+            name: 'Claude official chat',
+            id: 'Claude',
+            baseUrl: 'https://api.anthropic.com',
+            kind: ProviderKind.claude,
+            useResponseApi: false,
+            modelId: 'claude-sonnet-4-20250514',
+            oauth: null,
+            providerName: null,
+            expected: true,
+          ),
+          (
+            name: 'Claude relay chat',
+            id: 'ClaudeRelay',
+            baseUrl: 'https://relay.example.com/v1',
+            kind: ProviderKind.claude,
+            useResponseApi: false,
+            modelId: 'claude-3-haiku-20240307',
+            oauth: null,
+            providerName: null,
+            expected: true,
+          ),
+          (
+            name: 'DeepSeek Claude-compatible chat',
+            id: 'DeepSeek',
+            baseUrl: 'https://api.deepseek.com/anthropic',
+            kind: ProviderKind.claude,
+            useResponseApi: false,
+            modelId: 'deepseek-chat',
+            oauth: null,
+            providerName: null,
+            expected: true,
+          ),
+          (
+            name: 'OpenRouter chat',
+            id: 'OpenRouter',
+            baseUrl: 'https://openrouter.ai/api/v1',
+            kind: ProviderKind.openai,
+            useResponseApi: false,
+            modelId: 'deepseek/deepseek-chat',
+            oauth: null,
+            providerName: null,
+            expected: true,
+          ),
+          (
+            name: 'Grok host chat',
+            id: 'Custom',
+            baseUrl: 'https://api.x.ai/v1',
+            kind: ProviderKind.openai,
+            useResponseApi: false,
+            modelId: 'any-chat-model',
+            oauth: null,
+            providerName: null,
+            expected: true,
+          ),
+          (
+            name: 'Grok OAuth chat',
+            id: 'GrokOAuth',
+            baseUrl: 'https://example.com/v1',
+            kind: ProviderKind.openai,
+            useResponseApi: false,
+            modelId: 'any-chat-model',
+            oauth: OAuthProvider.grok,
+            providerName: null,
+            expected: true,
+          ),
+          (
+            name: 'DashScope chat completions',
+            id: 'DashScope',
+            baseUrl: 'https://dashscope.aliyuncs.com/compatible-mode/v1',
+            kind: ProviderKind.openai,
+            useResponseApi: false,
+            modelId: 'qwen-max-latest',
+            oauth: null,
+            providerName: null,
+            expected: true,
+          ),
+          (
+            name: 'Ark chat',
+            id: 'Ark',
+            baseUrl: 'https://ark.cn-beijing.volces.com/api/v3',
+            kind: ProviderKind.openai,
+            useResponseApi: false,
+            modelId: 'doubao-seed-2.0-pro',
+            oauth: null,
+            providerName: null,
+            expected: true,
+          ),
+          (
+            name: 'MiMo chat',
+            id: 'MiMo',
+            baseUrl: 'https://api.xiaomimimo.com/v1',
+            kind: ProviderKind.openai,
+            useResponseApi: false,
+            modelId: 'mimo-v2.5-pro',
+            oauth: null,
+            providerName: null,
+            expected: true,
+          ),
+          (
+            name: 'Moonshot chat',
+            id: 'Moonshot',
+            baseUrl: 'https://api.moonshot.cn/v1',
+            kind: ProviderKind.openai,
+            useResponseApi: false,
+            modelId: 'moonshot-v1-8k',
+            oauth: null,
+            providerName: null,
+            expected: true,
+          ),
+          (
+            name: 'Zhipu chat',
+            id: 'Zhipu',
+            baseUrl: 'https://open.bigmodel.cn/api/paas/v4',
+            kind: ProviderKind.openai,
+            useResponseApi: false,
+            modelId: 'glm-4',
+            oauth: null,
+            providerName: null,
+            expected: true,
+          ),
+          (
+            name: 'OpenAI Responses chat',
+            id: 'OpenAI',
+            baseUrl: 'https://api.openai.com/v1',
+            kind: ProviderKind.openai,
+            useResponseApi: true,
+            modelId: 'gpt-4o',
+            oauth: null,
+            providerName: null,
+            expected: true,
+          ),
+          (
+            name: 'custom OpenAI Responses chat',
+            id: 'CustomOpenAI',
+            baseUrl: 'https://proxy.example/v1',
+            kind: ProviderKind.openai,
+            useResponseApi: true,
+            modelId: 'deepseek-v4-pro',
+            oauth: null,
+            providerName: null,
+            expected: true,
+          ),
+          (
+            name: 'OpenAI Chat Completions',
+            id: 'OpenAI',
+            baseUrl: 'https://api.openai.com/v1',
+            kind: ProviderKind.openai,
+            useResponseApi: false,
+            modelId: 'gpt-4o',
+            oauth: null,
+            providerName: null,
+            expected: false,
+          ),
+          (
+            name: 'OpenAI Responses image model',
+            id: 'OpenAI',
+            baseUrl: 'https://api.openai.com/v1',
+            kind: ProviderKind.openai,
+            useResponseApi: true,
+            modelId: 'dall-e-3',
+            oauth: null,
+            providerName: null,
+            expected: false,
+          ),
+        ];
 
-    test('supportsBuiltInSearchForModel routes Ark/MiMo/Zhipu/Kimi', () {
-      final ark = _cfg(
-        baseUrl: 'https://ark.cn-beijing.volces.com/api/v3',
-        useResponseApi: true,
-        modelId: 'doubao-seed-2.0-pro',
-      );
-      final mimo = _cfg(
-        baseUrl: 'https://api.xiaomimimo.com/v1',
-        useResponseApi: false,
-        modelId: 'mimo-v2.5-pro',
-      );
-      final zhipu = _cfg(
-        baseUrl: 'https://open.bigmodel.cn/api/paas/v4',
-        useResponseApi: false,
-        modelId: 'glm-5',
-      );
-      final kimi = _cfg(
-        baseUrl: 'https://api.moonshot.cn/v1',
-        useResponseApi: false,
-        modelId: 'kimi-k3',
-      );
+    for (final c in cases) {
+      test(c.name, () {
+        final cfg = _cfg(
+          id: c.id,
+          baseUrl: c.baseUrl,
+          kind: c.kind,
+          useResponseApi: c.useResponseApi,
+          modelId: c.modelId,
+          oauthProvider: c.oauth,
+          name: c.providerName,
+        );
+        expect(
+          BuiltInToolsHelper.supportsBuiltInSearchForModel(
+            cfg: cfg,
+            modelId: c.modelId,
+          ),
+          c.expected,
+        );
+      });
+    }
+  });
 
-      expect(
-        BuiltInToolsHelper.supportsBuiltInSearchForModel(
-          cfg: ark,
-          modelId: 'doubao-seed-2.0-pro',
-        ),
-        isTrue,
-      );
-      expect(
-        BuiltInToolsHelper.supportsBuiltInSearchForModel(
-          cfg: mimo,
-          modelId: 'mimo-v2.5-pro',
-        ),
-        isTrue,
-      );
-      expect(
-        BuiltInToolsHelper.supportsBuiltInSearchForModel(
-          cfg: zhipu,
-          modelId: 'glm-5',
-        ),
-        isTrue,
-      );
-      expect(
-        BuiltInToolsHelper.supportsBuiltInSearchForModel(
-          cfg: kimi,
-          modelId: 'kimi-k3',
-        ),
-        isTrue,
-      );
-    });
-
-    test('Chat builder preserves provider-specific search formats', () {
+  group('host wire shapes', () {
+    test('Chat Completions keeps provider-specific search formats', () {
       final grok = _cfg(
+        id: 'Grok',
         baseUrl: 'https://api.x.ai/v1',
-        useResponseApi: false,
-        modelId: 'grok-4',
+        kind: ProviderKind.openai,
+        modelId: 'any-chat-model',
       );
       final dashScope = _cfg(
+        id: 'DashScope',
         baseUrl: 'https://dashscope.aliyuncs.com/compatible-mode/v1',
-        useResponseApi: false,
+        kind: ProviderKind.openai,
         modelId: 'qwen-max-latest',
       );
       final mimo = _cfg(
+        id: 'MiMo',
         baseUrl: 'https://api.xiaomimimo.com/v1',
-        useResponseApi: false,
+        kind: ProviderKind.openai,
         modelId: 'mimo-v2.5-pro',
       );
       final zhipu = _cfg(
+        id: 'Zhipu',
         baseUrl: 'https://open.bigmodel.cn/api/paas/v4',
-        useResponseApi: false,
-        modelId: 'glm-5',
+        kind: ProviderKind.openai,
+        modelId: 'glm-4',
       );
 
       expect(
         BuiltInToolsHelper.buildChatCompletionsTools(
           cfg: grok,
-          modelId: 'grok-4',
-          upstreamModelId: 'grok-4',
+          modelId: 'any-chat-model',
+          upstreamModelId: 'any-chat-model',
         ).body['search_parameters'],
         <String, dynamic>{'mode': 'auto', 'return_citations': true},
       );
@@ -185,8 +311,8 @@ void main() {
       expect(
         BuiltInToolsHelper.buildChatCompletionsTools(
           cfg: zhipu,
-          modelId: 'glm-5',
-          upstreamModelId: 'glm-5',
+          modelId: 'glm-4',
+          upstreamModelId: 'glm-4',
         ).tools,
         <Map<String, dynamic>>[
           <String, dynamic>{
@@ -197,6 +323,88 @@ void main() {
             },
           },
         ],
+      );
+    });
+
+    test('Responses uses web_search for OpenAI / DashScope / Ark', () {
+      final openai = _cfg(
+        id: 'OpenAI',
+        baseUrl: 'https://api.openai.com/v1',
+        kind: ProviderKind.openai,
+        useResponseApi: true,
+        modelId: 'any-chat-model',
+      );
+      final dashScope = _cfg(
+        id: 'DashScope',
+        baseUrl: 'https://dashscope.aliyuncs.com/compatible-mode/v1',
+        kind: ProviderKind.openai,
+        useResponseApi: true,
+        modelId: 'qwen-max-latest',
+      );
+      final ark = _cfg(
+        id: 'Ark',
+        baseUrl: 'https://ark.cn-beijing.volces.com/api/v3',
+        kind: ProviderKind.openai,
+        useResponseApi: true,
+        modelId: 'doubao-seed-2.0-pro',
+      );
+
+      expect(
+        BuiltInToolsHelper.buildResponsesTools(
+          cfg: openai,
+          modelId: 'any-chat-model',
+          upstreamModelId: 'any-chat-model',
+        ).tools.any((tool) => tool['type'] == 'web_search'),
+        isTrue,
+      );
+      expect(
+        BuiltInToolsHelper.buildResponsesTools(
+          cfg: dashScope,
+          modelId: 'qwen-max-latest',
+          upstreamModelId: 'qwen-max-latest',
+        ).tools,
+        contains(
+          predicate<Map<String, dynamic>>(
+            (tool) => tool['type'] == 'web_search',
+          ),
+        ),
+      );
+      expect(
+        BuiltInToolsHelper.buildResponsesTools(
+          cfg: ark,
+          modelId: 'doubao-seed-2.0-pro',
+          upstreamModelId: 'doubao-seed-2.0-pro',
+        ).tools,
+        contains(
+          predicate<Map<String, dynamic>>(
+            (tool) => tool['type'] == 'web_search',
+          ),
+        ),
+      );
+    });
+  });
+
+  group('Claude search tool versions', () {
+    test('generation helper picks the 2026-03-18 tool for current ids', () {
+      for (final id in const [
+        'claude-opus-4-7',
+        'claude-opus-4-8',
+        'claude-sonnet-4-6',
+        'claude-fable-5',
+        'claude-mythos-preview',
+        'claude-opus-5',
+      ]) {
+        expect(
+          BuiltInToolsHelper.claudeGenerationSupportsDynamicSearchTools(id),
+          isTrue,
+          reason: id,
+        );
+      }
+      expect(
+        BuiltInToolsHelper.claudeGenerationSupportsDynamicSearchTools(
+          'claude-sonnet-4-20250514',
+        ),
+        isFalse,
       );
     });
   });

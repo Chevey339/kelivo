@@ -141,6 +141,31 @@ void main() {
       );
     });
 
+    test('reasoningDetailsNeedSignedReplay keys on format or signature', () {
+      expect(
+        reasoningDetailsNeedSignedReplay([
+          {
+            'type': 'reasoning.text',
+            'text': 'x',
+            'format': 'anthropic-claude-v1',
+          },
+        ]),
+        isTrue,
+      );
+      expect(
+        reasoningDetailsNeedSignedReplay([
+          {'type': 'reasoning.text', 'text': 'x', 'signature': 'sig-1'},
+        ]),
+        isTrue,
+      );
+      expect(
+        reasoningDetailsNeedSignedReplay([
+          {'type': 'reasoning.text', 'text': 'x'},
+        ]),
+        isFalse,
+      );
+    });
+
     test('returns null when nothing replayable remains', () {
       expect(normalizeReasoningDetailsForReplay(const []), isNull);
       expect(

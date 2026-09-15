@@ -68,6 +68,31 @@ class VendorDefaults {
       );
     }
 
+    if (kind == ProviderKind.claude && _isKimiAnthropicProvider(cfg, host)) {
+      return VendorDefaults(
+        dialect: ReasoningDialect.anthropicBudget,
+        levels: const [
+          ReasoningLevel.low,
+          ReasoningLevel.medium,
+          ReasoningLevel.high,
+        ],
+        canDisable: true,
+        protocolDefault: protocolDefault,
+        maxTokensKey: maxTokensKey,
+        sendStreamOptions: sendStreamOptions,
+      );
+    }
+
+    // Anthropic Messages: model dialect comes from the guesser/catalog.
+    // Host names like "OpenRouter" must not force Chat Completions dialects.
+    if (kind == ProviderKind.claude) {
+      return VendorDefaults(
+        protocolDefault: protocolDefault,
+        maxTokensKey: maxTokensKey,
+        sendStreamOptions: sendStreamOptions,
+      );
+    }
+
     if (cfg.oauthProvider == OAuthProvider.chatgpt) {
       dialect = ReasoningDialect.openaiResponsesReasoning;
     } else if (providerId.contains('openrouter') ||
@@ -167,6 +192,14 @@ ReasoningDialect _protocolDefault(ProviderKind kind, ProviderConfig cfg) {
       }
       return ReasoningDialect.openaiReasoningEffort;
   }
+}
+
+bool _isKimiAnthropicProvider(ProviderConfig cfg, String host) {
+  if (cfg.oauthProvider == OAuthProvider.kimi) return true;
+  if (host == 'api.kimi.com') return true;
+  final id = cfg.id.trim().toLowerCase();
+  final name = cfg.name.trim().toLowerCase();
+  return id.contains('kimi') || name.contains('kimi');
 }
 
 bool _isPoolsideHost(String host) {

@@ -120,6 +120,11 @@ ReasoningResolution resolveReasoning(ModelSpec spec, ReasoningRequest request) {
 /// flags (Responses `reasoning.summary`, adaptive `thinking`, Gemini
 /// `includeThoughts`). Explicit levels and `off` strip only the keys the
 /// effective dialect/transport owns, then write the shape.
+///
+/// `qwenEnableThinking` + `!canDisable` never writes `enable_thinking`
+/// (thinking-only DashScope models reject it). `thinkingType` over
+/// [ReasoningTransport.responses] uses `reasoning: {effort}` and owns
+/// `reasoning` only.
 Map<String, dynamic> applyReasoning(
   Map<String, dynamic> body,
   ModelSpec spec,
@@ -318,8 +323,12 @@ void _stripDialectOwnedKeys(
       body.remove('enable_thinking');
       body.remove('thinking_budget');
     case ReasoningDialect.thinkingType:
-      body.remove('thinking');
-      body.remove('reasoning_effort');
+      if (transport == ReasoningTransport.responses) {
+        body.remove('reasoning');
+      } else {
+        body.remove('thinking');
+        body.remove('reasoning_effort');
+      }
     case ReasoningDialect.kimiThinking:
       body.remove('thinking');
       body.remove('reasoning_effort');
@@ -367,7 +376,7 @@ void _writeDialect(
     case ReasoningDialect.siliconflowEnableThinking:
       _writeSiliconFlow(body, resolution);
     case ReasoningDialect.thinkingType:
-      _writeThinkingType(body, spec, resolution);
+      _writeThinkingType(body, spec, resolution, transport);
     case ReasoningDialect.kimiThinking:
       _writeKimiThinking(body, spec, resolution);
     case ReasoningDialect.internThinkingMode:
@@ -506,6 +515,12 @@ void _writeQwen(
   ReasoningResolution resolution,
   ReasoningTransport transport,
 ) {
+  if (!spec.reasoning.canDisable) {
+    if (resolution.budget != null) {
+      body['thinking_budget'] = resolution.budget;
+    }
+    return;
+  }
   final effective = resolution.effective;
   if (effective == ReasoningLevel.off) {
     body['enable_thinking'] = false;
@@ -549,8 +564,15 @@ void _writeThinkingType(
   Map<String, dynamic> body,
   ModelSpec spec,
   ReasoningResolution resolution,
+  ReasoningTransport transport,
 ) {
   final effective = resolution.effective;
+  if (transport == ReasoningTransport.responses) {
+    body['reasoning'] = <String, dynamic>{
+      'effort': effective == ReasoningLevel.off ? 'none' : effective.name,
+    };
+    return;
+  }
   if (effective == ReasoningLevel.off) {
     body['thinking'] = <String, dynamic>{'type': 'disabled'};
     return;

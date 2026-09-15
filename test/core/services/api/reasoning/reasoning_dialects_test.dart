@@ -248,6 +248,9 @@ Map<String, dynamic> _expectedBody({
       });
     case ReasoningDialect.qwenEnableThinking:
       if (effective == ReasoningLevel.auto) return {};
+      if (!canDisable) {
+        return {if (budget != null) 'thinking_budget': budget};
+      }
       if (effective == ReasoningLevel.off) {
         return {'enable_thinking': false};
       }
@@ -269,6 +272,13 @@ Map<String, dynamic> _expectedBody({
       return {'thinking_budget': budget};
     case ReasoningDialect.thinkingType:
       if (effective == ReasoningLevel.auto) return {};
+      if (transport == ReasoningTransport.responses) {
+        return {
+          'reasoning': {
+            'effort': effective == ReasoningLevel.off ? 'none' : effective.name,
+          },
+        };
+      }
       if (effective == ReasoningLevel.off) {
         return {
           'thinking': {'type': 'disabled'},
@@ -974,6 +984,81 @@ void main() {
         {
           'thinking': {'type': 'enabled'},
           'reasoning_effort': 'low',
+        },
+      );
+    });
+  });
+
+  group('qwen thinking-only and thinkingType Responses', () {
+    test('qwen !canDisable writes only thinking_budget', () {
+      final spec = _spec(
+        dialect: ReasoningDialect.qwenEnableThinking,
+        canDisable: false,
+      );
+      expect(
+        applyReasoning(
+          <String, dynamic>{'enable_thinking': true},
+          spec,
+          const ReasoningRequest(ReasoningLevel.high),
+          transport: ReasoningTransport.chatCompletions,
+        ),
+        {'thinking_budget': 8192},
+      );
+    });
+
+    test(
+      'qwen !canDisable off uses the lowest budget and omits enable_thinking',
+      () {
+        final spec = _spec(
+          dialect: ReasoningDialect.qwenEnableThinking,
+          canDisable: false,
+        );
+        expect(
+          applyReasoning(
+            <String, dynamic>{'enable_thinking': false},
+            spec,
+            const ReasoningRequest(ReasoningLevel.off),
+            transport: ReasoningTransport.chatCompletions,
+          ),
+          {'thinking_budget': 512},
+        );
+      },
+    );
+
+    test('thinkingType over responses writes reasoning.effort', () {
+      final spec = _spec(dialect: ReasoningDialect.thinkingType);
+      expect(
+        applyReasoning(
+          <String, dynamic>{
+            'thinking': {'type': 'enabled'},
+            'reasoning_effort': 'low',
+          },
+          spec,
+          const ReasoningRequest(ReasoningLevel.high),
+          transport: ReasoningTransport.responses,
+        ),
+        {
+          'thinking': {'type': 'enabled'},
+          'reasoning_effort': 'low',
+          'reasoning': {'effort': 'high'},
+        },
+      );
+    });
+
+    test('thinkingType over responses off writes effort none', () {
+      final spec = _spec(dialect: ReasoningDialect.thinkingType);
+      expect(
+        applyReasoning(
+          <String, dynamic>{
+            'thinking': {'type': 'enabled'},
+          },
+          spec,
+          const ReasoningRequest(ReasoningLevel.off),
+          transport: ReasoningTransport.responses,
+        ),
+        {
+          'thinking': {'type': 'enabled'},
+          'reasoning': {'effort': 'none'},
         },
       );
     });

@@ -176,8 +176,6 @@ void main() {
           ReasoningLevel.low: 1024,
           ReasoningLevel.medium: 4096,
           ReasoningLevel.high: 8192,
-          ReasoningLevel.xhigh: 16000,
-          ReasoningLevel.max: 32000,
         });
       },
     );

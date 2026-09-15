@@ -7,10 +7,13 @@ import '../../../core/models/chat_input_data.dart';
 import '../../../core/models/chat_message.dart';
 import '../../../core/models/message_part.dart';
 import '../../../core/models/conversation.dart';
+import '../../../core/models/model_spec.dart';
 import '../../../core/models/skills_binding.dart';
 import '../../../core/providers/settings_provider.dart';
 import '../../../core/services/api/builtin_tools.dart';
 import '../../../core/services/api/chat_api_service.dart';
+import '../../../core/services/api/reasoning/reasoning_dialects.dart';
+import '../../../core/services/model_spec/model_spec_resolver.dart';
 import '../../../core/providers/workspace_provider.dart';
 import '../../../core/services/chat/chat_service.dart';
 import '../../../core/services/chat/document_text_extractor.dart';
@@ -117,9 +120,7 @@ class MessageGenerationService {
 
   /// Check if reasoning is enabled for given budget
   bool isReasoningEnabled(int? budget) {
-    if (budget == null) return true;
-    if (budget == -1) return true;
-    return budget >= 1024;
+    return levelForLegacyBudget(budget) != ReasoningLevel.off;
   }
 
   /// Prepare API messages with all injections applied.
@@ -809,9 +810,11 @@ class MessageGenerationService {
     required String providerKey,
     required String modelId,
   }) {
-    // Former Omni audio allowlist removed; OpenAI-compatible providers do not
-    // receive special audio attachment support via this gate.
-    return false;
+    final cfg = settings.getProviderConfig(providerKey);
+    return ModelSpecResolver.instance
+        .spec(cfg, modelId)
+        .input
+        .contains(Modality.audio);
   }
 
   bool supportsAudioAttachmentsForProvider(

@@ -22,7 +22,6 @@ import 'providers/claude_official.dart';
 import 'providers/google_gemini.dart';
 import 'providers/google_vertex.dart';
 import 'providers/openai_chat_completions.dart';
-import 'providers/openai/openai_vendor_compat.dart';
 import 'providers/openai_images.dart';
 import 'providers/openai_responses.dart';
 import 'providers/zhipu_layout_parsing.dart';
@@ -47,13 +46,6 @@ class ChatApiService {
   @visibleForTesting
   static String normalizeClaudeImageMimeForTest(String mime) =>
       normalizeClaudeImageMime(mime);
-
-  @visibleForTesting
-  static bool isLongCatHostForTest(String baseUrl) => isLongCatHost(baseUrl);
-
-  @visibleForTesting
-  static bool shouldIncludeStreamingUsageOptionsForTest(String host) =>
-      shouldIncludeStreamingUsageOptions(host);
 
   static bool supportsOpenAIImagesApiRouting(
     ProviderConfig config,

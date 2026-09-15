@@ -77,77 +77,87 @@ void main() {
       }
     });
 
-    test(
-      'OpenAI-compatible latest models expose documented effort caps',
-      () async {
-        final harness = await createBusinessTestHarness(initial: {});
-        final settings = SettingsProvider(harness.preferences);
+    test('spec ladders drive xhigh / max support', () async {
+      final harness = await createBusinessTestHarness(initial: {});
+      final settings = SettingsProvider(harness.preferences);
+      await settings.loaded;
+      await settings.setProviderConfig(
+        'Claude',
+        ProviderConfig(
+          id: 'Claude',
+          enabled: true,
+          name: 'Claude',
+          apiKey: 'test-key',
+          baseUrl: 'https://api.anthropic.com/v1',
+          providerType: ProviderKind.claude,
+        ),
+      );
 
-        await settings.loaded;
+      const cases = <({String provider, String model, bool xhigh, bool max})>[
+        (provider: 'OpenAI', model: 'gpt-5.6-sol', xhigh: true, max: true),
+        (
+          provider: 'OpenRouter',
+          model: 'openai/gpt-5.6-sol',
+          xhigh: true,
+          max: true,
+        ),
+        (provider: 'OpenAI', model: 'kimi-k3', xhigh: false, max: true),
+        (
+          provider: 'OpenRouter',
+          model: 'moonshotai/kimi-k3',
+          xhigh: false,
+          max: true,
+        ),
+        (provider: 'OpenAI', model: 'grok-4.5', xhigh: false, max: false),
+        (provider: 'OpenAI', model: 'grok-4.6', xhigh: true, max: false),
+        (provider: 'OpenAI', model: 'deepseek-v4-pro', xhigh: false, max: true),
+        (provider: 'OpenAI', model: 'muse-spark-1.1', xhigh: true, max: false),
+        (provider: 'OpenAI', model: 'muse-spark-1.3', xhigh: true, max: true),
+        (provider: 'OpenAI', model: 'gpt-6-astra', xhigh: true, max: true),
+        (provider: 'OpenAI', model: 'glm-5.3', xhigh: false, max: true),
+        (provider: 'OpenAI', model: 'glm-5.3-flash', xhigh: false, max: true),
+        (provider: 'OpenAI', model: 'glm-5.2', xhigh: true, max: true),
+        (provider: 'OpenAI', model: 'gpt-5.3-codex', xhigh: true, max: false),
+        (provider: 'OpenAI', model: 'gpt-5.1-codex', xhigh: false, max: false),
+        (
+          provider: 'OpenAI',
+          model: 'gpt-5.1-codex-max',
+          xhigh: true,
+          max: false,
+        ),
+        (provider: 'Claude', model: 'claude-fable-5-1', xhigh: true, max: true),
+        (provider: 'Claude', model: 'claude-fable-5', xhigh: true, max: true),
+        (provider: 'Claude', model: 'claude-mythos-5', xhigh: true, max: true),
+        (provider: 'Claude', model: 'claude-opus-4-8', xhigh: true, max: true),
+        (provider: 'Claude', model: 'claude-opus-5', xhigh: true, max: true),
+        (provider: 'Claude', model: 'claude-sonnet-5', xhigh: true, max: true),
+        (
+          provider: 'Claude',
+          model: 'claude-haiku-4-5',
+          xhigh: false,
+          max: false,
+        ),
+        (
+          provider: 'Claude',
+          model: 'claude-sonnet-4-6',
+          xhigh: false,
+          max: true,
+        ),
+      ];
 
+      for (final c in cases) {
         expect(
-          settings.supportsXhighReasoning('OpenAI', 'gpt-5.6-sol'),
-          isTrue,
-        );
-        expect(settings.supportsMaxReasoning('OpenAI', 'gpt-5.6-sol'), isTrue);
-        expect(
-          settings.supportsXhighReasoning('OpenRouter', 'openai/gpt-5.6-sol'),
-          isTrue,
+          settings.supportsXhighReasoning(c.provider, c.model),
+          c.xhigh,
+          reason: '${c.provider}/${c.model} xhigh',
         );
         expect(
-          settings.supportsMaxReasoning('OpenRouter', 'openai/gpt-5.6-sol'),
-          isTrue,
+          settings.supportsMaxReasoning(c.provider, c.model),
+          c.max,
+          reason: '${c.provider}/${c.model} max',
         );
-        expect(settings.supportsMaxReasoning('OpenAI', 'kimi-k3'), isTrue);
-        expect(
-          settings.supportsMaxReasoning('OpenRouter', 'moonshotai/kimi-k3'),
-          isTrue,
-        );
-        expect(settings.supportsMaxReasoning('OpenAI', 'grok-4.5'), isFalse);
-        expect(settings.supportsXhighReasoning('OpenAI', 'grok-4.6'), isTrue);
-        expect(settings.supportsMaxReasoning('OpenAI', 'grok-4.6'), isFalse);
-        expect(
-          settings.supportsXhighReasoning('OpenAI', 'deepseek-v4-pro'),
-          isFalse,
-        );
-        expect(
-          settings.supportsMaxReasoning('OpenAI', 'deepseek-v4-pro'),
-          isTrue,
-        );
-        expect(
-          settings.supportsMaxReasoning('OpenAI', 'muse-spark-1.1'),
-          isFalse,
-        );
-        expect(
-          settings.supportsMaxReasoning('OpenAI', 'muse-spark-1.3'),
-          isTrue,
-        );
-        expect(
-          settings.supportsXhighReasoning('OpenAI', 'gpt-6-astra'),
-          isTrue,
-        );
-        expect(settings.supportsMaxReasoning('OpenAI', 'gpt-6-astra'), isTrue);
-        expect(settings.supportsMaxReasoning('OpenAI', 'glm-5.3'), isTrue);
-        expect(
-          settings.supportsXhighReasoning('OpenAI', 'glm-5.3-flash'),
-          isFalse,
-        );
-        expect(settings.supportsXhighReasoning('OpenAI', 'glm-5.2'), isTrue);
-        expect(settings.supportsMaxReasoning('OpenAI', 'glm-5.2'), isTrue);
-        expect(
-          settings.supportsXhighReasoning('OpenAI', 'gpt-5.3-codex'),
-          isTrue,
-        );
-        expect(
-          settings.supportsXhighReasoning('OpenAI', 'gpt-5.1-codex'),
-          isFalse,
-        );
-        expect(
-          settings.supportsXhighReasoning('OpenAI', 'gpt-5.1-codex-max'),
-          isTrue,
-        );
-      },
-    );
+      }
+    });
 
     test('OpenRouter can be routed through Anthropic format explicitly', () {
       final cfg = ProviderConfig(
@@ -332,55 +342,6 @@ void main() {
         },
       );
     });
-
-    test(
-      'Claude latest models expose xhigh and max reasoning without presets',
-      () async {
-        final harness = await createBusinessTestHarness(initial: {});
-        final settings = SettingsProvider(harness.preferences);
-
-        await settings.loaded;
-        await settings.setProviderConfig(
-          'Claude',
-          ProviderConfig(
-            id: 'Claude',
-            enabled: true,
-            name: 'Claude',
-            apiKey: 'test-key',
-            baseUrl: 'https://api.anthropic.com/v1',
-            providerType: ProviderKind.claude,
-            models: const [
-              'claude-fable-5-1',
-              'claude-fable-5',
-              'claude-mythos-5',
-              'claude-opus-4-8',
-              'claude-opus-5',
-              'claude-sonnet-5',
-            ],
-          ),
-        );
-
-        for (final model in const [
-          'claude-fable-5-1',
-          'claude-fable-5',
-          'claude-mythos-5',
-          'claude-opus-4-8',
-          'claude-opus-5',
-          'claude-sonnet-5',
-        ]) {
-          expect(settings.supportsXhighReasoning('Claude', model), isTrue);
-          expect(settings.supportsMaxReasoning('Claude', model), isTrue);
-        }
-        expect(settings.getProviderConfig('Claude').models, [
-          'claude-fable-5-1',
-          'claude-fable-5',
-          'claude-mythos-5',
-          'claude-opus-4-8',
-          'claude-opus-5',
-          'claude-sonnet-5',
-        ]);
-      },
-    );
 
     test('OpenRouter Anthropic format exposes Claude max reasoning', () async {
       final harness = await createBusinessTestHarness(initial: {});

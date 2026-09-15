@@ -29,6 +29,20 @@ bool reasoningDetailsLookAnthropic(dynamic raw) {
   return false;
 }
 
+/// True when details are Anthropic-tagged or carry a thinking signature.
+/// Those payloads must be rebuilt into whole signed blocks; the parallel
+/// `reasoning_content` text echo is rejected by the same upstreams.
+bool reasoningDetailsNeedSignedReplay(dynamic raw) {
+  if (reasoningDetailsLookAnthropic(raw)) return true;
+  if (raw is! List) return false;
+  for (final item in raw) {
+    if (item is! Map) continue;
+    final signature = item['signature'];
+    if (signature is String && signature.isNotEmpty) return true;
+  }
+  return false;
+}
+
 /// Returns the merged details list, or null when nothing replayable remains.
 List<Map<String, dynamic>>? normalizeReasoningDetailsForReplay(dynamic raw) {
   if (raw is! List || raw.isEmpty) return null;

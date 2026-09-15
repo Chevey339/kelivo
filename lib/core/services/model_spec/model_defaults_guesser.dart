@@ -187,6 +187,7 @@ class ModelDefaultsGuesser {
     _ReasoningRule(matches: _isGemini3FlashImage, apply: _gemini3FlashImage),
     _ReasoningRule(matches: _isGemini3Pro, apply: _gemini3Pro),
     _ReasoningRule(matches: _isGemini3Flash, apply: _gemini3Flash),
+    _ReasoningRule(matches: _isGemini3ReplayOnly, apply: _gemini3ReplayOnly),
     _ReasoningRule(matches: _isGeminiBudgetFamily, apply: _geminiBudget),
     _ReasoningRule(matches: _isQwen3Family, apply: _qwen3),
     _ReasoningRule(matches: _isLaguna, apply: _laguna),
@@ -201,7 +202,7 @@ class ModelDefaultsGuesser {
 
   static ModelGuess guess(String modelId, {ModelSpec? base}) {
     final spec = base ?? ModelSpec(id: modelId, displayName: modelId);
-    final id = modelId.toLowerCase();
+    final id = _normalizeGuesserId(modelId);
     final draft = _CapDraft(
       type: spec.type,
       input: spec.input,
@@ -219,6 +220,17 @@ class ModelDefaultsGuesser {
 
     if (_isImagesApiId(id)) {
       draft.type = ModelType.image;
+      // dall-e-2 accepts reference images on the edits endpoint; the others
+      // in this set are generation-only (agnes / SenseNova never allowed edits).
+      if (id == 'dall-e-2') {
+        if (!draft.input.contains(Modality.image)) {
+          draft.input.add(Modality.image);
+        }
+      } else if (id == 'dall-e-3' ||
+          id.startsWith('agnes-image-') ||
+          id == 'sensenova-u1-fast') {
+        draft.input.removeWhere((m) => m == Modality.image);
+      }
     }
 
     final normalized = ModelSpec(
@@ -251,6 +263,10 @@ class ModelDefaultsGuesser {
       }
     }
 
+    if (maxOutput == null && _isKimiFamily(id)) {
+      maxOutput = 32000;
+    }
+
     return ModelGuess(
       type: normalized.type,
       input: normalized.input,
@@ -277,6 +293,41 @@ class ModelDefaultsGuesser {
             ..clear()
             ..add(Modality.text);
           draft.abilities.clear();
+        },
+        terminal: true,
+      ),
+      _CapRule(
+        matches: _isGemini3FlashImage,
+        apply: (draft) {
+          if (!draft.input.contains(Modality.image)) {
+            draft.input.add(Modality.image);
+          }
+          if (!draft.output.contains(Modality.image)) {
+            draft.output.add(Modality.image);
+          }
+          draft.abilities.removeWhere((x) => x == ModelAbility.tool);
+          if (!draft.abilities.contains(ModelAbility.reasoning)) {
+            draft.abilities.add(ModelAbility.reasoning);
+          }
+        },
+        terminal: true,
+      ),
+      _CapRule(
+        matches: (id) =>
+            id.contains('image') &&
+            id.contains('gemini-3') &&
+            !_isGemini3FlashImage(id),
+        apply: (draft) {
+          if (!draft.input.contains(Modality.image)) {
+            draft.input.add(Modality.image);
+          }
+          if (!draft.output.contains(Modality.image)) {
+            draft.output.add(Modality.image);
+          }
+          draft.abilities.removeWhere((x) => x == ModelAbility.tool);
+          if (!draft.abilities.contains(ModelAbility.reasoning)) {
+            draft.abilities.add(ModelAbility.reasoning);
+          }
         },
         terminal: true,
       ),
@@ -335,7 +386,9 @@ class ModelDefaultsGuesser {
         },
       ),
       _CapRule(
-        matches: (id) => _reasoning.hasMatch(id) || _isKimiCode(id),
+        matches: (id) =>
+            (_reasoning.hasMatch(id) || _isKimiCode(id)) &&
+            !_isGemini25NonTextVariant(id),
         apply: (draft) {
           if (!draft.abilities.contains(ModelAbility.reasoning)) {
             draft.abilities.add(ModelAbility.reasoning);
@@ -358,6 +411,23 @@ bool _isImagesApiId(String id) {
 bool _matches(String id, String pattern) {
   return RegExp(pattern, caseSensitive: false).hasMatch(id);
 }
+
+/// Lowercase the id and strip a Vertex-style `@YYYYMMDD` (or any all-digit)
+/// suffix so family tables match `claude-sonnet-4@20250514`.
+String _normalizeGuesserId(String modelId) {
+  var id = modelId.toLowerCase();
+  final at = id.lastIndexOf('@');
+  if (at <= 0) return id;
+  final suffix = id.substring(at + 1);
+  if (suffix.isEmpty) return id;
+  for (var i = 0; i < suffix.length; i++) {
+    final code = suffix.codeUnitAt(i);
+    if (code < 48 || code > 57) return id;
+  }
+  return id.substring(0, at);
+}
+
+bool _isKimiFamily(String id) => id.contains('kimi') || _isKimiCodeK3Alias(id);
 
 bool _isKimiCodeK3Alias(String id) {
   final normalized = id.trim().toLowerCase();
@@ -472,11 +542,24 @@ bool _isGemini3TextModel(String id) {
 bool _isGemini25Pro(String id) =>
     _matches(id, r'(^|[/_:@])gemini-2\.5-pro(?:$|[-.])');
 
+bool _isGeminiNonTextVariant(String id) {
+  if (!id.contains('gemini')) return false;
+  if (_isGemini3FlashImage(id)) return false;
+  return _gemini3NonTextSuffix.hasMatch(id);
+}
+
+bool _isGemini3ReplayOnly(String id) =>
+    id.contains('gemini-3') && _isGeminiNonTextVariant(id);
+
+bool _isGemini25NonTextVariant(String id) =>
+    _isGeminiNonTextVariant(id) && !id.contains('gemini-3');
+
 bool _isGeminiBudgetFamily(String id) {
   return id.contains('gemini') &&
       !_isGemini3FlashImage(id) &&
       !_isGemini3Pro(id) &&
-      !_isGemini3Flash(id);
+      !_isGemini3Flash(id) &&
+      !_isGeminiNonTextVariant(id);
 }
 
 bool _isDashScopeThinkingOnlyModel(String id) {
@@ -758,6 +841,14 @@ _ReasoningHit _gemma4(String id) {
   );
 }
 
+_ReasoningHit _gemini3ReplayOnly(String _) {
+  return _fixed(
+    dialect: ReasoningDialect.none,
+    canDisable: true,
+    replay: ReasoningReplayPolicy.all,
+  );
+}
+
 _ReasoningHit _gemini3FlashImage(String id) {
   return _fixed(
     dialect: ReasoningDialect.geminiThinkingLevel,
@@ -765,6 +856,7 @@ _ReasoningHit _gemini3FlashImage(String id) {
     canDisable: false,
     defaultLevel: ReasoningLevel.minimal,
     sampling: _isGemini3TextModel(id) ? SamplingPolicy.never : null,
+    replay: ReasoningReplayPolicy.all,
   );
 }
 
@@ -779,6 +871,7 @@ _ReasoningHit _gemini3Pro(String id) {
     canDisable: false,
     defaultLevel: ReasoningLevel.high,
     sampling: SamplingPolicy.never,
+    replay: ReasoningReplayPolicy.all,
   );
 }
 
@@ -807,6 +900,7 @@ _ReasoningHit _gemini3Flash(String id) {
     defaultLevel: defaultLevel,
     sampling: SamplingPolicy.never,
     maxOutput: minor >= 5 ? 65536 : null,
+    replay: ReasoningReplayPolicy.all,
   );
 }
 
@@ -815,6 +909,7 @@ _ReasoningHit _geminiBudget(String id) {
     dialect: ReasoningDialect.geminiThinkingBudget,
     canDisable: !_isGemini25Pro(id),
     sampling: _isGemini3TextModel(id) ? SamplingPolicy.never : null,
+    replay: id.contains('gemini-3') ? ReasoningReplayPolicy.all : null,
   );
 }
 
@@ -886,32 +981,19 @@ bool _claudeSupportsMax(String id) {
 }
 
 int _claudeMaxOutput(String id) {
-  const vertex = <String, int>{
-    'claude-fable-5-1': 128000,
-    'claude-fable-5': 128000,
-    'claude-opus-5': 128000,
-    'claude-opus-4-8': 128000,
-    'claude-opus-4-7': 128000,
-    'claude-opus-4-6': 128000,
-    'claude-sonnet-5': 128000,
-    'claude-sonnet-4-6': 128000,
-    'claude-opus-4-5@20251101': 64000,
-    'claude-sonnet-4-5@20250929': 64000,
-    'claude-haiku-4-5@20251001': 64000,
-    'claude-sonnet-4@20250514': 64000,
-    'claude-opus-4-1@20250805': 32000,
-    'claude-opus-4@20250514': 32000,
-    'claude-3-haiku@20240307': 8000,
-    'claude-3-5-sonnet@20240620': 8192,
-    'claude-3-5-sonnet-v2@20241022': 8192,
-  };
-  final exact = vertex[id];
-  if (exact != null) return exact;
-  if (RegExp(
-    r'claude-(?:fable-5|mythos-5|opus-(?:5|4-8)|sonnet-5)(?:$|[._:@/-])',
-    caseSensitive: false,
-  ).hasMatch(id)) {
+  if (_matches(
+    id,
+    r'claude-(?:fable-5|mythos-5|opus-(?:5|4-[678])|sonnet-(?:5|4-6))(?:$|[._:/-])',
+  )) {
     return 128000;
+  }
+  if (_matches(id, r'claude-3-haiku(?:$|[._:/])')) return 8000;
+  if (id.contains('claude-3-5-sonnet') || id.contains('claude-3.5-sonnet')) {
+    return 8192;
+  }
+  if (_matches(id, r'claude-opus-4-1(?:$|[._:/])') ||
+      _matches(id, r'claude-opus-4(?:$|[._:/])')) {
+    return 32000;
   }
   return 64000;
 }
@@ -952,6 +1034,11 @@ _ReasoningHit _claudeFamily(String id) {
   }
   return _fixed(
     dialect: ReasoningDialect.anthropicBudget,
+    levels: const [
+      ReasoningLevel.low,
+      ReasoningLevel.medium,
+      ReasoningLevel.high,
+    ],
     canDisable: true,
     sampling: sampling,
     maxOutput: maxOutput,

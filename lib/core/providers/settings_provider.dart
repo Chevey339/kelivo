@@ -30,7 +30,8 @@ import '../services/screen_wakelock.dart';
 import '../../utils/app_directories.dart';
 import '../../utils/sandbox_path_resolver.dart';
 import '../../utils/avatar_cache.dart';
-import '../utils/openai_model_compat.dart';
+import '../models/model_spec.dart';
+import '../services/model_spec/model_spec_resolver.dart';
 import '../../utils/provider_grouping_logic.dart';
 import '../../utils/brand_assets.dart';
 import '../../utils/image_compressor.dart';
@@ -562,139 +563,22 @@ class SettingsProvider extends ChangeNotifier {
     return ProviderConfig.defaultsFor(key, displayName: defaultName);
   }
 
-  String resolveOpenAIUpstreamModelId(String providerKey, String modelId) {
-    final cfg = getProviderConfig(providerKey);
-    final kind = ProviderConfig.classify(
-      cfg.id,
-      explicitType: cfg.providerType,
-    );
-    if (kind != ProviderKind.openai) return modelId;
-    final rawOv = cfg.modelOverrides[modelId];
-    final ov = rawOv is Map ? rawOv.cast<String, dynamic>() : null;
-    return resolveApiModelIdOverride(ov, modelId);
-  }
-
   bool supportsXhighReasoning(String providerKey, String modelId) {
     final cfg = getProviderConfig(providerKey);
-    final kind = ProviderConfig.classify(
-      cfg.id,
-      explicitType: cfg.providerType,
-    );
-    switch (kind) {
-      case ProviderKind.openai:
-        final modelForCheck = resolveOpenAIUpstreamModelId(
-          providerKey,
-          modelId,
-        );
-        return openAISupportsXhighReasoning(modelForCheck);
-      case ProviderKind.claude:
-        final rawOv = cfg.modelOverrides[modelId];
-        final ov = rawOv is Map ? rawOv.cast<String, dynamic>() : null;
-        final modelForCheck = resolveApiModelIdOverride(ov, modelId);
-        return !ProviderConfig.isDeepSeekClaudeCompatible(
-              modelForCheck,
-              config: cfg,
-            ) &&
-            _claudeSupportsXhighReasoning(modelForCheck);
-      case ProviderKind.google:
-        return false;
-    }
+    return ModelSpecResolver.instance
+        .spec(cfg, modelId)
+        .reasoning
+        .levels
+        .contains(ReasoningLevel.xhigh);
   }
 
   bool supportsMaxReasoning(String providerKey, String modelId) {
     final cfg = getProviderConfig(providerKey);
-    final kind = ProviderConfig.classify(
-      cfg.id,
-      explicitType: cfg.providerType,
-    );
-    switch (kind) {
-      case ProviderKind.openai:
-        final modelForCheck = resolveOpenAIUpstreamModelId(
-          providerKey,
-          modelId,
-        );
-        return openAISupportsMaxReasoning(modelForCheck);
-      case ProviderKind.google:
-        return false;
-      case ProviderKind.claude:
-        final rawOv = cfg.modelOverrides[modelId];
-        final ov = rawOv is Map ? rawOv.cast<String, dynamic>() : null;
-        final modelForCheck = resolveApiModelIdOverride(ov, modelId);
-        return ProviderConfig.isDeepSeekClaudeCompatible(
-              modelForCheck,
-              config: cfg,
-            ) ||
-            _claudeSupportsMaxReasoning(modelForCheck);
-    }
-  }
-
-  bool supportsOpenAIXhighReasoning(String providerKey, String modelId) {
-    return supportsXhighReasoning(providerKey, modelId);
-  }
-
-  bool _claudeSupportsXhighReasoning(String modelId) {
-    final lower = modelId.trim().toLowerCase();
-    if (!lower.contains('claude-')) return false;
-    if (lower.contains('fable') || lower.contains('mythos')) return true;
-    if (RegExp(
-      r'claude-(?:opus|sonnet)-5(?:$|[._:@/-])',
-      caseSensitive: false,
-    ).hasMatch(lower)) {
-      return true;
-    }
-    final m = RegExp(
-      r'claude-(opus|sonnet)-(\d+)[-.](\d+)',
-      caseSensitive: false,
-    ).firstMatch(lower);
-    if (m == null) {
-      return lower.contains('claude-opus-4-7') ||
-          lower.contains('claude-opus-4.7') ||
-          lower.contains('claude-opus-4-8') ||
-          lower.contains('claude-opus-4.8');
-    }
-    final family = (m.group(1) ?? '').toLowerCase();
-    final major = int.tryParse(m.group(2) ?? '');
-    final minor = int.tryParse(m.group(3) ?? '');
-    if (major == null || minor == null) return false;
-    if (family == 'opus' && (major > 4 || (major == 4 && minor >= 7))) {
-      return true;
-    }
-    return false;
-  }
-
-  bool _claudeSupportsMaxReasoning(String modelId) {
-    final lower = modelId.trim().toLowerCase();
-    if (!lower.contains('claude-')) return false;
-    if (lower.contains('fable') || lower.contains('mythos')) return true;
-    if (RegExp(
-      r'claude-(?:opus|sonnet)-5(?:$|[._:@/-])',
-      caseSensitive: false,
-    ).hasMatch(lower)) {
-      return true;
-    }
-    final m = RegExp(
-      r'claude-(opus|sonnet)-(\d+)[-.](\d+)',
-      caseSensitive: false,
-    ).firstMatch(lower);
-    if (m == null) {
-      return lower.contains('claude-opus-4-7') ||
-          lower.contains('claude-opus-4.7') ||
-          lower.contains('claude-opus-4-8') ||
-          lower.contains('claude-opus-4.8') ||
-          lower.contains('claude-opus-4-6') ||
-          lower.contains('claude-opus-4.6') ||
-          lower.contains('claude-sonnet-4-6') ||
-          lower.contains('claude-sonnet-4.6');
-    }
-    final family = (m.group(1) ?? '').toLowerCase();
-    final major = int.tryParse(m.group(2) ?? '');
-    final minor = int.tryParse(m.group(3) ?? '');
-    if (major == null || minor == null) return false;
-    if (family == 'opus' && (major > 4 || (major == 4 && minor >= 7))) {
-      return true;
-    }
-    if (major == 4 && minor == 6) return true;
-    return false;
+    return ModelSpecResolver.instance
+        .spec(cfg, modelId)
+        .reasoning
+        .levels
+        .contains(ReasoningLevel.max);
   }
 
   // Explicitly ensure a provider config exists in memory (without persisting to storage).
@@ -6105,16 +5989,6 @@ class ProviderConfig {
     return host.contains('deepseek.com') ||
         config.id.trim().toLowerCase().contains('deepseek') ||
         config.name.trim().toLowerCase().contains('deepseek');
-  }
-
-  /// Whether this config talks to DeepSeek's Claude-compatible endpoint,
-  /// which diverges from Anthropic on thinking/effort handling.
-  static bool isDeepSeekClaudeCompatible(
-    String modelId, {
-    ProviderConfig? config,
-  }) {
-    if (modelId.trim().toLowerCase().contains('deepseek')) return true;
-    return isDeepSeekConfig(config);
   }
 
   static const String claudePromptCachingTtl5m = '5m';

@@ -75,16 +75,13 @@ Map<String, dynamic>? openaiMetadataForExtraContent(dynamic extraContent) {
   };
 }
 
-Map<String, dynamic> openaiToolCallForRequest(
-  Map toolCall, {
-  bool includeGoogleExtraContent = true,
-}) {
+Map<String, dynamic> openaiToolCallForRequest(Map toolCall) {
   final copy = toolCall.map((key, value) => MapEntry(key.toString(), value));
   final extra =
       _openaiExtraContentFrom(copy['extra_content']) ??
       _openaiExtraContentFromMetadata(copy['metadata']);
   copy.remove('metadata');
-  if (extra != null && includeGoogleExtraContent) {
+  if (extra != null) {
     copy['extra_content'] = extra;
   } else {
     copy.remove('extra_content');

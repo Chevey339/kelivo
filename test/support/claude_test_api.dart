@@ -313,7 +313,6 @@ Future<ClaudeExchange> captureClaudeExchange({
   final serverUrl = 'http://${server.address.address}:${server.port}';
   final cfg = config ?? claudeConfig();
   final keepBaseUrl =
-      cfg.vertexAI == true ||
       (Uri.tryParse(cfg.baseUrl)?.host ?? '') == 'api.anthropic.com';
 
   final chunks = <StreamChunk>[];
