@@ -66,16 +66,6 @@ const Map<ReasoningLevel, int> _fixedBudgets = {
   ReasoningLevel.max: 32000,
 };
 
-const List<String> _ownedTopLevelKeys = [
-  'reasoning_effort',
-  'reasoning',
-  'thinking',
-  'output_config',
-  'enable_thinking',
-  'thinking_budget',
-  'thinking_mode',
-];
-
 const List<String> _chatSamplingKeys = [
   'temperature',
   'top_p',
@@ -121,9 +111,15 @@ ReasoningResolution resolveReasoning(ModelSpec spec, ReasoningRequest request) {
   );
 }
 
-/// Removes every key owned by the spec's dialect from [body] and writes the
-/// shape for the effective level. Mutates and returns [body]. No-op when the
-/// model has no reasoning ability or dialect == none.
+/// Writes the effective dialect shape into [body]. Runs after extraBody merge
+/// and is the only writer of reasoning keys. Mutates and returns [body].
+///
+/// No-op when the model has no reasoning ability or dialect == none.
+///
+/// `auto` is non-destructive: it strips nothing and only put-if-absent surface
+/// flags (Responses `reasoning.summary`, adaptive `thinking`, Gemini
+/// `includeThoughts`). Explicit levels and `off` strip only the keys the
+/// effective dialect/transport owns, then write the shape.
 Map<String, dynamic> applyReasoning(
   Map<String, dynamic> body,
   ModelSpec spec,
@@ -135,7 +131,11 @@ Map<String, dynamic> applyReasoning(
     return body;
   }
   final resolution = resolveReasoning(spec, request);
-  _stripOwnedKeys(body);
+  if (resolution.effective == ReasoningLevel.auto) {
+    _writeAutoSurfaceFlags(body, spec.reasoning.dialect, transport);
+    return body;
+  }
+  _stripDialectOwnedKeys(body, spec.reasoning.dialect, transport);
   _writeDialect(body, spec, request, resolution, transport);
   return body;
 }
@@ -247,12 +247,94 @@ ReasoningLevel _lowestExplicitLevel(ReasoningSpec spec) {
   return ReasoningLevel.minimal;
 }
 
-void _stripOwnedKeys(Map<String, dynamic> body) {
-  for (final key in _ownedTopLevelKeys) {
-    body.remove(key);
+bool _usesResponsesEnvelope(
+  ReasoningDialect dialect,
+  ReasoningTransport transport,
+) {
+  return switch (transport) {
+    ReasoningTransport.responses => true,
+    ReasoningTransport.chatCompletions => false,
+    ReasoningTransport.anthropicMessages ||
+    ReasoningTransport.geminiGenerateContent =>
+      dialect == ReasoningDialect.openaiResponsesReasoning,
+  };
+}
+
+void _writeAutoSurfaceFlags(
+  Map<String, dynamic> body,
+  ReasoningDialect dialect,
+  ReasoningTransport transport,
+) {
+  if (_isOpenAiDialect(dialect) && transport == ReasoningTransport.responses) {
+    final reasoning = _ensureMap(body, 'reasoning');
+    reasoning.putIfAbsent('summary', () => 'auto');
+    return;
   }
-  _removeFromNested(body, 'chat_template_kwargs', const ['enable_thinking']);
-  _removeFromNested(body, 'generationConfig', const ['thinkingConfig']);
+  if (dialect == ReasoningDialect.anthropicAdaptiveEffort) {
+    if (!body.containsKey('thinking')) {
+      body['thinking'] = <String, dynamic>{
+        'type': 'adaptive',
+        'display': 'summarized',
+      };
+    }
+    return;
+  }
+  if (dialect == ReasoningDialect.geminiThinkingBudget ||
+      dialect == ReasoningDialect.geminiThinkingLevel) {
+    final thinkingConfig = _ensureMap(
+      _ensureMap(body, 'generationConfig'),
+      'thinkingConfig',
+    );
+    thinkingConfig.putIfAbsent('includeThoughts', () => true);
+  }
+}
+
+void _stripDialectOwnedKeys(
+  Map<String, dynamic> body,
+  ReasoningDialect dialect,
+  ReasoningTransport transport,
+) {
+  switch (dialect) {
+    case ReasoningDialect.openaiReasoningEffort:
+    case ReasoningDialect.openaiResponsesReasoning:
+      if (_usesResponsesEnvelope(dialect, transport)) {
+        body.remove('reasoning');
+      } else {
+        body.remove('reasoning_effort');
+      }
+    case ReasoningDialect.openrouterReasoning:
+      body.remove('reasoning');
+      body.remove('reasoning_effort');
+    case ReasoningDialect.anthropicBudget:
+    case ReasoningDialect.anthropicAdaptiveEffort:
+    case ReasoningDialect.anthropicEffort:
+      body.remove('thinking');
+      body.remove('output_config');
+    case ReasoningDialect.geminiThinkingBudget:
+    case ReasoningDialect.geminiThinkingLevel:
+      _removeFromNested(body, 'generationConfig', const ['thinkingConfig']);
+    case ReasoningDialect.qwenEnableThinking:
+    case ReasoningDialect.siliconflowEnableThinking:
+      body.remove('enable_thinking');
+      body.remove('thinking_budget');
+    case ReasoningDialect.thinkingType:
+      body.remove('thinking');
+      body.remove('reasoning_effort');
+    case ReasoningDialect.kimiThinking:
+      body.remove('thinking');
+      body.remove('reasoning_effort');
+      body.remove('reasoning');
+      body.remove('output_config');
+    case ReasoningDialect.internThinkingMode:
+      body.remove('thinking_mode');
+    case ReasoningDialect.chatTemplateKwargs:
+      _removeFromNested(body, 'chat_template_kwargs', const [
+        'enable_thinking',
+      ]);
+    case ReasoningDialect.custom:
+    case ReasoningDialect.none:
+      break;
+  }
 }
 
 void _writeDialect(
@@ -307,23 +389,10 @@ void _writeOpenAi(
   ReasoningResolution resolution,
   ReasoningTransport transport,
 ) {
-  final useResponsesEnvelope = switch (transport) {
-    ReasoningTransport.responses => true,
-    ReasoningTransport.chatCompletions => false,
-    ReasoningTransport.anthropicMessages ||
-    ReasoningTransport.geminiGenerateContent =>
-      dialect == ReasoningDialect.openaiResponsesReasoning,
-  };
-  final effective = resolution.effective;
-  if (effective == ReasoningLevel.auto) {
-    if (dialect == ReasoningDialect.openaiResponsesReasoning &&
-        useResponsesEnvelope) {
-      body['reasoning'] = <String, dynamic>{'summary': 'auto'};
-    }
-    return;
-  }
-  final effort = effective == ReasoningLevel.off ? 'none' : effective.name;
-  if (useResponsesEnvelope) {
+  final effort = resolution.effective == ReasoningLevel.off
+      ? 'none'
+      : resolution.effective.name;
+  if (_usesResponsesEnvelope(dialect, transport)) {
     body['reasoning'] = <String, dynamic>{'effort': effort, 'summary': 'auto'};
   } else {
     body['reasoning_effort'] = effort;
@@ -336,7 +405,6 @@ void _writeOpenRouter(
   ReasoningResolution resolution,
 ) {
   final effective = resolution.effective;
-  if (effective == ReasoningLevel.auto) return;
   if (effective == ReasoningLevel.off) {
     body['reasoning'] = <String, dynamic>{'enabled': false};
     return;
@@ -356,7 +424,6 @@ void _writeAnthropicBudget(
   ReasoningResolution resolution,
 ) {
   final effective = resolution.effective;
-  if (effective == ReasoningLevel.auto) return;
   if (effective == ReasoningLevel.off) {
     body['thinking'] = <String, dynamic>{'type': 'disabled'};
     return;
@@ -380,9 +447,7 @@ void _writeAnthropicAdaptive(
     'type': 'adaptive',
     'display': 'summarized',
   };
-  if (_isExplicitLevel(effective)) {
-    body['output_config'] = <String, dynamic>{'effort': effective.name};
-  }
+  body['output_config'] = <String, dynamic>{'effort': effective.name};
 }
 
 void _writeAnthropicEffort(
@@ -390,7 +455,6 @@ void _writeAnthropicEffort(
   ReasoningResolution resolution,
 ) {
   final effective = resolution.effective;
-  if (effective == ReasoningLevel.auto) return;
   if (effective == ReasoningLevel.off) {
     body['thinking'] = <String, dynamic>{'type': 'disabled'};
     return;
@@ -405,10 +469,6 @@ void _writeGeminiBudget(
   ReasoningResolution resolution,
 ) {
   final hideThoughts = request.level == ReasoningLevel.off;
-  if (resolution.effective == ReasoningLevel.auto) {
-    _setThinkingConfig(body, <String, dynamic>{'includeThoughts': true});
-    return;
-  }
   if (resolution.effective == ReasoningLevel.off) {
     _setThinkingConfig(body, <String, dynamic>{
       'includeThoughts': false,
@@ -427,10 +487,6 @@ void _writeGeminiLevel(
   ModelSpec spec,
   ReasoningResolution resolution,
 ) {
-  if (resolution.effective == ReasoningLevel.auto) {
-    _setThinkingConfig(body, <String, dynamic>{'includeThoughts': true});
-    return;
-  }
   final hideThoughts =
       resolution.requested == ReasoningLevel.off ||
       resolution.effective == ReasoningLevel.off;
@@ -451,7 +507,6 @@ void _writeQwen(
   ReasoningTransport transport,
 ) {
   final effective = resolution.effective;
-  if (effective == ReasoningLevel.auto) return;
   if (effective == ReasoningLevel.off) {
     body['enable_thinking'] = false;
     return;
@@ -481,7 +536,6 @@ void _writeSiliconFlow(
   ReasoningResolution resolution,
 ) {
   final effective = resolution.effective;
-  if (effective == ReasoningLevel.auto) return;
   if (effective == ReasoningLevel.off) {
     body['enable_thinking'] = false;
     return;
@@ -497,7 +551,6 @@ void _writeThinkingType(
   ReasoningResolution resolution,
 ) {
   final effective = resolution.effective;
-  if (effective == ReasoningLevel.auto) return;
   if (effective == ReasoningLevel.off) {
     body['thinking'] = <String, dynamic>{'type': 'disabled'};
     return;
@@ -519,7 +572,6 @@ void _writeKimiThinking(
   // K3 is already openaiReasoningEffort. No in-repo evidence that Moonshot
   // rejects thinking.effort, so this is not split into a second enum.
   final effective = resolution.effective;
-  if (effective == ReasoningLevel.auto) return;
   if (effective == ReasoningLevel.off) {
     body['thinking'] = <String, dynamic>{'type': 'disabled'};
     return;
@@ -531,19 +583,15 @@ void _writeKimiThinking(
 }
 
 void _writeIntern(Map<String, dynamic> body, ReasoningResolution resolution) {
-  final effective = resolution.effective;
-  if (effective == ReasoningLevel.auto) return;
-  body['thinking_mode'] = effective != ReasoningLevel.off;
+  body['thinking_mode'] = resolution.effective != ReasoningLevel.off;
 }
 
 void _writeChatTemplateKwargs(
   Map<String, dynamic> body,
   ReasoningResolution resolution,
 ) {
-  final effective = resolution.effective;
-  if (effective == ReasoningLevel.auto) return;
-  final kwargs = _mutableChild(body, 'chat_template_kwargs');
-  kwargs['enable_thinking'] = effective != ReasoningLevel.off;
+  _ensureMap(body, 'chat_template_kwargs')['enable_thinking'] =
+      resolution.effective != ReasoningLevel.off;
 }
 
 void _writeCustom(
@@ -551,7 +599,6 @@ void _writeCustom(
   ModelSpec spec,
   ReasoningResolution resolution,
 ) {
-  if (resolution.effective == ReasoningLevel.auto) return;
   final patch = spec.reasoning.customPatches[resolution.effective];
   if (patch == null) return;
   final remove = patch[r'$remove'];
@@ -569,7 +616,7 @@ void _setThinkingConfig(
   Map<String, dynamic> body,
   Map<String, dynamic> config,
 ) {
-  _mutableChild(body, 'generationConfig')['thinkingConfig'] = config;
+  _ensureMap(body, 'generationConfig')['thinkingConfig'] = config;
 }
 
 Map<String, dynamic> _asMutableMap(dynamic value) {
@@ -584,7 +631,7 @@ Map<String, dynamic> _asMutableMap(dynamic value) {
   return <String, dynamic>{};
 }
 
-Map<String, dynamic> _mutableChild(Map<String, dynamic> parent, String key) {
+Map<String, dynamic> _ensureMap(Map<String, dynamic> parent, String key) {
   final child = _asMutableMap(parent[key]);
   parent[key] = child;
   return child;

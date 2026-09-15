@@ -117,7 +117,7 @@ Map<String, dynamic> _openaiBody({
       dialect == ReasoningDialect.openaiResponsesReasoning,
   };
   if (effective == ReasoningLevel.auto) {
-    if (dialect == ReasoningDialect.openaiResponsesReasoning && responses) {
+    if (transport == ReasoningTransport.responses) {
       return {
         'reasoning': {'summary': 'auto'},
       };
@@ -448,7 +448,9 @@ void main() {
             const ReasoningRequest(ReasoningLevel.auto),
             transport: ReasoningTransport.responses,
           ),
-          isEmpty,
+          {
+            'reasoning': {'summary': 'auto'},
+          },
         );
         expect(
           applyReasoning(
@@ -630,7 +632,7 @@ void main() {
   });
 
   group('stale-key removal', () {
-    test('switching dialects drops every owned key', () {
+    test('explicit level strips only the effective dialect keys', () {
       final dirty = <String, dynamic>{
         'model': 'kept',
         'reasoning_effort': 'high',
@@ -639,7 +641,7 @@ void main() {
         'output_config': {'effort': 'high'},
         'enable_thinking': true,
         'thinking_budget': 999,
-        'thinking_mode': true,
+        'thinking_mode': false,
         'chat_template_kwargs': {'enable_thinking': true, 'other': 1},
         'generationConfig': {
           'thinkingConfig': {'includeThoughts': true, 'thinkingBudget': 9},
@@ -654,9 +656,18 @@ void main() {
       );
       expect(body, {
         'model': 'kept',
+        'reasoning_effort': 'high',
+        'reasoning': {'effort': 'high', 'enabled': true, 'max_tokens': 9},
+        'thinking': {'type': 'enabled', 'budget_tokens': 9, 'effort': 'high'},
+        'output_config': {'effort': 'high'},
+        'enable_thinking': true,
+        'thinking_budget': 999,
         'thinking_mode': true,
-        'chat_template_kwargs': {'other': 1},
-        'generationConfig': {'temperature': 0.2},
+        'chat_template_kwargs': {'enable_thinking': true, 'other': 1},
+        'generationConfig': {
+          'thinkingConfig': {'includeThoughts': true, 'thinkingBudget': 9},
+          'temperature': 0.2,
+        },
       });
     });
   });
@@ -688,10 +699,11 @@ void main() {
         'stale': {'left': true},
         'keep': 'yes',
         'nested': {'a': 1, 'b': 2},
+        'reasoning_effort': 'gone',
       });
     });
 
-    test('auto applies no patch after stripping', () {
+    test('auto applies no patch and does not strip', () {
       final spec = _spec(
         dialect: ReasoningDialect.custom,
         customPatches: _customPatches,
@@ -703,7 +715,7 @@ void main() {
           const ReasoningRequest(ReasoningLevel.auto),
           transport: ReasoningTransport.chatCompletions,
         ),
-        {'flag': 'old'},
+        {'reasoning_effort': 'high', 'flag': 'old'},
       );
     });
   });
@@ -994,6 +1006,126 @@ void main() {
           ),
           const ReasoningRequest(ReasoningLevel.high),
           transport: ReasoningTransport.chatCompletions,
+        ),
+        {
+          'thinking': {'type': 'enabled'},
+        },
+      );
+    });
+  });
+
+  group('extraBody survival', () {
+    test('user-provided reasoning_effort survives auto', () {
+      expect(
+        applyReasoning(
+          <String, dynamic>{'reasoning_effort': 'high', 'keep': true},
+          _spec(dialect: ReasoningDialect.openaiReasoningEffort),
+          const ReasoningRequest(ReasoningLevel.auto),
+          transport: ReasoningTransport.chatCompletions,
+        ),
+        {'reasoning_effort': 'high', 'keep': true},
+      );
+    });
+
+    test('auto does not clobber a user thinking map on an OpenAI dialect', () {
+      expect(
+        applyReasoning(
+          <String, dynamic>{
+            'thinking': {'type': 'enabled', 'effort': 'low'},
+          },
+          _spec(dialect: ReasoningDialect.openaiReasoningEffort),
+          const ReasoningRequest(ReasoningLevel.auto),
+          transport: ReasoningTransport.chatCompletions,
+        ),
+        {
+          'thinking': {'type': 'enabled', 'effort': 'low'},
+        },
+      );
+    });
+
+    test(
+      'Gemini auto keeps a user thinkingBudget and adds includeThoughts',
+      () {
+        expect(
+          applyReasoning(
+            <String, dynamic>{
+              'generationConfig': {
+                'thinkingConfig': {'thinkingBudget': 2048},
+              },
+            },
+            _spec(dialect: ReasoningDialect.geminiThinkingBudget),
+            const ReasoningRequest(ReasoningLevel.auto),
+            transport: ReasoningTransport.geminiGenerateContent,
+          ),
+          {
+            'generationConfig': {
+              'thinkingConfig': {
+                'thinkingBudget': 2048,
+                'includeThoughts': true,
+              },
+            },
+          },
+        );
+      },
+    );
+
+    test('explicit level replaces the user value for the owned key', () {
+      expect(
+        applyReasoning(
+          <String, dynamic>{'reasoning_effort': 'low'},
+          _spec(dialect: ReasoningDialect.openaiReasoningEffort),
+          const ReasoningRequest(ReasoningLevel.high),
+          transport: ReasoningTransport.chatCompletions,
+        ),
+        {'reasoning_effort': 'high'},
+      );
+    });
+
+    test('explicit level leaves unrelated dialect keys alone', () {
+      expect(
+        applyReasoning(
+          <String, dynamic>{
+            'reasoning_effort': 'low',
+            'thinking': {'type': 'enabled'},
+            'enable_thinking': true,
+          },
+          _spec(dialect: ReasoningDialect.openaiReasoningEffort),
+          const ReasoningRequest(ReasoningLevel.high),
+          transport: ReasoningTransport.chatCompletions,
+        ),
+        {
+          'reasoning_effort': 'high',
+          'thinking': {'type': 'enabled'},
+          'enable_thinking': true,
+        },
+      );
+    });
+
+    test('Responses auto keeps a user effort and adds summary if absent', () {
+      expect(
+        applyReasoning(
+          <String, dynamic>{
+            'reasoning': {'effort': 'high'},
+          },
+          _spec(dialect: ReasoningDialect.openaiResponsesReasoning),
+          const ReasoningRequest(ReasoningLevel.auto),
+          transport: ReasoningTransport.responses,
+        ),
+        {
+          'reasoning': {'effort': 'high', 'summary': 'auto'},
+        },
+      );
+    });
+
+    test('adaptive auto does not replace a user thinking map', () {
+      expect(
+        applyReasoning(
+          <String, dynamic>{
+            'thinking': {'type': 'enabled'},
+          },
+          _spec(dialect: ReasoningDialect.anthropicAdaptiveEffort),
+          const ReasoningRequest(ReasoningLevel.auto),
+          transport: ReasoningTransport.anthropicMessages,
         ),
         {
           'thinking': {'type': 'enabled'},
