@@ -1003,9 +1003,26 @@ void main() {
     );
     await tester.tap(find.text('Synced Kimi'));
     await tester.pumpAndSettle();
-    expect(find.text('Confirm'), findsOneWidget);
-    expect(find.byType(BottomSheet), desktop ? findsNothing : findsOneWidget);
+    if (desktop) {
+      expect(find.text('Confirm'), findsOneWidget);
+      expect(find.byType(BottomSheet), findsNothing);
+    } else {
+      expect(find.byKey(const ValueKey('model-spec-save')), findsOneWidget);
+      expect(find.byType(BottomSheet), findsNothing);
+    }
     expect(tester.takeException(), isNull);
+  }
+
+  Future<void> confirmModelEditor(
+    WidgetTester tester, {
+    required bool desktop,
+  }) async {
+    await tester.tap(
+      desktop
+          ? find.text('Confirm')
+          : find.byKey(const ValueKey('model-spec-save')),
+    );
+    await tester.pumpAndSettle();
   }
 
   const anthropicMetadata = <String, dynamic>{
@@ -1038,8 +1055,7 @@ void main() {
         'model Confirm preserves ${metadata['oauthProtocol']} OAuth metadata desktop=$desktop',
         (tester) async {
           await openModelEditor(tester, desktop: desktop, metadata: metadata);
-          await tester.tap(find.text('Confirm'));
-          await tester.pumpAndSettle();
+          await confirmModelEditor(tester, desktop: desktop);
 
           final config = settings.providerConfigs['oauth-test']!;
           final saved = config.modelOverrides['kimi-test-alias'] as Map;
@@ -1078,8 +1094,7 @@ void main() {
           ),
         );
         await tester.pumpAndSettle();
-        await tester.tap(find.text('Confirm'));
-        await tester.pumpAndSettle();
+        await confirmModelEditor(tester, desktop: desktop);
 
         final saved =
             settings
@@ -1103,8 +1118,7 @@ void main() {
         await tester.ensureVisible(find.text('Embedding'));
         await tester.tap(find.text('Embedding'));
         await tester.pumpAndSettle();
-        await tester.tap(find.text('Confirm'));
-        await tester.pumpAndSettle();
+        await confirmModelEditor(tester, desktop: desktop);
 
         final saved =
             settings

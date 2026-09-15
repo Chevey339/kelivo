@@ -3553,6 +3553,271 @@ class AppLocalizationsZh extends AppLocalizations {
   String get modelDetailSheetBodyJsonHint => 'Body JSON';
 
   @override
+  String get modelSpecFormSourceCustom => '自定义';
+
+  @override
+  String get modelSpecFormSourceCatalog => '目录';
+
+  @override
+  String get modelSpecFormSourceInferred => '推断';
+
+  @override
+  String get modelSpecFormSourceDefault => '默认';
+
+  @override
+  String get modelSpecFormReset => '重置为默认';
+
+  @override
+  String get modelSpecFormImageType => '图像';
+
+  @override
+  String get modelSpecFormAudioMode => '音频';
+
+  @override
+  String get modelSpecFormVideoMode => '视频';
+
+  @override
+  String get modelSpecFormPdfMode => 'PDF';
+
+  @override
+  String get modelSpecFormStructuredOutputAbility => '结构化输出';
+
+  @override
+  String get modelSpecFormReasoningSection => '推理';
+
+  @override
+  String get modelSpecFormDialect => '推理方言';
+
+  @override
+  String get modelSpecFormDialectNone => '无';
+
+  @override
+  String get modelSpecFormDialectNoneSubtitle => '不写入推理字段';
+
+  @override
+  String get modelSpecFormDialectOpenaiReasoningEffort =>
+      'OpenAI reasoning effort';
+
+  @override
+  String get modelSpecFormDialectOpenaiReasoningEffortSubtitle =>
+      'reasoning_effort';
+
+  @override
+  String get modelSpecFormDialectOpenaiResponsesReasoning =>
+      'OpenAI Responses reasoning';
+
+  @override
+  String get modelSpecFormDialectOpenaiResponsesReasoningSubtitle =>
+      'reasoning.effort';
+
+  @override
+  String get modelSpecFormDialectOpenrouterReasoning => 'OpenRouter reasoning';
+
+  @override
+  String get modelSpecFormDialectOpenrouterReasoningSubtitle => 'reasoning';
+
+  @override
+  String get modelSpecFormDialectAnthropicBudget => 'Anthropic budget';
+
+  @override
+  String get modelSpecFormDialectAnthropicBudgetSubtitle =>
+      'thinking.budget_tokens';
+
+  @override
+  String get modelSpecFormDialectAnthropicAdaptiveEffort =>
+      'Anthropic adaptive effort';
+
+  @override
+  String get modelSpecFormDialectAnthropicAdaptiveEffortSubtitle =>
+      'thinking + output_config.effort';
+
+  @override
+  String get modelSpecFormDialectAnthropicEffort => 'Anthropic effort';
+
+  @override
+  String get modelSpecFormDialectAnthropicEffortSubtitle =>
+      'thinking + output_config.effort';
+
+  @override
+  String get modelSpecFormDialectGeminiThinkingBudget =>
+      'Gemini thinking budget';
+
+  @override
+  String get modelSpecFormDialectGeminiThinkingBudgetSubtitle =>
+      'thinkingConfig.thinkingBudget';
+
+  @override
+  String get modelSpecFormDialectGeminiThinkingLevel => 'Gemini thinking level';
+
+  @override
+  String get modelSpecFormDialectGeminiThinkingLevelSubtitle =>
+      'thinkingConfig.thinkingLevel';
+
+  @override
+  String get modelSpecFormDialectQwenEnableThinking => 'Qwen enable thinking';
+
+  @override
+  String get modelSpecFormDialectQwenEnableThinkingSubtitle =>
+      'enable_thinking';
+
+  @override
+  String get modelSpecFormDialectThinkingType => 'Thinking type';
+
+  @override
+  String get modelSpecFormDialectThinkingTypeSubtitle => 'thinking.type';
+
+  @override
+  String get modelSpecFormDialectSiliconflowEnableThinking =>
+      'SiliconFlow enable thinking';
+
+  @override
+  String get modelSpecFormDialectSiliconflowEnableThinkingSubtitle =>
+      'enable_thinking';
+
+  @override
+  String get modelSpecFormDialectInternThinkingMode => 'Intern thinking mode';
+
+  @override
+  String get modelSpecFormDialectInternThinkingModeSubtitle => 'thinking_mode';
+
+  @override
+  String get modelSpecFormDialectChatTemplateKwargs => 'Chat template kwargs';
+
+  @override
+  String get modelSpecFormDialectChatTemplateKwargsSubtitle =>
+      'chat_template_kwargs.enable_thinking';
+
+  @override
+  String get modelSpecFormDialectKimiThinking => 'Kimi thinking';
+
+  @override
+  String get modelSpecFormDialectKimiThinkingSubtitle => 'thinking';
+
+  @override
+  String get modelSpecFormDialectCustom => '自定义 JSON';
+
+  @override
+  String get modelSpecFormDialectCustomSubtitle => '按级别写入 JSON 补丁';
+
+  @override
+  String get modelSpecFormLevels => '支持的级别';
+
+  @override
+  String get modelSpecFormCanDisable => '允许关闭';
+
+  @override
+  String get modelSpecFormDefaultLevel => '默认级别';
+
+  @override
+  String get modelSpecFormBudgets => 'Token 预算';
+
+  @override
+  String modelSpecFormBudgetPlaceholder(String tokens) {
+    return '$tokens';
+  }
+
+  @override
+  String modelSpecFormCustomPatch(String level) {
+    return 'JSON 补丁（$level）';
+  }
+
+  @override
+  String get modelSpecFormCustomPatchHint => '例如 reasoning_effort: high';
+
+  @override
+  String get modelSpecFormInvalidJson => '自定义推理补丁必须是有效的 JSON 对象';
+
+  @override
+  String get modelSpecFormInvalidNumber => '请输入有效数字';
+
+  @override
+  String get modelSpecFormStrategySection => '策略';
+
+  @override
+  String get modelSpecFormSampling => '采样';
+
+  @override
+  String get modelSpecFormSamplingAlways => '始终保留';
+
+  @override
+  String get modelSpecFormSamplingAlwaysSubtitle => '保留 temperature 等采样字段';
+
+  @override
+  String get modelSpecFormSamplingOnlyWhenReasoningOff => '仅在关闭推理时';
+
+  @override
+  String get modelSpecFormSamplingOnlyWhenReasoningOffSubtitle => '模型思考时移除采样字段';
+
+  @override
+  String get modelSpecFormSamplingNever => '从不';
+
+  @override
+  String get modelSpecFormSamplingNeverSubtitle => '始终移除采样字段';
+
+  @override
+  String get modelSpecFormReplay => '推理回放';
+
+  @override
+  String get modelSpecFormReplayNone => '无';
+
+  @override
+  String get modelSpecFormReplayNoneSubtitle => '不把先前推理发回模型';
+
+  @override
+  String get modelSpecFormReplayToolTurns => '工具轮次';
+
+  @override
+  String get modelSpecFormReplayToolTurnsSubtitle => '仅在工具调用轮次回放推理';
+
+  @override
+  String get modelSpecFormReplayAll => '全部';
+
+  @override
+  String get modelSpecFormReplayAllSubtitle => '每一轮后续请求都回放推理';
+
+  @override
+  String get modelSpecFormReplayField => '回放字段';
+
+  @override
+  String get modelSpecFormReplayFieldReasoningContent => 'reasoning_content';
+
+  @override
+  String get modelSpecFormReplayFieldReasoning => 'reasoning';
+
+  @override
+  String get modelSpecFormReplayFieldReasoningDetails => 'reasoning_details';
+
+  @override
+  String get modelSpecFormLimitsSection => '限额';
+
+  @override
+  String get modelSpecFormContextWindow => '上下文窗口';
+
+  @override
+  String get modelSpecFormMaxOutput => '最大输出';
+
+  @override
+  String get modelSpecFormPricingSection => '定价';
+
+  @override
+  String get modelSpecFormPricingInput => '输入 / 1M';
+
+  @override
+  String get modelSpecFormPricingOutput => '输出 / 1M';
+
+  @override
+  String get modelSpecFormPricingCacheRead => '缓存读取 / 1M';
+
+  @override
+  String get modelSpecFormPricingCacheWrite => '缓存写入 / 1M';
+
+  @override
+  String get modelSpecFormCurrency => '货币';
+
+  @override
+  String get modelSpecFormAdvancedSection => '请求';
+
+  @override
   String get modelSelectSheetSearchHint => '搜索模型或服务商';
 
   @override
@@ -14963,6 +15228,271 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get modelDetailSheetBodyJsonHint => 'Body JSON';
 
   @override
+  String get modelSpecFormSourceCustom => '自定义';
+
+  @override
+  String get modelSpecFormSourceCatalog => '目录';
+
+  @override
+  String get modelSpecFormSourceInferred => '推断';
+
+  @override
+  String get modelSpecFormSourceDefault => '默认';
+
+  @override
+  String get modelSpecFormReset => '重置为默认';
+
+  @override
+  String get modelSpecFormImageType => '图像';
+
+  @override
+  String get modelSpecFormAudioMode => '音频';
+
+  @override
+  String get modelSpecFormVideoMode => '视频';
+
+  @override
+  String get modelSpecFormPdfMode => 'PDF';
+
+  @override
+  String get modelSpecFormStructuredOutputAbility => '结构化输出';
+
+  @override
+  String get modelSpecFormReasoningSection => '推理';
+
+  @override
+  String get modelSpecFormDialect => '推理方言';
+
+  @override
+  String get modelSpecFormDialectNone => '无';
+
+  @override
+  String get modelSpecFormDialectNoneSubtitle => '不写入推理字段';
+
+  @override
+  String get modelSpecFormDialectOpenaiReasoningEffort =>
+      'OpenAI reasoning effort';
+
+  @override
+  String get modelSpecFormDialectOpenaiReasoningEffortSubtitle =>
+      'reasoning_effort';
+
+  @override
+  String get modelSpecFormDialectOpenaiResponsesReasoning =>
+      'OpenAI Responses reasoning';
+
+  @override
+  String get modelSpecFormDialectOpenaiResponsesReasoningSubtitle =>
+      'reasoning.effort';
+
+  @override
+  String get modelSpecFormDialectOpenrouterReasoning => 'OpenRouter reasoning';
+
+  @override
+  String get modelSpecFormDialectOpenrouterReasoningSubtitle => 'reasoning';
+
+  @override
+  String get modelSpecFormDialectAnthropicBudget => 'Anthropic budget';
+
+  @override
+  String get modelSpecFormDialectAnthropicBudgetSubtitle =>
+      'thinking.budget_tokens';
+
+  @override
+  String get modelSpecFormDialectAnthropicAdaptiveEffort =>
+      'Anthropic adaptive effort';
+
+  @override
+  String get modelSpecFormDialectAnthropicAdaptiveEffortSubtitle =>
+      'thinking + output_config.effort';
+
+  @override
+  String get modelSpecFormDialectAnthropicEffort => 'Anthropic effort';
+
+  @override
+  String get modelSpecFormDialectAnthropicEffortSubtitle =>
+      'thinking + output_config.effort';
+
+  @override
+  String get modelSpecFormDialectGeminiThinkingBudget =>
+      'Gemini thinking budget';
+
+  @override
+  String get modelSpecFormDialectGeminiThinkingBudgetSubtitle =>
+      'thinkingConfig.thinkingBudget';
+
+  @override
+  String get modelSpecFormDialectGeminiThinkingLevel => 'Gemini thinking level';
+
+  @override
+  String get modelSpecFormDialectGeminiThinkingLevelSubtitle =>
+      'thinkingConfig.thinkingLevel';
+
+  @override
+  String get modelSpecFormDialectQwenEnableThinking => 'Qwen enable thinking';
+
+  @override
+  String get modelSpecFormDialectQwenEnableThinkingSubtitle =>
+      'enable_thinking';
+
+  @override
+  String get modelSpecFormDialectThinkingType => 'Thinking type';
+
+  @override
+  String get modelSpecFormDialectThinkingTypeSubtitle => 'thinking.type';
+
+  @override
+  String get modelSpecFormDialectSiliconflowEnableThinking =>
+      'SiliconFlow enable thinking';
+
+  @override
+  String get modelSpecFormDialectSiliconflowEnableThinkingSubtitle =>
+      'enable_thinking';
+
+  @override
+  String get modelSpecFormDialectInternThinkingMode => 'Intern thinking mode';
+
+  @override
+  String get modelSpecFormDialectInternThinkingModeSubtitle => 'thinking_mode';
+
+  @override
+  String get modelSpecFormDialectChatTemplateKwargs => 'Chat template kwargs';
+
+  @override
+  String get modelSpecFormDialectChatTemplateKwargsSubtitle =>
+      'chat_template_kwargs.enable_thinking';
+
+  @override
+  String get modelSpecFormDialectKimiThinking => 'Kimi thinking';
+
+  @override
+  String get modelSpecFormDialectKimiThinkingSubtitle => 'thinking';
+
+  @override
+  String get modelSpecFormDialectCustom => '自定义 JSON';
+
+  @override
+  String get modelSpecFormDialectCustomSubtitle => '按级别写入 JSON 补丁';
+
+  @override
+  String get modelSpecFormLevels => '支持的级别';
+
+  @override
+  String get modelSpecFormCanDisable => '允许关闭';
+
+  @override
+  String get modelSpecFormDefaultLevel => '默认级别';
+
+  @override
+  String get modelSpecFormBudgets => 'Token 预算';
+
+  @override
+  String modelSpecFormBudgetPlaceholder(String tokens) {
+    return '$tokens';
+  }
+
+  @override
+  String modelSpecFormCustomPatch(String level) {
+    return 'JSON 补丁（$level）';
+  }
+
+  @override
+  String get modelSpecFormCustomPatchHint => '例如 reasoning_effort: high';
+
+  @override
+  String get modelSpecFormInvalidJson => '自定义推理补丁必须是有效的 JSON 对象';
+
+  @override
+  String get modelSpecFormInvalidNumber => '请输入有效数字';
+
+  @override
+  String get modelSpecFormStrategySection => '策略';
+
+  @override
+  String get modelSpecFormSampling => '采样';
+
+  @override
+  String get modelSpecFormSamplingAlways => '始终保留';
+
+  @override
+  String get modelSpecFormSamplingAlwaysSubtitle => '保留 temperature 等采样字段';
+
+  @override
+  String get modelSpecFormSamplingOnlyWhenReasoningOff => '仅在关闭推理时';
+
+  @override
+  String get modelSpecFormSamplingOnlyWhenReasoningOffSubtitle => '模型思考时移除采样字段';
+
+  @override
+  String get modelSpecFormSamplingNever => '从不';
+
+  @override
+  String get modelSpecFormSamplingNeverSubtitle => '始终移除采样字段';
+
+  @override
+  String get modelSpecFormReplay => '推理回放';
+
+  @override
+  String get modelSpecFormReplayNone => '无';
+
+  @override
+  String get modelSpecFormReplayNoneSubtitle => '不把先前推理发回模型';
+
+  @override
+  String get modelSpecFormReplayToolTurns => '工具轮次';
+
+  @override
+  String get modelSpecFormReplayToolTurnsSubtitle => '仅在工具调用轮次回放推理';
+
+  @override
+  String get modelSpecFormReplayAll => '全部';
+
+  @override
+  String get modelSpecFormReplayAllSubtitle => '每一轮后续请求都回放推理';
+
+  @override
+  String get modelSpecFormReplayField => '回放字段';
+
+  @override
+  String get modelSpecFormReplayFieldReasoningContent => 'reasoning_content';
+
+  @override
+  String get modelSpecFormReplayFieldReasoning => 'reasoning';
+
+  @override
+  String get modelSpecFormReplayFieldReasoningDetails => 'reasoning_details';
+
+  @override
+  String get modelSpecFormLimitsSection => '限额';
+
+  @override
+  String get modelSpecFormContextWindow => '上下文窗口';
+
+  @override
+  String get modelSpecFormMaxOutput => '最大输出';
+
+  @override
+  String get modelSpecFormPricingSection => '定价';
+
+  @override
+  String get modelSpecFormPricingInput => '输入 / 1M';
+
+  @override
+  String get modelSpecFormPricingOutput => '输出 / 1M';
+
+  @override
+  String get modelSpecFormPricingCacheRead => '缓存读取 / 1M';
+
+  @override
+  String get modelSpecFormPricingCacheWrite => '缓存写入 / 1M';
+
+  @override
+  String get modelSpecFormCurrency => '货币';
+
+  @override
+  String get modelSpecFormAdvancedSection => '请求';
+
+  @override
   String get modelSelectSheetSearchHint => '搜索模型或服务商';
 
   @override
@@ -26297,6 +26827,271 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get modelDetailSheetBodyJsonHint => 'Body JSON';
+
+  @override
+  String get modelSpecFormSourceCustom => '自訂';
+
+  @override
+  String get modelSpecFormSourceCatalog => '目錄';
+
+  @override
+  String get modelSpecFormSourceInferred => '推斷';
+
+  @override
+  String get modelSpecFormSourceDefault => '預設';
+
+  @override
+  String get modelSpecFormReset => '重設為預設';
+
+  @override
+  String get modelSpecFormImageType => '圖像';
+
+  @override
+  String get modelSpecFormAudioMode => '音訊';
+
+  @override
+  String get modelSpecFormVideoMode => '影片';
+
+  @override
+  String get modelSpecFormPdfMode => 'PDF';
+
+  @override
+  String get modelSpecFormStructuredOutputAbility => '結構化輸出';
+
+  @override
+  String get modelSpecFormReasoningSection => '推理';
+
+  @override
+  String get modelSpecFormDialect => '推理方言';
+
+  @override
+  String get modelSpecFormDialectNone => '無';
+
+  @override
+  String get modelSpecFormDialectNoneSubtitle => '不寫入推理欄位';
+
+  @override
+  String get modelSpecFormDialectOpenaiReasoningEffort =>
+      'OpenAI reasoning effort';
+
+  @override
+  String get modelSpecFormDialectOpenaiReasoningEffortSubtitle =>
+      'reasoning_effort';
+
+  @override
+  String get modelSpecFormDialectOpenaiResponsesReasoning =>
+      'OpenAI Responses reasoning';
+
+  @override
+  String get modelSpecFormDialectOpenaiResponsesReasoningSubtitle =>
+      'reasoning.effort';
+
+  @override
+  String get modelSpecFormDialectOpenrouterReasoning => 'OpenRouter reasoning';
+
+  @override
+  String get modelSpecFormDialectOpenrouterReasoningSubtitle => 'reasoning';
+
+  @override
+  String get modelSpecFormDialectAnthropicBudget => 'Anthropic budget';
+
+  @override
+  String get modelSpecFormDialectAnthropicBudgetSubtitle =>
+      'thinking.budget_tokens';
+
+  @override
+  String get modelSpecFormDialectAnthropicAdaptiveEffort =>
+      'Anthropic adaptive effort';
+
+  @override
+  String get modelSpecFormDialectAnthropicAdaptiveEffortSubtitle =>
+      'thinking + output_config.effort';
+
+  @override
+  String get modelSpecFormDialectAnthropicEffort => 'Anthropic effort';
+
+  @override
+  String get modelSpecFormDialectAnthropicEffortSubtitle =>
+      'thinking + output_config.effort';
+
+  @override
+  String get modelSpecFormDialectGeminiThinkingBudget =>
+      'Gemini thinking budget';
+
+  @override
+  String get modelSpecFormDialectGeminiThinkingBudgetSubtitle =>
+      'thinkingConfig.thinkingBudget';
+
+  @override
+  String get modelSpecFormDialectGeminiThinkingLevel => 'Gemini thinking level';
+
+  @override
+  String get modelSpecFormDialectGeminiThinkingLevelSubtitle =>
+      'thinkingConfig.thinkingLevel';
+
+  @override
+  String get modelSpecFormDialectQwenEnableThinking => 'Qwen enable thinking';
+
+  @override
+  String get modelSpecFormDialectQwenEnableThinkingSubtitle =>
+      'enable_thinking';
+
+  @override
+  String get modelSpecFormDialectThinkingType => 'Thinking type';
+
+  @override
+  String get modelSpecFormDialectThinkingTypeSubtitle => 'thinking.type';
+
+  @override
+  String get modelSpecFormDialectSiliconflowEnableThinking =>
+      'SiliconFlow enable thinking';
+
+  @override
+  String get modelSpecFormDialectSiliconflowEnableThinkingSubtitle =>
+      'enable_thinking';
+
+  @override
+  String get modelSpecFormDialectInternThinkingMode => 'Intern thinking mode';
+
+  @override
+  String get modelSpecFormDialectInternThinkingModeSubtitle => 'thinking_mode';
+
+  @override
+  String get modelSpecFormDialectChatTemplateKwargs => 'Chat template kwargs';
+
+  @override
+  String get modelSpecFormDialectChatTemplateKwargsSubtitle =>
+      'chat_template_kwargs.enable_thinking';
+
+  @override
+  String get modelSpecFormDialectKimiThinking => 'Kimi thinking';
+
+  @override
+  String get modelSpecFormDialectKimiThinkingSubtitle => 'thinking';
+
+  @override
+  String get modelSpecFormDialectCustom => '自訂 JSON';
+
+  @override
+  String get modelSpecFormDialectCustomSubtitle => '依級別寫入 JSON 補丁';
+
+  @override
+  String get modelSpecFormLevels => '支援的級別';
+
+  @override
+  String get modelSpecFormCanDisable => '允許關閉';
+
+  @override
+  String get modelSpecFormDefaultLevel => '預設級別';
+
+  @override
+  String get modelSpecFormBudgets => 'Token 預算';
+
+  @override
+  String modelSpecFormBudgetPlaceholder(String tokens) {
+    return '$tokens';
+  }
+
+  @override
+  String modelSpecFormCustomPatch(String level) {
+    return 'JSON 補丁（$level）';
+  }
+
+  @override
+  String get modelSpecFormCustomPatchHint => '例如 reasoning_effort: high';
+
+  @override
+  String get modelSpecFormInvalidJson => '自訂推理補丁必須是有效的 JSON 物件';
+
+  @override
+  String get modelSpecFormInvalidNumber => '請輸入有效數字';
+
+  @override
+  String get modelSpecFormStrategySection => '策略';
+
+  @override
+  String get modelSpecFormSampling => '取樣';
+
+  @override
+  String get modelSpecFormSamplingAlways => '始終保留';
+
+  @override
+  String get modelSpecFormSamplingAlwaysSubtitle => '保留 temperature 等取樣欄位';
+
+  @override
+  String get modelSpecFormSamplingOnlyWhenReasoningOff => '僅在關閉推理時';
+
+  @override
+  String get modelSpecFormSamplingOnlyWhenReasoningOffSubtitle => '模型思考時移除取樣欄位';
+
+  @override
+  String get modelSpecFormSamplingNever => '從不';
+
+  @override
+  String get modelSpecFormSamplingNeverSubtitle => '始終移除取樣欄位';
+
+  @override
+  String get modelSpecFormReplay => '推理回放';
+
+  @override
+  String get modelSpecFormReplayNone => '無';
+
+  @override
+  String get modelSpecFormReplayNoneSubtitle => '不把先前推理傳回模型';
+
+  @override
+  String get modelSpecFormReplayToolTurns => '工具輪次';
+
+  @override
+  String get modelSpecFormReplayToolTurnsSubtitle => '僅在工具呼叫輪次回放推理';
+
+  @override
+  String get modelSpecFormReplayAll => '全部';
+
+  @override
+  String get modelSpecFormReplayAllSubtitle => '每一輪後續請求都回放推理';
+
+  @override
+  String get modelSpecFormReplayField => '回放欄位';
+
+  @override
+  String get modelSpecFormReplayFieldReasoningContent => 'reasoning_content';
+
+  @override
+  String get modelSpecFormReplayFieldReasoning => 'reasoning';
+
+  @override
+  String get modelSpecFormReplayFieldReasoningDetails => 'reasoning_details';
+
+  @override
+  String get modelSpecFormLimitsSection => '限額';
+
+  @override
+  String get modelSpecFormContextWindow => '上下文視窗';
+
+  @override
+  String get modelSpecFormMaxOutput => '最大輸出';
+
+  @override
+  String get modelSpecFormPricingSection => '定價';
+
+  @override
+  String get modelSpecFormPricingInput => '輸入 / 1M';
+
+  @override
+  String get modelSpecFormPricingOutput => '輸出 / 1M';
+
+  @override
+  String get modelSpecFormPricingCacheRead => '快取讀取 / 1M';
+
+  @override
+  String get modelSpecFormPricingCacheWrite => '快取寫入 / 1M';
+
+  @override
+  String get modelSpecFormCurrency => '貨幣';
+
+  @override
+  String get modelSpecFormAdvancedSection => '請求';
 
   @override
   String get modelSelectSheetSearchHint => '搜尋模型或供應商';

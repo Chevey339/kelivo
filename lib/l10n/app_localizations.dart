@@ -6787,6 +6787,498 @@ abstract class AppLocalizations {
   /// **'Body JSON'**
   String get modelDetailSheetBodyJsonHint;
 
+  /// No description provided for @modelSpecFormSourceCustom.
+  ///
+  /// In en, this message translates to:
+  /// **'Custom'**
+  String get modelSpecFormSourceCustom;
+
+  /// No description provided for @modelSpecFormSourceCatalog.
+  ///
+  /// In en, this message translates to:
+  /// **'Catalog'**
+  String get modelSpecFormSourceCatalog;
+
+  /// No description provided for @modelSpecFormSourceInferred.
+  ///
+  /// In en, this message translates to:
+  /// **'Inferred'**
+  String get modelSpecFormSourceInferred;
+
+  /// No description provided for @modelSpecFormSourceDefault.
+  ///
+  /// In en, this message translates to:
+  /// **'Default'**
+  String get modelSpecFormSourceDefault;
+
+  /// No description provided for @modelSpecFormReset.
+  ///
+  /// In en, this message translates to:
+  /// **'Reset to default'**
+  String get modelSpecFormReset;
+
+  /// No description provided for @modelSpecFormImageType.
+  ///
+  /// In en, this message translates to:
+  /// **'Image'**
+  String get modelSpecFormImageType;
+
+  /// No description provided for @modelSpecFormAudioMode.
+  ///
+  /// In en, this message translates to:
+  /// **'Audio'**
+  String get modelSpecFormAudioMode;
+
+  /// No description provided for @modelSpecFormVideoMode.
+  ///
+  /// In en, this message translates to:
+  /// **'Video'**
+  String get modelSpecFormVideoMode;
+
+  /// No description provided for @modelSpecFormPdfMode.
+  ///
+  /// In en, this message translates to:
+  /// **'PDF'**
+  String get modelSpecFormPdfMode;
+
+  /// No description provided for @modelSpecFormStructuredOutputAbility.
+  ///
+  /// In en, this message translates to:
+  /// **'Structured Output'**
+  String get modelSpecFormStructuredOutputAbility;
+
+  /// No description provided for @modelSpecFormReasoningSection.
+  ///
+  /// In en, this message translates to:
+  /// **'Reasoning'**
+  String get modelSpecFormReasoningSection;
+
+  /// No description provided for @modelSpecFormDialect.
+  ///
+  /// In en, this message translates to:
+  /// **'Dialect'**
+  String get modelSpecFormDialect;
+
+  /// No description provided for @modelSpecFormDialectNone.
+  ///
+  /// In en, this message translates to:
+  /// **'None'**
+  String get modelSpecFormDialectNone;
+
+  /// No description provided for @modelSpecFormDialectNoneSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'No reasoning fields'**
+  String get modelSpecFormDialectNoneSubtitle;
+
+  /// No description provided for @modelSpecFormDialectOpenaiReasoningEffort.
+  ///
+  /// In en, this message translates to:
+  /// **'OpenAI reasoning effort'**
+  String get modelSpecFormDialectOpenaiReasoningEffort;
+
+  /// No description provided for @modelSpecFormDialectOpenaiReasoningEffortSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'reasoning_effort'**
+  String get modelSpecFormDialectOpenaiReasoningEffortSubtitle;
+
+  /// No description provided for @modelSpecFormDialectOpenaiResponsesReasoning.
+  ///
+  /// In en, this message translates to:
+  /// **'OpenAI Responses reasoning'**
+  String get modelSpecFormDialectOpenaiResponsesReasoning;
+
+  /// No description provided for @modelSpecFormDialectOpenaiResponsesReasoningSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'reasoning.effort'**
+  String get modelSpecFormDialectOpenaiResponsesReasoningSubtitle;
+
+  /// No description provided for @modelSpecFormDialectOpenrouterReasoning.
+  ///
+  /// In en, this message translates to:
+  /// **'OpenRouter reasoning'**
+  String get modelSpecFormDialectOpenrouterReasoning;
+
+  /// No description provided for @modelSpecFormDialectOpenrouterReasoningSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'reasoning'**
+  String get modelSpecFormDialectOpenrouterReasoningSubtitle;
+
+  /// No description provided for @modelSpecFormDialectAnthropicBudget.
+  ///
+  /// In en, this message translates to:
+  /// **'Anthropic budget'**
+  String get modelSpecFormDialectAnthropicBudget;
+
+  /// No description provided for @modelSpecFormDialectAnthropicBudgetSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'thinking.budget_tokens'**
+  String get modelSpecFormDialectAnthropicBudgetSubtitle;
+
+  /// No description provided for @modelSpecFormDialectAnthropicAdaptiveEffort.
+  ///
+  /// In en, this message translates to:
+  /// **'Anthropic adaptive effort'**
+  String get modelSpecFormDialectAnthropicAdaptiveEffort;
+
+  /// No description provided for @modelSpecFormDialectAnthropicAdaptiveEffortSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'thinking + output_config.effort'**
+  String get modelSpecFormDialectAnthropicAdaptiveEffortSubtitle;
+
+  /// No description provided for @modelSpecFormDialectAnthropicEffort.
+  ///
+  /// In en, this message translates to:
+  /// **'Anthropic effort'**
+  String get modelSpecFormDialectAnthropicEffort;
+
+  /// No description provided for @modelSpecFormDialectAnthropicEffortSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'thinking + output_config.effort'**
+  String get modelSpecFormDialectAnthropicEffortSubtitle;
+
+  /// No description provided for @modelSpecFormDialectGeminiThinkingBudget.
+  ///
+  /// In en, this message translates to:
+  /// **'Gemini thinking budget'**
+  String get modelSpecFormDialectGeminiThinkingBudget;
+
+  /// No description provided for @modelSpecFormDialectGeminiThinkingBudgetSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'thinkingConfig.thinkingBudget'**
+  String get modelSpecFormDialectGeminiThinkingBudgetSubtitle;
+
+  /// No description provided for @modelSpecFormDialectGeminiThinkingLevel.
+  ///
+  /// In en, this message translates to:
+  /// **'Gemini thinking level'**
+  String get modelSpecFormDialectGeminiThinkingLevel;
+
+  /// No description provided for @modelSpecFormDialectGeminiThinkingLevelSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'thinkingConfig.thinkingLevel'**
+  String get modelSpecFormDialectGeminiThinkingLevelSubtitle;
+
+  /// No description provided for @modelSpecFormDialectQwenEnableThinking.
+  ///
+  /// In en, this message translates to:
+  /// **'Qwen enable thinking'**
+  String get modelSpecFormDialectQwenEnableThinking;
+
+  /// No description provided for @modelSpecFormDialectQwenEnableThinkingSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'enable_thinking'**
+  String get modelSpecFormDialectQwenEnableThinkingSubtitle;
+
+  /// No description provided for @modelSpecFormDialectThinkingType.
+  ///
+  /// In en, this message translates to:
+  /// **'Thinking type'**
+  String get modelSpecFormDialectThinkingType;
+
+  /// No description provided for @modelSpecFormDialectThinkingTypeSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'thinking.type'**
+  String get modelSpecFormDialectThinkingTypeSubtitle;
+
+  /// No description provided for @modelSpecFormDialectSiliconflowEnableThinking.
+  ///
+  /// In en, this message translates to:
+  /// **'SiliconFlow enable thinking'**
+  String get modelSpecFormDialectSiliconflowEnableThinking;
+
+  /// No description provided for @modelSpecFormDialectSiliconflowEnableThinkingSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'enable_thinking'**
+  String get modelSpecFormDialectSiliconflowEnableThinkingSubtitle;
+
+  /// No description provided for @modelSpecFormDialectInternThinkingMode.
+  ///
+  /// In en, this message translates to:
+  /// **'Intern thinking mode'**
+  String get modelSpecFormDialectInternThinkingMode;
+
+  /// No description provided for @modelSpecFormDialectInternThinkingModeSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'thinking_mode'**
+  String get modelSpecFormDialectInternThinkingModeSubtitle;
+
+  /// No description provided for @modelSpecFormDialectChatTemplateKwargs.
+  ///
+  /// In en, this message translates to:
+  /// **'Chat template kwargs'**
+  String get modelSpecFormDialectChatTemplateKwargs;
+
+  /// No description provided for @modelSpecFormDialectChatTemplateKwargsSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'chat_template_kwargs.enable_thinking'**
+  String get modelSpecFormDialectChatTemplateKwargsSubtitle;
+
+  /// No description provided for @modelSpecFormDialectKimiThinking.
+  ///
+  /// In en, this message translates to:
+  /// **'Kimi thinking'**
+  String get modelSpecFormDialectKimiThinking;
+
+  /// No description provided for @modelSpecFormDialectKimiThinkingSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'thinking'**
+  String get modelSpecFormDialectKimiThinkingSubtitle;
+
+  /// No description provided for @modelSpecFormDialectCustom.
+  ///
+  /// In en, this message translates to:
+  /// **'Custom JSON'**
+  String get modelSpecFormDialectCustom;
+
+  /// No description provided for @modelSpecFormDialectCustomSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Per-level JSON patch'**
+  String get modelSpecFormDialectCustomSubtitle;
+
+  /// No description provided for @modelSpecFormLevels.
+  ///
+  /// In en, this message translates to:
+  /// **'Supported levels'**
+  String get modelSpecFormLevels;
+
+  /// No description provided for @modelSpecFormCanDisable.
+  ///
+  /// In en, this message translates to:
+  /// **'Allow disabling'**
+  String get modelSpecFormCanDisable;
+
+  /// No description provided for @modelSpecFormDefaultLevel.
+  ///
+  /// In en, this message translates to:
+  /// **'Default level'**
+  String get modelSpecFormDefaultLevel;
+
+  /// No description provided for @modelSpecFormBudgets.
+  ///
+  /// In en, this message translates to:
+  /// **'Token budgets'**
+  String get modelSpecFormBudgets;
+
+  /// No description provided for @modelSpecFormBudgetPlaceholder.
+  ///
+  /// In en, this message translates to:
+  /// **'{tokens}'**
+  String modelSpecFormBudgetPlaceholder(String tokens);
+
+  /// No description provided for @modelSpecFormCustomPatch.
+  ///
+  /// In en, this message translates to:
+  /// **'JSON patch ({level})'**
+  String modelSpecFormCustomPatch(String level);
+
+  /// No description provided for @modelSpecFormCustomPatchHint.
+  ///
+  /// In en, this message translates to:
+  /// **'e.g. reasoning_effort: high'**
+  String get modelSpecFormCustomPatchHint;
+
+  /// No description provided for @modelSpecFormInvalidJson.
+  ///
+  /// In en, this message translates to:
+  /// **'Custom reasoning patch must be a valid JSON object'**
+  String get modelSpecFormInvalidJson;
+
+  /// No description provided for @modelSpecFormInvalidNumber.
+  ///
+  /// In en, this message translates to:
+  /// **'Please enter a valid number'**
+  String get modelSpecFormInvalidNumber;
+
+  /// No description provided for @modelSpecFormStrategySection.
+  ///
+  /// In en, this message translates to:
+  /// **'Strategy'**
+  String get modelSpecFormStrategySection;
+
+  /// No description provided for @modelSpecFormSampling.
+  ///
+  /// In en, this message translates to:
+  /// **'Sampling'**
+  String get modelSpecFormSampling;
+
+  /// No description provided for @modelSpecFormSamplingAlways.
+  ///
+  /// In en, this message translates to:
+  /// **'Always'**
+  String get modelSpecFormSamplingAlways;
+
+  /// No description provided for @modelSpecFormSamplingAlwaysSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Keep temperature and other sampling fields'**
+  String get modelSpecFormSamplingAlwaysSubtitle;
+
+  /// No description provided for @modelSpecFormSamplingOnlyWhenReasoningOff.
+  ///
+  /// In en, this message translates to:
+  /// **'Only when reasoning is off'**
+  String get modelSpecFormSamplingOnlyWhenReasoningOff;
+
+  /// No description provided for @modelSpecFormSamplingOnlyWhenReasoningOffSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Strip sampling fields while the model is thinking'**
+  String get modelSpecFormSamplingOnlyWhenReasoningOffSubtitle;
+
+  /// No description provided for @modelSpecFormSamplingNever.
+  ///
+  /// In en, this message translates to:
+  /// **'Never'**
+  String get modelSpecFormSamplingNever;
+
+  /// No description provided for @modelSpecFormSamplingNeverSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Always strip sampling fields'**
+  String get modelSpecFormSamplingNeverSubtitle;
+
+  /// No description provided for @modelSpecFormReplay.
+  ///
+  /// In en, this message translates to:
+  /// **'Reasoning replay'**
+  String get modelSpecFormReplay;
+
+  /// No description provided for @modelSpecFormReplayNone.
+  ///
+  /// In en, this message translates to:
+  /// **'None'**
+  String get modelSpecFormReplayNone;
+
+  /// No description provided for @modelSpecFormReplayNoneSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Do not send prior reasoning back to the model'**
+  String get modelSpecFormReplayNoneSubtitle;
+
+  /// No description provided for @modelSpecFormReplayToolTurns.
+  ///
+  /// In en, this message translates to:
+  /// **'Tool turns'**
+  String get modelSpecFormReplayToolTurns;
+
+  /// No description provided for @modelSpecFormReplayToolTurnsSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Replay reasoning on tool-call turns'**
+  String get modelSpecFormReplayToolTurnsSubtitle;
+
+  /// No description provided for @modelSpecFormReplayAll.
+  ///
+  /// In en, this message translates to:
+  /// **'All'**
+  String get modelSpecFormReplayAll;
+
+  /// No description provided for @modelSpecFormReplayAllSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Replay reasoning on every follow-up turn'**
+  String get modelSpecFormReplayAllSubtitle;
+
+  /// No description provided for @modelSpecFormReplayField.
+  ///
+  /// In en, this message translates to:
+  /// **'Replay field'**
+  String get modelSpecFormReplayField;
+
+  /// No description provided for @modelSpecFormReplayFieldReasoningContent.
+  ///
+  /// In en, this message translates to:
+  /// **'reasoning_content'**
+  String get modelSpecFormReplayFieldReasoningContent;
+
+  /// No description provided for @modelSpecFormReplayFieldReasoning.
+  ///
+  /// In en, this message translates to:
+  /// **'reasoning'**
+  String get modelSpecFormReplayFieldReasoning;
+
+  /// No description provided for @modelSpecFormReplayFieldReasoningDetails.
+  ///
+  /// In en, this message translates to:
+  /// **'reasoning_details'**
+  String get modelSpecFormReplayFieldReasoningDetails;
+
+  /// No description provided for @modelSpecFormLimitsSection.
+  ///
+  /// In en, this message translates to:
+  /// **'Limits'**
+  String get modelSpecFormLimitsSection;
+
+  /// No description provided for @modelSpecFormContextWindow.
+  ///
+  /// In en, this message translates to:
+  /// **'Context window'**
+  String get modelSpecFormContextWindow;
+
+  /// No description provided for @modelSpecFormMaxOutput.
+  ///
+  /// In en, this message translates to:
+  /// **'Max output'**
+  String get modelSpecFormMaxOutput;
+
+  /// No description provided for @modelSpecFormPricingSection.
+  ///
+  /// In en, this message translates to:
+  /// **'Pricing'**
+  String get modelSpecFormPricingSection;
+
+  /// No description provided for @modelSpecFormPricingInput.
+  ///
+  /// In en, this message translates to:
+  /// **'Input / 1M'**
+  String get modelSpecFormPricingInput;
+
+  /// No description provided for @modelSpecFormPricingOutput.
+  ///
+  /// In en, this message translates to:
+  /// **'Output / 1M'**
+  String get modelSpecFormPricingOutput;
+
+  /// No description provided for @modelSpecFormPricingCacheRead.
+  ///
+  /// In en, this message translates to:
+  /// **'Cache read / 1M'**
+  String get modelSpecFormPricingCacheRead;
+
+  /// No description provided for @modelSpecFormPricingCacheWrite.
+  ///
+  /// In en, this message translates to:
+  /// **'Cache write / 1M'**
+  String get modelSpecFormPricingCacheWrite;
+
+  /// No description provided for @modelSpecFormCurrency.
+  ///
+  /// In en, this message translates to:
+  /// **'Currency'**
+  String get modelSpecFormCurrency;
+
+  /// No description provided for @modelSpecFormAdvancedSection.
+  ///
+  /// In en, this message translates to:
+  /// **'Request'**
+  String get modelSpecFormAdvancedSection;
+
   /// No description provided for @modelSelectSheetSearchHint.
   ///
   /// In en, this message translates to:

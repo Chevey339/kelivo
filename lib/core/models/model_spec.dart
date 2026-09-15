@@ -362,23 +362,37 @@ class ReasoningSpecOverride {
 
   ReasoningSpecOverride copyWith({
     List<ReasoningLevel>? levels,
+    bool clearLevels = false,
     bool? canDisable,
+    bool clearCanDisable = false,
     ReasoningLevel? defaultLevel,
+    bool clearDefaultLevel = false,
     ReasoningDialect? dialect,
+    bool clearDialect = false,
     Map<ReasoningLevel, int>? budgets,
+    bool clearBudgets = false,
     Map<ReasoningLevel, Map<String, dynamic>>? customPatches,
+    bool clearCustomPatches = false,
     ReasoningReplayPolicy? replay,
+    bool clearReplay = false,
     ReasoningReplayField? replayField,
+    bool clearReplayField = false,
   }) {
     return ReasoningSpecOverride(
-      levels: levels != null ? _normalizeReasoningLevels(levels) : this.levels,
-      canDisable: canDisable ?? this.canDisable,
-      defaultLevel: defaultLevel ?? this.defaultLevel,
-      dialect: dialect ?? this.dialect,
-      budgets: budgets ?? this.budgets,
-      customPatches: customPatches ?? this.customPatches,
-      replay: replay ?? this.replay,
-      replayField: replayField ?? this.replayField,
+      levels: clearLevels
+          ? null
+          : (levels != null ? _normalizeReasoningLevels(levels) : this.levels),
+      canDisable: clearCanDisable ? null : (canDisable ?? this.canDisable),
+      defaultLevel: clearDefaultLevel
+          ? null
+          : (defaultLevel ?? this.defaultLevel),
+      dialect: clearDialect ? null : (dialect ?? this.dialect),
+      budgets: clearBudgets ? null : (budgets ?? this.budgets),
+      customPatches: clearCustomPatches
+          ? null
+          : (customPatches ?? this.customPatches),
+      replay: clearReplay ? null : (replay ?? this.replay),
+      replayField: clearReplayField ? null : (replayField ?? this.replayField),
     );
   }
 
@@ -790,36 +804,54 @@ class ModelSpecOverride {
 
   ModelSpecOverride copyWith({
     String? apiModelId,
+    bool clearApiModelId = false,
     String? displayName,
+    bool clearDisplayName = false,
     ModelType? type,
+    bool clearType = false,
     List<Modality>? input,
+    bool clearInput = false,
     List<Modality>? output,
+    bool clearOutput = false,
     List<ModelAbility>? abilities,
+    bool clearAbilities = false,
     ReasoningSpecOverride? reasoning,
+    bool clearReasoning = false,
     SamplingPolicy? sampling,
+    bool clearSampling = false,
     int? contextWindow,
+    bool clearContextWindow = false,
     int? maxOutput,
+    bool clearMaxOutput = false,
     ModelPricing? pricing,
+    bool clearPricing = false,
     List<Map<String, String>>? headers,
+    bool clearHeaders = false,
     List<Map<String, String>>? body,
+    bool clearBody = false,
     List<String>? builtInTools,
+    bool clearBuiltInTools = false,
     Map<String, dynamic>? extra,
   }) {
     return ModelSpecOverride(
-      apiModelId: apiModelId ?? this.apiModelId,
-      displayName: displayName ?? this.displayName,
-      type: type ?? this.type,
-      input: input ?? this.input,
-      output: output ?? this.output,
-      abilities: abilities ?? this.abilities,
-      reasoning: reasoning ?? this.reasoning,
-      sampling: sampling ?? this.sampling,
-      contextWindow: contextWindow ?? this.contextWindow,
-      maxOutput: maxOutput ?? this.maxOutput,
-      pricing: pricing ?? this.pricing,
-      headers: headers ?? this.headers,
-      body: body ?? this.body,
-      builtInTools: builtInTools ?? this.builtInTools,
+      apiModelId: clearApiModelId ? null : (apiModelId ?? this.apiModelId),
+      displayName: clearDisplayName ? null : (displayName ?? this.displayName),
+      type: clearType ? null : (type ?? this.type),
+      input: clearInput ? null : (input ?? this.input),
+      output: clearOutput ? null : (output ?? this.output),
+      abilities: clearAbilities ? null : (abilities ?? this.abilities),
+      reasoning: clearReasoning ? null : (reasoning ?? this.reasoning),
+      sampling: clearSampling ? null : (sampling ?? this.sampling),
+      contextWindow: clearContextWindow
+          ? null
+          : (contextWindow ?? this.contextWindow),
+      maxOutput: clearMaxOutput ? null : (maxOutput ?? this.maxOutput),
+      pricing: clearPricing ? null : (pricing ?? this.pricing),
+      headers: clearHeaders ? null : (headers ?? this.headers),
+      body: clearBody ? null : (body ?? this.body),
+      builtInTools: clearBuiltInTools
+          ? null
+          : (builtInTools ?? this.builtInTools),
       extra: extra ?? this.extra,
     );
   }

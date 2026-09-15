@@ -3679,6 +3679,279 @@ class AppLocalizationsEn extends AppLocalizations {
   String get modelDetailSheetBodyJsonHint => 'Body JSON';
 
   @override
+  String get modelSpecFormSourceCustom => 'Custom';
+
+  @override
+  String get modelSpecFormSourceCatalog => 'Catalog';
+
+  @override
+  String get modelSpecFormSourceInferred => 'Inferred';
+
+  @override
+  String get modelSpecFormSourceDefault => 'Default';
+
+  @override
+  String get modelSpecFormReset => 'Reset to default';
+
+  @override
+  String get modelSpecFormImageType => 'Image';
+
+  @override
+  String get modelSpecFormAudioMode => 'Audio';
+
+  @override
+  String get modelSpecFormVideoMode => 'Video';
+
+  @override
+  String get modelSpecFormPdfMode => 'PDF';
+
+  @override
+  String get modelSpecFormStructuredOutputAbility => 'Structured Output';
+
+  @override
+  String get modelSpecFormReasoningSection => 'Reasoning';
+
+  @override
+  String get modelSpecFormDialect => 'Dialect';
+
+  @override
+  String get modelSpecFormDialectNone => 'None';
+
+  @override
+  String get modelSpecFormDialectNoneSubtitle => 'No reasoning fields';
+
+  @override
+  String get modelSpecFormDialectOpenaiReasoningEffort =>
+      'OpenAI reasoning effort';
+
+  @override
+  String get modelSpecFormDialectOpenaiReasoningEffortSubtitle =>
+      'reasoning_effort';
+
+  @override
+  String get modelSpecFormDialectOpenaiResponsesReasoning =>
+      'OpenAI Responses reasoning';
+
+  @override
+  String get modelSpecFormDialectOpenaiResponsesReasoningSubtitle =>
+      'reasoning.effort';
+
+  @override
+  String get modelSpecFormDialectOpenrouterReasoning => 'OpenRouter reasoning';
+
+  @override
+  String get modelSpecFormDialectOpenrouterReasoningSubtitle => 'reasoning';
+
+  @override
+  String get modelSpecFormDialectAnthropicBudget => 'Anthropic budget';
+
+  @override
+  String get modelSpecFormDialectAnthropicBudgetSubtitle =>
+      'thinking.budget_tokens';
+
+  @override
+  String get modelSpecFormDialectAnthropicAdaptiveEffort =>
+      'Anthropic adaptive effort';
+
+  @override
+  String get modelSpecFormDialectAnthropicAdaptiveEffortSubtitle =>
+      'thinking + output_config.effort';
+
+  @override
+  String get modelSpecFormDialectAnthropicEffort => 'Anthropic effort';
+
+  @override
+  String get modelSpecFormDialectAnthropicEffortSubtitle =>
+      'thinking + output_config.effort';
+
+  @override
+  String get modelSpecFormDialectGeminiThinkingBudget =>
+      'Gemini thinking budget';
+
+  @override
+  String get modelSpecFormDialectGeminiThinkingBudgetSubtitle =>
+      'thinkingConfig.thinkingBudget';
+
+  @override
+  String get modelSpecFormDialectGeminiThinkingLevel => 'Gemini thinking level';
+
+  @override
+  String get modelSpecFormDialectGeminiThinkingLevelSubtitle =>
+      'thinkingConfig.thinkingLevel';
+
+  @override
+  String get modelSpecFormDialectQwenEnableThinking => 'Qwen enable thinking';
+
+  @override
+  String get modelSpecFormDialectQwenEnableThinkingSubtitle =>
+      'enable_thinking';
+
+  @override
+  String get modelSpecFormDialectThinkingType => 'Thinking type';
+
+  @override
+  String get modelSpecFormDialectThinkingTypeSubtitle => 'thinking.type';
+
+  @override
+  String get modelSpecFormDialectSiliconflowEnableThinking =>
+      'SiliconFlow enable thinking';
+
+  @override
+  String get modelSpecFormDialectSiliconflowEnableThinkingSubtitle =>
+      'enable_thinking';
+
+  @override
+  String get modelSpecFormDialectInternThinkingMode => 'Intern thinking mode';
+
+  @override
+  String get modelSpecFormDialectInternThinkingModeSubtitle => 'thinking_mode';
+
+  @override
+  String get modelSpecFormDialectChatTemplateKwargs => 'Chat template kwargs';
+
+  @override
+  String get modelSpecFormDialectChatTemplateKwargsSubtitle =>
+      'chat_template_kwargs.enable_thinking';
+
+  @override
+  String get modelSpecFormDialectKimiThinking => 'Kimi thinking';
+
+  @override
+  String get modelSpecFormDialectKimiThinkingSubtitle => 'thinking';
+
+  @override
+  String get modelSpecFormDialectCustom => 'Custom JSON';
+
+  @override
+  String get modelSpecFormDialectCustomSubtitle => 'Per-level JSON patch';
+
+  @override
+  String get modelSpecFormLevels => 'Supported levels';
+
+  @override
+  String get modelSpecFormCanDisable => 'Allow disabling';
+
+  @override
+  String get modelSpecFormDefaultLevel => 'Default level';
+
+  @override
+  String get modelSpecFormBudgets => 'Token budgets';
+
+  @override
+  String modelSpecFormBudgetPlaceholder(String tokens) {
+    return '$tokens';
+  }
+
+  @override
+  String modelSpecFormCustomPatch(String level) {
+    return 'JSON patch ($level)';
+  }
+
+  @override
+  String get modelSpecFormCustomPatchHint => 'e.g. reasoning_effort: high';
+
+  @override
+  String get modelSpecFormInvalidJson =>
+      'Custom reasoning patch must be a valid JSON object';
+
+  @override
+  String get modelSpecFormInvalidNumber => 'Please enter a valid number';
+
+  @override
+  String get modelSpecFormStrategySection => 'Strategy';
+
+  @override
+  String get modelSpecFormSampling => 'Sampling';
+
+  @override
+  String get modelSpecFormSamplingAlways => 'Always';
+
+  @override
+  String get modelSpecFormSamplingAlwaysSubtitle =>
+      'Keep temperature and other sampling fields';
+
+  @override
+  String get modelSpecFormSamplingOnlyWhenReasoningOff =>
+      'Only when reasoning is off';
+
+  @override
+  String get modelSpecFormSamplingOnlyWhenReasoningOffSubtitle =>
+      'Strip sampling fields while the model is thinking';
+
+  @override
+  String get modelSpecFormSamplingNever => 'Never';
+
+  @override
+  String get modelSpecFormSamplingNeverSubtitle =>
+      'Always strip sampling fields';
+
+  @override
+  String get modelSpecFormReplay => 'Reasoning replay';
+
+  @override
+  String get modelSpecFormReplayNone => 'None';
+
+  @override
+  String get modelSpecFormReplayNoneSubtitle =>
+      'Do not send prior reasoning back to the model';
+
+  @override
+  String get modelSpecFormReplayToolTurns => 'Tool turns';
+
+  @override
+  String get modelSpecFormReplayToolTurnsSubtitle =>
+      'Replay reasoning on tool-call turns';
+
+  @override
+  String get modelSpecFormReplayAll => 'All';
+
+  @override
+  String get modelSpecFormReplayAllSubtitle =>
+      'Replay reasoning on every follow-up turn';
+
+  @override
+  String get modelSpecFormReplayField => 'Replay field';
+
+  @override
+  String get modelSpecFormReplayFieldReasoningContent => 'reasoning_content';
+
+  @override
+  String get modelSpecFormReplayFieldReasoning => 'reasoning';
+
+  @override
+  String get modelSpecFormReplayFieldReasoningDetails => 'reasoning_details';
+
+  @override
+  String get modelSpecFormLimitsSection => 'Limits';
+
+  @override
+  String get modelSpecFormContextWindow => 'Context window';
+
+  @override
+  String get modelSpecFormMaxOutput => 'Max output';
+
+  @override
+  String get modelSpecFormPricingSection => 'Pricing';
+
+  @override
+  String get modelSpecFormPricingInput => 'Input / 1M';
+
+  @override
+  String get modelSpecFormPricingOutput => 'Output / 1M';
+
+  @override
+  String get modelSpecFormPricingCacheRead => 'Cache read / 1M';
+
+  @override
+  String get modelSpecFormPricingCacheWrite => 'Cache write / 1M';
+
+  @override
+  String get modelSpecFormCurrency => 'Currency';
+
+  @override
+  String get modelSpecFormAdvancedSection => 'Request';
+
+  @override
   String get modelSelectSheetSearchHint => 'Search models or providers';
 
   @override

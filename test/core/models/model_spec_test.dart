@@ -349,6 +349,26 @@ void main() {
       expect(ModelSpecOverride.fromJson({'reasoning': {}}).toJson(), isEmpty);
     });
 
+    test('copyWith can clear fields back to null', () {
+      const ov = ModelSpecOverride(
+        displayName: 'X',
+        type: ModelType.chat,
+        contextWindow: 1000,
+        sampling: SamplingPolicy.never,
+      );
+      final cleared = ov.copyWith(
+        clearDisplayName: true,
+        clearType: true,
+        clearContextWindow: true,
+        clearSampling: true,
+      );
+      expect(cleared.displayName, isNull);
+      expect(cleared.type, isNull);
+      expect(cleared.contextWindow, isNull);
+      expect(cleared.sampling, isNull);
+      expect(ov.copyWith().type, ModelType.chat);
+    });
+
     test('isEmpty is true only when nothing is set', () {
       expect(const ModelSpecOverride().isEmpty, isTrue);
       expect(const ModelSpecOverride(displayName: 'x').isEmpty, isFalse);
@@ -475,6 +495,26 @@ void main() {
       expect(messy.dialect, ReasoningDialect.none);
       expect(messy.replay, ReasoningReplayPolicy.none);
       expect(messy.replayField, ReasoningReplayField.reasoningContent);
+    });
+
+    test('copyWith can clear nullable fields', () {
+      const ov = ReasoningSpecOverride(
+        levels: [ReasoningLevel.low],
+        canDisable: true,
+        dialect: ReasoningDialect.openaiReasoningEffort,
+        replay: ReasoningReplayPolicy.all,
+      );
+      final cleared = ov.copyWith(
+        clearLevels: true,
+        clearCanDisable: true,
+        clearDialect: true,
+        clearReplay: true,
+      );
+      expect(cleared.levels, isNull);
+      expect(cleared.canDisable, isNull);
+      expect(cleared.dialect, isNull);
+      expect(cleared.replay, isNull);
+      expect(ov.copyWith().dialect, ReasoningDialect.openaiReasoningEffort);
     });
 
     test('copyWith strips auto/off from levels', () {

@@ -15,7 +15,7 @@ import 'package:image_picker/image_picker.dart';
 import '../../../icons/lucide_adapter.dart';
 import '../../../core/providers/model_provider.dart';
 import '../../../core/providers/assistant_provider.dart';
-import '../../model/widgets/model_detail_sheet.dart';
+import '../../model/pages/model_spec_edit_page.dart';
 import '../../model/widgets/model_select_sheet.dart';
 import '../widgets/share_provider_sheet.dart';
 import '../widgets/provider_group_picker_sheet.dart';
@@ -2478,7 +2478,7 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
                   padding: compact ? iconButtonPadding : textButtonPadding,
                   colorScheme: cs,
                   onTap: () async {
-                    await showCreateModelSheet(
+                    await showCreateModelSpecPage(
                       context,
                       providerKey: widget.keyName,
                     );
@@ -4140,10 +4140,10 @@ class _ModelCard extends StatelessWidget {
                     semanticLabel: l10n.providerDetailPageEditTooltip,
                     haptics: false,
                     onTap: () async {
-                      await showModelDetailSheet(
+                      await showModelSpecEditPage(
                         context,
                         providerKey: providerKey,
-                        modelId: modelId,
+                        modelKey: modelId,
                       );
                     },
                   ),
