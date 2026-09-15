@@ -9,6 +9,36 @@ class AppLocalizationsEn extends AppLocalizations {
   AppLocalizationsEn([String locale = 'en']) : super(locale);
 
   @override
+  String get settingsSearchHint => 'Search settings';
+
+  @override
+  String get settingsSearchCancel => 'Cancel';
+
+  @override
+  String get settingsSearchClear => 'Clear search';
+
+  @override
+  String get settingsSearchSuggestions => 'Quick access';
+
+  @override
+  String get settingsSearchNoResults => 'No settings found';
+
+  @override
+  String get settingsSearchNoResultsHint =>
+      'Try a different name or a shorter keyword.';
+
+  @override
+  String settingsSearchResultCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count results',
+      one: '1 result',
+    );
+    return '$_temp0';
+  }
+
+  @override
   String get helloWorld => 'Hello World!';
 
   @override

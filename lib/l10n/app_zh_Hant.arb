@@ -1,4 +1,11 @@
 {
+  "settingsSearchHint": "搜尋設定",
+  "settingsSearchCancel": "取消",
+  "settingsSearchClear": "清除搜尋",
+  "settingsSearchSuggestions": "常用設定",
+  "settingsSearchNoResults": "找不到相關設定",
+  "settingsSearchNoResultsHint": "試試其他名稱，或更簡短的關鍵字。",
+  "settingsSearchResultCount": "找到 {count} 項設定",
   "helloWorld": "你好，世界！",
   "settingsPageBackButton": "返回",
   "settingsPageTitle": "設定",

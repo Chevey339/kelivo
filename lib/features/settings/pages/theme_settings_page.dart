@@ -1,3 +1,4 @@
+import '../widgets/settings_search_target.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -400,7 +401,7 @@ Widget _iosSwitchRow(
   required ValueChanged<bool> onChanged,
 }) {
   final cs = Theme.of(context).colorScheme;
-  return _TactileRow(
+  final row = _TactileRow(
     onTap: () => onChanged(!value),
     builder: (pressed) {
       final baseColor = cs.onSurface.withValues(alpha: 0.9);
@@ -436,6 +437,7 @@ Widget _iosSwitchRow(
       );
     },
   );
+  return SettingsSearchTarget.wrap(context, label, row);
 }
 
 Widget _paletteRow(

@@ -1,8 +1,9 @@
+import '../widgets/settings_search_target.dart';
+import 'package:flutter/foundation.dart' show defaultTargetPlatform;
 import 'mobile_background_settings_page.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
-import 'dart:io' show Platform;
 import '../../../icons/lucide_adapter.dart';
 import 'package:syncfusion_flutter_sliders/sliders.dart';
 import 'package:syncfusion_flutter_core/theme.dart';
@@ -180,7 +181,8 @@ class _DisplaySettingsPageState extends State<DisplaySettingsPage> {
                 ),
               ),
               _iosDivider(context),
-              if (Platform.isAndroid || Platform.isIOS) ...[
+              if (defaultTargetPlatform == TargetPlatform.android ||
+                  defaultTargetPlatform == TargetPlatform.iOS) ...[
                 _iosNavRow(
                   context,
                   icon: Lucide.Activity,
@@ -1179,7 +1181,7 @@ Widget _iosNavRow(
 }) {
   final cs = Theme.of(context).colorScheme;
   final interactive = onTap != null;
-  return _TactileRow(
+  final row = _TactileRow(
     onTap: onTap,
     haptics: true,
     builder: (pressed) {
@@ -1246,6 +1248,7 @@ Widget _iosNavRow(
       );
     },
   );
+  return SettingsSearchTarget.wrap(context, label, row);
 }
 
 Widget _iosSwitchRow(
@@ -1258,7 +1261,7 @@ Widget _iosSwitchRow(
   required ValueChanged<bool> onChanged,
 }) {
   final cs = Theme.of(context).colorScheme;
-  return Padding(
+  final row = Padding(
     padding: EdgeInsets.symmetric(
       horizontal: 12,
       vertical: subtitle == null ? 2 : 8,
@@ -1320,6 +1323,7 @@ Widget _iosSwitchRow(
       ],
     ),
   );
+  return SettingsSearchTarget.wrap(context, label, row);
 }
 
 Widget _sheetOption(
@@ -1677,7 +1681,8 @@ class RenderingSettingsPage extends StatelessWidget {
                       .setAutoCollapseCodeBlockLines(v),
                 ),
               ],
-              if (Platform.isAndroid || Platform.isIOS) ...[
+              if (defaultTargetPlatform == TargetPlatform.android ||
+                  defaultTargetPlatform == TargetPlatform.iOS) ...[
                 _iosDivider(context),
                 _iosSwitchRow(
                   context,
@@ -1985,7 +1990,8 @@ class BehaviorStartupSettingsPage extends StatelessWidget {
                 onChanged: (v) =>
                     context.read<SettingsProvider>().setShowAppUpdates(v),
               ),
-              if (Platform.isAndroid || Platform.isIOS) ...[
+              if (defaultTargetPlatform == TargetPlatform.android ||
+                  defaultTargetPlatform == TargetPlatform.iOS) ...[
                 _iosDivider(context),
                 _iosSwitchRow(
                   context,

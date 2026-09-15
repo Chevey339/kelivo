@@ -1,4 +1,12 @@
 {
+  "settingsSearchHint": "Search settings",
+  "settingsSearchCancel": "Cancel",
+  "settingsSearchClear": "Clear search",
+  "settingsSearchSuggestions": "Quick access",
+  "settingsSearchNoResults": "No settings found",
+  "settingsSearchNoResultsHint": "Try a different name or a shorter keyword.",
+  "settingsSearchResultCount": "{count, plural, =1{1 result} other{{count} results}}",
+  "@settingsSearchResultCount": {"placeholders": {"count": {"type": "int"}}},
   "helloWorld": "Hello World!",
   "settingsPageBackButton": "Back",
   "settingsPageTitle": "Settings",
