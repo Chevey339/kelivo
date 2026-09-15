@@ -4,6 +4,7 @@ import '../../../icons/lucide_adapter.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../shared/widgets/ios_tactile.dart';
 import '../widgets/health_data_settings_connected.dart';
+import '../../../utils/ui_scale.dart';
 
 class HealthDataSettingsDesktopLayout extends StatelessWidget {
   const HealthDataSettingsDesktopLayout({super.key, required this.assistantId});
@@ -33,7 +34,7 @@ class HealthDataSettingsDesktopLayout extends StatelessWidget {
       body: Align(
         alignment: Alignment.topCenter,
         child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 560),
+          constraints: BoxConstraints(maxWidth: scaledDim(context, 560)),
           child: HealthDataSettingsConnected(
             assistantId: assistantId,
             padding: const EdgeInsets.fromLTRB(24, 16, 24, 32),

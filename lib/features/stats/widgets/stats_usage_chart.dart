@@ -50,7 +50,10 @@ class _StatsUsageChartState extends State<StatsUsageChart> {
       final count = day.providerTokens.values.where(_hasDetailTokens).length;
       return count > previous ? count : previous;
     });
-    final chartHeight = (82 + maxDetailRows * 31.0).clamp(160.0, 360.0);
+    final ts = MediaQuery.textScalerOf(context);
+    final chartHeight = ts
+        .scale(82.0 + maxDetailRows * 31.0)
+        .clamp(ts.scale(160.0), ts.scale(360.0));
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -61,8 +64,10 @@ class _StatsUsageChartState extends State<StatsUsageChart> {
               ? const SizedBox.shrink()
               : LayoutBuilder(
                   builder: (context, constraints) {
-                    final barWidth = widget.days.length > 45 ? 8.0 : 12.0;
-                    final gap = widget.days.length > 45 ? 3.0 : 5.0;
+                    final barWidth = ts.scale(
+                      widget.days.length > 45 ? 8.0 : 12.0,
+                    );
+                    final gap = ts.scale(widget.days.length > 45 ? 3.0 : 5.0);
                     final contentWidth =
                         widget.days.length * barWidth +
                         (widget.days.length - 1) * gap;
@@ -198,8 +203,8 @@ class _StatsUsageChartState extends State<StatsUsageChart> {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Container(
-                      width: 9,
-                      height: 9,
+                      width: ts.scale(9.0),
+                      height: ts.scale(9.0),
                       decoration: BoxDecoration(
                         color: _providerColor(context, i),
                         borderRadius: BorderRadius.circular(3),
@@ -440,11 +445,13 @@ class _UsageDetailBubble extends StatelessWidget {
     final l10n = AppLocalizations.of(context)!;
     final cs = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final maxLeft = (chartWidth - _usageDetailBubbleWidth).clamp(
-      0.0,
-      double.infinity,
-    );
-    final left = (barLeft - _usageDetailBubbleWidth / 2).clamp(0.0, maxLeft);
+    // The rows scale with the ambient text scaler, so this fixed-width bubble
+    // has to scale too — otherwise large UI font scales ellipsize the provider
+    // names (same failure mode the token detail popup had).
+    final ts = MediaQuery.textScalerOf(context);
+    final bubbleWidth = ts.scale(_usageDetailBubbleWidth);
+    final maxLeft = (chartWidth - bubbleWidth).clamp(0.0, double.infinity);
+    final left = (barLeft - bubbleWidth / 2).clamp(0.0, maxLeft);
     final providerRows = <(int, String, StatsTokenBucket)>[];
     for (var i = 0; i < providers.length; i++) {
       final bucket = day.providerTokens[providers[i]];
@@ -456,7 +463,7 @@ class _UsageDetailBubble extends StatelessWidget {
 
     return Positioned(
       left: left,
-      top: _usageDetailBubbleTop,
+      top: ts.scale(_usageDetailBubbleTop),
       child: DecoratedBox(
         decoration: BoxDecoration(
           color: cs.surfaceContainerHigh,
@@ -470,7 +477,7 @@ class _UsageDetailBubble extends StatelessWidget {
           ],
         ),
         child: SizedBox(
-          width: _usageDetailBubbleWidth,
+          width: bubbleWidth,
           child: Padding(
             padding: const EdgeInsets.fromLTRB(12, 10, 12, 11),
             child: Column(

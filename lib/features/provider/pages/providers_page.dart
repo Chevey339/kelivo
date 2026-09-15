@@ -25,6 +25,7 @@ import '../widgets/provider_group_select_sheet.dart';
 import '../../../utils/provider_grouping_logic.dart';
 import '../../../theme/app_font_weights.dart';
 import 'package:Kelivo/theme/app_semantic_colors.dart';
+import '../../../utils/ui_scale.dart';
 
 class ProvidersPage extends StatefulWidget {
   const ProvidersPage({super.key});
@@ -1646,7 +1647,7 @@ Future<void> _showMultiExportSheet(
               ],
               // Limited preview of codes (6-7 lines), full content still copied/shared
               SizedBox(
-                height: 128,
+                height: scaledDim(context, 128),
                 child: SingleChildScrollView(
                   child: Text(
                     text,

@@ -59,6 +59,7 @@ import '../../../shared/widgets/snackbar.dart';
 import '../../../theme/app_font_weights.dart';
 import '../../../theme/design_tokens.dart';
 import '../../../utils/avatar_cache.dart';
+import '../../../utils/avatar_scale.dart';
 import '../../../utils/brand_assets.dart';
 import '../../../utils/platform_utils.dart';
 import '../../../utils/sandbox_path_resolver.dart';
@@ -69,6 +70,7 @@ import 'assistant_settings_edit_workspace_tab.dart';
 import 'health_data_settings_page.dart';
 import 'package:Kelivo/theme/app_semantic_colors.dart';
 import 'package:Kelivo/shared/widgets/section_card.dart';
+import '../../../utils/ui_scale.dart';
 
 part 'assistant_settings_edit_basic_tab.dart';
 part '../widgets/assistant_gradient_settings.dart';
@@ -1661,7 +1663,10 @@ Future<void> showAssistantDesktopDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
         child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 860, maxHeight: 640),
+          constraints: BoxConstraints(
+            maxWidth: scaledDim(context, 860),
+            maxHeight: scaledDim(context, 640),
+          ),
           child: _DesktopAssistantDialogShell(assistantId: assistantId),
         ),
       );

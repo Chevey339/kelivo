@@ -376,7 +376,7 @@ class _DesktopProvidersBodyState extends State<_DesktopProvidersBody> {
       child: Padding(
         padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
         child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 1200),
+          constraints: BoxConstraints(maxWidth: scaledDim(context, 1200)),
           child: Row(
             children: [
               // Left providers list
@@ -1081,7 +1081,7 @@ class _DesktopProviderDetailPaneState
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
         insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
         child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 460),
+          constraints: BoxConstraints(maxWidth: scaledDim(context, 460)),
           child: Padding(
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
             child: Column(
@@ -1161,7 +1161,7 @@ class _DesktopProviderDetailPaneState
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         SizedBox(
-          height: 36,
+          height: scaledDim(context, 36),
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 12),
             child: Row(
@@ -1171,7 +1171,9 @@ class _DesktopProviderDetailPaneState
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     ConstrainedBox(
-                      constraints: const BoxConstraints(maxWidth: 480),
+                      constraints: BoxConstraints(
+                        maxWidth: scaledDim(context, 480),
+                      ),
                       child: Text(
                         cfg.name.isNotEmpty ? cfg.name : widget.providerKey,
                         maxLines: 1,
@@ -1194,7 +1196,9 @@ class _DesktopProviderDetailPaneState
                         cfg.balanceEnabled == true) ...[
                       const SizedBox(width: 8),
                       ConstrainedBox(
-                        constraints: const BoxConstraints(maxWidth: 120),
+                        constraints: BoxConstraints(
+                          maxWidth: scaledDim(context, 120),
+                        ),
                         child: ProviderBalanceBadge(
                           providerKey: widget.providerKey,
                           displayName: widget.displayName,
@@ -1832,7 +1836,9 @@ class _DesktopProviderDetailPaneState
                 ),
                 const SizedBox(height: 6),
                 ConstrainedBox(
-                  constraints: const BoxConstraints(minHeight: 120),
+                  constraints: BoxConstraints(
+                    minHeight: scaledDim(context, 120),
+                  ),
                   child: Focus(
                     onFocusChange: (has) async {
                       if (!has) {
@@ -2435,7 +2441,7 @@ class _DesktopProviderDetailPaneState
           ),
           child: ConstrainedBox(
             constraints: BoxConstraints(
-              maxWidth: 520,
+              maxWidth: scaledDim(context, 520),
               maxHeight: MediaQuery.of(ctx).size.height * 0.82,
             ),
             child: Consumer<SettingsProvider>(
@@ -2540,7 +2546,7 @@ class _DesktopProviderDetailPaneState
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
                       SizedBox(
-                        height: 44,
+                        height: scaledDim(context, 44),
                         child: Padding(
                           padding: const EdgeInsets.symmetric(horizontal: 12),
                           child: Row(
@@ -3072,11 +3078,13 @@ class _DesktopProviderDetailPaneState
                                                 alignment:
                                                     Alignment.centerRight,
                                                 child: ConstrainedBox(
-                                                  constraints:
-                                                      const BoxConstraints(
-                                                        minWidth: 72,
-                                                        maxWidth: 120,
-                                                      ),
+                                                  constraints: BoxConstraints(
+                                                    minWidth: 72,
+                                                    maxWidth: scaledDim(
+                                                      context,
+                                                      120,
+                                                    ),
+                                                  ),
                                                   child: ProviderBalanceBadge(
                                                     providerKey:
                                                         widget.providerKey,
@@ -3727,13 +3735,13 @@ class _DesktopProviderDetailPaneState
               ),
               backgroundColor: context.overlaySurface,
               child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 420),
+                constraints: BoxConstraints(maxWidth: scaledDim(context, 420)),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     SizedBox(
-                      height: 44,
+                      height: scaledDim(context, 44),
                       child: Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 12),
                         child: Row(
@@ -4205,7 +4213,7 @@ class _DesktopProviderDetailPaneState
                 vertical: 24,
               ),
               child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 520),
+                constraints: BoxConstraints(maxWidth: scaledDim(context, 520)),
                 child: StatefulBuilder(
                   builder: (cc, setCC) {
                     return Column(
@@ -4213,7 +4221,7 @@ class _DesktopProviderDetailPaneState
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
                         SizedBox(
-                          height: 44,
+                          height: scaledDim(context, 44),
                           child: Padding(
                             padding: const EdgeInsets.symmetric(horizontal: 12),
                             child: Row(
@@ -4370,7 +4378,10 @@ class _DesktopProviderDetailPaneState
             vertical: 24,
           ),
           child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 680, maxHeight: 620),
+            constraints: BoxConstraints(
+              maxWidth: scaledDim(context, 680),
+              maxHeight: scaledDim(context, 620),
+            ),
             child: StatefulBuilder(
               builder: (dctx, setD) {
                 setDRef = setD;
@@ -4389,7 +4400,7 @@ class _DesktopProviderDetailPaneState
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     SizedBox(
-                      height: 44,
+                      height: scaledDim(context, 44),
                       child: Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 12),
                         child: Row(
@@ -4724,7 +4735,7 @@ class _DesktopProviderDetailPaneState
                 vertical: 24,
               ),
               child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 520),
+                constraints: BoxConstraints(maxWidth: scaledDim(context, 520)),
                 child: Padding(
                   padding: const EdgeInsets.fromLTRB(18, 18, 18, 12),
                   child: Column(
@@ -4954,7 +4965,7 @@ class _DesktopProviderDetailPaneState
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
         insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
         child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 520),
+          constraints: BoxConstraints(maxWidth: scaledDim(context, 520)),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -5078,7 +5089,7 @@ class _DesktopProviderDetailPaneState
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
         insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
         child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 520),
+          constraints: BoxConstraints(maxWidth: scaledDim(context, 520)),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -5608,7 +5619,7 @@ class _IconTextBtnState extends State<_IconTextBtn> {
       child: GestureDetector(
         onTap: widget.onTap,
         child: Container(
-          height: 28,
+          height: scaledDim(context, 28),
           padding: const EdgeInsets.symmetric(horizontal: 8),
           decoration: BoxDecoration(
             color: bg,
@@ -5790,12 +5801,15 @@ class _DesktopProviderGroupsDialogState
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
       insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
       child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 520, maxHeight: 560),
+        constraints: BoxConstraints(
+          maxWidth: scaledDim(context, 520),
+          maxHeight: scaledDim(context, 560),
+        ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             SizedBox(
-              height: 48,
+              height: scaledDim(context, 48),
               child: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 10),
                 child: Row(
@@ -6140,7 +6154,7 @@ class _DesktopProviderShareDialogState
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
       insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
       child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 520),
+        constraints: BoxConstraints(maxWidth: scaledDim(context, 520)),
         child: Padding(
           padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
           child: Column(
@@ -6211,7 +6225,9 @@ class _DesktopProviderShareDialogState
                   ),
                 ),
                 child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxHeight: 160),
+                  constraints: BoxConstraints(
+                    maxHeight: scaledDim(context, 160),
+                  ),
                   child: SingleChildScrollView(
                     child: SelectableText(
                       _code,
@@ -6824,7 +6840,7 @@ class _ModelGroupAccordionState extends State<_ModelGroupAccordion> {
                 focusColor: Colors.transparent,
                 onTap: () => setState(() => _open = !_open),
                 child: Container(
-                  height: 40,
+                  height: scaledDim(context, 40),
                   padding: const EdgeInsets.symmetric(horizontal: 12),
                   decoration: BoxDecoration(
                     color: Theme.of(context).brightness == Brightness.dark

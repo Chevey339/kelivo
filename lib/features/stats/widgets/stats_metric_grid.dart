@@ -58,7 +58,9 @@ class StatsMetricGrid extends StatelessWidget {
           physics: const NeverScrollableScrollPhysics(),
           gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
             crossAxisCount: columns,
-            mainAxisExtent: 78,
+            // The tile texts scale with the ambient text scaler, so the fixed
+            // height budget has to scale with it too.
+            mainAxisExtent: MediaQuery.textScalerOf(context).scale(78.0),
             crossAxisSpacing: 8,
             mainAxisSpacing: 8,
           ),

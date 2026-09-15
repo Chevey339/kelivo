@@ -14,6 +14,7 @@ import '../../../shared/widgets/ios_switch.dart';
 import '../../../shared/widgets/ios_tactile.dart';
 import 'package:Kelivo/theme/app_semantic_colors.dart';
 import 'package:Kelivo/shared/widgets/section_card.dart';
+import '../../../utils/ui_scale.dart';
 
 class NetworkProxyPage extends StatefulWidget {
   const NetworkProxyPage({super.key});
@@ -464,7 +465,7 @@ class _ProxyTypeSheetField extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: SizedBox(
-        height: 48,
+        height: scaledDim(ctx, 48),
         child: IosCardPress(
           borderRadius: BorderRadius.circular(14),
           baseColor: cs.surface,

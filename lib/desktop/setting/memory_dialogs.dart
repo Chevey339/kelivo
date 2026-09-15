@@ -16,6 +16,7 @@ import '../../shared/widgets/ios_tactile.dart';
 import '../../shared/widgets/ios_tile_button.dart';
 import '../../theme/app_font_weights.dart';
 import 'package:Kelivo/theme/app_semantic_colors.dart';
+import '../../utils/ui_scale.dart';
 
 /// Shared chrome for memory-related desktop dialogs (matches MCP / assistant
 /// dialog shells: surface Dialog + title row + close).
@@ -46,7 +47,7 @@ Future<T?> showDesktopMemoryDialog<T>(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               SizedBox(
-                height: 44,
+                height: scaledDim(context, 44),
                 child: Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 12),
                   child: Row(
@@ -122,7 +123,7 @@ Future<T?> showDesktopMemoryFormDialog<T>(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               SizedBox(
-                height: 44,
+                height: scaledDim(context, 44),
                 child: Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 12),
                   child: Row(
@@ -412,13 +413,16 @@ class _DesktopMemoryTextInputDialogState
       insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: ConstrainedBox(
-        constraints: BoxConstraints(maxWidth: 480, maxHeight: maxHeight),
+        constraints: BoxConstraints(
+          maxWidth: scaledDim(context, 480),
+          maxHeight: maxHeight,
+        ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             SizedBox(
-              height: 44,
+              height: scaledDim(context, 44),
               child: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 12),
                 child: Row(
@@ -555,7 +559,7 @@ Future<bool> showDesktopMemoryConfirmDialog(
         insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 420),
+          constraints: BoxConstraints(maxWidth: scaledDim(context, 420)),
           child: Padding(
             padding: const EdgeInsets.fromLTRB(20, 8, 12, 16),
             child: Column(
@@ -563,7 +567,7 @@ Future<bool> showDesktopMemoryConfirmDialog(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 SizedBox(
-                  height: 40,
+                  height: scaledDim(context, 40),
                   child: Row(
                     children: [
                       Expanded(

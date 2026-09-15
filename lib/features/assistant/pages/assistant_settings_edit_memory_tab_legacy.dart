@@ -34,13 +34,13 @@ class _LegacyMemoryTabBody extends StatelessWidget {
               vertical: 24,
             ),
             child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 560),
+              constraints: BoxConstraints(maxWidth: scaledDim(context, 560)),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   SizedBox(
-                    height: 44,
+                    height: scaledDim(context, 44),
                     child: Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 12),
                       child: Row(
@@ -615,13 +615,13 @@ class _LegacyMemoryTabBody extends StatelessWidget {
               vertical: 24,
             ),
             child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 560),
+              constraints: BoxConstraints(maxWidth: scaledDim(context, 560)),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   SizedBox(
-                    height: 44,
+                    height: scaledDim(context, 44),
                     child: Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 12),
                       child: Row(
@@ -929,7 +929,7 @@ class _LegacyRecentChatsSummaryFrequencySection extends StatelessWidget {
                   l10n.assistantEditRecentChatsSummaryFrequencyCustomTitle,
                 ),
                 content: SizedBox(
-                  width: 360,
+                  width: scaledDim(context, 360),
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     crossAxisAlignment: CrossAxisAlignment.start,

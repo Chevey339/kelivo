@@ -12,6 +12,7 @@ import '../shared/widgets/ios_tactile.dart';
 import 'dart:convert';
 import '../theme/app_font_weights.dart';
 import 'package:Kelivo/theme/app_semantic_colors.dart';
+import '../utils/ui_scale.dart';
 
 Future<void> showHtmlPreviewDesktopDialog(
   BuildContext context, {
@@ -185,10 +186,10 @@ class _HtmlPreviewDialogState extends State<_HtmlPreviewDialog> {
       insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: ConstrainedBox(
-        constraints: const BoxConstraints(
-          minWidth: 520,
-          maxWidth: 900,
-          maxHeight: 740,
+        constraints: BoxConstraints(
+          minWidth: scaledDim(context, 520),
+          maxWidth: scaledDim(context, 900),
+          maxHeight: scaledDim(context, 740),
         ),
         child: ClipRRect(
           borderRadius: BorderRadius.circular(16),
@@ -313,10 +314,10 @@ class _ConsoleDialog extends StatelessWidget {
       insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: ConstrainedBox(
-        constraints: const BoxConstraints(
-          minWidth: 520,
-          maxWidth: 700,
-          maxHeight: 620,
+        constraints: BoxConstraints(
+          minWidth: scaledDim(context, 520),
+          maxWidth: scaledDim(context, 700),
+          maxHeight: scaledDim(context, 620),
         ),
         child: ClipRRect(
           borderRadius: BorderRadius.circular(16),

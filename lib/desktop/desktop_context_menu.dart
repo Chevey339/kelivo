@@ -5,6 +5,7 @@ import '../icons/lucide_adapter.dart';
 import '../shared/widgets/ios_tactile.dart';
 import '../core/services/haptics.dart';
 import 'package:Kelivo/theme/app_font_weights.dart';
+import '../utils/ui_scale.dart';
 
 /// Simple anchored context menu for desktop.
 /// Shows a Material menu near the cursor or an anchor widget with a subtle animation.
@@ -49,7 +50,13 @@ Future<void> showDesktopContextMenuAt(
   );
   final screen = overlayBox.size;
   final double menuMaxHeight = screen.height * 0.5; // scroll if exceeds
-  final double estMenuHeight = (items.length * 44.0).clamp(44.0, menuMaxHeight);
+  // Estimate with the scaled per-item height: _GlassMenuItem rows are
+  // scaledDim(44), so a raw 44.0 underestimates at large UI font scales and
+  // the anchored menu would overflow the bottom of the screen.
+  final double estMenuHeight = (items.length * scaledDim(context, 44.0)).clamp(
+    44.0,
+    menuMaxHeight,
+  );
   const double gap = 8; // offset from cursor
   final cs = Theme.of(context).colorScheme;
   final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -295,7 +302,7 @@ class _GlassMenuItemState extends State<_GlassMenuItem> {
           widget.onTap?.call();
         },
         child: Container(
-          height: 44,
+          height: scaledDim(context, 44),
           padding: const EdgeInsets.symmetric(horizontal: 12),
           alignment: Alignment.centerLeft,
           decoration: BoxDecoration(color: bg),

@@ -26,6 +26,7 @@ import '../../../core/services/model_override_resolver.dart';
 import '../../../theme/app_font_weights.dart';
 import 'package:Kelivo/shared/widgets/section_card.dart';
 import 'package:Kelivo/theme/app_semantic_colors.dart';
+import '../../../utils/ui_scale.dart';
 
 class ModelSelection {
   final String providerKey;
@@ -2130,10 +2131,10 @@ class _DesktopModelSelectDialogBodyState
 
     final dialog = Center(
       child: ConstrainedBox(
-        constraints: const BoxConstraints(
-          minWidth: 460,
-          maxWidth: 620,
-          maxHeight: 560,
+        constraints: BoxConstraints(
+          minWidth: scaledDim(context, 460),
+          maxWidth: scaledDim(context, 620),
+          maxHeight: scaledDim(context, 560),
         ),
         child: Material(
           color: context.overlaySurface,

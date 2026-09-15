@@ -71,8 +71,8 @@ class _BasicSettingsTabState extends State<_BasicSettingsTab> {
                 return ClipOval(
                   child: Image.file(
                     File(p),
-                    width: size,
-                    height: size,
+                    width: scaledAvatarSize(context, size),
+                    height: scaledAvatarSize(context, size),
                     fit: BoxFit.cover,
                   ),
                 );
@@ -80,8 +80,8 @@ class _BasicSettingsTabState extends State<_BasicSettingsTab> {
               return ClipOval(
                 child: Image.network(
                   av,
-                  width: size,
-                  height: size,
+                  width: scaledAvatarSize(context, size),
+                  height: scaledAvatarSize(context, size),
                   fit: BoxFit.cover,
                 ),
               );
@@ -92,30 +92,36 @@ class _BasicSettingsTabState extends State<_BasicSettingsTab> {
           inner = ClipOval(
             child: Image.file(
               File(fixed),
-              width: size,
-              height: size,
+              width: scaledAvatarSize(context, size),
+              height: scaledAvatarSize(context, size),
               fit: BoxFit.cover,
             ),
           );
         } else {
-          inner = Text(
-            av,
+          inner = Transform.translate(
+            offset: Offset(0, avatarInitialNudgeY(context, size)),
+            child: Text(
+              av,
+              style: TextStyle(
+                color: cs.primary,
+                fontWeight: AppFontWeights.emphasis,
+                fontSize: size * 0.42,
+              ),
+            ),
+          );
+        }
+      } else {
+        inner = Transform.translate(
+          offset: Offset(0, avatarInitialNudgeY(context, size)),
+          child: Text(
+            (a.name.trim().isNotEmpty
+                ? String.fromCharCode(a.name.trim().runes.first).toUpperCase()
+                : 'A'),
             style: TextStyle(
               color: cs.primary,
               fontWeight: AppFontWeights.emphasis,
               fontSize: size * 0.42,
             ),
-          );
-        }
-      } else {
-        inner = Text(
-          (a.name.trim().isNotEmpty
-              ? String.fromCharCode(a.name.trim().runes.first).toUpperCase()
-              : 'A'),
-          style: TextStyle(
-            color: cs.primary,
-            fontWeight: AppFontWeights.emphasis,
-            fontSize: size * 0.42,
           ),
         );
       }
@@ -537,7 +543,7 @@ class _BasicSettingsTabState extends State<_BasicSettingsTab> {
           return Padding(
             padding: const EdgeInsets.symmetric(vertical: 4),
             child: SizedBox(
-              height: 48,
+              height: scaledDim(context, 48),
               child: IosCardPress(
                 borderRadius: BorderRadius.circular(14),
                 baseColor: sheetTileColor(ctx),
@@ -1207,9 +1213,9 @@ class _BackgroundPreviewState extends State<_BackgroundPreview> {
       );
     }
     return ConstrainedBox(
-      constraints: const BoxConstraints(
-        maxHeight: 280,
-        minHeight: 100,
+      constraints: BoxConstraints(
+        maxHeight: scaledDim(context, 280),
+        minHeight: scaledDim(context, 100),
         minWidth: double.infinity,
       ),
       child: FittedBox(
@@ -1369,7 +1375,7 @@ class _SliderTileNew extends StatelessWidget {
                       builder: (_, __) {
                         final range = (max - min).abs();
                         return SizedBox(
-                          height: 18,
+                          height: scaledDim(context, 18),
                           child: Stack(
                             fit: StackFit.expand,
                             children: stops.map((v) {

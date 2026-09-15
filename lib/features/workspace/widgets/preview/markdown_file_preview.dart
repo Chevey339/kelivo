@@ -13,6 +13,7 @@ import 'package:Kelivo/shared/widgets/segmented_tabs.dart';
 import 'code_file_preview.dart';
 import 'preview_states.dart';
 import 'preview_text_document.dart';
+import '../../../../utils/ui_scale.dart';
 
 class MarkdownFilePreview extends StatefulWidget {
   const MarkdownFilePreview({
@@ -157,7 +158,7 @@ class _MarkdownRenderedView extends StatelessWidget {
           ? Align(
               alignment: Alignment.topCenter,
               child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 760),
+                constraints: BoxConstraints(maxWidth: scaledDim(context, 760)),
                 child: markdown,
               ),
             )

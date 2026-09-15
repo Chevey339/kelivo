@@ -39,6 +39,7 @@ import '../../../theme/app_font_weights.dart';
 import '../../home/widgets/model_icon.dart';
 import '../utils/thinking_tag_parser.dart';
 import 'package:Kelivo/theme/app_semantic_colors.dart';
+import '../../../utils/ui_scale.dart';
 import 'chat_message_widget.dart'
     show ChatMessageWidget, ToolUIPart, ReasoningSegment;
 
@@ -1994,10 +1995,10 @@ class _ExportDialogState extends State<_ExportDialog> {
     final cs = Theme.of(context).colorScheme;
     final l10n = AppLocalizations.of(context)!;
     return ConstrainedBox(
-      constraints: const BoxConstraints(
-        minWidth: 420,
-        maxWidth: 640,
-        maxHeight: 640,
+      constraints: BoxConstraints(
+        minWidth: scaledDim(context, 420),
+        maxWidth: scaledDim(context, 640),
+        maxHeight: scaledDim(context, 640),
       ),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(16),
@@ -2224,10 +2225,10 @@ class _BatchExportDialogState extends State<_BatchExportDialog> {
     final cs = Theme.of(context).colorScheme;
     final l10n = AppLocalizations.of(context)!;
     return ConstrainedBox(
-      constraints: const BoxConstraints(
-        minWidth: 480,
-        maxWidth: 720,
-        maxHeight: 460,
+      constraints: BoxConstraints(
+        minWidth: scaledDim(context, 480),
+        maxWidth: scaledDim(context, 720),
+        maxHeight: scaledDim(context, 460),
       ),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(16),

@@ -636,6 +636,22 @@ class _DisplaySettingsPageState extends State<DisplaySettingsPage> {
                           '${(scale * 100).round()}%',
                           style: TextStyle(color: cs.onSurface, fontSize: 12),
                         ),
+                        Tooltip(
+                          message: AppLocalizations.of(
+                            context,
+                          )!.displaySettingsPageFontResetLabel,
+                          child: IconButton(
+                            visualDensity: VisualDensity.compact,
+                            icon: Icon(
+                              Lucide.RotateCcw,
+                              size: 18,
+                              color: cs.onSurface.withValues(alpha: 0.7),
+                            ),
+                            // Reset to the default 100% scale.
+                            onPressed: () =>
+                                setter(context.read<SettingsProvider>(), 1.0),
+                          ),
+                        ),
                       ],
                     ),
                     const SizedBox(height: 8),

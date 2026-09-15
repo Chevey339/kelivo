@@ -4,6 +4,7 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../shared/widgets/ios_tactile.dart';
 import '../../shared/widgets/section_card.dart';
 import '../../theme/app_semantic_colors.dart';
+import '../../utils/ui_scale.dart';
 
 /// The same compact label/control arrangement used in desktop preferences.
 class DesktopScheduledTaskRow extends StatelessWidget {
@@ -120,8 +121,8 @@ class DesktopScheduledTaskPicker extends StatelessWidget {
         baseColor: cs.surfaceContainerHigh,
         borderRadius: BorderRadius.circular(10),
         child: Container(
-          width: 240,
-          constraints: const BoxConstraints(minHeight: 36),
+          width: scaledDim(context, 240),
+          constraints: BoxConstraints(minHeight: scaledDim(context, 36)),
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(10),

@@ -27,6 +27,7 @@ import 'package:Kelivo/theme/app_semantic_colors.dart';
 import 'package:Kelivo/utils/mcp_structured_image.dart';
 
 import 'chat_surface.dart';
+import '../../../utils/ui_scale.dart';
 
 export 'package:Kelivo/features/workspace/workspace_file_navigation.dart';
 
@@ -325,7 +326,7 @@ class ToolApprovalButton extends StatelessWidget {
       onTap: onTap,
       behavior: HitTestBehavior.opaque,
       child: Container(
-        height: 36,
+        height: scaledDim(context, 36),
         alignment: Alignment.center,
         decoration: BoxDecoration(
           color: filled

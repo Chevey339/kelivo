@@ -38,6 +38,7 @@ import '../../../utils/model_grouping.dart';
 import '../../../theme/app_font_weights.dart';
 import 'package:Kelivo/theme/app_semantic_colors.dart';
 import 'package:Kelivo/shared/widgets/section_card.dart';
+import '../../../utils/ui_scale.dart';
 
 class ProviderDetailPage extends StatefulWidget {
   const ProviderDetailPage({
@@ -359,7 +360,7 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
           return Padding(
             padding: const EdgeInsets.symmetric(vertical: 4),
             child: SizedBox(
-              height: 48,
+              height: scaledDim(context, 48),
               child: IosCardPress(
                 borderRadius: BorderRadius.circular(14),
                 baseColor: cs.surface,
@@ -2539,7 +2540,10 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
           onTap: onTap,
           builder: (pressed) {
             return Container(
-              constraints: const BoxConstraints(minWidth: 44, minHeight: 44),
+              constraints: BoxConstraints(
+                minWidth: scaledDim(context, 44),
+                minHeight: scaledDim(context, 44),
+              ),
               decoration: BoxDecoration(
                 color: destructive
                     ? colorScheme.error.withValues(alpha: 0.1)
@@ -2810,7 +2814,10 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
           },
           builder: (pressed) {
             return Container(
-              constraints: const BoxConstraints(minWidth: 44, minHeight: 44),
+              constraints: BoxConstraints(
+                minWidth: scaledDim(context, 44),
+                minHeight: scaledDim(context, 44),
+              ),
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(999),
                 border: Border.all(
@@ -2936,7 +2943,10 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
           onTap: disabled ? null : _startDetection,
           builder: (pressed) {
             return Container(
-              constraints: const BoxConstraints(minWidth: 44, minHeight: 44),
+              constraints: BoxConstraints(
+                minWidth: scaledDim(context, 44),
+                minHeight: scaledDim(context, 44),
+              ),
               decoration: BoxDecoration(
                 color: disabled
                     ? colorScheme.onSurface.withValues(alpha: 0.1)
@@ -3002,7 +3012,10 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
           onTap: disabled ? null : onTap,
           builder: (pressed) {
             return Container(
-              constraints: const BoxConstraints(minWidth: 44, minHeight: 44),
+              constraints: BoxConstraints(
+                minWidth: scaledDim(context, 44),
+                minHeight: scaledDim(context, 44),
+              ),
               decoration: BoxDecoration(
                 color: disabled
                     ? colorScheme.onSurface.withValues(alpha: 0.1)
@@ -4228,7 +4241,7 @@ class _ConnectionTestDialogState extends State<_ConnectionTestDialog> {
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
       child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 520),
+        constraints: BoxConstraints(maxWidth: scaledDim(context, 520)),
         child: Padding(
           padding: const EdgeInsets.fromLTRB(18, 18, 18, 12),
           child: Column(

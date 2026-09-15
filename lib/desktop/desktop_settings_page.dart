@@ -29,6 +29,7 @@ import '../core/providers/assistant_provider.dart';
 import '../features/home/controllers/chat_actions.dart' show ChatActions;
 import '../core/models/assistant.dart';
 import '../utils/avatar_cache.dart';
+import '../utils/avatar_scale.dart';
 import '../utils/sandbox_path_resolver.dart';
 import 'dart:io' show Directory, File, Platform;
 import '../utils/app_directories.dart';
@@ -84,6 +85,7 @@ import '../theme/custom_theme.dart';
 import '../features/settings/widgets/custom_theme_widgets.dart';
 import '../features/settings/pages/message_style_settings_page.dart';
 import '../features/settings/widgets/memory_ui.dart';
+import '../utils/ui_scale.dart';
 
 part 'setting/assistants_pane.dart';
 part 'setting/providers_pane.dart';
@@ -158,9 +160,9 @@ class _DesktopSettingsPageState extends State<DesktopSettingsPage> {
     final cs = Theme.of(context).colorScheme;
     final l10n = AppLocalizations.of(context)!;
 
-    const double menuWidth = 250;
+    final double menuWidth = scaledDim(context, 250);
     final topBar = SizedBox(
-      height: 36,
+      height: scaledDim(context, 36),
       child: Align(
         alignment: Alignment.centerLeft,
         child: Padding(

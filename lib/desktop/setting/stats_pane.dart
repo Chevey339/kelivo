@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../features/stats/pages/stats_page.dart';
 import '../../l10n/app_localizations.dart';
 import 'package:Kelivo/theme/app_font_weights.dart';
+import '../../utils/ui_scale.dart';
 
 class DesktopStatsPane extends StatelessWidget {
   const DesktopStatsPane({super.key});
@@ -15,7 +16,7 @@ class DesktopStatsPane extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         SizedBox(
-          height: 48,
+          height: scaledDim(context, 48),
           child: Padding(
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
             child: Align(

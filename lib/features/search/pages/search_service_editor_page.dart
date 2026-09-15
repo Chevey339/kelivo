@@ -17,6 +17,7 @@ import 'search_api_keys_page.dart';
 import 'package:Kelivo/theme/app_semantic_colors.dart';
 import 'package:Kelivo/shared/widgets/ios_tactile.dart';
 import 'package:Kelivo/shared/widgets/section_card.dart';
+import '../../../utils/ui_scale.dart';
 
 class SearchServiceEditorResult {
   const SearchServiceEditorResult.saved(this.service) : deleted = false;
@@ -168,7 +169,7 @@ class _SearchServiceEditorPageState extends State<SearchServiceEditorPage> {
             child: Align(
               alignment: Alignment.topCenter,
               child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 760),
+                constraints: BoxConstraints(maxWidth: scaledDim(context, 760)),
                 child: ListView(
                   keyboardDismissBehavior:
                       ScrollViewKeyboardDismissBehavior.onDrag,
@@ -2068,7 +2069,7 @@ class _SearchResultRow extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               SizedBox(
-                width: 24,
+                width: scaledDim(context, 24),
                 child: Text(
                   '$index',
                   style: TextStyle(

@@ -10,6 +10,7 @@ import '../icons/lucide_adapter.dart';
 import '../l10n/app_localizations.dart';
 import 'package:Kelivo/theme/app_font_weights.dart';
 import '../theme/design_tokens.dart';
+import '../utils/ui_scale.dart';
 
 Future<void> showDesktopWorldBookPopover(
   BuildContext context, {
@@ -227,7 +228,7 @@ class _WorldBookList extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.only(bottom: 2),
       child: ConstrainedBox(
-        constraints: const BoxConstraints(maxHeight: 420),
+        constraints: BoxConstraints(maxHeight: scaledDim(context, 420)),
         child: _WorldBookListInner(
           assistantId: assistantId,
           conversationId: conversationId,

@@ -11,6 +11,8 @@ import '../../utils/brand_assets.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import '../../theme/app_font_weights.dart';
 import 'package:Kelivo/theme/app_semantic_colors.dart';
+import '../../utils/avatar_scale.dart';
+import '../../utils/ui_scale.dart';
 
 class DesktopDefaultModelPane extends StatelessWidget {
   const DesktopDefaultModelPane({super.key});
@@ -38,12 +40,12 @@ class DesktopDefaultModelPane extends StatelessWidget {
         child: Center(
           child: Center(
             child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 960),
+              constraints: BoxConstraints(maxWidth: scaledDim(context, 960)),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   SizedBox(
-                    height: 36,
+                    height: scaledDim(context, 36),
                     child: Align(
                       alignment: Alignment.centerLeft,
                       child: Text(
@@ -341,7 +343,7 @@ class DesktopDefaultModelPane extends StatelessWidget {
                 vertical: 24,
               ),
               child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 600),
+                constraints: BoxConstraints(maxWidth: scaledDim(context, 600)),
                 child: Padding(
                   padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
                   child: Column(
@@ -432,7 +434,7 @@ class DesktopDefaultModelPane extends StatelessWidget {
             vertical: 24,
           ),
           child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 600),
+            constraints: BoxConstraints(maxWidth: scaledDim(context, 600)),
             child: Padding(
               padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
               child: Column(
@@ -530,7 +532,7 @@ class DesktopDefaultModelPane extends StatelessWidget {
             vertical: 24,
           ),
           child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 600),
+            constraints: BoxConstraints(maxWidth: scaledDim(context, 600)),
             child: Padding(
               padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
               child: Column(
@@ -618,7 +620,7 @@ class DesktopDefaultModelPane extends StatelessWidget {
             vertical: 24,
           ),
           child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 600),
+            constraints: BoxConstraints(maxWidth: scaledDim(context, 600)),
             child: Padding(
               padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
               child: Column(
@@ -717,7 +719,7 @@ class DesktopDefaultModelPane extends StatelessWidget {
             vertical: 24,
           ),
           child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 600),
+            constraints: BoxConstraints(maxWidth: scaledDim(context, 600)),
             child: Padding(
               padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
               child: Column(
@@ -813,7 +815,7 @@ class DesktopDefaultModelPane extends StatelessWidget {
             vertical: 24,
           ),
           child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 600),
+            constraints: BoxConstraints(maxWidth: scaledDim(context, 600)),
             child: Padding(
               padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
               child: Column(
@@ -1385,19 +1387,22 @@ class _BrandCircle extends StatelessWidget {
     final asset = BrandAssets.assetForName(name);
     Widget inner;
     if (asset == null) {
-      inner = Text(
-        name.isNotEmpty ? name.characters.first.toUpperCase() : '?',
-        style: TextStyle(
-          color: cs.primary,
-          fontWeight: AppFontWeights.heavy,
-          fontSize: size * 0.45,
+      inner = Transform.translate(
+        offset: Offset(0, avatarInitialNudgeY(context, size)),
+        child: Text(
+          name.isNotEmpty ? name.characters.first.toUpperCase() : '?',
+          style: TextStyle(
+            color: cs.primary,
+            fontWeight: AppFontWeights.heavy,
+            fontSize: size * 0.45,
+          ),
         ),
       );
     } else if (asset.endsWith('.svg')) {
       inner = SvgPicture.asset(
         asset,
-        width: size * 0.62,
-        height: size * 0.62,
+        width: scaledAvatarSize(context, size) * 0.62,
+        height: scaledAvatarSize(context, size) * 0.62,
         fit: BoxFit.contain,
         colorFilter: isDark && BrandAssets.assetNeedsDarkInvert(asset)
             ? ColorFilter.mode(cs.onSurface, BlendMode.srcIn)
@@ -1406,14 +1411,14 @@ class _BrandCircle extends StatelessWidget {
     } else {
       inner = Image.asset(
         asset,
-        width: size * 0.62,
-        height: size * 0.62,
+        width: scaledAvatarSize(context, size) * 0.62,
+        height: scaledAvatarSize(context, size) * 0.62,
         fit: BoxFit.contain,
       );
     }
     return Container(
-      width: size,
-      height: size,
+      width: scaledAvatarSize(context, size),
+      height: scaledAvatarSize(context, size),
       decoration: BoxDecoration(
         color: cs.primary.withValues(alpha: isDark ? 0.18 : 0.10),
         shape: BoxShape.circle,

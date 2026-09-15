@@ -36,6 +36,7 @@ import '../../../utils/app_directories.dart';
 import 'package:super_clipboard/super_clipboard.dart';
 import '../../../desktop/desktop_context_menu.dart';
 import 'package:Kelivo/theme/app_font_weights.dart';
+import '../../../utils/ui_scale.dart';
 
 class ChatInputBarController {
   final shareImport = ValueNotifier<ShareImportProgress?>(null);
@@ -3255,9 +3256,9 @@ class _ImageModePill extends StatelessWidget {
               border: Border.all(color: border),
             ),
             child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 172),
+              constraints: BoxConstraints(maxWidth: scaledDim(context, 172)),
               child: SizedBox(
-                height: 24,
+                height: scaledDim(context, 24),
                 child: Padding(
                   padding: const EdgeInsetsDirectional.only(start: 9, end: 3),
                   child: Row(

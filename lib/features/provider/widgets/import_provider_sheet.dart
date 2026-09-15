@@ -13,6 +13,7 @@ import '../../../core/services/haptics.dart';
 import '../../../shared/widgets/ios_tile_button.dart';
 import 'package:Kelivo/theme/app_font_weights.dart';
 import 'package:Kelivo/theme/app_semantic_colors.dart';
+import '../../../utils/ui_scale.dart';
 
 class _ImportResult {
   final String key;
@@ -295,7 +296,7 @@ Future<void> showImportProviderSheet(BuildContext context) async {
                   const SizedBox(height: 12),
                   // iOS-style header: centered title with left/right actions
                   SizedBox(
-                    height: 36,
+                    height: scaledDim(context, 36),
                     child: Stack(
                       children: [
                         Align(

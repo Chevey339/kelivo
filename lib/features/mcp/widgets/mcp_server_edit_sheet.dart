@@ -16,6 +16,7 @@ import '../../../shared/widgets/ios_tile_button.dart';
 import '../../../theme/app_font_weights.dart';
 import 'package:Kelivo/theme/app_semantic_colors.dart';
 import 'package:Kelivo/shared/widgets/section_card.dart';
+import '../../../utils/ui_scale.dart';
 
 class _HeaderEntry {
   final TextEditingController key;
@@ -579,7 +580,7 @@ class _McpServerEditSheetState extends State<_McpServerEditSheet>
               const SizedBox(height: 12),
               // Header: centered title with close on the left (match provider sheet)
               SizedBox(
-                height: 36,
+                height: scaledDim(context, 36),
                 child: Stack(
                   children: [
                     Align(

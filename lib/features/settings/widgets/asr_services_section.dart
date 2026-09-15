@@ -18,6 +18,7 @@ import '../../../theme/app_font_weights.dart';
 import '../../../utils/brand_assets.dart';
 import 'voice_service_widgets.dart';
 import 'package:Kelivo/theme/app_semantic_colors.dart';
+import '../../../utils/ui_scale.dart';
 
 /// The speech-recognition half of the Voice Services screen.
 ///
@@ -509,7 +510,10 @@ Future<AsrServiceOptions?> _showAsrEditor(
         backgroundColor: dialogContext.overlaySurface,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 560, maxHeight: 720),
+          constraints: BoxConstraints(
+            maxWidth: scaledDim(context, 560),
+            maxHeight: scaledDim(context, 720),
+          ),
           child: _AsrEditor(
             initial: initial,
             desktop: true,

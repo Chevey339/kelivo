@@ -11,6 +11,8 @@ import '../utils/model_grouping.dart';
 import '../shared/widgets/model_tag_wrap.dart';
 import '../theme/app_font_weights.dart';
 import 'package:Kelivo/theme/app_semantic_colors.dart';
+import '../utils/avatar_scale.dart';
+import '../utils/ui_scale.dart';
 
 Future<void> showModelFetchDialog(
   BuildContext context, {
@@ -159,10 +161,10 @@ class _ModelFetchDialogBodyState extends State<_ModelFetchDialogBody> {
 
     final dialog = Center(
       child: ConstrainedBox(
-        constraints: const BoxConstraints(
-          minWidth: 520,
-          maxWidth: 860,
-          maxHeight: 720,
+        constraints: BoxConstraints(
+          minWidth: scaledDim(context, 520),
+          maxWidth: scaledDim(context, 860),
+          maxHeight: scaledDim(context, 720),
         ),
         child: Material(
           color: context.overlaySurface,
@@ -183,7 +185,7 @@ class _ModelFetchDialogBodyState extends State<_ModelFetchDialogBody> {
               children: [
                 // Title bar with inset divider
                 Container(
-                  height: 48,
+                  height: scaledDim(context, 48),
                   decoration: BoxDecoration(color: context.overlaySurface),
                   child: Padding(
                     padding: const EdgeInsets.fromLTRB(14, 6, 14, 0),
@@ -646,7 +648,9 @@ class _ModelFetchDialogBodyState extends State<_ModelFetchDialogBody> {
                 ),
                 const SizedBox(width: 8),
                 ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 300),
+                  constraints: BoxConstraints(
+                    maxWidth: scaledDim(context, 300),
+                  ),
                   child: Align(
                     alignment: Alignment.centerRight,
                     child: ModelCapsulesRow(model: m),
@@ -774,31 +778,34 @@ class _BrandAvatar extends StatelessWidget {
             : null;
         inner = SvgPicture.asset(
           asset,
-          width: size * 0.62,
-          height: size * 0.62,
+          width: scaledAvatarSize(context, size) * 0.62,
+          height: scaledAvatarSize(context, size) * 0.62,
           colorFilter: tint,
         );
       } else {
         inner = Image.asset(
           asset,
-          width: size * 0.62,
-          height: size * 0.62,
+          width: scaledAvatarSize(context, size) * 0.62,
+          height: scaledAvatarSize(context, size) * 0.62,
           fit: BoxFit.contain,
         );
       }
     } else {
-      inner = Text(
-        name.isNotEmpty ? name.characters.first.toUpperCase() : '?',
-        style: TextStyle(
-          color: cs.primary,
-          fontWeight: AppFontWeights.emphasis,
-          fontSize: size * 0.42,
+      inner = Transform.translate(
+        offset: Offset(0, avatarInitialNudgeY(context, size)),
+        child: Text(
+          name.isNotEmpty ? name.characters.first.toUpperCase() : '?',
+          style: TextStyle(
+            color: cs.primary,
+            fontWeight: AppFontWeights.emphasis,
+            fontSize: size * 0.42,
+          ),
         ),
       );
     }
     return Container(
-      width: size,
-      height: size,
+      width: scaledAvatarSize(context, size),
+      height: scaledAvatarSize(context, size),
       decoration: BoxDecoration(
         color: cs.primary.withValues(alpha: isDark ? 0.18 : 0.1),
         shape: BoxShape.circle,

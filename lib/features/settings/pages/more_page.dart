@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../../utils/url_launcher_ext.dart';
 import '../../../shared/widgets/favicon.dart';
+import '../../../utils/ui_scale.dart';
 
 class MorePage extends StatelessWidget {
   const MorePage({super.key});
@@ -79,7 +80,7 @@ class LeaderBoardItem extends StatelessWidget {
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
     return ConstrainedBox(
-      constraints: const BoxConstraints(minWidth: 150),
+      constraints: BoxConstraints(minWidth: scaledDim(context, 150)),
       child: Card(
         elevation: 0,
         color: theme.colorScheme.surface,

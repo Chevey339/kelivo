@@ -17,6 +17,7 @@ import '../../shared/widgets/snackbar.dart';
 import '../widgets/desktop_select_dropdown.dart';
 import '../../theme/app_font_weights.dart';
 import 'package:Kelivo/theme/app_semantic_colors.dart';
+import '../../utils/ui_scale.dart';
 
 class DesktopWorldBookPane extends StatefulWidget {
   const DesktopWorldBookPane({super.key});
@@ -268,12 +269,12 @@ class _DesktopWorldBookPaneState extends State<DesktopWorldBookPane> {
       child: Padding(
         padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
         child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 960),
+          constraints: BoxConstraints(maxWidth: scaledDim(context, 960)),
           child: CustomScrollView(
             slivers: [
               SliverToBoxAdapter(
                 child: SizedBox(
-                  height: 36,
+                  height: scaledDim(context, 36),
                   child: Row(
                     children: [
                       Expanded(
@@ -906,7 +907,7 @@ class _WorldBookEditDialogState extends State<_WorldBookEditDialog> {
       insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 560),
+        constraints: BoxConstraints(maxWidth: scaledDim(context, 560)),
         child: Stack(
           children: [
             Padding(
@@ -1258,7 +1259,10 @@ class _WorldBookEntryEditDialogState extends State<_WorldBookEntryEditDialog> {
       insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: ConstrainedBox(
-        constraints: BoxConstraints(maxWidth: 760, maxHeight: maxHeight),
+        constraints: BoxConstraints(
+          maxWidth: scaledDim(context, 760),
+          maxHeight: maxHeight,
+        ),
         child: Stack(
           children: [
             Padding(

@@ -48,6 +48,7 @@ import 'streaming_rich_text.dart';
 import 'streaming_code_fence.dart';
 import 'markdown_line_lexer.dart';
 import 'markdown_source_scan.dart';
+import '../../utils/ui_scale.dart';
 
 // Inline math is parsed on the UI thread. Bound the lookahead window so a long
 // line with many unmatched openers cannot trigger repeated whole-line scans.
@@ -557,8 +558,10 @@ class _MarkdownWithCodeHighlightState extends State<MarkdownWithCodeHighlight> {
                       }
                     },
                     child: Container(
-                      constraints: const BoxConstraints(minWidth: 20),
-                      height: 20,
+                      constraints: BoxConstraints(
+                        minWidth: scaledDim(context, 20),
+                      ),
+                      height: scaledDim(context, 20),
                       padding: const EdgeInsets.symmetric(horizontal: 5),
                       decoration: BoxDecoration(
                         color: cs.primary.withValues(alpha: 0.20),
@@ -4199,7 +4202,7 @@ class _MarkdownTableToolbar extends StatelessWidget {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Container(
-      height: 38,
+      height: scaledDim(context, 38),
       padding: const EdgeInsetsDirectional.only(start: 12, end: 6),
       decoration: BoxDecoration(
         color: backgroundColor,

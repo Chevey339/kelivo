@@ -20,6 +20,7 @@ import 'dart:convert';
 import 'package:Kelivo/theme/app_font_weights.dart';
 import 'package:Kelivo/theme/app_semantic_colors.dart';
 import '../../../shared/widgets/section_card.dart';
+import '../../../utils/ui_scale.dart';
 
 enum MessageMoreAction {
   edit,
@@ -190,7 +191,7 @@ class _MessageMoreSheetState extends State<_MessageMoreSheet> {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: SizedBox(
-        height: 48,
+        height: scaledDim(context, 48),
         child: IosCardPress(
           borderRadius: BorderRadius.circular(14),
           baseColor: sheetTileColor(context),

@@ -8,6 +8,7 @@ import '../../../core/services/haptics.dart';
 import '../../../core/providers/settings_provider.dart';
 import '../../../theme/app_font_weights.dart';
 import 'package:Kelivo/theme/app_semantic_colors.dart';
+import '../../../utils/ui_scale.dart';
 
 Future<MessageEditResult?> showMessageEditSheet(
   BuildContext context, {
@@ -83,7 +84,7 @@ class _MessageEditSheetState extends State<_MessageEditSheet> {
               ),
               const SizedBox(height: 10),
               SizedBox(
-                height: 32,
+                height: scaledDim(context, 32),
                 child: Stack(
                   alignment: Alignment.center,
                   children: [
