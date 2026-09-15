@@ -7,6 +7,7 @@ import '../../../l10n/app_localizations.dart';
 import '../../../shared/widgets/ios_tactile.dart';
 import 'package:Kelivo/theme/app_semantic_colors.dart';
 import '../../../shared/widgets/section_card.dart';
+import 'context_usage_header.dart';
 
 /// Bottom sheet for mobile: compress context or clear context.
 class ContextManagementSheet extends StatelessWidget {
@@ -15,6 +16,8 @@ class ContextManagementSheet extends StatelessWidget {
     this.onCompress,
     this.onClear,
     this.messageCountLabel,
+    this.conversationId,
+    this.draftText = '',
   });
 
   final VoidCallback? onCompress;
@@ -22,6 +25,8 @@ class ContextManagementSheet extends StatelessWidget {
 
   /// Messages currently in context, e.g. "12 messages". Shown on the clear row.
   final String? messageCountLabel;
+  final String? conversationId;
+  final String draftText;
 
   @override
   Widget build(BuildContext context) {
@@ -56,6 +61,11 @@ class ContextManagementSheet extends StatelessWidget {
               color: cs.onSurface.withValues(alpha: 0.2),
               borderRadius: BorderRadius.circular(999),
             ),
+          ),
+          const SizedBox(height: 16),
+          ContextUsageHeader(
+            conversationId: conversationId,
+            draftText: draftText,
           ),
           const SizedBox(height: 16),
           _OptionRow(

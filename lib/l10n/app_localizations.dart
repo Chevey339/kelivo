@@ -5854,6 +5854,108 @@ abstract class AppLocalizations {
   /// **'Collapse'**
   String get chatInputBarCollapse;
 
+  /// No description provided for @contextUsageTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Context usage'**
+  String get contextUsageTitle;
+
+  /// No description provided for @contextUsageStateExact.
+  ///
+  /// In en, this message translates to:
+  /// **'Exact from last response'**
+  String get contextUsageStateExact;
+
+  /// No description provided for @contextUsageStateEstimated.
+  ///
+  /// In en, this message translates to:
+  /// **'Estimated'**
+  String get contextUsageStateEstimated;
+
+  /// No description provided for @contextUsageStateStale.
+  ///
+  /// In en, this message translates to:
+  /// **'Stale — updating…'**
+  String get contextUsageStateStale;
+
+  /// No description provided for @contextUsageStateComputing.
+  ///
+  /// In en, this message translates to:
+  /// **'Computing…'**
+  String get contextUsageStateComputing;
+
+  /// No description provided for @contextUsageStateNone.
+  ///
+  /// In en, this message translates to:
+  /// **'No data yet'**
+  String get contextUsageStateNone;
+
+  /// No description provided for @contextUsageBucketSystem.
+  ///
+  /// In en, this message translates to:
+  /// **'System'**
+  String get contextUsageBucketSystem;
+
+  /// No description provided for @contextUsageBucketInjections.
+  ///
+  /// In en, this message translates to:
+  /// **'Injections'**
+  String get contextUsageBucketInjections;
+
+  /// No description provided for @contextUsageBucketHistory.
+  ///
+  /// In en, this message translates to:
+  /// **'History'**
+  String get contextUsageBucketHistory;
+
+  /// No description provided for @contextUsageBucketTools.
+  ///
+  /// In en, this message translates to:
+  /// **'Tools'**
+  String get contextUsageBucketTools;
+
+  /// No description provided for @contextUsageBucketAttachments.
+  ///
+  /// In en, this message translates to:
+  /// **'Attachments'**
+  String get contextUsageBucketAttachments;
+
+  /// No description provided for @contextUsageBucketDraft.
+  ///
+  /// In en, this message translates to:
+  /// **'Draft'**
+  String get contextUsageBucketDraft;
+
+  /// Context usage summary: used tokens, window size, and percent
+  ///
+  /// In en, this message translates to:
+  /// **'{used} / {window} ({percent}%)'**
+  String contextUsageUsedWindow(String used, String window, int percent);
+
+  /// No description provided for @contextUsageNoWindow.
+  ///
+  /// In en, this message translates to:
+  /// **'No context window'**
+  String get contextUsageNoWindow;
+
+  /// No description provided for @contextUsageSetWindow.
+  ///
+  /// In en, this message translates to:
+  /// **'Set context window'**
+  String get contextUsageSetWindow;
+
+  /// No description provided for @contextUsageRefresh.
+  ///
+  /// In en, this message translates to:
+  /// **'Refresh'**
+  String get contextUsageRefresh;
+
+  /// No description provided for @contextUsageExactNote.
+  ///
+  /// In en, this message translates to:
+  /// **'Totals come from the last response; a bucket breakdown is not available.'**
+  String get contextUsageExactNote;
+
   /// No description provided for @mcpPageBackTooltip.
   ///
   /// In en, this message translates to:

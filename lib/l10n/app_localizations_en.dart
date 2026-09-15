@@ -3154,6 +3154,60 @@ class AppLocalizationsEn extends AppLocalizations {
   String get chatInputBarCollapse => 'Collapse';
 
   @override
+  String get contextUsageTitle => 'Context usage';
+
+  @override
+  String get contextUsageStateExact => 'Exact from last response';
+
+  @override
+  String get contextUsageStateEstimated => 'Estimated';
+
+  @override
+  String get contextUsageStateStale => 'Stale — updating…';
+
+  @override
+  String get contextUsageStateComputing => 'Computing…';
+
+  @override
+  String get contextUsageStateNone => 'No data yet';
+
+  @override
+  String get contextUsageBucketSystem => 'System';
+
+  @override
+  String get contextUsageBucketInjections => 'Injections';
+
+  @override
+  String get contextUsageBucketHistory => 'History';
+
+  @override
+  String get contextUsageBucketTools => 'Tools';
+
+  @override
+  String get contextUsageBucketAttachments => 'Attachments';
+
+  @override
+  String get contextUsageBucketDraft => 'Draft';
+
+  @override
+  String contextUsageUsedWindow(String used, String window, int percent) {
+    return '$used / $window ($percent%)';
+  }
+
+  @override
+  String get contextUsageNoWindow => 'No context window';
+
+  @override
+  String get contextUsageSetWindow => 'Set context window';
+
+  @override
+  String get contextUsageRefresh => 'Refresh';
+
+  @override
+  String get contextUsageExactNote =>
+      'Totals come from the last response; a bucket breakdown is not available.';
+
+  @override
   String get mcpPageBackTooltip => 'Back';
 
   @override

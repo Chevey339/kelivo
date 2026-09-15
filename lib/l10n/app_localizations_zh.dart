@@ -3050,6 +3050,59 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatInputBarCollapse => '收起';
 
   @override
+  String get contextUsageTitle => '上下文用量';
+
+  @override
+  String get contextUsageStateExact => '来自上次回复的精确值';
+
+  @override
+  String get contextUsageStateEstimated => '估算';
+
+  @override
+  String get contextUsageStateStale => '已过期 — 正在更新…';
+
+  @override
+  String get contextUsageStateComputing => '正在计算…';
+
+  @override
+  String get contextUsageStateNone => '暂无数据';
+
+  @override
+  String get contextUsageBucketSystem => '系统';
+
+  @override
+  String get contextUsageBucketInjections => '注入';
+
+  @override
+  String get contextUsageBucketHistory => '历史';
+
+  @override
+  String get contextUsageBucketTools => '工具';
+
+  @override
+  String get contextUsageBucketAttachments => '附件';
+
+  @override
+  String get contextUsageBucketDraft => '草稿';
+
+  @override
+  String contextUsageUsedWindow(String used, String window, int percent) {
+    return '$used / $window ($percent%)';
+  }
+
+  @override
+  String get contextUsageNoWindow => '未设置上下文窗口';
+
+  @override
+  String get contextUsageSetWindow => '设置上下文窗口';
+
+  @override
+  String get contextUsageRefresh => '刷新';
+
+  @override
+  String get contextUsageExactNote => '总量来自上次回复，无法提供分项明细。';
+
+  @override
   String get mcpPageBackTooltip => '返回';
 
   @override
@@ -14717,6 +14770,59 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get chatInputBarCollapse => '收起';
 
   @override
+  String get contextUsageTitle => '上下文用量';
+
+  @override
+  String get contextUsageStateExact => '来自上次回复的精确值';
+
+  @override
+  String get contextUsageStateEstimated => '估算';
+
+  @override
+  String get contextUsageStateStale => '已过期 — 正在更新…';
+
+  @override
+  String get contextUsageStateComputing => '正在计算…';
+
+  @override
+  String get contextUsageStateNone => '暂无数据';
+
+  @override
+  String get contextUsageBucketSystem => '系统';
+
+  @override
+  String get contextUsageBucketInjections => '注入';
+
+  @override
+  String get contextUsageBucketHistory => '历史';
+
+  @override
+  String get contextUsageBucketTools => '工具';
+
+  @override
+  String get contextUsageBucketAttachments => '附件';
+
+  @override
+  String get contextUsageBucketDraft => '草稿';
+
+  @override
+  String contextUsageUsedWindow(String used, String window, int percent) {
+    return '$used / $window ($percent%)';
+  }
+
+  @override
+  String get contextUsageNoWindow => '未设置上下文窗口';
+
+  @override
+  String get contextUsageSetWindow => '设置上下文窗口';
+
+  @override
+  String get contextUsageRefresh => '刷新';
+
+  @override
+  String get contextUsageExactNote => '总量来自上次回复，无法提供分项明细。';
+
+  @override
   String get mcpPageBackTooltip => '返回';
 
   @override
@@ -26308,6 +26414,59 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get chatInputBarCollapse => '收起';
+
+  @override
+  String get contextUsageTitle => '上下文用量';
+
+  @override
+  String get contextUsageStateExact => '來自上次回覆的精確值';
+
+  @override
+  String get contextUsageStateEstimated => '估算';
+
+  @override
+  String get contextUsageStateStale => '已過期 — 正在更新…';
+
+  @override
+  String get contextUsageStateComputing => '正在計算…';
+
+  @override
+  String get contextUsageStateNone => '暫無資料';
+
+  @override
+  String get contextUsageBucketSystem => '系統';
+
+  @override
+  String get contextUsageBucketInjections => '注入';
+
+  @override
+  String get contextUsageBucketHistory => '歷史';
+
+  @override
+  String get contextUsageBucketTools => '工具';
+
+  @override
+  String get contextUsageBucketAttachments => '附件';
+
+  @override
+  String get contextUsageBucketDraft => '草稿';
+
+  @override
+  String contextUsageUsedWindow(String used, String window, int percent) {
+    return '$used / $window ($percent%)';
+  }
+
+  @override
+  String get contextUsageNoWindow => '未設定上下文視窗';
+
+  @override
+  String get contextUsageSetWindow => '設定上下文視窗';
+
+  @override
+  String get contextUsageRefresh => '重新整理';
+
+  @override
+  String get contextUsageExactNote => '總量來自上次回覆，無法提供分項明細。';
 
   @override
   String get mcpPageBackTooltip => '返回';
