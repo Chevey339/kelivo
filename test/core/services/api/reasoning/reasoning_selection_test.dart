@@ -93,47 +93,4 @@ void main() {
       },
     );
   });
-
-  group('UI budget mapping', () {
-    test('fixed stops map to the P2 levels', () {
-      expect(reasoningFromUiBudget(0), ReasoningRequest.off);
-      expect(reasoningFromUiBudget(-1), ReasoningRequest.auto);
-      expect(
-        reasoningFromUiBudget(1024),
-        const ReasoningRequest(ReasoningLevel.low, budgetTokens: 1024),
-      );
-      expect(
-        reasoningFromUiBudget(16000),
-        const ReasoningRequest(ReasoningLevel.medium, budgetTokens: 16000),
-      );
-      expect(
-        reasoningFromUiBudget(32000),
-        const ReasoningRequest(ReasoningLevel.high, budgetTokens: 32000),
-      );
-      expect(
-        reasoningFromUiBudget(64000),
-        const ReasoningRequest(ReasoningLevel.xhigh, budgetTokens: 64000),
-      );
-      expect(
-        reasoningFromUiBudget(128000),
-        const ReasoningRequest(ReasoningLevel.max, budgetTokens: 128000),
-      );
-    });
-
-    test('uiBudgetFromReasoning prefers explicit tokens', () {
-      expect(uiBudgetFromReasoning(null), -1);
-      expect(uiBudgetFromReasoning(ReasoningRequest.off), 0);
-      expect(uiBudgetFromReasoning(ReasoningRequest.auto), -1);
-      expect(
-        uiBudgetFromReasoning(const ReasoningRequest(ReasoningLevel.high)),
-        32000,
-      );
-      expect(
-        uiBudgetFromReasoning(
-          const ReasoningRequest(ReasoningLevel.low, budgetTokens: 2048),
-        ),
-        2048,
-      );
-    });
-  });
 }

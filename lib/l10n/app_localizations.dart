@@ -1939,8 +1939,20 @@ abstract class AppLocalizations {
   /// No description provided for @assistantEditThinkingBudgetTitle.
   ///
   /// In en, this message translates to:
-  /// **'Thinking Budget'**
+  /// **'Thinking'**
   String get assistantEditThinkingBudgetTitle;
+
+  /// No description provided for @assistantEditReasoningFollowDefault.
+  ///
+  /// In en, this message translates to:
+  /// **'Follow model default'**
+  String get assistantEditReasoningFollowDefault;
+
+  /// No description provided for @assistantEditReasoningClampedSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'The actual level is clamped to what each model supports'**
+  String get assistantEditReasoningClampedSubtitle;
 
   /// No description provided for @assistantEditConfigureButton.
   ///
@@ -4522,107 +4534,161 @@ abstract class AppLocalizations {
   /// **'Delete All Versions'**
   String get messageMoreSheetDeleteAllVersions;
 
-  /// No description provided for @reasoningBudgetSheetOff.
-  ///
-  /// In en, this message translates to:
-  /// **'Off'**
-  String get reasoningBudgetSheetOff;
-
-  /// No description provided for @reasoningBudgetSheetAuto.
-  ///
-  /// In en, this message translates to:
-  /// **'Auto'**
-  String get reasoningBudgetSheetAuto;
-
-  /// No description provided for @reasoningBudgetSheetLight.
-  ///
-  /// In en, this message translates to:
-  /// **'Light Reasoning'**
-  String get reasoningBudgetSheetLight;
-
-  /// No description provided for @reasoningBudgetSheetMedium.
-  ///
-  /// In en, this message translates to:
-  /// **'Medium Reasoning'**
-  String get reasoningBudgetSheetMedium;
-
-  /// No description provided for @reasoningBudgetSheetHeavy.
-  ///
-  /// In en, this message translates to:
-  /// **'Heavy Reasoning'**
-  String get reasoningBudgetSheetHeavy;
-
-  /// No description provided for @reasoningBudgetSheetXhigh.
-  ///
-  /// In en, this message translates to:
-  /// **'Extreme Reasoning'**
-  String get reasoningBudgetSheetXhigh;
-
-  /// No description provided for @reasoningBudgetSheetMax.
-  ///
-  /// In en, this message translates to:
-  /// **'Maximum Reasoning'**
-  String get reasoningBudgetSheetMax;
-
   /// No description provided for @reasoningBudgetSheetTitle.
   ///
   /// In en, this message translates to:
   /// **'Reasoning Chain Strength'**
   String get reasoningBudgetSheetTitle;
 
-  /// No description provided for @reasoningBudgetSheetCurrentLevel.
+  /// No description provided for @reasoningLevelSheetTitle.
   ///
   /// In en, this message translates to:
-  /// **'Current Level: {level}'**
-  String reasoningBudgetSheetCurrentLevel(String level);
+  /// **'Reasoning'**
+  String get reasoningLevelSheetTitle;
 
-  /// No description provided for @reasoningBudgetSheetOffSubtitle.
+  /// No description provided for @reasoningLevelAuto.
   ///
   /// In en, this message translates to:
-  /// **'Turn off reasoning, answer directly'**
-  String get reasoningBudgetSheetOffSubtitle;
+  /// **'Auto'**
+  String get reasoningLevelAuto;
 
-  /// No description provided for @reasoningBudgetSheetAutoSubtitle.
+  /// No description provided for @reasoningLevelAutoSubtitle.
   ///
   /// In en, this message translates to:
-  /// **'Let the model decide reasoning level automatically'**
-  String get reasoningBudgetSheetAutoSubtitle;
+  /// **'Uses the model or provider default'**
+  String get reasoningLevelAutoSubtitle;
 
-  /// No description provided for @reasoningBudgetSheetLightSubtitle.
+  /// No description provided for @reasoningLevelOff.
   ///
   /// In en, this message translates to:
-  /// **'Use light reasoning to answer questions'**
-  String get reasoningBudgetSheetLightSubtitle;
+  /// **'Off'**
+  String get reasoningLevelOff;
 
-  /// No description provided for @reasoningBudgetSheetMediumSubtitle.
+  /// No description provided for @reasoningLevelOffSubtitle.
   ///
   /// In en, this message translates to:
-  /// **'Use moderate reasoning to answer questions'**
-  String get reasoningBudgetSheetMediumSubtitle;
+  /// **'Turn off reasoning and answer directly'**
+  String get reasoningLevelOffSubtitle;
 
-  /// No description provided for @reasoningBudgetSheetHeavySubtitle.
+  /// No description provided for @reasoningLevelMinimal.
   ///
   /// In en, this message translates to:
-  /// **'Use heavy reasoning for complex questions'**
-  String get reasoningBudgetSheetHeavySubtitle;
+  /// **'Minimal'**
+  String get reasoningLevelMinimal;
 
-  /// No description provided for @reasoningBudgetSheetXhighSubtitle.
+  /// No description provided for @reasoningLevelLow.
   ///
   /// In en, this message translates to:
-  /// **'Use maximum reasoning depth for the toughest problems'**
-  String get reasoningBudgetSheetXhighSubtitle;
+  /// **'Low'**
+  String get reasoningLevelLow;
 
-  /// No description provided for @reasoningBudgetSheetCustomLabel.
+  /// No description provided for @reasoningLevelMedium.
   ///
   /// In en, this message translates to:
-  /// **'Custom Reasoning Budget'**
-  String get reasoningBudgetSheetCustomLabel;
+  /// **'Medium'**
+  String get reasoningLevelMedium;
 
-  /// No description provided for @reasoningBudgetSheetCustomHint.
+  /// No description provided for @reasoningLevelHigh.
   ///
   /// In en, this message translates to:
-  /// **'e.g. 2048 (-1 auto, 0 off)'**
-  String get reasoningBudgetSheetCustomHint;
+  /// **'High'**
+  String get reasoningLevelHigh;
+
+  /// No description provided for @reasoningLevelXhigh.
+  ///
+  /// In en, this message translates to:
+  /// **'Extra High'**
+  String get reasoningLevelXhigh;
+
+  /// No description provided for @reasoningLevelMax.
+  ///
+  /// In en, this message translates to:
+  /// **'Max'**
+  String get reasoningLevelMax;
+
+  /// No description provided for @reasoningLevelCannotDisable.
+  ///
+  /// In en, this message translates to:
+  /// **'Thinking cannot be turned off for this model'**
+  String get reasoningLevelCannotDisable;
+
+  /// No description provided for @reasoningLevelNoReasoning.
+  ///
+  /// In en, this message translates to:
+  /// **'This model does not support reasoning'**
+  String get reasoningLevelNoReasoning;
+
+  /// No description provided for @reasoningLevelCustomBudget.
+  ///
+  /// In en, this message translates to:
+  /// **'Custom budget…'**
+  String get reasoningLevelCustomBudget;
+
+  /// No description provided for @reasoningLevelCustomBudgetHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Token budget, e.g. 2048'**
+  String get reasoningLevelCustomBudgetHint;
+
+  /// No description provided for @reasoningLevelReset.
+  ///
+  /// In en, this message translates to:
+  /// **'Reset to default'**
+  String get reasoningLevelReset;
+
+  /// No description provided for @reasoningLevelSourcePerModel.
+  ///
+  /// In en, this message translates to:
+  /// **'Per-model setting'**
+  String get reasoningLevelSourcePerModel;
+
+  /// No description provided for @reasoningLevelSourceAssistant.
+  ///
+  /// In en, this message translates to:
+  /// **'From assistant'**
+  String get reasoningLevelSourceAssistant;
+
+  /// No description provided for @reasoningLevelSourceModelDefault.
+  ///
+  /// In en, this message translates to:
+  /// **'Model default'**
+  String get reasoningLevelSourceModelDefault;
+
+  /// No description provided for @reasoningLevelCompactMin.
+  ///
+  /// In en, this message translates to:
+  /// **'min'**
+  String get reasoningLevelCompactMin;
+
+  /// No description provided for @reasoningLevelCompactLow.
+  ///
+  /// In en, this message translates to:
+  /// **'low'**
+  String get reasoningLevelCompactLow;
+
+  /// No description provided for @reasoningLevelCompactMid.
+  ///
+  /// In en, this message translates to:
+  /// **'mid'**
+  String get reasoningLevelCompactMid;
+
+  /// No description provided for @reasoningLevelCompactHigh.
+  ///
+  /// In en, this message translates to:
+  /// **'high'**
+  String get reasoningLevelCompactHigh;
+
+  /// No description provided for @reasoningLevelCompactXhigh.
+  ///
+  /// In en, this message translates to:
+  /// **'xhigh'**
+  String get reasoningLevelCompactXhigh;
+
+  /// No description provided for @reasoningLevelCompactMax.
+  ///
+  /// In en, this message translates to:
+  /// **'max'**
+  String get reasoningLevelCompactMax;
 
   /// No description provided for @chatMessageWidgetFileNotFound.
   ///
@@ -19538,36 +19604,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Show files created or modified by tools below replies.'**
   String get displaySettingsPageShowProducedFilesSubtitle;
-
-  /// No description provided for @reasoningBudgetSliderLow.
-  ///
-  /// In en, this message translates to:
-  /// **'Low'**
-  String get reasoningBudgetSliderLow;
-
-  /// No description provided for @reasoningBudgetSliderMedium.
-  ///
-  /// In en, this message translates to:
-  /// **'Medium'**
-  String get reasoningBudgetSliderMedium;
-
-  /// No description provided for @reasoningBudgetSliderHigh.
-  ///
-  /// In en, this message translates to:
-  /// **'High'**
-  String get reasoningBudgetSliderHigh;
-
-  /// No description provided for @reasoningBudgetSliderXhigh.
-  ///
-  /// In en, this message translates to:
-  /// **'XHigh'**
-  String get reasoningBudgetSliderXhigh;
-
-  /// No description provided for @reasoningBudgetSliderMax.
-  ///
-  /// In en, this message translates to:
-  /// **'Max'**
-  String get reasoningBudgetSliderMax;
 
   /// No description provided for @defaultModelPagePerChatModelTitle.
   ///

@@ -187,38 +187,28 @@ class _BasicSettingsTabState extends State<_BasicSettingsTab> {
                 onTap: () => _showContextMessagesSheet(context, a),
               ),
               _iosDivider(context),
-              // Thinking budget
+              // Thinking / reasoning default
               _iosNavRow(
                 context,
                 icon: Lucide.Brain,
                 label: l10n.assistantEditThinkingBudgetTitle,
+                subtitle: l10n.assistantEditReasoningClampedSubtitle,
                 detailText: a.reasoning == null
-                    ? '-'
-                    : uiBudgetFromReasoning(a.reasoning).toString(),
+                    ? l10n.assistantEditReasoningFollowDefault
+                    : reasoningLevelLabel(l10n, a.reasoning!.level),
                 onTap: () async {
                   final assistantProvider = context.read<AssistantProvider>();
-                  // Seed via initialBudget instead of pre-writing global
-                  // settings: the synchronous notify would rebuild the page
-                  // during the sheet's entrance animation.
-                  int? chosen;
-                  await showReasoningBudgetSheet(
+                  final picked = await showAssistantReasoningPicker(
                     context,
-                    modelProvider: a.chatModelProvider,
-                    modelId: a.chatModelId,
-                    initialBudget: a.reasoning == null
-                        ? null
-                        : uiBudgetFromReasoning(a.reasoning),
-                    onChanged: (v) => chosen = v,
+                    current: a.reasoning,
                   );
-                  if (!context.mounted) return;
-                  if (chosen != null) {
-                    final next = reasoningFromUiBudget(chosen!);
-                    if (next != a.reasoning) {
-                      await assistantProvider.updateAssistant(
-                        a.copyWith(reasoning: next),
-                      );
-                    }
-                  }
+                  if (!context.mounted || picked == null) return;
+                  if (picked.request == a.reasoning) return;
+                  await assistantProvider.updateAssistant(
+                    picked.request == null
+                        ? a.copyWith(clearReasoning: true)
+                        : a.copyWith(reasoning: picked.request),
+                  );
                 },
               ),
               _iosDivider(context),

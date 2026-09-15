@@ -72,14 +72,14 @@ ReasoningResolution resolveReasoning(ModelSpec spec, ReasoningRequest request) {
         ? ReasoningLevel.off
         : _lowestExplicitLevel(reasoning);
   } else if (reasoning.levels.contains(requested) ||
-      (reasoning.levels.isEmpty && _isBudgetDialect(reasoning.dialect))) {
+      (reasoning.levels.isEmpty && isBudgetDialect(reasoning.dialect))) {
     effective = requested;
   } else {
     effective = nearestLevel(requested, reasoning.levels);
   }
 
   final budget =
-      _isBudgetDialect(reasoning.dialect) && _isExplicitLevel(effective)
+      isBudgetDialect(reasoning.dialect) && _isExplicitLevel(effective)
       ? resolveBudget(
           spec,
           effective,
@@ -188,7 +188,7 @@ bool _isExplicitLevel(ReasoningLevel level) {
   return level != ReasoningLevel.auto && level != ReasoningLevel.off;
 }
 
-bool _isBudgetDialect(ReasoningDialect dialect) {
+bool isBudgetDialect(ReasoningDialect dialect) {
   switch (dialect) {
     case ReasoningDialect.anthropicBudget:
     case ReasoningDialect.geminiThinkingBudget:

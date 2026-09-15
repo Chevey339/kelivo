@@ -1003,7 +1003,14 @@ class AppLocalizationsEn extends AppLocalizations {
       'Enable streaming responses';
 
   @override
-  String get assistantEditThinkingBudgetTitle => 'Thinking Budget';
+  String get assistantEditThinkingBudgetTitle => 'Thinking';
+
+  @override
+  String get assistantEditReasoningFollowDefault => 'Follow model default';
+
+  @override
+  String get assistantEditReasoningClampedSubtitle =>
+      'The actual level is clamped to what each model supports';
 
   @override
   String get assistantEditConfigureButton => 'Configure';
@@ -2403,63 +2410,85 @@ class AppLocalizationsEn extends AppLocalizations {
   String get messageMoreSheetDeleteAllVersions => 'Delete All Versions';
 
   @override
-  String get reasoningBudgetSheetOff => 'Off';
-
-  @override
-  String get reasoningBudgetSheetAuto => 'Auto';
-
-  @override
-  String get reasoningBudgetSheetLight => 'Light Reasoning';
-
-  @override
-  String get reasoningBudgetSheetMedium => 'Medium Reasoning';
-
-  @override
-  String get reasoningBudgetSheetHeavy => 'Heavy Reasoning';
-
-  @override
-  String get reasoningBudgetSheetXhigh => 'Extreme Reasoning';
-
-  @override
-  String get reasoningBudgetSheetMax => 'Maximum Reasoning';
-
-  @override
   String get reasoningBudgetSheetTitle => 'Reasoning Chain Strength';
 
   @override
-  String reasoningBudgetSheetCurrentLevel(String level) {
-    return 'Current Level: $level';
-  }
+  String get reasoningLevelSheetTitle => 'Reasoning';
 
   @override
-  String get reasoningBudgetSheetOffSubtitle =>
-      'Turn off reasoning, answer directly';
+  String get reasoningLevelAuto => 'Auto';
 
   @override
-  String get reasoningBudgetSheetAutoSubtitle =>
-      'Let the model decide reasoning level automatically';
+  String get reasoningLevelAutoSubtitle => 'Uses the model or provider default';
 
   @override
-  String get reasoningBudgetSheetLightSubtitle =>
-      'Use light reasoning to answer questions';
+  String get reasoningLevelOff => 'Off';
 
   @override
-  String get reasoningBudgetSheetMediumSubtitle =>
-      'Use moderate reasoning to answer questions';
+  String get reasoningLevelOffSubtitle =>
+      'Turn off reasoning and answer directly';
 
   @override
-  String get reasoningBudgetSheetHeavySubtitle =>
-      'Use heavy reasoning for complex questions';
+  String get reasoningLevelMinimal => 'Minimal';
 
   @override
-  String get reasoningBudgetSheetXhighSubtitle =>
-      'Use maximum reasoning depth for the toughest problems';
+  String get reasoningLevelLow => 'Low';
 
   @override
-  String get reasoningBudgetSheetCustomLabel => 'Custom Reasoning Budget';
+  String get reasoningLevelMedium => 'Medium';
 
   @override
-  String get reasoningBudgetSheetCustomHint => 'e.g. 2048 (-1 auto, 0 off)';
+  String get reasoningLevelHigh => 'High';
+
+  @override
+  String get reasoningLevelXhigh => 'Extra High';
+
+  @override
+  String get reasoningLevelMax => 'Max';
+
+  @override
+  String get reasoningLevelCannotDisable =>
+      'Thinking cannot be turned off for this model';
+
+  @override
+  String get reasoningLevelNoReasoning =>
+      'This model does not support reasoning';
+
+  @override
+  String get reasoningLevelCustomBudget => 'Custom budget…';
+
+  @override
+  String get reasoningLevelCustomBudgetHint => 'Token budget, e.g. 2048';
+
+  @override
+  String get reasoningLevelReset => 'Reset to default';
+
+  @override
+  String get reasoningLevelSourcePerModel => 'Per-model setting';
+
+  @override
+  String get reasoningLevelSourceAssistant => 'From assistant';
+
+  @override
+  String get reasoningLevelSourceModelDefault => 'Model default';
+
+  @override
+  String get reasoningLevelCompactMin => 'min';
+
+  @override
+  String get reasoningLevelCompactLow => 'low';
+
+  @override
+  String get reasoningLevelCompactMid => 'mid';
+
+  @override
+  String get reasoningLevelCompactHigh => 'high';
+
+  @override
+  String get reasoningLevelCompactXhigh => 'xhigh';
+
+  @override
+  String get reasoningLevelCompactMax => 'max';
 
   @override
   String chatMessageWidgetFileNotFound(String fileName) {
@@ -10892,21 +10921,6 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get displaySettingsPageShowProducedFilesSubtitle =>
       'Show files created or modified by tools below replies.';
-
-  @override
-  String get reasoningBudgetSliderLow => 'Low';
-
-  @override
-  String get reasoningBudgetSliderMedium => 'Medium';
-
-  @override
-  String get reasoningBudgetSliderHigh => 'High';
-
-  @override
-  String get reasoningBudgetSliderXhigh => 'XHigh';
-
-  @override
-  String get reasoningBudgetSliderMax => 'Max';
 
   @override
   String get defaultModelPagePerChatModelTitle => 'Per-Chat Model';

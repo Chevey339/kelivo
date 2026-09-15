@@ -969,7 +969,13 @@ class AppLocalizationsZh extends AppLocalizations {
   String get assistantEditStreamOutputDescription => '是否启用消息的流式输出';
 
   @override
-  String get assistantEditThinkingBudgetTitle => '思考预算';
+  String get assistantEditThinkingBudgetTitle => '思考';
+
+  @override
+  String get assistantEditReasoningFollowDefault => '跟随模型默认';
+
+  @override
+  String get assistantEditReasoningClampedSubtitle => '实际档位会按各模型的能力收敛';
 
   @override
   String get assistantEditConfigureButton => '配置';
@@ -2327,57 +2333,82 @@ class AppLocalizationsZh extends AppLocalizations {
   String get messageMoreSheetDeleteAllVersions => '删除全部版本';
 
   @override
-  String get reasoningBudgetSheetOff => '关闭';
-
-  @override
-  String get reasoningBudgetSheetAuto => '自动';
-
-  @override
-  String get reasoningBudgetSheetLight => '轻度推理';
-
-  @override
-  String get reasoningBudgetSheetMedium => '中度推理';
-
-  @override
-  String get reasoningBudgetSheetHeavy => '重度推理';
-
-  @override
-  String get reasoningBudgetSheetXhigh => '极限推理';
-
-  @override
-  String get reasoningBudgetSheetMax => '全力推理';
-
-  @override
   String get reasoningBudgetSheetTitle => '思维链强度';
 
   @override
-  String reasoningBudgetSheetCurrentLevel(String level) {
-    return '当前档位：$level';
-  }
+  String get reasoningLevelSheetTitle => '推理';
 
   @override
-  String get reasoningBudgetSheetOffSubtitle => '关闭推理功能，直接回答';
+  String get reasoningLevelAuto => '自动';
 
   @override
-  String get reasoningBudgetSheetAutoSubtitle => '由模型自动决定推理级别';
+  String get reasoningLevelAutoSubtitle => '使用模型或供应商的默认设置';
 
   @override
-  String get reasoningBudgetSheetLightSubtitle => '使用少量推理来回答问题';
+  String get reasoningLevelOff => '关闭';
 
   @override
-  String get reasoningBudgetSheetMediumSubtitle => '使用较多推理来回答问题';
+  String get reasoningLevelOffSubtitle => '关闭推理，直接回答';
 
   @override
-  String get reasoningBudgetSheetHeavySubtitle => '使用大量推理来回答问题，适合复杂问题';
+  String get reasoningLevelMinimal => '最低';
 
   @override
-  String get reasoningBudgetSheetXhighSubtitle => '使用最大推理深度，适合最复杂的问题';
+  String get reasoningLevelLow => '低';
 
   @override
-  String get reasoningBudgetSheetCustomLabel => '自定义推理预算';
+  String get reasoningLevelMedium => '中';
 
   @override
-  String get reasoningBudgetSheetCustomHint => '例如：2048 (-1 自动，0 关闭)';
+  String get reasoningLevelHigh => '高';
+
+  @override
+  String get reasoningLevelXhigh => '极高';
+
+  @override
+  String get reasoningLevelMax => '最大';
+
+  @override
+  String get reasoningLevelCannotDisable => '此模型无法关闭思考';
+
+  @override
+  String get reasoningLevelNoReasoning => '此模型不支持推理';
+
+  @override
+  String get reasoningLevelCustomBudget => '自定义预算…';
+
+  @override
+  String get reasoningLevelCustomBudgetHint => '例如：2048';
+
+  @override
+  String get reasoningLevelReset => '重置为默认';
+
+  @override
+  String get reasoningLevelSourcePerModel => '按模型记忆';
+
+  @override
+  String get reasoningLevelSourceAssistant => '来自助手';
+
+  @override
+  String get reasoningLevelSourceModelDefault => '模型默认';
+
+  @override
+  String get reasoningLevelCompactMin => 'min';
+
+  @override
+  String get reasoningLevelCompactLow => 'low';
+
+  @override
+  String get reasoningLevelCompactMid => 'mid';
+
+  @override
+  String get reasoningLevelCompactHigh => 'high';
+
+  @override
+  String get reasoningLevelCompactXhigh => 'xhigh';
+
+  @override
+  String get reasoningLevelCompactMax => 'max';
 
   @override
   String chatMessageWidgetFileNotFound(String fileName) {
@@ -10426,21 +10457,6 @@ class AppLocalizationsZh extends AppLocalizations {
       '在回复底部显示工具创建或修改的文件。';
 
   @override
-  String get reasoningBudgetSliderLow => 'Low';
-
-  @override
-  String get reasoningBudgetSliderMedium => 'Medium';
-
-  @override
-  String get reasoningBudgetSliderHigh => 'High';
-
-  @override
-  String get reasoningBudgetSliderXhigh => 'XHigh';
-
-  @override
-  String get reasoningBudgetSliderMax => 'Max';
-
-  @override
   String get defaultModelPagePerChatModelTitle => '每个对话独立模型';
 
   @override
@@ -12363,7 +12379,13 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get assistantEditStreamOutputDescription => '是否启用消息的流式输出';
 
   @override
-  String get assistantEditThinkingBudgetTitle => '思考预算';
+  String get assistantEditThinkingBudgetTitle => '思考';
+
+  @override
+  String get assistantEditReasoningFollowDefault => '跟随模型默认';
+
+  @override
+  String get assistantEditReasoningClampedSubtitle => '实际档位会按各模型的能力收敛';
 
   @override
   String get assistantEditConfigureButton => '配置';
@@ -13721,57 +13743,82 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get messageMoreSheetDeleteAllVersions => '删除全部版本';
 
   @override
-  String get reasoningBudgetSheetOff => '关闭';
-
-  @override
-  String get reasoningBudgetSheetAuto => '自动';
-
-  @override
-  String get reasoningBudgetSheetLight => '轻度推理';
-
-  @override
-  String get reasoningBudgetSheetMedium => '中度推理';
-
-  @override
-  String get reasoningBudgetSheetHeavy => '重度推理';
-
-  @override
-  String get reasoningBudgetSheetXhigh => '极限推理';
-
-  @override
-  String get reasoningBudgetSheetMax => '全力推理';
-
-  @override
   String get reasoningBudgetSheetTitle => '思维链强度';
 
   @override
-  String reasoningBudgetSheetCurrentLevel(String level) {
-    return '当前档位：$level';
-  }
+  String get reasoningLevelSheetTitle => '推理';
 
   @override
-  String get reasoningBudgetSheetOffSubtitle => '关闭推理功能，直接回答';
+  String get reasoningLevelAuto => '自动';
 
   @override
-  String get reasoningBudgetSheetAutoSubtitle => '由模型自动决定推理级别';
+  String get reasoningLevelAutoSubtitle => '使用模型或供应商的默认设置';
 
   @override
-  String get reasoningBudgetSheetLightSubtitle => '使用少量推理来回答问题';
+  String get reasoningLevelOff => '关闭';
 
   @override
-  String get reasoningBudgetSheetMediumSubtitle => '使用较多推理来回答问题';
+  String get reasoningLevelOffSubtitle => '关闭推理，直接回答';
 
   @override
-  String get reasoningBudgetSheetHeavySubtitle => '使用大量推理来回答问题，适合复杂问题';
+  String get reasoningLevelMinimal => '最低';
 
   @override
-  String get reasoningBudgetSheetXhighSubtitle => '使用最大推理深度，适合最复杂的问题';
+  String get reasoningLevelLow => '低';
 
   @override
-  String get reasoningBudgetSheetCustomLabel => '自定义推理预算';
+  String get reasoningLevelMedium => '中';
 
   @override
-  String get reasoningBudgetSheetCustomHint => '例如：2048 (-1 自动，0 关闭)';
+  String get reasoningLevelHigh => '高';
+
+  @override
+  String get reasoningLevelXhigh => '极高';
+
+  @override
+  String get reasoningLevelMax => '最大';
+
+  @override
+  String get reasoningLevelCannotDisable => '此模型无法关闭思考';
+
+  @override
+  String get reasoningLevelNoReasoning => '此模型不支持推理';
+
+  @override
+  String get reasoningLevelCustomBudget => '自定义预算…';
+
+  @override
+  String get reasoningLevelCustomBudgetHint => '例如：2048';
+
+  @override
+  String get reasoningLevelReset => '重置为默认';
+
+  @override
+  String get reasoningLevelSourcePerModel => '按模型记忆';
+
+  @override
+  String get reasoningLevelSourceAssistant => '来自助手';
+
+  @override
+  String get reasoningLevelSourceModelDefault => '模型默认';
+
+  @override
+  String get reasoningLevelCompactMin => 'min';
+
+  @override
+  String get reasoningLevelCompactLow => 'low';
+
+  @override
+  String get reasoningLevelCompactMid => 'mid';
+
+  @override
+  String get reasoningLevelCompactHigh => 'high';
+
+  @override
+  String get reasoningLevelCompactXhigh => 'xhigh';
+
+  @override
+  String get reasoningLevelCompactMax => 'max';
 
   @override
   String chatMessageWidgetFileNotFound(String fileName) {
@@ -21746,21 +21793,6 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
       '在回复底部显示工具创建或修改的文件。';
 
   @override
-  String get reasoningBudgetSliderLow => 'Low';
-
-  @override
-  String get reasoningBudgetSliderMedium => 'Medium';
-
-  @override
-  String get reasoningBudgetSliderHigh => 'High';
-
-  @override
-  String get reasoningBudgetSliderXhigh => 'XHigh';
-
-  @override
-  String get reasoningBudgetSliderMax => 'Max';
-
-  @override
   String get defaultModelPagePerChatModelTitle => '每个对话独立模型';
 
   @override
@@ -23683,7 +23715,13 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get assistantEditStreamOutputDescription => '是否啟用訊息的串流輸出';
 
   @override
-  String get assistantEditThinkingBudgetTitle => '思考預算';
+  String get assistantEditThinkingBudgetTitle => '思考';
+
+  @override
+  String get assistantEditReasoningFollowDefault => '跟隨模型預設';
+
+  @override
+  String get assistantEditReasoningClampedSubtitle => '實際檔位會依各模型的能力收斂';
 
   @override
   String get assistantEditConfigureButton => '設定';
@@ -25041,57 +25079,82 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get messageMoreSheetDeleteAllVersions => '刪除全部版本';
 
   @override
-  String get reasoningBudgetSheetOff => '關閉';
-
-  @override
-  String get reasoningBudgetSheetAuto => '自動';
-
-  @override
-  String get reasoningBudgetSheetLight => '輕度推理';
-
-  @override
-  String get reasoningBudgetSheetMedium => '中度推理';
-
-  @override
-  String get reasoningBudgetSheetHeavy => '重度推理';
-
-  @override
-  String get reasoningBudgetSheetXhigh => '極限推理';
-
-  @override
-  String get reasoningBudgetSheetMax => '全力推理';
-
-  @override
   String get reasoningBudgetSheetTitle => '思維鏈強度';
 
   @override
-  String reasoningBudgetSheetCurrentLevel(String level) {
-    return '目前檔位：$level';
-  }
+  String get reasoningLevelSheetTitle => '推理';
 
   @override
-  String get reasoningBudgetSheetOffSubtitle => '關閉推理功能，直接回答';
+  String get reasoningLevelAuto => '自動';
 
   @override
-  String get reasoningBudgetSheetAutoSubtitle => '由模型自動決定推理級別';
+  String get reasoningLevelAutoSubtitle => '使用模型或供應商的預設設定';
 
   @override
-  String get reasoningBudgetSheetLightSubtitle => '使用少量推理來回答問題';
+  String get reasoningLevelOff => '關閉';
 
   @override
-  String get reasoningBudgetSheetMediumSubtitle => '使用較多推理來回答問題';
+  String get reasoningLevelOffSubtitle => '關閉推理，直接回答';
 
   @override
-  String get reasoningBudgetSheetHeavySubtitle => '使用大量推理來回答問題，適合複雜問題';
+  String get reasoningLevelMinimal => '最低';
 
   @override
-  String get reasoningBudgetSheetXhighSubtitle => '使用最大推理深度，適合最複雜的問題';
+  String get reasoningLevelLow => '低';
 
   @override
-  String get reasoningBudgetSheetCustomLabel => '自訂推理預算';
+  String get reasoningLevelMedium => '中';
 
   @override
-  String get reasoningBudgetSheetCustomHint => '例如：2048 (-1 自動，0 關閉)';
+  String get reasoningLevelHigh => '高';
+
+  @override
+  String get reasoningLevelXhigh => '極高';
+
+  @override
+  String get reasoningLevelMax => '最大';
+
+  @override
+  String get reasoningLevelCannotDisable => '此模型無法關閉思考';
+
+  @override
+  String get reasoningLevelNoReasoning => '此模型不支援推理';
+
+  @override
+  String get reasoningLevelCustomBudget => '自訂預算…';
+
+  @override
+  String get reasoningLevelCustomBudgetHint => '例如：2048';
+
+  @override
+  String get reasoningLevelReset => '重設為預設';
+
+  @override
+  String get reasoningLevelSourcePerModel => '依模型記憶';
+
+  @override
+  String get reasoningLevelSourceAssistant => '來自助手';
+
+  @override
+  String get reasoningLevelSourceModelDefault => '模型預設';
+
+  @override
+  String get reasoningLevelCompactMin => 'min';
+
+  @override
+  String get reasoningLevelCompactLow => 'low';
+
+  @override
+  String get reasoningLevelCompactMid => 'mid';
+
+  @override
+  String get reasoningLevelCompactHigh => 'high';
+
+  @override
+  String get reasoningLevelCompactXhigh => 'xhigh';
+
+  @override
+  String get reasoningLevelCompactMax => 'max';
 
   @override
   String chatMessageWidgetFileNotFound(String fileName) {
@@ -33141,21 +33204,6 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   @override
   String get displaySettingsPageShowProducedFilesSubtitle =>
       '在回覆底部顯示工具建立或修改的檔案。';
-
-  @override
-  String get reasoningBudgetSliderLow => 'Low';
-
-  @override
-  String get reasoningBudgetSliderMedium => 'Medium';
-
-  @override
-  String get reasoningBudgetSliderHigh => 'High';
-
-  @override
-  String get reasoningBudgetSliderXhigh => 'XHigh';
-
-  @override
-  String get reasoningBudgetSliderMax => 'Max';
 
   @override
   String get defaultModelPagePerChatModelTitle => '每個對話獨立模型';

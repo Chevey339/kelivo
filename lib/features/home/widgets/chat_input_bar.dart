@@ -20,6 +20,10 @@ import '../../../shared/responsive/breakpoints.dart';
 import 'dart:async';
 import 'dart:io';
 import '../../../core/models/chat_input_data.dart';
+import '../../../core/models/model_spec.dart';
+import '../../../core/models/reasoning_request.dart';
+import '../../../core/services/api/reasoning/reasoning_level_options.dart';
+import '../../chat/widgets/reasoning_level_sheet.dart';
 import '../../../utils/clipboard_images.dart';
 import '../../../core/providers/asr_provider.dart';
 import '../../../core/providers/settings_provider.dart';
@@ -141,7 +145,8 @@ class ChatInputBar extends StatefulWidget {
     this.queuedPreviewText,
     this.onCancelQueuedInput,
     this.reasoningActive = false,
-    this.reasoningBudget,
+    this.reasoning,
+    this.reasoningCustomBudget = false,
     this.supportsReasoning = true,
     this.showToolsButton = false,
     this.toolsActive = false,
@@ -198,7 +203,8 @@ class ChatInputBar extends StatefulWidget {
   final String? queuedPreviewText;
   final VoidCallback? onCancelQueuedInput;
   final bool reasoningActive;
-  final int? reasoningBudget;
+  final ReasoningRequest? reasoning;
+  final bool reasoningCustomBudget;
   final bool supportsReasoning;
   final bool showToolsButton;
   final bool toolsActive;
@@ -1927,23 +1933,31 @@ class _ChatInputBarState extends State<ChatInputBar>
         );
 
         if (widget.supportsReasoning) {
+          final request = widget.reasoning ?? ReasoningRequest.auto;
+          final compactLabel = _reasoningCompactLabel(
+            l10n,
+            request,
+            customBudget: widget.reasoningCustomBudget,
+          );
           actions.add(
             _OverflowAction(
-              width: normalButtonW,
+              width: compactLabel == null
+                  ? normalButtonW
+                  : _reasoningButtonWidth(compactLabel),
               builder: () => _CompactIconButton(
                 tooltip: l10n.chatInputBarReasoningStrengthTooltip,
                 icon: Lucide.Brain,
                 active: widget.reasoningActive,
+                badge: compactLabel,
                 onTap: lockTap(widget.onConfigureReasoning),
-                childBuilder: (c) => ReasoningIcons.budgetIcon(
-                  widget.reasoningBudget,
-                  size: 20,
-                  color: c,
-                ),
+                childBuilder: (c) =>
+                    ReasoningIcons.levelIcon(request.level, size: 20, color: c),
               ),
               menu: DesktopContextMenuItem(
-                svgAsset: ReasoningIcons.assetForBudget(widget.reasoningBudget),
-                label: l10n.chatInputBarReasoningStrengthTooltip,
+                svgAsset: ReasoningIcons.assetForLevel(request.level),
+                label: compactLabel == null
+                    ? l10n.chatInputBarReasoningStrengthTooltip
+                    : '${l10n.chatInputBarReasoningStrengthTooltip} · $compactLabel',
                 onTap: lockTap(widget.onConfigureReasoning),
               ),
             ),
@@ -3293,6 +3307,25 @@ class _OverflowAction {
 }
 
 // New compact button for the integrated input bar
+String? _reasoningCompactLabel(
+  AppLocalizations l10n,
+  ReasoningRequest request, {
+  required bool customBudget,
+}) {
+  if (customBudget && request.budgetTokens != null) {
+    return formatReasoningBudgetK(request.budgetTokens!);
+  }
+  if (request.level == ReasoningLevel.off ||
+      request.level == ReasoningLevel.auto) {
+    return null;
+  }
+  return reasoningLevelCompactLabel(l10n, request.level);
+}
+
+double _reasoningButtonWidth(String label) {
+  return (32.0 + label.length * 7.0).clamp(48.0, 76.0);
+}
+
 class _CompactIconButton extends StatelessWidget {
   const _CompactIconButton({
     required this.icon,
@@ -3302,6 +3335,7 @@ class _CompactIconButton extends StatelessWidget {
     this.active = false,
     this.child,
     this.childBuilder,
+    this.badge,
     this.modelIcon = false,
   });
 
@@ -3312,6 +3346,7 @@ class _CompactIconButton extends StatelessWidget {
   final bool active;
   final Widget? child;
   final Widget Function(Color color)? childBuilder;
+  final String? badge;
   final bool modelIcon;
 
   @override
@@ -3342,20 +3377,38 @@ class _CompactIconButton extends StatelessWidget {
       // Disable long press on desktop platforms
       onLongPress: isDesktop ? null : onLongPress,
       color: fgColor,
-      builder: childBuilder != null
-          ? (c) => SizedBox(
-              width: childSize,
-              height: childSize,
-              child: childBuilder!(c),
-            )
-          : (child != null
-                ? (_) => SizedBox(
-                    width: childSize,
-                    height: childSize,
-                    child: child,
-                  )
-                : null),
-      icon: child == null && childBuilder == null ? icon : null,
+      builder: childBuilder != null || child != null || badge != null
+          ? (c) {
+              final glyph = childBuilder != null
+                  ? childBuilder!(c)
+                  : child ?? Icon(icon, size: 20, color: c);
+              final iconBox = SizedBox(
+                width: childSize,
+                height: childSize,
+                child: glyph,
+              );
+              if (badge == null) return iconBox;
+              return Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  iconBox,
+                  const SizedBox(width: 3),
+                  Text(
+                    badge!,
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: AppFontWeights.semibold,
+                      height: 1,
+                      color: c,
+                    ),
+                  ),
+                ],
+              );
+            }
+          : null,
+      icon: child == null && childBuilder == null && badge == null
+          ? icon
+          : null,
     );
 
     if (tooltip == null) {
