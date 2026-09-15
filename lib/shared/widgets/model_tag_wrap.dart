@@ -4,16 +4,24 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
-import '../../core/models/model_types.dart';
+import '../../core/models/model_spec.dart';
 import '../../icons/lucide_adapter.dart';
 import '../../l10n/app_localizations.dart';
 import 'package:Kelivo/theme/app_font_weights.dart';
+
+IconData _modalityIcon(Modality m) => switch (m) {
+  Modality.text => Lucide.Type,
+  Modality.image => Lucide.Image,
+  Modality.audio => Lucide.AudioLines,
+  Modality.video => Lucide.FileVideo,
+  Modality.pdf => Lucide.FileText,
+};
 
 /// Shared model tag/capsule renderer used across model lists.
 class ModelTagWrap extends StatelessWidget {
   const ModelTagWrap({super.key, required this.model});
 
-  final ModelInfo model;
+  final ModelSpec model;
 
   Widget _abilityChip({
     required bool isDark,
@@ -79,7 +87,7 @@ class ModelTagWrap extends StatelessWidget {
         ),
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
         child: Text(
-          model.type == ModelType.chat ? chatLabel : embeddingLabel,
+          model.type == ModelType.embedding ? embeddingLabel : chatLabel,
           style: TextStyle(
             fontSize: 11,
             color: isDark ? cs.primary : cs.primary.withValues(alpha: 0.9),
@@ -93,12 +101,12 @@ class ModelTagWrap extends StatelessWidget {
         isEmbedding && model.input.any((m) => m != Modality.text);
     final inputMods = (isEmbedding && !embeddingHasNonTextMods)
         ? const [Modality.text]
-        : (model.type == ModelType.chat && model.input.isEmpty
+        : (model.type != ModelType.embedding && model.input.isEmpty
               ? const [Modality.text]
               : model.input);
     final outputMods = isEmbedding
         ? const [Modality.text]
-        : (model.type == ModelType.chat && model.output.isEmpty
+        : (model.type != ModelType.embedding && model.output.isEmpty
               ? const [Modality.text]
               : model.output);
 
@@ -108,7 +116,13 @@ class ModelTagWrap extends StatelessWidget {
     final outputModsUnique = LinkedHashSet<Modality>.from(
       outputMods,
     ).toList(growable: false);
-    String modLabel(Modality m) => m == Modality.text ? textLabel : imageLabel;
+    String modLabel(Modality m) => switch (m) {
+      Modality.text => textLabel,
+      Modality.image => imageLabel,
+      Modality.audio => 'Audio',
+      Modality.video => 'Video',
+      Modality.pdf => 'PDF',
+    };
     final ioLabel =
         '${inputModsUnique.map(modLabel).join(', ')} -> ${outputModsUnique.map(modLabel).join(', ')}';
 
@@ -137,7 +151,7 @@ class ModelTagWrap extends StatelessWidget {
                     Padding(
                       padding: const EdgeInsets.only(right: 2),
                       child: Icon(
-                        mod == Modality.text ? Lucide.Type : Lucide.Image,
+                        _modalityIcon(mod),
                         size: 12,
                         color: isDark
                             ? cs.tertiary
@@ -155,7 +169,7 @@ class ModelTagWrap extends StatelessWidget {
                     Padding(
                       padding: const EdgeInsets.only(left: 2),
                       child: Icon(
-                        mod == Modality.text ? Lucide.Type : Lucide.Image,
+                        _modalityIcon(mod),
                         size: 12,
                         color: isDark
                             ? cs.tertiary
@@ -173,67 +187,72 @@ class ModelTagWrap extends StatelessWidget {
     if (!isEmbedding) {
       final uniqueAbilities = LinkedHashSet<ModelAbility>.from(model.abilities);
       for (final ab in uniqueAbilities) {
-        if (ab == ModelAbility.tool) {
-          chips.add(
-            _abilityChip(
-              isDark: isDark,
-              label: toolsLabel,
-              baseColor: cs.primary,
-              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
-              child: Icon(
-                Lucide.Hammer,
-                size: 12,
-                color: isDark ? cs.primary : cs.primary.withValues(alpha: 0.9),
-              ),
-              darkBgAlpha: 0.25,
-              lightBgAlpha: 0.15,
-              borderAlpha: 0.2,
-            ),
-          );
-        } else if (ab == ModelAbility.reasoning) {
-          chips.add(
-            _abilityChip(
-              isDark: isDark,
-              label: reasoningLabel,
-              baseColor: cs.secondary,
-              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
-              child: SvgPicture.asset(
-                'assets/icons/deepthink.svg',
-                width: 12,
-                height: 12,
-                colorFilter: ColorFilter.mode(
-                  isDark ? cs.secondary : cs.secondary.withValues(alpha: 0.9),
-                  BlendMode.srcIn,
+        switch (ab) {
+          case ModelAbility.tool:
+            chips.add(
+              _abilityChip(
+                isDark: isDark,
+                label: toolsLabel,
+                baseColor: cs.primary,
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                child: Icon(
+                  Lucide.Hammer,
+                  size: 12,
+                  color: isDark
+                      ? cs.primary
+                      : cs.primary.withValues(alpha: 0.9),
                 ),
-                errorBuilder: (_, __, ___) {
-                  if (kDebugMode) {
-                    debugPrint(
-                      '[ModelTagWrap] Failed to load assets/icons/deepthink.svg',
-                    );
-                  }
-                  return Icon(
-                    Lucide.Brain,
-                    size: 12,
-                    color: isDark
-                        ? cs.secondary
-                        : cs.secondary.withValues(alpha: 0.9),
-                  );
-                },
-                placeholderBuilder: (_) {
-                  return Icon(
-                    Lucide.Brain,
-                    size: 12,
-                    color: isDark
-                        ? cs.secondary
-                        : cs.secondary.withValues(alpha: 0.9),
-                  );
-                },
+                darkBgAlpha: 0.25,
+                lightBgAlpha: 0.15,
+                borderAlpha: 0.2,
               ),
-              darkBgAlpha: 0.3,
-              lightBgAlpha: 0.18,
-              borderAlpha: 0.25,
-            ),
-          );
+            );
+          case ModelAbility.reasoning:
+            chips.add(
+              _abilityChip(
+                isDark: isDark,
+                label: reasoningLabel,
+                baseColor: cs.secondary,
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                child: SvgPicture.asset(
+                  'assets/icons/deepthink.svg',
+                  width: 12,
+                  height: 12,
+                  colorFilter: ColorFilter.mode(
+                    isDark ? cs.secondary : cs.secondary.withValues(alpha: 0.9),
+                    BlendMode.srcIn,
+                  ),
+                  errorBuilder: (_, __, ___) {
+                    if (kDebugMode) {
+                      debugPrint(
+                        '[ModelTagWrap] Failed to load assets/icons/deepthink.svg',
+                      );
+                    }
+                    return Icon(
+                      Lucide.Brain,
+                      size: 12,
+                      color: isDark
+                          ? cs.secondary
+                          : cs.secondary.withValues(alpha: 0.9),
+                    );
+                  },
+                  placeholderBuilder: (_) {
+                    return Icon(
+                      Lucide.Brain,
+                      size: 12,
+                      color: isDark
+                          ? cs.secondary
+                          : cs.secondary.withValues(alpha: 0.9),
+                    );
+                  },
+                ),
+                darkBgAlpha: 0.3,
+                lightBgAlpha: 0.18,
+                borderAlpha: 0.25,
+              ),
+            );
+          case ModelAbility.structuredOutput:
+            break;
         }
       }
     }
@@ -260,7 +279,7 @@ class ModelCapsulesRow extends StatelessWidget {
     this.itemSpacing = 4,
   });
 
-  final ModelInfo model;
+  final ModelSpec model;
   final double iconSize;
   final EdgeInsets pillPadding;
   final double bgOpacityDark;
@@ -322,7 +341,8 @@ class ModelCapsulesRow extends StatelessWidget {
       );
     }
 
-    if (model.type == ModelType.chat && model.output.contains(Modality.image)) {
+    if (model.type != ModelType.embedding &&
+        model.output.contains(Modality.image)) {
       caps.add(
         labeledCapsule(
           label: '$outputLabel: $imageLabel',
@@ -332,49 +352,52 @@ class ModelCapsulesRow extends StatelessWidget {
       );
     }
 
-    if (model.type == ModelType.chat) {
+    if (model.type != ModelType.embedding) {
       final uniqueAbilities = LinkedHashSet<ModelAbility>.from(model.abilities);
       for (final ab in uniqueAbilities) {
-        if (ab == ModelAbility.tool) {
-          caps.add(
-            labeledCapsule(
-              label: toolsLabel,
-              icon: Icon(Lucide.Hammer, size: iconSize, color: cs.primary),
-              color: cs.primary,
-            ),
-          );
-        } else if (ab == ModelAbility.reasoning) {
-          caps.add(
-            labeledCapsule(
-              label: reasoningLabel,
-              icon: SvgPicture.asset(
-                'assets/icons/deepthink.svg',
-                width: iconSize,
-                height: iconSize,
-                colorFilter: ColorFilter.mode(cs.secondary, BlendMode.srcIn),
-                errorBuilder: (_, __, ___) {
-                  if (kDebugMode) {
-                    debugPrint(
-                      '[ModelTagWrap] Failed to load assets/icons/deepthink.svg',
-                    );
-                  }
-                  return Icon(
-                    Lucide.Brain,
-                    size: iconSize,
-                    color: cs.secondary,
-                  );
-                },
-                placeholderBuilder: (_) {
-                  return Icon(
-                    Lucide.Brain,
-                    size: iconSize,
-                    color: cs.secondary,
-                  );
-                },
+        switch (ab) {
+          case ModelAbility.tool:
+            caps.add(
+              labeledCapsule(
+                label: toolsLabel,
+                icon: Icon(Lucide.Hammer, size: iconSize, color: cs.primary),
+                color: cs.primary,
               ),
-              color: cs.secondary,
-            ),
-          );
+            );
+          case ModelAbility.reasoning:
+            caps.add(
+              labeledCapsule(
+                label: reasoningLabel,
+                icon: SvgPicture.asset(
+                  'assets/icons/deepthink.svg',
+                  width: iconSize,
+                  height: iconSize,
+                  colorFilter: ColorFilter.mode(cs.secondary, BlendMode.srcIn),
+                  errorBuilder: (_, __, ___) {
+                    if (kDebugMode) {
+                      debugPrint(
+                        '[ModelTagWrap] Failed to load assets/icons/deepthink.svg',
+                      );
+                    }
+                    return Icon(
+                      Lucide.Brain,
+                      size: iconSize,
+                      color: cs.secondary,
+                    );
+                  },
+                  placeholderBuilder: (_) {
+                    return Icon(
+                      Lucide.Brain,
+                      size: iconSize,
+                      color: cs.secondary,
+                    );
+                  },
+                ),
+                color: cs.secondary,
+              ),
+            );
+          case ModelAbility.structuredOutput:
+            break;
         }
       }
     }

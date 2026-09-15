@@ -15,6 +15,7 @@ import 'stream/stream_chunk.dart';
 import 'stream/stream_chunk_handler.dart';
 
 import '../../models/auto_retry_options.dart';
+import '../model_spec/model_spec_resolver.dart';
 import 'chat_api_helpers.dart';
 import 'provider_request_headers.dart';
 import 'providers/claude_official.dart';
@@ -119,7 +120,10 @@ class ChatApiService {
   }
 
   static bool _supportsImageInput(ProviderConfig config, String modelId) {
-    return effectiveModelInfo(config, modelId).input.contains(Modality.image);
+    return ModelSpecResolver.instance
+        .spec(config, modelId)
+        .input
+        .contains(Modality.image);
   }
 
   static http.Client _clientFor(ProviderConfig cfg, CancelToken cancelToken) {
@@ -229,10 +233,10 @@ class ChatApiService {
           ? const <String>[]
           : userImagePaths;
 
-      final imageOutput = effectiveModelInfo(
-        config,
-        modelId,
-      ).output.contains(Modality.image);
+      final imageOutput = ModelSpecResolver.instance
+          .spec(config, modelId)
+          .output
+          .contains(Modality.image);
       final retryNetworkErrors =
           !useOpenAIImagesApi && !useZhipuLayoutParsing && !imageOutput;
       final emitRetryUi = options.enabled && options.maxRetries > 0;

@@ -3923,6 +3923,33 @@ class AppLocalizationsEn extends AppLocalizations {
   String get providersPageProviderAddedSnackbar => 'Provider added';
 
   @override
+  String get modelCatalogTitle => 'Model catalog';
+
+  @override
+  String modelCatalogSourceBundled(String date) {
+    return 'Bundled snapshot · $date';
+  }
+
+  @override
+  String modelCatalogSourceRemote(String date) {
+    return 'models.dev · updated $date';
+  }
+
+  @override
+  String get modelCatalogAutoUpdate => 'Auto-update every 24 hours';
+
+  @override
+  String get modelCatalogRefresh => 'Update now';
+
+  @override
+  String get modelCatalogUpdated => 'Model catalog updated';
+
+  @override
+  String modelCatalogRefreshFailed(String error) {
+    return 'Update failed: $error';
+  }
+
+  @override
   String get providerGroupsGroupLabel => 'Group';
 
   @override

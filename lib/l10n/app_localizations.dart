@@ -7237,6 +7237,48 @@ abstract class AppLocalizations {
   /// **'Provider added'**
   String get providersPageProviderAddedSnackbar;
 
+  /// No description provided for @modelCatalogTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Model catalog'**
+  String get modelCatalogTitle;
+
+  /// No description provided for @modelCatalogSourceBundled.
+  ///
+  /// In en, this message translates to:
+  /// **'Bundled snapshot · {date}'**
+  String modelCatalogSourceBundled(String date);
+
+  /// No description provided for @modelCatalogSourceRemote.
+  ///
+  /// In en, this message translates to:
+  /// **'models.dev · updated {date}'**
+  String modelCatalogSourceRemote(String date);
+
+  /// No description provided for @modelCatalogAutoUpdate.
+  ///
+  /// In en, this message translates to:
+  /// **'Auto-update every 24 hours'**
+  String get modelCatalogAutoUpdate;
+
+  /// No description provided for @modelCatalogRefresh.
+  ///
+  /// In en, this message translates to:
+  /// **'Update now'**
+  String get modelCatalogRefresh;
+
+  /// No description provided for @modelCatalogUpdated.
+  ///
+  /// In en, this message translates to:
+  /// **'Model catalog updated'**
+  String get modelCatalogUpdated;
+
+  /// No description provided for @modelCatalogRefreshFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Update failed: {error}'**
+  String modelCatalogRefreshFailed(String error);
+
   /// No description provided for @providerGroupsGroupLabel.
   ///
   /// In en, this message translates to:

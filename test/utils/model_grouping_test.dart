@@ -1,13 +1,13 @@
 import 'dart:io';
 
-import 'package:Kelivo/core/models/model_types.dart';
+import 'package:Kelivo/core/models/model_spec.dart';
 import 'package:Kelivo/utils/brand_assets.dart';
 import 'package:Kelivo/utils/model_grouping.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 String groupFor(String id, {ModelType type = ModelType.chat}) {
   return ModelGrouping.groupFor(
-    ModelInfo(id: id, displayName: id, type: type),
+    ModelSpec(id: id, displayName: id, type: type),
     embeddingsLabel: '嵌入模型',
     otherLabel: '其他模型',
   );

@@ -1742,6 +1742,34 @@
   "providersPageAddTooltip": "Add",
   "providersPageSearchHint": "Search providers or groups",
   "providersPageProviderAddedSnackbar": "Provider added",
+  "modelCatalogTitle": "Model catalog",
+  "modelCatalogSourceBundled": "Bundled snapshot · {date}",
+  "@modelCatalogSourceBundled": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "modelCatalogSourceRemote": "models.dev · updated {date}",
+  "@modelCatalogSourceRemote": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "modelCatalogAutoUpdate": "Auto-update every 24 hours",
+  "modelCatalogRefresh": "Update now",
+  "modelCatalogUpdated": "Model catalog updated",
+  "modelCatalogRefreshFailed": "Update failed: {error}",
+  "@modelCatalogRefreshFailed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
   "providerGroupsGroupLabel": "Group",
   "providerGroupsOther": "Other",
   "providerGroupsOtherUngroupedOption": "Other (Ungrouped)",

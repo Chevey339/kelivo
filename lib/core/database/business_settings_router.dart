@@ -26,6 +26,7 @@ final class BusinessKeyRegistry {
     'desktop_hotkeys_enabled_v1',
     'display_chat_font_scale_v1',
     'flutter_log_enabled_v1',
+    'model_catalog_auto_update_v1',
   };
 
   static const discardedKeys = <String>{

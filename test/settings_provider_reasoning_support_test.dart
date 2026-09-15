@@ -3,8 +3,9 @@ import 'dart:convert';
 
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:Kelivo/core/providers/model_provider.dart';
+import 'package:Kelivo/core/models/model_spec.dart';
 import 'package:Kelivo/core/providers/settings_provider.dart';
+import 'package:Kelivo/core/services/model_spec/model_defaults_guesser.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -55,18 +56,10 @@ void main() {
     });
 
     test('latest model ids infer only their documented capabilities', () {
-      final glm = ModelRegistry.infer(
-        ModelInfo(id: 'glm-5.2', displayName: 'glm-5.2'),
-      );
-      final kimiK2 = ModelRegistry.infer(
-        ModelInfo(id: 'kimi-k2.7-code', displayName: 'kimi-k2.7-code'),
-      );
-      final kimiK3 = ModelRegistry.infer(
-        ModelInfo(id: 'kimi-k3', displayName: 'kimi-k3'),
-      );
-      final muse = ModelRegistry.infer(
-        ModelInfo(id: 'muse-spark-1.1', displayName: 'muse-spark-1.1'),
-      );
+      final glm = ModelDefaultsGuesser.guess('glm-5.2');
+      final kimiK2 = ModelDefaultsGuesser.guess('kimi-k2.7-code');
+      final kimiK3 = ModelDefaultsGuesser.guess('kimi-k3');
+      final muse = ModelDefaultsGuesser.guess('muse-spark-1.1');
 
       expect(glm.input, const [Modality.text]);
       expect(glm.output, const [Modality.text]);
@@ -82,9 +75,6 @@ void main() {
           containsAll([ModelAbility.tool, ModelAbility.reasoning]),
         );
       }
-      expect(kimiK2.id, 'kimi-k2.7-code');
-      expect(kimiK3.id, 'kimi-k3');
-      expect(muse.id, 'muse-spark-1.1');
     });
 
     test(

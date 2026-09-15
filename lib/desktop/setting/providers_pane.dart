@@ -402,6 +402,8 @@ class _DesktopProvidersBodyState extends State<_DesktopProvidersBody> {
                       },
                     ),
                     const SizedBox(height: 8),
+                    const _DesktopModelCatalogSection(),
+                    const SizedBox(height: 8),
                     Expanded(
                       child: groupingActive
                           ? ReorderableListView.builder(
@@ -758,6 +760,141 @@ class _DesktopProviderGroupingProviderVM extends _DesktopProviderGroupingRowVM {
 
   final ({String name, String key}) item;
   final String groupKey;
+}
+
+class _DesktopModelCatalogSection extends StatefulWidget {
+  const _DesktopModelCatalogSection();
+
+  @override
+  State<_DesktopModelCatalogSection> createState() =>
+      _DesktopModelCatalogSectionState();
+}
+
+class _DesktopModelCatalogSectionState
+    extends State<_DesktopModelCatalogSection> {
+  @override
+  void initState() {
+    super.initState();
+    unawaited(ModelCatalogService.instance.ensureLoaded());
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final catalog = ModelCatalogService.instance;
+    final cs = Theme.of(context).colorScheme;
+    final l10n = AppLocalizations.of(context)!;
+
+    return ListenableBuilder(
+      listenable: catalog,
+      builder: (context, _) {
+        final date = _formatDesktopCatalogDate(catalog.generatedAt);
+        final subtitle = catalog.generatedAt == null
+            ? null
+            : catalog.isBundled
+            ? l10n.modelCatalogSourceBundled(date)
+            : l10n.modelCatalogSourceRemote(date);
+        return _DesktopIosSectionCard(
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(12, 10, 8, 10),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          l10n.modelCatalogTitle,
+                          style: const TextStyle(fontSize: 13.5),
+                        ),
+                        if (subtitle != null) ...[
+                          const SizedBox(height: 2),
+                          Text(
+                            subtitle,
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: cs.onSurface.withValues(alpha: 0.6),
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                  catalog.refreshing
+                      ? SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: cs.primary,
+                          ),
+                        )
+                      : _IconBtn(
+                          icon: lucide.Lucide.RefreshCw,
+                          onTap: () => _refreshCatalog(context),
+                        ),
+                ],
+              ),
+            ),
+            Divider(
+              height: 1,
+              thickness: 0.6,
+              color: context.appColors.hairline,
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(12, 8, 10, 8),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      l10n.modelCatalogAutoUpdate,
+                      style: const TextStyle(fontSize: 13.5),
+                    ),
+                  ),
+                  IosSwitch(
+                    value: catalog.autoUpdate,
+                    onChanged: (value) {
+                      unawaited(catalog.setAutoUpdate(value));
+                    },
+                  ),
+                ],
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Future<void> _refreshCatalog(BuildContext context) async {
+    final l10n = AppLocalizations.of(context)!;
+    final ok = await ModelCatalogService.instance.refresh(force: true);
+    if (!context.mounted) return;
+    if (ok) {
+      showAppSnackBar(
+        context,
+        message: l10n.modelCatalogUpdated,
+        type: NotificationType.success,
+      );
+      return;
+    }
+    showAppSnackBar(
+      context,
+      message: l10n.modelCatalogRefreshFailed(
+        ModelCatalogService.instance.lastError ?? '',
+      ),
+      type: NotificationType.error,
+    );
+  }
+}
+
+String _formatDesktopCatalogDate(DateTime? value) {
+  if (value == null) return '—';
+  final date = value.toUtc();
+  final year = date.year.toString().padLeft(4, '0');
+  final month = date.month.toString().padLeft(2, '0');
+  final day = date.day.toString().padLeft(2, '0');
+  return '$year-$month-$day';
 }
 
 class _DesktopProvidersSearchField extends StatelessWidget {
@@ -7047,40 +7184,10 @@ class _ModelRow extends StatelessWidget {
     final l10n = AppLocalizations.of(context)!;
     final sp = context.watch<SettingsProvider>();
     final cfg = sp.getProviderConfig(providerKey);
-    ModelInfo infer(String id) =>
-        ModelRegistry.infer(ModelInfo(id: id, displayName: id));
-    // Resolve upstream/api model id for inference + capsules
-    String baseId = modelId;
-    final rawOv = cfg.modelOverrides[modelId];
-    final Map<String, dynamic>? ov = rawOv is Map
-        ? {for (final e in rawOv.entries) e.key.toString(): e.value}
-        : null;
-    if (ov != null) {
-      final apiId = (ov['apiModelId'] ?? ov['api_model_id'])?.toString().trim();
-      if (apiId != null && apiId.isNotEmpty) {
-        baseId = apiId;
-      }
-    }
-
-    ModelInfo effective() {
-      final base = infer(baseId);
-      if (ov == null) return base;
-      return ModelOverrideResolver.applyModelOverride(base, ov);
-    }
-
-    final info = effective();
-    // Display label: prefer override name, then upstream model id, then logical key
-    String displayName = modelId;
-    if (ov != null) {
-      final overrideName = ov['name']?.toString().trim();
-      if (overrideName != null && overrideName.isNotEmpty) {
-        displayName = overrideName;
-      } else {
-        displayName = baseId;
-      }
-    } else {
-      displayName = baseId;
-    }
+    final resolved = ModelSpecResolver.instance.resolve(cfg, modelId);
+    final info = resolved.spec;
+    final baseId = info.upstreamId;
+    final displayName = resolved.override.displayName ?? baseId;
 
     return GestureDetector(
       onTap: isSelectionMode

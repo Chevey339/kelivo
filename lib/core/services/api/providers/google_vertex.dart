@@ -12,6 +12,7 @@ import '../../../../utils/mcp_structured_image.dart';
 import '../../../../utils/sandbox_path_resolver.dart';
 import '../builtin_tools.dart';
 import '../chat_api_helpers.dart';
+import '../../model_spec/model_spec_resolver.dart';
 import '../generation/tool_loop_runner.dart';
 import '../google_service_account_auth.dart';
 import '../stream/sse_framing.dart';
@@ -194,10 +195,10 @@ Stream<StreamChunk> sendGoogleVertexClaudeStream({
     'https://$host/v1/projects/$proj/locations/$loc/publishers/anthropic/models/$upstreamId:$endpoint',
   );
 
-  final isReasoning = effectiveModelInfo(
-    config,
-    modelId,
-  ).abilities.contains(ModelAbility.reasoning);
+  final isReasoning = ModelSpecResolver.instance
+      .spec(config, modelId)
+      .abilities
+      .contains(ModelAbility.reasoning);
 
   // Determine effective max_tokens based on model capabilities
   int effectiveMaxTokens =

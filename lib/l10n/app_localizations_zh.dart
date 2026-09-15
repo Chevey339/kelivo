@@ -3789,6 +3789,33 @@ class AppLocalizationsZh extends AppLocalizations {
   String get providersPageProviderAddedSnackbar => '已添加供应商';
 
   @override
+  String get modelCatalogTitle => '模型目录';
+
+  @override
+  String modelCatalogSourceBundled(String date) {
+    return '内置快照 · $date';
+  }
+
+  @override
+  String modelCatalogSourceRemote(String date) {
+    return 'models.dev · 更新于 $date';
+  }
+
+  @override
+  String get modelCatalogAutoUpdate => '每 24 小时自动更新';
+
+  @override
+  String get modelCatalogRefresh => '立即更新';
+
+  @override
+  String get modelCatalogUpdated => '模型目录已更新';
+
+  @override
+  String modelCatalogRefreshFailed(String error) {
+    return '更新失败：$error';
+  }
+
+  @override
   String get providerGroupsGroupLabel => '分组';
 
   @override
@@ -15156,6 +15183,33 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get providersPageProviderAddedSnackbar => '已添加供应商';
 
   @override
+  String get modelCatalogTitle => '模型目录';
+
+  @override
+  String modelCatalogSourceBundled(String date) {
+    return '内置快照 · $date';
+  }
+
+  @override
+  String modelCatalogSourceRemote(String date) {
+    return 'models.dev · 更新于 $date';
+  }
+
+  @override
+  String get modelCatalogAutoUpdate => '每 24 小时自动更新';
+
+  @override
+  String get modelCatalogRefresh => '立即更新';
+
+  @override
+  String get modelCatalogUpdated => '模型目录已更新';
+
+  @override
+  String modelCatalogRefreshFailed(String error) {
+    return '更新失败：$error';
+  }
+
+  @override
   String get providerGroupsGroupLabel => '分组';
 
   @override
@@ -26447,6 +26501,33 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get providersPageProviderAddedSnackbar => '已新增供應商';
+
+  @override
+  String get modelCatalogTitle => '模型目錄';
+
+  @override
+  String modelCatalogSourceBundled(String date) {
+    return '內建快照 · $date';
+  }
+
+  @override
+  String modelCatalogSourceRemote(String date) {
+    return 'models.dev · 更新於 $date';
+  }
+
+  @override
+  String get modelCatalogAutoUpdate => '每 24 小時自動更新';
+
+  @override
+  String get modelCatalogRefresh => '立即更新';
+
+  @override
+  String get modelCatalogUpdated => '模型目錄已更新';
+
+  @override
+  String modelCatalogRefreshFailed(String error) {
+    return '更新失敗：$error';
+  }
 
   @override
   String get providerGroupsGroupLabel => '分組';

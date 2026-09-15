@@ -36,7 +36,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../core/providers/settings_provider.dart';
 import 'package:Kelivo/theme/app_semantic_colors.dart';
-import '../../../core/providers/model_provider.dart';
+import '../../../core/services/model_spec/model_spec_resolver.dart';
 import '../../../core/models/assistant_regex.dart';
 import '../../../shared/widgets/custom_bottom_sheet.dart';
 import '../../../shared/widgets/ios_checkbox.dart';
@@ -1381,38 +1381,18 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
     }
 
     final providerId = widget.message.providerId;
-    String baseId = modelId;
+    String displayName = modelId;
     String? providerName;
     if (providerId != null && providerId.isNotEmpty) {
       try {
         final cfg = settings.getProviderConfig(providerId);
         providerName = cfg.name.trim();
-        final ov = cfg.modelOverrides[modelId] as Map?;
-        if (ov != null) {
-          final name = (ov['name'] as String?)?.trim();
-          if (name != null && name.isNotEmpty) {
-            if (settings.showProviderInChatMessage && providerName.isNotEmpty) {
-              return '$name | $providerName';
-            }
-            return name;
-          }
-          final apiId = (ov['apiModelId'] ?? ov['api_model_id'])
-              ?.toString()
-              .trim();
-          if (apiId != null && apiId.isNotEmpty) {
-            baseId = apiId;
-          }
-        }
+        final resolved = ModelSpecResolver.instance.resolve(cfg, modelId);
+        displayName = resolved.override.displayName ?? resolved.spec.upstreamId;
       } catch (_) {
-        // ignore lookup failures; fall through to inferred name.
+        // ignore lookup failures; fall through to the logical model id.
       }
     }
-
-    final inferred = ModelRegistry.infer(
-      ModelInfo(id: baseId, displayName: baseId),
-    );
-    final fallback = inferred.displayName.trim();
-    final displayName = fallback.isNotEmpty ? fallback : baseId;
     if (settings.showProviderInChatMessage &&
         providerName != null &&
         providerName.isNotEmpty) {

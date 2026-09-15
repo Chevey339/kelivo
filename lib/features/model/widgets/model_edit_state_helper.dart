@@ -1,4 +1,4 @@
-import '../../../core/models/model_types.dart';
+import '../../../core/models/model_spec.dart';
 import '../../../core/providers/settings_provider.dart';
 import '../../../core/services/api/builtin_tools.dart';
 import '../../../l10n/app_localizations.dart';
@@ -79,12 +79,12 @@ class ModelEditTypeSwitch {
     var nextOutput = {...output};
     var nextAbilities = {...abilities};
 
-    if (prev == ModelType.chat && next == ModelType.embedding) {
+    if (prev != ModelType.embedding && next == ModelType.embedding) {
       nextCachedChatInput = {...input};
       nextCachedChatOutput = {...output};
       nextCachedChatAbilities = {...abilities};
     }
-    if (prev == ModelType.embedding && next == ModelType.chat) {
+    if (prev == ModelType.embedding && next != ModelType.embedding) {
       nextCachedEmbeddingInput = {...input};
     }
 
@@ -111,7 +111,7 @@ class ModelEditTypeSwitch {
       );
     }
 
-    if (prev == ModelType.embedding && next == ModelType.chat) {
+    if (prev == ModelType.embedding && next != ModelType.embedding) {
       nextInput
         ..clear()
         ..addAll(nextCachedChatInput ?? const {Modality.text});

@@ -9,6 +9,7 @@ import 'package:uuid/uuid.dart';
 import '../../models/provider_oauth.dart';
 import '../../providers/model_provider.dart';
 import '../../providers/settings_provider.dart';
+import '../model_spec/model_spec_resolver.dart';
 import '../network/dio_http_client.dart';
 import 'codex_request.dart';
 import 'claude_oauth_request.dart';
@@ -338,56 +339,38 @@ class ProviderOAuthService extends ChangeNotifier {
     }
   }
 
-  Future<List<ModelInfo>> models(ProviderConfig original) => _authenticated(
-    original,
-    (wire, config) async {
-      final rows = await ProviderOAuthAdapter.forProvider(
-        config.oauthProvider!,
-      ).models(wire, config.oauthCredentials!);
-      final ids = <String>{};
-      return [
-        for (final row in rows)
-          if (oauthString(row['id']) != null &&
-              ids.add(row['id'] as String) &&
-              (config.oauthProvider != OAuthProvider.grok ||
-                  !RegExp(
-                    r'grok-(?:imagine|stt|voice|tts)',
-                  ).hasMatch(row['id'] as String)))
-            _OAuthModelInfo(
-              row: row,
-              base: ModelRegistry.infer(
-                ModelInfo(
-                  id: row['id'] as String,
-                  displayName:
-                      oauthString(row['display_name']) ??
-                      oauthString(row['name']) ??
-                      row['id'] as String,
-                  input: [
-                    Modality.text,
-                    if (row['supports_image_in'] == true ||
-                        (row['input_modalities'] as List? ?? const []).contains(
-                          'image',
-                        ))
-                      Modality.image,
-                  ],
-                  abilities: [
-                    ModelAbility.tool,
-                    if (row['supports_reasoning'] == true ||
-                        {
-                          'only',
-                          'both',
-                        }.contains(row['supports_thinking_type']) ||
-                        oauthMap(row['think_efforts'])['support'] == true ||
-                        (row['supported_reasoning_levels'] as List? ?? const [])
-                            .isNotEmpty)
-                      ModelAbility.reasoning,
-                  ],
+  Future<List<ModelSpec>> models(ProviderConfig original) =>
+      _authenticated(original, (wire, config) async {
+        final rows = await ProviderOAuthAdapter.forProvider(
+          config.oauthProvider!,
+        ).models(wire, config.oauthCredentials!);
+        final ids = <String>{};
+        return [
+          for (final row in rows)
+            if (oauthString(row['id']) != null &&
+                ids.add(row['id'] as String) &&
+                (config.oauthProvider != OAuthProvider.grok ||
+                    !RegExp(
+                      r'grok-(?:imagine|stt|voice|tts)',
+                    ).hasMatch(row['id'] as String)))
+              _OAuthModelSpec(
+                row: row,
+                base: _oauthDiscoveredSpec(
+                  ModelSpecResolver.instance
+                      .resolve(
+                        config,
+                        row['id'] as String,
+                        displayName:
+                            oauthString(row['display_name']) ??
+                            oauthString(row['name']) ??
+                            row['id'] as String,
+                      )
+                      .spec,
+                  row,
                 ),
               ),
-            ),
-      ];
-    },
-  );
+        ];
+      });
 
   Future<void> syncModels(String id) async {
     final before = _current(id);
@@ -409,7 +392,7 @@ class ProviderOAuthService extends ChangeNotifier {
         'output': model.output.map((e) => e.name).toList(),
         'abilities': model.abilities.map((e) => e.name).toList(),
         if (current.oauthProvider == OAuthProvider.kimi &&
-            model is _OAuthModelInfo) ...{
+            model is _OAuthModelSpec) ...{
           'oauthThinkingMode':
               oauthMap(model.row['think_efforts'])['support'] == true
               ? 'adaptive'
@@ -428,7 +411,7 @@ class ProviderOAuthService extends ChangeNotifier {
           ),
         },
         if (current.oauthProvider == OAuthProvider.kimi &&
-            model is _OAuthModelInfo)
+            model is _OAuthModelSpec)
           'oauthProtocol':
               model.row['protocol'] == null && model.row.containsKey('protocol')
               ? 'openai'
@@ -477,15 +460,43 @@ class ProviderOAuthService extends ChangeNotifier {
       config.isOAuth ? _ProviderOAuthHttpClient(client, config, this) : client;
 }
 
-class _OAuthModelInfo extends ModelInfo {
-  _OAuthModelInfo({required this.row, required ModelInfo base})
+ModelSpec _oauthDiscoveredSpec(ModelSpec resolved, Map<String, dynamic> row) {
+  final imageIn =
+      row['supports_image_in'] == true ||
+      (row['input_modalities'] as List? ?? const []).contains('image');
+  final reasoning =
+      row['supports_reasoning'] == true ||
+      const {'only', 'both'}.contains(row['supports_thinking_type']) ||
+      oauthMap(row['think_efforts'])['support'] == true ||
+      (row['supported_reasoning_levels'] as List? ?? const []).isNotEmpty;
+  return resolved.copyWith(
+    input: <Modality>[...resolved.input, if (imageIn) Modality.image],
+    abilities: <ModelAbility>[
+      ...resolved.abilities,
+      ModelAbility.tool,
+      if (reasoning) ModelAbility.reasoning,
+    ],
+  );
+}
+
+class _OAuthModelSpec extends ModelSpec {
+  _OAuthModelSpec({required this.row, required ModelSpec base})
     : super(
         id: base.id,
+        apiModelId: base.apiModelId,
         displayName: base.displayName,
         type: base.type,
         input: base.input,
         output: base.output,
         abilities: base.abilities,
+        reasoning: base.reasoning,
+        sampling: base.sampling,
+        contextWindow: base.contextWindow,
+        maxOutput: base.maxOutput,
+        pricing: base.pricing,
+        headers: base.headers,
+        body: base.body,
+        builtInTools: base.builtInTools,
       );
   final Map<String, dynamic> row;
 }

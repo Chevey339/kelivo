@@ -6,7 +6,6 @@ import 'package:Kelivo/secrets/fallback.dart';
 import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:http/http.dart' as http;
 
-import '../../providers/model_provider.dart';
 import '../../providers/settings_provider.dart';
 import '../../services/api_key_manager.dart';
 import '../../utils/multimodal_input_utils.dart';
@@ -14,7 +13,6 @@ import '../../utils/openai_model_compat.dart';
 import '../../../utils/sandbox_path_resolver.dart';
 import '../logging/flutter_logger.dart';
 import '../model_override_payload_parser.dart';
-import '../model_override_resolver.dart';
 import '../custom_request_merger.dart';
 import 'builtin_tools.dart';
 import 'provider_request_headers.dart';
@@ -132,25 +130,6 @@ Map<String, dynamic> customBody(
 bool _isAihubmix(ProviderConfig cfg) {
   final base = cfg.baseUrl.toLowerCase();
   return base.contains('aihubmix.com');
-}
-
-// Resolve effective model info by respecting per-model overrides; fallback to inference
-ModelInfo effectiveModelInfo(ProviderConfig cfg, String modelId) {
-  final upstreamId = apiModelId(cfg, modelId);
-  final base = ModelRegistry.infer(
-    ModelInfo(id: upstreamId, displayName: upstreamId),
-  );
-  final ov = _modelOverride(cfg, modelId);
-  if (ov.isEmpty) return base;
-  try {
-    return ModelOverrideResolver.applyModelOverride(base, ov);
-  } catch (e, st) {
-    FlutterLogger.log(
-      '[ModelOverride] applyModelOverride failed: $e\n$st',
-      tag: 'ModelOverride',
-    );
-    return base;
-  }
 }
 
 String mimeFromPath(String path) {

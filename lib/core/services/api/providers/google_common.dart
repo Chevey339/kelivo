@@ -13,6 +13,7 @@ import '../../../../utils/markdown_media_sanitizer.dart';
 import '../../../../utils/sandbox_path_resolver.dart';
 import '../builtin_tools.dart';
 import '../chat_api_helpers.dart';
+import '../../model_spec/model_spec_resolver.dart';
 import '../gemini_tool_config.dart';
 import '../generation/tool_loop_runner.dart';
 import '../google_service_account_auth.dart';
@@ -357,7 +358,7 @@ int? _defaultGeminiMaxOutputTokens(String upstreamModelId) {
 bool _shouldRequestGoogleThoughts(
   ProviderConfig config,
   String modelId,
-  ModelInfo effective,
+  ModelSpec effective,
 ) {
   if (effective.abilities.contains(ModelAbility.reasoning)) return true;
   final kind = ProviderConfig.classify(
@@ -482,7 +483,7 @@ Stream<StreamChunk> sendGoogleStream(
   final builtIns = builtInTools(config, modelId);
   final enableYoutube = builtIns.contains(BuiltInToolNames.youtube);
   // Effective model features (includes user overrides)
-  final effective = effectiveModelInfo(config, modelId);
+  final effective = ModelSpecResolver.instance.spec(config, modelId);
   final isReasoning = _shouldRequestGoogleThoughts(config, modelId, effective);
   // Non-streaming path: use generateContent
   if (!stream) {

@@ -106,7 +106,7 @@ int compressRequestCharBudget({
 
 /// Read a context-window token count from a model-override map.
 ///
-/// Kelivo has no first-class [ModelInfo] context field; some imports /
+/// Kelivo has no first-class [ModelSpec] context field; some imports /
 /// overrides may still store one of these keys.
 int? readModelContextWindowTokens(Map<String, dynamic>? override) {
   if (override == null || override.isEmpty) return null;

@@ -13,6 +13,7 @@ import '../../../utils/multimodal_input_utils.dart';
 import '../../../../utils/mcp_structured_image.dart';
 import '../builtin_tools.dart';
 import '../chat_api_helpers.dart';
+import '../../model_spec/model_spec_resolver.dart';
 import '../generation/tool_loop_runner.dart';
 import '../stream/sse_framing.dart';
 import '../stream/stream_chunk.dart';
@@ -66,10 +67,10 @@ Stream<StreamChunk> sendClaudeStream(
       : config.baseUrl;
   final url = Uri.parse('$base/messages');
 
-  final isReasoning = effectiveModelInfo(
-    config,
-    modelId,
-  ).abilities.contains(ModelAbility.reasoning);
+  final isReasoning = ModelSpecResolver.instance
+      .spec(config, modelId)
+      .abilities
+      .contains(ModelAbility.reasoning);
   final skipRedactedThinkingBlocks = BuiltInToolsHelper.isOpenRouterProvider(
     config,
   );

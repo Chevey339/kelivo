@@ -73,6 +73,7 @@ import 'core/database/startup_failure_report.dart';
 import 'core/services/backup/backup_activity.dart';
 import 'core/services/backup/local_snapshot_schedule.dart';
 import 'core/services/chat/chat_service.dart';
+import 'core/services/model_catalog/model_catalog_service.dart';
 import 'core/services/app_exit_flush.dart';
 import 'core/services/backup/restore_archive_pruner.dart';
 import 'core/services/backup/restore_business_lease.dart';
@@ -328,6 +329,7 @@ Future<void> main() async {
       ScheduledTasksService.configureDesktop(businessPreferences);
       // Best-effort trim of archived restore runs after a few cold starts.
       unawaited(_pruneRestoreArchive(appDataDirectory));
+      unawaited(ModelCatalogService.instance.maybeAutoRefresh());
       // Enable edge-to-edge to allow content under system bars (Android)
       SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
       // Start app (Flutter log capture is toggleable and off by default)

@@ -12,6 +12,7 @@ import '../../../../utils/multimodal_input_utils.dart';
 import '../../../../../utils/sandbox_path_resolver.dart';
 import '../../builtin_tools.dart';
 import '../../chat_api_helpers.dart';
+import '../../../model_spec/model_spec_resolver.dart';
 import '../../generation/tool_loop_runner.dart';
 import '../../kimi_formula_search.dart';
 import '../../stream/sse_framing.dart';
@@ -129,7 +130,7 @@ Stream<StreamChunk> sendOpenAIStream(
   // thinking blocks; unsigned reasoning echoes are stripped before sending.
   final isClaudeUpstream = upstreamModelId.toLowerCase().contains('claude');
 
-  final effectiveInfo = effectiveModelInfo(config, modelId);
+  final effectiveInfo = ModelSpecResolver.instance.spec(config, modelId);
   final isReasoning = effectiveInfo.abilities.contains(ModelAbility.reasoning);
   final wantsImageOutput = effectiveInfo.output.contains(Modality.image);
   final bool canImageInput = effectiveInfo.input.contains(Modality.image);

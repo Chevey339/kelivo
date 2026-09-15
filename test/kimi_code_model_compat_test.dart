@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:Kelivo/core/providers/model_provider.dart';
+import 'package:Kelivo/core/models/model_spec.dart';
 import 'package:Kelivo/core/providers/settings_provider.dart';
+import 'package:Kelivo/core/services/model_spec/model_defaults_guesser.dart';
 import 'package:Kelivo/core/utils/openai_model_compat.dart';
 import 'support/business_test_harness.dart';
 
@@ -17,8 +18,7 @@ void main() {
       'kimi-k2.8',
       'moonshotai/kimi-k2.8-preview',
     ]) {
-      final model = ModelRegistry.infer(ModelInfo(id: id, displayName: id));
-      expect(model.id, id);
+      final model = ModelDefaultsGuesser.guess(id);
       expect(model.input, [Modality.text, Modality.image], reason: id);
       expect(model.output, [Modality.text], reason: id);
       expect(
@@ -28,7 +28,7 @@ void main() {
       );
     }
     for (final id in ['k30', 'my-k3', 'kimi-for-coding-other']) {
-      final model = ModelRegistry.infer(ModelInfo(id: id, displayName: id));
+      final model = ModelDefaultsGuesser.guess(id);
       expect(model.abilities, isEmpty, reason: id);
       expect(model.input, [Modality.text], reason: id);
       expect(openAIReasoningSupport(id), isNull, reason: id);

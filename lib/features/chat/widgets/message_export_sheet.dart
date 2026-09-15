@@ -21,7 +21,7 @@ import '../../../core/models/chat_message.dart';
 import '../../../core/models/message_part.dart';
 import '../../../core/models/conversation.dart';
 import '../../../core/providers/settings_provider.dart';
-import '../../../core/providers/model_provider.dart';
+import '../../../core/services/model_spec/model_spec_resolver.dart';
 import '../../../core/providers/user_provider.dart';
 import '../../../core/providers/assistant_provider.dart';
 import '../../../core/models/assistant.dart';
@@ -58,35 +58,17 @@ String? _modelDisplayNameFromSettings(
   if (msg.role != 'assistant') return null;
   final modelId = msg.modelId;
   if (modelId == null || modelId.isEmpty) return null;
-  String? name;
-  String baseId = modelId;
   final providerId = msg.providerId;
   if (providerId != null && providerId.isNotEmpty) {
     try {
       final cfg = settings.getProviderConfig(providerId);
-      final ov = cfg.modelOverrides[modelId] as Map?;
-      if (ov != null) {
-        final overrideName = (ov['name'] as String?)?.trim();
-        if (overrideName != null && overrideName.isNotEmpty) {
-          name = overrideName;
-        }
-        final apiId = (ov['apiModelId'] ?? ov['api_model_id'])
-            ?.toString()
-            .trim();
-        if (apiId != null && apiId.isNotEmpty) {
-          baseId = apiId;
-        }
-      }
+      final resolved = ModelSpecResolver.instance.resolve(cfg, modelId);
+      return resolved.override.displayName ?? resolved.spec.upstreamId;
     } catch (_) {
-      // ignore lookup issues; fall back to inference below.
+      // ignore lookup issues; fall back to the logical model id.
     }
   }
-
-  final inferred = ModelRegistry.infer(
-    ModelInfo(id: baseId, displayName: baseId),
-  );
-  final fallback = inferred.displayName.trim();
-  return name ?? (fallback.isNotEmpty ? fallback : baseId);
+  return modelId;
 }
 
 String _getRoleNameFromDependencies({

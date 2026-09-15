@@ -4,7 +4,7 @@ import 'package:provider/provider.dart';
 import '../../../core/providers/settings_provider.dart';
 import '../../../core/providers/model_provider.dart';
 import '../../../core/services/api/builtin_tools.dart';
-import '../../../core/services/model_override_resolver.dart';
+import '../../../core/services/model_spec/model_spec_resolver.dart';
 import '../../../core/services/logging/flutter_logger.dart';
 import '../../../icons/lucide_adapter.dart';
 import '../../../l10n/app_localizations.dart';
@@ -153,21 +153,15 @@ class _ModelDetailSheetState extends State<_ModelDetailSheet>
       }
     }
     _idCtrl = TextEditingController(text: displayModelId);
-    // Defaults from inferred base if id provided; otherwise generic defaults for new
-    final base = ModelRegistry.infer(
-      ModelInfo(
-        id: displayModelId.isEmpty ? 'custom' : displayModelId,
-        displayName: displayModelId.isEmpty ? '' : displayModelId,
-      ),
+    final resolved = ModelSpecResolver.instance.resolve(
+      cfg,
+      widget.isNew
+          ? (displayModelId.isEmpty ? 'custom' : displayModelId)
+          : widget.modelId,
+      displayName: displayModelId.isEmpty ? '' : displayModelId,
     );
     final ov = initialOv;
-    final effective = ov == null
-        ? base
-        : ModelOverrideResolver.applyModelOverride(
-            base,
-            ov,
-            applyDisplayName: true,
-          );
+    final effective = resolved.spec;
     _nameCtrl = TextEditingController(text: effective.displayName);
     _type = effective.type;
     _input
@@ -182,7 +176,7 @@ class _ModelDetailSheetState extends State<_ModelDetailSheet>
     if (_type == ModelType.embedding) {
       if (_input.isEmpty) _input.add(Modality.text);
       _cachedEmbeddingInput = {..._input};
-    } else if (_type == ModelType.chat) {
+    } else {
       if (_input.isEmpty) _input.add(Modality.text);
       if (_output.isEmpty) _output.add(Modality.text);
     }
@@ -492,7 +486,7 @@ class _ModelDetailSheetState extends State<_ModelDetailSheet>
                 l10n.modelDetailSheetChatType,
                 l10n.modelDetailSheetEmbeddingType,
               ],
-              value: _type == ModelType.chat ? 0 : 1,
+              value: _type == ModelType.embedding ? 1 : 0,
               onChanged: (i) => setState(
                 () => _setType(i == 0 ? ModelType.chat : ModelType.embedding),
               ),
@@ -526,7 +520,7 @@ class _ModelDetailSheetState extends State<_ModelDetailSheet>
                 }
               }),
             ),
-            if (_type == ModelType.chat) ...[
+            if (_type != ModelType.embedding) ...[
               const SizedBox(height: 12),
               _label(context, l10n.modelDetailSheetOutputModesLabel),
               const SizedBox(height: 6),
@@ -778,18 +772,10 @@ class _ModelDetailSheetState extends State<_ModelDetailSheet>
       ...modelSyncMetadata(prev),
       'apiModelId': apiModelId,
       'name': _nameCtrl.text.trim(),
-      'type': _type == ModelType.chat ? 'chat' : 'embedding',
-      'input': _input
-          .map((e) => e == Modality.image ? 'image' : 'text')
-          .toList(),
-      if (!isEmbedding)
-        'output': _output
-            .map((e) => e == Modality.image ? 'image' : 'text')
-            .toList(),
-      if (!isEmbedding)
-        'abilities': _abilities
-            .map((e) => e == ModelAbility.reasoning ? 'reasoning' : 'tool')
-            .toList(),
+      'type': _type.name,
+      'input': _input.map((e) => e.name).toList(),
+      if (!isEmbedding) 'output': _output.map((e) => e.name).toList(),
+      if (!isEmbedding) 'abilities': _abilities.map((e) => e.name).toList(),
       'headers': headers,
       'body': bodies,
       if (!isEmbedding && builtInTools.isNotEmpty) 'builtInTools': builtInTools,
