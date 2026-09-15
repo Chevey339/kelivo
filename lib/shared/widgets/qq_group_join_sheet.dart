@@ -10,6 +10,7 @@ import '../../theme/app_font_weights.dart';
 import 'custom_bottom_sheet.dart';
 import 'ios_tactile.dart';
 import 'package:Kelivo/theme/app_semantic_colors.dart';
+import '../../utils/ui_scale.dart';
 
 class _QQGroupEntry {
   const _QQGroupEntry({required this.name, required this.joinUrl});
@@ -179,7 +180,10 @@ class _QQGroupJoinDialog extends StatelessWidget {
       insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: ConstrainedBox(
-        constraints: const BoxConstraints(minWidth: 360, maxWidth: 480),
+        constraints: BoxConstraints(
+          minWidth: scaledDim(context, 360),
+          maxWidth: scaledDim(context, 480),
+        ),
         child: Padding(
           padding: const EdgeInsets.fromLTRB(20, 14, 12, 16),
           child: Column(

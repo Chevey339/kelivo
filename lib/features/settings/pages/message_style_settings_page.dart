@@ -22,6 +22,7 @@ import '../../chat/widgets/frosted/frosted_surface.dart';
 import '../../home/pages/home_mobile_layout.dart';
 import '../widgets/custom_theme_widgets.dart';
 import 'package:Kelivo/shared/widgets/section_card.dart';
+import '../../../utils/ui_scale.dart';
 
 class MessageStyleSettingsPage extends StatelessWidget {
   const MessageStyleSettingsPage({super.key});
@@ -519,7 +520,7 @@ Future<bool> _confirmReset(BuildContext context) async {
             child: GestureDetector(
               onTap: () {},
               child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 360),
+                constraints: BoxConstraints(maxWidth: scaledDim(context, 360)),
                 child: DecoratedBox(
                   decoration: ShapeDecoration(
                     color: cs.surface,
@@ -1150,7 +1151,9 @@ class _PreviewScene extends StatelessWidget {
                 Align(
                   alignment: Alignment.centerRight,
                   child: ConstrainedBox(
-                    constraints: const BoxConstraints(maxWidth: 240),
+                    constraints: BoxConstraints(
+                      maxWidth: scaledDim(context, 240),
+                    ),
                     child: maybeDim(
                       active: editingUser,
                       child: _PreviewSurface(
@@ -1213,7 +1216,9 @@ class _PreviewScene extends StatelessWidget {
                 Align(
                   alignment: Alignment.centerLeft,
                   child: ConstrainedBox(
-                    constraints: const BoxConstraints(maxWidth: 260),
+                    constraints: BoxConstraints(
+                      maxWidth: scaledDim(context, 260),
+                    ),
                     child: maybeDim(
                       active: !editingUser,
                       child: _PreviewSurface(

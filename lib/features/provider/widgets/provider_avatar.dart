@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 
 import '../../../core/providers/settings_provider.dart';
 import '../../../utils/avatar_cache.dart';
+import '../../../utils/avatar_scale.dart';
 import '../../../utils/sandbox_path_resolver.dart';
 import '../../../utils/brand_assets.dart';
 import '../../../shared/widgets/emoji_text.dart';
@@ -27,6 +28,7 @@ class ProviderAvatar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final dim = scaledAvatarSize(context, size);
     final cs = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final cfg = context.watch<SettingsProvider>().getProviderConfig(
@@ -40,8 +42,8 @@ class ProviderAvatar extends StatelessWidget {
 
     if (type == 'emoji' && value != null && value.isNotEmpty) {
       avatar = Container(
-        width: size,
-        height: size,
+        width: dim,
+        height: dim,
         decoration: BoxDecoration(
           color: cs.primary.withValues(alpha: 0.15),
           shape: BoxShape.circle,
@@ -62,8 +64,8 @@ class ProviderAvatar extends StatelessWidget {
             return ClipOval(
               child: Image(
                 image: FileImage(File(p)),
-                width: size,
-                height: size,
+                width: dim,
+                height: dim,
                 fit: BoxFit.cover,
               ),
             );
@@ -71,8 +73,8 @@ class ProviderAvatar extends StatelessWidget {
           return ClipOval(
             child: Image.network(
               value,
-              width: size,
-              height: size,
+              width: dim,
+              height: dim,
               fit: BoxFit.cover,
               errorBuilder: (_, __, ___) => _brandOrInitial(
                 context,
@@ -89,8 +91,8 @@ class ProviderAvatar extends StatelessWidget {
         avatar = ClipOval(
           child: Image(
             image: FileImage(f),
-            width: size,
-            height: size,
+            width: dim,
+            height: dim,
             fit: BoxFit.cover,
           ),
         );
@@ -125,8 +127,8 @@ class ProviderAvatar extends StatelessWidget {
     }
 
     final portrait = Container(
-      width: size,
-      height: size,
+      width: dim,
+      height: dim,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
         border: Border.all(
@@ -177,6 +179,7 @@ class ProviderAvatar extends StatelessWidget {
   Widget _brandOrInitial(BuildContext context, String name) {
     final cs = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final dim = scaledAvatarSize(context, size);
     final asset = BrandAssets.assetForName(name);
     if (asset == null) {
       return Container(
@@ -185,12 +188,15 @@ class ProviderAvatar extends StatelessWidget {
           shape: BoxShape.circle,
         ),
         alignment: Alignment.center,
-        child: Text(
-          name.isNotEmpty ? name.characters.first.toUpperCase() : '?',
-          style: TextStyle(
-            color: cs.primary,
-            fontWeight: AppFontWeights.emphasis,
-            fontSize: size * 0.42,
+        child: Transform.translate(
+          offset: Offset(0, avatarInitialNudgeY(context, size)),
+          child: Text(
+            name.isNotEmpty ? name.characters.first.toUpperCase() : '?',
+            style: TextStyle(
+              color: cs.primary,
+              fontWeight: AppFontWeights.emphasis,
+              fontSize: size * 0.42,
+            ),
           ),
         ),
       );
@@ -201,16 +207,16 @@ class ProviderAvatar extends StatelessWidget {
       child: asset.endsWith('.svg')
           ? SvgPicture.asset(
               asset,
-              width: size * 0.7,
-              height: size * 0.7,
+              width: dim * 0.7,
+              height: dim * 0.7,
               colorFilter: mono
                   ? ColorFilter.mode(cs.onSurface, BlendMode.srcIn)
                   : null,
             )
           : Image.asset(
               asset,
-              width: size * 0.7,
-              height: size * 0.7,
+              width: dim * 0.7,
+              height: dim * 0.7,
               fit: BoxFit.contain,
               color: mono ? cs.onSurface : null,
               colorBlendMode: mono ? BlendMode.srcIn : null,
@@ -275,12 +281,13 @@ class ProviderAvatar extends StatelessWidget {
 
   Widget _lobehubTile(BuildContext context, String path, Color bg) {
     final cs = Theme.of(context).colorScheme;
+    final dim = scaledAvatarSize(context, size);
     return CircleAvatar(
       backgroundColor: bg,
       child: SvgPicture.file(
         File(path),
-        width: size * 0.7,
-        height: size * 0.7,
+        width: dim * 0.7,
+        height: dim * 0.7,
         fit: BoxFit.contain,
         // LobeHub 单色图标用 fill="currentColor"，注入前景色以适配明暗；
         // 带 -color 的彩色图标有固定填充，不受影响
@@ -295,21 +302,22 @@ class ProviderAvatar extends StatelessWidget {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final isSvg = asset.endsWith('.svg');
     final needsMono = isDark && BrandAssets.assetNeedsDarkInvert(asset);
+    final dim = scaledAvatarSize(context, size);
     return CircleAvatar(
       backgroundColor: cs.primary.withValues(alpha: isDark ? 0.18 : 0.1),
       child: isSvg
           ? SvgPicture.asset(
               asset,
-              width: size * 0.7,
-              height: size * 0.7,
+              width: dim * 0.7,
+              height: dim * 0.7,
               colorFilter: needsMono
                   ? ColorFilter.mode(cs.onSurface, BlendMode.srcIn)
                   : null,
             )
           : Image.asset(
               asset,
-              width: size * 0.7,
-              height: size * 0.7,
+              width: dim * 0.7,
+              height: dim * 0.7,
               fit: BoxFit.contain,
               color: needsMono ? cs.onSurface : null,
               colorBlendMode: needsMono ? BlendMode.srcIn : null,

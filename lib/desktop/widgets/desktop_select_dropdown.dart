@@ -156,11 +156,16 @@ class _DesktopSelectDropdownState<T> extends State<DesktopSelectDropdown<T>> {
     final triggerSize = rb.size;
     final triggerWidth = triggerSize.width;
     final hasSubtitles = widget.options.any(_optionHasSubtitle);
+    // The menu keeps the trigger's width (the field and the menu stay
+    // edge-aligned); only the subtitle variant's 360/440 bounds scale with
+    // the ambient UI font scale so subtitles are not clipped at 150%+.
     var overlayWidth = triggerWidth;
     var overlayDx = 0.0;
     if (hasSubtitles) {
-      overlayWidth = triggerWidth < 360 ? 360.0 : triggerWidth;
-      if (overlayWidth > 440) overlayWidth = 440.0;
+      final minW = MediaQuery.textScalerOf(context).scale(360.0);
+      final maxW = MediaQuery.textScalerOf(context).scale(440.0);
+      final target = triggerWidth < minW ? minW : triggerWidth;
+      overlayWidth = target > maxW ? maxW : target;
       overlayDx = triggerWidth - overlayWidth;
     }
     final overlay = Overlay.of(context);

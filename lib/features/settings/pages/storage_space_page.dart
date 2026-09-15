@@ -30,6 +30,7 @@ import '../widgets/storage_contents_list.dart';
 import '../widgets/windows_data_directory_tile.dart';
 import 'package:Kelivo/theme/app_semantic_colors.dart';
 import 'package:Kelivo/shared/widgets/section_card.dart';
+import '../../../utils/ui_scale.dart';
 
 Set<String>? _conversationIdsOrNull(BuildContext context) {
   try {
@@ -709,7 +710,7 @@ class _StorageSpacePageState extends State<StorageSpacePage> {
     final selectedCat = cat(_selected);
 
     final topBar = SizedBox(
-      height: 36,
+      height: scaledDim(context, 36),
       child: Row(
         children: [
           Padding(
@@ -744,7 +745,7 @@ class _StorageSpacePageState extends State<StorageSpacePage> {
       child: Align(
         alignment: Alignment.topCenter,
         child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 1200),
+          constraints: BoxConstraints(maxWidth: scaledDim(context, 1200)),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -2543,7 +2544,7 @@ class _StorageChoiceRow<T> extends StatelessWidget {
     return Row(
       children: [
         SizedBox(
-          width: 48,
+          width: scaledDim(context, 48),
           child: Text(
             label,
             style: TextStyle(

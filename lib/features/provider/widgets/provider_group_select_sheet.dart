@@ -11,6 +11,7 @@ import '../pages/provider_groups_page.dart';
 import '../../../theme/app_font_weights.dart';
 import 'package:Kelivo/theme/app_semantic_colors.dart';
 import '../../../shared/widgets/section_card.dart';
+import '../../../utils/ui_scale.dart';
 
 Future<String?> showProviderGroupSelectSheet(
   BuildContext context, {
@@ -81,7 +82,7 @@ class ProviderGroupSelectSheet extends StatelessWidget {
       return Padding(
         padding: const EdgeInsets.symmetric(vertical: 4),
         child: SizedBox(
-          height: 48,
+          height: scaledDim(context, 48),
           child: IosCardPress(
             borderRadius: BorderRadius.circular(14),
             baseColor: sheetTileColor(context),

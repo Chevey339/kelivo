@@ -6,6 +6,7 @@ import 'package:Kelivo/icons/lucide_adapter.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
 import 'package:Kelivo/shared/widgets/ios_tactile.dart';
 import 'package:flutter/material.dart';
+import '../../../utils/ui_scale.dart';
 
 class SkillsPageDesktopLayout extends StatelessWidget {
   const SkillsPageDesktopLayout({super.key});
@@ -40,7 +41,7 @@ class SkillsPageDesktopLayout extends StatelessWidget {
       body: Align(
         alignment: Alignment.topCenter,
         child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 640),
+          constraints: BoxConstraints(maxWidth: scaledDim(context, 640)),
           child: const Padding(
             padding: EdgeInsets.fromLTRB(24, 16, 24, 0),
             child: SkillsPane(
