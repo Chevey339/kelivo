@@ -8,6 +8,7 @@ import '../../core/models/quick_phrase.dart';
 import '../../core/providers/quick_phrase_provider.dart';
 import '../../theme/app_font_weights.dart';
 import 'package:Kelivo/theme/app_semantic_colors.dart';
+import '../../utils/ui_scale.dart';
 
 class DesktopQuickPhrasesPane extends StatefulWidget {
   const DesktopQuickPhrasesPane({super.key});
@@ -39,12 +40,12 @@ class _DesktopQuickPhrasesPaneState extends State<DesktopQuickPhrasesPane> {
       child: Padding(
         padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
         child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 960),
+          constraints: BoxConstraints(maxWidth: scaledDim(context, 960)),
           child: CustomScrollView(
             slivers: [
               SliverToBoxAdapter(
                 child: SizedBox(
-                  height: 36,
+                  height: scaledDim(context, 36),
                   child: Row(
                     children: [
                       Expanded(
@@ -213,7 +214,7 @@ class _QuickPhraseCardState extends State<_QuickPhraseCard> {
             border: Border.all(color: borderColor, width: 1.0),
           ),
           padding: const EdgeInsets.all(14),
-          constraints: const BoxConstraints(minHeight: 64),
+          constraints: BoxConstraints(minHeight: scaledDim(context, 64)),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
@@ -299,7 +300,7 @@ class _QuickPhraseEditDialogState extends State<_QuickPhraseEditDialog> {
       insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 520),
+        constraints: BoxConstraints(maxWidth: scaledDim(context, 520)),
         child: Stack(
           children: [
             Padding(

@@ -399,14 +399,14 @@ class _DesktopProvidersBodyState extends State<_DesktopProvidersBody> {
       child: Padding(
         padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
         child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 1200),
+          constraints: BoxConstraints(maxWidth: scaledDim(context, 1200)),
           child: DesktopAdaptivePanes(
-            sidebarWidth: 269,
+            sidebarWidth: scaledDim(context, 269),
             showDetail: _showDetail,
             onBack: () => setState(() => _showDetail = false),
             backLabel: l10n.settingsPageProviders,
             sidebar: SizedBox(
-              width: 256,
+              width: scaledDim(context, 256),
               child: Column(
                 children: [
                   Row(
@@ -1237,7 +1237,7 @@ class _DesktopProviderDetailPaneState extends State<DesktopProviderDetailPane> {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
         insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
         child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 460),
+          constraints: BoxConstraints(maxWidth: scaledDim(context, 460)),
           child: Padding(
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
             child: Column(
@@ -2256,7 +2256,9 @@ class _DesktopProviderDetailPaneState extends State<DesktopProviderDetailPane> {
                   children: [
                     Flexible(
                       child: ConstrainedBox(
-                        constraints: const BoxConstraints(maxWidth: 480),
+                        constraints: BoxConstraints(
+                          maxWidth: scaledDim(context, 480),
+                        ),
                         child: Text(
                           cfg.name.isNotEmpty ? cfg.name : widget.providerKey,
                           maxLines: 1,

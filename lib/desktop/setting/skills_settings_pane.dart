@@ -4,6 +4,7 @@ import 'package:Kelivo/features/workspace/widgets/skills/skills_pane.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
 import 'package:Kelivo/theme/app_font_weights.dart';
 import 'package:flutter/material.dart';
+import '../../utils/ui_scale.dart';
 
 /// Desktop settings pane wrapping [SkillsPane] with the shared header chrome.
 class DesktopSkillsSettingsPane extends StatelessWidget {
@@ -19,12 +20,12 @@ class DesktopSkillsSettingsPane extends StatelessWidget {
       child: Align(
         alignment: Alignment.topCenter,
         child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 960),
+          constraints: BoxConstraints(maxWidth: scaledDim(context, 960)),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               SizedBox(
-                height: 36,
+                height: scaledDim(context, 36),
                 child: Row(
                   children: [
                     Expanded(

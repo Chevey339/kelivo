@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import '../../core/services/backup/restore_startup_gate.dart';
 import '../../l10n/app_localizations.dart';
 import 'package:Kelivo/theme/app_font_weights.dart';
+import '../../utils/ui_scale.dart';
 
 /// Shown while the startup gate converges a published restore.
 ///
@@ -25,7 +26,7 @@ class RestoreProgressScreen extends StatelessWidget {
       body: SafeArea(
         child: Center(
           child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 360),
+            constraints: BoxConstraints(maxWidth: scaledDim(context, 360)),
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 32),
               child: Column(

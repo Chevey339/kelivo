@@ -16,6 +16,7 @@ import 'package:Kelivo/shared/widgets/ios_settings_rows.dart';
 import 'package:Kelivo/shared/widgets/ios_tactile.dart';
 import 'package:Kelivo/shared/widgets/ios_tile_button.dart';
 import 'package:Kelivo/shared/widgets/section_card.dart';
+import '../../../../utils/ui_scale.dart';
 
 String _title(AppLocalizations l10n, EnvironmentDependency dependency) =>
     switch (dependency) {
@@ -338,7 +339,7 @@ class _InstallationLogState extends State<_InstallationLog> {
     return SectionCard(
       child: SizedBox(
         key: const ValueKey('environment-dependency-log'),
-        height: 240,
+        height: scaledDim(context, 240),
         width: double.infinity,
         child: Scrollbar(
           controller: _scrollController,

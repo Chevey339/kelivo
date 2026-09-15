@@ -8,6 +8,7 @@ import '../../l10n/app_localizations.dart';
 import '../../shared/widgets/snackbar.dart';
 import '../../theme/app_font_weights.dart';
 import 'package:Kelivo/theme/app_semantic_colors.dart';
+import '../../utils/ui_scale.dart';
 
 Future<void> showDesktopMcpTimeoutDialog(BuildContext context) async {
   await showDialog<void>(
@@ -69,7 +70,7 @@ class _DesktopMcpTimeoutDialogState extends State<_DesktopMcpTimeoutDialog> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return ConstrainedBox(
-      constraints: const BoxConstraints(maxWidth: 460),
+      constraints: BoxConstraints(maxWidth: scaledDim(context, 460)),
       child: Padding(
         padding: const EdgeInsets.fromLTRB(16, 2, 16, 12),
         child: Column(
@@ -77,7 +78,7 @@ class _DesktopMcpTimeoutDialogState extends State<_DesktopMcpTimeoutDialog> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             SizedBox(
-              height: 52,
+              height: scaledDim(context, 52),
               child: Row(
                 children: [
                   Text(

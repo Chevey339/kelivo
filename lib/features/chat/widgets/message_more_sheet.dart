@@ -22,6 +22,7 @@ import 'dart:convert';
 import 'package:Kelivo/theme/app_font_weights.dart';
 import 'package:Kelivo/theme/app_semantic_colors.dart';
 import '../../../shared/widgets/section_card.dart';
+import '../../../utils/ui_scale.dart';
 
 enum MessageMoreAction {
   edit,

@@ -7,6 +7,7 @@ import '../../l10n/app_localizations.dart';
 import '../../theme/app_font_weights.dart';
 import 'ios_tactile.dart';
 import 'ios_tile_button.dart';
+import '../../utils/ui_scale.dart';
 
 Future<int?> showIosTimePicker(
   BuildContext context, {
@@ -72,7 +73,7 @@ Future<int?> _showIosDesktopTimeDialog(
         backgroundColor: Colors.transparent,
         surfaceTintColor: Colors.transparent,
         child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 380),
+          constraints: BoxConstraints(maxWidth: scaledDim(context, 380)),
           child: _IosTimeWheelPanel(
             initialMinutes: initial,
             title: title,
@@ -300,7 +301,7 @@ class _IosTimeWheelPanelState extends State<_IosTimeWheelPanel> {
                 ),
               ),
               SizedBox(
-                width: 28,
+                width: scaledDim(context, 28),
                 child: Center(
                   child: Text(
                     ':',
