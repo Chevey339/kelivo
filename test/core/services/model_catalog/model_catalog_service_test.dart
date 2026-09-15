@@ -314,6 +314,49 @@ void main() {
     );
   });
 
+  group('modelsOfProvider', () {
+    test('empty before load, fixture after ensureLoaded', () async {
+      final svc = service();
+      expect(svc.modelsOfProvider('openai'), isEmpty);
+
+      await svc.ensureLoaded();
+      expect(svc.modelsOfProvider('openai').map((m) => m.id), ['gpt-4o']);
+      expect(svc.modelsOfProvider('missing'), isEmpty);
+    });
+
+    test('reads the currently loaded catalog after refresh', () async {
+      final svc = service(
+        clientFactory: () =>
+            MockClient((_) async => http.Response(_rawModelsDevPayload, 200)),
+      );
+      svc.debugSetData(
+        ModelCatalogData(
+          schemaVersion: 1,
+          generatedAt: DateTime.utc(2026, 1, 1),
+          providers: {
+            'google-vertex-anthropic': _provider(
+              'google-vertex-anthropic',
+              models: [
+                _model('claude-opus-4-5@20251101'),
+                _model('claude-sonnet-4-5@20250929'),
+              ],
+            ),
+          },
+        ),
+        bundled: true,
+      );
+      expect(svc.modelsOfProvider('google-vertex-anthropic').map((m) => m.id), [
+        'claude-opus-4-5@20251101',
+        'claude-sonnet-4-5@20250929',
+      ]);
+
+      final changed = await svc.refresh(force: true);
+      expect(changed, isTrue);
+      expect(svc.modelsOfProvider('google-vertex-anthropic'), isEmpty);
+      expect(svc.modelsOfProvider('acme').map((m) => m.id), ['acme-1']);
+    });
+  });
+
   group('ensureLoaded', () {
     test('loads injected bundled trimmed JSON', () async {
       final svc = service(loadBundledJson: () async => _trimmedFixtureJson);

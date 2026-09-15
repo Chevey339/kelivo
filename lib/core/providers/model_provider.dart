@@ -14,6 +14,7 @@ import 'package:Kelivo/secrets/fallback.dart';
 import '../services/api/google_service_account_auth.dart';
 import '../models/model_spec.dart';
 import '../services/model_spec/model_spec_resolver.dart';
+import '../services/model_catalog/model_catalog_service.dart';
 
 abstract class BaseProvider {
   Future<List<ModelSpec>> listModels(ProviderConfig cfg);
@@ -206,35 +207,24 @@ class GoogleProvider extends BaseProvider {
         }
       } catch (_) {}
 
-      // If this is Vertex AI, augment with known Anthropic models
-      // Since Google listModels API often only returns Gemini models under publishers/google,
-      // we manually inject known supported Claude models for convenience.
+      // Vertex listModels only returns Gemini under publishers/google.
+      // Merge Anthropic ids from the models.dev Vertex Anthropic catalog.
       if (cfg.vertexAI == true) {
-        final knownClaude = [
-          'claude-fable-5-1',
-          'claude-fable-5',
-          'claude-opus-5',
-          'claude-opus-4-8',
-          'claude-opus-4-7',
-          'claude-opus-4-6',
-          'claude-opus-4-5@20251101',
-          'claude-opus-4-1@20250805',
-          'claude-opus-4@20250514',
-          'claude-sonnet-5',
-          'claude-sonnet-4-6',
-          'claude-sonnet-4-5@20250929',
-          'claude-sonnet-4@20250514',
-          'claude-3-7-sonnet@20250219',
-          'claude-3-5-sonnet-v2@20241022',
-          'claude-haiku-4-5@20251001',
-          'claude-3-5-haiku@20241022',
-          'claude-3-5-sonnet@20240620',
-          'claude-3-opus@20240229',
-          'claude-3-haiku@20240307',
-        ];
-        for (final id in knownClaude) {
-          if (!out.any((m) => m.id == id)) {
-            out.add(ModelSpecResolver.instance.resolve(cfg, id).spec);
+        final catalog = ModelCatalogService.instance;
+        await catalog.ensureLoaded();
+        for (final model in catalog.modelsOfProvider(
+          'google-vertex-anthropic',
+        )) {
+          if (!out.any((m) => m.id == model.id)) {
+            out.add(
+              ModelSpecResolver.instance
+                  .resolve(
+                    cfg,
+                    model.id,
+                    displayName: model.name.isEmpty ? null : model.name,
+                  )
+                  .spec,
+            );
           }
         }
       }

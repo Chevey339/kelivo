@@ -250,6 +250,19 @@ class ModelCatalogService extends ChangeNotifier {
     return list;
   }
 
+  /// Models for [providerId] in the currently loaded catalog.
+  ///
+  /// Uses whatever snapshot is loaded (bundled, cache, or post-refresh).
+  /// Returns an empty list when the catalog is not loaded or the provider
+  /// is absent. Call [ensureLoaded] first when a load is required.
+  List<CatalogModel> modelsOfProvider(String providerId) {
+    final provider = _data?.providers[providerId];
+    if (provider == null) {
+      return const <CatalogModel>[];
+    }
+    return List<CatalogModel>.of(provider.models.values);
+  }
+
   CatalogMatch? lookup(ProviderConfig cfg, String modelId) {
     if (_data == null) {
       unawaited(ensureLoaded());
