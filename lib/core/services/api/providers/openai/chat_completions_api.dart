@@ -748,7 +748,7 @@ Stream<StreamChunk> runOpenAIChatCompletionsToolFollowUps({
   required bool canImageInput,
   required bool allowRemoteImages,
   required bool skipImageParsing,
-  required int? thinkingBudget,
+  required ReasoningRequest reasoning,
   required double? temperature,
   required double? topP,
   required List<Map<String, dynamic>>? tools,
@@ -775,7 +775,7 @@ Stream<StreamChunk> runOpenAIChatCompletionsToolFollowUps({
 
   String assistantContent() =>
       lastRound?.assistantContent ?? firstAssistantContent;
-  String reasoning() => lastRound?.reasoningEcho ?? firstReasoning;
+  String reasoningEcho() => lastRound?.reasoningEcho ?? firstReasoning;
   dynamic reasoningDetails() =>
       lastRound?.reasoningDetails ?? firstReasoningDetails;
 
@@ -788,7 +788,7 @@ Stream<StreamChunk> runOpenAIChatCompletionsToolFollowUps({
         _buildAssistantToolCallMessage(
           calls: openaiToolCallMaps([for (final item in executed) item.call]),
           content: assistantContent(),
-          reasoningContent: needsReasoningEcho ? reasoning() : null,
+          reasoningContent: needsReasoningEcho ? reasoningEcho() : null,
           reasoningField: spec.reasoning.replayField.wireName,
           includeEmptyReasoningContent: needsReasoningEcho,
           reasoningDetails: reasoningDetails(),
@@ -830,7 +830,7 @@ Stream<StreamChunk> runOpenAIChatCompletionsToolFollowUps({
       applyOpenAIResolvedRequest(
         body2,
         spec: spec,
-        thinkingBudget: thinkingBudget,
+        reasoning: reasoning,
         transport: ReasoningTransport.chatCompletions,
       );
       final req2 = http.Request('POST', url);

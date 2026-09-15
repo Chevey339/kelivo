@@ -7,6 +7,7 @@ import 'package:provider/provider.dart';
 
 import '../core/providers/assistant_provider.dart';
 import '../core/providers/settings_provider.dart';
+import '../core/services/api/reasoning/reasoning_selection.dart';
 import '../icons/lucide_adapter.dart';
 import '../icons/reasoning_icons.dart';
 import '../l10n/app_localizations.dart';
@@ -259,6 +260,33 @@ class _ReasoningContent extends StatelessWidget {
     return !presets.contains(v);
   }
 
+  (String?, String?) _resolvedModel(
+    BuildContext context,
+    SettingsProvider settings,
+  ) {
+    final assistant = context.read<AssistantProvider>().currentAssistant;
+    return (
+      modelProvider ??
+          assistant?.chatModelProvider ??
+          settings.currentModelProvider,
+      modelId ?? assistant?.chatModelId ?? settings.currentModelId,
+    );
+  }
+
+  Future<void> _writeChoice(
+    BuildContext context,
+    SettingsProvider settings,
+    int value,
+  ) async {
+    final (provider, currentModelId) = _resolvedModel(context, settings);
+    if (provider == null || currentModelId == null) return;
+    await settings.setReasoningChoice(
+      provider,
+      currentModelId,
+      reasoningFromUiBudget(value),
+    );
+  }
+
   bool _showXhighOption(BuildContext context, SettingsProvider settings) {
     final assistant = context.read<AssistantProvider>().currentAssistant;
     final currentProvider =
@@ -289,9 +317,13 @@ class _ReasoningContent extends StatelessWidget {
     final sp = context.watch<SettingsProvider>();
     final showXhigh = _showXhighOption(context, sp);
     final showMax = _showMaxOption(context, sp);
-    final selected = sp.thinkingBudget ?? -1;
+    final (provider, currentModelId) = _resolvedModel(context, sp);
+    final choice = (provider != null && currentModelId != null)
+        ? sp.reasoningChoiceFor(provider, currentModelId)
+        : null;
+    final selected = uiBudgetFromReasoning(choice);
     final customActive = _isCustomSelected(
-      sp.thinkingBudget,
+      selected,
       showXhigh: showXhigh,
       showMax: showMax,
     );
@@ -318,7 +350,11 @@ class _ReasoningContent extends StatelessWidget {
           onTap:
               onTap ??
               () async {
-                await context.read<SettingsProvider>().setThinkingBudget(value);
+                await _writeChoice(
+                  context,
+                  context.read<SettingsProvider>(),
+                  value,
+                );
                 await onDone();
               },
           labelStyle: TextStyle(
@@ -436,7 +472,9 @@ class _ReasoningContent extends StatelessWidget {
                   if (!context.mounted) return;
                   if (chosen == null) return;
                   restore = false;
-                  await context.read<SettingsProvider>().setThinkingBudget(
+                  await _writeChoice(
+                    context,
+                    context.read<SettingsProvider>(),
                     chosen,
                   );
                   if (!context.mounted) return;

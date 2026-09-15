@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../../core/models/chat_input_data.dart';
 import '../../../core/models/assistant.dart';
+import '../../../core/models/reasoning_request.dart';
 import '../../../core/models/chat_message.dart';
 import '../../../core/models/compress_context_options.dart';
 import '../../../core/models/conversation.dart';
@@ -1212,9 +1213,7 @@ class HomeViewModel extends ChangeNotifier {
     if (provKey == null || mdlId == null) return 'no_model';
 
     final cfg = settings.getProviderConfig(provKey);
-    final budget = settings.compressGenerationThinkingBudgetFor(
-      assistant?.thinkingBudget,
-    );
+    final reasoning = settings.compressGenerationReasoningFor(assistant);
 
     var stage = 'prepare';
     var inputLength = summarizeInput.fold<int>(
@@ -1236,7 +1235,7 @@ class HomeViewModel extends ChangeNotifier {
             config: cfg,
             modelId: mdlId,
             prompt: prompt,
-            thinkingBudget: budget,
+            reasoning: reasoning,
             skipImageParsing: true,
           )).trim();
         },
@@ -1556,9 +1555,7 @@ class HomeViewModel extends ChangeNotifier {
     final mdlId = settings.titleModelId ?? chatModel.modelId;
     if (provKey == null || mdlId == null) return;
     final cfg = settings.getProviderConfig(provKey);
-    final budget = settings.titleGenerationThinkingBudgetFor(
-      assistant?.thinkingBudget,
-    );
+    final reasoning = settings.titleGenerationReasoningFor(assistant);
     final locale = Localizations.localeOf(_contextProvider).toLanguageTag();
 
     // Build content from messages (shared with the side drawer title path;
@@ -1575,7 +1572,7 @@ class HomeViewModel extends ChangeNotifier {
         config: cfg,
         modelId: mdlId,
         prompt: prompt,
-        thinkingBudget: budget,
+        reasoning: reasoning,
         skipImageParsing: true,
       )).trim();
       if (title.isNotEmpty) {
@@ -1628,9 +1625,7 @@ class HomeViewModel extends ChangeNotifier {
         ? assistantProvider.getById(convo.assistantId!)
         : assistantProvider.currentAssistant;
 
-    final budget = settings.summaryGenerationThinkingBudgetFor(
-      assistant?.thinkingBudget,
-    );
+    final reasoning = settings.summaryGenerationReasoningFor(assistant);
 
     final legacy = settings.legacyMemoryMode;
     if (legacy) {
@@ -1717,7 +1712,7 @@ class HomeViewModel extends ChangeNotifier {
         config: cfg,
         modelId: mdlId,
         prompt: prompt,
-        thinkingBudget: budget,
+        reasoning: reasoning,
         skipImageParsing: true,
       )).trim();
       traceStep?.appendResponse(summary);
@@ -1823,9 +1818,7 @@ class HomeViewModel extends ChangeNotifier {
     final mdlId = settings.suggestionModelId ?? chatModel.modelId;
     if (provKey == null || mdlId == null) return;
     final locale = Localizations.localeOf(_contextProvider).toLanguageTag();
-    final budget = settings.suggestionGenerationThinkingBudgetFor(
-      assistant?.thinkingBudget,
-    );
+    final reasoning = settings.suggestionGenerationReasoningFor(assistant);
 
     final loadedMessages = await _chatService.loadMessages(convo.id);
     // Raw revision count snapshot for the post-generation freshness check:
@@ -1852,7 +1845,7 @@ class HomeViewModel extends ChangeNotifier {
         messages: msgs,
         truncateIndex: _chatService.getContextStartIndex(conversationId),
         locale: locale,
-        thinkingBudget: budget,
+        reasoning: reasoning,
       );
       if (suggestions.isEmpty) {
         onBackgroundTaskError?.call(
@@ -1901,8 +1894,8 @@ class HomeViewModel extends ChangeNotifier {
     return _generationController.isToolModel(providerKey, modelId);
   }
 
-  bool isReasoningEnabled(int? budget) {
-    return _generationController.isReasoningEnabled(budget);
+  bool isReasoningEnabled(ReasoningRequest r) {
+    return _generationController.isReasoningEnabled(r);
   }
 
   // ============================================================================

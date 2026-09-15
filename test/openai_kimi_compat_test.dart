@@ -7,6 +7,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:Kelivo/core/providers/settings_provider.dart';
 import 'package:Kelivo/core/services/api/chat_api_service.dart';
 import 'support/collect_generation.dart';
+import 'support/legacy_reasoning.dart';
 
 ProviderConfig _moonshotConfig(String baseUrl) {
   return ProviderConfig(
@@ -64,7 +65,7 @@ Future<Map<String, dynamic>> _captureMoonshotBody({
     messages: messages,
     userImagePaths: userImagePaths,
     stream: stream,
-    thinkingBudget: thinkingBudget,
+    reasoning: legacyBudget(thinkingBudget),
     extraBody: extraBody,
   ).toList();
   return requestBody;
@@ -385,7 +386,7 @@ void main() {
           messages: const [
             {'role': 'user', 'content': 'hello'},
           ],
-          thinkingBudget: 0,
+          reasoning: legacyBudget(0),
           temperature: 0.7,
           topP: 0.8,
         ).toList();
@@ -443,7 +444,7 @@ void main() {
         messages: const [
           {'role': 'user', 'content': 'hello'},
         ],
-        thinkingBudget: 16000,
+        reasoning: legacyBudget(16000),
       ).toList();
       await ChatApiService.sendMessageStream(
         config: _moonshotConfig(baseUrl),
@@ -451,7 +452,7 @@ void main() {
         messages: const [
           {'role': 'user', 'content': 'hello again'},
         ],
-        thinkingBudget: 0,
+        reasoning: legacyBudget(0),
       ).toList();
 
       expect(requestBodies, hasLength(2));
@@ -511,7 +512,7 @@ void main() {
           messages: const [
             {'role': 'user', 'content': 'hello'},
           ],
-          thinkingBudget: 0,
+          reasoning: legacyBudget(0),
           temperature: 0.7,
           topP: 0.8,
         ).toList();
@@ -621,7 +622,7 @@ void main() {
               config: _moonshotConfig(baseUrl),
               modelId: modelId,
               stream: stream,
-              thinkingBudget: 128000,
+              reasoning: legacyBudget(128000),
               messages: const [
                 {'role': 'user', 'content': '今天几号？'},
               ],
@@ -868,7 +869,7 @@ void main() {
         final chunks = await ChatApiService.sendMessageStream(
           config: _moonshotConfig(baseUrl),
           modelId: 'kimi-k2.6',
-          thinkingBudget: 16000,
+          reasoning: legacyBudget(16000),
           messages: const [
             {'role': 'user', 'content': '现在几点了'},
           ],

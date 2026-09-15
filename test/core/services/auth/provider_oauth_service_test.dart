@@ -15,6 +15,7 @@ import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 
 import '../../../support/business_test_harness.dart';
+import '../../../support/legacy_reasoning.dart';
 
 ProviderConfig config({
   OAuthProvider provider = OAuthProvider.kimi,
@@ -373,7 +374,7 @@ void main() {
         ],
         temperature: .7,
         maxTokens: 32,
-        thinkingBudget: 0,
+        reasoning: legacyBudget(0),
       ).toList();
       expect(chunks.whereType<TextDelta>().map((e) => e.text).join(), 'Hello');
       final sent = requests.single;
@@ -597,7 +598,7 @@ void main() {
             {'role': 'user', 'content': 'Hi'},
           ],
           stream: false,
-          thinkingBudget: scenario.budget,
+          reasoning: legacyBudget(scenario.budget),
         ).toList();
         expect(chunks.whereType<TextDelta>().map((e) => e.text).join(), 'OK');
         expect(requests.length, 2);
@@ -842,7 +843,7 @@ void main() {
           [
             {'role': 'user', 'content': 'Lookup'},
           ],
-          thinkingBudget: scenario.budget,
+          reasoning: legacyBudget(scenario.budget),
           extraBody: {
             if (scenario.overrideThinking != null)
               'thinking': scenario.overrideThinking,
@@ -970,7 +971,7 @@ void main() {
               {'role': 'user', 'content': 'Continue with two lookups'},
             ],
             stream: stream,
-            thinkingBudget: 0,
+            reasoning: legacyBudget(0),
             tools: [
               {
                 'type': 'function',

@@ -7,6 +7,7 @@ import 'package:Kelivo/core/providers/settings_provider.dart';
 import 'package:Kelivo/core/services/api/builtin_tools.dart';
 import 'package:Kelivo/core/services/api/chat_api_service.dart';
 import 'support/collect_generation.dart';
+import 'support/legacy_reasoning.dart';
 
 ProviderConfig _deepSeekConfig(
   String baseUrl, {
@@ -89,7 +90,7 @@ void main() {
         messages: const [
           {'role': 'user', 'content': '9.11 and 9.8, which is greater?'},
         ],
-        thinkingBudget: 2000,
+        reasoning: legacyBudget(2000),
         stream: false,
       ).toList();
 
@@ -187,7 +188,7 @@ void main() {
         messages: const [
           {'role': 'user', 'content': 'hello'},
         ],
-        thinkingBudget: 0,
+        reasoning: legacyBudget(0),
         stream: false,
       ).toList();
 
@@ -236,7 +237,7 @@ void main() {
         messages: const [
           {'role': 'user', 'content': 'hello'},
         ],
-        thinkingBudget: 128000,
+        reasoning: legacyBudget(128000),
         stream: false,
       ).toList();
 
@@ -289,7 +290,7 @@ void main() {
           messages: const [
             {'role': 'user', 'content': 'hello'},
           ],
-          thinkingBudget: budget,
+          reasoning: legacyBudget(budget),
         ).toList();
         expect(chunks.isGenerationDone, isTrue);
         return requestBody;
@@ -352,7 +353,7 @@ void main() {
         messages: const [
           {'role': 'user', 'content': 'hello'},
         ],
-        thinkingBudget: 0,
+        reasoning: legacyBudget(0),
       ).toList();
 
       expect(chunks.isGenerationDone, isTrue);

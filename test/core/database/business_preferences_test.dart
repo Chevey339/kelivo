@@ -35,7 +35,7 @@ void main() {
           'providers_order_v1': <String>['first', 'second'],
           'theme_mode_v1': 'dark',
           'use_dynamic_color_v1': false,
-          'thinking_budget_v1': 4096,
+          'app_launch_count_v1': 4096,
           'tts_speech_rate_v1': 0.75,
           'pinned_models_v1': <String>['first::model-a'],
         }),
@@ -46,7 +46,7 @@ void main() {
 
       expect(preferences.getString('theme_mode_v1'), 'dark');
       expect(preferences.getBool('use_dynamic_color_v1'), isFalse);
-      expect(preferences.getInt('thinking_budget_v1'), 4096);
+      expect(preferences.getInt('app_launch_count_v1'), 4096);
       expect(preferences.getDouble('tts_speech_rate_v1'), 0.75);
       expect(preferences.getStringList('pinned_models_v1'), <String>[
         'first::model-a',

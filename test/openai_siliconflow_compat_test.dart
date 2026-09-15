@@ -6,6 +6,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:Kelivo/core/providers/settings_provider.dart';
 import 'package:Kelivo/core/services/api/chat_api_service.dart';
 import 'support/collect_generation.dart';
+import 'support/legacy_reasoning.dart';
 
 ProviderConfig _siliconFlowConfig(String baseUrl, {String apiKey = ''}) {
   return ProviderConfig(
@@ -78,7 +79,7 @@ void main() {
           messages: const [
             {'role': 'user', 'content': 'hello'},
           ],
-          thinkingBudget: 1024,
+          reasoning: legacyBudget(1024),
         ).toList();
 
         await ChatApiService.sendMessageStream(
@@ -87,7 +88,7 @@ void main() {
           messages: const [
             {'role': 'user', 'content': 'hello again'},
           ],
-          thinkingBudget: 0,
+          reasoning: legacyBudget(0),
         ).toList();
 
         expect(requests, hasLength(2));
@@ -205,7 +206,7 @@ void main() {
           messages: const [
             {'role': 'user', 'content': '今天几号？'},
           ],
-          thinkingBudget: 1024,
+          reasoning: legacyBudget(1024),
           tools: const [
             {
               'type': 'function',
@@ -341,7 +342,7 @@ void main() {
           messages: const [
             {'role': 'user', 'content': '今天几号？'},
           ],
-          thinkingBudget: 1024,
+          reasoning: legacyBudget(1024),
           tools: const [
             {
               'type': 'function',

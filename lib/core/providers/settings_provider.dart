@@ -30,7 +30,9 @@ import '../services/screen_wakelock.dart';
 import '../../utils/app_directories.dart';
 import '../../utils/sandbox_path_resolver.dart';
 import '../../utils/avatar_cache.dart';
+import '../models/assistant.dart';
 import '../models/model_spec.dart';
+import '../models/reasoning_request.dart';
 import '../services/model_spec/model_spec_resolver.dart';
 import '../../utils/provider_grouping_logic.dart';
 import '../../utils/brand_assets.dart';
@@ -128,7 +130,8 @@ class SettingsProvider extends ChangeNotifier {
   static const String _legacyCustomSeedColorKey = 'theme_custom_seed_v1';
   static const String _legacyCustomPrimaryOverrideKey =
       'theme_custom_primary_v1';
-  static const String _thinkingBudgetKey = 'thinking_budget_v1';
+  static const String _reasoningChoiceByModelKey =
+      'reasoning_choice_by_model_v1';
   static const String _titleGenerationThinkingEnabledKey =
       'title_generation_thinking_enabled_v1';
   static const String _summaryGenerationThinkingEnabledKey =
@@ -846,8 +849,9 @@ class SettingsProvider extends ChangeNotifier {
     _learningModePrompt = (lmp == null || lmp.trim().isEmpty)
         ? defaultLearningModePrompt
         : lmp;
-    // load thinking budget (reasoning strength)
-    _thinkingBudget = prefs.getInt(_thinkingBudgetKey);
+    _reasoningChoiceByModel = _decodeReasoningChoiceByModel(
+      prefs.getString(_reasoningChoiceByModelKey),
+    );
     _titleGenerationThinkingEnabled =
         prefs.getBool(_titleGenerationThinkingEnabledKey) ?? false;
     _summaryGenerationThinkingEnabled =
@@ -3317,6 +3321,13 @@ class SettingsProvider extends ChangeNotifier {
       await prefs.setStringList(_pinnedModelsKey, _pinnedModels.toList());
       changed = true;
     }
+    if (_reasoningChoiceByModel.containsKey(pinKey)) {
+      _reasoningChoiceByModel = Map<String, ReasoningRequest>.from(
+        _reasoningChoiceByModel,
+      )..remove(pinKey);
+      await _persistReasoningChoiceByModel();
+      changed = true;
+    }
     if (changed) notifyListeners();
   }
 
@@ -3383,6 +3394,13 @@ class SettingsProvider extends ChangeNotifier {
     _pinnedModels.removeWhere((entry) => entry.startsWith('$key::'));
     if (_pinnedModels.length != beforePinned) {
       await prefs.setStringList(_pinnedModelsKey, _pinnedModels.toList());
+    }
+    final nextReasoning = Map<String, ReasoningRequest>.from(
+      _reasoningChoiceByModel,
+    )..removeWhere((entry, _) => entry.startsWith('$key::'));
+    if (nextReasoning.length != _reasoningChoiceByModel.length) {
+      _reasoningChoiceByModel = nextReasoning;
+      await _persistReasoningChoiceByModel();
     }
 
     // Persist updates
@@ -3915,18 +3933,67 @@ Requirements:
   Future<void> resetLearningModePrompt() async =>
       setLearningModePrompt(defaultLearningModePrompt);
 
-  // Reasoning strength / thinking budget
-  int?
-  _thinkingBudget; // null = not set, use provider defaults; -1 = auto; 0 = off; >0 = budget tokens
-  int? get thinkingBudget => _thinkingBudget;
-  Future<void> setThinkingBudget(int? budget) async {
-    _thinkingBudget = budget;
-    notifyListeners();
-    final prefs = _preferences;
-    if (budget == null) {
-      await prefs.remove(_thinkingBudgetKey);
+  Map<String, ReasoningRequest> _reasoningChoiceByModel =
+      <String, ReasoningRequest>{};
+
+  static String reasoningChoiceKey(String providerKey, String modelId) =>
+      '$providerKey::$modelId';
+
+  ReasoningRequest? reasoningChoiceFor(String providerKey, String modelId) {
+    return _reasoningChoiceByModel[reasoningChoiceKey(providerKey, modelId)];
+  }
+
+  Future<void> setReasoningChoice(
+    String providerKey,
+    String modelId,
+    ReasoningRequest? choice,
+  ) async {
+    final key = reasoningChoiceKey(providerKey, modelId);
+    final next = Map<String, ReasoningRequest>.from(_reasoningChoiceByModel);
+    if (choice == null) {
+      if (!next.containsKey(key)) return;
+      next.remove(key);
+    } else if (next[key] == choice) {
+      return;
     } else {
-      await prefs.setInt(_thinkingBudgetKey, budget);
+      next[key] = choice;
+    }
+    _reasoningChoiceByModel = next;
+    notifyListeners();
+    await _persistReasoningChoiceByModel();
+  }
+
+  Future<void> _persistReasoningChoiceByModel() async {
+    final prefs = _preferences;
+    if (_reasoningChoiceByModel.isEmpty) {
+      await prefs.remove(_reasoningChoiceByModelKey);
+      return;
+    }
+    await prefs.setString(
+      _reasoningChoiceByModelKey,
+      jsonEncode({
+        for (final e in _reasoningChoiceByModel.entries)
+          e.key: e.value.toJson(),
+      }),
+    );
+  }
+
+  static Map<String, ReasoningRequest> _decodeReasoningChoiceByModel(
+    String? raw,
+  ) {
+    if (raw == null || raw.isEmpty) return <String, ReasoningRequest>{};
+    try {
+      final decoded = jsonDecode(raw);
+      if (decoded is! Map) return <String, ReasoningRequest>{};
+      final out = <String, ReasoningRequest>{};
+      for (final entry in decoded.entries) {
+        final value = entry.value;
+        if (value is! Map) continue;
+        out[entry.key.toString()] = ReasoningRequest.fromJson(value);
+      }
+      return out;
+    } catch (_) {
+      return <String, ReasoningRequest>{};
     }
   }
 
@@ -4373,46 +4440,28 @@ Requirements:
   Future<void> resetMemoryMigratePromptEn() async =>
       setMemoryMigratePromptEn(MemoryPrompts.migrateEn);
 
-  int? titleGenerationThinkingBudgetFor(int? assistantBudget) {
-    return _backgroundThinkingBudgetFor(
-      _titleGenerationThinkingEnabled,
-      assistantBudget,
-    );
+  ReasoningRequest titleGenerationReasoningFor(Assistant? assistant) {
+    return _backgroundReasoningFor(_titleGenerationThinkingEnabled, assistant);
   }
 
-  int? summaryGenerationThinkingBudgetFor(int? assistantBudget) =>
-      _backgroundThinkingBudgetFor(
-        _summaryGenerationThinkingEnabled,
-        assistantBudget,
-      );
+  ReasoningRequest summaryGenerationReasoningFor(Assistant? assistant) =>
+      _backgroundReasoningFor(_summaryGenerationThinkingEnabled, assistant);
 
-  int? suggestionGenerationThinkingBudgetFor(int? assistantBudget) =>
-      _backgroundThinkingBudgetFor(
-        _suggestionGenerationThinkingEnabled,
-        assistantBudget,
-      );
+  ReasoningRequest suggestionGenerationReasoningFor(Assistant? assistant) =>
+      _backgroundReasoningFor(_suggestionGenerationThinkingEnabled, assistant);
 
-  int? compressGenerationThinkingBudgetFor(int? assistantBudget) =>
-      _backgroundThinkingBudgetFor(
-        _compressGenerationThinkingEnabled,
-        assistantBudget,
-      );
+  ReasoningRequest compressGenerationReasoningFor(Assistant? assistant) =>
+      _backgroundReasoningFor(_compressGenerationThinkingEnabled, assistant);
 
-  int? translateGenerationThinkingBudgetFor(int? assistantBudget) =>
-      _backgroundThinkingBudgetFor(
-        _translateGenerationThinkingEnabled,
-        assistantBudget,
-      );
+  ReasoningRequest translateGenerationReasoningFor(Assistant? assistant) =>
+      _backgroundReasoningFor(_translateGenerationThinkingEnabled, assistant);
 
-  int? ocrGenerationThinkingBudgetFor(int? assistantBudget) =>
-      _backgroundThinkingBudgetFor(
-        _ocrGenerationThinkingEnabled,
-        assistantBudget,
-      );
+  ReasoningRequest ocrGenerationReasoningFor(Assistant? assistant) =>
+      _backgroundReasoningFor(_ocrGenerationThinkingEnabled, assistant);
 
-  int? _backgroundThinkingBudgetFor(bool enabled, int? assistantBudget) {
-    if (!enabled) return 0;
-    return assistantBudget ?? _thinkingBudget;
+  ReasoningRequest _backgroundReasoningFor(bool enabled, Assistant? assistant) {
+    if (!enabled) return ReasoningRequest.off;
+    return assistant?.reasoning ?? ReasoningRequest.auto;
   }
 
   // Display settings: user avatar and model icon visibility
@@ -5587,7 +5636,9 @@ Requirements:
     copy._ocrModelId = _ocrModelId;
     copy._ocrPrompt = _ocrPrompt;
     copy._ocrEnabled = _ocrEnabled;
-    copy._thinkingBudget = _thinkingBudget;
+    copy._reasoningChoiceByModel = Map<String, ReasoningRequest>.from(
+      _reasoningChoiceByModel,
+    );
     copy._titleGenerationThinkingEnabled = _titleGenerationThinkingEnabled;
     copy._summaryGenerationThinkingEnabled = _summaryGenerationThinkingEnabled;
     copy._suggestionGenerationThinkingEnabled =

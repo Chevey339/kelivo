@@ -64,18 +64,14 @@ void _appendChatTool(Map<String, dynamic> body, Map<String, dynamic> tool) {
 void applyOpenAIResolvedRequest(
   Map<String, dynamic> body, {
   required ModelSpec spec,
-  required int? thinkingBudget,
+  required ReasoningRequest reasoning,
   required ReasoningTransport transport,
 }) {
-  final request = ReasoningRequest(
-    levelForLegacyBudget(thinkingBudget),
-    budgetTokens: (thinkingBudget ?? 0) > 0 ? thinkingBudget : null,
-  );
-  applyReasoning(body, spec, request, transport: transport);
+  applyReasoning(body, spec, reasoning, transport: transport);
   applySamplingPolicy(
     body,
     spec,
-    resolveReasoning(spec, request),
+    resolveReasoning(spec, reasoning),
     transport: transport,
   );
 }

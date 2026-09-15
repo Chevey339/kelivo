@@ -6,6 +6,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:Kelivo/core/providers/settings_provider.dart';
 import 'package:Kelivo/core/services/api/chat_api_service.dart';
 import 'support/collect_generation.dart';
+import 'support/legacy_reasoning.dart';
 
 ProviderConfig _mimoConfig(String baseUrl) {
   return ProviderConfig(
@@ -74,7 +75,7 @@ void main() {
         messages: const [
           {'role': 'user', 'content': '9.11 和 9.8 哪个大？'},
         ],
-        thinkingBudget: 2000,
+        reasoning: legacyBudget(2000),
       ).toList();
 
       expect(requestBody['reasoning'], {'effort': 'low'});
@@ -193,7 +194,7 @@ void main() {
         messages: const [
           {'role': 'user', 'content': 'hello'},
         ],
-        thinkingBudget: 0,
+        reasoning: legacyBudget(0),
         stream: false,
       ).toList();
 

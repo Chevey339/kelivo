@@ -200,7 +200,7 @@ Stream<StreamChunk> runOpenAIResponsesToolFollowUps({
   required double? temperature,
   required double? topP,
   required int? maxTokens,
-  required int? thinkingBudget,
+  required ReasoningRequest reasoning,
   required TokenUsage? initialUsage,
   required int streamRound,
   required int approxPromptTokens,
@@ -260,7 +260,7 @@ Stream<StreamChunk> runOpenAIResponsesToolFollowUps({
       applyOpenAIResolvedRequest(
         body2,
         spec: spec,
-        thinkingBudget: thinkingBudget,
+        reasoning: reasoning,
         transport: ReasoningTransport.responses,
       );
 

@@ -3,7 +3,10 @@ import 'dart:convert';
 
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:Kelivo/core/database/business_settings_router.dart';
+import 'package:Kelivo/core/models/assistant.dart';
 import 'package:Kelivo/core/models/model_spec.dart';
+import 'package:Kelivo/core/models/reasoning_request.dart';
 import 'package:Kelivo/core/providers/settings_provider.dart';
 import 'package:Kelivo/core/services/model_spec/model_defaults_guesser.dart';
 
@@ -216,42 +219,55 @@ void main() {
       },
     );
 
-    group('title generation thinking', () {
-      test('defaults to disabled', () async {
-        final harness = await createBusinessTestHarness(
-          initial: {'thinking_budget_v1': 16000},
-        );
+    group('background generation reasoning', () {
+      const assistantReasoning = ReasoningRequest(
+        ReasoningLevel.high,
+        budgetTokens: 32000,
+      );
+      const assistant = Assistant(
+        id: 'a',
+        name: 'A',
+        reasoning: assistantReasoning,
+      );
+
+      test('defaults to disabled / off', () async {
+        final harness = await createBusinessTestHarness(initial: {});
         final settings = SettingsProvider(harness.preferences);
 
         await settings.loaded;
 
         expect(settings.titleGenerationThinkingEnabled, isFalse);
-        expect(settings.titleGenerationThinkingBudgetFor(null), 0);
-        expect(settings.titleGenerationThinkingBudgetFor(1024), 0);
+        expect(
+          settings.titleGenerationReasoningFor(null),
+          ReasoningRequest.off,
+        );
+        expect(
+          settings.titleGenerationReasoningFor(assistant),
+          ReasoningRequest.off,
+        );
       });
 
-      test(
-        'disabled title generation thinking resolves to off budget',
-        () async {
-          final harness = await createBusinessTestHarness(initial: {});
-          final settings = SettingsProvider(harness.preferences);
+      test('disabled title generation thinking resolves to off', () async {
+        final harness = await createBusinessTestHarness(initial: {});
+        final settings = SettingsProvider(harness.preferences);
 
-          await settings.loaded;
-          await settings.setThinkingBudget(16000);
-          await settings.setTitleGenerationThinkingEnabled(true);
-          await settings.setTitleGenerationThinkingEnabled(false);
+        await settings.loaded;
+        await settings.setTitleGenerationThinkingEnabled(true);
+        await settings.setTitleGenerationThinkingEnabled(false);
 
-          expect(settings.titleGenerationThinkingEnabled, isFalse);
-          expect(settings.titleGenerationThinkingBudgetFor(null), 0);
-          expect(settings.titleGenerationThinkingBudgetFor(1024), 0);
+        expect(settings.titleGenerationThinkingEnabled, isFalse);
+        expect(
+          settings.titleGenerationReasoningFor(null),
+          ReasoningRequest.off,
+        );
+        expect(
+          settings.titleGenerationReasoningFor(assistant),
+          ReasoningRequest.off,
+        );
 
-          final prefs = harness.preferences;
-          expect(
-            prefs.getBool('title_generation_thinking_enabled_v1'),
-            isFalse,
-          );
-        },
-      );
+        final prefs = harness.preferences;
+        expect(prefs.getBool('title_generation_thinking_enabled_v1'), isFalse);
+      });
 
       test('loads persisted disabled state', () async {
         final harness = await createBusinessTestHarness(
@@ -262,15 +278,15 @@ void main() {
         await settings.loaded;
 
         expect(settings.titleGenerationThinkingEnabled, isFalse);
-        expect(settings.titleGenerationThinkingBudgetFor(32000), 0);
+        expect(
+          settings.titleGenerationReasoningFor(assistant),
+          ReasoningRequest.off,
+        );
       });
 
       test('reset restores disabled default', () async {
         final harness = await createBusinessTestHarness(
-          initial: {
-            'title_generation_thinking_enabled_v1': true,
-            'thinking_budget_v1': 64000,
-          },
+          initial: {'title_generation_thinking_enabled_v1': true},
         );
         final settings = SettingsProvider(harness.preferences);
 
@@ -278,7 +294,10 @@ void main() {
         await settings.resetTitleGenerationThinkingEnabled();
 
         expect(settings.titleGenerationThinkingEnabled, isFalse);
-        expect(settings.titleGenerationThinkingBudgetFor(null), 0);
+        expect(
+          settings.titleGenerationReasoningFor(null),
+          ReasoningRequest.off,
+        );
 
         final prefs = harness.preferences;
         expect(prefs.getBool('title_generation_thinking_enabled_v1'), isFalse);
@@ -287,30 +306,67 @@ void main() {
       test(
         'all utility model thinking toggles default off and persist',
         () async {
-          final harness = await createBusinessTestHarness(
-            initial: {'thinking_budget_v1': 16000},
-          );
+          final harness = await createBusinessTestHarness(initial: {});
           final settings = SettingsProvider(harness.preferences);
 
           await settings.loaded;
 
-          expect(settings.summaryGenerationThinkingBudgetFor(1024), 0);
-          expect(settings.suggestionGenerationThinkingBudgetFor(1024), 0);
-          expect(settings.compressGenerationThinkingBudgetFor(1024), 0);
-          expect(settings.translateGenerationThinkingBudgetFor(1024), 0);
-          expect(settings.ocrGenerationThinkingBudgetFor(1024), 0);
+          expect(
+            settings.summaryGenerationReasoningFor(assistant),
+            ReasoningRequest.off,
+          );
+          expect(
+            settings.suggestionGenerationReasoningFor(assistant),
+            ReasoningRequest.off,
+          );
+          expect(
+            settings.compressGenerationReasoningFor(assistant),
+            ReasoningRequest.off,
+          );
+          expect(
+            settings.translateGenerationReasoningFor(assistant),
+            ReasoningRequest.off,
+          );
+          expect(
+            settings.ocrGenerationReasoningFor(assistant),
+            ReasoningRequest.off,
+          );
 
           await settings.setSummaryGenerationThinkingEnabled(true);
           await settings.setSuggestionGenerationThinkingEnabled(true);
           await settings.setCompressGenerationThinkingEnabled(true);
           await settings.setTranslateGenerationThinkingEnabled(true);
           await settings.setOcrGenerationThinkingEnabled(true);
+          await settings.setTitleGenerationThinkingEnabled(true);
 
-          expect(settings.summaryGenerationThinkingBudgetFor(null), 16000);
-          expect(settings.suggestionGenerationThinkingBudgetFor(1024), 1024);
-          expect(settings.compressGenerationThinkingBudgetFor(1024), 1024);
-          expect(settings.translateGenerationThinkingBudgetFor(1024), 1024);
-          expect(settings.ocrGenerationThinkingBudgetFor(1024), 1024);
+          expect(
+            settings.titleGenerationReasoningFor(null),
+            ReasoningRequest.auto,
+          );
+          expect(
+            settings.titleGenerationReasoningFor(assistant),
+            assistantReasoning,
+          );
+          expect(
+            settings.summaryGenerationReasoningFor(null),
+            ReasoningRequest.auto,
+          );
+          expect(
+            settings.suggestionGenerationReasoningFor(assistant),
+            assistantReasoning,
+          );
+          expect(
+            settings.compressGenerationReasoningFor(assistant),
+            assistantReasoning,
+          );
+          expect(
+            settings.translateGenerationReasoningFor(assistant),
+            assistantReasoning,
+          );
+          expect(
+            settings.ocrGenerationReasoningFor(assistant),
+            assistantReasoning,
+          );
           expect(
             harness.preferences.getBool(
               'summary_generation_thinking_enabled_v1',
@@ -340,6 +396,50 @@ void main() {
             isTrue,
           );
         },
+      );
+    });
+
+    test('per-model reasoning choices persist and can be cleared', () async {
+      final harness = await createBusinessTestHarness(initial: {});
+      final settings = SettingsProvider(harness.preferences);
+      await settings.loaded;
+
+      const choice = ReasoningRequest(
+        ReasoningLevel.medium,
+        budgetTokens: 16000,
+      );
+      await settings.setReasoningChoice('OpenAI', 'gpt-5.1', choice);
+
+      expect(settings.reasoningChoiceFor('OpenAI', 'gpt-5.1'), choice);
+      expect(settings.reasoningChoiceFor('OpenAI', 'other'), isNull);
+      expect(
+        SettingsProvider.reasoningChoiceKey('OpenAI', 'gpt-5.1'),
+        'OpenAI::gpt-5.1',
+      );
+
+      final raw = harness.preferences.getString('reasoning_choice_by_model_v1');
+      expect(raw, isNotNull);
+      expect(jsonDecode(raw!), {
+        'OpenAI::gpt-5.1': {'level': 'medium', 'budgetTokens': 16000},
+      });
+      expect(
+        BusinessKeyRegistry.classify('reasoning_choice_by_model_v1'),
+        BusinessKeyDisposition.preference,
+      );
+      expect(
+        BusinessKeyRegistry.preferenceKeys,
+        contains('reasoning_choice_by_model_v1'),
+      );
+
+      final reloaded = SettingsProvider(harness.preferences);
+      await reloaded.loaded;
+      expect(reloaded.reasoningChoiceFor('OpenAI', 'gpt-5.1'), choice);
+
+      await reloaded.setReasoningChoice('OpenAI', 'gpt-5.1', null);
+      expect(reloaded.reasoningChoiceFor('OpenAI', 'gpt-5.1'), isNull);
+      expect(
+        harness.preferences.getString('reasoning_choice_by_model_v1'),
+        isNull,
       );
     });
 

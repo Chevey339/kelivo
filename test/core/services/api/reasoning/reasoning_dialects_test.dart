@@ -895,24 +895,6 @@ void main() {
     });
   });
 
-  group('levelForLegacyBudget', () {
-    test('thresholds match the P1 bridge', () {
-      expect(levelForLegacyBudget(null), ReasoningLevel.auto);
-      expect(levelForLegacyBudget(-1), ReasoningLevel.auto);
-      expect(levelForLegacyBudget(0), ReasoningLevel.off);
-      expect(levelForLegacyBudget(1023), ReasoningLevel.off);
-      expect(levelForLegacyBudget(1024), ReasoningLevel.low);
-      expect(levelForLegacyBudget(2000), ReasoningLevel.low);
-      expect(levelForLegacyBudget(2001), ReasoningLevel.medium);
-      expect(levelForLegacyBudget(20000), ReasoningLevel.medium);
-      expect(levelForLegacyBudget(20001), ReasoningLevel.high);
-      expect(levelForLegacyBudget(32000), ReasoningLevel.high);
-      expect(levelForLegacyBudget(32001), ReasoningLevel.xhigh);
-      expect(levelForLegacyBudget(64000), ReasoningLevel.xhigh);
-      expect(levelForLegacyBudget(64001), ReasoningLevel.max);
-    });
-  });
-
   group('no reasoning ability', () {
     test('leaves the body untouched', () {
       final dirty = <String, dynamic>{

@@ -1,4 +1,5 @@
 import '../../../core/models/chat_message.dart';
+import '../../../core/models/reasoning_request.dart';
 import '../../../core/providers/settings_provider.dart';
 import '../../../core/services/api/chat_api_service.dart';
 
@@ -77,7 +78,7 @@ class ChatSuggestionService {
     required List<ChatMessage> messages,
     required int truncateIndex,
     required String locale,
-    int? thinkingBudget,
+    ReasoningRequest reasoning = ReasoningRequest.auto,
   }) async {
     final content = buildContent(messages, truncateIndex: truncateIndex);
     if (content.trim().isEmpty) return const <String>[];
@@ -89,7 +90,7 @@ class ChatSuggestionService {
       config: settings.getProviderConfig(providerKey),
       modelId: modelId,
       prompt: prompt,
-      thinkingBudget: thinkingBudget,
+      reasoning: reasoning,
     );
     return parseSuggestions(raw);
   }

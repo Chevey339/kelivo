@@ -59,6 +59,10 @@ void main() {
           BusinessKeyRegistry.classify('plugin_future_key_v1'),
           BusinessKeyDisposition.unknownPreference,
         );
+        expect(
+          BusinessKeyRegistry.classify('reasoning_choice_by_model_v1'),
+          BusinessKeyDisposition.preference,
+        );
       },
     );
 
@@ -89,7 +93,8 @@ void main() {
           'providers_order_v1': <String>['first', 'orphan'],
           'theme_mode_v1': 'dark',
           'use_dynamic_color_v1': false,
-          'thinking_budget_v1': 4096,
+          'reasoning_choice_by_model_v1':
+              '{"OpenAI::gpt-test":{"level":"high","budgetTokens":32000}}',
           'tts_speech_rate_v1': 0.75,
           'pinned_models_v1': jsonEncode(['first/model-a']),
           'plugin_future_key_v1': <String>['one', 'two'],

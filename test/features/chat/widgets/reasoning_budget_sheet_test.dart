@@ -5,6 +5,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'package:Kelivo/core/models/model_spec.dart';
+import 'package:Kelivo/core/models/reasoning_request.dart';
 import 'package:Kelivo/core/providers/assistant_provider.dart';
 import 'package:Kelivo/core/providers/settings_provider.dart';
 import 'package:Kelivo/features/chat/widgets/reasoning_budget_sheet.dart';
@@ -96,7 +98,10 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      expect(settings.thinkingBudget, 128000);
+      expect(
+        settings.reasoningChoiceFor('Claude', 'claude-fable-5'),
+        const ReasoningRequest(ReasoningLevel.max, budgetTokens: 128000),
+      );
       expect(find.text('Max'), findsOneWidget);
     });
 
@@ -160,7 +165,10 @@ void main() {
         // Opening must not mutate or notify global settings — that rebuilds
         // the caller's page during the entrance animation.
         expect(notifies, 0);
-        expect(settings.thinkingBudget, isNull);
+        expect(
+          settings.reasoningChoiceFor('Claude', 'claude-sonnet-4-5'),
+          isNull,
+        );
         // The sheet still displays the seeded selection.
         expect(find.text('High'), findsOneWidget);
 
@@ -170,7 +178,10 @@ void main() {
         await tester.pumpAndSettle();
 
         expect(changed, 16000);
-        expect(settings.thinkingBudget, 16000);
+        expect(
+          settings.reasoningChoiceFor('Claude', 'claude-sonnet-4-5'),
+          const ReasoningRequest(ReasoningLevel.medium, budgetTokens: 16000),
+        );
       },
     );
 

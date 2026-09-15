@@ -107,7 +107,7 @@ Stream<StreamChunk> sendOpenAIStream(
   String modelId,
   List<Map<String, dynamic>> messages, {
   List<String>? userImagePaths,
-  int? thinkingBudget,
+  ReasoningRequest reasoning = ReasoningRequest.auto,
   double? temperature,
   double? topP,
   int? maxTokens,
@@ -606,7 +606,7 @@ Stream<StreamChunk> sendOpenAIStream(
   applyOpenAIResolvedRequest(
     body,
     spec: spec,
-    thinkingBudget: thinkingBudget,
+    reasoning: reasoning,
     transport: config.useResponseApi == true
         ? ReasoningTransport.responses
         : ReasoningTransport.chatCompletions,
@@ -927,7 +927,7 @@ Stream<StreamChunk> sendOpenAIStream(
             temperature: temperature,
             topP: topP,
             maxTokens: maxTokens,
-            thinkingBudget: thinkingBudget,
+            reasoning: reasoning,
             initialUsage: usage,
             streamRound: streamRound,
             approxPromptTokens: approxPromptTokens,
@@ -984,7 +984,7 @@ Stream<StreamChunk> sendOpenAIStream(
               canImageInput: canImageInput,
               allowRemoteImages: allowRemoteImages,
               skipImageParsing: skipImageParsing,
-              thinkingBudget: thinkingBudget,
+              reasoning: reasoning,
               temperature: temperature,
               topP: topP,
               tools: tools,
@@ -1048,7 +1048,7 @@ Stream<StreamChunk> sendOpenAIStream(
           canImageInput: canImageInput,
           allowRemoteImages: allowRemoteImages,
           skipImageParsing: skipImageParsing,
-          thinkingBudget: thinkingBudget,
+          reasoning: reasoning,
           temperature: temperature,
           topP: topP,
           tools: tools,
@@ -1099,7 +1099,7 @@ Stream<StreamChunk> sendOpenAIStream(
             canImageInput: canImageInput,
             allowRemoteImages: allowRemoteImages,
             skipImageParsing: skipImageParsing,
-            thinkingBudget: thinkingBudget,
+            reasoning: reasoning,
             temperature: temperature,
             topP: topP,
             tools: tools,

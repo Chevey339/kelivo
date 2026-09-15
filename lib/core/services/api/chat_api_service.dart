@@ -15,6 +15,7 @@ import 'stream/stream_chunk.dart';
 import 'stream/stream_chunk_handler.dart';
 
 import '../../models/auto_retry_options.dart';
+import '../../models/reasoning_request.dart';
 import '../model_spec/model_spec_resolver.dart';
 import 'chat_api_helpers.dart';
 import 'provider_request_headers.dart';
@@ -146,7 +147,7 @@ class ChatApiService {
     required String modelId,
     required List<Map<String, dynamic>> messages,
     List<String>? userImagePaths,
-    int? thinkingBudget,
+    ReasoningRequest reasoning = ReasoningRequest.auto,
     double? temperature,
     double? topP,
     int? maxTokens,
@@ -264,7 +265,7 @@ class ChatApiService {
           modelId: modelId,
           messages: safeMessages,
           userImagePaths: safeUserImagePaths,
-          thinkingBudget: thinkingBudget,
+          reasoning: reasoning,
           temperature: temperature,
           topP: topP,
           maxTokens: maxTokens,
@@ -334,7 +335,7 @@ class ChatApiService {
     required String modelId,
     required List<Map<String, dynamic>> messages,
     List<String>? userImagePaths,
-    int? thinkingBudget,
+    ReasoningRequest reasoning = ReasoningRequest.auto,
     double? temperature,
     double? topP,
     int? maxTokens,
@@ -388,7 +389,7 @@ class ChatApiService {
             modelId,
             messages,
             userImagePaths: userImagePaths,
-            thinkingBudget: thinkingBudget,
+            reasoning: reasoning,
             temperature: temperature,
             topP: topP,
             maxTokens: maxTokens,
@@ -408,7 +409,7 @@ class ChatApiService {
             modelId,
             messages,
             userImagePaths: userImagePaths,
-            thinkingBudget: thinkingBudget,
+            reasoning: reasoning,
             temperature: temperature,
             topP: topP,
             maxTokens: maxTokens,
@@ -429,7 +430,7 @@ class ChatApiService {
           modelId,
           messages,
           userImagePaths: userImagePaths,
-          thinkingBudget: thinkingBudget,
+          reasoning: reasoning,
           temperature: temperature,
           topP: topP,
           maxTokens: maxTokens,
@@ -453,7 +454,7 @@ class ChatApiService {
             modelId: modelId,
             messages: messages,
             userImagePaths: userImagePaths,
-            thinkingBudget: thinkingBudget,
+            reasoning: reasoning,
             temperature: temperature,
             topP: topP,
             maxTokens: maxTokens,
@@ -472,7 +473,7 @@ class ChatApiService {
             modelId,
             messages,
             userImagePaths: userImagePaths,
-            thinkingBudget: thinkingBudget,
+            reasoning: reasoning,
             temperature: temperature,
             topP: topP,
             maxTokens: maxTokens,
@@ -491,7 +492,7 @@ class ChatApiService {
             modelId,
             messages,
             userImagePaths: userImagePaths,
-            thinkingBudget: thinkingBudget,
+            reasoning: reasoning,
             temperature: temperature,
             topP: topP,
             maxTokens: maxTokens,
@@ -516,7 +517,7 @@ class ChatApiService {
     required String modelId,
     required List<Map<String, dynamic>> messages,
     List<String>? userImagePaths,
-    int? thinkingBudget,
+    ReasoningRequest reasoning = ReasoningRequest.auto,
     double? temperature,
     double? topP,
     int? maxTokens,
@@ -542,7 +543,7 @@ class ChatApiService {
       modelId: modelId,
       messages: messages,
       userImagePaths: userImagePaths,
-      thinkingBudget: thinkingBudget,
+      reasoning: reasoning,
       temperature: temperature,
       topP: topP,
       maxTokens: maxTokens,
@@ -576,7 +577,7 @@ class ChatApiService {
     String? conversationId,
     Map<String, String>? extraHeaders,
     Map<String, dynamic>? extraBody,
-    int? thinkingBudget,
+    ReasoningRequest reasoning = ReasoningRequest.auto,
     bool skipImageParsing = false,
   }) async {
     final result = await generateMessage(
@@ -588,7 +589,7 @@ class ChatApiService {
       ],
       extraHeaders: extraHeaders,
       extraBody: extraBody,
-      thinkingBudget: thinkingBudget,
+      reasoning: reasoning,
       // Utility calls only ever want search; never image generation or a
       // code interpreter.
       builtInSearchOnly: true,

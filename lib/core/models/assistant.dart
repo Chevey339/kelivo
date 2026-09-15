@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'assistant_regex.dart';
 import 'health_data_type.dart';
 import 'preset_message.dart';
+import 'reasoning_request.dart';
 
 enum MemorySmartAddMode { batched, perItem }
 
@@ -43,8 +44,7 @@ class Assistant {
   final int contextMessageSize; // number of previous messages to include
   final bool limitContextMessages; // whether to enforce contextMessageSize
   final bool streamOutput; // streaming responses
-  final int?
-  thinkingBudget; // null = use global/default; 0=off; >0 tokens budget
+  final ReasoningRequest? reasoning; // null = no assistant default
   final int? maxTokens; // null = unlimited
   final String systemPrompt;
   final bool allowConversationSystemPrompt;
@@ -102,7 +102,7 @@ class Assistant {
     this.contextMessageSize = 64,
     this.limitContextMessages = false,
     this.streamOutput = true,
-    this.thinkingBudget,
+    this.reasoning,
     this.maxTokens,
     this.systemPrompt = '',
     this.allowConversationSystemPrompt = false,
@@ -149,7 +149,7 @@ class Assistant {
     int? contextMessageSize,
     bool? limitContextMessages,
     bool? streamOutput,
-    int? thinkingBudget,
+    ReasoningRequest? reasoning,
     int? maxTokens,
     String? systemPrompt,
     bool? allowConversationSystemPrompt,
@@ -187,7 +187,7 @@ class Assistant {
     bool clearAvatar = false,
     bool clearTemperature = false,
     bool clearTopP = false,
-    bool clearThinkingBudget = false,
+    bool clearReasoning = false,
     bool clearMaxTokens = false,
     bool clearBackground = false,
   }) {
@@ -206,9 +206,7 @@ class Assistant {
       contextMessageSize: contextMessageSize ?? this.contextMessageSize,
       limitContextMessages: limitContextMessages ?? this.limitContextMessages,
       streamOutput: streamOutput ?? this.streamOutput,
-      thinkingBudget: clearThinkingBudget
-          ? null
-          : (thinkingBudget ?? this.thinkingBudget),
+      reasoning: clearReasoning ? null : (reasoning ?? this.reasoning),
       maxTokens: clearMaxTokens ? null : (maxTokens ?? this.maxTokens),
       systemPrompt: systemPrompt ?? this.systemPrompt,
       allowConversationSystemPrompt:
@@ -271,7 +269,7 @@ class Assistant {
     'contextMessageSize': contextMessageSize,
     'limitContextMessages': limitContextMessages,
     'streamOutput': streamOutput,
-    'thinkingBudget': thinkingBudget,
+    'reasoning': reasoning?.toJson(),
     'maxTokens': maxTokens,
     'systemPrompt': systemPrompt,
     'allowConversationSystemPrompt': allowConversationSystemPrompt,
@@ -305,6 +303,11 @@ class Assistant {
     'regexRules': regexRules.map((e) => e.toJson()).toList(),
   };
 
+  static ReasoningRequest? _readReasoning(Object? value) {
+    if (value is Map) return ReasoningRequest.fromJson(value);
+    return null;
+  }
+
   static double _readGradientBackgroundPhase(Object? value) =>
       value is num && value.isFinite && value >= 0
       ? value.toDouble()
@@ -323,7 +326,7 @@ class Assistant {
     contextMessageSize: (json['contextMessageSize'] as num?)?.toInt() ?? 64,
     limitContextMessages: json['limitContextMessages'] as bool? ?? false,
     streamOutput: json['streamOutput'] as bool? ?? true,
-    thinkingBudget: (json['thinkingBudget'] as num?)?.toInt(),
+    reasoning: _readReasoning(json['reasoning']),
     maxTokens: (json['maxTokens'] as num?)?.toInt(),
     systemPrompt: (json['systemPrompt'] as String?) ?? '',
     allowConversationSystemPrompt:

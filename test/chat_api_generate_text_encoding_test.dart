@@ -5,6 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'package:Kelivo/core/providers/settings_provider.dart';
 import 'package:Kelivo/core/services/api/chat_api_service.dart';
+import 'support/legacy_reasoning.dart';
 
 ProviderConfig _openAIConfig(String baseUrl) {
   return ProviderConfig(
@@ -106,7 +107,7 @@ Future<Map<String, dynamic>> _captureGenerateTextBody({
       ),
       modelId: modelId,
       prompt: 'summarize',
-      thinkingBudget: thinkingBudget,
+      reasoning: legacyBudget(thinkingBudget),
     );
   }
 
@@ -289,7 +290,7 @@ void main() {
           config: _openAIConfig(baseUrl),
           modelId: 'kimi-k2.7-code',
           prompt: 'summarize',
-          thinkingBudget: 0,
+          reasoning: legacyBudget(0),
         );
 
         expect(title, '标题');

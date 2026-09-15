@@ -6,6 +6,8 @@ import 'package:provider/provider.dart';
 
 import '../../../core/models/chat_input_data.dart';
 import '../../../core/models/assistant.dart';
+import '../../../core/models/reasoning_request.dart';
+import '../../../core/services/api/reasoning/reasoning_selection.dart';
 import '../../../core/models/workspace_binding.dart';
 import '../../../core/models/skills_binding.dart';
 import '../../../core/providers/asr_provider.dart';
@@ -31,7 +33,7 @@ typedef IsReasoningModelCallback =
     bool Function(String providerKey, String modelId);
 
 /// Callback for checking if reasoning is enabled.
-typedef IsReasoningEnabledCallback = bool Function(int? budget);
+typedef IsReasoningEnabledCallback = bool Function(ReasoningRequest request);
 
 /// Widget that wraps ChatInputBar with all the necessary logic and callbacks.
 ///
@@ -200,15 +202,11 @@ class ChatInputSection extends StatelessWidget {
       asrProvider: asr,
       onConfigureReasoning: onConfigureReasoning,
       reasoningActive: isReasoningEnabled(
-        (context.watch<AssistantProvider>().currentAssistant?.thinkingBudget) ??
-            settings.thinkingBudget,
+        _selectedReasoning(settings, a, pk, mid),
       ),
-      reasoningBudget:
-          (context
-              .watch<AssistantProvider>()
-              .currentAssistant
-              ?.thinkingBudget) ??
-          settings.thinkingBudget,
+      reasoningBudget: uiBudgetFromReasoning(
+        _selectedReasoning(settings, a, pk, mid),
+      ),
       supportsReasoning: (pk != null && mid != null)
           ? isReasoningModel(pk, mid)
           : false,
@@ -353,21 +351,23 @@ class ChatInputSection extends StatelessWidget {
         }
       });
     }
+  }
 
-    final supportsReasoning = isReasoningModel(pk, mid);
-    if (!supportsReasoning && a != null) {
-      final enabledNow = isReasoningEnabled(
-        a.thinkingBudget ?? settings.thinkingBudget,
-      );
-      if (enabledNow) {
-        WidgetsBinding.instance.addPostFrameCallback((_) async {
-          final aa = ap.currentAssistant;
-          if (aa != null) {
-            await ap.updateAssistant(aa.copyWith(thinkingBudget: 0));
-          }
-        });
-      }
+  ReasoningRequest _selectedReasoning(
+    SettingsProvider settings,
+    Assistant? assistant,
+    String? providerKey,
+    String? modelId,
+  ) {
+    if (providerKey == null || modelId == null) {
+      return assistant?.reasoning ?? ReasoningRequest.auto;
     }
+    return selectReasoningRequest(
+      settings: settings,
+      config: settings.getProviderConfig(providerKey),
+      modelId: modelId,
+      assistant: assistant,
+    );
   }
 
   /// The button hosts local tools and the workspace as well as MCP, so it

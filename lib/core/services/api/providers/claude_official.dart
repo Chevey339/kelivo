@@ -36,7 +36,7 @@ Stream<StreamChunk> sendClaudeStream(
   String modelId,
   List<Map<String, dynamic>> messages, {
   List<String>? userImagePaths,
-  int? thinkingBudget,
+  ReasoningRequest reasoning = ReasoningRequest.auto,
   double? temperature,
   double? topP,
   int? maxTokens,
@@ -337,17 +337,13 @@ Stream<StreamChunk> sendClaudeStream(
       if (extraClaude.isNotEmpty) {
         body.addAll(extraClaude);
       }
-      final request = ReasoningRequest(
-        levelForLegacyBudget(thinkingBudget),
-        budgetTokens: (thinkingBudget ?? 0) > 0 ? thinkingBudget : null,
-      );
       applyReasoning(
         body,
         spec,
-        request,
+        reasoning,
         transport: ReasoningTransport.anthropicMessages,
       );
-      final resolution = resolveReasoning(spec, request);
+      final resolution = resolveReasoning(spec, reasoning);
       applySamplingPolicy(
         body,
         spec,

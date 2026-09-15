@@ -30,7 +30,7 @@ Stream<StreamChunk> sendGoogleVertexStream(
   String modelId,
   List<Map<String, dynamic>> messages, {
   List<String>? userImagePaths,
-  int? thinkingBudget,
+  ReasoningRequest reasoning = ReasoningRequest.auto,
   double? temperature,
   double? topP,
   int? maxTokens,
@@ -49,7 +49,7 @@ Stream<StreamChunk> sendGoogleVertexStream(
     modelId,
     messages,
     userImagePaths: userImagePaths,
-    thinkingBudget: thinkingBudget,
+    reasoning: reasoning,
     temperature: temperature,
     topP: topP,
     maxTokens: maxTokens,
@@ -140,7 +140,7 @@ Stream<StreamChunk> sendGoogleVertexClaudeStream({
   required String modelId,
   required List<Map<String, dynamic>> messages,
   List<String>? userImagePaths,
-  int? thinkingBudget,
+  ReasoningRequest reasoning = ReasoningRequest.auto,
   double? temperature,
   double? topP,
   int? maxTokens,
@@ -436,17 +436,13 @@ Stream<StreamChunk> sendGoogleVertexClaudeStream({
         if (allTools.isNotEmpty) 'tool_choice': {'type': 'auto'},
       };
       body.addAll(customBody(config, modelId, assistantBody: extraBody));
-      final request = ReasoningRequest(
-        levelForLegacyBudget(thinkingBudget),
-        budgetTokens: (thinkingBudget ?? 0) > 0 ? thinkingBudget : null,
-      );
       applyReasoning(
         body,
         spec,
-        request,
+        reasoning,
         transport: ReasoningTransport.anthropicMessages,
       );
-      final resolution = resolveReasoning(spec, request);
+      final resolution = resolveReasoning(spec, reasoning);
       applySamplingPolicy(
         body,
         spec,

@@ -936,9 +936,7 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
     final mdlId = settings.titleModelId ?? chatModel.modelId;
     if (provKey == null || mdlId == null) return;
     final cfg = settings.getProviderConfig(provKey);
-    final budget = settings.titleGenerationThinkingBudgetFor(
-      assistant?.thinkingBudget,
-    );
+    final reasoning = settings.titleGenerationReasoningFor(assistant);
     final locale = Localizations.localeOf(context).toLanguageTag();
 
     try {
@@ -953,7 +951,7 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
         config: cfg,
         modelId: mdlId,
         prompt: prompt,
-        thinkingBudget: budget,
+        reasoning: reasoning,
         skipImageParsing: true,
       )).trim();
       if (title.isNotEmpty) {

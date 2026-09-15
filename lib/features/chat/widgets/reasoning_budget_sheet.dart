@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/physics.dart';
 import 'package:provider/provider.dart';
+import '../../../core/models/reasoning_request.dart';
 import '../../../core/providers/assistant_provider.dart';
 import '../../../core/providers/settings_provider.dart';
+import '../../../core/services/api/reasoning/reasoning_selection.dart';
 import '../../../icons/lucide_adapter.dart';
 import '../../../icons/reasoning_icons.dart';
 import '../../../l10n/app_localizations.dart';
@@ -90,10 +92,9 @@ class _ReasoningBudgetSheetState extends State<_ReasoningBudgetSheet>
   @override
   void initState() {
     super.initState();
+    final settings = context.read<SettingsProvider>();
     _selected =
-        widget.initialBudget ??
-        context.read<SettingsProvider>().thinkingBudget ??
-        -1;
+        widget.initialBudget ?? uiBudgetFromReasoning(_choiceFor(settings));
     _snap = AnimationController.unbounded(vsync: this)
       ..addListener(() {
         final last = (_stops.length - 1).toDouble();
@@ -188,7 +189,7 @@ class _ReasoningBudgetSheetState extends State<_ReasoningBudgetSheet>
     widget.onChanged?.call(value);
     // Fire-and-forget: persistence is not interactive-blocking.
     // ignore: discarded_futures
-    context.read<SettingsProvider>().setThinkingBudget(value);
+    _writeChoice(context.read<SettingsProvider>(), value);
   }
 
   void _animateTo(int index) {
@@ -224,7 +225,33 @@ class _ReasoningBudgetSheetState extends State<_ReasoningBudgetSheet>
     });
     widget.onChanged?.call(chosen);
     // ignore: discarded_futures
-    context.read<SettingsProvider>().setThinkingBudget(chosen);
+    _writeChoice(context.read<SettingsProvider>(), chosen);
+  }
+
+  (String?, String?) _resolvedModel(SettingsProvider settings) {
+    final assistant = context.read<AssistantProvider>().currentAssistant;
+    return (
+      widget.modelProvider ??
+          assistant?.chatModelProvider ??
+          settings.currentModelProvider,
+      widget.modelId ?? assistant?.chatModelId ?? settings.currentModelId,
+    );
+  }
+
+  ReasoningRequest? _choiceFor(SettingsProvider settings) {
+    final (provider, modelId) = _resolvedModel(settings);
+    if (provider == null || modelId == null) return null;
+    return settings.reasoningChoiceFor(provider, modelId);
+  }
+
+  Future<void> _writeChoice(SettingsProvider settings, int value) async {
+    final (provider, modelId) = _resolvedModel(settings);
+    if (provider == null || modelId == null) return;
+    await settings.setReasoningChoice(
+      provider,
+      modelId,
+      reasoningFromUiBudget(value),
+    );
   }
 
   bool _showXhighOption(SettingsProvider settings) {

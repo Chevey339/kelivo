@@ -14,7 +14,9 @@ import '../../../core/models/conversation.dart';
 import '../../../core/models/token_usage.dart';
 import '../../../core/providers/assistant_provider.dart';
 import '../../../core/providers/settings_provider.dart';
+import '../../../core/models/reasoning_request.dart';
 import '../../../core/services/api/chat_api_service.dart';
+import '../../../core/services/api/reasoning/reasoning_selection.dart';
 import '../../../core/services/api/retry_policy.dart';
 import '../../../core/services/api/stream/stream_chunk.dart';
 import '../../../core/services/chat/chat_service.dart';
@@ -745,8 +747,22 @@ class ChatActions {
     return generationController.isReasoningModel(providerKey, modelId);
   }
 
-  bool _isReasoningEnabled(int? budget) {
-    return messageGenerationService.isReasoningEnabled(budget);
+  bool _isReasoningEnabled(ReasoningRequest request) {
+    return messageGenerationService.isReasoningEnabled(request);
+  }
+
+  ReasoningRequest _selectedReasoning({
+    required SettingsProvider settings,
+    required String providerKey,
+    required String modelId,
+    Assistant? assistant,
+  }) {
+    return selectReasoningRequest(
+      settings: settings,
+      config: settings.getProviderConfig(providerKey),
+      modelId: modelId,
+      assistant: assistant,
+    );
   }
 
   Conversation _conversationForMessageContext(
@@ -1347,7 +1363,12 @@ class ChatActions {
       final enableReasoning =
           supportsReasoning &&
           _isReasoningEnabled(
-            assistant?.thinkingBudget ?? settings.thinkingBudget,
+            _selectedReasoning(
+              settings: settings,
+              providerKey: providerKey,
+              modelId: modelId,
+              assistant: assistant,
+            ),
           );
       // Prepare API messages
       _bindFileProcessingCallbacks();
@@ -1741,7 +1762,12 @@ class ChatActions {
       final enableReasoning =
           supportsReasoning &&
           _isReasoningEnabled(
-            assistant?.thinkingBudget ?? settings.thinkingBudget,
+            _selectedReasoning(
+              settings: settings,
+              providerKey: providerKey,
+              modelId: modelId,
+              assistant: assistant,
+            ),
           );
       _bindFileProcessingCallbacks();
       try {
@@ -1905,7 +1931,12 @@ class ChatActions {
     final enableReasoning =
         supportsReasoning &&
         _isReasoningEnabled(
-          assistant?.thinkingBudget ?? settings.thinkingBudget,
+          _selectedReasoning(
+            settings: settings,
+            providerKey: providerKey,
+            modelId: modelId,
+            assistant: assistant,
+          ),
         );
 
     _bindFileProcessingCallbacks();
@@ -2220,8 +2251,12 @@ class ChatActions {
             modelId: ctx.modelId,
             messages: ctx.apiMessages,
             userImagePaths: ctx.userImagePaths,
-            thinkingBudget:
-                assistant?.thinkingBudget ?? ctx.settings.thinkingBudget,
+            reasoning: selectReasoningRequest(
+              settings: ctx.settings,
+              config: ctx.config,
+              modelId: ctx.modelId,
+              assistant: assistant,
+            ),
             temperature: assistant?.temperature,
             topP: assistant?.topP,
             maxTokens: assistant?.maxTokens,
@@ -2275,8 +2310,12 @@ class ChatActions {
         modelId: ctx.modelId,
         messages: ctx.apiMessages,
         userImagePaths: ctx.userImagePaths,
-        thinkingBudget:
-            assistant?.thinkingBudget ?? ctx.settings.thinkingBudget,
+        reasoning: selectReasoningRequest(
+          settings: ctx.settings,
+          config: ctx.config,
+          modelId: ctx.modelId,
+          assistant: assistant,
+        ),
         temperature: assistant?.temperature,
         topP: assistant?.topP,
         maxTokens: assistant?.maxTokens,

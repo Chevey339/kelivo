@@ -25,6 +25,7 @@ import '../../home/widgets/assistant_avatar.dart';
 import '../../chat/widgets/reasoning_budget_sheet.dart';
 import '../../model/widgets/model_select_sheet.dart';
 import '../../../core/models/assistant.dart';
+import '../../../core/services/api/reasoning/reasoning_selection.dart';
 import '../../../core/models/chat_message.dart';
 import '../../../core/models/conversation.dart';
 import '../../../core/models/preset_message.dart';

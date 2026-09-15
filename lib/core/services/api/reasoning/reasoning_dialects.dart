@@ -1,32 +1,15 @@
 import 'package:flutter/foundation.dart';
 
 import '../../../models/model_spec.dart';
+import '../../../models/reasoning_request.dart';
+
+export '../../../models/reasoning_request.dart';
 
 enum ReasoningTransport {
   chatCompletions,
   responses,
   anthropicMessages,
   geminiGenerateContent,
-}
-
-@immutable
-class ReasoningRequest {
-  final ReasoningLevel level;
-  final int? budgetTokens;
-
-  const ReasoningRequest(this.level, {this.budgetTokens});
-
-  @override
-  bool operator ==(Object other) {
-    return identical(this, other) ||
-        (other is ReasoningRequest &&
-            runtimeType == other.runtimeType &&
-            level == other.level &&
-            budgetTokens == other.budgetTokens);
-  }
-
-  @override
-  int get hashCode => Object.hash(level, budgetTokens);
 }
 
 @immutable
@@ -199,16 +182,6 @@ ReasoningLevel nearestLevel(
     }
   }
   return best;
-}
-
-ReasoningLevel levelForLegacyBudget(int? budget) {
-  if (budget == null || budget == -1) return ReasoningLevel.auto;
-  if (budget < 1024) return ReasoningLevel.off;
-  if (budget <= 2000) return ReasoningLevel.low;
-  if (budget <= 20000) return ReasoningLevel.medium;
-  if (budget <= 32000) return ReasoningLevel.high;
-  if (budget <= 64000) return ReasoningLevel.xhigh;
-  return ReasoningLevel.max;
 }
 
 bool _isExplicitLevel(ReasoningLevel level) {

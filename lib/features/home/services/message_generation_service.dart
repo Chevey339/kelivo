@@ -8,6 +8,7 @@ import '../../../core/models/chat_message.dart';
 import '../../../core/models/message_part.dart';
 import '../../../core/models/conversation.dart';
 import '../../../core/models/model_spec.dart';
+import '../../../core/models/reasoning_request.dart';
 import '../../../core/models/skills_binding.dart';
 import '../../../core/providers/settings_provider.dart';
 import '../../../core/services/api/builtin_tools.dart';
@@ -119,8 +120,8 @@ class MessageGenerationService {
   void Function(String? messageId)? onFileProcessingFinished;
 
   /// Check if reasoning is enabled for given budget
-  bool isReasoningEnabled(int? budget) {
-    return levelForLegacyBudget(budget) != ReasoningLevel.off;
+  bool isReasoningEnabled(ReasoningRequest r) {
+    return r.level != ReasoningLevel.off;
   }
 
   /// Prepare API messages with all injections applied.

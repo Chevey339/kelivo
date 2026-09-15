@@ -6,6 +6,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:Kelivo/core/providers/settings_provider.dart';
 import 'package:Kelivo/core/services/api/chat_api_service.dart';
 import 'support/collect_generation.dart';
+import 'support/legacy_reasoning.dart';
 
 ProviderConfig _openAIConfig(
   String baseUrl, {
@@ -96,7 +97,7 @@ Future<Map<String, dynamic>> _captureChatBody({
     messages: const [
       {'role': 'user', 'content': 'hello'},
     ],
-    thinkingBudget: thinkingBudget,
+    reasoning: legacyBudget(thinkingBudget),
     temperature: temperature,
     topP: topP,
     tools: tools,

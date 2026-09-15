@@ -6,6 +6,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:Kelivo/core/providers/settings_provider.dart';
 import 'package:Kelivo/core/services/api/chat_api_service.dart';
 import 'support/collect_generation.dart';
+import 'support/legacy_reasoning.dart';
 
 ProviderConfig _geminiConfig(String baseUrl) {
   return ProviderConfig(
@@ -101,7 +102,7 @@ Future<Map<String, dynamic>> _capture({
     messages: const [
       {'role': 'user', 'content': 'hello'},
     ],
-    thinkingBudget: thinkingBudget,
+    reasoning: legacyBudget(thinkingBudget),
     stream: stream,
   ).toList();
 

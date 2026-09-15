@@ -264,7 +264,7 @@ Stream<StreamChunk> sendGoogleStream(
   String modelId,
   List<Map<String, dynamic>> messages, {
   List<String>? userImagePaths,
-  int? thinkingBudget,
+  ReasoningRequest reasoning = ReasoningRequest.auto,
   double? temperature,
   double? topP,
   int? maxTokens,
@@ -286,7 +286,7 @@ Stream<StreamChunk> sendGoogleStream(
       modelId: modelId,
       messages: messages,
       userImagePaths: userImagePaths,
-      thinkingBudget: thinkingBudget,
+      reasoning: reasoning,
       temperature: temperature,
       topP: topP,
       maxTokens: maxTokens,
@@ -572,17 +572,13 @@ Stream<StreamChunk> sendGoogleStream(
     final extraG = customBody(config, modelId, assistantBody: extraBody);
     if (extraG.isNotEmpty) baseBody.addAll(extraG);
     final spec = effective;
-    final request = ReasoningRequest(
-      levelForLegacyBudget(thinkingBudget),
-      budgetTokens: (thinkingBudget ?? 0) > 0 ? thinkingBudget : null,
-    );
     applyReasoning(
       baseBody,
       spec,
-      request,
+      reasoning,
       transport: ReasoningTransport.geminiGenerateContent,
     );
-    final resolution = resolveReasoning(spec, request);
+    final resolution = resolveReasoning(spec, reasoning);
     applySamplingPolicy(
       baseBody,
       spec,
@@ -1092,17 +1088,13 @@ Stream<StreamChunk> sendGoogleStream(
         body.addAll(extra);
       }
       final spec = effective;
-      final reasoningRequest = ReasoningRequest(
-        levelForLegacyBudget(thinkingBudget),
-        budgetTokens: (thinkingBudget ?? 0) > 0 ? thinkingBudget : null,
-      );
       applyReasoning(
         body,
         spec,
-        reasoningRequest,
+        reasoning,
         transport: ReasoningTransport.geminiGenerateContent,
       );
-      final resolution = resolveReasoning(spec, reasoningRequest);
+      final resolution = resolveReasoning(spec, reasoning);
       applySamplingPolicy(
         body,
         spec,

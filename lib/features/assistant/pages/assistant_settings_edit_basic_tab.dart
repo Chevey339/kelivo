@@ -10,7 +10,6 @@ class _BasicSettingsTab extends StatefulWidget {
 
 class _BasicSettingsTabState extends State<_BasicSettingsTab> {
   late final TextEditingController _nameCtrl;
-  late final TextEditingController _thinkingCtrl;
   late final TextEditingController _maxTokensCtrl;
   late final TextEditingController _backgroundCtrl;
 
@@ -20,9 +19,6 @@ class _BasicSettingsTabState extends State<_BasicSettingsTab> {
     final ap = context.read<AssistantProvider>();
     final a = ap.getById(widget.assistantId)!;
     _nameCtrl = TextEditingController(text: a.name);
-    _thinkingCtrl = TextEditingController(
-      text: a.thinkingBudget?.toString() ?? '',
-    );
     _maxTokensCtrl = TextEditingController(text: a.maxTokens?.toString() ?? '');
     _backgroundCtrl = TextEditingController(text: a.background ?? '');
   }
@@ -34,7 +30,6 @@ class _BasicSettingsTabState extends State<_BasicSettingsTab> {
       final ap = context.read<AssistantProvider>();
       final a = ap.getById(widget.assistantId)!;
       _nameCtrl.text = a.name;
-      _thinkingCtrl.text = a.thinkingBudget?.toString() ?? '';
       _maxTokensCtrl.text = a.maxTokens?.toString() ?? '';
       _backgroundCtrl.text = a.background ?? '';
     }
@@ -43,7 +38,6 @@ class _BasicSettingsTabState extends State<_BasicSettingsTab> {
   @override
   void dispose() {
     _nameCtrl.dispose();
-    _thinkingCtrl.dispose();
     _maxTokensCtrl.dispose();
     _backgroundCtrl.dispose();
     super.dispose();
@@ -198,7 +192,9 @@ class _BasicSettingsTabState extends State<_BasicSettingsTab> {
                 context,
                 icon: Lucide.Brain,
                 label: l10n.assistantEditThinkingBudgetTitle,
-                detailText: a.thinkingBudget?.toString() ?? '-',
+                detailText: a.reasoning == null
+                    ? '-'
+                    : uiBudgetFromReasoning(a.reasoning).toString(),
                 onTap: () async {
                   final assistantProvider = context.read<AssistantProvider>();
                   // Seed via initialBudget instead of pre-writing global
@@ -209,14 +205,19 @@ class _BasicSettingsTabState extends State<_BasicSettingsTab> {
                     context,
                     modelProvider: a.chatModelProvider,
                     modelId: a.chatModelId,
-                    initialBudget: a.thinkingBudget,
+                    initialBudget: a.reasoning == null
+                        ? null
+                        : uiBudgetFromReasoning(a.reasoning),
                     onChanged: (v) => chosen = v,
                   );
                   if (!context.mounted) return;
-                  if (chosen != null && chosen != a.thinkingBudget) {
-                    await assistantProvider.updateAssistant(
-                      a.copyWith(thinkingBudget: chosen),
-                    );
+                  if (chosen != null) {
+                    final next = reasoningFromUiBudget(chosen!);
+                    if (next != a.reasoning) {
+                      await assistantProvider.updateAssistant(
+                        a.copyWith(reasoning: next),
+                      );
+                    }
                   }
                 },
               ),

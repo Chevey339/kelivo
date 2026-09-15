@@ -12,6 +12,7 @@ import '../../../core/models/chat_input_data.dart';
 import '../../../core/models/chat_message.dart';
 import '../../../core/models/message_part.dart';
 import '../../../core/models/conversation.dart';
+import '../../../core/models/reasoning_request.dart';
 import '../../../core/models/workspace_binding.dart';
 import '../../../core/providers/workspace_provider.dart';
 import '../../../core/models/quick_phrase.dart';
@@ -2765,8 +2766,8 @@ class HomePageController extends ChangeNotifier {
     return _generationController.isToolModel(providerKey, modelId);
   }
 
-  bool isReasoningEnabled(int? budget) {
-    return _generationController.isReasoningEnabled(budget);
+  bool isReasoningEnabled(ReasoningRequest r) {
+    return _generationController.isReasoningEnabled(r);
   }
 
   // ============================================================================

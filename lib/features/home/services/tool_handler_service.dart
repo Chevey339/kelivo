@@ -4,6 +4,7 @@ import 'dart:convert';
 import 'package:flutter/widgets.dart';
 import 'package:provider/provider.dart';
 import '../../../core/models/assistant.dart';
+import '../../../core/models/reasoning_request.dart';
 import '../../../core/providers/assistant_provider.dart';
 import '../../../core/providers/environment_provider.dart';
 import '../../../core/providers/mcp_provider.dart';
@@ -635,15 +636,15 @@ class ToolHandlerService {
     final mdlId = settings.memoryModelId;
     if (provKey != null && mdlId != null) {
       final cfg = settings.getProviderConfig(provKey);
-      final budget = settings.memoryModelThinkingEnabled
-          ? (assistant.thinkingBudget ?? settings.thinkingBudget)
-          : 0;
+      final reasoning = settings.memoryModelThinkingEnabled
+          ? (assistant.reasoning ?? ReasoningRequest.auto)
+          : ReasoningRequest.off;
       memoryLlmCall = (prompt) => ChatApiService.generateText(
         conversationId: conversationId,
         config: cfg,
         modelId: mdlId,
         prompt: prompt,
-        thinkingBudget: budget,
+        reasoning: reasoning,
       );
     }
 
