@@ -676,13 +676,11 @@ class ClaudeClientTool {
 TokenUsage claudeUsageFromMap(Map<String, dynamic> usage) {
   final inTok = _readClaudeUsageInt(usage['input_tokens']);
   final outTok = _readClaudeUsageInt(usage['output_tokens']);
-  final cached =
-      _readClaudeUsageInt(usage['cache_read_input_tokens']) +
-      _readClaudeUsageInt(usage['cache_creation_input_tokens']);
   return TokenUsage(
     promptTokens: inTok,
     completionTokens: outTok,
-    cachedTokens: cached,
+    cachedTokens: _readClaudeUsageInt(usage['cache_read_input_tokens']),
+    cacheWriteTokens: _readClaudeUsageInt(usage['cache_creation_input_tokens']),
     totalTokens: inTok + outTok,
   );
 }

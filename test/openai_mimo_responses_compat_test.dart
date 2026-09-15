@@ -85,6 +85,7 @@ void main() {
       expect(chunks.joinedContent, contains('9.8 更大。'));
       expect(chunks.isGenerationDone, isTrue);
       expect(chunks.lastUsage?.cachedTokens, 64);
+      expect(chunks.lastUsage?.reasoningTokens, 20);
       expect(chunks.lastUsage?.totalTokens, 130);
     });
 

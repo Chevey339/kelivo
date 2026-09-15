@@ -131,16 +131,7 @@ TokenUsage? openaiUsageFromObj(Map<String, dynamic> obj) {
   try {
     final u = obj['usage'];
     if (u is! Map) return null;
-    final prompt = (u['prompt_tokens'] ?? 0) as int? ?? 0;
-    final completion = (u['completion_tokens'] ?? 0) as int? ?? 0;
-    final cached =
-        (u['prompt_tokens_details']?['cached_tokens'] ?? 0) as int? ?? 0;
-    return TokenUsage(
-      promptTokens: prompt,
-      completionTokens: completion,
-      cachedTokens: cached,
-      totalTokens: prompt + completion,
-    );
+    return tokenUsageFromOpenAICompatible(u);
   } catch (_) {
     return null;
   }
@@ -152,24 +143,35 @@ int _readOpenAIUsageInt(dynamic value) {
   return 0;
 }
 
+TokenUsage tokenUsageFromOpenAICompatible(Map rawUsage) {
+  final inputDetails =
+      rawUsage['prompt_tokens_details'] ?? rawUsage['input_tokens_details'];
+  final outputDetails =
+      rawUsage['completion_tokens_details'] ??
+      rawUsage['output_tokens_details'];
+  final prompt = _readOpenAIUsageInt(
+    rawUsage['prompt_tokens'] ?? rawUsage['input_tokens'],
+  );
+  final completion = _readOpenAIUsageInt(
+    rawUsage['completion_tokens'] ?? rawUsage['output_tokens'],
+  );
+  return TokenUsage(
+    promptTokens: prompt,
+    completionTokens: completion,
+    cachedTokens: inputDetails is Map
+        ? _readOpenAIUsageInt(inputDetails['cached_tokens'])
+        : 0,
+    reasoningTokens: outputDetails is Map
+        ? _readOpenAIUsageInt(outputDetails['reasoning_tokens'])
+        : 0,
+    totalTokens: prompt + completion,
+  );
+}
+
 TokenUsage? mergeOpenAICompatibleUsage(TokenUsage? current, dynamic rawUsage) {
   if (rawUsage is! Map) return current;
-
-  final details =
-      rawUsage['prompt_tokens_details'] ?? rawUsage['input_tokens_details'];
-  final cachedTokens = details is Map
-      ? _readOpenAIUsageInt(details['cached_tokens'])
-      : 0;
   return (current ?? const TokenUsage()).merge(
-    TokenUsage(
-      promptTokens: _readOpenAIUsageInt(
-        rawUsage['prompt_tokens'] ?? rawUsage['input_tokens'],
-      ),
-      completionTokens: _readOpenAIUsageInt(
-        rawUsage['completion_tokens'] ?? rawUsage['output_tokens'],
-      ),
-      cachedTokens: cachedTokens,
-    ),
+    tokenUsageFromOpenAICompatible(rawUsage),
   );
 }
 

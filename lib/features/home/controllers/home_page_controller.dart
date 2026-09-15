@@ -47,6 +47,7 @@ import 'stream_controller.dart' as stream_ctrl;
 import 'generation_controller.dart';
 import 'scroll_controller.dart' as scroll_ctrl;
 import 'home_view_model.dart';
+import '../services/context_usage_service.dart';
 import '../services/message_builder_service.dart';
 import '../services/message_generation_service.dart';
 import '../services/local_tools_service.dart';
@@ -477,6 +478,13 @@ class HomePageController extends ChangeNotifier {
   }
 
   void _initializeViewModel() {
+    ContextUsageService? contextUsage;
+    try {
+      contextUsage = _context.read<ContextUsageService>();
+    } catch (_) {}
+    contextUsage?.bindAssembler(
+      _messageGenerationService.previewContextAssembly,
+    );
     _viewModel = HomeViewModel(
       chatService: _chatService,
       messageBuilderService: _messageBuilderService,
@@ -486,6 +494,7 @@ class HomePageController extends ChangeNotifier {
       chatController: _chatController,
       contextProvider: _context,
       getTitleForLocale: _titleForLocale,
+      contextUsage: contextUsage,
     );
     _viewModel.onBackgroundTaskError = _showBackgroundTaskFailure;
     _viewModel.addListener(notifyListeners);

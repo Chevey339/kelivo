@@ -18,6 +18,7 @@ import '../../../core/services/memory/memory_trace.dart';
 import '../../../utils/utf16_safe_cut.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../chat/widgets/chat_message_widget.dart' show ToolUIPart;
+import '../services/context_usage_service.dart';
 import '../services/message_builder_service.dart';
 import '../services/message_generation_service.dart';
 import '../services/chat_suggestion_service.dart';
@@ -104,7 +105,8 @@ class HomeViewModel extends ChangeNotifier {
     required this._chatController,
     required this._contextProvider,
     required this.getTitleForLocale,
-  }) {
+    ContextUsageService? contextUsage,
+  }) : _contextUsage = contextUsage {
     // Initialize ChatActions
     _chatActions = ChatActions(
       chatService: _chatService,
@@ -114,6 +116,7 @@ class HomeViewModel extends ChangeNotifier {
       messageGenerationService: _messageGenerationService,
       contextProvider: _contextProvider,
       viewModel: this,
+      contextUsage: contextUsage,
     );
 
     // Wire up callbacks
@@ -144,6 +147,7 @@ class HomeViewModel extends ChangeNotifier {
   final stream_ctrl.StreamController _streamController;
   final ChatController _chatController;
   final BuildContext _contextProvider;
+  final ContextUsageService? _contextUsage;
   final ChatSuggestionService _suggestionService =
       const ChatSuggestionService();
   late final ChatActions _chatActions;
@@ -908,6 +912,10 @@ class HomeViewModel extends ChangeNotifier {
   // Public Methods - Conversation Management
   // ============================================================================
 
+  void _syncContextUsageConversation() {
+    _contextUsage?.setActiveConversation(currentConversation?.id);
+  }
+
   /// Switch to an existing conversation.
   ///
   /// The caller flushes the current conversation's progress before invoking
@@ -921,6 +929,7 @@ class HomeViewModel extends ChangeNotifier {
     if (currentConversation?.id == id) return;
 
     _chatService.setCurrentConversation(id);
+    _syncContextUsageConversation();
     final convo = _chatService.getConversation(id);
     if (convo != null) {
       // Assistant preference persistence runs concurrently with the window
@@ -971,6 +980,7 @@ class HomeViewModel extends ChangeNotifier {
   void commitConversationSwitch(PreparedConversationSwitch prepared) {
     final id = prepared.conversation.id;
     _chatService.setCurrentConversation(id);
+    _syncContextUsageConversation();
     _chatController.commitConversationWindow(
       prepared.window,
       onDeferredGroupDataLoaded: notifyListeners,
@@ -1031,6 +1041,7 @@ class HomeViewModel extends ChangeNotifier {
     );
 
     _chatController.setDraftConversation(conversation);
+    _syncContextUsageConversation();
     _streamController.clearAllState(
       keepMessageIds: _chatActions.activeStreamingMessageIds,
     );
@@ -1093,6 +1104,7 @@ class HomeViewModel extends ChangeNotifier {
     );
 
     _chatController.setDraftConversation(conversation);
+    _syncContextUsageConversation();
     _streamController.clearAllState(
       keepMessageIds: _chatActions.activeStreamingMessageIds,
     );
@@ -1116,6 +1128,7 @@ class HomeViewModel extends ChangeNotifier {
 
     // Switch to the new conversation
     _chatService.setCurrentConversation(newConvo.id);
+    _syncContextUsageConversation();
     await _chatController.setCurrentConversationAndLoad(newConvo);
     _restoreMessageUiState();
     onConversationSwitched?.call();
@@ -1321,6 +1334,7 @@ class HomeViewModel extends ChangeNotifier {
         );
 
         _chatService.setCurrentConversation(newConvo.id);
+        _syncContextUsageConversation();
         await _chatController.setCurrentConversationAndLoad(
           _chatService.getConversation(newConvo.id) ?? newConvo,
         );
@@ -1347,6 +1361,7 @@ class HomeViewModel extends ChangeNotifier {
 
       // Switch to the new conversation
       _chatService.setCurrentConversation(newConvo.id);
+      _syncContextUsageConversation();
       await _chatController.setCurrentConversationAndLoad(
         _chatService.getConversation(newConvo.id) ?? newConvo,
       );

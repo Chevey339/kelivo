@@ -27,6 +27,7 @@ import '../../../utils/assistant_regex.dart';
 import '../../../core/models/assistant_regex.dart';
 import '../services/ask_user_interaction_service.dart';
 import '../../chat/utils/thinking_tag_parser.dart';
+import '../services/context_usage_service.dart';
 import '../services/message_generation_service.dart';
 import '../services/tool_approval_service.dart';
 import 'active_streaming_message_store.dart';
@@ -180,6 +181,7 @@ class ChatActions {
     required this.messageGenerationService,
     required this.contextProvider,
     required this.viewModel,
+    this.contextUsage,
     MobileBackgroundCoordinator? backgroundCoordinator,
   }) : _background =
            backgroundCoordinator ?? MobileBackgroundCoordinator.instance {
@@ -259,6 +261,7 @@ class ChatActions {
   final GenerationController generationController;
   final MessageGenerationService messageGenerationService;
   final BuildContext contextProvider;
+  final ContextUsageService? contextUsage;
 
   // ============================================================================
   // Callbacks for UI updates (set by HomeViewModel)
@@ -522,6 +525,8 @@ class ChatActions {
       promptTokens: state.usage?.promptTokens,
       completionTokens: state.usage?.completionTokens,
       cachedTokens: state.usage?.cachedTokens,
+      reasoningTokens: state.usage?.reasoningTokens,
+      cacheWriteTokens: state.usage?.cacheWriteTokens,
       // copyWith keeps base.durationMs when this resolves to null.
       durationMs: _elapsedMsFrom(state.streamStartedAt),
     );
@@ -2673,6 +2678,8 @@ class ChatActions {
     final finalPromptTokens = state.usage?.promptTokens;
     final finalCompletionTokens = state.usage?.completionTokens;
     final finalCachedTokens = state.usage?.cachedTokens;
+    final finalReasoningTokens = state.usage?.reasoningTokens;
+    final finalCacheWriteTokens = state.usage?.cacheWriteTokens;
 
     // Flush final content to the streaming notifier before async operations.
     // This ensures any intermediate rebuild (e.g., from isProcessingFiles change
@@ -2699,8 +2706,22 @@ class ChatActions {
       promptTokens: finalPromptTokens,
       completionTokens: finalCompletionTokens,
       cachedTokens: finalCachedTokens,
+      reasoningTokens: finalReasoningTokens,
+      cacheWriteTokens: finalCacheWriteTokens,
       durationMs: finalDurationMs,
     );
+    final usage = state.usage;
+    if (usage != null) {
+      final assistant = state.ctx.assistant;
+      contextUsage?.recordUsage(
+        conversationId: conversationId,
+        providerKey: state.ctx.providerKey,
+        modelId: state.ctx.modelId,
+        assistantId: assistant is Assistant ? assistant.id : null,
+        usage: usage,
+        assistantMessage: finalizedMessage,
+      );
+    }
     try {
       await _finalizeStreamingCheckpoint(
         finalizedMessage,

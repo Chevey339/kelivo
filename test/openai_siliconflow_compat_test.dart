@@ -190,6 +190,7 @@ void main() {
                   'completion_tokens': 53,
                   'total_tokens': 895,
                   'prompt_tokens_details': {'cached_tokens': 384},
+                  'completion_tokens_details': {'reasoning_tokens': 17},
                 },
               })}\n\n',
             );
@@ -258,6 +259,7 @@ void main() {
         expect(chunks.lastUsage?.promptTokens, 842);
         expect(chunks.lastUsage?.completionTokens, 53);
         expect(chunks.lastUsage?.cachedTokens, 384);
+        expect(chunks.lastUsage?.reasoningTokens, 17);
       },
     );
 

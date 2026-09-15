@@ -5,6 +5,7 @@ import '../../stream/sse_event.dart';
 import '../../stream/stream_chunk.dart';
 import '../../stream/stream_chunk_decoder.dart';
 import '../../stream/stream_chunk_ids.dart';
+import 'openai_request_shaping.dart';
 
 /// Stateful OpenAI Chat Completions SSE decoder. One instance per HTTP response.
 class ChatCompletionsStreamDecoder implements StreamChunkDecoder {
@@ -535,27 +536,7 @@ List<dynamic> _imageItems(Map delta) {
 }
 
 TokenUsage? _mergeUsage(TokenUsage? current, dynamic rawUsage) {
-  if (rawUsage is! Map) return current;
-  final details =
-      rawUsage['prompt_tokens_details'] ?? rawUsage['input_tokens_details'];
-  final cachedTokens = details is Map ? _readInt(details['cached_tokens']) : 0;
-  return (current ?? const TokenUsage()).merge(
-    TokenUsage(
-      promptTokens: _readInt(
-        rawUsage['prompt_tokens'] ?? rawUsage['input_tokens'],
-      ),
-      completionTokens: _readInt(
-        rawUsage['completion_tokens'] ?? rawUsage['output_tokens'],
-      ),
-      cachedTokens: cachedTokens,
-    ),
-  );
-}
-
-int _readInt(dynamic value) {
-  if (value is num) return value.toInt();
-  if (value is String) return int.tryParse(value) ?? 0;
-  return 0;
+  return mergeOpenAICompatibleUsage(current, rawUsage);
 }
 
 Map<String, dynamic>? _extraContentOf(Map toolCall) {

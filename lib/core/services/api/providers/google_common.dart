@@ -616,14 +616,8 @@ Stream<StreamChunk> sendGoogleStream(
         try {
           final u = (obj['usageMetadata'] as Map?)?.cast<String, dynamic>();
           if (u != null) {
-            final prompt = (u['promptTokenCount'] ?? 0) as int? ?? 0;
-            final completion = (u['candidatesTokenCount'] ?? 0) as int? ?? 0;
             totalUsage = (totalUsage ?? const TokenUsage()).merge(
-              TokenUsage(
-                promptTokens: prompt,
-                completionTokens: completion,
-                cachedTokens: 0,
-              ),
+              googleUsageFromMetadata(u),
             );
           }
         } catch (_) {}

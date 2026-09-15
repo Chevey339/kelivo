@@ -5847,9 +5847,22 @@ class ChatDatabaseRepository {
   }
 
   Future<void> _updateMessageRow(ChatMessage message) async {
+    final current = await (_db.select(
+      _db.messageRows,
+    )..where((t) => t.id.equals(message.id))).getSingleOrNull();
     await (_db.update(
       _db.messageRows,
-    )..where((t) => t.id.equals(message.id))).write(_messageUpdate(message));
+    )..where((t) => t.id.equals(message.id))).write(
+      _messageUpdate(message).copyWith(
+        extrasJson: Value(
+          _encodeTokenExtras(
+            current?.extrasJson ?? '{}',
+            reasoningTokens: message.reasoningTokens,
+            cacheWriteTokens: message.cacheWriteTokens,
+          ),
+        ),
+      ),
+    );
   }
 
   /// Partial-column UPDATE: only the non-null fields are written, so
@@ -5873,6 +5886,8 @@ class ChatDatabaseRepository {
     int? completionTokens,
     int? cachedTokens,
     int? durationMs,
+    int? reasoningTokens,
+    int? cacheWriteTokens,
   }) {
     final companion = MessageRowsCompanion(
       updatedAt: Value(DateTime.now().toUtc()),
@@ -5906,9 +5921,26 @@ class ChatDatabaseRepository {
       durationMs: durationMs != null ? Value(durationMs) : const Value.absent(),
     );
     return _db.transaction(() async {
+      var write = companion;
+      if (reasoningTokens != null || cacheWriteTokens != null) {
+        final current = await (_db.select(
+          _db.messageRows,
+        )..where((t) => t.id.equals(messageId))).getSingleOrNull();
+        if (current != null) {
+          write = companion.copyWith(
+            extrasJson: Value(
+              _encodeTokenExtras(
+                current.extrasJson,
+                reasoningTokens: reasoningTokens,
+                cacheWriteTokens: cacheWriteTokens,
+              ),
+            ),
+          );
+        }
+      }
       await (_db.update(
         _db.messageRows,
-      )..where((t) => t.id.equals(messageId))).write(companion);
+      )..where((t) => t.id.equals(messageId))).write(write);
       final updated = await getMessage(messageId);
       if (updated == null) return null;
       if (content == null && reasoningText == null && parts == null) {
@@ -6934,6 +6966,7 @@ class ChatDatabaseRepository {
     final reasoningParts = parts.whereType<ReasoningPart>().toList(
       growable: false,
     );
+    final extras = _decodeExtrasJson(row.extrasJson);
     return ChatMessage(
       id: row.id,
       role: row.role,
@@ -6957,6 +6990,8 @@ class ChatDatabaseRepository {
       completionTokens: row.completionTokens,
       cachedTokens: row.cachedTokens,
       durationMs: row.durationMs,
+      reasoningTokens: _tokenExtraInt(extras, _reasoningTokensExtraKey),
+      cacheWriteTokens: _tokenExtraInt(extras, _cacheWriteTokensExtraKey),
     );
   }
 
@@ -7202,6 +7237,13 @@ class ChatDatabaseRepository {
       completionTokens: Value(message.completionTokens),
       cachedTokens: Value(message.cachedTokens),
       durationMs: Value(message.durationMs),
+      extrasJson: Value(
+        _encodeTokenExtras(
+          '{}',
+          reasoningTokens: message.reasoningTokens,
+          cacheWriteTokens: message.cacheWriteTokens,
+        ),
+      ),
       messageOrder: messageOrder,
     );
   }
@@ -7250,6 +7292,33 @@ class ChatDatabaseRepository {
 
   Map<String, dynamic> _decodeExtrasJson(String raw) {
     return Conversation.decodeExtras(raw);
+  }
+
+  static const _reasoningTokensExtraKey = 'tokens.reasoning';
+  static const _cacheWriteTokensExtraKey = 'tokens.cacheWrite';
+
+  int? _tokenExtraInt(Map<String, dynamic> extras, String key) {
+    final value = extras[key];
+    if (value is int) return value;
+    if (value is num) return value.toInt();
+    if (value is String) return int.tryParse(value);
+    return null;
+  }
+
+  String _encodeTokenExtras(
+    String existing, {
+    int? reasoningTokens,
+    int? cacheWriteTokens,
+  }) {
+    final extras = Map<String, dynamic>.from(_decodeExtrasJson(existing));
+    if (reasoningTokens != null) {
+      extras[_reasoningTokensExtraKey] = reasoningTokens;
+    }
+    if (cacheWriteTokens != null) {
+      extras[_cacheWriteTokensExtraKey] = cacheWriteTokens;
+    }
+    if (extras.isEmpty) return '{}';
+    return jsonEncode(extras);
   }
 
   // —— Memory system V1 read path (§13.3) ——

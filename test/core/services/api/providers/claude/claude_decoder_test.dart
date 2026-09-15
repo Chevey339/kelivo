@@ -430,7 +430,8 @@ void main() {
       );
       expect(decoder.usage!.promptTokens, 25);
       expect(decoder.usage!.completionTokens, 1);
-      expect(decoder.usage!.cachedTokens, 15);
+      expect(decoder.usage!.cachedTokens, 5);
+      expect(decoder.usage!.cacheWriteTokens, 10);
       expect(start.chunks.whereType<Usage>().single.usage.promptTokens, 25);
 
       final delta = decoder.accept(
@@ -442,12 +443,14 @@ void main() {
       );
       expect(decoder.usage!.promptTokens, 25);
       expect(decoder.usage!.completionTokens, 15);
-      expect(decoder.usage!.cachedTokens, 15);
+      expect(decoder.usage!.cachedTokens, 5);
+      expect(decoder.usage!.cacheWriteTokens, 10);
       expect(decoder.usage!.totalTokens, 40);
       final streamed = delta.chunks.whereType<Usage>().single.usage;
       expect(streamed.promptTokens, 25);
       expect(streamed.completionTokens, 15);
-      expect(streamed.cachedTokens, 15);
+      expect(streamed.cachedTokens, 5);
+      expect(streamed.cacheWriteTokens, 10);
       expect(streamed.totalTokens, 40);
     },
   );

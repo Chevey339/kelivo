@@ -261,6 +261,45 @@ class ChatService extends ChangeNotifier {
     _conversationListRevision++;
   }
 
+  final Map<String, int> _contextRevisions = {};
+  final Map<String, ValueNotifier<int>> _contextRevisionNotifiers = {};
+
+  int contextRevision(String conversationId) =>
+      _contextRevisions[conversationId] ?? 0;
+
+  ValueListenable<int> contextRevisionListenable(String conversationId) {
+    return _contextRevisionNotifiers.putIfAbsent(
+      conversationId,
+      () => ValueNotifier<int>(contextRevision(conversationId)),
+    );
+  }
+
+  void _bumpContextRevision(String conversationId) {
+    if (conversationId.isEmpty) return;
+    final next = contextRevision(conversationId) + 1;
+    _contextRevisions[conversationId] = next;
+    final notifier = _contextRevisionNotifiers[conversationId];
+    if (notifier != null) notifier.value = next;
+  }
+
+  void _forgetContextRevision(String conversationId) {
+    _contextRevisions.remove(conversationId);
+    final notifier = _contextRevisionNotifiers.remove(conversationId);
+    notifier?.dispose();
+  }
+
+  bool _shouldBumpContextRevision({
+    String? content,
+    List<MessagePart>? parts,
+    String? reasoningText,
+    String? reasoningSegmentsJson,
+  }) {
+    return content != null ||
+        parts != null ||
+        reasoningText != null ||
+        reasoningSegmentsJson != null;
+  }
+
   String? get currentConversationId => _currentConversationId;
 
   bool isTemporaryConversation(String? id) {
@@ -367,6 +406,10 @@ class ChatService extends ChangeNotifier {
       } catch (_) {}
     }
     _initialized = false;
+    for (final id in List<String>.of(_contextRevisionNotifiers.keys)) {
+      _forgetContextRevision(id);
+    }
+    _contextRevisions.clear();
     final lease = _databaseLease;
     _databaseLease = null;
     await lease?.release();
@@ -1990,6 +2033,7 @@ class ChatService extends ChangeNotifier {
       _temporaryProviderArtifacts.remove(message.id);
     }
     _messagesCache.remove(id);
+    _forgetContextRevision(id);
     if (_currentConversationId == id) {
       _currentConversationId = null;
     }
@@ -2024,6 +2068,7 @@ class ChatService extends ChangeNotifier {
     if (_currentConversationId == id) {
       _currentConversationId = null;
     }
+    _forgetContextRevision(id);
     if (bump) {
       _bumpConversationListRevision();
     }
@@ -2606,6 +2651,7 @@ class ChatService extends ChangeNotifier {
       }
     }
 
+    _bumpContextRevision(conversationId);
     notifyListeners();
   }
 
@@ -2627,6 +2673,7 @@ class ChatService extends ChangeNotifier {
       final draft = _draftConversations[conversationId]!;
       draft.mcpServerIds = List.of(serverIds);
       draft.updatedAt = DateTime.now();
+      _bumpContextRevision(conversationId);
       notifyListeners();
       return;
     }
@@ -2636,6 +2683,7 @@ class ChatService extends ChangeNotifier {
     c.updatedAt = DateTime.now();
     await _saveConversation(c);
     _bumpConversationListRevision();
+    _bumpContextRevision(conversationId);
     notifyListeners();
   }
 
@@ -2686,6 +2734,7 @@ class ChatService extends ChangeNotifier {
       final draft = _draftConversations[id]!;
       draft.summary = summary;
       draft.lastSummarizedMessageCount = messageCount;
+      _bumpContextRevision(id);
       notifyListeners();
       return;
     }
@@ -2696,6 +2745,7 @@ class ChatService extends ChangeNotifier {
     conversation.summary = summary;
     conversation.lastSummarizedMessageCount = messageCount;
     await _saveConversation(conversation);
+    _bumpContextRevision(id);
     notifyListeners();
   }
 
@@ -2722,6 +2772,7 @@ class ChatService extends ChangeNotifier {
       final draft = _draftConversations[conversationId]!;
       draft.summary = null;
       draft.lastSummarizedMessageCount = 0;
+      _bumpContextRevision(conversationId);
       notifyListeners();
       return;
     }
@@ -2732,6 +2783,7 @@ class ChatService extends ChangeNotifier {
     conversation.summary = null;
     conversation.lastSummarizedMessageCount = 0;
     await _saveConversation(conversation);
+    _bumpContextRevision(conversationId);
     notifyListeners();
   }
 
@@ -2745,12 +2797,14 @@ class ChatService extends ChangeNotifier {
       _draftConversations[conversationId] = draft.copyWith(
         extras: update(Map<String, dynamic>.from(draft.extras)),
       );
+      _bumpContextRevision(conversationId);
       notifyListeners();
       return;
     }
     if (!_initialized) return;
     await _repo.updateConversationExtras(conversationId, update);
     await _refreshConversation(conversationId);
+    _bumpContextRevision(conversationId);
     notifyListeners();
   }
 
@@ -2968,6 +3022,7 @@ class ChatService extends ChangeNotifier {
       }
     }
     _touchMessageCache(conversationId);
+    _bumpContextRevision(conversationId);
 
     notifyListeners();
     return message;
@@ -3116,6 +3171,7 @@ class ChatService extends ChangeNotifier {
     }
     _touchMessageCache(conversationId);
     _bumpConversationListRevision();
+    _bumpContextRevision(conversationId);
     notifyListeners();
   }
 
@@ -3158,6 +3214,8 @@ class ChatService extends ChangeNotifier {
     int? completionTokens,
     int? cachedTokens,
     int? durationMs,
+    int? reasoningTokens,
+    int? cacheWriteTokens,
   }) {
     return _updateMessage(
       messageId,
@@ -3175,6 +3233,8 @@ class ChatService extends ChangeNotifier {
       completionTokens: completionTokens,
       cachedTokens: cachedTokens,
       durationMs: durationMs,
+      reasoningTokens: reasoningTokens,
+      cacheWriteTokens: cacheWriteTokens,
     );
   }
 
@@ -3195,6 +3255,8 @@ class ChatService extends ChangeNotifier {
     int? completionTokens,
     int? cachedTokens,
     int? durationMs,
+    int? reasoningTokens,
+    int? cacheWriteTokens,
   }) {
     return _updateMessage(
       messageId,
@@ -3211,6 +3273,9 @@ class ChatService extends ChangeNotifier {
       completionTokens: completionTokens,
       cachedTokens: cachedTokens,
       durationMs: durationMs,
+      reasoningTokens: reasoningTokens,
+      cacheWriteTokens: cacheWriteTokens,
+      bumpContextRevision: false,
     );
   }
 
@@ -3232,8 +3297,20 @@ class ChatService extends ChangeNotifier {
     int? completionTokens,
     int? cachedTokens,
     int? durationMs,
+    int? reasoningTokens,
+    int? cacheWriteTokens,
+    bool bumpContextRevision = true,
   }) async {
     if (!_initialized) return;
+
+    final shouldBump =
+        bumpContextRevision &&
+        _shouldBumpContextRevision(
+          content: content,
+          parts: parts,
+          reasoningText: reasoningText,
+          reasoningSegmentsJson: reasoningSegmentsJson,
+        );
 
     // Temporary conversations live only in memory.
     final temporaryMessage = _cachedTemporaryMessage(messageId);
@@ -3253,8 +3330,11 @@ class ChatService extends ChangeNotifier {
           completionTokens: completionTokens,
           cachedTokens: cachedTokens,
           durationMs: durationMs,
+          reasoningTokens: reasoningTokens,
+          cacheWriteTokens: cacheWriteTokens,
         ),
       );
+      if (shouldBump) _bumpContextRevision(temporaryMessage.conversationId);
       if (notify) notifyListeners();
       return;
     }
@@ -3278,6 +3358,8 @@ class ChatService extends ChangeNotifier {
       completionTokens: completionTokens,
       cachedTokens: cachedTokens,
       durationMs: durationMs,
+      reasoningTokens: reasoningTokens,
+      cacheWriteTokens: cacheWriteTokens,
     );
     if (updatedMessage == null) return;
 
@@ -3286,6 +3368,7 @@ class ChatService extends ChangeNotifier {
     }
 
     _replaceCachedMessage(updatedMessage);
+    if (shouldBump) _bumpContextRevision(updatedMessage.conversationId);
     if (notify) notifyListeners();
   }
 
@@ -3769,6 +3852,7 @@ class ChatService extends ChangeNotifier {
       conversation.messageIds.add(newMsg.id);
       conversation.versionSelections[groupId] = nextVersion;
       conversation.updatedAt = DateTime.now();
+      _bumpContextRevision(conversationId);
       notifyListeners();
       return newMsg;
     }
@@ -3801,6 +3885,7 @@ class ChatService extends ChangeNotifier {
     if (arr != null) arr.add(newMsg);
     _touchMessageCache(cid);
     _bumpConversationListRevision();
+    _bumpContextRevision(cid);
     notifyListeners();
     return newMsg;
   }
@@ -3951,6 +4036,7 @@ class ChatService extends ChangeNotifier {
       final draft = _draftConversations[conversationId]!;
       draft.versionSelections[groupId] = version;
       draft.updatedAt = DateTime.now();
+      _bumpContextRevision(conversationId);
       notifyListeners();
       return;
     }
@@ -3973,6 +4059,7 @@ class ChatService extends ChangeNotifier {
     if (conversation == null) return;
     _conversationsCache[conversationId] = conversation;
     _bumpConversationListRevision();
+    _bumpContextRevision(conversationId);
     notifyListeners();
   }
 
@@ -3984,6 +4071,7 @@ class ChatService extends ChangeNotifier {
       final draft = _draftConversations[conversationId]!;
       draft.versionSelections.remove(groupId);
       draft.updatedAt = DateTime.now();
+      _bumpContextRevision(conversationId);
       notifyListeners();
       return;
     }
@@ -3995,6 +4083,7 @@ class ChatService extends ChangeNotifier {
     if (conversation == null) return;
     _conversationsCache[conversationId] = conversation;
     _bumpConversationListRevision();
+    _bumpContextRevision(conversationId);
     notifyListeners();
   }
 
@@ -4018,9 +4107,13 @@ class ChatService extends ChangeNotifier {
 
     final draft = _draftConversations[conversationId];
     if (draft != null) {
+      if (draft.chatModelProvider == provider && draft.chatModelId == model) {
+        return draft;
+      }
       draft.chatModelProvider = provider;
       draft.chatModelId = model;
       draft.updatedAt = DateTime.now();
+      _bumpContextRevision(conversationId);
       notifyListeners();
       return draft;
     }
@@ -4034,6 +4127,7 @@ class ChatService extends ChangeNotifier {
     conversation.chatModelProvider = provider;
     conversation.chatModelId = model;
     await _saveConversation(conversation);
+    _bumpContextRevision(conversationId);
     notifyListeners();
     return conversation;
   }
@@ -4055,6 +4149,7 @@ class ChatService extends ChangeNotifier {
       if (modelId != null && conversation.chatModelId != modelId) continue;
       conversation.chatModelProvider = null;
       conversation.chatModelId = null;
+      _bumpContextRevision(conversation.id);
       touchedCache = true;
     }
     for (final draft in _draftConversations.values) {
@@ -4062,6 +4157,7 @@ class ChatService extends ChangeNotifier {
       if (modelId != null && draft.chatModelId != modelId) continue;
       draft.chatModelProvider = null;
       draft.chatModelId = null;
+      _bumpContextRevision(draft.id);
       touchedCache = true;
     }
     if (changed > 0 || touchedCache) notifyListeners();
@@ -4082,6 +4178,7 @@ class ChatService extends ChangeNotifier {
       draft.truncateIndex = newValue;
       if ((defaultTitle ?? '').isNotEmpty) draft.title = defaultTitle!;
       draft.updatedAt = DateTime.now();
+      _bumpContextRevision(conversationId);
       notifyListeners();
       return draft;
     }
@@ -4101,6 +4198,7 @@ class ChatService extends ChangeNotifier {
     c.updatedAt = DateTime.now();
     await _saveConversation(c);
     _bumpConversationListRevision();
+    _bumpContextRevision(conversationId);
     notifyListeners();
     return c;
   }
@@ -4120,6 +4218,7 @@ class ChatService extends ChangeNotifier {
       messages?.removeWhere((m) => m.id == messageId);
       _temporaryToolEvents.remove(messageId);
       _temporaryProviderArtifacts.remove(messageId);
+      _bumpContextRevision(message.conversationId);
       notifyListeners();
       return;
     }
@@ -4163,6 +4262,7 @@ class ChatService extends ChangeNotifier {
         _temporaryToolEvents.remove(id);
         _temporaryProviderArtifacts.remove(id);
       }
+      _bumpContextRevision(conversationId);
       notifyListeners();
       return Set<String>.unmodifiable(deletedIds);
     }
@@ -4185,6 +4285,7 @@ class ChatService extends ChangeNotifier {
     await _loadMessageOrder(conversationId);
     await _cleanupOrphanUploads();
     _bumpConversationListRevision();
+    _bumpContextRevision(conversationId);
     notifyListeners();
     return Set<String>.unmodifiable(deletedIds);
   }
@@ -4217,6 +4318,10 @@ class ChatService extends ChangeNotifier {
     _messageOrderIds.clear();
     _firstGroupIndicesCache.clear();
     _currentConversationId = null;
+    for (final id in List<String>.of(_contextRevisionNotifiers.keys)) {
+      _forgetContextRevision(id);
+    }
+    _contextRevisions.clear();
     if (deleteUploads) await _deleteUploadDirectory();
     _bumpConversationListRevision();
     notifyListeners();
@@ -4273,9 +4378,14 @@ class ChatService extends ChangeNotifier {
     if (!_initialized) await init();
     if (_draftConversations.containsKey(conversationId)) {
       final draft = _draftConversations[conversationId]!;
+      if (draft.assistantId == assistantId) {
+        if (notify) notifyListeners();
+        return true;
+      }
       draft.assistantId = assistantId;
       draft.updatedAt = DateTime.now();
-      if (notify) notifyListeners(); // preserve today's draft: notify, no bump
+      _bumpContextRevision(conversationId);
+      if (notify) notifyListeners();
       return true;
     }
     final c = _conversationsCache[conversationId];
@@ -4291,6 +4401,7 @@ class ChatService extends ChangeNotifier {
     c.assistantId = assistantId;
     c.updatedAt = updatedAt;
     c.injectedMemoryHash = null;
+    _bumpContextRevision(conversationId);
     if (notify) {
       _bumpConversationListRevision();
       notifyListeners();

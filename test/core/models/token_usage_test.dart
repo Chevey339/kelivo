@@ -49,5 +49,33 @@ void main() {
       expect(kept.completionTokens, 20);
       expect(kept.totalTokens, 120);
     });
+
+    test('merge newest non-zero wins for reasoning and cache-write', () {
+      final merged = const TokenUsage(reasoningTokens: 5, cacheWriteTokens: 3)
+          .merge(const TokenUsage(reasoningTokens: 0, cacheWriteTokens: 8))
+          .merge(const TokenUsage(reasoningTokens: 9, cacheWriteTokens: 0));
+
+      expect(merged.reasoningTokens, 9);
+      expect(merged.cacheWriteTokens, 8);
+    });
+
+    test('JSON round-trip keeps reasoning and cache-write', () {
+      const original = TokenUsage(
+        promptTokens: 10,
+        completionTokens: 4,
+        cachedTokens: 2,
+        reasoningTokens: 7,
+        cacheWriteTokens: 3,
+        totalTokens: 14,
+      );
+
+      final restored = TokenUsage.fromJson(original.toJson());
+      expect(restored.promptTokens, 10);
+      expect(restored.completionTokens, 4);
+      expect(restored.cachedTokens, 2);
+      expect(restored.reasoningTokens, 7);
+      expect(restored.cacheWriteTokens, 3);
+      expect(restored.totalTokens, 14);
+    });
   });
 }

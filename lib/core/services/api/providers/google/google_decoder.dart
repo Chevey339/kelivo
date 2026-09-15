@@ -258,11 +258,7 @@ class GoogleStreamDecoder implements StreamChunkDecoder {
     final um = obj['usageMetadata'];
     if (um is Map<String, dynamic>) {
       _round = (_round ?? const TokenUsage()).merge(
-        TokenUsage(
-          promptTokens: (um['promptTokenCount'] ?? 0) as int,
-          completionTokens: (um['candidatesTokenCount'] ?? 0) as int,
-          totalTokens: (um['totalTokenCount'] ?? 0) as int,
-        ),
+        googleUsageFromMetadata(um),
       );
       chunks.add(Usage(usage!));
     }
@@ -574,4 +570,23 @@ bool _looksLikeImageStart(String data) {
     if (data.startsWith(prefix)) return true;
   }
   return false;
+}
+
+int _readGoogleUsageInt(dynamic value) {
+  if (value is int) return value;
+  if (value is num) return value.toInt();
+  if (value is String) return int.tryParse(value) ?? 0;
+  return 0;
+}
+
+TokenUsage googleUsageFromMetadata(Map usageMetadata) {
+  return TokenUsage(
+    promptTokens: _readGoogleUsageInt(usageMetadata['promptTokenCount']),
+    completionTokens: _readGoogleUsageInt(
+      usageMetadata['candidatesTokenCount'],
+    ),
+    cachedTokens: _readGoogleUsageInt(usageMetadata['cachedContentTokenCount']),
+    reasoningTokens: _readGoogleUsageInt(usageMetadata['thoughtsTokenCount']),
+    totalTokens: _readGoogleUsageInt(usageMetadata['totalTokenCount']),
+  );
 }

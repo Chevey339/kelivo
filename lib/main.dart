@@ -73,6 +73,7 @@ import 'core/database/startup_failure_report.dart';
 import 'core/services/backup/backup_activity.dart';
 import 'core/services/backup/local_snapshot_schedule.dart';
 import 'core/services/chat/chat_service.dart';
+import 'features/home/services/context_usage_service.dart';
 import 'core/services/model_catalog/model_catalog_service.dart';
 import 'core/services/app_exit_flush.dart';
 import 'core/services/backup/restore_archive_pruner.dart';
@@ -706,6 +707,13 @@ class MyApp extends StatelessWidget {
           create: (ctx) => AssistantProvider(
             preferences: businessPreferences,
             chatService: ctx.read<ChatService>(),
+          ),
+        ),
+        ChangeNotifierProvider(
+          create: (ctx) => ContextUsageService(
+            chatService: ctx.read<ChatService>(),
+            settings: ctx.read<SettingsProvider>(),
+            assistants: ctx.read<AssistantProvider>(),
           ),
         ),
         ChangeNotifierProvider(
