@@ -14,6 +14,7 @@ const _mobileOAuthChannel = MethodChannel('app.oauth');
 Future<OAuthCallback> openOAuthCallback(
   Uri authorizationServer, {
   Uri? loopbackRedirect,
+  String? expectedState,
 }) async {
   if (loopbackRedirect != null) {
     if (loopbackRedirect.scheme != "http" ||
@@ -26,7 +27,8 @@ Future<OAuthCallback> openOAuthCallback(
     );
     return _IoOAuthCallback(
       server,
-      redirectUri: loopbackRedirect,
+      redirectUri: loopbackRedirect.replace(port: server.port),
+      expectedState: expectedState,
       mobileCallback: Platform.isAndroid
           ? _AndroidOAuthCallback(authorizationServer)
           : Platform.isIOS
@@ -41,7 +43,7 @@ Future<OAuthCallback> openOAuthCallback(
     return _IosOAuthCallback(authorizationServer);
   }
   final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
-  return _IoOAuthCallback(server);
+  return _IoOAuthCallback(server, expectedState: expectedState);
 }
 
 @visibleForTesting
@@ -171,16 +173,21 @@ final class _IosOAuthCallback implements OAuthCallback {
 }
 
 final class _IoOAuthCallback implements OAuthCallback {
-  _IoOAuthCallback(HttpServer server, {Uri? redirectUri, this.mobileCallback})
-    : _server = server,
-      _redirectUri =
-          redirectUri ??
-          Uri(
-            scheme: 'http',
-            host: InternetAddress.loopbackIPv4.address,
-            port: server.port,
-            path: '/oauth/callback',
-          ) {
+  _IoOAuthCallback(
+    HttpServer server, {
+    Uri? redirectUri,
+    String? expectedState,
+    this.mobileCallback,
+  }) : _server = server,
+       _state = expectedState,
+       _redirectUri =
+           redirectUri ??
+           Uri(
+             scheme: 'http',
+             host: InternetAddress.loopbackIPv4.address,
+             port: server.port,
+             path: '/oauth/callback',
+           ) {
     _callback.future.ignore();
     _subscription = _server.listen(_handleRequest);
   }
@@ -248,7 +255,9 @@ final class _IoOAuthCallback implements OAuthCallback {
       return;
     }
 
-    if (mobileCallback case final mobile?) {
+    // A fixed port may still receive redirects from a cancelled login. Check
+    // the nonce before completing the listener, including before authorize().
+    if (mobileCallback != null || _state != null) {
       final params = request.uri.queryParametersAll;
       final codes = params['code'];
       final errors = params['error'];
@@ -257,25 +266,32 @@ final class _IoOAuthCallback implements OAuthCallback {
           (errors?.length == 1 && errors!.single.isNotEmpty && codes == null);
       if (_closed || _callback.isCompleted) {
         request.response.statusCode = HttpStatus.gone;
-      } else if (request.method != 'GET' ||
+        await request.response.close();
+        return;
+      }
+      if (request.method != 'GET' ||
           _state == null ||
           params['state']?.length != 1 ||
           params['state']?.single != _state ||
           !validResult) {
         request.response.statusCode = HttpStatus.badRequest;
-      } else {
-        // Keep the authorization code on the loopback connection. The custom
-        // URI only signals completion of this particular browser session.
-        request.response
-          ..statusCode = HttpStatus.found
-          ..headers.set(HttpHeaders.cacheControlHeader, 'no-store')
-          ..headers.set('Referrer-Policy', 'no-referrer')
-          ..headers.set(
-            HttpHeaders.locationHeader,
-            mobile.redirectUri.replace(queryParameters: {'state': _state!}),
-          );
-        _callback.complete(redirectUri.replace(query: request.uri.query));
+        await request.response.close();
+        return;
       }
+    }
+
+    if (mobileCallback case final mobile?) {
+      // Keep the authorization code on the loopback connection. The custom
+      // URI only signals completion of this particular browser session.
+      request.response
+        ..statusCode = HttpStatus.found
+        ..headers.set(HttpHeaders.cacheControlHeader, 'no-store')
+        ..headers.set('Referrer-Policy', 'no-referrer')
+        ..headers.set(
+          HttpHeaders.locationHeader,
+          mobile.redirectUri.replace(queryParameters: {'state': _state!}),
+        );
+      _callback.complete(redirectUri.replace(query: request.uri.query));
       await request.response.close();
       return;
     }

@@ -1,4 +1,5 @@
 import '../../../models/provider_oauth.dart';
+import '../../auth/claude_oauth_request.dart';
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
@@ -456,7 +457,10 @@ Stream<StreamChunk> sendClaudeStream(
             } catch (_) {}
           } else if (type == 'tool_use') {
             final id = (it['id'] ?? '').toString();
-            final name = (it['name'] ?? '').toString();
+            final rawName = (it['name'] ?? '').toString();
+            final name = config.oauthProvider == OAuthProvider.claude
+                ? decodeClaudeOAuthToolName(rawName)
+                : rawName;
             final args =
                 (it['input'] as Map?)?.cast<String, dynamic>() ??
                 const <String, dynamic>{};
@@ -525,6 +529,9 @@ Stream<StreamChunk> sendClaudeStream(
 
       final sse = response.stream.transform(utf8.decoder);
       final decoder = ClaudeStreamDecoder(
+        decodeToolName: config.oauthProvider == OAuthProvider.claude
+            ? decodeClaudeOAuthToolName
+            : null,
         skipRedactedThinkingBlocks: skipRedactedThinkingBlocks,
         initialUsage: totalUsage,
         serverToolNames: declaredServerToolNames,

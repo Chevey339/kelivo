@@ -4194,5 +4194,11 @@
   "oauthQuotaAvailable": "额度可用",
   "oauthSavedResets": "可用额度重置次数：{count}",
   "oauthPrimaryWindow": "主要窗口",
-  "oauthSecondaryWindow": "次要窗口"
+  "oauthSecondaryWindow": "次要窗口",
+  "oauthAuthorizationCode": "授权码或回调链接",
+  "oauthAuthorizationCodeHint": "如果浏览器没有自动返回，请将最后的回调链接或授权码粘贴到这里。",
+  "oauthInvalidAuthorizationCode": "请输入本次登录的授权码或回调链接。",
+  "oauthSubmitAuthorizationCode": "完成登录",
+  "oauthExtraUsage": "额外用量",
+  "oauthPromptCachingHelp": "复用多轮对话中的上下文，可设置缓存保留时长。"
 }

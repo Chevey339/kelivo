@@ -807,7 +807,7 @@ final class BusinessSettingsRouter {
   ) {
     final oauthProvider = payload['oauthProvider'];
     if (oauthProvider != null &&
-        !{'chatgpt', 'grok', 'kimi'}.contains(oauthProvider)) {
+        !{'chatgpt', 'grok', 'kimi', 'claude'}.contains(oauthProvider)) {
       throw const FormatException('Invalid OAuth provider');
     }
     final credentials = payload['oauthCredentials'];
@@ -821,7 +821,14 @@ final class BusinessSettingsRouter {
           'expiresAt',
           'sessionId',
         },
-        strings: const {'email', 'accountId', 'plan', 'deviceId'},
+        strings: const {
+          'email',
+          'accountId',
+          'plan',
+          'deviceId',
+          'organizationId',
+          'organizationName',
+        },
         booleans: const {'requiresLogin'},
       );
       if (oauthProvider == null ||

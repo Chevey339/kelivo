@@ -24,6 +24,8 @@ Map<String, String>? providerSessionHeaders(
         'x-client-request-id': session,
       },
       if (config.oauthProvider == OAuthProvider.grok) 'x-grok-conv-id': session,
+      if (config.oauthProvider == OAuthProvider.claude)
+        'X-Claude-Code-Session-Id': session,
       ...?extraHeaders,
     };
   }

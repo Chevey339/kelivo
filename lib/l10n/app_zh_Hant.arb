@@ -4194,5 +4194,11 @@
   "oauthQuotaAvailable": "額度可用",
   "oauthSavedResets": "可用額度重設次數：{count}",
   "oauthPrimaryWindow": "主要視窗",
-  "oauthSecondaryWindow": "次要視窗"
+  "oauthSecondaryWindow": "次要視窗",
+  "oauthAuthorizationCode": "授權碼或回呼連結",
+  "oauthAuthorizationCodeHint": "如果瀏覽器沒有自動返回，請將最後的回呼連結或授權碼貼到這裡。",
+  "oauthInvalidAuthorizationCode": "請輸入本次登入的授權碼或回呼連結。",
+  "oauthSubmitAuthorizationCode": "完成登入",
+  "oauthExtraUsage": "額外用量",
+  "oauthPromptCachingHelp": "重用多輪對話中的上下文，可設定快取保留時間。"
 }

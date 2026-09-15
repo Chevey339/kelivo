@@ -226,7 +226,9 @@ class _UsageBar extends StatelessWidget {
     final l = AppLocalizations.of(context)!;
     final cs = Theme.of(context).colorScheme;
     final duration = window.duration;
-    final windowLabel = (window.id == 'monthly'
+    final windowLabel = (window.id == 'extra'
+        ? l.oauthExtraUsage
+        : window.id == 'monthly'
         ? l.oauthMonthly
         : window.id == 'total'
         ? l.oauthTotal
@@ -265,7 +267,11 @@ class _UsageBar extends StatelessWidget {
               ),
             ),
             Text(
-              percent == null ? '—' : '${percent.toStringAsFixed(0)}%',
+              window.unit == 'usd'
+                  ? '\$${window.used?.toStringAsFixed(2) ?? '—'}${window.limit == null ? '' : ' / \$${window.limit!.toStringAsFixed(2)}'}'
+                  : percent == null
+                  ? '—'
+                  : '${percent.toStringAsFixed(0)}%',
               style: TextStyle(fontSize: 12, fontWeight: AppFontWeights.medium),
             ),
           ],

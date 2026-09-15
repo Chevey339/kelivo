@@ -10,6 +10,7 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../shared/widgets/ios_tile_button.dart';
 import '../../../shared/widgets/section_card.dart';
+import '../../../shared/widgets/ios_form_text_field.dart';
 import '../../../theme/app_font_weights.dart';
 import '../../../theme/app_semantic_colors.dart';
 import 'provider_avatar.dart';
@@ -72,6 +73,8 @@ class _OAuthLoginPanelState extends State<OAuthLoginPanel> {
   Object? _error;
   bool _browserLogin = false;
   bool _switchingToDeviceCode = false;
+  final _authorizationCode = TextEditingController();
+  bool _invalidAuthorizationCode = false;
 
   @override
   void initState() {
@@ -86,18 +89,23 @@ class _OAuthLoginPanelState extends State<OAuthLoginPanel> {
   @override
   void dispose() {
     _cancellation?.cancel();
+    _authorizationCode.dispose();
     super.dispose();
   }
 
   Future<void> _login(OAuthProvider provider, {bool? deviceCode}) async {
     if (_active != null) return;
     final cancellation = OAuthCancellation();
-    final useDeviceCode = deviceCode ?? provider != OAuthProvider.chatgpt;
+    final useDeviceCode =
+        deviceCode ??
+        (provider != OAuthProvider.chatgpt && provider != OAuthProvider.claude);
+    _authorizationCode.clear();
     setState(() {
       _active = provider;
       _browserLogin = provider == OAuthProvider.chatgpt && !useDeviceCode;
       _error = null;
       _prompt = null;
+      _invalidAuthorizationCode = false;
       _cancellation = cancellation;
     });
     try {
@@ -231,7 +239,8 @@ class _OAuthLoginPanelState extends State<OAuthLoginPanel> {
                 ),
             ],
             if (_prompt != null &&
-                (!_prompt!.browserAuthorization ||
+                (_prompt!.submitAuthorizationCode != null ||
+                    !_prompt!.browserAuthorization ||
                     !(Platform.isAndroid || Platform.isIOS)))
               IosTileButton(
                 label: l.oauthOpenBrowser,
@@ -242,6 +251,40 @@ class _OAuthLoginPanelState extends State<OAuthLoginPanel> {
                 ),
               ),
             const SizedBox(height: 12),
+            if (_prompt?.submitAuthorizationCode case final submit?) ...[
+              Text(
+                l.oauthAuthorizationCodeHint,
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 12,
+                  color: cs.onSurface.withValues(alpha: .6),
+                ),
+              ),
+              const SizedBox(height: 12),
+              IosFormTextField(
+                label: l.oauthAuthorizationCode,
+                controller: _authorizationCode,
+              ),
+              if (_invalidAuthorizationCode)
+                Padding(
+                  padding: const EdgeInsets.only(top: 8),
+                  child: Text(
+                    l.oauthInvalidAuthorizationCode,
+                    style: TextStyle(color: cs.error, fontSize: 12),
+                  ),
+                ),
+              const SizedBox(height: 12),
+              IosTileButton(
+                label: l.oauthSubmitAuthorizationCode,
+                icon: LucideIcons.check,
+                onTap: () => setState(
+                  () => _invalidAuthorizationCode = !submit(
+                    _authorizationCode.text,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+            ],
             if (_browserLogin) ...[
               IosTileButton(
                 label: l.oauthDeviceLogin,
@@ -357,6 +400,7 @@ class _OAuthLoginPanelState extends State<OAuthLoginPanel> {
                               OAuthProvider.chatgpt => 'Codex',
                               OAuthProvider.grok => 'xAI',
                               OAuthProvider.kimi => 'Kimi Code',
+                              OAuthProvider.claude => 'Pro / Max',
                             },
                             style: TextStyle(
                               fontSize: 12,

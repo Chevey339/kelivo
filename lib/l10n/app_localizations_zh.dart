@@ -11351,6 +11351,24 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get oauthSecondaryWindow => '次要窗口';
+
+  @override
+  String get oauthAuthorizationCode => '授权码或回调链接';
+
+  @override
+  String get oauthAuthorizationCodeHint => '如果浏览器没有自动返回，请将最后的回调链接或授权码粘贴到这里。';
+
+  @override
+  String get oauthInvalidAuthorizationCode => '请输入本次登录的授权码或回调链接。';
+
+  @override
+  String get oauthSubmitAuthorizationCode => '完成登录';
+
+  @override
+  String get oauthExtraUsage => '额外用量';
+
+  @override
+  String get oauthPromptCachingHelp => '复用多轮对话中的上下文，可设置缓存保留时长。';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hans`).
@@ -22626,6 +22644,24 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get oauthSecondaryWindow => '次要窗口';
+
+  @override
+  String get oauthAuthorizationCode => '授权码或回调链接';
+
+  @override
+  String get oauthAuthorizationCodeHint => '如果浏览器没有自动返回，请将最后的回调链接或授权码粘贴到这里。';
+
+  @override
+  String get oauthInvalidAuthorizationCode => '请输入本次登录的授权码或回调链接。';
+
+  @override
+  String get oauthSubmitAuthorizationCode => '完成登录';
+
+  @override
+  String get oauthExtraUsage => '额外用量';
+
+  @override
+  String get oauthPromptCachingHelp => '复用多轮对话中的上下文，可设置缓存保留时长。';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hant`).
@@ -33980,4 +34016,22 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get oauthSecondaryWindow => '次要視窗';
+
+  @override
+  String get oauthAuthorizationCode => '授權碼或回呼連結';
+
+  @override
+  String get oauthAuthorizationCodeHint => '如果瀏覽器沒有自動返回，請將最後的回呼連結或授權碼貼到這裡。';
+
+  @override
+  String get oauthInvalidAuthorizationCode => '請輸入本次登入的授權碼或回呼連結。';
+
+  @override
+  String get oauthSubmitAuthorizationCode => '完成登入';
+
+  @override
+  String get oauthExtraUsage => '額外用量';
+
+  @override
+  String get oauthPromptCachingHelp => '重用多輪對話中的上下文，可設定快取保留時間。';
 }

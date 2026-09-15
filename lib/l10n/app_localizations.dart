@@ -21308,6 +21308,42 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Secondary window'**
   String get oauthSecondaryWindow;
+
+  /// No description provided for @oauthAuthorizationCode.
+  ///
+  /// In en, this message translates to:
+  /// **'Authorization code or callback URL'**
+  String get oauthAuthorizationCode;
+
+  /// No description provided for @oauthAuthorizationCodeHint.
+  ///
+  /// In en, this message translates to:
+  /// **'If the browser does not return automatically, paste the final callback URL or authorization code here.'**
+  String get oauthAuthorizationCodeHint;
+
+  /// No description provided for @oauthInvalidAuthorizationCode.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter the code or callback URL from this login attempt.'**
+  String get oauthInvalidAuthorizationCode;
+
+  /// No description provided for @oauthSubmitAuthorizationCode.
+  ///
+  /// In en, this message translates to:
+  /// **'Complete login'**
+  String get oauthSubmitAuthorizationCode;
+
+  /// No description provided for @oauthExtraUsage.
+  ///
+  /// In en, this message translates to:
+  /// **'Extra usage'**
+  String get oauthExtraUsage;
+
+  /// No description provided for @oauthPromptCachingHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'Reuse context across messages and choose how long the cache is retained.'**
+  String get oauthPromptCachingHelp;
 }
 
 class _AppLocalizationsDelegate

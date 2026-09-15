@@ -3,6 +3,7 @@ import 'package:Kelivo/desktop/desktop_settings_page.dart'
 import 'package:Kelivo/features/provider/pages/provider_network_page.dart';
 import 'package:Kelivo/features/provider/pages/provider_custom_request_page.dart';
 import 'package:Kelivo/features/provider/widgets/oauth_connection_info.dart';
+import 'package:Kelivo/features/provider/widgets/provider_prompt_cache_settings.dart';
 import 'package:Kelivo/shared/widgets/ios_switch.dart';
 import 'dart:async';
 import 'dart:convert';
@@ -105,6 +106,53 @@ class _DetailService extends ProviderOAuthService {
   Future<void> syncModels(String id) async {
     syncCalls++;
     await syncGate?.future;
+  }
+}
+
+class _ClaudeLoginService extends _DetailService {
+  final submitted = <String>[];
+  final completed = Completer<void>();
+
+  @override
+  Future<ProviderConfig> login({
+    required OAuthProvider provider,
+    required OAuthCancellation cancellation,
+    required void Function(OAuthLoginPrompt) onPrompt,
+    String? providerId,
+    bool deviceCode = true,
+    Future<bool> Function(Uri)? launcher,
+  }) async {
+    expect(provider, OAuthProvider.claude);
+    expect(deviceCode, isFalse);
+    onPrompt(
+      OAuthLoginPrompt(
+        url: Uri.parse('https://claude.ai/oauth/authorize'),
+        browserAuthorization: true,
+        submitAuthorizationCode: (value) {
+          submitted.add(value);
+          if (value != 'valid-code') return false;
+          completed.complete();
+          return true;
+        },
+      ),
+    );
+    await completed.future;
+    return ProviderConfig(
+      id: 'claude-new',
+      name: 'Claude',
+      enabled: true,
+      apiKey: '',
+      baseUrl: OAuthProvider.claude.baseUrl,
+      providerType: ProviderKind.claude,
+      oauthProvider: provider,
+      oauthCredentials: ProviderOAuthCredentials(
+        accessToken: 'token',
+        refreshToken: 'refresh',
+        expiresAt: DateTime.now().add(const Duration(hours: 1)),
+        sessionId: 'session',
+        email: 'claude@example.com',
+      ),
+    );
   }
 }
 
@@ -318,7 +366,7 @@ void main() {
   );
 
   testWidgets(
-    'account login is the fourth add tab and has only the three implemented providers',
+    'account login is the fourth add tab and offers all four providers',
     (tester) async {
       tester.view.physicalSize = const Size(390, 844);
       tester.view.devicePixelRatio = 1;
@@ -349,7 +397,14 @@ void main() {
       expect(find.text('ChatGPT'), findsOneWidget);
       expect(find.text('Grok'), findsOneWidget);
       expect(find.text('Kimi Code'), findsNWidgets(2));
-      expect(find.text('Log in'), findsNWidgets(3));
+      expect(
+        find.descendant(
+          of: find.byType(OAuthLoginPanel),
+          matching: find.text('Claude'),
+        ),
+        findsOneWidget,
+      );
+      expect(find.text('Log in'), findsNWidgets(4));
       expect(find.text('Use device code'), findsNothing);
       expect(find.text('API Key'), findsNothing);
       expect(tester.takeException(), isNull);
@@ -1059,6 +1114,156 @@ void main() {
       },
     );
   }
+
+  for (final desktop in [false, true]) {
+    for (final brightness in Brightness.values) {
+      testWidgets(
+        'Claude OAuth TTL saves through the real detail page desktop=$desktop theme=${brightness.name}',
+        (tester) async {
+          tester.view.physicalSize = desktop
+              ? const Size(1280, 900)
+              : const Size(390, 844);
+          tester.view.devicePixelRatio = 1;
+          addTearDown(tester.view.resetPhysicalSize);
+          addTearDown(tester.view.resetDevicePixelRatio);
+          final config = settings
+              .getProviderConfig('oauth-test')
+              .copyWith(
+                name: 'Claude',
+                oauthProvider: OAuthProvider.claude,
+                providerType: ProviderKind.claude,
+                baseUrl: OAuthProvider.claude.baseUrl,
+                claudePromptCachingEnabled: true,
+                claudePromptCachingTtl: '1h',
+              );
+          await tester.runAsync(
+            () => settings.setProviderConfig(config.id, config),
+          );
+          final key = GlobalKey();
+          await tester.pumpWidget(
+            app(
+              RepaintBoundary(
+                key: key,
+                child: OAuthProviderDetailPage(
+                  providerId: config.id,
+                  embedded: desktop,
+                  service: _DetailService(),
+                ),
+              ),
+              brightness: brightness,
+            ),
+          );
+          await tester.pumpAndSettle();
+          final controls = find.byType(ProviderPromptCacheSettings);
+          expect(controls, findsOneWidget);
+          await tester.ensureVisible(
+            find.descendant(of: controls, matching: find.text('1 hour')),
+          );
+          if (desktop) {
+            await tester.tap(find.text('1 hour'));
+            await tester.pumpAndSettle();
+          }
+          await tester.tap(find.text('5 min'));
+          await tester.pumpAndSettle();
+          expect(
+            settings.getProviderConfig(config.id).claudePromptCachingTtl,
+            '5m',
+          );
+          expect(tester.takeException(), isNull);
+          await snapshot(
+            tester,
+            key,
+            'claude-cache-${desktop ? 'desktop' : 'mobile'}-${brightness.name}',
+          );
+          final toggle = find.descendant(
+            of: controls,
+            matching: find.byType(IosSwitch),
+          );
+          await tester.ensureVisible(toggle);
+          await tester.tap(toggle);
+          await tester.pumpAndSettle();
+          expect(
+            settings.getProviderConfig(config.id).claudePromptCachingEnabled,
+            isFalse,
+          );
+          expect(
+            find.descendant(of: controls, matching: find.text('5 min')),
+            findsNothing,
+          );
+          await tester.tap(toggle);
+          await tester.pumpAndSettle();
+          final restored = ProviderConfig.fromJson(
+            settings.getProviderConfig(config.id).toJson(),
+          );
+          expect(restored.claudePromptCachingEnabled, isTrue);
+          expect(restored.claudePromptCachingTtl, '5m');
+          expect(tester.takeException(), isNull);
+        },
+      );
+    }
+  }
+
+  testWidgets(
+    'Claude login accepts a pasted authorization code using app controls',
+    (tester) async {
+      tester.view.physicalSize = const Size(390, 844);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      final service = _ClaudeLoginService();
+      await tester.pumpWidget(
+        app(
+          SingleChildScrollView(
+            child: OAuthLoginPanel(
+              provider: OAuthProvider.claude,
+              service: service,
+              autoStart: true,
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('Use device code'), findsNothing);
+      await tester.tap(find.text('Complete login'));
+      await tester.pumpAndSettle();
+      expect(
+        find.text('Enter the code or callback URL from this login attempt.'),
+        findsOneWidget,
+      );
+      await tester.enterText(find.byType(TextField), 'valid-code');
+      await tester.tap(find.text('Complete login'));
+      await tester.pumpAndSettle();
+      expect(find.text('Connected'), findsOneWidget);
+      expect(find.text('claude@example.com'), findsOneWidget);
+      expect(service.submitted, ['', 'valid-code']);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'Claude extra usage renders dollars without a fabricated unlimited percentage',
+    (tester) async {
+      await tester.pumpWidget(
+        app(
+          OAuthAccountCard(
+            avatar: const SizedBox(),
+            name: 'Claude',
+            usage: ProviderUsageSnapshot(
+              fetchedAt: DateTime(2026, 9, 15),
+              windows: const [
+                ProviderUsageWindow(id: 'extra', unit: 'usd', used: 2.49),
+              ],
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('Extra usage'), findsOneWidget);
+      expect(find.text('\$2.49'), findsOneWidget);
+      expect(find.text('0%'), findsNothing);
+      expect(tester.takeException(), isNull);
+    },
+  );
 
   testWidgets('expired chat recovery becomes a confirmation after login', (
     tester,

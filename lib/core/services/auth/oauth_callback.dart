@@ -8,7 +8,9 @@ export 'oauth_callback_types.dart';
 Future<OAuthCallback> openOAuthCallback(
   Uri authorizationServer, {
   Uri? loopbackRedirect,
+  String? expectedState,
 }) => implementation.openOAuthCallback(
   authorizationServer,
   loopbackRedirect: loopbackRedirect,
+  expectedState: expectedState,
 );

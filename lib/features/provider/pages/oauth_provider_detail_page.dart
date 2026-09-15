@@ -20,6 +20,7 @@ import '../widgets/oauth_account_card.dart';
 import '../widgets/oauth_login_panel.dart';
 import '../widgets/provider_avatar.dart';
 import '../widgets/oauth_connection_info.dart';
+import '../widgets/provider_prompt_cache_settings.dart';
 import 'provider_network_page.dart';
 import 'provider_custom_request_page.dart';
 
@@ -269,7 +270,15 @@ class _OAuthProviderDetailPageState extends State<OAuthProviderDetailPage> {
               key: widget.desktopPaneKey ?? ValueKey(config.id),
               providerKey: config.id,
               displayName: config.name,
-              oauthAccount: _account(config),
+              oauthAccount: Column(
+                children: [
+                  _account(config),
+                  if (config.oauthProvider == OAuthProvider.claude) ...[
+                    const SizedBox(height: 18),
+                    ProviderPromptCacheSettings(config: config, desktop: true),
+                  ],
+                ],
+              ),
               syncingModels: _syncing,
               onSyncModels: needsLogin ? null : _syncModels,
               onClose: widget.embedded
@@ -358,6 +367,10 @@ class _OAuthProviderDetailPageState extends State<OAuthProviderDetailPage> {
                     ),
                     children: [
                       _account(config),
+                      if (config.oauthProvider == OAuthProvider.claude) ...[
+                        const SizedBox(height: 18),
+                        ProviderPromptCacheSettings(config: config),
+                      ],
                       const SizedBox(height: 20),
                       SectionCard(
                         children: [

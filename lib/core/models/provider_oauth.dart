@@ -1,30 +1,34 @@
 import 'dart:convert';
 
-enum OAuthProvider { chatgpt, grok, kimi }
+enum OAuthProvider { chatgpt, grok, kimi, claude }
 
 extension OAuthProviderInfo on OAuthProvider {
   String get displayName => switch (this) {
     OAuthProvider.chatgpt => 'ChatGPT',
     OAuthProvider.grok => 'Grok',
     OAuthProvider.kimi => 'Kimi Code',
+    OAuthProvider.claude => 'Claude',
   };
 
   String get baseUrl => switch (this) {
     OAuthProvider.chatgpt => 'https://chatgpt.com/backend-api/codex',
     OAuthProvider.grok => 'https://api.x.ai/v1',
     OAuthProvider.kimi => 'https://api.kimi.com/coding/v1',
+    OAuthProvider.claude => 'https://api.anthropic.com/v1',
   };
 
   String get clientId => switch (this) {
     OAuthProvider.chatgpt => 'app_EMoamEEZ73f0CkXaXp7hrann',
     OAuthProvider.grok => 'b1a00492-073a-47ea-816f-4c329264a828',
     OAuthProvider.kimi => '17e5f671-d194-4dfb-9706-5516cb48c098',
+    OAuthProvider.claude => '9d1c250a-e61b-44d9-88ed-5944d1962f5e',
   };
 
   String get tokenEndpoint => switch (this) {
     OAuthProvider.chatgpt => 'https://auth.openai.com/oauth/token',
     OAuthProvider.grok => 'https://auth.x.ai/oauth2/token',
     OAuthProvider.kimi => 'https://auth.kimi.com/api/oauth/token',
+    OAuthProvider.claude => 'https://api.anthropic.com/v1/oauth/token',
   };
 
   String get scope => switch (this) {
@@ -33,13 +37,19 @@ extension OAuthProviderInfo on OAuthProvider {
     OAuthProvider.grok =>
       'openid profile email offline_access grok-cli:access api:access',
     OAuthProvider.kimi => '',
+    OAuthProvider.claude =>
+      'org:create_api_key user:profile user:inference user:sessions:claude_code user:mcp_servers user:file_upload',
   };
 
   String get icon => switch (this) {
     OAuthProvider.chatgpt => 'assets/icons/openai.svg',
     OAuthProvider.grok => 'assets/icons/grok.svg',
     OAuthProvider.kimi => 'assets/icons/kimi-color.svg',
+    OAuthProvider.claude => 'assets/icons/claude-color.svg',
   };
+
+  bool get usesResponsesApi =>
+      this == OAuthProvider.chatgpt || this == OAuthProvider.grok;
 }
 
 /// Stored with the provider configuration, including in portable backups.
@@ -53,6 +63,8 @@ class ProviderOAuthCredentials {
     this.email,
     this.plan,
     this.deviceId,
+    this.organizationId,
+    this.organizationName,
     this.requiresLogin = false,
   });
 
@@ -64,10 +76,14 @@ class ProviderOAuthCredentials {
   final String? email;
   final String? plan;
   final String? deviceId;
+  final String? organizationId;
+  final String? organizationName;
   final bool requiresLogin;
 
-  bool shouldRefresh(DateTime now) =>
-      !now.add(const Duration(minutes: 1)).isBefore(expiresAt);
+  bool shouldRefresh(
+    DateTime now, {
+    Duration leeway = const Duration(minutes: 1),
+  }) => !now.add(leeway).isBefore(expiresAt);
 
   ProviderOAuthCredentials copyWith({
     String? accessToken,
@@ -76,6 +92,9 @@ class ProviderOAuthCredentials {
     String? accountId,
     String? email,
     String? plan,
+    String? deviceId,
+    String? organizationId,
+    String? organizationName,
     bool? requiresLogin,
   }) => ProviderOAuthCredentials(
     accessToken: accessToken ?? this.accessToken,
@@ -85,7 +104,9 @@ class ProviderOAuthCredentials {
     accountId: accountId ?? this.accountId,
     email: email ?? this.email,
     plan: plan ?? this.plan,
-    deviceId: deviceId,
+    deviceId: deviceId ?? this.deviceId,
+    organizationId: organizationId ?? this.organizationId,
+    organizationName: organizationName ?? this.organizationName,
     requiresLogin: requiresLogin ?? this.requiresLogin,
   );
 
@@ -98,6 +119,8 @@ class ProviderOAuthCredentials {
     if (email != null) 'email': email,
     if (plan != null) 'plan': plan,
     if (deviceId != null) 'deviceId': deviceId,
+    if (organizationId != null) 'organizationId': organizationId,
+    if (organizationName != null) 'organizationName': organizationName,
     'requiresLogin': requiresLogin,
   };
 
@@ -111,6 +134,8 @@ class ProviderOAuthCredentials {
         email: json['email'] as String?,
         plan: json['plan'] as String?,
         deviceId: json['deviceId'] as String?,
+        organizationId: json['organizationId'] as String?,
+        organizationName: json['organizationName'] as String?,
         requiresLogin: json['requiresLogin'] == true,
       );
 }
@@ -138,6 +163,7 @@ class ProviderUsageWindow {
     this.limit,
     this.resetsAt,
     this.duration,
+    this.unit,
   });
   final String id;
   final String? label;
@@ -146,6 +172,7 @@ class ProviderUsageWindow {
   final double? limit;
   final DateTime? resetsAt;
   final Duration? duration;
+  final String? unit;
 }
 
 class ProviderUsageSnapshot {

@@ -56,6 +56,7 @@ dependencies:
   http: ^1.5.0
   cupertino_http: ^3.0.2
   crypto: ^3.0.3
+  hashlib: ^2.4.2
   ffi: ^2.2.0
   dio: 5.9.2
   socks5_proxy: ^2.1.1

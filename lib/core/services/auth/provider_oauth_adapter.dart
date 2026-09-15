@@ -11,6 +11,9 @@ import '../logging/log_redactor.dart';
 import 'oauth_callback.dart';
 import 'oauth_cancellation.dart';
 import 'oauth_pkce.dart';
+import 'claude_oauth_request.dart';
+
+part 'claude_oauth_adapter.dart';
 
 const codexClientVersion = '0.153.0';
 
@@ -19,18 +22,21 @@ class OAuthLoginPrompt {
     required this.url,
     this.userCode,
     this.browserAuthorization = false,
+    this.submitAuthorizationCode,
   });
   final Uri url;
   final String? userCode;
   final bool browserAuthorization;
+  final bool Function(String input)? submitAuthorizationCode;
 }
 
 typedef OAuthPromptHandler = Future<void> Function(OAuthLoginPrompt prompt);
 
 class OAuthWireResponse {
-  const OAuthWireResponse(this.status, this.data);
+  const OAuthWireResponse(this.status, this.data, {this.headers = const {}});
   final int status;
   final Map<String, dynamic> data;
+  final Map<String, String> headers;
   bool get ok => status >= 200 && status < 300;
 }
 
@@ -73,7 +79,11 @@ class OAuthWire {
           );
         }
       }
-      return OAuthWireResponse(response.statusCode, data);
+      return OAuthWireResponse(
+        response.statusCode,
+        data,
+        headers: response.headers,
+      );
     } on ProviderOAuthException {
       rethrow;
     } on TimeoutException {
@@ -181,6 +191,7 @@ abstract class ProviderOAuthAdapter {
         OAuthProvider.chatgpt => ChatGptOAuthAdapter(),
         OAuthProvider.grok => GrokOAuthAdapter(),
         OAuthProvider.kimi => KimiOAuthAdapter(),
+        OAuthProvider.claude => ClaudeOAuthAdapter(),
       };
 
   Map<String, String> headers(ProviderOAuthCredentials credentials) => {

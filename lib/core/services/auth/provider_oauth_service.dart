@@ -11,6 +11,7 @@ import '../../providers/model_provider.dart';
 import '../../providers/settings_provider.dart';
 import '../network/dio_http_client.dart';
 import 'codex_request.dart';
+import 'claude_oauth_request.dart';
 import 'oauth_cancellation.dart';
 import 'provider_oauth_adapter.dart';
 
@@ -113,9 +114,15 @@ class ProviderOAuthService extends ChangeNotifier {
           name: provider.displayName,
           apiKey: '',
           baseUrl: provider.baseUrl,
-          providerType: ProviderKind.openai,
+          providerType: provider == OAuthProvider.claude
+              ? ProviderKind.claude
+              : ProviderKind.openai,
           oauthProvider: provider,
-          useResponseApi: provider != OAuthProvider.kimi,
+          useResponseApi: provider.usesResponsesApi,
+          claudePromptCachingEnabled: provider == OAuthProvider.claude,
+          claudePromptCachingTtl: provider == OAuthProvider.claude
+              ? ProviderConfig.claudePromptCachingTtl1h
+              : ProviderConfig.claudePromptCachingTtl5m,
           avatarType: 'icon',
           avatarValue: provider.icon,
         );
@@ -209,7 +216,13 @@ class ProviderOAuthService extends ChangeNotifier {
         providerId: config.id,
       );
     }
-    if (!force && !current.oauthCredentials!.shouldRefresh(DateTime.now())) {
+    if (!force &&
+        !current.oauthCredentials!.shouldRefresh(
+          DateTime.now(),
+          leeway: current.oauthProvider == OAuthProvider.claude
+              ? const Duration(minutes: 5)
+              : const Duration(minutes: 1),
+        )) {
       return _forRequest(current);
     }
     final key = _sessionKey(current);
@@ -229,7 +242,10 @@ class ProviderOAuthService extends ChangeNotifier {
   ProviderConfig _forRequest(ProviderConfig config) => config.copyWith(
     apiKey: config.oauthCredentials!.accessToken,
     baseUrl: config.oauthProvider!.baseUrl,
-    useResponseApi: config.oauthProvider != OAuthProvider.kimi,
+    useResponseApi: config.oauthProvider!.usesResponsesApi,
+    providerType: config.oauthProvider == OAuthProvider.claude
+        ? ProviderKind.claude
+        : config.providerType,
     multiKeyEnabled: false,
   );
 
@@ -483,6 +499,7 @@ class _ProviderOAuthHttpClient extends http.BaseClient {
   ProviderConfig config;
   final ProviderOAuthService service;
   final String? _sessionId;
+  final String _claudeConversationId = const Uuid().v4();
 
   void _checkSession() {
     if (config.oauthCredentials?.sessionId != _sessionId) {
@@ -502,31 +519,72 @@ class _ProviderOAuthHttpClient extends http.BaseClient {
     final base = Uri.parse(config.oauthProvider!.baseUrl);
     if (request.url.origin != base.origin ||
         !request.url.path.startsWith('${base.path}/') ||
-        request is! http.Request) {
+        request is! http.Request &&
+            config.oauthProvider != OAuthProvider.claude) {
       throw const ProviderOAuthException(ProviderOAuthFailure.invalidResponse);
     }
-    final body = request.bodyBytes;
+    final body = request is http.Request
+        ? request.bodyBytes
+        : await request.finalize().toBytes();
+    final isClaude = config.oauthProvider == OAuthProvider.claude;
+    final claudeMessages = isClaude && request.url.path.endsWith('/messages');
     http.Request build() {
       // Recheck immediately before every send, including after refresh awaits.
       _checkSession();
-      final result = http.Request(request.method, request.url)
-        ..followRedirects = false
-        ..headers.addAll(request.headers)
-        ..bodyBytes = body;
+      final result =
+          http.Request(
+              request.method,
+              claudeMessages
+                  ? request.url.replace(
+                      queryParameters: {
+                        ...request.url.queryParameters,
+                        'beta': 'true',
+                      },
+                    )
+                  : request.url,
+            )
+            ..followRedirects = false
+            ..headers.addAll(request.headers)
+            ..bodyBytes = body;
       final authHeaders = ProviderOAuthAdapter.forProvider(
         config.oauthProvider!,
       ).headers(config.oauthCredentials!);
+      final existingBeta = result.headers['anthropic-beta'];
+      final existingContentType = result.headers['content-type'];
       for (final name in authHeaders.keys) {
         result.headers.removeWhere(
           (key, _) => key.toLowerCase() == name.toLowerCase(),
         );
       }
       result.headers.addAll(authHeaders);
+      if (isClaude) {
+        result.headers.removeWhere(
+          (key, _) => key.toLowerCase() == 'x-api-key',
+        );
+        setClaudeOAuthHeader(
+          result.headers,
+          'anthropic-beta',
+          {
+            ...claudeOAuthBetas,
+            ...?existingBeta
+                ?.split(',')
+                .map((value) => value.trim())
+                .where((value) => value.isNotEmpty),
+          }.where((value) => value != 'context-1m-2025-08-07').join(','),
+        );
+        if (existingContentType != null && !claudeMessages) {
+          setClaudeOAuthHeader(
+            result.headers,
+            'Content-Type',
+            existingContentType,
+          );
+        }
+      }
       if (config.oauthProvider == OAuthProvider.kimi &&
           request.url.path.endsWith('/messages')) {
         result.headers['x-api-key'] = config.oauthCredentials!.accessToken;
       }
-      if (request.method == 'POST') {
+      if (request.method == 'POST' && (!isClaude || claudeMessages)) {
         final payload = (jsonDecode(utf8.decode(body)) as Map)
             .cast<String, dynamic>();
         if (config.oauthProvider == OAuthProvider.chatgpt) {
@@ -572,7 +630,14 @@ class _ProviderOAuthHttpClient extends http.BaseClient {
             'reasoning.encrypted_content',
           }.toList();
         }
-        result.body = jsonEncode(payload);
+        result.body = isClaude
+            ? encodeClaudeOAuthRequest(
+                payload,
+                config,
+                result.headers,
+                _claudeConversationId,
+              )
+            : jsonEncode(payload);
       }
       return result;
     }

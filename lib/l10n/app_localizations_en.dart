@@ -11873,4 +11873,25 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get oauthSecondaryWindow => 'Secondary window';
+
+  @override
+  String get oauthAuthorizationCode => 'Authorization code or callback URL';
+
+  @override
+  String get oauthAuthorizationCodeHint =>
+      'If the browser does not return automatically, paste the final callback URL or authorization code here.';
+
+  @override
+  String get oauthInvalidAuthorizationCode =>
+      'Enter the code or callback URL from this login attempt.';
+
+  @override
+  String get oauthSubmitAuthorizationCode => 'Complete login';
+
+  @override
+  String get oauthExtraUsage => 'Extra usage';
+
+  @override
+  String get oauthPromptCachingHelp =>
+      'Reuse context across messages and choose how long the cache is retained.';
 }

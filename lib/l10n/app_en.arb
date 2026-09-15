@@ -5220,5 +5220,11 @@
   "oauthSavedResets": "Available usage resets: {count}",
   "@oauthSavedResets": { "placeholders": { "count": { "type": "String" } } },
   "oauthPrimaryWindow": "Primary window",
-  "oauthSecondaryWindow": "Secondary window"
+  "oauthSecondaryWindow": "Secondary window",
+  "oauthAuthorizationCode": "Authorization code or callback URL",
+  "oauthAuthorizationCodeHint": "If the browser does not return automatically, paste the final callback URL or authorization code here.",
+  "oauthInvalidAuthorizationCode": "Enter the code or callback URL from this login attempt.",
+  "oauthSubmitAuthorizationCode": "Complete login",
+  "oauthExtraUsage": "Extra usage",
+  "oauthPromptCachingHelp": "Reuse context across messages and choose how long the cache is retained."
 }
