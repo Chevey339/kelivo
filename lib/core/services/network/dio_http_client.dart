@@ -187,7 +187,9 @@ class DioHttpClient extends http.BaseClient {
     final bodyBytes = await request.finalize().toBytes();
 
     final reqHeaders = Map<String, String>.from(request.headers);
-    reqHeaders.putIfAbsent('User-Agent', () => 'Kelivo');
+    if (!reqHeaders.keys.any((key) => key.toLowerCase() == 'user-agent')) {
+      reqHeaders['User-Agent'] = 'Kelivo';
+    }
 
     if (logRequests && RequestLogger.enabled) {
       RequestLogger.logLine(

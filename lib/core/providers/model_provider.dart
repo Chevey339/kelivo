@@ -180,6 +180,18 @@ abstract class BaseProvider {
 }
 
 class _Http {
+  static Map<String, String> modelListHeaders(
+    ProviderConfig cfg,
+    Map<String, String> base,
+  ) {
+    return CustomRequestMerger.mergeHeaders(
+      base: base,
+      provider: ModelOverridePayloadParser.customHeadersFromRows(
+        cfg.customHeaders,
+      ),
+    );
+  }
+
   static http.Client clientFor(ProviderConfig cfg) {
     final enabled = cfg.proxyEnabled == true;
     final host = (cfg.proxyHost ?? '').trim();
@@ -212,7 +224,10 @@ class OpenAIProvider extends BaseProvider {
       final uri = Uri.parse('${cfg.baseUrl}/models');
       final headers = <String, String>{};
       if (key.isNotEmpty) headers['Authorization'] = 'Bearer $key';
-      final res = await client.get(uri, headers: headers);
+      final res = await client.get(
+        uri,
+        headers: _Http.modelListHeaders(cfg, headers),
+      );
       if (res.statusCode >= 200 && res.statusCode < 300) {
         final data = (jsonDecode(res.body)['data'] as List?) ?? [];
         return [
@@ -243,7 +258,10 @@ class ClaudeProvider extends BaseProvider {
       final uri = Uri.parse('${cfg.baseUrl}/models');
       final headers = <String, String>{'anthropic-version': anthropicVersion};
       if (key.isNotEmpty) headers['x-api-key'] = key;
-      final res = await client.get(uri, headers: headers);
+      final res = await client.get(
+        uri,
+        headers: _Http.modelListHeaders(cfg, headers),
+      );
       if (res.statusCode >= 200 && res.statusCode < 300) {
         final obj = jsonDecode(res.body) as Map<String, dynamic>;
         final data = (obj['data'] as List?) ?? [];
@@ -313,7 +331,10 @@ class GoogleProvider extends BaseProvider {
       }
       final out = <ModelInfo>[];
       try {
-        final res = await client.get(Uri.parse(url), headers: headers);
+        final res = await client.get(
+          Uri.parse(url),
+          headers: _Http.modelListHeaders(cfg, headers),
+        );
         if (res.statusCode >= 200 && res.statusCode < 300) {
           final obj = jsonDecode(res.body) as Map<String, dynamic>;
           final arr = (obj['models'] as List?) ?? [];
