@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
 import '../../core/models/model_spec.dart';
+import '../../core/utils/token_format.dart';
 import '../../icons/lucide_adapter.dart';
 import '../../l10n/app_localizations.dart';
 import 'package:Kelivo/theme/app_font_weights.dart';
@@ -65,11 +66,16 @@ class ModelTagWrap extends StatelessWidget {
     final bool isEmbedding = model.type == ModelType.embedding;
     final chatLabel = l10n?.modelSelectSheetChatType ?? 'Chat';
     final embeddingLabel = l10n?.modelSelectSheetEmbeddingType ?? 'Embedding';
+    final imageTypeLabel = l10n?.modelSpecFormImageType ?? 'Image';
     final textLabel = l10n?.modelDetailSheetTextMode ?? 'Text';
     final imageLabel = l10n?.modelDetailSheetImageMode ?? 'Image';
+    final audioLabel = l10n?.modelSpecFormAudioMode ?? 'Audio';
+    final videoLabel = l10n?.modelSpecFormVideoMode ?? 'Video';
+    final pdfLabel = l10n?.modelSpecFormPdfMode ?? 'PDF';
     final toolsLabel = l10n?.modelDetailSheetToolsAbility ?? 'Tools';
     final reasoningLabel =
         l10n?.modelDetailSheetReasoningAbility ?? 'Reasoning';
+    final contextLabel = l10n?.modelSpecFormContextWindow ?? 'Context window';
 
     final chips = <Widget>[];
 
@@ -87,7 +93,11 @@ class ModelTagWrap extends StatelessWidget {
         ),
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
         child: Text(
-          model.type == ModelType.embedding ? embeddingLabel : chatLabel,
+          model.type == ModelType.embedding
+              ? embeddingLabel
+              : model.type == ModelType.image
+              ? imageTypeLabel
+              : chatLabel,
           style: TextStyle(
             fontSize: 11,
             color: isDark ? cs.primary : cs.primary.withValues(alpha: 0.9),
@@ -119,9 +129,9 @@ class ModelTagWrap extends StatelessWidget {
     String modLabel(Modality m) => switch (m) {
       Modality.text => textLabel,
       Modality.image => imageLabel,
-      Modality.audio => 'Audio',
-      Modality.video => 'Video',
-      Modality.pdf => 'PDF',
+      Modality.audio => audioLabel,
+      Modality.video => videoLabel,
+      Modality.pdf => pdfLabel,
     };
     final ioLabel =
         '${inputModsUnique.map(modLabel).join(', ')} -> ${outputModsUnique.map(modLabel).join(', ')}';
@@ -257,6 +267,41 @@ class ModelTagWrap extends StatelessWidget {
       }
     }
 
+    final contextWindow = model.contextWindow;
+    if (contextWindow != null) {
+      chips.add(
+        Tooltip(
+          message: contextLabel,
+          child: Semantics(
+            label: '$contextLabel ${formatTokenCount(contextWindow)}',
+            child: ExcludeSemantics(
+              child: Container(
+                decoration: BoxDecoration(
+                  color: isDark
+                      ? cs.onSurface.withValues(alpha: 0.12)
+                      : cs.onSurface.withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(999),
+                  border: Border.all(
+                    color: cs.onSurface.withValues(alpha: 0.16),
+                    width: 0.5,
+                  ),
+                ),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                child: Text(
+                  formatTokenCount(contextWindow),
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: cs.onSurface.withValues(alpha: isDark ? 0.86 : 0.78),
+                    fontWeight: AppFontWeights.medium,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
     return Wrap(
       spacing: 6,
       runSpacing: 6,
@@ -295,9 +340,13 @@ class ModelCapsulesRow extends StatelessWidget {
     final inputLabel = l10n?.modelDetailSheetInputModesLabel ?? 'Input';
     final outputLabel = l10n?.modelDetailSheetOutputModesLabel ?? 'Output';
     final imageLabel = l10n?.modelDetailSheetImageMode ?? 'Image';
+    final audioLabel = l10n?.modelSpecFormAudioMode ?? 'Audio';
+    final videoLabel = l10n?.modelSpecFormVideoMode ?? 'Video';
+    final pdfLabel = l10n?.modelSpecFormPdfMode ?? 'PDF';
     final toolsLabel = l10n?.modelDetailSheetToolsAbility ?? 'Tools';
     final reasoningLabel =
         l10n?.modelDetailSheetReasoningAbility ?? 'Reasoning';
+    final contextLabel = l10n?.modelSpecFormContextWindow ?? 'Context window';
 
     Widget pillCapsule(Widget icon, Color color) {
       final bg = isDark
@@ -337,6 +386,36 @@ class ModelCapsulesRow extends StatelessWidget {
           label: '$inputLabel: $imageLabel',
           icon: Icon(Lucide.Eye, size: iconSize, color: cs.secondary),
           color: cs.secondary,
+        ),
+      );
+    }
+
+    if (model.input.contains(Modality.audio)) {
+      caps.add(
+        labeledCapsule(
+          label: '$inputLabel: $audioLabel',
+          icon: Icon(Lucide.AudioLines, size: iconSize, color: cs.tertiary),
+          color: cs.tertiary,
+        ),
+      );
+    }
+
+    if (model.input.contains(Modality.video)) {
+      caps.add(
+        labeledCapsule(
+          label: '$inputLabel: $videoLabel',
+          icon: Icon(Lucide.FileVideo, size: iconSize, color: cs.tertiary),
+          color: cs.tertiary,
+        ),
+      );
+    }
+
+    if (model.input.contains(Modality.pdf)) {
+      caps.add(
+        labeledCapsule(
+          label: '$inputLabel: $pdfLabel',
+          icon: Icon(Lucide.FileText, size: iconSize, color: cs.tertiary),
+          color: cs.tertiary,
         ),
       );
     }
@@ -400,6 +479,25 @@ class ModelCapsulesRow extends StatelessWidget {
             break;
         }
       }
+    }
+
+    final contextWindow = model.contextWindow;
+    if (contextWindow != null) {
+      caps.add(
+        labeledCapsule(
+          label: contextLabel,
+          icon: Text(
+            formatTokenCount(contextWindow),
+            style: TextStyle(
+              fontSize: iconSize,
+              height: 1,
+              color: cs.onSurface.withValues(alpha: 0.82),
+              fontWeight: AppFontWeights.medium,
+            ),
+          ),
+          color: cs.onSurface,
+        ),
+      );
     }
 
     if (caps.isEmpty) return const SizedBox.shrink();

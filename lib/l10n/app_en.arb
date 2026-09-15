@@ -1592,14 +1592,6 @@
   "modelDetailSheetBuiltinToolsTab": "Built-in Tools",
   "modelDetailSheetModelIdLabel": "Model ID",
   "modelDetailSheetModelIdHint": "Required, suggest lowercase/digits/hyphens",
-  "modelDetailSheetModelIdDisabledHint": "{modelId}",
-  "@modelDetailSheetModelIdDisabledHint": {
-    "placeholders": {
-      "modelId": {
-        "type": "String"
-      }
-    }
-  },
   "modelDetailSheetModelNameLabel": "Model Name",
   "modelDetailSheetModelTypeLabel": "Model Type",
   "modelDetailSheetChatType": "Chat",
@@ -1618,8 +1610,6 @@
   "modelDetailSheetSaveFailedMessage": "Save failed. Please try again.",
   "modelDetailSheetAddBody": "Add Body",
   "modelDetailSheetBuiltinToolsDescription": "Built-in tools depend on the provider and API mode.",
-  "modelDetailSheetSearchTool": "Search",
-  "modelDetailSheetSearchToolDescription": "Enable Google Search integration",
   "modelDetailSheetUrlContextTool": "URL Context",
   "modelDetailSheetUrlContextToolDescription": "Enable URL content ingestion",
   "modelDetailSheetCodeExecutionTool": "Code Execution",
@@ -1641,7 +1631,6 @@
   "modelDetailSheetAddButton": "Add",
   "modelDetailSheetConfirmButton": "Confirm",
   "modelDetailSheetInvalidIdError": "Please enter a valid model ID (>=2 chars)",
-  "modelDetailSheetModelIdExistsError": "Model ID already exists",
   "modelDetailSheetHeaderKeyHint": "Header Key",
   "modelDetailSheetHeaderValueHint": "Header Value",
   "modelDetailSheetBodyKeyHint": "Body Key",
@@ -1651,6 +1640,7 @@
   "modelSpecFormSourceInferred": "Inferred",
   "modelSpecFormSourceDefault": "Default",
   "modelSpecFormReset": "Reset to default",
+  "modelSpecFormModalitiesSection": "Modalities & abilities",
   "modelSpecFormImageType": "Image",
   "modelSpecFormAudioMode": "Audio",
   "modelSpecFormVideoMode": "Video",
@@ -1733,6 +1723,7 @@
   "modelSpecFormReplayFieldReasoning": "reasoning",
   "modelSpecFormReplayFieldReasoningDetails": "reasoning_details",
   "modelSpecFormLimitsSection": "Limits",
+  "modelSpecFormLimitsPricingSection": "Limits & pricing",
   "modelSpecFormContextWindow": "Context window",
   "modelSpecFormMaxOutput": "Max output",
   "modelSpecFormPricingSection": "Pricing",

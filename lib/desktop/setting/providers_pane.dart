@@ -4885,7 +4885,7 @@ class _DesktopProviderDetailPaneState extends State<DesktopProviderDetailPane> {
   // }
 
   Future<void> _createModel(BuildContext context) async {
-    final res = await showDesktopCreateModelDialog(
+    final res = await showDesktopCreateModelSpecDialog(
       context,
       providerKey: widget.providerKey,
     );
@@ -7193,10 +7193,10 @@ class _ModelRow extends StatelessWidget {
       onTap: isSelectionMode
           ? () => onSelectionChanged?.call(!isSelected)
           : cfg.isOAuth
-          ? () => showDesktopModelEditDialog(
+          ? () => showDesktopModelSpecEditDialog(
               context,
               providerKey: providerKey,
-              modelId: modelId,
+              modelKey: modelId,
             )
           : null,
       child: Container(
@@ -7269,15 +7269,15 @@ class _ModelRow extends StatelessWidget {
               const SizedBox(width: 8),
             ],
             if (!isSelectionMode) ...[
-              ModelCapsulesRow(model: info),
+              Flexible(child: ModelCapsulesRow(model: info)),
               const SizedBox(width: 8),
               _IconBtn(
                 icon: lucide.Lucide.Settings2,
                 onTap: () async {
-                  await showDesktopModelEditDialog(
+                  await showDesktopModelSpecEditDialog(
                     context,
                     providerKey: providerKey,
-                    modelId: modelId,
+                    modelKey: modelId,
                   );
                 },
               ),

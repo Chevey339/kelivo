@@ -10,7 +10,7 @@ import '../../../core/providers/assistant_provider.dart';
 import '../../../core/services/chat/chat_service.dart';
 import '../../../icons/lucide_adapter.dart';
 import 'package:flutter_svg/flutter_svg.dart';
-import '../../../desktop/model_edit_dialog.dart';
+import '../../../desktop/model_spec_edit_dialog.dart';
 import '../../../shared/responsive/screen_type_helper.dart';
 import '../pages/model_spec_edit_page.dart';
 import '../../provider/pages/provider_detail_page.dart';
@@ -1384,10 +1384,10 @@ class _ModelSelectSheetState extends State<_ModelSelectSheet> {
               Navigator.of(context).pop(ModelSelection(m.providerKey, m.id)),
           onLongPress: () async {
             if (ResponsiveHelper.isDesktop(context)) {
-              await showDesktopModelEditDialog(
+              await showDesktopModelSpecEditDialog(
                 context,
                 providerKey: m.providerKey,
-                modelId: m.id,
+                modelKey: m.id,
               );
             } else {
               await showModelSpecEditPage(
@@ -2358,16 +2358,18 @@ class _DesktopModelSelectDialogBodyState
               ),
             ),
             const SizedBox(width: 6),
-            ModelCapsulesRow(
-              model: m.info,
-              pillPadding: const EdgeInsets.symmetric(
-                horizontal: 5,
-                vertical: 2,
+            Flexible(
+              child: ModelCapsulesRow(
+                model: m.info,
+                pillPadding: const EdgeInsets.symmetric(
+                  horizontal: 5,
+                  vertical: 2,
+                ),
+                bgOpacityDark: 0.18,
+                bgOpacityLight: 0.14,
+                borderOpacity: 0.22,
+                itemSpacing: 4,
               ),
-              bgOpacityDark: 0.18,
-              bgOpacityLight: 0.14,
-              borderOpacity: 0.22,
-              itemSpacing: 4,
             ),
             const SizedBox(width: 4),
             Builder(

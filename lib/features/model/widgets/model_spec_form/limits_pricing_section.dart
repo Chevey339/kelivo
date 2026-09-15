@@ -29,6 +29,7 @@ class LimitsPricingSection extends StatelessWidget {
               onReset: _resetLimits,
             ),
             IosFormTextField(
+              key: const ValueKey('model-spec-context-window'),
               label: l10n.modelSpecFormContextWindow,
               controller: controller.contextWindowController,
               keyboardType: TextInputType.number,

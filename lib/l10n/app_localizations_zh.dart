@@ -3403,11 +3403,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get modelDetailSheetModelIdHint => '必填，建议小写字母、数字、连字符';
 
   @override
-  String modelDetailSheetModelIdDisabledHint(String modelId) {
-    return '$modelId';
-  }
-
-  @override
   String get modelDetailSheetModelNameLabel => '模型名称';
 
   @override
@@ -3460,12 +3455,6 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get modelDetailSheetBuiltinToolsDescription => '内置工具取决于供应商和 API 模式。';
-
-  @override
-  String get modelDetailSheetSearchTool => '搜索';
-
-  @override
-  String get modelDetailSheetSearchToolDescription => '启用 Google 搜索集成';
 
   @override
   String get modelDetailSheetUrlContextTool => 'URL 上下文';
@@ -3538,9 +3527,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get modelDetailSheetInvalidIdError => '请输入有效的模型 ID（不少于2个字符）';
 
   @override
-  String get modelDetailSheetModelIdExistsError => '模型 ID 已存在';
-
-  @override
   String get modelDetailSheetHeaderKeyHint => 'Header Key';
 
   @override
@@ -3566,6 +3552,9 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get modelSpecFormReset => '重置为默认';
+
+  @override
+  String get modelSpecFormModalitiesSection => '模态与能力';
 
   @override
   String get modelSpecFormImageType => '图像';
@@ -3789,6 +3778,9 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get modelSpecFormLimitsSection => '限额';
+
+  @override
+  String get modelSpecFormLimitsPricingSection => '限额与定价';
 
   @override
   String get modelSpecFormContextWindow => '上下文窗口';
@@ -15078,11 +15070,6 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get modelDetailSheetModelIdHint => '必填，建议小写字母、数字、连字符';
 
   @override
-  String modelDetailSheetModelIdDisabledHint(String modelId) {
-    return '$modelId';
-  }
-
-  @override
   String get modelDetailSheetModelNameLabel => '模型名称';
 
   @override
@@ -15135,12 +15122,6 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get modelDetailSheetBuiltinToolsDescription => '内置工具取决于供应商和 API 模式。';
-
-  @override
-  String get modelDetailSheetSearchTool => '搜索';
-
-  @override
-  String get modelDetailSheetSearchToolDescription => '启用 Google 搜索集成';
 
   @override
   String get modelDetailSheetUrlContextTool => 'URL 上下文';
@@ -15213,9 +15194,6 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get modelDetailSheetInvalidIdError => '请输入有效的模型 ID（不少于2个字符）';
 
   @override
-  String get modelDetailSheetModelIdExistsError => '模型 ID 已存在';
-
-  @override
   String get modelDetailSheetHeaderKeyHint => 'Header Key';
 
   @override
@@ -15241,6 +15219,9 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get modelSpecFormReset => '重置为默认';
+
+  @override
+  String get modelSpecFormModalitiesSection => '模态与能力';
 
   @override
   String get modelSpecFormImageType => '图像';
@@ -15464,6 +15445,9 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get modelSpecFormLimitsSection => '限额';
+
+  @override
+  String get modelSpecFormLimitsPricingSection => '限额与定价';
 
   @override
   String get modelSpecFormContextWindow => '上下文窗口';
@@ -26679,11 +26663,6 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get modelDetailSheetModelIdHint => '必填，建議小寫字母、數字、連字號';
 
   @override
-  String modelDetailSheetModelIdDisabledHint(String modelId) {
-    return '$modelId';
-  }
-
-  @override
   String get modelDetailSheetModelNameLabel => '模型名稱';
 
   @override
@@ -26736,12 +26715,6 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get modelDetailSheetBuiltinToolsDescription => '內建工具取決於供應商和 API 模式。';
-
-  @override
-  String get modelDetailSheetSearchTool => '搜尋';
-
-  @override
-  String get modelDetailSheetSearchToolDescription => '啟用 Google 搜尋整合';
 
   @override
   String get modelDetailSheetUrlContextTool => 'URL 上下文';
@@ -26814,9 +26787,6 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get modelDetailSheetInvalidIdError => '請輸入有效的模型 ID（不少於2個字元）';
 
   @override
-  String get modelDetailSheetModelIdExistsError => '模型 ID 已存在';
-
-  @override
   String get modelDetailSheetHeaderKeyHint => 'Header Key';
 
   @override
@@ -26842,6 +26812,9 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get modelSpecFormReset => '重設為預設';
+
+  @override
+  String get modelSpecFormModalitiesSection => '模態與能力';
 
   @override
   String get modelSpecFormImageType => '圖像';
@@ -27065,6 +27038,9 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get modelSpecFormLimitsSection => '限額';
+
+  @override
+  String get modelSpecFormLimitsPricingSection => '限額與定價';
 
   @override
   String get modelSpecFormContextWindow => '上下文視窗';
