@@ -452,6 +452,22 @@ class AppLocalizationsEn extends AppLocalizations {
   String get statsPageLaunchCount => 'App Launches';
 
   @override
+  String statsPageCost(String currency) {
+    return 'Cost ($currency)';
+  }
+
+  @override
+  String statsPageModelsWithoutPricing(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count models without pricing',
+      one: '$count model without pricing',
+    );
+    return '$_temp0';
+  }
+
+  @override
   String get statsPageUsageTrendTitle => 'Usage Trend';
 
   @override
@@ -8305,6 +8321,21 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String tokenDetailTotalTokens(int count) {
     return '$count tokens';
+  }
+
+  @override
+  String tokenDetailReasoningTokens(int count) {
+    return '$count reasoning tokens';
+  }
+
+  @override
+  String tokenDetailCacheWriteTokens(int count) {
+    return '$count cache write tokens';
+  }
+
+  @override
+  String tokenDetailCost(String amount) {
+    return '$amount';
   }
 
   @override

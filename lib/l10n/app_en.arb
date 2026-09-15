@@ -196,6 +196,22 @@
   "statsPageOutputTokens": "Output Tokens",
   "statsPageCachedTokens": "Cached Tokens",
   "statsPageLaunchCount": "App Launches",
+  "statsPageCost": "Cost ({currency})",
+  "@statsPageCost": {
+    "placeholders": {
+      "currency": {
+        "type": "String"
+      }
+    }
+  },
+  "statsPageModelsWithoutPricing": "{count, plural, one{{count} model without pricing} other{{count} models without pricing}}",
+  "@statsPageModelsWithoutPricing": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "statsPageUsageTrendTitle": "Usage Trend",
   "statsPageModelUsageTitle": "Model Usage",
   "statsPageAssistantUsageTitle": "Assistant Usage",
@@ -3536,6 +3552,30 @@
     "placeholders": {
       "count": {
         "type": "int"
+      }
+    }
+  },
+  "tokenDetailReasoningTokens": "{count} reasoning tokens",
+  "@tokenDetailReasoningTokens": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "tokenDetailCacheWriteTokens": "{count} cache write tokens",
+  "@tokenDetailCacheWriteTokens": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "tokenDetailCost": "{amount}",
+  "@tokenDetailCost": {
+    "placeholders": {
+      "amount": {
+        "type": "String"
       }
     }
   },

@@ -898,6 +898,18 @@ abstract class AppLocalizations {
   /// **'App Launches'**
   String get statsPageLaunchCount;
 
+  /// No description provided for @statsPageCost.
+  ///
+  /// In en, this message translates to:
+  /// **'Cost ({currency})'**
+  String statsPageCost(String currency);
+
+  /// No description provided for @statsPageModelsWithoutPricing.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, one{{count} model without pricing} other{{count} models without pricing}}'**
+  String statsPageModelsWithoutPricing(int count);
+
   /// No description provided for @statsPageUsageTrendTitle.
   ///
   /// In en, this message translates to:
@@ -15096,6 +15108,24 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'{count} tokens'**
   String tokenDetailTotalTokens(int count);
+
+  /// No description provided for @tokenDetailReasoningTokens.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} reasoning tokens'**
+  String tokenDetailReasoningTokens(int count);
+
+  /// No description provided for @tokenDetailCacheWriteTokens.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} cache write tokens'**
+  String tokenDetailCacheWriteTokens(int count);
+
+  /// No description provided for @tokenDetailCost.
+  ///
+  /// In en, this message translates to:
+  /// **'{amount}'**
+  String tokenDetailCost(String amount);
 
   /// No description provided for @debugPageTitle.
   ///

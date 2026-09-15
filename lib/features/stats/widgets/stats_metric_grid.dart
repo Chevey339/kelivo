@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
 
+import '../../../core/utils/model_cost.dart';
 import '../../../icons/lucide_adapter.dart';
 import '../../../l10n/app_localizations.dart';
-import '../models/stats_models.dart';
 import '../../../theme/app_font_weights.dart';
+import '../models/stats_models.dart';
 
 class StatsMetricGrid extends StatelessWidget {
   const StatsMetricGrid({super.key, required this.summary});
@@ -13,6 +14,7 @@ class StatsMetricGrid extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
+    final currencies = summary.costByCurrency.keys.toList()..sort();
     final items = [
       _MetricItem(
         icon: Lucide.MessagesSquare,
@@ -44,28 +46,56 @@ class StatsMetricGrid extends StatelessWidget {
         label: l10n.statsPageLaunchCount,
         value: _formatCompact(summary.launchCount),
       ),
+      for (final currency in currencies)
+        _MetricItem(
+          icon: Lucide.Coins,
+          label: l10n.statsPageCost(currency),
+          value: formatModelCost(
+            ModelCost(
+              amount: summary.costByCurrency[currency]!,
+              currency: currency,
+            ),
+          ),
+        ),
     ];
 
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final columns = constraints.maxWidth >= 720
-            ? 3
-            : constraints.maxWidth >= 420
-            ? 2
-            : 1;
-        return GridView.builder(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: columns,
-            mainAxisExtent: 78,
-            crossAxisSpacing: 8,
-            mainAxisSpacing: 8,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        LayoutBuilder(
+          builder: (context, constraints) {
+            final columns = constraints.maxWidth >= 720
+                ? 3
+                : constraints.maxWidth >= 420
+                ? 2
+                : 1;
+            return GridView.builder(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: columns,
+                mainAxisExtent: 78,
+                crossAxisSpacing: 8,
+                mainAxisSpacing: 8,
+              ),
+              itemCount: items.length,
+              itemBuilder: (context, index) => _MetricTile(item: items[index]),
+            );
+          },
+        ),
+        if (summary.modelsWithoutPricing > 0) ...[
+          const SizedBox(height: 8),
+          Text(
+            l10n.statsPageModelsWithoutPricing(summary.modelsWithoutPricing),
+            style: TextStyle(
+              fontSize: 12,
+              color: Theme.of(
+                context,
+              ).colorScheme.onSurface.withValues(alpha: 0.62),
+            ),
           ),
-          itemCount: items.length,
-          itemBuilder: (context, index) => _MetricTile(item: items[index]),
-        );
-      },
+        ],
+      ],
     );
   }
 }

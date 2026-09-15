@@ -7,9 +7,11 @@ import 'package:provider/provider.dart';
 
 import '../../../core/database/chat_database_repository.dart';
 import '../../../core/models/assistant.dart';
+import '../../../core/models/model_spec.dart';
 import '../../../core/providers/assistant_provider.dart';
 import '../../../core/providers/settings_provider.dart';
 import '../../../core/services/chat/chat_service.dart';
+import '../../../core/services/model_spec/model_spec_resolver.dart';
 import '../../../icons/lucide_adapter.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../shared/widgets/ios_tactile.dart';
@@ -194,6 +196,14 @@ class _StatsPageState extends State<StatsPage> {
       for (final entry in settings.providerConfigs.entries)
         entry.key: entry.value.name,
     };
+    ModelPricing? resolvePricing(String? providerKey, String modelId) {
+      final key = providerKey?.trim();
+      if (key == null || key.isEmpty) return null;
+      return ModelSpecResolver.instance
+          .spec(settings.getProviderConfig(key), modelId)
+          .pricing;
+    }
+
     final conversationSignature = conversations
         .map(
           (conversation) =>
@@ -210,7 +220,7 @@ class _StatsPageState extends State<StatsPage> {
         '$conversationSignature|${_range.preset.name}:'
         '${_range.start}:${_range.end}:${settings.appLaunchCount}:'
         '${_mapSignature(providerNames)}:${_mapSignature(assistantNames)}:'
-        '${chatService.statisticsRevision}';
+        '${_pricingSignature(settings)}:${chatService.statisticsRevision}';
     if (_failedStatsSignature != null && _failedStatsSignature != signature) {
       _failedStatsSignature = null;
     }
@@ -265,6 +275,7 @@ class _StatsPageState extends State<StatsPage> {
                         providerNames: requestedProviderNames,
                         unknownProviderLabel: l10n.statsPageUnknownProvider,
                         unknownTopicLabel: l10n.statsPageUnknownTopic,
+                        resolvePricing: resolvePricing,
                       );
                   _statsSignature = signature;
                   _pendingStatsSignature = null;
@@ -306,6 +317,7 @@ class _StatsPageState extends State<StatsPage> {
           providerNames: providerNames,
           unknownProviderLabel: l10n.statsPageUnknownProvider,
           unknownTopicLabel: l10n.statsPageUnknownTopic,
+          resolvePricing: resolvePricing,
         );
   }
 
@@ -313,6 +325,14 @@ class _StatsPageState extends State<StatsPage> {
     final entries = values.entries.toList()
       ..sort((a, b) => a.key.compareTo(b.key));
     return entries.map((entry) => '${entry.key}=${entry.value}').join(',');
+  }
+
+  String _pricingSignature(SettingsProvider settings) {
+    final entries = settings.providerConfigs.entries.toList()
+      ..sort((a, b) => a.key.compareTo(b.key));
+    return entries
+        .map((entry) => '${entry.key}=${entry.value.modelOverrides}')
+        .join(',');
   }
 
   void _setPreset(StatsDateRangePreset preset) {

@@ -436,6 +436,16 @@ class AppLocalizationsZh extends AppLocalizations {
   String get statsPageLaunchCount => '应用启动次数';
 
   @override
+  String statsPageCost(String currency) {
+    return '费用 ($currency)';
+  }
+
+  @override
+  String statsPageModelsWithoutPricing(int count) {
+    return '$count 个模型无定价';
+  }
+
+  @override
   String get statsPageUsageTrendTitle => '用量趋势';
 
   @override
@@ -7976,6 +7986,21 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
+  String tokenDetailReasoningTokens(int count) {
+    return '$count 推理 tokens';
+  }
+
+  @override
+  String tokenDetailCacheWriteTokens(int count) {
+    return '$count 缓存写入 tokens';
+  }
+
+  @override
+  String tokenDetailCost(String amount) {
+    return '$amount';
+  }
+
+  @override
   String get debugPageTitle => 'Debug';
 
   @override
@@ -12154,6 +12179,16 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get statsPageLaunchCount => '应用启动次数';
+
+  @override
+  String statsPageCost(String currency) {
+    return '费用 ($currency)';
+  }
+
+  @override
+  String statsPageModelsWithoutPricing(int count) {
+    return '$count 个模型无定价';
+  }
 
   @override
   String get statsPageUsageTrendTitle => '用量趋势';
@@ -19622,6 +19657,21 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   }
 
   @override
+  String tokenDetailReasoningTokens(int count) {
+    return '$count 推理 tokens';
+  }
+
+  @override
+  String tokenDetailCacheWriteTokens(int count) {
+    return '$count 缓存写入 tokens';
+  }
+
+  @override
+  String tokenDetailCost(String amount) {
+    return '$amount';
+  }
+
+  @override
   String get debugPageTitle => 'Debug';
 
   @override
@@ -23800,6 +23850,16 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get statsPageLaunchCount => '應用啟動次數';
+
+  @override
+  String statsPageCost(String currency) {
+    return '費用 ($currency)';
+  }
+
+  @override
+  String statsPageModelsWithoutPricing(int count) {
+    return '$count 個模型無定價';
+  }
 
   @override
   String get statsPageUsageTrendTitle => '用量趨勢';
@@ -31340,6 +31400,21 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   @override
   String tokenDetailTotalTokens(int count) {
     return '$count tokens';
+  }
+
+  @override
+  String tokenDetailReasoningTokens(int count) {
+    return '$count 推理 tokens';
+  }
+
+  @override
+  String tokenDetailCacheWriteTokens(int count) {
+    return '$count 快取寫入 tokens';
+  }
+
+  @override
+  String tokenDetailCost(String amount) {
+    return '$amount';
   }
 
   @override

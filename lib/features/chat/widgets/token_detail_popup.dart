@@ -1,28 +1,35 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:Kelivo/theme/app_semantic_colors.dart';
+import '../../../core/models/token_usage.dart';
+import '../../../core/providers/settings_provider.dart';
+import '../../../core/services/model_spec/model_spec_resolver.dart';
+import '../../../core/utils/model_cost.dart';
 import '../../../icons/lucide_adapter.dart';
 import '../../../l10n/app_localizations.dart';
 
 /// A bubble card showing detailed token usage info.
-///
-/// Shows up to 4 rows (hidden when data is null/0):
-/// - ArrowUp: prompt tokens (with cached count if > 0)
-/// - ArrowDown: completion tokens
-/// - Zap: tok/s (completionTokens / durationSeconds)
-/// - Timer: duration in seconds
 class TokenDetailPopup extends StatelessWidget {
   const TokenDetailPopup({
     super.key,
     this.promptTokens,
     this.completionTokens,
     this.cachedTokens,
+    this.reasoningTokens,
+    this.cacheWriteTokens,
     this.durationMs,
+    this.providerId,
+    this.modelId,
   });
 
   final int? promptTokens;
   final int? completionTokens;
   final int? cachedTokens;
+  final int? reasoningTokens;
+  final int? cacheWriteTokens;
   final int? durationMs;
+  final String? providerId;
+  final String? modelId;
 
   @override
   Widget build(BuildContext context) {
@@ -30,7 +37,6 @@ class TokenDetailPopup extends StatelessWidget {
     final l10n = AppLocalizations.of(context)!;
     final rows = <Widget>[];
 
-    // Prompt tokens row
     if (promptTokens != null && promptTokens! > 0) {
       final cached = (cachedTokens ?? 0) > 0 ? cachedTokens! : 0;
       rows.add(
@@ -44,7 +50,6 @@ class TokenDetailPopup extends StatelessWidget {
       );
     }
 
-    // Completion tokens row
     if (completionTokens != null && completionTokens! > 0) {
       rows.add(
         _buildRow(
@@ -55,7 +60,26 @@ class TokenDetailPopup extends StatelessWidget {
       );
     }
 
-    // tok/s row
+    if (reasoningTokens != null && reasoningTokens! > 0) {
+      rows.add(
+        _buildRow(
+          icon: Lucide.Brain,
+          text: l10n.tokenDetailReasoningTokens(reasoningTokens!),
+          cs: cs,
+        ),
+      );
+    }
+
+    if (cacheWriteTokens != null && cacheWriteTokens! > 0) {
+      rows.add(
+        _buildRow(
+          icon: Lucide.Database,
+          text: l10n.tokenDetailCacheWriteTokens(cacheWriteTokens!),
+          cs: cs,
+        ),
+      );
+    }
+
     if (completionTokens != null &&
         completionTokens! > 0 &&
         durationMs != null &&
@@ -71,13 +95,23 @@ class TokenDetailPopup extends StatelessWidget {
       );
     }
 
-    // Duration row
     if (durationMs != null && durationMs! > 0) {
       final durationSec = (durationMs! / 1000.0).toStringAsFixed(1);
       rows.add(
         _buildRow(
           icon: Lucide.clock,
           text: l10n.tokenDetailDuration(durationSec),
+          cs: cs,
+        ),
+      );
+    }
+
+    final cost = _resolveCost(context);
+    if (cost != null) {
+      rows.add(
+        _buildRow(
+          icon: Lucide.Coins,
+          text: l10n.tokenDetailCost(formatModelCost(cost)),
           cs: cs,
         ),
       );
@@ -118,6 +152,29 @@ class TokenDetailPopup extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+
+  ModelCost? _resolveCost(BuildContext context) {
+    final providerKey = providerId?.trim();
+    final modelKey = modelId?.trim();
+    if (providerKey == null ||
+        providerKey.isEmpty ||
+        modelKey == null ||
+        modelKey.isEmpty) {
+      return null;
+    }
+    final settings = context.read<SettingsProvider>();
+    return estimateModelCost(
+      TokenUsage(
+        promptTokens: promptTokens ?? 0,
+        completionTokens: completionTokens ?? 0,
+        cachedTokens: cachedTokens ?? 0,
+        cacheWriteTokens: cacheWriteTokens ?? 0,
+      ),
+      ModelSpecResolver.instance
+          .spec(settings.getProviderConfig(providerKey), modelKey)
+          .pricing,
     );
   }
 
