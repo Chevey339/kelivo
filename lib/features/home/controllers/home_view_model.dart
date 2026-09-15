@@ -11,8 +11,8 @@ import '../../../core/providers/assistant_provider.dart';
 import '../../../core/providers/settings_provider.dart';
 import '../../../core/services/api/chat_api_service.dart';
 import '../../../core/services/chat/chat_service.dart';
-import '../../../core/services/model_override_payload_parser.dart';
 import '../../../core/services/logging/flutter_logger.dart';
+import '../../../core/services/model_spec/model_spec_resolver.dart';
 import '../../../core/services/memory/memory_pipeline.dart';
 import '../../../core/services/memory/memory_trace.dart';
 import '../../../utils/utf16_safe_cut.dart';
@@ -1252,9 +1252,9 @@ class HomeViewModel extends ChangeNotifier {
     try {
       stage = 'prepare';
       final requestChars = compressRequestCharBudget(
-        contextWindowTokens: readModelContextWindowTokens(
-          ModelOverridePayloadParser.modelOverride(cfg.modelOverrides, mdlId),
-        ),
+        contextWindowTokens: ModelSpecResolver.instance
+            .spec(cfg, mdlId)
+            .contextWindow,
       );
       stage = 'chunk';
       final chunks = buildCompressRequestContents(
