@@ -14,6 +14,7 @@ import '../../core/providers/instruction_injection_provider.dart';
 import '../../shared/widgets/snackbar.dart';
 import '../../theme/app_font_weights.dart';
 import 'package:Kelivo/theme/app_semantic_colors.dart';
+import '../../utils/ui_scale.dart';
 
 class DesktopInstructionInjectionPane extends StatefulWidget {
   const DesktopInstructionInjectionPane({super.key});
@@ -84,12 +85,12 @@ class _DesktopInstructionInjectionPaneState
       child: Padding(
         padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
         child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 960),
+          constraints: BoxConstraints(maxWidth: scaledDim(context, 960)),
           child: CustomScrollView(
             slivers: [
               SliverToBoxAdapter(
                 child: SizedBox(
-                  height: 36,
+                  height: scaledDim(context, 36),
                   child: Row(
                     children: [
                       Expanded(
@@ -363,7 +364,7 @@ class _InstructionInjectionCardState extends State<_InstructionInjectionCard> {
             border: Border.all(color: borderColor, width: 1.0),
           ),
           padding: const EdgeInsets.all(14),
-          constraints: const BoxConstraints(minHeight: 64),
+          constraints: BoxConstraints(minHeight: scaledDim(context, 64)),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
@@ -458,7 +459,7 @@ class _InstructionInjectionEditDialogState
       insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 520),
+        constraints: BoxConstraints(maxWidth: scaledDim(context, 520)),
         child: Stack(
           children: [
             Padding(

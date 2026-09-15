@@ -15,6 +15,7 @@ import '../../../shared/widgets/ios_tile_button.dart';
 import 'model_edit_state_helper.dart';
 import 'package:Kelivo/theme/app_font_weights.dart';
 import 'package:Kelivo/theme/app_semantic_colors.dart';
+import '../../../utils/ui_scale.dart';
 
 Future<bool?> showModelDetailSheet(
   BuildContext context, {
@@ -306,7 +307,7 @@ class _ModelDetailSheetState extends State<_ModelDetailSheet>
   Widget _buildHeader(BuildContext context, AppLocalizations l10n) {
     final cs = Theme.of(context).colorScheme;
     return SizedBox(
-      height: 44,
+      height: scaledDim(context, 44),
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16),
         child: Row(

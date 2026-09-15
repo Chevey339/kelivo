@@ -16,6 +16,7 @@ import '../../shared/widgets/ios_switch.dart';
 import '../../shared/widgets/snackbar.dart';
 import '../../theme/app_font_weights.dart';
 import 'package:Kelivo/theme/app_semantic_colors.dart';
+import '../../utils/ui_scale.dart';
 
 /// Desktop: TTS (语音服务) right-side pane
 /// Adapts mobile TTS page to desktop with hoverable list card style
@@ -50,7 +51,7 @@ class _DesktopTtsServicesPaneState extends State<DesktopTtsServicesPane> {
       child: Padding(
         padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
         child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 960),
+          constraints: BoxConstraints(maxWidth: scaledDim(context, 960)),
           child: CustomScrollView(
             slivers: [
               SliverToBoxAdapter(
@@ -185,7 +186,7 @@ class _NetworkServiceCardState extends State<_NetworkServiceCard> {
             border: Border.all(color: borderColor, width: 1.0),
           ),
           padding: const EdgeInsets.all(14),
-          constraints: const BoxConstraints(minHeight: 64),
+          constraints: BoxConstraints(minHeight: scaledDim(context, 64)),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -310,7 +311,7 @@ void _showErrorDialog(BuildContext context, String message) {
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
       child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 560),
+        constraints: BoxConstraints(maxWidth: scaledDim(context, 560)),
         child: Padding(
           padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
           child: Column(
@@ -374,7 +375,10 @@ void _showTtsSettingsDialog(BuildContext context) {
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       insetPadding: const EdgeInsets.symmetric(horizontal: 28, vertical: 24),
       child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 620, maxHeight: 720),
+        constraints: BoxConstraints(
+          maxWidth: scaledDim(context, 620),
+          maxHeight: scaledDim(context, 720),
+        ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -500,7 +504,7 @@ class _SystemTtsCardState extends State<_SystemTtsCard> {
             border: Border.all(color: borderColor, width: 1.0),
           ),
           padding: const EdgeInsets.all(14),
-          constraints: const BoxConstraints(minHeight: 64),
+          constraints: BoxConstraints(minHeight: scaledDim(context, 64)),
           child: Row(
             children: [
               // Brand-like circular badge with a speaker icon
@@ -587,7 +591,7 @@ class _SystemTtsCardState extends State<_SystemTtsCard> {
             vertical: 18,
           ),
           child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 440),
+            constraints: BoxConstraints(maxWidth: scaledDim(context, 440)),
             child: Padding(
               padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
               child: Column(
@@ -1086,7 +1090,7 @@ Future<TtsServiceOptions?> _showNetworkDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
         child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 560),
+          constraints: BoxConstraints(maxWidth: scaledDim(context, 560)),
           child: Padding(
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
             child: StatefulBuilder(

@@ -5,6 +5,7 @@ import '../../../l10n/app_localizations.dart';
 import '../../../icons/lucide_adapter.dart';
 import '../../../theme/app_font_weights.dart';
 import 'package:Kelivo/theme/app_semantic_colors.dart';
+import '../../../utils/ui_scale.dart';
 
 Future<void> showAssistantTagsManagerDialog(
   BuildContext context, {
@@ -28,9 +29,9 @@ Future<void> showAssistantTagsManagerDialog(
               behavior: HitTestBehavior.translucent,
               onTap: () {}, // absorb taps inside the dialog
               child: ConstrainedBox(
-                constraints: const BoxConstraints(
-                  maxWidth: 520,
-                  maxHeight: 600,
+                constraints: BoxConstraints(
+                  maxWidth: scaledDim(context, 520),
+                  maxHeight: scaledDim(context, 600),
                 ),
                 child: DecoratedBox(
                   decoration: ShapeDecoration(
@@ -187,7 +188,7 @@ class _TagsManagerBodyState extends State<_TagsManagerBody> {
       children: [
         // Top bar without bottom divider; desktop small buttons, no ripples
         SizedBox(
-          height: 48,
+          height: scaledDim(context, 48),
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 10),
             child: Row(

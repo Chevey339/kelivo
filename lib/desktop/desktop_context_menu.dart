@@ -5,6 +5,7 @@ import '../icons/lucide_adapter.dart';
 import '../shared/widgets/ios_tactile.dart';
 import '../core/services/haptics.dart';
 import 'package:Kelivo/theme/app_font_weights.dart';
+import '../utils/ui_scale.dart';
 
 /// Simple anchored context menu for desktop.
 /// Shows a Material menu near the cursor or an anchor widget with a subtle animation.
@@ -40,15 +41,22 @@ Future<void> showDesktopContextMenuAt(
 
   const double minMenuWidth = 160;
   const double maxMenuWidth = 360;
+  final double fontScale = MediaQuery.textScalerOf(context).scale(1.0);
   final double menuWidth = _estimateMenuWidth(
     context,
     items,
-    minMenuWidth,
-    maxMenuWidth,
+    minMenuWidth * fontScale,
+    maxMenuWidth * fontScale,
   );
   final screen = overlayBox.size;
   final double menuMaxHeight = screen.height * 0.5; // scroll if exceeds
-  final double estMenuHeight = (items.length * 44.0).clamp(44.0, menuMaxHeight);
+  // Estimate with the scaled per-item height: _GlassMenuItem rows are
+  // scaledDim(44), so a raw 44.0 underestimates at large UI font scales and
+  // the anchored menu would overflow the bottom of the screen.
+  final double estMenuHeight = (items.length * scaledDim(context, 44.0)).clamp(
+    44.0,
+    menuMaxHeight,
+  );
   const double gap = 8; // offset from cursor
   final cs = Theme.of(context).colorScheme;
   final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -155,10 +163,14 @@ double _estimateMenuWidth(
   double minW,
   double maxW,
 ) {
-  // Base paddings: 12 left/right; icon 18 + spacing 10 if present
+  // Base paddings: 12 left/right; icon 18 + spacing 10 if present. Font size
+  // and width bounds scale with the user's text-scaler so menu items stay
+  // legible at chatFontScale 150%+ (otherwise the layout was computed at 14.5px
+  // and the rendered text at 21.75px overflowed, wrapping the last glyph).
+  final double fontScale = MediaQuery.textScalerOf(context).scale(1.0);
   double maxText = 0;
   final textStyle = TextStyle(
-    fontSize: 14.5,
+    fontSize: 14.5 * fontScale,
     color: Theme.of(context).colorScheme.onSurface,
     decoration: TextDecoration.none,
     fontWeight: AppFontWeights.medium,
@@ -196,11 +208,12 @@ Future<void> showDesktopAnchoredMenu(
   const double minMenuWidth = 160;
   const double maxMenuWidth = 360;
   const double gap = 8; // should match showDesktopContextMenuAt gap
+  final double fontScale = MediaQuery.textScalerOf(context).scale(1.0);
   final double menuWidth = _estimateMenuWidth(
     context,
     items,
-    minMenuWidth,
-    maxMenuWidth,
+    minMenuWidth * fontScale,
+    maxMenuWidth * fontScale,
   );
   final anchorBottomCenter = topLeft + Offset(size.width / 2, size.height);
   final adjusted = anchorBottomCenter - Offset(menuWidth / 2 + gap, 0);
@@ -289,7 +302,7 @@ class _GlassMenuItemState extends State<_GlassMenuItem> {
           widget.onTap?.call();
         },
         child: Container(
-          height: 44,
+          height: scaledDim(context, 44),
           padding: const EdgeInsets.symmetric(horizontal: 12),
           alignment: Alignment.centerLeft,
           decoration: BoxDecoration(color: bg),
@@ -310,6 +323,8 @@ class _GlassMenuItemState extends State<_GlassMenuItem> {
               Expanded(
                 child: Text(
                   widget.label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                   style: TextStyle(
                     fontSize: 14.5,
                     color: fg,

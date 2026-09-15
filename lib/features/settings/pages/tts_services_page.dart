@@ -18,6 +18,7 @@ import '../widgets/mimo_reference_audio_picker.dart';
 import '../../../theme/app_font_weights.dart';
 import 'package:Kelivo/theme/app_semantic_colors.dart';
 import 'package:Kelivo/shared/widgets/section_card.dart';
+import '../../../utils/ui_scale.dart';
 
 class TtsServicesPage extends StatelessWidget {
   const TtsServicesPage({super.key});
@@ -423,8 +424,8 @@ class _AvatarBadge extends StatelessWidget {
       alignment: Alignment.center,
       children: [
         Container(
-          width: 36,
-          height: 36,
+          width: scaledDim(context, 36),
+          height: scaledDim(context, 36),
           decoration: BoxDecoration(color: baseBg, shape: BoxShape.circle),
           alignment: Alignment.center,
           child: Text(
@@ -463,8 +464,8 @@ class _AvatarBrandBadge extends StatelessWidget {
       alignment: Alignment.center,
       children: [
         Container(
-          width: 36,
-          height: 36,
+          width: scaledDim(context, 36),
+          height: scaledDim(context, 36),
           decoration: BoxDecoration(color: baseBg, shape: BoxShape.circle),
           alignment: Alignment.center,
           child: asset == null

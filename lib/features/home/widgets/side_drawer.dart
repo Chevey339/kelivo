@@ -33,6 +33,7 @@ import 'package:animations/animations.dart';
 import '../../../utils/sandbox_path_resolver.dart';
 import '../../../utils/search_highlight.dart';
 import '../../../utils/avatar_cache.dart';
+import '../../../utils/avatar_scale.dart';
 import 'dart:ui' as ui;
 import '../../../shared/widgets/ios_checkbox.dart';
 import '../../../shared/widgets/ios_tactile.dart';
@@ -55,6 +56,7 @@ import 'assistant_entry_actions.dart';
 import 'sidebar_selection_bars.dart';
 import 'package:Kelivo/theme/app_semantic_colors.dart';
 import '../../../shared/widgets/section_card.dart';
+import '../../../utils/ui_scale.dart';
 
 class SideDrawer extends StatefulWidget {
   const SideDrawer({
@@ -422,7 +424,7 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
           return Padding(
             padding: const EdgeInsets.symmetric(vertical: 4),
             child: SizedBox(
-              height: 48,
+              height: scaledDim(context, 48),
               child: IosCardPress(
                 borderRadius: BorderRadius.circular(14),
                 baseColor: sheetTileColor(ctx),
@@ -1673,8 +1675,8 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
       final value = up.avatarValue;
       if (type == 'emoji' && value != null && value.isNotEmpty) {
         return Container(
-          width: size,
-          height: size,
+          width: scaledAvatarSize(context, size),
+          height: scaledAvatarSize(context, size),
           decoration: BoxDecoration(
             color: cs.primary.withValues(alpha: 0.15),
             shape: BoxShape.circle,
@@ -1696,8 +1698,8 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
               return ClipOval(
                 child: Image(
                   image: FileImage(File(p)),
-                  width: size,
-                  height: size,
+                  width: scaledAvatarSize(context, size),
+                  height: scaledAvatarSize(context, size),
                   fit: BoxFit.cover,
                 ),
               );
@@ -1705,12 +1707,12 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
             return ClipOval(
               child: Image.network(
                 value,
-                width: size,
-                height: size,
+                width: scaledAvatarSize(context, size),
+                height: scaledAvatarSize(context, size),
                 fit: BoxFit.cover,
                 errorBuilder: (c, e, s) => Container(
-                  width: size,
-                  height: size,
+                  width: scaledAvatarSize(context, size),
+                  height: scaledAvatarSize(context, size),
                   alignment: Alignment.center,
                   decoration: BoxDecoration(
                     color: cs.primary.withValues(alpha: 0.15),
@@ -1737,8 +1739,8 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
           return ClipOval(
             child: Image(
               image: FileImage(f),
-              width: size,
-              height: size,
+              width: scaledAvatarSize(context, size),
+              height: scaledAvatarSize(context, size),
               fit: BoxFit.cover,
             ),
           );
@@ -1747,19 +1749,22 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
       // default: initial
       final letter = name.isNotEmpty ? name.characters.first : '?';
       return Container(
-        width: size,
-        height: size,
+        width: scaledAvatarSize(context, size),
+        height: scaledAvatarSize(context, size),
         decoration: BoxDecoration(
           color: cs.primary.withValues(alpha: 0.15),
           shape: BoxShape.circle,
         ),
         alignment: Alignment.center,
-        child: Text(
-          letter,
-          style: TextStyle(
-            color: cs.primary,
-            fontSize: size * 0.42,
-            fontWeight: AppFontWeights.emphasis,
+        child: Transform.translate(
+          offset: Offset(0, avatarInitialNudgeY(context, size)),
+          child: Text(
+            letter,
+            style: TextStyle(
+              color: cs.primary,
+              fontSize: size * 0.42,
+              fontWeight: AppFontWeights.emphasis,
+            ),
           ),
         ),
       );
@@ -2840,7 +2845,7 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
                                             horizontal: 0,
                                           ),
                                           child: SizedBox(
-                                            height: 45,
+                                            height: scaledDim(context, 45),
                                             child: Align(
                                               alignment: Alignment.centerLeft,
                                               child: Text(
@@ -3096,7 +3101,7 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
           return Padding(
             padding: const EdgeInsets.symmetric(vertical: 4),
             child: SizedBox(
-              height: 48,
+              height: scaledDim(context, 48),
               child: IosCardPress(
                 borderRadius: BorderRadius.circular(14),
                 baseColor: sheetTileColor(ctx),
@@ -4595,7 +4600,7 @@ class _DesktopSidebarTabsState extends State<_DesktopSidebarTabs> {
     final isDark = theme.brightness == Brightness.dark;
     final idx = widget.controller.index;
     return SizedBox(
-      height: 40,
+      height: scaledDim(context, 40),
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 2),
         child: LayoutBuilder(

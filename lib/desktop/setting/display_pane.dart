@@ -12,7 +12,7 @@ class _DisplaySettingsBody extends StatelessWidget {
       child: SingleChildScrollView(
         padding: const EdgeInsets.fromLTRB(20, 14, 20, 22),
         child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 960),
+          constraints: BoxConstraints(maxWidth: scaledDim(context, 960)),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
@@ -39,14 +39,30 @@ class _DisplaySettingsBody extends StatelessWidget {
               const SizedBox(height: 16),
               _SettingsCard(
                 title: l10n.desktopSettingsFontsTitle,
-                children: const [
-                  _DesktopAppFontRow(),
-                  _RowDivider(),
-                  _DesktopCodeFontRow(),
-                  _RowDivider(),
-                  _AppLanguageRow(),
-                  _RowDivider(),
-                  _ChatFontSizeRow(),
+                children: [
+                  const _DesktopAppFontRow(),
+                  const _RowDivider(),
+                  const _DesktopCodeFontRow(),
+                  const _RowDivider(),
+                  const _AppLanguageRow(),
+                  const _RowDivider(),
+                  _FontScaleRow(
+                    label: l10n.displaySettingsPageUiFontSizeTitle,
+                    getter: (s) => s.uiFontScale,
+                    setter: (s, v) => s.setUiFontScale(v),
+                  ),
+                  const _RowDivider(),
+                  _FontScaleRow(
+                    label: l10n.displaySettingsPageChatFontSizeTitle,
+                    getter: (s) => s.chatFontScale,
+                    setter: (s, v) => s.setChatFontScale(v),
+                  ),
+                  const _RowDivider(),
+                  _FontScaleRow(
+                    label: l10n.displaySettingsPageInputFontSizeTitle,
+                    getter: (s) => s.inputFontScale,
+                    setter: (s, v) => s.setInputFontScale(v),
+                  ),
                 ],
               ),
               const SizedBox(height: 16),
@@ -230,7 +246,7 @@ class _ImageQualityDropdown extends StatelessWidget {
             label: _imageQualityTitle(quality, l10n),
           ),
       ],
-      minWidth: 140,
+      minWidth: scaledDim(context, 140),
       onSelected: (quality) =>
           context.read<SettingsProvider>().setImageUploadQuality(quality),
     );
@@ -248,7 +264,7 @@ class _ImageCustomQualityRow extends StatelessWidget {
     return _LabeledRow(
       label: l10n.imageSettingsPageCustomQualityTitle,
       trailing: SizedBox(
-        width: 280,
+        width: scaledDim(context, 280),
         child: Row(
           children: [
             Expanded(
@@ -264,7 +280,7 @@ class _ImageCustomQualityRow extends StatelessWidget {
               ),
             ),
             SizedBox(
-              width: 32,
+              width: scaledDim(context, 32),
               child: Text(
                 '$quality',
                 textAlign: TextAlign.right,
@@ -953,26 +969,43 @@ class _TopicPositionDropdown extends StatefulWidget {
 }
 
 class _TopicPositionDropdownState extends State<_TopicPositionDropdown> {
+  final GlobalKey _anchorKey = GlobalKey();
+
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
     final sp = context.watch<SettingsProvider>();
-    final options = <DesktopSelectOption<DesktopTopicPosition>>[
-      DesktopSelectOption(
-        value: DesktopTopicPosition.left,
-        label: l10n.desktopDisplaySettingsTopicPositionLeft,
+    final isLeft = sp.desktopTopicPosition == DesktopTopicPosition.left;
+    // Use the same dialog-launcher chip as the neighboring rows (message
+    // style / auto retry) so the trigger geometry is identical at any UI
+    // font scale, with the shared anchored menu for the two options.
+    return Container(
+      key: _anchorKey,
+      child: _DesktopFontDropdownButton(
+        display: isLeft
+            ? l10n.desktopDisplaySettingsTopicPositionLeft
+            : l10n.desktopDisplaySettingsTopicPositionRight,
+        onTap: () => showDesktopAnchoredMenu(
+          context,
+          anchorKey: _anchorKey,
+          items: [
+            DesktopContextMenuItem(
+              label: l10n.desktopDisplaySettingsTopicPositionLeft,
+              checked: isLeft,
+              onTap: () => context
+                  .read<SettingsProvider>()
+                  .setDesktopTopicPosition(DesktopTopicPosition.left),
+            ),
+            DesktopContextMenuItem(
+              label: l10n.desktopDisplaySettingsTopicPositionRight,
+              checked: !isLeft,
+              onTap: () => context
+                  .read<SettingsProvider>()
+                  .setDesktopTopicPosition(DesktopTopicPosition.right),
+            ),
+          ],
+        ),
       ),
-      DesktopSelectOption(
-        value: DesktopTopicPosition.right,
-        label: l10n.desktopDisplaySettingsTopicPositionRight,
-      ),
-    ];
-
-    return DesktopSelectDropdown<DesktopTopicPosition>(
-      value: sp.desktopTopicPosition,
-      options: options,
-      onSelected: (pos) =>
-          context.read<SettingsProvider>().setDesktopTopicPosition(pos),
     );
   }
 }
@@ -1644,18 +1677,25 @@ class _LanguageDropdownItemState extends State<_LanguageDropdownItem> {
   }
 }
 
-class _ChatFontSizeRow extends StatefulWidget {
-  const _ChatFontSizeRow();
+class _FontScaleRow extends StatefulWidget {
+  const _FontScaleRow({
+    required this.label,
+    required this.getter,
+    required this.setter,
+  });
+  final String label;
+  final double Function(SettingsProvider) getter;
+  final Future<void> Function(SettingsProvider, double) setter;
   @override
-  State<_ChatFontSizeRow> createState() => _ChatFontSizeRowState();
+  State<_FontScaleRow> createState() => _FontScaleRowState();
 }
 
-class _ChatFontSizeRowState extends State<_ChatFontSizeRow> {
+class _FontScaleRowState extends State<_FontScaleRow> {
   late final TextEditingController _controller;
   @override
   void initState() {
     super.initState();
-    final scale = context.read<SettingsProvider>().chatFontScale;
+    final scale = widget.getter(context.read<SettingsProvider>());
     _controller = TextEditingController(text: '${(scale * 100).round()}');
   }
 
@@ -1665,12 +1705,12 @@ class _ChatFontSizeRowState extends State<_ChatFontSizeRow> {
     super.dispose();
   }
 
-  void _commit(String text) {
+  Future<void> _commit(String text) async {
     final v = text.trim();
     final n = double.tryParse(v);
     if (n == null) return;
     final clamped = (n / 100.0).clamp(0.5, 1.5);
-    context.read<SettingsProvider>().setChatFontScale(clamped);
+    await widget.setter(context.read<SettingsProvider>(), clamped);
     _controller.text = '${(clamped * 100).round()}';
   }
 
@@ -1678,7 +1718,7 @@ class _ChatFontSizeRowState extends State<_ChatFontSizeRow> {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
     return _LabeledRow(
-      label: l10n.displaySettingsPageChatFontSizeTitle,
+      label: widget.label,
       trailing: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -1701,6 +1741,18 @@ class _ChatFontSizeRowState extends State<_ChatFontSizeRow> {
               ).colorScheme.onSurface.withValues(alpha: 0.7),
               fontSize: 14,
               decoration: TextDecoration.none,
+            ),
+          ),
+          const SizedBox(width: 8),
+          Tooltip(
+            message: l10n.displaySettingsPageFontResetLabel,
+            child: _IconBtn(
+              icon: lucide.Lucide.RotateCcw,
+              onTap: () async {
+                // Reset to the default 100% scale.
+                await widget.setter(context.read<SettingsProvider>(), 1.0);
+                _controller.text = '100';
+              },
             ),
           ),
         ],
@@ -1951,7 +2003,7 @@ class _DesktopFontDropdownButtonState
             mainAxisSize: MainAxisSize.min,
             children: [
               ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 220),
+                constraints: BoxConstraints(maxWidth: scaledDim(context, 220)),
                 child: Text(
                   widget.display,
                   maxLines: 1,
@@ -2083,7 +2135,10 @@ Future<String?> _showDesktopFontChooserDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
         insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
         child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 520, maxHeight: 520),
+          constraints: BoxConstraints(
+            maxWidth: scaledDim(context, 520),
+            maxHeight: scaledDim(context, 520),
+          ),
           child: Padding(
             padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
             child: StatefulBuilder(
@@ -2243,7 +2298,7 @@ class _FontRowItemState extends State<_FontRowItem> {
       child: GestureDetector(
         onTap: widget.onTap,
         child: Container(
-          height: 44,
+          height: scaledDim(context, 44),
           padding: const EdgeInsets.symmetric(horizontal: 12),
           decoration: BoxDecoration(
             color: bg,
@@ -2904,8 +2959,8 @@ class _ToggleRowMsgNavButtons extends StatelessWidget {
       trailing: DesktopSelectDropdown<DesktopMessageNavButtonsMode>(
         value: sp.desktopMessageNavButtonsMode,
         options: options,
-        minWidth: 168,
-        maxLabelWidth: 190,
+        minWidth: scaledDim(context, 168),
+        maxLabelWidth: scaledDim(context, 190),
         onSelected: (mode) => context
             .read<SettingsProvider>()
             .setDesktopMessageNavButtonsMode(mode),
@@ -3649,7 +3704,7 @@ class _SendShortcutDropdownState extends State<_SendShortcutDropdown> {
               showWhenUnlinked: false,
               offset: Offset(0, triggerSize.height + 6),
               child: _SendShortcutOverlay(
-                width: triggerWidth,
+                width: triggerWidth + scaledDim(context, 24),
                 backgroundColor: bgColor,
                 selected: sp.desktopSendShortcut,
                 onSelected: (shortcut) async {
@@ -3689,7 +3744,10 @@ class _SendShortcutDropdownState extends State<_SendShortcutDropdown> {
             duration: const Duration(milliseconds: 120),
             curve: Curves.easeOutCubic,
             padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 6),
-            constraints: const BoxConstraints(minWidth: 130, minHeight: 34),
+            constraints: BoxConstraints(
+              minWidth: scaledDim(context, 130),
+              minHeight: 34,
+            ),
             decoration: BoxDecoration(
               color: Theme.of(context).colorScheme.surfaceContainerHigh,
               borderRadius: BorderRadius.circular(10),

@@ -5,6 +5,7 @@ import '../l10n/app_localizations.dart';
 import '../icons/lucide_adapter.dart';
 import '../theme/app_font_weights.dart';
 import 'package:Kelivo/theme/app_semantic_colors.dart';
+import '../utils/ui_scale.dart';
 
 Future<MessageEditResult?> showMessageEditDesktopDialog(
   BuildContext context, {
@@ -50,10 +51,10 @@ class _MessageEditDesktopDialogState extends State<_MessageEditDesktopDialog> {
       insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: ConstrainedBox(
-        constraints: const BoxConstraints(
-          minWidth: 520,
-          maxWidth: 720,
-          maxHeight: 680,
+        constraints: BoxConstraints(
+          minWidth: scaledDim(context, 520),
+          maxWidth: scaledDim(context, 720),
+          maxHeight: scaledDim(context, 680),
         ),
         child: ClipRRect(
           borderRadius: BorderRadius.circular(16),

@@ -20,6 +20,7 @@ import '../../../shared/widgets/ios_tactile.dart';
 import '../../../shared/widgets/section_card.dart';
 import '../../../shared/widgets/ios_tile_button.dart';
 import '../../../utils/platform_utils.dart';
+import '../../../utils/ui_scale.dart';
 
 final DateFormat memoryEntryDateFormat = DateFormat('yyyy-MM-dd');
 
@@ -101,7 +102,7 @@ class _MemoryTipIconState extends State<MemoryTipIcon> {
       waitDuration: const Duration(milliseconds: 250),
       showDuration: const Duration(seconds: 8),
       preferBelow: true,
-      constraints: const BoxConstraints(maxWidth: 280),
+      constraints: BoxConstraints(maxWidth: scaledDim(context, 280)),
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
         onLongPress: () => _tooltipKey.currentState?.ensureTooltipVisible(),
@@ -829,13 +830,16 @@ Future<T?> showMemoryOptionPicker<T>(
             borderRadius: BorderRadius.circular(16),
           ),
           child: ConstrainedBox(
-            constraints: BoxConstraints(maxWidth: 420, maxHeight: maxHeight),
+            constraints: BoxConstraints(
+              maxWidth: scaledDim(context, 420),
+              maxHeight: maxHeight,
+            ),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 SizedBox(
-                  height: 44,
+                  height: scaledDim(context, 44),
                   child: Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 12),
                     child: Row(
@@ -1093,7 +1097,10 @@ Future<void> showMemoryEntryEditor(
             borderRadius: BorderRadius.circular(16),
           ),
           child: ConstrainedBox(
-            constraints: BoxConstraints(maxWidth: 520, maxHeight: maxHeight),
+            constraints: BoxConstraints(
+              maxWidth: scaledDim(context, 520),
+              maxHeight: maxHeight,
+            ),
             child: buildForm(desktop: true),
           ),
         );
@@ -1325,7 +1332,7 @@ class _MemoryEntryEditFormState extends State<MemoryEntryEditForm> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           SizedBox(
-            height: 44,
+            height: scaledDim(context, 44),
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 12),
               child: Row(

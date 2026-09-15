@@ -16,6 +16,7 @@ import '../../../theme/app_font_weights.dart';
 import '../../../theme/app_semantic_colors.dart';
 import '../../../theme/custom_theme.dart';
 import '../../../theme/palettes.dart';
+import '../../../utils/ui_scale.dart';
 
 bool get _isDesktop =>
     defaultTargetPlatform == TargetPlatform.macOS ||
@@ -155,7 +156,7 @@ Future<T?> _showAppSheet<T>(
                   ),
                   const SizedBox(height: 12),
                   SizedBox(
-                    height: 36,
+                    height: scaledDim(context, 36),
                     child: Stack(
                       children: [
                         Align(
@@ -202,7 +203,7 @@ class AppDialogHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     return SizedBox(
-      height: 48,
+      height: scaledDim(context, 48),
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 12),
         child: Row(

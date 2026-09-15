@@ -15,6 +15,7 @@ import '../../../shared/widgets/ios_tile_button.dart';
 import 'package:Kelivo/theme/app_font_weights.dart';
 import 'package:Kelivo/theme/app_semantic_colors.dart';
 import 'package:Kelivo/shared/widgets/section_card.dart';
+import '../../../utils/ui_scale.dart';
 
 Future<String?> showAddProviderSheet(BuildContext context) async {
   return showModalBottomSheet<String?>(
@@ -461,7 +462,7 @@ class _AddProviderSheetState extends State<_AddProviderSheet>
               ),
               const SizedBox(height: 12),
               SizedBox(
-                height: 36,
+                height: scaledDim(context, 36),
                 child: Stack(
                   children: [
                     Align(

@@ -17,6 +17,7 @@ import '../../utils/platform_utils.dart';
 import 'hive_to_sqlite_migration_service.dart';
 import 'widgets/migration_backup_options.dart';
 import 'package:Kelivo/theme/app_semantic_colors.dart';
+import '../../utils/ui_scale.dart';
 
 typedef MobileBackupSaver =
     Future<bool> Function({required String sourcePath, String? fileName});
@@ -1610,7 +1611,7 @@ class _LogCard extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           ConstrainedBox(
-            constraints: const BoxConstraints(maxHeight: 120),
+            constraints: BoxConstraints(maxHeight: scaledDim(context, 120)),
             child: SingleChildScrollView(
               child: Text(
                 // The error and stack trace are appended at the end of the

@@ -20,6 +20,7 @@ import 'memory_about_page.dart';
 import 'memory_entries_page.dart';
 import 'memory_trace_page.dart';
 import 'user_profile_page.dart';
+import '../../../utils/ui_scale.dart';
 
 /// Global memory settings: mode, model, prompt templates, data.
 class MemorySettingsPage extends StatelessWidget {
@@ -487,7 +488,10 @@ Future<void> _openPromptEditor(BuildContext context, _PromptEntry entry) async {
         insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 860, maxHeight: 660),
+          constraints: BoxConstraints(
+            maxWidth: scaledDim(context, 860),
+            maxHeight: scaledDim(context, 660),
+          ),
           child: _MemoryPromptEditPage(entry: entry, desktopDialog: true),
         ),
       ),
@@ -740,7 +744,7 @@ class _MemoryPromptEditPageState extends State<_MemoryPromptEditPage> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           SizedBox(
-            height: 44,
+            height: scaledDim(context, 44),
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 12),
               child: Row(

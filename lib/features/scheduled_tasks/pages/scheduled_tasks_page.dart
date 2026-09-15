@@ -22,6 +22,7 @@ import '../../../shared/widgets/snackbar.dart';
 import '../widgets/scheduled_task_tile.dart';
 import '../../settings/pages/mobile_background_settings_page.dart';
 import '../../settings/widgets/custom_theme_widgets.dart';
+import '../../../utils/ui_scale.dart';
 
 String _repeatLabel(ScheduledTask task, AppLocalizations l) {
   if (task.onceDate != null) return scheduledRepeatLabel(task.repeat, l);
@@ -363,7 +364,9 @@ class _ScheduledTasksPageState extends State<ScheduledTasksPage>
                   ),
                   const SizedBox(height: 8),
                   ConstrainedBox(
-                    constraints: const BoxConstraints(maxWidth: 480),
+                    constraints: BoxConstraints(
+                      maxWidth: scaledDim(context, 480),
+                    ),
                     child: Text(
                       l.scheduledTasksEmptyDetail,
                       textAlign: TextAlign.center,

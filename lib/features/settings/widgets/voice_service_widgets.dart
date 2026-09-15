@@ -7,6 +7,7 @@ import '../../../icons/lucide_adapter.dart';
 import '../../../theme/app_font_weights.dart';
 import 'package:Kelivo/shared/widgets/section_card.dart';
 import 'package:Kelivo/theme/app_semantic_colors.dart';
+import '../../../utils/ui_scale.dart';
 
 /// Shared visual vocabulary for the TTS and ASR halves of Voice Services.
 ///
@@ -633,7 +634,7 @@ Future<T?> _showVoiceServiceOptions<T>(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
       insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
       child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 420),
+        constraints: BoxConstraints(maxWidth: scaledDim(context, 420)),
         child: Padding(
           padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
           child: ConstrainedBox(

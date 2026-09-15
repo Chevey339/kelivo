@@ -33,6 +33,7 @@ import 'package:flutter/services.dart';
 import 'package:path/path.dart' as p;
 import 'package:provider/provider.dart';
 import 'package:share_plus/share_plus.dart';
+import '../../../../utils/ui_scale.dart';
 
 enum _FileItemAction { preview, rename, move, share, copyPath, export, delete }
 
@@ -1395,7 +1396,7 @@ class FileBrowserState extends State<FileBrowser> {
                                 if (columns) ...[
                                   const SizedBox(width: 12),
                                   SizedBox(
-                                    width: 132,
+                                    width: scaledDim(context, 132),
                                     child: Text(
                                       _relativeMtime(
                                         entry.modified,
@@ -1409,7 +1410,7 @@ class FileBrowserState extends State<FileBrowser> {
                                     ),
                                   ),
                                   SizedBox(
-                                    width: 80,
+                                    width: scaledDim(context, 80),
                                     child: Text(
                                       entry.isDirectory
                                           ? '—'
@@ -1535,7 +1536,7 @@ class _BreadcrumbBarState extends State<_BreadcrumbBar> {
         (i + 1, widget.segments[i]),
     ];
     return SizedBox(
-      height: 28,
+      height: scaledDim(context, 28),
       child: ListView(
         controller: _controller,
         scrollDirection: Axis.horizontal,
@@ -1556,7 +1557,7 @@ class _BreadcrumbBarState extends State<_BreadcrumbBar> {
               padding: const EdgeInsets.symmetric(horizontal: 8),
               borderRadius: BorderRadius.circular(8),
               child: SizedBox(
-                height: 28,
+                height: scaledDim(context, 28),
                 child: Center(
                   child: Text(
                     crumbs[i].$2,

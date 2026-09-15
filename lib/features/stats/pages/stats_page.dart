@@ -461,7 +461,7 @@ class _RangeButton extends StatelessWidget {
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 160),
           curve: Curves.easeOutCubic,
-          height: 32,
+          height: MediaQuery.textScalerOf(context).scale(32.0),
           constraints: const BoxConstraints(minWidth: 64),
           padding: const EdgeInsets.symmetric(horizontal: 13),
           alignment: Alignment.center,

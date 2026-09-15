@@ -5,6 +5,7 @@ import 'package:Kelivo/features/workspace/widgets/environment/environment_pane.d
 import 'package:Kelivo/icons/lucide_adapter.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
 import 'package:Kelivo/shared/widgets/ios_tactile.dart';
+import '../../../utils/ui_scale.dart';
 
 class EnvironmentPageDesktopLayout extends StatelessWidget {
   const EnvironmentPageDesktopLayout({super.key});
@@ -35,7 +36,7 @@ class EnvironmentPageDesktopLayout extends StatelessWidget {
       body: Align(
         alignment: Alignment.topCenter,
         child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 640),
+          constraints: BoxConstraints(maxWidth: scaledDim(context, 640)),
           child: const EnvironmentPane(),
         ),
       ),

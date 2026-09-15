@@ -17,6 +17,7 @@ import 'package:Kelivo/shared/widgets/ios_tile_button.dart';
 import 'package:Kelivo/shared/widgets/section_card.dart';
 import 'package:Kelivo/shared/widgets/snackbar.dart';
 import 'package:Kelivo/theme/app_font_weights.dart';
+import '../../../utils/ui_scale.dart';
 
 class MirrorPage extends StatelessWidget {
   const MirrorPage({super.key, required this.category});
@@ -298,7 +299,7 @@ class _MirrorEntryRow extends StatelessWidget {
         : Row(mainAxisSize: MainAxisSize.min, children: trailingChildren);
 
     return ConstrainedBox(
-      constraints: const BoxConstraints(minHeight: 44),
+      constraints: BoxConstraints(minHeight: scaledDim(context, 44)),
       child: IosCardPress(
         haptics: false,
         onTap: applying

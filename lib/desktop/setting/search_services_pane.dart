@@ -13,6 +13,7 @@ import '../../theme/app_font_weights.dart';
 import '../widgets/desktop_select_dropdown.dart';
 import 'package:Kelivo/theme/app_semantic_colors.dart';
 import 'package:Kelivo/shared/widgets/section_card.dart';
+import '../../utils/ui_scale.dart';
 
 class DesktopSearchServicesPane extends StatefulWidget {
   const DesktopSearchServicesPane({super.key});
@@ -41,12 +42,12 @@ class _DesktopSearchServicesPaneState extends State<DesktopSearchServicesPane> {
       child: Padding(
         padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
         child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 960),
+          constraints: BoxConstraints(maxWidth: scaledDim(context, 960)),
           child: CustomScrollView(
             slivers: [
               SliverToBoxAdapter(
                 child: SizedBox(
-                  height: 36,
+                  height: scaledDim(context, 36),
                   child: Row(
                     children: [
                       Expanded(
@@ -333,7 +334,7 @@ class _ServiceCardState extends State<_ServiceCard> {
             border: Border.all(color: borderColor, width: 1.0),
           ),
           padding: const EdgeInsets.all(14),
-          constraints: const BoxConstraints(minHeight: 64),
+          constraints: BoxConstraints(minHeight: scaledDim(context, 64)),
           child: Row(
             children: [
               _BrandBadge.forService(widget.service, size: 24),
@@ -492,7 +493,7 @@ class _StepperRowState extends State<_StepperRow> {
           ),
           const SizedBox(width: 8),
           Container(
-            width: 42,
+            width: scaledDim(context, 42),
             alignment: Alignment.center,
             child: Text(
               '${widget.value}',
@@ -819,7 +820,7 @@ class _AddServiceDialogState extends State<_AddServiceDialog> {
       insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 420),
+        constraints: BoxConstraints(maxWidth: scaledDim(context, 420)),
         child: Stack(
           children: [
             Padding(
@@ -1555,7 +1556,7 @@ class _EditServiceDialogState extends State<_EditServiceDialog> {
       insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 480),
+        constraints: BoxConstraints(maxWidth: scaledDim(context, 480)),
         child: Stack(
           children: [
             Padding(
@@ -2345,7 +2346,10 @@ class _MultiKeyManageDialogState extends State<_MultiKeyManageDialog> {
       insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 440, maxHeight: 520),
+        constraints: BoxConstraints(
+          maxWidth: scaledDim(context, 440),
+          maxHeight: scaledDim(context, 520),
+        ),
         child: Padding(
           padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
           child: Column(
@@ -2695,11 +2699,12 @@ class _ServiceTypeDropdownState extends State<_ServiceTypeDropdown> {
     final rb = _key.currentContext?.findRenderObject() as RenderBox?;
     if (rb == null) return;
     final triggerW = rb.size.width;
-    const maxW = 320.0;
+    final maxW = MediaQuery.textScalerOf(context).scale(320.0);
+    final minW = MediaQuery.textScalerOf(context).scale(200.0);
     _entry = OverlayEntry(
       builder: (ctx) {
         final cs = Theme.of(ctx).colorScheme;
-        final width = triggerW.clamp(200.0, maxW);
+        final width = triggerW.clamp(minW, maxW);
         final dx = (triggerW - width) / 2;
         final maxH = MediaQuery.of(ctx).size.height * 0.4;
         return Stack(

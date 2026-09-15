@@ -15,6 +15,7 @@ import '../../../core/services/haptics.dart';
 import '../../../theme/app_font_weights.dart';
 import 'package:Kelivo/theme/app_semantic_colors.dart';
 import '../../../shared/widgets/section_card.dart';
+import '../../../utils/ui_scale.dart';
 
 /// [chatModelProviderKey]/[chatModelId] carry the model the chat actually
 /// sends with, resolved by the caller (conversation override -> assistant ->
@@ -418,7 +419,7 @@ class _SearchSettingsSheet extends StatelessWidget {
                     return Padding(
                       padding: const EdgeInsets.symmetric(vertical: 4),
                       child: SizedBox(
-                        height: 48,
+                        height: scaledDim(context, 48),
                         child: IosCardPress(
                           borderRadius: BorderRadius.circular(14),
                           baseColor: sheetTileColor(context),

@@ -12,6 +12,7 @@ import '../../../core/services/haptics.dart';
 import 'package:Kelivo/theme/app_font_weights.dart';
 import 'package:Kelivo/theme/app_semantic_colors.dart';
 import '../../../shared/widgets/section_card.dart';
+import '../../../utils/ui_scale.dart';
 
 Future<void> showReasoningBudgetSheet(
   BuildContext context, {
@@ -329,7 +330,7 @@ class _ReasoningBudgetSheetState extends State<_ReasoningBudgetSheet>
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 12),
       child: SizedBox(
-        height: 48,
+        height: scaledDim(context, 48),
         child: IosCardPress(
           borderRadius: BorderRadius.circular(14),
           baseColor: sheetTileColor(context),

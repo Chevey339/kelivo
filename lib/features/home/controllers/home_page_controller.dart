@@ -287,8 +287,9 @@ class HomePageController extends ChangeNotifier {
   bool get isDragHovering => _isDragHovering;
   bool get tabletSidebarOpen => _tabletSidebarOpen;
   bool get rightSidebarOpen => _rightSidebarOpen;
-  double get embeddedSidebarWidth => _embeddedSidebarWidth;
-  double get rightSidebarWidth => _rightSidebarWidth;
+  double get embeddedSidebarWidth =>
+      _embeddedSidebarWidth * _sidebarWidthScale();
+  double get rightSidebarWidth => _rightSidebarWidth * _sidebarWidthScale();
   double get inputBarHeight => _inputBarHeight;
   bool get desktopUiInited => _desktopUiInited;
   bool get isGlobalSearchMode => _isGlobalSearchMode;
@@ -2352,8 +2353,27 @@ class HomePageController extends ChangeNotifier {
     } catch (_) {}
   }
 
+  /// Damped width scale for the persisted sidebars (1.0 at 100% font scale).
+  /// Sidebar widths are persisted in 100%-space and scaled at usage so the
+  /// panes keep their proportions at large UI font scales (topic list would
+  /// otherwise wrap and truncate inside the unscaled width). The scale grows
+  /// at half the font rate — a full 1.5× width felt bloated; tune
+  /// [_widthScaleDamping] (0 = no growth, 1 = full font scale) to adjust.
+  static const double _widthScaleDamping = 0.5;
+
+  double _sidebarWidthScale() {
+    try {
+      final fs = MediaQuery.textScalerOf(_context).scale(1.0);
+      return 1.0 + (fs - 1.0) * _widthScaleDamping;
+    } catch (_) {
+      return 1.0;
+    }
+  }
+
   void updateSidebarWidth(double dx) {
-    _embeddedSidebarWidth = (_embeddedSidebarWidth + dx).clamp(
+    // dx arrives in screen space; the stored width is logical (100%-space).
+    final fs = _sidebarWidthScale();
+    _embeddedSidebarWidth = (_embeddedSidebarWidth + dx / fs).clamp(
       _sidebarMinWidth,
       _sidebarMaxWidth,
     );
@@ -2369,7 +2389,9 @@ class HomePageController extends ChangeNotifier {
   }
 
   void updateRightSidebarWidth(double dx) {
-    _rightSidebarWidth = (_rightSidebarWidth - dx).clamp(
+    // dx arrives in screen space; the stored width is logical (100%-space).
+    final fs = _sidebarWidthScale();
+    _rightSidebarWidth = (_rightSidebarWidth - dx / fs).clamp(
       _sidebarMinWidth,
       _sidebarMaxWidth,
     );

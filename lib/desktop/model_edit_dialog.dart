@@ -14,6 +14,7 @@ import '../shared/widgets/snackbar.dart';
 import '../features/model/widgets/model_edit_state_helper.dart';
 import '../theme/app_font_weights.dart';
 import 'package:Kelivo/theme/app_semantic_colors.dart';
+import '../utils/ui_scale.dart';
 
 Future<bool?> showDesktopModelEditDialog(
   BuildContext context, {
@@ -318,10 +319,10 @@ class _ModelEditDialogBodyState extends State<_ModelEditDialogBody>
     final l10n = AppLocalizations.of(context)!;
     return Center(
       child: ConstrainedBox(
-        constraints: const BoxConstraints(
-          minWidth: 540,
-          maxWidth: 700,
-          maxHeight: 650,
+        constraints: BoxConstraints(
+          minWidth: scaledDim(context, 540),
+          maxWidth: scaledDim(context, 700),
+          maxHeight: scaledDim(context, 650),
         ),
         child: Material(
           color: context.overlaySurface,
@@ -340,7 +341,7 @@ class _ModelEditDialogBodyState extends State<_ModelEditDialogBody>
               children: [
                 // Header
                 Container(
-                  height: 52,
+                  height: scaledDim(context, 52),
                   color: context.overlaySurface,
                   child: Padding(
                     padding: const EdgeInsets.fromLTRB(16, 10, 10, 0),
