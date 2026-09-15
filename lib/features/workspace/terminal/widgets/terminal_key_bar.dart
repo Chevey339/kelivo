@@ -8,6 +8,7 @@ import 'package:Kelivo/l10n/app_localizations.dart';
 import 'package:Kelivo/shared/widgets/ios_tactile.dart';
 import 'package:Kelivo/theme/app_font_weights.dart';
 import 'package:Kelivo/theme/app_semantic_colors.dart';
+import '../../../../utils/ui_scale.dart';
 
 /// Extra keys shown above the soft keyboard.
 class TerminalKeyBar extends StatelessWidget {
@@ -250,7 +251,10 @@ class _KeyChip extends StatelessWidget {
             onTap();
           },
           child: ConstrainedBox(
-            constraints: const BoxConstraints(minWidth: 28, minHeight: 36),
+            constraints: BoxConstraints(
+              minWidth: scaledDim(context, 28),
+              minHeight: scaledDim(context, 36),
+            ),
             child: Center(
               widthFactor: 1,
               heightFactor: 1,

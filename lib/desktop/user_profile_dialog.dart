@@ -15,6 +15,7 @@ import '../shared/widgets/snackbar.dart';
 import '../utils/sandbox_path_resolver.dart';
 import '../theme/app_font_weights.dart';
 import 'package:Kelivo/theme/app_semantic_colors.dart';
+import '../utils/ui_scale.dart';
 
 Future<void> showUserProfileDialog(BuildContext context) async {
   await showGeneralDialog<void>(
@@ -118,7 +119,10 @@ class _UserProfileDialogBodyState extends State<_UserProfileDialogBody> {
 
     final dialog = Center(
       child: ConstrainedBox(
-        constraints: const BoxConstraints(minWidth: 320, maxWidth: 420),
+        constraints: BoxConstraints(
+          minWidth: scaledDim(context, 320),
+          maxWidth: scaledDim(context, 420),
+        ),
         child: Material(
           color: Theme.of(context).colorScheme.surfaceContainerHigh,
           elevation: 0,
@@ -184,7 +188,9 @@ class _UserProfileDialogBodyState extends State<_UserProfileDialogBody> {
                 Align(
                   alignment: Alignment.center,
                   child: ConstrainedBox(
-                    constraints: const BoxConstraints(maxWidth: 280),
+                    constraints: BoxConstraints(
+                      maxWidth: scaledDim(context, 280),
+                    ),
                     child: TextField(
                       controller: _nameController,
                       autofocus: true,

@@ -5,6 +5,7 @@ import 'package:Kelivo/l10n/app_localizations.dart';
 import 'package:Kelivo/shared/widgets/ios_tile_button.dart';
 import 'package:Kelivo/shared/widgets/section_card.dart';
 import 'package:Kelivo/theme/app_font_weights.dart';
+import '../../../../utils/ui_scale.dart';
 
 class SystemTerminalCard extends StatelessWidget {
   const SystemTerminalCard({super.key, required this.hostDir, this.onOpen});
@@ -23,7 +24,7 @@ class SystemTerminalCard extends StatelessWidget {
     return Center(
       child: ConstrainedBox(
         key: cardKey,
-        constraints: const BoxConstraints(maxWidth: 440),
+        constraints: BoxConstraints(maxWidth: scaledDim(context, 440)),
         child: Padding(
           padding: const EdgeInsets.all(24),
           child: SectionCard(

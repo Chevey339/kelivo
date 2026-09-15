@@ -5,6 +5,7 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../shared/widgets/ios_tactile.dart';
 import '../../../theme/app_font_weights.dart';
+import '../../../utils/ui_scale.dart';
 
 /// Matches Settings' themed navigation bar using the app's own controls.
 class ScheduledTasksScaffold extends StatelessWidget {
@@ -132,14 +133,14 @@ class ScheduledTasksScaffold extends StatelessWidget {
       child: Align(
         alignment: Alignment.topCenter,
         child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 992),
+          constraints: BoxConstraints(maxWidth: scaledDim(context, 992)),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Padding(
                 padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
                 child: SizedBox(
-                  height: 36,
+                  height: scaledDim(context, 36),
                   child: Row(
                     children: [
                       if (!embedded) ...[

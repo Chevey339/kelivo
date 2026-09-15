@@ -4,6 +4,7 @@ import '../../icons/lucide_adapter.dart';
 import '../../l10n/app_localizations.dart';
 import '../../utils/url_launcher_ext.dart';
 import 'package:Kelivo/theme/app_font_weights.dart';
+import '../../utils/ui_scale.dart';
 
 /// Shown when the installed database was written by a newer app version;
 /// restarting cannot help, so the only immediate action is updating Kelivo.
@@ -38,7 +39,7 @@ class UpdateRequiredScreen extends StatelessWidget {
           child: SingleChildScrollView(
             padding: const EdgeInsets.all(24),
             child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 560),
+              constraints: BoxConstraints(maxWidth: scaledDim(context, 560)),
               child: Material(
                 color: colors.surfaceContainerLow,
                 borderRadius: BorderRadius.circular(20),
@@ -113,10 +114,10 @@ class UpdateRequiredScreen extends StatelessWidget {
                         number: 3,
                         text: l10n.startupDatabaseUpdateRequiredDowngradeStep3,
                       ),
-                      const SizedBox(height: 16),
+                      SizedBox(height: 16),
                       SizedBox(
                         width: double.infinity,
-                        height: 44,
+                        height: scaledDim(context, 44),
                         child: OutlinedButton.icon(
                           onPressed: () => _openConversionTool(context),
                           icon: const Icon(Lucide.ExternalLink, size: 18),
@@ -175,8 +176,8 @@ class _NumberedStep extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Container(
-          width: 28,
-          height: 28,
+          width: scaledDim(context, 28),
+          height: scaledDim(context, 28),
           alignment: Alignment.center,
           decoration: BoxDecoration(
             color: colors.secondaryContainer,

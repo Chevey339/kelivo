@@ -10,6 +10,7 @@ import '../core/models/chat_message.dart';
 import '../core/models/message_part.dart';
 import '../theme/design_tokens.dart';
 import 'desktop_overlay_backdrop.dart';
+import '../utils/ui_scale.dart';
 
 Future<String?> showDesktopMiniMapPopover(
   BuildContext context, {
@@ -392,7 +393,7 @@ class _MiniMapListState extends State<_MiniMapList> {
       return Padding(
         padding: const EdgeInsets.only(bottom: 2),
         child: ConstrainedBox(
-          constraints: const BoxConstraints(maxHeight: 420),
+          constraints: BoxConstraints(maxHeight: scaledDim(context, 420)),
           child: ListView.builder(
             padding: const EdgeInsets.fromLTRB(12, 10, 12, 2),
             primary: false,
@@ -438,7 +439,7 @@ class _MiniMapListState extends State<_MiniMapList> {
     return Padding(
       padding: const EdgeInsets.only(bottom: 2),
       child: ConstrainedBox(
-        constraints: const BoxConstraints(maxHeight: 420),
+        constraints: BoxConstraints(maxHeight: scaledDim(context, 420)),
         child: ListView.builder(
           padding: const EdgeInsets.fromLTRB(12, 10, 12, 2),
           primary: false,

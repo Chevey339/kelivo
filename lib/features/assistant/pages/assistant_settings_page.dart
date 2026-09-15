@@ -11,6 +11,7 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 import 'assistant_settings_edit_page.dart';
 import '../widgets/assistant_copy_dialog.dart';
 import '../../../utils/avatar_cache.dart';
+import '../../../utils/avatar_scale.dart';
 import '../../../utils/sandbox_path_resolver.dart';
 import '../../../core/services/haptics.dart';
 import 'package:flutter_slidable/flutter_slidable.dart';
@@ -566,8 +567,8 @@ class _AssistantAvatar extends StatelessWidget {
               return ClipOval(
                 child: Image(
                   image: FileImage(File(p)),
-                  width: size,
-                  height: size,
+                  width: scaledAvatarSize(context, size),
+                  height: scaledAvatarSize(context, size),
                   fit: BoxFit.cover,
                 ),
               );
@@ -575,10 +576,10 @@ class _AssistantAvatar extends StatelessWidget {
             return ClipOval(
               child: Image.network(
                 av,
-                width: size,
-                height: size,
+                width: scaledAvatarSize(context, size),
+                height: scaledAvatarSize(context, size),
                 fit: BoxFit.cover,
-                errorBuilder: (c, e, s) => _initial(cs),
+                errorBuilder: (c, e, s) => _initial(context, cs),
               ),
             );
           },
@@ -590,45 +591,48 @@ class _AssistantAvatar extends StatelessWidget {
           return ClipOval(
             child: Image(
               image: FileImage(f),
-              width: size,
-              height: size,
+              width: scaledAvatarSize(context, size),
+              height: scaledAvatarSize(context, size),
               fit: BoxFit.cover,
             ),
           );
         }
-        return _initial(cs);
+        return _initial(context, cs);
       } else {
-        return _emoji(cs, av);
+        return _emoji(context, cs, av);
       }
     }
-    return _initial(cs);
+    return _initial(context, cs);
   }
 
-  Widget _initial(ColorScheme cs) {
+  Widget _initial(BuildContext context, ColorScheme cs) {
     final letter = item.name.isNotEmpty ? item.name.characters.first : '?';
     return Container(
-      width: size,
-      height: size,
+      width: scaledAvatarSize(context, size),
+      height: scaledAvatarSize(context, size),
       decoration: BoxDecoration(
         color: cs.primary.withValues(alpha: 0.15),
         shape: BoxShape.circle,
       ),
       alignment: Alignment.center,
-      child: Text(
-        letter,
-        style: TextStyle(
-          color: cs.primary,
-          fontWeight: AppFontWeights.emphasis,
-          fontSize: size * 0.42,
+      child: Transform.translate(
+        offset: Offset(0, avatarInitialNudgeY(context, size)),
+        child: Text(
+          letter,
+          style: TextStyle(
+            color: cs.primary,
+            fontWeight: AppFontWeights.emphasis,
+            fontSize: size * 0.42,
+          ),
         ),
       ),
     );
   }
 
-  Widget _emoji(ColorScheme cs, String emoji) {
+  Widget _emoji(BuildContext context, ColorScheme cs, String emoji) {
     return Container(
-      width: size,
-      height: size,
+      width: scaledAvatarSize(context, size),
+      height: scaledAvatarSize(context, size),
       decoration: BoxDecoration(
         color: cs.primary.withValues(alpha: 0.15),
         shape: BoxShape.circle,

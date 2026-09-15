@@ -8,6 +8,7 @@ import '../icons/lucide_adapter.dart';
 import 'package:Kelivo/theme/app_font_weights.dart';
 import '../theme/design_tokens.dart';
 import 'desktop_overlay_backdrop.dart';
+import '../utils/ui_scale.dart';
 
 Future<QuickPhrase?> showDesktopQuickPhrasePopover(
   BuildContext context, {
@@ -229,7 +230,7 @@ class _QuickPhraseList extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.only(bottom: 2),
       child: ConstrainedBox(
-        constraints: const BoxConstraints(maxHeight: 420),
+        constraints: BoxConstraints(maxHeight: scaledDim(context, 420)),
         child: ListView.builder(
           padding: const EdgeInsets.fromLTRB(12, 10, 12, 2),
           shrinkWrap: true,

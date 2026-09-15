@@ -14,6 +14,7 @@ import '../../l10n/app_localizations.dart';
 import '../../features/settings/widgets/custom_theme_widgets.dart';
 import '../../shared/widgets/ios_switch.dart';
 import '../../shared/widgets/ios_tactile.dart';
+import '../../utils/ui_scale.dart';
 
 Future<void> showDesktopAutoRetryDialog(BuildContext context) {
   final l10n = AppLocalizations.of(context)!;
@@ -147,7 +148,10 @@ class _DesktopAutoRetryPaneState extends State<DesktopAutoRetryPane> {
     bool decimal = false,
   }) {
     return ConstrainedBox(
-      constraints: const BoxConstraints(minWidth: 140, maxWidth: 220),
+      constraints: BoxConstraints(
+        minWidth: scaledDim(context, 140),
+        maxWidth: scaledDim(context, 220),
+      ),
       child: TextField(
         controller: controller,
         focusNode: focusNode,
@@ -175,12 +179,12 @@ class _DesktopAutoRetryPaneState extends State<DesktopAutoRetryPane> {
       child: Padding(
         padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
         child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 960),
+          constraints: BoxConstraints(maxWidth: scaledDim(context, 960)),
           child: ListView(
             children: [
               if (widget.showPageTitle) ...[
                 SizedBox(
-                  height: 36,
+                  height: scaledDim(context, 36),
                   child: Align(
                     alignment: Alignment.centerLeft,
                     child: Text(

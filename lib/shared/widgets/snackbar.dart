@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import '../../core/services/haptics.dart';
 import 'package:Kelivo/theme/app_font_weights.dart';
 import 'package:Kelivo/theme/app_semantic_colors.dart';
+import '../../utils/ui_scale.dart';
 
 final GlobalKey<NavigatorState> rootNavigatorKey = GlobalKey<NavigatorState>();
 
@@ -376,7 +377,7 @@ class _NotificationWidgetState extends State<NotificationWidget>
           ),
         child: Container(
           margin: const EdgeInsets.only(bottom: 8),
-          constraints: const BoxConstraints(maxWidth: 400),
+          constraints: BoxConstraints(maxWidth: scaledDim(context, 400)),
           decoration: BoxDecoration(
             color: cs.surfaceContainerHigh.withValues(alpha: 0.98),
             // color: cs.surface.withValues(alpha: 0.98),

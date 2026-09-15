@@ -29,6 +29,7 @@ import '../../../shared/widgets/section_card.dart';
 import '../../../theme/app_font_weights.dart';
 import 'tools_sheet_row.dart';
 import '../../browser/browser_navigation.dart';
+import '../../../utils/ui_scale.dart';
 
 /// Row that opens the session skills picker, and pushes the skills library on
 /// a long press.
@@ -70,7 +71,7 @@ class BottomToolsSheet extends StatelessWidget {
       final cardColor = sheetTileColor(context);
       return Expanded(
         child: SizedBox(
-          height: 72,
+          height: scaledDim(context, 72),
           child: IosCardPress(
             baseColor: cardColor,
             borderRadius: BorderRadius.circular(14),

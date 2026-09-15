@@ -14,6 +14,7 @@ import '../../../shared/widgets/snackbar.dart';
 import '../../../core/services/haptics.dart';
 import '../../../theme/app_font_weights.dart';
 import 'package:Kelivo/theme/app_semantic_colors.dart';
+import '../../../utils/ui_scale.dart';
 
 class AssistantRegexTab extends StatefulWidget {
   const AssistantRegexTab({super.key, required this.assistantId});
@@ -128,7 +129,7 @@ class _AssistantRegexTabState extends State<AssistantRegexTab> {
               ),
               const SizedBox(height: 24),
               ConstrainedBox(
-                constraints: const BoxConstraints(minWidth: 200),
+                constraints: BoxConstraints(minWidth: scaledDim(context, 200)),
                 child: IosCardPress(
                   onTap: () => _addOrEdit(),
                   borderRadius: BorderRadius.circular(12),
@@ -970,13 +971,13 @@ Future<_RegexFormData?> _showRegexDialog(
             }
 
             return ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 560),
+              constraints: BoxConstraints(maxWidth: scaledDim(context, 560)),
               child: IntrinsicHeight(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     SizedBox(
-                      height: 48,
+                      height: scaledDim(context, 48),
                       child: Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 12),
                         child: Row(

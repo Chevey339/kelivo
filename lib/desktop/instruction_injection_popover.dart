@@ -12,6 +12,7 @@ import '../l10n/app_localizations.dart';
 import '../theme/app_font_weights.dart';
 import '../theme/design_tokens.dart';
 import 'desktop_overlay_backdrop.dart';
+import '../utils/ui_scale.dart';
 
 Future<void> showDesktopInstructionInjectionPopover(
   BuildContext context, {
@@ -239,7 +240,7 @@ class _InstructionInjectionList extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.only(bottom: 2),
       child: ConstrainedBox(
-        constraints: const BoxConstraints(maxHeight: 420),
+        constraints: BoxConstraints(maxHeight: scaledDim(context, 420)),
         child: _InstructionInjectionListInner(
           items: items,
           assistantId: assistantId,

@@ -15,6 +15,7 @@ import '../../../shared/widgets/snackbar.dart';
 import '../../../utils/platform_utils.dart';
 import '../widgets/memory_ui.dart';
 import 'package:Kelivo/theme/app_semantic_colors.dart';
+import '../../../utils/ui_scale.dart';
 
 /// Structured user profile fields (§14.4 / §5.7).
 class UserProfilePage extends StatelessWidget {
@@ -121,7 +122,10 @@ class _UserProfileContentState extends State<UserProfileContent> {
               borderRadius: BorderRadius.circular(16),
             ),
             child: ConstrainedBox(
-              constraints: BoxConstraints(maxWidth: 480, maxHeight: maxHeight),
+              constraints: BoxConstraints(
+                maxWidth: scaledDim(context, 480),
+                maxHeight: maxHeight,
+              ),
               child: buildForm(desktop: true),
             ),
           );
@@ -374,7 +378,7 @@ class _ProfileFieldFormState extends State<_ProfileFieldForm> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           SizedBox(
-            height: 44,
+            height: scaledDim(context, 44),
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 12),
               child: Row(
