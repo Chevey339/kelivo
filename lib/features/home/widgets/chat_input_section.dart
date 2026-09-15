@@ -158,6 +158,7 @@ class ChatInputSection extends StatelessWidget {
     final reasoningSpec = (pk != null && mid != null)
         ? ModelSpecResolver.instance.spec(settings.getProviderConfig(pk), mid)
         : null;
+    final supportsImageInput = reasoningSpec?.supportsImageInput ?? false;
 
     // Enforce model capabilities: disable MCP selection if model doesn't
     // support tools. Skipped while the conversation overrides the model —
@@ -238,8 +239,12 @@ class ChatInputSection extends StatelessWidget {
       // Tablet-specific parameters
       showMiniMapButton: isTablet,
       onOpenMiniMap: isTablet ? onOpenMiniMap : null,
-      onPickCamera: isTablet ? (isDesktop ? null : onPickCamera) : null,
-      onPickPhotos: isTablet ? (isDesktop ? null : onPickPhotos) : null,
+      onPickCamera: isTablet && !isDesktop && supportsImageInput
+          ? onPickCamera
+          : null,
+      onPickPhotos: isTablet && !isDesktop && supportsImageInput
+          ? onPickPhotos
+          : null,
       onUploadFiles: isTablet ? onUploadFiles : null,
       onToggleLearningMode: isTablet ? onToggleLearningMode : null,
       onOpenWorldBook: hasWorldBooks ? onOpenWorldBook : null,

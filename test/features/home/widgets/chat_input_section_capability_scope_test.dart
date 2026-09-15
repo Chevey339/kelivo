@@ -2,9 +2,11 @@ import 'dart:convert';
 
 import 'package:Kelivo/core/providers/asr_provider.dart';
 import 'package:Kelivo/core/providers/assistant_provider.dart';
+import 'package:Kelivo/core/providers/instruction_injection_provider.dart';
 import 'package:Kelivo/core/providers/mcp_provider.dart';
 import 'package:Kelivo/core/providers/quick_phrase_provider.dart';
 import 'package:Kelivo/core/providers/settings_provider.dart';
+import 'package:Kelivo/core/providers/world_book_provider.dart';
 import 'package:Kelivo/features/home/widgets/chat_input_bar.dart';
 import 'package:Kelivo/features/home/widgets/chat_input_section.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
@@ -131,5 +133,85 @@ void main() {
     );
 
     expect(assistants.currentAssistant?.mcpServerIds, isEmpty);
+  });
+
+  Future<void> pumpTabletComposer(
+    WidgetTester tester, {
+    required AssistantProvider assistants,
+    required String modelId,
+  }) async {
+    final settings = SettingsProvider(preferences);
+    await tester.pumpWidget(
+      MultiProvider(
+        providers: [
+          ChangeNotifierProvider.value(value: settings),
+          ChangeNotifierProvider.value(value: assistants),
+          ChangeNotifierProvider(create: (_) => AsrProvider()),
+          ChangeNotifierProvider(
+            create: (_) => McpProvider(preferences: preferences),
+          ),
+          ChangeNotifierProvider(
+            create: (_) => QuickPhraseProvider(preferences: preferences),
+          ),
+          ChangeNotifierProvider(
+            create: (_) => WorldBookProvider(preferences: preferences),
+          ),
+          ChangeNotifierProvider(
+            create: (_) =>
+                InstructionInjectionProvider(preferences: preferences),
+          ),
+        ],
+        child: MaterialApp(
+          theme: ThemeData(platform: TargetPlatform.android),
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: Scaffold(
+            body: ChatInputSection(
+              inputBarKey: GlobalKey(),
+              chatModelProviderKey: 'SomeProvider',
+              chatModelId: modelId,
+              inputFocus: FocusNode(),
+              inputController: TextEditingController(),
+              mediaController: ChatInputBarController(),
+              isTablet: true,
+              isLoading: false,
+              isToolModel: (_, _) => false,
+              isReasoningModel: (_, _) => false,
+              isReasoningEnabled: (_) => false,
+              onPickCamera: () {},
+              onPickPhotos: () {},
+              onUploadFiles: () {},
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+  }
+
+  testWidgets('tablet camera and photos hide when the spec lacks image', (
+    tester,
+  ) async {
+    final assistants = await loadAssistantWithMcp(tester);
+    await pumpTabletComposer(
+      tester,
+      assistants: assistants,
+      modelId: 'mimo-v2.5-pro',
+    );
+    final bar = tester.widget<ChatInputBar>(find.byType(ChatInputBar));
+    expect(bar.onPickCamera, isNull);
+    expect(bar.onPickPhotos, isNull);
+    expect(bar.onUploadFiles, isNotNull);
+  });
+
+  testWidgets('tablet camera and photos show when the spec accepts image', (
+    tester,
+  ) async {
+    final assistants = await loadAssistantWithMcp(tester);
+    await pumpTabletComposer(tester, assistants: assistants, modelId: 'gpt-4o');
+    final bar = tester.widget<ChatInputBar>(find.byType(ChatInputBar));
+    expect(bar.onPickCamera, isNotNull);
+    expect(bar.onPickPhotos, isNotNull);
+    expect(bar.onUploadFiles, isNotNull);
   });
 }

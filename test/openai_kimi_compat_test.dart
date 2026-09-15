@@ -183,6 +183,11 @@ void main() {
       test('$modelId sends inline images and video', () async {
         final body = await _captureMoonshotBody(
           modelId: modelId,
+          modelOverrides: {
+            modelId: const {
+              'input': ['text', 'image', 'video'],
+            },
+          },
           messages: const [
             {'role': 'user', 'content': 'describe'},
           ],

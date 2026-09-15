@@ -152,6 +152,9 @@ void main() {
   Future<AppLocalizations> pumpSheet(
     WidgetTester tester, {
     Conversation? conversation,
+    VoidCallback? onCamera,
+    VoidCallback? onPhotos,
+    VoidCallback? onUpload,
   }) async {
     tester.view.physicalSize = const Size(800, 1600);
     tester.view.devicePixelRatio = 1.0;
@@ -185,6 +188,9 @@ void main() {
               body: BottomToolsSheet(
                 assistantId: assistantId,
                 conversationId: conversation?.id,
+                onCamera: onCamera,
+                onPhotos: onPhotos,
+                onUpload: onUpload,
               ),
             ),
           ),
@@ -194,6 +200,31 @@ void main() {
     await tester.pump();
     return AppLocalizations.of(tester.element(find.byType(Scaffold)))!;
   }
+
+  testWidgets('hides camera and photos when those callbacks are null', (
+    tester,
+  ) async {
+    final l10n = await pumpSheet(tester, onUpload: () {});
+
+    expect(find.text(l10n.bottomToolsSheetCamera), findsNothing);
+    expect(find.text(l10n.bottomToolsSheetPhotos), findsNothing);
+    expect(find.text(l10n.bottomToolsSheetUpload), findsOneWidget);
+  });
+
+  testWidgets('shows camera and photos when those callbacks are set', (
+    tester,
+  ) async {
+    final l10n = await pumpSheet(
+      tester,
+      onCamera: () {},
+      onPhotos: () {},
+      onUpload: () {},
+    );
+
+    expect(find.text(l10n.bottomToolsSheetCamera), findsOneWidget);
+    expect(find.text(l10n.bottomToolsSheetPhotos), findsOneWidget);
+    expect(find.text(l10n.bottomToolsSheetUpload), findsOneWidget);
+  });
 
   testWidgets('keeps session skills and drops the workspace block', (
     tester,

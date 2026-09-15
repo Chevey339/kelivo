@@ -332,7 +332,17 @@
   "displaySettingsPageLanguageChineseLabel": "Simplified Chinese",
   "displaySettingsPageLanguageEnglishLabel": "English",
   "homePagePleaseSelectModel": "Please select a model first",
-  "homePageAudioAttachmentUnsupported": "The current model does not support audio attachments. Switch to a model that supports audio input or remove the audio file and try again.",
+  "homePageAttachmentUnsupported": "This model does not accept {modalities} attachments. Switch model or remove them.",
+  "@homePageAttachmentUnsupported": {
+    "placeholders": {
+      "modalities": {
+        "type": "String"
+      }
+    }
+  },
+  "homePageAttachmentModalityImage": "image",
+  "homePageAttachmentModalityAudio": "audio",
+  "homePageAttachmentModalityVideo": "video",
   "homePagePleaseSetupTranslateModel": "Please set a translation model first",
   "homePageTranslating": "Translating...",
   "homePageTranslateFailed": "Translation failed: {error}",

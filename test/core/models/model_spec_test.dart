@@ -78,6 +78,8 @@ void main() {
 
       expect(spec.upstreamId, 'upstream');
       expect(spec.supportsImageInput, isTrue);
+      expect(spec.supportsAudioInput, isFalse);
+      expect(spec.supportsVideoInput, isFalse);
       expect(spec.supportsTool, isTrue);
       expect(spec.supportsReasoning, isTrue);
 

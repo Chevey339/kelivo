@@ -19,6 +19,17 @@ ProviderConfig _openAiConfig(String baseUrl, {bool useResponseApi = false}) {
   );
 }
 
+ProviderConfig _withVideoInput(ProviderConfig config, String modelId) {
+  return config.copyWith(
+    modelOverrides: {
+      ...config.modelOverrides,
+      modelId: const {
+        'input': ['text', 'image', 'video'],
+      },
+    },
+  );
+}
+
 Future<Map<String, dynamic>> _sendAndCaptureRequestBody(
   Future<List<dynamic>> Function(String baseUrl) sendRequest,
 ) async {
@@ -993,7 +1004,10 @@ void main() {
         await file.writeAsBytes(const [1, 2, 3, 4]);
 
         return ChatApiService.sendMessageStream(
-          config: _openAiConfig(baseUrl, useResponseApi: true),
+          config: _withVideoInput(
+            _openAiConfig(baseUrl, useResponseApi: true),
+            'gpt-4.1',
+          ),
           modelId: 'gpt-4.1',
           messages: [
             {
@@ -1036,7 +1050,10 @@ void main() {
         videoPath = file.path;
 
         return ChatApiService.sendMessageStream(
-          config: _openAiConfig(baseUrl, useResponseApi: true),
+          config: _withVideoInput(
+            _openAiConfig(baseUrl, useResponseApi: true),
+            'gpt-4.1',
+          ),
           modelId: 'gpt-4.1',
           messages: [
             {
@@ -1070,7 +1087,10 @@ void main() {
     test('remote video URL stays as text, not input_image', () async {
       final body = await _sendAndCaptureResponsesBody((baseUrl) async {
         return ChatApiService.sendMessageStream(
-          config: _openAiConfig(baseUrl, useResponseApi: true),
+          config: _withVideoInput(
+            _openAiConfig(baseUrl, useResponseApi: true),
+            'gpt-4.1',
+          ),
           modelId: 'gpt-4.1',
           messages: [
             {
@@ -1538,7 +1558,10 @@ void main() {
         final body = await _captureProviderBody(
           (baseUrl) {
             return ChatApiService.sendMessageStream(
-              config: _claudeConfig(baseUrl),
+              config: _withVideoInput(
+                _claudeConfig(baseUrl),
+                'claude-sonnet-4-6',
+              ),
               modelId: 'claude-sonnet-4-6',
               messages: [
                 {
@@ -1589,7 +1612,10 @@ void main() {
         final body = await _captureProviderBody(
           (baseUrl) {
             return ChatApiService.sendMessageStream(
-              config: _claudeConfig(baseUrl),
+              config: _withVideoInput(
+                _claudeConfig(baseUrl),
+                'claude-sonnet-4-6',
+              ),
               modelId: 'claude-sonnet-4-6',
               messages: [
                 {

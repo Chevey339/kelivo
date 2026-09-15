@@ -13,10 +13,6 @@ import 'package:Kelivo/core/services/chat/chat_service.dart';
 import 'package:Kelivo/core/services/api/providers/google/gemini_thought_signature.dart';
 import 'package:Kelivo/core/utils/multimodal_input_utils.dart';
 import 'package:Kelivo/features/home/services/message_builder_service.dart';
-import 'package:Kelivo/features/home/services/message_generation_service.dart';
-import 'package:Kelivo/features/home/controllers/generation_controller.dart';
-import 'package:Kelivo/features/home/controllers/stream_controller.dart'
-    as stream_ctrl;
 import 'package:Kelivo/features/home/services/ocr_service.dart';
 
 import '../../../support/business_test_harness.dart';
@@ -48,26 +44,6 @@ class _FakeChatService extends ChatService {
         .where((message) => message.conversationId == conversationId)
         .toList();
   }
-}
-
-class _StubGenerationController extends Fake implements GenerationController {}
-
-class _StubStreamController extends Fake
-    implements stream_ctrl.StreamController {}
-
-MessageGenerationService _messageGenerationServiceForAudioCheck() {
-  final chatService = _FakeChatService(const {});
-  final messageBuilderService = MessageBuilderService(
-    chatService: chatService,
-    contextProvider: _FakeBuildContext(),
-  );
-  return MessageGenerationService(
-    chatService: chatService,
-    messageBuilderService: messageBuilderService,
-    generationController: _StubGenerationController(),
-    streamController: _StubStreamController(),
-    contextProvider: _FakeBuildContext(),
-  );
 }
 
 ChatMessage _message({
@@ -541,41 +517,6 @@ void main() {
       );
       expect(refs.single.mime, 'audio/wav');
     });
-
-    test(
-      'assistant audio media refs trip apiMessagesContainAudioAttachments',
-      () {
-        final builder = MessageBuilderService(
-          chatService: _FakeChatService(const {}),
-          contextProvider: _FakeBuildContext(),
-        );
-        final apiMessages = builder.buildApiMessages(
-          messages: [
-            _message(id: 'u1', role: 'user', content: 'hi'),
-            ChatMessage(
-              id: 'a1',
-              role: 'assistant',
-              conversationId: 'c1',
-              parts: const [
-                TextPart('voice reply'),
-                FilePart(
-                  uri: '/tmp/assistant.wav',
-                  name: 'assistant.wav',
-                  mime: 'audio/wav',
-                ),
-              ],
-            ),
-          ],
-          versionSelections: const {},
-          currentConversation: Conversation(title: 'test'),
-        );
-        final generation = _messageGenerationServiceForAudioCheck();
-        expect(
-          generation.apiMessagesContainAudioAttachments(apiMessages),
-          isTrue,
-        );
-      },
-    );
   });
 
   group('MessageBuilderService.buildApiMessages', () {

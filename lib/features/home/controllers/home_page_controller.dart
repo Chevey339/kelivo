@@ -47,6 +47,7 @@ import 'stream_controller.dart' as stream_ctrl;
 import 'generation_controller.dart';
 import 'scroll_controller.dart' as scroll_ctrl;
 import 'home_view_model.dart';
+import '../services/attachment_modality_gate.dart';
 import '../services/context_usage_service.dart';
 import '../services/message_builder_service.dart';
 import '../services/message_generation_service.dart';
@@ -572,12 +573,23 @@ class HomePageController extends ChangeNotifier {
   }
 
   String _localizeGenerationError(AppLocalizations l10n, String error) {
-    switch (error) {
-      case 'audio_attachment_unsupported':
-        return l10n.homePageAudioAttachmentUnsupported;
-      default:
-        return '${l10n.generationInterrupted}: $error';
+    if (error.startsWith(attachmentUnsupportedErrorPrefix)) {
+      final labels = [
+        for (final name
+            in error
+                .substring(attachmentUnsupportedErrorPrefix.length)
+                .split(','))
+          if (name.isNotEmpty)
+            switch (name) {
+              'image' => l10n.homePageAttachmentModalityImage,
+              'audio' => l10n.homePageAttachmentModalityAudio,
+              'video' => l10n.homePageAttachmentModalityVideo,
+              _ => name,
+            },
+      ];
+      return l10n.homePageAttachmentUnsupported(labels.join(', '));
     }
+    return '${l10n.generationInterrupted}: $error';
   }
 
   void _initializeScrollController() {

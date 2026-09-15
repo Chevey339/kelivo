@@ -7,7 +7,7 @@ import '../../providers/settings_provider.dart';
 import '../../providers/model_provider.dart';
 import '../network/dio_http_client.dart';
 import '../../../utils/unicode_sanitizer.dart';
-import '../logging/context_log_models.dart';
+import '../../models/model_spec.dart';
 import '../../utils/multimodal_input_utils.dart';
 import 'generation/text_generation_result.dart';
 import 'generation/tool_loop_runner.dart';
@@ -95,28 +95,81 @@ class ChatApiService {
     return content;
   }
 
-  static Future<List<Map<String, dynamic>>> _stripImageInputsFromMessages(
+  static ModelSpec _stripSpecForRequest({
+    required ModelSpec spec,
+    required bool keepImages,
+  }) {
+    if (!keepImages || spec.supportsImageInput) return spec;
+    return spec.copyWith(input: [...spec.input, Modality.image]);
+  }
+
+  static String _mediaRefMime(InternalMediaRef ref) {
+    final explicit = ref.mime?.trim() ?? '';
+    if (explicit.isNotEmpty) return explicit;
+    return inferMediaMimeFromSource(ref.uri);
+  }
+
+  static bool _specAcceptsMime(ModelSpec spec, String mime) {
+    if (isImageMime(mime)) return spec.supportsImageInput;
+    if (isAudioMime(mime)) return spec.supportsAudioInput;
+    if (isVideoMime(mime)) return spec.supportsVideoInput;
+    return true;
+  }
+
+  static bool _specAcceptsMediaPath(ModelSpec spec, String path) {
+    final mime = inferMediaMimeFromSource(path);
+    if (mime.isEmpty) return spec.supportsImageInput;
+    return _specAcceptsMime(spec, mime);
+  }
+
+  static List<String> _filterUserMediaPaths(
+    List<String> paths,
+    ModelSpec spec,
+  ) {
+    return [
+      for (final path in paths)
+        if (_specAcceptsMediaPath(spec, path)) path,
+    ];
+  }
+
+  /// Drops image / audio / video the [spec] cannot accept. Documents stay.
+  @visibleForTesting
+  static Future<List<Map<String, dynamic>>> stripUnsupportedMediaFromMessages(
     List<Map<String, dynamic>> messages,
+    ModelSpec spec,
   ) async {
+    final keepImage = spec.supportsImageInput;
+    final keepAudio = spec.supportsAudioInput;
+    final keepVideo = spec.supportsVideoInput;
+    if (keepImage && keepAudio && keepVideo) return messages;
+
     final out = <Map<String, dynamic>>[];
     for (final message in messages) {
       final copy = Map<String, dynamic>.from(message);
-      copy.remove(multimodalInternalMediaPathsKey);
-      copy.remove(multimodalInternalRevisionIdKey);
-      copy.remove(kelivoContextSegmentsKey);
-      if (copy.containsKey('content')) {
+      if (copy.containsKey(multimodalInternalMediaPathsKey)) {
+        final refs = parseInternalMediaRefs(
+          copy[multimodalInternalMediaPathsKey],
+          includeUnavailable: true,
+        );
+        final kept = [
+          for (final ref in refs)
+            if (_specAcceptsMime(spec, _mediaRefMime(ref))) ref,
+        ];
+        if (kept.isEmpty) {
+          copy.remove(multimodalInternalMediaPathsKey);
+        } else if (kept.length != refs.length) {
+          copy[multimodalInternalMediaPathsKey] = encodeInternalMediaRefs(
+            kept,
+            includeUnavailable: true,
+          );
+        }
+      }
+      if (!keepImage && copy.containsKey('content')) {
         copy['content'] = await _stripImageInputsFromContent(copy['content']);
       }
       out.add(copy);
     }
     return out;
-  }
-
-  static bool _supportsImageInput(ProviderConfig config, String modelId) {
-    return ModelSpecResolver.instance
-        .spec(config, modelId)
-        .input
-        .contains(Modality.image);
   }
 
   static http.Client _clientFor(ProviderConfig cfg, CancelToken cancelToken) {
@@ -213,18 +266,21 @@ class ChatApiService {
         modelId,
       );
       final unicodeSafeMessages = _sanitizeMessages(messages);
-      final stripUnsupportedImageInputs =
-          !skipImageParsing &&
-          !ocrActive &&
-          !useOpenAIImagesApi &&
-          !useZhipuLayoutParsing &&
-          !_supportsImageInput(config, modelId);
-      final safeMessages = stripUnsupportedImageInputs
-          ? await _stripImageInputsFromMessages(unicodeSafeMessages)
-          : unicodeSafeMessages;
-      final safeUserImagePaths = stripUnsupportedImageInputs
-          ? const <String>[]
-          : userImagePaths;
+      final spec = _stripSpecForRequest(
+        spec: ModelSpecResolver.instance.spec(config, modelId),
+        keepImages:
+            skipImageParsing ||
+            ocrActive ||
+            useOpenAIImagesApi ||
+            useZhipuLayoutParsing,
+      );
+      final safeMessages = await stripUnsupportedMediaFromMessages(
+        unicodeSafeMessages,
+        spec,
+      );
+      final safeUserImagePaths = userImagePaths == null
+          ? null
+          : _filterUserMediaPaths(userImagePaths, spec);
 
       final imageOutput = ModelSpecResolver.instance
           .spec(config, modelId)

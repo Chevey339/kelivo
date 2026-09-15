@@ -912,51 +912,11 @@ class MessageGenerationService {
     required String modelId,
   }) {
     final cfg = settings.getProviderConfig(providerKey);
-    return ModelSpecResolver.instance
-        .spec(cfg, modelId)
-        .input
-        .contains(Modality.audio);
-  }
-
-  bool supportsAudioAttachmentsForProvider(
-    SettingsProvider settings, {
-    required String providerKey,
-    required String modelId,
-  }) {
-    return _shouldIncludeAudioForProvider(
-      settings,
-      providerKey: providerKey,
-      modelId: modelId,
-    );
+    return ModelSpecResolver.instance.spec(cfg, modelId).supportsAudioInput;
   }
 
   String _effectiveAttachmentMime(DocumentAttachment attachment) {
     return resolveDocumentAttachmentMime(attachment);
-  }
-
-  bool inputContainsAudioAttachments(ChatInputData input) {
-    for (final attachment in input.documents) {
-      if (isAudioMime(_effectiveAttachmentMime(attachment))) {
-        return true;
-      }
-    }
-    return false;
-  }
-
-  bool apiMessagesContainAudioAttachments(List<Map<String, dynamic>> messages) {
-    for (final message in messages) {
-      for (final ref in parseInternalMediaRefs(
-        message[MessageBuilderService.internalMediaPathsKey],
-      )) {
-        final mime = (ref.mime != null && ref.mime!.trim().isNotEmpty)
-            ? ref.mime!.trim()
-            : inferMediaMimeFromSource(ref.uri);
-        if (isAudioMime(mime)) {
-          return true;
-        }
-      }
-    }
-    return false;
   }
 
   List<String> _filterMediaPathsForProvider(

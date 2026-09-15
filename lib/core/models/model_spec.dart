@@ -626,6 +626,10 @@ class ModelSpec {
 
   bool get supportsImageInput => input.contains(Modality.image);
 
+  bool get supportsAudioInput => input.contains(Modality.audio);
+
+  bool get supportsVideoInput => input.contains(Modality.video);
+
   bool get isEmbedding => type == ModelType.embedding;
 
   ModelSpec({

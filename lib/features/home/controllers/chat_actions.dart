@@ -11,12 +11,14 @@ import '../../../core/models/message_part.dart';
 import '../../../utils/app_directories.dart';
 import '../../../utils/sandbox_path_resolver.dart';
 import '../../../core/models/conversation.dart';
+import '../../../core/models/model_spec.dart';
 import '../../../core/models/token_usage.dart';
 import '../../../core/providers/assistant_provider.dart';
 import '../../../core/providers/settings_provider.dart';
 import '../../../core/models/reasoning_request.dart';
 import '../../../core/services/api/chat_api_service.dart';
 import '../../../core/services/api/reasoning/reasoning_selection.dart';
+import '../../../core/services/model_spec/model_spec_resolver.dart';
 import '../../../core/services/api/retry_policy.dart';
 import '../../../core/services/api/stream/stream_chunk.dart';
 import '../../../core/services/chat/chat_service.dart';
@@ -28,6 +30,7 @@ import '../../../core/models/assistant_regex.dart';
 import '../services/ask_user_interaction_service.dart';
 import '../../chat/utils/thinking_tag_parser.dart';
 import '../services/context_usage_service.dart';
+import '../services/attachment_modality_gate.dart';
 import '../services/message_generation_service.dart';
 import '../services/tool_approval_service.dart';
 import 'active_streaming_message_store.dart';
@@ -36,15 +39,6 @@ import 'generation_controller.dart';
 import 'home_view_model.dart';
 import 'latest_wins_checkpoint_writer.dart';
 import 'stream_controller.dart' as stream_ctrl;
-
-/// Raised when the generation context carries audio the target model cannot
-/// read. Its [toString] is the error code the UI localizes.
-final class UnsupportedAudioAttachmentException implements Exception {
-  const UnsupportedAudioAttachmentException();
-
-  @override
-  String toString() => 'audio_attachment_unsupported';
-}
 
 final class _BarrierStreamSubscription<T> implements StreamSubscription<T> {
   _BarrierStreamSubscription(this._delegate, this._cancelWithBarrier);
@@ -163,6 +157,16 @@ class ChatActions {
   /// [targetGroupId] is null when the assistant is treated as a new reply, or
   /// when the anchor is a user message with no following assistant group
   /// (e.g. every generated version was deleted).
+  /// Non-null when [input] carries image/audio/video the [spec] cannot read.
+  /// [_sendMessageClaimed] returns this as [ChatActionResult.error] before
+  /// persisting anything.
+  @visibleForTesting
+  static String? draftUnsupportedError(ChatInputData input, ModelSpec spec) {
+    final unsupported = unsupportedDraftModalities(input, spec);
+    if (unsupported.isEmpty) return null;
+    return attachmentUnsupportedErrorCode(unsupported);
+  }
+
   @visibleForTesting
   static bool shouldBeginNewAssistantReply({
     required String role,
@@ -974,55 +978,6 @@ class ChatActions {
     });
   }
 
-  bool _supportsAudioAttachmentsForProvider(
-    SettingsProvider settings, {
-    required String providerKey,
-    required String modelId,
-  }) {
-    return messageGenerationService.supportsAudioAttachmentsForProvider(
-      settings,
-      providerKey: providerKey,
-      modelId: modelId,
-    );
-  }
-
-  bool _hasUnsupportedAudioAttachments({
-    required List<ChatMessage> messages,
-    required Conversation conversation,
-    required SettingsProvider settings,
-    required String providerKey,
-    required String modelId,
-    ChatInputData? pendingInput,
-    int? maxRawTruncateIndex,
-  }) {
-    if (_supportsAudioAttachmentsForProvider(
-      settings,
-      providerKey: providerKey,
-      modelId: modelId,
-    )) {
-      return false;
-    }
-
-    if (pendingInput != null &&
-        messageGenerationService.inputContainsAudioAttachments(pendingInput)) {
-      return true;
-    }
-
-    final apiMessages = messageGenerationService.messageBuilderService
-        .buildApiMessages(
-          messages: messages,
-          versionSelections: _versionSelections,
-          currentConversation: _conversationForMessageContext(
-            conversation,
-            messages,
-            maxRawTruncateIndex: maxRawTruncateIndex,
-          ),
-        );
-    return messageGenerationService.apiMessagesContainAudioAttachments(
-      apiMessages,
-    );
-  }
-
   @visibleForTesting
   static List<ChatMessage> projectMessagesForRegenerationContext({
     required List<ChatMessage> messages,
@@ -1240,17 +1195,15 @@ class ChatActions {
       }
     }
 
-    // Only the pending input is screened here: it needs no database read, so
-    // the send pair still reaches the screen without waiting on the context
-    // query. History is screened in [_runSendGeneration], where a failure
-    // lands on the assistant message instead of rejecting the input.
-    if (!_supportsAudioAttachmentsForProvider(
-          settings,
-          providerKey: providerKey,
-          modelId: modelId,
-        ) &&
-        messageGenerationService.inputContainsAudioAttachments(input)) {
-      return ChatActionResult.error('audio_attachment_unsupported');
+    // Draft attachments are screened here so a rejected send restores the
+    // composer. History media the model cannot read is stripped later.
+    final spec = ModelSpecResolver.instance.spec(
+      settings.getProviderConfig(providerKey),
+      modelId,
+    );
+    final draftError = ChatActions.draftUnsupportedError(input, spec);
+    if (draftError != null) {
+      return ChatActionResult.error(draftError);
     }
 
     late final ChatMessage userMessage;
@@ -1351,16 +1304,6 @@ class ChatActions {
           if (message.id != userMessage.id && message.id != assistantMessage.id)
             message,
       ];
-      if (_hasUnsupportedAudioAttachments(
-        messages: existingContextMessages,
-        conversation: conversation,
-        settings: settings,
-        providerKey: providerKey,
-        modelId: modelId,
-        maxRawTruncateIndex: null,
-      )) {
-        throw const UnsupportedAudioAttachmentException();
-      }
 
       // Reset tool parts and initialize reasoning
       streamController.toolParts.remove(assistantMessage.id);
@@ -1650,24 +1593,6 @@ class ChatActions {
     }
     final providerKey = modelConfig.providerKey!;
     final modelId = modelConfig.modelId!;
-
-    final projectedMessages = ChatActions.projectMessagesForRegenerationContext(
-      messages: completeMessages,
-      lastKeep: versioning.lastKeep,
-      targetGroupId: versioning.targetGroupId,
-    );
-    if (_hasUnsupportedAudioAttachments(
-      messages: projectedMessages,
-      conversation: isTemporaryConversation
-          ? conversation
-          : conversation.copyWith(truncateIndex: -1),
-      settings: settings,
-      providerKey: providerKey,
-      modelId: modelId,
-      maxRawTruncateIndex: versioning.lastKeep,
-    )) {
-      return ChatActionResult.error('audio_attachment_unsupported');
-    }
 
     if (shouldPhysicallyRemoveRegenerationTail(
       deleteTrailingEnabled: truncateFuture,
