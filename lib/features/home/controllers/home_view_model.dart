@@ -912,8 +912,8 @@ class HomeViewModel extends ChangeNotifier {
   // Public Methods - Conversation Management
   // ============================================================================
 
-  void _syncContextUsageConversation() {
-    _contextUsage?.setActiveConversation(currentConversation?.id);
+  void _syncContextUsageConversation(String? conversationId) {
+    _contextUsage?.setActiveConversation(conversationId);
   }
 
   /// Switch to an existing conversation.
@@ -929,7 +929,7 @@ class HomeViewModel extends ChangeNotifier {
     if (currentConversation?.id == id) return;
 
     _chatService.setCurrentConversation(id);
-    _syncContextUsageConversation();
+    _syncContextUsageConversation(id);
     final convo = _chatService.getConversation(id);
     if (convo != null) {
       // Assistant preference persistence runs concurrently with the window
@@ -980,7 +980,7 @@ class HomeViewModel extends ChangeNotifier {
   void commitConversationSwitch(PreparedConversationSwitch prepared) {
     final id = prepared.conversation.id;
     _chatService.setCurrentConversation(id);
-    _syncContextUsageConversation();
+    _syncContextUsageConversation(id);
     _chatController.commitConversationWindow(
       prepared.window,
       onDeferredGroupDataLoaded: notifyListeners,
@@ -1041,7 +1041,7 @@ class HomeViewModel extends ChangeNotifier {
     );
 
     _chatController.setDraftConversation(conversation);
-    _syncContextUsageConversation();
+    _syncContextUsageConversation(conversation.id);
     _streamController.clearAllState(
       keepMessageIds: _chatActions.activeStreamingMessageIds,
     );
@@ -1104,7 +1104,7 @@ class HomeViewModel extends ChangeNotifier {
     );
 
     _chatController.setDraftConversation(conversation);
-    _syncContextUsageConversation();
+    _syncContextUsageConversation(conversation.id);
     _streamController.clearAllState(
       keepMessageIds: _chatActions.activeStreamingMessageIds,
     );
@@ -1128,7 +1128,7 @@ class HomeViewModel extends ChangeNotifier {
 
     // Switch to the new conversation
     _chatService.setCurrentConversation(newConvo.id);
-    _syncContextUsageConversation();
+    _syncContextUsageConversation(newConvo.id);
     await _chatController.setCurrentConversationAndLoad(newConvo);
     _restoreMessageUiState();
     onConversationSwitched?.call();
@@ -1334,7 +1334,7 @@ class HomeViewModel extends ChangeNotifier {
         );
 
         _chatService.setCurrentConversation(newConvo.id);
-        _syncContextUsageConversation();
+        _syncContextUsageConversation(newConvo.id);
         await _chatController.setCurrentConversationAndLoad(
           _chatService.getConversation(newConvo.id) ?? newConvo,
         );
@@ -1361,7 +1361,7 @@ class HomeViewModel extends ChangeNotifier {
 
       // Switch to the new conversation
       _chatService.setCurrentConversation(newConvo.id);
-      _syncContextUsageConversation();
+      _syncContextUsageConversation(newConvo.id);
       await _chatController.setCurrentConversationAndLoad(
         _chatService.getConversation(newConvo.id) ?? newConvo,
       );
