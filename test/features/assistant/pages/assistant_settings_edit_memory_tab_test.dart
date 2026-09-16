@@ -24,6 +24,7 @@ import 'package:Kelivo/core/services/tts/tts_playback_models.dart';
 import 'package:Kelivo/features/assistant/pages/assistant_settings_edit_page.dart';
 import 'package:Kelivo/features/settings/pages/memory_settings_page.dart';
 import 'package:Kelivo/features/settings/widgets/memory_ui.dart';
+import 'package:Kelivo/shared/widgets/tip_icon.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
 
 import '../../../support/business_test_harness.dart';
@@ -305,7 +306,7 @@ void main() {
     expect(find.text('Summaries are only used by chat search'), findsNothing);
     expect(find.text('Use long-term memory'), findsOneWidget);
     expect(find.text('Auto-organize memory'), findsOneWidget);
-    expect(find.byType(MemoryTipIcon), findsWidgets);
+    expect(find.byType(TipIcon), findsWidgets);
   });
 
   testWidgets(

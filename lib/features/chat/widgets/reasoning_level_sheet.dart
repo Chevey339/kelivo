@@ -12,6 +12,7 @@ import '../../../icons/reasoning_icons.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../shared/dialogs/reasoning_budget_custom_dialog.dart';
 import '../../../shared/widgets/custom_bottom_sheet.dart';
+import '../../../shared/widgets/effort_slider.dart';
 import '../../../shared/widgets/ios_tactile.dart';
 import '../../../shared/widgets/section_card.dart';
 import '../../../theme/app_font_weights.dart';
@@ -73,6 +74,21 @@ String reasoningChoiceSourceLabel(
   };
 }
 
+String? reasoningLevelStopSubtitle(
+  AppLocalizations l10n,
+  ReasoningLevelPickerSnapshot snapshot,
+  ReasoningLevelRow row,
+) {
+  return switch (row.kind) {
+    ReasoningLevelRowKind.auto => l10n.reasoningLevelAutoSubtitle,
+    ReasoningLevelRowKind.off => l10n.reasoningLevelOffSubtitle,
+    ReasoningLevelRowKind.level
+        when snapshot.isBudgetStyle && row.budget != null =>
+      l10n.reasoningLevelBudgetTokens(formatReasoningBudgetK(row.budget!)),
+    _ => null,
+  };
+}
+
 class ReasoningLevelPicker extends StatelessWidget {
   const ReasoningLevelPicker({
     super.key,
@@ -110,20 +126,15 @@ class ReasoningLevelPicker extends StatelessWidget {
       spec: spec,
       assistant: assistant,
     );
-    return compact
-        ? _CompactPicker(
-            snapshot: snapshot,
-            config: config,
-            modelId: modelId,
-            onClose: onClose,
-            onSuspendedChanged: onSuspendedChanged,
-          )
-        : _SheetPicker(
-            snapshot: snapshot,
-            config: config,
-            modelId: modelId,
-            scrollController: scrollController,
-          );
+    return _SliderPicker(
+      snapshot: snapshot,
+      config: config,
+      modelId: modelId,
+      scrollController: scrollController,
+      compact: compact,
+      onClose: onClose,
+      onSuspendedChanged: onSuspendedChanged,
+    );
   }
 }
 
@@ -162,116 +173,13 @@ class _UnsupportedState extends StatelessWidget {
   }
 }
 
-class _SheetPicker extends StatelessWidget {
-  const _SheetPicker({
+class _SliderPicker extends StatelessWidget {
+  const _SliderPicker({
     required this.snapshot,
     required this.config,
     required this.modelId,
+    required this.compact,
     this.scrollController,
-  });
-
-  final ReasoningLevelPickerSnapshot snapshot;
-  final ProviderConfig config;
-  final String modelId;
-  final ScrollController? scrollController;
-
-  @override
-  Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context)!;
-    final cs = Theme.of(context).colorScheme;
-    return ListView(
-      controller: scrollController,
-      padding: const EdgeInsets.fromLTRB(16, 4, 16, 20),
-      children: [
-        _SourceHeader(
-          source: snapshot.source,
-          showReset: snapshot.hasPerModelMemory,
-          compact: false,
-          onReset: () => _reset(context),
-        ),
-        const SizedBox(height: 8),
-        for (final row in snapshot.rows) ...[
-          Padding(
-            padding: const EdgeInsets.only(bottom: 8),
-            child: _SheetRow(
-              row: row,
-              selected: snapshot.isSelected(row),
-              customBudget: snapshot.customSelected
-                  ? snapshot.selected.budgetTokens
-                  : null,
-              onTap: () => _onRowTap(context, snapshot, row),
-            ),
-          ),
-          if (row.kind == ReasoningLevelRowKind.auto &&
-              snapshot.showCannotDisableHint)
-            Padding(
-              key: const ValueKey('reasoning-cannot-disable'),
-              padding: const EdgeInsets.fromLTRB(4, 0, 4, 8),
-              child: Text(
-                l10n.reasoningLevelCannotDisable,
-                style: TextStyle(
-                  fontSize: 12,
-                  color: cs.onSurface.withValues(alpha: 0.55),
-                ),
-              ),
-            ),
-        ],
-      ],
-    );
-  }
-
-  Future<void> _reset(BuildContext context) {
-    return context.read<SettingsProvider>().setReasoningChoice(
-      config.id,
-      modelId,
-      null,
-    );
-  }
-
-  Future<void> _onRowTap(
-    BuildContext context,
-    ReasoningLevelPickerSnapshot snapshot,
-    ReasoningLevelRow row,
-  ) async {
-    Haptics.soft();
-    if (row.kind == ReasoningLevelRowKind.custom) {
-      await _pickCustomBudget(context, snapshot);
-      return;
-    }
-    final request = row.request;
-    if (request == null) return;
-    await context.read<SettingsProvider>().setReasoningChoice(
-      config.id,
-      modelId,
-      request,
-    );
-  }
-
-  Future<void> _pickCustomBudget(
-    BuildContext context,
-    ReasoningLevelPickerSnapshot snapshot,
-  ) async {
-    final initial = snapshot.customSelected
-        ? (snapshot.selected.budgetTokens ?? 2048)
-        : 2048;
-    final chosen = await ReasoningBudgetCustomDialog.show(
-      context,
-      initialValue: initial,
-    );
-    if (!context.mounted || chosen == null) return;
-    await context.read<SettingsProvider>().setReasoningChoice(
-      config.id,
-      modelId,
-      requestForCustomBudget(snapshot.spec, chosen),
-    );
-  }
-}
-
-class _CompactPicker extends StatelessWidget {
-  const _CompactPicker({
-    required this.snapshot,
-    required this.config,
-    required this.modelId,
     this.onClose,
     this.onSuspendedChanged,
   });
@@ -279,6 +187,8 @@ class _CompactPicker extends StatelessWidget {
   final ReasoningLevelPickerSnapshot snapshot;
   final ProviderConfig config;
   final String modelId;
+  final bool compact;
+  final ScrollController? scrollController;
   final Future<void> Function()? onClose;
   final ValueChanged<bool>? onSuspendedChanged;
 
@@ -286,52 +196,111 @@ class _CompactPicker extends StatelessWidget {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
     final cs = Theme.of(context).colorScheme;
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 2),
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.fromLTRB(0, 10, 0, 2),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(20, 0, 12, 6),
-              child: _SourceHeader(
-                source: snapshot.source,
-                showReset: snapshot.hasPerModelMemory,
-                compact: true,
-                onReset: () => _reset(context),
-              ),
-            ),
-            for (final row in snapshot.rows) ...[
-              _CompactRow(
-                row: row,
-                selected: snapshot.isSelected(row),
-                customBudget: snapshot.customSelected
-                    ? snapshot.selected.budgetTokens
-                    : null,
-                onTap: () => _onRowTap(context, snapshot, row),
-              ),
-              if (row.kind == ReasoningLevelRowKind.auto &&
-                  snapshot.showCannotDisableHint)
-                Padding(
-                  key: const ValueKey('reasoning-cannot-disable'),
-                  padding: const EdgeInsets.fromLTRB(20, 2, 20, 6),
-                  child: Align(
-                    alignment: Alignment.centerLeft,
-                    child: Text(
-                      l10n.reasoningLevelCannotDisable,
-                      style: TextStyle(
-                        fontSize: 11,
-                        color: cs.onSurface.withValues(alpha: 0.55),
-                        decoration: TextDecoration.none,
-                      ),
-                    ),
-                  ),
-                ),
-            ],
-          ],
+    final stops = snapshot.sliderStops;
+    final children = <Widget>[
+      Padding(
+        padding: EdgeInsets.fromLTRB(compact ? 20 : 0, 0, compact ? 12 : 0, 6),
+        child: _SourceHeader(
+          source: snapshot.source,
+          showReset: snapshot.hasPerModelMemory,
+          compact: compact,
+          onReset: () => _reset(context),
         ),
       ),
+      if (stops.isNotEmpty)
+        EffortSliderGroup(
+          selectedIndex: snapshot.sliderIndex,
+          customSelected: snapshot.customSelected,
+          stopCount: stops.length,
+          stopKeys: [for (final stop in stops) stop.key],
+          stopLabels: [
+            for (final stop in stops)
+              reasoningLevelCompactLabel(
+                l10n,
+                stop.level ?? ReasoningLevel.auto,
+              ),
+          ],
+          padding: EdgeInsets.symmetric(horizontal: compact ? 20 : 28),
+          semanticsValue: (index) {
+            if (snapshot.customSelected) {
+              return l10n.reasoningLevelCustomBudget;
+            }
+            final stop = stops[index.clamp(0, stops.length - 1)];
+            return reasoningLevelLabel(l10n, stop.level ?? ReasoningLevel.auto);
+          },
+          onCommit: (index) => _commitStop(context, stops[index]),
+          header: (context, visualIndex) {
+            if (snapshot.customSelected) {
+              return EffortSliderActiveStop(
+                icon: Icon(Lucide.Hash, size: 18, color: cs.primary),
+                iconKey: 'custom',
+                title: l10n.reasoningLevelCustomBudget,
+                subtitle: snapshot.selected.budgetTokens?.toString(),
+              );
+            }
+            final stop = stops[visualIndex.clamp(0, stops.length - 1)];
+            final level = stop.level ?? ReasoningLevel.auto;
+            return EffortSliderActiveStop(
+              icon: ReasoningIcons.levelIcon(
+                level,
+                size: 18,
+                color: cs.primary,
+              ),
+              iconKey: level,
+              title: reasoningLevelLabel(l10n, level),
+              subtitle: reasoningLevelStopSubtitle(l10n, snapshot, stop),
+            );
+          },
+        ),
+      if (snapshot.showCannotDisableHint)
+        Padding(
+          key: const ValueKey('reasoning-cannot-disable'),
+          padding: EdgeInsets.fromLTRB(
+            compact ? 20 : 4,
+            12,
+            compact ? 20 : 4,
+            0,
+          ),
+          child: Text(
+            l10n.reasoningLevelCannotDisable,
+            style: TextStyle(
+              fontSize: compact ? 11 : 12,
+              color: cs.onSurface.withValues(alpha: 0.55),
+              decoration: TextDecoration.none,
+            ),
+          ),
+        ),
+      if (snapshot.isBudgetStyle) ...[
+        const SizedBox(height: 20),
+        _CustomBudgetRow(
+          compact: compact,
+          selected: snapshot.customSelected,
+          budget: snapshot.customSelected
+              ? snapshot.selected.budgetTokens
+              : null,
+          onTap: () => _pickCustomBudget(context),
+        ),
+      ],
+    ];
+
+    if (scrollController == null) {
+      return Padding(
+        padding: const EdgeInsets.only(bottom: 2),
+        child: SingleChildScrollView(
+          padding: EdgeInsets.fromLTRB(
+            compact ? 0 : 16,
+            10,
+            compact ? 0 : 16,
+            12,
+          ),
+          child: Column(mainAxisSize: MainAxisSize.min, children: children),
+        ),
+      );
+    }
+    return ListView(
+      controller: scrollController,
+      padding: const EdgeInsets.fromLTRB(16, 4, 16, 20),
+      children: children,
     );
   }
 
@@ -343,15 +312,7 @@ class _CompactPicker extends StatelessWidget {
     );
   }
 
-  Future<void> _onRowTap(
-    BuildContext context,
-    ReasoningLevelPickerSnapshot snapshot,
-    ReasoningLevelRow row,
-  ) async {
-    if (row.kind == ReasoningLevelRowKind.custom) {
-      await _pickCustomBudget(context, snapshot);
-      return;
-    }
+  Future<void> _commitStop(BuildContext context, ReasoningLevelRow row) async {
     final request = row.request;
     if (request == null) return;
     await context.read<SettingsProvider>().setReasoningChoice(
@@ -359,19 +320,15 @@ class _CompactPicker extends StatelessWidget {
       modelId,
       request,
     );
-    if (!context.mounted) return;
-    await onClose?.call();
   }
 
-  Future<void> _pickCustomBudget(
-    BuildContext context,
-    ReasoningLevelPickerSnapshot snapshot,
-  ) async {
+  Future<void> _pickCustomBudget(BuildContext context) async {
+    if (!compact) Haptics.light();
     final initial = snapshot.customSelected
         ? (snapshot.selected.budgetTokens ?? 2048)
         : 2048;
-    onSuspendedChanged?.call(true);
-    var restore = true;
+    if (compact) onSuspendedChanged?.call(true);
+    var restore = compact;
     try {
       final chosen = await ReasoningBudgetCustomDialog.show(
         context,
@@ -385,7 +342,7 @@ class _CompactPicker extends StatelessWidget {
         requestForCustomBudget(snapshot.spec, chosen),
       );
       if (!context.mounted) return;
-      await onClose?.call();
+      if (compact) await onClose?.call();
     } finally {
       if (restore && context.mounted) onSuspendedChanged?.call(false);
     }
@@ -450,274 +407,84 @@ class _SourceHeader extends StatelessWidget {
   }
 }
 
-class _SheetRow extends StatelessWidget {
-  const _SheetRow({
-    required this.row,
+class _CustomBudgetRow extends StatelessWidget {
+  const _CustomBudgetRow({
+    required this.compact,
     required this.selected,
     required this.onTap,
-    this.customBudget,
+    this.budget,
   });
 
-  final ReasoningLevelRow row;
+  final bool compact;
   final bool selected;
   final VoidCallback onTap;
-  final int? customBudget;
+  final int? budget;
 
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
     final cs = Theme.of(context).colorScheme;
     final onColor = selected ? cs.primary : cs.onSurface;
-    final subtitle = _subtitle(l10n);
-    final trailing = _trailingText();
-    return SizedBox(
-      key: ValueKey(row.key),
-      height: subtitle == null ? 48 : 56,
+    final row = SizedBox(
+      key: const ValueKey('reasoning-row-custom'),
+      height: compact ? 40 : 48,
       child: IosCardPress(
-        borderRadius: BorderRadius.circular(14),
-        baseColor: sheetTileColor(context),
+        borderRadius: BorderRadius.circular(compact ? 12 : 14),
+        baseColor: compact ? Colors.transparent : sheetTileColor(context),
         duration: const Duration(milliseconds: 260),
         onTap: onTap,
         padding: const EdgeInsets.symmetric(horizontal: 12),
         child: Row(
           children: [
-            _leading(onColor, size: 20),
+            Icon(
+              Lucide.Hash,
+              size: compact ? 16 : 20,
+              color: selected
+                  ? cs.primary
+                  : cs.onSurface.withValues(alpha: 0.7),
+            ),
             const SizedBox(width: 10),
             Expanded(
-              child: subtitle == null
-                  ? Text(
-                      _title(l10n),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontSize: 15,
-                        fontWeight: AppFontWeights.medium,
-                        color: onColor,
-                      ),
-                    )
-                  : Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          _title(l10n),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            fontSize: 15,
-                            fontWeight: AppFontWeights.medium,
-                            color: onColor,
-                          ),
-                        ),
-                        Text(
-                          subtitle,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: cs.onSurface.withValues(alpha: 0.55),
-                          ),
-                        ),
-                      ],
-                    ),
-            ),
-            if (trailing != null) ...[
-              Text(
-                trailing,
+              child: Text(
+                l10n.reasoningLevelCustomBudget,
                 style: TextStyle(
-                  fontSize: 13,
+                  fontSize: compact ? 13 : 15,
+                  fontWeight: compact
+                      ? AppFontWeights.regular
+                      : AppFontWeights.medium,
+                  color: onColor,
+                  decoration: TextDecoration.none,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+            if (selected && budget != null) ...[
+              Text(
+                budget.toString(),
+                style: TextStyle(
+                  fontSize: compact ? 12 : 13,
                   fontWeight: AppFontWeights.semibold,
-                  color: selected
-                      ? cs.primary
-                      : cs.onSurface.withValues(alpha: 0.55),
+                  color: cs.primary,
+                  decoration: TextDecoration.none,
                 ),
               ),
               const SizedBox(width: 8),
-            ],
-            if (row.kind == ReasoningLevelRowKind.custom && !selected)
+              Icon(Lucide.Check, size: compact ? 16 : 18, color: cs.primary),
+            ] else
               Icon(
                 Lucide.ChevronRight,
-                size: 18,
+                size: compact ? 16 : 18,
                 color: cs.onSurface.withValues(alpha: 0.45),
-              )
-            else if (selected)
-              Icon(Lucide.Check, size: 18, color: cs.primary)
-            else
-              const SizedBox(width: 18),
+              ),
           ],
         ),
       ),
     );
-  }
-
-  String _title(AppLocalizations l10n) {
-    if (row.kind == ReasoningLevelRowKind.custom) {
-      return l10n.reasoningLevelCustomBudget;
-    }
-    return reasoningLevelLabel(l10n, row.level ?? ReasoningLevel.auto);
-  }
-
-  String? _subtitle(AppLocalizations l10n) {
-    return switch (row.kind) {
-      ReasoningLevelRowKind.auto => l10n.reasoningLevelAutoSubtitle,
-      ReasoningLevelRowKind.off => l10n.reasoningLevelOffSubtitle,
-      _ => null,
-    };
-  }
-
-  String? _trailingText() {
-    if (row.kind == ReasoningLevelRowKind.custom) {
-      return customBudget?.toString();
-    }
-    return row.budget?.toString();
-  }
-
-  Widget _leading(Color color, {required double size}) {
-    if (row.kind == ReasoningLevelRowKind.custom) {
-      return Icon(Lucide.Hash, size: size, color: color);
-    }
-    return ReasoningIcons.levelIcon(
-      row.level ?? ReasoningLevel.auto,
-      size: size,
-      color: color,
-    );
-  }
-}
-
-class _CompactRow extends StatefulWidget {
-  const _CompactRow({
-    required this.row,
-    required this.selected,
-    required this.onTap,
-    this.customBudget,
-  });
-
-  final ReasoningLevelRow row;
-  final bool selected;
-  final VoidCallback onTap;
-  final int? customBudget;
-
-  @override
-  State<_CompactRow> createState() => _CompactRowState();
-}
-
-class _CompactRowState extends State<_CompactRow> {
-  bool _hovered = false;
-
-  @override
-  Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context)!;
-    final theme = Theme.of(context);
-    final cs = theme.colorScheme;
-    final isDark = theme.brightness == Brightness.dark;
-    final active = widget.selected;
-    final onColor = active ? cs.primary : cs.onSurface;
-    final trailing = _trailingText();
+    if (!compact) return row;
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 1),
-      child: MouseRegion(
-        cursor: SystemMouseCursors.click,
-        onEnter: (_) => setState(() => _hovered = true),
-        onExit: (_) => setState(() => _hovered = false),
-        child: GestureDetector(
-          behavior: HitTestBehavior.opaque,
-          onTap: widget.onTap,
-          child: AnimatedContainer(
-            key: ValueKey(widget.row.key),
-            duration: const Duration(milliseconds: 120),
-            height: 40,
-            padding: const EdgeInsets.symmetric(horizontal: 8),
-            decoration: BoxDecoration(
-              color: _hovered
-                  ? cs.onSurface.withValues(alpha: isDark ? 0.12 : 0.10)
-                  : Colors.transparent,
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Row(
-              children: [
-                SizedBox(
-                  width: 22,
-                  height: 22,
-                  child: Center(child: _leading(onColor)),
-                ),
-                const SizedBox(width: 6),
-                Expanded(
-                  child: Text(
-                    _title(l10n),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: AppFontWeights.regular,
-                      color: onColor,
-                      decoration: TextDecoration.none,
-                    ),
-                  ),
-                ),
-                if (trailing != null) ...[
-                  const SizedBox(width: 8),
-                  Text(
-                    trailing,
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: AppFontWeights.semibold,
-                      color: active
-                          ? cs.primary
-                          : cs.onSurface.withValues(alpha: 0.55),
-                      decoration: TextDecoration.none,
-                    ),
-                  ),
-                ],
-                if (widget.row.kind == ReasoningLevelRowKind.custom &&
-                    !active) ...[
-                  const SizedBox(width: 8),
-                  Icon(
-                    Lucide.ChevronRight,
-                    size: 16,
-                    color: cs.onSurface.withValues(alpha: 0.45),
-                  ),
-                ],
-                AnimatedSwitcher(
-                  duration: const Duration(milliseconds: 160),
-                  child: active
-                      ? Icon(
-                          Lucide.Check,
-                          key: const ValueKey('check'),
-                          size: 16,
-                          color: cs.primary,
-                        )
-                      : const SizedBox(width: 16, key: ValueKey('space')),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  String _title(AppLocalizations l10n) {
-    if (widget.row.kind == ReasoningLevelRowKind.custom) {
-      return l10n.reasoningLevelCustomBudget;
-    }
-    return reasoningLevelLabel(l10n, widget.row.level ?? ReasoningLevel.auto);
-  }
-
-  String? _trailingText() {
-    if (widget.row.kind == ReasoningLevelRowKind.custom) {
-      return widget.customBudget?.toString();
-    }
-    return widget.row.budget?.toString();
-  }
-
-  Widget _leading(Color color) {
-    if (widget.row.kind == ReasoningLevelRowKind.custom) {
-      return Icon(Lucide.Hash, size: 16, color: color);
-    }
-    return ReasoningIcons.levelIcon(
-      widget.row.level ?? ReasoningLevel.auto,
-      size: 16,
-      color: color,
+      padding: const EdgeInsets.symmetric(horizontal: 12),
+      child: row,
     );
   }
 }

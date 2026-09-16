@@ -54,6 +54,22 @@ class ReasoningLevelPickerSnapshot {
     if (customSelected) return false;
     return selected.level == row.level;
   }
+
+  List<ReasoningLevelRow> get sliderStops => rows
+      .where((row) => row.kind != ReasoningLevelRowKind.custom)
+      .toList(growable: false);
+
+  int get sliderIndex {
+    final stops = sliderStops;
+    if (stops.isEmpty) return 0;
+    if (customSelected && selected.budgetTokens != null) {
+      final nearest = levelForCustomBudget(spec, selected.budgetTokens!);
+      final index = stops.indexWhere((row) => row.level == nearest);
+      return index >= 0 ? index : 0;
+    }
+    final index = stops.indexWhere((row) => row.level == selected.level);
+    return index >= 0 ? index : 0;
+  }
 }
 
 /// Budget-style pickers show trailing token counts and a custom-budget row.

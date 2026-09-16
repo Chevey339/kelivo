@@ -2517,6 +2517,11 @@ class AppLocalizationsEn extends AppLocalizations {
   String get reasoningLevelCompactMax => 'max';
 
   @override
+  String reasoningLevelBudgetTokens(String budget) {
+    return '$budget tokens';
+  }
+
+  @override
   String chatMessageWidgetFileNotFound(String fileName) {
     return 'File not found: $fileName';
   }

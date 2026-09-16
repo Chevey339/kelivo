@@ -2,14 +2,11 @@ import 'package:flutter/material.dart';
 
 import '../../../core/models/model_spec.dart';
 import '../../../core/models/reasoning_request.dart';
-import '../../../core/services/haptics.dart';
 import '../../../icons/lucide_adapter.dart';
 import '../../../icons/reasoning_icons.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../shared/widgets/custom_bottom_sheet.dart';
-import '../../../shared/widgets/ios_tactile.dart';
-import '../../../shared/widgets/section_card.dart';
-import '../../../theme/app_font_weights.dart';
+import '../../../shared/widgets/effort_slider.dart';
 import '../../../utils/platform_utils.dart';
 import '../../chat/widgets/reasoning_level_sheet.dart';
 
@@ -22,10 +19,15 @@ class AssistantReasoningPick {
 Future<AssistantReasoningPick?> showAssistantReasoningPicker(
   BuildContext context, {
   required ReasoningRequest? current,
-}) {
+}) async {
   final l10n = AppLocalizations.of(context)!;
+  AssistantReasoningPick? picked;
+  void onSelected(ReasoningRequest? request) {
+    picked = AssistantReasoningPick(request);
+  }
+
   if (PlatformUtils.isDesktop) {
-    return showDialog<AssistantReasoningPick>(
+    await showDialog<void>(
       context: context,
       builder: (ctx) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
@@ -34,25 +36,23 @@ Future<AssistantReasoningPick?> showAssistantReasoningPicker(
           width: 380,
           child: AssistantReasoningPicker(
             current: current,
-            onSelected: (request) {
-              Navigator.of(ctx).pop(AssistantReasoningPick(request));
-            },
+            onSelected: onSelected,
           ),
         ),
       ),
     );
+    return picked;
   }
-  return showCustomBottomSheet<AssistantReasoningPick>(
+  await showCustomBottomSheet<void>(
     context: context,
     title: l10n.assistantEditThinkingBudgetTitle,
     builder: (context, controller) => AssistantReasoningPicker(
       current: current,
       scrollController: controller,
-      onSelected: (request) {
-        Navigator.of(context).pop(AssistantReasoningPick(request));
-      },
+      onSelected: onSelected,
     ),
   );
+  return picked;
 }
 
 class AssistantReasoningPicker extends StatelessWidget {
@@ -69,107 +69,75 @@ class AssistantReasoningPicker extends StatelessWidget {
 
   static const List<ReasoningLevel> _levels = ReasoningLevel.values;
 
+  int _indexFor(ReasoningRequest? current) {
+    if (current == null) return 0;
+    final index = _levels.indexOf(current.level);
+    return index >= 0 ? index + 1 : 0;
+  }
+
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
     final cs = Theme.of(context).colorScheme;
+    final keys = <String>[
+      'assistant-reasoning-follow-default',
+      for (final level in _levels) 'assistant-reasoning-${level.name}',
+    ];
+    final titles = <String>[
+      l10n.assistantEditReasoningFollowDefault,
+      for (final level in _levels) reasoningLevelLabel(l10n, level),
+    ];
+    final labels = <String>[
+      l10n.reasoningLevelSourceModelDefault,
+      for (final level in _levels) reasoningLevelCompactLabel(l10n, level),
+    ];
+    final slider = EffortSliderGroup(
+      selectedIndex: _indexFor(current),
+      stopCount: keys.length,
+      stopKeys: keys,
+      stopLabels: labels,
+      semanticsValue: (index) => titles[index.clamp(0, titles.length - 1)],
+      onCommit: (index) {
+        if (index <= 0) {
+          onSelected(null);
+          return;
+        }
+        final level = _levels[index - 1];
+        onSelected(
+          level == ReasoningLevel.auto
+              ? ReasoningRequest.auto
+              : level == ReasoningLevel.off
+              ? ReasoningRequest.off
+              : ReasoningRequest(level),
+        );
+      },
+      header: (context, visualIndex) {
+        final index = visualIndex.clamp(0, titles.length - 1);
+        return EffortSliderActiveStop(
+          icon: index == 0
+              ? Icon(Lucide.RotateCcw, size: 18, color: cs.primary)
+              : ReasoningIcons.levelIcon(
+                  _levels[index - 1],
+                  size: 18,
+                  color: cs.primary,
+                ),
+          iconKey: index == 0 ? 'follow' : _levels[index - 1],
+          title: titles[index],
+        );
+      },
+    );
+
+    if (scrollController == null) {
+      return SingleChildScrollView(
+        padding: const EdgeInsets.fromLTRB(8, 8, 8, 16),
+        child: slider,
+      );
+    }
     return ListView(
       controller: scrollController,
       shrinkWrap: true,
-      padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
-      children: [
-        Text(
-          l10n.assistantEditReasoningClampedSubtitle,
-          style: TextStyle(
-            fontSize: 12,
-            color: cs.onSurface.withValues(alpha: 0.55),
-          ),
-        ),
-        const SizedBox(height: 10),
-        _row(
-          context,
-          key: 'assistant-reasoning-follow-default',
-          title: l10n.assistantEditReasoningFollowDefault,
-          selected: current == null,
-          leading: Icon(
-            Lucide.RotateCcw,
-            size: 20,
-            color: current == null
-                ? cs.primary
-                : cs.onSurface.withValues(alpha: 0.7),
-          ),
-          onTap: () => onSelected(null),
-        ),
-        for (final level in _levels)
-          _row(
-            context,
-            key: 'assistant-reasoning-${level.name}',
-            title: reasoningLevelLabel(l10n, level),
-            selected: current?.level == level && current != null,
-            leading: ReasoningIcons.levelIcon(
-              level,
-              size: 20,
-              color: current?.level == level && current != null
-                  ? cs.primary
-                  : cs.onSurface.withValues(alpha: 0.7),
-            ),
-            onTap: () => onSelected(
-              level == ReasoningLevel.auto
-                  ? ReasoningRequest.auto
-                  : level == ReasoningLevel.off
-                  ? ReasoningRequest.off
-                  : ReasoningRequest(level),
-            ),
-          ),
-      ],
-    );
-  }
-
-  Widget _row(
-    BuildContext context, {
-    required String key,
-    required String title,
-    required bool selected,
-    required Widget leading,
-    required VoidCallback onTap,
-  }) {
-    final cs = Theme.of(context).colorScheme;
-    final onColor = selected ? cs.primary : cs.onSurface;
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: SizedBox(
-        key: ValueKey(key),
-        height: 48,
-        child: IosCardPress(
-          borderRadius: BorderRadius.circular(14),
-          baseColor: sheetTileColor(context),
-          duration: const Duration(milliseconds: 260),
-          onTap: () {
-            Haptics.soft();
-            onTap();
-          },
-          padding: const EdgeInsets.symmetric(horizontal: 12),
-          child: Row(
-            children: [
-              leading,
-              const SizedBox(width: 10),
-              Expanded(
-                child: Text(
-                  title,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontSize: 15,
-                    fontWeight: AppFontWeights.medium,
-                    color: onColor,
-                  ),
-                ),
-              ),
-              if (selected) Icon(Lucide.Check, size: 18, color: cs.primary),
-            ],
-          ),
-        ),
-      ),
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+      children: [slider],
     );
   }
 }

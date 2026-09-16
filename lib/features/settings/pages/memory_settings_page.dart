@@ -14,6 +14,7 @@ import '../../../shared/widgets/section_card.dart';
 import '../../../shared/widgets/snackbar.dart';
 import '../../../utils/platform_utils.dart';
 import '../../model/widgets/model_select_sheet.dart';
+import '../../../shared/widgets/tip_icon.dart';
 import '../widgets/memory_ui.dart';
 import 'legacy_memory_page.dart';
 import 'memory_about_page.dart';
@@ -1080,7 +1081,7 @@ class _NavRow extends StatelessWidget {
               child: titleWidget,
             ),
           ),
-          MemoryTipIcon(message: tip!),
+          TipIcon(message: tip!),
           IosCardPress(
             onTap: onTap,
             borderRadius: BorderRadius.zero,

@@ -883,6 +883,14 @@
   "reasoningLevelCompactHigh": "high",
   "reasoningLevelCompactXhigh": "xhigh",
   "reasoningLevelCompactMax": "max",
+  "reasoningLevelBudgetTokens": "{budget} tokens",
+  "@reasoningLevelBudgetTokens": {
+    "placeholders": {
+      "budget": {
+        "type": "String"
+      }
+    }
+  },
   "chatMessageWidgetFileNotFound": "檔案不存在: {fileName}",
   "chatMessageWidgetCannotOpenFile": "無法開啟檔案: {message}",
   "chatMessageWidgetOpenFileError": "開啟檔案失敗: {error}",

@@ -3133,7 +3133,7 @@ class _ToggleRow extends StatelessWidget {
               ],
             ),
           ),
-          if (tip != null) MemoryTipIcon(message: tip!),
+          if (tip != null) TipIcon(message: tip!),
           const SizedBox(width: 12),
           IosSwitch(value: value, onChanged: onChanged),
         ],

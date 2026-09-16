@@ -2431,6 +2431,11 @@ class AppLocalizationsZh extends AppLocalizations {
   String get reasoningLevelCompactMax => 'max';
 
   @override
+  String reasoningLevelBudgetTokens(String budget) {
+    return '$budget tokens';
+  }
+
+  @override
   String chatMessageWidgetFileNotFound(String fileName) {
     return '文件不存在: $fileName';
   }
@@ -14186,6 +14191,11 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get reasoningLevelCompactMax => 'max';
 
   @override
+  String reasoningLevelBudgetTokens(String budget) {
+    return '$budget tokens';
+  }
+
+  @override
   String chatMessageWidgetFileNotFound(String fileName) {
     return '文件不存在: $fileName';
   }
@@ -25865,6 +25875,11 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get reasoningLevelCompactMax => 'max';
+
+  @override
+  String reasoningLevelBudgetTokens(String budget) {
+    return '$budget tokens';
+  }
 
   @override
   String chatMessageWidgetFileNotFound(String fileName) {

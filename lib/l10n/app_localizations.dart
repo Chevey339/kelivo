@@ -4720,6 +4720,12 @@ abstract class AppLocalizations {
   /// **'max'**
   String get reasoningLevelCompactMax;
 
+  /// No description provided for @reasoningLevelBudgetTokens.
+  ///
+  /// In en, this message translates to:
+  /// **'{budget} tokens'**
+  String reasoningLevelBudgetTokens(String budget);
+
   /// No description provided for @chatMessageWidgetFileNotFound.
   ///
   /// In en, this message translates to:

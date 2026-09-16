@@ -24,6 +24,7 @@ void main() {
       ChangeNotifierProvider<SettingsProvider>.value(
         value: settings,
         child: MaterialApp(
+          locale: const Locale('en'),
           localizationsDelegates: AppLocalizations.localizationsDelegates,
           supportedLocales: AppLocalizations.supportedLocales,
           home: Scaffold(
@@ -52,17 +53,22 @@ void main() {
       find.byKey(const ValueKey('assistant-reasoning-max')),
       findsOneWidget,
     );
+    expect(
+      find.text('The actual level is clamped to what each model supports'),
+      findsNothing,
+    );
 
-    await tester.tap(
-      find.byKey(const ValueKey('assistant-reasoning-follow-default')),
+    await tester.tapAt(
+      tester.getCenter(
+        find.byKey(const ValueKey('assistant-reasoning-follow-default')),
+      ),
     );
     await tester.pump();
     expect(picked, isNull);
 
-    await tester.ensureVisible(
-      find.byKey(const ValueKey('assistant-reasoning-high')),
+    await tester.tapAt(
+      tester.getCenter(find.byKey(const ValueKey('assistant-reasoning-high'))),
     );
-    await tester.tap(find.byKey(const ValueKey('assistant-reasoning-high')));
     await tester.pump();
     expect(picked, const ReasoningRequest(ReasoningLevel.high));
   });

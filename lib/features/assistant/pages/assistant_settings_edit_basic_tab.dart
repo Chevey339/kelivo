@@ -192,7 +192,7 @@ class _BasicSettingsTabState extends State<_BasicSettingsTab> {
                 context,
                 icon: Lucide.Brain,
                 label: l10n.assistantEditThinkingBudgetTitle,
-                subtitle: l10n.assistantEditReasoningClampedSubtitle,
+                tip: l10n.assistantEditReasoningClampedSubtitle,
                 detailText: a.reasoning == null
                     ? l10n.assistantEditReasoningFollowDefault
                     : reasoningLevelLabel(l10n, a.reasoning!.level),

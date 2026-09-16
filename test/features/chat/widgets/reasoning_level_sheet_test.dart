@@ -9,6 +9,7 @@ import 'package:Kelivo/core/models/model_spec.dart';
 import 'package:Kelivo/core/models/reasoning_request.dart';
 import 'package:Kelivo/core/providers/assistant_provider.dart';
 import 'package:Kelivo/core/providers/settings_provider.dart';
+import 'package:Kelivo/core/services/api/reasoning/reasoning_level_options.dart';
 import 'package:Kelivo/core/services/model_spec/model_spec_resolver.dart';
 import 'package:Kelivo/features/chat/widgets/reasoning_level_sheet.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
@@ -93,6 +94,7 @@ Future<void> _pumpSheet(
         ),
       ],
       child: MaterialApp(
+        locale: const Locale('en'),
         localizationsDelegates: AppLocalizations.localizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
         home: Scaffold(
@@ -118,6 +120,11 @@ Future<void> _pumpSheet(
 
 Future<void> _openSheet(WidgetTester tester) async {
   await tester.tap(find.byKey(const ValueKey('open-reasoning-sheet')));
+  await tester.pumpAndSettle();
+}
+
+Future<void> _tapStop(WidgetTester tester, String key) async {
+  await tester.tapAt(tester.getCenter(find.byKey(ValueKey(key))));
   await tester.pumpAndSettle();
 }
 
@@ -166,12 +173,9 @@ void main() {
       );
       expect(find.byKey(const ValueKey('reasoning-row-high')), findsOneWidget);
       expect(find.byKey(const ValueKey('reasoning-row-custom')), findsNothing);
-      expect(find.text('1024'), findsNothing);
     });
 
-    testWidgets('budget dialect shows budgets and a custom row', (
-      tester,
-    ) async {
+    testWidgets('budget dialect shows a custom affordance', (tester) async {
       final config = _budgetConfig();
       final settings = await _settingsWith(
         tester,
@@ -196,12 +200,20 @@ void main() {
         find.byKey(const ValueKey('reasoning-row-custom')),
         findsOneWidget,
       );
-      expect(find.text('1024'), findsOneWidget);
-      expect(find.text('4096'), findsOneWidget);
-      expect(find.text('8192'), findsOneWidget);
+
+      await _tapStop(tester, 'reasoning-row-low');
+      expect(
+        settings.reasoningChoiceFor('Test', 'kelivo-test-budget'),
+        const ReasoningRequest(ReasoningLevel.low),
+      );
+      expect(find.text('Low'), findsWidgets);
+      expect(
+        find.text('${formatReasoningBudgetK(1024)} tokens'),
+        findsOneWidget,
+      );
     });
 
-    testWidgets('tapping a level row writes setReasoningChoice', (
+    testWidgets('tapping a level stop writes setReasoningChoice', (
       tester,
     ) async {
       final config = _effortConfig();
@@ -218,13 +230,46 @@ void main() {
       );
       await _openSheet(tester);
 
-      await tester.tap(find.byKey(const ValueKey('reasoning-row-high')));
-      await tester.pumpAndSettle();
+      await _tapStop(tester, 'reasoning-row-high');
 
       expect(
         settings.reasoningChoiceFor('Test', 'kelivo-test-effort'),
         const ReasoningRequest(ReasoningLevel.high),
       );
+    });
+
+    testWidgets('custom budget path writes requestForCustomBudget', (
+      tester,
+    ) async {
+      final config = _budgetConfig();
+      final spec = ModelSpecResolver.instance.spec(
+        config,
+        'kelivo-test-budget',
+      );
+      final settings = await _settingsWith(
+        tester,
+        config,
+        'kelivo-test-budget',
+      );
+      await _pumpSheet(
+        tester,
+        settings: settings,
+        config: config,
+        modelId: 'kelivo-test-budget',
+      );
+      await _openSheet(tester);
+
+      await tester.tap(find.byKey(const ValueKey('reasoning-row-custom')));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byType(TextField), '2048');
+      await tester.testTextInput.receiveAction(TextInputAction.done);
+      await tester.pumpAndSettle();
+
+      expect(
+        settings.reasoningChoiceFor('Test', 'kelivo-test-budget'),
+        requestForCustomBudget(spec, 2048),
+      );
+      expect(find.text('2048'), findsWidgets);
     });
 
     testWidgets('reset clears per-model memory', (tester) async {

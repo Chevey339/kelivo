@@ -1062,6 +1062,14 @@
   "reasoningLevelCompactHigh": "high",
   "reasoningLevelCompactXhigh": "xhigh",
   "reasoningLevelCompactMax": "max",
+  "reasoningLevelBudgetTokens": "{budget} tokens",
+  "@reasoningLevelBudgetTokens": {
+    "placeholders": {
+      "budget": {
+        "type": "String"
+      }
+    }
+  },
   "chatMessageWidgetFileNotFound": "File not found: {fileName}",
   "@chatMessageWidgetFileNotFound": {
     "placeholders": {
