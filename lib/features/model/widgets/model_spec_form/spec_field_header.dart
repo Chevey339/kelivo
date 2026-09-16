@@ -22,12 +22,14 @@ class SpecFieldHeader extends StatelessWidget {
     required this.source,
     required this.overridden,
     this.onReset,
+    this.trailing,
   });
 
   final String label;
   final SpecSource source;
   final bool overridden;
   final VoidCallback? onReset;
+  final Widget? trailing;
 
   @override
   Widget build(BuildContext context) {
@@ -58,6 +60,7 @@ class SpecFieldHeader extends StatelessWidget {
               color: cs.onSurface.withValues(alpha: 0.7),
               onTap: onReset,
             ),
+          if (trailing != null) trailing!,
         ],
       ),
     );

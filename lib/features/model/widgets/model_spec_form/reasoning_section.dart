@@ -7,6 +7,7 @@ import '../../../../l10n/app_localizations.dart';
 import '../../../../shared/widgets/ios_checkbox.dart';
 import '../../../../shared/widgets/ios_form_text_field.dart';
 import '../../../../shared/widgets/ios_settings_rows.dart';
+import '../../../../shared/widgets/ios_switch.dart';
 import '../../../../shared/widgets/option_sheet.dart';
 import 'model_spec_form_controller.dart';
 import 'spec_field_header.dart';
@@ -65,11 +66,12 @@ class ReasoningSection extends StatelessWidget {
               ),
               onReset: () =>
                   controller.reset(ModelSpecField.reasoningCanDisable),
-            ),
-            IosSwitchRow(
-              label: l10n.modelSpecFormCanDisable,
-              value: spec.reasoning.canDisable,
-              onChanged: controller.setCanDisable,
+              trailing: IosSwitch(
+                key: const ValueKey('model-spec-can-disable'),
+                value: spec.reasoning.canDisable,
+                onChanged: controller.setCanDisable,
+                semanticLabel: l10n.modelSpecFormCanDisable,
+              ),
             ),
             const SizedBox(height: 8),
             SpecFieldHeader(

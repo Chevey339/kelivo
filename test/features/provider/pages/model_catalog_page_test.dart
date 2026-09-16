@@ -83,7 +83,8 @@ void main() {
     await tester.pump();
 
     expect(find.byKey(const ValueKey('model-catalog-page')), findsOneWidget);
-    expect(find.text('Model catalog'), findsWidgets);
+    expect(find.text('Model catalog'), findsOneWidget);
+    expect(find.text('models.dev'), findsOneWidget);
     expect(find.textContaining('Bundled snapshot'), findsOneWidget);
     expect(find.textContaining('2026-09-16'), findsOneWidget);
     expect(find.text('1 providers'), findsOneWidget);

@@ -68,7 +68,7 @@ class _ModelCatalogPanelState extends State<ModelCatalogPanel> {
     return [
       IosNavRow(
         key: const ValueKey('model-catalog-source'),
-        label: l10n.modelCatalogTitle,
+        label: 'models.dev',
         subtitle: source,
       ),
       if (catalog.isLoaded) ...[
