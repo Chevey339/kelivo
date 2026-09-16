@@ -903,33 +903,28 @@ class MessageGenerationService {
     return deletedIds;
   }
 
-  bool _shouldIncludeAudioForProvider(
-    SettingsProvider settings, {
-    required String providerKey,
-    required String modelId,
-  }) {
-    final cfg = settings.getProviderConfig(providerKey);
-    return ModelSpecResolver.instance.spec(cfg, modelId).supportsAudioInput;
-  }
-
   String _effectiveAttachmentMime(DocumentAttachment attachment) {
     return resolveDocumentAttachmentMime(attachment);
   }
 
-  List<String> _filterMediaPathsForProvider(
+  /// Image / audio / video the [spec] can read. Documents are never included.
+  @visibleForTesting
+  static List<String> filterMediaPathsForProvider(
     List<String> paths, {
-    required bool includeAudio,
+    required ModelSpec spec,
   }) {
-    return paths
-        .where((path) {
-          final mime = inferMediaMimeFromSource(
-            path,
-            fallbackMime: 'image/png',
-          );
-          if (isAudioMime(mime)) return includeAudio;
-          return isImageMime(mime) || isVideoMime(mime);
-        })
-        .toList(growable: false);
+    return [
+      for (final path in paths)
+        if (_specAcceptsGatedMediaPath(path, spec)) path,
+    ];
+  }
+
+  static bool _specAcceptsGatedMediaPath(String path, ModelSpec spec) {
+    final mime = inferMediaMimeFromSource(path, fallbackMime: 'image/png');
+    if (isAudioMime(mime)) return spec.supportsAudioInput;
+    if (isVideoMime(mime)) return spec.supportsVideoInput;
+    if (isImageMime(mime)) return spec.supportsImageInput;
+    return false;
   }
 
   /// Build user image paths considering OCR mode.
@@ -941,29 +936,26 @@ class MessageGenerationService {
     required String modelId,
   }) {
     final bool ocrActive = settings.ocrActive;
-
-    final includeAudio = _shouldIncludeAudioForProvider(
-      settings,
-      providerKey: providerKey,
-      modelId: modelId,
+    final spec = ModelSpecResolver.instance.spec(
+      settings.getProviderConfig(providerKey),
+      modelId,
     );
 
     if (input != null) {
       final currentMediaPaths = <String>[];
       for (final d in input.documents) {
         final effectiveMime = _effectiveAttachmentMime(d);
-        if (isVideoMime(effectiveMime) ||
-            (includeAudio && isAudioMime(effectiveMime))) {
+        if (isVideoMime(effectiveMime) || isAudioMime(effectiveMime)) {
           currentMediaPaths.add(d.path);
         }
       }
-      return _filterMediaPathsForProvider(<String>[
+      return filterMediaPathsForProvider(<String>[
         if (!ocrActive) ...input.imagePaths,
         ...currentMediaPaths,
-      ], includeAudio: includeAudio);
+      ], spec: spec);
     }
 
-    return _filterMediaPathsForProvider(
+    return filterMediaPathsForProvider(
       lastUserImagePaths
           .where((path) {
             if (!ocrActive) return true;
@@ -972,7 +964,7 @@ class MessageGenerationService {
             );
           })
           .toList(growable: false),
-      includeAudio: includeAudio,
+      spec: spec,
     );
   }
 

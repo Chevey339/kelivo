@@ -99,5 +99,28 @@ void main() {
       expect(docs.single.uri, '/tmp/notes.pdf');
       expect(docs.single.mime, 'application/pdf');
     });
+
+    test(
+      'current draft user message drops images for a text-only model',
+      () async {
+        final draft = [
+          _userMessage(
+            content: 'describe this',
+            media: [
+              encodeInternalMediaRef(uri: '/tmp/a.png', mime: 'image/png'),
+            ],
+          ),
+        ];
+        final out = await ChatApiService.stripUnsupportedMediaFromMessages(
+          draft,
+          _spec(const [Modality.text]),
+        );
+        expect(
+          out.single.containsKey(multimodalInternalMediaPathsKey),
+          isFalse,
+        );
+        expect(out.single['content'], 'describe this');
+      },
+    );
   });
 }

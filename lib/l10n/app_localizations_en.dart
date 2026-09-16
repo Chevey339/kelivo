@@ -768,20 +768,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get homePagePleaseSelectModel => 'Please select a model first';
 
   @override
-  String homePageAttachmentUnsupported(String modalities) {
-    return 'This model does not accept $modalities attachments. Switch model or remove them.';
-  }
-
-  @override
-  String get homePageAttachmentModalityImage => 'image';
-
-  @override
-  String get homePageAttachmentModalityAudio => 'audio';
-
-  @override
-  String get homePageAttachmentModalityVideo => 'video';
-
-  @override
   String get homePagePleaseSetupTranslateModel =>
       'Please set a translation model first';
 

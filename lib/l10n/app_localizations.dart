@@ -1486,30 +1486,6 @@ abstract class AppLocalizations {
   /// **'Please select a model first'**
   String get homePagePleaseSelectModel;
 
-  /// No description provided for @homePageAttachmentUnsupported.
-  ///
-  /// In en, this message translates to:
-  /// **'This model does not accept {modalities} attachments. Switch model or remove them.'**
-  String homePageAttachmentUnsupported(String modalities);
-
-  /// No description provided for @homePageAttachmentModalityImage.
-  ///
-  /// In en, this message translates to:
-  /// **'image'**
-  String get homePageAttachmentModalityImage;
-
-  /// No description provided for @homePageAttachmentModalityAudio.
-  ///
-  /// In en, this message translates to:
-  /// **'audio'**
-  String get homePageAttachmentModalityAudio;
-
-  /// No description provided for @homePageAttachmentModalityVideo.
-  ///
-  /// In en, this message translates to:
-  /// **'video'**
-  String get homePageAttachmentModalityVideo;
-
   /// No description provided for @homePagePleaseSetupTranslateModel.
   ///
   /// In en, this message translates to:

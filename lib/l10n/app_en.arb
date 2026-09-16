@@ -332,17 +332,6 @@
   "displaySettingsPageLanguageChineseLabel": "Simplified Chinese",
   "displaySettingsPageLanguageEnglishLabel": "English",
   "homePagePleaseSelectModel": "Please select a model first",
-  "homePageAttachmentUnsupported": "This model does not accept {modalities} attachments. Switch model or remove them.",
-  "@homePageAttachmentUnsupported": {
-    "placeholders": {
-      "modalities": {
-        "type": "String"
-      }
-    }
-  },
-  "homePageAttachmentModalityImage": "image",
-  "homePageAttachmentModalityAudio": "audio",
-  "homePageAttachmentModalityVideo": "video",
   "homePagePleaseSetupTranslateModel": "Please set a translation model first",
   "homePageTranslating": "Translating...",
   "homePageTranslateFailed": "Translation failed: {error}",

@@ -11,14 +11,12 @@ import '../../../core/models/message_part.dart';
 import '../../../utils/app_directories.dart';
 import '../../../utils/sandbox_path_resolver.dart';
 import '../../../core/models/conversation.dart';
-import '../../../core/models/model_spec.dart';
 import '../../../core/models/token_usage.dart';
 import '../../../core/providers/assistant_provider.dart';
 import '../../../core/providers/settings_provider.dart';
 import '../../../core/models/reasoning_request.dart';
 import '../../../core/services/api/chat_api_service.dart';
 import '../../../core/services/api/reasoning/reasoning_selection.dart';
-import '../../../core/services/model_spec/model_spec_resolver.dart';
 import '../../../core/services/api/retry_policy.dart';
 import '../../../core/services/api/stream/stream_chunk.dart';
 import '../../../core/services/chat/chat_service.dart';
@@ -30,7 +28,6 @@ import '../../../core/models/assistant_regex.dart';
 import '../services/ask_user_interaction_service.dart';
 import '../../chat/utils/thinking_tag_parser.dart';
 import '../services/context_usage_service.dart';
-import '../services/attachment_modality_gate.dart';
 import '../services/message_generation_service.dart';
 import '../services/tool_approval_service.dart';
 import 'active_streaming_message_store.dart';
@@ -157,25 +154,6 @@ class ChatActions {
   /// [targetGroupId] is null when the assistant is treated as a new reply, or
   /// when the anchor is a user message with no following assistant group
   /// (e.g. every generated version was deleted).
-  /// Non-null when [input] carries image/audio/video the [spec] cannot read.
-  /// Images are allowed when [ocrActive] is true — they go through OCR.
-  /// [_sendMessageClaimed] returns this as [ChatActionResult.error] before
-  /// persisting anything.
-  @visibleForTesting
-  static String? draftUnsupportedError(
-    ChatInputData input,
-    ModelSpec spec, {
-    bool ocrActive = false,
-  }) {
-    final unsupported = unsupportedDraftModalities(
-      input,
-      spec,
-      ocrActive: ocrActive,
-    );
-    if (unsupported.isEmpty) return null;
-    return attachmentUnsupportedErrorCode(unsupported);
-  }
-
   @visibleForTesting
   static bool shouldBeginNewAssistantReply({
     required String role,
@@ -1202,21 +1180,6 @@ class ChatActions {
       if (loaded) {
         viewModel.restoreMessageUiState();
       }
-    }
-
-    // Draft attachments are screened here so a rejected send restores the
-    // composer. History media the model cannot read is stripped later.
-    final spec = ModelSpecResolver.instance.spec(
-      settings.getProviderConfig(providerKey),
-      modelId,
-    );
-    final draftError = ChatActions.draftUnsupportedError(
-      input,
-      spec,
-      ocrActive: settings.ocrActive,
-    );
-    if (draftError != null) {
-      return ChatActionResult.error(draftError);
     }
 
     late final ChatMessage userMessage;
