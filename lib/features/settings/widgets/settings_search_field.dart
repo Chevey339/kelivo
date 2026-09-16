@@ -93,6 +93,9 @@ class SettingsSearchField extends StatelessWidget {
                                   style: style,
                                   textAlignVertical: TextAlignVertical.center,
                                   decoration: InputDecoration(
+                                    // The surrounding field owns its height;
+                                    // desktop compact density shifts the baseline.
+                                    visualDensity: VisualDensity.standard,
                                     hintText: l10n.settingsSearchHint,
                                     hintStyle: hintStyle,
                                     isDense: true,
