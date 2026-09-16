@@ -5914,6 +5914,12 @@ abstract class AppLocalizations {
   /// **'Exact (from last response)'**
   String get contextUsageStateExact;
 
+  /// No description provided for @contextUsageStateExactCalibrated.
+  ///
+  /// In en, this message translates to:
+  /// **'Exact (breakdown scaled from estimate)'**
+  String get contextUsageStateExactCalibrated;
+
   /// No description provided for @contextUsageStateEstimated.
   ///
   /// In en, this message translates to:
@@ -6009,12 +6015,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Refresh'**
   String get contextUsageRefresh;
-
-  /// No description provided for @contextUsageExactNote.
-  ///
-  /// In en, this message translates to:
-  /// **'Totals come from the last response; a bucket breakdown is not available.'**
-  String get contextUsageExactNote;
 
   /// No description provided for @mcpPageBackTooltip.
   ///

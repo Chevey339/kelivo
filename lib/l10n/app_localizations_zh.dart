@@ -3087,6 +3087,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get contextUsageStateExact => '精确（来自上次响应）';
 
   @override
+  String get contextUsageStateExactCalibrated => '精确（分项按估算比例）';
+
+  @override
   String get contextUsageStateEstimated => '估算';
 
   @override
@@ -3135,9 +3138,6 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get contextUsageRefresh => '刷新';
-
-  @override
-  String get contextUsageExactNote => '总量来自上次回复，无法提供分项明细。';
 
   @override
   String get mcpPageBackTooltip => '返回';
@@ -14876,6 +14876,9 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get contextUsageStateExact => '精确（来自上次响应）';
 
   @override
+  String get contextUsageStateExactCalibrated => '精确（分项按估算比例）';
+
+  @override
   String get contextUsageStateEstimated => '估算';
 
   @override
@@ -14924,9 +14927,6 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get contextUsageRefresh => '刷新';
-
-  @override
-  String get contextUsageExactNote => '总量来自上次回复，无法提供分项明细。';
 
   @override
   String get mcpPageBackTooltip => '返回';
@@ -26591,6 +26591,9 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get contextUsageStateExact => '精確（來自上次回應）';
 
   @override
+  String get contextUsageStateExactCalibrated => '精確（分項按估算比例）';
+
+  @override
   String get contextUsageStateEstimated => '估算';
 
   @override
@@ -26639,9 +26642,6 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get contextUsageRefresh => '重新整理';
-
-  @override
-  String get contextUsageExactNote => '總量來自上次回覆，無法提供分項明細。';
 
   @override
   String get mcpPageBackTooltip => '返回';

@@ -9,6 +9,7 @@ ContextUsageSnapshot usageSnap({
   ContextUsageState state = ContextUsageState.estimated,
   int used = 110,
   int? window = 1000,
+  bool calibrated = false,
   ContextUsageBuckets buckets = const ContextUsageBuckets(
     system: 10,
     injections: 8,
@@ -29,6 +30,7 @@ ContextUsageSnapshot usageSnap({
     modelId: 'window-model',
     assistantId: null,
     computedAt: DateTime.utc(2026, 1, 1),
+    calibrated: calibrated,
   );
 }
 
@@ -73,6 +75,20 @@ void main() {
     );
     expectSegment(segments[5], key: 'draft', tokens: 9, fraction: 9 / 110);
     expect(segments.any((segment) => segment.isFreeSpace), isFalse);
+  });
+
+  test('calibrated exact snapshot uses bucket segments', () {
+    final segments = buildContextUsageSegments(
+      usageSnap(state: ContextUsageState.exact, calibrated: true),
+    );
+    expect(segments, hasLength(7));
+    expectSegment(segments[0], key: 'system', tokens: 10, fraction: 0.01);
+    expectSegment(segments[1], key: 'injections', tokens: 8, fraction: 0.008);
+    expectSegment(segments[2], key: 'history', tokens: 70, fraction: 0.07);
+    expectSegment(segments[3], key: 'tools', tokens: 6, fraction: 0.006);
+    expectSegment(segments[4], key: 'attachments', tokens: 7, fraction: 0.007);
+    expectSegment(segments[5], key: 'draft', tokens: 9, fraction: 0.009);
+    expectSegment(segments[6], key: 'freeSpace', tokens: 890, fraction: 0.89);
   });
 
   test('exact snapshot is a single used segment plus free space', () {
@@ -188,9 +204,7 @@ void main() {
     );
   });
 
-  testWidgets('exact breakdown uses used row and keeps the note', (
-    tester,
-  ) async {
+  testWidgets('exact breakdown uses used row without a note', (tester) async {
     final snapshot = usageSnap(
       state: ContextUsageState.exact,
       used: 250,
@@ -208,6 +222,7 @@ void main() {
     expect(find.text('Used'), findsOneWidget);
     expect(find.text('250'), findsOneWidget);
     expect(find.text('25%'), findsOneWidget);
+    expect(find.text('Exact (from last response)'), findsOneWidget);
     expect(
       find.byKey(const ValueKey('context-usage-bucket-used')),
       findsOneWidget,
@@ -220,7 +235,44 @@ void main() {
       find.text(
         'Totals come from the last response; a bucket breakdown is not available.',
       ),
+      findsNothing,
+    );
+  });
+
+  testWidgets('calibrated exact breakdown shows buckets and no note', (
+    tester,
+  ) async {
+    final snapshot = usageSnap(
+      state: ContextUsageState.exact,
+      calibrated: true,
+    );
+    await tester.pumpWidget(
+      MaterialApp(
+        locale: const Locale('en'),
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        home: Scaffold(body: ContextUsageBreakdown(snapshot: snapshot)),
+      ),
+    );
+
+    expect(find.text('Exact (breakdown scaled from estimate)'), findsOneWidget);
+    expect(find.text('System'), findsOneWidget);
+    expect(find.text('History'), findsOneWidget);
+    expect(find.text('Draft'), findsOneWidget);
+    expect(find.text('Used'), findsNothing);
+    expect(
+      find.byKey(const ValueKey('context-usage-bucket-history')),
       findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey('context-usage-bucket-used')),
+      findsNothing,
+    );
+    expect(
+      find.text(
+        'Totals come from the last response; a bucket breakdown is not available.',
+      ),
+      findsNothing,
     );
   });
 }

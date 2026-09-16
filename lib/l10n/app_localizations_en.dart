@@ -3203,6 +3203,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get contextUsageStateExact => 'Exact (from last response)';
 
   @override
+  String get contextUsageStateExactCalibrated =>
+      'Exact (breakdown scaled from estimate)';
+
+  @override
   String get contextUsageStateEstimated => 'Estimated';
 
   @override
@@ -3251,10 +3255,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get contextUsageRefresh => 'Refresh';
-
-  @override
-  String get contextUsageExactNote =>
-      'Totals come from the last response; a bucket breakdown is not available.';
 
   @override
   String get mcpPageBackTooltip => 'Back';

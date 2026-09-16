@@ -32,7 +32,9 @@ class ContextUsageBuckets {
   final int attachments;
   final int draft;
 
-  int get total => system + injections + history + tools + attachments + draft;
+  int get nonDraftTotal => system + injections + history + tools + attachments;
+
+  int get total => nonDraftTotal + draft;
 
   ContextUsageBuckets copyWith({
     int? system,
@@ -53,6 +55,43 @@ class ContextUsageBuckets {
   }
 }
 
+/// Scales non-draft buckets so they sum to [anchorTotal], keeping proportions.
+/// Returns null when there is nothing to scale (single "used" presentation).
+ContextUsageBuckets? calibrateContextUsageBuckets({
+  required ContextUsageBuckets estimated,
+  required int anchorTotal,
+}) {
+  final values = <int>[
+    estimated.system,
+    estimated.injections,
+    estimated.history,
+    estimated.tools,
+    estimated.attachments,
+  ];
+  final estimatedNonDraft = values.fold<int>(0, (sum, value) => sum + value);
+  if (estimatedNonDraft <= 0) return null;
+  final scaled = [
+    for (final value in values)
+      (value * anchorTotal / estimatedNonDraft).round(),
+  ];
+  var residual = anchorTotal - scaled.fold<int>(0, (sum, value) => sum + value);
+  if (residual != 0) {
+    var largest = 0;
+    for (var i = 1; i < scaled.length; i++) {
+      if (scaled[i] > scaled[largest]) largest = i;
+    }
+    scaled[largest] += residual;
+  }
+  return ContextUsageBuckets(
+    system: scaled[0],
+    injections: scaled[1],
+    history: scaled[2],
+    tools: scaled[3],
+    attachments: scaled[4],
+    draft: estimated.draft,
+  );
+}
+
 class ContextUsageSnapshot {
   const ContextUsageSnapshot({
     required this.state,
@@ -65,6 +104,7 @@ class ContextUsageSnapshot {
     required this.modelId,
     required this.assistantId,
     required this.computedAt,
+    this.calibrated = false,
   });
 
   final ContextUsageState state;
@@ -77,6 +117,7 @@ class ContextUsageSnapshot {
   final String modelId;
   final String? assistantId;
   final DateTime computedAt;
+  final bool calibrated;
 
   double? get ratio {
     final window = contextWindow;
@@ -95,6 +136,7 @@ class ContextUsageSnapshot {
     String? modelId,
     String? assistantId,
     DateTime? computedAt,
+    bool? calibrated,
   }) {
     return ContextUsageSnapshot(
       state: state ?? this.state,
@@ -107,6 +149,7 @@ class ContextUsageSnapshot {
       modelId: modelId ?? this.modelId,
       assistantId: assistantId ?? this.assistantId,
       computedAt: computedAt ?? this.computedAt,
+      calibrated: calibrated ?? this.calibrated,
     );
   }
 }
@@ -135,10 +178,12 @@ class ContextUsageService extends ChangeNotifier {
       <String, ContextUsageSnapshot>{};
   final Map<String, int> _inFlight = <String, int>{};
   final Map<String, Timer> _debounce = <String, Timer>{};
+  final Map<String, _ExactAnchor> _anchors = <String, _ExactAnchor>{};
 
   String? _activeConversationId;
   VoidCallback? _revisionListener;
   ValueListenable<int>? _revisionListenable;
+  bool _disposed = false;
 
   String? get activeConversationId => _activeConversationId;
 
@@ -170,6 +215,7 @@ class ContextUsageService extends ChangeNotifier {
       if (snap != null &&
           snap.revision != revision &&
           snap.state != ContextUsageState.none) {
+        _clearExactAnchor(conversationId);
         _snapshots[conversationId] = snap.copyWith(
           state: ContextUsageState.stale,
         );
@@ -191,29 +237,49 @@ class ContextUsageService extends ChangeNotifier {
     if (usage.promptTokens <= 0) return;
     final cfg = _settings.getProviderConfig(providerKey);
     final spec = ModelSpecResolver.instance.spec(cfg, modelId);
-    final extra = estimateAssistantTurnTokens(
+    final used = contextTokensAfterTurn(
+      usage: usage,
       assistantMessage: assistantMessage,
       replay: spec.reasoning.replay,
       toolEvents: _chatService.getToolEvents(assistantMessage.id),
     );
     final window = spec.contextWindow;
-    final used = usage.promptTokens + extra;
     final previous = _snapshots[conversationId];
+    final draft = previous?.buckets.draft ?? 0;
+    final revision = _chatService.contextRevision(conversationId);
+    final computedAt = DateTime.now();
+    final resolved = _resolvedIdentity(conversationId);
+    final resolvedMatches =
+        resolved != null &&
+        resolved.providerKey == providerKey &&
+        resolved.modelId == modelId;
+    final storedAssistantId = resolvedMatches
+        ? resolved.assistantId
+        : assistantId;
+    _anchors[conversationId] = _ExactAnchor(
+      total: used,
+      revision: revision,
+      computedAt: computedAt,
+      providerKey: providerKey,
+      modelId: modelId,
+      assistantId: storedAssistantId,
+    );
     _snapshots[conversationId] = ContextUsageSnapshot(
       state: ContextUsageState.exact,
       buckets: (previous?.buckets ?? const ContextUsageBuckets()).copyWith(
-        draft: previous?.buckets.draft ?? 0,
+        draft: draft,
       ),
-      usedTokens: used + (previous?.buckets.draft ?? 0),
+      usedTokens: used + draft,
       contextWindow: window,
       conversationId: conversationId,
-      revision: _chatService.contextRevision(conversationId),
+      revision: revision,
       providerKey: providerKey,
       modelId: modelId,
-      assistantId: assistantId,
-      computedAt: DateTime.now(),
+      assistantId: storedAssistantId,
+      computedAt: computedAt,
     );
     notifyListeners();
+    unawaited(refresh(conversationId, force: true));
   }
 
   Future<void> refresh(
@@ -234,19 +300,22 @@ class ContextUsageService extends ChangeNotifier {
     final revision = _chatService.contextRevision(conversationId);
     final generation = (_inFlight[conversationId] ?? 0) + 1;
     _inFlight[conversationId] = generation;
-    _snapshots[conversationId] = ContextUsageSnapshot(
-      state: ContextUsageState.computing,
-      buckets: existing?.buckets ?? const ContextUsageBuckets(),
-      usedTokens: existing?.usedTokens ?? 0,
-      contextWindow: resolved.contextWindow,
-      conversationId: conversationId,
-      revision: revision,
-      providerKey: resolved.providerKey,
-      modelId: resolved.modelId,
-      assistantId: resolved.assistantId,
-      computedAt: existing?.computedAt ?? DateTime.now(),
-    );
-    notifyListeners();
+    final keepExact = _anchorMatches(conversationId, revision, resolved);
+    if (!keepExact) {
+      _snapshots[conversationId] = ContextUsageSnapshot(
+        state: ContextUsageState.computing,
+        buckets: existing?.buckets ?? const ContextUsageBuckets(),
+        usedTokens: existing?.usedTokens ?? 0,
+        contextWindow: resolved.contextWindow,
+        conversationId: conversationId,
+        revision: revision,
+        providerKey: resolved.providerKey,
+        modelId: resolved.modelId,
+        assistantId: resolved.assistantId,
+        computedAt: existing?.computedAt ?? DateTime.now(),
+      );
+      notifyListeners();
+    }
 
     try {
       final assemble = _assemble;
@@ -264,7 +333,7 @@ class ContextUsageService extends ChangeNotifier {
               modelId: resolved.modelId,
               assistantId: resolved.assistantId,
             );
-      if (_inFlight[conversationId] != generation) return;
+      if (_disposed || _inFlight[conversationId] != generation) return;
       final job = ContextEstimateJob(
         systemText: preview.systemText,
         injectionsText: preview.injectionsText,
@@ -275,7 +344,7 @@ class ContextUsageService extends ChangeNotifier {
         kind: resolved.kind,
       );
       final estimated = await _runEstimate(() => estimateContextBuckets(job));
-      if (_inFlight[conversationId] != generation) return;
+      if (_disposed || _inFlight[conversationId] != generation) return;
       if (_chatService.contextRevision(conversationId) != revision) return;
       final buckets = ContextUsageBuckets(
         system: estimated.system,
@@ -285,21 +354,15 @@ class ContextUsageService extends ChangeNotifier {
         attachments: estimated.attachments,
         draft: estimated.draft,
       );
-      _snapshots[conversationId] = ContextUsageSnapshot(
-        state: ContextUsageState.estimated,
-        buckets: buckets,
-        usedTokens: buckets.total,
-        contextWindow: resolved.contextWindow,
+      _snapshots[conversationId] = _snapshotFromEstimate(
         conversationId: conversationId,
         revision: revision,
-        providerKey: resolved.providerKey,
-        modelId: resolved.modelId,
-        assistantId: resolved.assistantId,
-        computedAt: DateTime.now(),
+        resolved: resolved,
+        buckets: buckets,
       );
       notifyListeners();
     } catch (_) {
-      if (_inFlight[conversationId] != generation) return;
+      if (_disposed || _inFlight[conversationId] != generation) return;
       final fallback = _snapshots[conversationId];
       if (fallback != null && fallback.state == ContextUsageState.computing) {
         _snapshots[conversationId] = fallback.copyWith(
@@ -312,6 +375,7 @@ class ContextUsageService extends ChangeNotifier {
 
   @override
   void dispose() {
+    _disposed = true;
     _settings.removeListener(_onSettingsOrAssistantChanged);
     _assistants.removeListener(_onSettingsOrAssistantChanged);
     _unlistenRevision();
@@ -320,6 +384,78 @@ class ContextUsageService extends ChangeNotifier {
     }
     _debounce.clear();
     super.dispose();
+  }
+
+  ContextUsageSnapshot _snapshotFromEstimate({
+    required String conversationId,
+    required int revision,
+    required _ResolvedIdentity resolved,
+    required ContextUsageBuckets buckets,
+  }) {
+    final anchor = _anchors[conversationId];
+    if (anchor != null && _anchorMatches(conversationId, revision, resolved)) {
+      final calibrated = calibrateContextUsageBuckets(
+        estimated: buckets,
+        anchorTotal: anchor.total,
+      );
+      if (calibrated != null) {
+        return ContextUsageSnapshot(
+          state: ContextUsageState.exact,
+          buckets: calibrated,
+          usedTokens: anchor.total + calibrated.draft,
+          contextWindow: resolved.contextWindow,
+          conversationId: conversationId,
+          revision: revision,
+          providerKey: resolved.providerKey,
+          modelId: resolved.modelId,
+          assistantId: resolved.assistantId,
+          computedAt: anchor.computedAt,
+          calibrated: true,
+        );
+      }
+      return ContextUsageSnapshot(
+        state: ContextUsageState.exact,
+        buckets: ContextUsageBuckets(draft: buckets.draft),
+        usedTokens: anchor.total + buckets.draft,
+        contextWindow: resolved.contextWindow,
+        conversationId: conversationId,
+        revision: revision,
+        providerKey: resolved.providerKey,
+        modelId: resolved.modelId,
+        assistantId: resolved.assistantId,
+        computedAt: anchor.computedAt,
+      );
+    }
+    _clearExactAnchor(conversationId);
+    return ContextUsageSnapshot(
+      state: ContextUsageState.estimated,
+      buckets: buckets,
+      usedTokens: buckets.total,
+      contextWindow: resolved.contextWindow,
+      conversationId: conversationId,
+      revision: revision,
+      providerKey: resolved.providerKey,
+      modelId: resolved.modelId,
+      assistantId: resolved.assistantId,
+      computedAt: DateTime.now(),
+    );
+  }
+
+  bool _anchorMatches(
+    String conversationId,
+    int revision,
+    _ResolvedIdentity resolved,
+  ) {
+    final anchor = _anchors[conversationId];
+    return anchor != null &&
+        anchor.revision == revision &&
+        anchor.providerKey == resolved.providerKey &&
+        anchor.modelId == resolved.modelId &&
+        anchor.assistantId == resolved.assistantId;
+  }
+
+  void _clearExactAnchor(String conversationId) {
+    _anchors.remove(conversationId);
   }
 
   void _foldDraft(
@@ -377,6 +513,7 @@ class ContextUsageService extends ChangeNotifier {
     if (snap != null &&
         snap.revision != revision &&
         snap.state != ContextUsageState.none) {
+      _clearExactAnchor(conversationId);
       _snapshots[conversationId] = snap.copyWith(
         state: ContextUsageState.stale,
       );
@@ -402,6 +539,7 @@ class ContextUsageService extends ChangeNotifier {
         snap.assistantId == resolved.assistantId) {
       return;
     }
+    _clearExactAnchor(id);
     _snapshots[id] = snap.copyWith(state: ContextUsageState.stale);
     notifyListeners();
     _scheduleRefresh(id);
@@ -445,6 +583,24 @@ class ContextUsageService extends ChangeNotifier {
       contextWindow: spec.contextWindow,
     );
   }
+}
+
+class _ExactAnchor {
+  const _ExactAnchor({
+    required this.total,
+    required this.revision,
+    required this.computedAt,
+    required this.providerKey,
+    required this.modelId,
+    required this.assistantId,
+  });
+
+  final int total;
+  final int revision;
+  final DateTime computedAt;
+  final String providerKey;
+  final String modelId;
+  final String? assistantId;
 }
 
 class _ResolvedIdentity {

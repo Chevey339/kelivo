@@ -3,6 +3,7 @@ import 'dart:convert';
 import '../../../core/models/chat_message.dart';
 import '../../../core/models/message_part.dart';
 import '../../../core/models/model_spec.dart';
+import '../../../core/models/token_usage.dart';
 import '../../../core/providers/settings_provider.dart';
 import '../../../core/utils/multimodal_input_utils.dart';
 import '../../../core/utils/token_estimator.dart';
@@ -164,33 +165,73 @@ List<ContextImageRef> imageRefsFromApiMessages(
   return images;
 }
 
-int estimateAssistantTurnTokens({
+bool assistantTurnHadTools({
+  required ChatMessage assistantMessage,
+  List<Map<String, dynamic>> toolEvents = const [],
+}) {
+  return assistantMessage.parts.any((part) => part is ToolCallPart) ||
+      toolEvents.isNotEmpty;
+}
+
+/// Whether the next request will send this turn's reasoning back.
+bool replaysAssistantReasoning({
+  required ReasoningReplayPolicy replay,
+  required ChatMessage assistantMessage,
+  List<Map<String, dynamic>> toolEvents = const [],
+}) {
+  return replay == ReasoningReplayPolicy.all ||
+      (replay == ReasoningReplayPolicy.toolTurns &&
+          assistantTurnHadTools(
+            assistantMessage: assistantMessage,
+            toolEvents: toolEvents,
+          ));
+}
+
+/// Visible assistant text plus reasoning only when it will be replayed.
+/// Tool payloads are never counted: they already sit in [TokenUsage.promptTokens].
+int estimateFinalAssistantTokens({
   required ChatMessage assistantMessage,
   required ReasoningReplayPolicy replay,
   List<Map<String, dynamic>> toolEvents = const [],
 }) {
   var tokens = estimateTokens(assistantMessage.content);
-  final hadTools =
-      assistantMessage.parts.any((part) => part is ToolCallPart) ||
-      toolEvents.isNotEmpty;
-  final replayReasoning =
-      replay == ReasoningReplayPolicy.all ||
-      (replay == ReasoningReplayPolicy.toolTurns && hadTools);
-  if (replayReasoning) {
-    final reasoning = (assistantMessage.reasoningText ?? '').trim();
-    if (reasoning.isNotEmpty) {
-      tokens += estimateTokens(reasoning);
-    }
+  if (!replaysAssistantReasoning(
+    replay: replay,
+    assistantMessage: assistantMessage,
+    toolEvents: toolEvents,
+  )) {
+    return tokens;
   }
-  if (hadTools) {
-    final payloads = <String>[
-      for (final part in assistantMessage.parts)
-        if (part is ToolCallPart) part.payloadJson,
-      if (toolEvents.isNotEmpty) jsonEncode(toolEvents),
-    ];
-    for (final payload in payloads) {
-      if (payload.isNotEmpty) tokens += estimateTokens(payload);
+  final reasoning = (assistantMessage.reasoningText ?? '').trim();
+  if (reasoning.isEmpty) return tokens;
+  return tokens + estimateTokens(reasoning);
+}
+
+/// Context size after a completed turn: last-request prompt + final completion,
+/// minus reasoning that will not be replayed. When the API omits completion
+/// tokens, fall back to [estimateFinalAssistantTokens].
+int contextTokensAfterTurn({
+  required TokenUsage usage,
+  required ChatMessage assistantMessage,
+  required ReasoningReplayPolicy replay,
+  List<Map<String, dynamic>> toolEvents = const [],
+}) {
+  if (usage.completionTokens > 0) {
+    var used = usage.promptTokens + usage.completionTokens;
+    if (!replaysAssistantReasoning(
+          replay: replay,
+          assistantMessage: assistantMessage,
+          toolEvents: toolEvents,
+        ) &&
+        usage.reasoningTokens > 0) {
+      used -= usage.reasoningTokens;
     }
+    return used < 0 ? 0 : used;
   }
-  return tokens;
+  return usage.promptTokens +
+      estimateFinalAssistantTokens(
+        assistantMessage: assistantMessage,
+        replay: replay,
+        toolEvents: toolEvents,
+      );
 }

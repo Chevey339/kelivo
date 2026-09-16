@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:fake_async/fake_async.dart';
@@ -153,6 +154,45 @@ void main() {
     }
   }
 
+  Future<void> waitUntil(bool Function() ready, {Object? debug}) async {
+    for (var i = 0; i < 40; i++) {
+      if (ready()) return;
+      await Future<void>.delayed(Duration.zero);
+    }
+    fail('condition not met: $debug');
+  }
+
+  String tokenWords(int count) => List.filled(count, 'aa').join(' ');
+
+  test('calibrateContextUsageBuckets scales and pushes residual', () {
+    const estimated = ContextUsageBuckets(
+      system: 10,
+      injections: 10,
+      history: 10,
+      tools: 10,
+      attachments: 11,
+      draft: 5,
+    );
+    final calibrated = calibrateContextUsageBuckets(
+      estimated: estimated,
+      anchorTotal: 100,
+    )!;
+    expect(calibrated.nonDraftTotal, 100);
+    expect(calibrated.draft, 5);
+    expect(calibrated.system, 20);
+    expect(calibrated.injections, 20);
+    expect(calibrated.history, 20);
+    expect(calibrated.tools, 20);
+    expect(calibrated.attachments, 20);
+    expect(
+      calibrateContextUsageBuckets(
+        estimated: const ContextUsageBuckets(draft: 3),
+        anchorTotal: 50,
+      ),
+      isNull,
+    );
+  });
+
   test('recordUsage anchors prompt plus replayed assistant turn', () async {
     final chat = await createChat();
     final providers = await createProviders();
@@ -293,13 +333,349 @@ void main() {
       );
       expect(
         usage.snapshot(conversation.id)!.usedTokens,
-        10 +
-            estimateTokens(content) +
-            estimateTokens(reasoning) +
-            estimateTokens(toolJson),
+        10 + estimateTokens(content) + estimateTokens(reasoning),
       );
     },
   );
+
+  test(
+    'recordUsage uses prompt plus completion and ignores tool payloads',
+    () async {
+      final chat = await createChat();
+      final providers = await createProviders();
+      final usage = createUsage(
+        chat: chat,
+        settings: providers.settings,
+        assistants: providers.assistants,
+      );
+      final conversation = await chat.createConversation(title: 'A');
+      const hugeTool = '{"name":"search","result":"xxxxxxxxxxxxxxxxxxxxxxxx"}';
+
+      usage.recordUsage(
+        conversationId: conversation.id,
+        providerKey: 'TestProvider',
+        modelId: 'window-model',
+        assistantId: null,
+        usage: const TokenUsage(promptTokens: 40991, completionTokens: 655),
+        assistantMessage: ChatMessage(
+          role: 'assistant',
+          conversationId: conversation.id,
+          reasoningText: 'thoughts that must not be estimated on top',
+          parts: const [TextPart('ok'), ToolCallPart(hugeTool)],
+        ),
+      );
+
+      final snap = usage.snapshot(conversation.id)!;
+      expect(snap.state, ContextUsageState.exact);
+      expect(snap.usedTokens, 41646);
+      expect(snap.calibrated, isFalse);
+
+      await waitUntil(
+        () => usage.snapshot(conversation.id)?.calibrated == true,
+        debug: usage.snapshot(conversation.id),
+      );
+      final calibrated = usage.snapshot(conversation.id)!;
+      expect(calibrated.state, ContextUsageState.exact);
+      expect(calibrated.usedTokens, 41646);
+      expect(calibrated.buckets.nonDraftTotal, 41646);
+      expect(calibrated.buckets.draft, 0);
+
+      await usage.refresh(conversation.id, draftText: 'typed later');
+      final folded = usage.snapshot(conversation.id)!;
+      expect(folded.state, ContextUsageState.exact);
+      expect(folded.calibrated, isTrue);
+      expect(folded.buckets.draft, estimateTokens('typed later'));
+      expect(folded.usedTokens, 41646 + folded.buckets.draft);
+    },
+  );
+
+  test('recordUsage subtracts reasoning when replay is none', () async {
+    final chat = await createChat();
+    final providers = await createProviders(modelId: 'plain-model');
+    final usage = createUsage(
+      chat: chat,
+      settings: providers.settings,
+      assistants: providers.assistants,
+    );
+    final conversation = await chat.createConversation(title: 'A');
+
+    usage.recordUsage(
+      conversationId: conversation.id,
+      providerKey: 'TestProvider',
+      modelId: 'plain-model',
+      assistantId: null,
+      usage: const TokenUsage(
+        promptTokens: 100,
+        completionTokens: 50,
+        reasoningTokens: 20,
+      ),
+      assistantMessage: ChatMessage(
+        role: 'assistant',
+        content: 'visible reply',
+        conversationId: conversation.id,
+        reasoningText: 'hidden thoughts',
+      ),
+    );
+
+    expect(usage.snapshot(conversation.id)!.usedTokens, 130);
+  });
+
+  test(
+    'recordUsage keeps reasoning on toolTurns only when tools ran',
+    () async {
+      final chat = await createChat();
+      final harness = await createBusinessTestHarness();
+      final settings = SettingsProvider(harness.preferences);
+      final assistants = AssistantProvider(preferences: harness.preferences);
+      await settings.loaded;
+      await assistants.loaded;
+      await settings.setProviderConfig(
+        'TestProvider',
+        ProviderConfig(
+          id: 'TestProvider',
+          enabled: true,
+          name: 'Test',
+          apiKey: 'k',
+          baseUrl: 'https://example.test',
+          models: const ['tool-model'],
+          modelOverrides: const {
+            'tool-model': {
+              'contextWindow': 2000,
+              'reasoning': {'replay': 'toolTurns'},
+            },
+          },
+        ),
+      );
+      await settings.setCurrentModel('TestProvider', 'tool-model');
+      disposers.add(settings.dispose);
+      disposers.add(assistants.dispose);
+      final usage = createUsage(
+        chat: chat,
+        settings: settings,
+        assistants: assistants,
+      );
+      final conversation = await chat.createConversation(title: 'A');
+
+      usage.recordUsage(
+        conversationId: conversation.id,
+        providerKey: 'TestProvider',
+        modelId: 'tool-model',
+        assistantId: null,
+        usage: const TokenUsage(
+          promptTokens: 80,
+          completionTokens: 40,
+          reasoningTokens: 15,
+        ),
+        assistantMessage: ChatMessage(
+          role: 'assistant',
+          content: 'done',
+          conversationId: conversation.id,
+          reasoningText: 'plan',
+        ),
+      );
+      expect(usage.snapshot(conversation.id)!.usedTokens, 105);
+
+      usage.recordUsage(
+        conversationId: conversation.id,
+        providerKey: 'TestProvider',
+        modelId: 'tool-model',
+        assistantId: null,
+        usage: const TokenUsage(
+          promptTokens: 80,
+          completionTokens: 40,
+          reasoningTokens: 15,
+        ),
+        assistantMessage: ChatMessage(
+          role: 'assistant',
+          conversationId: conversation.id,
+          reasoningText: 'plan',
+          parts: const [TextPart('done'), ToolCallPart('{"name":"search"}')],
+        ),
+      );
+      expect(usage.snapshot(conversation.id)!.usedTokens, 120);
+    },
+  );
+
+  test('recordUsage calibrates buckets to the exact anchor', () async {
+    final chat = await createChat();
+    final providers = await createProviders();
+    final systemText = tokenWords(10);
+    final injectionsText = tokenWords(20);
+    final historyText = tokenWords(70);
+    final usage = createUsage(
+      chat: chat,
+      settings: providers.settings,
+      assistants: providers.assistants,
+      assemble:
+          ({
+            required conversationId,
+            required providerKey,
+            required modelId,
+            required assistantId,
+          }) async => ContextAssemblyPreview(
+            systemText: systemText,
+            injectionsText: injectionsText,
+            historyText: historyText,
+            tools: const [],
+            images: const [],
+          ),
+    );
+    final conversation = await chat.createConversation(title: 'A');
+    const anchor = 41646;
+
+    usage.recordUsage(
+      conversationId: conversation.id,
+      providerKey: 'TestProvider',
+      modelId: 'window-model',
+      assistantId: null,
+      usage: const TokenUsage(promptTokens: 40991, completionTokens: 655),
+      assistantMessage: ChatMessage(
+        role: 'assistant',
+        content: 'ok',
+        conversationId: conversation.id,
+      ),
+    );
+
+    await waitUntil(
+      () => usage.snapshot(conversation.id)?.calibrated == true,
+      debug: usage.snapshot(conversation.id),
+    );
+    final snap = usage.snapshot(conversation.id)!;
+    expect(snap.state, ContextUsageState.exact);
+    expect(snap.calibrated, isTrue);
+    expect(snap.buckets.nonDraftTotal, anchor);
+    expect(snap.usedTokens, anchor);
+    expect(snap.buckets.system, 4165);
+    expect(snap.buckets.injections, 8329);
+    expect(snap.buckets.history, 29152);
+    expect(snap.buckets.tools, 0);
+    expect(snap.buckets.attachments, 0);
+    expect(snap.buckets.system / anchor, closeTo(0.1, 1e-4));
+    expect(snap.buckets.injections / anchor, closeTo(0.2, 1e-4));
+    expect(snap.buckets.history / anchor, closeTo(0.7, 1e-4));
+  });
+
+  test('recordUsage stays exact until estimate lands', () async {
+    final chat = await createChat();
+    final providers = await createProviders();
+    final preview = Completer<ContextAssemblyPreview>();
+    final usage = createUsage(
+      chat: chat,
+      settings: providers.settings,
+      assistants: providers.assistants,
+      assemble:
+          ({
+            required conversationId,
+            required providerKey,
+            required modelId,
+            required assistantId,
+          }) => preview.future,
+    );
+    final conversation = await chat.createConversation(title: 'A');
+
+    usage.recordUsage(
+      conversationId: conversation.id,
+      providerKey: 'TestProvider',
+      modelId: 'window-model',
+      assistantId: null,
+      usage: const TokenUsage(promptTokens: 40991, completionTokens: 655),
+      assistantMessage: ChatMessage(
+        role: 'assistant',
+        content: 'ok',
+        conversationId: conversation.id,
+      ),
+    );
+
+    final pending = usage.snapshot(conversation.id)!;
+    expect(pending.state, ContextUsageState.exact);
+    expect(pending.calibrated, isFalse);
+    expect(pending.usedTokens, 41646);
+
+    preview.complete(
+      ContextAssemblyPreview(
+        systemText: tokenWords(10),
+        injectionsText: tokenWords(20),
+        historyText: tokenWords(70),
+        tools: const [],
+        images: const [],
+      ),
+    );
+    await waitUntil(
+      () => usage.snapshot(conversation.id)?.calibrated == true,
+      debug: usage.snapshot(conversation.id),
+    );
+    expect(usage.snapshot(conversation.id)!.state, ContextUsageState.exact);
+    expect(usage.snapshot(conversation.id)!.usedTokens, 41646);
+  });
+
+  test('revision bump after recordUsage drops back to estimated', () async {
+    final chat = await createChat();
+    final providers = await createProviders();
+    var assembleCalls = 0;
+    final usage = createUsage(
+      chat: chat,
+      settings: providers.settings,
+      assistants: providers.assistants,
+      assemble:
+          ({
+            required conversationId,
+            required providerKey,
+            required modelId,
+            required assistantId,
+          }) async {
+            assembleCalls++;
+            return ContextAssemblyPreview(
+              systemText: tokenWords(10),
+              injectionsText: tokenWords(20),
+              historyText: tokenWords(70),
+              tools: const [],
+              images: const [],
+            );
+          },
+    );
+    final conversation = await chat.createDraftConversation(title: 'A');
+    usage.setActiveConversation(conversation.id);
+    usage.recordUsage(
+      conversationId: conversation.id,
+      providerKey: 'TestProvider',
+      modelId: 'window-model',
+      assistantId: null,
+      usage: const TokenUsage(promptTokens: 40991, completionTokens: 655),
+      assistantMessage: ChatMessage(
+        role: 'assistant',
+        content: 'ok',
+        conversationId: conversation.id,
+      ),
+    );
+    await waitUntil(
+      () => usage.snapshot(conversation.id)?.calibrated == true,
+      debug: usage.snapshot(conversation.id),
+    );
+    expect(usage.snapshot(conversation.id)!.state, ContextUsageState.exact);
+    expect(assembleCalls, 1);
+
+    fakeAsync((async) {
+      chat.updateConversationExtras(conversation.id, (extras) {
+        extras['k'] = 1;
+        return extras;
+      });
+      async.flushMicrotasks();
+      expect(usage.snapshot(conversation.id)!.state, ContextUsageState.stale);
+      async.elapse(const Duration(milliseconds: 800));
+      flushUntil(
+        async,
+        () =>
+            usage.snapshot(conversation.id)?.state ==
+            ContextUsageState.estimated,
+      );
+      final snap = usage.snapshot(conversation.id)!;
+      expect(snap.state, ContextUsageState.estimated);
+      expect(snap.calibrated, isFalse);
+      expect(snap.usedTokens, snap.buckets.total);
+      expect(snap.buckets.nonDraftTotal, isNot(41646));
+      expect(assembleCalls, 2);
+    });
+  });
 
   test('recordUsage does not anchor when promptTokens is 0', () async {
     final chat = await createChat();

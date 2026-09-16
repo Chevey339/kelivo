@@ -50,7 +50,11 @@ String contextUsageStateLabel(
   AppLocalizations l10n,
   ContextUsageSnapshot? snapshot,
 ) {
-  return switch (snapshot?.state) {
+  final state = snapshot?.state;
+  if (state == ContextUsageState.exact && snapshot!.calibrated) {
+    return l10n.contextUsageStateExactCalibrated;
+  }
+  return switch (state) {
     ContextUsageState.exact => l10n.contextUsageStateExact,
     ContextUsageState.estimated => l10n.contextUsageStateEstimated,
     ContextUsageState.stale => l10n.contextUsageStateStale,
@@ -107,7 +111,8 @@ List<ContextUsageSegment> buildContextUsageSegments(
   final used = snapshot.usedTokens;
   final buckets = snapshot.buckets;
   final useBuckets =
-      snapshot.state != ContextUsageState.exact && buckets.total > 0;
+      (snapshot.state != ContextUsageState.exact || snapshot.calibrated) &&
+      buckets.total > 0;
   final denom = hasWindow
       ? window
       : math.max(useBuckets ? buckets.total : used, 1);
@@ -408,8 +413,6 @@ class ContextUsageBreakdown extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context)!;
-    final cs = Theme.of(context).colorScheme;
     final segments = snapshot == null
         ? const <ContextUsageSegment>[]
         : buildContextUsageSegments(snapshot!);
@@ -426,16 +429,6 @@ class ContextUsageBreakdown extends StatelessWidget {
           ),
           const SizedBox(height: 12),
           ContextUsageLegend(snapshot: snapshot!),
-        ],
-        if (snapshot?.state == ContextUsageState.exact) ...[
-          const SizedBox(height: 10),
-          Text(
-            l10n.contextUsageExactNote,
-            style: TextStyle(
-              fontSize: 12,
-              color: cs.onSurface.withValues(alpha: 0.55),
-            ),
-          ),
         ],
       ],
     );
