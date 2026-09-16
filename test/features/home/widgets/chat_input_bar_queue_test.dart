@@ -1,5 +1,7 @@
 import "../../../support/business_test_harness.dart";
 import 'package:Kelivo/core/models/chat_input_data.dart';
+import 'package:Kelivo/core/models/model_spec.dart';
+import 'package:Kelivo/core/models/reasoning_request.dart';
 import 'package:Kelivo/features/home/utils/model_display_helper.dart';
 import 'package:Kelivo/core/providers/assistant_provider.dart';
 import 'package:Kelivo/core/providers/settings_provider.dart';
@@ -34,6 +36,9 @@ void main() {
     bool backgroundImageActive = false,
     double inputBackgroundOpacityLight = 0.8236,
     double inputBackgroundOpacityDark = 0.7396,
+    bool supportsReasoning = false,
+    ReasoningRequest? reasoning,
+    bool reasoningActive = false,
   }) {
     final settings =
         settingsProvider ?? SettingsProvider(createBusinessTestPreferences());
@@ -76,6 +81,9 @@ void main() {
             backgroundImageActive: backgroundImageActive,
             inputBackgroundOpacityLight: inputBackgroundOpacityLight,
             inputBackgroundOpacityDark: inputBackgroundOpacityDark,
+            supportsReasoning: supportsReasoning,
+            reasoning: reasoning,
+            reasoningActive: reasoningActive,
           ),
         ),
       ),
@@ -538,6 +546,58 @@ void main() {
 
     controller.dispose();
     focusNode.dispose();
+  });
+
+  testWidgets('reasoning button hides level badge by default', (tester) async {
+    final controller = TextEditingController();
+    final focusNode = FocusNode();
+    addTearDown(controller.dispose);
+    addTearDown(focusNode.dispose);
+
+    await tester.pumpWidget(
+      buildHarness(
+        controller: controller,
+        focusNode: focusNode,
+        onSend: (_) async => ChatInputSubmissionResult.rejected,
+        supportsReasoning: true,
+        reasoning: const ReasoningRequest(ReasoningLevel.low),
+        reasoningActive: true,
+      ),
+    );
+    await tester.pump();
+
+    expect(find.byTooltip('Reasoning Strength'), findsOneWidget);
+    expect(find.text('low'), findsNothing);
+  });
+
+  testWidgets('reasoning button shows level badge when enabled', (
+    tester,
+  ) async {
+    final settings = SettingsProvider(createBusinessTestPreferences());
+    addTearDown(settings.dispose);
+    await settings.loaded;
+    await settings.setShowReasoningLevelBadge(true);
+
+    final controller = TextEditingController();
+    final focusNode = FocusNode();
+    addTearDown(controller.dispose);
+    addTearDown(focusNode.dispose);
+
+    await tester.pumpWidget(
+      buildHarness(
+        controller: controller,
+        focusNode: focusNode,
+        settingsProvider: settings,
+        onSend: (_) async => ChatInputSubmissionResult.rejected,
+        supportsReasoning: true,
+        reasoning: const ReasoningRequest(ReasoningLevel.low),
+        reasoningActive: true,
+      ),
+    );
+    await tester.pump();
+
+    expect(find.byTooltip('Reasoning Strength'), findsOneWidget);
+    expect(find.text('low'), findsOneWidget);
   });
 }
 

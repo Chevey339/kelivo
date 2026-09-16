@@ -9259,6 +9259,18 @@ abstract class AppLocalizations {
   /// **'When off, tool-use cards are hidden in chat.'**
   String get displaySettingsPageShowToolCardsSubtitle;
 
+  /// No description provided for @displaySettingsShowReasoningLevelBadge.
+  ///
+  /// In en, this message translates to:
+  /// **'Show reasoning level on the button'**
+  String get displaySettingsShowReasoningLevelBadge;
+
+  /// No description provided for @displaySettingsShowReasoningLevelBadgeSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Show the current level next to the reasoning icon in the input bar'**
+  String get displaySettingsShowReasoningLevelBadgeSubtitle;
+
   /// No description provided for @displaySettingsPageAutoCollapseThinkingTitle.
   ///
   /// In en, this message translates to:

@@ -5050,6 +5050,14 @@ class AppLocalizationsEn extends AppLocalizations {
       'When off, tool-use cards are hidden in chat.';
 
   @override
+  String get displaySettingsShowReasoningLevelBadge =>
+      'Show reasoning level on the button';
+
+  @override
+  String get displaySettingsShowReasoningLevelBadgeSubtitle =>
+      'Show the current level next to the reasoning icon in the input bar';
+
+  @override
   String get displaySettingsPageAutoCollapseThinkingTitle =>
       'Auto-collapse Thinking';
 

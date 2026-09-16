@@ -1937,11 +1937,13 @@ class _ChatInputBarState extends State<ChatInputBar>
 
         if (widget.supportsReasoning) {
           final request = widget.reasoning ?? ReasoningRequest.auto;
-          final compactLabel = _reasoningCompactLabel(
-            l10n,
-            request,
-            customBudget: widget.reasoningCustomBudget,
-          );
+          final compactLabel = settings.showReasoningLevelBadge
+              ? _reasoningCompactLabel(
+                  l10n,
+                  request,
+                  customBudget: widget.reasoningCustomBudget,
+                )
+              : null;
           actions.add(
             _OverflowAction(
               width: compactLabel == null

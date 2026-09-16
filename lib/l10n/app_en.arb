@@ -2238,6 +2238,8 @@
   "displaySettingsPageShowThinkingCardsSubtitle": "When off, thinking-process cards are hidden in chat.",
   "displaySettingsPageShowToolCardsTitle": "Show Tool Cards",
   "displaySettingsPageShowToolCardsSubtitle": "When off, tool-use cards are hidden in chat.",
+  "displaySettingsShowReasoningLevelBadge": "Show reasoning level on the button",
+  "displaySettingsShowReasoningLevelBadgeSubtitle": "Show the current level next to the reasoning icon in the input bar",
   "displaySettingsPageAutoCollapseThinkingTitle": "Auto-collapse Thinking",
   "displaySettingsPageAutoCollapseThinkingSubtitle": "Collapse reasoning after finish",
   "displaySettingsPageCollapseThinkingStepsTitle": "Collapse Thinking Steps",

@@ -4869,6 +4869,13 @@ class AppLocalizationsZh extends AppLocalizations {
   String get displaySettingsPageShowToolCardsSubtitle => '关闭后，聊天中不再显示工具调用卡片';
 
   @override
+  String get displaySettingsShowReasoningLevelBadge => '在推理按钮上显示档位';
+
+  @override
+  String get displaySettingsShowReasoningLevelBadgeSubtitle =>
+      '在输入栏的推理图标旁显示当前档位';
+
+  @override
   String get displaySettingsPageAutoCollapseThinkingTitle => '自动折叠思考';
 
   @override
@@ -16651,6 +16658,13 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get displaySettingsPageShowToolCardsSubtitle => '关闭后，聊天中不再显示工具调用卡片';
 
   @override
+  String get displaySettingsShowReasoningLevelBadge => '在推理按钮上显示档位';
+
+  @override
+  String get displaySettingsShowReasoningLevelBadgeSubtitle =>
+      '在输入栏的推理图标旁显示当前档位';
+
+  @override
   String get displaySettingsPageAutoCollapseThinkingTitle => '自动折叠思考';
 
   @override
@@ -28356,6 +28370,13 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get displaySettingsPageShowToolCardsSubtitle => '關閉後，聊天中不再顯示工具呼叫卡片';
+
+  @override
+  String get displaySettingsShowReasoningLevelBadge => '在推理按鈕上顯示檔位';
+
+  @override
+  String get displaySettingsShowReasoningLevelBadgeSubtitle =>
+      '在輸入欄的推理圖示旁顯示目前檔位';
 
   @override
   String get displaySettingsPageAutoCollapseThinkingTitle => '自動折疊思考';

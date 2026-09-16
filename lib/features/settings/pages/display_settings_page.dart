@@ -1577,6 +1577,17 @@ class ChatItemDisplaySettingsPage extends StatelessWidget {
                 onChanged: (v) =>
                     context.read<SettingsProvider>().setShowProducedFiles(v),
               ),
+              _iosDivider(context),
+              _iosSwitchRow(
+                context,
+                icon: Lucide.Lightbulb,
+                label: l10n.displaySettingsShowReasoningLevelBadge,
+                tip: l10n.displaySettingsShowReasoningLevelBadgeSubtitle,
+                value: sp.showReasoningLevelBadge,
+                onChanged: (v) => context
+                    .read<SettingsProvider>()
+                    .setShowReasoningLevelBadge(v),
+              ),
             ],
           ),
         ],

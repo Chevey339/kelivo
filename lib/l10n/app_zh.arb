@@ -1748,6 +1748,8 @@
   "displaySettingsPageShowThinkingCardsSubtitle": "关闭后，聊天中不再显示思考过程卡片",
   "displaySettingsPageShowToolCardsTitle": "显示工具卡片",
   "displaySettingsPageShowToolCardsSubtitle": "关闭后，聊天中不再显示工具调用卡片",
+  "displaySettingsShowReasoningLevelBadge": "在推理按钮上显示档位",
+  "displaySettingsShowReasoningLevelBadgeSubtitle": "在输入栏的推理图标旁显示当前档位",
   "displaySettingsPageAutoCollapseThinkingTitle": "自动折叠思考",
   "displaySettingsPageAutoCollapseThinkingSubtitle": "思考完成后自动折叠，保持界面简洁",
   "displaySettingsPageCollapseThinkingStepsTitle": "折叠思考步骤",

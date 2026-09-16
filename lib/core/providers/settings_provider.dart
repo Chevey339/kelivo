@@ -202,6 +202,8 @@ class SettingsProvider extends ChangeNotifier {
   static const String _displayShowToolCardsKey = 'display_show_tool_cards_v1';
   static const String _displayShowProducedFilesKey =
       'display_show_produced_files_v1';
+  static const String _displayShowReasoningLevelBadgeKey =
+      'display_show_reasoning_level_badge_v1';
   static const String _displayAutoCollapseThinkingKey =
       'display_auto_collapse_thinking_v1';
   static const String _displayCollapseThinkingStepsKey =
@@ -979,6 +981,8 @@ class SettingsProvider extends ChangeNotifier {
     _showThinkingCards = prefs.getBool(_displayShowThinkingCardsKey) ?? true;
     _showToolCards = prefs.getBool(_displayShowToolCardsKey) ?? true;
     _showProducedFiles = prefs.getBool(_displayShowProducedFilesKey) ?? true;
+    _showReasoningLevelBadge =
+        prefs.getBool(_displayShowReasoningLevelBadgeKey) ?? false;
     _autoCollapseThinking =
         prefs.getBool(_displayAutoCollapseThinkingKey) ?? true;
     _collapseThinkingSteps =
@@ -4608,6 +4612,16 @@ Requirements:
     await _preferences.setBool(_displayShowProducedFilesKey, v);
   }
 
+  bool _showReasoningLevelBadge = false;
+  bool get showReasoningLevelBadge => _showReasoningLevelBadge;
+  Future<void> setShowReasoningLevelBadge(bool v) async {
+    if (_showReasoningLevelBadge == v) return;
+    _showReasoningLevelBadge = v;
+    notifyListeners();
+    final prefs = _preferences;
+    await prefs.setBool(_displayShowReasoningLevelBadgeKey, v);
+  }
+
   // Display: auto-collapse reasoning/thinking section
   bool _autoCollapseThinking = true;
   bool get autoCollapseThinking => _autoCollapseThinking;
@@ -5689,6 +5703,7 @@ Requirements:
     copy._showThinkingCards = _showThinkingCards;
     copy._showToolCards = _showToolCards;
     copy._showProducedFiles = _showProducedFiles;
+    copy._showReasoningLevelBadge = _showReasoningLevelBadge;
     copy._autoCollapseThinking = _autoCollapseThinking;
     copy._collapseThinkingSteps = _collapseThinkingSteps;
     copy._showToolResultSummary = _showToolResultSummary;
