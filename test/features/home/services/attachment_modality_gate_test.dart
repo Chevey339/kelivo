@@ -68,6 +68,38 @@ void main() {
       );
     });
 
+    test(
+      'images are allowed when OCR is active; audio and video stay gated',
+      () {
+        final input = ChatInputData(
+          text: 'hi',
+          imagePaths: const ['/tmp/a.png'],
+          documents: [
+            _doc(path: '/tmp/shot.jpg', mime: 'image/jpeg'),
+            _doc(path: '/tmp/voice.wav', mime: 'audio/wav'),
+            _doc(path: '/tmp/clip.mp4', mime: 'video/mp4'),
+          ],
+        );
+
+        expect(
+          unsupportedDraftModalities(
+            input,
+            _spec(const [Modality.text]),
+            ocrActive: true,
+          ),
+          [Modality.audio, Modality.video],
+        );
+        expect(
+          unsupportedDraftModalities(
+            input,
+            _spec(const [Modality.text]),
+            ocrActive: false,
+          ),
+          [Modality.image, Modality.audio, Modality.video],
+        );
+      },
+    );
+
     test('error code lists gated modalities in image, audio, video order', () {
       final input = ChatInputData(
         text: '',

@@ -22,9 +22,14 @@ Modality? gatedAttachmentModality(String mime) {
 ///
 /// `imagePaths` are always image. `documents` are classified by MIME
 /// (`audio/*` / `video/*`); everything else — including PDF — is ignored.
-List<Modality> unsupportedDraftModalities(ChatInputData input, ModelSpec spec) {
+/// When [ocrActive] is true, images are omitted: OCR turns them into text.
+List<Modality> unsupportedDraftModalities(
+  ChatInputData input,
+  ModelSpec spec, {
+  bool ocrActive = false,
+}) {
   final unsupported = <Modality>{};
-  if (input.imagePaths.isNotEmpty && !spec.supportsImageInput) {
+  if (input.imagePaths.isNotEmpty && !spec.supportsImageInput && !ocrActive) {
     unsupported.add(Modality.image);
   }
   for (final attachment in input.documents) {
@@ -32,6 +37,7 @@ List<Modality> unsupportedDraftModalities(ChatInputData input, ModelSpec spec) {
       resolveDocumentAttachmentMime(attachment),
     );
     if (modality == null) continue;
+    if (ocrActive && modality == Modality.image) continue;
     if (!spec.input.contains(modality)) unsupported.add(modality);
   }
   return [

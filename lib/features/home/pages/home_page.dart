@@ -1929,23 +1929,7 @@ class _HomePageState extends State<HomePage>
 
   void _toggleTools() async {
     _controller.dismissKeyboard();
-    final assistantProvider = context.read<AssistantProvider>();
-    final assistantId = assistantProvider.currentAssistantId;
-    final settings = context.read<SettingsProvider>();
-    final chatModel = resolveChatModel(
-      settings,
-      conversation: _controller.currentConversation,
-      assistant: assistantProvider.currentAssistant,
-    );
-    final supportsImage =
-        chatModel.providerKey != null &&
-        chatModel.modelId != null &&
-        ModelSpecResolver.instance
-            .spec(
-              settings.getProviderConfig(chatModel.providerKey!),
-              chatModel.modelId!,
-            )
-            .supportsImageInput;
+    final assistantId = context.read<AssistantProvider>().currentAssistantId;
     await showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -1960,18 +1944,14 @@ class _HomePageState extends State<HomePage>
             return SafeArea(
               top: false,
               child: BottomToolsSheet(
-                onPhotos: supportsImage
-                    ? () {
-                        Navigator.of(ctx).maybePop();
-                        _controller.onPickPhotos();
-                      }
-                    : null,
-                onCamera: supportsImage
-                    ? () {
-                        Navigator.of(ctx).maybePop();
-                        _controller.onPickCamera();
-                      }
-                    : null,
+                onPhotos: () {
+                  Navigator.of(ctx).maybePop();
+                  _controller.onPickPhotos();
+                },
+                onCamera: () {
+                  Navigator.of(ctx).maybePop();
+                  _controller.onPickCamera();
+                },
                 onUpload: () {
                   Navigator.of(ctx).maybePop();
                   _controller.onPickFiles();

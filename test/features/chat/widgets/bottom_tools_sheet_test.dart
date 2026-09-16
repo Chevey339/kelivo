@@ -211,20 +211,23 @@ void main() {
     expect(find.text(l10n.bottomToolsSheetUpload), findsOneWidget);
   });
 
-  testWidgets('shows camera and photos when those callbacks are set', (
-    tester,
-  ) async {
-    final l10n = await pumpSheet(
-      tester,
-      onCamera: () {},
-      onPhotos: () {},
-      onUpload: () {},
-    );
+  testWidgets(
+    'shows camera and photos rows when callers pass them for a text-only model',
+    (tester) async {
+      // HomePage always supplies these callbacks; the sheet must show the
+      // rows even when the selected chat model cannot read images.
+      final l10n = await pumpSheet(
+        tester,
+        onCamera: () {},
+        onPhotos: () {},
+        onUpload: () {},
+      );
 
-    expect(find.text(l10n.bottomToolsSheetCamera), findsOneWidget);
-    expect(find.text(l10n.bottomToolsSheetPhotos), findsOneWidget);
-    expect(find.text(l10n.bottomToolsSheetUpload), findsOneWidget);
-  });
+      expect(find.text(l10n.bottomToolsSheetCamera), findsOneWidget);
+      expect(find.text(l10n.bottomToolsSheetPhotos), findsOneWidget);
+      expect(find.text(l10n.bottomToolsSheetUpload), findsOneWidget);
+    },
+  );
 
   testWidgets('keeps session skills and drops the workspace block', (
     tester,

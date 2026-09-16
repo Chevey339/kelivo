@@ -3630,6 +3630,10 @@ Do not interpret or translate—only transcribe and describe what is visually pr
   bool _ocrEnabled = false;
   bool get ocrEnabled => _ocrEnabled;
 
+  /// OCR is enabled and a model is configured, so attached images become text.
+  bool get ocrActive =>
+      _ocrEnabled && _ocrModelProvider != null && _ocrModelId != null;
+
   Future<void> setOcrModel(String providerKey, String modelId) async {
     _ocrModelProvider = providerKey;
     _ocrModelId = modelId;

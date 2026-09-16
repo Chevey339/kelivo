@@ -158,11 +158,20 @@ class ChatActions {
   /// when the anchor is a user message with no following assistant group
   /// (e.g. every generated version was deleted).
   /// Non-null when [input] carries image/audio/video the [spec] cannot read.
+  /// Images are allowed when [ocrActive] is true — they go through OCR.
   /// [_sendMessageClaimed] returns this as [ChatActionResult.error] before
   /// persisting anything.
   @visibleForTesting
-  static String? draftUnsupportedError(ChatInputData input, ModelSpec spec) {
-    final unsupported = unsupportedDraftModalities(input, spec);
+  static String? draftUnsupportedError(
+    ChatInputData input,
+    ModelSpec spec, {
+    bool ocrActive = false,
+  }) {
+    final unsupported = unsupportedDraftModalities(
+      input,
+      spec,
+      ocrActive: ocrActive,
+    );
     if (unsupported.isEmpty) return null;
     return attachmentUnsupportedErrorCode(unsupported);
   }
@@ -1201,7 +1210,11 @@ class ChatActions {
       settings.getProviderConfig(providerKey),
       modelId,
     );
-    final draftError = ChatActions.draftUnsupportedError(input, spec);
+    final draftError = ChatActions.draftUnsupportedError(
+      input,
+      spec,
+      ocrActive: settings.ocrActive,
+    );
     if (draftError != null) {
       return ChatActionResult.error(draftError);
     }

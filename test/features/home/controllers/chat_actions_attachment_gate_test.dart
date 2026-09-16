@@ -22,6 +22,19 @@ void main() {
     );
   });
 
+  test('image draft on a text-only model proceeds when OCR is active', () {
+    final spec = ModelSpec(
+      id: 'text-only',
+      displayName: 'text-only',
+      input: const [Modality.text],
+    );
+
+    expect(
+      ChatActions.draftUnsupportedError(imageDraft, spec, ocrActive: true),
+      isNull,
+    );
+  });
+
   test('image draft on a vision model proceeds', () {
     final spec = ModelSpec(
       id: 'vision',

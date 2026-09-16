@@ -718,10 +718,7 @@ class MessageGenerationService {
     String? generationRunId,
     bool scheduled = false,
   }) {
-    final bool ocrActive =
-        settings.ocrEnabled &&
-        settings.ocrModelProvider != null &&
-        settings.ocrModelId != null;
+    final bool ocrActive = settings.ocrActive;
 
     return stream_ctrl.GenerationContext(
       assistantMessage: assistantMessage,
@@ -943,10 +940,7 @@ class MessageGenerationService {
     required String providerKey,
     required String modelId,
   }) {
-    final bool ocrActive =
-        settings.ocrEnabled &&
-        settings.ocrModelProvider != null &&
-        settings.ocrModelId != null;
+    final bool ocrActive = settings.ocrActive;
 
     final includeAudio = _shouldIncludeAudioForProvider(
       settings,

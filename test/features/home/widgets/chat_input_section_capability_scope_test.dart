@@ -189,7 +189,7 @@ void main() {
     await tester.pump();
   }
 
-  testWidgets('tablet camera and photos hide when the spec lacks image', (
+  testWidgets('tablet camera and photos stay available for a text-only model', (
     tester,
   ) async {
     final assistants = await loadAssistantWithMcp(tester);
@@ -199,8 +199,8 @@ void main() {
       modelId: 'mimo-v2.5-pro',
     );
     final bar = tester.widget<ChatInputBar>(find.byType(ChatInputBar));
-    expect(bar.onPickCamera, isNull);
-    expect(bar.onPickPhotos, isNull);
+    expect(bar.onPickCamera, isNotNull);
+    expect(bar.onPickPhotos, isNotNull);
     expect(bar.onUploadFiles, isNotNull);
   });
 
