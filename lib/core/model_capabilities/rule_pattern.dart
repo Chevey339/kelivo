@@ -46,6 +46,7 @@ class PatternAlternative {
     required this.endAnchored,
     required this.items,
     this.minDate,
+    this.requireDate = false,
   });
 
   final bool anchored;
@@ -53,11 +54,16 @@ class PatternAlternative {
   final List<PatternItem> items;
   final ModelDate? minDate;
 
+  /// When true, [minDate] only matches ids that actually carry a snapshot;
+  /// bare aliases are rejected.
+  final bool requireDate;
+
   /// Matches this alternative anywhere in [tokens] (or at the start when
   /// [anchored]).
   ///
   /// A `@>=` bound admits bare aliases (no snapshot) and dated snapshots at or
-  /// after the bound; a yearless snapshot cannot be ordered and so is rejected.
+  /// after the bound; `@snap>=` additionally requires a snapshot, and a
+  /// yearless snapshot cannot be ordered and so is rejected either way.
   /// A trailing `$` accepts the end of the id as well as the start of a
   /// colon-qualified variant (see [TokenizedModelId.colonBoundaries]).
   PatternMatch? match(
@@ -66,8 +72,12 @@ class PatternAlternative {
     Set<int> colonBoundaries = const <int>{},
   }) {
     final threshold = minDate;
-    if (threshold != null && date != null && !date.isOnOrAfter(threshold)) {
-      return null;
+    if (threshold != null) {
+      if (date == null) {
+        if (requireDate) return null;
+      } else if (!date.isOnOrAfter(threshold)) {
+        return null;
+      }
     }
     final starts = anchored
         ? const <int>[0]
@@ -257,17 +267,19 @@ class RulePattern {
     stripEndAnchor();
 
     ModelDate? minDate;
+    var requireDate = false;
     final dateFilter = RegExp(
-      r'@>=(\d{4})-(\d{2})-(\d{2})\s*$',
+      r'@(snap)?>=(\d{4})-(\d{2})-(\d{2})\s*$',
     ).firstMatch(text);
     if (dateFilter != null) {
-      final month = int.parse(dateFilter[2]!);
-      final day = int.parse(dateFilter[3]!);
+      final month = int.parse(dateFilter[3]!);
+      final day = int.parse(dateFilter[4]!);
       if (month < 1 || month > 12 || day < 1 || day > 31) {
         throw FormatException('Invalid date bound in pattern "$source"');
       }
+      requireDate = dateFilter[1] != null;
       minDate = ModelDate(
-        year: int.parse(dateFilter[1]!),
+        year: int.parse(dateFilter[2]!),
         month: month,
         day: day,
       );
@@ -289,6 +301,7 @@ class RulePattern {
       endAnchored: endAnchored,
       items: List.unmodifiable(items),
       minDate: minDate,
+      requireDate: requireDate,
     );
   }
 

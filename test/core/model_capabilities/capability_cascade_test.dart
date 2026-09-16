@@ -202,7 +202,6 @@ void main() {
     test('gpt-5.3 keeps identity but loses reasoning options', () {
       final caps = builtinCapabilityCascade.resolve('gpt-5.3').capabilities;
       expect(caps.group, 'GPT');
-      expect(caps.toolCall, isTrue);
       expect(caps.reasoningOptions, isNull);
       expect(caps.quirks, isNull);
     });
@@ -220,10 +219,10 @@ void main() {
       expect(caps.quirks, contains(CapabilityQuirk.reasoningAlwaysOn));
     });
 
-    test('unknown gpt SKUs stay grouped and tool-capable', () {
+    test('unknown gpt SKUs stay grouped without claiming abilities', () {
       final caps = builtinCapabilityCascade.resolve('gpt-9-nova').capabilities;
       expect(caps.group, 'GPT');
-      expect(caps.toolCall, isTrue);
+      expect(caps.toolCall, isNull);
       expect(caps.reasoningOptions, isNull);
     });
 
