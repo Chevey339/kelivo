@@ -35,6 +35,7 @@ class StrategySection extends StatelessWidget {
               subtitleMaxLines: 2,
               onTap: () => _pickSampling(context),
             ),
+            const SizedBox(height: 8),
             SpecFieldHeader(
               label: l10n.modelSpecFormReplay,
               source: controller.sourceOf(ModelSpecField.reasoningReplay),

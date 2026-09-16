@@ -7366,31 +7366,31 @@ abstract class AppLocalizations {
   /// No description provided for @modelSpecFormPricingSection.
   ///
   /// In en, this message translates to:
-  /// **'Pricing'**
+  /// **'Pricing / 1M'**
   String get modelSpecFormPricingSection;
 
   /// No description provided for @modelSpecFormPricingInput.
   ///
   /// In en, this message translates to:
-  /// **'Input / 1M'**
+  /// **'Input'**
   String get modelSpecFormPricingInput;
 
   /// No description provided for @modelSpecFormPricingOutput.
   ///
   /// In en, this message translates to:
-  /// **'Output / 1M'**
+  /// **'Output'**
   String get modelSpecFormPricingOutput;
 
   /// No description provided for @modelSpecFormPricingCacheRead.
   ///
   /// In en, this message translates to:
-  /// **'Cache read / 1M'**
+  /// **'Cache read'**
   String get modelSpecFormPricingCacheRead;
 
   /// No description provided for @modelSpecFormPricingCacheWrite.
   ///
   /// In en, this message translates to:
-  /// **'Cache write / 1M'**
+  /// **'Cache write'**
   String get modelSpecFormPricingCacheWrite;
 
   /// No description provided for @modelSpecFormCurrency.
@@ -7962,6 +7962,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Update failed: {error}'**
   String modelCatalogRefreshFailed(String error);
+
+  /// No description provided for @modelCatalogProviderCount.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} providers'**
+  String modelCatalogProviderCount(int count);
+
+  /// No description provided for @modelCatalogModelCount.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} models'**
+  String modelCatalogModelCount(int count);
 
   /// No description provided for @providerGroupsGroupLabel.
   ///

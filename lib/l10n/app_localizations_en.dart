@@ -4007,19 +4007,19 @@ class AppLocalizationsEn extends AppLocalizations {
   String get modelSpecFormMaxOutput => 'Max output';
 
   @override
-  String get modelSpecFormPricingSection => 'Pricing';
+  String get modelSpecFormPricingSection => 'Pricing / 1M';
 
   @override
-  String get modelSpecFormPricingInput => 'Input / 1M';
+  String get modelSpecFormPricingInput => 'Input';
 
   @override
-  String get modelSpecFormPricingOutput => 'Output / 1M';
+  String get modelSpecFormPricingOutput => 'Output';
 
   @override
-  String get modelSpecFormPricingCacheRead => 'Cache read / 1M';
+  String get modelSpecFormPricingCacheRead => 'Cache read';
 
   @override
-  String get modelSpecFormPricingCacheWrite => 'Cache write / 1M';
+  String get modelSpecFormPricingCacheWrite => 'Cache write';
 
   @override
   String get modelSpecFormCurrency => 'Currency';
@@ -4325,6 +4325,16 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String modelCatalogRefreshFailed(String error) {
     return 'Update failed: $error';
+  }
+
+  @override
+  String modelCatalogProviderCount(int count) {
+    return '$count providers';
+  }
+
+  @override
+  String modelCatalogModelCount(int count) {
+    return '$count models';
   }
 
   @override

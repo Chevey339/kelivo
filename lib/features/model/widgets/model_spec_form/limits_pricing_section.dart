@@ -6,6 +6,8 @@ import '../../../../shared/widgets/ios_form_text_field.dart';
 import 'model_spec_form_controller.dart';
 import 'spec_field_header.dart';
 
+const double kModelSpecValueFieldWidth = 120;
+
 class LimitsPricingSection extends StatelessWidget {
   const LimitsPricingSection({super.key, required this.controller});
 
@@ -33,6 +35,8 @@ class LimitsPricingSection extends StatelessWidget {
               label: l10n.modelSpecFormContextWindow,
               controller: controller.contextWindowController,
               keyboardType: TextInputType.number,
+              textAlign: TextAlign.right,
+              fieldWidth: kModelSpecValueFieldWidth,
               onChanged: (raw) {
                 final trimmed = raw.trim();
                 if (trimmed.isEmpty) {
@@ -44,9 +48,12 @@ class LimitsPricingSection extends StatelessWidget {
               },
             ),
             IosFormTextField(
+              key: const ValueKey('model-spec-max-output'),
               label: l10n.modelSpecFormMaxOutput,
               controller: controller.maxOutputController,
               keyboardType: TextInputType.number,
+              textAlign: TextAlign.right,
+              fieldWidth: kModelSpecValueFieldWidth,
               onChanged: (raw) {
                 final trimmed = raw.trim();
                 if (trimmed.isEmpty) {
@@ -57,6 +64,7 @@ class LimitsPricingSection extends StatelessWidget {
                 if (value != null) controller.setMaxOutput(value);
               },
             ),
+            const SizedBox(height: 8),
             SpecFieldHeader(
               label: l10n.modelSpecFormPricingSection,
               source: controller.sourceOf(ModelSpecField.pricing),
@@ -64,43 +72,58 @@ class LimitsPricingSection extends StatelessWidget {
               onReset: () => controller.reset(ModelSpecField.pricing),
             ),
             IosFormTextField(
+              key: const ValueKey('model-spec-pricing-input'),
               label: l10n.modelSpecFormPricingInput,
               controller: controller.pricingInputController,
               keyboardType: const TextInputType.numberWithOptions(
                 decimal: true,
               ),
+              textAlign: TextAlign.right,
+              fieldWidth: kModelSpecValueFieldWidth,
               onChanged: (raw) => _setDouble(raw, controller.setPricingInput),
             ),
             IosFormTextField(
+              key: const ValueKey('model-spec-pricing-output'),
               label: l10n.modelSpecFormPricingOutput,
               controller: controller.pricingOutputController,
               keyboardType: const TextInputType.numberWithOptions(
                 decimal: true,
               ),
+              textAlign: TextAlign.right,
+              fieldWidth: kModelSpecValueFieldWidth,
               onChanged: (raw) => _setDouble(raw, controller.setPricingOutput),
             ),
             IosFormTextField(
+              key: const ValueKey('model-spec-pricing-cache-read'),
               label: l10n.modelSpecFormPricingCacheRead,
               controller: controller.pricingCacheReadController,
               keyboardType: const TextInputType.numberWithOptions(
                 decimal: true,
               ),
+              textAlign: TextAlign.right,
+              fieldWidth: kModelSpecValueFieldWidth,
               onChanged: (raw) =>
                   _setDouble(raw, controller.setPricingCacheRead),
             ),
             IosFormTextField(
+              key: const ValueKey('model-spec-pricing-cache-write'),
               label: l10n.modelSpecFormPricingCacheWrite,
               controller: controller.pricingCacheWriteController,
               keyboardType: const TextInputType.numberWithOptions(
                 decimal: true,
               ),
+              textAlign: TextAlign.right,
+              fieldWidth: kModelSpecValueFieldWidth,
               onChanged: (raw) =>
                   _setDouble(raw, controller.setPricingCacheWrite),
             ),
             IosFormTextField(
+              key: const ValueKey('model-spec-currency'),
               label: l10n.modelSpecFormCurrency,
               controller: controller.currencyController,
               hintText: 'USD',
+              textAlign: TextAlign.right,
+              fieldWidth: kModelSpecValueFieldWidth,
               onChanged: controller.setCurrency,
             ),
           ],

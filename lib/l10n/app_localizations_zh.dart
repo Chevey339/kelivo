@@ -3867,19 +3867,19 @@ class AppLocalizationsZh extends AppLocalizations {
   String get modelSpecFormMaxOutput => '最大输出';
 
   @override
-  String get modelSpecFormPricingSection => '定价';
+  String get modelSpecFormPricingSection => '定价 / 1M';
 
   @override
-  String get modelSpecFormPricingInput => '输入 / 1M';
+  String get modelSpecFormPricingInput => '输入';
 
   @override
-  String get modelSpecFormPricingOutput => '输出 / 1M';
+  String get modelSpecFormPricingOutput => '输出';
 
   @override
-  String get modelSpecFormPricingCacheRead => '缓存读取 / 1M';
+  String get modelSpecFormPricingCacheRead => '缓存读取';
 
   @override
-  String get modelSpecFormPricingCacheWrite => '缓存写入 / 1M';
+  String get modelSpecFormPricingCacheWrite => '缓存写入';
 
   @override
   String get modelSpecFormCurrency => '货币';
@@ -4179,6 +4179,16 @@ class AppLocalizationsZh extends AppLocalizations {
   @override
   String modelCatalogRefreshFailed(String error) {
     return '更新失败：$error';
+  }
+
+  @override
+  String modelCatalogProviderCount(int count) {
+    return '$count 个供应商';
+  }
+
+  @override
+  String modelCatalogModelCount(int count) {
+    return '$count 个模型';
   }
 
   @override
@@ -15627,19 +15637,19 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get modelSpecFormMaxOutput => '最大输出';
 
   @override
-  String get modelSpecFormPricingSection => '定价';
+  String get modelSpecFormPricingSection => '定价 / 1M';
 
   @override
-  String get modelSpecFormPricingInput => '输入 / 1M';
+  String get modelSpecFormPricingInput => '输入';
 
   @override
-  String get modelSpecFormPricingOutput => '输出 / 1M';
+  String get modelSpecFormPricingOutput => '输出';
 
   @override
-  String get modelSpecFormPricingCacheRead => '缓存读取 / 1M';
+  String get modelSpecFormPricingCacheRead => '缓存读取';
 
   @override
-  String get modelSpecFormPricingCacheWrite => '缓存写入 / 1M';
+  String get modelSpecFormPricingCacheWrite => '缓存写入';
 
   @override
   String get modelSpecFormCurrency => '货币';
@@ -15939,6 +15949,16 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   @override
   String modelCatalogRefreshFailed(String error) {
     return '更新失败：$error';
+  }
+
+  @override
+  String modelCatalogProviderCount(int count) {
+    return '$count 个供应商';
+  }
+
+  @override
+  String modelCatalogModelCount(int count) {
+    return '$count 个模型';
   }
 
   @override
@@ -27313,19 +27333,19 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get modelSpecFormMaxOutput => '最大輸出';
 
   @override
-  String get modelSpecFormPricingSection => '定價';
+  String get modelSpecFormPricingSection => '定價 / 1M';
 
   @override
-  String get modelSpecFormPricingInput => '輸入 / 1M';
+  String get modelSpecFormPricingInput => '輸入';
 
   @override
-  String get modelSpecFormPricingOutput => '輸出 / 1M';
+  String get modelSpecFormPricingOutput => '輸出';
 
   @override
-  String get modelSpecFormPricingCacheRead => '快取讀取 / 1M';
+  String get modelSpecFormPricingCacheRead => '快取讀取';
 
   @override
-  String get modelSpecFormPricingCacheWrite => '快取寫入 / 1M';
+  String get modelSpecFormPricingCacheWrite => '快取寫入';
 
   @override
   String get modelSpecFormCurrency => '貨幣';
@@ -27625,6 +27645,16 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   @override
   String modelCatalogRefreshFailed(String error) {
     return '更新失敗：$error';
+  }
+
+  @override
+  String modelCatalogProviderCount(int count) {
+    return '$count 個供應商';
+  }
+
+  @override
+  String modelCatalogModelCount(int count) {
+    return '$count 個模型';
   }
 
   @override

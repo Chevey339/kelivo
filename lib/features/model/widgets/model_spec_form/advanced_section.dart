@@ -31,6 +31,19 @@ class AdvancedSection extends StatelessWidget {
               overridden: controller.isHeadersOverridden,
               onReset: controller.resetHeaders,
             ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(12, 4, 12, 0),
+              child: ProviderCustomRequestEditor(
+                headers: headers,
+                body: const <Map<String, String>>[],
+                showHeader: false,
+                showSectionTitles: false,
+                showBodySection: false,
+                onHeadersChanged: (rows) async => controller.setHeaders(rows),
+                onBodyChanged: (_) async {},
+              ),
+            ),
+            const SizedBox(height: 16),
             SpecFieldHeader(
               label: l10n.modelDetailSheetCustomBodyTitle,
               source: controller.isBodyOverridden
@@ -39,12 +52,17 @@ class AdvancedSection extends StatelessWidget {
               overridden: controller.isBodyOverridden,
               onReset: controller.resetBody,
             ),
-            ProviderCustomRequestEditor(
-              headers: headers,
-              body: body,
-              showHeader: false,
-              onHeadersChanged: (rows) async => controller.setHeaders(rows),
-              onBodyChanged: (rows) async => controller.setBody(rows),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(12, 4, 12, 12),
+              child: ProviderCustomRequestEditor(
+                headers: const <Map<String, String>>[],
+                body: body,
+                showHeader: false,
+                showSectionTitles: false,
+                showHeadersSection: false,
+                onHeadersChanged: (_) async {},
+                onBodyChanged: (rows) async => controller.setBody(rows),
+              ),
             ),
           ],
         );

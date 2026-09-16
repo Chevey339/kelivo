@@ -11,10 +11,8 @@ import '../../../core/providers/settings_provider.dart';
 import '../../../core/services/chat/chat_service.dart';
 import '../../../core/services/model_catalog/model_catalog_service.dart';
 import '../../../l10n/app_localizations.dart';
-import '../../../shared/widgets/ios_settings_rows.dart';
-import '../../../shared/widgets/ios_tactile.dart';
-import '../../../shared/widgets/section_card.dart';
 import '../../../shared/widgets/snackbar.dart';
+import 'model_catalog_page.dart';
 import '../../../core/services/haptics.dart';
 import '../widgets/share_provider_sheet.dart';
 import '../../../core/providers/assistant_provider.dart';
@@ -50,6 +48,12 @@ class _ProvidersPageState extends State<ProvidersPage> {
   bool _groupHeaderDragActive = false;
   bool _groupHeaderReorderInFlight = false;
   bool _groupHeaderRestorePending = false;
+
+  @override
+  void initState() {
+    super.initState();
+    unawaited(ModelCatalogService.instance.ensureLoaded());
+  }
 
   @override
   void dispose() {
@@ -171,6 +175,19 @@ class _ProvidersPageState extends State<ProvidersPage> {
         title: Text(l10n.providersPageTitle),
         actions: [
           Tooltip(
+            message: l10n.modelCatalogTitle,
+            child: _TactileIconButton(
+              icon: Lucide.BookOpen,
+              color: cs.onSurface,
+              size: 22,
+              onTap: () {
+                Navigator.of(context).push<void>(
+                  MaterialPageRoute<void>(builder: (_) => ModelCatalogPage()),
+                );
+              },
+            ),
+          ),
+          Tooltip(
             message: _selectMode
                 ? l10n.searchServicesPageDone
                 : l10n.providersPageMultiSelectTooltip,
@@ -231,7 +248,6 @@ class _ProvidersPageState extends State<ProvidersPage> {
                   setState(() => _searchQuery = '');
                 },
               ),
-              const _ModelCatalogSection(),
               Expanded(
                 child: !groupingActive
                     ? _ProvidersList(
@@ -714,106 +730,6 @@ class _ProvidersPageState extends State<ProvidersPage> {
       type: NotificationType.success,
     );
   }
-}
-
-class _ModelCatalogSection extends StatefulWidget {
-  const _ModelCatalogSection();
-
-  @override
-  State<_ModelCatalogSection> createState() => _ModelCatalogSectionState();
-}
-
-class _ModelCatalogSectionState extends State<_ModelCatalogSection> {
-  @override
-  void initState() {
-    super.initState();
-    unawaited(ModelCatalogService.instance.ensureLoaded());
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final catalog = ModelCatalogService.instance;
-    final cs = Theme.of(context).colorScheme;
-    final l10n = AppLocalizations.of(context)!;
-
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-      child: ListenableBuilder(
-        listenable: catalog,
-        builder: (context, _) {
-          final date = _formatCatalogDate(catalog.generatedAt);
-          final subtitle = catalog.generatedAt == null
-              ? null
-              : catalog.isBundled
-              ? l10n.modelCatalogSourceBundled(date)
-              : l10n.modelCatalogSourceRemote(date);
-          return SectionCard(
-            dividers: true,
-            children: [
-              IosNavRow(
-                label: l10n.modelCatalogTitle,
-                subtitle: subtitle,
-                trailing: catalog.refreshing
-                    ? SizedBox(
-                        width: 18,
-                        height: 18,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: cs.primary,
-                        ),
-                      )
-                    : IosIconButton(
-                        icon: Lucide.RefreshCw,
-                        size: 18,
-                        tooltip: l10n.modelCatalogRefresh,
-                        semanticLabel: l10n.modelCatalogRefresh,
-                        color: cs.onSurface,
-                        onTap: () => _refreshCatalog(context),
-                      ),
-              ),
-              IosSwitchRow(
-                label: l10n.modelCatalogAutoUpdate,
-                value: catalog.autoUpdate,
-                onChanged: (value) {
-                  unawaited(catalog.setAutoUpdate(value));
-                },
-              ),
-            ],
-          );
-        },
-      ),
-    );
-  }
-
-  Future<void> _refreshCatalog(BuildContext context) async {
-    final l10n = AppLocalizations.of(context)!;
-    final ok = await ModelCatalogService.instance.refresh(force: true);
-    if (!context.mounted) return;
-    if (ok) {
-      showAppSnackBar(
-        context,
-        message: l10n.modelCatalogUpdated,
-        type: NotificationType.success,
-      );
-      return;
-    }
-    showAppSnackBar(
-      context,
-      message: l10n.modelCatalogRefreshFailed(
-        ModelCatalogService.instance.lastError ?? '',
-      ),
-      type: NotificationType.error,
-    );
-  }
-}
-
-String _formatCatalogDate(DateTime? value) {
-  if (value == null) return '—';
-  final date = value.toUtc();
-  final year = date.year.toString().padLeft(4, '0');
-  final month = date.month.toString().padLeft(2, '0');
-  final day = date.day.toString().padLeft(2, '0');
-  return '$year-$month-$day';
 }
 
 sealed class _ProviderGroupingRowVM {

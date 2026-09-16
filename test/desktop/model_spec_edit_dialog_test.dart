@@ -86,6 +86,31 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('model-spec-nav-limits')));
     await tester.pumpAndSettle();
 
+    TextAlign fieldAlign(Key key) {
+      return tester
+          .widget<TextField>(
+            find.descendant(
+              of: find.byKey(key),
+              matching: find.byType(TextField),
+            ),
+          )
+          .textAlign;
+    }
+
+    expect(
+      fieldAlign(const ValueKey('model-spec-context-window')),
+      TextAlign.right,
+    );
+    expect(
+      fieldAlign(const ValueKey('model-spec-max-output')),
+      TextAlign.right,
+    );
+    expect(
+      fieldAlign(const ValueKey('model-spec-pricing-input')),
+      TextAlign.right,
+    );
+    expect(fieldAlign(const ValueKey('model-spec-currency')), TextAlign.right);
+
     await tester.enterText(
       find.descendant(
         of: find.byKey(const ValueKey('model-spec-context-window')),

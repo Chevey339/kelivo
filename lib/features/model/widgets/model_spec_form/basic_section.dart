@@ -45,6 +45,7 @@ class BasicSection extends StatelessWidget {
               )
             else
               _ReadOnlyIdField(controller: controller),
+            const SizedBox(height: 8),
             SpecFieldHeader(
               label: l10n.modelDetailSheetModelNameLabel,
               source: controller.isDisplayNameOverridden
@@ -59,6 +60,7 @@ class BasicSection extends StatelessWidget {
               inlineLabel: false,
               onChanged: controller.setDisplayName,
             ),
+            const SizedBox(height: 8),
             SpecFieldHeader(
               label: l10n.modelDetailSheetModelTypeLabel,
               source: controller.sourceOf(ModelSpecField.type),

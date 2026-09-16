@@ -35,6 +35,7 @@ import '../utils/sandbox_path_resolver.dart';
 import 'dart:io' show Directory, File, Platform;
 import '../utils/app_directories.dart';
 import 'add_provider_dialog.dart' show showDesktopAddProviderDialog;
+import 'model_catalog_popover.dart' show showDesktopModelCatalogPopover;
 import 'model_spec_edit_dialog.dart'
     show showDesktopCreateModelSpecDialog, showDesktopModelSpecEditDialog;
 // Use the unified model selector (desktop dialog on desktop platforms)

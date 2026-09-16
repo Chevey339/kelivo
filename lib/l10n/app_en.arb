@@ -1791,11 +1791,11 @@
   "modelSpecFormLimitsPricingSection": "Limits & pricing",
   "modelSpecFormContextWindow": "Context window",
   "modelSpecFormMaxOutput": "Max output",
-  "modelSpecFormPricingSection": "Pricing",
-  "modelSpecFormPricingInput": "Input / 1M",
-  "modelSpecFormPricingOutput": "Output / 1M",
-  "modelSpecFormPricingCacheRead": "Cache read / 1M",
-  "modelSpecFormPricingCacheWrite": "Cache write / 1M",
+  "modelSpecFormPricingSection": "Pricing / 1M",
+  "modelSpecFormPricingInput": "Input",
+  "modelSpecFormPricingOutput": "Output",
+  "modelSpecFormPricingCacheRead": "Cache read",
+  "modelSpecFormPricingCacheWrite": "Cache write",
   "modelSpecFormCurrency": "Currency",
   "modelSpecFormAdvancedSection": "Request",
   "modelSelectSheetSearchHint": "Search models or providers",
@@ -1923,6 +1923,22 @@
     "placeholders": {
       "error": {
         "type": "String"
+      }
+    }
+  },
+  "modelCatalogProviderCount": "{count} providers",
+  "@modelCatalogProviderCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "modelCatalogModelCount": "{count} models",
+  "@modelCatalogModelCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
       }
     }
   },

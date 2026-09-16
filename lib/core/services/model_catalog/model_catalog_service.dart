@@ -152,6 +152,16 @@ class ModelCatalogService extends ChangeNotifier {
   DateTime? get generatedAt => _data?.generatedAt;
   bool get isBundled => _isBundled;
   bool get autoUpdate => _autoUpdate;
+  int get providerCount => _data?.providers.length ?? 0;
+  int get modelCount {
+    final providers = _data?.providers;
+    if (providers == null) return 0;
+    var total = 0;
+    for (final provider in providers.values) {
+      total += provider.models.length;
+    }
+    return total;
+  }
 
   bool get isStale {
     final data = _data;

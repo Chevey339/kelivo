@@ -55,6 +55,7 @@ class ModalityAbilitySection extends StatelessWidget {
               onChanged: (_) => controller.toggleInput(Modality.pdf),
             ),
             if (!hideChatFields) ...[
+              const SizedBox(height: 8),
               SpecFieldHeader(
                 label: l10n.modelDetailSheetOutputModesLabel,
                 source: controller.sourceOf(ModelSpecField.output),
@@ -76,6 +77,7 @@ class ModalityAbilitySection extends StatelessWidget {
                 value: spec.output.contains(Modality.audio),
                 onChanged: (_) => controller.toggleOutput(Modality.audio),
               ),
+              const SizedBox(height: 8),
               SpecFieldHeader(
                 label: l10n.modelDetailSheetAbilitiesLabel,
                 source: controller.sourceOf(ModelSpecField.abilities),

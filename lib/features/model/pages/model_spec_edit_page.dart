@@ -115,10 +115,22 @@ class _ModelSpecEditPageState extends State<ModelSpecEditPage> {
     return Scaffold(
       backgroundColor: cs.surface,
       appBar: AppBar(
+        leadingWidth: 52,
+        leading: Padding(
+          padding: const EdgeInsets.only(left: 8),
+          child: IosIconButton(
+            icon: Lucide.ArrowLeft,
+            size: 22,
+            semanticLabel: l10n.settingsPageBackButton,
+            minSize: 44,
+            onTap: () => Navigator.of(context).maybePop(),
+          ),
+        ),
         title: Text(
           widget.isNew
               ? l10n.modelDetailSheetAddModel
               : l10n.modelDetailSheetEditModel,
+          style: const TextStyle(fontSize: 16),
         ),
         actions: [
           IosIconButton(

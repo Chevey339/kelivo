@@ -69,6 +69,49 @@ void main() {
 
     expect(find.byKey(const ValueKey('spec-source-capsule')), findsWidgets);
 
+    TextAlign fieldAlign(Key key) {
+      return tester
+          .widget<TextField>(
+            find.descendant(
+              of: find.byKey(key),
+              matching: find.byType(TextField),
+            ),
+          )
+          .textAlign;
+    }
+
+    await tester.ensureVisible(
+      find.byKey(const ValueKey('model-spec-context-window')),
+    );
+    expect(
+      fieldAlign(const ValueKey('model-spec-context-window')),
+      TextAlign.right,
+    );
+    expect(
+      fieldAlign(const ValueKey('model-spec-max-output')),
+      TextAlign.right,
+    );
+    await tester.ensureVisible(
+      find.byKey(const ValueKey('model-spec-pricing-input')),
+    );
+    expect(
+      fieldAlign(const ValueKey('model-spec-pricing-input')),
+      TextAlign.right,
+    );
+    expect(
+      fieldAlign(const ValueKey('model-spec-pricing-output')),
+      TextAlign.right,
+    );
+    expect(
+      fieldAlign(const ValueKey('model-spec-pricing-cache-read')),
+      TextAlign.right,
+    );
+    expect(
+      fieldAlign(const ValueKey('model-spec-pricing-cache-write')),
+      TextAlign.right,
+    );
+    expect(fieldAlign(const ValueKey('model-spec-currency')), TextAlign.right);
+
     final tool = find.byKey(const ValueKey('model-spec-ability-tool'));
     await tester.ensureVisible(tool);
     await tester.tap(tool);

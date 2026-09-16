@@ -41,6 +41,7 @@ class ReasoningSection extends StatelessWidget {
               subtitleMaxLines: 2,
               onTap: () => _pickDialect(context),
             ),
+            const SizedBox(height: 8),
             SpecFieldHeader(
               label: l10n.modelSpecFormLevels,
               source: controller.sourceOf(ModelSpecField.reasoningLevels),
@@ -55,6 +56,7 @@ class ReasoningSection extends StatelessWidget {
                 value: spec.reasoning.levels.contains(level),
                 onChanged: (_) => controller.toggleLevel(level),
               ),
+            const SizedBox(height: 8),
             SpecFieldHeader(
               label: l10n.modelSpecFormCanDisable,
               source: controller.sourceOf(ModelSpecField.reasoningCanDisable),
@@ -69,6 +71,7 @@ class ReasoningSection extends StatelessWidget {
               value: spec.reasoning.canDisable,
               onChanged: controller.setCanDisable,
             ),
+            const SizedBox(height: 8),
             SpecFieldHeader(
               label: l10n.modelSpecFormDefaultLevel,
               source: controller.sourceOf(ModelSpecField.reasoningDefaultLevel),
@@ -83,6 +86,7 @@ class ReasoningSection extends StatelessWidget {
               onTap: () => _pickDefaultLevel(context),
             ),
             if (isBudgetDialect(dialect)) ...[
+              const SizedBox(height: 8),
               SpecFieldHeader(
                 label: l10n.modelSpecFormBudgets,
                 source: controller.sourceOf(ModelSpecField.reasoningBudgets),
@@ -94,9 +98,12 @@ class ReasoningSection extends StatelessWidget {
               ),
               for (final level in spec.reasoning.levels)
                 IosFormTextField(
+                  key: ValueKey('model-spec-budget-${level.name}'),
                   label: reasoningLevelLabel(l10n, level),
                   controller: controller.budgetControllers[level]!,
                   keyboardType: TextInputType.number,
+                  textAlign: TextAlign.right,
+                  fieldWidth: 120,
                   hintText: l10n.modelSpecFormBudgetPlaceholder(
                     '${resolveBudget(spec, level) ?? ''}',
                   ),
