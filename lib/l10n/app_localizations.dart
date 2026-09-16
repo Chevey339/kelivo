@@ -5893,13 +5893,13 @@ abstract class AppLocalizations {
   /// No description provided for @contextUsageTitle.
   ///
   /// In en, this message translates to:
-  /// **'Context usage'**
+  /// **'Context window'**
   String get contextUsageTitle;
 
   /// No description provided for @contextUsageStateExact.
   ///
   /// In en, this message translates to:
-  /// **'Exact from last response'**
+  /// **'Exact (from last response)'**
   String get contextUsageStateExact;
 
   /// No description provided for @contextUsageStateEstimated.
@@ -5911,7 +5911,7 @@ abstract class AppLocalizations {
   /// No description provided for @contextUsageStateStale.
   ///
   /// In en, this message translates to:
-  /// **'Stale — updating…'**
+  /// **'Stale, updating…'**
   String get contextUsageStateStale;
 
   /// No description provided for @contextUsageStateComputing.
@@ -5961,6 +5961,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Draft'**
   String get contextUsageBucketDraft;
+
+  /// No description provided for @contextUsageBucketUsed.
+  ///
+  /// In en, this message translates to:
+  /// **'Used'**
+  String get contextUsageBucketUsed;
+
+  /// No description provided for @contextUsageFreeSpace.
+  ///
+  /// In en, this message translates to:
+  /// **'Free space'**
+  String get contextUsageFreeSpace;
 
   /// Context usage summary: used tokens, window size, and percent
   ///

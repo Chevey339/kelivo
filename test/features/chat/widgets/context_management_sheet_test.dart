@@ -103,7 +103,17 @@ void main() {
     await tester.pump();
 
     expect(find.byType(ContextUsageHeader), findsOneWidget);
-    expect(find.byType(ContextUsageRing), findsOneWidget);
+    expect(find.byType(ContextUsageRing), findsNothing);
+    expect(find.text('Context window'), findsOneWidget);
+    expect(find.text('57 / 1k (6%)'), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('context-usage-stacked-bar')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey('context-usage-bucket-freeSpace')),
+      findsOneWidget,
+    );
     expect(usage.refreshCalls, 1);
     expect(usage.lastDraft, 'draft');
     expect(usage.lastForce, isFalse);

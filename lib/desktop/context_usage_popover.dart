@@ -8,7 +8,6 @@ import '../features/home/services/context_usage_service.dart';
 import '../icons/lucide_adapter.dart';
 import '../l10n/app_localizations.dart';
 import '../shared/widgets/context_usage_details.dart';
-import '../shared/widgets/context_usage_ring.dart';
 import '../shared/widgets/ios_tactile.dart';
 import '../theme/app_font_weights.dart';
 import '../theme/design_tokens.dart';
@@ -257,7 +256,6 @@ class _ContextUsagePopoverContent extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
-    final cs = Theme.of(context).colorScheme;
     final usage = context.watch<ContextUsageService>();
     final snapshot = usage.snapshot(conversationId) ?? usage.current;
     final showSetWindow =
@@ -275,64 +273,20 @@ class _ContextUsagePopoverContent extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Row(
-              children: [
-                ContextUsageRing(snapshot: snapshot, onTap: () {}, size: 28),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Text(
-                    l10n.contextUsageTitle,
-                    style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: AppFontWeights.semibold,
-                      color: cs.onSurface,
-                    ),
-                  ),
-                ),
-                IosIconButton(
-                  tooltip: l10n.contextUsageRefresh,
-                  semanticLabel: l10n.contextUsageRefresh,
-                  icon: Lucide.RefreshCw,
-                  size: 16,
-                  onTap: () => usage.refresh(
-                    conversationId,
-                    draftText: draftText,
-                    force: true,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 10),
-            Text(
-              contextUsageSummaryText(l10n, snapshot),
-              style: TextStyle(
-                fontSize: 15,
-                fontWeight: AppFontWeights.semibold,
-                color: cs.onSurface,
-              ),
-            ),
-            const SizedBox(height: 2),
-            Text(
-              contextUsageStateLabel(l10n, snapshot),
-              style: TextStyle(
-                fontSize: 12,
-                color: cs.onSurface.withValues(alpha: 0.55),
-              ),
-            ),
-            if (snapshot?.state == ContextUsageState.estimated) ...[
-              const SizedBox(height: 12),
-              ContextUsageBucketBars(snapshot: snapshot!),
-            ],
-            if (snapshot?.state == ContextUsageState.exact) ...[
-              const SizedBox(height: 10),
-              Text(
-                l10n.contextUsageExactNote,
-                style: TextStyle(
-                  fontSize: 12,
-                  color: cs.onSurface.withValues(alpha: 0.55),
+            ContextUsageBreakdown(
+              snapshot: snapshot,
+              headerTrailing: IosIconButton(
+                tooltip: l10n.contextUsageRefresh,
+                semanticLabel: l10n.contextUsageRefresh,
+                icon: Lucide.RefreshCw,
+                size: 16,
+                onTap: () => usage.refresh(
+                  conversationId,
+                  draftText: draftText,
+                  force: true,
                 ),
               ),
-            ],
+            ),
             if (showSetWindow) ...[
               const SizedBox(height: 8),
               _ActionRow(

@@ -3075,19 +3075,19 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatInputBarCollapse => '收起';
 
   @override
-  String get contextUsageTitle => '上下文用量';
+  String get contextUsageTitle => '上下文窗口';
 
   @override
-  String get contextUsageStateExact => '来自上次回复的精确值';
+  String get contextUsageStateExact => '精确（来自上次响应）';
 
   @override
   String get contextUsageStateEstimated => '估算';
 
   @override
-  String get contextUsageStateStale => '已过期 — 正在更新…';
+  String get contextUsageStateStale => '已过时，正在更新…';
 
   @override
-  String get contextUsageStateComputing => '正在计算…';
+  String get contextUsageStateComputing => '计算中…';
 
   @override
   String get contextUsageStateNone => '暂无数据';
@@ -3109,6 +3109,12 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get contextUsageBucketDraft => '草稿';
+
+  @override
+  String get contextUsageBucketUsed => '已用';
+
+  @override
+  String get contextUsageFreeSpace => '剩余空间';
 
   @override
   String contextUsageUsedWindow(String used, String window, int percent) {
@@ -14845,19 +14851,19 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get chatInputBarCollapse => '收起';
 
   @override
-  String get contextUsageTitle => '上下文用量';
+  String get contextUsageTitle => '上下文窗口';
 
   @override
-  String get contextUsageStateExact => '来自上次回复的精确值';
+  String get contextUsageStateExact => '精确（来自上次响应）';
 
   @override
   String get contextUsageStateEstimated => '估算';
 
   @override
-  String get contextUsageStateStale => '已过期 — 正在更新…';
+  String get contextUsageStateStale => '已过时，正在更新…';
 
   @override
-  String get contextUsageStateComputing => '正在计算…';
+  String get contextUsageStateComputing => '计算中…';
 
   @override
   String get contextUsageStateNone => '暂无数据';
@@ -14879,6 +14885,12 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get contextUsageBucketDraft => '草稿';
+
+  @override
+  String get contextUsageBucketUsed => '已用';
+
+  @override
+  String get contextUsageFreeSpace => '剩余空间';
 
   @override
   String contextUsageUsedWindow(String used, String window, int percent) {
@@ -26541,19 +26553,19 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get chatInputBarCollapse => '收起';
 
   @override
-  String get contextUsageTitle => '上下文用量';
+  String get contextUsageTitle => '上下文視窗';
 
   @override
-  String get contextUsageStateExact => '來自上次回覆的精確值';
+  String get contextUsageStateExact => '精確（來自上次回應）';
 
   @override
   String get contextUsageStateEstimated => '估算';
 
   @override
-  String get contextUsageStateStale => '已過期 — 正在更新…';
+  String get contextUsageStateStale => '已過時，正在更新…';
 
   @override
-  String get contextUsageStateComputing => '正在計算…';
+  String get contextUsageStateComputing => '計算中…';
 
   @override
   String get contextUsageStateNone => '暫無資料';
@@ -26575,6 +26587,12 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get contextUsageBucketDraft => '草稿';
+
+  @override
+  String get contextUsageBucketUsed => '已用';
+
+  @override
+  String get contextUsageFreeSpace => '剩餘空間';
 
   @override
   String contextUsageUsedWindow(String used, String window, int percent) {

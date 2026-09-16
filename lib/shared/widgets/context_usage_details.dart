@@ -7,6 +7,45 @@ import '../../features/home/services/context_usage_service.dart';
 import '../../l10n/app_localizations.dart';
 import '../../theme/app_font_weights.dart';
 
+abstract final class ContextUsagePalette {
+  static const Color system = Color(0xFF8E8E93);
+  static const Color injections = Color(0xFF2FBF71);
+  static const Color history = Color(0xFF3B82F6);
+  static const Color tools = Color(0xFFF59E0B);
+  static const Color attachments = Color(0xFFE0A61A);
+  static const Color draft = Color(0xFFA855F7);
+
+  static Color track(ColorScheme cs) => cs.onSurface.withValues(alpha: 0.12);
+
+  static Color of(String key, ColorScheme cs) {
+    return switch (key) {
+      'system' => system,
+      'injections' => injections,
+      'history' => history,
+      'tools' => tools,
+      'attachments' => attachments,
+      'draft' => draft,
+      'used' => cs.primary,
+      'freeSpace' => track(cs),
+      _ => cs.primary,
+    };
+  }
+}
+
+class ContextUsageSegment {
+  const ContextUsageSegment({
+    required this.key,
+    required this.tokens,
+    required this.fraction,
+  });
+
+  final String key;
+  final int tokens;
+  final double fraction;
+
+  bool get isFreeSpace => key == 'freeSpace';
+}
+
 String contextUsageStateLabel(
   AppLocalizations l10n,
   ContextUsageSnapshot? snapshot,
@@ -24,50 +63,252 @@ String contextUsageSummaryText(
   AppLocalizations l10n,
   ContextUsageSnapshot? snapshot,
 ) {
+  final used = snapshot?.usedTokens ?? 0;
   final window = snapshot?.contextWindow;
-  if (snapshot == null || window == null || window <= 0) {
-    return l10n.contextUsageNoWindow;
+  if (window == null || window <= 0) {
+    return formatTokenCount(used);
   }
-  final percent = ((snapshot.ratio ?? 0) * 100).round();
+  final percent = ((snapshot?.ratio ?? 0) * 100).round();
   return l10n.contextUsageUsedWindow(
-    formatTokenCount(snapshot.usedTokens),
+    formatTokenCount(used),
     formatTokenCount(window),
     percent,
   );
 }
 
-List<({String key, String label, int tokens})> contextUsageVisibleBuckets(
-  AppLocalizations l10n,
-  ContextUsageBuckets buckets,
-) {
-  return [
-    (
-      key: 'system',
-      label: l10n.contextUsageBucketSystem,
-      tokens: buckets.system,
-    ),
-    (
-      key: 'injections',
-      label: l10n.contextUsageBucketInjections,
-      tokens: buckets.injections,
-    ),
-    (
-      key: 'history',
-      label: l10n.contextUsageBucketHistory,
-      tokens: buckets.history,
-    ),
-    (key: 'tools', label: l10n.contextUsageBucketTools, tokens: buckets.tools),
-    (
-      key: 'attachments',
-      label: l10n.contextUsageBucketAttachments,
-      tokens: buckets.attachments,
-    ),
-    (key: 'draft', label: l10n.contextUsageBucketDraft, tokens: buckets.draft),
-  ].where((entry) => entry.tokens > 0).toList(growable: false);
+String contextUsageSegmentLabel(AppLocalizations l10n, String key) {
+  return switch (key) {
+    'system' => l10n.contextUsageBucketSystem,
+    'injections' => l10n.contextUsageBucketInjections,
+    'history' => l10n.contextUsageBucketHistory,
+    'tools' => l10n.contextUsageBucketTools,
+    'attachments' => l10n.contextUsageBucketAttachments,
+    'draft' => l10n.contextUsageBucketDraft,
+    'used' => l10n.contextUsageBucketUsed,
+    'freeSpace' => l10n.contextUsageFreeSpace,
+    _ => key,
+  };
 }
 
-class ContextUsageBucketBars extends StatelessWidget {
-  const ContextUsageBucketBars({super.key, required this.snapshot});
+bool contextUsageHasWindow(ContextUsageSnapshot? snapshot) {
+  final window = snapshot?.contextWindow;
+  return window != null && window > 0;
+}
+
+List<ContextUsageSegment> buildContextUsageSegments(
+  ContextUsageSnapshot snapshot,
+) {
+  if (snapshot.state == ContextUsageState.none) {
+    return const [];
+  }
+
+  final window = snapshot.contextWindow;
+  final hasWindow = window != null && window > 0;
+  final used = snapshot.usedTokens;
+  final buckets = snapshot.buckets;
+  final useBuckets =
+      snapshot.state != ContextUsageState.exact && buckets.total > 0;
+  final denom = hasWindow
+      ? window
+      : math.max(useBuckets ? buckets.total : used, 1);
+
+  final items = <ContextUsageSegment>[];
+  if (useBuckets) {
+    for (final entry in [
+      (key: 'system', tokens: buckets.system),
+      (key: 'injections', tokens: buckets.injections),
+      (key: 'history', tokens: buckets.history),
+      (key: 'tools', tokens: buckets.tools),
+      (key: 'attachments', tokens: buckets.attachments),
+      (key: 'draft', tokens: buckets.draft),
+    ]) {
+      if (entry.tokens <= 0) continue;
+      items.add(
+        ContextUsageSegment(
+          key: entry.key,
+          tokens: entry.tokens,
+          fraction: entry.tokens / denom,
+        ),
+      );
+    }
+  } else if (used > 0) {
+    items.add(
+      ContextUsageSegment(key: 'used', tokens: used, fraction: used / denom),
+    );
+  }
+
+  if (hasWindow) {
+    final free = math.max(window - used, 0);
+    if (free > 0) {
+      items.add(
+        ContextUsageSegment(
+          key: 'freeSpace',
+          tokens: free,
+          fraction: free / window,
+        ),
+      );
+    }
+  }
+  return items;
+}
+
+class ContextUsageSummaryHeader extends StatelessWidget {
+  const ContextUsageSummaryHeader({
+    super.key,
+    required this.snapshot,
+    this.trailing,
+  });
+
+  final ContextUsageSnapshot? snapshot;
+  final Widget? trailing;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    final cs = Theme.of(context).colorScheme;
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Expanded(
+          child: Padding(
+            padding: const EdgeInsets.only(top: 2),
+            child: Text(
+              l10n.contextUsageTitle,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: AppFontWeights.semibold,
+                color: cs.onSurface,
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(width: 8),
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            Text(
+              contextUsageSummaryText(l10n, snapshot),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: AppFontWeights.medium,
+                color: cs.onSurface.withValues(alpha: 0.78),
+              ),
+            ),
+            const SizedBox(height: 2),
+            Text(
+              contextUsageStateLabel(l10n, snapshot),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: 11,
+                color: cs.onSurface.withValues(alpha: 0.45),
+              ),
+            ),
+          ],
+        ),
+        if (trailing != null) trailing!,
+      ],
+    );
+  }
+}
+
+class ContextUsageStackedBar extends StatelessWidget {
+  const ContextUsageStackedBar({
+    super.key,
+    required this.snapshot,
+    this.height = 8,
+  });
+
+  final ContextUsageSnapshot snapshot;
+  final double height;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final painted = buildContextUsageSegments(
+      snapshot,
+    ).where((segment) => !segment.isFreeSpace).toList(growable: false);
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(999),
+      child: SizedBox(
+        height: height,
+        width: double.infinity,
+        child: CustomPaint(
+          painter: _ContextUsageStackedBarPainter(
+            trackColor: ContextUsagePalette.track(cs),
+            segments: [
+              for (final segment in painted)
+                (
+                  color: ContextUsagePalette.of(segment.key, cs),
+                  fraction: segment.fraction,
+                ),
+            ],
+          ),
+          child: const SizedBox.expand(),
+        ),
+      ),
+    );
+  }
+}
+
+class _ContextUsageStackedBarPainter extends CustomPainter {
+  const _ContextUsageStackedBarPainter({
+    required this.trackColor,
+    required this.segments,
+  });
+
+  final Color trackColor;
+  final List<({Color color, double fraction})> segments;
+
+  static const double _gap = 1.5;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final radius = Radius.circular(size.height / 2);
+    final rrect = RRect.fromLTRBR(0, 0, size.width, size.height, radius);
+    canvas.drawRRect(rrect, Paint()..color = trackColor);
+    if (segments.isEmpty) return;
+
+    canvas.save();
+    canvas.clipRRect(rrect);
+    var x = 0.0;
+    for (var i = 0; i < segments.length; i++) {
+      final width = size.width * segments[i].fraction;
+      if (width <= 0) continue;
+      var left = x;
+      var right = x + width;
+      if (i > 0) left += _gap / 2;
+      if (i < segments.length - 1) right -= _gap / 2;
+      if (right > left) {
+        canvas.drawRect(
+          Rect.fromLTRB(left, 0, right, size.height),
+          Paint()..color = segments[i].color,
+        );
+      }
+      x += width;
+    }
+    canvas.restore();
+  }
+
+  @override
+  bool shouldRepaint(_ContextUsageStackedBarPainter oldDelegate) {
+    if (trackColor != oldDelegate.trackColor) return true;
+    if (segments.length != oldDelegate.segments.length) return true;
+    for (var i = 0; i < segments.length; i++) {
+      final a = segments[i];
+      final b = oldDelegate.segments[i];
+      if (a.color != b.color || a.fraction != b.fraction) return true;
+    }
+    return false;
+  }
+}
+
+class ContextUsageLegend extends StatelessWidget {
+  const ContextUsageLegend({super.key, required this.snapshot});
 
   final ContextUsageSnapshot snapshot;
 
@@ -75,21 +316,22 @@ class ContextUsageBucketBars extends StatelessWidget {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
     final cs = Theme.of(context).colorScheme;
-    final entries = contextUsageVisibleBuckets(l10n, snapshot.buckets);
-    if (entries.isEmpty) return const SizedBox.shrink();
-    final denom = math.max(snapshot.contextWindow ?? snapshot.usedTokens, 1);
+    final segments = buildContextUsageSegments(snapshot);
+    if (segments.isEmpty) return const SizedBox.shrink();
+    final showPercent = contextUsageHasWindow(snapshot);
 
     return Column(
       children: [
-        for (var i = 0; i < entries.length; i++) ...[
+        for (var i = 0; i < segments.length; i++) ...[
           if (i > 0) const SizedBox(height: 8),
-          _BucketRow(
-            key: ValueKey('context-usage-bucket-${entries[i].key}'),
-            label: entries[i].label,
-            tokens: entries[i].tokens,
-            fraction: entries[i].tokens / denom,
-            color: cs.primary,
-            trackColor: cs.outline.withValues(alpha: 0.16),
+          _LegendRow(
+            key: ValueKey('context-usage-bucket-${segments[i].key}'),
+            color: ContextUsagePalette.of(segments[i].key, cs),
+            label: contextUsageSegmentLabel(l10n, segments[i].key),
+            tokens: segments[i].tokens,
+            percent: showPercent
+                ? '${(segments[i].fraction * 100).round()}%'
+                : null,
           ),
         ],
       ],
@@ -97,68 +339,104 @@ class ContextUsageBucketBars extends StatelessWidget {
   }
 }
 
-class _BucketRow extends StatelessWidget {
-  const _BucketRow({
+class _LegendRow extends StatelessWidget {
+  const _LegendRow({
     super.key,
+    required this.color,
     required this.label,
     required this.tokens,
-    required this.fraction,
-    required this.color,
-    required this.trackColor,
+    required this.percent,
   });
 
+  final Color color;
   final String label;
   final int tokens;
-  final double fraction;
-  final Color color;
-  final Color trackColor;
+  final String? percent;
 
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+    final valueStyle = TextStyle(
+      fontSize: 12,
+      fontWeight: AppFontWeights.medium,
+      color: cs.onSurface.withValues(alpha: 0.58),
+    );
+    return Row(
       children: [
-        Row(
-          children: [
-            Expanded(
-              child: Text(
-                label,
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: AppFontWeights.medium,
-                  color: cs.onSurface,
-                ),
-              ),
-            ),
-            Text(
-              formatTokenCount(tokens),
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: AppFontWeights.medium,
-                color: cs.onSurface.withValues(alpha: 0.62),
-              ),
-            ),
-          ],
+        DecoratedBox(
+          decoration: BoxDecoration(
+            color: color,
+            borderRadius: BorderRadius.circular(3),
+          ),
+          child: const SizedBox(width: 10, height: 10),
         ),
-        const SizedBox(height: 4),
-        ClipRRect(
-          borderRadius: BorderRadius.circular(999),
-          child: SizedBox(
-            height: 4,
-            child: Stack(
-              fit: StackFit.expand,
-              children: [
-                ColoredBox(color: trackColor),
-                FractionallySizedBox(
-                  alignment: AlignmentDirectional.centerStart,
-                  widthFactor: fraction.clamp(0.0, 1.0),
-                  child: ColoredBox(color: color),
-                ),
-              ],
+        const SizedBox(width: 10),
+        Expanded(
+          child: Text(
+            label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: AppFontWeights.regular,
+              color: cs.onSurface,
             ),
           ),
         ),
+        Text(formatTokenCount(tokens), style: valueStyle),
+        if (percent != null) ...[
+          const SizedBox(width: 8),
+          SizedBox(
+            width: 36,
+            child: Text(percent!, textAlign: TextAlign.end, style: valueStyle),
+          ),
+        ],
+      ],
+    );
+  }
+}
+
+class ContextUsageBreakdown extends StatelessWidget {
+  const ContextUsageBreakdown({
+    super.key,
+    required this.snapshot,
+    this.headerTrailing,
+  });
+
+  final ContextUsageSnapshot? snapshot;
+  final Widget? headerTrailing;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    final cs = Theme.of(context).colorScheme;
+    final segments = snapshot == null
+        ? const <ContextUsageSegment>[]
+        : buildContextUsageSegments(snapshot!);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        ContextUsageSummaryHeader(snapshot: snapshot, trailing: headerTrailing),
+        if (segments.isNotEmpty) ...[
+          const SizedBox(height: 10),
+          ContextUsageStackedBar(
+            key: const ValueKey('context-usage-stacked-bar'),
+            snapshot: snapshot!,
+          ),
+          const SizedBox(height: 12),
+          ContextUsageLegend(snapshot: snapshot!),
+        ],
+        if (snapshot?.state == ContextUsageState.exact) ...[
+          const SizedBox(height: 10),
+          Text(
+            l10n.contextUsageExactNote,
+            style: TextStyle(
+              fontSize: 12,
+              color: cs.onSurface.withValues(alpha: 0.55),
+            ),
+          ),
+        ],
       ],
     );
   }

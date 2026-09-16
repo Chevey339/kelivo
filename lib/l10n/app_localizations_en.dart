@@ -3185,16 +3185,16 @@ class AppLocalizationsEn extends AppLocalizations {
   String get chatInputBarCollapse => 'Collapse';
 
   @override
-  String get contextUsageTitle => 'Context usage';
+  String get contextUsageTitle => 'Context window';
 
   @override
-  String get contextUsageStateExact => 'Exact from last response';
+  String get contextUsageStateExact => 'Exact (from last response)';
 
   @override
   String get contextUsageStateEstimated => 'Estimated';
 
   @override
-  String get contextUsageStateStale => 'Stale — updating…';
+  String get contextUsageStateStale => 'Stale, updating…';
 
   @override
   String get contextUsageStateComputing => 'Computing…';
@@ -3219,6 +3219,12 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get contextUsageBucketDraft => 'Draft';
+
+  @override
+  String get contextUsageBucketUsed => 'Used';
+
+  @override
+  String get contextUsageFreeSpace => 'Free space';
 
   @override
   String contextUsageUsedWindow(String used, String window, int percent) {

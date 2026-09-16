@@ -145,6 +145,16 @@ void main() {
     expect(usage.refreshCalls, 1);
     expect(usage.lastForce, isFalse);
     expect(find.byKey(contextUsagePopoverKey), findsOneWidget);
+    expect(find.text('Context window'), findsOneWidget);
+    expect(find.text('110 / 1k (11%)'), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('context-usage-stacked-bar')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey('context-usage-bucket-freeSpace')),
+      findsOneWidget,
+    );
     expect(
       find.byKey(const ValueKey('context-usage-bucket-system')),
       findsOneWidget,
@@ -187,5 +197,7 @@ void main() {
       findsOneWidget,
     );
     expect(find.text('Set context window'), findsOneWidget);
+    expect(find.text('40'), findsWidgets);
+    expect(find.textContaining('%'), findsNothing);
   });
 }

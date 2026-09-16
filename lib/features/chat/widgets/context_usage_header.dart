@@ -7,7 +7,6 @@ import '../../../features/model/pages/model_spec_edit_page.dart';
 import '../../../icons/lucide_adapter.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../shared/widgets/context_usage_details.dart';
-import '../../../shared/widgets/context_usage_ring.dart';
 import '../../../shared/widgets/ios_tactile.dart';
 import '../../../shared/widgets/section_card.dart';
 import '../../../theme/app_font_weights.dart';
@@ -63,8 +62,6 @@ class _ContextUsageHeaderState extends State<ContextUsageHeader> {
 
   @override
   Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context)!;
-    final cs = Theme.of(context).colorScheme;
     final usage = context.watch<ContextUsageService?>();
     final id = _conversationId;
     final snapshot = id == null
@@ -80,49 +77,7 @@ class _ContextUsageHeaderState extends State<ContextUsageHeader> {
       key: const ValueKey('context-usage-header'),
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Row(
-          children: [
-            ContextUsageRing(snapshot: snapshot, onTap: () {}, size: 44),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    contextUsageSummaryText(l10n, snapshot),
-                    style: TextStyle(
-                      fontSize: 15,
-                      fontWeight: AppFontWeights.semibold,
-                      color: cs.onSurface,
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    contextUsageStateLabel(l10n, snapshot),
-                    style: TextStyle(
-                      fontSize: 13,
-                      color: cs.onSurface.withValues(alpha: 0.55),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-        if (snapshot?.state == ContextUsageState.estimated) ...[
-          const SizedBox(height: 14),
-          ContextUsageBucketBars(snapshot: snapshot!),
-        ],
-        if (snapshot?.state == ContextUsageState.exact) ...[
-          const SizedBox(height: 10),
-          Text(
-            l10n.contextUsageExactNote,
-            style: TextStyle(
-              fontSize: 12,
-              color: cs.onSurface.withValues(alpha: 0.55),
-            ),
-          ),
-        ],
+        ContextUsageBreakdown(snapshot: snapshot),
         if (showSetWindow) ...[
           const SizedBox(height: 12),
           _SetWindowRow(onTap: () => _openSetWindow(snapshot)),
