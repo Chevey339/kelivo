@@ -5,7 +5,6 @@ import '../../../core/models/reasoning_request.dart';
 import '../../../icons/lucide_adapter.dart';
 import '../../../icons/reasoning_icons.dart';
 import '../../../l10n/app_localizations.dart';
-import '../../../shared/widgets/custom_bottom_sheet.dart';
 import '../../../shared/widgets/effort_slider.dart';
 import '../../../utils/platform_utils.dart';
 import '../../chat/widgets/reasoning_level_sheet.dart';
@@ -43,14 +42,11 @@ Future<AssistantReasoningPick?> showAssistantReasoningPicker(
     );
     return picked;
   }
-  await showCustomBottomSheet<void>(
+  await showReasoningPickerSheet<void>(
     context: context,
     title: l10n.assistantEditThinkingBudgetTitle,
-    builder: (context, controller) => AssistantReasoningPicker(
-      current: current,
-      scrollController: controller,
-      onSelected: onSelected,
-    ),
+    builder: (context) =>
+        AssistantReasoningPicker(current: current, onSelected: onSelected),
   );
   return picked;
 }
@@ -60,12 +56,10 @@ class AssistantReasoningPicker extends StatelessWidget {
     super.key,
     required this.current,
     required this.onSelected,
-    this.scrollController,
   });
 
   final ReasoningRequest? current;
   final ValueChanged<ReasoningRequest?> onSelected;
-  final ScrollController? scrollController;
 
   static const List<ReasoningLevel> _levels = ReasoningLevel.values;
 
@@ -89,7 +83,7 @@ class AssistantReasoningPicker extends StatelessWidget {
     ];
     final labels = <String>[
       l10n.reasoningLevelSourceModelDefault,
-      for (final level in _levels) reasoningLevelCompactLabel(l10n, level),
+      for (final level in _levels) reasoningLevelLabel(l10n, level),
     ];
     final slider = EffortSliderGroup(
       selectedIndex: _indexFor(current),
@@ -127,17 +121,9 @@ class AssistantReasoningPicker extends StatelessWidget {
       },
     );
 
-    if (scrollController == null) {
-      return SingleChildScrollView(
-        padding: const EdgeInsets.fromLTRB(8, 8, 8, 16),
-        child: slider,
-      );
-    }
-    return ListView(
-      controller: scrollController,
-      shrinkWrap: true,
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-      children: [slider],
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(8, 8, 8, 16),
+      child: slider,
     );
   }
 }

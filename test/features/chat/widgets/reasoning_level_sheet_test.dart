@@ -14,6 +14,7 @@ import 'package:Kelivo/core/services/model_spec/model_spec_resolver.dart';
 import 'package:Kelivo/features/chat/widgets/reasoning_level_sheet.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
 import 'package:Kelivo/shared/widgets/custom_bottom_sheet.dart';
+import 'package:Kelivo/shared/widgets/effort_slider.dart';
 
 ProviderConfig _effortConfig() {
   return ProviderConfig(
@@ -159,7 +160,26 @@ void main() {
       );
       await _openSheet(tester);
 
-      expect(find.byKey(CustomBottomSheet.panelKey), findsOneWidget);
+      expect(find.byType(CustomBottomSheet), findsNothing);
+      expect(find.byKey(CustomBottomSheet.panelKey), findsNothing);
+      expect(find.byKey(ReasoningPickerSheet.panelKey), findsOneWidget);
+      final sheetHeight = tester
+          .getSize(find.byKey(ReasoningPickerSheet.panelKey))
+          .height;
+      final surfaceHeight = tester.getSize(find.byType(MaterialApp)).height;
+      expect(sheetHeight, lessThan(surfaceHeight * 0.60));
+      expect(find.text('Auto'), findsWidgets);
+      expect(find.text('Low'), findsWidgets);
+      expect(find.text('Medium'), findsWidgets);
+      expect(find.text('High'), findsWidgets);
+      expect(find.text('mid'), findsNothing);
+      expect(
+        find.descendant(
+          of: find.byType(EffortSlider),
+          matching: find.byType(ExcludeSemantics),
+        ),
+        findsWidgets,
+      );
       expect(find.byKey(const ValueKey('reasoning-row-auto')), findsOneWidget);
       expect(find.byKey(const ValueKey('reasoning-row-off')), findsNothing);
       expect(

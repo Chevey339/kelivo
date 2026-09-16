@@ -95,6 +95,11 @@ void main() {
     expect(find.byKey(const ValueKey('reasoning-row-off')), findsNothing);
     expect(find.byKey(const ValueKey('reasoning-row-custom')), findsNothing);
     expect(find.byKey(const ValueKey('reasoning-row-high')), findsOneWidget);
+    expect(find.text('Auto'), findsWidgets);
+    expect(find.text('Low'), findsWidgets);
+    expect(find.text('Medium'), findsWidgets);
+    expect(find.text('High'), findsWidgets);
+    expect(find.text('mid'), findsNothing);
 
     await tester.tapAt(
       tester.getCenter(find.byKey(const ValueKey('reasoning-row-high'))),

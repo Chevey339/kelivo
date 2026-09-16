@@ -62,6 +62,11 @@ class EffortSlider extends StatelessWidget {
     return _stopInset + span * (index / (stopCount - 1));
   }
 
+  double _labelSlotWidth(double width) {
+    if (stopCount <= 0) return width;
+    return width / stopCount;
+  }
+
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
@@ -95,6 +100,7 @@ class EffortSlider extends StatelessWidget {
             child: SizedBox(
               height: _height + (showLabels ? _labelHeight : 0),
               child: Stack(
+                clipBehavior: Clip.none,
                 alignment: Alignment.topCenter,
                 children: [
                   CustomPaint(
@@ -150,19 +156,26 @@ class EffortSlider extends StatelessWidget {
                   if (showLabels)
                     for (var i = 0; i < stopLabels.length; i++)
                       Positioned(
-                        left: _stopX(width, i) - 22,
+                        left: _stopX(width, i) - _labelSlotWidth(width) / 2,
                         top: _height,
-                        width: 44,
-                        height: _labelHeight,
-                        child: Text(
-                          stopLabels[i],
-                          textAlign: TextAlign.center,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            fontSize: 10,
-                            height: 1.2,
-                            color: cs.onSurface.withValues(alpha: 0.45),
+                        child: SizedBox(
+                          width: _labelSlotWidth(width),
+                          height: _labelHeight,
+                          child: ExcludeSemantics(
+                            child: FittedBox(
+                              fit: BoxFit.scaleDown,
+                              child: Text(
+                                stopLabels[i],
+                                textAlign: TextAlign.center,
+                                maxLines: 1,
+                                softWrap: false,
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  height: 1.2,
+                                  color: cs.onSurface.withValues(alpha: 0.45),
+                                ),
+                              ),
+                            ),
                           ),
                         ),
                       ),

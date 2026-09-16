@@ -11,11 +11,11 @@ import '../../../icons/lucide_adapter.dart';
 import '../../../icons/reasoning_icons.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../shared/dialogs/reasoning_budget_custom_dialog.dart';
-import '../../../shared/widgets/custom_bottom_sheet.dart';
 import '../../../shared/widgets/effort_slider.dart';
 import '../../../shared/widgets/ios_tactile.dart';
 import '../../../shared/widgets/section_card.dart';
 import '../../../theme/app_font_weights.dart';
+import '../../../theme/app_semantic_colors.dart';
 
 Future<void> showReasoningLevelSheet(
   BuildContext context, {
@@ -24,17 +24,128 @@ Future<void> showReasoningLevelSheet(
   Assistant? assistant,
 }) {
   final l10n = AppLocalizations.of(context)!;
-  return showCustomBottomSheet<void>(
+  return showReasoningPickerSheet<void>(
     context: context,
     title: l10n.reasoningLevelSheetTitle,
-    builder: (context, controller) => ReasoningLevelPicker(
+    builder: (context) => ReasoningLevelPicker(
       config: config,
       modelId: modelId,
       assistant: assistant,
-      scrollController: controller,
-      compact: false,
     ),
   );
+}
+
+/// Content-sized mobile sheet for the reasoning pickers.
+///
+/// Matches the app's other mobile sheets (radius 20, handle, overlay
+/// surface) but wraps its child instead of locking to a 60 % partial height.
+Future<T?> showReasoningPickerSheet<T>({
+  required BuildContext context,
+  required String title,
+  required WidgetBuilder builder,
+}) {
+  return showModalBottomSheet<T>(
+    context: context,
+    isScrollControlled: true,
+    backgroundColor: context.overlaySurface,
+    shape: const RoundedRectangleBorder(
+      borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+    ),
+    builder: (ctx) => ReasoningPickerSheet(title: title, child: builder(ctx)),
+  );
+}
+
+class ReasoningPickerSheet extends StatelessWidget {
+  const ReasoningPickerSheet({
+    super.key,
+    required this.title,
+    required this.child,
+  });
+
+  static const panelKey = ValueKey<String>('reasoning_picker_sheet_panel');
+  static const closeButtonKey = ValueKey<String>(
+    'reasoning_picker_sheet_close_button',
+  );
+  static const double maxHeightFactor = 0.85;
+
+  final String title;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final l10n = AppLocalizations.of(context);
+    final maxHeight = MediaQuery.sizeOf(context).height * maxHeightFactor;
+    final titleStyle = TextStyle(
+      color: cs.onSurface,
+      fontSize: 15,
+      fontWeight: AppFontWeights.emphasis,
+      height: 1.2,
+    );
+
+    return SafeArea(
+      top: false,
+      child: ConstrainedBox(
+        key: panelKey,
+        constraints: BoxConstraints(maxHeight: maxHeight),
+        child: ListView(
+          shrinkWrap: true,
+          padding: EdgeInsets.only(
+            bottom: MediaQuery.viewInsetsOf(context).bottom,
+          ),
+          children: [
+            SizedBox(
+              height: 30,
+              child: Center(
+                child: Container(
+                  width: 32,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: cs.onSurface.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 8, 16, 0),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: titleStyle,
+                    ),
+                  ),
+                  SizedBox(
+                    key: closeButtonKey,
+                    width: 24,
+                    height: 24,
+                    child: Tooltip(
+                      message:
+                          l10n?.commonClose ??
+                          MaterialLocalizations.of(context).closeButtonTooltip,
+                      child: IosIconButton(
+                        icon: Lucide.X,
+                        size: 20,
+                        padding: EdgeInsets.zero,
+                        color: cs.onSurface.withValues(alpha: 0.62),
+                        semanticLabel: l10n?.commonClose,
+                        onTap: () => Navigator.of(context).maybePop(),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            child,
+          ],
+        ),
+      ),
+    );
+  }
 }
 
 String reasoningLevelLabel(AppLocalizations l10n, ReasoningLevel level) {
@@ -95,7 +206,6 @@ class ReasoningLevelPicker extends StatelessWidget {
     required this.config,
     required this.modelId,
     this.assistant,
-    this.scrollController,
     this.compact = false,
     this.onClose,
     this.onSuspendedChanged,
@@ -104,7 +214,6 @@ class ReasoningLevelPicker extends StatelessWidget {
   final ProviderConfig config;
   final String modelId;
   final Assistant? assistant;
-  final ScrollController? scrollController;
   final bool compact;
   final Future<void> Function()? onClose;
   final ValueChanged<bool>? onSuspendedChanged;
@@ -114,10 +223,7 @@ class ReasoningLevelPicker extends StatelessWidget {
     final settings = context.watch<SettingsProvider>();
     final spec = ModelSpecResolver.instance.spec(config, modelId);
     if (!spec.supportsReasoning) {
-      return _UnsupportedState(
-        compact: compact,
-        scrollController: scrollController,
-      );
+      return _UnsupportedState(compact: compact);
     }
     final snapshot = buildReasoningLevelPickerSnapshot(
       settings: settings,
@@ -130,7 +236,6 @@ class ReasoningLevelPicker extends StatelessWidget {
       snapshot: snapshot,
       config: config,
       modelId: modelId,
-      scrollController: scrollController,
       compact: compact,
       onClose: onClose,
       onSuspendedChanged: onSuspendedChanged,
@@ -139,16 +244,15 @@ class ReasoningLevelPicker extends StatelessWidget {
 }
 
 class _UnsupportedState extends StatelessWidget {
-  const _UnsupportedState({required this.compact, this.scrollController});
+  const _UnsupportedState({required this.compact});
 
   final bool compact;
-  final ScrollController? scrollController;
 
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
     final cs = Theme.of(context).colorScheme;
-    final body = Padding(
+    return Padding(
       key: const ValueKey('reasoning-unsupported'),
       padding: EdgeInsets.fromLTRB(
         compact ? 16 : 20,
@@ -164,12 +268,6 @@ class _UnsupportedState extends StatelessWidget {
         ),
       ),
     );
-    if (scrollController == null) return body;
-    return ListView(
-      controller: scrollController,
-      padding: EdgeInsets.zero,
-      children: [body],
-    );
   }
 }
 
@@ -179,7 +277,6 @@ class _SliderPicker extends StatelessWidget {
     required this.config,
     required this.modelId,
     required this.compact,
-    this.scrollController,
     this.onClose,
     this.onSuspendedChanged,
   });
@@ -188,7 +285,6 @@ class _SliderPicker extends StatelessWidget {
   final ProviderConfig config;
   final String modelId;
   final bool compact;
-  final ScrollController? scrollController;
   final Future<void> Function()? onClose;
   final ValueChanged<bool>? onSuspendedChanged;
 
@@ -215,10 +311,7 @@ class _SliderPicker extends StatelessWidget {
           stopKeys: [for (final stop in stops) stop.key],
           stopLabels: [
             for (final stop in stops)
-              reasoningLevelCompactLabel(
-                l10n,
-                stop.level ?? ReasoningLevel.auto,
-              ),
+              reasoningLevelLabel(l10n, stop.level ?? ReasoningLevel.auto),
           ],
           padding: EdgeInsets.symmetric(horizontal: compact ? 20 : 28),
           semanticsValue: (index) {
@@ -283,24 +376,9 @@ class _SliderPicker extends StatelessWidget {
       ],
     ];
 
-    if (scrollController == null) {
-      return Padding(
-        padding: const EdgeInsets.only(bottom: 2),
-        child: SingleChildScrollView(
-          padding: EdgeInsets.fromLTRB(
-            compact ? 0 : 16,
-            10,
-            compact ? 0 : 16,
-            12,
-          ),
-          child: Column(mainAxisSize: MainAxisSize.min, children: children),
-        ),
-      );
-    }
-    return ListView(
-      controller: scrollController,
-      padding: const EdgeInsets.fromLTRB(16, 4, 16, 20),
-      children: children,
+    return Padding(
+      padding: EdgeInsets.fromLTRB(compact ? 0 : 16, 10, compact ? 0 : 16, 12),
+      child: Column(mainAxisSize: MainAxisSize.min, children: children),
     );
   }
 
