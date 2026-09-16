@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -10,46 +9,36 @@ import '../l10n/app_localizations.dart';
 import '../shared/widgets/context_usage_details.dart';
 import '../shared/widgets/ios_tactile.dart';
 import '../theme/app_font_weights.dart';
-import '../theme/design_tokens.dart';
+import 'desktop_glass_popover.dart';
 import 'model_spec_edit_dialog.dart';
 
 const Key contextUsagePopoverKey = ValueKey<String>('context-usage-popover');
+
+const double kContextUsagePopoverWidth = 332;
 
 Future<void> showContextUsagePopover(
   BuildContext context, {
   required Rect anchorRect,
   required String conversationId,
   required String draftText,
-  VoidCallback? onCompress,
-  VoidCallback? onClear,
 }) async {
   final usage = context.read<ContextUsageService>();
   unawaited(usage.refresh(conversationId, draftText: draftText));
 
-  final overlay = Overlay.maybeOf(context);
-  if (overlay == null) return;
-
   var requestSetWindow = false;
-  final completer = Completer<void>();
-  late OverlayEntry entry;
-  entry = OverlayEntry(
-    builder: (ctx) => _ContextUsagePopoverOverlay(
-      anchorRect: anchorRect,
+  await showDesktopGlassPopover(
+    context,
+    anchorRect: anchorRect,
+    width: kContextUsagePopoverWidth,
+    builder: (ctx, handle) => _ContextUsagePopoverContent(
       conversationId: conversationId,
       draftText: draftText,
-      onCompress: onCompress,
-      onClear: onClear,
-      onRequestSetWindow: () => requestSetWindow = true,
-      onClose: () {
-        try {
-          entry.remove();
-        } catch (_) {}
-        if (!completer.isCompleted) completer.complete();
+      onRequestSetWindow: () async {
+        requestSetWindow = true;
+        await handle.close();
       },
     ),
   );
-  overlay.insert(entry);
-  await completer.future;
   if (!context.mounted || !requestSetWindow) return;
 
   final snap = usage.snapshot(conversationId) ?? usage.current;
@@ -66,192 +55,16 @@ Future<void> showContextUsagePopover(
   }
 }
 
-class _ContextUsagePopoverOverlay extends StatefulWidget {
-  const _ContextUsagePopoverOverlay({
-    required this.anchorRect,
-    required this.conversationId,
-    required this.draftText,
-    required this.onClose,
-    required this.onRequestSetWindow,
-    this.onCompress,
-    this.onClear,
-  });
-
-  final Rect anchorRect;
-  final String conversationId;
-  final String draftText;
-  final VoidCallback onClose;
-  final VoidCallback onRequestSetWindow;
-  final VoidCallback? onCompress;
-  final VoidCallback? onClear;
-
-  @override
-  State<_ContextUsagePopoverOverlay> createState() =>
-      _ContextUsagePopoverOverlayState();
-}
-
-class _ContextUsagePopoverOverlayState
-    extends State<_ContextUsagePopoverOverlay>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _controller;
-  late final Animation<double> _fadeIn;
-  Offset _offset = const Offset(0, 0.12);
-  bool _closing = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _controller = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 260),
-    );
-    _fadeIn = CurvedAnimation(parent: _controller, curve: Curves.easeOutCubic);
-    WidgetsBinding.instance.addPostFrameCallback((_) async {
-      if (!mounted) return;
-      setState(() => _offset = Offset.zero);
-      try {
-        await _controller.forward();
-      } catch (_) {}
-    });
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  Future<void> _close() async {
-    if (_closing) return;
-    _closing = true;
-    setState(() => _offset = const Offset(0, 1.0));
-    try {
-      await _controller.reverse();
-    } catch (_) {}
-    if (mounted) widget.onClose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    const width = 300.0;
-    final screen = MediaQuery.of(context).size;
-    final left =
-        (widget.anchorRect.left + (widget.anchorRect.width - width) / 2).clamp(
-          8.0,
-          screen.width - width - 8.0,
-        );
-    final clipHeight = widget.anchorRect.top.clamp(0.0, screen.height);
-
-    return Stack(
-      children: [
-        Positioned.fill(
-          child: GestureDetector(
-            behavior: HitTestBehavior.translucent,
-            onTap: _close,
-          ),
-        ),
-        Positioned(
-          left: 0,
-          right: 0,
-          top: 0,
-          height: clipHeight,
-          child: ClipRect(
-            child: Stack(
-              children: [
-                Positioned(
-                  left: left,
-                  width: width,
-                  bottom: 0,
-                  child: FadeTransition(
-                    opacity: _fadeIn,
-                    child: AnimatedSlide(
-                      duration: const Duration(milliseconds: 260),
-                      curve: Curves.easeOutCubic,
-                      offset: _offset,
-                      child: _GlassPanel(
-                        borderRadius: const BorderRadius.vertical(
-                          top: Radius.circular(14),
-                        ),
-                        child: _ContextUsagePopoverContent(
-                          conversationId: widget.conversationId,
-                          draftText: widget.draftText,
-                          onCompress: widget.onCompress,
-                          onClear: widget.onClear,
-                          onClose: _close,
-                          onRequestSetWindow: () async {
-                            widget.onRequestSetWindow();
-                            await _close();
-                          },
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _GlassPanel extends StatelessWidget {
-  const _GlassPanel({required this.child, this.borderRadius});
-  final Widget child;
-  final BorderRadius? borderRadius;
-
-  @override
-  Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final cs = Theme.of(context).colorScheme;
-    final radius = borderRadius ?? BorderRadius.circular(14);
-    return ClipRRect(
-      borderRadius: radius,
-      child: BackdropFilter(
-        filter: ui.ImageFilter.blur(sigmaX: 20, sigmaY: 20),
-        child: DecoratedBox(
-          decoration: BoxDecoration(
-            color: AppOverlayColors.desktopPopoverSurface(cs),
-            borderRadius: radius,
-            border: Border(
-              top: BorderSide(
-                color: cs.onSurface.withValues(alpha: isDark ? 0.06 : 0.12),
-                width: 0.7,
-              ),
-              left: BorderSide(
-                color: cs.onSurface.withValues(alpha: isDark ? 0.06 : 0.12),
-                width: 0.6,
-              ),
-              right: BorderSide(
-                color: cs.onSurface.withValues(alpha: isDark ? 0.06 : 0.12),
-                width: 0.6,
-              ),
-            ),
-          ),
-          child: Material(type: MaterialType.transparency, child: child),
-        ),
-      ),
-    );
-  }
-}
-
 class _ContextUsagePopoverContent extends StatelessWidget {
   const _ContextUsagePopoverContent({
     required this.conversationId,
     required this.draftText,
-    required this.onClose,
     required this.onRequestSetWindow,
-    this.onCompress,
-    this.onClear,
   });
 
   final String conversationId;
   final String draftText;
-  final VoidCallback onClose;
-  final VoidCallback onRequestSetWindow;
-  final VoidCallback? onCompress;
-  final VoidCallback? onClear;
+  final Future<void> Function() onRequestSetWindow;
 
   @override
   Widget build(BuildContext context) {
@@ -268,7 +81,7 @@ class _ContextUsagePopoverContent extends StatelessWidget {
       key: contextUsagePopoverKey,
       constraints: const BoxConstraints(maxHeight: 420),
       child: SingleChildScrollView(
-        padding: const EdgeInsets.fromLTRB(14, 12, 14, 10),
+        padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -293,29 +106,7 @@ class _ContextUsagePopoverContent extends StatelessWidget {
                 key: const ValueKey('context-usage-set-window'),
                 icon: Lucide.Settings2,
                 label: l10n.contextUsageSetWindow,
-                onTap: onRequestSetWindow,
-              ),
-            ],
-            if (onCompress != null) ...[
-              const SizedBox(height: 4),
-              _ActionRow(
-                icon: Lucide.package2,
-                label: l10n.compressContext,
-                onTap: () {
-                  onClose();
-                  onCompress!();
-                },
-              ),
-            ],
-            if (onClear != null) ...[
-              const SizedBox(height: 4),
-              _ActionRow(
-                icon: Lucide.Eraser,
-                label: l10n.bottomToolsSheetClearContext,
-                onTap: () {
-                  onClose();
-                  onClear!();
-                },
+                onTap: () => unawaited(onRequestSetWindow()),
               ),
             ],
           ],

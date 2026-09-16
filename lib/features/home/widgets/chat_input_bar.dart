@@ -3065,9 +3065,6 @@ class _ChatInputBarState extends State<ChatInputBar>
                                                 conversationId:
                                                     widget.conversationId!,
                                                 draftText: _controller.text,
-                                                onCompress:
-                                                    widget.onCompressContext,
-                                                onClear: widget.onClearContext,
                                               ),
                                             _CompactSendButton(
                                               enabled:
@@ -3445,14 +3442,10 @@ class _ContextUsageInputControl extends StatelessWidget {
   const _ContextUsageInputControl({
     required this.conversationId,
     required this.draftText,
-    this.onCompress,
-    this.onClear,
   });
 
   final String conversationId;
   final String draftText;
-  final VoidCallback? onCompress;
-  final VoidCallback? onClear;
 
   @override
   Widget build(BuildContext context) {
@@ -3474,8 +3467,6 @@ class _ContextUsageInputControl extends StatelessWidget {
                   anchorRect: origin & box.size,
                   conversationId: conversationId,
                   draftText: draftText,
-                  onCompress: onCompress,
-                  onClear: onClear,
                 ),
               );
             },

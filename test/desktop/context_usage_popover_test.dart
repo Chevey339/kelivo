@@ -6,8 +6,10 @@ import 'package:Kelivo/core/providers/assistant_provider.dart';
 import 'package:Kelivo/core/providers/settings_provider.dart';
 import 'package:Kelivo/core/services/chat/chat_service.dart';
 import 'package:Kelivo/desktop/context_usage_popover.dart';
+import 'package:Kelivo/desktop/desktop_glass_popover.dart';
 import 'package:Kelivo/features/home/services/context_usage_service.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
+import 'package:Kelivo/shared/widgets/context_usage_details.dart';
 
 import '../support/business_test_harness.dart';
 
@@ -144,7 +146,11 @@ void main() {
 
     expect(usage.refreshCalls, 1);
     expect(usage.lastForce, isFalse);
+    expect(find.byType(DesktopGlassPanel), findsOneWidget);
+    expect(find.byType(ContextUsageBreakdown), findsOneWidget);
     expect(find.byKey(contextUsagePopoverKey), findsOneWidget);
+    expect(find.text('Compress Context'), findsNothing);
+    expect(find.text('Clear Context'), findsNothing);
     expect(find.text('Context window'), findsOneWidget);
     expect(find.text('110 / 1k (11%)'), findsOneWidget);
     expect(
@@ -192,6 +198,10 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('open-context-usage-popover')));
     await tester.pumpAndSettle();
 
+    expect(find.byType(DesktopGlassPanel), findsOneWidget);
+    expect(find.byType(ContextUsageBreakdown), findsOneWidget);
+    expect(find.text('Compress Context'), findsNothing);
+    expect(find.text('Clear Context'), findsNothing);
     expect(
       find.byKey(const ValueKey('context-usage-set-window')),
       findsOneWidget,

@@ -1,15 +1,22 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
-import 'package:flutter_animate/flutter_animate.dart';
 
 import '../../features/home/services/context_usage_service.dart';
 import '../../l10n/app_localizations.dart';
-import '../../theme/app_font_weights.dart';
 import '../../core/utils/token_format.dart';
+import '../../theme/app_semantic_colors.dart';
 import 'ios_tactile.dart';
 
-Color contextUsageColor(ColorScheme cs, ContextUsageSnapshot? snapshot) {
+const double kContextUsageRingSize = 16;
+const double kContextUsageRingStroke = 2;
+const double kContextUsageRingHitSize = 32;
+
+Color contextUsageColor(
+  ColorScheme cs,
+  ContextUsageSnapshot? snapshot, {
+  Color? warning,
+}) {
   final grey = cs.outline;
   if (snapshot == null || snapshot.state == ContextUsageState.none) {
     return grey;
@@ -19,12 +26,12 @@ Color contextUsageColor(ColorScheme cs, ContextUsageSnapshot? snapshot) {
   final Color base;
   if (ratio == null) {
     base = grey;
-  } else if (ratio > 0.95) {
+  } else if (ratio > 0.90) {
     base = cs.error;
-  } else if (ratio >= 0.8) {
-    base = cs.tertiary;
+  } else if (ratio > 0.75) {
+    base = warning ?? const Color(0xFFF57C00);
   } else {
-    base = cs.primary;
+    base = cs.onSurface.withValues(alpha: 0.70);
   }
 
   return switch (snapshot.state) {
@@ -41,7 +48,7 @@ class ContextUsageRingPainter extends CustomPainter {
     required this.trackColor,
     required this.progressColor,
     required this.ratio,
-    this.strokeWidth = 2.6,
+    this.strokeWidth = kContextUsageRingStroke,
   });
 
   final Color trackColor;
@@ -55,6 +62,7 @@ class ContextUsageRingPainter extends CustomPainter {
     final radius = (size.shortestSide - strokeWidth) / 2;
     final rect = Rect.fromCircle(center: center, radius: radius);
     final track = Paint()
+      ..isAntiAlias = true
       ..style = PaintingStyle.stroke
       ..strokeWidth = strokeWidth
       ..strokeCap = StrokeCap.round
@@ -62,6 +70,7 @@ class ContextUsageRingPainter extends CustomPainter {
     canvas.drawCircle(center, radius, track);
     if (ratio == null) return;
     final progress = Paint()
+      ..isAntiAlias = true
       ..style = PaintingStyle.stroke
       ..strokeWidth = strokeWidth
       ..strokeCap = StrokeCap.round
@@ -89,35 +98,30 @@ class ContextUsageRing extends StatelessWidget {
     super.key,
     required this.snapshot,
     required this.onTap,
-    this.size = 28,
+    this.size = kContextUsageRingSize,
+    this.hitSize = kContextUsageRingHitSize,
+    this.strokeWidth = kContextUsageRingStroke,
   });
 
   final ContextUsageSnapshot? snapshot;
   final VoidCallback onTap;
   final double size;
+  final double hitSize;
+  final double strokeWidth;
 
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
     final cs = Theme.of(context).colorScheme;
-    final progressColor = contextUsageColor(cs, snapshot);
+    final progressColor = contextUsageColor(
+      cs,
+      snapshot,
+      warning: context.appColors.warning,
+    );
     final ratio = snapshot?.ratio;
     final hasArc = ratio != null && snapshot?.state != ContextUsageState.none;
-    final showLabel = size >= 28 && hasArc;
     final tooltip = _tooltip(l10n, snapshot);
-    final painter = ContextUsageRingPainter(
-      trackColor: cs.outline.withValues(alpha: 0.35),
-      progressColor: progressColor,
-      ratio: hasArc ? ratio : null,
-    );
-
-    Widget ring = CustomPaint(painter: painter, size: Size.square(size));
-    if (snapshot?.state == ContextUsageState.computing) {
-      ring = ring
-          .animate(onPlay: (controller) => controller.repeat())
-          .rotate(duration: 1400.ms)
-          .fade(begin: 0.55, end: 1, duration: 800.ms);
-    }
+    final targetRatio = (ratio ?? 0).clamp(0.0, 1.0);
 
     return Tooltip(
       message: tooltip,
@@ -127,29 +131,27 @@ class ContextUsageRing extends StatelessWidget {
         haptics: false,
         borderRadius: BorderRadius.circular(999),
         padding: EdgeInsets.zero,
+        baseColor: Colors.transparent,
+        pressedBlendStrength: 0,
         child: SizedBox.square(
-          dimension: size,
-          child: Stack(
-            alignment: Alignment.center,
-            children: [
-              ring,
-              if (showLabel)
-                Padding(
-                  padding: const EdgeInsets.all(5),
-                  child: FittedBox(
-                    fit: BoxFit.scaleDown,
-                    child: Text(
-                      '${(ratio * 100).round()}%',
-                      style: TextStyle(
-                        fontSize: 8,
-                        fontWeight: AppFontWeights.semibold,
-                        height: 1,
-                        color: progressColor,
-                      ),
-                    ),
+          dimension: hitSize,
+          child: Center(
+            child: TweenAnimationBuilder<double>(
+              duration: const Duration(milliseconds: 280),
+              curve: Curves.easeOutCubic,
+              tween: Tween<double>(begin: 0, end: targetRatio),
+              builder: (context, animatedRatio, _) {
+                return CustomPaint(
+                  size: Size.square(size),
+                  painter: ContextUsageRingPainter(
+                    trackColor: cs.onSurface.withValues(alpha: 0.18),
+                    progressColor: progressColor,
+                    ratio: hasArc ? animatedRatio : null,
+                    strokeWidth: strokeWidth,
                   ),
-                ),
-            ],
+                );
+              },
+            ),
           ),
         ),
       ),
