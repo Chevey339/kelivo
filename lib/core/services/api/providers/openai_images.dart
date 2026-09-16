@@ -423,7 +423,7 @@ Future<http.MultipartFile?> _tryOpenAIImageMultipartFile(ImageRef ref) async {
     final mime = (ref.mime != null && ref.mime!.trim().isNotEmpty)
         ? ref.mime!.trim()
         : mimeFromPath(fixed);
-    return http.MultipartFile.fromPath(
+    return await http.MultipartFile.fromPath(
       'image[]',
       fixed,
       contentType: _openAIImageMediaType(mime),

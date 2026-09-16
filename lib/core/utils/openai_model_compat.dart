@@ -1,5 +1,9 @@
-import 'kimi_model_compat.dart';
+import '../model_capabilities/builtin_model_rules.dart';
+import '../model_capabilities/model_capabilities.dart';
 
+/// Legacy-shaped view over a model's resolved reasoning support.
+///
+/// Built from the capability cascade rather than a private dispatch table.
 class OpenAIReasoningSupport {
   const OpenAIReasoningSupport({
     required this.supportedEfforts,
@@ -20,126 +24,6 @@ class OpenAIReasoningSupport {
   bool get supportsMax => supportedEfforts.contains('max');
 }
 
-const OpenAIReasoningSupport _gpt5Support = OpenAIReasoningSupport(
-  supportedEfforts: <String>['none', 'low', 'medium', 'high'],
-);
-const OpenAIReasoningSupport _gpt5ProSupport = OpenAIReasoningSupport(
-  supportedEfforts: <String>['high'],
-  offFallback: 'high',
-);
-const OpenAIReasoningSupport _gpt5CodexSupport = OpenAIReasoningSupport(
-  supportedEfforts: <String>['low', 'medium', 'high'],
-  offFallback: 'low',
-);
-const OpenAIReasoningSupport _gpt51Support = OpenAIReasoningSupport(
-  supportedEfforts: <String>['none', 'low', 'medium', 'high'],
-);
-const OpenAIReasoningSupport _gpt51ChatLatestSupport = OpenAIReasoningSupport(
-  supportedEfforts: <String>['none', 'low', 'medium', 'high'],
-);
-const OpenAIReasoningSupport _gpt52Support = OpenAIReasoningSupport(
-  supportedEfforts: <String>['none', 'low', 'medium', 'high', 'xhigh'],
-  samplingRequiresNone: true,
-);
-const OpenAIReasoningSupport _gpt52ChatLatestSupport = OpenAIReasoningSupport(
-  supportedEfforts: <String>['none', 'low', 'medium', 'high', 'xhigh'],
-);
-const OpenAIReasoningSupport _gpt51CodexSupport = OpenAIReasoningSupport(
-  supportedEfforts: <String>['low', 'medium', 'high'],
-  offFallback: 'low',
-);
-const OpenAIReasoningSupport _gpt51CodexMaxSupport = OpenAIReasoningSupport(
-  supportedEfforts: <String>['low', 'medium', 'high', 'xhigh'],
-  offFallback: 'low',
-);
-const OpenAIReasoningSupport _gpt52ProSupport = OpenAIReasoningSupport(
-  supportedEfforts: <String>['medium', 'high', 'xhigh'],
-  offFallback: 'medium',
-);
-const OpenAIReasoningSupport _gpt52CodexSupport = OpenAIReasoningSupport(
-  supportedEfforts: <String>['low', 'medium', 'high', 'xhigh'],
-  offFallback: 'low',
-);
-const OpenAIReasoningSupport _gpt53ChatLatestSupport = OpenAIReasoningSupport(
-  supportedEfforts: <String>['none', 'low', 'medium', 'high', 'xhigh'],
-);
-const OpenAIReasoningSupport _gpt53CodexSupport = OpenAIReasoningSupport(
-  supportedEfforts: <String>['low', 'medium', 'high', 'xhigh'],
-  offFallback: 'low',
-);
-const OpenAIReasoningSupport _gpt54Support = OpenAIReasoningSupport(
-  supportedEfforts: <String>['none', 'low', 'medium', 'high', 'xhigh'],
-  samplingRequiresNone: true,
-);
-const OpenAIReasoningSupport _gpt54ProSupport = OpenAIReasoningSupport(
-  supportedEfforts: <String>['medium', 'high', 'xhigh'],
-  offFallback: 'medium',
-);
-const OpenAIReasoningSupport _gpt55Support = OpenAIReasoningSupport(
-  supportedEfforts: <String>['none', 'low', 'medium', 'high', 'xhigh'],
-  samplingRequiresNone: true,
-);
-const OpenAIReasoningSupport _gpt55ProSupport = OpenAIReasoningSupport(
-  supportedEfforts: <String>['medium', 'high', 'xhigh'],
-  offFallback: 'medium',
-);
-const OpenAIReasoningSupport _gpt56Support = OpenAIReasoningSupport(
-  supportedEfforts: <String>['none', 'low', 'medium', 'high', 'xhigh', 'max'],
-  samplingRequiresNone: true,
-  samplingAllowsAuto: false,
-);
-const OpenAIReasoningSupport _kimiK3Support = OpenAIReasoningSupport(
-  supportedEfforts: <String>['low', 'high', 'max'],
-  offFallback: 'low',
-);
-const OpenAIReasoningSupport _kimiCodeSupport = OpenAIReasoningSupport(
-  supportedEfforts: <String>['none', 'low', 'high', 'max'],
-);
-const OpenAIReasoningSupport _kimiCodeHighSpeedSupport = OpenAIReasoningSupport(
-  supportedEfforts: <String>[],
-  effortParameterSupported: false,
-);
-const OpenAIReasoningSupport _grok45Support = OpenAIReasoningSupport(
-  supportedEfforts: <String>['low', 'medium', 'high'],
-  offFallback: 'low',
-);
-const OpenAIReasoningSupport _grok46Support = OpenAIReasoningSupport(
-  supportedEfforts: <String>['low', 'medium', 'high', 'xhigh'],
-  offFallback: 'low',
-);
-const OpenAIReasoningSupport _gpt6AstraSupport = OpenAIReasoningSupport(
-  supportedEfforts: <String>['low', 'medium', 'high', 'xhigh', 'max'],
-  samplingRequiresNone: true,
-  samplingAllowsAuto: false,
-  offFallback: 'low',
-);
-const OpenAIReasoningSupport _museSparkSupport = OpenAIReasoningSupport(
-  supportedEfforts: <String>['low', 'medium', 'high', 'xhigh'],
-  offFallback: 'low',
-);
-const OpenAIReasoningSupport _museSpark13Support = OpenAIReasoningSupport(
-  supportedEfforts: <String>['low', 'medium', 'high', 'xhigh', 'max'],
-  offFallback: 'low',
-);
-const OpenAIReasoningSupport _glm53Support = OpenAIReasoningSupport(
-  supportedEfforts: <String>['low', 'high', 'max'],
-  offFallback: 'low',
-);
-// Official 5.2 effort: none/minimal abandon thinking; low/medium map to high;
-// xhigh maps to max. We disable via thinking.type and send the rest as-is.
-// https://docs.bigmodel.cn/cn/guide/start/concept-param
-const OpenAIReasoningSupport _glm52Support = OpenAIReasoningSupport(
-  supportedEfforts: <String>['low', 'medium', 'high', 'xhigh', 'max'],
-);
-// Official V4 effort: low / high / max. medium and xhigh map to high.
-// https://api-docs.deepseek.com/guides/thinking_mode
-const OpenAIReasoningSupport _deepSeekSupport = OpenAIReasoningSupport(
-  supportedEfforts: <String>['low', 'high', 'max'],
-);
-const OpenAIReasoningSupport _mimoSupport = OpenAIReasoningSupport(
-  supportedEfforts: <String>['none', 'low', 'medium', 'high'],
-);
-
 String resolveApiModelIdOverride(
   Map<String, dynamic>? override,
   String fallbackModelId,
@@ -149,14 +33,6 @@ String resolveApiModelIdOverride(
       .trim();
   if (raw != null && raw.isNotEmpty) return raw;
   return fallbackModelId;
-}
-
-bool isOpenAIGpt5FamilyModel(String modelId) {
-  return RegExp(r'gpt-5(?=$|[-.])', caseSensitive: false).hasMatch(modelId);
-}
-
-bool isOpenAIGpt6FamilyModel(String modelId) {
-  return RegExp(r'gpt-6(?=$|[-.])', caseSensitive: false).hasMatch(modelId);
 }
 
 bool isGlm53FamilyModel(String modelId) {
@@ -186,10 +62,7 @@ bool openAISupportsNoneReasoning(String modelId) {
 }
 
 bool openAIChatCompletionsToolsRequireNone(String modelId) {
-  return _matchesModel(
-    modelId.trim().toLowerCase(),
-    r'(^|[/_:@])gpt-5\.6(?:-(?:sol|terra|luna))?(?:$|[.@])',
-  );
+  return _quirksFor(modelId).contains(CapabilityQuirk.toolsForceEffortNone);
 }
 
 String openAINormalizeReasoningEffort(String effort, String modelId) {
@@ -197,226 +70,121 @@ String openAINormalizeReasoningEffort(String effort, String modelId) {
   if (normalizedEffort.isEmpty) return effort;
   if (normalizedEffort == 'auto') return 'auto';
 
-  final support = openAIReasoningSupport(modelId);
-  if (support?.effortParameterSupported == false) return 'auto';
-  if (support == _kimiCodeSupport && normalizedEffort == 'xhigh') {
+  final quirks = _quirksFor(modelId);
+  if (quirks.contains(CapabilityQuirk.effortParameterUnsupported)) {
+    return 'auto';
+  }
+  if (normalizedEffort == 'xhigh' &&
+      quirks.contains(CapabilityQuirk.xhighEffortMapsToMax)) {
     return 'max';
   }
+
+  final efforts = _effortsFor(modelId);
   if (normalizedEffort == 'off') {
-    if (support?.supportsNone == true) return 'none';
-    return support?.offFallback ?? 'off';
+    if (efforts == null) return 'off';
+    if (efforts.contains('none')) return 'none';
+    if (quirks.contains(CapabilityQuirk.reasoningAlwaysOn)) {
+      return efforts.first;
+    }
+    return 'off';
   }
   if ((normalizedEffort == 'xhigh' || normalizedEffort == 'max') &&
-      support == null) {
+      efforts == null) {
     return 'high';
   }
-  if (support == null) return normalizedEffort;
-  if (support.supportedEfforts.contains(normalizedEffort)) {
-    return normalizedEffort;
-  }
+  if (efforts == null) return normalizedEffort;
+  if (efforts.contains(normalizedEffort)) return normalizedEffort;
 
-  switch (normalizedEffort) {
-    case 'none':
-      return _pickSupportedEffort(support, const <String>[
-        'none',
-        'low',
-        'medium',
-        'high',
-        'xhigh',
-        'max',
-      ]);
-    case 'low':
-      return _pickSupportedEffort(support, const <String>[
-        'low',
-        'medium',
-        'high',
-        'xhigh',
-        'max',
-      ]);
-    case 'medium':
-      return _pickSupportedEffort(support, const <String>[
-        'medium',
-        'high',
-        'xhigh',
-        'max',
-        'low',
-      ]);
-    case 'high':
-      return _pickSupportedEffort(support, const <String>[
-        'high',
-        'xhigh',
-        'max',
-        'medium',
-        'low',
-        'none',
-      ]);
-    case 'xhigh':
-      return _pickSupportedEffort(support, const <String>[
-        'xhigh',
-        'high',
-        'max',
-        'medium',
-        'low',
-        'none',
-      ]);
-    case 'max':
-      return _pickSupportedEffort(support, const <String>[
-        'max',
-        'xhigh',
-        'high',
-        'medium',
-        'low',
-        'none',
-      ]);
-    default:
-      return normalizedEffort;
-  }
+  return _pickSupportedEffort(efforts, _preferenceOrder(normalizedEffort));
 }
 
 bool openAIAllowsSamplingParams(String modelId, {required String effort}) {
-  final support = openAIReasoningSupport(modelId);
-  if (support == null || !support.samplingRequiresNone) return true;
+  final quirks = _quirksFor(modelId);
+  if (!quirks.contains(CapabilityQuirk.samplingRequiresNoThinking)) return true;
   final normalizedEffort = openAINormalizeReasoningEffort(effort, modelId);
   return normalizedEffort == 'none' ||
       normalizedEffort == 'off' ||
-      (normalizedEffort == 'auto' && support.samplingAllowsAuto);
+      (normalizedEffort == 'auto' &&
+          !quirks.contains(CapabilityQuirk.autoDisallowsSampling));
 }
 
 OpenAIReasoningSupport? openAIReasoningSupport(String modelId) {
-  final normalized = modelId.trim().toLowerCase();
-  if (isKimiCodeHighSpeedModel(normalized)) return _kimiCodeHighSpeedSupport;
-  if (isKimiCodeK3Alias(normalized) ||
-      isKimiForCodingModel(normalized) ||
-      isKimiK28Model(normalized)) {
-    return _kimiCodeSupport;
-  }
-  if (normalized.contains('deepseek')) return _deepSeekSupport;
-  if (_matchesModel(normalized, r'(^|[/_:@])mimo-v2(?:$|[-.])')) {
-    return _mimoSupport;
-  }
-  if (_matchesModel(normalized, r'(^|[/_:@])kimi-k3(?:$|[-.])')) {
-    return _kimiK3Support;
-  }
-  if (_matchesModel(normalized, r'(^|[/_:@])grok-4\.6(?:$|[-.])')) {
-    return _grok46Support;
-  }
-  if (_matchesModel(normalized, r'(^|[/_:@])grok-4\.5(?:$|[-.])')) {
-    return _grok45Support;
-  }
-  if (_matchesModel(normalized, r'(^|[/_:@])muse-spark-1\.3(?:$|[-.])')) {
-    return normalized.contains('contributor')
-        ? _museSparkSupport
-        : _museSpark13Support;
-  }
-  if (_matchesModel(normalized, r'(^|[/_:@])muse-spark-1(?:$|[-.])')) {
-    return _museSparkSupport;
-  }
-  if (isGlm53FamilyModel(normalized)) {
-    return _glm53Support;
-  }
-  if (isGlm52FamilyModel(normalized)) {
-    return _glm52Support;
-  }
-  if (isOpenAIGpt6FamilyModel(normalized)) {
-    return _gpt6AstraSupport;
-  }
-  if (!isOpenAIGpt5FamilyModel(normalized)) return null;
+  return _supportCache.putIfAbsent(modelId, () {
+    final efforts = _effortsFor(modelId);
+    final quirks = _quirksFor(modelId);
+    if (efforts == null && quirks.isEmpty) return null;
+    return OpenAIReasoningSupport(
+      supportedEfforts: efforts ?? const <String>[],
+      samplingRequiresNone: quirks.contains(
+        CapabilityQuirk.samplingRequiresNoThinking,
+      ),
+      samplingAllowsAuto: !quirks.contains(
+        CapabilityQuirk.autoDisallowsSampling,
+      ),
+      effortParameterSupported: !quirks.contains(
+        CapabilityQuirk.effortParameterUnsupported,
+      ),
+      offFallback:
+          quirks.contains(CapabilityQuirk.reasoningAlwaysOn) &&
+              (efforts?.isNotEmpty ?? false)
+          ? efforts!.first
+          : null,
+    );
+  });
+}
 
-  if (_matchesModel(
-    normalized,
-    r'(^|[/_:@])gpt-5\.6(?:-(?:sol|terra|luna))?(?:$|[.@])',
-  )) {
-    return _gpt56Support;
+final Map<String, ModelCapabilities> _capabilitiesCache =
+    <String, ModelCapabilities>{};
+final Map<String, OpenAIReasoningSupport?> _supportCache =
+    <String, OpenAIReasoningSupport?>{};
+
+ModelCapabilities _capabilitiesFor(String modelId) =>
+    _capabilitiesCache.putIfAbsent(
+      modelId,
+      () => builtinCapabilityCascade.resolve(modelId).capabilities,
+    );
+
+Set<CapabilityQuirk> _quirksFor(String modelId) =>
+    _capabilitiesFor(modelId).quirks ?? const <CapabilityQuirk>{};
+
+List<String>? _effortsFor(String modelId) {
+  final options = _capabilitiesFor(modelId).reasoningOptions;
+  if (options == null) return null;
+  final values = <String>[
+    for (final option in options)
+      if (option.type == ReasoningOptionType.effort) ...option.values,
+  ];
+  if (values.isEmpty) return null;
+  return values;
+}
+
+List<String> _preferenceOrder(String effort) {
+  switch (effort) {
+    case 'none':
+      return const <String>['none', 'low', 'medium', 'high', 'xhigh', 'max'];
+    case 'low':
+      return const <String>['low', 'medium', 'high', 'xhigh', 'max'];
+    case 'medium':
+      return const <String>['medium', 'high', 'xhigh', 'max', 'low'];
+    case 'high':
+      return const <String>['high', 'xhigh', 'max', 'medium', 'low', 'none'];
+    case 'xhigh':
+      return const <String>['xhigh', 'high', 'max', 'medium', 'low', 'none'];
+    case 'max':
+      return const <String>['max', 'xhigh', 'high', 'medium', 'low', 'none'];
+    default:
+      return const <String>[];
   }
-  if (_matchesModel(normalized, r'(^|[/_:@])gpt-5\.5-pro(?:$|[-.])')) {
-    return _gpt55ProSupport;
-  }
-  if (_matchesModel(
-    normalized,
-    r'(^|[/_:@])gpt-5\.5-(?:codex|chat-latest)(?:$|[-.])',
-  )) {
-    return null;
-  }
-  if (_matchesModel(normalized, r'(^|[/_:@])gpt-5\.5(?:$|[-.])')) {
-    return _gpt55Support;
-  }
-  if (_matchesModel(normalized, r'(^|[/_:@])gpt-5\.4-pro(?:$|[-.])')) {
-    return _gpt54ProSupport;
-  }
-  if (_matchesModel(
-    normalized,
-    r'(^|[/_:@])gpt-5\.4-(?:codex|chat-latest)(?:$|[-.])',
-  )) {
-    return null;
-  }
-  if (_matchesModel(normalized, r'(^|[/_:@])gpt-5\.4(?:$|[-.])')) {
-    return _gpt54Support;
-  }
-  if (_matchesModel(normalized, r'(^|[/_:@])gpt-5\.3-codex(?:$|[-.])')) {
-    return _gpt53CodexSupport;
-  }
-  if (_matchesModel(normalized, r'(^|[/_:@])gpt-5\.3-chat-latest(?:$|[-.])')) {
-    return _gpt53ChatLatestSupport;
-  }
-  if (_matchesModel(
-    normalized,
-    r'(^|[/_:@])gpt-5\.3-(?:pro|chat-latest)(?:$|[-.])',
-  )) {
-    return null;
-  }
-  if (_matchesModel(normalized, r'(^|[/_:@])gpt-5\.3(?:$|[-.])')) {
-    return null;
-  }
-  if (_matchesModel(normalized, r'(^|[/_:@])gpt-5\.2-pro(?:$|[-.])')) {
-    return _gpt52ProSupport;
-  }
-  if (_matchesModel(normalized, r'(^|[/_:@])gpt-5\.2-codex(?:$|[-.])')) {
-    return _gpt52CodexSupport;
-  }
-  if (_matchesModel(normalized, r'(^|[/_:@])gpt-5\.2-chat-latest(?:$|[-.])')) {
-    return _gpt52ChatLatestSupport;
-  }
-  if (_matchesModel(normalized, r'(^|[/_:@])gpt-5\.2(?:$|[-.])')) {
-    return _gpt52Support;
-  }
-  if (_matchesModel(normalized, r'(^|[/_:@])gpt-5\.1-chat-latest(?:$|[-.])')) {
-    return _gpt51ChatLatestSupport;
-  }
-  if (_matchesModel(normalized, r'(^|[/_:@])gpt-5\.1-codex-max(?:$|[-.])')) {
-    return _gpt51CodexMaxSupport;
-  }
-  if (_matchesModel(normalized, r'(^|[/_:@])gpt-5\.1-codex(?:$|[-.])')) {
-    return _gpt51CodexSupport;
-  }
-  if (_matchesModel(normalized, r'(^|[/_:@])gpt-5\.1-pro(?:$|[-.])')) {
-    return null;
-  }
-  if (_matchesModel(normalized, r'(^|[/_:@])gpt-5\.1(?:$|[-.])')) {
-    return _gpt51Support;
-  }
-  if (_matchesModel(normalized, r'(^|[/_:@])gpt-5-pro(?:$|[-.])')) {
-    return _gpt5ProSupport;
-  }
-  if (_matchesModel(normalized, r'(^|[/_:@])gpt-5-codex(?:$|[-.])')) {
-    return _gpt5CodexSupport;
-  }
-  if (_matchesModel(normalized, r'(^|[/_:@])gpt-5-chat-latest(?:$|[-.])')) {
-    return null;
-  }
-  if (_matchesModel(normalized, r'(^|[/_:@])gpt-5(?:$|-)')) {
-    return _gpt5Support;
-  }
-  return null;
 }
 
 String _pickSupportedEffort(
-  OpenAIReasoningSupport support,
+  List<String> supportedEfforts,
   List<String> preferenceOrder,
 ) {
   for (final effort in preferenceOrder) {
-    if (support.supportedEfforts.contains(effort)) return effort;
+    if (supportedEfforts.contains(effort)) return effort;
   }
-  return support.supportedEfforts.last;
+  return supportedEfforts.last;
 }
 
 bool _matchesModel(String modelId, String pattern) {
