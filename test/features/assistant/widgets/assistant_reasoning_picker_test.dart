@@ -55,13 +55,17 @@ void main() {
       find.byKey(const ValueKey('assistant-reasoning-max')),
       findsOneWidget,
     );
+    final off = tester.getCenter(
+      find.byKey(const ValueKey('assistant-reasoning-off')),
+    );
+    final auto = tester.getCenter(
+      find.byKey(const ValueKey('assistant-reasoning-auto')),
+    );
+    expect(off.dx, lessThan(auto.dx));
     expect(
       find.text('The actual level is clamped to what each model supports'),
       findsNothing,
     );
-    expect(find.text('Minimal'), findsWidgets);
-    expect(find.text('Extra High'), findsWidgets);
-    expect(find.text('Max'), findsWidgets);
     expect(find.text('mid'), findsNothing);
     expect(find.text('xhigh'), findsNothing);
 
@@ -98,7 +102,6 @@ void main() {
                   key: const ValueKey('open-assistant-sheet'),
                   onPressed: () => showReasoningPickerSheet<void>(
                     context: context,
-                    title: 'Thinking',
                     builder: (_) => AssistantReasoningPicker(
                       current: null,
                       onSelected: (_) {},
@@ -118,6 +121,7 @@ void main() {
 
     expect(find.byType(CustomBottomSheet), findsNothing);
     expect(find.byKey(ReasoningPickerSheet.panelKey), findsOneWidget);
+    expect(find.text('Thinking'), findsNothing);
     expect(
       tester.getSize(find.byKey(ReasoningPickerSheet.panelKey)).height,
       lessThan(tester.getSize(find.byType(MaterialApp)).height * 0.60),

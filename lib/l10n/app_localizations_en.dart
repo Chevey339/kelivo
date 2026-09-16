@@ -2458,45 +2458,57 @@ class AppLocalizationsEn extends AppLocalizations {
   String get reasoningLevelMinimal => 'Minimal';
 
   @override
+  String get reasoningLevelMinimalSubtitle =>
+      'Use the lightest reasoning to answer questions';
+
+  @override
   String get reasoningLevelLow => 'Low';
+
+  @override
+  String get reasoningLevelLowSubtitle =>
+      'Use light reasoning to answer questions';
 
   @override
   String get reasoningLevelMedium => 'Medium';
 
   @override
+  String get reasoningLevelMediumSubtitle =>
+      'Use moderate reasoning to answer questions';
+
+  @override
   String get reasoningLevelHigh => 'High';
+
+  @override
+  String get reasoningLevelHighSubtitle =>
+      'Use heavy reasoning for complex questions';
 
   @override
   String get reasoningLevelXhigh => 'Extra High';
 
   @override
+  String get reasoningLevelXhighSubtitle =>
+      'Use very high reasoning depth for harder problems';
+
+  @override
   String get reasoningLevelMax => 'Max';
 
   @override
-  String get reasoningLevelCannotDisable =>
-      'Thinking cannot be turned off for this model';
+  String get reasoningLevelMaxSubtitle =>
+      'Use maximum reasoning depth for the toughest problems';
+
+  @override
+  String get reasoningLevelFollowModelDefaultSubtitle =>
+      'Use the model\'s default when the assistant doesn\'t set one';
 
   @override
   String get reasoningLevelNoReasoning =>
       'This model does not support reasoning';
 
   @override
-  String get reasoningLevelCustomBudget => 'Custom budget…';
+  String get reasoningLevelCustomBudget => 'Custom Reasoning Budget';
 
   @override
   String get reasoningLevelCustomBudgetHint => 'Token budget, e.g. 2048';
-
-  @override
-  String get reasoningLevelReset => 'Reset to default';
-
-  @override
-  String get reasoningLevelSourcePerModel => 'Per-model setting';
-
-  @override
-  String get reasoningLevelSourceAssistant => 'From assistant';
-
-  @override
-  String get reasoningLevelSourceModelDefault => 'Model default';
 
   @override
   String get reasoningLevelCompactMin => 'min';

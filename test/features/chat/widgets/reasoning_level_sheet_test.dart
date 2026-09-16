@@ -133,7 +133,9 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   group('ReasoningLevelSheet', () {
-    testWidgets('hides off when canDisable is false', (tester) async {
+    testWidgets('uses the plain sheet and hides off when canDisable is false', (
+      tester,
+    ) async {
       final config = _effortConfig();
       final spec = ModelSpecResolver.instance.spec(
         config,
@@ -163,75 +165,88 @@ void main() {
       expect(find.byType(CustomBottomSheet), findsNothing);
       expect(find.byKey(CustomBottomSheet.panelKey), findsNothing);
       expect(find.byKey(ReasoningPickerSheet.panelKey), findsOneWidget);
-      final sheetHeight = tester
-          .getSize(find.byKey(ReasoningPickerSheet.panelKey))
-          .height;
-      final surfaceHeight = tester.getSize(find.byType(MaterialApp)).height;
-      expect(sheetHeight, lessThan(surfaceHeight * 0.60));
-      expect(find.text('Auto'), findsWidgets);
-      expect(find.text('Low'), findsWidgets);
-      expect(find.text('Medium'), findsWidgets);
-      expect(find.text('High'), findsWidgets);
-      expect(find.text('mid'), findsNothing);
+      expect(find.text('Reasoning'), findsNothing);
+      expect(find.byType(EffortSlider), findsOneWidget);
       expect(
         find.descendant(
           of: find.byType(EffortSlider),
           matching: find.byType(ExcludeSemantics),
         ),
-        findsWidgets,
+        findsNothing,
       );
-      expect(find.byKey(const ValueKey('reasoning-row-auto')), findsOneWidget);
-      expect(find.byKey(const ValueKey('reasoning-row-off')), findsNothing);
-      expect(
-        find.byKey(const ValueKey('reasoning-cannot-disable')),
-        findsOneWidget,
-      );
-      expect(find.byKey(const ValueKey('reasoning-row-low')), findsOneWidget);
-      expect(
-        find.byKey(const ValueKey('reasoning-row-medium')),
-        findsOneWidget,
-      );
-      expect(find.byKey(const ValueKey('reasoning-row-high')), findsOneWidget);
-      expect(find.byKey(const ValueKey('reasoning-row-custom')), findsNothing);
-    });
-
-    testWidgets('budget dialect shows a custom affordance', (tester) async {
-      final config = _budgetConfig();
-      final settings = await _settingsWith(
-        tester,
-        config,
-        'kelivo-test-budget',
-      );
-      await _pumpSheet(
-        tester,
-        settings: settings,
-        config: config,
-        modelId: 'kelivo-test-budget',
-      );
-      await _openSheet(tester);
-
-      expect(find.byKey(const ValueKey('reasoning-row-auto')), findsOneWidget);
-      expect(find.byKey(const ValueKey('reasoning-row-off')), findsOneWidget);
+      final sheetHeight = tester
+          .getSize(find.byKey(ReasoningPickerSheet.panelKey))
+          .height;
+      final surfaceHeight = tester.getSize(find.byType(MaterialApp)).height;
+      expect(sheetHeight, lessThan(surfaceHeight * 0.60));
+      expect(find.byKey(const ValueKey('reasoning-stop-auto')), findsOneWidget);
+      expect(find.byKey(const ValueKey('reasoning-stop-off')), findsNothing);
       expect(
         find.byKey(const ValueKey('reasoning-cannot-disable')),
         findsNothing,
       );
+      expect(find.byKey(const ValueKey('reasoning-stop-low')), findsOneWidget);
       expect(
-        find.byKey(const ValueKey('reasoning-row-custom')),
+        find.byKey(const ValueKey('reasoning-stop-medium')),
         findsOneWidget,
       );
-
-      await _tapStop(tester, 'reasoning-row-low');
-      expect(
-        settings.reasoningChoiceFor('Test', 'kelivo-test-budget'),
-        const ReasoningRequest(ReasoningLevel.low),
-      );
-      expect(find.text('Low'), findsWidgets);
-      expect(
-        find.text('${formatReasoningBudgetK(1024)} tokens'),
-        findsOneWidget,
-      );
+      expect(find.byKey(const ValueKey('reasoning-stop-high')), findsOneWidget);
+      expect(find.byKey(const ValueKey('reasoning-row-custom')), findsNothing);
     });
+
+    testWidgets(
+      'budget dialect shows a custom affordance and off before auto',
+      (tester) async {
+        final config = _budgetConfig();
+        final settings = await _settingsWith(
+          tester,
+          config,
+          'kelivo-test-budget',
+        );
+        await _pumpSheet(
+          tester,
+          settings: settings,
+          config: config,
+          modelId: 'kelivo-test-budget',
+        );
+        await _openSheet(tester);
+
+        final off = tester.getCenter(
+          find.byKey(const ValueKey('reasoning-stop-off')),
+        );
+        final auto = tester.getCenter(
+          find.byKey(const ValueKey('reasoning-stop-auto')),
+        );
+        expect(off.dx, lessThan(auto.dx));
+        expect(
+          find.byKey(const ValueKey('reasoning-stop-off')),
+          findsOneWidget,
+        );
+        expect(
+          find.byKey(const ValueKey('reasoning-stop-auto')),
+          findsOneWidget,
+        );
+        expect(
+          find.byKey(const ValueKey('reasoning-cannot-disable')),
+          findsNothing,
+        );
+        expect(
+          find.byKey(const ValueKey('reasoning-row-custom')),
+          findsOneWidget,
+        );
+
+        await _tapStop(tester, 'reasoning-stop-low');
+        expect(
+          settings.reasoningChoiceFor('Test', 'kelivo-test-budget'),
+          const ReasoningRequest(ReasoningLevel.low),
+        );
+        expect(find.text('Low'), findsWidgets);
+        expect(
+          find.text('${formatReasoningBudgetK(1024)} tokens'),
+          findsOneWidget,
+        );
+      },
+    );
 
     testWidgets('tapping a level stop writes setReasoningChoice', (
       tester,
@@ -250,12 +265,40 @@ void main() {
       );
       await _openSheet(tester);
 
-      await _tapStop(tester, 'reasoning-row-high');
+      await _tapStop(tester, 'reasoning-stop-high');
 
       expect(
         settings.reasoningChoiceFor('Test', 'kelivo-test-effort'),
         const ReasoningRequest(ReasoningLevel.high),
       );
+    });
+
+    testWidgets('selecting the fallback level clears per-model memory', (
+      tester,
+    ) async {
+      final config = _effortConfig();
+      final settings = await _settingsWith(
+        tester,
+        config,
+        'kelivo-test-effort',
+      );
+      await settings.setReasoningChoice(
+        'Test',
+        'kelivo-test-effort',
+        const ReasoningRequest(ReasoningLevel.low),
+      );
+      await _pumpSheet(
+        tester,
+        settings: settings,
+        config: config,
+        modelId: 'kelivo-test-effort',
+      );
+      await _openSheet(tester);
+
+      expect(find.byKey(const ValueKey('reasoning-reset')), findsNothing);
+      await _tapStop(tester, 'reasoning-stop-medium');
+
+      expect(settings.reasoningChoiceFor('Test', 'kelivo-test-effort'), isNull);
     });
 
     testWidgets('custom budget path writes requestForCustomBudget', (
@@ -290,33 +333,6 @@ void main() {
         requestForCustomBudget(spec, 2048),
       );
       expect(find.text('2048'), findsWidgets);
-    });
-
-    testWidgets('reset clears per-model memory', (tester) async {
-      final config = _effortConfig();
-      final settings = await _settingsWith(
-        tester,
-        config,
-        'kelivo-test-effort',
-      );
-      await settings.setReasoningChoice(
-        'Test',
-        'kelivo-test-effort',
-        const ReasoningRequest(ReasoningLevel.low),
-      );
-      await _pumpSheet(
-        tester,
-        settings: settings,
-        config: config,
-        modelId: 'kelivo-test-effort',
-      );
-      await _openSheet(tester);
-
-      expect(find.byKey(const ValueKey('reasoning-reset')), findsOneWidget);
-      await tester.tap(find.byKey(const ValueKey('reasoning-reset')));
-      await tester.pumpAndSettle();
-
-      expect(settings.reasoningChoiceFor('Test', 'kelivo-test-effort'), isNull);
     });
   });
 }

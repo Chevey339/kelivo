@@ -44,7 +44,6 @@ Future<AssistantReasoningPick?> showAssistantReasoningPicker(
   }
   await showReasoningPickerSheet<void>(
     context: context,
-    title: l10n.assistantEditThinkingBudgetTitle,
     builder: (context) =>
         AssistantReasoningPicker(current: current, onSelected: onSelected),
   );
@@ -61,7 +60,16 @@ class AssistantReasoningPicker extends StatelessWidget {
   final ReasoningRequest? current;
   final ValueChanged<ReasoningRequest?> onSelected;
 
-  static const List<ReasoningLevel> _levels = ReasoningLevel.values;
+  static const List<ReasoningLevel> _levels = [
+    ReasoningLevel.off,
+    ReasoningLevel.auto,
+    ReasoningLevel.minimal,
+    ReasoningLevel.low,
+    ReasoningLevel.medium,
+    ReasoningLevel.high,
+    ReasoningLevel.xhigh,
+    ReasoningLevel.max,
+  ];
 
   int _indexFor(ReasoningRequest? current) {
     if (current == null) return 0;
@@ -73,57 +81,46 @@ class AssistantReasoningPicker extends StatelessWidget {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
     final cs = Theme.of(context).colorScheme;
-    final keys = <String>[
-      'assistant-reasoning-follow-default',
-      for (final level in _levels) 'assistant-reasoning-${level.name}',
-    ];
-    final titles = <String>[
-      l10n.assistantEditReasoningFollowDefault,
-      for (final level in _levels) reasoningLevelLabel(l10n, level),
-    ];
-    final labels = <String>[
-      l10n.reasoningLevelSourceModelDefault,
-      for (final level in _levels) reasoningLevelLabel(l10n, level),
-    ];
-    final slider = EffortSliderGroup(
-      selectedIndex: _indexFor(current),
-      stopCount: keys.length,
-      stopKeys: keys,
-      stopLabels: labels,
-      semanticsValue: (index) => titles[index.clamp(0, titles.length - 1)],
-      onCommit: (index) {
-        if (index <= 0) {
-          onSelected(null);
-          return;
-        }
-        final level = _levels[index - 1];
-        onSelected(
-          level == ReasoningLevel.auto
-              ? ReasoningRequest.auto
-              : level == ReasoningLevel.off
-              ? ReasoningRequest.off
-              : ReasoningRequest(level),
-        );
-      },
-      header: (context, visualIndex) {
-        final index = visualIndex.clamp(0, titles.length - 1);
-        return EffortSliderActiveStop(
-          icon: index == 0
-              ? Icon(Lucide.RotateCcw, size: 18, color: cs.primary)
-              : ReasoningIcons.levelIcon(
-                  _levels[index - 1],
-                  size: 18,
-                  color: cs.primary,
-                ),
-          iconKey: index == 0 ? 'follow' : _levels[index - 1],
-          title: titles[index],
-        );
-      },
-    );
-
     return Padding(
-      padding: const EdgeInsets.fromLTRB(8, 8, 8, 16),
-      child: slider,
+      padding: const EdgeInsets.only(bottom: 12),
+      child: EffortSliderGroup(
+        selectedIndex: _indexFor(current),
+        onCommit: (index) {
+          if (index <= 0) {
+            onSelected(null);
+            return;
+          }
+          final level = _levels[index - 1];
+          onSelected(
+            level == ReasoningLevel.auto
+                ? ReasoningRequest.auto
+                : level == ReasoningLevel.off
+                ? ReasoningRequest.off
+                : ReasoningRequest(level),
+          );
+        },
+        stops: [
+          EffortSliderStop(
+            stopKey: 'assistant-reasoning-follow-default',
+            icon: Icon(Lucide.RotateCcw, size: 18, color: cs.primary),
+            iconKey: 'follow',
+            title: l10n.assistantEditReasoningFollowDefault,
+            subtitle: l10n.reasoningLevelFollowModelDefaultSubtitle,
+          ),
+          for (final level in _levels)
+            EffortSliderStop(
+              stopKey: 'assistant-reasoning-${level.name}',
+              icon: ReasoningIcons.levelIcon(
+                level,
+                size: 18,
+                color: cs.primary,
+              ),
+              iconKey: level,
+              title: reasoningLevelLabel(l10n, level),
+              subtitle: reasoningLevelEffortSubtitle(l10n, level),
+            ),
+        ],
+      ),
     );
   }
 }

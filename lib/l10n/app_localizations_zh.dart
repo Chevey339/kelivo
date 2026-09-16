@@ -2374,43 +2374,49 @@ class AppLocalizationsZh extends AppLocalizations {
   String get reasoningLevelMinimal => '最低';
 
   @override
+  String get reasoningLevelMinimalSubtitle => '使用极少推理来回答问题';
+
+  @override
   String get reasoningLevelLow => '低';
+
+  @override
+  String get reasoningLevelLowSubtitle => '使用少量推理来回答问题';
 
   @override
   String get reasoningLevelMedium => '中';
 
   @override
+  String get reasoningLevelMediumSubtitle => '使用较多推理来回答问题';
+
+  @override
   String get reasoningLevelHigh => '高';
+
+  @override
+  String get reasoningLevelHighSubtitle => '使用大量推理来回答问题，适合复杂问题';
 
   @override
   String get reasoningLevelXhigh => '极高';
 
   @override
+  String get reasoningLevelXhighSubtitle => '使用很高推理深度，适合更复杂的问题';
+
+  @override
   String get reasoningLevelMax => '最大';
 
   @override
-  String get reasoningLevelCannotDisable => '此模型无法关闭思考';
+  String get reasoningLevelMaxSubtitle => '使用最大推理深度，适合最复杂的问题';
+
+  @override
+  String get reasoningLevelFollowModelDefaultSubtitle => '使用模型或助手未设置时的默认档位';
 
   @override
   String get reasoningLevelNoReasoning => '此模型不支持推理';
 
   @override
-  String get reasoningLevelCustomBudget => '自定义预算…';
+  String get reasoningLevelCustomBudget => '自定义推理预算';
 
   @override
   String get reasoningLevelCustomBudgetHint => '例如：2048';
-
-  @override
-  String get reasoningLevelReset => '重置为默认';
-
-  @override
-  String get reasoningLevelSourcePerModel => '按模型记忆';
-
-  @override
-  String get reasoningLevelSourceAssistant => '来自助手';
-
-  @override
-  String get reasoningLevelSourceModelDefault => '模型默认';
 
   @override
   String get reasoningLevelCompactMin => 'min';
@@ -14150,43 +14156,49 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get reasoningLevelMinimal => '最低';
 
   @override
+  String get reasoningLevelMinimalSubtitle => '使用极少推理来回答问题';
+
+  @override
   String get reasoningLevelLow => '低';
+
+  @override
+  String get reasoningLevelLowSubtitle => '使用少量推理来回答问题';
 
   @override
   String get reasoningLevelMedium => '中';
 
   @override
+  String get reasoningLevelMediumSubtitle => '使用较多推理来回答问题';
+
+  @override
   String get reasoningLevelHigh => '高';
+
+  @override
+  String get reasoningLevelHighSubtitle => '使用大量推理来回答问题，适合复杂问题';
 
   @override
   String get reasoningLevelXhigh => '极高';
 
   @override
+  String get reasoningLevelXhighSubtitle => '使用很高推理深度，适合更复杂的问题';
+
+  @override
   String get reasoningLevelMax => '最大';
 
   @override
-  String get reasoningLevelCannotDisable => '此模型无法关闭思考';
+  String get reasoningLevelMaxSubtitle => '使用最大推理深度，适合最复杂的问题';
+
+  @override
+  String get reasoningLevelFollowModelDefaultSubtitle => '使用模型或助手未设置时的默认档位';
 
   @override
   String get reasoningLevelNoReasoning => '此模型不支持推理';
 
   @override
-  String get reasoningLevelCustomBudget => '自定义预算…';
+  String get reasoningLevelCustomBudget => '自定义推理预算';
 
   @override
   String get reasoningLevelCustomBudgetHint => '例如：2048';
-
-  @override
-  String get reasoningLevelReset => '重置为默认';
-
-  @override
-  String get reasoningLevelSourcePerModel => '按模型记忆';
-
-  @override
-  String get reasoningLevelSourceAssistant => '来自助手';
-
-  @override
-  String get reasoningLevelSourceModelDefault => '模型默认';
 
   @override
   String get reasoningLevelCompactMin => 'min';
@@ -25852,43 +25864,49 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get reasoningLevelMinimal => '最低';
 
   @override
+  String get reasoningLevelMinimalSubtitle => '使用極少推理來回答問題';
+
+  @override
   String get reasoningLevelLow => '低';
+
+  @override
+  String get reasoningLevelLowSubtitle => '使用少量推理來回答問題';
 
   @override
   String get reasoningLevelMedium => '中';
 
   @override
+  String get reasoningLevelMediumSubtitle => '使用較多推理來回答問題';
+
+  @override
   String get reasoningLevelHigh => '高';
+
+  @override
+  String get reasoningLevelHighSubtitle => '使用大量推理來回答問題，適合複雜問題';
 
   @override
   String get reasoningLevelXhigh => '極高';
 
   @override
+  String get reasoningLevelXhighSubtitle => '使用很高推理深度，適合更複雜的問題';
+
+  @override
   String get reasoningLevelMax => '最大';
 
   @override
-  String get reasoningLevelCannotDisable => '此模型無法關閉思考';
+  String get reasoningLevelMaxSubtitle => '使用最大推理深度，適合最複雜的問題';
+
+  @override
+  String get reasoningLevelFollowModelDefaultSubtitle => '使用模型或助手未設定時的預設檔位';
 
   @override
   String get reasoningLevelNoReasoning => '此模型不支援推理';
 
   @override
-  String get reasoningLevelCustomBudget => '自訂預算…';
+  String get reasoningLevelCustomBudget => '自訂推理預算';
 
   @override
   String get reasoningLevelCustomBudgetHint => '例如：2048';
-
-  @override
-  String get reasoningLevelReset => '重設為預設';
-
-  @override
-  String get reasoningLevelSourcePerModel => '依模型記憶';
-
-  @override
-  String get reasoningLevelSourceAssistant => '來自助手';
-
-  @override
-  String get reasoningLevelSourceModelDefault => '模型預設';
 
   @override
   String get reasoningLevelCompactMin => 'min';

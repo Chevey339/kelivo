@@ -4606,11 +4606,23 @@ abstract class AppLocalizations {
   /// **'Minimal'**
   String get reasoningLevelMinimal;
 
+  /// No description provided for @reasoningLevelMinimalSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Use the lightest reasoning to answer questions'**
+  String get reasoningLevelMinimalSubtitle;
+
   /// No description provided for @reasoningLevelLow.
   ///
   /// In en, this message translates to:
   /// **'Low'**
   String get reasoningLevelLow;
+
+  /// No description provided for @reasoningLevelLowSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Use light reasoning to answer questions'**
+  String get reasoningLevelLowSubtitle;
 
   /// No description provided for @reasoningLevelMedium.
   ///
@@ -4618,11 +4630,23 @@ abstract class AppLocalizations {
   /// **'Medium'**
   String get reasoningLevelMedium;
 
+  /// No description provided for @reasoningLevelMediumSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Use moderate reasoning to answer questions'**
+  String get reasoningLevelMediumSubtitle;
+
   /// No description provided for @reasoningLevelHigh.
   ///
   /// In en, this message translates to:
   /// **'High'**
   String get reasoningLevelHigh;
+
+  /// No description provided for @reasoningLevelHighSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Use heavy reasoning for complex questions'**
+  String get reasoningLevelHighSubtitle;
 
   /// No description provided for @reasoningLevelXhigh.
   ///
@@ -4630,17 +4654,29 @@ abstract class AppLocalizations {
   /// **'Extra High'**
   String get reasoningLevelXhigh;
 
+  /// No description provided for @reasoningLevelXhighSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Use very high reasoning depth for harder problems'**
+  String get reasoningLevelXhighSubtitle;
+
   /// No description provided for @reasoningLevelMax.
   ///
   /// In en, this message translates to:
   /// **'Max'**
   String get reasoningLevelMax;
 
-  /// No description provided for @reasoningLevelCannotDisable.
+  /// No description provided for @reasoningLevelMaxSubtitle.
   ///
   /// In en, this message translates to:
-  /// **'Thinking cannot be turned off for this model'**
-  String get reasoningLevelCannotDisable;
+  /// **'Use maximum reasoning depth for the toughest problems'**
+  String get reasoningLevelMaxSubtitle;
+
+  /// No description provided for @reasoningLevelFollowModelDefaultSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Use the model\'s default when the assistant doesn\'t set one'**
+  String get reasoningLevelFollowModelDefaultSubtitle;
 
   /// No description provided for @reasoningLevelNoReasoning.
   ///
@@ -4651,7 +4687,7 @@ abstract class AppLocalizations {
   /// No description provided for @reasoningLevelCustomBudget.
   ///
   /// In en, this message translates to:
-  /// **'Custom budget…'**
+  /// **'Custom Reasoning Budget'**
   String get reasoningLevelCustomBudget;
 
   /// No description provided for @reasoningLevelCustomBudgetHint.
@@ -4659,30 +4695,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Token budget, e.g. 2048'**
   String get reasoningLevelCustomBudgetHint;
-
-  /// No description provided for @reasoningLevelReset.
-  ///
-  /// In en, this message translates to:
-  /// **'Reset to default'**
-  String get reasoningLevelReset;
-
-  /// No description provided for @reasoningLevelSourcePerModel.
-  ///
-  /// In en, this message translates to:
-  /// **'Per-model setting'**
-  String get reasoningLevelSourcePerModel;
-
-  /// No description provided for @reasoningLevelSourceAssistant.
-  ///
-  /// In en, this message translates to:
-  /// **'From assistant'**
-  String get reasoningLevelSourceAssistant;
-
-  /// No description provided for @reasoningLevelSourceModelDefault.
-  ///
-  /// In en, this message translates to:
-  /// **'Model default'**
-  String get reasoningLevelSourceModelDefault;
 
   /// No description provided for @reasoningLevelCompactMin.
   ///

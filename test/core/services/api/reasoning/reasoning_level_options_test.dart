@@ -1,8 +1,12 @@
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:Kelivo/core/models/assistant.dart';
 import 'package:Kelivo/core/models/model_spec.dart';
 import 'package:Kelivo/core/models/reasoning_request.dart';
+import 'package:Kelivo/core/providers/settings_provider.dart';
 import 'package:Kelivo/core/services/api/reasoning/reasoning_level_options.dart';
+
+import '../../../../support/business_test_harness.dart';
 
 void main() {
   test(
@@ -164,15 +168,93 @@ void main() {
         source: ReasoningChoiceSource.perModel,
         hasPerModelMemory: true,
         isBudgetStyle: true,
-        showCannotDisableHint: false,
         customSelected: true,
         rows: rows,
       );
-      expect(
-        snapshot.sliderStops.map((row) => row.kind),
-        isNot(contains(ReasoningLevelRowKind.custom)),
-      );
+      expect(snapshot.sliderStops.map((row) => row.kind), [
+        ReasoningLevelRowKind.off,
+        ReasoningLevelRowKind.auto,
+        ReasoningLevelRowKind.level,
+        ReasoningLevelRowKind.level,
+      ]);
       expect(snapshot.sliderIndex, 2);
+    },
+  );
+
+  test(
+    'commitReasoningChoice clears memory when the request matches fallback',
+    () async {
+      final harness = await createBusinessTestHarness();
+      final settings = SettingsProvider(harness.preferences);
+      await settings.loaded;
+      final config = ProviderConfig(
+        id: 'Test',
+        enabled: true,
+        name: 'Test',
+        apiKey: 'test-key',
+        baseUrl: 'https://example.com/v1',
+        providerType: ProviderKind.openai,
+        models: const ['kelivo-test-effort'],
+        modelOverrides: const {
+          'kelivo-test-effort': {
+            'type': 'chat',
+            'abilities': ['reasoning'],
+            'reasoning': {
+              'levels': ['low', 'medium', 'high'],
+              'canDisable': false,
+              'defaultLevel': 'medium',
+              'dialect': 'openaiReasoningEffort',
+            },
+          },
+        },
+      );
+      await settings.setProviderConfig(config.id, config);
+      await settings.setReasoningChoice(
+        config.id,
+        'kelivo-test-effort',
+        const ReasoningRequest(ReasoningLevel.high),
+      );
+
+      await commitReasoningChoice(
+        settings,
+        config,
+        'kelivo-test-effort',
+        null,
+        const ReasoningRequest(ReasoningLevel.medium),
+      );
+      expect(
+        settings.reasoningChoiceFor(config.id, 'kelivo-test-effort'),
+        isNull,
+      );
+
+      await commitReasoningChoice(
+        settings,
+        config,
+        'kelivo-test-effort',
+        null,
+        const ReasoningRequest(ReasoningLevel.high),
+      );
+      expect(
+        settings.reasoningChoiceFor(config.id, 'kelivo-test-effort'),
+        const ReasoningRequest(ReasoningLevel.high),
+      );
+
+      const assistant = Assistant(
+        id: 'a',
+        name: 'A',
+        reasoning: ReasoningRequest(ReasoningLevel.low),
+      );
+      await commitReasoningChoice(
+        settings,
+        config,
+        'kelivo-test-effort',
+        assistant,
+        const ReasoningRequest(ReasoningLevel.low),
+      );
+      expect(
+        settings.reasoningChoiceFor(config.id, 'kelivo-test-effort'),
+        isNull,
+      );
     },
   );
 }

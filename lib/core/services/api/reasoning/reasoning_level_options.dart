@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import '../../../models/assistant.dart';
 import '../../../models/model_spec.dart';
 import '../../../providers/settings_provider.dart';
+import '../../model_spec/model_spec_resolver.dart';
 import 'reasoning_dialects.dart';
 import 'reasoning_selection.dart';
 
@@ -35,7 +36,6 @@ class ReasoningLevelPickerSnapshot {
     required this.source,
     required this.hasPerModelMemory,
     required this.isBudgetStyle,
-    required this.showCannotDisableHint,
     required this.customSelected,
     required this.rows,
   });
@@ -45,7 +45,6 @@ class ReasoningLevelPickerSnapshot {
   final ReasoningChoiceSource source;
   final bool hasPerModelMemory;
   final bool isBudgetStyle;
-  final bool showCannotDisableHint;
   final bool customSelected;
   final List<ReasoningLevelRow> rows;
 
@@ -55,9 +54,25 @@ class ReasoningLevelPickerSnapshot {
     return selected.level == row.level;
   }
 
-  List<ReasoningLevelRow> get sliderStops => rows
-      .where((row) => row.kind != ReasoningLevelRowKind.custom)
-      .toList(growable: false);
+  /// Slider / popover stops in the original order: Off → Auto → levels.
+  List<ReasoningLevelRow> get sliderStops {
+    final off = <ReasoningLevelRow>[];
+    final auto = <ReasoningLevelRow>[];
+    final levels = <ReasoningLevelRow>[];
+    for (final row in rows) {
+      switch (row.kind) {
+        case ReasoningLevelRowKind.off:
+          off.add(row);
+        case ReasoningLevelRowKind.auto:
+          auto.add(row);
+        case ReasoningLevelRowKind.level:
+          levels.add(row);
+        case ReasoningLevelRowKind.custom:
+          break;
+      }
+    }
+    return [...off, ...auto, ...levels];
+  }
 
   int get sliderIndex {
     final stops = sliderStops;
@@ -138,6 +153,25 @@ ReasoningRequest requestForCustomBudget(ModelSpec spec, int budget) {
   );
 }
 
+/// Writes a per-model override, or clears it when [request] matches the
+/// assistant / spec fallback (so the button shows the inherited value).
+Future<void> commitReasoningChoice(
+  SettingsProvider settings,
+  ProviderConfig config,
+  String modelId,
+  Assistant? assistant,
+  ReasoningRequest request,
+) {
+  final spec = ModelSpecResolver.instance.spec(config, modelId);
+  final fallback =
+      assistant?.reasoning ?? ReasoningRequest(spec.reasoning.defaultLevel);
+  return settings.setReasoningChoice(
+    config.id,
+    modelId,
+    request == fallback ? null : request,
+  );
+}
+
 String formatReasoningBudgetK(int tokens) {
   if (tokens.abs() < 1000) return tokens.toString();
   if (tokens % 1000 == 0) return '${tokens ~/ 1000}k';
@@ -161,23 +195,23 @@ ReasoningLevelPickerSnapshot buildReasoningLevelPickerSnapshot({
   final budgetStyle = isBudgetStylePicker(spec.reasoning);
   final customSelected = isCustomBudgetSelection(spec, selected);
   final rows = <ReasoningLevelRow>[
-    const ReasoningLevelRow(
-      kind: ReasoningLevelRowKind.auto,
-      key: 'reasoning-row-auto',
-      level: ReasoningLevel.auto,
-      request: ReasoningRequest.auto,
-    ),
     if (spec.reasoning.canDisable)
       const ReasoningLevelRow(
         kind: ReasoningLevelRowKind.off,
-        key: 'reasoning-row-off',
+        key: 'reasoning-stop-off',
         level: ReasoningLevel.off,
         request: ReasoningRequest.off,
       ),
+    const ReasoningLevelRow(
+      kind: ReasoningLevelRowKind.auto,
+      key: 'reasoning-stop-auto',
+      level: ReasoningLevel.auto,
+      request: ReasoningRequest.auto,
+    ),
     for (final level in spec.reasoning.levels)
       ReasoningLevelRow(
         kind: ReasoningLevelRowKind.level,
-        key: 'reasoning-row-${level.name}',
+        key: 'reasoning-stop-${level.name}',
         level: level,
         request: ReasoningRequest(level),
         budget: budgetStyle ? resolveBudget(spec, level) : null,
@@ -199,7 +233,6 @@ ReasoningLevelPickerSnapshot buildReasoningLevelPickerSnapshot({
     ),
     hasPerModelMemory: settings.reasoningChoiceFor(config.id, modelId) != null,
     isBudgetStyle: budgetStyle,
-    showCannotDisableHint: !spec.reasoning.canDisable,
     customSelected: customSelected,
     rows: rows,
   );

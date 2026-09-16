@@ -20,13 +20,11 @@ class EffortSlider extends StatelessWidget {
     required this.onDragEnd,
     required this.onPositionChanged,
     required this.onSnap,
-    this.stopLabels = const [],
   });
 
   final double position;
   final int stopCount;
   final List<String> stopKeys;
-  final List<String> stopLabels;
   final bool dragging;
   final String semanticsValue;
   final VoidCallback onDragStart;
@@ -35,7 +33,6 @@ class EffortSlider extends StatelessWidget {
   final ValueChanged<int> onSnap;
 
   static const double _height = 56;
-  static const double _labelHeight = 18;
   static const double _thumbRadius = 19;
   // Stops sit exactly one thumb radius from each end, so at the extremes the
   // thumb is flush with the track edge and fully covers the fill — no
@@ -56,21 +53,9 @@ class EffortSlider extends StatelessWidget {
     return _stopInset + span * t;
   }
 
-  double _stopX(double width, int index) {
-    final span = width - 2 * _stopInset;
-    if (stopCount <= 1) return _stopInset;
-    return _stopInset + span * (index / (stopCount - 1));
-  }
-
-  double _labelSlotWidth(double width) {
-    if (stopCount <= 0) return width;
-    return width / stopCount;
-  }
-
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    final showLabels = stopLabels.length == stopCount && stopCount > 0;
     return Semantics(
       slider: true,
       value: semanticsValue,
@@ -98,10 +83,9 @@ class EffortSlider extends StatelessWidget {
               onSnap(index);
             },
             child: SizedBox(
-              height: _height + (showLabels ? _labelHeight : 0),
+              height: _height,
               child: Stack(
-                clipBehavior: Clip.none,
-                alignment: Alignment.topCenter,
+                alignment: Alignment.center,
                 children: [
                   CustomPaint(
                     size: Size(width, _height),
@@ -115,11 +99,7 @@ class EffortSlider extends StatelessWidget {
                       upcomingDotColor: cs.onSurface.withValues(alpha: 0.25),
                     ),
                   ),
-                  Positioned(
-                    left: 0,
-                    right: 0,
-                    top: 0,
-                    height: _height,
+                  Positioned.fill(
                     child: Row(
                       children: [
                         for (final key in stopKeys)
@@ -153,32 +133,6 @@ class EffortSlider extends StatelessWidget {
                       ),
                     ),
                   ),
-                  if (showLabels)
-                    for (var i = 0; i < stopLabels.length; i++)
-                      Positioned(
-                        left: _stopX(width, i) - _labelSlotWidth(width) / 2,
-                        top: _height,
-                        child: SizedBox(
-                          width: _labelSlotWidth(width),
-                          height: _labelHeight,
-                          child: ExcludeSemantics(
-                            child: FittedBox(
-                              fit: BoxFit.scaleDown,
-                              child: Text(
-                                stopLabels[i],
-                                textAlign: TextAlign.center,
-                                maxLines: 1,
-                                softWrap: false,
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  height: 1.2,
-                                  color: cs.onSurface.withValues(alpha: 0.45),
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
                 ],
               ),
             ),
@@ -326,8 +280,24 @@ class AnimatedWidthText extends StatelessWidget {
   }
 }
 
-class EffortSliderActiveStop extends StatelessWidget {
-  const EffortSliderActiveStop({
+class EffortSliderStop {
+  const EffortSliderStop({
+    required this.stopKey,
+    required this.icon,
+    required this.iconKey,
+    required this.title,
+    this.subtitle,
+  });
+
+  final String stopKey;
+  final Widget icon;
+  final Object iconKey;
+  final String title;
+  final String? subtitle;
+}
+
+class EffortSliderLabelPill extends StatelessWidget {
+  const EffortSliderLabelPill({
     super.key,
     required this.icon,
     required this.iconKey,
@@ -385,14 +355,12 @@ class EffortSliderActiveStop extends StatelessWidget {
             ),
           ],
         ),
-        if (subtitle != null && subtitle!.isNotEmpty) ...[
-          const SizedBox(height: 2),
-          AnimatedWidthText(
-            text: subtitle!,
-            style: subtitleStyle,
-            switchKey: ValueKey('s:$subtitle'),
-          ),
-        ],
+        const SizedBox(height: 2),
+        AnimatedWidthText(
+          text: subtitle ?? '',
+          style: subtitleStyle,
+          switchKey: ValueKey('s:${subtitle ?? ''}'),
+        ),
       ],
     );
   }
@@ -401,25 +369,25 @@ class EffortSliderActiveStop extends StatelessWidget {
 class EffortSliderGroup extends StatefulWidget {
   const EffortSliderGroup({
     super.key,
+    required this.stops,
     required this.selectedIndex,
-    required this.stopCount,
-    required this.stopKeys,
-    required this.semanticsValue,
     required this.onCommit,
-    required this.header,
     this.customSelected = false,
-    this.stopLabels = const [],
+    this.customIcon,
+    this.customIconKey,
+    this.customTitle,
+    this.customSubtitle,
     this.padding = const EdgeInsets.symmetric(horizontal: 28),
   });
 
+  final List<EffortSliderStop> stops;
   final int selectedIndex;
   final bool customSelected;
-  final int stopCount;
-  final List<String> stopKeys;
-  final List<String> stopLabels;
-  final String Function(int visualIndex) semanticsValue;
+  final Widget? customIcon;
+  final Object? customIconKey;
+  final String? customTitle;
+  final String? customSubtitle;
   final ValueChanged<int> onCommit;
-  final Widget Function(BuildContext context, int visualIndex) header;
   final EdgeInsets padding;
 
   @override
@@ -439,6 +407,8 @@ class _EffortSliderGroupState extends State<EffortSliderGroup>
   bool _dragging = false;
   late int _committed;
 
+  int get _stopCount => widget.stops.length;
+
   @override
   void initState() {
     super.initState();
@@ -446,10 +416,7 @@ class _EffortSliderGroupState extends State<EffortSliderGroup>
     _position = widget.selectedIndex.toDouble();
     _snap = AnimationController.unbounded(vsync: this)
       ..addListener(() {
-        final last = (widget.stopCount - 1).toDouble().clamp(
-          0.0,
-          double.infinity,
-        );
+        final last = (_stopCount - 1).toDouble().clamp(0.0, double.infinity);
         setState(() => _position = _snap.value.clamp(0.0, last).toDouble());
       });
   }
@@ -457,8 +424,8 @@ class _EffortSliderGroupState extends State<EffortSliderGroup>
   @override
   void didUpdateWidget(covariant EffortSliderGroup oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (widget.stopCount != oldWidget.stopCount && widget.stopCount > 0) {
-      final last = (widget.stopCount - 1).toDouble();
+    if (_stopCount != oldWidget.stops.length && _stopCount > 0) {
+      final last = (_stopCount - 1).toDouble();
       if (_position > last) _position = last;
     }
     if (widget.selectedIndex != oldWidget.selectedIndex && !_dragging) {
@@ -474,7 +441,7 @@ class _EffortSliderGroupState extends State<EffortSliderGroup>
   }
 
   void _commitIndex(int index) {
-    if (index < 0 || index >= widget.stopCount) return;
+    if (index < 0 || index >= _stopCount) return;
     if (index == _committed && !widget.customSelected) return;
     _committed = index;
     Haptics.soft();
@@ -502,22 +469,39 @@ class _EffortSliderGroupState extends State<EffortSliderGroup>
 
   @override
   Widget build(BuildContext context) {
-    final last = widget.stopCount <= 0 ? 0 : widget.stopCount - 1;
+    final last = _stopCount <= 0 ? 0 : _stopCount - 1;
     final visualIndex = _position.round().clamp(0, last).toInt();
+    final custom =
+        widget.customSelected &&
+        widget.customTitle != null &&
+        widget.customIcon != null;
+    final stop = widget.stops.isEmpty
+        ? null
+        : widget.stops[visualIndex.clamp(0, widget.stops.length - 1)];
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Center(child: widget.header(context, visualIndex)),
+        Center(
+          child: EffortSliderLabelPill(
+            icon: custom
+                ? widget.customIcon!
+                : (stop?.icon ?? const SizedBox()),
+            iconKey: custom
+                ? (widget.customIconKey ?? 'custom')
+                : (stop?.iconKey ?? 'empty'),
+            title: custom ? widget.customTitle! : (stop?.title ?? ''),
+            subtitle: custom ? widget.customSubtitle : stop?.subtitle,
+          ),
+        ),
         const SizedBox(height: 22),
         Padding(
           padding: widget.padding,
           child: EffortSlider(
             position: _position,
-            stopCount: widget.stopCount,
-            stopKeys: widget.stopKeys,
-            stopLabels: widget.stopLabels,
+            stopCount: _stopCount,
+            stopKeys: [for (final stop in widget.stops) stop.stopKey],
             dragging: _dragging,
-            semanticsValue: widget.semanticsValue(visualIndex),
+            semanticsValue: custom ? widget.customTitle! : (stop?.title ?? ''),
             onDragStart: () {
               _snap.stop();
               setState(() => _dragging = true);
