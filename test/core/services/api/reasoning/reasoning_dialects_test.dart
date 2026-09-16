@@ -919,6 +919,23 @@ void main() {
         },
       );
     });
+
+    test('auto does not write surface flags', () {
+      final spec = _spec(
+        dialect: ReasoningDialect.geminiThinkingBudget,
+        abilities: const [],
+      );
+      expect(spec.supportsReasoning, isFalse);
+      expect(
+        applyReasoning(
+          <String, dynamic>{},
+          spec,
+          const ReasoningRequest(ReasoningLevel.auto),
+          transport: ReasoningTransport.geminiGenerateContent,
+        ),
+        isEmpty,
+      );
+    });
   });
 
   group('resolveReasoning', () {

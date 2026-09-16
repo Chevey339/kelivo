@@ -66,6 +66,11 @@ class ModelSpecResolver {
   static final ModelSpecResolver instance = ModelSpecResolver();
 
   static const int _memoCap = 4096;
+  static const List<ReasoningLevel> _effortLadder = [
+    ReasoningLevel.low,
+    ReasoningLevel.medium,
+    ReasoningLevel.high,
+  ];
   static const List<ReasoningLevel> _budgetLadder = [
     ReasoningLevel.low,
     ReasoningLevel.medium,
@@ -95,12 +100,6 @@ class ModelSpecResolver {
     ReasoningDialect.qwenEnableThinking,
     ReasoningDialect.siliconflowEnableThinking,
     ReasoningDialect.openrouterReasoning,
-  };
-  static const Set<ReasoningDialect> _cannotDisableDialects = {
-    ReasoningDialect.openaiReasoningEffort,
-    ReasoningDialect.openaiResponsesReasoning,
-    ReasoningDialect.geminiThinkingLevel,
-    ReasoningDialect.none,
   };
 
   final ModelCatalogService _catalog;
@@ -194,7 +193,6 @@ class ModelSpecResolver {
     );
 
     final reasoning = _resolveReasoning(
-      abilities: abilities,
       guess: guess,
       vendor: vendor,
       match: match,
@@ -332,22 +330,11 @@ class ModelSpecResolver {
   }
 
   static ReasoningSpec _resolveReasoning({
-    required List<ModelAbility> abilities,
     required ModelGuess guess,
     required VendorDefaults vendor,
     required CatalogMatch? match,
     required Map<ModelSpecField, SpecSource> sources,
   }) {
-    if (!abilities.contains(ModelAbility.reasoning)) {
-      sources[ModelSpecField.reasoningDialect] = SpecSource.fallback;
-      sources[ModelSpecField.reasoningLevels] = SpecSource.fallback;
-      sources[ModelSpecField.reasoningCanDisable] = SpecSource.fallback;
-      sources[ModelSpecField.reasoningDefaultLevel] = SpecSource.fallback;
-      sources[ModelSpecField.reasoningBudgets] = SpecSource.fallback;
-      sources[ModelSpecField.reasoningReplay] = SpecSource.fallback;
-      return const ReasoningSpec();
-    }
-
     final dialect = _resolveDialect(
       vendor: vendor,
       guess: guess,
@@ -364,7 +351,6 @@ class ModelSpecResolver {
       vendor: vendor,
       match: match,
       guess: guess,
-      dialect: dialect,
       sources: sources,
     );
     final budgets = _resolveBudgets(
@@ -431,16 +417,21 @@ class ModelSpecResolver {
       sources[ModelSpecField.reasoningLevels] = SpecSource.catalog;
       return catalogLevels;
     }
-    if (guess.reasoning?.levels != null && guess.reasoning!.levels.isNotEmpty) {
+    final guessLevels = guess.reasoning?.levels;
+    if (guessLevels != null && guessLevels.isNotEmpty) {
       sources[ModelSpecField.reasoningLevels] = SpecSource.guess;
-      return guess.reasoning!.levels;
+      return guessLevels;
     }
     if (_budgetDialects.contains(dialect)) {
       sources[ModelSpecField.reasoningLevels] = SpecSource.fallback;
       return _budgetLadder;
     }
+    if (guess.reasoning != null) {
+      sources[ModelSpecField.reasoningLevels] = SpecSource.guess;
+      return const [];
+    }
     sources[ModelSpecField.reasoningLevels] = SpecSource.fallback;
-    return const [];
+    return _effortLadder;
   }
 
   static List<ReasoningLevel>? _catalogEffortLevels(CatalogModel? model) {
@@ -475,7 +466,6 @@ class ModelSpecResolver {
     required VendorDefaults vendor,
     required CatalogMatch? match,
     required ModelGuess guess,
-    required ReasoningDialect dialect,
     required Map<ModelSpecField, SpecSource> sources,
   }) {
     if (vendor.canDisable != null) {
@@ -492,7 +482,7 @@ class ModelSpecResolver {
       return guess.reasoning!.canDisable;
     }
     sources[ModelSpecField.reasoningCanDisable] = SpecSource.fallback;
-    return !_cannotDisableDialects.contains(dialect);
+    return true;
   }
 
   static bool? _catalogCanDisable(CatalogModel? model) {

@@ -7,6 +7,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:Kelivo/core/models/model_spec.dart';
 import 'package:Kelivo/core/providers/settings_provider.dart';
+import 'package:Kelivo/core/services/api/reasoning/reasoning_dialects.dart';
 import 'package:Kelivo/core/services/model_catalog/catalog_entry.dart';
 import 'package:Kelivo/core/services/model_catalog/model_catalog_service.dart';
 import 'package:Kelivo/core/services/model_spec/model_spec_resolver.dart';
@@ -329,6 +330,211 @@ void main() {
         expect(resolved.spec.reasoning.canDisable, isFalse);
       },
     );
+
+    test(
+      'guessed toggle-only models keep empty levels; unknown ids get the effort ladder',
+      () {
+        final cfg = _cfg(
+          id: 'Moonshot',
+          kind: ProviderKind.openai,
+          baseUrl: 'https://api.moonshot.cn/v1',
+        );
+
+        final kimi = resolver.resolve(cfg, 'kimi-k2.6');
+        expect(kimi.catalog, isNull);
+        expect(kimi.spec.reasoning.levels, isEmpty);
+        expect(kimi.sources[ModelSpecField.reasoningLevels], SpecSource.guess);
+        expect(kimi.spec.reasoning.dialect, ReasoningDialect.kimiThinking);
+
+        final unknown = resolver.resolve(cfg, 'stealth/ox-alpha');
+        expect(unknown.catalog, isNull);
+        expect(unknown.spec.reasoning.levels, [
+          ReasoningLevel.low,
+          ReasoningLevel.medium,
+          ReasoningLevel.high,
+        ]);
+        expect(
+          unknown.sources[ModelSpecField.reasoningLevels],
+          SpecSource.fallback,
+        );
+      },
+    );
+
+    test('unknown chat models get the provider-default reasoning spec', () {
+      const id = 'stealth/ox-alpha';
+
+      final openai = resolver.resolve(_openai(), id);
+      expect(openai.spec.abilities, isNot(contains(ModelAbility.reasoning)));
+      expect(
+        openai.spec.reasoning.dialect,
+        ReasoningDialect.openaiReasoningEffort,
+      );
+      expect(
+        openai.sources[ModelSpecField.reasoningDialect],
+        SpecSource.vendor,
+      );
+      expect(openai.spec.reasoning.levels, [
+        ReasoningLevel.low,
+        ReasoningLevel.medium,
+        ReasoningLevel.high,
+      ]);
+      expect(
+        openai.sources[ModelSpecField.reasoningLevels],
+        SpecSource.fallback,
+      );
+      expect(openai.spec.reasoning.canDisable, isTrue);
+      expect(
+        openai.sources[ModelSpecField.reasoningCanDisable],
+        SpecSource.fallback,
+      );
+      expect(openai.spec.reasoning.defaultLevel, ReasoningLevel.auto);
+      expect(
+        openai.sources[ModelSpecField.reasoningDefaultLevel],
+        SpecSource.fallback,
+      );
+
+      final claude = resolver.resolve(_anthropic(), id);
+      expect(claude.spec.reasoning.dialect, ReasoningDialect.anthropicBudget);
+      expect(
+        claude.sources[ModelSpecField.reasoningDialect],
+        SpecSource.vendor,
+      );
+      expect(claude.spec.reasoning.levels, [
+        ReasoningLevel.low,
+        ReasoningLevel.medium,
+        ReasoningLevel.high,
+        ReasoningLevel.xhigh,
+        ReasoningLevel.max,
+      ]);
+      expect(
+        claude.sources[ModelSpecField.reasoningLevels],
+        SpecSource.fallback,
+      );
+      expect(claude.spec.reasoning.canDisable, isTrue);
+      expect(claude.spec.reasoning.defaultLevel, ReasoningLevel.auto);
+
+      final google = resolver.resolve(_google(), id);
+      expect(
+        google.spec.reasoning.dialect,
+        ReasoningDialect.geminiThinkingBudget,
+      );
+      expect(
+        google.sources[ModelSpecField.reasoningDialect],
+        SpecSource.vendor,
+      );
+      expect(google.spec.reasoning.levels, [
+        ReasoningLevel.low,
+        ReasoningLevel.medium,
+        ReasoningLevel.high,
+        ReasoningLevel.xhigh,
+        ReasoningLevel.max,
+      ]);
+      expect(
+        google.sources[ModelSpecField.reasoningLevels],
+        SpecSource.fallback,
+      );
+      expect(google.spec.reasoning.canDisable, isTrue);
+
+      final responses = resolver.resolve(
+        _openai().copyWith(useResponseApi: true),
+        id,
+      );
+      expect(
+        responses.spec.reasoning.dialect,
+        ReasoningDialect.openaiResponsesReasoning,
+      );
+      expect(
+        responses.sources[ModelSpecField.reasoningDialect],
+        SpecSource.vendor,
+      );
+      expect(responses.spec.reasoning.levels, [
+        ReasoningLevel.low,
+        ReasoningLevel.medium,
+        ReasoningLevel.high,
+      ]);
+      expect(responses.spec.reasoning.canDisable, isTrue);
+      expect(responses.spec.reasoning.defaultLevel, ReasoningLevel.auto);
+    });
+
+    test('known gpt-5-pro keeps guesser canDisable false', () {
+      final resolved = resolver.resolve(_openai(), 'gpt-5-pro');
+      expect(resolved.spec.abilities, contains(ModelAbility.reasoning));
+      expect(resolved.spec.reasoning.canDisable, isFalse);
+      expect(
+        resolved.sources[ModelSpecField.reasoningCanDisable],
+        SpecSource.guess,
+      );
+      expect(
+        resolved.spec.reasoning.dialect,
+        ReasoningDialect.openaiReasoningEffort,
+      );
+      expect(
+        resolved.sources[ModelSpecField.reasoningDialect],
+        SpecSource.guess,
+      );
+    });
+
+    test(
+      'ability-only override keeps the provider-default dialect and levels',
+      () {
+        const id = 'stealth/ox-alpha';
+        final ov = <String, dynamic>{
+          id: <String, dynamic>{
+            'abilities': <String>['reasoning'],
+          },
+        };
+        final resolved = resolver.resolve(_openai(overrides: ov), id);
+
+        expect(resolved.spec.abilities, contains(ModelAbility.reasoning));
+        expect(resolved.sources[ModelSpecField.abilities], SpecSource.override);
+        expect(
+          resolved.spec.reasoning.dialect,
+          ReasoningDialect.openaiReasoningEffort,
+        );
+        expect(
+          resolved.sources[ModelSpecField.reasoningDialect],
+          SpecSource.vendor,
+        );
+        expect(resolved.spec.reasoning.levels, [
+          ReasoningLevel.low,
+          ReasoningLevel.medium,
+          ReasoningLevel.high,
+        ]);
+        expect(
+          resolved.sources[ModelSpecField.reasoningLevels],
+          SpecSource.fallback,
+        );
+        expect(resolved.spec.reasoning.canDisable, isTrue);
+        expect(
+          resolved.sources[ModelSpecField.reasoningCanDisable],
+          SpecSource.fallback,
+        );
+        expect(resolved.spec.reasoning.defaultLevel, ReasoningLevel.auto);
+        expect(
+          resolved.base.reasoning.dialect,
+          resolved.spec.reasoning.dialect,
+        );
+        expect(resolved.base.reasoning.levels, resolved.spec.reasoning.levels);
+      },
+    );
+
+    test('auto request does not emit reasoning fields without the ability', () {
+      final resolved = resolver.resolve(_google(), 'stealth/ox-alpha');
+      expect(resolved.spec.supportsReasoning, isFalse);
+      expect(
+        resolved.spec.reasoning.dialect,
+        ReasoningDialect.geminiThinkingBudget,
+      );
+      expect(
+        applyReasoning(
+          <String, dynamic>{},
+          resolved.spec,
+          const ReasoningRequest(ReasoningLevel.auto),
+          transport: ReasoningTransport.geminiGenerateContent,
+        ),
+        isEmpty,
+      );
+    });
   });
 }
 
