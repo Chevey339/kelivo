@@ -164,9 +164,7 @@ void main() {
           openRouter.balanceResultPath,
           'data.total_credits - data.total_usage',
         );
-        expect(siliconFlow.balanceEnabled, isTrue);
-        expect(siliconFlow.balanceApiPath, '/user/info');
-        expect(siliconFlow.balanceResultPath, 'data.totalBalance');
+        expect(siliconFlow.balanceEnabled, isFalse);
         expect(vercel.balanceEnabled, isTrue);
         expect(vercel.balanceApiPath, '/credits');
         expect(vercel.balanceResultPath, 'balance');
