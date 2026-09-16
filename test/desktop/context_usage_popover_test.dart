@@ -96,6 +96,7 @@ void main() {
   }) {
     final settings = SettingsProvider(createBusinessTestPreferences());
     addTearDown(settings.dispose);
+    final anchorKey = GlobalKey();
     return tester.pumpWidget(
       MultiProvider(
         providers: [
@@ -109,23 +110,26 @@ void main() {
           home: Scaffold(
             body: Align(
               alignment: Alignment.bottomCenter,
-              child: Builder(
-                builder: (context) {
-                  return TextButton(
-                    key: const ValueKey('open-context-usage-popover'),
-                    onPressed: () {
-                      final box = context.findRenderObject() as RenderBox;
-                      final origin = box.localToGlobal(Offset.zero);
-                      showContextUsagePopover(
-                        context,
-                        anchorRect: origin & box.size,
-                        conversationId: 'c1',
-                        draftText: 'hello',
-                      );
-                    },
-                    child: const Text('open'),
-                  );
-                },
+              child: SizedBox(
+                key: anchorKey,
+                width: 320,
+                height: 48,
+                child: Builder(
+                  builder: (context) {
+                    return TextButton(
+                      key: const ValueKey('open-context-usage-popover'),
+                      onPressed: () {
+                        showContextUsagePopover(
+                          context,
+                          anchorKey: anchorKey,
+                          conversationId: 'c1',
+                          draftText: 'hello',
+                        );
+                      },
+                      child: const Text('open'),
+                    );
+                  },
+                ),
               ),
             ),
           ),

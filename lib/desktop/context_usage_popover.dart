@@ -18,10 +18,24 @@ const double kContextUsagePopoverWidth = 332;
 
 Future<void> showContextUsagePopover(
   BuildContext context, {
-  required Rect anchorRect,
+  required GlobalKey anchorKey,
   required String conversationId,
   required String draftText,
 }) async {
+  final keyContext = anchorKey.currentContext;
+  if (keyContext == null) return;
+
+  final box = keyContext.findRenderObject() as RenderBox?;
+  if (box == null) return;
+  final offset = box.localToGlobal(Offset.zero);
+  final size = box.size;
+  final anchorRect = Rect.fromLTWH(
+    offset.dx,
+    offset.dy,
+    size.width,
+    size.height,
+  );
+
   final usage = context.read<ContextUsageService>();
   unawaited(usage.refresh(conversationId, draftText: draftText));
 

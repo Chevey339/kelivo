@@ -39,7 +39,6 @@ import '../../../shared/widgets/snackbar.dart';
 import '../../../utils/app_directories.dart';
 import 'package:super_clipboard/super_clipboard.dart';
 import '../../../desktop/desktop_context_menu.dart';
-import '../../../desktop/context_usage_popover.dart';
 import '../../../shared/widgets/context_usage_ring.dart';
 import '../services/context_usage_service.dart';
 import 'package:Kelivo/theme/app_font_weights.dart';
@@ -137,6 +136,7 @@ class ChatInputBar extends StatefulWidget {
     this.onOpenSearch,
     this.onMore,
     this.onConfigureReasoning,
+    this.onOpenContextUsage,
     this.moreOpen = false,
     this.focusNode,
     this.modelIcon,
@@ -195,6 +195,7 @@ class ChatInputBar extends StatefulWidget {
   final VoidCallback? onOpenSearch;
   final VoidCallback? onMore;
   final VoidCallback? onConfigureReasoning;
+  final VoidCallback? onOpenContextUsage;
   final bool moreOpen;
   final FocusNode? focusNode;
   final Widget? modelIcon;
@@ -3062,9 +3063,9 @@ class _ChatInputBarState extends State<ChatInputBar>
                                                         ?.isNotEmpty ??
                                                     false))
                                               _ContextUsageInputControl(
-                                                conversationId:
-                                                    widget.conversationId!,
-                                                draftText: _controller.text,
+                                                onTap: _composerLocked
+                                                    ? null
+                                                    : widget.onOpenContextUsage,
                                               ),
                                             _CompactSendButton(
                                               enabled:
@@ -3439,13 +3440,9 @@ class _CompactIconButton extends StatelessWidget {
 }
 
 class _ContextUsageInputControl extends StatelessWidget {
-  const _ContextUsageInputControl({
-    required this.conversationId,
-    required this.draftText,
-  });
+  const _ContextUsageInputControl({this.onTap});
 
-  final String conversationId;
-  final String draftText;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
@@ -3453,25 +3450,9 @@ class _ContextUsageInputControl extends StatelessWidget {
     if (usage == null) return const SizedBox.shrink();
     return Padding(
       padding: const EdgeInsets.only(right: 8),
-      child: Builder(
-        builder: (ringContext) {
-          return ContextUsageRing(
-            snapshot: usage.current,
-            onTap: () {
-              final box = ringContext.findRenderObject() as RenderBox?;
-              if (box == null || !box.hasSize) return;
-              final origin = box.localToGlobal(Offset.zero);
-              unawaited(
-                showContextUsagePopover(
-                  context,
-                  anchorRect: origin & box.size,
-                  conversationId: conversationId,
-                  draftText: draftText,
-                ),
-              );
-            },
-          );
-        },
+      child: ContextUsageRing(
+        snapshot: usage.current,
+        onTap: () => onTap?.call(),
       ),
     );
   }

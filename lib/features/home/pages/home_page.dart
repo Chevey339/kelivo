@@ -30,6 +30,7 @@ import '../../../core/services/logging/flutter_logger.dart';
 import '../../../utils/platform_utils.dart';
 import '../../../desktop/search_provider_popover.dart';
 import '../../../desktop/reasoning_level_popover.dart';
+import '../../../desktop/context_usage_popover.dart';
 import '../../../desktop/tools_popover.dart';
 import '../../../desktop/workspace_dialog.dart';
 import '../../../desktop/skills_popover.dart';
@@ -1572,6 +1573,9 @@ class _HomePageState extends State<HomePage>
       onConfigureReasoning: () async {
         await _openReasoningSettings();
       },
+      onOpenContextUsage: () async {
+        await _openContextUsagePopover();
+      },
       onSend: (text) async {
         final result = await _controller.sendMessage(text);
         if (!mounted) return result;
@@ -1812,6 +1816,17 @@ class _HomePageState extends State<HomePage>
         chatModelId: model.modelId,
       );
     }
+  }
+
+  Future<void> _openContextUsagePopover() async {
+    final conversationId = _controller.currentConversation?.id;
+    if (conversationId == null || conversationId.isEmpty) return;
+    await showContextUsagePopover(
+      context,
+      anchorKey: _inputBarKey,
+      conversationId: conversationId,
+      draftText: _inputController.text,
+    );
   }
 
   Future<void> _openReasoningSettings() async {
