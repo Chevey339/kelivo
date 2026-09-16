@@ -2357,41 +2357,48 @@ class _DesktopModelSelectDialogBodyState
                 overflow: TextOverflow.ellipsis,
               ),
             ),
-            const SizedBox(width: 6),
-            Flexible(
-              child: ModelCapsulesRow(
-                model: m.info,
-                pillPadding: const EdgeInsets.symmetric(
-                  horizontal: 5,
-                  vertical: 2,
-                ),
-                bgOpacityDark: 0.18,
-                bgOpacityLight: 0.14,
-                borderOpacity: 0.22,
-                itemSpacing: 4,
-              ),
-            ),
-            const SizedBox(width: 4),
-            Builder(
-              builder: (context) {
-                final pinnedNow = context.select<SettingsProvider, bool>(
-                  (s) => s.isModelPinned(m.providerKey, m.id),
-                );
-                final icon = pinnedNow ? Icons.favorite : Icons.favorite_border;
-                return Tooltip(
-                  message: l10n.modelSelectSheetFavoriteTooltip,
-                  child: IosIconButton(
-                    icon: icon,
-                    size: 16,
-                    color: cs.primary,
-                    onTap: () => context
-                        .read<SettingsProvider>()
-                        .togglePinModel(m.providerKey, m.id),
-                    padding: const EdgeInsets.all(3),
-                    minSize: 26,
+            const SizedBox(width: 8),
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                ModelCapsulesRow(
+                  model: m.info,
+                  alignment: WrapAlignment.end,
+                  pillPadding: const EdgeInsets.symmetric(
+                    horizontal: 5,
+                    vertical: 2,
                   ),
-                );
-              },
+                  bgOpacityDark: 0.18,
+                  bgOpacityLight: 0.14,
+                  borderOpacity: 0.22,
+                  itemSpacing: 4,
+                ),
+                const SizedBox(width: 4),
+                Builder(
+                  builder: (context) {
+                    final pinnedNow = context.select<SettingsProvider, bool>(
+                      (s) => s.isModelPinned(m.providerKey, m.id),
+                    );
+                    final icon = pinnedNow
+                        ? Icons.favorite
+                        : Icons.favorite_border;
+                    return IosIconButton(
+                      key: ValueKey(
+                        'desktop-model-favorite-${m.providerKey}::${m.id}',
+                      ),
+                      icon: icon,
+                      size: 16,
+                      color: cs.primary,
+                      tooltip: l10n.modelSelectSheetFavoriteTooltip,
+                      onTap: () => context
+                          .read<SettingsProvider>()
+                          .togglePinModel(m.providerKey, m.id),
+                      padding: const EdgeInsets.all(3),
+                      minSize: 26,
+                    );
+                  },
+                ),
+              ],
             ),
           ],
         ),

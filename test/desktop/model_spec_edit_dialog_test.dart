@@ -5,7 +5,9 @@ import 'package:provider/provider.dart';
 
 import 'package:Kelivo/core/providers/settings_provider.dart';
 import 'package:Kelivo/desktop/model_spec_edit_dialog.dart';
+import 'package:Kelivo/desktop/widgets/desktop_form_dialog.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
+import 'package:Kelivo/shared/widgets/ios_form_text_field.dart';
 
 ProviderConfig _config() {
   return ProviderConfig(
@@ -82,6 +84,15 @@ void main() {
       find.byKey(const ValueKey('model-spec-edit-dialog')),
       findsOneWidget,
     );
+    expect(find.byType(DesktopFormDialog), findsOneWidget);
+    expect(find.byType(DesktopFormDialogHeader), findsOneWidget);
+    expect(find.byType(DesktopFormDialogFooter), findsOneWidget);
+    expect(find.byType(DesktopFormDialogNavItem), findsWidgets);
+
+    for (final field in tester.widgetList<TextField>(find.byType(TextField))) {
+      expect(field.textAlignVertical, TextAlignVertical.center);
+    }
+    expect(find.byType(IosFormTextField), findsWidgets);
 
     await tester.tap(find.byKey(const ValueKey('model-spec-nav-limits')));
     await tester.pumpAndSettle();
@@ -110,6 +121,30 @@ void main() {
       TextAlign.right,
     );
     expect(fieldAlign(const ValueKey('model-spec-currency')), TextAlign.right);
+
+    TextAlignVertical? fieldVertical(Key key) {
+      return tester
+          .widget<TextField>(
+            find.descendant(
+              of: find.byKey(key),
+              matching: find.byType(TextField),
+            ),
+          )
+          .textAlignVertical;
+    }
+
+    expect(
+      fieldVertical(const ValueKey('model-spec-context-window')),
+      TextAlignVertical.center,
+    );
+    expect(
+      fieldVertical(const ValueKey('model-spec-max-output')),
+      TextAlignVertical.center,
+    );
+    expect(
+      fieldVertical(const ValueKey('model-spec-pricing-input')),
+      TextAlignVertical.center,
+    );
 
     await tester.enterText(
       find.descendant(

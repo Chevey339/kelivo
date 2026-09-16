@@ -7162,55 +7162,61 @@ class _ModelRow extends StatelessWidget {
               ),
               const SizedBox(width: 8),
             ],
-            if (!isSelectionMode) ...[
-              Flexible(child: ModelCapsulesRow(model: info)),
-              const SizedBox(width: 8),
-              _IconBtn(
-                icon: lucide.Lucide.Settings2,
-                onTap: () async {
-                  await showDesktopModelSpecEditDialog(
-                    context,
-                    providerKey: providerKey,
-                    modelKey: modelId,
-                  );
-                },
-              ),
-              if (!cfg.isOAuth) ...[
-                const SizedBox(width: 4),
-                _IconBtn(
-                  icon: lucide.Lucide.Minus,
-                  onTap: () async {
-                    final sp = context.read<SettingsProvider>();
-                    final ap = context.read<AssistantProvider>();
-                    final chatService = context.read<ChatService>();
-                    final old = sp.getProviderConfig(providerKey);
-                    final list = List<String>.from(old.models)
-                      ..removeWhere((e) => e == modelId);
-                    await sp.setProviderConfig(
-                      providerKey,
-                      old.copyWith(models: list),
-                    );
-                    // Clear global and assistant-level model selections that reference the deleted model
-                    await sp.clearSelectionsForModel(providerKey, modelId);
-                    try {
-                      for (final a in ap.assistants) {
-                        if (a.chatModelProvider == providerKey &&
-                            a.chatModelId == modelId) {
-                          await ap.updateAssistant(
-                            a.copyWith(clearChatModel: true),
-                          );
-                        }
-                      }
-                      // Conversations can pin a model too.
-                      await chatService.clearConversationModelOverrides(
+            if (!isSelectionMode)
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  ModelCapsulesRow(model: info, alignment: WrapAlignment.end),
+                  const SizedBox(width: 8),
+                  _IconBtn(
+                    key: ValueKey('desktop-provider-model-settings-$modelId'),
+                    icon: lucide.Lucide.Settings2,
+                    onTap: () async {
+                      await showDesktopModelSpecEditDialog(
+                        context,
                         providerKey: providerKey,
-                        modelId: modelId,
+                        modelKey: modelId,
                       );
-                    } catch (_) {}
-                  },
-                ),
-              ],
-            ],
+                    },
+                  ),
+                  if (!cfg.isOAuth) ...[
+                    const SizedBox(width: 4),
+                    _IconBtn(
+                      key: ValueKey('desktop-provider-model-remove-$modelId'),
+                      icon: lucide.Lucide.Minus,
+                      onTap: () async {
+                        final sp = context.read<SettingsProvider>();
+                        final ap = context.read<AssistantProvider>();
+                        final chatService = context.read<ChatService>();
+                        final old = sp.getProviderConfig(providerKey);
+                        final list = List<String>.from(old.models)
+                          ..removeWhere((e) => e == modelId);
+                        await sp.setProviderConfig(
+                          providerKey,
+                          old.copyWith(models: list),
+                        );
+                        // Clear global and assistant-level model selections that reference the deleted model
+                        await sp.clearSelectionsForModel(providerKey, modelId);
+                        try {
+                          for (final a in ap.assistants) {
+                            if (a.chatModelProvider == providerKey &&
+                                a.chatModelId == modelId) {
+                              await ap.updateAssistant(
+                                a.copyWith(clearChatModel: true),
+                              );
+                            }
+                          }
+                          // Conversations can pin a model too.
+                          await chatService.clearConversationModelOverrides(
+                            providerKey: providerKey,
+                            modelId: modelId,
+                          );
+                        } catch (_) {}
+                      },
+                    ),
+                  ],
+                ],
+              ),
           ],
         ),
       ),

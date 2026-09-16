@@ -1,5 +1,3 @@
-import 'dart:math' as math;
-
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
@@ -16,11 +14,8 @@ import '../features/model/widgets/model_spec_form/reasoning_section.dart';
 import '../features/model/widgets/model_spec_form/strategy_section.dart';
 import '../icons/lucide_adapter.dart';
 import '../l10n/app_localizations.dart';
-import '../shared/widgets/ios_tactile.dart';
-import '../shared/widgets/section_card.dart';
 import '../shared/widgets/snackbar.dart';
-import '../theme/app_font_weights.dart';
-import 'package:Kelivo/theme/app_semantic_colors.dart';
+import 'widgets/desktop_form_dialog.dart';
 
 Future<bool?> showDesktopModelSpecEditDialog(
   BuildContext context, {
@@ -148,9 +143,6 @@ class _ModelSpecEditDialogBodyState extends State<_ModelSpecEditDialogBody> {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final l10n = AppLocalizations.of(context)!;
-    final media = MediaQuery.sizeOf(context);
-    final width = math.min(760.0, math.max(0.0, media.width - 48));
-    final height = math.min(640.0, math.max(0.0, media.height - 48));
 
     return CallbackShortcuts(
       bindings: {
@@ -160,178 +152,90 @@ class _ModelSpecEditDialogBodyState extends State<_ModelSpecEditDialogBody> {
       },
       child: Focus(
         autofocus: true,
-        child: Center(
-          child: SizedBox(
-            width: width,
-            height: height,
-            child: Material(
-              color: context.overlaySurface,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
-                side: BorderSide(
-                  color: Theme.of(context).brightness == Brightness.dark
-                      ? cs.onSurface.withValues(alpha: 0.08)
-                      : cs.outlineVariant.withValues(alpha: 0.25),
-                ),
-              ),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(16),
-                child: ListenableBuilder(
-                  listenable: _controller,
-                  builder: (context, _) {
-                    final spec = _controller.spec;
-                    final showTools =
-                        spec.type == ModelType.chat &&
-                        ModelBuiltInToolTiles.forConfig(
-                          cfg: _controller.config,
-                          l10n: l10n,
-                        ).isNotEmpty;
-                    final sections = _visibleSections(spec, showTools);
-                    var section = _section;
-                    if (!sections.contains(section) ||
-                        !_sectionEnabled(section, spec)) {
-                      section = _SpecSection.basic;
-                      if (_section != section) {
-                        WidgetsBinding.instance.addPostFrameCallback((_) {
-                          if (mounted) setState(() => _section = section);
-                        });
-                      }
-                    }
-                    return Column(
-                      key: const ValueKey('model-spec-edit-dialog'),
+        child: DesktopFormDialog(
+          key: const ValueKey('model-spec-edit-dialog'),
+          child: ListenableBuilder(
+            listenable: _controller,
+            builder: (context, _) {
+              final spec = _controller.spec;
+              final showTools =
+                  spec.type == ModelType.chat &&
+                  ModelBuiltInToolTiles.forConfig(
+                    cfg: _controller.config,
+                    l10n: l10n,
+                  ).isNotEmpty;
+              final sections = _visibleSections(spec, showTools);
+              var section = _section;
+              if (!sections.contains(section) ||
+                  !_sectionEnabled(section, spec)) {
+                section = _SpecSection.basic;
+                if (_section != section) {
+                  WidgetsBinding.instance.addPostFrameCallback((_) {
+                    if (mounted) setState(() => _section = section);
+                  });
+                }
+              }
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  DesktopFormDialogHeader(
+                    title: widget.isNew
+                        ? l10n.modelDetailSheetAddModel
+                        : l10n.modelDetailSheetEditModel,
+                    closeTooltip: l10n.mcpPageClose,
+                    closeSemanticLabel: l10n.mcpPageClose,
+                    onClose: () => Navigator.of(context).maybePop(false),
+                  ),
+                  Expanded(
+                    child: Row(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        _header(cs, l10n),
-                        Expanded(
-                          child: Row(
-                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                        SizedBox(
+                          width: 188,
+                          child: ListView(
+                            padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
                             children: [
-                              SizedBox(
-                                width: 180,
-                                child: ColoredBox(
-                                  color: context.appColors.surfaceFill,
-                                  child: ListView(
-                                    padding: const EdgeInsets.fromLTRB(
-                                      8,
-                                      8,
-                                      8,
-                                      12,
-                                    ),
-                                    children: [
-                                      for (final item in sections)
-                                        _NavItem(
-                                          key: ValueKey(
-                                            'model-spec-nav-${item.name}',
-                                          ),
-                                          label: _sectionLabel(l10n, item),
-                                          subtitle: _sectionSubtitle(
-                                            l10n,
-                                            item,
-                                            spec,
-                                          ),
-                                          selected: item == section,
-                                          enabled: _sectionEnabled(item, spec),
-                                          onTap: () =>
-                                              setState(() => _section = item),
-                                        ),
-                                    ],
-                                  ),
+                              for (final item in sections)
+                                DesktopFormDialogNavItem(
+                                  key: ValueKey('model-spec-nav-${item.name}'),
+                                  label: _sectionLabel(l10n, item),
+                                  subtitle: _sectionSubtitle(l10n, item, spec),
+                                  selected: item == section,
+                                  enabled: _sectionEnabled(item, spec),
+                                  onTap: () => setState(() => _section = item),
                                 ),
-                              ),
-                              VerticalDivider(
-                                width: 1,
-                                thickness: 1,
-                                color: cs.outlineVariant.withValues(
-                                  alpha: 0.22,
-                                ),
-                              ),
-                              Expanded(
-                                child: ColoredBox(
-                                  color: context.overlaySurface,
-                                  child: ListView(
-                                    padding: const EdgeInsets.fromLTRB(
-                                      16,
-                                      12,
-                                      16,
-                                      16,
-                                    ),
-                                    children: [
-                                      SectionCard(child: _sectionBody(section)),
-                                    ],
-                                  ),
-                                ),
-                              ),
                             ],
                           ),
                         ),
-                        _footer(l10n),
+                        VerticalDivider(
+                          width: 1,
+                          thickness: 0.5,
+                          color: cs.outlineVariant.withValues(alpha: 0.12),
+                        ),
+                        Expanded(
+                          child: ListView(
+                            padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+                            children: [_sectionBody(section)],
+                          ),
+                        ),
                       ],
-                    );
-                  },
-                ),
-              ),
-            ),
+                    ),
+                  ),
+                  DesktopFormDialogFooter(
+                    secondaryLabel: l10n.modelDetailSheetCancelButton,
+                    onSecondary: () => Navigator.of(context).maybePop(false),
+                    primaryKey: const ValueKey('model-spec-confirm'),
+                    primaryIcon: widget.isNew ? Lucide.Plus : Lucide.Check,
+                    primaryLabel: widget.isNew
+                        ? l10n.modelDetailSheetAddButton
+                        : l10n.modelDetailSheetConfirmButton,
+                    onPrimary: _save,
+                  ),
+                ],
+              );
+            },
           ),
         ),
-      ),
-    );
-  }
-
-  Widget _header(ColorScheme cs, AppLocalizations l10n) {
-    return SizedBox(
-      height: 52,
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 10, 8, 0),
-        child: Row(
-          children: [
-            Expanded(
-              child: Text(
-                widget.isNew
-                    ? l10n.modelDetailSheetAddModel
-                    : l10n.modelDetailSheetEditModel,
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: AppFontWeights.emphasis,
-                ),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
-            IosIconButton(
-              icon: Lucide.X,
-              size: 20,
-              minSize: 36,
-              tooltip: l10n.mcpPageClose,
-              semanticLabel: l10n.mcpPageClose,
-              color: cs.onSurface.withValues(alpha: 0.9),
-              onTap: () => Navigator.of(context).maybePop(false),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _footer(AppLocalizations l10n) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
-      child: Row(
-        children: [
-          const Spacer(),
-          _DeskTextButton(
-            label: l10n.modelDetailSheetCancelButton,
-            onTap: () => Navigator.of(context).maybePop(false),
-          ),
-          const SizedBox(width: 8),
-          _PrimaryDeskButton(
-            key: const ValueKey('model-spec-confirm'),
-            icon: widget.isNew ? Lucide.Plus : Lucide.Check,
-            label: widget.isNew
-                ? l10n.modelDetailSheetAddButton
-                : l10n.modelDetailSheetConfirmButton,
-            onTap: _save,
-          ),
-        ],
       ),
     );
   }
@@ -394,209 +298,5 @@ class _ModelSpecEditDialogBodyState extends State<_ModelSpecEditDialogBody> {
       return l10n.reasoningLevelNoReasoning;
     }
     return null;
-  }
-}
-
-class _NavItem extends StatefulWidget {
-  const _NavItem({
-    super.key,
-    required this.label,
-    required this.selected,
-    required this.enabled,
-    required this.onTap,
-    this.subtitle,
-  });
-
-  final String label;
-  final String? subtitle;
-  final bool selected;
-  final bool enabled;
-  final VoidCallback onTap;
-
-  @override
-  State<_NavItem> createState() => _NavItemState();
-}
-
-class _NavItemState extends State<_NavItem> {
-  bool _hover = false;
-
-  @override
-  Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final selected = widget.selected && widget.enabled;
-    final bg = selected
-        ? cs.primary.withValues(alpha: 0.14)
-        : (_hover && widget.enabled
-              ? cs.onSurface.withValues(alpha: isDark ? 0.06 : 0.04)
-              : Colors.transparent);
-    final fg = selected
-        ? cs.primary
-        : cs.onSurface.withValues(alpha: widget.enabled ? 0.88 : 0.45);
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 4),
-      child: MouseRegion(
-        onEnter: (_) => setState(() => _hover = true),
-        onExit: (_) => setState(() => _hover = false),
-        cursor: widget.enabled
-            ? SystemMouseCursors.click
-            : SystemMouseCursors.basic,
-        child: GestureDetector(
-          behavior: HitTestBehavior.opaque,
-          onTap: widget.enabled ? widget.onTap : null,
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 140),
-            curve: Curves.easeOutCubic,
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-            decoration: BoxDecoration(
-              color: bg,
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  widget.label,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontSize: 13,
-                    fontWeight: selected
-                        ? AppFontWeights.semibold
-                        : AppFontWeights.medium,
-                    color: fg,
-                  ),
-                ),
-                if (widget.subtitle != null) ...[
-                  const SizedBox(height: 2),
-                  Text(
-                    widget.subtitle!,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      fontSize: 11,
-                      color: cs.onSurface.withValues(alpha: 0.5),
-                    ),
-                  ),
-                ],
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _DeskTextButton extends StatefulWidget {
-  const _DeskTextButton({required this.label, required this.onTap});
-
-  final String label;
-  final VoidCallback onTap;
-
-  @override
-  State<_DeskTextButton> createState() => _DeskTextButtonState();
-}
-
-class _DeskTextButtonState extends State<_DeskTextButton> {
-  bool _hover = false;
-  bool _pressed = false;
-
-  @override
-  Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    final bg = _pressed
-        ? cs.onSurface.withValues(alpha: 0.08)
-        : (_hover ? cs.onSurface.withValues(alpha: 0.05) : Colors.transparent);
-    return MouseRegion(
-      onEnter: (_) => setState(() => _hover = true),
-      onExit: (_) => setState(() => _hover = false),
-      cursor: SystemMouseCursors.click,
-      child: GestureDetector(
-        onTapDown: (_) => setState(() => _pressed = true),
-        onTapUp: (_) => setState(() => _pressed = false),
-        onTapCancel: () => setState(() => _pressed = false),
-        onTap: widget.onTap,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 120),
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-          decoration: BoxDecoration(
-            color: bg,
-            borderRadius: BorderRadius.circular(10),
-          ),
-          child: Text(
-            widget.label,
-            style: TextStyle(
-              color: cs.onSurface.withValues(alpha: 0.82),
-              fontWeight: AppFontWeights.semibold,
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _PrimaryDeskButton extends StatefulWidget {
-  const _PrimaryDeskButton({
-    super.key,
-    required this.label,
-    required this.onTap,
-    this.icon,
-  });
-
-  final String label;
-  final VoidCallback onTap;
-  final IconData? icon;
-
-  @override
-  State<_PrimaryDeskButton> createState() => _PrimaryDeskButtonState();
-}
-
-class _PrimaryDeskButtonState extends State<_PrimaryDeskButton> {
-  bool _hover = false;
-  bool _pressed = false;
-
-  @override
-  Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    final bg = _pressed
-        ? cs.primary.withValues(alpha: 0.85)
-        : (_hover ? cs.primary.withValues(alpha: 0.92) : cs.primary);
-    return MouseRegion(
-      onEnter: (_) => setState(() => _hover = true),
-      onExit: (_) => setState(() => _hover = false),
-      cursor: SystemMouseCursors.click,
-      child: GestureDetector(
-        onTapDown: (_) => setState(() => _pressed = true),
-        onTapUp: (_) => setState(() => _pressed = false),
-        onTapCancel: () => setState(() => _pressed = false),
-        onTap: widget.onTap,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 120),
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-          decoration: BoxDecoration(
-            color: bg,
-            borderRadius: BorderRadius.circular(10),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              if (widget.icon != null) ...[
-                Icon(widget.icon, size: 16, color: cs.onPrimary),
-                const SizedBox(width: 8),
-              ],
-              Text(
-                widget.label,
-                style: TextStyle(
-                  color: cs.onPrimary,
-                  fontWeight: AppFontWeights.semibold,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
   }
 }

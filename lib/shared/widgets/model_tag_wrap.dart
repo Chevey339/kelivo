@@ -20,9 +20,14 @@ IconData _modalityIcon(Modality m) => switch (m) {
 
 /// Shared model tag/capsule renderer used across model lists.
 class ModelTagWrap extends StatelessWidget {
-  const ModelTagWrap({super.key, required this.model});
+  const ModelTagWrap({
+    super.key,
+    required this.model,
+    this.alignment = WrapAlignment.start,
+  });
 
   final ModelSpec model;
+  final WrapAlignment alignment;
 
   Widget _abilityChip({
     required bool isDark,
@@ -305,6 +310,7 @@ class ModelTagWrap extends StatelessWidget {
     return Wrap(
       spacing: 6,
       runSpacing: 6,
+      alignment: alignment,
       crossAxisAlignment: WrapCrossAlignment.center,
       children: chips,
     );
@@ -322,6 +328,7 @@ class ModelCapsulesRow extends StatelessWidget {
     this.bgOpacityLight = 0.16,
     this.borderOpacity = 0.25,
     this.itemSpacing = 4,
+    this.alignment = WrapAlignment.start,
   });
 
   final ModelSpec model;
@@ -331,6 +338,7 @@ class ModelCapsulesRow extends StatelessWidget {
   final double bgOpacityLight;
   final double borderOpacity;
   final double itemSpacing;
+  final WrapAlignment alignment;
 
   @override
   Widget build(BuildContext context) {
@@ -505,6 +513,7 @@ class ModelCapsulesRow extends StatelessWidget {
     return Wrap(
       spacing: itemSpacing,
       runSpacing: itemSpacing,
+      alignment: alignment,
       crossAxisAlignment: WrapCrossAlignment.center,
       children: caps,
     );
