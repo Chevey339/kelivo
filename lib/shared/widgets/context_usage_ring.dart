@@ -8,8 +8,8 @@ import '../../core/utils/token_format.dart';
 import '../../theme/app_semantic_colors.dart';
 import 'ios_tactile.dart';
 
-const double kContextUsageRingSize = 13;
-const double kContextUsageRingStroke = 2.8;
+const double kContextUsageRingSize = 16;
+const double kContextUsageRingStroke = 2;
 const double kContextUsageRingHitSize = 32;
 
 Color contextUsageColor(

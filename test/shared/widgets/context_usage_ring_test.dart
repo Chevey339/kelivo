@@ -149,12 +149,12 @@ void main() {
     expect(tester.getSize(find.byType(ContextUsageRing)), const Size(32, 32));
 
     final ring = tester.widget<ContextUsageRing>(find.byType(ContextUsageRing));
-    expect(ring.size, 13);
-    expect(ring.strokeWidth, 2.8);
+    expect(ring.size, kContextUsageRingSize);
+    expect(ring.strokeWidth, kContextUsageRingStroke);
     expect(ring.hitSize, 32);
 
     final painter = ringPainter(tester);
-    expect(painter.strokeWidth, 2.8);
+    expect(painter.strokeWidth, kContextUsageRingStroke);
     expect(painter.ratio, closeTo(0.4, 0.001));
 
     expect(

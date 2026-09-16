@@ -14,8 +14,6 @@ import 'model_spec_edit_dialog.dart';
 
 const Key contextUsagePopoverKey = ValueKey<String>('context-usage-popover');
 
-const double kContextUsagePopoverWidth = 332;
-
 Future<void> showContextUsagePopover(
   BuildContext context, {
   required GlobalKey anchorKey,
@@ -43,7 +41,7 @@ Future<void> showContextUsagePopover(
   await showDesktopGlassPopover(
     context,
     anchorRect: anchorRect,
-    width: kContextUsagePopoverWidth,
+    width: (size.width - 16).clamp(260.0, 720.0),
     builder: (ctx, handle) => _ContextUsagePopoverContent(
       conversationId: conversationId,
       draftText: draftText,
