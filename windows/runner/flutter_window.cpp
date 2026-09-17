@@ -2,7 +2,9 @@
 
 #include <optional>
 #include <chrono>
+#include <cmath>
 #include <fstream>
+#include <limits>
 #include <vector>
 #include <string>
 #include <wincodec.h>
@@ -11,8 +13,73 @@
 
 #include <flutter/method_channel.h>
 #include <flutter/standard_method_codec.h>
+#include <flutter_windows.h>
 
 #include "flutter/generated_plugin_registrant.h"
+
+namespace {
+
+flutter::EncodableMap EncodeWindowRect(const RECT& rect) {
+  return {
+      {flutter::EncodableValue("left"),
+       flutter::EncodableValue(static_cast<double>(rect.left))},
+      {flutter::EncodableValue("top"),
+       flutter::EncodableValue(static_cast<double>(rect.top))},
+      {flutter::EncodableValue("right"),
+       flutter::EncodableValue(static_cast<double>(rect.right))},
+      {flutter::EncodableValue("bottom"),
+       flutter::EncodableValue(static_cast<double>(rect.bottom))},
+  };
+}
+
+BOOL CALLBACK CollectWindowDisplay(HMONITOR monitor, HDC, LPRECT, LPARAM data) {
+  MONITORINFO info{};
+  info.cbSize = sizeof(info);
+  if (!GetMonitorInfo(monitor, &info)) return FALSE;
+  auto* displays = reinterpret_cast<flutter::EncodableList*>(data);
+  displays->emplace_back(flutter::EncodableMap{
+      {flutter::EncodableValue("bounds"),
+       flutter::EncodableValue(EncodeWindowRect(info.rcMonitor))},
+      {flutter::EncodableValue("workArea"),
+       flutter::EncodableValue(EncodeWindowRect(info.rcWork))},
+      {flutter::EncodableValue("scale"),
+       flutter::EncodableValue(FlutterDesktopGetDpiForMonitor(monitor) / 96.0)},
+      {flutter::EncodableValue("isPrimary"),
+       flutter::EncodableValue((info.dwFlags & MONITORINFOF_PRIMARY) != 0)},
+  });
+  return TRUE;
+}
+
+std::optional<RECT> DecodeWindowRect(const flutter::EncodableValue* value) {
+  const auto* args = value ? std::get_if<flutter::EncodableMap>(value) : nullptr;
+  if (!args) return std::nullopt;
+  double coordinates[4];
+  size_t index = 0;
+  for (const char* key : {"left", "top", "right", "bottom"}) {
+    auto entry = args->find(flutter::EncodableValue(key));
+    if (entry == args->end()) return std::nullopt;
+    const auto* coordinate = std::get_if<double>(&entry->second);
+    if (!coordinate || !std::isfinite(*coordinate) ||
+        *coordinate < std::numeric_limits<LONG>::min() ||
+        *coordinate > std::numeric_limits<LONG>::max()) {
+      return std::nullopt;
+    }
+    coordinates[index++] = *coordinate;
+  }
+  const double width = coordinates[2] - coordinates[0];
+  const double height = coordinates[3] - coordinates[1];
+  if (width < 1 || height < 1 ||
+      width > std::numeric_limits<LONG>::max() ||
+      height > std::numeric_limits<LONG>::max()) {
+    return std::nullopt;
+  }
+  return RECT{static_cast<LONG>(coordinates[0]),
+              static_cast<LONG>(coordinates[1]),
+              static_cast<LONG>(coordinates[2]),
+              static_cast<LONG>(coordinates[3])};
+}
+
+}  // namespace
 
 FlutterWindow::FlutterWindow(const flutter::DartProject& project)
     : project_(project) {}
@@ -35,6 +102,46 @@ bool FlutterWindow::OnCreate() {
   }
   RegisterPlugins(flutter_controller_->engine());
   SetChildContent(flutter_controller_->view()->GetNativeWindow());
+
+  auto window_channel =
+      std::make_unique<flutter::MethodChannel<flutter::EncodableValue>>(
+          flutter_controller_->engine()->messenger(), "app.desktop_window",
+          &flutter::StandardMethodCodec::GetInstance());
+  window_channel->SetMethodCallHandler(
+      [this](const flutter::MethodCall<flutter::EncodableValue>& call,
+             std::unique_ptr<flutter::MethodResult<flutter::EncodableValue>> result) {
+        if (call.method_name() == "getDisplays") {
+          flutter::EncodableList displays;
+          if (!EnumDisplayMonitors(nullptr, nullptr, CollectWindowDisplay,
+                                   reinterpret_cast<LPARAM>(&displays))) {
+            result->Error("display_query_failed", "EnumDisplayMonitors failed");
+            return;
+          }
+          result->Success(flutter::EncodableValue(displays));
+        } else if (call.method_name() == "restoreBounds") {
+          const auto bounds = DecodeWindowRect(call.arguments());
+          if (!bounds) {
+            result->Error("invalid_bounds", "Expected a physical window rectangle");
+            return;
+          }
+          // This synchronous call runs on the window thread. The bounds already
+          // use the target DPI; do not rescale them during WM_DPICHANGED or
+          // constrain them using the previous monitor's WM_GETMINMAXINFO.
+          restoring_bounds_ = bounds;
+          const BOOL restored = SetWindowPos(
+              GetHandle(), nullptr, bounds->left, bounds->top,
+              bounds->right - bounds->left, bounds->bottom - bounds->top,
+              SWP_NOZORDER | SWP_NOACTIVATE | SWP_NOSENDCHANGING);
+          restoring_bounds_.reset();
+          if (restored) {
+            result->Success();
+          } else {
+            result->Error("restore_bounds_failed", "SetWindowPos failed");
+          }
+        } else {
+          result->NotImplemented();
+        }
+      });
 
   auto power_channel = std::make_unique<flutter::MethodChannel<flutter::EncodableValue>>(
       flutter_controller_->engine()->messenger(), "app.desktop_power",
@@ -312,6 +419,12 @@ LRESULT
 FlutterWindow::MessageHandler(HWND hwnd, UINT const message,
                               WPARAM const wparam,
                               LPARAM const lparam) noexcept {
+  if (message == WM_GETDPISCALEDSIZE && restoring_bounds_) {
+    auto* size = reinterpret_cast<SIZE*>(lparam);
+    size->cx = restoring_bounds_->right - restoring_bounds_->left;
+    size->cy = restoring_bounds_->bottom - restoring_bounds_->top;
+    return TRUE;
+  }
   // Record power changes before a plugin can consume the window message.
   if (message == WM_POWERBROADCAST) {
     if (wparam == PBT_APMSUSPEND) {
@@ -330,6 +443,10 @@ FlutterWindow::MessageHandler(HWND hwnd, UINT const message,
       return *result;
     }
   }
+
+  // Plugins still receive the new DPI, but the runner must not replace the
+  // explicitly restored physical bounds with Windows' suggested rectangle.
+  if (message == WM_DPICHANGED && restoring_bounds_) return 0;
 
   switch (message) {
     case WM_POWERBROADCAST:

@@ -6,6 +6,7 @@
 
 #include <memory>
 #include <cstdint>
+#include <optional>
 
 #include "win32_window.h"
 
@@ -26,6 +27,7 @@ class FlutterWindow : public Win32Window {
  private:
   bool system_sleeping_ = false;
   int64_t last_system_wake_at_ = 0;
+  std::optional<RECT> restoring_bounds_;
 
   // The project to run.
   flutter::DartProject project_;
