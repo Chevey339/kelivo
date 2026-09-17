@@ -572,85 +572,44 @@ void main() {
       },
     );
 
-    test(
-      'Responses API supports built-in search for the DeepSeek Flash / V4 family',
-      () {
-        for (final modelId in const [
-          'deepseek-flash',
-          'deepseek/deepseek-flash',
-          'deepseek-v4-pro',
-          'deepseek-v4-flash',
-        ]) {
-          final modelOverrides = <String, dynamic>{
+    test('Responses API no longer offers built-in search for DeepSeek', () {
+      for (final modelId in const [
+        'deepseek-flash',
+        'deepseek/deepseek-flash',
+        'deepseek-v4-pro',
+        'deepseek-v4-flash',
+      ]) {
+        final cfg = _deepSeekConfig(
+          'https://api.deepseek.com/v1',
+          useResponseApi: true,
+          modelOverrides: <String, dynamic>{
             modelId: <String, dynamic>{
               'builtInTools': const <String>[BuiltInToolNames.search],
             },
-          };
-          final responsesConfig = _deepSeekConfig(
-            'https://api.deepseek.com/v1',
-            useResponseApi: true,
-            modelOverrides: modelOverrides,
-          );
-          final chatConfig = _deepSeekConfig(
-            'https://api.deepseek.com/v1',
-            modelOverrides: modelOverrides,
-          );
-
-          expect(
-            BuiltInToolsHelper.supportsBuiltInSearchForModel(
-              cfg: responsesConfig,
-              modelId: modelId,
-            ),
-            isTrue,
-            reason: modelId,
-          );
-          expect(
-            BuiltInToolsHelper.supportsBuiltInSearchForModel(
-              cfg: chatConfig,
-              modelId: modelId,
-            ),
-            isFalse,
-            reason: modelId,
-          );
-        }
-      },
-    );
-
-    test('Responses search requires a DeepSeek provider for V4 models', () {
-      const modelId = 'deepseek-v4-pro';
-      final cfg = ProviderConfig(
-        id: 'CustomOpenAI',
-        enabled: true,
-        name: 'Custom OpenAI',
-        apiKey: 'test-key',
-        baseUrl: 'https://proxy.example/v1',
-        providerType: ProviderKind.openai,
-        useResponseApi: true,
-        modelOverrides: const <String, dynamic>{
-          modelId: <String, dynamic>{
-            'builtInTools': <String>[BuiltInToolNames.search],
           },
-        },
-      );
+        );
 
-      expect(
-        BuiltInToolsHelper.supportsBuiltInSearchForModel(
-          cfg: cfg,
-          modelId: modelId,
-        ),
-        isFalse,
-      );
-      expect(
-        BuiltInToolsHelper.buildResponsesTools(
-          cfg: cfg,
-          modelId: modelId,
-          upstreamModelId: modelId,
-        ).tools,
-        isEmpty,
-      );
+        expect(
+          BuiltInToolsHelper.supportsBuiltInSearchForModel(
+            cfg: cfg,
+            modelId: modelId,
+          ),
+          isFalse,
+          reason: modelId,
+        );
+        expect(
+          BuiltInToolsHelper.buildResponsesTools(
+            cfg: cfg,
+            modelId: modelId,
+            upstreamModelId: modelId,
+          ).tools,
+          isEmpty,
+          reason: modelId,
+        );
+      }
     });
 
-    test('Responses request injects web_search for DeepSeek V4', () async {
+    test('Responses request omits web_search for DeepSeek', () async {
       final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
       addTearDown(() async {
         await server.close(force: true);
@@ -692,13 +651,10 @@ void main() {
       expect(chunks.isGenerationDone, isTrue);
       expect(requestBody, isNotNull);
       expect(requestBody!['model'], 'deepseek-v4-pro');
+      final tools = (requestBody!['tools'] as List?) ?? const <dynamic>[];
       expect(
-        requestBody!['tools'],
-        contains(
-          predicate<Map<String, dynamic>>(
-            (tool) => tool['type'] == 'web_search',
-          ),
-        ),
+        tools.whereType<Map<String, dynamic>>().map((tool) => tool['type']),
+        isNot(contains('web_search')),
       );
     });
   });
