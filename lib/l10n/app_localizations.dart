@@ -15160,7 +15160,7 @@ abstract class AppLocalizations {
   /// No description provided for @tokenDetailReasoningTokens.
   ///
   /// In en, this message translates to:
-  /// **'{count} reasoning tokens'**
+  /// **'{count} tokens'**
   String tokenDetailReasoningTokens(int count);
 
   /// No description provided for @tokenDetailCacheWriteTokens.

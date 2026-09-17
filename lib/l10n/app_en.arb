@@ -3584,7 +3584,7 @@
       }
     }
   },
-  "tokenDetailReasoningTokens": "{count} reasoning tokens",
+  "tokenDetailReasoningTokens": "{count} tokens",
   "@tokenDetailReasoningTokens": {
     "placeholders": {
       "count": {

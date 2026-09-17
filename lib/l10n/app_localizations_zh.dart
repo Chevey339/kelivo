@@ -8017,7 +8017,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String tokenDetailReasoningTokens(int count) {
-    return '$count 推理 tokens';
+    return '$count tokens';
   }
 
   @override
@@ -19718,7 +19718,7 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String tokenDetailReasoningTokens(int count) {
-    return '$count 推理 tokens';
+    return '$count tokens';
   }
 
   @override
@@ -31494,7 +31494,7 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String tokenDetailReasoningTokens(int count) {
-    return '$count 推理 tokens';
+    return '$count tokens';
   }
 
   @override

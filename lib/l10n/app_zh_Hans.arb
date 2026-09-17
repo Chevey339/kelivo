@@ -2958,7 +2958,7 @@
   "tokenDetailSpeed": "{value} tok/s",
   "tokenDetailDuration": "{value}s",
   "tokenDetailTotalTokens": "{count} tokens",
-  "tokenDetailReasoningTokens": "{count} 推理 tokens",
+  "tokenDetailReasoningTokens": "{count} tokens",
   "tokenDetailCacheWriteTokens": "{count} 缓存写入 tokens",
   "tokenDetailCost": "{amount}",
   "debugPageTitle": "Debug",

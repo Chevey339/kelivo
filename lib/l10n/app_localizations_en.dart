@@ -8362,7 +8362,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String tokenDetailReasoningTokens(int count) {
-    return '$count reasoning tokens';
+    return '$count tokens';
   }
 
   @override

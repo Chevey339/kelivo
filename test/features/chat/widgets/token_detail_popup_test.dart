@@ -61,7 +61,7 @@ void main() {
     );
     await tester.pump();
 
-    expect(find.text('7 reasoning tokens'), findsOneWidget);
+    expect(find.text('7 tokens'), findsOneWidget);
     expect(find.text('3 cache write tokens'), findsOneWidget);
     expect(find.text(r'$0'), findsNothing);
   });
