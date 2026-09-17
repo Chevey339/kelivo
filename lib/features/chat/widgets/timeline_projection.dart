@@ -1,7 +1,7 @@
 import 'dart:convert';
 
 import '../../../core/models/message_part.dart';
-import '../utils/thinking_tag_parser.dart';
+import '../../../core/utils/thinking_tag_parser.dart';
 import 'timeline_visibility.dart';
 
 /// A tool as the timeline projector sees it.

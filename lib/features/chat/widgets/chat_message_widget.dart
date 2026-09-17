@@ -50,7 +50,7 @@ import '../../home/services/ask_user_interaction_service.dart';
 import '../../home/services/local_tools_service.dart';
 import '../../home/services/tool_approval_service.dart';
 import '../utils/assistant_paragraph_splitter.dart';
-import '../utils/thinking_tag_parser.dart';
+import '../../../core/utils/thinking_tag_parser.dart';
 import 'timeline_projection.dart';
 import 'timeline_visibility.dart';
 import 'citation_sources_sheet.dart';
