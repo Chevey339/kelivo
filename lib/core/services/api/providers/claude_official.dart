@@ -393,9 +393,8 @@ Stream<StreamChunk> sendClaudeStream(
         try {
           final u = (obj['usage'] as Map?)?.cast<String, dynamic>();
           if (u != null) {
-            totalUsage = (totalUsage ?? const TokenUsage()).merge(
-              claudeUsageFromMap(u),
-            );
+            final next = claudeUsageFromMap(u);
+            if (next.hasReportedTokens) totalUsage = next.asSnapshot();
           }
         } catch (_) {}
         container =

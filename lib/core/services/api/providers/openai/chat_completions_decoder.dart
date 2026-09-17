@@ -25,10 +25,7 @@ class ChatCompletionsStreamDecoder implements StreamChunkDecoder {
 
   TokenUsage? _round;
 
-  TokenUsage? get usage {
-    if (_round == null) return initialUsage;
-    return (initialUsage ?? const TokenUsage()).merge(_round!);
-  }
+  TokenUsage? get usage => _round?.asSnapshot() ?? initialUsage;
 
   String? finishReason;
   int approxCompletionChars = 0;

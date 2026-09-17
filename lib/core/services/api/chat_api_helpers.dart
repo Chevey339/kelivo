@@ -416,17 +416,23 @@ String textFromContentParts(dynamic content) {
 
 /// Anthropic Messages API constraints, applied after [applyReasoning].
 ///
-/// When `thinking.type` is `enabled`, `top_p` must be in `[0.95, 1.0]` or
-/// omitted, and `thinking.budget_tokens` must stay below `max_tokens`.
+/// Thinking uses the default temperature and no top_k; top_p must be in
+/// `[0.95, 1.0]` or omitted. An explicit budget must stay below max_tokens.
 void applyAnthropicMessagesProtocolConstraints(Map<String, dynamic> body) {
   final thinking = body['thinking'];
   if (thinking is! Map) return;
-  if (thinking['type']?.toString() != 'enabled') return;
+  final type = thinking['type']?.toString();
+  if (type != 'enabled' && type != 'adaptive') return;
+
+  body.remove('temperature');
+  body.remove('top_k');
 
   final topP = body['top_p'];
   if (topP is num && (topP < 0.95 || topP > 1.0)) {
     body.remove('top_p');
   }
+
+  if (type != 'enabled') return;
 
   final rawBudget = thinking['budget_tokens'];
   final rawMax = body['max_tokens'];

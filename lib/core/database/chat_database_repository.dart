@@ -3451,7 +3451,7 @@ class ChatDatabaseRepository {
         .get();
 
     final modelRows = await _db.customSelect('''
-      SELECT m.model_id AS id, MIN(m.provider_id) AS provider_id,
+      SELECT m.model_id AS id, NULLIF(TRIM(m.provider_id), '') AS provider_id,
         COUNT(*) AS item_count,
         COALESCE(SUM(m.prompt_tokens), 0) AS input_tokens,
         COALESCE(SUM(m.completion_tokens), 0) AS output_tokens,
@@ -3460,7 +3460,8 @@ class ChatDatabaseRepository {
           AS INTEGER)), 0) AS cache_write_tokens
       FROM message_rows m
       WHERE NULLIF(TRIM(m.model_id), '') IS NOT NULL $rangeWhere
-      GROUP BY m.model_id ORDER BY item_count DESC, id;
+      GROUP BY m.model_id, NULLIF(TRIM(m.provider_id), '')
+      ORDER BY item_count DESC, id, provider_id;
     ''', variables: rangeVariables).get();
     final topicRows = await _db.customSelect('''
       SELECT c.id AS id, c.title AS label, COUNT(*) AS item_count

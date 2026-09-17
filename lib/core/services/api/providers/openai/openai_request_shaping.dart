@@ -131,16 +131,17 @@ TokenUsage? openaiUsageFromObj(Map<String, dynamic> obj) {
   try {
     final u = obj['usage'];
     if (u is! Map) return null;
-    return tokenUsageFromOpenAICompatible(u);
+    final usage = tokenUsageFromOpenAICompatible(u);
+    return usage.hasReportedTokens ? usage.asSnapshot() : null;
   } catch (_) {
     return null;
   }
 }
 
-int _readOpenAIUsageInt(dynamic value) {
+int? _readOpenAIUsageInt(dynamic value) {
   if (value is num) return value.toInt();
-  if (value is String) return int.tryParse(value) ?? 0;
-  return 0;
+  if (value is String) return int.tryParse(value);
+  return null;
 }
 
 TokenUsage tokenUsageFromOpenAICompatible(Map rawUsage) {
@@ -160,19 +161,20 @@ TokenUsage tokenUsageFromOpenAICompatible(Map rawUsage) {
     completionTokens: completion,
     cachedTokens: inputDetails is Map
         ? _readOpenAIUsageInt(inputDetails['cached_tokens'])
-        : 0,
+        : null,
     reasoningTokens: outputDetails is Map
         ? _readOpenAIUsageInt(outputDetails['reasoning_tokens'])
-        : 0,
-    totalTokens: prompt + completion,
+        : null,
+    totalTokens: _readOpenAIUsageInt(rawUsage['total_tokens']),
   );
 }
 
 TokenUsage? mergeOpenAICompatibleUsage(TokenUsage? current, dynamic rawUsage) {
   if (rawUsage is! Map) return current;
-  return (current ?? const TokenUsage()).merge(
-    tokenUsageFromOpenAICompatible(rawUsage),
-  );
+  final update = tokenUsageFromOpenAICompatible(rawUsage);
+  return update.hasReportedTokens
+      ? (current ?? const TokenUsage()).merge(update)
+      : current;
 }
 
 Stream<String> rethrowFollowUpStreamErrors(Stream<String> source) {

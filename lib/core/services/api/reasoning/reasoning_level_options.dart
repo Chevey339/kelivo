@@ -48,10 +48,13 @@ class ReasoningLevelPickerSnapshot {
   final bool customSelected;
   final List<ReasoningLevelRow> rows;
 
+  ReasoningLevel get effectiveLevel =>
+      resolveReasoning(spec, selected).effective;
+
   bool isSelected(ReasoningLevelRow row) {
     if (row.kind == ReasoningLevelRowKind.custom) return customSelected;
     if (customSelected) return false;
-    return selected.level == row.level;
+    return effectiveLevel == row.level;
   }
 
   /// Slider / popover stops in the original order: Off → Auto → levels.
@@ -82,7 +85,7 @@ class ReasoningLevelPickerSnapshot {
       final index = stops.indexWhere((row) => row.level == nearest);
       return index >= 0 ? index : 0;
     }
-    final index = stops.indexWhere((row) => row.level == selected.level);
+    final index = stops.indexWhere((row) => row.level == effectiveLevel);
     return index >= 0 ? index : 0;
   }
 }

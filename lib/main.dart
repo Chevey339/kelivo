@@ -710,10 +710,19 @@ class MyApp extends StatelessWidget {
           ),
         ),
         ChangeNotifierProvider(
+          create: (_) =>
+              InstructionInjectionProvider(preferences: businessPreferences),
+        ),
+        ChangeNotifierProvider(
+          create: (_) => WorldBookProvider(preferences: businessPreferences),
+        ),
+        ChangeNotifierProvider(
           create: (ctx) => ContextUsageService(
             chatService: ctx.read<ChatService>(),
             settings: ctx.read<SettingsProvider>(),
             assistants: ctx.read<AssistantProvider>(),
+            instructions: ctx.read<InstructionInjectionProvider>(),
+            worldBooks: ctx.read<WorldBookProvider>(),
           ),
         ),
         ChangeNotifierProvider(
@@ -731,16 +740,9 @@ class MyApp extends StatelessWidget {
           create: (_) => QuickPhraseProvider(preferences: businessPreferences),
         ),
         ChangeNotifierProvider(
-          create: (_) =>
-              InstructionInjectionProvider(preferences: businessPreferences),
-        ),
-        ChangeNotifierProvider(
           create: (_) => InstructionInjectionGroupProvider(
             preferences: businessPreferences,
           ),
-        ),
-        ChangeNotifierProvider(
-          create: (_) => WorldBookProvider(preferences: businessPreferences),
         ),
         ChangeNotifierProvider(
           create: (_) => MemoryProvider(preferences: businessPreferences),

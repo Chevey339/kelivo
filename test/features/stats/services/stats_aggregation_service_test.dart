@@ -614,7 +614,7 @@ void main() {
           snapshot.modelRank
               .singleWhere((item) => item.id == 'gpt-priced')
               .cost,
-          const ModelCost(amount: 5.8, currency: 'USD'),
+          const ModelCost(amount: 5.6, currency: 'USD'),
         );
         expect(
           snapshot.modelRank
@@ -628,7 +628,7 @@ void main() {
               .cost,
           isNull,
         );
-        expect(snapshot.summary.costByCurrency, {'USD': 5.8, 'CNY': 6});
+        expect(snapshot.summary.costByCurrency, {'USD': 5.6, 'CNY': 6});
         expect(snapshot.summary.modelsWithoutPricing, 1);
       },
     );

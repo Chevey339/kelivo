@@ -5,10 +5,65 @@ import 'package:Kelivo/core/models/model_spec.dart';
 import 'package:Kelivo/core/models/reasoning_request.dart';
 import 'package:Kelivo/core/providers/settings_provider.dart';
 import 'package:Kelivo/core/services/api/reasoning/reasoning_level_options.dart';
+import 'package:Kelivo/core/services/model_spec/model_spec_resolver.dart';
 
 import '../../../../support/business_test_harness.dart';
 
 void main() {
+  test(
+    'picker selection follows effective levels for inherited and saved choices',
+    () async {
+      final harness = await createBusinessTestHarness();
+      final settings = SettingsProvider(harness.preferences);
+      addTearDown(settings.dispose);
+      await settings.loaded;
+      final config = ProviderConfig(
+        id: 'Test',
+        enabled: true,
+        name: 'Test',
+        apiKey: '',
+        baseUrl: '',
+        modelOverrides: const {
+          'model': {
+            'abilities': ['reasoning'],
+            'reasoning': {
+              'dialect': 'openaiReasoningEffort',
+              'levels': ['low', 'high'],
+              'canDisable': false,
+            },
+          },
+        },
+      );
+      final spec = ModelSpecResolver.instance.spec(config, 'model');
+      for (final saved in [false, true]) {
+        for (final (requested, effective) in [
+          (ReasoningLevel.max, ReasoningLevel.high),
+          (ReasoningLevel.off, ReasoningLevel.low),
+          (ReasoningLevel.auto, ReasoningLevel.auto),
+        ]) {
+          final request = ReasoningRequest(requested);
+          await settings.setReasoningChoice(
+            'Test',
+            'model',
+            saved ? request : null,
+          );
+          final snapshot = buildReasoningLevelPickerSnapshot(
+            settings: settings,
+            config: config,
+            modelId: 'model',
+            spec: spec,
+            assistant: Assistant(id: 'a', name: 'A', reasoning: request),
+          );
+          expect(
+            snapshot.rows.where(snapshot.isSelected).single.level,
+            effective,
+          );
+          expect(snapshot.sliderStops[snapshot.sliderIndex].level, effective);
+        }
+      }
+    },
+  );
+
   test(
     'openrouter with levels is effort-style; empty levels is budget-style',
     () {

@@ -616,9 +616,8 @@ Stream<StreamChunk> sendGoogleStream(
         try {
           final u = (obj['usageMetadata'] as Map?)?.cast<String, dynamic>();
           if (u != null) {
-            totalUsage = (totalUsage ?? const TokenUsage()).merge(
-              googleUsageFromMetadata(u),
-            );
+            final next = googleUsageFromMetadata(u);
+            if (next.hasReportedTokens) totalUsage = next.asSnapshot();
           }
         } catch (_) {}
         final candidates = (obj['candidates'] as List?) ?? const <dynamic>[];

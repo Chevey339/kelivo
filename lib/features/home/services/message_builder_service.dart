@@ -10,7 +10,6 @@ import '../../../core/models/chat_input_data.dart';
 import '../../../core/models/chat_message.dart';
 import '../../../core/models/message_part.dart';
 import '../../../core/models/conversation.dart';
-import '../../../core/models/instruction_injection.dart';
 import '../../../core/models/memory_entry.dart';
 import '../../../core/models/world_book.dart';
 import '../../../core/models/conversation_prompt_settings.dart';
@@ -1805,26 +1804,20 @@ class MessageBuilderService {
     bool conversationScoped = false,
   }) async {
     try {
-      List<InstructionInjection> actives = const <InstructionInjection>[];
-      try {
-        final ip = contextProvider.read<InstructionInjectionProvider>();
-        await ip.initialize();
-        final ids = conversationScoped
+      final ip = contextProvider.read<InstructionInjectionProvider>();
+      await ip.initialize();
+      final prompt = ip.promptFor(
+        assistantId,
+        instructionIds: conversationScoped
             ? ConversationPromptSettings.fromExtras(
                 conversation?.extras ?? const {},
               ).instructionIds
-            : ip.activeIdsFor(assistantId);
-        actives = ip.items.where((item) => ids.contains(item.id)).toList();
-      } catch (_) {}
-      final prompts = actives
-          .map((e) => e.prompt.trim())
-          .where((p) => p.isNotEmpty)
-          .toList(growable: false);
-      if (prompts.isNotEmpty) {
-        final lp = prompts.join('\n\n');
+            : null,
+      );
+      if (prompt.isNotEmpty) {
         _appendToSystemMessage(
           apiMessages,
-          lp,
+          prompt,
           source: ContextSource.instructionInjection,
         );
       }
@@ -1910,26 +1903,23 @@ class MessageBuilderService {
     Conversation? conversation,
     bool conversationScoped = false,
     List<ChatMessage>? sourceMessages,
+    bool persistActivation = true,
+    void Function(int before, int after)? onActivationPersisted,
   }) async {
     try {
-      List<WorldBook> all = const <WorldBook>[];
-      List<String> activeBookIds = const <String>[];
-
+      List<WorldBook> books = const <WorldBook>[];
       try {
         final wb = contextProvider.read<WorldBookProvider>();
         await wb.initialize();
-        all = wb.books;
-        activeBookIds = conversationScoped
-            ? ConversationPromptSettings.fromExtras(
-                conversation?.extras ?? const {},
-              ).worldBookIds
-            : wb.activeBookIdsFor(assistantId);
+        books = wb.activeBooksFor(
+          assistantId,
+          bookIds: conversationScoped
+              ? ConversationPromptSettings.fromExtras(
+                  conversation?.extras ?? const {},
+                ).worldBookIds
+              : null,
+        );
       } catch (_) {}
-
-      final activeSet = activeBookIds.toSet();
-      final books = all
-          .where((b) => b.enabled && activeSet.contains(b.id))
-          .toList(growable: false);
       final latest = conversation == null
           ? null
           : chatService.getConversation(conversation.id) ?? conversation;
@@ -1994,9 +1984,11 @@ class MessageBuilderService {
               ],
         previous: previous,
       );
-      if (conversation != null &&
+      if (persistActivation &&
+          conversation != null &&
           ((result.state['effects'] as Map).isNotEmpty ||
               previous.isNotEmpty)) {
+        final before = chatService.contextRevision(conversation.id);
         await chatService.updateConversationExtras(conversation.id, (extras) {
           final next = Map<String, dynamic>.from(extras);
           if ((result.state['effects'] as Map).isEmpty) {
@@ -2006,6 +1998,10 @@ class MessageBuilderService {
           }
           return next;
         });
+        onActivationPersisted?.call(
+          before,
+          chatService.contextRevision(conversation.id),
+        );
       }
       final triggered = result.entries;
       if (triggered.isEmpty) return;

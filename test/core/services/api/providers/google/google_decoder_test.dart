@@ -516,15 +516,15 @@ void main() {
           'candidatesTokenCount': 12,
           'thoughtsTokenCount': 9,
           'cachedContentTokenCount': 4,
-          'totalTokenCount': 92,
+          'totalTokenCount': 101,
         },
       }),
     );
 
     expect(decoder.usage!.promptTokens, 80);
-    expect(decoder.usage!.completionTokens, 12);
+    expect(decoder.usage!.completionTokens, 21);
     expect(decoder.usage!.reasoningTokens, 9);
     expect(decoder.usage!.cachedTokens, 4);
-    expect(decoder.usage!.totalTokens, 92);
+    expect(decoder.usage!.totalTokens, 101);
   });
 }

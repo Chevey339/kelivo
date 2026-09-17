@@ -121,9 +121,8 @@ class StatsAggregationService {
   }) {
     final rangeMessages = <ChatMessage>[];
     final heatmapCounts = <DateTime, int>{};
-    final modelCounts = <String, int>{};
-    final modelProviders = <String, String>{};
-    final modelTokens = <String, TokenUsage>{};
+    final modelCounts = <(String?, String), int>{};
+    final modelTokens = <(String?, String), TokenUsage>{};
     final assistantCounts = <String, int>{};
     final topicCounts = <String, int>{};
     final topicLabels = <String, String>{};
@@ -161,13 +160,11 @@ class StatsAggregationService {
 
         final modelId = message.modelId?.trim();
         if (modelId != null && modelId.isNotEmpty) {
-          modelCounts[modelId] = (modelCounts[modelId] ?? 0) + 1;
           final providerId = message.providerId?.trim();
-          if (providerId != null && providerId.isNotEmpty) {
-            modelProviders.putIfAbsent(modelId, () => providerId);
-          }
-          final previous = modelTokens[modelId] ?? const TokenUsage();
-          modelTokens[modelId] = TokenUsage(
+          final key = (providerId == '' ? null : providerId, modelId);
+          modelCounts[key] = (modelCounts[key] ?? 0) + 1;
+          final previous = modelTokens[key] ?? const TokenUsage();
+          modelTokens[key] = TokenUsage(
             promptTokens: previous.promptTokens + (message.promptTokens ?? 0),
             completionTokens:
                 previous.completionTokens + (message.completionTokens ?? 0),
@@ -198,15 +195,19 @@ class StatsAggregationService {
       unknownProviderLabel: unknownProviderLabel,
     );
 
-    final modelRank = _rank(
-      modelCounts,
-      (id) => id,
-      providerFor: (id) => modelProviders[id],
-      costFor: (id) => estimateModelCost(
-        modelTokens[id] ?? const TokenUsage(),
-        resolvePricing?.call(modelProviders[id], id),
-      ),
-    );
+    final modelRank = [
+      for (final entry in modelCounts.entries)
+        StatsRankItem(
+          id: entry.key.$2,
+          label: entry.key.$2,
+          value: entry.value,
+          providerId: entry.key.$1,
+          cost: estimateModelCost(
+            modelTokens[entry.key]!,
+            resolvePricing?.call(entry.key.$1, entry.key.$2),
+          ),
+        ),
+    ]..sort((a, b) => b.value.compareTo(a.value));
     final costs = _summarizeCosts(modelRank);
 
     return StatsSnapshot(
@@ -329,10 +330,8 @@ class StatsAggregationService {
 
   static List<StatsRankItem> _rank(
     Map<String, int> counts,
-    String Function(String id) labelFor, {
-    String? Function(String id)? providerFor,
-    ModelCost? Function(String id)? costFor,
-  }) {
+    String Function(String id) labelFor,
+  ) {
     final entries = counts.entries.toList();
     entries.sort((a, b) {
       final byValue = b.value.compareTo(a.value);
@@ -345,8 +344,6 @@ class StatsAggregationService {
           id: entry.key,
           label: labelFor(entry.key),
           value: entry.value,
-          providerId: providerFor?.call(entry.key),
-          cost: costFor?.call(entry.key),
         ),
     ];
   }

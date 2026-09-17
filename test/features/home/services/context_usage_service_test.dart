@@ -8,10 +8,15 @@ import 'package:hive_flutter/hive_flutter.dart';
 import 'package:path_provider_platform_interface/path_provider_platform_interface.dart';
 
 import 'package:Kelivo/core/models/chat_message.dart';
+import 'package:Kelivo/core/models/conversation.dart';
+import 'package:Kelivo/core/models/conversation_prompt_settings.dart';
+import 'package:Kelivo/core/models/instruction_injection.dart';
 import 'package:Kelivo/core/models/message_part.dart';
 import 'package:Kelivo/core/models/token_usage.dart';
 import 'package:Kelivo/core/providers/assistant_provider.dart';
+import 'package:Kelivo/core/providers/instruction_injection_provider.dart';
 import 'package:Kelivo/core/providers/settings_provider.dart';
+import 'package:Kelivo/core/providers/world_book_provider.dart';
 import 'package:Kelivo/core/services/chat/chat_service.dart';
 import 'package:Kelivo/core/utils/token_estimator.dart';
 import 'package:Kelivo/features/home/services/context_assembly.dart';
@@ -116,12 +121,26 @@ void main() {
     required ChatService chat,
     required SettingsProvider settings,
     required AssistantProvider assistants,
+    InstructionInjectionProvider? instructions,
+    WorldBookProvider? worldBooks,
     ContextAssemblyPreviewFn? assemble,
   }) {
+    final resolvedInstructions =
+        instructions ??
+        InstructionInjectionProvider(
+          preferences: createBusinessTestPreferences(),
+        );
+    if (instructions == null) disposers.add(resolvedInstructions.dispose);
+    final resolvedWorldBooks =
+        worldBooks ??
+        WorldBookProvider(preferences: createBusinessTestPreferences());
+    if (worldBooks == null) disposers.add(resolvedWorldBooks.dispose);
     final service = ContextUsageService(
       chatService: chat,
       settings: settings,
       assistants: assistants,
+      instructions: resolvedInstructions,
+      worldBooks: resolvedWorldBooks,
       assemble:
           assemble ??
           ({
@@ -162,7 +181,623 @@ void main() {
     fail('condition not met: $debug');
   }
 
+  Object requestConfiguration(
+    ({SettingsProvider settings, AssistantProvider assistants}) providers, {
+    String modelId = 'window-model',
+    InstructionInjectionProvider? instructions,
+    WorldBookProvider? worldBooks,
+    Conversation? conversation,
+  }) => contextUsageConfiguration(
+    settings: providers.settings,
+    config: providers.settings.getProviderConfig('TestProvider'),
+    providerKey: 'TestProvider',
+    modelId: modelId,
+    assistant: providers.assistants.currentAssistant,
+    instructions: instructions,
+    worldBooks: worldBooks,
+    conversation: conversation,
+  );
+
   String tokenWords(int count) => List.filled(count, 'aa').join(' ');
+
+  test(
+    'late usage rejects a changed history revision, not streaming writes',
+    () async {
+      final chat = await createChat();
+      final providers = await createProviders();
+      final conversation = await chat.createDraftConversation(title: 'History');
+      final first = await chat.addMessage(
+        conversationId: conversation.id,
+        role: 'user',
+        content: 'short',
+      );
+      final second = (await chat.appendMessageVersion(
+        messageId: first.id,
+        content: tokenWords(100),
+      ))!;
+      final groupId = first.groupId ?? first.id;
+      await chat.setSelectedVersion(conversation.id, groupId, first.version);
+      final reply = await chat.addMessage(
+        conversationId: conversation.id,
+        role: 'assistant',
+        content: '',
+        isStreaming: true,
+      );
+      final usage = createUsage(
+        chat: chat,
+        settings: providers.settings,
+        assistants: providers.assistants,
+        assemble:
+            ({
+              required conversationId,
+              required providerKey,
+              required modelId,
+              required assistantId,
+            }) async {
+              final selected = chat.getVersionSelections(
+                conversationId,
+              )[groupId];
+              final history = (await chat.loadMessages(conversationId))
+                  .singleWhere(
+                    (message) =>
+                        (message.groupId ?? message.id) == groupId &&
+                        message.version == selected,
+                  );
+              return ContextAssemblyPreview(
+                systemText: '',
+                injectionsText: '',
+                historyText: history.content,
+                tools: [],
+                images: [],
+              );
+            },
+      );
+      usage.setActiveConversation(conversation.id);
+      final sentRevision = chat.contextRevision(conversation.id);
+      final sentConfiguration = requestConfiguration(providers);
+      void respond() => usage.recordUsage(
+        conversationId: conversation.id,
+        providerKey: 'TestProvider',
+        modelId: 'window-model',
+        assistantId: null,
+        requestRevision: sentRevision,
+        requestConfiguration: sentConfiguration,
+        usage: const TokenUsage(promptTokens: 9, completionTokens: 1),
+        assistantMessage: reply.copyWith(content: 'reply'),
+      );
+      await chat.updateStreamingCheckpointSilent(
+        reply.copyWith(content: 'reply'),
+        const [],
+      );
+      expect(chat.contextRevision(conversation.id), sentRevision);
+      respond();
+      await usage.refresh(conversation.id, force: true);
+      expect(usage.current!.state, ContextUsageState.exact);
+      expect(usage.current!.usedTokens, 10);
+
+      await chat.setSelectedVersion(conversation.id, groupId, second.version);
+      expect(chat.contextRevision(conversation.id), sentRevision + 1);
+      respond();
+      await usage.refresh(conversation.id, force: true);
+      expect(usage.current!.state, ContextUsageState.estimated);
+      expect(usage.current!.usedTokens, 100);
+    },
+  );
+
+  for (final force in [false, true]) {
+    test('instruction changes invalidate exact usage, force=$force', () async {
+      final chat = await createChat();
+      final providers = await createProviders();
+      final instructions = InstructionInjectionProvider(
+        preferences: createBusinessTestPreferences(),
+      );
+      disposers.add(instructions.dispose);
+      await instructions.initialize();
+      final assistantId = await providers.assistants.addAssistant(name: 'A');
+      await providers.assistants.setCurrentAssistant(assistantId);
+      final conversation = await chat.createDraftConversation(
+        title: 'Instructions',
+        assistantId: assistantId,
+      );
+      final instruction = InstructionInjection(
+        id: 'long',
+        title: 'Long',
+        prompt: tokenWords(100),
+      );
+      await instructions.add(instruction);
+      final usage = createUsage(
+        chat: chat,
+        settings: providers.settings,
+        assistants: providers.assistants,
+        instructions: instructions,
+        assemble:
+            ({
+              required conversationId,
+              required providerKey,
+              required modelId,
+              required assistantId,
+            }) async => ContextAssemblyPreview(
+              systemText: '',
+              injectionsText: instructions.promptFor(assistantId),
+              historyText: '',
+              tools: [],
+              images: [],
+            ),
+      );
+      // Also exercise forced refresh for a background conversation, where the
+      // provider listener does not proactively mark its snapshot stale.
+      if (!force) usage.setActiveConversation(conversation.id);
+      final sentConfiguration = requestConfiguration(
+        providers,
+        instructions: instructions,
+        conversation: conversation,
+      );
+      final sentRevision = chat.contextRevision(conversation.id);
+      void respond() => usage.recordUsage(
+        conversationId: conversation.id,
+        providerKey: 'TestProvider',
+        modelId: 'window-model',
+        assistantId: assistantId,
+        requestRevision: sentRevision,
+        requestConfiguration: sentConfiguration,
+        usage: const TokenUsage(promptTokens: 9, completionTokens: 1),
+        assistantMessage: ChatMessage(
+          role: 'assistant',
+          content: 'x',
+          conversationId: conversation.id,
+        ),
+      );
+      respond();
+      await usage.refresh(conversation.id, force: true);
+      expect(usage.snapshot(conversation.id)!.state, ContextUsageState.exact);
+      expect(usage.snapshot(conversation.id)!.usedTokens, 10);
+
+      await instructions.setActiveIds(['long'], assistantId: assistantId);
+      if (!force) {
+        expect(usage.current!.state, ContextUsageState.stale);
+      }
+      await usage.refresh(conversation.id, force: force);
+      expect(
+        usage.snapshot(conversation.id)!.state,
+        ContextUsageState.estimated,
+      );
+      expect(usage.snapshot(conversation.id)!.usedTokens, 100);
+      respond();
+      await usage.refresh(conversation.id, force: true);
+      expect(
+        usage.snapshot(conversation.id)!.state,
+        ContextUsageState.estimated,
+      );
+      expect(usage.snapshot(conversation.id)!.usedTokens, 100);
+
+      await instructions.update(instruction.copyWith(prompt: tokenWords(200)));
+      await usage.refresh(conversation.id, force: force);
+      expect(usage.snapshot(conversation.id)!.usedTokens, 200);
+      await instructions.setActiveIds([], assistantId: assistantId);
+      await usage.refresh(conversation.id, force: force);
+      expect(usage.snapshot(conversation.id)!.usedTokens, 0);
+    });
+  }
+
+  test(
+    'conversation instruction bindings track only their effective prompts',
+    () async {
+      final chat = await createChat();
+      final providers = await createProviders();
+      final instructions = InstructionInjectionProvider(
+        preferences: createBusinessTestPreferences(),
+      );
+      disposers.add(instructions.dispose);
+      await instructions.initialize();
+      final assistantId = await providers.assistants.addAssistant(name: 'A');
+      await providers.assistants.setCurrentAssistant(assistantId);
+      await providers.assistants.updateAssistant(
+        providers.assistants
+            .getById(assistantId)!
+            .copyWith(allowConversationPromptInjection: true),
+      );
+      var conversation = await chat.createDraftConversation(
+        title: 'Bound',
+        assistantId: assistantId,
+      );
+      await chat.updateConversationExtras(
+        conversation.id,
+        (extras) => {
+          ...extras,
+          ConversationPromptSettings.instructionIdsKey: ['bound'],
+        },
+      );
+      conversation = chat.getConversation(conversation.id)!;
+      const bound = InstructionInjection(
+        id: 'bound',
+        title: 'Bound',
+        prompt: 'short',
+      );
+      await instructions.add(bound);
+      await instructions.add(
+        InstructionInjection(
+          id: 'other',
+          title: 'Other',
+          prompt: tokenWords(50),
+        ),
+      );
+      final usage = createUsage(
+        chat: chat,
+        settings: providers.settings,
+        assistants: providers.assistants,
+        instructions: instructions,
+        assemble:
+            ({
+              required conversationId,
+              required providerKey,
+              required modelId,
+              required assistantId,
+            }) async => ContextAssemblyPreview(
+              systemText: '',
+              injectionsText: instructions.promptFor(
+                assistantId,
+                instructionIds: ['bound'],
+              ),
+              historyText: '',
+              tools: [],
+              images: [],
+            ),
+      );
+      usage.setActiveConversation(conversation.id);
+      usage.recordUsage(
+        conversationId: conversation.id,
+        providerKey: 'TestProvider',
+        modelId: 'window-model',
+        assistantId: assistantId,
+        requestRevision: chat.contextRevision(conversation.id),
+        requestConfiguration: requestConfiguration(
+          providers,
+          instructions: instructions,
+          conversation: conversation,
+        ),
+        usage: const TokenUsage(promptTokens: 9, completionTokens: 1),
+        assistantMessage: ChatMessage(
+          role: 'assistant',
+          content: 'x',
+          conversationId: conversation.id,
+        ),
+      );
+      await usage.refresh(conversation.id, force: true);
+      await instructions.setActiveIds(['other'], assistantId: assistantId);
+      await instructions.update(
+        bound.copyWith(title: 'Renamed', prompt: ' short '),
+      );
+      await usage.refresh(conversation.id);
+      expect(usage.current!.state, ContextUsageState.exact);
+      expect(usage.current!.usedTokens, 10);
+
+      await instructions.update(bound.copyWith(prompt: tokenWords(100)));
+      await usage.refresh(conversation.id);
+      expect(usage.current!.state, ContextUsageState.estimated);
+      expect(usage.current!.usedTokens, 100);
+      await instructions.delete('bound');
+      await usage.refresh(conversation.id, force: true);
+      expect(usage.current!.usedTokens, 0);
+    },
+  );
+
+  test(
+    'late responses cannot anchor a changed assistant configuration',
+    () async {
+      final chat = await createChat();
+      final providers = await createProviders();
+      final assistantId = await providers.assistants.addAssistant(name: 'A');
+      await providers.assistants.updateAssistant(
+        providers.assistants
+            .getById(assistantId)!
+            .copyWith(systemPrompt: 'short'),
+      );
+      final usage = createUsage(
+        chat: chat,
+        settings: providers.settings,
+        assistants: providers.assistants,
+        assemble:
+            ({
+              required conversationId,
+              required providerKey,
+              required modelId,
+              required assistantId,
+            }) async => ContextAssemblyPreview(
+              systemText: providers.assistants
+                  .getById(assistantId!)!
+                  .systemPrompt,
+              injectionsText: '',
+              historyText: '',
+              tools: [],
+              images: [],
+            ),
+      );
+      final conversation = await chat.createDraftConversation(
+        title: 'A',
+        assistantId: assistantId,
+      );
+      usage.setActiveConversation(conversation.id);
+      final sentConfiguration = requestConfiguration(providers);
+      final reply = ChatMessage(
+        role: 'assistant',
+        content: 'x',
+        conversationId: conversation.id,
+      );
+      void respond() => usage.recordUsage(
+        requestRevision: chat.contextRevision(conversation.id),
+        conversationId: conversation.id,
+        providerKey: 'TestProvider',
+        modelId: 'window-model',
+        assistantId: assistantId,
+        requestConfiguration: sentConfiguration,
+        usage: const TokenUsage(promptTokens: 9, completionTokens: 1),
+        assistantMessage: reply,
+      );
+      respond();
+      await waitUntil(() => usage.current?.calibrated == true);
+      expect(usage.current!.state, ContextUsageState.exact);
+      expect(usage.current!.usedTokens, 10);
+
+      await providers.assistants.updateAssistant(
+        providers.assistants
+            .getById(assistantId)!
+            .copyWith(systemPrompt: tokenWords(100)),
+      );
+      respond();
+      await waitUntil(
+        () => usage.current?.state == ContextUsageState.estimated,
+      );
+      expect(usage.current!.usedTokens, 100);
+    },
+  );
+
+  test(
+    'memory templates invalidate cache and reject usage from the old template',
+    () async {
+      final chat = await createChat();
+      final providers = await createProviders();
+      final assistantId = await providers.assistants.addAssistant(
+        name: 'Memory',
+      );
+      await providers.assistants.updateAssistant(
+        providers.assistants.getById(assistantId)!.copyWith(enableMemory: true),
+      );
+      final settings = providers.settings;
+      await settings.setMemoryPromptLang('en');
+      await settings.setMemoryRulesPromptEn('short');
+      final usage = createUsage(
+        chat: chat,
+        settings: settings,
+        assistants: providers.assistants,
+        assemble:
+            ({
+              required conversationId,
+              required providerKey,
+              required modelId,
+              required assistantId,
+            }) async => ContextAssemblyPreview(
+              systemText: '',
+              injectionsText: settings.memoryRulesPromptEn,
+              historyText: '',
+              tools: [],
+              images: [],
+            ),
+      );
+      final conversation = await chat.createDraftConversation(
+        title: 'A',
+        assistantId: assistantId,
+      );
+      usage.setActiveConversation(conversation.id);
+      await usage.refresh(conversation.id);
+      expect(usage.current!.usedTokens, 1);
+      final sentConfiguration = requestConfiguration(providers);
+      await settings.setMemoryRulesPromptEn(tokenWords(100));
+      await usage.refresh(conversation.id);
+      expect(usage.current!.usedTokens, 100);
+      usage.recordUsage(
+        requestRevision: chat.contextRevision(conversation.id),
+        conversationId: conversation.id,
+        providerKey: 'TestProvider',
+        modelId: 'window-model',
+        assistantId: assistantId,
+        requestConfiguration: sentConfiguration,
+        usage: const TokenUsage(promptTokens: 9, completionTokens: 1),
+        assistantMessage: ChatMessage(
+          role: 'assistant',
+          content: 'x',
+          conversationId: conversation.id,
+        ),
+      );
+      await waitUntil(
+        () => usage.current?.state == ContextUsageState.estimated,
+      );
+      expect(usage.current!.usedTokens, 100);
+    },
+  );
+
+  test('usage without request provenance remains an estimate', () async {
+    final chat = await createChat();
+    final providers = await createProviders();
+    final usage = createUsage(
+      chat: chat,
+      settings: providers.settings,
+      assistants: providers.assistants,
+    );
+    final conversation = await chat.createDraftConversation(title: 'A');
+    usage.recordUsage(
+      requestRevision: chat.contextRevision(conversation.id),
+      conversationId: conversation.id,
+      providerKey: 'TestProvider',
+      modelId: 'window-model',
+      assistantId: null,
+      usage: const TokenUsage(promptTokens: 9, completionTokens: 1),
+      assistantMessage: ChatMessage(
+        role: 'assistant',
+        content: 'x',
+        conversationId: conversation.id,
+      ),
+    );
+    await waitUntil(
+      () =>
+          usage.snapshot(conversation.id)?.state == ContextUsageState.estimated,
+    );
+  });
+
+  test('same model window edits and removal invalidate cached usage', () async {
+    final chat = await createChat();
+    final providers = await createProviders();
+    final usage = createUsage(
+      chat: chat,
+      settings: providers.settings,
+      assistants: providers.assistants,
+    );
+    final conversation = await chat.createDraftConversation(title: 'A');
+    usage.setActiveConversation(conversation.id);
+    await usage.refresh(conversation.id);
+    expect(usage.current!.contextWindow, 1000);
+    for (final window in [2000, null]) {
+      final cfg = providers.settings.getProviderConfig('TestProvider');
+      await providers.settings.setProviderConfig(
+        'TestProvider',
+        cfg.copyWith(
+          modelOverrides: {
+            'window-model': {'contextWindow': window},
+          },
+        ),
+      );
+      expect(usage.current!.state, ContextUsageState.stale);
+      await usage.refresh(conversation.id);
+      expect(usage.current!.contextWindow, window);
+      expect(usage.current!.state, ContextUsageState.estimated);
+    }
+  });
+
+  test(
+    'editing the same assistant drops exact anchors and rebuilds its prompt',
+    () async {
+      final chat = await createChat();
+      final providers = await createProviders();
+      final id = await providers.assistants.addAssistant(name: 'A');
+      await providers.assistants.updateAssistant(
+        providers.assistants.getById(id)!.copyWith(systemPrompt: 'short'),
+      );
+      final usage = createUsage(
+        chat: chat,
+        settings: providers.settings,
+        assistants: providers.assistants,
+        assemble:
+            ({
+              required conversationId,
+              required providerKey,
+              required modelId,
+              required assistantId,
+            }) async => ContextAssemblyPreview(
+              systemText: providers.assistants
+                  .getById(assistantId!)!
+                  .systemPrompt,
+              injectionsText: '',
+              historyText: '',
+              tools: [],
+              images: [],
+            ),
+      );
+      final conversation = await chat.createDraftConversation(
+        title: 'A',
+        assistantId: id,
+      );
+      usage.setActiveConversation(conversation.id);
+      usage.recordUsage(
+        requestRevision: chat.contextRevision(conversation.id),
+        requestConfiguration: requestConfiguration(
+          providers,
+          modelId: 'window-model',
+        ),
+        conversationId: conversation.id,
+        providerKey: 'TestProvider',
+        modelId: 'window-model',
+        assistantId: id,
+        usage: const TokenUsage(promptTokens: 90, completionTokens: 10),
+        assistantMessage: ChatMessage(
+          role: 'assistant',
+          content: 'reply',
+          conversationId: conversation.id,
+        ),
+      );
+      await waitUntil(() => usage.current?.calibrated == true);
+      final prompt = tokenWords(40);
+      await providers.assistants.updateAssistant(
+        providers.assistants
+            .getById(id)!
+            .copyWith(
+              systemPrompt: prompt,
+              contextMessageSize: 2,
+              limitContextMessages: true,
+            ),
+      );
+      expect(usage.current!.state, ContextUsageState.stale);
+      await usage.refresh(conversation.id);
+      expect(usage.current!.state, ContextUsageState.estimated);
+      expect(usage.current!.usedTokens, estimateTokens(prompt));
+    },
+  );
+
+  test(
+    'a settings edit rejects an in-flight estimate with the same model id',
+    () async {
+      final chat = await createChat();
+      final providers = await createProviders();
+      final pending = Completer<ContextAssemblyPreview>();
+      var calls = 0;
+      final usage = createUsage(
+        chat: chat,
+        settings: providers.settings,
+        assistants: providers.assistants,
+        assemble:
+            ({
+              required conversationId,
+              required providerKey,
+              required modelId,
+              required assistantId,
+            }) async {
+              calls++;
+              if (calls == 1) return pending.future;
+              return const ContextAssemblyPreview(
+                systemText: 'new',
+                injectionsText: '',
+                historyText: '',
+                tools: [],
+                images: [],
+              );
+            },
+      );
+      final conversation = await chat.createDraftConversation(title: 'A');
+      usage.setActiveConversation(conversation.id);
+      final first = usage.refresh(conversation.id);
+      final cfg = providers.settings.getProviderConfig('TestProvider');
+      await providers.settings.setProviderConfig(
+        'TestProvider',
+        cfg.copyWith(
+          modelOverrides: const {
+            'window-model': {'contextWindow': 2000},
+          },
+        ),
+      );
+      pending.complete(
+        const ContextAssemblyPreview(
+          systemText: 'old',
+          injectionsText: '',
+          historyText: '',
+          tools: [],
+          images: [],
+        ),
+      );
+      await first;
+      expect(usage.current!.state, ContextUsageState.stale);
+      await usage.refresh(conversation.id);
+      expect(usage.current!.contextWindow, 2000);
+      expect(usage.current!.usedTokens, estimateTokens('new'));
+    },
+  );
 
   test('calibrateContextUsageBuckets scales and pushes residual', () {
     const estimated = ContextUsageBuckets(
@@ -212,6 +847,11 @@ void main() {
     );
 
     usage.recordUsage(
+      requestRevision: chat.contextRevision(conversation.id),
+      requestConfiguration: requestConfiguration(
+        providers,
+        modelId: 'window-model',
+      ),
       conversationId: conversation.id,
       providerKey: 'TestProvider',
       modelId: 'window-model',
@@ -247,6 +887,11 @@ void main() {
     );
 
     usage.recordUsage(
+      requestRevision: chat.contextRevision(conversation.id),
+      requestConfiguration: requestConfiguration(
+        providers,
+        modelId: 'plain-model',
+      ),
       conversationId: conversation.id,
       providerKey: 'TestProvider',
       modelId: 'plain-model',
@@ -301,6 +946,11 @@ void main() {
       const toolJson = '{"name":"search"}';
 
       usage.recordUsage(
+        requestRevision: chat.contextRevision(conversation.id),
+        requestConfiguration: requestConfiguration((
+          settings: settings,
+          assistants: assistants,
+        ), modelId: 'tool-model'),
         conversationId: conversation.id,
         providerKey: 'TestProvider',
         modelId: 'tool-model',
@@ -319,6 +969,11 @@ void main() {
       );
 
       usage.recordUsage(
+        requestRevision: chat.contextRevision(conversation.id),
+        requestConfiguration: requestConfiguration((
+          settings: settings,
+          assistants: assistants,
+        ), modelId: 'tool-model'),
         conversationId: conversation.id,
         providerKey: 'TestProvider',
         modelId: 'tool-model',
@@ -352,6 +1007,11 @@ void main() {
       const hugeTool = '{"name":"search","result":"xxxxxxxxxxxxxxxxxxxxxxxx"}';
 
       usage.recordUsage(
+        requestRevision: chat.contextRevision(conversation.id),
+        requestConfiguration: requestConfiguration(
+          providers,
+          modelId: 'window-model',
+        ),
         conversationId: conversation.id,
         providerKey: 'TestProvider',
         modelId: 'window-model',
@@ -400,6 +1060,11 @@ void main() {
     final conversation = await chat.createConversation(title: 'A');
 
     usage.recordUsage(
+      requestRevision: chat.contextRevision(conversation.id),
+      requestConfiguration: requestConfiguration(
+        providers,
+        modelId: 'plain-model',
+      ),
       conversationId: conversation.id,
       providerKey: 'TestProvider',
       modelId: 'plain-model',
@@ -457,6 +1122,11 @@ void main() {
       final conversation = await chat.createConversation(title: 'A');
 
       usage.recordUsage(
+        requestRevision: chat.contextRevision(conversation.id),
+        requestConfiguration: requestConfiguration((
+          settings: settings,
+          assistants: assistants,
+        ), modelId: 'tool-model'),
         conversationId: conversation.id,
         providerKey: 'TestProvider',
         modelId: 'tool-model',
@@ -476,6 +1146,11 @@ void main() {
       expect(usage.snapshot(conversation.id)!.usedTokens, 105);
 
       usage.recordUsage(
+        requestRevision: chat.contextRevision(conversation.id),
+        requestConfiguration: requestConfiguration((
+          settings: settings,
+          assistants: assistants,
+        ), modelId: 'tool-model'),
         conversationId: conversation.id,
         providerKey: 'TestProvider',
         modelId: 'tool-model',
@@ -524,6 +1199,11 @@ void main() {
     const anchor = 41646;
 
     usage.recordUsage(
+      requestRevision: chat.contextRevision(conversation.id),
+      requestConfiguration: requestConfiguration(
+        providers,
+        modelId: 'window-model',
+      ),
       conversationId: conversation.id,
       providerKey: 'TestProvider',
       modelId: 'window-model',
@@ -574,6 +1254,11 @@ void main() {
     final conversation = await chat.createConversation(title: 'A');
 
     usage.recordUsage(
+      requestRevision: chat.contextRevision(conversation.id),
+      requestConfiguration: requestConfiguration(
+        providers,
+        modelId: 'window-model',
+      ),
       conversationId: conversation.id,
       providerKey: 'TestProvider',
       modelId: 'window-model',
@@ -636,6 +1321,11 @@ void main() {
     final conversation = await chat.createDraftConversation(title: 'A');
     usage.setActiveConversation(conversation.id);
     usage.recordUsage(
+      requestRevision: chat.contextRevision(conversation.id),
+      requestConfiguration: requestConfiguration(
+        providers,
+        modelId: 'window-model',
+      ),
       conversationId: conversation.id,
       providerKey: 'TestProvider',
       modelId: 'window-model',
@@ -688,6 +1378,11 @@ void main() {
     final conversation = await chat.createConversation(title: 'A');
 
     usage.recordUsage(
+      requestRevision: chat.contextRevision(conversation.id),
+      requestConfiguration: requestConfiguration(
+        providers,
+        modelId: 'window-model',
+      ),
       conversationId: conversation.id,
       providerKey: 'TestProvider',
       modelId: 'window-model',

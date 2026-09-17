@@ -1,18 +1,37 @@
 class TokenUsage {
-  final int promptTokens;
-  final int completionTokens;
-  final int cachedTokens;
-  final int reasoningTokens;
-  final int cacheWriteTokens;
-  final int totalTokens;
+  /// Total input, including cache reads and cache writes.
+  int get promptTokens => _promptTokens ?? 0;
+
+  /// Total output, including reasoning tokens.
+  int get completionTokens => _completionTokens ?? 0;
+  int get cachedTokens => _cachedTokens ?? 0;
+  int get reasoningTokens => _reasoningTokens ?? 0;
+  int get cacheWriteTokens => _cacheWriteTokens ?? 0;
+  int get totalTokens => _totalTokens ?? promptTokens + completionTokens;
+
+  // Null means absent from a partial update; zero is a reported value.
+  final int? _promptTokens;
+  final int? _completionTokens;
+  final int? _cachedTokens;
+  final int? _reasoningTokens;
+  final int? _cacheWriteTokens;
+  final int? _totalTokens;
+
+  bool get hasReportedTokens =>
+      _promptTokens != null ||
+      _completionTokens != null ||
+      _cachedTokens != null ||
+      _reasoningTokens != null ||
+      _cacheWriteTokens != null ||
+      _totalTokens != null;
 
   const TokenUsage({
-    this.promptTokens = 0,
-    this.completionTokens = 0,
-    this.cachedTokens = 0,
-    this.reasoningTokens = 0,
-    this.cacheWriteTokens = 0,
-    this.totalTokens = 0,
+    this._promptTokens,
+    this._completionTokens,
+    this._cachedTokens,
+    this._reasoningTokens,
+    this._cacheWriteTokens,
+    this._totalTokens,
   });
 
   TokenUsage copyWith({
@@ -23,64 +42,64 @@ class TokenUsage {
     int? cacheWriteTokens,
     int? totalTokens,
   }) {
-    return TokenUsage(
-      promptTokens: promptTokens ?? this.promptTokens,
-      completionTokens: completionTokens ?? this.completionTokens,
-      cachedTokens: cachedTokens ?? this.cachedTokens,
-      reasoningTokens: reasoningTokens ?? this.reasoningTokens,
-      cacheWriteTokens: cacheWriteTokens ?? this.cacheWriteTokens,
-      totalTokens: totalTokens ?? this.totalTokens,
+    return merge(
+      TokenUsage(
+        promptTokens: promptTokens,
+        completionTokens: completionTokens,
+        cachedTokens: cachedTokens,
+        reasoningTokens: reasoningTokens,
+        cacheWriteTokens: cacheWriteTokens,
+        totalTokens: totalTokens,
+      ),
     );
   }
 
-  /// Folds a usage snapshot into the running one: the newest non-zero field
-  /// wins, so a later round's numbers replace the previous round's rather than
-  /// adding to them (providers already report the full context each round).
+  /// Merges a partial update within one request, including explicitly reported
+  /// zeros. A new tool round replaces the old round with [asSnapshot] instead.
   TokenUsage merge(TokenUsage other) {
-    final prompt = other.promptTokens > 0 ? other.promptTokens : promptTokens;
-    final completion = other.completionTokens > 0
-        ? other.completionTokens
-        : completionTokens;
-    final cached = other.cachedTokens > 0 ? other.cachedTokens : cachedTokens;
-    final reasoning = other.reasoningTokens > 0
-        ? other.reasoningTokens
-        : reasoningTokens;
-    final cacheWrite = other.cacheWriteTokens > 0
-        ? other.cacheWriteTokens
-        : cacheWriteTokens;
-    final splitTotal = prompt + completion;
-    final explicitTotal = other.totalTokens > 0
-        ? other.totalTokens
-        : totalTokens;
-    final total = splitTotal > 0 ? splitTotal : explicitTotal;
+    final prompt = other._promptTokens ?? _promptTokens;
+    final completion = other._completionTokens ?? _completionTokens;
+    final splitUpdated =
+        other._promptTokens != null || other._completionTokens != null;
     return TokenUsage(
       promptTokens: prompt,
       completionTokens: completion,
-      cachedTokens: cached,
-      reasoningTokens: reasoning,
-      cacheWriteTokens: cacheWrite,
-      totalTokens: total,
+      cachedTokens: other._cachedTokens ?? _cachedTokens,
+      reasoningTokens: other._reasoningTokens ?? _reasoningTokens,
+      cacheWriteTokens: other._cacheWriteTokens ?? _cacheWriteTokens,
+      totalTokens: other._totalTokens ?? (splitUpdated ? null : _totalTokens),
     );
   }
 
+  /// Completes this round's snapshot so omitted counters cannot leak in from
+  /// an earlier tool round when consumers receive the next Usage chunk.
+  TokenUsage asSnapshot() => TokenUsage(
+    promptTokens: promptTokens,
+    completionTokens: completionTokens,
+    cachedTokens: cachedTokens,
+    reasoningTokens: reasoningTokens,
+    cacheWriteTokens: cacheWriteTokens,
+    totalTokens: totalTokens,
+  );
+
   Map<String, dynamic> toJson() {
     return <String, dynamic>{
-      'promptTokens': promptTokens,
-      'completionTokens': completionTokens,
-      'cachedTokens': cachedTokens,
-      'reasoningTokens': reasoningTokens,
-      'cacheWriteTokens': cacheWriteTokens,
-      'totalTokens': totalTokens,
+      if (_promptTokens != null) 'promptTokens': _promptTokens,
+      if (_completionTokens != null) 'completionTokens': _completionTokens,
+      if (_cachedTokens != null) 'cachedTokens': _cachedTokens,
+      if (_reasoningTokens != null) 'reasoningTokens': _reasoningTokens,
+      if (_cacheWriteTokens != null) 'cacheWriteTokens': _cacheWriteTokens,
+      if (_totalTokens != null) 'totalTokens': _totalTokens,
     };
   }
 
   factory TokenUsage.fromJson(Map<String, dynamic> json) {
-    int read(String key) {
+    int? read(String key) {
       final value = json[key];
       if (value is int) return value;
       if (value is num) return value.toInt();
-      if (value is String) return int.tryParse(value) ?? 0;
-      return 0;
+      if (value is String) return int.tryParse(value);
+      return null;
     }
 
     return TokenUsage(

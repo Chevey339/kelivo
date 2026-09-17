@@ -29,8 +29,9 @@ ModelCost? estimateModelCost(TokenUsage usage, ModelPricing? pricing) {
   final cacheReadPrice = pricing.cacheRead ?? input;
   final cacheWritePrice = pricing.cacheWrite ?? input;
   final cacheRead = usage.cachedTokens;
-  final billedPrompt = usage.promptTokens > cacheRead
-      ? usage.promptTokens - cacheRead
+  final cachedInput = cacheRead + usage.cacheWriteTokens;
+  final billedPrompt = usage.promptTokens > cachedInput
+      ? usage.promptTokens - cachedInput
       : 0;
 
   final amount =

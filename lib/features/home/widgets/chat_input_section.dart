@@ -6,8 +6,8 @@ import 'package:provider/provider.dart';
 
 import '../../../core/models/chat_input_data.dart';
 import '../../../core/models/assistant.dart';
-import '../../../core/models/reasoning_request.dart';
 import '../../../core/services/api/reasoning/reasoning_level_options.dart';
+import '../../../core/services/api/reasoning/reasoning_dialects.dart';
 import '../../../core/services/api/reasoning/reasoning_selection.dart';
 import '../../../core/services/model_spec/model_spec_resolver.dart';
 import '../../../core/models/workspace_binding.dart';
@@ -160,6 +160,12 @@ class ChatInputSection extends StatelessWidget {
     final reasoningSpec = (pk != null && mid != null)
         ? ModelSpecResolver.instance.spec(settings.getProviderConfig(pk), mid)
         : null;
+    final effectiveReasoning = reasoningSpec == null
+        ? selectedReasoning
+        : ReasoningRequest(
+            resolveReasoning(reasoningSpec, selectedReasoning).effective,
+            budgetTokens: selectedReasoning.budgetTokens,
+          );
 
     // Enforce model capabilities: disable MCP selection if model doesn't
     // support tools. Skipped while the conversation overrides the model —
@@ -210,8 +216,8 @@ class ChatInputSection extends StatelessWidget {
       asrProvider: asr,
       onConfigureReasoning: onConfigureReasoning,
       onOpenContextUsage: onOpenContextUsage,
-      reasoningActive: isReasoningEnabled(selectedReasoning),
-      reasoning: selectedReasoning,
+      reasoningActive: isReasoningEnabled(effectiveReasoning),
+      reasoning: effectiveReasoning,
       reasoningCustomBudget: reasoningSpec != null
           ? isCustomBudgetSelection(reasoningSpec, selectedReasoning)
           : false,

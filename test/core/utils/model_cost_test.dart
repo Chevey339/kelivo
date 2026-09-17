@@ -59,7 +59,10 @@ void main() {
     });
 
     test('bills cache writes at cacheWrite or input fallback', () {
-      const usage = TokenUsage(cacheWriteTokens: 1000000);
+      const usage = TokenUsage(
+        promptTokens: 1000000,
+        cacheWriteTokens: 1000000,
+      );
       expect(
         estimateModelCost(usage, const ModelPricing(input: 2, output: 5)),
         const ModelCost(amount: 2, currency: 'USD'),
@@ -102,7 +105,7 @@ void main() {
           currency: 'EUR',
         ),
       );
-      expect(cost, const ModelCost(amount: 10.725, currency: 'EUR'));
+      expect(cost, const ModelCost(amount: 10.225, currency: 'EUR'));
     });
   });
 

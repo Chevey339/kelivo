@@ -3,7 +3,9 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 
 import 'package:Kelivo/core/providers/assistant_provider.dart';
+import 'package:Kelivo/core/providers/instruction_injection_provider.dart';
 import 'package:Kelivo/core/providers/settings_provider.dart';
+import 'package:Kelivo/core/providers/world_book_provider.dart';
 import 'package:Kelivo/core/services/chat/chat_service.dart';
 import 'package:Kelivo/features/home/services/context_usage_service.dart';
 import 'package:Kelivo/features/home/widgets/chat_input_bar.dart';
@@ -29,13 +31,23 @@ void main() {
     );
     await settings.loaded;
     await assistants.loaded;
+    final instructions = InstructionInjectionProvider(
+      preferences: createBusinessTestPreferences(),
+    );
+    final worldBooks = WorldBookProvider(
+      preferences: createBusinessTestPreferences(),
+    );
     final usage = ContextUsageService(
       chatService: ChatService(),
       settings: settings,
       assistants: assistants,
+      instructions: instructions,
+      worldBooks: worldBooks,
     );
     addTearDown(assistants.dispose);
     addTearDown(settings.dispose);
+    addTearDown(instructions.dispose);
+    addTearDown(worldBooks.dispose);
     addTearDown(usage.dispose);
     return (settings: settings, assistants: assistants, usage: usage);
   }

@@ -6,6 +6,44 @@ import 'support/collect_generation.dart';
 
 void main() {
   group('Claude thinking compatibility', () {
+    for (final vertex in [false, true]) {
+      for (final model in [
+        'claude-sonnet-4-5',
+        'claude-haiku-4-5',
+        'claude-sonnet-4-6',
+      ]) {
+        test(
+          '$model thinking strips temperature and top_k (vertex=$vertex)',
+          () async {
+            final overrides = {
+              model: {
+                'body': [
+                  {'key': 'temperature', 'value': '0.7'},
+                  {'key': 'top_k', 'value': '40'},
+                ],
+              },
+            };
+            final body = await captureClaudeRequestBody(
+              modelId: model,
+              config: vertex
+                  ? vertexClaudeConfig(modelOverrides: overrides)
+                  : claudeConfig(modelOverrides: overrides),
+              thinkingBudget: 2048,
+              temperature: 0.7,
+              topP: 0.96,
+            );
+            expect(
+              (body['thinking'] as Map)['type'],
+              isIn(['enabled', 'adaptive']),
+            );
+            expect(body.containsKey('temperature'), isFalse);
+            expect(body.containsKey('top_k'), isFalse);
+            expect(body['top_p'], 0.96);
+          },
+        );
+      }
+    }
+
     test(
       'prompt caching adds official Claude top-level cache control',
       () async {

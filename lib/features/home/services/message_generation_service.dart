@@ -11,7 +11,9 @@ import '../../../core/models/model_spec.dart';
 import '../../../core/models/reasoning_request.dart';
 import '../../../core/models/skills_binding.dart';
 import '../../../core/providers/assistant_provider.dart';
+import '../../../core/providers/instruction_injection_provider.dart';
 import '../../../core/providers/settings_provider.dart';
+import '../../../core/providers/world_book_provider.dart';
 import '../../../core/services/api/builtin_tools.dart';
 import '../../../core/services/api/chat_api_service.dart';
 import '../../../core/services/api/reasoning/reasoning_dialects.dart';
@@ -33,6 +35,7 @@ import '../controllers/stream_controller.dart' as stream_ctrl;
 import '../controllers/generation_controller.dart';
 import 'ask_user_interaction_service.dart';
 import 'context_assembly.dart';
+import 'context_usage_service.dart';
 import 'message_builder_service.dart';
 import 'tool_approval_service.dart';
 import '../utils/model_display_helper.dart';
@@ -97,6 +100,8 @@ class PreparedGeneration {
   final ToolCallHandler? onToolCall;
   final bool hasBuiltInSearch;
   final List<String> lastUserImagePaths;
+  final Object? contextUsageConfiguration;
+  final int? contextUsageRevision;
 
   PreparedGeneration({
     required this.apiMessages,
@@ -104,6 +109,8 @@ class PreparedGeneration {
     this.onToolCall,
     required this.hasBuiltInSearch,
     required this.lastUserImagePaths,
+    this.contextUsageConfiguration,
+    this.contextUsageRevision,
   });
 }
 
@@ -164,6 +171,8 @@ class MessageGenerationService {
     required String modelId,
     String? requiredAttachmentMessageId,
     bool syncWorkspaceAttachments = true,
+    bool persistWorldBookActivation = true,
+    void Function(int before, int after)? onWorldBookActivationPersisted,
   }) async {
     final cfg = settings.getProviderConfig(providerKey);
     final kind = ProviderConfig.classify(
@@ -245,6 +254,8 @@ class MessageGenerationService {
       assistantId,
       conversation: promptConversation,
       conversationScoped: assistant?.allowConversationPromptInjection ?? false,
+      persistActivation: persistWorldBookActivation,
+      onActivationPersisted: onWorldBookActivationPersisted,
       sourceMessages: messageBuilderService.collapseVersions(
         messages,
         versionSelections,
@@ -354,6 +365,7 @@ class MessageGenerationService {
       providerKey: providerKey,
       modelId: modelId,
       syncWorkspaceAttachments: false,
+      persistWorldBookActivation: false,
     );
     return ContextAssemblyPreview(
       systemText: packed.systemText,
@@ -384,6 +396,27 @@ class MessageGenerationService {
     String? processingMessageId,
     String? requiredAttachmentMessageId,
   }) async {
+    var requestRevision = currentConversation == null
+        ? null
+        : chatService.contextRevision(currentConversation.id);
+    final instructions = contextProvider.read<InstructionInjectionProvider?>();
+    final worldBooks = contextProvider.read<WorldBookProvider?>();
+    await instructions?.initialize();
+    await worldBooks?.initialize();
+    final requestConfiguration = contextUsageConfiguration(
+      settings: settings,
+      config: settings.getProviderConfig(providerKey),
+      providerKey: providerKey,
+      modelId: modelId,
+      assistant: assistant,
+      assistantId: assistantId,
+      instructions: instructions,
+      worldBooks: worldBooks,
+      conversation: currentConversation == null
+          ? null
+          : chatService.getConversation(currentConversation.id) ??
+                currentConversation,
+    );
     final packed = await assembleUnprocessedRequestContext(
       messages: messages,
       versionSelections: versionSelections,
@@ -394,6 +427,13 @@ class MessageGenerationService {
       providerKey: providerKey,
       modelId: modelId,
       requiredAttachmentMessageId: requiredAttachmentMessageId,
+      onWorldBookActivationPersisted: (before, after) {
+        // Accept only this preparation's own write. A history edit before or
+        // during persistence invalidates provenance and must not be rebased.
+        requestRevision = requestRevision == before && after == before + 1
+            ? after
+            : null;
+      },
     );
     final cfg = packed.cfg;
     final apiMessages = packed.apiMessages;
@@ -492,6 +532,8 @@ class MessageGenerationService {
       onToolCall: onToolCall,
       hasBuiltInSearch: hasBuiltInSearch,
       lastUserImagePaths: lastUserImagePaths,
+      contextUsageConfiguration: requestConfiguration,
+      contextUsageRevision: requestRevision,
     );
   }
 
@@ -723,6 +765,8 @@ class MessageGenerationService {
     return stream_ctrl.GenerationContext(
       assistantMessage: assistantMessage,
       apiMessages: prepared.apiMessages,
+      contextUsageConfiguration: prepared.contextUsageConfiguration,
+      contextUsageRevision: prepared.contextUsageRevision,
       userImagePaths: userImagePaths,
       allowImagesApiRouting: allowImagesApiRouting,
       providerKey: providerKey,

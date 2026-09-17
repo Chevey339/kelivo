@@ -50,9 +50,9 @@
     {
       "type": "usage",
       "promptTokens": 17,
-      "completionTokens": 481,
+      "completionTokens": 2544,
       "cachedTokens": 0,
-      "totalTokens": 498
+      "totalTokens": 2561
     },
     {
       "type": "image_start",
@@ -69,9 +69,9 @@
     {
       "type": "usage",
       "promptTokens": 17,
-      "completionTokens": 481,
+      "completionTokens": 1352,
       "cachedTokens": 0,
-      "totalTokens": 498
+      "totalTokens": 1369
     },
     {
       "type": "image_end",
@@ -82,9 +82,9 @@
   "completed": true,
   "usage": {
     "promptTokens": 17,
-    "completionTokens": 481,
+    "completionTokens": 1352,
     "cachedTokens": 0,
-    "totalTokens": 498
+    "totalTokens": 1369
   },
   "extras": {
     "bufferedImage": {

@@ -133,6 +133,46 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   group('ReasoningLevelSheet', () {
+    testWidgets('clamps inherited max and can turn it off directly', (
+      tester,
+    ) async {
+      final config = _budgetConfig();
+      final settings = await _settingsWith(
+        tester,
+        config,
+        'kelivo-test-budget',
+      );
+      addTearDown(settings.dispose);
+      await _pumpSheet(
+        tester,
+        settings: settings,
+        config: config,
+        modelId: 'kelivo-test-budget',
+        assistant: const Assistant(
+          id: 'a',
+          name: 'A',
+          reasoning: ReasoningRequest(ReasoningLevel.max),
+        ),
+      );
+      await _openSheet(tester);
+      final slider = tester.widget<EffortSliderGroup>(
+        find.byType(EffortSliderGroup),
+      );
+      expect(slider.stops[slider.selectedIndex].stopKey, 'reasoning-stop-high');
+      await _tapStop(tester, 'reasoning-stop-off');
+      expect(
+        settings.reasoningChoiceFor('Test', 'kelivo-test-budget'),
+        ReasoningRequest.off,
+      );
+      final updated = tester.widget<EffortSliderGroup>(
+        find.byType(EffortSliderGroup),
+      );
+      expect(
+        updated.stops[updated.selectedIndex].stopKey,
+        'reasoning-stop-off',
+      );
+    });
+
     testWidgets('uses the plain sheet and hides off when canDisable is false', (
       tester,
     ) async {

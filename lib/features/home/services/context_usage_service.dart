@@ -1,19 +1,77 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:isolate';
 
 import 'package:flutter/foundation.dart';
 
+import '../../../core/models/assistant.dart';
 import '../../../core/models/chat_message.dart';
+import '../../../core/models/conversation.dart';
+import '../../../core/models/conversation_prompt_settings.dart';
+import '../../../core/models/model_spec.dart';
 import '../../../core/models/token_usage.dart';
 import '../../../core/providers/assistant_provider.dart';
+import '../../../core/providers/instruction_injection_provider.dart';
 import '../../../core/providers/settings_provider.dart';
+import '../../../core/providers/world_book_provider.dart';
 import '../../../core/services/chat/chat_service.dart';
+import '../../../core/services/model_catalog/model_catalog_service.dart';
 import '../../../core/services/model_spec/model_spec_resolver.dart';
 import '../../../core/utils/token_estimator.dart';
 import '../utils/model_display_helper.dart';
 import 'context_assembly.dart';
 
 enum ContextUsageState { none, computing, exact, estimated, stale }
+
+/// Capture before assembling a request. Only matching request-time settings
+/// can anchor the current context to that response's usage.
+Object contextUsageConfiguration({
+  required SettingsProvider settings,
+  required ProviderConfig config,
+  required String providerKey,
+  required String modelId,
+  required Assistant? assistant,
+  required InstructionInjectionProvider? instructions,
+  required WorldBookProvider? worldBooks,
+  Conversation? conversation,
+  String? assistantId,
+}) => (
+  providerKey,
+  modelId,
+  assistant?.id ?? assistantId,
+  ProviderConfig.classify(providerKey, explicitType: config.providerType),
+  ModelSpecResolver.instance.spec(config, modelId),
+  jsonEncode(assistant?.toJson()),
+  settings.legacyMemoryMode,
+  settings.resolvedMemoryPromptLang,
+  settings.memoryRulesPromptEn,
+  settings.memoryRulesPromptZh,
+  settings.legacyMemoryPromptEn,
+  settings.legacyMemoryPromptZh,
+  instructions?.promptFor(
+        assistant?.id ?? assistantId,
+        instructionIds: assistant?.allowConversationPromptInjection == true
+            ? ConversationPromptSettings.fromExtras(
+                conversation?.extras ?? const {},
+              ).instructionIds
+            : null,
+      ) ??
+      '',
+  jsonEncode(
+    worldBooks
+            ?.activeBooksFor(
+              assistant?.id ?? assistantId,
+              bookIds: assistant?.allowConversationPromptInjection == true
+                  ? ConversationPromptSettings.fromExtras(
+                      conversation?.extras ?? const {},
+                    ).worldBookIds
+                  : null,
+            )
+            .map((book) => book.toJson())
+            .toList() ??
+        const [],
+  ),
+);
 
 class ContextUsageBuckets {
   const ContextUsageBuckets({
@@ -159,17 +217,24 @@ class ContextUsageService extends ChangeNotifier {
     required this._chatService,
     required this._settings,
     required this._assistants,
+    required this._instructions,
+    required this._worldBooks,
     this._assemble,
     this._staleRefreshDelay = const Duration(milliseconds: 800),
     Future<T> Function<T>(T Function() computation)? runEstimate,
   }) : _runEstimate = runEstimate ?? Isolate.run {
     _settings.addListener(_onSettingsOrAssistantChanged);
     _assistants.addListener(_onSettingsOrAssistantChanged);
+    _instructions.addListener(_onSettingsOrAssistantChanged);
+    _worldBooks.addListener(_onSettingsOrAssistantChanged);
+    ModelCatalogService.instance.addListener(_onSettingsOrAssistantChanged);
   }
 
   final ChatService _chatService;
   final SettingsProvider _settings;
   final AssistantProvider _assistants;
+  final InstructionInjectionProvider _instructions;
+  final WorldBookProvider _worldBooks;
   ContextAssemblyPreviewFn? _assemble;
   final Duration _staleRefreshDelay;
   final Future<T> Function<T>(T Function() computation) _runEstimate;
@@ -179,6 +244,7 @@ class ContextUsageService extends ChangeNotifier {
   final Map<String, int> _inFlight = <String, int>{};
   final Map<String, Timer> _debounce = <String, Timer>{};
   final Map<String, _ExactAnchor> _anchors = <String, _ExactAnchor>{};
+  final Map<String, Object?> _snapshotConfigurations = <String, Object?>{};
 
   String? _activeConversationId;
   VoidCallback? _revisionListener;
@@ -233,10 +299,23 @@ class ContextUsageService extends ChangeNotifier {
     required String? assistantId,
     required TokenUsage usage,
     required ChatMessage assistantMessage,
+    Object? requestConfiguration,
+    int? requestRevision,
   }) {
     if (usage.promptTokens <= 0) return;
-    final cfg = _settings.getProviderConfig(providerKey);
-    final spec = ModelSpecResolver.instance.spec(cfg, modelId);
+    final revision = _chatService.contextRevision(conversationId);
+    final resolved = _resolvedIdentity(conversationId);
+    if (requestRevision != revision ||
+        requestConfiguration == null ||
+        resolved == null ||
+        resolved.providerKey != providerKey ||
+        resolved.modelId != modelId ||
+        resolved.configuration != requestConfiguration) {
+      _clearExactAnchor(conversationId);
+      unawaited(refresh(conversationId, force: true));
+      return;
+    }
+    final spec = resolved.spec;
     final used = contextTokensAfterTurn(
       usage: usage,
       assistantMessage: assistantMessage,
@@ -246,16 +325,10 @@ class ContextUsageService extends ChangeNotifier {
     final window = spec.contextWindow;
     final previous = _snapshots[conversationId];
     final draft = previous?.buckets.draft ?? 0;
-    final revision = _chatService.contextRevision(conversationId);
     final computedAt = DateTime.now();
-    final resolved = _resolvedIdentity(conversationId);
-    final resolvedMatches =
-        resolved != null &&
-        resolved.providerKey == providerKey &&
-        resolved.modelId == modelId;
-    final storedAssistantId = resolvedMatches
-        ? resolved.assistantId
-        : assistantId;
+    final storedAssistantId = resolved.assistantId;
+    final configuration = requestConfiguration;
+    _snapshotConfigurations[conversationId] = configuration;
     _anchors[conversationId] = _ExactAnchor(
       total: used,
       revision: revision,
@@ -263,6 +336,7 @@ class ContextUsageService extends ChangeNotifier {
       providerKey: providerKey,
       modelId: modelId,
       assistantId: storedAssistantId,
+      configuration: configuration,
     );
     _snapshots[conversationId] = ContextUsageSnapshot(
       state: ContextUsageState.exact,
@@ -301,6 +375,7 @@ class ContextUsageService extends ChangeNotifier {
     final generation = (_inFlight[conversationId] ?? 0) + 1;
     _inFlight[conversationId] = generation;
     final keepExact = _anchorMatches(conversationId, revision, resolved);
+    _snapshotConfigurations[conversationId] = resolved.configuration;
     if (!keepExact) {
       _snapshots[conversationId] = ContextUsageSnapshot(
         state: ContextUsageState.computing,
@@ -346,6 +421,10 @@ class ContextUsageService extends ChangeNotifier {
       final estimated = await _runEstimate(() => estimateContextBuckets(job));
       if (_disposed || _inFlight[conversationId] != generation) return;
       if (_chatService.contextRevision(conversationId) != revision) return;
+      if (_resolvedIdentity(conversationId)?.configuration !=
+          resolved.configuration) {
+        return;
+      }
       final buckets = ContextUsageBuckets(
         system: estimated.system,
         injections: estimated.injections,
@@ -378,6 +457,9 @@ class ContextUsageService extends ChangeNotifier {
     _disposed = true;
     _settings.removeListener(_onSettingsOrAssistantChanged);
     _assistants.removeListener(_onSettingsOrAssistantChanged);
+    _instructions.removeListener(_onSettingsOrAssistantChanged);
+    _worldBooks.removeListener(_onSettingsOrAssistantChanged);
+    ModelCatalogService.instance.removeListener(_onSettingsOrAssistantChanged);
     _unlistenRevision();
     for (final timer in _debounce.values) {
       timer.cancel();
@@ -451,7 +533,8 @@ class ContextUsageService extends ChangeNotifier {
         anchor.revision == revision &&
         anchor.providerKey == resolved.providerKey &&
         anchor.modelId == resolved.modelId &&
-        anchor.assistantId == resolved.assistantId;
+        anchor.assistantId == resolved.assistantId &&
+        anchor.configuration == resolved.configuration;
   }
 
   void _clearExactAnchor(String conversationId) {
@@ -485,7 +568,8 @@ class ContextUsageService extends ChangeNotifier {
     return snapshot.revision == _chatService.contextRevision(conversationId) &&
         snapshot.providerKey == resolved.providerKey &&
         snapshot.modelId == resolved.modelId &&
-        snapshot.assistantId == resolved.assistantId;
+        snapshot.assistantId == resolved.assistantId &&
+        _snapshotConfigurations[conversationId] == resolved.configuration;
   }
 
   void _listenRevision(String conversationId) {
@@ -536,10 +620,12 @@ class ContextUsageService extends ChangeNotifier {
     if (resolved == null || snap == null) return;
     if (snap.providerKey == resolved.providerKey &&
         snap.modelId == resolved.modelId &&
-        snap.assistantId == resolved.assistantId) {
+        snap.assistantId == resolved.assistantId &&
+        _snapshotConfigurations[id] == resolved.configuration) {
       return;
     }
     _clearExactAnchor(id);
+    _inFlight[id] = (_inFlight[id] ?? 0) + 1;
     _snapshots[id] = snap.copyWith(state: ContextUsageState.stale);
     notifyListeners();
     _scheduleRefresh(id);
@@ -580,7 +666,18 @@ class ContextUsageService extends ChangeNotifier {
         providerKey,
         explicitType: cfg.providerType,
       ),
-      contextWindow: spec.contextWindow,
+      spec: spec,
+      configuration: contextUsageConfiguration(
+        settings: _settings,
+        config: cfg,
+        providerKey: providerKey,
+        modelId: modelId,
+        assistant: assistant,
+        assistantId: assistantId,
+        instructions: _instructions,
+        worldBooks: _worldBooks,
+        conversation: conversation,
+      ),
     );
   }
 }
@@ -593,6 +690,7 @@ class _ExactAnchor {
     required this.providerKey,
     required this.modelId,
     required this.assistantId,
+    required this.configuration,
   });
 
   final int total;
@@ -601,6 +699,7 @@ class _ExactAnchor {
   final String providerKey;
   final String modelId;
   final String? assistantId;
+  final Object? configuration;
 }
 
 class _ResolvedIdentity {
@@ -609,12 +708,16 @@ class _ResolvedIdentity {
     required this.modelId,
     required this.assistantId,
     required this.kind,
-    required this.contextWindow,
+    required this.spec,
+    required this.configuration,
   });
 
   final String providerKey;
   final String modelId;
   final String? assistantId;
   final ProviderKind kind;
-  final int? contextWindow;
+  final ModelSpec spec;
+  final Object configuration;
+
+  int? get contextWindow => spec.contextWindow;
 }

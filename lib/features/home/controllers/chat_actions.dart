@@ -2621,6 +2621,8 @@ class ChatActions {
         assistantId: assistant is Assistant ? assistant.id : null,
         usage: usage,
         assistantMessage: finalizedMessage,
+        requestConfiguration: state.ctx.contextUsageConfiguration,
+        requestRevision: state.ctx.contextUsageRevision,
       );
     }
     try {

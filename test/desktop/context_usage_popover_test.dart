@@ -3,7 +3,9 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 
 import 'package:Kelivo/core/providers/assistant_provider.dart';
+import 'package:Kelivo/core/providers/instruction_injection_provider.dart';
 import 'package:Kelivo/core/providers/settings_provider.dart';
+import 'package:Kelivo/core/providers/world_book_provider.dart';
 import 'package:Kelivo/core/services/chat/chat_service.dart';
 import 'package:Kelivo/desktop/context_usage_popover.dart';
 import 'package:Kelivo/desktop/desktop_glass_popover.dart';
@@ -18,6 +20,8 @@ class _RecordingUsage extends ContextUsageService {
     required super.chatService,
     required super.settings,
     required super.assistants,
+    required super.instructions,
+    required super.worldBooks,
   });
 
   ContextUsageSnapshot? seeded;
@@ -76,13 +80,23 @@ Future<_RecordingUsage> _createUsage() async {
   );
   await settings.loaded;
   await assistants.loaded;
+  final instructions = InstructionInjectionProvider(
+    preferences: createBusinessTestPreferences(),
+  );
+  final worldBooks = WorldBookProvider(
+    preferences: createBusinessTestPreferences(),
+  );
   final usage = _RecordingUsage(
     chatService: ChatService(),
     settings: settings,
     assistants: assistants,
+    instructions: instructions,
+    worldBooks: worldBooks,
   );
   addTearDown(assistants.dispose);
   addTearDown(settings.dispose);
+  addTearDown(instructions.dispose);
+  addTearDown(worldBooks.dispose);
   addTearDown(usage.dispose);
   return usage;
 }
