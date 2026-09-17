@@ -6537,8 +6537,6 @@ class _AskUserOptionRow extends StatelessWidget {
             Expanded(
               child: Text(
                 label,
-                maxLines: 3,
-                overflow: TextOverflow.ellipsis,
                 style: TextStyle(
                   fontSize: 13,
                   height: 1.25,

@@ -3,6 +3,7 @@ import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 
@@ -1903,6 +1904,124 @@ void main() {
       expect(payload['answers']['scope']['value'], 'Complete');
       expect(payload['answers']['scope']['custom'], isFalse);
     });
+
+    for (final kind in AskUserQuestionKind.values) {
+      for (final viewport in [
+        (width: 360.0, scale: 1.0, brightness: Brightness.light),
+        (width: 360.0, scale: 2.0, brightness: Brightness.dark),
+        (width: 1024.0, scale: 1.0, brightness: Brightness.light),
+        (width: 1024.0, scale: 2.0, brightness: Brightness.dark),
+      ]) {
+        testWidgets('ask user ${kind.name} shows and submits full long option '
+            'at width ${viewport.width} scale ${viewport.scale}', (
+          tester,
+        ) async {
+          tester.view.devicePixelRatio = 1;
+          tester.view.physicalSize = Size(viewport.width, 800);
+          addTearDown(tester.view.resetDevicePixelRatio);
+          addTearDown(tester.view.resetPhysicalSize);
+          final settings = await _createSettings(
+            ChatMessageBackgroundStyle.defaultStyle,
+          );
+          final service = AskUserInteractionService();
+          await settings.setShowModelTimestamp(false);
+          addTearDown(service.dispose);
+          const option =
+              '完整显示此选项的全部内容，包括最后的说明。 '
+              'Show the complete option, including all details needed to '
+              'make a decision. Wrap this long explanation onto as many '
+              'lines as needed without hiding its final qualification.\n'
+              'Keep the existing settings.\n'
+              'Include the additional explanation.\n'
+              'This final line must remain visible and selectable.';
+          final arguments = <String, dynamic>{
+            'questions': [
+              {
+                'id': 'scope',
+                'question': 'Choose scope?',
+                'type': kind.name,
+                'options': [option, 'Short option'],
+              },
+            ],
+          };
+          final answer = service.requestAnswer(
+            toolCallId: 'ask-long',
+            arguments: arguments,
+          );
+
+          await tester.pumpWidget(
+            _buildHarness(
+              settings: settings,
+              askUserService: service,
+              locale: const Locale('zh'),
+              child: Builder(
+                builder: (context) => Theme(
+                  data: ThemeData(brightness: viewport.brightness),
+                  child: MediaQuery(
+                    data: MediaQuery.of(
+                      context,
+                    ).copyWith(textScaler: TextScaler.linear(viewport.scale)),
+                    child: SingleChildScrollView(
+                      child: ChatMessageWidget(
+                        message: ChatMessage(
+                          role: 'assistant',
+                          content: '',
+                          conversationId: 'conversation-ask-long',
+                          isStreaming: true,
+                        ),
+                        showModelIcon: false,
+                        toolParts: [
+                          ToolUIPart(
+                            id: 'ask-long',
+                            toolName: AskUserToolNames.askUser,
+                            arguments: arguments,
+                            loading: true,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          );
+          await tester.pumpAndSettle();
+
+          final label = find.text(option);
+          final paragraph = tester.renderObject<RenderParagraph>(label);
+          expect(paragraph.didExceedMaxLines, isFalse);
+          final tail = paragraph.getBoxesForSelection(
+            const TextSelection(
+              baseOffset: option.length - 1,
+              extentOffset: option.length,
+            ),
+          );
+          expect(tail, isNotEmpty);
+          expect(tail.last.bottom, lessThanOrEqualTo(paragraph.size.height));
+
+          // Scroll the final line into view and select from that line.
+          await Scrollable.ensureVisible(tester.element(label), alignment: 1);
+          await tester.pumpAndSettle();
+          await tester.tapAt(
+            paragraph.localToGlobal(tail.last.toRect().center),
+          );
+          await tester.pumpAndSettle();
+          final submit = find.text('提交回答');
+          await tester.ensureVisible(submit);
+          await tester.pumpAndSettle();
+          await tester.tap(submit);
+          await tester.pump();
+
+          expect(service.isPending('ask-long'), isFalse);
+          final result = await answer;
+          expect(
+            result.answers['scope']!.value,
+            kind == AskUserQuestionKind.single ? option : [option],
+          );
+          expect(tester.takeException(), isNull);
+        });
+      }
+    }
 
     testWidgets('answered ask user card stays expanded and can collapse', (
       tester,
