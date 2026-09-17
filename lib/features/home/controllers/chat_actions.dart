@@ -24,7 +24,7 @@ import '../../../l10n/app_localizations.dart';
 import '../../../utils/assistant_regex.dart';
 import '../../../core/models/assistant_regex.dart';
 import '../services/ask_user_interaction_service.dart';
-import '../../chat/utils/thinking_tag_parser.dart';
+import '../../../core/utils/thinking_tag_parser.dart';
 import '../services/message_generation_service.dart';
 import '../services/tool_approval_service.dart';
 import 'active_streaming_message_store.dart';

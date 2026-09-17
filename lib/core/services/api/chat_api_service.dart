@@ -9,6 +9,7 @@ import '../network/dio_http_client.dart';
 import '../../../utils/unicode_sanitizer.dart';
 import '../logging/context_log_models.dart';
 import '../../utils/multimodal_input_utils.dart';
+import '../../utils/thinking_tag_parser.dart';
 import 'generation/text_generation_result.dart';
 import 'generation/tool_loop_runner.dart';
 import 'stream/stream_chunk.dart';
@@ -599,7 +600,10 @@ class ChatApiService {
       skipImageParsing: skipImageParsing,
       allowImagesApiRouting: !skipImageParsing,
     );
-    return result.text;
+    // Utility text generation (titles, summaries, suggestions, context
+    // compression, memory extraction) must never expose raw reasoning: strip
+    // inline <think>...</think> and truncated CoT blocks.
+    return ThinkingTagParser.stripUtilityThinking(result.text);
   }
 
   static List<Map<String, dynamic>> _sanitizeMessages(

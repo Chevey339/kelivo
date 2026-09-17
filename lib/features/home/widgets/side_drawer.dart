@@ -6,7 +6,6 @@ import 'package:http/http.dart' as http;
 import '../../../icons/lucide_adapter.dart';
 import 'package:provider/provider.dart';
 import '../../../core/services/chat/chat_service.dart';
-import '../../../core/services/api/chat_api_service.dart';
 import '../../../core/services/logging/flutter_logger.dart';
 import '../../../core/providers/settings_provider.dart';
 import '../../../core/providers/backup_reminder_provider.dart';
@@ -49,7 +48,7 @@ import '../../../desktop/desktop_settings_navigation_bus.dart';
 import 'dart:async';
 import '../../../features/search/services/global_session_search_service.dart';
 import '../controllers/chat_actions.dart';
-import '../utils/model_display_helper.dart';
+import '../../../core/services/chat/title_generation_service.dart';
 import 'assistant_avatar.dart';
 import 'assistant_entry_actions.dart';
 import 'sidebar_selection_bars.dart';
@@ -917,58 +916,16 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
     String conversationId,
   ) async {
     final settings = context.read<SettingsProvider>();
-    final chatService = context.read<ChatService>();
-    final assistantProvider = context.read<AssistantProvider>();
-    final convo = chatService.getConversation(conversationId);
-    if (convo == null) return;
     if (!settings.isTitleGenerationEnabled) return;
-
-    // Get assistant for this conversation
-    final assistant = convo.assistantId != null
-        ? assistantProvider.getById(convo.assistantId!)
-        : assistantProvider.currentAssistant;
-    final chatModel = resolveChatModel(
-      settings,
-      conversation: convo,
-      assistant: assistant,
-    );
-    final provKey = settings.titleModelProvider ?? chatModel.providerKey;
-    final mdlId = settings.titleModelId ?? chatModel.modelId;
-    if (provKey == null || mdlId == null) return;
-    final cfg = settings.getProviderConfig(provKey);
-    final budget = settings.titleGenerationThinkingBudgetFor(
-      assistant?.thinkingBudget,
+    final service = TitleGenerationService(
+      chatService: context.read<ChatService>(),
+      settings: settings,
+      assistants: context.read<AssistantProvider>(),
     );
     final locale = Localizations.localeOf(context).toLanguageTag();
 
     try {
-      // Content (shared source builder with HomeViewModel title generation;
-      // applies truncateIndex and collapses multi-version groups)
-      final content = await chatService.generateTitleSource(conversationId);
-      final prompt = settings.titlePrompt
-          .replaceAll('{locale}', locale)
-          .replaceAll('{content}', content);
-      final title = (await ChatApiService.generateText(
-        conversationId: conversationId,
-        config: cfg,
-        modelId: mdlId,
-        prompt: prompt,
-        thinkingBudget: budget,
-        skipImageParsing: true,
-      )).trim();
-      if (title.isNotEmpty) {
-        await chatService.renameConversation(conversationId, title);
-      } else if (context.mounted) {
-        final l10n = AppLocalizations.of(context)!;
-        showAppSnackBar(
-          context,
-          message: l10n.backgroundTaskFailed(
-            l10n.defaultModelPageTitleModelTitle,
-            'empty_response',
-          ),
-          type: NotificationType.error,
-        );
-      }
+      await service.generate(conversationId, locale: locale, force: true);
     } catch (e) {
       FlutterLogger.log(
         '[SideDrawer] Regenerate title failed: $e',

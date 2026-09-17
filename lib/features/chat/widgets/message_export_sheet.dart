@@ -37,7 +37,7 @@ import '../../../shared/widgets/ios_switch.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../theme/app_font_weights.dart';
 import '../../home/widgets/model_icon.dart';
-import '../utils/thinking_tag_parser.dart';
+import '../../../core/utils/thinking_tag_parser.dart';
 import 'package:Kelivo/theme/app_semantic_colors.dart';
 import 'chat_message_widget.dart'
     show ChatMessageWidget, ToolUIPart, ReasoningSegment;
