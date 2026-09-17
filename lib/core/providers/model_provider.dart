@@ -13,111 +13,19 @@ import '../services/custom_request_merger.dart';
 import 'package:Kelivo/secrets/fallback.dart';
 import '../services/api/google_service_account_auth.dart';
 import '../models/model_types.dart';
-import '../utils/kimi_model_compat.dart';
+import '../model_capabilities/builtin_model_rules.dart';
+import '../model_capabilities/model_capabilities.dart';
 
 class ModelRegistry {
-  // Updated model groups to reflect new series
-  // Vision-capable models (text + image input).
-  // Qwen vision is intentional and precise (see [_isQwenVisionModel]): not
-  // every Qwen 3.7 Max id is multimodal.
-  static final RegExp vision = RegExp(
-    // GPT family incl. 4o, 4.1, 5 (exclude gpt-5-chat), and OpenAI o* series
-    r'(gpt-4o|gpt-4\.1|gpt-5(?!-chat)|gpt-6|o\d|gemini|claude|kimi-k2([-.])(?:5|6|7)|kimi-k3(?:$|[/_:@.-])|muse-spark-1(?:$|[/_:@.-])|doubao.+(?:1([-.])(?:6|8)|seed-2|seed-evolving)|grok-4|step-3|intern-s1|minimax-m3(?:$|[/_:@])|mimo-v2(?:-omni(?:$|[/_:@])|\.5(?:$|[/_:@]))|sensenova-6\.7-flash-lite)',
-    caseSensitive: false,
-  );
-  // Tool-using models
-  static final RegExp tool = RegExp(
-    (r'(gpt-4o|gpt-4\.1|gpt-oss|gpt-5(?!-chat)|gpt-6|o\d|'
-            r'gemini|claude|'
-            r'qwen-?3|doubao.+(?:1([-.])(?:6|8)|seed-2|seed-evolving)|grok-4|kimi-k2|'
-            r'kimi-k3(?:$|[/_:@.-])|muse-spark-1(?:$|[/_:@.-])|'
-            r'step-3|intern-s1|glm-4([-.])(?:5|6|7)|glm-5|minimax-(?:m2|m3)|'
-            r'deepseek-(?:r1|v3|chat|v3\.1|v3\.2|v4|flash)|'
-            r'deepseek-reasoner|'
-            r'mimo-v2|'
-            r'sensenova-6\.7-flash-lite|'
-            r'laguna'
-            r')')
-        .replaceAll(' ', ''),
-    caseSensitive: false,
-  );
-  static final RegExp reasoning = RegExp(
-    (r'(gpt-oss|gpt-5(?!-chat)|gpt-6|o\d|'
-            r'gemini-(?:2\.5|3).*|gemini-(?:flash-latest|pro-latest)|'
-            r'gemini-3-pro-image-preview|'
-            r'gemma[-_]?4|'
-            r'claude|'
-            r'qwen-?3|doubao.+(?:1([-.])(?:6|8)|seed-2|seed-evolving)|grok-4|kimi-k2|'
-            r'kimi-k3(?:$|[/_:@.-])|muse-spark-1(?:$|[/_:@.-])|'
-            r'step-3|intern-s1|glm-4([-.])(?:5|6|7)|glm-5|minimax-(?:m2|m3)|'
-            r'deepseek-(?:r1|v3\.1|v3\.2|v4|flash)|'
-            r'deepseek-reasoner|'
-            r'mimo-v2|'
-            r'laguna'
-            r')')
-        .replaceAll(' ', ''),
-    caseSensitive: false,
-  );
-
-  /// Precise Qwen vision matrix:
-  /// - `qwen3.5*` (existing)
-  /// - `qwen3.7-plus` / `qwen3.7-flash` (+ snapshots)
-  /// - vision Max snapshot `qwen3.7-max-2026-06-08` and later only
-  /// - `qwen3.8-max` / `qwen3.8-flash` / `qwen3.8-27b` (+ snapshots)
-  /// Open `qwen3.8-2.4t-a95b` and plain / earlier `qwen3.7-max` stay text-only.
-  static bool _isQwenVisionModel(String id) {
-    final lower = id.toLowerCase();
-    if (RegExp(r'qwen-?3([-.])5').hasMatch(lower)) return true;
-    if (RegExp(r'qwen-?3([-.])7-(?:plus|flash)').hasMatch(lower)) {
-      return true;
-    }
-    if (RegExp(r'qwen-?3([-.])8-(?:max|flash|27b)').hasMatch(lower)) {
-      return true;
-    }
-    final maxSnap = RegExp(
-      r'qwen-?3([-.])7-max-(\d{4}-\d{2}-\d{2})',
-    ).firstMatch(lower);
-    if (maxSnap == null) return false;
-    final date = DateTime.tryParse(maxSnap.group(2)!);
-    if (date == null) return false;
-    return !date.isBefore(DateTime(2026, 6, 8));
-  }
-
-  /// GLM-5.3-Flash is the first native multimodal GLM-5 SKU.
-  static bool _isGlmVisionModel(String id) {
-    return RegExp(
-      r'(^|[/_:@])glm-5\.3-flash(?:$|[-.])',
-      caseSensitive: false,
-    ).hasMatch(id);
-  }
-
-  /// DeepSeek V4.1 Flash (`deepseek-flash`) is native multimodal.
-  /// Retired Flash IDs temporarily route to it and inherit image input.
-  /// `deepseek-v4-pro` stays text-only until that SKU is retired.
-  static bool _isDeepSeekVisionModel(String id) {
-    return RegExp(
-      r'(^|[/_:@])(?:deepseek-flash|deepseek-v4-flash)(?:$|[/_:@.-])',
-      caseSensitive: false,
-    ).hasMatch(id);
-  }
-
+  /// Structural id test: embedding-looking ids are never chat models.
   static bool isLikelyEmbeddingId(String rawId) {
     final id = rawId.toLowerCase();
     return id.contains('embedding') ||
         RegExp(r'(^|[-_/])embed(?:dings?)?([-.]|$)').hasMatch(id);
   }
 
-  static bool _isGemini35Flash(String id) {
-    return RegExp(
-      r'(^|[/:_-])gemini-3\.5-flash([._:@/-]|$)',
-      caseSensitive: false,
-    ).hasMatch(id);
-  }
-
   static ModelInfo infer(ModelInfo base) {
     final id = base.id.toLowerCase();
-    final isKimiCode =
-        isKimiCodeK3Alias(id) || isKimiForCodingModel(id) || isKimiK28Model(id);
     final inMods = <Modality>[...base.input];
     final outMods = <Modality>[...base.output];
     final ab = <ModelAbility>[...base.abilities];
@@ -135,9 +43,8 @@ class ModelRegistry {
         abilities: ab,
       );
     }
-    // If model id contains 'image', treat it as an image model:
-    // - Input and output both include image
-    // - No tool or reasoning abilities
+    // Image-generation models are structural: any id mentioning "image"
+    // takes image in/out and drops tool/reasoning, ahead of family rules.
     if (id.contains('image')) {
       if (!inMods.contains(Modality.image)) inMods.add(Modality.image);
       if (!outMods.contains(Modality.image)) outMods.add(Modality.image);
@@ -146,32 +53,56 @@ class ModelRegistry {
       );
       return base.copyWith(input: inMods, output: outMods, abilities: ab);
     }
-    if (_isGemini35Flash(id)) {
-      if (!inMods.contains(Modality.image)) inMods.add(Modality.image);
-      outMods
-        ..clear()
-        ..add(Modality.text);
-      if (!ab.contains(ModelAbility.tool)) ab.add(ModelAbility.tool);
-      if (!ab.contains(ModelAbility.reasoning)) {
-        ab.add(ModelAbility.reasoning);
+
+    final caps = builtinCapabilityCascade.resolve(base.id).capabilities;
+    final capIn = caps.inputModalities;
+    if (capIn != null) {
+      for (final modality in capIn) {
+        final mapped = _toModality(modality);
+        if (mapped != null && !inMods.contains(mapped)) inMods.add(mapped);
       }
-      return base.copyWith(input: inMods, output: outMods, abilities: ab);
     }
-    if (vision.hasMatch(id) ||
-        isKimiCode ||
-        _isQwenVisionModel(id) ||
-        _isGlmVisionModel(id) ||
-        _isDeepSeekVisionModel(id)) {
-      if (!inMods.contains(Modality.image)) inMods.add(Modality.image);
+    final capOut = caps.outputModalities;
+    if (capOut != null) {
+      for (final modality in capOut) {
+        final mapped = _toModality(modality);
+        if (mapped != null && !outMods.contains(mapped)) outMods.add(mapped);
+      }
     }
-    if ((tool.hasMatch(id) || isKimiCode) && !ab.contains(ModelAbility.tool)) {
-      ab.add(ModelAbility.tool);
+    final toolCall = caps.toolCall;
+    if (toolCall != null) {
+      _applyAbility(ab, ModelAbility.tool, toolCall);
     }
-    if ((reasoning.hasMatch(id) || isKimiCode) &&
-        !ab.contains(ModelAbility.reasoning)) {
-      ab.add(ModelAbility.reasoning);
+    final reasoning = caps.reasoning;
+    if (reasoning != null) {
+      _applyAbility(ab, ModelAbility.reasoning, reasoning);
     }
     return base.copyWith(input: inMods, output: outMods, abilities: ab);
+  }
+
+  static Modality? _toModality(CapabilityModality modality) {
+    switch (modality) {
+      case CapabilityModality.text:
+        return Modality.text;
+      case CapabilityModality.image:
+        return Modality.image;
+      case CapabilityModality.audio:
+      case CapabilityModality.video:
+      case CapabilityModality.pdf:
+        return null;
+    }
+  }
+
+  static void _applyAbility(
+    List<ModelAbility> abilities,
+    ModelAbility ability,
+    bool enabled,
+  ) {
+    if (enabled) {
+      if (!abilities.contains(ability)) abilities.add(ability);
+    } else {
+      abilities.remove(ability);
+    }
   }
 }
 
