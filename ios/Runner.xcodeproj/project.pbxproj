@@ -667,7 +667,9 @@
 				"$(SRCROOT)/sandbox/patches/0002-fs-fake-bind-stat-device.patch",
 				"$(SRCROOT)/sandbox/patches/0003-kernel-host-managed-lifetime.patch",
 				"$(SRCROOT)/sandbox/patches/0004-kernel-node-random-seed.patch",
+				"$(SRCROOT)/sandbox/patches/0005-kernel-init-exit-status.patch",
 				"$(SRCROOT)/sandbox/prepare_alpine_rootfs.sh",
+				"$(SRCROOT)/sandbox/overlay/usr/local/bin/kelivo-repair-rootfs",
 				"$(SRCROOT)/sandbox/resources/VERSION",
 			);
 			name = "Ensure Workspace Sandbox Artifacts";
@@ -677,6 +679,7 @@
 				"$(SRCROOT)/sandbox/build/$(PLATFORM_NAME)/libfakefs.a",
 				"$(SRCROOT)/sandbox/build/$(PLATFORM_NAME)/.kelivo-ish-build",
 				"$(SRCROOT)/sandbox/build/fakefsify",
+				"$(SRCROOT)/sandbox/build/ish",
 				"$(SRCROOT)/sandbox/build/include/ish/cpu-offsets.h",
 				"$(SRCROOT)/sandbox/resources/alpine-rootfs.zip",
 				"$(SRCROOT)/sandbox/resources/libvdso.so.elf",
