@@ -9,6 +9,7 @@ import '../../utils/brand_assets.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:uuid/uuid.dart';
 import '../../shared/widgets/ios_switch.dart';
+import '../../shared/widgets/ios_form_text_field.dart';
 import '../../theme/app_font_weights.dart';
 import '../widgets/desktop_select_dropdown.dart';
 import 'package:Kelivo/theme/app_semantic_colors.dart';
@@ -611,6 +612,7 @@ class _BrandBadge extends StatelessWidget {
     if (s is TinyFishOptions) return 'tinyfish';
     if (s is AnySearchOptions) return 'anysearch';
     if (s is ParallelOptions) return 'parallel';
+    if (s is KimiOptions) return 'kimi';
     if (s is YouSearchOptions) return 'you';
     if (s is KelivoOptions) return 'kelivo';
     return 'search';
@@ -1230,6 +1232,30 @@ class _AddServiceDialogState extends State<_AddServiceDialog> {
             }),
           ),
         ];
+      case 'kimi':
+        return [
+          IosFormTextField(
+            controller: _controllers['apiKey']!,
+            label: l10n.searchServicesDialogApiKey,
+            inlineLabel: false,
+            outerPadding: EdgeInsets.zero,
+            autocorrect: false,
+            enableSuggestions: false,
+          ),
+          const SizedBox(height: 12),
+          _deskModeDropdown(
+            context: context,
+            label: l10n.searchServicesDialogSearchMode,
+            value: KimiOptions.normalizeMode(_controllers['mode']!.text),
+            items: [
+              for (final mode in KimiOptions.modes)
+                (value: mode, label: KimiOptions.modeLabel(mode)),
+            ],
+            onChanged: (value) => setState(() {
+              _controllers['mode']!.text = value;
+            }),
+          ),
+        ];
       case 'you':
         return [
           TextField(
@@ -1399,6 +1425,12 @@ class _AddServiceDialogState extends State<_AddServiceDialog> {
           apiKey: _controllers['apiKey']!.text,
           mode: ParallelOptions.normalizeMode(_controllers['mode']!.text),
         );
+      case 'kimi':
+        return KimiOptions(
+          id: id,
+          apiKey: _controllers['apiKey']!.text,
+          mode: KimiOptions.normalizeMode(_controllers['mode']!.text),
+        );
       case 'you':
         return YouSearchOptions(
           id: id,
@@ -1529,6 +1561,9 @@ class _EditServiceDialogState extends State<_EditServiceDialog> {
       _controllers['apiKey'] = TextEditingController(text: s.apiKey);
       _controllers['url'] = TextEditingController(text: s.url);
     } else if (s is ParallelOptions) {
+      _controllers['apiKey'] = TextEditingController(text: s.apiKey);
+      _controllers['mode'] = TextEditingController(text: s.mode);
+    } else if (s is KimiOptions) {
       _controllers['apiKey'] = TextEditingController(text: s.apiKey);
       _controllers['mode'] = TextEditingController(text: s.mode);
     } else if (s is YouSearchOptions) {
@@ -1959,6 +1994,32 @@ class _EditServiceDialogState extends State<_EditServiceDialog> {
           }),
         ),
       ];
+    } else if (s is KimiOptions) {
+      return [
+        IosFormTextField(
+          controller: _controllers['apiKey']!,
+          label: l10n.searchServicesDialogApiKey,
+          inlineLabel: false,
+          outerPadding: EdgeInsets.zero,
+          autocorrect: false,
+          enableSuggestions: false,
+        ),
+        const SizedBox(height: 12),
+        _multiKeyTile(),
+        const SizedBox(height: 12),
+        _deskModeDropdown(
+          context: context,
+          label: l10n.searchServicesDialogSearchMode,
+          value: KimiOptions.normalizeMode(_controllers['mode']!.text),
+          items: [
+            for (final mode in KimiOptions.modes)
+              (value: mode, label: KimiOptions.modeLabel(mode)),
+          ],
+          onChanged: (value) => setState(() {
+            _controllers['mode']!.text = value;
+          }),
+        ),
+      ];
     } else if (s is YouSearchOptions) {
       return [
         TextField(
@@ -2268,6 +2329,14 @@ class _EditServiceDialogState extends State<_EditServiceDialog> {
         extraApiKeys: _extraApiKeys,
       );
     }
+    if (s is KimiOptions) {
+      return KimiOptions(
+        id: s.id,
+        apiKey: _controllers['apiKey']!.text,
+        mode: KimiOptions.normalizeMode(_controllers['mode']!.text),
+        extraApiKeys: _extraApiKeys,
+      );
+    }
     if (s is YouSearchOptions) {
       return YouSearchOptions(
         id: s.id,
@@ -2559,6 +2628,7 @@ class _ServiceTypeChipsState extends State<_ServiceTypeChips> {
     (type: 'tinyfish', brand: 'tinyfish'),
     (type: 'anysearch', brand: 'anysearch'),
     (type: 'parallel', brand: 'parallel'),
+    (type: 'kimi', brand: 'kimi'),
     (type: 'you', brand: 'you'),
   ];
   @override
@@ -2656,6 +2726,8 @@ String _serviceTypeName(BuildContext context, String type) {
       return l10n.searchServiceNameAnySearch;
     case 'parallel':
       return l10n.searchServiceNameParallel;
+    case 'kimi':
+      return l10n.searchServiceNameKimi;
     case 'you':
       return l10n.searchServiceNameYou;
     case 'kelivo':

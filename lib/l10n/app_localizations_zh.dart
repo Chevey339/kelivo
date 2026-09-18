@@ -5503,6 +5503,13 @@ class AppLocalizationsZh extends AppLocalizations {
       '面向 AI 智能体的统一搜索服务，可在网页与专业数据源间自动路由。API Key 可选。';
 
   @override
+  String get searchServiceNameKimi => 'Kimi';
+
+  @override
+  String get searchProviderKimiDescription =>
+      'Kimi 搜索 API。Pro 返回相关网页正文片段，Basic 返回标题、链接和摘要。';
+
+  @override
   String get searchServiceNameParallel => 'Parallel';
 
   @override
@@ -16794,6 +16801,13 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   @override
   String get searchProviderAnySearchDescription =>
       '面向 AI 智能体的统一搜索服务，可在网页与专业数据源间自动路由。API Key 可选。';
+
+  @override
+  String get searchServiceNameKimi => 'Kimi';
+
+  @override
+  String get searchProviderKimiDescription =>
+      'Kimi 搜索 API。Pro 返回相关网页正文片段，Basic 返回标题、链接和摘要。';
 
   @override
   String get searchServiceNameParallel => 'Parallel';
@@ -28161,6 +28175,13 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   @override
   String get searchProviderAnySearchDescription =>
       '面向 AI 智慧代理的統一搜尋服務，可在網頁與專業資料來源間自動路由。API Key 可選。';
+
+  @override
+  String get searchServiceNameKimi => 'Kimi';
+
+  @override
+  String get searchProviderKimiDescription =>
+      'Kimi 搜尋 API。Pro 傳回相關網頁正文片段，Basic 傳回標題、連結和摘要。';
 
   @override
   String get searchServiceNameParallel => 'Parallel';

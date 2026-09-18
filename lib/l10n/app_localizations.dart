@@ -10483,6 +10483,18 @@ abstract class AppLocalizations {
   /// **'Unified search for AI agents with automatic routing across web and specialist data sources. API key is optional.'**
   String get searchProviderAnySearchDescription;
 
+  /// No description provided for @searchServiceNameKimi.
+  ///
+  /// In en, this message translates to:
+  /// **'Kimi'**
+  String get searchServiceNameKimi;
+
+  /// No description provided for @searchProviderKimiDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Kimi Search API. Pro returns relevant web content excerpts; Basic returns titles, links, and snippets.'**
+  String get searchProviderKimiDescription;
+
   /// No description provided for @searchServiceNameParallel.
   ///
   /// In en, this message translates to:

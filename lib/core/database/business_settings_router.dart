@@ -1083,6 +1083,7 @@ final class BusinessSettingsRouter {
           stringLists: const {'apiKeys'},
         );
       case 'parallel':
+      case 'kimi':
         _validateKnownFields(
           kind,
           payload,

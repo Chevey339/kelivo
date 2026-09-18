@@ -5727,6 +5727,13 @@ class AppLocalizationsEn extends AppLocalizations {
       'Unified search for AI agents with automatic routing across web and specialist data sources. API key is optional.';
 
   @override
+  String get searchServiceNameKimi => 'Kimi';
+
+  @override
+  String get searchProviderKimiDescription =>
+      'Kimi Search API. Pro returns relevant web content excerpts; Basic returns titles, links, and snippets.';
+
+  @override
   String get searchServiceNameParallel => 'Parallel';
 
   @override
