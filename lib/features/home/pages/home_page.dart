@@ -1274,7 +1274,6 @@ class _HomePageState extends State<HomePage>
           ? const ChatAssistantBackground(
               desktop: true,
               includeSurfaceFill: true,
-              applyMaskStrength: false,
               pinnedToBackdrop: true,
             )
           : null,
@@ -1341,7 +1340,6 @@ class _HomePageState extends State<HomePage>
     return const ChatAssistantBackground(
       desktop: true,
       includeSurfaceFill: true,
-      applyMaskStrength: false,
     );
   }
 
