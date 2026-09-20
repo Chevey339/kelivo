@@ -24,6 +24,7 @@ import 'providers/stepfun_search_service.dart';
 import 'providers/firecrawl_search_service.dart';
 import 'providers/tinyfish_search_service.dart';
 import 'providers/anysearch_search_service.dart';
+import 'providers/kagi_search_service.dart';
 import 'providers/doubao_search_service.dart';
 import 'providers/kelivo_search_service.dart';
 import 'providers/parallel_search_service.dart';
@@ -102,6 +103,8 @@ abstract class SearchService<T extends SearchServiceOptions> {
         return TinyFishSearchService() as SearchService;
       case AnySearchOptions _:
         return AnySearchSearchService() as SearchService;
+      case KagiOptions _:
+        return KagiSearchService() as SearchService;
       case DoubaoOptions _:
         return DoubaoSearchService() as SearchService;
       case KelivoOptions _:
@@ -260,6 +263,8 @@ abstract class SearchServiceOptions {
         return TinyFishOptions.fromJson(json);
       case 'anysearch':
         return AnySearchOptions.fromJson(json);
+      case 'kagi':
+        return KagiOptions.fromJson(json);
       case 'doubao':
         return DoubaoOptions.fromJson(json);
       case 'kelivo':
@@ -1002,6 +1007,26 @@ class AnySearchOptions extends SearchServiceOptions {
         url: json['url'] ?? '',
         extraApiKeys: SearchServiceOptions.parseExtraApiKeys(json),
       );
+}
+
+class KagiOptions extends SearchServiceOptions {
+  final String apiKey;
+
+  KagiOptions({required super.id, required this.apiKey, super.extraApiKeys});
+
+  @override
+  Map<String, dynamic> toJson() => {
+    'type': 'kagi',
+    'id': id,
+    'apiKey': apiKey,
+    if (extraApiKeys.isNotEmpty) 'apiKeys': extraApiKeys,
+  };
+
+  factory KagiOptions.fromJson(Map<String, dynamic> json) => KagiOptions(
+    id: json['id'],
+    apiKey: json['apiKey'] ?? '',
+    extraApiKeys: SearchServiceOptions.parseExtraApiKeys(json),
+  );
 }
 
 class DoubaoOptions extends SearchServiceOptions {

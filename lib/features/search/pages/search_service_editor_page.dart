@@ -1188,6 +1188,8 @@ class _SearchServiceEditorPageState extends State<SearchServiceEditorPage> {
       _putController('apiKey', service.apiKey);
     } else if (service is DoubaoOptions) {
       _putController('apiKey', service.apiKey);
+    } else if (service is KagiOptions) {
+      _putController('apiKey', service.apiKey);
     } else if (service is SerperOptions) {
       _putController('apiKey', service.apiKey);
       _putController('gl', service.gl);
@@ -1347,6 +1349,12 @@ class _SearchServiceEditorPageState extends State<SearchServiceEditorPage> {
         );
       case 'doubao':
         return DoubaoOptions(
+          id: _serviceId,
+          apiKey: _text('apiKey'),
+          extraApiKeys: _extraApiKeys,
+        );
+      case 'kagi':
+        return KagiOptions(
           id: _serviceId,
           apiKey: _text('apiKey'),
           extraApiKeys: _extraApiKeys,
@@ -2451,6 +2459,7 @@ String _typeForService(SearchServiceOptions service) {
   if (service is PerplexityOptions) return 'perplexity';
   if (service is BochaOptions) return 'bocha';
   if (service is DoubaoOptions) return 'doubao';
+  if (service is KagiOptions) return 'kagi';
   if (service is SerperOptions) return 'serper';
   if (service is QueritOptions) return 'querit';
   if (service is GrokOptions) return 'grok';
@@ -2499,6 +2508,8 @@ SearchServiceOptions _defaultService(String type, String id) {
       return BochaOptions(id: id, apiKey: '');
     case 'doubao':
       return DoubaoOptions(id: id, apiKey: '');
+    case 'kagi':
+      return KagiOptions(id: id, apiKey: '');
     case 'serper':
       return SerperOptions(id: id, apiKey: '');
     case 'querit':
@@ -2555,6 +2566,8 @@ String _serviceTypeName(BuildContext context, String type) {
       return l10n.searchServiceNameBocha;
     case 'doubao':
       return l10n.searchServiceNameDoubao;
+    case 'kagi':
+      return l10n.searchServiceNameKagi;
     case 'serper':
       return l10n.searchServiceNameSerper;
     case 'querit':
@@ -2595,6 +2608,7 @@ const _providerTypes = <({String type, String brand})>[
   (type: 'perplexity', brand: 'perplexity'),
   (type: 'bocha', brand: 'bocha'),
   (type: 'doubao', brand: 'doubao'),
+  (type: 'kagi', brand: 'kagi'),
   (type: 'serper', brand: 'serper'),
   (type: 'querit', brand: 'querit'),
   (type: 'grok', brand: 'grok'),

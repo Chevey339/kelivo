@@ -79,6 +79,57 @@ void main() {
     expect((created! as ParallelOptions).mode, 'turbo');
   });
 
+  testWidgets('desktop add dialog saves Kagi credentials', (tester) async {
+    SearchServiceOptions? created;
+    await _pumpDialogHost(
+      tester,
+      onOpen: (context) async {
+        created = await showDesktopAddSearchServiceDialog(context);
+      },
+    );
+
+    await tester.tap(find.text('Open'));
+    await tester.pumpAndSettle();
+
+    await _selectServiceType(tester, 'Kagi');
+    await tester.enterText(find.byType(TextField).last, 'kagi-key');
+    await tester.tap(find.text('Add'));
+    await tester.pumpAndSettle();
+
+    expect(created, isA<KagiOptions>());
+    expect((created! as KagiOptions).apiKey, 'kagi-key');
+  });
+
+  testWidgets('desktop edit dialog updates Kagi credentials', (tester) async {
+    SearchServiceOptions? updated;
+    await _pumpDialogHost(
+      tester,
+      onOpen: (context) async {
+        updated = await showDesktopEditSearchServiceDialog(
+          context,
+          KagiOptions(
+            id: 'kagi',
+            apiKey: 'old-key',
+            extraApiKeys: const ['backup-key'],
+          ),
+        );
+      },
+    );
+
+    await tester.tap(find.text('Open'));
+    await tester.pumpAndSettle();
+
+    await tester.enterText(find.byType(TextField).first, 'new-key');
+    await tester.tap(find.text('Save'));
+    await tester.pumpAndSettle();
+
+    expect(updated, isA<KagiOptions>());
+    final saved = updated! as KagiOptions;
+    expect(saved.id, 'kagi');
+    expect(saved.apiKey, 'new-key');
+    expect(saved.extraApiKeys, ['backup-key']);
+  });
+
   testWidgets('desktop edit dialog saves You.com content mode', (tester) async {
     SearchServiceOptions? updated;
     await _pumpDialogHost(

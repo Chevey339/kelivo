@@ -780,6 +780,38 @@ void main() {
       );
     });
 
+    test('accepts and preserves Kagi search credentials', () {
+      final snapshot = BusinessSettingsRouter.normalizeAndRoute({
+        'search_services_v1': jsonEncode([
+          {
+            'id': 'kagi-1',
+            'type': 'kagi',
+            'apiKey': 'primary-key',
+            'apiKeys': ['backup-key'],
+          },
+        ]),
+      });
+
+      final exported = BusinessSettingsRouter.exportSnapshot(snapshot);
+      expect(jsonDecode(exported['search_services_v1']! as String), [
+        {
+          'id': 'kagi-1',
+          'type': 'kagi',
+          'apiKey': 'primary-key',
+          'apiKeys': ['backup-key'],
+        },
+      ]);
+
+      expect(
+        () => BusinessSettingsRouter.normalizeAndRoute({
+          'search_services_v1': jsonEncode([
+            {'id': 'kagi-invalid', 'type': 'kagi', 'apiKey': 123},
+          ]),
+        }),
+        throwsA(isA<FormatException>()),
+      );
+    });
+
     test('preserves payload shapes tolerated by published decoders', () {
       final source = <String, Object?>{
         'provider_configs_v1': jsonEncode({
