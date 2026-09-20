@@ -177,7 +177,7 @@ class SearchCommonOptions {
   final int resultSize;
   final int timeout;
 
-  const SearchCommonOptions({this.resultSize = 10, this.timeout = 5000});
+  const SearchCommonOptions({this.resultSize = 10, this.timeout = 30000});
 
   Map<String, dynamic> toJson() => {
     'resultSize': resultSize,
@@ -187,7 +187,7 @@ class SearchCommonOptions {
   factory SearchCommonOptions.fromJson(Map<String, dynamic> json) =>
       SearchCommonOptions(
         resultSize: json['resultSize'] ?? 10,
-        timeout: json['timeout'] ?? 5000,
+        timeout: json['timeout'] ?? 30000,
       );
 }
 
