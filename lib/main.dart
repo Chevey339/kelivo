@@ -327,7 +327,7 @@ Future<void> main() async {
       }
       // Desktop exit hook: drain queued preference writes before process exit.
       _installExitFlush(businessPreferences);
-      ScheduledTasksService.configureDesktop(businessPreferences);
+      ScheduledTasksService.configureDevice(businessPreferences);
       // Best-effort trim of archived restore runs after a few cold starts.
       unawaited(_pruneRestoreArchive(appDataDirectory));
       // Enable edge-to-edge to allow content under system bars (Android)

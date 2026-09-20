@@ -104,6 +104,8 @@ class _MemoryTipIconState extends State<MemoryTipIcon> {
       constraints: const BoxConstraints(maxWidth: 280),
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
+        // Own the tap so a surrounding settings row does not activate.
+        onTap: () => _tooltipKey.currentState?.ensureTooltipVisible(),
         onLongPress: () => _tooltipKey.currentState?.ensureTooltipVisible(),
         child: SizedBox(
           width: 28,

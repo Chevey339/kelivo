@@ -325,6 +325,8 @@ class ChatActions {
     return _background.start(
       id: _backgroundTaskId(ctx),
       scheduled: ctx.scheduled,
+      scheduledNotify: ctx.scheduledNotify,
+      scheduledPreview: ctx.scheduledPreview,
       conversationId: conversationId,
       title: chatService.getConversation(conversationId)?.title ?? 'Kelivo',
       cancel: () async {
@@ -1142,6 +1144,8 @@ class ChatActions {
     ({String providerKey, String modelId})? modelOverride,
     ValueChanged<String>? onGenerationStarted,
     bool scheduled = false,
+    bool scheduledNotify = true,
+    bool scheduledPreview = true,
   }) async {
     final claimToken = ++_sendInFlightClaimSerial;
     if (isSendInFlight(conversation.id)) {
@@ -1156,6 +1160,8 @@ class ChatActions {
         modelOverride: modelOverride,
         onGenerationStarted: onGenerationStarted,
         scheduled: scheduled,
+        scheduledNotify: scheduledNotify,
+        scheduledPreview: scheduledPreview,
       );
     } finally {
       if (_sendInFlightClaims[conversation.id] == claimToken) {
@@ -1171,6 +1177,8 @@ class ChatActions {
     ({String providerKey, String modelId})? modelOverride,
     ValueChanged<String>? onGenerationStarted,
     bool scheduled = false,
+    bool scheduledNotify = true,
+    bool scheduledPreview = true,
   }) async {
     final content = input.text.trim();
     if (content.isEmpty &&
@@ -1281,6 +1289,8 @@ class ChatActions {
         conversation: conversation,
         settings: settings,
         scheduled: scheduled,
+        scheduledNotify: scheduledNotify,
+        scheduledPreview: scheduledPreview,
         assistant: assistant,
         assistantId: assistantId,
         providerKey: providerKey,
@@ -1303,6 +1313,8 @@ class ChatActions {
     required Conversation conversation,
     required SettingsProvider settings,
     required bool scheduled,
+    required bool scheduledNotify,
+    required bool scheduledPreview,
     required Assistant? assistant,
     required String? assistantId,
     required String providerKey,
@@ -1398,6 +1410,8 @@ class ChatActions {
         supportsReasoning: supportsReasoning,
         enableReasoning: enableReasoning,
         scheduled: scheduled,
+        scheduledNotify: scheduledNotify,
+        scheduledPreview: scheduledPreview,
         generateTitleOnFinish: true,
         generationRunId: generationRunId,
       );
@@ -1524,6 +1538,8 @@ class ChatActions {
     bool preserveFollowingMessages = false,
     ValueChanged<String>? onGenerationStarted,
     bool scheduled = false,
+    bool scheduledNotify = true,
+    bool scheduledPreview = true,
   }) async {
     final claimToken = ++_sendInFlightClaimSerial;
     if (isSendInFlight(conversation.id)) {
@@ -1541,6 +1557,8 @@ class ChatActions {
         preserveFollowingMessages: preserveFollowingMessages,
         onGenerationStarted: onGenerationStarted,
         scheduled: scheduled,
+        scheduledNotify: scheduledNotify,
+        scheduledPreview: scheduledPreview,
       );
     } finally {
       if (_sendInFlightClaims[conversation.id] == claimToken) {
@@ -1559,6 +1577,8 @@ class ChatActions {
     bool preserveFollowingMessages = false,
     ValueChanged<String>? onGenerationStarted,
     bool scheduled = false,
+    bool scheduledNotify = true,
+    bool scheduledPreview = true,
   }) async {
     // Avoid using BuildContext across async gaps (this class holds a BuildContext).
     final settings = contextProvider.read<SettingsProvider>();
@@ -1794,6 +1814,8 @@ class ChatActions {
           supportsReasoning: supportsReasoning,
           enableReasoning: enableReasoning,
           scheduled: scheduled,
+          scheduledNotify: scheduledNotify,
+          scheduledPreview: scheduledPreview,
           generateTitleOnFinish: false,
           generationRunId: begin.runId,
         );

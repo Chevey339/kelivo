@@ -2576,6 +2576,29 @@ class ChatService extends ChangeNotifier {
     notifyListeners();
   }
 
+  Future<void> publishScheduledMessages({
+    required Conversation conversation,
+    required ChatMessage instruction,
+    required ChatMessage response,
+    required bool createConversation,
+    String? expectedContextRevision,
+  }) async {
+    final persisted = await _repo.publishScheduledMessages(
+      conversation: conversation,
+      instruction: instruction,
+      response: response,
+      createConversation: createConversation,
+      expectedContextRevision: expectedContextRevision,
+    );
+    _conversationsCache[persisted.id] = persisted;
+    _messageOrderIds.remove(persisted.id);
+    _messagesCache.remove(persisted.id);
+    _messageCounts.remove(persisted.id);
+    _firstGroupIndicesCache.remove(persisted.id);
+    _bumpConversationListRevision();
+    notifyListeners();
+  }
+
   // Add a message directly to an existing conversation (for merge mode)
   Future<void> addMessageDirectly(
     String conversationId,

@@ -21356,6 +21356,234 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Reuse context across messages and choose how long the cache is retained.'**
   String get oauthPromptCachingHelp;
+
+  /// No description provided for @scheduledTasksPreparation.
+  ///
+  /// In en, this message translates to:
+  /// **'Execution and notifications'**
+  String get scheduledTasksPreparation;
+
+  /// No description provided for @scheduledTasksAllowPreparation.
+  ///
+  /// In en, this message translates to:
+  /// **'Allow advance preparation'**
+  String get scheduledTasksAllowPreparation;
+
+  /// No description provided for @scheduledTasksPreparationDetail.
+  ///
+  /// In en, this message translates to:
+  /// **'Advance preparation is for text tasks that do not need current information. It cannot use tools or attachments, or perform external actions.'**
+  String get scheduledTasksPreparationDetail;
+
+  /// No description provided for @scheduledTasksIOSDetail.
+  ///
+  /// In en, this message translates to:
+  /// **'iOS background limits prevent Kelivo from waking at a set time to run a model. Instead, content is prepared while the app can run, and the system shows a notification at the scheduled time. Only the next occurrence is prepared. Preparation may not finish after leaving the app; reopen Kelivo to prepare subsequent occurrences.'**
+  String get scheduledTasksIOSDetail;
+
+  /// No description provided for @scheduledTasksContextPolicy.
+  ///
+  /// In en, this message translates to:
+  /// **'Conversation context'**
+  String get scheduledTasksContextPolicy;
+
+  /// No description provided for @scheduledTasksContextLatest.
+  ///
+  /// In en, this message translates to:
+  /// **'Follow the latest conversation'**
+  String get scheduledTasksContextLatest;
+
+  /// No description provided for @scheduledTasksContextSnapshot.
+  ///
+  /// In en, this message translates to:
+  /// **'Use the prepared snapshot'**
+  String get scheduledTasksContextSnapshot;
+
+  /// No description provided for @scheduledTasksUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'When unable to execute'**
+  String get scheduledTasksUnavailable;
+
+  /// No description provided for @scheduledTasksRemind.
+  ///
+  /// In en, this message translates to:
+  /// **'Send a reminder only'**
+  String get scheduledTasksRemind;
+
+  /// No description provided for @scheduledTasksSkip.
+  ///
+  /// In en, this message translates to:
+  /// **'Skip this occurrence'**
+  String get scheduledTasksSkip;
+
+  /// No description provided for @scheduledTasksNotify.
+  ///
+  /// In en, this message translates to:
+  /// **'Result notifications'**
+  String get scheduledTasksNotify;
+
+  /// No description provided for @scheduledTasksShowPreview.
+  ///
+  /// In en, this message translates to:
+  /// **'Show result text in notifications'**
+  String get scheduledTasksShowPreview;
+
+  /// No description provided for @scheduledTasksPreparationWindow.
+  ///
+  /// In en, this message translates to:
+  /// **'Prepare up to'**
+  String get scheduledTasksPreparationWindow;
+
+  /// No description provided for @scheduledTasksPreparationAttempts.
+  ///
+  /// In en, this message translates to:
+  /// **'Attempts per occurrence'**
+  String get scheduledTasksPreparationAttempts;
+
+  /// No description provided for @scheduledTasksPreparationCooldown.
+  ///
+  /// In en, this message translates to:
+  /// **'Minimum interval (minutes)'**
+  String get scheduledTasksPreparationCooldown;
+
+  /// No description provided for @scheduledTasksPreparationBudget.
+  ///
+  /// In en, this message translates to:
+  /// **'At most one preparation at a time and six attempts per hour across all tasks. Cancelled attempts count toward the limit.'**
+  String get scheduledTasksPreparationBudget;
+
+  /// No description provided for @scheduledTasksPreparing.
+  ///
+  /// In en, this message translates to:
+  /// **'Preparing result'**
+  String get scheduledTasksPreparing;
+
+  /// No description provided for @scheduledTasksPrepared.
+  ///
+  /// In en, this message translates to:
+  /// **'Result prepared'**
+  String get scheduledTasksPrepared;
+
+  /// No description provided for @scheduledTasksPendingPreparation.
+  ///
+  /// In en, this message translates to:
+  /// **'Result not prepared yet'**
+  String get scheduledTasksPendingPreparation;
+
+  /// No description provided for @scheduledTasksNotificationRegistered.
+  ///
+  /// In en, this message translates to:
+  /// **'Notification scheduled'**
+  String get scheduledTasksNotificationRegistered;
+
+  /// No description provided for @scheduledTasksNotificationUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'Notification not scheduled'**
+  String get scheduledTasksNotificationUnavailable;
+
+  /// No description provided for @scheduledTasksReminded.
+  ///
+  /// In en, this message translates to:
+  /// **'Due · reminder only'**
+  String get scheduledTasksReminded;
+
+  /// No description provided for @scheduledTasksSkipped.
+  ///
+  /// In en, this message translates to:
+  /// **'Skipped'**
+  String get scheduledTasksSkipped;
+
+  /// No description provided for @scheduledTasksCancelled.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancelled'**
+  String get scheduledTasksCancelled;
+
+  /// No description provided for @scheduledTasksReminderBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Your scheduled task is due. Open Kelivo to continue.'**
+  String get scheduledTasksReminderBody;
+
+  /// No description provided for @scheduledTasksResultBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Your scheduled task result is ready.'**
+  String get scheduledTasksResultBody;
+
+  /// No description provided for @scheduledTasksNotificationPermission.
+  ///
+  /// In en, this message translates to:
+  /// **'Allow task notifications'**
+  String get scheduledTasksNotificationPermission;
+
+  /// No description provided for @scheduledTasksPreparationCost.
+  ///
+  /// In en, this message translates to:
+  /// **'Preparation calls the model and may cost extra. With “Follow latest conversation”, new messages can invalidate a prepared result. Unused or cancelled output may still be billed, and preparing again makes another model request.'**
+  String get scheduledTasksPreparationCost;
+
+  /// No description provided for @scheduledTasksAllowPreparationTip.
+  ///
+  /// In en, this message translates to:
+  /// **'Generate the next result before its scheduled time, while Kelivo can run. The result stays out of the chat until it is due. Preparation uses text only, without tools, attachments or custom request bodies. It may incur model charges.'**
+  String get scheduledTasksAllowPreparationTip;
+
+  /// No description provided for @scheduledTasksContextPolicyTip.
+  ///
+  /// In en, this message translates to:
+  /// **'Follow latest conversation: new messages, edits or switching message versions invalidate the prepared result; preparing again uses another attempt and may cost extra.\n\nUse preparation snapshot: keep the prepared result even if the conversation changes. It will not reflect later messages.'**
+  String get scheduledTasksContextPolicyTip;
+
+  /// No description provided for @scheduledTasksPreparationWindowTip.
+  ///
+  /// In en, this message translates to:
+  /// **'How far ahead of the scheduled time preparation may begin, up to 24 hours. For example, opening Kelivo at noon can prepare the next morning’s reminder. A larger window gives more chances to prepare, but the result may be less current. It does not change the scheduled time or guarantee background execution.'**
+  String get scheduledTasksPreparationWindowTip;
+
+  /// No description provided for @scheduledTasksPreparationAttemptsTip.
+  ///
+  /// In en, this message translates to:
+  /// **'Maximum preparation attempts for one occurrence, including the first attempt, failures and cancellations. More attempts allow more retries but may cost more. This limits attempts, not spending.'**
+  String get scheduledTasksPreparationAttemptsTip;
+
+  /// No description provided for @scheduledTasksPreparationCooldownTip.
+  ///
+  /// In en, this message translates to:
+  /// **'Minimum time between the start of preparation attempts for the same occurrence. Waiting longer reduces repeated requests. A retry still needs the app to be able to run; it is not a background timer.'**
+  String get scheduledTasksPreparationCooldownTip;
+
+  /// No description provided for @scheduledTasksUnavailableTip.
+  ///
+  /// In en, this message translates to:
+  /// **'If no prepared result is available and the task cannot run when due, send a reminder or skip the occurrence. A reminder contains no generated answer and requires notifications to be enabled. If Kelivo is open when the task is due, it can run the task then.'**
+  String get scheduledTasksUnavailableTip;
+
+  /// No description provided for @scheduledTasksNotifyTip.
+  ///
+  /// In en, this message translates to:
+  /// **'Allow result notifications and fallback reminders. Turning this off does not stop the task or model calls, and does not prevent preparation charges. System notification permission is also required.'**
+  String get scheduledTasksNotifyTip;
+
+  /// No description provided for @scheduledTasksShowPreviewTip.
+  ///
+  /// In en, this message translates to:
+  /// **'Show the prepared result text in the notification, including on the lock screen if allowed by system settings. Turn this off to show a generic notice; the full result remains available in the chat. Global notification privacy settings also apply.'**
+  String get scheduledTasksShowPreviewTip;
+
+  /// No description provided for @scheduledTasksHours.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 hour} other{{count} hours}}'**
+  String scheduledTasksHours(int count);
+
+  /// No description provided for @scheduledTasksMinutes.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 minute} other{{count} minutes}}'**
+  String scheduledTasksMinutes(int count);
 }
 
 class _AppLocalizationsDelegate

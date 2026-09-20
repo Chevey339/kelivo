@@ -11901,4 +11901,148 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get oauthPromptCachingHelp =>
       'Reuse context across messages and choose how long the cache is retained.';
+
+  @override
+  String get scheduledTasksPreparation => 'Execution and notifications';
+
+  @override
+  String get scheduledTasksAllowPreparation => 'Allow advance preparation';
+
+  @override
+  String get scheduledTasksPreparationDetail =>
+      'Advance preparation is for text tasks that do not need current information. It cannot use tools or attachments, or perform external actions.';
+
+  @override
+  String get scheduledTasksIOSDetail =>
+      'iOS background limits prevent Kelivo from waking at a set time to run a model. Instead, content is prepared while the app can run, and the system shows a notification at the scheduled time. Only the next occurrence is prepared. Preparation may not finish after leaving the app; reopen Kelivo to prepare subsequent occurrences.';
+
+  @override
+  String get scheduledTasksContextPolicy => 'Conversation context';
+
+  @override
+  String get scheduledTasksContextLatest => 'Follow the latest conversation';
+
+  @override
+  String get scheduledTasksContextSnapshot => 'Use the prepared snapshot';
+
+  @override
+  String get scheduledTasksUnavailable => 'When unable to execute';
+
+  @override
+  String get scheduledTasksRemind => 'Send a reminder only';
+
+  @override
+  String get scheduledTasksSkip => 'Skip this occurrence';
+
+  @override
+  String get scheduledTasksNotify => 'Result notifications';
+
+  @override
+  String get scheduledTasksShowPreview => 'Show result text in notifications';
+
+  @override
+  String get scheduledTasksPreparationWindow => 'Prepare up to';
+
+  @override
+  String get scheduledTasksPreparationAttempts => 'Attempts per occurrence';
+
+  @override
+  String get scheduledTasksPreparationCooldown => 'Minimum interval (minutes)';
+
+  @override
+  String get scheduledTasksPreparationBudget =>
+      'At most one preparation at a time and six attempts per hour across all tasks. Cancelled attempts count toward the limit.';
+
+  @override
+  String get scheduledTasksPreparing => 'Preparing result';
+
+  @override
+  String get scheduledTasksPrepared => 'Result prepared';
+
+  @override
+  String get scheduledTasksPendingPreparation => 'Result not prepared yet';
+
+  @override
+  String get scheduledTasksNotificationRegistered => 'Notification scheduled';
+
+  @override
+  String get scheduledTasksNotificationUnavailable =>
+      'Notification not scheduled';
+
+  @override
+  String get scheduledTasksReminded => 'Due · reminder only';
+
+  @override
+  String get scheduledTasksSkipped => 'Skipped';
+
+  @override
+  String get scheduledTasksCancelled => 'Cancelled';
+
+  @override
+  String get scheduledTasksReminderBody =>
+      'Your scheduled task is due. Open Kelivo to continue.';
+
+  @override
+  String get scheduledTasksResultBody => 'Your scheduled task result is ready.';
+
+  @override
+  String get scheduledTasksNotificationPermission => 'Allow task notifications';
+
+  @override
+  String get scheduledTasksPreparationCost =>
+      'Preparation calls the model and may cost extra. With “Follow latest conversation”, new messages can invalidate a prepared result. Unused or cancelled output may still be billed, and preparing again makes another model request.';
+
+  @override
+  String get scheduledTasksAllowPreparationTip =>
+      'Generate the next result before its scheduled time, while Kelivo can run. The result stays out of the chat until it is due. Preparation uses text only, without tools, attachments or custom request bodies. It may incur model charges.';
+
+  @override
+  String get scheduledTasksContextPolicyTip =>
+      'Follow latest conversation: new messages, edits or switching message versions invalidate the prepared result; preparing again uses another attempt and may cost extra.\n\nUse preparation snapshot: keep the prepared result even if the conversation changes. It will not reflect later messages.';
+
+  @override
+  String get scheduledTasksPreparationWindowTip =>
+      'How far ahead of the scheduled time preparation may begin, up to 24 hours. For example, opening Kelivo at noon can prepare the next morning’s reminder. A larger window gives more chances to prepare, but the result may be less current. It does not change the scheduled time or guarantee background execution.';
+
+  @override
+  String get scheduledTasksPreparationAttemptsTip =>
+      'Maximum preparation attempts for one occurrence, including the first attempt, failures and cancellations. More attempts allow more retries but may cost more. This limits attempts, not spending.';
+
+  @override
+  String get scheduledTasksPreparationCooldownTip =>
+      'Minimum time between the start of preparation attempts for the same occurrence. Waiting longer reduces repeated requests. A retry still needs the app to be able to run; it is not a background timer.';
+
+  @override
+  String get scheduledTasksUnavailableTip =>
+      'If no prepared result is available and the task cannot run when due, send a reminder or skip the occurrence. A reminder contains no generated answer and requires notifications to be enabled. If Kelivo is open when the task is due, it can run the task then.';
+
+  @override
+  String get scheduledTasksNotifyTip =>
+      'Allow result notifications and fallback reminders. Turning this off does not stop the task or model calls, and does not prevent preparation charges. System notification permission is also required.';
+
+  @override
+  String get scheduledTasksShowPreviewTip =>
+      'Show the prepared result text in the notification, including on the lock screen if allowed by system settings. Turn this off to show a generic notice; the full result remains available in the chat. Global notification privacy settings also apply.';
+
+  @override
+  String scheduledTasksHours(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count hours',
+      one: '1 hour',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String scheduledTasksMinutes(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count minutes',
+      one: '1 minute',
+    );
+    return '$_temp0';
+  }
 }

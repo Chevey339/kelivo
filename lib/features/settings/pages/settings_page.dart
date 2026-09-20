@@ -278,7 +278,8 @@ class SettingsPage extends StatelessWidget {
                 },
               ),
               _iosDivider(context),
-              if (defaultTargetPlatform == TargetPlatform.android) ...[
+              if (defaultTargetPlatform == TargetPlatform.android ||
+                  defaultTargetPlatform == TargetPlatform.iOS) ...[
                 _iosNavRow(
                   context,
                   icon: LucideIcons.clock,

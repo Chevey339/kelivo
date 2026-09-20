@@ -1546,6 +1546,8 @@ class GenerationContext {
     this.generateTitleOnFinish = true,
     this.generationRunId,
     this.scheduled = false,
+    this.scheduledNotify = true,
+    this.scheduledPreview = true,
   });
 
   final ChatMessage assistantMessage;
@@ -1568,6 +1570,7 @@ class GenerationContext {
   final bool generateTitleOnFinish;
   final String? generationRunId;
   final bool scheduled;
+  final bool scheduledNotify, scheduledPreview;
 }
 
 /// State object for streaming message generation.

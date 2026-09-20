@@ -447,7 +447,9 @@ class SettingsSearchIndex {
         keywords: 'storage cache cleanup database 存储 儲存 缓存 快取 空间 空間 清理 数据库 資料庫',
       );
     }
-    if (desktop || platform == TargetPlatform.android) {
+    if (desktop ||
+        platform == TargetPlatform.android ||
+        platform == TargetPlatform.iOS) {
       add(
         'scheduledTasks',
         SettingsSearchDestination.scheduledTasks,

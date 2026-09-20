@@ -113,7 +113,9 @@ class _ScheduledTasksPageState extends State<ScheduledTasksPage>
   }
 
   Future<void> _save(ScheduledTask task, {bool? enabled}) async {
-    if (!service.isDesktop && (enabled ?? task.enabled)) {
+    if (service.isIOS && task.notify && (enabled ?? task.enabled)) {
+      await service.requestPermission();
+    } else if (!service.isDesktop && (enabled ?? task.enabled)) {
       await widget.requestNotificationsPermission();
     }
     await service.save(task, enabled: enabled);
@@ -219,7 +221,7 @@ class _ScheduledTasksPageState extends State<ScheduledTasksPage>
                       children: [
                         IosNavRow(
                           label: _status(run.status, l),
-                          detailText: _date(run.startedAt, l),
+                          detailText: _date(run.displayTime, l),
                           icon: run.status == 'completed'
                               ? LucideIcons.check
                               : LucideIcons.clock,
@@ -299,6 +301,12 @@ class _ScheduledTasksPageState extends State<ScheduledTasksPage>
   String _status(String status, AppLocalizations l) => switch (status) {
     'completed' => l.scheduledTasksCompleted,
     'running' => l.scheduledTasksRunning,
+    'pending' => l.scheduledTasksPendingPreparation,
+    'preparing' => l.scheduledTasksPreparing,
+    'prepared' || 'publishing' => l.scheduledTasksPrepared,
+    'reminded' => l.scheduledTasksReminded,
+    'skipped' => l.scheduledTasksSkipped,
+    'cancelled' => l.scheduledTasksCancelled,
     'interrupted' => l.scheduledTasksInterrupted,
     _ => l.scheduledTasksFailed,
   };
@@ -324,7 +332,8 @@ class _ScheduledTasksPageState extends State<ScheduledTasksPage>
     return value;
   }
 
-  String _taskDetail(ScheduledTask task, AppLocalizations l) => task.running
+  String _desktopTaskDetail(ScheduledTask task, AppLocalizations l) =>
+      task.running
       ? l.scheduledTasksRunning
       : task.exhausted
       ? l.scheduledTasksFinished
@@ -411,6 +420,20 @@ class _ScheduledTasksPageState extends State<ScheduledTasksPage>
     );
   }
 
+  String _taskDetail(ScheduledTask task, AppLocalizations l) {
+    if (!service.isIOS &&
+        !service.isDesktop &&
+        !service.exactAlarms &&
+        task.enabled &&
+        !task.running) {
+      return l.scheduledTasksWaitingPermission;
+    }
+    final base = _desktopTaskDetail(task, l);
+    final pending = task.runs.where((r) => r.awaitingPublication).firstOrNull;
+    if (!service.isIOS || pending == null || !task.enabled) return base;
+    return '$base\n${_status(pending.status, l)} · ${pending.notificationState == 'registered' ? l.scheduledTasksNotificationRegistered : l.scheduledTasksNotificationUnavailable}';
+  }
+
   @override
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context)!;
@@ -474,17 +497,7 @@ class _ScheduledTasksPageState extends State<ScheduledTasksPage>
               name: task.name,
               time: task.timeLabel,
               repeat: _repeatLabel(task, l),
-              detail: task.running
-                  ? l.scheduledTasksRunning
-                  : task.exhausted
-                  ? l.scheduledTasksFinished
-                  : !task.enabled
-                  ? l.scheduledTasksPaused
-                  : !service.isDesktop && !service.exactAlarms
-                  ? l.scheduledTasksWaitingPermission
-                  : task.nextRunAt == null
-                  ? l.scheduledTasksWaitingPermission
-                  : l.scheduledTasksNextRun(_date(task.nextRunAt!, l)),
+              detail: _taskDetail(task, l),
               enabled: task.enabled,
               running: task.running,
               onTap: () => _details(task),
@@ -495,9 +508,24 @@ class _ScheduledTasksPageState extends State<ScheduledTasksPage>
           ],
           IosSectionFooter(
             key: const ValueKey('scheduled-tasks-description'),
-            text: l.scheduledTasksDescription,
+            text: service.isIOS
+                ? l.scheduledTasksIOSDetail
+                : l.scheduledTasksDescription,
           ),
-          ...[
+          if (service.isIOS) ...[
+            const SizedBox(height: 24),
+            SectionCard(
+              key: const ValueKey('scheduled-tasks-notification-permission'),
+              children: [
+                IosNavRow(
+                  label: l.scheduledTasksNotificationPermission,
+                  icon: LucideIcons.bell,
+                  onTap: () => _perform(service.requestPermission),
+                ),
+              ],
+            ),
+          ],
+          if (!service.isIOS) ...[
             const SizedBox(height: 24),
             SectionCard(
               key: const ValueKey('scheduled-tasks-background-settings'),

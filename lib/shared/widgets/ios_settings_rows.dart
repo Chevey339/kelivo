@@ -19,6 +19,7 @@ class IosNavRow extends StatelessWidget {
     this.caption,
     this.subtitleMaxLines = 1,
     this.detailText,
+    this.labelTrailing,
     this.trailing,
     this.onTap,
     this.onLongPress,
@@ -40,6 +41,7 @@ class IosNavRow extends StatelessWidget {
   /// `null` lets a long subtitle wrap. Defaults to one line with ellipsis.
   final int? subtitleMaxLines;
   final String? detailText;
+  final Widget? labelTrailing;
   final Widget? trailing;
   final VoidCallback? onTap;
   final VoidCallback? onLongPress;
@@ -89,8 +91,10 @@ class IosNavRow extends StatelessWidget {
                         color: baseColor,
                         fontWeight: labelWeight,
                       ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
+                      maxLines: labelTrailing == null ? 1 : null,
+                      overflow: labelTrailing == null
+                          ? TextOverflow.ellipsis
+                          : TextOverflow.visible,
                     )
                   : Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -103,8 +107,10 @@ class IosNavRow extends StatelessWidget {
                             color: baseColor,
                             fontWeight: labelWeight,
                           ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
+                          maxLines: labelTrailing == null ? 1 : null,
+                          overflow: labelTrailing == null
+                              ? TextOverflow.ellipsis
+                              : TextOverflow.visible,
                         ),
                         if (subtitle != null)
                           Text(
@@ -131,6 +137,7 @@ class IosNavRow extends StatelessWidget {
                       ],
                     ),
             ),
+            if (labelTrailing != null) labelTrailing!,
             if (detailText != null)
               Padding(
                 padding: const EdgeInsets.only(right: 6),
@@ -165,11 +172,13 @@ class IosSwitchRow extends StatelessWidget {
     this.destructive = false,
     this.iconColor,
     this.subtitle,
+    this.labelTrailing,
   });
 
   final IconData? icon;
   final String label;
   final String? subtitle;
+  final Widget? labelTrailing;
   final bool value;
   final ValueChanged<bool> onChanged;
   final VoidCallback? onLongPress;
@@ -231,6 +240,7 @@ class IosSwitchRow extends StatelessWidget {
                       style: TextStyle(fontSize: 15, color: baseColor),
                     ),
             ),
+            if (labelTrailing != null) labelTrailing!,
             IosSwitch(value: value, onChanged: onChanged),
           ],
         ),

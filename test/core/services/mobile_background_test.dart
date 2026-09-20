@@ -418,6 +418,41 @@ void main() {
   );
 
   test(
+    'per-task notification and preview controls apply to due-time execution',
+    () async {
+      coordinator.didChangeAppLifecycleState(AppLifecycleState.paused);
+      await coordinator.start(
+        id: 'silent',
+        conversationId: 'chat',
+        title: 'Task',
+        scheduled: true,
+        scheduledNotify: false,
+        cancel: () async {},
+      );
+      await coordinator.finish(
+        'silent',
+        BackgroundTaskOutcome.completed,
+        replyPreview: 'Secret',
+      );
+      expect(notifications, isEmpty);
+      await coordinator.start(
+        id: 'hidden',
+        conversationId: 'chat',
+        title: 'Task',
+        scheduled: true,
+        scheduledPreview: false,
+        cancel: () async {},
+      );
+      await coordinator.finish(
+        'hidden',
+        BackgroundTaskOutcome.completed,
+        replyPreview: 'Secret',
+      );
+      expect(notifications.single['body'], l10n.backgroundCompleted);
+    },
+  );
+
+  test(
     'opening the scheduled conversation suppresses its completion notification',
     () async {
       coordinator.didChangeAppLifecycleState(AppLifecycleState.resumed);

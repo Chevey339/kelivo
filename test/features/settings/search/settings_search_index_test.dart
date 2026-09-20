@@ -66,7 +66,7 @@ void main() {
     final ios = ids(TargetPlatform.iOS);
     final android = ids(TargetPlatform.android, logs: true, dynamicColor: true);
     final desktop = ids(TargetPlatform.macOS);
-    expect(ios, isNot(contains('scheduledTasks')));
+    expect(ios, contains('scheduledTasks'));
     expect(ios, isNot(contains('hotkeys')));
     expect(ios, isNot(contains('logs')));
     expect(

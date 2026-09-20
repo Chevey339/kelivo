@@ -14,6 +14,7 @@ import 'package:Kelivo/core/services/scheduled_tasks_service.dart';
 import 'package:Kelivo/features/home/widgets/assistant_avatar.dart';
 import 'package:Kelivo/features/scheduled_tasks/pages/scheduled_task_editor_page.dart';
 import 'package:Kelivo/features/scheduled_tasks/pages/scheduled_tasks_page.dart';
+import 'package:Kelivo/features/settings/widgets/memory_ui.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
 import 'package:Kelivo/shared/widgets/ios_settings_rows.dart';
 import 'package:Kelivo/shared/widgets/ios_tactile.dart';
@@ -41,6 +42,13 @@ class _EditorChatService extends ChatService {
   @override
   Conversation? getConversation(String id) =>
       conversations.where((c) => c.id == id).firstOrNull;
+}
+
+class _IosEditorScheduledTasksService extends ScheduledTasksService {
+  _IosEditorScheduledTasksService({required super.channel});
+
+  @override
+  bool get isIOS => true;
 }
 
 void main() {
@@ -246,6 +254,197 @@ void main() {
     });
   }
 
+  for (final (width, locale, dark) in [
+    (320.0, 'en', false),
+    (390.0, 'zh', false),
+    (390.0, 'zh', true),
+  ]) {
+    testWidgets(
+      'iOS preparation help leaves settings unchanged ($width, $locale, dark=$dark)',
+      (tester) async {
+        tester.view.physicalSize = Size(width, 844);
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.reset);
+        await tester.pumpWidget(
+          app(
+            editor(
+              task: ScheduledTask.fromJson({
+                ...initial.toJson(),
+                'allowPreparation': true,
+              }),
+            ),
+            locale: locale,
+            dark: dark,
+          ),
+        );
+        await tester.pumpAndSettle();
+        final l = lookupAppLocalizations(Locale(locale));
+        final card = find.byKey(
+          const ValueKey('scheduled-tasks-preparation-settings'),
+        );
+        await Scrollable.ensureVisible(tester.element(card));
+        await tester.pumpAndSettle();
+        expect(
+          find.descendant(of: card, matching: find.byType(MemoryTipIcon)),
+          findsNWidgets(8),
+        );
+        // Rows without leading icons must align both ends of their dividers.
+        final dividers = tester.widgetList<Divider>(
+          find.descendant(of: card, matching: find.byType(Divider)),
+        );
+        expect(dividers, isNotEmpty);
+        for (final divider in dividers) {
+          expect(divider.indent, divider.endIndent);
+        }
+        final suffix = '${width.toInt()}-$locale-${dark ? 'dark' : 'light'}';
+        await capture(tester, 'ios-preparation-$suffix');
+
+        // A nested info icon must own both gestures, without toggling the
+        // parent switch or opening the option sheet.
+        for (final message in [
+          l.scheduledTasksAllowPreparationTip,
+          l.scheduledTasksContextPolicyTip,
+        ]) {
+          final tip = find.byWidgetPredicate(
+            (widget) => widget is MemoryTipIcon && widget.message == message,
+          );
+          await Scrollable.ensureVisible(tester.element(tip), alignment: .4);
+          await tester.pumpAndSettle();
+          await tester.tap(tip);
+          await tester.pumpAndSettle();
+          expect(find.text(message), findsOneWidget);
+          expect(find.byType(BottomSheet), findsNothing);
+          Tooltip.dismissAllToolTips();
+          await tester.pumpAndSettle();
+          await tester.longPress(tip);
+          await tester.pumpAndSettle();
+          expect(find.text(message), findsOneWidget);
+          expect(find.byType(BottomSheet), findsNothing);
+          if (message == l.scheduledTasksContextPolicyTip) {
+            await capture(tester, 'ios-preparation-tip-$suffix');
+          }
+          Tooltip.dismissAllToolTips();
+          await tester.pumpAndSettle();
+        }
+
+        await tester.ensureVisible(find.text(l.scheduledTasksPreparationCost));
+        await tester.pumpAndSettle();
+        expect(
+          find.text(l.scheduledTasksPreparationCost).hitTestable(),
+          findsOneWidget,
+        );
+        expect(find.textContaining('Android'), findsNothing);
+        await capture(tester, 'ios-preparation-cost-$suffix');
+        expect(tester.takeException(), isNull);
+        expect(
+          tester
+              .widget<IosSwitchRow>(
+                find.widgetWithText(
+                  IosSwitchRow,
+                  l.scheduledTasksAllowPreparation,
+                ),
+              )
+              .value,
+          isTrue,
+        );
+        expect(find.text(l.scheduledTasksContextLatest), findsOneWidget);
+
+        service.dispose();
+        service = _IosEditorScheduledTasksService(channel: channel);
+        await tester.pumpWidget(
+          app(
+            ScheduledTasksPage(service: service),
+            locale: locale,
+            dark: dark,
+          ),
+        );
+        await tester.pumpAndSettle();
+        final permission = find.byKey(
+          const ValueKey('scheduled-tasks-notification-permission'),
+        );
+        await tester.ensureVisible(permission);
+        await tester.pumpAndSettle();
+        expect(find.text(l.scheduledTasksIOSDetail), findsOneWidget);
+        final footerBottom = tester
+            .getBottomLeft(
+              find.byKey(const ValueKey('scheduled-tasks-description')),
+            )
+            .dy;
+        expect(
+          tester.getTopLeft(permission).dy - footerBottom,
+          greaterThanOrEqualTo(24),
+        );
+        expect(find.textContaining('Android'), findsNothing);
+        await capture(tester, 'ios-list-$suffix');
+        expect(tester.takeException(), isNull);
+      },
+      variant: TargetPlatformVariant({TargetPlatform.iOS}),
+    );
+  }
+
+  testWidgets(
+    'iOS editor saves preparation limits and preview preferences in the same task',
+    (tester) async {
+      const haptics = MethodChannel('haptic_feedback');
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(haptics, (_) async => null);
+      addTearDown(
+        () => TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+            .setMockMethodCallHandler(haptics, null),
+      );
+      tester.view.physicalSize = const Size(390, 844);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      await tester.pumpWidget(
+        app(
+          editor(
+            task: ScheduledTask.fromJson({
+              ...initial.toJson(),
+              'preparationWindowMinutes': 120,
+            }),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      Future<void> toggle(String label) async {
+        final row = find.widgetWithText(IosSwitchRow, label);
+        await Scrollable.ensureVisible(tester.element(row), alignment: .5);
+        await tester.pumpAndSettle();
+        await tester.tap(row);
+        await tester.pumpAndSettle();
+      }
+
+      await toggle('Allow advance preparation');
+      expect(find.text('2 hours'), findsOneWidget);
+      await tapRow(tester, 'Prepare up to');
+      for (final option in [
+        '30 minutes',
+        '1 hour',
+        '6 hours',
+        '8 hours',
+        '18 hours',
+        '24 hours',
+      ]) {
+        expect(find.text(option), findsOneWidget);
+      }
+      await tester.ensureVisible(find.text('24 hours'));
+      await tap(tester, find.text('24 hours'));
+      await tapRow(tester, 'Attempts per occurrence');
+      await tap(tester, find.text('3').last);
+      await toggle('Show result text in notifications');
+      await tap(tester, find.byKey(const ValueKey('scheduled-tasks-action')));
+      expect(saved!.allowPreparation, isTrue);
+      expect(saved!.maxPrepareAttempts, 3);
+      expect(saved!.preparationWindowMinutes, 1440);
+      expect(saved!.showPreview, isFalse);
+      expect(saved!.contextPolicy, ScheduledTaskContextPolicy.latest);
+      expect(saved!.hour, initial.hour);
+      expect(tester.takeException(), isNull);
+    },
+    variant: TargetPlatformVariant({TargetPlatform.iOS}),
+  );
+
   testWidgets(
     'add opens a route with the same navigation geometry as the list',
     (tester) async {
@@ -416,7 +615,8 @@ void main() {
     final clear = find.byWidgetPredicate(
       (w) => w is IosIconButton && w.semanticLabel == 'Clear Start date',
     );
-    await tester.ensureVisible(clear);
+    await Scrollable.ensureVisible(tester.element(clear), alignment: 0.5);
+    await tester.pumpAndSettle();
     await tap(tester, clear);
     await tester.pumpAndSettle();
     await tap(tester, find.byKey(const ValueKey('scheduled-tasks-action')));

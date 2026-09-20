@@ -1,3 +1,4 @@
+import '../../../core/services/scheduled_tasks_service.dart';
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -365,6 +366,8 @@ class HomeViewModel extends ChangeNotifier {
     required Assistant assistant,
     ({String providerKey, String modelId})? modelOverride,
     ValueChanged<String>? onGenerationStarted,
+    bool scheduledNotify = true,
+    bool scheduledPreview = true,
   }) {
     if (_chatController.isConversationLoading(conversation.id) ||
         _chatActions.activeStreamingMessageId(conversation.id) != null) {
@@ -375,6 +378,8 @@ class HomeViewModel extends ChangeNotifier {
       conversation: conversation,
       assistantOverride: assistant,
       scheduled: true,
+      scheduledNotify: scheduledNotify,
+      scheduledPreview: scheduledPreview,
       modelOverride: modelOverride,
       onGenerationStarted: onGenerationStarted,
     );
@@ -386,6 +391,8 @@ class HomeViewModel extends ChangeNotifier {
     required Assistant assistant,
     ({String providerKey, String modelId})? modelOverride,
     ValueChanged<String>? onGenerationStarted,
+    bool scheduledNotify = true,
+    bool scheduledPreview = true,
   }) {
     if (_chatController.isConversationLoading(conversation.id) ||
         _chatActions.activeStreamingMessageId(conversation.id) != null) {
@@ -396,6 +403,8 @@ class HomeViewModel extends ChangeNotifier {
       conversation: conversation,
       assistantOverride: assistant,
       scheduled: true,
+      scheduledNotify: scheduledNotify,
+      scheduledPreview: scheduledPreview,
       modelOverride: modelOverride,
       preserveFollowingMessages: true,
       onGenerationStarted: onGenerationStarted,
@@ -403,6 +412,7 @@ class HomeViewModel extends ChangeNotifier {
   }
 
   Future<ChatInputSubmissionResult> sendMessage(ChatInputData input) async {
+    await ScheduledTasksService.instance.reconcileBeforeSend();
     final content = input.text.trim();
     if (content.isEmpty &&
         input.imagePaths.isEmpty &&

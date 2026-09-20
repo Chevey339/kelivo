@@ -11376,6 +11376,136 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get oauthPromptCachingHelp => '复用多轮对话中的上下文，可设置缓存保留时长。';
+
+  @override
+  String get scheduledTasksPreparation => '执行与通知';
+
+  @override
+  String get scheduledTasksAllowPreparation => '允许提前准备';
+
+  @override
+  String get scheduledTasksPreparationDetail =>
+      '提前准备适合不依赖实时信息的文字任务，不会使用工具、附件或执行外部操作。';
+
+  @override
+  String get scheduledTasksIOSDetail =>
+      '受 iOS 后台限制，Kelivo 不能在指定时间自动唤醒并运行模型。此功能会在 App 可运行时提前准备内容，由系统到点展示通知。每次仅准备下一次结果；离开 App 后不保证准备完成，后续任务需再次打开 Kelivo 才能补充。';
+
+  @override
+  String get scheduledTasksContextPolicy => '对话上下文';
+
+  @override
+  String get scheduledTasksContextLatest => '跟随最新对话';
+
+  @override
+  String get scheduledTasksContextSnapshot => '使用准备时的快照';
+
+  @override
+  String get scheduledTasksUnavailable => '无法执行时';
+
+  @override
+  String get scheduledTasksRemind => '仅发送提醒';
+
+  @override
+  String get scheduledTasksSkip => '跳过本次';
+
+  @override
+  String get scheduledTasksNotify => '结果通知';
+
+  @override
+  String get scheduledTasksShowPreview => '通知显示结果正文';
+
+  @override
+  String get scheduledTasksPreparationWindow => '最多提前';
+
+  @override
+  String get scheduledTasksPreparationAttempts => '每次执行最多准备次数';
+
+  @override
+  String get scheduledTasksPreparationCooldown => '准备最小间隔（分钟）';
+
+  @override
+  String get scheduledTasksPreparationBudget =>
+      '所有任务合计最多同时准备一个，每小时最多尝试六次，取消的请求也计入次数。';
+
+  @override
+  String get scheduledTasksPreparing => '正在准备结果';
+
+  @override
+  String get scheduledTasksPrepared => '结果已准备';
+
+  @override
+  String get scheduledTasksPendingPreparation => '本次尚未准备';
+
+  @override
+  String get scheduledTasksNotificationRegistered => '通知已登记';
+
+  @override
+  String get scheduledTasksNotificationUnavailable => '通知未登记';
+
+  @override
+  String get scheduledTasksReminded => '已到期 · 仅提醒';
+
+  @override
+  String get scheduledTasksSkipped => '已跳过';
+
+  @override
+  String get scheduledTasksCancelled => '已取消';
+
+  @override
+  String get scheduledTasksReminderBody => '定时任务已到期，打开 Kelivo 继续。';
+
+  @override
+  String get scheduledTasksResultBody => '定时任务结果已准备好。';
+
+  @override
+  String get scheduledTasksNotificationPermission => '允许任务通知';
+
+  @override
+  String get scheduledTasksPreparationCost =>
+      '提前准备会调用模型，可能产生额外费用。选择「跟随最新对话」时，新消息可能使已准备内容失效。即使结果未使用或请求被取消，仍可能计费；重新准备会再次调用模型。';
+
+  @override
+  String get scheduledTasksAllowPreparationTip =>
+      '在 Kelivo 可运行时，提前生成下一次任务的结果，到期前不会显示在聊天中。仅使用文字，不使用工具、附件或自定义请求体；调用模型可能产生费用。';
+
+  @override
+  String get scheduledTasksContextPolicyTip =>
+      '跟随最新对话：发送新消息、编辑消息或切换消息版本后，已准备内容会失效；重新准备会占用次数，并可能增加费用。\n\n使用准备时的快照：对话变化后仍保留已准备结果，内容不会包含后续聊天。';
+
+  @override
+  String get scheduledTasksPreparationWindowTip =>
+      '允许在任务到期前多久开始准备，最长 24 小时。例如第二天早上提醒，前一天中午打开 Kelivo 时就有机会准备。时间越长，准备机会越多，但内容也可能更早过时。不会改变任务时间，也不代表能在后台定时运行。';
+
+  @override
+  String get scheduledTasksPreparationAttemptsTip =>
+      '同一次任务允许尝试准备的总次数，包含首次、失败和取消的请求。次数越多，重试机会越多，也可能多花钱。这是次数限制，不是费用上限。';
+
+  @override
+  String get scheduledTasksPreparationCooldownTip =>
+      '同一次任务两次开始准备之间，至少间隔多少分钟。间隔越长，重复请求越少。重试仍需 App 有运行机会，不是在后台设定一个定时器。';
+
+  @override
+  String get scheduledTasksUnavailableTip =>
+      '到期时没有可用结果、也无法运行任务，就发送提醒或跳过本次。提醒不包含模型生成的回答，且需要开启通知。如果到期时 Kelivo 正在打开运行，可直接执行任务。';
+
+  @override
+  String get scheduledTasksNotifyTip =>
+      '允许发送结果通知和无法执行时的提醒。关闭后仍会执行任务、调用模型，提前准备也仍可能产生费用。还需要允许系统通知权限。';
+
+  @override
+  String get scheduledTasksShowPreviewTip =>
+      '在通知中显示已生成的结果，系统设置允许时也会显示在锁屏上。关闭后只显示通用提示，完整结果仍可在聊天中查看；同时遵循全局通知隐私设置。';
+
+  @override
+  String scheduledTasksHours(int count) {
+    return '$count 小时';
+  }
+
+  @override
+  String scheduledTasksMinutes(int count) {
+    return '$count 分钟';
+  }
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hans`).
@@ -22676,6 +22806,136 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get oauthPromptCachingHelp => '复用多轮对话中的上下文，可设置缓存保留时长。';
+
+  @override
+  String get scheduledTasksPreparation => '执行与通知';
+
+  @override
+  String get scheduledTasksAllowPreparation => '允许提前准备';
+
+  @override
+  String get scheduledTasksPreparationDetail =>
+      '提前准备适合不依赖实时信息的文字任务，不会使用工具、附件或执行外部操作。';
+
+  @override
+  String get scheduledTasksIOSDetail =>
+      '受 iOS 后台限制，Kelivo 不能在指定时间自动唤醒并运行模型。此功能会在 App 可运行时提前准备内容，由系统到点展示通知。每次仅准备下一次结果；离开 App 后不保证准备完成，后续任务需再次打开 Kelivo 才能补充。';
+
+  @override
+  String get scheduledTasksContextPolicy => '对话上下文';
+
+  @override
+  String get scheduledTasksContextLatest => '跟随最新对话';
+
+  @override
+  String get scheduledTasksContextSnapshot => '使用准备时的快照';
+
+  @override
+  String get scheduledTasksUnavailable => '无法执行时';
+
+  @override
+  String get scheduledTasksRemind => '仅发送提醒';
+
+  @override
+  String get scheduledTasksSkip => '跳过本次';
+
+  @override
+  String get scheduledTasksNotify => '结果通知';
+
+  @override
+  String get scheduledTasksShowPreview => '通知显示结果正文';
+
+  @override
+  String get scheduledTasksPreparationWindow => '最多提前';
+
+  @override
+  String get scheduledTasksPreparationAttempts => '每次执行最多准备次数';
+
+  @override
+  String get scheduledTasksPreparationCooldown => '准备最小间隔（分钟）';
+
+  @override
+  String get scheduledTasksPreparationBudget =>
+      '所有任务合计最多同时准备一个，每小时最多尝试六次，取消的请求也计入次数。';
+
+  @override
+  String get scheduledTasksPreparing => '正在准备结果';
+
+  @override
+  String get scheduledTasksPrepared => '结果已准备';
+
+  @override
+  String get scheduledTasksPendingPreparation => '本次尚未准备';
+
+  @override
+  String get scheduledTasksNotificationRegistered => '通知已登记';
+
+  @override
+  String get scheduledTasksNotificationUnavailable => '通知未登记';
+
+  @override
+  String get scheduledTasksReminded => '已到期 · 仅提醒';
+
+  @override
+  String get scheduledTasksSkipped => '已跳过';
+
+  @override
+  String get scheduledTasksCancelled => '已取消';
+
+  @override
+  String get scheduledTasksReminderBody => '定时任务已到期，打开 Kelivo 继续。';
+
+  @override
+  String get scheduledTasksResultBody => '定时任务结果已准备好。';
+
+  @override
+  String get scheduledTasksNotificationPermission => '允许任务通知';
+
+  @override
+  String get scheduledTasksPreparationCost =>
+      '提前准备会调用模型，可能产生额外费用。选择「跟随最新对话」时，新消息可能使已准备内容失效。即使结果未使用或请求被取消，仍可能计费；重新准备会再次调用模型。';
+
+  @override
+  String get scheduledTasksAllowPreparationTip =>
+      '在 Kelivo 可运行时，提前生成下一次任务的结果，到期前不会显示在聊天中。仅使用文字，不使用工具、附件或自定义请求体；调用模型可能产生费用。';
+
+  @override
+  String get scheduledTasksContextPolicyTip =>
+      '跟随最新对话：发送新消息、编辑消息或切换消息版本后，已准备内容会失效；重新准备会占用次数，并可能增加费用。\n\n使用准备时的快照：对话变化后仍保留已准备结果，内容不会包含后续聊天。';
+
+  @override
+  String get scheduledTasksPreparationWindowTip =>
+      '允许在任务到期前多久开始准备，最长 24 小时。例如第二天早上提醒，前一天中午打开 Kelivo 时就有机会准备。时间越长，准备机会越多，但内容也可能更早过时。不会改变任务时间，也不代表能在后台定时运行。';
+
+  @override
+  String get scheduledTasksPreparationAttemptsTip =>
+      '同一次任务允许尝试准备的总次数，包含首次、失败和取消的请求。次数越多，重试机会越多，也可能多花钱。这是次数限制，不是费用上限。';
+
+  @override
+  String get scheduledTasksPreparationCooldownTip =>
+      '同一次任务两次开始准备之间，至少间隔多少分钟。间隔越长，重复请求越少。重试仍需 App 有运行机会，不是在后台设定一个定时器。';
+
+  @override
+  String get scheduledTasksUnavailableTip =>
+      '到期时没有可用结果、也无法运行任务，就发送提醒或跳过本次。提醒不包含模型生成的回答，且需要开启通知。如果到期时 Kelivo 正在打开运行，可直接执行任务。';
+
+  @override
+  String get scheduledTasksNotifyTip =>
+      '允许发送结果通知和无法执行时的提醒。关闭后仍会执行任务、调用模型，提前准备也仍可能产生费用。还需要允许系统通知权限。';
+
+  @override
+  String get scheduledTasksShowPreviewTip =>
+      '在通知中显示已生成的结果，系统设置允许时也会显示在锁屏上。关闭后只显示通用提示，完整结果仍可在聊天中查看；同时遵循全局通知隐私设置。';
+
+  @override
+  String scheduledTasksHours(int count) {
+    return '$count 小时';
+  }
+
+  @override
+  String scheduledTasksMinutes(int count) {
+    return '$count 分钟';
+  }
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hant`).
@@ -34055,4 +34315,134 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get oauthPromptCachingHelp => '重用多輪對話中的上下文，可設定快取保留時間。';
+
+  @override
+  String get scheduledTasksPreparation => '執行與通知';
+
+  @override
+  String get scheduledTasksAllowPreparation => '允許提前準備';
+
+  @override
+  String get scheduledTasksPreparationDetail =>
+      '提前準備適合不依賴即時資訊的文字任務，不會使用工具、附件或執行外部操作。';
+
+  @override
+  String get scheduledTasksIOSDetail =>
+      '受 iOS 背景限制，Kelivo 不能在指定時間自動喚醒並執行模型。此功能會在 App 可執行時提前準備內容，由系統到點顯示通知。每次僅準備下一次結果；離開 App 後不保證準備完成，後續任務需再次開啟 Kelivo 才能補充。';
+
+  @override
+  String get scheduledTasksContextPolicy => '對話上下文';
+
+  @override
+  String get scheduledTasksContextLatest => '跟隨最新對話';
+
+  @override
+  String get scheduledTasksContextSnapshot => '使用準備時的快照';
+
+  @override
+  String get scheduledTasksUnavailable => '無法執行時';
+
+  @override
+  String get scheduledTasksRemind => '僅傳送提醒';
+
+  @override
+  String get scheduledTasksSkip => '略過本次';
+
+  @override
+  String get scheduledTasksNotify => '結果通知';
+
+  @override
+  String get scheduledTasksShowPreview => '通知顯示結果全文';
+
+  @override
+  String get scheduledTasksPreparationWindow => '最多提前';
+
+  @override
+  String get scheduledTasksPreparationAttempts => '每次執行最多準備次數';
+
+  @override
+  String get scheduledTasksPreparationCooldown => '準備最小間隔（分鐘）';
+
+  @override
+  String get scheduledTasksPreparationBudget =>
+      '所有任務合計最多同時準備一個，每小時最多嘗試六次，取消的請求也計入次數。';
+
+  @override
+  String get scheduledTasksPreparing => '正在準備結果';
+
+  @override
+  String get scheduledTasksPrepared => '結果已準備';
+
+  @override
+  String get scheduledTasksPendingPreparation => '本次尚未準備';
+
+  @override
+  String get scheduledTasksNotificationRegistered => '通知已登記';
+
+  @override
+  String get scheduledTasksNotificationUnavailable => '通知未登記';
+
+  @override
+  String get scheduledTasksReminded => '已到期 · 僅提醒';
+
+  @override
+  String get scheduledTasksSkipped => '已略過';
+
+  @override
+  String get scheduledTasksCancelled => '已取消';
+
+  @override
+  String get scheduledTasksReminderBody => '定時任務已到期，開啟 Kelivo 繼續。';
+
+  @override
+  String get scheduledTasksResultBody => '定時任務結果已準備好。';
+
+  @override
+  String get scheduledTasksNotificationPermission => '允許任務通知';
+
+  @override
+  String get scheduledTasksPreparationCost =>
+      '提前準備會呼叫模型，可能產生額外費用。選擇「跟隨最新對話」時，新訊息可能使已準備內容失效。即使結果未使用或請求被取消，仍可能計費；重新準備會再次呼叫模型。';
+
+  @override
+  String get scheduledTasksAllowPreparationTip =>
+      '在 Kelivo 可執行時，提前產生下一次任務的結果，到期前不會顯示在聊天中。僅使用文字，不使用工具、附件或自訂請求內容；呼叫模型可能產生費用。';
+
+  @override
+  String get scheduledTasksContextPolicyTip =>
+      '跟隨最新對話：傳送新訊息、編輯訊息或切換訊息版本後，已準備內容會失效；重新準備會占用次數，並可能增加費用。\n\n使用準備時的快照：對話變化後仍保留已準備結果，內容不會包含後續聊天。';
+
+  @override
+  String get scheduledTasksPreparationWindowTip =>
+      '允許在任務到期前多久開始準備，最長 24 小時。例如第二天早上提醒，前一天中午開啟 Kelivo 時就有機會準備。時間越長，準備機會越多，但內容也可能更早過時。不會改變任務時間，也不代表能在背景定時執行。';
+
+  @override
+  String get scheduledTasksPreparationAttemptsTip =>
+      '同一次任務允許嘗試準備的總次數，包含首次、失敗和取消的請求。次數越多，重試機會越多，也可能多花錢。這是次數限制，不是費用上限。';
+
+  @override
+  String get scheduledTasksPreparationCooldownTip =>
+      '同一次任務兩次開始準備之間，至少間隔多少分鐘。間隔越長，重複請求越少。重試仍需 App 有執行機會，不是在背景設定一個計時器。';
+
+  @override
+  String get scheduledTasksUnavailableTip =>
+      '到期時沒有可用結果、也無法執行任務，就傳送提醒或略過本次。提醒不包含模型產生的回答，且需要開啟通知。如果到期時 Kelivo 正在開啟執行，可直接執行任務。';
+
+  @override
+  String get scheduledTasksNotifyTip =>
+      '允許傳送結果通知和無法執行時的提醒。關閉後仍會執行任務、呼叫模型，提前準備也仍可能產生費用。還需要允許系統通知權限。';
+
+  @override
+  String get scheduledTasksShowPreviewTip =>
+      '在通知中顯示已產生的結果，系統設定允許時也會顯示在鎖定畫面上。關閉後只顯示一般提示，完整結果仍可在聊天中查看；同時遵循全域通知隱私設定。';
+
+  @override
+  String scheduledTasksHours(int count) {
+    return '$count 小時';
+  }
+
+  @override
+  String scheduledTasksMinutes(int count) {
+    return '$count 分鐘';
+  }
 }

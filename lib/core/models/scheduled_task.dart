@@ -1,8 +1,14 @@
 enum ScheduledTaskMode { newChat, followUp, regenerate }
 
+enum ScheduledTaskContextPolicy { latest, snapshot }
+
+enum ScheduledTaskUnavailablePolicy { remind, skip }
+
 enum ScheduledTaskRepeat { once, daily, weekdays, custom }
 
 class ScheduledTask {
+  static const defaultPreparationWindowMinutes = Duration.minutesPerDay;
+
   const ScheduledTask({
     required this.id,
     required this.name,
@@ -23,6 +29,16 @@ class ScheduledTask {
     this.startDate,
     this.endDate,
     this.exhausted = false,
+    this.allowPreparation = false,
+    this.contextPolicy = ScheduledTaskContextPolicy.latest,
+    this.unavailablePolicy = ScheduledTaskUnavailablePolicy.remind,
+    this.notify = true,
+    this.showPreview = true,
+    this.preparationWindowMinutes = defaultPreparationWindowMinutes,
+    this.maxPrepareAttempts = 2,
+    this.preparationCooldownMinutes = 10,
+    this.revision = 0,
+    this.scheduleRevision = 0,
   });
 
   final String id, name, prompt, assistantId;
@@ -35,6 +51,18 @@ class ScheduledTask {
   final String? conversationId, messageId, modelProvider, modelId;
   final DateTime? onceDate, startDate, endDate;
   final bool exhausted;
+  final bool allowPreparation, notify, showPreview;
+  final ScheduledTaskContextPolicy contextPolicy;
+  final ScheduledTaskUnavailablePolicy unavailablePolicy;
+  final int preparationWindowMinutes,
+      maxPrepareAttempts,
+      preparationCooldownMinutes,
+      revision,
+      scheduleRevision;
+
+  bool get canPrepare =>
+      allowPreparation && mode != ScheduledTaskMode.regenerate;
+
   ScheduledTaskRepeat get repeat {
     if (onceDate != null) return ScheduledTaskRepeat.once;
     final days = weekdays.toSet();
@@ -54,6 +82,8 @@ class ScheduledTask {
     bool? enabled,
     bool? exhausted,
     List<ScheduledTaskRun>? runs,
+    int? revision,
+    int? scheduleRevision,
   }) => ScheduledTask(
     id: id,
     name: name,
@@ -74,6 +104,16 @@ class ScheduledTask {
     onceDate: onceDate,
     startDate: startDate,
     endDate: endDate,
+    allowPreparation: allowPreparation,
+    contextPolicy: contextPolicy,
+    unavailablePolicy: unavailablePolicy,
+    notify: notify,
+    showPreview: showPreview,
+    preparationWindowMinutes: preparationWindowMinutes,
+    maxPrepareAttempts: maxPrepareAttempts,
+    preparationCooldownMinutes: preparationCooldownMinutes,
+    revision: revision ?? this.revision,
+    scheduleRevision: scheduleRevision ?? this.scheduleRevision,
   );
 
   factory ScheduledTask.fromJson(Map<String, dynamic> json) => ScheduledTask(
@@ -94,6 +134,24 @@ class ScheduledTask {
     startDate: _parseDate(json['startDate']),
     endDate: _parseDate(json['endDate']),
     exhausted: json['exhausted'] == true,
+    allowPreparation: json['allowPreparation'] == true,
+    contextPolicy: ScheduledTaskContextPolicy.values.byName(
+      json['contextPolicy'] as String? ?? 'latest',
+    ),
+    unavailablePolicy: ScheduledTaskUnavailablePolicy.values.byName(
+      json['unavailablePolicy'] as String? ?? 'remind',
+    ),
+    notify: json['notify'] != false,
+    showPreview: json['showPreview'] != false,
+    preparationWindowMinutes:
+        (json['preparationWindowMinutes'] as int? ??
+                defaultPreparationWindowMinutes)
+            .clamp(1, 1440),
+    maxPrepareAttempts: (json['maxPrepareAttempts'] as int? ?? 2).clamp(1, 5),
+    preparationCooldownMinutes:
+        (json['preparationCooldownMinutes'] as int? ?? 10).clamp(1, 1440),
+    revision: json['revision'] as int? ?? 0,
+    scheduleRevision: json['scheduleRevision'] as int? ?? 0,
     nextRunAt: json['nextRunAt'] == null
         ? null
         : DateTime.fromMillisecondsSinceEpoch(json['nextRunAt'] as int),
@@ -121,6 +179,16 @@ class ScheduledTask {
     'onceDate': dateKey(onceDate),
     'startDate': dateKey(startDate),
     'endDate': dateKey(endDate),
+    'allowPreparation': allowPreparation,
+    'contextPolicy': contextPolicy.name,
+    'unavailablePolicy': unavailablePolicy.name,
+    'notify': notify,
+    'showPreview': showPreview,
+    'preparationWindowMinutes': preparationWindowMinutes,
+    'maxPrepareAttempts': maxPrepareAttempts,
+    'preparationCooldownMinutes': preparationCooldownMinutes,
+    'revision': revision,
+    'scheduleRevision': scheduleRevision,
   };
 
   Map<String, dynamic> toStoredJson() => {
@@ -144,34 +212,69 @@ class ScheduledTask {
 class ScheduledTaskRun {
   const ScheduledTaskRun({
     required this.id,
-    required this.startedAt,
+    this.startedAt,
     required this.status,
     this.conversationId,
     this.preview,
     this.error,
+    this.scheduledFor,
+    this.preparedAt,
+    this.lastPrepareAt,
+    this.taskRevision = 0,
+    this.contextRevision,
+    this.payloadId,
+    this.prepareAttempts = 0,
+    this.notificationState = 'none',
   });
   final String id, status;
-  final DateTime startedAt;
-  final String? conversationId, preview, error;
+  final DateTime? startedAt, scheduledFor, preparedAt, lastPrepareAt;
+  final String? conversationId, preview, error, contextRevision, payloadId;
+  final int taskRevision, prepareAttempts;
+  final String notificationState;
+
+  bool get awaitingPublication =>
+      const {'pending', 'preparing', 'prepared', 'publishing'}.contains(status);
+  DateTime get displayTime => scheduledFor ?? startedAt!;
+
+  ScheduledTaskRun update(Map<String, Object?> changes) =>
+      ScheduledTaskRun.fromJson({...toJson(), ...changes});
 
   Map<String, dynamic> toJson() => {
     'id': id,
-    'startedAt': startedAt.millisecondsSinceEpoch,
+    'startedAt': startedAt?.millisecondsSinceEpoch,
     'status': status,
     'conversationId': conversationId,
     'preview': preview,
     'error': error,
+    'scheduledFor': scheduledFor?.millisecondsSinceEpoch,
+    'preparedAt': preparedAt?.millisecondsSinceEpoch,
+    'lastPrepareAt': lastPrepareAt?.millisecondsSinceEpoch,
+    'taskRevision': taskRevision,
+    'contextRevision': contextRevision,
+    'payloadId': payloadId,
+    'prepareAttempts': prepareAttempts,
+    'notificationState': notificationState,
   };
 
-  factory ScheduledTaskRun.fromJson(Map<String, dynamic> json) =>
-      ScheduledTaskRun(
-        id: json['id'] as String,
-        startedAt: DateTime.fromMillisecondsSinceEpoch(
-          json['startedAt'] as int,
-        ),
-        status: json['status'] as String,
-        conversationId: json['conversationId'] as String?,
-        preview: json['preview'] as String?,
-        error: json['error'] as String?,
-      );
+  factory ScheduledTaskRun.fromJson(Map<String, dynamic> json) {
+    DateTime? date(String key) => json[key] == null
+        ? null
+        : DateTime.fromMillisecondsSinceEpoch(json[key] as int);
+    return ScheduledTaskRun(
+      id: json['id'] as String,
+      startedAt: date('startedAt'),
+      status: json['status'] as String,
+      conversationId: json['conversationId'] as String?,
+      preview: json['preview'] as String?,
+      error: json['error'] as String?,
+      scheduledFor: date('scheduledFor'),
+      preparedAt: date('preparedAt'),
+      lastPrepareAt: date('lastPrepareAt'),
+      taskRevision: json['taskRevision'] as int? ?? 0,
+      contextRevision: json['contextRevision'] as String?,
+      payloadId: json['payloadId'] as String?,
+      prepareAttempts: json['prepareAttempts'] as int? ?? 0,
+      notificationState: json['notificationState'] as String? ?? 'none',
+    );
+  }
 }

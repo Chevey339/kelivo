@@ -465,6 +465,8 @@ class _RecordingViewModel extends Fake implements HomeViewModel {
     required Assistant assistant,
     ({String providerKey, String modelId})? modelOverride,
     ValueChanged<String>? onGenerationStarted,
+    bool scheduledNotify = true,
+    bool scheduledPreview = true,
   }) async {
     requests.add((
       conversationId: conversation.id,
@@ -483,6 +485,8 @@ class _RecordingViewModel extends Fake implements HomeViewModel {
     required Assistant assistant,
     ({String providerKey, String modelId})? modelOverride,
     ValueChanged<String>? onGenerationStarted,
+    bool scheduledNotify = true,
+    bool scheduledPreview = true,
   }) async {
     requests.add((
       conversationId: conversation.id,
