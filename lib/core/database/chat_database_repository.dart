@@ -4133,8 +4133,7 @@ class ChatDatabaseRepository {
         );
       END;
     ''');
-    // Rare direct payload rewrites (e.g. sandbox path migration). Normal
-    // checkpoints delete+insert parts instead.
+    // Payload updates include streaming checkpoints and sandbox path rewrites.
     await _db.customStatement('''
       CREATE TRIGGER IF NOT EXISTS message_search_fts_update
       AFTER UPDATE OF payload, conversation_id, kind ON message_part_rows
@@ -4161,7 +4160,7 @@ class ChatDatabaseRepository {
     ''');
     // Streaming checkpoints defer FTS; when is_streaming flips to 0, index the
     // text parts present at that moment. The subsequent part rewrite (if any)
-    // then delete+inserts under the finalized gate.
+    // then updates changed parts under the finalized gate.
     await _db.customStatement('''
       CREATE TRIGGER IF NOT EXISTS message_search_fts_finalize
       AFTER UPDATE OF is_streaming ON message_rows
@@ -4861,9 +4860,12 @@ class ChatDatabaseRepository {
       message = message.copyWith(reasoningText: effectiveReasoningText);
     }
     final parts = _partsForPersistence(message, toolEvents);
-    await (_db.delete(
-      _db.messagePartRows,
-    )..where((row) => row.revisionId.equals(message.id))).go();
+    await (_db.delete(_db.messagePartRows)..where(
+          (row) =>
+              row.revisionId.equals(message.id) &
+              row.ordinal.isBiggerOrEqualValue(parts.length),
+        ))
+        .go();
     var ordinal = 0;
     final now = DateTime.now().toUtc();
     final updatedAt = now.isBefore(message.timestamp) ? message.timestamp : now;
@@ -4879,6 +4881,24 @@ class ChatDatabaseRepository {
             payload: part.encodePayload(),
             createdAt: message.timestamp,
             updatedAt: updatedAt,
+          ),
+          onConflict: DoUpdate<MessagePartRows, MessagePartRow>.withExcluded(
+            (old, incoming) => MessagePartRowsCompanion.custom(
+              conversationId: incoming.conversationId,
+              kind: incoming.kind,
+              payload: incoming.payload,
+              createdAt: incoming.createdAt,
+              updatedAt: incoming.updatedAt,
+            ),
+            target: [
+              _db.messagePartRows.revisionId,
+              _db.messagePartRows.ordinal,
+            ],
+            where: (old, incoming) =>
+                old.kind.isNotExp(incoming.kind) |
+                old.payload.isNotExp(incoming.payload) |
+                old.conversationId.isNotExp(incoming.conversationId) |
+                old.createdAt.isNotExp(incoming.createdAt),
           ),
         );
       }

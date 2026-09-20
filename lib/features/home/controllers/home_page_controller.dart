@@ -4,7 +4,6 @@ import '../../scheduled_tasks/scheduled_task_runner.dart';
 import 'dart:async';
 import 'package:flutter/foundation.dart' show listEquals, defaultTargetPlatform;
 import 'package:flutter/material.dart';
-import 'package:flutter/scheduler.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:image_picker/image_picker.dart';
@@ -25,6 +24,7 @@ import '../../../core/providers/quick_phrase_provider.dart';
 import '../../../core/providers/instruction_injection_provider.dart';
 import '../../../core/providers/memory_provider.dart';
 import '../../../core/services/chat/chat_service.dart';
+import '../../../core/utils/scheduler_idle.dart';
 import '../../../core/services/tts/tts_text_selection.dart';
 import '../../../core/services/haptics.dart';
 import '../../../core/services/notification_service.dart';
@@ -227,6 +227,8 @@ class HomePageController extends ChangeNotifier {
   // App and route visibility determine whether a completion notification
   // would add value or merely duplicate content already on screen.
   bool _homeRouteVisible = true;
+  bool _homePresentationVisible = true;
+  bool _homeAppVisible = true;
   bool _chatInitialized = false;
   bool _openingNotificationConversation = false;
   String? _pendingNotificationConversationId;
@@ -488,7 +490,10 @@ class HomePageController extends ChangeNotifier {
       getTitleForLocale: _titleForLocale,
     );
     _viewModel.onBackgroundTaskError = _showBackgroundTaskFailure;
-    _viewModel.addListener(notifyListeners);
+    _viewModel.addListener(() {
+      _streamController.refreshPresentation();
+      notifyListeners();
+    });
   }
 
   void _showBackgroundTaskFailure(BackgroundTaskKind task, Object error) {
@@ -897,10 +902,8 @@ class HomePageController extends ChangeNotifier {
     if (ids.isEmpty) return;
     final Future<void> task;
     try {
-      task = SchedulerBinding.instance.scheduleTask(
-        () => warmUpRecentConversations(ids, serial),
-        Priority.idle,
-        debugLabel: 'home.startupWarmup',
+      task = waitForSchedulerIdle().then(
+        (_) => warmUpRecentConversations(ids, serial),
       );
     } catch (_) {
       // No scheduler binding (bare unit tests): warm-up is optional.
@@ -2836,6 +2839,13 @@ class HomePageController extends ChangeNotifier {
   // ============================================================================
 
   void onAppLifecycleStateChanged(AppLifecycleState state) {
+    _homeAppVisible =
+        state != AppLifecycleState.paused &&
+        state != AppLifecycleState.hidden &&
+        state != AppLifecycleState.detached;
+    _streamController.setPresentationEnabled(
+      _homePresentationVisible && _homeAppVisible,
+    );
     if (state == AppLifecycleState.resumed ||
         state == AppLifecycleState.paused) {
       unawaited(
@@ -2864,6 +2874,11 @@ class HomePageController extends ChangeNotifier {
   void onDidPushNext() {
     _homeRouteVisible = false;
     dismissKeyboard();
+  }
+
+  void onHomeVisibilityChanged(bool visible) {
+    _homePresentationVisible = visible;
+    _streamController.setPresentationEnabled(visible && _homeAppVisible);
   }
 
   // ============================================================================

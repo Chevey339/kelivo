@@ -1,5 +1,6 @@
 import 'dart:collection';
 import 'dart:math' as math;
+import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 
@@ -209,6 +210,13 @@ class _StreamingRichTextState extends State<StreamingRichText> {
           );
         } else {
           var start = _chunks.isEmpty ? 0 : _chunks.last.end;
+          // Measure enough lookahead for the 16 lines we retain. Always shaping
+          // 2048 characters repeats several screens of CJK text per chunk.
+          var windowCharacters = _chunks.isEmpty
+              ? 2048
+              : ((_chunks.last.end - _chunks.last.block.start) * 20 / 16)
+                    .ceil()
+                    .clamp(128, 2048);
           final painter = TextPainter(
             textDirection: direction,
             textScaler: scale,
@@ -216,15 +224,34 @@ class _StreamingRichTextState extends State<StreamingRichText> {
           );
           try {
             while (start < length) {
-              var end = math.min(start + 2048, length);
-              if (end < length) {
-                final unit = _codeUnitAt(end - 1);
-                if (unit >= 0xd800 && unit <= 0xdbff) end--;
+              var end = math.min(start + windowCharacters, length);
+              late List<ui.LineMetrics> metrics;
+              while (true) {
+                if (end < length) {
+                  final unit = _codeUnitAt(end - 1);
+                  if (unit >= 0xd800 && unit <= 0xdbff) end--;
+                }
+                painter.text = _slice(start, end, style);
+                painter.layout(maxWidth: constraints.maxWidth);
+                metrics = painter.computeLineMetrics();
+                if (end == length ||
+                    metrics.length >= 18 ||
+                    windowCharacters == 2048) {
+                  break;
+                }
+                // A different script/style can fit more characters per line.
+                // Grow back to the original window rather than freezing fewer
+                // lines, preserving the same chunk boundaries and pixels.
+                windowCharacters = math.min(
+                  2048,
+                  math.max(
+                    windowCharacters + 128,
+                    (windowCharacters * 20 / math.max(1, metrics.length - 1))
+                        .ceil(),
+                  ),
+                );
+                end = math.min(start + windowCharacters, length);
               }
-              final span = _slice(start, end, style);
-              painter.text = span;
-              painter.layout(maxWidth: constraints.maxWidth);
-              final metrics = painter.computeLineMetrics();
               final freezeLines = math.min(16, metrics.length - 2);
               int? lines;
               if (freezeLines > 0) {
@@ -241,6 +268,12 @@ class _StreamingRichTextState extends State<StreamingRichText> {
               // Very wide views can hold the whole window on one line. Keep that
               // paragraph intact rather than inventing a visible line break.
               if (lines == null) end = length;
+              if (lines != null) {
+                windowCharacters = ((end - start) * 20 / lines).ceil().clamp(
+                  128,
+                  2048,
+                );
+              }
               final content = _slice(start, end, style);
               final block = IncrementalMarkdownBlock(
                 start: start,
@@ -275,7 +308,9 @@ class _StreamingRichTextState extends State<StreamingRichText> {
           signature: layout,
           itemBuilder: (_, i) => KeyedSubtree(
             key: ValueKey(_chunks[i].block.start),
-            child: _chunks[i].widget,
+            // Scrolling or a changing sibling must not redraw every unchanged
+            // paragraph. Retain its display list, including custom-font glyphs.
+            child: RepaintBoundary(child: _chunks[i].widget),
           ),
         );
       },

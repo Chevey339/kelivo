@@ -28,6 +28,65 @@ void main() {
   });
 
   group('ChatActions.listenSequentiallyToStream', () {
+    test(
+      'backpressure bounds a slow consumer and resumes without losing order',
+      () async {
+        final source = async.StreamController<int>(sync: true);
+        final release = async.Completer<void>();
+        final done = async.Completer<void>();
+        final seen = <int>[];
+        final subscription = ChatActions.listenSequentiallyToStream<int>(
+          stream: source.stream,
+          onData: (value) async {
+            seen.add(value);
+            if (value == 0) await release.future;
+          },
+          onError: (e, s) async => done.completeError(e, s),
+          onDone: () async => done.complete(),
+        );
+        for (var i = 0; i < 1000; i++) {
+          source.add(i);
+        }
+        expect(source.isPaused, true);
+        expect(seen, [0]);
+        release.complete();
+        await source.close();
+        await done.future;
+        expect(seen, List.generate(1000, (i) => i));
+        await subscription.cancel();
+      },
+    );
+
+    test(
+      'a busy burst yields an event-loop turn before draining completely',
+      () async {
+        final source = async.StreamController<int>(sync: true);
+        final done = async.Completer<void>();
+        final timer = async.Completer<int>();
+        var processed = 0;
+        final subscription = ChatActions.listenSequentiallyToStream<int>(
+          stream: source.stream,
+          onData: (value) async {
+            final work = Stopwatch()..start();
+            while (work.elapsedMicroseconds < 250) {}
+            processed++;
+          },
+          onError: (e, s) async => done.completeError(e, s),
+          onDone: () async => done.complete(),
+        );
+        async.Timer.run(() => timer.complete(processed));
+        for (var i = 0; i < 256; i++) {
+          source.add(i);
+        }
+        final processedBeforeTimer = await timer.future;
+        expect(processedBeforeTimer, lessThan(256));
+        await source.close();
+        await done.future;
+        expect(processed, 256);
+        await subscription.cancel();
+      },
+    );
+
     test('正常流按顺序处理 chunk 并调用 done', () async {
       final controller = async.StreamController<int>();
       final done = async.Completer<void>();

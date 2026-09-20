@@ -28,6 +28,10 @@ import 'markdown_viewport_animation_test.dart' as viewport_animation;
 //   --target=integration_test/long_streaming_performance_test.dart
 void main() {
   final binding = IntegrationTestWidgetsFlutterBinding.ensureInitialized();
+  const liveFrames = bool.fromEnvironment('STREAM_LIVE');
+  if (liveFrames) {
+    binding.framePolicy = LiveTestWidgetsFlutterBindingFramePolicy.fullyLive;
+  }
   if (const bool.fromEnvironment('STREAM_CHECK_COLLAPSE')) {
     viewport_animation.main();
   }
@@ -140,6 +144,7 @@ void main() {
                   );
                 }
               }
+              final initialPump = Stopwatch()..start();
               await tester.pumpWidget(
                 MultiProvider(
                   providers: [
@@ -233,6 +238,7 @@ void main() {
                   ),
                 ),
               );
+              initialPump.stop();
               await tester.pump(const Duration(seconds: 1));
               scroll.jumpTo(scroll.position.maxScrollExtent);
               await tester.pump(const Duration(seconds: 1));
@@ -282,6 +288,10 @@ void main() {
               final name = '${reasoning ? 'reasoning' : 'reply'}-$count';
               final summary = <String, Object>{
                 'chars': source.value.length,
+                'initialPumpMs': initialPump.elapsedMilliseconds,
+                'liveFrames': liveFrames,
+                'refreshRateHz':
+                    PlatformDispatcher.instance.views.first.display.refreshRate,
                 'seconds': elapsed.elapsed.inSeconds,
                 'shape': shape,
                 'frosted': frosted,
@@ -305,6 +315,13 @@ void main() {
                       (f) =>
                           f.buildDuration.inMicroseconds > 16667 ||
                           f.rasterDuration.inMicroseconds > 16667,
+                    )
+                    .length,
+                'overBudget120Hz': frames
+                    .where(
+                      (f) =>
+                          f.buildDuration.inMicroseconds > 8333 ||
+                          f.rasterDuration.inMicroseconds > 8333,
                     )
                     .length,
                 'updateP95Us': _percentile(updates, .95),

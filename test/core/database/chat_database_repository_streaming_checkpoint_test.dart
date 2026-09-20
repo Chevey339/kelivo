@@ -76,6 +76,68 @@ void main() {
       }
     });
 
+    test(
+      'checkpoints preserve unchanged parts and remove only a truncated tail',
+      () async {
+        final snapshot = ChatMessage(
+          id: 'streaming',
+          role: 'assistant',
+          conversationId: 'conversation',
+          isStreaming: true,
+          parts: const [
+            ReasoningPart('plan'),
+            TextPart('before'),
+            TextPart('tail'),
+          ],
+        );
+        await repository.updateStreamingCheckpoint(snapshot, const []);
+        final raw = sqlite.sqlite3.open('${directory.path}/chat.sqlite');
+        try {
+          final before = raw.select(
+            "SELECT part_id, updated_at FROM message_part_rows WHERE revision_id = 'streaming' ORDER BY ordinal",
+          );
+          await repository.updateStreamingCheckpoint(
+            snapshot.copyWith(
+              parts: const [
+                ReasoningPart('plan'),
+                TextPart('before'),
+                TextPart('tail more'),
+              ],
+            ),
+            const [],
+          );
+          final after = raw.select(
+            "SELECT part_id, updated_at FROM message_part_rows WHERE revision_id = 'streaming' ORDER BY ordinal",
+          );
+          expect(
+            after.map((r) => r['part_id']),
+            before.map((r) => r['part_id']),
+          );
+          expect(
+            after.take(2).map((r) => r['updated_at']),
+            before.take(2).map((r) => r['updated_at']),
+          );
+          await repository.updateStreamingCheckpoint(
+            snapshot.copyWith(
+              parts: const [ReasoningPart('plan'), TextPart('before')],
+              isStreaming: false,
+            ),
+            const [],
+          );
+          final finalRows = raw.select(
+            "SELECT part_id, payload FROM message_part_rows WHERE revision_id = 'streaming' ORDER BY ordinal",
+          );
+          expect(
+            finalRows.map((r) => r['part_id']),
+            before.take(2).map((r) => r['part_id']),
+          );
+          expect(finalRows.map((r) => r['payload']), ['plan', 'before']);
+        } finally {
+          raw.close();
+        }
+      },
+    );
+
     test('一次事务写入完整消息快照和 tool events 且不改变顺序', () async {
       final snapshot = ChatMessage(
         id: 'streaming',

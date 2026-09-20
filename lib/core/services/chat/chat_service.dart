@@ -28,6 +28,7 @@ import '../../models/conversation.dart';
 import '../../models/workspace_binding.dart';
 import '../../../utils/sandbox_path_resolver.dart';
 import '../../../utils/app_directories.dart';
+import '../../utils/scheduler_idle.dart';
 
 final class LoadedTimelineSlot {
   const LoadedTimelineSlot({required this.identity, required this.message});
@@ -352,7 +353,7 @@ class ChatService extends ChangeNotifier {
         await assetMaintenance;
       } catch (_) {}
     }
-    // Abort idle waits so close never hangs on Priority.idle.
+    // Abort idle waits so close never waits for an animation to finish.
     for (final abort in _messageOrderBackfillAbort.values) {
       if (!abort.isCompleted) abort.complete();
     }
@@ -448,8 +449,8 @@ class ChatService extends ChangeNotifier {
   /// foreground-installed skeleton. Cancel/close leave an absent key absent.
   ///
   /// Does not start [getMessageIds] immediately — waits past the next frame,
-  /// then for [SchedulerBinding.scheduleTask] at [Priority.idle] (same pattern
-  /// as chat/home idle warm-ups). Post-frame matters: an idle task alone can
+  /// then for an idle slot (same pattern as chat/home idle warm-ups).
+  /// Post-frame matters: an idle task alone can
   /// still start during first-paint sibling awaits (e.g. visible-group preload)
   /// and contend for SQLite. The registered future covers frame + idle wait +
   /// query so tests and [close] can await it deterministically.
@@ -494,16 +495,9 @@ class ChatService extends ChangeNotifier {
       await Future.any<void>([frame.future, abort.future]);
       if (abort.isCompleted) return false;
 
-      // 2) Project idle-priority slot (chat/home warm-up pattern).
-      await Future.any<void>([
-        binding.scheduleTask<void>(
-          () {},
-          Priority.idle,
-          debugLabel: 'chat.messageOrderBackfill',
-        ),
-        abort.future,
-      ]);
-      return !abort.isCompleted;
+      // 2) Wait alongside frames instead of spinning the event loop while
+      // a spinner, route transition or scroll animation keeps idle work paused.
+      return await waitForSchedulerIdle(cancelled: abort.future);
     } catch (_) {
       // No scheduler binding (rare bare isolates): proceed immediately.
       return !abort.isCompleted;

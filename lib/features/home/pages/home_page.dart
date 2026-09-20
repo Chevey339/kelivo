@@ -767,6 +767,9 @@ class _HomePageState extends State<HomePage>
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
+    // Modal routes disable tickers only after an opaque route covers us.
+    // Keep streaming visible behind translucent dialogs and bottom sheets.
+    _controller.onHomeVisibilityChanged(TickerMode.valuesOf(context).enabled);
     final route = ModalRoute.of(context);
     if (route != null) {
       routeObserver.subscribe(this, route);
