@@ -13,6 +13,7 @@ import '../../../core/providers/backup_reminder_provider.dart';
 import '../../../core/models/chat_item.dart';
 import '../../../core/providers/user_provider.dart';
 import '../../settings/pages/settings_page.dart';
+import '../../stats/pages/stats_page.dart';
 import '../../translate/pages/translate_page.dart';
 import '../../backup/pages/backup_page.dart';
 import '../../../core/providers/assistant_provider.dart';
@@ -1620,6 +1621,7 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
+    final l10n = AppLocalizations.of(context)!;
     final textBase = cs.onSurface; // 纯黑（白天），夜间自动适配
     final ap = context.watch<AssistantProvider>();
     final currentAssistantId = ap.currentAssistantId;
@@ -2876,6 +2878,35 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
                                                 MaterialPageRoute(
                                                   builder: (_) =>
                                                       const TranslatePage(),
+                                                ),
+                                              );
+                                            },
+                                          ),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 4),
+                                      // 统计按钮（圆形，无水波纹）
+                                      SizedBox(
+                                        width: 45,
+                                        height: 45,
+                                        child: Center(
+                                          child: IosIconButton(
+                                            key: const ValueKey<String>(
+                                              'sidebar-stats-button',
+                                            ),
+                                            size: 22,
+                                            color: textBase,
+                                            icon: Lucide.ChartColumnBig,
+                                            padding: const EdgeInsets.all(10),
+                                            semanticLabel:
+                                                l10n.settingsPageStatistics,
+                                            tooltip:
+                                                l10n.settingsPageStatistics,
+                                            onTap: () {
+                                              Navigator.of(context).push(
+                                                MaterialPageRoute(
+                                                  builder: (_) =>
+                                                      const StatsPage(),
                                                 ),
                                               );
                                             },
