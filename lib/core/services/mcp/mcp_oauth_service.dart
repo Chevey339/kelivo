@@ -1,12 +1,11 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:math';
 
-import 'package:crypto/crypto.dart';
 import 'package:http/http.dart' as http;
 import 'package:url_launcher/url_launcher.dart' as url_launcher;
 
-import 'mcp_oauth_callback.dart';
+import '../auth/oauth_callback.dart';
+import '../auth/oauth_pkce.dart';
 import 'mcp_oauth_http_client.dart';
 
 enum McpOAuthFailureKind { authorizationRequired, transient, invalidResponse }
@@ -219,15 +218,15 @@ final class McpOAuthDiscovery {
 final class McpOAuthService {
   McpOAuthService({
     http.Client? httpClient,
-    McpOAuthCallbackFactory? callbackFactory,
-    McpOAuthUrlLauncher? launchAuthorizationUrl,
+    OAuthCallbackFactory? callbackFactory,
+    OAuthUrlLauncher? launchAuthorizationUrl,
     Duration requestTimeout = const Duration(seconds: 20),
     int maximumResponseBytes = 1024 * 1024,
   }) : _httpClient = httpClient ?? http.Client(),
        _discoveryHttpClient = httpClient ?? createMcpOAuthDiscoveryHttpClient(),
        _ownsHttpClients = httpClient == null,
        _validateDiscoveredHosts = httpClient == null,
-       _callbackFactory = callbackFactory ?? openMcpOAuthCallback,
+       _callbackFactory = callbackFactory ?? openOAuthCallback,
        _launchAuthorizationUrl =
            launchAuthorizationUrl ?? _defaultLaunchAuthorizationUrl,
        _requestTimeout = requestTimeout > Duration.zero
@@ -243,8 +242,8 @@ final class McpOAuthService {
   final http.Client _discoveryHttpClient;
   final bool _ownsHttpClients;
   final bool _validateDiscoveredHosts;
-  final McpOAuthCallbackFactory _callbackFactory;
-  final McpOAuthUrlLauncher _launchAuthorizationUrl;
+  final OAuthCallbackFactory _callbackFactory;
+  final OAuthUrlLauncher _launchAuthorizationUrl;
   final Duration _requestTimeout;
   final int _maximumResponseBytes;
   final Map<String, Future<McpOAuthDiscovery>> _discoveryCache = {};
@@ -522,7 +521,7 @@ final class McpOAuthService {
     List<String> additionalScopes = const [],
     McpOAuthClientRegistration? clientRegistration,
   }) async {
-    McpOAuthCallback? callback;
+    OAuthCallback? callback;
     final discoveryKey = _discoveryCacheKey(
       serverUrl,
       headers,
@@ -564,11 +563,9 @@ final class McpOAuthService {
         );
       }
 
-      final verifier = _randomBase64Url(32);
-      final challenge = base64UrlEncode(
-        sha256.convert(ascii.encode(verifier)).bytes,
-      ).replaceAll('=', '');
-      final state = _randomBase64Url(16);
+      final verifier = oauthRandomString(32);
+      final challenge = oauthPkceChallenge(verifier);
+      final state = oauthRandomString(16);
       final authorizationUrl = discovery.authorizationEndpoint.replace(
         queryParameters: {
           ...discovery.authorizationEndpoint.queryParameters,
@@ -669,7 +666,7 @@ final class McpOAuthService {
         'timed out waiting for authorization',
         kind: McpOAuthFailureKind.transient,
       );
-    } on McpOAuthCallbackException catch (error) {
+    } on OAuthCallbackException catch (error) {
       throw McpOAuthException(
         error.message,
         kind: error.cancelled
@@ -1464,13 +1461,6 @@ final class McpOAuthService {
       : uri.scheme.toLowerCase() == 'https'
       ? 443
       : 80;
-
-  static String _randomBase64Url(int byteCount) {
-    final random = Random.secure();
-    return base64UrlEncode(
-      List<int>.generate(byteCount, (_) => random.nextInt(256)),
-    ).replaceAll('=', '');
-  }
 
   static DateTime? _expiresAt(Object? expiresIn) {
     final seconds = _asInt(expiresIn);

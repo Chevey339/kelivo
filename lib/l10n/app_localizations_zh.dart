@@ -9,6 +9,29 @@ class AppLocalizationsZh extends AppLocalizations {
   AppLocalizationsZh([String locale = 'zh']) : super(locale);
 
   @override
+  String get settingsSearchHint => '搜索设置';
+
+  @override
+  String get settingsSearchCancel => '取消';
+
+  @override
+  String get settingsSearchClear => '清空搜索';
+
+  @override
+  String get settingsSearchSuggestions => '常用设置';
+
+  @override
+  String get settingsSearchNoResults => '未找到相关设置';
+
+  @override
+  String get settingsSearchNoResultsHint => '试试其他名称，或更简短的关键词。';
+
+  @override
+  String settingsSearchResultCount(int count) {
+    return '找到 $count 项设置';
+  }
+
+  @override
   String get helloWorld => '你好，世界！';
 
   @override
@@ -536,8 +559,13 @@ class AppLocalizationsZh extends AppLocalizations {
   String get homePageClearContext => '清空上下文';
 
   @override
-  String homePageClearContextWithCount(String actual, String configured) {
-    return '清空上下文 ($actual/$configured)';
+  String contextMessageCount(int count) {
+    return '$count 条消息';
+  }
+
+  @override
+  String contextMessageCountLimited(int actual, int configured) {
+    return '$actual/$configured 条消息';
   }
 
   @override
@@ -661,6 +689,17 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get mcpServerEditSheetStdioWorkingDirectoryLabel => '工作目录（可选）';
+
+  @override
+  String get mcpWorkspaceBindingLabel => '绑定工作区（可选）';
+
+  @override
+  String get mcpWorkspaceBindingHint =>
+      '服务器可通过 /workspace 访问此工作区。工作目录留空时默认进入该目录，切换聊天不会改变绑定。';
+
+  @override
+  String get mcpWorkspaceBindingMobileOnly =>
+      '工作区绑定适用于移动端 Linux 环境。在桌面端运行此服务器前，请先解除绑定。';
 
   @override
   String get mcpServerEditSheetStdioEnvironmentTitle => '环境变量';
@@ -2596,6 +2635,26 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get displaySettingsPageAutoCollapseCodeBlockLinesUnit => '行';
+
+  @override
+  String get displaySettingsPageCollapseLongUserMessagesTitle => '折叠过长消息';
+
+  @override
+  String get displaySettingsPageCollapseLongUserMessagesSubtitle =>
+      '超过阈值的用户消息折叠显示，点击可展开';
+
+  @override
+  String get displaySettingsPageCollapseLongUserMessagesCharsTitle =>
+      '超过多少字符折叠';
+
+  @override
+  String get displaySettingsPageCollapseLongUserMessagesCharsUnit => '字符';
+
+  @override
+  String get chatMessageExpandLongText => '展开';
+
+  @override
+  String get chatMessageCollapseLongText => '收起';
 
   @override
   String get messageExportSheetFormatTitle => '导出格式';
@@ -9326,6 +9385,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get workspaceEntryChange => '更换';
 
   @override
+  String get workspaceEntrySetAssistantDefault => '设为助手默认工作区';
+
+  @override
   String get workspaceEntryLocked => '已锁定';
 
   @override
@@ -9903,6 +9965,11 @@ class AppLocalizationsZh extends AppLocalizations {
   String get skillsDetailBodyEmpty => '还没有技能正文';
 
   @override
+  String skillsDetailBodyTooLarge(String size) {
+    return '文件较大，暂不支持预览（$size）。';
+  }
+
+  @override
   String get workspaceEnvSizeTimeout => '计算超时';
 
   @override
@@ -9924,9 +9991,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String workspaceBindingSetAssistantDefault(String assistant) {
     return '已设为「$assistant」的默认工作区';
   }
-
-  @override
-  String get workspaceUnbindHint => '已解绑本对话；助手默认工作区可在助手设置中修改';
 
   @override
   String get storageSpaceCategoryWorkspaceFiles => '工作区文件';
@@ -10763,11 +10827,584 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get mcpImportConfirm => '导入';
+
+  @override
+  String get startupRecoverySnapshotTitle => '从数据库快照恢复';
+
+  @override
+  String get startupRecoverySnapshotBody =>
+      '即使数据库无法打开，也可以选择本机快照恢复聊天和设置。请勿卸载 Kelivo，卸载会一并删除这些快照。';
+
+  @override
+  String get startupRecoverySnapshotEmpty => '未在本机找到数据库快照。请先导出数据，再尝试其他恢复操作。';
+
+  @override
+  String get startupRecoverySnapshotButton => '选择快照恢复';
+
+  @override
+  String startupRecoverySnapshotConfirm(String when) {
+    return '将聊天和设置恢复到 $when 的快照？快照之后的更改不会包含在内。现有附件文件和快照会保留，Kelivo 将重启以完成恢复。';
+  }
+
+  @override
+  String startupRecoverySnapshotFailed(String reason) {
+    return '无法准备快照恢复：$reason';
+  }
+
+  @override
+  String get startupRecoverySnapshotReady => '快照已准备好，请重启 Kelivo 完成恢复。';
+
+  @override
+  String get scheduledTasksTitle => '定时任务';
+
+  @override
+  String get scheduledTasksDescription => '在指定时间自动执行任务，支持新建聊天、继续追问或重新运行。';
+
+  @override
+  String get scheduledTasksEmpty => '把任务交给时间';
+
+  @override
+  String get scheduledTasksEmptyDetail => '晨间简报、每日复盘，或任何希望定期完成的事。';
+
+  @override
+  String get scheduledTasksAdd => '添加任务';
+
+  @override
+  String get scheduledTasksEdit => '编辑任务';
+
+  @override
+  String get scheduledTasksName => '任务名称';
+
+  @override
+  String get scheduledTasksNameHint => '晨间简报';
+
+  @override
+  String get scheduledTasksPrompt => '任务内容';
+
+  @override
+  String get scheduledTasksPromptHint => '希望助手为你完成什么？';
+
+  @override
+  String get scheduledTasksAssistant => '执行助手';
+
+  @override
+  String get scheduledTasksChooseAssistant => '选择助手';
+
+  @override
+  String get scheduledTasksAssistantMissing => '助手已不存在';
+
+  @override
+  String get scheduledTasksTime => '执行时间';
+
+  @override
+  String get scheduledTasksTimeHint => '24 小时制，例如 08:00';
+
+  @override
+  String get scheduledTasksRepeat => '重复';
+
+  @override
+  String get scheduledTasksEveryDay => '每天';
+
+  @override
+  String get scheduledTasksWeekdays => '工作日';
+
+  @override
+  String get scheduledTasksEnabled => '启用任务';
+
+  @override
+  String get scheduledTasksPermission => '闹钟和提醒';
+
+  @override
+  String get scheduledTasksPermissionDetail =>
+      '允许设置闹钟，才能按指定时间执行。未授权时，已启用的任务会等待授权。';
+
+  @override
+  String get scheduledTasksPermissionAction => '去授权';
+
+  @override
+  String get scheduledTasksReliability =>
+      '建议在电池设置中允许 Kelivo 后台运行。强行停止后需重新打开应用。错过的任务不会补跑，执行时间跟随设备时区。';
+
+  @override
+  String get scheduledTasksExecutionDetail =>
+      '结果保存在对话中，完成后会发送回复预览通知，点击可打开对话。单次最多运行 10 分钟；需要用户回答或工具确认时会停止。';
+
+  @override
+  String get scheduledTasksRunNow => '立即运行';
+
+  @override
+  String get scheduledTasksHistory => '执行记录';
+
+  @override
+  String get scheduledTasksNoRuns => '尚无执行记录';
+
+  @override
+  String get scheduledTasksRunning => '正在运行';
+
+  @override
+  String get scheduledTasksCompleted => '已完成';
+
+  @override
+  String get scheduledTasksFailed => '执行失败';
+
+  @override
+  String get scheduledTasksInterrupted => '已中断';
+
+  @override
+  String get scheduledTasksPaused => '已暂停';
+
+  @override
+  String get scheduledTasksWaitingPermission => '等待授权';
+
+  @override
+  String scheduledTasksNextRun(String time) {
+    return '下次：$time';
+  }
+
+  @override
+  String get scheduledTasksDelete => '删除任务';
+
+  @override
+  String get scheduledTasksDeleteDetail => '删除此任务及执行记录？已经生成的对话会保留。';
+
+  @override
+  String get scheduledTasksSave => '保存';
+
+  @override
+  String get scheduledTasksCancel => '取消';
+
+  @override
+  String get scheduledTasksInvalid => '请填写名称、任务内容和助手，自定义重复需至少选择一天。';
+
+  @override
+  String get scheduledTasksLoading => '正在加载…';
+
+  @override
+  String get scheduledTasksOpenChat => '查看对话';
+
+  @override
+  String get scheduledTasksNeedsInput => '任务需要用户回答或工具确认，已停止。可打开对话继续。';
+
+  @override
+  String get scheduledTasksTimeout => '已达到执行时限。';
+
+  @override
+  String get scheduledTasksProcessTerminated => '上次执行被系统终止。';
+
+  @override
+  String get scheduledTasksOnce => '仅一次';
+
+  @override
+  String get scheduledTasksCustom => '自定义';
+
+  @override
+  String get scheduledTasksExecution => '执行任务';
+
+  @override
+  String get scheduledTasksMode => '执行方式';
+
+  @override
+  String get scheduledTasksNewChat => '新建聊天';
+
+  @override
+  String get scheduledTasksFollowUp => '继续追问';
+
+  @override
+  String get scheduledTasksRegenerate => '重新运行';
+
+  @override
+  String get scheduledTasksChat => '目标聊天';
+
+  @override
+  String get scheduledTasksChooseChat => '选择聊天';
+
+  @override
+  String get scheduledTasksMessage => '重新运行的问题';
+
+  @override
+  String get scheduledTasksChooseMessage => '选择问题';
+
+  @override
+  String get scheduledTasksAttachmentMessage => '含附件的消息';
+
+  @override
+  String get scheduledTasksModel => '模型';
+
+  @override
+  String get scheduledTasksChooseModel => '选择模型';
+
+  @override
+  String get scheduledTasksModelDefault => '跟随聊天或助手的模型';
+
+  @override
+  String get scheduledTasksSchedule => '执行时间';
+
+  @override
+  String get scheduledTasksActiveWindow => '活动时段';
+
+  @override
+  String get scheduledTasksStartDate => '开始日期';
+
+  @override
+  String get scheduledTasksEndDate => '结束日期';
+
+  @override
+  String get scheduledTasksActiveWindowDetail =>
+      '仅在此日期范围内执行，包含结束当天。未设置的日期不作限制。';
+
+  @override
+  String get scheduledTasksDate => '日期';
+
+  @override
+  String get scheduledTasksDateUnrestricted => '不限';
+
+  @override
+  String get scheduledTasksClear => '清除';
+
+  @override
+  String get scheduledTasksSearch => '搜索';
+
+  @override
+  String get scheduledTasksNoTargets => '此助手下没有符合条件的内容';
+
+  @override
+  String get scheduledTasksFutureDate => '请选择未来的执行日期和时间。';
+
+  @override
+  String get scheduledTasksDateRangeInvalid => '结束日期不能早于开始日期。';
+
+  @override
+  String get scheduledTasksRegenerateDetail =>
+      '使用原有上下文，为所选问题生成新的回答，保留已有回答和后续消息。';
+
+  @override
+  String get scheduledTasksSaving => '正在保存…';
+
+  @override
+  String get scheduledTasksFinished => '计划已结束';
+
+  @override
+  String get scheduledTasksModelMissing => '所选模型已不可用，请编辑任务重新选择。';
+
+  @override
+  String get scheduledTasksChatMissing => '目标聊天已不存在或已移至其他助手。';
+
+  @override
+  String get scheduledTasksMessageMissing => '所选问题已不存在，请重新选择。';
+
+  @override
+  String get scheduledTasksChatBusy => '此聊天正在生成回答，本次任务已跳过。';
+
+  @override
+  String get scheduledTasksDesktopEmpty => '暂无定时任务';
+
+  @override
+  String get scheduledTasksDesktopReliability =>
+      '仅在 Kelivo 运行时执行，最小化或驻留托盘时也会继续。退出或电脑休眠期间错过的任务不会补运行，也不会自动启动应用。';
+
+  @override
+  String get scheduledTasksDesktopExecutionDetail =>
+      '结果保存在对话中，可从任务的运行记录打开。单次最多运行 10 分钟；需要用户回答或工具确认时会停止。';
+
+  @override
+  String get worldBookStickyLabel => '粘滞（消息数）';
+
+  @override
+  String get worldBookStickyHint => '触发后在后续 N 条消息中保持激活，重复命中不延长。0 表示关闭。';
+
+  @override
+  String get worldBookCooldownLabel => '冷却（消息数）';
+
+  @override
+  String get worldBookCooldownHint => '触发后（或粘滞结束后）N 条消息内不再触发。0 表示关闭。';
+
+  @override
+  String get worldBookDelayLabel => '延迟（消息数）';
+
+  @override
+  String get worldBookDelayHint => '对话至少有 N 条消息时才允许触发。按单条消息计数，不是对话轮数。0 表示关闭。';
+
+  @override
+  String get worldBookDragToReorder => '拖动调整顺序';
+
+  @override
+  String worldBookEnabledCount(int enabled, int total) {
+    return '已启用 $enabled/$total';
+  }
+
+  @override
+  String get assistantConversationSystemPromptTitle => '独立对话系统提示';
+
+  @override
+  String get assistantConversationSystemPromptHint => '允许每个对话设置自己的系统提示词。';
+
+  @override
+  String get assistantConversationInjectionTitle => '独立对话指令注入';
+
+  @override
+  String get assistantConversationInjectionHint => '每个对话单独选择指令注入和世界书，默认不选中。';
+
+  @override
+  String get conversationSystemPromptTitle => '对话系统提示词';
+
+  @override
+  String get conversationSystemPromptHint => '仅对当前对话生效，留空时使用助手的系统提示词。';
+
+  @override
+  String get conversationSystemPromptClear => '恢复助手提示词';
+
+  @override
+  String get conversationSystemPromptPlaceholder => '为这个对话编写系统提示词…';
+
+  @override
+  String get conversationPromptScope => '仅当前对话';
+
+  @override
+  String get oauthAccountsTab => '账号登录';
+
+  @override
+  String get oauthLogin => '登录';
+
+  @override
+  String oauthLoginTo(String provider) {
+    return '登录 $provider';
+  }
+
+  @override
+  String get oauthConnected => '已连接';
+
+  @override
+  String get oauthNotConnected => '未连接';
+
+  @override
+  String oauthWaiting(String provider) {
+    return '正在等待 $provider 授权';
+  }
+
+  @override
+  String get oauthCancel => '取消授权';
+
+  @override
+  String get oauthOpenBrowser => '打开授权页面';
+
+  @override
+  String get oauthCopyCode => '复制验证码';
+
+  @override
+  String get oauthCodeHint => '在授权页面输入此验证码';
+
+  @override
+  String get oauthDeviceHint => '请先在 ChatGPT 安全设置或工作区权限中启用设备码登录。';
+
+  @override
+  String get oauthDeviceLogin => '使用设备码登录';
+
+  @override
+  String get oauthDetails => '查看账号详情';
+
+  @override
+  String get oauthConnectAnother => '再连一个';
+
+  @override
+  String get oauthRelogin => '重新登录';
+
+  @override
+  String get oauthNeedsLogin => '需重新登录';
+
+  @override
+  String oauthExpired(String provider) {
+    return '$provider 登录已过期';
+  }
+
+  @override
+  String get oauthLoginRestored => '已重新登录，可使用消息的重试按钮再次发送。';
+
+  @override
+  String get oauthLogout => '退出登录';
+
+  @override
+  String get oauthLogoutDescription => '清除此账号在本机保存的授权凭证';
+
+  @override
+  String get oauthRefreshing => '正在续期授权…';
+
+  @override
+  String get oauthRefreshUsage => '刷新用量';
+
+  @override
+  String get oauthUsageDetails => '用量明细';
+
+  @override
+  String get oauthUsageUnavailable => '暂时无法获取用量';
+
+  @override
+  String oauthLastUpdated(String time) {
+    return '更新于 $time';
+  }
+
+  @override
+  String get oauthSyncModels => '同步';
+
+  @override
+  String get oauthSyncing => '正在同步模型…';
+
+  @override
+  String get oauthModelsHint => '可用模型由账号同步。';
+
+  @override
+  String get oauthNoModels => '同步模型后即可开始对话';
+
+  @override
+  String get oauthConnection => '接入';
+
+  @override
+  String get oauthConnectionInfo => '接入信息';
+
+  @override
+  String get oauthEndpoint => '接入端点';
+
+  @override
+  String get oauthScope => '授权范围';
+
+  @override
+  String get oauthAccountId => '账号 ID';
+
+  @override
+  String get oauthTokenExpiry => '令牌有效期';
+
+  @override
+  String get oauthName => '供应商名称';
+
+  @override
+  String get oauthEnabledHint => '在模型选择器中显示这些模型';
+
+  @override
+  String get oauthNetwork => '网络代理';
+
+  @override
+  String get oauthFollowGlobal => '跟随全局设置';
+
+  @override
+  String get oauthCustomRequest => '自定义请求';
+
+  @override
+  String get oauthWeekly => '本周窗口';
+
+  @override
+  String get oauthMonthly => '本月窗口';
+
+  @override
+  String get oauthTotal => '总额度';
+
+  @override
+  String oauthHours(String count) {
+    return '$count 小时窗口';
+  }
+
+  @override
+  String oauthMinutes(String count) {
+    return '$count 分钟窗口';
+  }
+
+  @override
+  String oauthDays(String count) {
+    return '$count 天窗口';
+  }
+
+  @override
+  String get oauthWindow => '用量窗口';
+
+  @override
+  String oauthResetsAt(String time) {
+    return '重置于 $time';
+  }
+
+  @override
+  String get oauthNetworkError => '连接失败，请检查网络后重试。';
+
+  @override
+  String get oauthInvalidResponse => '授权未完成，请重试。';
+
+  @override
+  String get oauthTimeout => '授权超时，请重试。';
+
+  @override
+  String get oauthDenied => '授权未获批准，请重试。';
+
+  @override
+  String get oauthSaving => '正在连接账号…';
+
+  @override
+  String get oauthQuotaExceeded => '该账号暂无可用额度。';
+
+  @override
+  String get oauthRateLimited => '请求过于频繁，请稍后重试。';
+
+  @override
+  String get oauthPermissionDenied => '该账号无权访问此资源。';
+
+  @override
+  String get oauthRequestFailed => '供应商未能完成请求。';
+
+  @override
+  String get oauthQuotaAvailable => '额度可用';
+
+  @override
+  String oauthSavedResets(String count) {
+    return '可用额度重置次数：$count';
+  }
+
+  @override
+  String get oauthPrimaryWindow => '主要窗口';
+
+  @override
+  String get oauthSecondaryWindow => '次要窗口';
+
+  @override
+  String get oauthAuthorizationCode => '授权码或回调链接';
+
+  @override
+  String get oauthAuthorizationCodeHint => '如果浏览器没有自动返回，请将最后的回调链接或授权码粘贴到这里。';
+
+  @override
+  String get oauthInvalidAuthorizationCode => '请输入本次登录的授权码或回调链接。';
+
+  @override
+  String get oauthSubmitAuthorizationCode => '完成登录';
+
+  @override
+  String get oauthExtraUsage => '额外用量';
+
+  @override
+  String get oauthPromptCachingHelp => '复用多轮对话中的上下文，可设置缓存保留时长。';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hans`).
 class AppLocalizationsZhHans extends AppLocalizationsZh {
   AppLocalizationsZhHans() : super('zh_Hans');
+
+  @override
+  String get settingsSearchHint => '搜索设置';
+
+  @override
+  String get settingsSearchCancel => '取消';
+
+  @override
+  String get settingsSearchClear => '清空搜索';
+
+  @override
+  String get settingsSearchSuggestions => '常用设置';
+
+  @override
+  String get settingsSearchNoResults => '未找到相关设置';
+
+  @override
+  String get settingsSearchNoResultsHint => '试试其他名称，或更简短的关键词。';
+
+  @override
+  String settingsSearchResultCount(int count) {
+    return '找到 $count 项设置';
+  }
 
   @override
   String get helloWorld => '你好，世界！';
@@ -11297,8 +11934,13 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get homePageClearContext => '清空上下文';
 
   @override
-  String homePageClearContextWithCount(String actual, String configured) {
-    return '清空上下文 ($actual/$configured)';
+  String contextMessageCount(int count) {
+    return '$count 条消息';
+  }
+
+  @override
+  String contextMessageCountLimited(int actual, int configured) {
+    return '$actual/$configured 条消息';
   }
 
   @override
@@ -11422,6 +12064,17 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get mcpServerEditSheetStdioWorkingDirectoryLabel => '工作目录（可选）';
+
+  @override
+  String get mcpWorkspaceBindingLabel => '绑定工作区（可选）';
+
+  @override
+  String get mcpWorkspaceBindingHint =>
+      '服务器可通过 /workspace 访问此工作区。工作目录留空时默认进入该目录，切换聊天不会改变绑定。';
+
+  @override
+  String get mcpWorkspaceBindingMobileOnly =>
+      '工作区绑定适用于移动端 Linux 环境。在桌面端运行此服务器前，请先解除绑定。';
 
   @override
   String get mcpServerEditSheetStdioEnvironmentTitle => '环境变量';
@@ -13357,6 +14010,26 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get displaySettingsPageAutoCollapseCodeBlockLinesUnit => '行';
+
+  @override
+  String get displaySettingsPageCollapseLongUserMessagesTitle => '折叠过长消息';
+
+  @override
+  String get displaySettingsPageCollapseLongUserMessagesSubtitle =>
+      '超过阈值的用户消息折叠显示，点击可展开';
+
+  @override
+  String get displaySettingsPageCollapseLongUserMessagesCharsTitle =>
+      '超过多少字符折叠';
+
+  @override
+  String get displaySettingsPageCollapseLongUserMessagesCharsUnit => '字符';
+
+  @override
+  String get chatMessageExpandLongText => '展开';
+
+  @override
+  String get chatMessageCollapseLongText => '收起';
 
   @override
   String get messageExportSheetFormatTitle => '导出格式';
@@ -20013,6 +20686,9 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get workspaceEntryChange => '更换';
 
   @override
+  String get workspaceEntrySetAssistantDefault => '设为助手默认工作区';
+
+  @override
   String get workspaceEntryLocked => '已锁定';
 
   @override
@@ -20590,6 +21266,11 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get skillsDetailBodyEmpty => '还没有技能正文';
 
   @override
+  String skillsDetailBodyTooLarge(String size) {
+    return '文件较大，暂不支持预览（$size）。';
+  }
+
+  @override
   String get workspaceEnvSizeTimeout => '计算超时';
 
   @override
@@ -20611,9 +21292,6 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String workspaceBindingSetAssistantDefault(String assistant) {
     return '已设为「$assistant」的默认工作区';
   }
-
-  @override
-  String get workspaceUnbindHint => '已解绑本对话；助手默认工作区可在助手设置中修改';
 
   @override
   String get storageSpaceCategoryWorkspaceFiles => '工作区文件';
@@ -21450,11 +22128,584 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get mcpImportConfirm => '导入';
+
+  @override
+  String get startupRecoverySnapshotTitle => '从数据库快照恢复';
+
+  @override
+  String get startupRecoverySnapshotBody =>
+      '即使数据库无法打开，也可以选择本机快照恢复聊天和设置。请勿卸载 Kelivo，卸载会一并删除这些快照。';
+
+  @override
+  String get startupRecoverySnapshotEmpty => '未在本机找到数据库快照。请先导出数据，再尝试其他恢复操作。';
+
+  @override
+  String get startupRecoverySnapshotButton => '选择快照恢复';
+
+  @override
+  String startupRecoverySnapshotConfirm(String when) {
+    return '将聊天和设置恢复到 $when 的快照？快照之后的更改不会包含在内。现有附件文件和快照会保留，Kelivo 将重启以完成恢复。';
+  }
+
+  @override
+  String startupRecoverySnapshotFailed(String reason) {
+    return '无法准备快照恢复：$reason';
+  }
+
+  @override
+  String get startupRecoverySnapshotReady => '快照已准备好，请重启 Kelivo 完成恢复。';
+
+  @override
+  String get scheduledTasksTitle => '定时任务';
+
+  @override
+  String get scheduledTasksDescription => '在指定时间自动执行任务，支持新建聊天、继续追问或重新运行。';
+
+  @override
+  String get scheduledTasksEmpty => '把任务交给时间';
+
+  @override
+  String get scheduledTasksEmptyDetail => '晨间简报、每日复盘，或任何希望定期完成的事。';
+
+  @override
+  String get scheduledTasksAdd => '添加任务';
+
+  @override
+  String get scheduledTasksEdit => '编辑任务';
+
+  @override
+  String get scheduledTasksName => '任务名称';
+
+  @override
+  String get scheduledTasksNameHint => '晨间简报';
+
+  @override
+  String get scheduledTasksPrompt => '任务内容';
+
+  @override
+  String get scheduledTasksPromptHint => '希望助手为你完成什么？';
+
+  @override
+  String get scheduledTasksAssistant => '执行助手';
+
+  @override
+  String get scheduledTasksChooseAssistant => '选择助手';
+
+  @override
+  String get scheduledTasksAssistantMissing => '助手已不存在';
+
+  @override
+  String get scheduledTasksTime => '执行时间';
+
+  @override
+  String get scheduledTasksTimeHint => '24 小时制，例如 08:00';
+
+  @override
+  String get scheduledTasksRepeat => '重复';
+
+  @override
+  String get scheduledTasksEveryDay => '每天';
+
+  @override
+  String get scheduledTasksWeekdays => '工作日';
+
+  @override
+  String get scheduledTasksEnabled => '启用任务';
+
+  @override
+  String get scheduledTasksPermission => '闹钟和提醒';
+
+  @override
+  String get scheduledTasksPermissionDetail =>
+      '允许设置闹钟，才能按指定时间执行。未授权时，已启用的任务会等待授权。';
+
+  @override
+  String get scheduledTasksPermissionAction => '去授权';
+
+  @override
+  String get scheduledTasksReliability =>
+      '建议在电池设置中允许 Kelivo 后台运行。强行停止后需重新打开应用。错过的任务不会补跑，执行时间跟随设备时区。';
+
+  @override
+  String get scheduledTasksExecutionDetail =>
+      '结果保存在对话中，完成后会发送回复预览通知，点击可打开对话。单次最多运行 10 分钟；需要用户回答或工具确认时会停止。';
+
+  @override
+  String get scheduledTasksRunNow => '立即运行';
+
+  @override
+  String get scheduledTasksHistory => '执行记录';
+
+  @override
+  String get scheduledTasksNoRuns => '尚无执行记录';
+
+  @override
+  String get scheduledTasksRunning => '正在运行';
+
+  @override
+  String get scheduledTasksCompleted => '已完成';
+
+  @override
+  String get scheduledTasksFailed => '执行失败';
+
+  @override
+  String get scheduledTasksInterrupted => '已中断';
+
+  @override
+  String get scheduledTasksPaused => '已暂停';
+
+  @override
+  String get scheduledTasksWaitingPermission => '等待授权';
+
+  @override
+  String scheduledTasksNextRun(String time) {
+    return '下次：$time';
+  }
+
+  @override
+  String get scheduledTasksDelete => '删除任务';
+
+  @override
+  String get scheduledTasksDeleteDetail => '删除此任务及执行记录？已经生成的对话会保留。';
+
+  @override
+  String get scheduledTasksSave => '保存';
+
+  @override
+  String get scheduledTasksCancel => '取消';
+
+  @override
+  String get scheduledTasksInvalid => '请填写名称、任务内容和助手，自定义重复需至少选择一天。';
+
+  @override
+  String get scheduledTasksLoading => '正在加载…';
+
+  @override
+  String get scheduledTasksOpenChat => '查看对话';
+
+  @override
+  String get scheduledTasksNeedsInput => '任务需要用户回答或工具确认，已停止。可打开对话继续。';
+
+  @override
+  String get scheduledTasksTimeout => '已达到执行时限。';
+
+  @override
+  String get scheduledTasksProcessTerminated => '上次执行被系统终止。';
+
+  @override
+  String get scheduledTasksOnce => '仅一次';
+
+  @override
+  String get scheduledTasksCustom => '自定义';
+
+  @override
+  String get scheduledTasksExecution => '执行任务';
+
+  @override
+  String get scheduledTasksMode => '执行方式';
+
+  @override
+  String get scheduledTasksNewChat => '新建聊天';
+
+  @override
+  String get scheduledTasksFollowUp => '继续追问';
+
+  @override
+  String get scheduledTasksRegenerate => '重新运行';
+
+  @override
+  String get scheduledTasksChat => '目标聊天';
+
+  @override
+  String get scheduledTasksChooseChat => '选择聊天';
+
+  @override
+  String get scheduledTasksMessage => '重新运行的问题';
+
+  @override
+  String get scheduledTasksChooseMessage => '选择问题';
+
+  @override
+  String get scheduledTasksAttachmentMessage => '含附件的消息';
+
+  @override
+  String get scheduledTasksModel => '模型';
+
+  @override
+  String get scheduledTasksChooseModel => '选择模型';
+
+  @override
+  String get scheduledTasksModelDefault => '跟随聊天或助手的模型';
+
+  @override
+  String get scheduledTasksSchedule => '执行时间';
+
+  @override
+  String get scheduledTasksActiveWindow => '活动时段';
+
+  @override
+  String get scheduledTasksStartDate => '开始日期';
+
+  @override
+  String get scheduledTasksEndDate => '结束日期';
+
+  @override
+  String get scheduledTasksActiveWindowDetail =>
+      '仅在此日期范围内执行，包含结束当天。未设置的日期不作限制。';
+
+  @override
+  String get scheduledTasksDate => '日期';
+
+  @override
+  String get scheduledTasksDateUnrestricted => '不限';
+
+  @override
+  String get scheduledTasksClear => '清除';
+
+  @override
+  String get scheduledTasksSearch => '搜索';
+
+  @override
+  String get scheduledTasksNoTargets => '此助手下没有符合条件的内容';
+
+  @override
+  String get scheduledTasksFutureDate => '请选择未来的执行日期和时间。';
+
+  @override
+  String get scheduledTasksDateRangeInvalid => '结束日期不能早于开始日期。';
+
+  @override
+  String get scheduledTasksRegenerateDetail =>
+      '使用原有上下文，为所选问题生成新的回答，保留已有回答和后续消息。';
+
+  @override
+  String get scheduledTasksSaving => '正在保存…';
+
+  @override
+  String get scheduledTasksFinished => '计划已结束';
+
+  @override
+  String get scheduledTasksModelMissing => '所选模型已不可用，请编辑任务重新选择。';
+
+  @override
+  String get scheduledTasksChatMissing => '目标聊天已不存在或已移至其他助手。';
+
+  @override
+  String get scheduledTasksMessageMissing => '所选问题已不存在，请重新选择。';
+
+  @override
+  String get scheduledTasksChatBusy => '此聊天正在生成回答，本次任务已跳过。';
+
+  @override
+  String get scheduledTasksDesktopEmpty => '暂无定时任务';
+
+  @override
+  String get scheduledTasksDesktopReliability =>
+      '仅在 Kelivo 运行时执行，最小化或驻留托盘时也会继续。退出或电脑休眠期间错过的任务不会补运行，也不会自动启动应用。';
+
+  @override
+  String get scheduledTasksDesktopExecutionDetail =>
+      '结果保存在对话中，可从任务的运行记录打开。单次最多运行 10 分钟；需要用户回答或工具确认时会停止。';
+
+  @override
+  String get worldBookStickyLabel => '粘滞（消息数）';
+
+  @override
+  String get worldBookStickyHint => '触发后在后续 N 条消息中保持激活，重复命中不延长。0 表示关闭。';
+
+  @override
+  String get worldBookCooldownLabel => '冷却（消息数）';
+
+  @override
+  String get worldBookCooldownHint => '触发后（或粘滞结束后）N 条消息内不再触发。0 表示关闭。';
+
+  @override
+  String get worldBookDelayLabel => '延迟（消息数）';
+
+  @override
+  String get worldBookDelayHint => '对话至少有 N 条消息时才允许触发。按单条消息计数，不是对话轮数。0 表示关闭。';
+
+  @override
+  String get worldBookDragToReorder => '拖动调整顺序';
+
+  @override
+  String worldBookEnabledCount(int enabled, int total) {
+    return '已启用 $enabled/$total';
+  }
+
+  @override
+  String get assistantConversationSystemPromptTitle => '独立对话系统提示';
+
+  @override
+  String get assistantConversationSystemPromptHint => '允许每个对话设置自己的系统提示词。';
+
+  @override
+  String get assistantConversationInjectionTitle => '独立对话指令注入';
+
+  @override
+  String get assistantConversationInjectionHint => '每个对话单独选择指令注入和世界书，默认不选中。';
+
+  @override
+  String get conversationSystemPromptTitle => '对话系统提示词';
+
+  @override
+  String get conversationSystemPromptHint => '仅对当前对话生效，留空时使用助手的系统提示词。';
+
+  @override
+  String get conversationSystemPromptClear => '恢复助手提示词';
+
+  @override
+  String get conversationSystemPromptPlaceholder => '为这个对话编写系统提示词…';
+
+  @override
+  String get conversationPromptScope => '仅当前对话';
+
+  @override
+  String get oauthAccountsTab => '账号登录';
+
+  @override
+  String get oauthLogin => '登录';
+
+  @override
+  String oauthLoginTo(String provider) {
+    return '登录 $provider';
+  }
+
+  @override
+  String get oauthConnected => '已连接';
+
+  @override
+  String get oauthNotConnected => '未连接';
+
+  @override
+  String oauthWaiting(String provider) {
+    return '正在等待 $provider 授权';
+  }
+
+  @override
+  String get oauthCancel => '取消授权';
+
+  @override
+  String get oauthOpenBrowser => '打开授权页面';
+
+  @override
+  String get oauthCopyCode => '复制验证码';
+
+  @override
+  String get oauthCodeHint => '在授权页面输入此验证码';
+
+  @override
+  String get oauthDeviceHint => '请先在 ChatGPT 安全设置或工作区权限中启用设备码登录。';
+
+  @override
+  String get oauthDeviceLogin => '使用设备码登录';
+
+  @override
+  String get oauthDetails => '查看账号详情';
+
+  @override
+  String get oauthConnectAnother => '再连一个';
+
+  @override
+  String get oauthRelogin => '重新登录';
+
+  @override
+  String get oauthNeedsLogin => '需重新登录';
+
+  @override
+  String oauthExpired(String provider) {
+    return '$provider 登录已过期';
+  }
+
+  @override
+  String get oauthLoginRestored => '已重新登录，可使用消息的重试按钮再次发送。';
+
+  @override
+  String get oauthLogout => '退出登录';
+
+  @override
+  String get oauthLogoutDescription => '清除此账号在本机保存的授权凭证';
+
+  @override
+  String get oauthRefreshing => '正在续期授权…';
+
+  @override
+  String get oauthRefreshUsage => '刷新用量';
+
+  @override
+  String get oauthUsageDetails => '用量明细';
+
+  @override
+  String get oauthUsageUnavailable => '暂时无法获取用量';
+
+  @override
+  String oauthLastUpdated(String time) {
+    return '更新于 $time';
+  }
+
+  @override
+  String get oauthSyncModels => '同步';
+
+  @override
+  String get oauthSyncing => '正在同步模型…';
+
+  @override
+  String get oauthModelsHint => '可用模型由账号同步。';
+
+  @override
+  String get oauthNoModels => '同步模型后即可开始对话';
+
+  @override
+  String get oauthConnection => '接入';
+
+  @override
+  String get oauthConnectionInfo => '接入信息';
+
+  @override
+  String get oauthEndpoint => '接入端点';
+
+  @override
+  String get oauthScope => '授权范围';
+
+  @override
+  String get oauthAccountId => '账号 ID';
+
+  @override
+  String get oauthTokenExpiry => '令牌有效期';
+
+  @override
+  String get oauthName => '供应商名称';
+
+  @override
+  String get oauthEnabledHint => '在模型选择器中显示这些模型';
+
+  @override
+  String get oauthNetwork => '网络代理';
+
+  @override
+  String get oauthFollowGlobal => '跟随全局设置';
+
+  @override
+  String get oauthCustomRequest => '自定义请求';
+
+  @override
+  String get oauthWeekly => '本周窗口';
+
+  @override
+  String get oauthMonthly => '本月窗口';
+
+  @override
+  String get oauthTotal => '总额度';
+
+  @override
+  String oauthHours(String count) {
+    return '$count 小时窗口';
+  }
+
+  @override
+  String oauthMinutes(String count) {
+    return '$count 分钟窗口';
+  }
+
+  @override
+  String oauthDays(String count) {
+    return '$count 天窗口';
+  }
+
+  @override
+  String get oauthWindow => '用量窗口';
+
+  @override
+  String oauthResetsAt(String time) {
+    return '重置于 $time';
+  }
+
+  @override
+  String get oauthNetworkError => '连接失败，请检查网络后重试。';
+
+  @override
+  String get oauthInvalidResponse => '授权未完成，请重试。';
+
+  @override
+  String get oauthTimeout => '授权超时，请重试。';
+
+  @override
+  String get oauthDenied => '授权未获批准，请重试。';
+
+  @override
+  String get oauthSaving => '正在连接账号…';
+
+  @override
+  String get oauthQuotaExceeded => '该账号暂无可用额度。';
+
+  @override
+  String get oauthRateLimited => '请求过于频繁，请稍后重试。';
+
+  @override
+  String get oauthPermissionDenied => '该账号无权访问此资源。';
+
+  @override
+  String get oauthRequestFailed => '供应商未能完成请求。';
+
+  @override
+  String get oauthQuotaAvailable => '额度可用';
+
+  @override
+  String oauthSavedResets(String count) {
+    return '可用额度重置次数：$count';
+  }
+
+  @override
+  String get oauthPrimaryWindow => '主要窗口';
+
+  @override
+  String get oauthSecondaryWindow => '次要窗口';
+
+  @override
+  String get oauthAuthorizationCode => '授权码或回调链接';
+
+  @override
+  String get oauthAuthorizationCodeHint => '如果浏览器没有自动返回，请将最后的回调链接或授权码粘贴到这里。';
+
+  @override
+  String get oauthInvalidAuthorizationCode => '请输入本次登录的授权码或回调链接。';
+
+  @override
+  String get oauthSubmitAuthorizationCode => '完成登录';
+
+  @override
+  String get oauthExtraUsage => '额外用量';
+
+  @override
+  String get oauthPromptCachingHelp => '复用多轮对话中的上下文，可设置缓存保留时长。';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hant`).
 class AppLocalizationsZhHant extends AppLocalizationsZh {
   AppLocalizationsZhHant() : super('zh_Hant');
+
+  @override
+  String get settingsSearchHint => '搜尋設定';
+
+  @override
+  String get settingsSearchCancel => '取消';
+
+  @override
+  String get settingsSearchClear => '清除搜尋';
+
+  @override
+  String get settingsSearchSuggestions => '常用設定';
+
+  @override
+  String get settingsSearchNoResults => '找不到相關設定';
+
+  @override
+  String get settingsSearchNoResultsHint => '試試其他名稱，或更簡短的關鍵字。';
+
+  @override
+  String settingsSearchResultCount(int count) {
+    return '找到 $count 項設定';
+  }
 
   @override
   String get helloWorld => '你好，世界！';
@@ -21984,8 +23235,13 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get homePageClearContext => '清空上下文';
 
   @override
-  String homePageClearContextWithCount(String actual, String configured) {
-    return '清空上下文 ($actual/$configured)';
+  String contextMessageCount(int count) {
+    return '$count 則訊息';
+  }
+
+  @override
+  String contextMessageCountLimited(int actual, int configured) {
+    return '$actual/$configured 則訊息';
   }
 
   @override
@@ -22109,6 +23365,17 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get mcpServerEditSheetStdioWorkingDirectoryLabel => '工作目錄（可選）';
+
+  @override
+  String get mcpWorkspaceBindingLabel => '綁定工作區（可選）';
+
+  @override
+  String get mcpWorkspaceBindingHint =>
+      '伺服器可透過 /workspace 存取此工作區。工作目錄留空時預設進入該目錄，切換聊天不會改變綁定。';
+
+  @override
+  String get mcpWorkspaceBindingMobileOnly =>
+      '工作區綁定適用於行動端 Linux 環境。在桌面端執行此伺服器前，請先解除綁定。';
 
   @override
   String get mcpServerEditSheetStdioEnvironmentTitle => '環境變數';
@@ -24044,6 +25311,26 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get displaySettingsPageAutoCollapseCodeBlockLinesUnit => '行';
+
+  @override
+  String get displaySettingsPageCollapseLongUserMessagesTitle => '摺疊過長訊息';
+
+  @override
+  String get displaySettingsPageCollapseLongUserMessagesSubtitle =>
+      '超過閾值的使用者訊息摺疊顯示，點擊可展開';
+
+  @override
+  String get displaySettingsPageCollapseLongUserMessagesCharsTitle =>
+      '超過多少字元摺疊';
+
+  @override
+  String get displaySettingsPageCollapseLongUserMessagesCharsUnit => '字元';
+
+  @override
+  String get chatMessageExpandLongText => '展開';
+
+  @override
+  String get chatMessageCollapseLongText => '收起';
 
   @override
   String get messageExportSheetFormatTitle => '匯出格式';
@@ -30776,6 +32063,9 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get workspaceEntryChange => '更換';
 
   @override
+  String get workspaceEntrySetAssistantDefault => '設為助手預設工作區';
+
+  @override
   String get workspaceEntryLocked => '已鎖定';
 
   @override
@@ -31353,6 +32643,11 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get skillsDetailBodyEmpty => '還沒有技能正文';
 
   @override
+  String skillsDetailBodyTooLarge(String size) {
+    return '檔案較大，暫不支援預覽（$size）。';
+  }
+
+  @override
   String get workspaceEnvSizeTimeout => '計算逾時';
 
   @override
@@ -31374,9 +32669,6 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String workspaceBindingSetAssistantDefault(String assistant) {
     return '已設為「$assistant」的預設工作區';
   }
-
-  @override
-  String get workspaceUnbindHint => '已解除綁定本對話；助手預設工作區可在助手設定中修改';
 
   @override
   String get storageSpaceCategoryWorkspaceFiles => '工作區檔案';
@@ -32216,4 +33508,554 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get mcpImportConfirm => '匯入';
+
+  @override
+  String get startupRecoverySnapshotTitle => '從資料庫快照還原';
+
+  @override
+  String get startupRecoverySnapshotBody =>
+      '即使資料庫無法開啟，也可以選擇本機快照還原聊天和設定。請勿解除安裝 Kelivo，解除安裝會一併刪除這些快照。';
+
+  @override
+  String get startupRecoverySnapshotEmpty => '未在本機找到資料庫快照。請先匯出資料，再嘗試其他還原操作。';
+
+  @override
+  String get startupRecoverySnapshotButton => '選擇快照還原';
+
+  @override
+  String startupRecoverySnapshotConfirm(String when) {
+    return '將聊天和設定還原到 $when 的快照？快照之後的變更不會包含在內。現有附件檔案和快照會保留，Kelivo 將重新啟動以完成還原。';
+  }
+
+  @override
+  String startupRecoverySnapshotFailed(String reason) {
+    return '無法準備快照還原：$reason';
+  }
+
+  @override
+  String get startupRecoverySnapshotReady => '快照已準備好，請重新啟動 Kelivo 完成還原。';
+
+  @override
+  String get scheduledTasksTitle => '定時任務';
+
+  @override
+  String get scheduledTasksDescription => '在指定時間自動執行任務，支援新增聊天、繼續追問或重新執行。';
+
+  @override
+  String get scheduledTasksEmpty => '把任務交給時間';
+
+  @override
+  String get scheduledTasksEmptyDetail => '晨間簡報、每日回顧，或任何希望定期完成的事。';
+
+  @override
+  String get scheduledTasksAdd => '新增任務';
+
+  @override
+  String get scheduledTasksEdit => '編輯任務';
+
+  @override
+  String get scheduledTasksName => '任務名稱';
+
+  @override
+  String get scheduledTasksNameHint => '晨間簡報';
+
+  @override
+  String get scheduledTasksPrompt => '任務內容';
+
+  @override
+  String get scheduledTasksPromptHint => '希望助手為你完成什麼？';
+
+  @override
+  String get scheduledTasksAssistant => '執行助手';
+
+  @override
+  String get scheduledTasksChooseAssistant => '選擇助手';
+
+  @override
+  String get scheduledTasksAssistantMissing => '助手已不存在';
+
+  @override
+  String get scheduledTasksTime => '執行時間';
+
+  @override
+  String get scheduledTasksTimeHint => '24 小時制，例如 08:00';
+
+  @override
+  String get scheduledTasksRepeat => '重複';
+
+  @override
+  String get scheduledTasksEveryDay => '每天';
+
+  @override
+  String get scheduledTasksWeekdays => '工作日';
+
+  @override
+  String get scheduledTasksEnabled => '啟用任務';
+
+  @override
+  String get scheduledTasksPermission => '鬧鐘和提醒';
+
+  @override
+  String get scheduledTasksPermissionDetail =>
+      '允許設定鬧鐘，才能按指定時間執行。未授權時，已啟用的任務會等待授權。';
+
+  @override
+  String get scheduledTasksPermissionAction => '前往授權';
+
+  @override
+  String get scheduledTasksReliability =>
+      '建議在電池設定中允許 Kelivo 背景執行。強制停止後需重新開啟應用程式。錯過的任務不會補跑，執行時間跟隨裝置時區。';
+
+  @override
+  String get scheduledTasksExecutionDetail =>
+      '結果儲存在對話中，完成後會傳送回覆預覽通知，點擊可開啟對話。單次最多執行 10 分鐘；需要使用者回答或工具確認時會停止。';
+
+  @override
+  String get scheduledTasksRunNow => '立即執行';
+
+  @override
+  String get scheduledTasksHistory => '執行紀錄';
+
+  @override
+  String get scheduledTasksNoRuns => '尚無執行紀錄';
+
+  @override
+  String get scheduledTasksRunning => '正在執行';
+
+  @override
+  String get scheduledTasksCompleted => '已完成';
+
+  @override
+  String get scheduledTasksFailed => '執行失敗';
+
+  @override
+  String get scheduledTasksInterrupted => '已中斷';
+
+  @override
+  String get scheduledTasksPaused => '已暫停';
+
+  @override
+  String get scheduledTasksWaitingPermission => '等待授權';
+
+  @override
+  String scheduledTasksNextRun(String time) {
+    return '下次：$time';
+  }
+
+  @override
+  String get scheduledTasksDelete => '刪除任務';
+
+  @override
+  String get scheduledTasksDeleteDetail => '刪除此任務及執行紀錄？已經產生的對話會保留。';
+
+  @override
+  String get scheduledTasksSave => '儲存';
+
+  @override
+  String get scheduledTasksCancel => '取消';
+
+  @override
+  String get scheduledTasksInvalid => '請填寫名稱、任務內容和助手，自訂重複需至少選擇一天。';
+
+  @override
+  String get scheduledTasksLoading => '正在載入…';
+
+  @override
+  String get scheduledTasksOpenChat => '查看對話';
+
+  @override
+  String get scheduledTasksNeedsInput => '任務需要使用者回答或工具確認，已停止。可開啟對話繼續。';
+
+  @override
+  String get scheduledTasksTimeout => '已達到執行時限。';
+
+  @override
+  String get scheduledTasksProcessTerminated => '上次執行被系統終止。';
+
+  @override
+  String get scheduledTasksOnce => '僅一次';
+
+  @override
+  String get scheduledTasksCustom => '自訂';
+
+  @override
+  String get scheduledTasksExecution => '執行任務';
+
+  @override
+  String get scheduledTasksMode => '執行方式';
+
+  @override
+  String get scheduledTasksNewChat => '新增聊天';
+
+  @override
+  String get scheduledTasksFollowUp => '繼續追問';
+
+  @override
+  String get scheduledTasksRegenerate => '重新執行';
+
+  @override
+  String get scheduledTasksChat => '目標聊天';
+
+  @override
+  String get scheduledTasksChooseChat => '選擇聊天';
+
+  @override
+  String get scheduledTasksMessage => '重新執行的問題';
+
+  @override
+  String get scheduledTasksChooseMessage => '選擇問題';
+
+  @override
+  String get scheduledTasksAttachmentMessage => '含附件的訊息';
+
+  @override
+  String get scheduledTasksModel => '模型';
+
+  @override
+  String get scheduledTasksChooseModel => '選擇模型';
+
+  @override
+  String get scheduledTasksModelDefault => '跟隨聊天或助手的模型';
+
+  @override
+  String get scheduledTasksSchedule => '執行時間';
+
+  @override
+  String get scheduledTasksActiveWindow => '活動時段';
+
+  @override
+  String get scheduledTasksStartDate => '開始日期';
+
+  @override
+  String get scheduledTasksEndDate => '結束日期';
+
+  @override
+  String get scheduledTasksActiveWindowDetail =>
+      '僅在此日期範圍內執行，包含結束當天。未設定的日期不作限制。';
+
+  @override
+  String get scheduledTasksDate => '日期';
+
+  @override
+  String get scheduledTasksDateUnrestricted => '不限';
+
+  @override
+  String get scheduledTasksClear => '清除';
+
+  @override
+  String get scheduledTasksSearch => '搜尋';
+
+  @override
+  String get scheduledTasksNoTargets => '此助手下沒有符合條件的內容';
+
+  @override
+  String get scheduledTasksFutureDate => '請選擇未來的執行日期和時間。';
+
+  @override
+  String get scheduledTasksDateRangeInvalid => '結束日期不能早於開始日期。';
+
+  @override
+  String get scheduledTasksRegenerateDetail =>
+      '使用原有上下文，為所選問題產生新的回答，保留已有回答和後續訊息。';
+
+  @override
+  String get scheduledTasksSaving => '正在儲存…';
+
+  @override
+  String get scheduledTasksFinished => '排程已結束';
+
+  @override
+  String get scheduledTasksModelMissing => '所選模型已無法使用，請編輯任務重新選擇。';
+
+  @override
+  String get scheduledTasksChatMissing => '目標聊天已不存在或已移至其他助手。';
+
+  @override
+  String get scheduledTasksMessageMissing => '所選問題已不存在，請重新選擇。';
+
+  @override
+  String get scheduledTasksChatBusy => '此聊天正在產生回答，本次任務已略過。';
+
+  @override
+  String get scheduledTasksDesktopEmpty => '尚無排程任務';
+
+  @override
+  String get scheduledTasksDesktopReliability =>
+      '僅在 Kelivo 執行時運作，最小化或常駐系統匣時也會繼續。結束或電腦休眠期間錯過的任務不會補執行，也不會自動啟動應用程式。';
+
+  @override
+  String get scheduledTasksDesktopExecutionDetail =>
+      '結果儲存在對話中，可從任務的執行記錄開啟。單次最多執行 10 分鐘；需要使用者回答或工具確認時會停止。';
+
+  @override
+  String get worldBookStickyLabel => '黏滯（訊息數）';
+
+  @override
+  String get worldBookStickyHint => '觸發後在後續 N 則訊息中保持啟用，重複命中不延長。0 表示關閉。';
+
+  @override
+  String get worldBookCooldownLabel => '冷卻（訊息數）';
+
+  @override
+  String get worldBookCooldownHint => '觸發後（或黏滯結束後）N 則訊息內不再觸發。0 表示關閉。';
+
+  @override
+  String get worldBookDelayLabel => '延遲（訊息數）';
+
+  @override
+  String get worldBookDelayHint => '對話至少有 N 則訊息時才允許觸發。按單則訊息計數，不是對話輪數。0 表示關閉。';
+
+  @override
+  String get worldBookDragToReorder => '拖曳調整順序';
+
+  @override
+  String worldBookEnabledCount(int enabled, int total) {
+    return '已啟用 $enabled/$total';
+  }
+
+  @override
+  String get assistantConversationSystemPromptTitle => '獨立對話系統提示';
+
+  @override
+  String get assistantConversationSystemPromptHint => '允許每個對話設定自己的系統提示詞。';
+
+  @override
+  String get assistantConversationInjectionTitle => '獨立對話指令注入';
+
+  @override
+  String get assistantConversationInjectionHint => '每個對話單獨選擇指令注入和世界書，預設不選取。';
+
+  @override
+  String get conversationSystemPromptTitle => '對話系統提示詞';
+
+  @override
+  String get conversationSystemPromptHint => '僅對目前對話生效，留空時使用助理的系統提示詞。';
+
+  @override
+  String get conversationSystemPromptClear => '恢復助理提示詞';
+
+  @override
+  String get conversationSystemPromptPlaceholder => '為這個對話編寫系統提示詞…';
+
+  @override
+  String get conversationPromptScope => '僅目前對話';
+
+  @override
+  String get oauthAccountsTab => '帳號登入';
+
+  @override
+  String get oauthLogin => '登入';
+
+  @override
+  String oauthLoginTo(String provider) {
+    return '登入 $provider';
+  }
+
+  @override
+  String get oauthConnected => '已連線';
+
+  @override
+  String get oauthNotConnected => '未連線';
+
+  @override
+  String oauthWaiting(String provider) {
+    return '正在等待 $provider 授權';
+  }
+
+  @override
+  String get oauthCancel => '取消授權';
+
+  @override
+  String get oauthOpenBrowser => '開啟授權頁面';
+
+  @override
+  String get oauthCopyCode => '複製驗證碼';
+
+  @override
+  String get oauthCodeHint => '在授權頁面輸入此驗證碼';
+
+  @override
+  String get oauthDeviceHint => '請先在 ChatGPT 安全設定或工作區權限中啟用裝置碼登入。';
+
+  @override
+  String get oauthDeviceLogin => '使用裝置碼登入';
+
+  @override
+  String get oauthDetails => '查看帳號詳情';
+
+  @override
+  String get oauthConnectAnother => '再連一個';
+
+  @override
+  String get oauthRelogin => '重新登入';
+
+  @override
+  String get oauthNeedsLogin => '需重新登入';
+
+  @override
+  String oauthExpired(String provider) {
+    return '$provider 登入已過期';
+  }
+
+  @override
+  String get oauthLoginRestored => '已重新登入，可使用訊息的重試按鈕再次傳送。';
+
+  @override
+  String get oauthLogout => '登出';
+
+  @override
+  String get oauthLogoutDescription => '清除此帳號在本機儲存的授權憑證';
+
+  @override
+  String get oauthRefreshing => '正在續期授權…';
+
+  @override
+  String get oauthRefreshUsage => '重新整理用量';
+
+  @override
+  String get oauthUsageDetails => '用量明細';
+
+  @override
+  String get oauthUsageUnavailable => '暫時無法取得用量';
+
+  @override
+  String oauthLastUpdated(String time) {
+    return '更新於 $time';
+  }
+
+  @override
+  String get oauthSyncModels => '同步';
+
+  @override
+  String get oauthSyncing => '正在同步模型…';
+
+  @override
+  String get oauthModelsHint => '可用模型由帳號同步。';
+
+  @override
+  String get oauthNoModels => '同步模型後即可開始對話';
+
+  @override
+  String get oauthConnection => '連線';
+
+  @override
+  String get oauthConnectionInfo => '連線資訊';
+
+  @override
+  String get oauthEndpoint => '連線端點';
+
+  @override
+  String get oauthScope => '授權範圍';
+
+  @override
+  String get oauthAccountId => '帳號 ID';
+
+  @override
+  String get oauthTokenExpiry => '權杖有效期限';
+
+  @override
+  String get oauthName => '供應商名稱';
+
+  @override
+  String get oauthEnabledHint => '在模型選擇器中顯示這些模型';
+
+  @override
+  String get oauthNetwork => '網路代理';
+
+  @override
+  String get oauthFollowGlobal => '跟隨全域設定';
+
+  @override
+  String get oauthCustomRequest => '自訂請求';
+
+  @override
+  String get oauthWeekly => '本週視窗';
+
+  @override
+  String get oauthMonthly => '本月視窗';
+
+  @override
+  String get oauthTotal => '總額度';
+
+  @override
+  String oauthHours(String count) {
+    return '$count 小時視窗';
+  }
+
+  @override
+  String oauthMinutes(String count) {
+    return '$count 分鐘視窗';
+  }
+
+  @override
+  String oauthDays(String count) {
+    return '$count 天視窗';
+  }
+
+  @override
+  String get oauthWindow => '用量視窗';
+
+  @override
+  String oauthResetsAt(String time) {
+    return '重設於 $time';
+  }
+
+  @override
+  String get oauthNetworkError => '連線失敗，請檢查網路後重試。';
+
+  @override
+  String get oauthInvalidResponse => '授權未完成，請重試。';
+
+  @override
+  String get oauthTimeout => '授權逾時，請重試。';
+
+  @override
+  String get oauthDenied => '授權未獲批准，請重試。';
+
+  @override
+  String get oauthSaving => '正在連接帳號…';
+
+  @override
+  String get oauthQuotaExceeded => '此帳號暫無可用額度。';
+
+  @override
+  String get oauthRateLimited => '請求過於頻繁，請稍後重試。';
+
+  @override
+  String get oauthPermissionDenied => '此帳號無權存取此資源。';
+
+  @override
+  String get oauthRequestFailed => '供應商未能完成請求。';
+
+  @override
+  String get oauthQuotaAvailable => '額度可用';
+
+  @override
+  String oauthSavedResets(String count) {
+    return '可用額度重設次數：$count';
+  }
+
+  @override
+  String get oauthPrimaryWindow => '主要視窗';
+
+  @override
+  String get oauthSecondaryWindow => '次要視窗';
+
+  @override
+  String get oauthAuthorizationCode => '授權碼或回呼連結';
+
+  @override
+  String get oauthAuthorizationCodeHint => '如果瀏覽器沒有自動返回，請將最後的回呼連結或授權碼貼到這裡。';
+
+  @override
+  String get oauthInvalidAuthorizationCode => '請輸入本次登入的授權碼或回呼連結。';
+
+  @override
+  String get oauthSubmitAuthorizationCode => '完成登入';
+
+  @override
+  String get oauthExtraUsage => '額外用量';
+
+  @override
+  String get oauthPromptCachingHelp => '重用多輪對話中的上下文，可設定快取保留時間。';
 }

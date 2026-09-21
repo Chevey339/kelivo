@@ -1,3 +1,4 @@
+import '../../../../models/provider_oauth.dart';
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
@@ -846,7 +847,15 @@ Stream<StreamChunk> runOpenAIChatCompletionsToolFollowUps({
       );
       normalizeMoonshotKimiChatBody(
         body2,
+        info: info,
         upstreamModelId: upstreamModelId,
+        isReasoning: isReasoning,
+        thinkingBudget: thinkingBudget,
+      );
+      applyKimiCodeChatThinking(
+        body2,
+        config: config,
+        modelId: modelId,
         isReasoning: isReasoning,
         thinkingBudget: thinkingBudget,
       );
@@ -871,6 +880,8 @@ Stream<StreamChunk> runOpenAIChatCompletionsToolFollowUps({
           final errorBody = await resp2.stream.bytesToString();
           throw HttpException('HTTP ${resp2.statusCode}: $errorBody');
         }
+      } on ProviderOAuthException {
+        rethrow;
       } on HttpException {
         rethrow;
       } catch (e) {

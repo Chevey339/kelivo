@@ -21,8 +21,12 @@ class ChatMessage extends HiveObject {
   final List<MessagePart> parts;
 
   /// Derived text body: concatenation of every [TextPart] in [parts] order.
-  String get content =>
-      parts.whereType<TextPart>().map((part) => part.text).join();
+  late final String _content = parts
+      .whereType<TextPart>()
+      .map((part) => part.text)
+      .join();
+
+  String get content => _content;
 
   @HiveField(3)
   final DateTime timestamp;

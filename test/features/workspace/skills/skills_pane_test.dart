@@ -71,6 +71,17 @@ void main() {
     await tester.pumpAndSettle(const Duration(milliseconds: 50));
   }
 
+  Future<void> waitForDetailBody(WidgetTester tester) async {
+    final loading = find.byKey(SkillsKeys.bodyLoading);
+    for (var i = 0; i < 200 && loading.evaluate().isNotEmpty; i++) {
+      await tester.runAsync(() async {
+        await Future<void>.delayed(const Duration(milliseconds: 10));
+      });
+      await tester.pump();
+    }
+    expect(loading, findsNothing);
+  }
+
   Future<void> dismissImportUi(WidgetTester tester) async {
     await settleOverlay(tester);
     final sheet = find.byType(FormSheet);
@@ -264,6 +275,7 @@ void main() {
     await tester.tap(find.byKey(SkillsPane.itemKey('md-skill')));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 400));
+    await waitForDetailBody(tester);
 
     expect(find.byType(MarkdownWithCodeHighlight), findsOneWidget);
     final markdown = tester.widget<MarkdownWithCodeHighlight>(
@@ -291,6 +303,7 @@ void main() {
     await tester.tap(find.byKey(SkillsPane.itemKey('frontmatter-skill')));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 400));
+    await waitForDetailBody(tester);
 
     expect(find.textContaining('name:'), findsNothing);
     expect(find.textContaining('description:'), findsNothing);
@@ -324,6 +337,7 @@ description: No instructions
     await tester.tap(find.byKey(SkillsPane.itemKey('empty-body')));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 400));
+    await waitForDetailBody(tester);
 
     expect(find.byType(MarkdownWithCodeHighlight), findsNothing);
     expect(find.byKey(SkillsKeys.bodyEmpty), findsOneWidget);

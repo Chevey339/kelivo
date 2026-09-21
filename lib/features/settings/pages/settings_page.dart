@@ -1,3 +1,6 @@
+import 'package:flutter/foundation.dart' show defaultTargetPlatform;
+import 'package:lucide_icons_flutter/lucide_icons.dart';
+import '../../scheduled_tasks/pages/scheduled_tasks_page.dart';
 import 'package:flutter/material.dart';
 import '../../../l10n/app_localizations.dart';
 import 'package:provider/provider.dart';
@@ -6,6 +9,8 @@ import '../../../core/providers/settings_provider.dart';
 import '../../model/pages/default_model_page.dart';
 import '../../provider/pages/providers_page.dart';
 import 'display_settings_page.dart';
+import 'settings_search_page.dart';
+import '../widgets/settings_search_entry.dart';
 import '../../mcp/pages/mcp_page.dart';
 import '../../workspace/pages/skills_page.dart';
 import '../../workspace/pages/workspace_settings_page.dart';
@@ -41,6 +46,7 @@ class SettingsPage extends StatelessWidget {
     final settings = context.watch<SettingsProvider>();
 
     String modeLabel(ThemeMode m) {
+      final l10n = AppLocalizations.of(context)!;
       switch (m) {
         case ThemeMode.dark:
           return l10n.settingsPageDarkMode;
@@ -123,8 +129,12 @@ class SettingsPage extends StatelessWidget {
         ),
         title: Text(l10n.settingsPageTitle),
       ),
-      body: ListView(
-        padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+      body: SettingsSearchList(
+        onSearch: (origin) => showMobileSettingsSearch(
+          context,
+          origin: origin,
+          onColorMode: pickThemeMode,
+        ),
         children: [
           if (!settings.hasAnyActiveModel)
             Material(
@@ -268,6 +278,19 @@ class SettingsPage extends StatelessWidget {
                 },
               ),
               _iosDivider(context),
+              if (defaultTargetPlatform == TargetPlatform.android) ...[
+                _iosNavRow(
+                  context,
+                  icon: LucideIcons.clock,
+                  label: l10n.scheduledTasksTitle,
+                  onTap: () => Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => const ScheduledTasksPage(),
+                    ),
+                  ),
+                ),
+                _iosDivider(context),
+              ],
               _iosNavRow(
                 context,
                 icon: Lucide.WandSparkles,

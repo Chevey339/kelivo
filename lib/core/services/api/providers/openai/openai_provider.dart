@@ -1,3 +1,4 @@
+import '../../../../models/provider_oauth.dart';
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
@@ -132,23 +133,37 @@ Stream<StreamChunk> sendOpenAIStream(
   final isReasoning = effectiveInfo.abilities.contains(ModelAbility.reasoning);
   final wantsImageOutput = effectiveInfo.output.contains(Modality.image);
   final bool canImageInput = effectiveInfo.input.contains(Modality.image);
-  final bool allowRemoteImages =
-      canImageInput && !isKimiK3Model(upstreamModelId);
 
   final effort = openAIEffortForBudget(thinkingBudget, upstreamModelId);
+  final modelMetadata = config.modelOverrides[modelId];
   final info = OpenAIProviderInfo(
     host: Uri.tryParse(config.baseUrl)?.host.toLowerCase() ?? '',
     providerId: config.id.toLowerCase(),
     upstreamModelId: upstreamModelId,
+    // Kimi Code can advertise opaque IDs such as k3. Its declared protocol and
+    // thinking capability apply even when the ID has no kimi-* prefix.
+    isKimiCodeThinkingModel:
+        config.oauthProvider == OAuthProvider.kimi &&
+        config.useResponseApi != true &&
+        modelMetadata is Map &&
+        modelMetadata['oauthProtocol'] == 'openai' &&
+        (isReasoning || modelMetadata['oauthThinkingRequired'] == true),
   );
+  final bool allowRemoteImages =
+      canImageInput &&
+      !isKimiK3Model(upstreamModelId) &&
+      !info.isKimiCodeK3Model;
   // OpenRouter documents delta-style `reasoning_details` chunks that must be
   // concatenated in order, so cumulative-snapshot detection is disabled for
   // it; other providers may resend the full array-so-far with each chunk.
   final reasoningDetailsAllowSnapshots =
       !BuiltInToolsHelper.isOpenRouterProvider(config);
   final bool needsReasoningEcho =
-      info.needsReasoningEcho &&
-      (isReasoning || (info.isDeepSeek && tools?.isNotEmpty == true));
+      info.isKimiCodeThinkingModel ||
+      (info.needsReasoningEcho &&
+          (isReasoning ||
+              info.isKimiCodingModel ||
+              (info.isDeepSeek && tools?.isNotEmpty == true)));
   void setMaxTokens(Map<String, dynamic> map) {
     if (maxTokens != null) map[info.completionTokensKey] = maxTokens;
   }
@@ -599,6 +614,7 @@ Stream<StreamChunk> sendOpenAIStream(
     if (info.isKimiThinkingModel) {
       normalizeMoonshotKimiChatBody(
         body,
+        info: info,
         upstreamModelId: upstreamModelId,
         isReasoning: isReasoning,
         thinkingBudget: thinkingBudget,
@@ -665,7 +681,15 @@ Stream<StreamChunk> sendOpenAIStream(
   );
   normalizeMoonshotKimiChatBody(
     body,
+    info: info,
     upstreamModelId: upstreamModelId,
+    isReasoning: isReasoning,
+    thinkingBudget: thinkingBudget,
+  );
+  applyKimiCodeChatThinking(
+    body,
+    config: config,
+    modelId: modelId,
     isReasoning: isReasoning,
     thinkingBudget: thinkingBudget,
   );
@@ -1189,6 +1213,8 @@ Stream<StreamChunk> sendOpenAIStream(
           return;
         }
       }
+    } on ProviderOAuthException {
+      rethrow;
     } on HttpException {
       // In-band error frames raised inside this block (follow-up tool-call
       // streams call throwIfInBandStreamError in here) and failed follow-up

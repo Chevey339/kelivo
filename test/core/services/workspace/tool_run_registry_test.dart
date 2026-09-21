@@ -63,6 +63,176 @@ void main() {
     expect(run.stderrSoFar, contains('err59'));
   });
 
+  test('progress replaces its live tail line independently of stderr', () {
+    final run = ToolRun(toolCallId: 'progress', toolName: 'shell');
+    addTearDown(run.dispose);
+
+    run.appendStdout(utf8.encode('starting\n10%'));
+    expect(run.tailLines, ['starting', '10%']);
+    run.appendStderr(utf8.encode('warning\r'));
+    run.appendStdout(utf8.encode('\r\x1b[32m100%\x1b[0m'));
+    expect(run.stdoutSoFar, 'starting\n100%');
+    expect(run.stderrSoFar, 'warning');
+    expect(run.tailLines, ['starting', '100%', 'warning']);
+
+    run.appendStderr(utf8.encode('recovered\r'));
+    run.appendStderr(utf8.encode('\n'));
+    run.complete(status: ToolRunStatus.succeeded, exitCode: 0);
+    expect(run.stdoutSoFar, 'starting\n100%');
+    expect(run.stderrSoFar, 'recovered\n');
+    expect(run.tailLines, ['starting', '100%', 'recovered']);
+  });
+
+  for (final progressOnStderr in [false, true]) {
+    test(
+      'control-only ${progressOnStderr ? 'stderr' : 'stdout'} chunks do not restore evicted progress',
+      () {
+        final run = ToolRun(toolCallId: 'control-only', toolName: 'shell');
+        addTearDown(run.dispose);
+        final appendProgress = progressOnStderr
+            ? run.appendStderr
+            : run.appendStdout;
+        final appendLogs = progressOnStderr
+            ? run.appendStdout
+            : run.appendStderr;
+        appendProgress(utf8.encode('10%'));
+        for (var i = 0; i < 205; i++) {
+          appendLogs(utf8.encode('log$i\n'));
+        }
+        final before = run.tailLines;
+        for (final control in [
+          '',
+          '\r',
+          '\x1b[0m',
+          '\x1b[?25h',
+          '\x1b',
+          '8',
+          '\x1b[',
+          '0m',
+          '\x1b]0;title',
+          '\x1b',
+          '\\',
+        ]) {
+          appendProgress(utf8.encode(control));
+          expect(run.tailLines, before, reason: jsonEncode(control));
+        }
+        run.complete(status: ToolRunStatus.succeeded, exitCode: 0);
+        expect(run.tailLines, before);
+        expect(progressOnStderr ? run.stderrSoFar : run.stdoutSoFar, '10%');
+      },
+    );
+
+    test(
+      'identical new ${progressOnStderr ? 'stderr' : 'stdout'} progress is shown after eviction',
+      () {
+        final run = ToolRun(toolCallId: 'repeated-progress', toolName: 'shell');
+        addTearDown(run.dispose);
+        final appendProgress = progressOnStderr
+            ? run.appendStderr
+            : run.appendStdout;
+        final appendLogs = progressOnStderr
+            ? run.appendStdout
+            : run.appendStderr;
+        appendProgress(utf8.encode('10%'));
+        for (var i = 0; i < 205; i++) {
+          appendLogs(utf8.encode('log$i\n'));
+        }
+        expect(run.tailLines.last, 'log204');
+        appendProgress(utf8.encode('\r\x1b[32m10%\x1b[0m'));
+        expect(run.tailLines.length, 200);
+        expect(run.tailLines.last, '10%');
+        final afterProgress = run.tailLines;
+        run.complete(status: ToolRunStatus.succeeded, exitCode: 0);
+        expect(run.tailLines, afterProgress);
+      },
+    );
+
+    test(
+      'incomplete ${progressOnStderr ? 'stderr' : 'stdout'} UTF-8 waits for visible text before restoring a tail',
+      () {
+        final run = ToolRun(toolCallId: 'partial-utf8', toolName: 'shell');
+        addTearDown(run.dispose);
+        final appendProgress = progressOnStderr
+            ? run.appendStderr
+            : run.appendStdout;
+        final appendLogs = progressOnStderr
+            ? run.appendStdout
+            : run.appendStderr;
+        appendProgress(utf8.encode('10%'));
+        for (var i = 0; i < 205; i++) {
+          appendLogs(utf8.encode('log$i\n'));
+        }
+        final before = run.tailLines;
+        final replacement = utf8.encode('\r完成 😀');
+        for (var i = 0; i < 3; i++) {
+          appendProgress(Uint8List.fromList([replacement[i]]));
+          expect(run.tailLines, before);
+        }
+        appendProgress(Uint8List.fromList(replacement.sublist(3)));
+        expect(run.tailLines.length, 200);
+        expect(run.tailLines.last, '完成 😀');
+        run.complete(status: ToolRunStatus.succeeded, exitCode: 0);
+        expect(run.tailLines.last, '完成 😀');
+      },
+    );
+
+    test(
+      'complete does not restore evicted ${progressOnStderr ? 'stderr' : 'stdout'} progress',
+      () {
+        final run = ToolRun(toolCallId: 'evicted-progress', toolName: 'shell');
+        addTearDown(run.dispose);
+        final appendProgress = progressOnStderr
+            ? run.appendStderr
+            : run.appendStdout;
+        final appendLogs = progressOnStderr
+            ? run.appendStdout
+            : run.appendStderr;
+        appendProgress(utf8.encode('10%'));
+        for (var i = 0; i < 205; i++) {
+          appendLogs(utf8.encode('log$i\n'));
+        }
+        final beforeComplete = run.tailLines;
+        expect(beforeComplete.length, 200);
+        expect(beforeComplete.first, 'log5');
+        expect(beforeComplete.last, 'log204');
+        expect(beforeComplete, isNot(contains('10%')));
+
+        run.complete(status: ToolRunStatus.succeeded, exitCode: 0);
+        expect(run.tailLines, beforeComplete);
+        expect(progressOnStderr ? run.stderrSoFar : run.stdoutSoFar, '10%');
+      },
+    );
+
+    test(
+      'complete still adds ${progressOnStderr ? 'stderr' : 'stdout'} text emitted by UTF-8 finalization',
+      () {
+        final run = ToolRun(toolCallId: 'utf8-finalization', toolName: 'shell');
+        addTearDown(run.dispose);
+        final appendProgress = progressOnStderr
+            ? run.appendStderr
+            : run.appendStdout;
+        final appendLogs = progressOnStderr
+            ? run.appendStdout
+            : run.appendStderr;
+        appendProgress(utf8.encode('partial '));
+        appendProgress(Uint8List.fromList([0xe4]));
+        for (var i = 0; i < 205; i++) {
+          appendLogs(utf8.encode('log$i\n'));
+        }
+        expect(run.tailLines.last, 'log204');
+
+        run.complete(status: ToolRunStatus.cancelled);
+        expect(run.tailLines.length, 200);
+        expect(run.tailLines.first, 'log6');
+        expect(run.tailLines.last, 'partial \uFFFD');
+        expect(
+          progressOnStderr ? run.stderrSoFar : run.stdoutSoFar,
+          'partial \uFFFD',
+        );
+      },
+    );
+  }
+
   test(
     'identical provider tool IDs remain independent across conversations',
     () {

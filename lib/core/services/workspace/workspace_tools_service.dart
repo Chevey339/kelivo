@@ -703,8 +703,6 @@ class WorkspaceToolsService {
       conversationId: conversationId ?? ctx.conversationId,
       runtimeRunId: runtimeRunId,
     );
-    final stdoutBuf = BoundedStreamBuffer();
-    final stderrBuf = BoundedStreamBuffer();
     final before = await FileSnapshot.snapshot([
       Directory(ctx.paths.workspaceHostRoot),
       ctx.sessionDir,
@@ -737,10 +735,8 @@ class WorkspaceToolsService {
             break;
           case CommandOutput(:final kind, :final bytes):
             if (kind == OutputStreamKind.stdout) {
-              stdoutBuf.add(bytes);
               run.appendStdout(bytes);
             } else {
-              stderrBuf.add(bytes);
               run.appendStderr(bytes);
             }
           case CommandExited():
@@ -770,6 +766,8 @@ class WorkspaceToolsService {
         ? ToolRunStatus.succeeded
         : ToolRunStatus.failed;
     run.complete(status: runStatus, exitCode: exited?.exitCode);
+    final stdout = run.stdoutSoFar;
+    final stderr = run.stderrSoFar;
 
     final after = await FileSnapshot.snapshot([
       Directory(ctx.paths.workspaceHostRoot),
@@ -815,8 +813,8 @@ class WorkspaceToolsService {
           status: 'error',
           code: 'shell_failed',
           command: command,
-          stdoutPreview: stdoutBuf.text,
-          stderrPreview: stderrBuf.text,
+          stdoutPreview: stdout,
+          stderrPreview: stderr,
           files: files,
           filesTruncated: filesTruncated,
         ),
@@ -825,8 +823,8 @@ class WorkspaceToolsService {
 
     final offload = await ToolOutputOffloader.maybeOffload(
       toolCallId: toolCallId,
-      stdout: stdoutBuf.text,
-      stderr: stderrBuf.text,
+      stdout: stdout,
+      stderr: stderr,
       outputsDir: ctx.outputsDir,
     );
     final payload = _shellPayload(offload.modelText);
@@ -835,7 +833,7 @@ class WorkspaceToolsService {
     payload['timed_out'] = exited.timedOut;
     payload['cancelled'] = exited.cancelled;
     payload['interrupted'] = exited.interrupted;
-    if (stdoutBuf.truncated || stderrBuf.truncated) {
+    if (run.stdoutTruncated || run.stderrTruncated) {
       payload['truncated'] = true;
     }
     if (files.isNotEmpty) {
@@ -864,16 +862,8 @@ class WorkspaceToolsService {
       timedOut: exited.timedOut,
       cancelled: exited.cancelled,
       interrupted: exited.interrupted,
-      stdoutPreview: utf16SafeCut(
-        stdoutBuf.text,
-        _previewLimit,
-        keepTail: true,
-      ),
-      stderrPreview: utf16SafeCut(
-        stderrBuf.text,
-        _previewLimit,
-        keepTail: true,
-      ),
+      stdoutPreview: utf16SafeCut(stdout, _previewLimit, keepTail: true),
+      stderrPreview: utf16SafeCut(stderr, _previewLimit, keepTail: true),
       files: files,
       filesTruncated: filesTruncated,
       truncated: payload['truncated'] == true,
@@ -1533,7 +1523,11 @@ class WorkspaceToolsService {
     final modelBase = p.posix.basename(
       resolved.modelPath.replaceAll('\\', '/'),
     );
-    if (base != 'SKILL.md' && modelBase != 'SKILL.md') return;
+    // Windows path canonicalization lowercases SKILL.md along with its parents.
+    if (base.toLowerCase() != 'skill.md' &&
+        modelBase.toLowerCase() != 'skill.md') {
+      return;
+    }
     final skillId = _skillIdUnderSkillsRoot(ctx, resolved);
     if (skillId == null || skillId.isEmpty) return;
     try {

@@ -14,12 +14,14 @@ class ContextManagementSheet extends StatelessWidget {
     super.key,
     this.onCompress,
     this.onClear,
-    this.clearLabel,
+    this.messageCountLabel,
   });
 
   final VoidCallback? onCompress;
   final VoidCallback? onClear;
-  final String? clearLabel;
+
+  /// Messages currently in context, e.g. "12 messages". Shown on the clear row.
+  final String? messageCountLabel;
 
   @override
   Widget build(BuildContext context) {
@@ -68,8 +70,9 @@ class ContextManagementSheet extends StatelessWidget {
           const SizedBox(height: 8),
           _OptionRow(
             icon: Lucide.Eraser,
-            label: clearLabel ?? l10n.bottomToolsSheetClearContext,
+            label: l10n.bottomToolsSheetClearContext,
             description: l10n.clearContextDesc,
+            trailing: messageCountLabel,
             onTap: () {
               Haptics.light();
               onClear?.call();
@@ -88,12 +91,14 @@ class _OptionRow extends StatelessWidget {
     required this.label,
     required this.description,
     this.onTap,
+    this.trailing,
   });
 
   final IconData icon;
   final String label;
   final String description;
   final VoidCallback? onTap;
+  final String? trailing;
 
   @override
   Widget build(BuildContext context) {
@@ -135,6 +140,17 @@ class _OptionRow extends StatelessWidget {
               ],
             ),
           ),
+          if (trailing != null) ...[
+            const SizedBox(width: 12),
+            Text(
+              trailing!,
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: AppFontWeights.medium,
+                color: cs.onSurface.withValues(alpha: 0.55),
+              ),
+            ),
+          ],
         ],
       ),
     );

@@ -8,6 +8,7 @@ Future<void> requireWorkspaceStdioCommand({
   required WorkspaceRuntime runtime,
   required String command,
   required String cwd,
+  List<Mount> mounts = const [],
   required Map<String, String> environment,
   required Duration timeout,
   required bool Function() isCancelled,
@@ -24,6 +25,7 @@ Future<void> requireWorkspaceStdioCommand({
                 command:
                     'command -v ${StdioArguments.format([command])} >/dev/null 2>&1',
                 cwd: cwd,
+                mounts: mounts,
                 env: environment,
                 timeout: timeout,
                 isCancelled: isCancelled,

@@ -241,4 +241,10 @@ class Lucide {
   static const IconData AArrowDown = lucide.LucideIcons.aArrowDown;
   static const IconData Braces = lucide.LucideIcons.braces;
   static const IconData File = lucide.LucideIcons.file;
+  static const IconData Bell = lucide.LucideIcons.bell;
+  static const IconData Battery = lucide.LucideIcons.battery;
+  static const IconData Power = lucide.LucideIcons.power;
+  static const IconData SlidersHorizontal =
+      lucide.LucideIcons.slidersHorizontal;
+  static const IconData AudioLines = lucide.LucideIcons.audioLines;
 }

@@ -71,6 +71,9 @@ class WorldBookEntry {
   final bool caseSensitive;
   final int scanDepth;
   final bool constantActive;
+  final int sticky;
+  final int cooldown;
+  final int delay;
 
   const WorldBookEntry({
     required this.id,
@@ -86,6 +89,9 @@ class WorldBookEntry {
     this.caseSensitive = false,
     this.scanDepth = 4,
     this.constantActive = false,
+    this.sticky = 0,
+    this.cooldown = 0,
+    this.delay = 0,
   });
 
   WorldBookEntry copyWith({
@@ -102,6 +108,9 @@ class WorldBookEntry {
     bool? caseSensitive,
     int? scanDepth,
     bool? constantActive,
+    int? sticky,
+    int? cooldown,
+    int? delay,
   }) {
     return WorldBookEntry(
       id: id ?? this.id,
@@ -117,6 +126,9 @@ class WorldBookEntry {
       caseSensitive: caseSensitive ?? this.caseSensitive,
       scanDepth: scanDepth ?? this.scanDepth,
       constantActive: constantActive ?? this.constantActive,
+      sticky: sticky ?? this.sticky,
+      cooldown: cooldown ?? this.cooldown,
+      delay: delay ?? this.delay,
     );
   }
 
@@ -134,6 +146,9 @@ class WorldBookEntry {
     'caseSensitive': caseSensitive,
     'scanDepth': scanDepth,
     'constantActive': constantActive,
+    'sticky': sticky,
+    'cooldown': cooldown,
+    'delay': delay,
   };
 
   static WorldBookEntry fromJson(Map<String, dynamic> json) {
@@ -158,6 +173,9 @@ class WorldBookEntry {
       caseSensitive: (json['caseSensitive'] as bool?) ?? false,
       scanDepth: (json['scanDepth'] as int?) ?? 4,
       constantActive: (json['constantActive'] as bool?) ?? false,
+      sticky: ((json['sticky'] as int?) ?? 0).clamp(0, 10000),
+      cooldown: ((json['cooldown'] as int?) ?? 0).clamp(0, 10000),
+      delay: ((json['delay'] as int?) ?? 0).clamp(0, 10000),
     );
   }
 }
@@ -168,6 +186,8 @@ class WorldBook {
   final String description;
   final bool enabled;
   final List<WorldBookEntry> entries;
+
+  int get enabledEntryCount => entries.where((entry) => entry.enabled).length;
 
   const WorldBook({
     required this.id,

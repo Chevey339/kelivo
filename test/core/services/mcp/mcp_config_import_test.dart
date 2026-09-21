@@ -17,6 +17,7 @@ void main() {
               'args': ['mcp-server-time', '', 'line1\nline2'],
               'env': {'KEY': '  value  '},
               'cwd': '/root',
+              'workspaceId': 'scripts-workspace',
             },
             'remote': {
               'url': 'https://example.com/mcp',
@@ -29,6 +30,7 @@ void main() {
       expect(servers[0].args, ['mcp-server-time', '', 'line1\nline2']);
       expect(servers[0].env['KEY'], '  value  ');
       expect(servers[0].workingDirectory, '/root');
+      expect(servers[0].workspaceId, 'scripts-workspace');
       expect(servers[1].transport, McpTransportType.http);
       expect(servers[1].headers['Authorization'], 'Bearer token');
       expect(servers[2].transport, McpTransportType.sse);
@@ -41,6 +43,7 @@ void main() {
         'args': [4],
       },
       {'type': 'stdio'},
+      {'command': 'node', 'workspaceId': 42},
       {'url': 'file:///secret'},
       {
         'command': 'npx',

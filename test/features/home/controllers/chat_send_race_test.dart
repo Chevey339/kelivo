@@ -22,6 +22,7 @@ import 'package:Kelivo/core/services/mcp/mcp_tool_service.dart';
 import 'package:Kelivo/features/chat/widgets/chat_message_widget.dart'
     show ToolUIPart;
 import 'package:Kelivo/features/home/controllers/home_page_controller.dart';
+import 'package:Kelivo/features/home/controllers/chat_actions.dart';
 import 'package:Kelivo/features/home/controllers/scroll_controller.dart';
 import 'package:Kelivo/features/home/services/ask_user_interaction_service.dart';
 import 'package:Kelivo/features/home/widgets/chat_input_bar.dart';
@@ -57,14 +58,56 @@ void main() {
   late SettingsProvider settings;
   late AssistantProvider assistantProvider;
   var streamRequestCount = 0;
+  final streamRequests = <Map<String, dynamic>>[];
   Completer<void>? streamHold;
+  Completer<void>? suggestionHold;
+  final suggestionRequests = <Map<String, dynamic>>[];
+  var suggestionResponse =
+      '{"suggestions":["suggestion one","suggestion two"]}';
+  var suggestionResponsesSent = 0;
+  late AskUserInteractionService questions;
 
   Future<void> handleApiRequest(HttpRequest request) async {
     final body =
         jsonDecode(await utf8.decoder.bind(request).join())
             as Map<String, dynamic>;
+    if (body['model'] == 'gpt-4o' &&
+        body['stream'] != true &&
+        !(body['messages'] as List).any((m) => m['role'] == 'tool')) {
+      request.response.headers.contentType = ContentType.json;
+      request.response.write(
+        jsonEncode({
+          'choices': [
+            {
+              'message': {
+                'role': 'assistant',
+                'content': null,
+                'tool_calls': [
+                  {
+                    'id': 'scheduled-ask',
+                    'type': 'function',
+                    'function': {
+                      'name': AskUserToolNames.askUser,
+                      'arguments': jsonEncode({
+                        'questions': [
+                          {'id': 'q1', 'question': 'Which option?'},
+                        ],
+                      }),
+                    },
+                  },
+                ],
+              },
+              'finish_reason': 'tool_calls',
+            },
+          ],
+        }),
+      );
+      await request.response.close();
+      return;
+    }
     if (body['stream'] == true) {
       streamRequestCount++;
+      streamRequests.add(body);
       final hold = streamHold;
       if (hold != null) await hold.future;
       request.response.statusCode = HttpStatus.ok;
@@ -92,18 +135,30 @@ void main() {
       await request.response.close();
       return;
     }
+    final isSuggestion = (body['messages'] as List).any(
+      (m) =>
+          m['role'] == 'system' &&
+          (m['content'] as String).contains('candidate next messages'),
+    );
+    final response = suggestionResponse;
+    if (isSuggestion) {
+      suggestionRequests.add(body);
+      final hold = suggestionHold;
+      if (hold != null) await hold.future;
+    }
     request.response.statusCode = HttpStatus.ok;
     request.response.headers.contentType = ContentType.json;
     request.response.write(
       jsonEncode({
         'choices': [
           {
-            'message': {'content': '- suggestion one\n- suggestion two'},
+            'message': {'content': isSuggestion ? response : 'Test title'},
           },
         ],
       }),
     );
     await request.response.close();
+    if (isSuggestion) suggestionResponsesSent++;
   }
 
   setUp(() async {
@@ -120,7 +175,13 @@ void main() {
     service = ChatService(existingRepository: repository);
     await service.init();
     streamRequestCount = 0;
+    streamRequests.clear();
     streamHold = null;
+    suggestionHold = null;
+    suggestionRequests.clear();
+    suggestionResponsesSent = 0;
+    suggestionResponse = '{"suggestions":["suggestion one","suggestion two"]}';
+    questions = AskUserInteractionService();
     server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
     server.listen(handleApiRequest);
   });
@@ -181,6 +242,9 @@ void main() {
     await tester.pumpWidget(
       MultiProvider(
         providers: [
+          ChangeNotifierProvider<AskUserInteractionService>.value(
+            value: questions,
+          ),
           ChangeNotifierProvider<SettingsProvider>.value(value: settings),
           ChangeNotifierProvider<ChatService>.value(value: service),
           ChangeNotifierProvider<AssistantProvider>.value(
@@ -490,6 +554,204 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets(
+    'suggestion requests isolate rules and preserve literal placeholders',
+    (tester) async {
+      final controller = await pumpHarness(tester, withSuggestions: true);
+      await tester.runAsync(() async {
+        final convo = await openConversation(controller);
+        await controller.sendMessage(
+          ChatInputData(text: 'Explain {locale} and {content}'),
+        );
+        await waitFor(
+          () => service.getConversation(convo.id)!.chatSuggestions.isNotEmpty,
+          'suggestions',
+        );
+        final request = suggestionRequests.single;
+        final messages = request['messages'] as List;
+        expect(messages.first['role'], 'system');
+        expect(messages.first['content'], contains('JSON object'));
+        expect(messages.last['role'], 'user');
+        expect(
+          messages.last['content'],
+          contains('Explain {locale} and {content}'),
+        );
+        expect(messages.last['content'], contains('"role":"assistant"'));
+        expect(request.containsKey('response_format'), isFalse);
+      });
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  for (final mutation in [
+    'clear context',
+    'edit answer',
+    'disable',
+    'send again',
+  ]) {
+    testWidgets('discard delayed suggestions after $mutation', (tester) async {
+      final controller = await pumpHarness(tester, withSuggestions: true);
+      await tester.runAsync(() async {
+        suggestionHold = Completer<void>();
+        final convo = await openConversation(controller);
+        await controller.sendMessage(ChatInputData(text: 'hello'));
+        await waitFor(
+          () => suggestionRequests.length == 1,
+          'pending suggestions',
+        );
+        await waitFor(
+          () => !controller.chatController.isConversationLoading(convo.id),
+          'first reply to finish',
+        );
+        switch (mutation) {
+          case 'clear context':
+            await controller.clearContext();
+          case 'edit answer':
+            final messages = await service.loadMessages(convo.id);
+            await service.updateMessage(
+              messages.last.id,
+              content: 'Edited answer',
+            );
+          case 'disable':
+            await settings.disableSuggestionGeneration();
+          case 'send again':
+            streamHold = Completer<void>();
+            await controller.sendMessage(ChatInputData(text: 'new question'));
+            await waitFor(
+              () => streamRequestCount == 2,
+              'second stream to start',
+            );
+        }
+        suggestionHold!.complete();
+        await waitFor(() => suggestionResponsesSent == 1, 'delayed response');
+        await Future<void>.delayed(const Duration(milliseconds: 200));
+        expect(service.getConversation(convo.id)!.chatSuggestions, isEmpty);
+        if (streamHold != null) {
+          await settings.disableSuggestionGeneration();
+          streamHold!.complete();
+          await waitFor(
+            () => !controller.chatController.isConversationLoading(convo.id),
+            'second reply to finish',
+          );
+        }
+      });
+      expect(tester.takeException(), isNull);
+    });
+  }
+
+  testWidgets('an empty suggestions array is not a background error', (
+    tester,
+  ) async {
+    final controller = await pumpHarness(tester, withSuggestions: true);
+    final errors = <Object>[];
+    controller.debugViewModel.onBackgroundTaskError = (_, error) =>
+        errors.add(error);
+    await tester.runAsync(() async {
+      suggestionResponse = '{"suggestions":[]}';
+      final convo = await openConversation(controller);
+      await controller.sendMessage(ChatInputData(text: 'Thanks, that is all.'));
+      await waitFor(() => suggestionResponsesSent == 1, 'empty response');
+      await Future<void>.delayed(const Duration(milliseconds: 200));
+      expect(service.getConversation(convo.id)!.chatSuggestions, isEmpty);
+      expect(errors, isEmpty);
+    });
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets(
+    'background suggestions use that conversations selected version',
+    (tester) async {
+      final controller = await pumpHarness(tester, withSuggestions: true);
+      await tester.runAsync(() async {
+        final convo = await openConversation(controller);
+        await service.addMessage(
+          conversationId: convo.id,
+          role: 'user',
+          content: 'Compare storage',
+        );
+        final answer = await service.addMessage(
+          conversationId: convo.id,
+          role: 'assistant',
+          content: 'SELECTED ANSWER',
+        );
+        await service.addMessage(
+          conversationId: convo.id,
+          role: 'assistant',
+          groupId: answer.groupId ?? answer.id,
+          version: 1,
+          content: 'UNSELECTED ANSWER',
+        );
+        await service.setSelectedVersion(
+          convo.id,
+          answer.groupId ?? answer.id,
+          0,
+        );
+        final other = await service.createConversation(title: 'Other');
+        await controller.chatController.setCurrentConversationAndLoad(other);
+        controller.debugViewModel.debugChatActions.onMaybeGenerateSuggestions!(
+          convo.id,
+        );
+        await waitFor(
+          () => service.getConversation(convo.id)!.chatSuggestions.isNotEmpty,
+          'background suggestions',
+        );
+        final prompt =
+            (suggestionRequests.single['messages'] as List).last['content']
+                as String;
+        expect(prompt, contains('SELECTED ANSWER'));
+        expect(prompt, isNot(contains('UNSELECTED ANSWER')));
+        expect(controller.currentConversation!.id, other.id);
+        expect(service.getConversation(other.id)!.chatSuggestions, isEmpty);
+      });
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets('older suggestion requests cannot overwrite a newer result', (
+    tester,
+  ) async {
+    final controller = await pumpHarness(tester, withSuggestions: true);
+    await tester.runAsync(() async {
+      final convo = await openConversation(controller);
+      await service.addMessage(
+        conversationId: convo.id,
+        role: 'user',
+        content: 'Question',
+      );
+      await service.addMessage(
+        conversationId: convo.id,
+        role: 'assistant',
+        content: 'Answer',
+      );
+      final oldHold = Completer<void>();
+      suggestionHold = oldHold;
+      suggestionResponse = '{"suggestions":["old suggestion"]}';
+      controller.debugViewModel.debugChatActions.onMaybeGenerateSuggestions!(
+        convo.id,
+      );
+      await waitFor(() => suggestionRequests.length == 1, 'old request');
+      suggestionHold = null;
+      suggestionResponse = '{"suggestions":["new suggestion"]}';
+      controller.debugViewModel.debugChatActions.onMaybeGenerateSuggestions!(
+        convo.id,
+      );
+      await waitFor(
+        () => service.getConversation(convo.id)!.chatSuggestions.isNotEmpty,
+        'new result',
+      );
+      expect(service.getConversation(convo.id)!.chatSuggestions, [
+        'new suggestion',
+      ]);
+      oldHold.complete();
+      await waitFor(() => suggestionResponsesSent == 2, 'old response');
+      await Future<void>.delayed(const Duration(milliseconds: 200));
+      expect(service.getConversation(convo.id)!.chatSuggestions, [
+        'new suggestion',
+      ]);
+    });
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('multi-version conversation still saves generated suggestions', (
     tester,
   ) async {
@@ -574,6 +836,275 @@ void main() {
           secondMessages.where((m) => m.role == 'user').single.content,
           'from b',
         );
+      });
+      expect(tester.takeException(), isNull);
+    },
+  );
+  testWidgets('scheduled send uses its model over the conversation pin', (
+    tester,
+  ) async {
+    final controller = await pumpHarness(tester);
+    await tester.runAsync(() async {
+      final target = await openConversation(controller);
+      await controller.sendMessage(ChatInputData(text: 'Previous question'));
+      await waitFor(
+        () => !controller.chatController.isConversationLoading(target.id),
+        'initial reply',
+      );
+      await service.setConversationModel(
+        target.id,
+        providerKey: 'SiliconFlow',
+        modelId: 'pinned-model',
+      );
+      final foreground = await openConversation(controller);
+      String? startedMessage;
+      final result = await controller.debugViewModel.sendScheduledMessage(
+        input: ChatInputData(text: 'Scheduled follow-up'),
+        conversation: service.getConversation(target.id)!,
+        assistant: assistantProvider.currentAssistant!,
+        modelOverride: (providerKey: 'SiliconFlow', modelId: 'scheduled-model'),
+        onGenerationStarted: (id) => startedMessage = id,
+      );
+      expect(result.success, isTrue);
+      expect(startedMessage, result.assistantMessage!.id);
+      await waitFor(
+        () => !controller.chatController.isConversationLoading(target.id),
+        'scheduled reply',
+      );
+      expect(streamRequests.last['model'], 'scheduled-model');
+      final messages = streamRequests.last['messages'] as List;
+      expect(
+        messages.where((m) => m['role'] == 'user').map((m) => m['content']),
+        ['Previous question', 'Scheduled follow-up'],
+      );
+      expect(service.getConversation(target.id)!.chatModelId, 'pinned-model');
+      expect(settings.currentModelId, 'test-model');
+      expect(controller.chatController.currentConversation!.id, foreground.id);
+    });
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets(
+    'scheduled rerun preserves later messages and the foreground chat',
+    (tester) async {
+      final controller = await pumpHarness(tester);
+      await tester.runAsync(() async {
+        final target = await openConversation(controller);
+        for (final question in ['First question', 'Later question']) {
+          await controller.sendMessage(ChatInputData(text: question));
+          await waitFor(
+            () => !controller.chatController.isConversationLoading(target.id),
+            'reply to $question',
+          );
+        }
+        final before = List<ChatMessage>.of(
+          await service.loadMessages(target.id),
+        );
+        final question = before.firstWhere((m) => m.role == 'user');
+        await settings.setRegenerateDeleteTrailingMessages(true);
+        final foreground = await openConversation(controller);
+        final selections = Map<String, int>.of(
+          controller.debugViewModel.versionSelections,
+        );
+        final result = await controller.debugViewModel
+            .regenerateScheduledMessage(
+              message: question,
+              conversation: service.getConversation(target.id)!,
+              assistant: assistantProvider.currentAssistant!,
+              modelOverride: (
+                providerKey: 'SiliconFlow',
+                modelId: 'rerun-model',
+              ),
+            );
+        expect(result.success, isTrue);
+        expect(result.generationRunId, isNotNull);
+        await waitFor(
+          () => !controller.chatController.isConversationLoading(target.id),
+          'scheduled rerun',
+        );
+        final after = await service.loadMessages(target.id);
+        expect(after, hasLength(before.length + 1));
+        expect(after.map((m) => m.id), containsAll(before.map((m) => m.id)));
+        expect(streamRequests.last['model'], 'rerun-model');
+        final messages = streamRequests.last['messages'] as List;
+        expect(
+          messages.where((m) => m['role'] == 'user').map((m) => m['content']),
+          ['First question'],
+        );
+        expect(
+          controller.chatController.currentConversation!.id,
+          foreground.id,
+        );
+        expect(controller.debugViewModel.versionSelections, selections);
+      });
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'a busy scheduled target and stale cancellation leave the user stream running',
+    (tester) async {
+      final controller = await pumpHarness(tester);
+      await tester.runAsync(() async {
+        streamHold = Completer<void>();
+        final target = await openConversation(controller);
+        await controller.sendMessage(ChatInputData(text: 'User is chatting'));
+        await waitFor(() => streamRequestCount == 1, 'held user request');
+        final question = (await service.loadMessages(
+          target.id,
+        )).firstWhere((m) => m.role == 'user');
+        var starts = 0;
+        final send = await controller.debugViewModel.sendScheduledMessage(
+          input: ChatInputData(text: 'Scheduled follow-up'),
+          conversation: target,
+          assistant: assistantProvider.currentAssistant!,
+          onGenerationStarted: (_) => starts++,
+        );
+        final rerun = await controller.debugViewModel
+            .regenerateScheduledMessage(
+              message: question,
+              conversation: target,
+              assistant: assistantProvider.currentAssistant!,
+              onGenerationStarted: (_) => starts++,
+            );
+        expect(send.errorMessage, 'in_flight');
+        expect(rerun.errorMessage, 'in_flight');
+        expect(starts, 0);
+        await ChatActions.cancelActiveGenerationFor(
+          target.id,
+          expectedMessageId: 'finished-scheduled-run',
+        );
+        expect(
+          controller.chatController.isConversationLoading(target.id),
+          isTrue,
+        );
+        streamHold!.complete();
+        await waitFor(
+          () => !controller.chatController.isConversationLoading(target.id),
+          'original user reply',
+        );
+        expect(streamRequestCount, 1);
+        expect((await service.loadMessages(target.id)).last.content, 'ok');
+      });
+      expect(tester.takeException(), isNull);
+    },
+  );
+  testWidgets(
+    'scheduled rerun before context reset succeeds without changing the cutoff',
+    (tester) async {
+      final controller = await pumpHarness(tester);
+      await tester.runAsync(() async {
+        final target = await openConversation(controller);
+        await controller.sendMessage(ChatInputData(text: 'Original question'));
+        await waitFor(
+          () => !controller.chatController.isConversationLoading(target.id),
+          'original reply',
+        );
+        final question = (await service.loadMessages(
+          target.id,
+        )).firstWhere((m) => m.role == 'user');
+        await service.toggleTruncateAtTail(target.id);
+        final current = service.getConversation(target.id)!;
+        final choices = await repository.getSelectedMessageProjections(
+          target.id,
+        );
+        expect(choices.any((m) => m.id == question.id), isTrue);
+        expect(await repository.getMessage(question.id), isNotNull);
+        final result = await controller.debugViewModel
+            .regenerateScheduledMessage(
+              message: question,
+              conversation: current,
+              assistant: assistantProvider.currentAssistant!,
+            );
+        expect(result.success, isTrue);
+        await waitFor(
+          () => !controller.chatController.isConversationLoading(target.id),
+          'scheduled rerun',
+        );
+        expect(streamRequestCount, 2);
+        expect(
+          service.getConversation(target.id)!.truncateIndex,
+          current.truncateIndex,
+        );
+        expect(
+          (streamRequests.last['messages'] as List)
+              .where((m) => m['role'] == 'user')
+              .map((m) => m['content']),
+          ['Original question'],
+        );
+        await controller.debugViewModel.sendScheduledMessage(
+          input: ChatInputData(text: 'After clear'),
+          conversation: service.getConversation(target.id)!,
+          assistant: assistantProvider.currentAssistant!,
+        );
+        await waitFor(
+          () => !controller.chatController.isConversationLoading(target.id),
+          'follow-up after clear',
+        );
+        expect(
+          (streamRequests.last['messages'] as List)
+              .where((m) => m['role'] == 'user')
+              .map((m) => m['content']),
+          ['After clear'],
+        );
+      });
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'scheduled nonstream rerun returns a run while user input is pending',
+    (tester) async {
+      final controller = await pumpHarness(tester);
+      await tester.runAsync(() async {
+        final target = await openConversation(controller);
+        await controller.sendMessage(ChatInputData(text: 'Original question'));
+        await waitFor(
+          () => !controller.chatController.isConversationLoading(target.id),
+          'original reply',
+        );
+        final question = (await service.loadMessages(
+          target.id,
+        )).firstWhere((m) => m.role == 'user');
+        var returned = false;
+        final run = controller.debugViewModel
+            .regenerateScheduledMessage(
+              message: question,
+              conversation: service.getConversation(target.id)!,
+              assistant: assistantProvider.currentAssistant!.copyWith(
+                streamOutput: false,
+                localToolIds: [AskUserToolNames.askUser],
+              ),
+              modelOverride: (providerKey: 'SiliconFlow', modelId: 'gpt-4o'),
+            )
+            .then((result) {
+              returned = true;
+              return result;
+            });
+        try {
+          await waitFor(
+            () => questions.pendingRequests.isNotEmpty,
+            'real ask-user tool request',
+          );
+          await Future<void>.delayed(const Duration(milliseconds: 700));
+          expect(returned, isTrue);
+          final result = await run;
+          expect(result.success, isTrue);
+          expect(result.generationRunId, isNotNull);
+          expect(
+            (await repository.getGenerationRun(
+              result.generationRunId!,
+            ))!.state.isTerminal,
+            isFalse,
+          );
+          expect(
+            questions.pendingRequests.values.single.conversationId,
+            target.id,
+          );
+        } finally {
+          await ChatActions.cancelActiveGenerationFor(target.id);
+          await run.timeout(const Duration(seconds: 10));
+        }
       });
       expect(tester.takeException(), isNull);
     },

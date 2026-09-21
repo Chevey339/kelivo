@@ -2,6 +2,13 @@ import Cocoa
 import FlutterMacOS
 
 class MainFlutterWindow: NSWindow {
+  private let systemPower = DesktopSystemPowerState()
+  private var powerChannel: FlutterMethodChannel?
+
+  deinit {
+    powerChannel?.setMethodCallHandler(nil)
+  }
+
   // Use Cocoa autosave to persist and restore window frame precisely on macOS.
   private let autosaveName = NSWindow.FrameAutosaveName("KelivoMainWindowFrame")
 
@@ -119,6 +126,17 @@ class MainFlutterWindow: NSWindow {
     self.layoutTrafficLights()
 
     RegisterGeneratedPlugins(registry: flutterViewController)
+
+    powerChannel = FlutterMethodChannel(name: "app.desktop_power",
+                                       binaryMessenger: flutterViewController.engine.binaryMessenger)
+    powerChannel?.setMethodCallHandler { [weak self] call, result in
+      guard call.method == "state", let self = self else {
+        result(FlutterMethodNotImplemented)
+        return
+      }
+      result(self.systemPower.snapshot)
+    }
+
 
     let channel = FlutterMethodChannel(name: "app.clipboard", binaryMessenger: flutterViewController.engine.binaryMessenger)
     channel.setMethodCallHandler { (call: FlutterMethodCall, result: @escaping FlutterResult) in

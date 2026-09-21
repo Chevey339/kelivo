@@ -573,9 +573,14 @@ void main() {
     );
 
     test(
-      'Responses API supports built-in search for the DeepSeek V4 family',
+      'Responses API supports built-in search for the DeepSeek Flash / V4 family',
       () {
-        for (final modelId in const ['deepseek-v4-pro', 'deepseek-v4-flash']) {
+        for (final modelId in const [
+          'deepseek-flash',
+          'deepseek/deepseek-flash',
+          'deepseek-v4-pro',
+          'deepseek-v4-flash',
+        ]) {
           final modelOverrides = <String, dynamic>{
             modelId: <String, dynamic>{
               'builtInTools': const <String>[BuiltInToolNames.search],

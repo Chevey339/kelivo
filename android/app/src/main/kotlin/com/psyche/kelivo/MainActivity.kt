@@ -38,6 +38,13 @@ class MainActivity : FlutterActivity() {
         kelivo.backgroundRuntime.setForeground(true)
     }
 
+    override fun onPostResume() {
+        super.onPostResume()
+        // A headless engine may have sent SystemChrome settings before its
+        // Activity/PlatformPlugin existed. Apply the window policy on attach.
+        applyEdgeToEdgeSystemBars(window)
+    }
+
     override fun onStop() {
         kelivo.backgroundRuntime.setForeground(false)
         super.onStop()
@@ -119,7 +126,7 @@ class MainActivity : FlutterActivity() {
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
          super.configureFlutterEngine(flutterEngine)
         incomingShareHandler = IncomingShareHandler(this, flutterEngine.dartExecutor.binaryMessenger)
-         McpOAuthHandler.configure(this, flutterEngine.dartExecutor.binaryMessenger)
+         OAuthHandler.configure(this, flutterEngine.dartExecutor.binaryMessenger)
          kelivo.backgroundRuntime.attachActivity(this)
          deviceLocalToolsHandler = kelivo.deviceTools.also { it.attachActivity(this) }
          workspacePlugin = kelivo.workspace.also { it.attachActivity(this) }
@@ -220,7 +227,7 @@ class MainActivity : FlutterActivity() {
     override fun onDestroy() {
         deviceLocalToolsHandler?.detachActivity(this)
         kelivo.backgroundRuntime.detachActivity(this)
-        McpOAuthHandler.detachActivity(this)
+        OAuthHandler.detachActivity(this)
         processTextChannel?.setMethodCallHandler(null)
         fileSaveChannel?.setMethodCallHandler(null)
         deviceStorageChannel?.setMethodCallHandler(null)

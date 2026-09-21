@@ -52,6 +52,10 @@ List<McpServerConfig> parseMcpConfigImport(String text) {
     if (cwd != null && cwd is! String) {
       throw FormatException('Invalid working directory: $name');
     }
+    final workspaceId = config['workspaceId'];
+    if (workspaceId != null && workspaceId is! String) {
+      throw FormatException('Invalid workspace binding: $name');
+    }
     result.add(
       McpServerConfig(
         id: const Uuid().v4(),
@@ -68,6 +72,7 @@ List<McpServerConfig> parseMcpConfigImport(String text) {
         url: stdio ? '' : url as String,
         headers: _strings(config['headers'], name),
         workingDirectory: cwd as String?,
+        workspaceId: stdio ? workspaceId as String? : null,
       ),
     );
   }

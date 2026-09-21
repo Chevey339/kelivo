@@ -100,6 +100,48 @@ abstract class AppLocalizations {
     Locale.fromSubtags(languageCode: 'zh', scriptCode: 'Hant'),
   ];
 
+  /// No description provided for @settingsSearchHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Search settings'**
+  String get settingsSearchHint;
+
+  /// No description provided for @settingsSearchCancel.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel'**
+  String get settingsSearchCancel;
+
+  /// No description provided for @settingsSearchClear.
+  ///
+  /// In en, this message translates to:
+  /// **'Clear search'**
+  String get settingsSearchClear;
+
+  /// No description provided for @settingsSearchSuggestions.
+  ///
+  /// In en, this message translates to:
+  /// **'Quick access'**
+  String get settingsSearchSuggestions;
+
+  /// No description provided for @settingsSearchNoResults.
+  ///
+  /// In en, this message translates to:
+  /// **'No settings found'**
+  String get settingsSearchNoResults;
+
+  /// No description provided for @settingsSearchNoResultsHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Try a different name or a shorter keyword.'**
+  String get settingsSearchNoResultsHint;
+
+  /// No description provided for @settingsSearchResultCount.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 result} other{{count} results}}'**
+  String settingsSearchResultCount(int count);
+
   /// No description provided for @helloWorld.
   ///
   /// In en, this message translates to:
@@ -1102,11 +1144,17 @@ abstract class AppLocalizations {
   /// **'Clear Context'**
   String get homePageClearContext;
 
-  /// No description provided for @homePageClearContextWithCount.
+  /// No description provided for @contextMessageCount.
   ///
   /// In en, this message translates to:
-  /// **'Clear Context ({actual}/{configured})'**
-  String homePageClearContextWithCount(String actual, String configured);
+  /// **'{count} messages'**
+  String contextMessageCount(int count);
+
+  /// No description provided for @contextMessageCountLimited.
+  ///
+  /// In en, this message translates to:
+  /// **'{actual}/{configured} messages'**
+  String contextMessageCountLimited(int actual, int configured);
 
   /// No description provided for @homePageDefaultAssistant.
   ///
@@ -1347,6 +1395,24 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Working Directory (optional)'**
   String get mcpServerEditSheetStdioWorkingDirectoryLabel;
+
+  /// No description provided for @mcpWorkspaceBindingLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Bind workspace (optional)'**
+  String get mcpWorkspaceBindingLabel;
+
+  /// No description provided for @mcpWorkspaceBindingHint.
+  ///
+  /// In en, this message translates to:
+  /// **'The server can access this workspace at /workspace. Leave Working Directory empty to start there. The binding stays fixed when you switch chats.'**
+  String get mcpWorkspaceBindingHint;
+
+  /// No description provided for @mcpWorkspaceBindingMobileOnly.
+  ///
+  /// In en, this message translates to:
+  /// **'Workspace binding is available in the mobile Linux environment. Unbind it to run this server on desktop.'**
+  String get mcpWorkspaceBindingMobileOnly;
 
   /// No description provided for @mcpServerEditSheetStdioEnvironmentTitle.
   ///
@@ -5001,6 +5067,42 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'lines'**
   String get displaySettingsPageAutoCollapseCodeBlockLinesUnit;
+
+  /// No description provided for @displaySettingsPageCollapseLongUserMessagesTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Collapse Long Messages'**
+  String get displaySettingsPageCollapseLongUserMessagesTitle;
+
+  /// No description provided for @displaySettingsPageCollapseLongUserMessagesSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Fold user messages past the threshold behind an expand button'**
+  String get displaySettingsPageCollapseLongUserMessagesSubtitle;
+
+  /// No description provided for @displaySettingsPageCollapseLongUserMessagesCharsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Collapse threshold'**
+  String get displaySettingsPageCollapseLongUserMessagesCharsTitle;
+
+  /// No description provided for @displaySettingsPageCollapseLongUserMessagesCharsUnit.
+  ///
+  /// In en, this message translates to:
+  /// **'chars'**
+  String get displaySettingsPageCollapseLongUserMessagesCharsUnit;
+
+  /// No description provided for @chatMessageExpandLongText.
+  ///
+  /// In en, this message translates to:
+  /// **'Expand'**
+  String get chatMessageExpandLongText;
+
+  /// No description provided for @chatMessageCollapseLongText.
+  ///
+  /// In en, this message translates to:
+  /// **'Collapse'**
+  String get chatMessageCollapseLongText;
 
   /// No description provided for @messageExportSheetFormatTitle.
   ///
@@ -17513,6 +17615,12 @@ abstract class AppLocalizations {
   /// **'Change'**
   String get workspaceEntryChange;
 
+  /// No description provided for @workspaceEntrySetAssistantDefault.
+  ///
+  /// In en, this message translates to:
+  /// **'Set as assistant default'**
+  String get workspaceEntrySetAssistantDefault;
+
   /// No description provided for @workspaceEntryLocked.
   ///
   /// In en, this message translates to:
@@ -18573,6 +18681,12 @@ abstract class AppLocalizations {
   /// **'No skill body yet'**
   String get skillsDetailBodyEmpty;
 
+  /// No description provided for @skillsDetailBodyTooLarge.
+  ///
+  /// In en, this message translates to:
+  /// **'This file is too large to preview ({size}).'**
+  String skillsDetailBodyTooLarge(String size);
+
   /// No description provided for @workspaceEnvSizeTimeout.
   ///
   /// In en, this message translates to:
@@ -18614,12 +18728,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Set as default workspace for “{assistant}”'**
   String workspaceBindingSetAssistantDefault(String assistant);
-
-  /// No description provided for @workspaceUnbindHint.
-  ///
-  /// In en, this message translates to:
-  /// **'Unbound this conversation; change the assistant\'s default workspace in assistant settings'**
-  String get workspaceUnbindHint;
 
   /// No description provided for @storageSpaceCategoryWorkspaceFiles.
   ///
@@ -20216,6 +20324,1038 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Import'**
   String get mcpImportConfirm;
+
+  /// No description provided for @startupRecoverySnapshotTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Restore from a database snapshot'**
+  String get startupRecoverySnapshotTitle;
+
+  /// No description provided for @startupRecoverySnapshotBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose a snapshot on this device to recover your chats and settings, even when the database cannot open. Do not uninstall Kelivo: uninstalling also removes these snapshots.'**
+  String get startupRecoverySnapshotBody;
+
+  /// No description provided for @startupRecoverySnapshotEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No database snapshots were found on this device. Export your data before trying other recovery actions.'**
+  String get startupRecoverySnapshotEmpty;
+
+  /// No description provided for @startupRecoverySnapshotButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose a snapshot'**
+  String get startupRecoverySnapshotButton;
+
+  /// No description provided for @startupRecoverySnapshotConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Restore chats and settings from {when}? Changes made after this snapshot will not be included. Existing attachment files and the snapshot will be kept. Kelivo will restart to complete the restore.'**
+  String startupRecoverySnapshotConfirm(String when);
+
+  /// No description provided for @startupRecoverySnapshotFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not prepare the snapshot restore: {reason}'**
+  String startupRecoverySnapshotFailed(String reason);
+
+  /// No description provided for @startupRecoverySnapshotReady.
+  ///
+  /// In en, this message translates to:
+  /// **'The snapshot is ready. Restart Kelivo to complete the restore.'**
+  String get startupRecoverySnapshotReady;
+
+  /// No description provided for @scheduledTasksTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Scheduled tasks'**
+  String get scheduledTasksTitle;
+
+  /// No description provided for @scheduledTasksDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Run tasks automatically at your chosen time: start a new chat, follow up, or run a question again.'**
+  String get scheduledTasksDescription;
+
+  /// No description provided for @scheduledTasksEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'Your day, on a schedule'**
+  String get scheduledTasksEmpty;
+
+  /// No description provided for @scheduledTasksEmptyDetail.
+  ///
+  /// In en, this message translates to:
+  /// **'Add a task for a morning briefing, a daily review, or anything you want to run regularly.'**
+  String get scheduledTasksEmptyDetail;
+
+  /// No description provided for @scheduledTasksAdd.
+  ///
+  /// In en, this message translates to:
+  /// **'Add task'**
+  String get scheduledTasksAdd;
+
+  /// No description provided for @scheduledTasksEdit.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit task'**
+  String get scheduledTasksEdit;
+
+  /// No description provided for @scheduledTasksName.
+  ///
+  /// In en, this message translates to:
+  /// **'Name'**
+  String get scheduledTasksName;
+
+  /// No description provided for @scheduledTasksNameHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Morning briefing'**
+  String get scheduledTasksNameHint;
+
+  /// No description provided for @scheduledTasksPrompt.
+  ///
+  /// In en, this message translates to:
+  /// **'Prompt'**
+  String get scheduledTasksPrompt;
+
+  /// No description provided for @scheduledTasksPromptHint.
+  ///
+  /// In en, this message translates to:
+  /// **'What would you like your assistant to do?'**
+  String get scheduledTasksPromptHint;
+
+  /// No description provided for @scheduledTasksAssistant.
+  ///
+  /// In en, this message translates to:
+  /// **'Assistant'**
+  String get scheduledTasksAssistant;
+
+  /// No description provided for @scheduledTasksChooseAssistant.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose an assistant'**
+  String get scheduledTasksChooseAssistant;
+
+  /// No description provided for @scheduledTasksAssistantMissing.
+  ///
+  /// In en, this message translates to:
+  /// **'Assistant unavailable'**
+  String get scheduledTasksAssistantMissing;
+
+  /// No description provided for @scheduledTasksTime.
+  ///
+  /// In en, this message translates to:
+  /// **'Time'**
+  String get scheduledTasksTime;
+
+  /// No description provided for @scheduledTasksTimeHint.
+  ///
+  /// In en, this message translates to:
+  /// **'24-hour time, e.g. 08:00'**
+  String get scheduledTasksTimeHint;
+
+  /// No description provided for @scheduledTasksRepeat.
+  ///
+  /// In en, this message translates to:
+  /// **'Repeat'**
+  String get scheduledTasksRepeat;
+
+  /// No description provided for @scheduledTasksEveryDay.
+  ///
+  /// In en, this message translates to:
+  /// **'Every day'**
+  String get scheduledTasksEveryDay;
+
+  /// No description provided for @scheduledTasksWeekdays.
+  ///
+  /// In en, this message translates to:
+  /// **'Weekdays'**
+  String get scheduledTasksWeekdays;
+
+  /// No description provided for @scheduledTasksEnabled.
+  ///
+  /// In en, this message translates to:
+  /// **'Enabled'**
+  String get scheduledTasksEnabled;
+
+  /// No description provided for @scheduledTasksPermission.
+  ///
+  /// In en, this message translates to:
+  /// **'Alarms & reminders'**
+  String get scheduledTasksPermission;
+
+  /// No description provided for @scheduledTasksPermissionDetail.
+  ///
+  /// In en, this message translates to:
+  /// **'Allow exact alarms to run tasks at your chosen time. Enabled tasks will wait until permission is granted.'**
+  String get scheduledTasksPermissionDetail;
+
+  /// No description provided for @scheduledTasksPermissionAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Allow'**
+  String get scheduledTasksPermissionAction;
+
+  /// No description provided for @scheduledTasksReliability.
+  ///
+  /// In en, this message translates to:
+  /// **'Keep Kelivo unrestricted in battery settings for more reliable execution. Force stopping the app cancels alarms until you reopen it. Missed runs are skipped; tasks follow the device time zone.'**
+  String get scheduledTasksReliability;
+
+  /// No description provided for @scheduledTasksExecutionDetail.
+  ///
+  /// In en, this message translates to:
+  /// **'Results are saved in chats. A completion notification previews the reply and opens the conversation when tapped. Runs stop after 10 minutes or when user input or tool approval is needed.'**
+  String get scheduledTasksExecutionDetail;
+
+  /// No description provided for @scheduledTasksRunNow.
+  ///
+  /// In en, this message translates to:
+  /// **'Run now'**
+  String get scheduledTasksRunNow;
+
+  /// No description provided for @scheduledTasksHistory.
+  ///
+  /// In en, this message translates to:
+  /// **'Run history'**
+  String get scheduledTasksHistory;
+
+  /// No description provided for @scheduledTasksNoRuns.
+  ///
+  /// In en, this message translates to:
+  /// **'No runs yet'**
+  String get scheduledTasksNoRuns;
+
+  /// No description provided for @scheduledTasksRunning.
+  ///
+  /// In en, this message translates to:
+  /// **'Running'**
+  String get scheduledTasksRunning;
+
+  /// No description provided for @scheduledTasksCompleted.
+  ///
+  /// In en, this message translates to:
+  /// **'Completed'**
+  String get scheduledTasksCompleted;
+
+  /// No description provided for @scheduledTasksFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed'**
+  String get scheduledTasksFailed;
+
+  /// No description provided for @scheduledTasksInterrupted.
+  ///
+  /// In en, this message translates to:
+  /// **'Interrupted'**
+  String get scheduledTasksInterrupted;
+
+  /// No description provided for @scheduledTasksPaused.
+  ///
+  /// In en, this message translates to:
+  /// **'Paused'**
+  String get scheduledTasksPaused;
+
+  /// No description provided for @scheduledTasksWaitingPermission.
+  ///
+  /// In en, this message translates to:
+  /// **'Waiting for permission'**
+  String get scheduledTasksWaitingPermission;
+
+  /// No description provided for @scheduledTasksNextRun.
+  ///
+  /// In en, this message translates to:
+  /// **'Next: {time}'**
+  String scheduledTasksNextRun(String time);
+
+  /// No description provided for @scheduledTasksDelete.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete task'**
+  String get scheduledTasksDelete;
+
+  /// No description provided for @scheduledTasksDeleteDetail.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete this schedule and its run history? Conversations already created will be kept.'**
+  String get scheduledTasksDeleteDetail;
+
+  /// No description provided for @scheduledTasksSave.
+  ///
+  /// In en, this message translates to:
+  /// **'Save'**
+  String get scheduledTasksSave;
+
+  /// No description provided for @scheduledTasksCancel.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel'**
+  String get scheduledTasksCancel;
+
+  /// No description provided for @scheduledTasksInvalid.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter a name, prompt and assistant, and select at least one day for a custom schedule.'**
+  String get scheduledTasksInvalid;
+
+  /// No description provided for @scheduledTasksLoading.
+  ///
+  /// In en, this message translates to:
+  /// **'Loading…'**
+  String get scheduledTasksLoading;
+
+  /// No description provided for @scheduledTasksOpenChat.
+  ///
+  /// In en, this message translates to:
+  /// **'View conversation'**
+  String get scheduledTasksOpenChat;
+
+  /// No description provided for @scheduledTasksNeedsInput.
+  ///
+  /// In en, this message translates to:
+  /// **'Stopped because user input or tool approval was required. Open the conversation to continue.'**
+  String get scheduledTasksNeedsInput;
+
+  /// No description provided for @scheduledTasksTimeout.
+  ///
+  /// In en, this message translates to:
+  /// **'The execution time limit was reached.'**
+  String get scheduledTasksTimeout;
+
+  /// No description provided for @scheduledTasksProcessTerminated.
+  ///
+  /// In en, this message translates to:
+  /// **'Android stopped the previous run.'**
+  String get scheduledTasksProcessTerminated;
+
+  /// No description provided for @scheduledTasksOnce.
+  ///
+  /// In en, this message translates to:
+  /// **'Once'**
+  String get scheduledTasksOnce;
+
+  /// No description provided for @scheduledTasksCustom.
+  ///
+  /// In en, this message translates to:
+  /// **'Custom'**
+  String get scheduledTasksCustom;
+
+  /// No description provided for @scheduledTasksExecution.
+  ///
+  /// In en, this message translates to:
+  /// **'Task'**
+  String get scheduledTasksExecution;
+
+  /// No description provided for @scheduledTasksMode.
+  ///
+  /// In en, this message translates to:
+  /// **'Action'**
+  String get scheduledTasksMode;
+
+  /// No description provided for @scheduledTasksNewChat.
+  ///
+  /// In en, this message translates to:
+  /// **'New chat'**
+  String get scheduledTasksNewChat;
+
+  /// No description provided for @scheduledTasksFollowUp.
+  ///
+  /// In en, this message translates to:
+  /// **'Follow up'**
+  String get scheduledTasksFollowUp;
+
+  /// No description provided for @scheduledTasksRegenerate.
+  ///
+  /// In en, this message translates to:
+  /// **'Run again'**
+  String get scheduledTasksRegenerate;
+
+  /// No description provided for @scheduledTasksChat.
+  ///
+  /// In en, this message translates to:
+  /// **'Conversation'**
+  String get scheduledTasksChat;
+
+  /// No description provided for @scheduledTasksChooseChat.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose a conversation'**
+  String get scheduledTasksChooseChat;
+
+  /// No description provided for @scheduledTasksMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Question to run again'**
+  String get scheduledTasksMessage;
+
+  /// No description provided for @scheduledTasksChooseMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose a question'**
+  String get scheduledTasksChooseMessage;
+
+  /// No description provided for @scheduledTasksAttachmentMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Message with attachments'**
+  String get scheduledTasksAttachmentMessage;
+
+  /// No description provided for @scheduledTasksModel.
+  ///
+  /// In en, this message translates to:
+  /// **'Model'**
+  String get scheduledTasksModel;
+
+  /// No description provided for @scheduledTasksChooseModel.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose a model'**
+  String get scheduledTasksChooseModel;
+
+  /// No description provided for @scheduledTasksModelDefault.
+  ///
+  /// In en, this message translates to:
+  /// **'Use the conversation or assistant model'**
+  String get scheduledTasksModelDefault;
+
+  /// No description provided for @scheduledTasksSchedule.
+  ///
+  /// In en, this message translates to:
+  /// **'Schedule'**
+  String get scheduledTasksSchedule;
+
+  /// No description provided for @scheduledTasksActiveWindow.
+  ///
+  /// In en, this message translates to:
+  /// **'Active dates'**
+  String get scheduledTasksActiveWindow;
+
+  /// No description provided for @scheduledTasksStartDate.
+  ///
+  /// In en, this message translates to:
+  /// **'Start date'**
+  String get scheduledTasksStartDate;
+
+  /// No description provided for @scheduledTasksEndDate.
+  ///
+  /// In en, this message translates to:
+  /// **'End date'**
+  String get scheduledTasksEndDate;
+
+  /// No description provided for @scheduledTasksActiveWindowDetail.
+  ///
+  /// In en, this message translates to:
+  /// **'Runs only within these dates, including the end date. Leave a date unset for no limit.'**
+  String get scheduledTasksActiveWindowDetail;
+
+  /// No description provided for @scheduledTasksDate.
+  ///
+  /// In en, this message translates to:
+  /// **'Date'**
+  String get scheduledTasksDate;
+
+  /// No description provided for @scheduledTasksDateUnrestricted.
+  ///
+  /// In en, this message translates to:
+  /// **'No limit'**
+  String get scheduledTasksDateUnrestricted;
+
+  /// No description provided for @scheduledTasksClear.
+  ///
+  /// In en, this message translates to:
+  /// **'Clear'**
+  String get scheduledTasksClear;
+
+  /// No description provided for @scheduledTasksSearch.
+  ///
+  /// In en, this message translates to:
+  /// **'Search'**
+  String get scheduledTasksSearch;
+
+  /// No description provided for @scheduledTasksNoTargets.
+  ///
+  /// In en, this message translates to:
+  /// **'No matching items for this assistant'**
+  String get scheduledTasksNoTargets;
+
+  /// No description provided for @scheduledTasksFutureDate.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose a future execution date and time.'**
+  String get scheduledTasksFutureDate;
+
+  /// No description provided for @scheduledTasksDateRangeInvalid.
+  ///
+  /// In en, this message translates to:
+  /// **'The end date must be on or after the start date.'**
+  String get scheduledTasksDateRangeInvalid;
+
+  /// No description provided for @scheduledTasksRegenerateDetail.
+  ///
+  /// In en, this message translates to:
+  /// **'Generates another answer to the selected question using its original context. Existing answers and later messages are kept.'**
+  String get scheduledTasksRegenerateDetail;
+
+  /// No description provided for @scheduledTasksSaving.
+  ///
+  /// In en, this message translates to:
+  /// **'Saving…'**
+  String get scheduledTasksSaving;
+
+  /// No description provided for @scheduledTasksFinished.
+  ///
+  /// In en, this message translates to:
+  /// **'Schedule ended'**
+  String get scheduledTasksFinished;
+
+  /// No description provided for @scheduledTasksModelMissing.
+  ///
+  /// In en, this message translates to:
+  /// **'The selected model is unavailable. Edit this task to choose another model.'**
+  String get scheduledTasksModelMissing;
+
+  /// No description provided for @scheduledTasksChatMissing.
+  ///
+  /// In en, this message translates to:
+  /// **'The conversation is unavailable or belongs to another assistant.'**
+  String get scheduledTasksChatMissing;
+
+  /// No description provided for @scheduledTasksMessageMissing.
+  ///
+  /// In en, this message translates to:
+  /// **'The selected question is no longer available.'**
+  String get scheduledTasksMessageMissing;
+
+  /// No description provided for @scheduledTasksChatBusy.
+  ///
+  /// In en, this message translates to:
+  /// **'This conversation is generating a reply. The scheduled run was skipped.'**
+  String get scheduledTasksChatBusy;
+
+  /// No description provided for @scheduledTasksDesktopEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No scheduled tasks'**
+  String get scheduledTasksDesktopEmpty;
+
+  /// No description provided for @scheduledTasksDesktopReliability.
+  ///
+  /// In en, this message translates to:
+  /// **'Tasks run only while Kelivo is running, including when minimized or in the system tray. Missed times are skipped after quitting or computer sleep. Kelivo will not start automatically.'**
+  String get scheduledTasksDesktopReliability;
+
+  /// No description provided for @scheduledTasksDesktopExecutionDetail.
+  ///
+  /// In en, this message translates to:
+  /// **'Results are saved in chats. Open them from the task’s run history. Runs stop after 10 minutes or when user input or tool approval is needed.'**
+  String get scheduledTasksDesktopExecutionDetail;
+
+  /// No description provided for @worldBookStickyLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Sticky (messages)'**
+  String get worldBookStickyLabel;
+
+  /// No description provided for @worldBookStickyHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Keep this entry active for N messages after triggering. Repeated matches do not extend it. 0 disables this effect.'**
+  String get worldBookStickyHint;
+
+  /// No description provided for @worldBookCooldownLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Cooldown (messages)'**
+  String get worldBookCooldownLabel;
+
+  /// No description provided for @worldBookCooldownHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Prevent reactivation for N messages after triggering or after sticky ends. 0 disables this effect.'**
+  String get worldBookCooldownHint;
+
+  /// No description provided for @worldBookDelayLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Delay (messages)'**
+  String get worldBookDelayLabel;
+
+  /// No description provided for @worldBookDelayHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Allow activation only after the conversation has at least N messages. Count individual messages, not exchanges. 0 disables this effect.'**
+  String get worldBookDelayHint;
+
+  /// No description provided for @worldBookDragToReorder.
+  ///
+  /// In en, this message translates to:
+  /// **'Drag to reorder'**
+  String get worldBookDragToReorder;
+
+  /// No description provided for @worldBookEnabledCount.
+  ///
+  /// In en, this message translates to:
+  /// **'{enabled}/{total} enabled'**
+  String worldBookEnabledCount(int enabled, int total);
+
+  /// No description provided for @assistantConversationSystemPromptTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Per-conversation system prompt'**
+  String get assistantConversationSystemPromptTitle;
+
+  /// No description provided for @assistantConversationSystemPromptHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Allow each conversation to use its own system prompt.'**
+  String get assistantConversationSystemPromptHint;
+
+  /// No description provided for @assistantConversationInjectionTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Per-conversation instruction injections'**
+  String get assistantConversationInjectionTitle;
+
+  /// No description provided for @assistantConversationInjectionHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose instruction injections and world books for each conversation. None selected by default.'**
+  String get assistantConversationInjectionHint;
+
+  /// No description provided for @conversationSystemPromptTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Conversation system prompt'**
+  String get conversationSystemPromptTitle;
+
+  /// No description provided for @conversationSystemPromptHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Applies only to this conversation. Leave blank to use the assistant’s system prompt.'**
+  String get conversationSystemPromptHint;
+
+  /// No description provided for @conversationSystemPromptClear.
+  ///
+  /// In en, this message translates to:
+  /// **'Use assistant prompt'**
+  String get conversationSystemPromptClear;
+
+  /// No description provided for @conversationSystemPromptPlaceholder.
+  ///
+  /// In en, this message translates to:
+  /// **'Write a system prompt for this conversation…'**
+  String get conversationSystemPromptPlaceholder;
+
+  /// No description provided for @conversationPromptScope.
+  ///
+  /// In en, this message translates to:
+  /// **'This conversation'**
+  String get conversationPromptScope;
+
+  /// No description provided for @oauthAccountsTab.
+  ///
+  /// In en, this message translates to:
+  /// **'Accounts'**
+  String get oauthAccountsTab;
+
+  /// No description provided for @oauthLogin.
+  ///
+  /// In en, this message translates to:
+  /// **'Log in'**
+  String get oauthLogin;
+
+  /// No description provided for @oauthLoginTo.
+  ///
+  /// In en, this message translates to:
+  /// **'Log in to {provider}'**
+  String oauthLoginTo(String provider);
+
+  /// No description provided for @oauthConnected.
+  ///
+  /// In en, this message translates to:
+  /// **'Connected'**
+  String get oauthConnected;
+
+  /// No description provided for @oauthNotConnected.
+  ///
+  /// In en, this message translates to:
+  /// **'Not connected'**
+  String get oauthNotConnected;
+
+  /// No description provided for @oauthWaiting.
+  ///
+  /// In en, this message translates to:
+  /// **'Waiting for {provider} authorization'**
+  String oauthWaiting(String provider);
+
+  /// No description provided for @oauthCancel.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel authorization'**
+  String get oauthCancel;
+
+  /// No description provided for @oauthOpenBrowser.
+  ///
+  /// In en, this message translates to:
+  /// **'Open authorization page'**
+  String get oauthOpenBrowser;
+
+  /// No description provided for @oauthCopyCode.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy code'**
+  String get oauthCopyCode;
+
+  /// No description provided for @oauthCodeHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter this code on the authorization page'**
+  String get oauthCodeHint;
+
+  /// No description provided for @oauthDeviceHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Enable device code login in your ChatGPT security settings or workspace permissions first.'**
+  String get oauthDeviceHint;
+
+  /// No description provided for @oauthDeviceLogin.
+  ///
+  /// In en, this message translates to:
+  /// **'Use device code'**
+  String get oauthDeviceLogin;
+
+  /// No description provided for @oauthDetails.
+  ///
+  /// In en, this message translates to:
+  /// **'View account details'**
+  String get oauthDetails;
+
+  /// No description provided for @oauthConnectAnother.
+  ///
+  /// In en, this message translates to:
+  /// **'Connect another account'**
+  String get oauthConnectAnother;
+
+  /// No description provided for @oauthRelogin.
+  ///
+  /// In en, this message translates to:
+  /// **'Log in again'**
+  String get oauthRelogin;
+
+  /// No description provided for @oauthNeedsLogin.
+  ///
+  /// In en, this message translates to:
+  /// **'Login required'**
+  String get oauthNeedsLogin;
+
+  /// No description provided for @oauthExpired.
+  ///
+  /// In en, this message translates to:
+  /// **'{provider} login has expired'**
+  String oauthExpired(String provider);
+
+  /// No description provided for @oauthLoginRestored.
+  ///
+  /// In en, this message translates to:
+  /// **'Logged in. Use the message retry button to send again.'**
+  String get oauthLoginRestored;
+
+  /// No description provided for @oauthLogout.
+  ///
+  /// In en, this message translates to:
+  /// **'Log out'**
+  String get oauthLogout;
+
+  /// No description provided for @oauthLogoutDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove this account’s saved credentials from this device'**
+  String get oauthLogoutDescription;
+
+  /// No description provided for @oauthRefreshing.
+  ///
+  /// In en, this message translates to:
+  /// **'Refreshing authorization…'**
+  String get oauthRefreshing;
+
+  /// No description provided for @oauthRefreshUsage.
+  ///
+  /// In en, this message translates to:
+  /// **'Refresh usage'**
+  String get oauthRefreshUsage;
+
+  /// No description provided for @oauthUsageDetails.
+  ///
+  /// In en, this message translates to:
+  /// **'Usage details'**
+  String get oauthUsageDetails;
+
+  /// No description provided for @oauthUsageUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'Usage is currently unavailable'**
+  String get oauthUsageUnavailable;
+
+  /// No description provided for @oauthLastUpdated.
+  ///
+  /// In en, this message translates to:
+  /// **'Updated {time}'**
+  String oauthLastUpdated(String time);
+
+  /// No description provided for @oauthSyncModels.
+  ///
+  /// In en, this message translates to:
+  /// **'Sync'**
+  String get oauthSyncModels;
+
+  /// No description provided for @oauthSyncing.
+  ///
+  /// In en, this message translates to:
+  /// **'Syncing models…'**
+  String get oauthSyncing;
+
+  /// No description provided for @oauthModelsHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Available models are synced from your account.'**
+  String get oauthModelsHint;
+
+  /// No description provided for @oauthNoModels.
+  ///
+  /// In en, this message translates to:
+  /// **'Sync models to start chatting'**
+  String get oauthNoModels;
+
+  /// No description provided for @oauthConnection.
+  ///
+  /// In en, this message translates to:
+  /// **'Connection'**
+  String get oauthConnection;
+
+  /// No description provided for @oauthConnectionInfo.
+  ///
+  /// In en, this message translates to:
+  /// **'Connection details'**
+  String get oauthConnectionInfo;
+
+  /// No description provided for @oauthEndpoint.
+  ///
+  /// In en, this message translates to:
+  /// **'Endpoint'**
+  String get oauthEndpoint;
+
+  /// No description provided for @oauthScope.
+  ///
+  /// In en, this message translates to:
+  /// **'Authorization scope'**
+  String get oauthScope;
+
+  /// No description provided for @oauthAccountId.
+  ///
+  /// In en, this message translates to:
+  /// **'Account ID'**
+  String get oauthAccountId;
+
+  /// No description provided for @oauthTokenExpiry.
+  ///
+  /// In en, this message translates to:
+  /// **'Token expires'**
+  String get oauthTokenExpiry;
+
+  /// No description provided for @oauthName.
+  ///
+  /// In en, this message translates to:
+  /// **'Provider name'**
+  String get oauthName;
+
+  /// No description provided for @oauthEnabledHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Show these models in the model picker'**
+  String get oauthEnabledHint;
+
+  /// No description provided for @oauthNetwork.
+  ///
+  /// In en, this message translates to:
+  /// **'Network proxy'**
+  String get oauthNetwork;
+
+  /// No description provided for @oauthFollowGlobal.
+  ///
+  /// In en, this message translates to:
+  /// **'Follow global settings'**
+  String get oauthFollowGlobal;
+
+  /// No description provided for @oauthCustomRequest.
+  ///
+  /// In en, this message translates to:
+  /// **'Custom request'**
+  String get oauthCustomRequest;
+
+  /// No description provided for @oauthWeekly.
+  ///
+  /// In en, this message translates to:
+  /// **'Weekly window'**
+  String get oauthWeekly;
+
+  /// No description provided for @oauthMonthly.
+  ///
+  /// In en, this message translates to:
+  /// **'Monthly window'**
+  String get oauthMonthly;
+
+  /// No description provided for @oauthTotal.
+  ///
+  /// In en, this message translates to:
+  /// **'Total quota'**
+  String get oauthTotal;
+
+  /// No description provided for @oauthHours.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} hour window'**
+  String oauthHours(String count);
+
+  /// No description provided for @oauthMinutes.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} minute window'**
+  String oauthMinutes(String count);
+
+  /// No description provided for @oauthDays.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} day window'**
+  String oauthDays(String count);
+
+  /// No description provided for @oauthWindow.
+  ///
+  /// In en, this message translates to:
+  /// **'Usage window'**
+  String get oauthWindow;
+
+  /// No description provided for @oauthResetsAt.
+  ///
+  /// In en, this message translates to:
+  /// **'Resets {time}'**
+  String oauthResetsAt(String time);
+
+  /// No description provided for @oauthNetworkError.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not connect. Check your network and try again.'**
+  String get oauthNetworkError;
+
+  /// No description provided for @oauthInvalidResponse.
+  ///
+  /// In en, this message translates to:
+  /// **'Authorization did not complete. Please try again.'**
+  String get oauthInvalidResponse;
+
+  /// No description provided for @oauthTimeout.
+  ///
+  /// In en, this message translates to:
+  /// **'Authorization timed out. Please try again.'**
+  String get oauthTimeout;
+
+  /// No description provided for @oauthDenied.
+  ///
+  /// In en, this message translates to:
+  /// **'Authorization was not granted. Please try again.'**
+  String get oauthDenied;
+
+  /// No description provided for @oauthSaving.
+  ///
+  /// In en, this message translates to:
+  /// **'Connecting account…'**
+  String get oauthSaving;
+
+  /// No description provided for @oauthQuotaExceeded.
+  ///
+  /// In en, this message translates to:
+  /// **'This account has no available quota.'**
+  String get oauthQuotaExceeded;
+
+  /// No description provided for @oauthRateLimited.
+  ///
+  /// In en, this message translates to:
+  /// **'Too many requests. Please try again later.'**
+  String get oauthRateLimited;
+
+  /// No description provided for @oauthPermissionDenied.
+  ///
+  /// In en, this message translates to:
+  /// **'This account cannot access this resource.'**
+  String get oauthPermissionDenied;
+
+  /// No description provided for @oauthRequestFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'The provider could not complete the request.'**
+  String get oauthRequestFailed;
+
+  /// No description provided for @oauthQuotaAvailable.
+  ///
+  /// In en, this message translates to:
+  /// **'Quota is available'**
+  String get oauthQuotaAvailable;
+
+  /// No description provided for @oauthSavedResets.
+  ///
+  /// In en, this message translates to:
+  /// **'Available usage resets: {count}'**
+  String oauthSavedResets(String count);
+
+  /// No description provided for @oauthPrimaryWindow.
+  ///
+  /// In en, this message translates to:
+  /// **'Primary window'**
+  String get oauthPrimaryWindow;
+
+  /// No description provided for @oauthSecondaryWindow.
+  ///
+  /// In en, this message translates to:
+  /// **'Secondary window'**
+  String get oauthSecondaryWindow;
+
+  /// No description provided for @oauthAuthorizationCode.
+  ///
+  /// In en, this message translates to:
+  /// **'Authorization code or callback URL'**
+  String get oauthAuthorizationCode;
+
+  /// No description provided for @oauthAuthorizationCodeHint.
+  ///
+  /// In en, this message translates to:
+  /// **'If the browser does not return automatically, paste the final callback URL or authorization code here.'**
+  String get oauthAuthorizationCodeHint;
+
+  /// No description provided for @oauthInvalidAuthorizationCode.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter the code or callback URL from this login attempt.'**
+  String get oauthInvalidAuthorizationCode;
+
+  /// No description provided for @oauthSubmitAuthorizationCode.
+  ///
+  /// In en, this message translates to:
+  /// **'Complete login'**
+  String get oauthSubmitAuthorizationCode;
+
+  /// No description provided for @oauthExtraUsage.
+  ///
+  /// In en, this message translates to:
+  /// **'Extra usage'**
+  String get oauthExtraUsage;
+
+  /// No description provided for @oauthPromptCachingHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'Reuse context across messages and choose how long the cache is retained.'**
+  String get oauthPromptCachingHelp;
 }
 
 class _AppLocalizationsDelegate

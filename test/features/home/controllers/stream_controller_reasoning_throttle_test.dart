@@ -91,4 +91,29 @@ void main() {
       controller.dispose();
     },
   );
+
+  testWidgets('clearing completed messages preserves pending reasoning ticks', (
+    tester,
+  ) async {
+    final settings = SettingsProvider(createBusinessTestPreferences());
+    final controller = buildController(
+      settings: settings,
+      currentConversationId: 'conversation-1',
+    );
+    final state = buildStreamingState(settings);
+    controller.markStreamingStarted(state.messageId);
+    final notifier = controller.streamingContentNotifier.getNotifier(
+      state.messageId,
+    );
+    await controller.handleReasoningChunk('before switching', state);
+    final startAt = controller.getReasoningData(state.messageId)!.startAt;
+    controller.clearAllState(keepMessageIds: {state.messageId});
+    await controller.handleReasoningChunk(' and after', state);
+    await tester.pump(const Duration(milliseconds: 50));
+
+    expect(notifier.value.reasoningText, 'before switching and after');
+    expect(notifier.value.reasoningStartAt, startAt);
+    expect(notifier.value.reasoningFinishedAt, isNull);
+    controller.dispose();
+  });
 }

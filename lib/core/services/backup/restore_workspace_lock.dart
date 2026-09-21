@@ -13,6 +13,7 @@ final class RestoreWorkspaceLock {
 
   static const workspaceRootName = '.kelivo_restore';
   static const lockFileName = '.receipt.lock';
+  static const snapshotRecoveryMarkerName = '.kelivo_snapshot_recovery_pending';
   static const activeRunFileName = '.active_run';
   static const publishingRunFileName = '.active_run.publishing';
   static const discardingRunFileName = '.active_run.discarding';
@@ -60,6 +61,77 @@ final class RestoreWorkspaceLock {
 
   Directory get completedRunsRoot =>
       Directory(p.join(workspaceRoot.path, completedRunsDirectoryName));
+
+  /// Starts a replacement snapshot recovery or explicit reset under both leases.
+  /// An operation-ahead marker blocks ordinary admission if preparation stops
+  /// after old evidence is moved but before a new candidate is published.
+  /// The lock inode and valid completed history stay in place.
+  Future<void> beginSnapshotRecoveryWhileLocked() async {
+    if (currentHold == null) throw StateError('restore_workspace_not_locked');
+    final entries = <FileSystemEntity>[];
+    await for (final entry in workspaceRoot.list(followLinks: false)) {
+      final name = p.basename(entry.path);
+      if (name == lockFileName) continue;
+      final type = await FileSystemEntity.type(entry.path, followLinks: false);
+      if (name == completedRunsDirectoryName &&
+          type == FileSystemEntityType.directory) {
+        try {
+          await validateCompletedRunsDirectory(Directory(entry.path));
+          continue;
+        } on StateError {
+          // A malformed completed directory can also block active admission.
+        }
+      }
+      if (type != FileSystemEntityType.file &&
+          type != FileSystemEntityType.directory) {
+        throw StateError('restore_recovery_evidence_type');
+      }
+      entries.add(entry);
+    }
+    final marker = File(
+      p.join(appDataDirectory.path, snapshotRecoveryMarkerName),
+    );
+    final markerType = await FileSystemEntity.type(
+      marker.path,
+      followLinks: false,
+    );
+    if (markerType == FileSystemEntityType.notFound) {
+      await marker.create(exclusive: true);
+      await durability.restrictFile(marker);
+      await marker.writeAsString('preparing snapshot recovery', flush: true);
+      await durability.syncFile(marker, fullBarrier: true);
+      await durability.syncDirectory(appDataDirectory, fullBarrier: true);
+    } else if (markerType != FileSystemEntityType.file) {
+      throw StateError('restore_recovery_marker_type');
+    }
+    if (entries.isEmpty) return;
+    final archive = await appDataDirectory.createTemp(
+      '.kelivo_restore_failed_',
+    );
+    await durability.restrictDirectory(archive);
+    await durability.syncDirectory(appDataDirectory, fullBarrier: true);
+    for (final entry in entries) {
+      await durability.renameAndSync(
+        source: entry,
+        targetPath: p.join(archive.path, p.basename(entry.path)),
+      );
+    }
+  }
+
+  /// Called only after the replacement candidate and receipt are durable, or
+  /// after an explicit reset has created a durable fresh installation.
+  Future<void> finishSnapshotRecoveryWhileLocked() async {
+    if (currentHold == null) throw StateError('restore_workspace_not_locked');
+    final marker = File(
+      p.join(appDataDirectory.path, snapshotRecoveryMarkerName),
+    );
+    if (await FileSystemEntity.type(marker.path, followLinks: false) !=
+        FileSystemEntityType.file) {
+      throw StateError('restore_recovery_marker_type');
+    }
+    await marker.delete();
+    await durability.syncDirectory(appDataDirectory, fullBarrier: true);
+  }
 
   Future<T> withPublishingRun<T>({
     required String runId,

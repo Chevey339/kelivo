@@ -1,3 +1,5 @@
+import '../../models/conversation_prompt_settings.dart';
+import '../world_book_activation.dart';
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
@@ -207,17 +209,23 @@ class ChatService extends ChangeNotifier {
     return Map<String, dynamic>.from(extras);
   }
 
-  Future<void> _copyWorkspaceBindingFrom(
+  Future<void> _copyConversationSettingsFrom(
     String conversationId,
     Map<String, dynamic> sourceExtras,
   ) {
     return updateConversationExtras(conversationId, (_) {
       final source = WorkspaceBinding.fromExtras(sourceExtras);
-      return WorkspaceBinding(
-        workspaceId: source.workspaceId,
-        cwd: source.cwd,
-        allowAll: source.allowAll,
-      ).applyTo({});
+      return ConversationPromptSettings.fromExtras(sourceExtras).applyTo(
+        WorkspaceBinding(
+          workspaceId: source.workspaceId,
+          cwd: source.cwd,
+          allowAll: source.allowAll,
+        ).applyTo({
+          if (sourceExtras.containsKey(WorldBookActivation.extrasKey))
+            WorldBookActivation.extrasKey:
+                sourceExtras[WorldBookActivation.extrasKey],
+        }),
+      );
     });
   }
 
@@ -1859,9 +1867,10 @@ class ChatService extends ChangeNotifier {
   Future<Conversation> createConversation({
     String? title,
     String? assistantId,
+    bool activate = true,
   }) async {
     if (!_initialized) await init();
-    _discardTemporaryConversation(_currentConversationId);
+    if (activate) _discardTemporaryConversation(_currentConversationId);
 
     final conversation = Conversation(
       title: title ?? _defaultConversationTitle,
@@ -1870,7 +1879,7 @@ class ChatService extends ChangeNotifier {
     );
 
     await _saveConversation(conversation);
-    _currentConversationId = conversation.id;
+    if (activate) _currentConversationId = conversation.id;
     _enforceMessageCacheLimits();
     _bumpConversationListRevision();
     notifyListeners();
@@ -3587,7 +3596,7 @@ class ChatService extends ChangeNotifier {
       title: source.title,
       assistantId: source.assistantId,
     );
-    await _copyWorkspaceBindingFrom(persisted.id, sourceExtras);
+    await _copyConversationSettingsFrom(persisted.id, sourceExtras);
     _messagesCache[persisted.id] = <ChatMessage>[];
     _messageOrderIds[persisted.id] = <String>[];
     _messageCounts[persisted.id] = 0;
@@ -3615,7 +3624,7 @@ class ChatService extends ChangeNotifier {
       title: title,
       assistantId: assistantId,
     );
-    await _copyWorkspaceBindingFrom(persisted.id, sourceExtras);
+    await _copyConversationSettingsFrom(persisted.id, sourceExtras);
     _messagesCache[persisted.id] = <ChatMessage>[];
     _messageOrderIds[persisted.id] = <String>[];
     _messageCounts[persisted.id] = 0;

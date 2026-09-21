@@ -2,8 +2,10 @@ import 'dart:developer' as developer;
 import 'dart:io';
 
 import 'package:path/path.dart' as p;
+import 'package:sqlite3/sqlite3.dart' as sqlite;
 
 import '../../database/app_database.dart';
+import '../../database/database_installation_gate.dart';
 import 'restore_bundle_mover.dart';
 import 'restore_bundle_staging.dart';
 import 'restore_durability.dart';
@@ -403,12 +405,31 @@ final class RestoreCutoverExecutor {
       if (manifestType != FileSystemEntityType.notFound) {
         throw StateError('restore_cutover_previous_manifest_type');
       }
-      await RestoreLiveDatabase.normalize(
-        databaseFile: File(
-          p.join(appDataDirectory.path, AppDatabase.databaseFileName),
-        ),
-        durability: durability,
-      );
+      try {
+        await RestoreLiveDatabase.normalize(
+          databaseFile: File(
+            p.join(appDataDirectory.path, AppDatabase.databaseFileName),
+          ),
+          durability: durability,
+        );
+      } catch (error) {
+        // A validated, durable candidate is already held under both leases.
+        // Missing/corrupt live data must not prevent restoring that candidate.
+        // Keep the raw family as evidence; lock, I/O and topology errors still
+        // fail closed because they do not establish database damage.
+        final orphanSidecar =
+            error is StateError &&
+            error.message == 'restore_live_database_orphan_sidecar';
+        final corruptDatabase =
+            error is sqlite.SqliteException &&
+            (error.resultCode == sqlite.SqlError.SQLITE_CORRUPT ||
+                error.resultCode == sqlite.SqlError.SQLITE_NOTADB);
+        if (!orphanSidecar && !corruptDatabase) rethrow;
+        await DatabaseInstallationGate.preserveFailedDatabaseForRestore(
+          appDataDirectory: appDataDirectory,
+          durability: durability,
+        );
+      }
       final bundle = await RestorePreviousBuilder.build(
         appDataDirectory: appDataDirectory,
         preparedReceipt: preparedReceipt,

@@ -25,6 +25,8 @@ sealed class MessagePart {
         return ImagePart.fromPayload(payload);
       case 'file':
         return FilePart.fromPayload(payload);
+      case 'provider_auth_error':
+        return ProviderAuthErrorPart.fromPayload(payload);
       default:
         return UnknownPart(rawKind: kind, payload: payload);
     }
@@ -33,6 +35,29 @@ sealed class MessagePart {
   String get kind;
 
   String encodePayload();
+}
+
+/// Durable recovery action for an OAuth failure, excluded from model input.
+final class ProviderAuthErrorPart extends MessagePart {
+  const ProviderAuthErrorPart({required this.providerId});
+  factory ProviderAuthErrorPart.fromPayload(String payload) {
+    final data = _decodeObjectPayload(payload);
+    final providerId = data['providerId'];
+    if (providerId is! String || providerId.isEmpty) {
+      throw const _MessagePartFormatException('missing_provider_id');
+    }
+    return ProviderAuthErrorPart(providerId: providerId);
+  }
+  final String providerId;
+  @override
+  String get kind => 'provider_auth_error';
+  @override
+  String encodePayload() => jsonEncode({'providerId': providerId});
+  @override
+  bool operator ==(Object other) =>
+      other is ProviderAuthErrorPart && other.providerId == providerId;
+  @override
+  int get hashCode => providerId.hashCode;
 }
 
 final class TextPart extends MessagePart {

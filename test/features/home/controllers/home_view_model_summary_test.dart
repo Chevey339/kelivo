@@ -301,23 +301,17 @@ void main() {
         chatService.getConversation(conversation.id)!,
       );
 
-      expect(
-        controller.debugViewModel.getClearContextLabel(
-          (actual, configured) => '$actual/$configured',
-          'Clear Context',
-        ),
-        '2/10',
-      );
+      expect(controller.debugViewModel.getContextMessageCount(), (
+        actual: 2,
+        configured: 10,
+      ));
 
       await controller.debugViewModel.clearContext();
 
-      expect(
-        controller.debugViewModel.getClearContextLabel(
-          (actual, configured) => '$actual/$configured',
-          'Clear Context',
-        ),
-        '0/10',
-      );
+      expect(controller.debugViewModel.getContextMessageCount(), (
+        actual: 0,
+        configured: 10,
+      ));
     });
     expect(tester.takeException(), isNull);
   });

@@ -94,6 +94,8 @@ void main() {
           'pinned_models_v1': jsonEncode(['first/model-a']),
           'plugin_future_key_v1': <String>['one', 'two'],
           'flutter_log_enabled_v1': true,
+          'window_physical_pos_x_v1': -3600.0,
+          'window_physical_pos_y_v1': 200.0,
           'pinned_chat_ids': <String>['chat-1'],
         };
 
@@ -112,6 +114,8 @@ void main() {
         expect(exported['pinned_models_v1'], <String>['first/model-a']);
         expect(exported['plugin_future_key_v1'], <String>['one', 'two']);
         expect(exported['flutter_log_enabled_v1'], isNull);
+        expect(exported['window_physical_pos_x_v1'], isNull);
+        expect(exported['window_physical_pos_y_v1'], isNull);
         expect(exported['pinned_chat_ids'], isNull);
 
         final providers = snapshot.entities[BusinessEntityKind.provider]!;

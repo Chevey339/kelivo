@@ -775,6 +775,7 @@ class _ModelDetailSheetState extends State<_ModelDetailSheet>
         : prevKey;
     final bool isEmbedding = _type == ModelType.embedding;
     ov[key] = {
+      ...modelSyncMetadata(prev),
       'apiModelId': apiModelId,
       'name': _nameCtrl.text.trim(),
       'type': _type == ModelType.chat ? 'chat' : 'embedding',

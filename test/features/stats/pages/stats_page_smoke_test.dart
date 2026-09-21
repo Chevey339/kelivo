@@ -502,7 +502,7 @@ void main() {
 
       expect(find.byType(DatePickerDialog), findsNothing);
       expect(
-        find.byKey(const ValueKey('stats-custom-date-calendar')),
+        find.byKey(const ValueKey('ios-date-picker-calendar')),
         findsOneWidget,
       );
       expect(find.text('2026-05'), findsOneWidget);
@@ -511,7 +511,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(
-        find.byKey(const ValueKey('stats-custom-date-calendar')),
+        find.byKey(const ValueKey('ios-date-picker-calendar')),
         findsNothing,
       );
       expect(find.text('2026-05-02'), findsOneWidget);
@@ -540,14 +540,11 @@ void main() {
 
     expect(find.text('2026-05'), findsOneWidget);
 
-    await tester.tap(find.byKey(const ValueKey('stats-date-picker-prev-year')));
+    await tester.tap(find.byKey(const ValueKey('ios-date-picker-prev-year')));
     await tester.pumpAndSettle();
 
     expect(find.text('2026-04'), findsOneWidget);
-    expect(
-      find.byKey(const ValueKey('stats-custom-month-picker')),
-      findsNothing,
-    );
+    expect(find.byKey(const ValueKey('ios-date-picker-months')), findsNothing);
   });
 
   testWidgets('custom range calendar title opens month selection', (
@@ -570,27 +567,24 @@ void main() {
     await tester.tap(find.text('Start'));
     await tester.pumpAndSettle();
 
-    await tester.tap(find.byKey(const ValueKey('stats-date-picker-title')));
+    await tester.tap(find.byKey(const ValueKey('ios-date-picker-title')));
     await tester.pumpAndSettle();
 
     expect(
-      find.byKey(const ValueKey('stats-custom-month-picker')),
+      find.byKey(const ValueKey('ios-date-picker-months')),
       findsOneWidget,
     );
     expect(find.text('2026'), findsOneWidget);
 
-    await tester.tap(find.byKey(const ValueKey('stats-date-picker-prev-year')));
+    await tester.tap(find.byKey(const ValueKey('ios-date-picker-prev-year')));
     await tester.pumpAndSettle();
 
     expect(find.text('2025'), findsOneWidget);
 
-    await tester.tap(find.byKey(const ValueKey('stats-month-cell-4')));
+    await tester.tap(find.byKey(const ValueKey('ios-date-picker-month-4')));
     await tester.pumpAndSettle();
 
-    expect(
-      find.byKey(const ValueKey('stats-custom-month-picker')),
-      findsNothing,
-    );
+    expect(find.byKey(const ValueKey('ios-date-picker-months')), findsNothing);
     expect(find.text('2025-04'), findsOneWidget);
 
     await tester.tap(find.text('2').first);

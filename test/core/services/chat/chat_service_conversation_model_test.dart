@@ -1,3 +1,5 @@
+import 'package:Kelivo/core/models/conversation_prompt_settings.dart';
+import 'package:Kelivo/core/services/world_book_activation.dart';
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
@@ -61,6 +63,79 @@ void main() {
     services.add(service);
     return service;
   }
+
+  test(
+    'conversation prompt settings survive restart and both fork modes',
+    () async {
+      final first = createService();
+      final conversation = await first.createConversation(
+        title: 'Prompts',
+        assistantId: 'a',
+      );
+      final message = await first.addMessage(
+        conversationId: conversation.id,
+        role: 'user',
+        content: 'hello',
+      );
+      await first.updateConversationExtras(
+        conversation.id,
+        (extras) =>
+            const ConversationPromptSettings(
+              systemPrompt: 'PRIVATE',
+              instructionIds: ['injection'],
+              worldBookIds: ['book'],
+            ).applyTo({
+              ...extras,
+              WorldBookActivation.extrasKey: {
+                'messageCount': 1,
+                'historyHash': 'hash',
+                'effects': {},
+              },
+            }),
+      );
+      await first.close();
+      services.remove(first);
+      final reopened = createService();
+      await reopened.init();
+      final expected = reopened.getConversation(conversation.id)!.extras;
+      expect(expected[ConversationPromptSettings.systemPromptKey], 'PRIVATE');
+      expect(expected[ConversationPromptSettings.instructionIdsKey], [
+        'injection',
+      ]);
+      for (final preserve in [false, true]) {
+        final fork = await reopened.forkConversationAtRevision(
+          sourceConversationId: conversation.id,
+          sourceRevisionId: message.id,
+          title: 'Fork',
+          preserveVersions: preserve,
+        );
+        expect(
+          ConversationPromptSettings.fromExtras(fork.extras).systemPrompt,
+          'PRIVATE',
+        );
+        expect(
+          ConversationPromptSettings.fromExtras(fork.extras).worldBookIds,
+          ['book'],
+        );
+        expect(
+          fork.extras[WorldBookActivation.extrasKey],
+          expected[WorldBookActivation.extrasKey],
+        );
+      }
+      final unrelated = await reopened.createConversation(
+        title: 'New',
+        assistantId: 'a',
+      );
+      expect(
+        ConversationPromptSettings.fromExtras(unrelated.extras).systemPrompt,
+        isEmpty,
+      );
+      expect(
+        ConversationPromptSettings.fromExtras(unrelated.extras).worldBookIds,
+        isEmpty,
+      );
+    },
+  );
 
   test('a new conversation inherits, carrying no override', () async {
     final service = createService();

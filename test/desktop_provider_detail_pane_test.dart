@@ -1,3 +1,4 @@
+import 'package:Kelivo/core/models/provider_oauth.dart';
 import "support/business_test_harness.dart";
 import 'package:Kelivo/core/providers/assistant_provider.dart';
 import 'package:Kelivo/core/providers/settings_provider.dart';
@@ -108,6 +109,56 @@ void main() {
       expect(find.byType(IosCheckbox), findsNothing);
     },
   );
+
+  testWidgets('provider pane can switch between OAuth and API settings', (
+    tester,
+  ) async {
+    final settings = await _buildSettings(tester);
+    addTearDown(settings.dispose);
+    await settings.setProviderConfig(
+      'Account',
+      _providerConfig('Account').copyWith(oauthProvider: OAuthProvider.chatgpt),
+    );
+    await settings.setProvidersOrder(const [
+      'ProviderA',
+      'Account',
+      'ProviderB',
+    ]);
+    await _pumpProviderSettings(tester, settings);
+    await tester.tap(find.text('Account').first);
+    await tester.pumpAndSettle();
+    expect(find.text('API Key'), findsNothing);
+    final accountSettings = find.byKey(
+      const ValueKey('desktop-provider-settings-Account'),
+    );
+    expect(accountSettings, findsOneWidget);
+    await tester.tap(accountSettings);
+    await tester.pumpAndSettle();
+    expect(
+      find.byKey(const ValueKey('desktop-provider-settings-dialog')),
+      findsOneWidget,
+    );
+    expect(find.text(OAuthProvider.chatgpt.baseUrl), findsOneWidget);
+    Navigator.of(
+      tester.element(
+        find.byKey(const ValueKey('desktop-provider-settings-dialog')),
+      ),
+    ).pop();
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('ProviderB').first);
+    await tester.pumpAndSettle();
+    expect(find.text('API Key'), findsOneWidget);
+    await tester.tap(
+      find.byKey(const ValueKey('desktop-provider-settings-ProviderB')),
+    );
+    await tester.pumpAndSettle();
+    expect(
+      find.byKey(const ValueKey('desktop-provider-settings-dialog')),
+      findsOneWidget,
+    );
+    expect(find.text(OAuthProvider.chatgpt.baseUrl), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
 
   testWidgets('desktop provider proxy port input preserves typed order', (
     tester,

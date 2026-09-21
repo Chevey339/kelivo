@@ -1,3 +1,4 @@
+import 'package:Kelivo/features/chat/utils/prompt_injection_selection.dart';
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
@@ -16,6 +17,7 @@ Future<void> showDesktopInstructionInjectionPopover(
   required GlobalKey anchorKey,
   required List<InstructionInjection> items,
   String? assistantId,
+  String? conversationId,
 }) async {
   if (items.isEmpty) return;
   final overlay = Overlay.maybeOf(context);
@@ -41,6 +43,7 @@ Future<void> showDesktopInstructionInjectionPopover(
       anchorWidth: size.width,
       items: items,
       assistantId: assistantId,
+      conversationId: conversationId,
       onClose: () {
         try {
           entry.remove();
@@ -57,6 +60,7 @@ class _InstructionInjectionPopover extends StatefulWidget {
     required this.anchorWidth,
     required this.items,
     required this.assistantId,
+    this.conversationId,
     required this.onClose,
   });
 
@@ -64,6 +68,7 @@ class _InstructionInjectionPopover extends StatefulWidget {
   final double anchorWidth;
   final List<InstructionInjection> items;
   final String? assistantId;
+  final String? conversationId;
   final VoidCallback onClose;
 
   @override
@@ -157,6 +162,7 @@ class _InstructionInjectionPopoverState
                         child: _InstructionInjectionList(
                           items: widget.items,
                           assistantId: widget.assistantId,
+                          conversationId: widget.conversationId,
                           onClose: _close,
                         ),
                       ),
@@ -216,10 +222,12 @@ class _InstructionInjectionList extends StatelessWidget {
   const _InstructionInjectionList({
     required this.items,
     required this.assistantId,
+    this.conversationId,
     required this.onClose,
   });
   final List<InstructionInjection> items;
   final String? assistantId;
+  final String? conversationId;
   final VoidCallback onClose;
 
   @override
@@ -231,6 +239,7 @@ class _InstructionInjectionList extends StatelessWidget {
         child: _InstructionInjectionListInner(
           items: items,
           assistantId: assistantId,
+          conversationId: conversationId,
           onClose: onClose,
         ),
       ),
@@ -242,10 +251,12 @@ class _InstructionInjectionListInner extends StatelessWidget {
   const _InstructionInjectionListInner({
     required this.items,
     required this.assistantId,
+    this.conversationId,
     required this.onClose,
   });
   final List<InstructionInjection> items;
   final String? assistantId;
+  final String? conversationId;
   final VoidCallback onClose;
 
   @override
@@ -253,8 +264,14 @@ class _InstructionInjectionListInner extends StatelessWidget {
     final l10n = AppLocalizations.of(context)!;
     final cs = Theme.of(context).colorScheme;
     final provider = context.watch<InstructionInjectionProvider>();
+    final items = provider.items;
     final groupUi = context.watch<InstructionInjectionGroupProvider>();
-    final selected = provider.activeIdsFor(assistantId).toSet();
+    final selected = promptSelectionIds(
+      context,
+      kind: PromptSelectionKind.instruction,
+      assistantId: assistantId,
+      conversationId: conversationId,
+    ).toSet();
 
     final Map<String, List<InstructionInjection>> grouped =
         <String, List<InstructionInjection>>{};
@@ -276,6 +293,17 @@ class _InstructionInjectionListInner extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
+          if (conversationId != null)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(8, 2, 8, 6),
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  l10n.conversationPromptScope,
+                  style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant),
+                ),
+              ),
+            ),
           Padding(
             padding: const EdgeInsets.only(bottom: 1),
             child: _CancelRow(
@@ -283,9 +311,13 @@ class _InstructionInjectionListInner extends StatelessWidget {
               label: l10n.homePageCancel,
               onTap: () async {
                 try {
-                  await context
-                      .read<InstructionInjectionProvider>()
-                      .setActiveIds(const <String>[], assistantId: assistantId);
+                  await setPromptSelection(
+                    context,
+                    const [],
+                    kind: PromptSelectionKind.instruction,
+                    assistantId: assistantId,
+                    conversationId: conversationId,
+                  );
                 } catch (_) {}
                 onClose();
               },
@@ -317,11 +349,12 @@ class _InstructionInjectionListInner extends StatelessWidget {
                     active: selected.contains(p.id),
                     onTap: () async {
                       try {
-                        final prov = context
-                            .read<InstructionInjectionProvider>();
-                        await prov.toggleActiveId(
+                        await togglePromptSelection(
+                          context,
                           p.id,
+                          kind: PromptSelectionKind.instruction,
                           assistantId: assistantId,
+                          conversationId: conversationId,
                         );
                       } catch (_) {}
                     },

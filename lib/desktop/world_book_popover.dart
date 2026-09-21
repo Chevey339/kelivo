@@ -1,3 +1,4 @@
+import 'package:Kelivo/features/chat/utils/prompt_injection_selection.dart';
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
@@ -15,6 +16,7 @@ Future<void> showDesktopWorldBookPopover(
   required GlobalKey anchorKey,
   required List<WorldBook> books,
   String? assistantId,
+  String? conversationId,
 }) async {
   if (books.isEmpty) return;
   final overlay = Overlay.maybeOf(context);
@@ -39,6 +41,7 @@ Future<void> showDesktopWorldBookPopover(
       anchorRect: anchorRect,
       anchorWidth: size.width,
       assistantId: assistantId,
+      conversationId: conversationId,
       onClose: () {
         try {
           entry.remove();
@@ -54,12 +57,14 @@ class _WorldBookPopover extends StatefulWidget {
     required this.anchorRect,
     required this.anchorWidth,
     required this.assistantId,
+    this.conversationId,
     required this.onClose,
   });
 
   final Rect anchorRect;
   final double anchorWidth;
   final String? assistantId;
+  final String? conversationId;
   final VoidCallback onClose;
 
   @override
@@ -149,6 +154,7 @@ class _WorldBookPopoverState extends State<_WorldBookPopover>
                         ),
                         child: _WorldBookList(
                           assistantId: widget.assistantId,
+                          conversationId: widget.conversationId,
                           onClose: _close,
                         ),
                       ),
@@ -206,9 +212,14 @@ class _GlassPanel extends StatelessWidget {
 }
 
 class _WorldBookList extends StatelessWidget {
-  const _WorldBookList({required this.assistantId, required this.onClose});
+  const _WorldBookList({
+    required this.assistantId,
+    this.conversationId,
+    required this.onClose,
+  });
 
   final String? assistantId;
+  final String? conversationId;
   final VoidCallback onClose;
 
   @override
@@ -217,16 +228,25 @@ class _WorldBookList extends StatelessWidget {
       padding: const EdgeInsets.only(bottom: 2),
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxHeight: 420),
-        child: _WorldBookListInner(assistantId: assistantId, onClose: onClose),
+        child: _WorldBookListInner(
+          assistantId: assistantId,
+          conversationId: conversationId,
+          onClose: onClose,
+        ),
       ),
     );
   }
 }
 
 class _WorldBookListInner extends StatelessWidget {
-  const _WorldBookListInner({required this.assistantId, required this.onClose});
+  const _WorldBookListInner({
+    required this.assistantId,
+    this.conversationId,
+    required this.onClose,
+  });
 
   final String? assistantId;
+  final String? conversationId;
   final VoidCallback onClose;
 
   @override
@@ -235,7 +255,12 @@ class _WorldBookListInner extends StatelessWidget {
     final cs = Theme.of(context).colorScheme;
     final provider = context.watch<WorldBookProvider>();
     final books = provider.books;
-    final selected = provider.activeBookIdsFor(assistantId).toSet();
+    final selected = promptSelectionIds(
+      context,
+      kind: PromptSelectionKind.worldBook,
+      assistantId: assistantId,
+      conversationId: conversationId,
+    ).toSet();
 
     return SingleChildScrollView(
       padding: const EdgeInsets.fromLTRB(12, 10, 12, 2),
@@ -243,15 +268,28 @@ class _WorldBookListInner extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           Padding(
+            padding: const EdgeInsets.fromLTRB(8, 2, 8, 6),
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: Text(
+                '${l10n.worldBookTitle} (${books.where((book) => book.enabled && selected.contains(book.id)).length}/${books.length})${conversationId == null ? '' : ' · ${l10n.conversationPromptScope}'}',
+                style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant),
+              ),
+            ),
+          ),
+          Padding(
             padding: const EdgeInsets.only(bottom: 1),
             child: _CancelRow(
               leading: Icon(Lucide.CircleX, size: 16, color: cs.onSurface),
               label: l10n.homePageCancel,
               onTap: () async {
                 try {
-                  await context.read<WorldBookProvider>().setActiveBookIds(
+                  await setPromptSelection(
+                    context,
                     const <String>[],
+                    kind: PromptSelectionKind.worldBook,
                     assistantId: assistantId,
+                    conversationId: conversationId,
                   );
                 } catch (_) {}
                 onClose();
@@ -265,16 +303,20 @@ class _WorldBookListInner extends StatelessWidget {
                 title: book.name.trim().isEmpty
                     ? l10n.worldBookUnnamed
                     : book.name,
-                preview: book.description,
+                preview:
+                    '${l10n.worldBookEnabledCount(book.enabledEntryCount, book.entries.length)}${book.description.isEmpty ? '' : ' · ${book.description}'}',
                 active: selected.contains(book.id),
                 disabled: !book.enabled,
                 onTap: () async {
                   final isActive = selected.contains(book.id);
                   if (!book.enabled && !isActive) return;
                   try {
-                    await context.read<WorldBookProvider>().toggleActiveBookId(
+                    await togglePromptSelection(
+                      context,
                       book.id,
+                      kind: PromptSelectionKind.worldBook,
                       assistantId: assistantId,
+                      conversationId: conversationId,
                     );
                   } catch (_) {}
                 },

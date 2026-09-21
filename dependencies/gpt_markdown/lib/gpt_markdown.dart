@@ -46,7 +46,20 @@ class GptMarkdown extends StatelessWidget {
     this.useDollarSignsForLatex = false,
     this.preprocessBlocks,
     this.generation,
+    this.textBuilder,
+    this.streaming = false,
+    this.spanBuilder,
+    this.newlinesNormalized = false,
   });
+
+  /// The caller has already normalized CR/CRLF, or proved they are absent.
+  final bool newlinesNormalized;
+
+  /// Allows plain append reuse for Markdown components with delimiter-based syntax.
+  final bool streaming;
+
+  /// Custom presentation of a parsed rich-text paragraph.
+  final Widget Function(Text text)? textBuilder;
 
   /// The direction of the text.
   final TextDirection textDirection;
@@ -153,6 +166,9 @@ class GptMarkdown extends StatelessWidget {
   /// See [GptMarkdownConfig.preprocessBlocks].
   final String Function(String text)? preprocessBlocks;
 
+  /// Optional spans for a block whose caller already parsed its structure.
+  final List<InlineSpan> Function(BuildContext, GptMarkdownConfig)? spanBuilder;
+
   /// See [GptMarkdownConfig.generation].
   final Object? generation;
 
@@ -170,7 +186,7 @@ class GptMarkdown extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     String tex =
-        data.contains('\r')
+        !newlinesNormalized && data.contains('\r')
             ? data.replaceAll('\r\n', '\n').replaceAll('\r', '\n').trim()
             : data.trim();
     if (useDollarSignsForLatex) {
@@ -220,6 +236,9 @@ class GptMarkdown extends StatelessWidget {
           tableBuilder: tableBuilder,
           preprocessBlocks: preprocessBlocks,
           generation: generation,
+          textBuilder: textBuilder,
+          streaming: streaming,
+          spanBuilder: spanBuilder,
         ),
       ),
     );

@@ -50,6 +50,121 @@ void _expectNoGooglePartIds(Map<String, dynamic> body) {
 
 void main() {
   group('Gemini API part ids', () {
+    for (final stream in [true, false]) {
+      test(
+        'omits unsigned empty text on tool follow-up (stream=$stream)',
+        () async {
+          final requests = <Map<String, dynamic>>[];
+          final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+          addTearDown(() => server.close(force: true));
+          const callPart = {
+            'functionCall': {
+              'name': 'get_current_time',
+              'args': <String, dynamic>{},
+            },
+            'thoughtSignature': 'sig-call',
+          };
+          const retainedParts = [
+            callPart,
+            {'text': '', 'thoughtSignature': 'sig-empty'},
+            {'thoughtSignature': 'sig-only'},
+            {'text': ' '},
+          ];
+
+          server.listen((request) async {
+            final body =
+                jsonDecode(await utf8.decoder.bind(request).join())
+                    as Map<String, dynamic>;
+            requests.add(body);
+            if (requests.length == 2) {
+              final modelParts = (body['contents'] as List)[1]['parts'] as List;
+              if (modelParts.any(
+                (p) => p is Map && p.length == 1 && p['text'] == '',
+              )) {
+                request.response.statusCode = HttpStatus.badRequest;
+                request.response.write(
+                  jsonEncode({
+                    'error': {
+                      'message':
+                          "contents[1].parts[1].data: required oneof field 'data' must have one initialized field",
+                    },
+                  }),
+                );
+                await request.response.close();
+                return;
+              }
+            }
+            final parts = requests.length == 1
+                ? <Map<String, dynamic>>[
+                    callPart,
+                    {'text': ''},
+                    {'id': 'internal-empty', 'text': ''},
+                    ...retainedParts.skip(1),
+                  ]
+                : <Map<String, dynamic>>[
+                    {'text': 'done'},
+                  ];
+            request.response.headers.contentType = stream
+                ? ContentType('text', 'event-stream')
+                : ContentType.json;
+            if (stream) {
+              for (final part in parts) {
+                request.response.write(
+                  'data: ${jsonEncode(_streamChunk([part]))}\n\n',
+                );
+              }
+              request.response.write(
+                'data: ${jsonEncode(_streamChunk([], finishReason: 'STOP'))}\n\n',
+              );
+              request.response.write('data: [DONE]\n\n');
+            } else {
+              request.response.write(
+                jsonEncode(_streamChunk(parts, finishReason: 'STOP')),
+              );
+            }
+            await request.response.close();
+          });
+
+          var calls = 0;
+          final chunks = await ChatApiService.sendMessageStream(
+            config: _geminiConfig(
+              'http://${server.address.address}:${server.port}/v1beta',
+            ),
+            modelId: 'gemini-3.8-flash',
+            messages: const [
+              {'role': 'user', 'content': 'Get the time.'},
+            ],
+            tools: const [
+              {
+                'function_declarations': [
+                  {
+                    'name': 'get_current_time',
+                    'description': 'Get current UTC time.',
+                    'parameters': {'type': 'object', 'properties': {}},
+                  },
+                ],
+              },
+            ],
+            stream: stream,
+            onToolCall: (name, args, {toolCallId}) async {
+              calls++;
+              return '{"utc":"2026-09-11T12:00:00Z"}';
+            },
+          ).toList();
+
+          expect(calls, 1);
+          expect(requests, hasLength(2));
+          expect(chunks.isGenerationDone, isTrue);
+          final contents = requests.last['contents'] as List;
+          expect(contents[1]['parts'], retainedParts);
+          expect(
+            contents[2]['parts'][0]['functionResponse']['name'],
+            'get_current_time',
+          );
+        },
+      );
+    }
+
     test('strips internal ids from historical function parts', () async {
       Map<String, dynamic>? requestBody;
       final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);

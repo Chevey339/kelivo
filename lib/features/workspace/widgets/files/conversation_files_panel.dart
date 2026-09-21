@@ -136,7 +136,7 @@ class ConversationFilesPanelState extends State<ConversationFilesPanel> {
     if (chosen == null || !mounted) return;
     final provider = context.read<WorkspaceProvider>();
     await bindConversationWorkspace(
-      context,
+      context.read<ChatService>(),
       conversationId: widget.conversationId,
       workspace: chosen,
     );

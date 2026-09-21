@@ -45,6 +45,7 @@ final class RestoreBundlePreparation {
     required bool bundleIncludesFiles,
     required bool restoreChats,
     required bool restoreFiles,
+    bool useExistingLocalAttachments = false,
     DateTime? createdAtUtc,
     Map<String, dynamic>? validatedSettings,
     BackupProgressSink? onProgress,
@@ -77,6 +78,7 @@ final class RestoreBundlePreparation {
         sourceIncludesFiles: bundleIncludesFiles,
         sourceManifestSha256: sourceManifestSha256,
         validatedSettings: validatedSettings,
+        useExistingLocalAttachments: useExistingLocalAttachments,
         onProgress: onProgress,
         cancelToken: cancelToken,
       );

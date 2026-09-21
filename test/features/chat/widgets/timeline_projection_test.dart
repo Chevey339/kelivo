@@ -28,6 +28,29 @@ List<TimelineToolRef> _toolsIn(TimelineProjection projected) {
 }
 
 void main() {
+  test('missing reasoning metadata defaults to collapsed after tool calls', () {
+    final projected = projectAssistantTimeline(
+      parts: const [
+        ReasoningPart('first'),
+        ToolCallPart('{"id":"t1","name":"search","arguments":{}}'),
+        ReasoningPart('second'),
+        TextPart('answer'),
+      ],
+      liveTools: const [],
+      reasoningSegments: const [
+        TimelineReasoningRef(text: 'first', expanded: true),
+      ],
+      visualContent: 'answer',
+    );
+    final thoughts = projected.blocks.first.steps
+        .where((step) => step.isReasoning)
+        .toList();
+    expect(thoughts.map((step) => step.reasoning!.text), ['first', 'second']);
+    expect(thoughts.map((step) => step.reasoning!.expanded), [true, false]);
+    expect(thoughts.first.reasoningOverlayIndex, 0);
+    expect(thoughts.last.reasoningOverlayIndex, isNull);
+  });
+
   for (final streaming in [false, true]) {
     test('inline thinking keeps tool order (streaming=$streaming)', () {
       final projected = projectAssistantTimeline(

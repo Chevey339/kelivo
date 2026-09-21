@@ -63,43 +63,40 @@ Use the tools and path zones shown in the current conversation. Kelivo supports
 SKILL.md instructions and supporting files; Codex/Claude-specific CLI commands,
 plugin manifests, subagents, and evaluation runners are not prerequisites.
 
-The installed skills directory is exposed for reading. Use Kelivo's skill
-management UI to import or edit installed skills rather than bypassing that
-boundary with shell commands.
+- **Workspace with a working shell:** install directly into Kelivo's skills
+  directory using the skills path provided in the workspace context (`/skills`
+  in a sandbox, the supplied host path in native mode). For skill creation and
+  updates, use `shell`: `write_file` and `edit_file` treat this directory as
+  read-only. For a new skill, choose an unused directory matching its name;
+  for an update, use the existing directory and preserve unrelated files.
+  Write supporting files there with their relative paths intact, then write
+  the complete SKILL.md last. Kelivo rescans installed skills after shell
+  commands, so saving here installs the skill without a separate import.
+- **No workspace or no working shell:** installed skills remain read-only.
+  Return the complete SKILL.md in a fenced Markdown block as a draft. Explain
+  that direct installation requires a bound workspace with a working shell.
 
-- **No writable workspace tools:** return the complete SKILL.md in one fenced
-  Markdown block. Tell the user to open **Skills → Import → Paste** and paste
-  the entire document, including frontmatter. For an existing skill, use its
-  **Edit** action instead, so an update does not create a second skill.
-- **Writable workspace tools available:** save the file under the current
-  workspace or this chat's outputs directory, using the paths provided in the
-  workspace context. Read it back to check the saved content. Link the file in
-  the response and explain **Skills → Import → File**. A single SKILL.md can be
-  imported directly; package skills with supporting files as a ZIP containing
-  SKILL.md and those files with their relative paths intact. Use an available
-  archive tool only when packaging is needed.
-
-Use `kelivo://chat/outputs/<relative-path>` for chat output links or
-`kelivo://workspace/<relative-path>` for workspace file links; URI-encode each
-path component. Without file tools, provide the text instead of inventing a
-file link. Describe an artifact as a draft or an importable skill until it has
-actually been imported. Imported skills are enabled by default; an assistant
-or conversation with an explicit skill selection may need the new skill selected.
+After installation, read back SKILL.md and its referenced files. Link the saved
+entrypoint as `kelivo://skills/<skill-directory>/SKILL.md`, using the actual
+directory name and URI-encoding each path component. Claim installation only
+after saving and verification succeed. New skills are enabled by default; an
+assistant or conversation with an explicit skill selection may need the new
+skill selected.
 
 ## Validate and refine
 
 Before delivery, check that name and description are present, frontmatter closes
 before the body, referenced files exist, and the instructions only depend on
 available tools or explicitly documented prerequisites. Finish or remove draft
-placeholders. For a ZIP, inspect the entries and confirm it contains the complete
-skill rather than unrelated workspace files.
+placeholders. Check that the skill directory contains all required files.
 
 Use a representative request to check the intended behavior and a nearby request
 that should not trigger the skill. For outputs with objective requirements,
 check those requirements; for subjective work, show a sample for user feedback.
 Run a small example when the necessary tools and inputs are available. Distinguish
 checks actually run from suggested test prompts, and keep any test outputs outside
-the packaged skill unless they are useful maintained examples.
+the skill directory unless they are useful maintained examples.
 
-End with what the skill does, how to import or update it, and what was verified.
+End with what the skill does, where it was installed or what is needed to install
+the draft, and what was verified.
 Make later changes from observed behavior and user feedback.

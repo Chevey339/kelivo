@@ -104,7 +104,16 @@ class GptMarkdownConfig {
     this.tableBuilder,
     this.preprocessBlocks,
     this.generation,
+    this.textBuilder,
+    this.streaming = false,
+    this.spanBuilder,
   });
+
+  final Widget Function(Text text)? textBuilder;
+  final bool streaming;
+
+  /// Render a block already parsed by the caller without reparsing its source.
+  final List<InlineSpan> Function(BuildContext, GptMarkdownConfig)? spanBuilder;
 
   /// The direction of the text.
   final TextDirection textDirection;
@@ -223,6 +232,9 @@ class GptMarkdownConfig {
       tableBuilder: tableBuilder ?? this.tableBuilder,
       preprocessBlocks: preprocessBlocks ?? this.preprocessBlocks,
       generation: generation ?? this.generation,
+      textBuilder: textBuilder,
+      streaming: streaming,
+      spanBuilder: spanBuilder,
     );
   }
 
@@ -240,7 +252,8 @@ class GptMarkdownConfig {
 
   /// A method to check if the configuration is the same.
   bool isSame(GptMarkdownConfig other) {
-    return style == other.style &&
+    return (spanBuilder == null) == (other.spanBuilder == null) &&
+        style == other.style &&
         textAlign == other.textAlign &&
         textScaler == other.textScaler &&
         maxLines == other.maxLines &&

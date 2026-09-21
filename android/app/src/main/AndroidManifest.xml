@@ -13,6 +13,8 @@
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
     <uses-permission android:name="android.permission.POST_PROMOTED_NOTIFICATIONS" />
@@ -85,7 +87,7 @@
             </intent-filter>
         </activity>
         <activity
-            android:name=".McpOAuthCallbackActivity"
+            android:name=".OAuthCallbackActivity"
             android:excludeFromRecents="true"
             android:exported="true"
             android:launchMode="singleTask"
@@ -99,6 +101,10 @@
                 <data android:scheme="psyche.kelivo" android:host="mcp-oauth-callback"/>
             </intent-filter>
         </activity>
+        <!-- Custom Tabs binds here only while its authorization window is visible. -->
+        <service
+            android:name=".OAuthBrowserService"
+            android:exported="true" />
         <!-- A separate process keeps Android SQLite handles separate from Drift's
              native SQLite connection and works without starting a Flutter engine. -->
         <provider
@@ -112,6 +118,15 @@
                 <action android:name="android.content.action.DOCUMENTS_PROVIDER" />
             </intent-filter>
         </provider>
+        <receiver android:name=".scheduled.ScheduledTaskReceiver" android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+                <action android:name="android.intent.action.TIME_SET" />
+                <action android:name="android.intent.action.TIMEZONE_CHANGED" />
+                <action android:name="android.app.action.SCHEDULE_EXACT_ALARM_PERMISSION_STATE_CHANGED" />
+            </intent-filter>
+        </receiver>
         <!-- Foreground service to keep Flutter isolate alive for background generation -->
         <service
             android:name=".background.GenerationForegroundService"
@@ -134,6 +149,9 @@
 
          In particular, this is used by the Flutter engine in io.flutter.plugin.text.ProcessTextPlugin. -->
     <queries>
+        <intent>
+            <action android:name="android.support.customtabs.action.CustomTabsService" />
+        </intent>
         <intent>
             <action android:name="android.intent.action.PROCESS_TEXT"/>
             <data android:mimeType="text/plain"/>

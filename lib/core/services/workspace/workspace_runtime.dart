@@ -162,6 +162,8 @@ abstract interface class WorkspaceStdioRuntime implements WorkspaceRuntime {
 
 /// Holds the process-wide [WorkspaceRuntime] once a later agent registers it.
 class WorkspaceRuntimeProvider extends ChangeNotifier {
+  /// Platform bootstrap, awaited by unattended work before resolving tools.
+  Future<void>? initialization;
   WorkspaceRuntime? runtime;
   RuntimeStatus? lastStatus;
 

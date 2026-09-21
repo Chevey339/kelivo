@@ -1,3 +1,4 @@
+import 'package:Kelivo/features/chat/utils/prompt_injection_selection.dart';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
@@ -12,8 +13,8 @@ import '../../../core/providers/settings_provider.dart';
 import '../../../core/providers/assistant_provider.dart';
 import '../../../core/providers/mcp_provider.dart';
 import '../../../core/providers/quick_phrase_provider.dart';
-import '../../../core/providers/instruction_injection_provider.dart';
 import '../../../core/providers/world_book_provider.dart';
+import '../../../core/providers/instruction_injection_provider.dart';
 import '../../../core/services/chat/chat_service.dart';
 import '../../../core/services/skills/skills_service.dart';
 import '../../../features/workspace/widgets/environment/environment_status_chip.dart';
@@ -146,7 +147,6 @@ class ChatInputSection extends StatelessWidget {
     final asr = context.watch<AsrProvider>();
     final ap = context.watch<AssistantProvider>();
     final a = ap.currentAssistant;
-    final assistantId = a?.id;
 
     final pk = chatModelProviderKey;
     final mid = chatModelId;
@@ -241,18 +241,12 @@ class ChatInputSection extends StatelessWidget {
       onToggleLearningMode: isTablet ? onToggleLearningMode : null,
       onOpenWorldBook: hasWorldBooks ? onOpenWorldBook : null,
       onLongPressLearning: isTablet ? onLongPressLearning : null,
-      learningModeActive: isTablet
-          ? context
-                .watch<InstructionInjectionProvider>()
-                .activeIdsFor(assistantId)
-                .isNotEmpty
-          : false,
-      worldBookActive: isTablet
-          ? context
-                .watch<WorldBookProvider>()
-                .activeBookIdsFor(assistantId)
-                .isNotEmpty
-          : false,
+      learningModeActive:
+          isTablet &&
+          _isPromptSelectionActive(context, a, PromptSelectionKind.instruction),
+      worldBookActive:
+          isTablet &&
+          _isPromptSelectionActive(context, a, PromptSelectionKind.worldBook),
       showMoreButton: !isTablet,
       onClearContext: isTablet ? onClearContext : null,
       onCompressContext: isTablet ? onCompressContext : null,
@@ -266,20 +260,43 @@ class ChatInputSection extends StatelessWidget {
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(
-            AppSpacing.sm,
-            AppSpacing.xxs,
-            AppSpacing.sm,
-            0,
+        if (showEnvChip && workspaceBound)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(
+              AppSpacing.sm,
+              AppSpacing.xxs,
+              AppSpacing.sm,
+              0,
+            ),
+            child: EnvironmentStatusChip(
+              onTap: () => WorkspaceNavigation.openEnvironmentPage(context),
+            ),
           ),
-          child: EnvironmentStatusChip(
-            onTap: () => WorkspaceNavigation.openEnvironmentPage(context),
-          ),
-        ),
         bar,
       ],
     );
+  }
+
+  bool _isPromptSelectionActive(
+    BuildContext context,
+    Assistant? assistant,
+    PromptSelectionKind kind,
+  ) {
+    final scoped = assistant?.allowConversationPromptInjection == true;
+    if (scoped && conversationId == null) return false;
+    final ids = promptSelectionIds(
+      context,
+      kind: kind,
+      assistantId: assistant?.id,
+      conversationId: scoped ? conversationId : null,
+    ).toSet();
+    return kind == PromptSelectionKind.worldBook
+        ? context.watch<WorldBookProvider>().books.any(
+            (book) => book.enabled && ids.contains(book.id),
+          )
+        : context.watch<InstructionInjectionProvider>().items.any(
+            (item) => ids.contains(item.id),
+          );
   }
 
   bool _isSkillsActive(BuildContext context, Assistant? assistant) {

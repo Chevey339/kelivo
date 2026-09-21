@@ -17,6 +17,7 @@ class IosNavRow extends StatelessWidget {
     required this.label,
     this.subtitle,
     this.caption,
+    this.subtitleMaxLines = 1,
     this.detailText,
     this.trailing,
     this.onTap,
@@ -35,6 +36,9 @@ class IosNavRow extends StatelessWidget {
 
   /// Extra muted line under [subtitle] (12 / α0.55), e.g. usage counts.
   final String? caption;
+
+  /// `null` lets a long subtitle wrap. Defaults to one line with ellipsis.
+  final int? subtitleMaxLines;
   final String? detailText;
   final Widget? trailing;
   final VoidCallback? onTap;
@@ -109,8 +113,10 @@ class IosNavRow extends StatelessWidget {
                               fontSize: 13,
                               color: cs.onSurface.withValues(alpha: 0.6),
                             ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
+                            maxLines: subtitleMaxLines,
+                            overflow: subtitleMaxLines == null
+                                ? TextOverflow.visible
+                                : TextOverflow.ellipsis,
                           ),
                         if (caption != null)
                           Text(
@@ -158,10 +164,12 @@ class IosSwitchRow extends StatelessWidget {
     this.onLongPress,
     this.destructive = false,
     this.iconColor,
+    this.subtitle,
   });
 
   final IconData? icon;
   final String label;
+  final String? subtitle;
   final bool value;
   final ValueChanged<bool> onChanged;
   final VoidCallback? onLongPress;
@@ -175,6 +183,7 @@ class IosSwitchRow extends StatelessWidget {
         ? cs.error
         : cs.onSurface.withValues(alpha: 0.9);
     final resolvedIconColor = iconColor ?? baseColor;
+    final hasSubtitle = subtitle != null && subtitle!.isNotEmpty;
 
     return IosCardPress(
       baseColor: Colors.transparent,
@@ -185,7 +194,10 @@ class IosSwitchRow extends StatelessWidget {
       onTap: () => onChanged(!value),
       onLongPress: onLongPress,
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
+        padding: EdgeInsets.symmetric(
+          horizontal: 12,
+          vertical: hasSubtitle ? 11 : 2,
+        ),
         child: Row(
           children: [
             if (icon != null) ...[
@@ -196,10 +208,28 @@ class IosSwitchRow extends StatelessWidget {
               const SizedBox(width: 12),
             ],
             Expanded(
-              child: Text(
-                label,
-                style: TextStyle(fontSize: 15, color: baseColor),
-              ),
+              child: hasSubtitle
+                  ? Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          label,
+                          style: TextStyle(fontSize: 15, color: baseColor),
+                        ),
+                        Text(
+                          subtitle!,
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: cs.onSurface.withValues(alpha: 0.6),
+                          ),
+                        ),
+                      ],
+                    )
+                  : Text(
+                      label,
+                      style: TextStyle(fontSize: 15, color: baseColor),
+                    ),
             ),
             IosSwitch(value: value, onChanged: onChanged),
           ],

@@ -1,9 +1,10 @@
+import 'package:Kelivo/features/backup/widgets/backup_reminder_helpers.dart';
+import 'package:Kelivo/shared/widgets/ios_time_picker.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:Kelivo/features/backup/widgets/backup_reminder_helpers.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
 
 void main() {
@@ -25,8 +26,11 @@ void main() {
                 body: Center(
                   child: TextButton(
                     onPressed: () async {
-                      selectedMinutes = await showBackupReminderTimePicker(
+                      selectedMinutes = await showIosTimePicker(
                         context,
+                        title: AppLocalizations.of(
+                          context,
+                        )!.backupReminderTimeTitle,
                         initialMinutes: 23 * 60 + 59,
                       );
                     },
@@ -45,11 +49,11 @@ void main() {
       expect(find.text('Reminder Time'), findsWidgets);
       expect(find.byType(BottomSheet), findsOneWidget);
       expect(
-        find.byKey(const ValueKey('backup-reminder-time-mobile-sheet')),
+        find.byKey(const ValueKey('ios-time-picker-mobile-sheet')),
         findsOneWidget,
       );
       expect(
-        find.byKey(const ValueKey('backup-reminder-time-mobile-actions')),
+        find.byKey(const ValueKey('ios-time-picker-mobile-actions')),
         findsOneWidget,
       );
       expect(find.byType(Divider), findsNothing);
@@ -82,8 +86,11 @@ void main() {
                 body: Center(
                   child: TextButton(
                     onPressed: () async {
-                      selectedMinutes = await showBackupReminderTimePicker(
+                      selectedMinutes = await showIosTimePicker(
                         context,
+                        title: AppLocalizations.of(
+                          context,
+                        )!.backupReminderTimeTitle,
                         initialMinutes: 0,
                       );
                     },
@@ -124,8 +131,11 @@ void main() {
                 body: Center(
                   child: TextButton(
                     onPressed: () async {
-                      selectedMinutes = await showBackupReminderTimePicker(
+                      selectedMinutes = await showIosTimePicker(
                         context,
+                        title: AppLocalizations.of(
+                          context,
+                        )!.backupReminderTimeTitle,
                         initialMinutes: 8 * 60,
                       );
                     },

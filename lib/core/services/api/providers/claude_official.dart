@@ -1,3 +1,5 @@
+import '../../../models/provider_oauth.dart';
+import '../../auth/claude_oauth_request.dart';
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
@@ -337,22 +339,28 @@ Stream<StreamChunk> sendClaudeStream(
         thinkingBudget,
         topP,
       );
+      final thinkingModelId = config.oauthProvider == OAuthProvider.kimi
+          ? modelId
+          : upstreamModelId;
       final thinking = isReasoning
           ? claudeThinkingConfig(
-              upstreamModelId,
+              thinkingModelId,
               thinkingBudget,
               config: config,
             )
           : null;
       final outputConfig = isReasoning
-          ? claudeOutputConfig(upstreamModelId, thinkingBudget, config: config)
+          ? claudeOutputConfig(thinkingModelId, thinkingBudget, config: config)
           : null;
 
       // Prepare request body per round
       final body = <String, dynamic>{
         'model': upstreamModelId,
         'max_tokens':
-            maxTokens ?? _defaultClaudeMaxOutputTokens(upstreamModelId),
+            maxTokens ??
+            (config.oauthProvider == OAuthProvider.kimi
+                ? 32000
+                : _defaultClaudeMaxOutputTokens(upstreamModelId)),
         'messages': convo,
         'stream': stream,
         if (systemPrompt.isNotEmpty) 'system': systemPrompt,
@@ -449,7 +457,10 @@ Stream<StreamChunk> sendClaudeStream(
             } catch (_) {}
           } else if (type == 'tool_use') {
             final id = (it['id'] ?? '').toString();
-            final name = (it['name'] ?? '').toString();
+            final rawName = (it['name'] ?? '').toString();
+            final name = config.oauthProvider == OAuthProvider.claude
+                ? decodeClaudeOAuthToolName(rawName)
+                : rawName;
             final args =
                 (it['input'] as Map?)?.cast<String, dynamic>() ??
                 const <String, dynamic>{};
@@ -518,6 +529,9 @@ Stream<StreamChunk> sendClaudeStream(
 
       final sse = response.stream.transform(utf8.decoder);
       final decoder = ClaudeStreamDecoder(
+        decodeToolName: config.oauthProvider == OAuthProvider.claude
+            ? decodeClaudeOAuthToolName
+            : null,
         skipRedactedThinkingBlocks: skipRedactedThinkingBlocks,
         initialUsage: totalUsage,
         serverToolNames: declaredServerToolNames,

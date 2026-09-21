@@ -2,8 +2,10 @@ import 'dart:async';
 import 'dart:io';
 
 import '../../../../models/token_usage.dart';
+import '../../../../models/provider_oauth.dart';
 import '../../../../providers/settings_provider.dart';
 import '../../../../utils/openai_model_compat.dart';
+import '../../../../utils/kimi_model_compat.dart';
 import '../../builtin_tools.dart';
 import '../../chat_api_helpers.dart';
 
@@ -68,6 +70,13 @@ void applyCompatibleResponsesReasoning(
   int? thinkingBudget,
 }) {
   if (config.useResponseApi != true) return;
+
+  if (config.oauthProvider == OAuthProvider.chatgpt) {
+    if (isReasoning && isOff(thinkingBudget)) {
+      body['reasoning'] = {'effort': 'none'};
+    }
+    return;
+  }
 
   final poolsideInfo = OpenAIProviderInfo(
     host: Uri.tryParse(config.baseUrl)?.host.toLowerCase() ?? '',
@@ -218,8 +227,59 @@ void normalizeMoonshotKimiChatBody(
   Map<String, dynamic> body, {
   required String upstreamModelId,
   required bool isReasoning,
+  required OpenAIProviderInfo info,
   int? thinkingBudget,
 }) {
+  if (info.isKimiCodingModel || info.isKimiCodeThinkingModel) {
+    if (upstreamModelId.trim().toLowerCase() == 'k3-256k') {
+      final messages = body['messages'];
+      if (messages is List &&
+          messages.whereType<Map>().any((message) {
+            final content = message['content'];
+            return content is List &&
+                content.whereType<Map>().any(
+                  (part) => part['type'] == 'video_url',
+                );
+          })) {
+        throw UnsupportedError(
+          'Kimi Code k3-256k does not support video input.',
+        );
+      }
+    }
+    _removeMoonshotKimiUnsupportedSamplingParams(body);
+    // OAuth uses catalog-driven thinking.type/effort below. Keep its native
+    // overrides intact instead of applying the API-key reasoning_effort rules.
+    if (info.isKimiCodeThinkingModel) return;
+    if (isKimiCodeHighSpeedModel(upstreamModelId)) {
+      body.remove('reasoning_effort');
+      body.remove('thinking');
+      return;
+    }
+    if (!isReasoning) {
+      body.remove('thinking');
+      body.remove('reasoning_effort');
+      return;
+    }
+    final rawEffort = body['reasoning_effort'];
+    final effort = rawEffort is String && rawEffort.trim().isNotEmpty
+        ? openAINormalizeReasoningEffort(rawEffort, upstreamModelId)
+        : 'auto';
+    final thinking = body['thinking'];
+    final thinkingType = thinking is Map ? thinking['type'] : null;
+    if (thinkingType == 'disabled' ||
+        (effort == 'none' && thinkingType != 'enabled')) {
+      body['thinking'] = {'type': 'disabled'};
+      body.remove('reasoning_effort');
+    } else {
+      body.remove('thinking');
+      if (effort == 'auto' || effort == 'none') {
+        body.remove('reasoning_effort');
+      } else {
+        body['reasoning_effort'] = effort;
+      }
+    }
+    return;
+  }
   if (!_isKimiThinkingModel(upstreamModelId)) return;
 
   if (isKimiK3Model(upstreamModelId)) {
@@ -261,6 +321,81 @@ void normalizeMoonshotKimiChatBody(
   if (_isKimiOmitsSamplingParamsModel(upstreamModelId)) {
     _removeMoonshotKimiUnsupportedSamplingParams(body);
   }
+}
+
+/// Kimi Code's OpenAI endpoint uses thinking.type/effort, not OpenAI's
+/// reasoning_effort or Anthropic's budget_tokens. Use the discovered ladder,
+/// including its lowest legal effort when thinking is mandatory (OMP policy).
+void applyKimiCodeChatThinking(
+  Map<String, dynamic> body, {
+  required ProviderConfig config,
+  required String modelId,
+  required bool isReasoning,
+  int? thinkingBudget,
+}) {
+  if (config.oauthProvider != OAuthProvider.kimi ||
+      config.useResponseApi == true) {
+    return;
+  }
+  final raw = config.modelOverrides[modelId];
+  final metadata = raw is Map ? raw : const {};
+  if (metadata['oauthProtocol'] != 'openai') return;
+  final required = metadata['oauthThinkingRequired'] == true;
+  final existing = body['thinking'];
+  final thinking = existing is Map ? existing : const {};
+  final requestedEffort = thinking['effort'];
+  final off =
+      thinking['type'] == 'disabled' ||
+      (thinking['type'] != 'enabled' && isOff(thinkingBudget));
+  body.remove('reasoning_effort');
+  body.remove('reasoning');
+  body.remove('output_config');
+  if (!isReasoning && !required) {
+    body.remove('thinking');
+    return;
+  }
+  if (off && !required) {
+    body['thinking'] = {'type': 'disabled'};
+    return;
+  }
+  const order = ['minimal', 'low', 'medium', 'high', 'xhigh', 'max'];
+  final advertised = metadata['oauthThinkingEfforts'];
+  final levels = [
+    for (final level in order)
+      if (advertised is List && advertised.contains(level)) level,
+  ];
+  String? effort;
+  if (levels.isNotEmpty) {
+    if (off) {
+      effort = levels.first;
+    } else {
+      final requested = requestedEffort is String
+          ? requestedEffort
+          : thinkingBudget != null && thinkingBudget >= 128000
+          ? 'max'
+          : thinkingBudget != null && thinkingBudget >= 64000
+          ? 'xhigh'
+          : effortForBudget(thinkingBudget);
+      if (requested == 'auto') {
+        final defaultEffort = metadata['oauthThinkingDefaultEffort'];
+        if (defaultEffort is String && levels.contains(defaultEffort)) {
+          effort = defaultEffort;
+        }
+      } else {
+        final index = order.indexOf(requested);
+        effort = levels.first;
+        for (final level in levels) {
+          if (order.indexOf(level) > index) break;
+          effort = level;
+        }
+      }
+    }
+  }
+  body['thinking'] = {
+    'type': 'enabled',
+    if (effort != null) 'effort': effort,
+    if (thinking['keep'] == 'all') 'keep': 'all',
+  };
 }
 
 TokenUsage? openaiUsageFromObj(Map<String, dynamic> obj) {
@@ -477,11 +612,13 @@ class OpenAIProviderInfo {
   final String host;
   final String providerId;
   final String upstreamModelId;
+  final bool isKimiCodeThinkingModel;
 
   const OpenAIProviderInfo({
     required this.host,
     required this.providerId,
     required this.upstreamModelId,
+    this.isKimiCodeThinkingModel = false,
   });
 
   bool get isZhipu => _isZhipuLikeProvider(
@@ -523,6 +660,24 @@ class OpenAIProviderInfo {
       host.contains('intern') ||
       host.contains('chat.intern-ai.org.cn');
   bool get isKimiThinkingModel => _isKimiThinkingModel(upstreamModelId);
+  bool get isKimiCodeK3Model =>
+      isKimiCodingModel && isKimiCodeK3Alias(upstreamModelId);
+  bool get isKimiCodingModel {
+    if (isKimiForCodingModel(upstreamModelId) ||
+        isKimiK28Model(upstreamModelId)) {
+      return true;
+    }
+    // Coding uses short K3 aliases. Require provider identity so unrelated
+    // models named k3 do not inherit Kimi's preserved-thinking contract.
+    final isKimiProvider =
+        host == 'api.kimi.com' ||
+        host == 'api.moonshot.ai' ||
+        host == 'api.moonshot.cn' ||
+        providerId.contains('kimi') ||
+        providerId.contains('moonshot');
+    return isKimiProvider && isKimiCodeK3Alias(upstreamModelId);
+  }
+
   bool get supportsGoogleOpenAIThoughtSignatures {
     final normalizedModelId = upstreamModelId.toLowerCase();
     final isGoogleApiHost =
@@ -536,9 +691,13 @@ class OpenAIProviderInfo {
       isDeepSeek ||
       isMimo ||
       isZhipu ||
+      isKimiCodingModel ||
+      isKimiCodeThinkingModel ||
       isKimiThinkingModel;
   ReasoningContentReplayPolicy get reasoningContentReplayPolicy {
     if (usesPoolsideThinking ||
+        isKimiCodingModel ||
+        isKimiCodeThinkingModel ||
         _isKimiPreservedThinkingModel(upstreamModelId)) {
       return ReasoningContentReplayPolicy.all;
     }

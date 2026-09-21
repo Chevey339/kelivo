@@ -122,6 +122,15 @@ void main() {
         openAINormalizeReasoningEffort('max', 'deepseek-v4-flash-vision-exp'),
         'max',
       );
+      expect(
+        openAINormalizeReasoningEffort('medium', 'deepseek-flash'),
+        'high',
+      );
+      expect(openAINormalizeReasoningEffort('max', 'deepseek-flash'), 'max');
+      expect(
+        openAINormalizeReasoningEffort('off', 'deepseek/deepseek-flash'),
+        'off',
+      );
       expect(openAINormalizeReasoningEffort('off', 'gpt-5-codex'), 'low');
       expect(openAINormalizeReasoningEffort('off', 'gpt-5.1-codex'), 'low');
       expect(

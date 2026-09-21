@@ -650,7 +650,7 @@ List<TimelineProjectedBlock> _projectFromParts({
               text: text,
               expanded:
                   provided?.expanded ??
-                  (inlineThinking ? inlineThinkingExpanded : true),
+                  (inlineThinking ? inlineThinkingExpanded : false),
               loading: provided?.loading ?? false,
               startAt: provided?.startAt,
               finishedAt: provided?.finishedAt,

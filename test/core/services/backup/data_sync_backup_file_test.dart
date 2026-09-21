@@ -12,6 +12,9 @@ import 'package:path_provider_platform_interface/path_provider_platform_interfac
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:Kelivo/core/database/app_database.dart';
+import 'package:Kelivo/core/database/extension_entity_store.dart';
+import 'package:Kelivo/core/database/database_installation_gate.dart';
+import 'package:Kelivo/core/database/startup_recovery_service.dart';
 import 'package:Kelivo/core/database/business_preferences.dart';
 import 'package:Kelivo/core/database/business_repository.dart';
 import 'package:Kelivo/core/database/business_restore_service.dart';
@@ -27,6 +30,8 @@ import 'package:Kelivo/core/providers/backup_provider.dart';
 import 'package:Kelivo/core/services/backup/backup_cancel_token.dart';
 import 'package:Kelivo/core/services/backup/backup_task_progress.dart';
 import 'package:Kelivo/core/services/backup/data_sync.dart';
+import 'package:Kelivo/core/services/backup/restore_business_lease.dart';
+import 'package:Kelivo/core/services/backup/restore_workspace_lock.dart';
 import 'package:Kelivo/core/services/backup/restore_previous_plan.dart';
 import 'package:Kelivo/core/services/backup/restore_receipt.dart';
 import 'package:Kelivo/core/services/backup/restore_startup_gate.dart';
@@ -277,6 +282,8 @@ Future<File> _createSqliteBackupFixture({
   bool secretsIncluded = true,
   bool includeFiles = false,
   String? assetContent,
+  List<MessagePart>? messageParts,
+  String? databaseIdentity,
   Object? businessEntityRowIds,
   int? schemaVersionOverride,
   int? minimumReadableOverride,
@@ -309,6 +316,7 @@ Future<File> _createSqliteBackupFixture({
               id: 'fixture-message',
               role: 'assistant',
               content: 'fixture content',
+              parts: messageParts,
               conversationId: 'fixture-conversation',
             ),
             messageOrder: 0,
@@ -320,6 +328,12 @@ Future<File> _createSqliteBackupFixture({
       await repository.checkpoint();
     } finally {
       await repository.close();
+    }
+    if (databaseIdentity != null) {
+      ChatDatabaseRepository.assignInstalledDatabaseIdentity(
+        databaseFile,
+        databaseIdentity,
+      );
     }
     return ChatDatabaseRepository.prepareSnapshotForRestore(databaseFile);
   });
@@ -441,6 +455,669 @@ void main() {
         await root.delete(recursive: true);
       }
     });
+
+    test(
+      'database export strips device state from both archive payloads',
+      () async {
+        final sourceFile = File(p.join(root.path, 'source.sqlite'));
+        final source = AppDatabase.open(file: sourceFile);
+        try {
+          await BusinessPreferences(
+            BusinessRepository(source),
+          ).setString('environment_state_v1', 'source-installed');
+          final store = ExtensionEntityStore(source);
+          await store.upsert('externalMounts', 'global', {
+            'bookmark': 'source-bookmark',
+          });
+          for (final kind in ['linked', 'managed']) {
+            await store.upsert('workspace', kind, {
+              'id': kind,
+              'kind': kind,
+              'hostPath': '/source/$kind',
+            });
+          }
+        } finally {
+          await source.close();
+        }
+        final sync = DataSync(
+          businessRepository: businessRepository,
+          chatService: ChatService(),
+        );
+        final backup = await sync.prepareBackupFileFromDatabase(sourceFile);
+        addTearDown(() => DataSync.cleanupTemporaryBackupFile(backup));
+        final input = InputFileStream(backup.path);
+        final archive = ZipDecoder().decodeStream(input);
+        final snapshotFile = File(p.join(root.path, 'exported.sqlite'));
+        try {
+          final settings =
+              jsonDecode(
+                    utf8.decode(
+                      archive.findFile('settings.json')!.readBytes()!,
+                    ),
+                  )
+                  as Map;
+          expect(settings, isNot(contains('environment_state_v1')));
+          expect(
+            (jsonDecode(settings['workspaces_v1'] as String) as List)
+                .single['id'],
+            'managed',
+          );
+          await snapshotFile.writeAsBytes(
+            archive.findFile('database/kelivo.db')!.readBytes()!,
+          );
+        } finally {
+          archive.clear();
+          input.closeSync();
+        }
+        final snapshot = AppDatabase.open(file: snapshotFile);
+        try {
+          expect(
+            await BusinessRepository(snapshot).preferenceSnapshot(),
+            isNot(contains('environment_state_v1')),
+          );
+          final store = ExtensionEntityStore(snapshot);
+          expect(await store.get('externalMounts', 'global'), isNull);
+          expect(await store.get('workspace', 'linked'), isNull);
+          expect(await store.get('workspace', 'managed'), isNotNull);
+        } finally {
+          await snapshot.close();
+        }
+        final original = AppDatabase.open(file: sourceFile);
+        try {
+          expect(
+            (await BusinessRepository(
+              original,
+            ).preferenceSnapshot())['environment_state_v1'],
+            'source-installed',
+          );
+          expect(
+            await ExtensionEntityStore(original).get('workspace', 'linked'),
+            isNotNull,
+          );
+        } finally {
+          await original.close();
+        }
+      },
+    );
+
+    test(
+      'startup snapshot restores a missing database with its old receipt',
+      () async {
+        await DatabaseInstallationGate.ensureReady(appDataDirectory: root);
+        final live = File(p.join(root.path, AppDatabase.databaseFileName));
+        await live.delete();
+        final orphan = File('${live.path}-wal');
+        await orphan.writeAsString('orphan WAL evidence');
+        await expectLater(
+          DatabaseInstallationGate.ensureReady(appDataDirectory: root),
+          throwsA(
+            isA<StateError>().having(
+              (e) => e.message,
+              'message',
+              'database_missing',
+            ),
+          ),
+        );
+        final snapshot = await _createSqliteBackupFixture(
+          root: root,
+          prefix: 'startup-snapshot',
+          settings: {'theme': 'dark'},
+        );
+        final originalHash = await _fileSha256(snapshot);
+        final asset = File(p.join(root.path, 'upload', 'keep.txt'));
+        await asset.parent.create(recursive: true);
+        await asset.writeAsString('keep attachment');
+
+        await DataSync.prepareStartupSnapshotRestore(
+          appDataDirectory: root,
+          snapshot: snapshot,
+        );
+        expect(await live.exists(), isFalse);
+        final terminal = await _recoverAcrossColdRestart(
+          appDataDirectory: root,
+        );
+        expect(terminal?.state, RestoreReceiptState.committed);
+        await DatabaseInstallationGate.ensureReady(
+          appDataDirectory: root,
+          allowDatabaseIdentityChange: true,
+        );
+        final repository = ChatDatabaseRepository.open(file: live);
+        try {
+          final messages = await repository.getMessagesRange(
+            'fixture-conversation',
+            start: 0,
+            limit: 10,
+          );
+          expect(messages.single.content, 'fixture content');
+        } finally {
+          await repository.close();
+        }
+        expect(await asset.readAsString(), 'keep attachment');
+        expect(await _fileSha256(snapshot), originalHash);
+        final preservedWal = root.listSync().whereType<File>().singleWhere(
+          (file) =>
+              file.path.contains('.displaced-') && file.path.endsWith('-wal'),
+        );
+        expect(await preservedWal.readAsString(), 'orphan WAL evidence');
+      },
+    );
+
+    test(
+      'startup snapshot restores over a corrupt database and preserves it',
+      () async {
+        final live = File(p.join(root.path, AppDatabase.databaseFileName));
+        await live.writeAsString('damaged database evidence');
+        final snapshot = await _createSqliteBackupFixture(
+          root: root,
+          prefix: 'corrupt-live-snapshot',
+          settings: {},
+        );
+        await DataSync.prepareStartupSnapshotRestore(
+          appDataDirectory: root,
+          snapshot: snapshot,
+        );
+        final terminal = await _recoverAcrossColdRestart(
+          appDataDirectory: root,
+        );
+        expect(terminal?.state, RestoreReceiptState.committed);
+        final copies = await DatabaseInstallationGate.listDisplacedDatabases(
+          appDataDirectory: root,
+        );
+        expect(
+          await copies.single.file.readAsString(),
+          'damaged database evidence',
+        );
+        expect(
+          ChatDatabaseRepository.inspectInstalledDatabase(live).schemaVersion,
+          AppDatabase.currentSchemaVersion,
+        );
+      },
+    );
+
+    test(
+      'startup snapshot rejects a bad hash without touching live data',
+      () async {
+        await DatabaseInstallationGate.ensureReady(appDataDirectory: root);
+        final live = File(p.join(root.path, AppDatabase.databaseFileName));
+        final originalHash = await _fileSha256(live);
+        final snapshot = await _createSqliteBackupFixture(
+          root: root,
+          prefix: 'invalid-startup-snapshot',
+          settings: {},
+          databaseSha256: '0' * 64,
+        );
+        await expectLater(
+          DataSync.prepareStartupSnapshotRestore(
+            appDataDirectory: root,
+            snapshot: snapshot,
+          ),
+          throwsA(anything),
+        );
+        expect(await _fileSha256(live), originalHash);
+        expect(
+          await RestoreStartupGate.hasPendingWork(appDataDirectory: root),
+          isFalse,
+        );
+        expect(await snapshot.exists(), isTrue);
+      },
+    );
+
+    test(
+      'startup snapshot retries after a damaged candidate and keeps the failed run',
+      () async {
+        final snapshot = await _createSqliteBackupFixture(
+          root: root,
+          prefix: 'retry',
+          settings: {},
+        );
+        await DataSync.prepareStartupSnapshotRestore(
+          appDataDirectory: root,
+          snapshot: snapshot,
+        );
+        final first = (await RestoreStartupGate.inspect(
+          appDataDirectory: root,
+        ))!;
+        final run = Directory(
+          '${root.path}/.kelivo_restore/run_${first.runId}',
+        );
+        final candidate = File('${run.path}/candidate/database/kelivo.db');
+        await candidate.writeAsString('damaged candidate');
+        final evidence = File('${run.path}/previous/preserved.txt');
+        await evidence.parent.create(recursive: true);
+        await evidence.writeAsString('previous data evidence');
+        await expectLater(
+          _recoverAcrossColdRestart(appDataDirectory: root),
+          throwsA(anything),
+        );
+
+        await DataSync.prepareStartupSnapshotRestore(
+          appDataDirectory: root,
+          snapshot: snapshot,
+        );
+        final next = (await RestoreStartupGate.inspect(
+          appDataDirectory: root,
+        ))!;
+        expect(next.runId, isNot(first.runId));
+        final preserved = root
+            .listSync(recursive: true, followLinks: false)
+            .whereType<File>()
+            .where((f) => f.path.endsWith('/previous/preserved.txt'))
+            .single;
+        expect(await preserved.readAsString(), 'previous data evidence');
+        expect(
+          await File(
+            '${preserved.parent.parent.path}/candidate/database/kelivo.db',
+          ).readAsString(),
+          'damaged candidate',
+        );
+        expect(
+          (await _recoverAcrossColdRestart(appDataDirectory: root))?.state,
+          RestoreReceiptState.committed,
+        );
+      },
+    );
+
+    test(
+      'startup snapshot rebuilds a corrupt installation receipt after commit',
+      () async {
+        await DatabaseInstallationGate.ensureReady(appDataDirectory: root);
+        final receipt = root.listSync().whereType<File>().singleWhere(
+          (f) =>
+              p.basename(f.path).startsWith('database_installation_receipt_'),
+        );
+        await receipt.writeAsString('{broken receipt');
+        final snapshot = await _createSqliteBackupFixture(
+          root: root,
+          prefix: 'receipt-repair',
+          settings: {},
+        );
+        await DataSync.prepareStartupSnapshotRestore(
+          appDataDirectory: root,
+          snapshot: snapshot,
+        );
+        expect(
+          (await _recoverAcrossColdRestart(appDataDirectory: root))?.state,
+          RestoreReceiptState.committed,
+        );
+        // Even if the process stops between cutover and admission, another cold
+        // launch must be able to open the installed snapshot without extra flags.
+        expect(await _recoverAcrossColdRestart(appDataDirectory: root), isNull);
+        await DatabaseInstallationGate.ensureReady(appDataDirectory: root);
+        expect(
+          await DatabaseInstallationGate.read(appDataDirectory: root),
+          isNotNull,
+        );
+        final preserved = root
+            .listSync(recursive: true, followLinks: false)
+            .whereType<File>()
+            .where(
+              (f) =>
+                  p.basename(f.path) == p.basename(receipt.path) &&
+                  f.path != receipt.path,
+            )
+            .single;
+        expect(await preserved.readAsString(), '{broken receipt');
+      },
+    );
+
+    test(
+      'startup snapshot rechecks local image and file availability',
+      () async {
+        final upload = Directory('${root.path}/upload');
+        await upload.create();
+        await File('${upload.path}/photo.png').writeAsString('image bytes');
+        await File('${upload.path}/note.txt').writeAsString('file bytes');
+        final snapshot = await _createSqliteBackupFixture(
+          root: root,
+          prefix: 'local-attachments',
+          settings: {},
+          messageParts: [
+            const TextPart('fixture content'),
+            const ImagePart(
+              uri: 'kelivo-file:///upload/photo.png',
+              unavailable: true,
+            ),
+            FilePart(
+              uri: Uri.file('${upload.path}/note.txt').toString(),
+              name: 'note.txt',
+              unavailable: true,
+            ),
+            const FilePart(
+              uri: 'kelivo-file:///upload/missing.txt',
+              name: 'missing.txt',
+            ),
+            const ImagePart(uri: 'https://example.com/photo.png'),
+          ],
+        );
+        await DataSync.prepareStartupSnapshotRestore(
+          appDataDirectory: root,
+          snapshot: snapshot,
+        );
+        expect(
+          (await _recoverAcrossColdRestart(appDataDirectory: root))?.state,
+          RestoreReceiptState.committed,
+        );
+        final repository = ChatDatabaseRepository.open(
+          file: File('${root.path}/kelivo.db'),
+        );
+        try {
+          final parts = (await repository.getMessagesRange(
+            'fixture-conversation',
+            start: 0,
+            limit: 1,
+          )).single.parts;
+          expect(parts.whereType<ImagePart>().map((part) => part.unavailable), [
+            false,
+            false,
+          ]);
+          expect(parts.whereType<FilePart>().map((part) => part.unavailable), [
+            false,
+            true,
+          ]);
+        } finally {
+          await repository.close();
+        }
+        expect(
+          await File('${upload.path}/note.txt').readAsString(),
+          'file bytes',
+        );
+      },
+    );
+
+    test(
+      'startup snapshot reuses its lease and refuses recovery by another owner',
+      () async {
+        final snapshot = await _createSqliteBackupFixture(
+          root: root,
+          prefix: 'lease',
+          settings: {},
+        );
+        await DataSync.prepareStartupSnapshotRestore(
+          appDataDirectory: root,
+          snapshot: snapshot,
+        );
+        final first = (await RestoreStartupGate.inspect(
+          appDataDirectory: root,
+        ))!;
+        final lease = await RestoreBusinessLease.acquire(
+          appDataDirectory: root,
+        );
+        try {
+          await expectLater(
+            DataSync.prepareStartupSnapshotRestore(
+              appDataDirectory: root,
+              snapshot: snapshot,
+            ),
+            throwsA(isA<RestoreBusinessLeaseUnavailable>()),
+          );
+          expect(
+            (await RestoreStartupGate.inspect(appDataDirectory: root))!.runId,
+            first.runId,
+          );
+          await DataSync.prepareStartupSnapshotRestore(
+            appDataDirectory: root,
+            snapshot: snapshot,
+            businessLease: lease,
+          );
+          expect(lease.isClosed, isFalse);
+          expect(
+            (await RestoreStartupGate.inspect(appDataDirectory: root))!.runId,
+            isNot(first.runId),
+          );
+        } finally {
+          await lease.close();
+        }
+      },
+    );
+
+    test(
+      'startup snapshot leaves a pending run intact when the new snapshot is invalid',
+      () async {
+        final good = await _createSqliteBackupFixture(
+          root: root,
+          prefix: 'pending-good',
+          settings: {},
+        );
+        await DataSync.prepareStartupSnapshotRestore(
+          appDataDirectory: root,
+          snapshot: good,
+        );
+        final first = (await RestoreStartupGate.inspect(
+          appDataDirectory: root,
+        ))!;
+        final bad = await _createSqliteBackupFixture(
+          root: root,
+          prefix: 'pending-bad',
+          settings: {},
+          databaseSha256: '0' * 64,
+        );
+        await expectLater(
+          DataSync.prepareStartupSnapshotRestore(
+            appDataDirectory: root,
+            snapshot: bad,
+          ),
+          throwsA(anything),
+        );
+        expect(
+          (await RestoreStartupGate.inspect(appDataDirectory: root))!.runId,
+          first.runId,
+        );
+        expect(
+          (await _recoverAcrossColdRestart(appDataDirectory: root))?.state,
+          RestoreReceiptState.committed,
+        );
+      },
+    );
+
+    test(
+      'startup snapshot receipt repair survives interruption before terminal archival',
+      () async {
+        await DatabaseInstallationGate.ensureReady(appDataDirectory: root);
+        final receipt = root.listSync().whereType<File>().singleWhere(
+          (f) =>
+              p.basename(f.path).startsWith('database_installation_receipt_'),
+        );
+        await receipt.writeAsString('{broken receipt');
+        const identity = '7a6b5648-fae2-40d4-8c15-464d1f339af4';
+        final snapshot = await _createSqliteBackupFixture(
+          root: root,
+          prefix: 'known-identity',
+          settings: {},
+          databaseIdentity: identity,
+        );
+        await DataSync.prepareStartupSnapshotRestore(
+          appDataDirectory: root,
+          snapshot: snapshot,
+        );
+        await expectLater(
+          RestoreStartupGate.recoverAndRequireBusinessReady(
+            appDataDirectory: root,
+            onStage: (stage) {
+              if (stage == RestoreStartupStage.finishing) {
+                throw StateError('interrupt_after_receipt_repair');
+              }
+            },
+          ),
+          throwsA(isA<StateError>()),
+        );
+        expect(
+          (await DatabaseInstallationGate.read(
+            appDataDirectory: root,
+          ))!.databaseId,
+          identity,
+        );
+        expect(
+          (await _recoverAcrossColdRestart(appDataDirectory: root))?.state,
+          RestoreReceiptState.committed,
+        );
+        expect(
+          (await DatabaseInstallationGate.ensureReady(
+            appDataDirectory: root,
+          )).databaseId,
+          identity,
+        );
+      },
+    );
+
+    test(
+      'startup snapshot resolves old sandbox paths without following external links',
+      () async {
+        if (Platform.isWindows) return;
+        final outside = await Directory.systemTemp.createTemp(
+          'kelivo-outside-attachment-',
+        );
+        addTearDown(() => outside.delete(recursive: true));
+        await File('${outside.path}/private.txt').writeAsString('outside');
+        final upload = await Directory('${root.path}/upload').create();
+        await File('${upload.path}/photo.png').writeAsString('image');
+        await Link(
+          '${upload.path}/linked.txt',
+        ).create('${outside.path}/private.txt');
+        final snapshot = await _createSqliteBackupFixture(
+          root: root,
+          prefix: 'sandbox',
+          settings: {},
+          messageParts: [
+            const ImagePart(
+              uri:
+                  '/var/mobile/Containers/Data/Application/11111111-1111-1111-1111-111111111111/Documents/upload/photo.png',
+              unavailable: true,
+            ),
+            const FilePart(
+              uri: 'kelivo-file:///upload/linked.txt',
+              name: 'linked.txt',
+            ),
+            FilePart(uri: '${outside.path}/private.txt', name: 'private.txt'),
+          ],
+        );
+        await DataSync.prepareStartupSnapshotRestore(
+          appDataDirectory: root,
+          snapshot: snapshot,
+        );
+        expect(
+          (await _recoverAcrossColdRestart(appDataDirectory: root))?.state,
+          RestoreReceiptState.committed,
+        );
+        final repository = ChatDatabaseRepository.open(
+          file: File('${root.path}/kelivo.db'),
+        );
+        try {
+          final parts = (await repository.getMessagesRange(
+            'fixture-conversation',
+            start: 0,
+            limit: 1,
+          )).single.parts;
+          expect(
+            parts.whereType<ImagePart>().single.uri,
+            'kelivo-file:///upload/photo.png',
+          );
+          expect(parts.whereType<ImagePart>().single.unavailable, isFalse);
+          expect(
+            parts.whereType<FilePart>().every((p) => p.unavailable),
+            isTrue,
+          );
+        } finally {
+          await repository.close();
+        }
+      },
+    );
+
+    test(
+      'startup snapshot interrupted after preserving a run stays closed until retry',
+      () async {
+        final snapshot = await _createSqliteBackupFixture(
+          root: root,
+          prefix: 'interrupted-retry',
+          settings: {},
+        );
+        await DataSync.prepareStartupSnapshotRestore(
+          appDataDirectory: root,
+          snapshot: snapshot,
+        );
+        final lease = await RestoreBusinessLease.acquire(
+          appDataDirectory: root,
+        );
+        try {
+          final lock = RestoreWorkspaceLock(appDataDirectory: root);
+          await lock.synchronized(lock.beginSnapshotRecoveryWhileLocked);
+        } finally {
+          await lease.close();
+        }
+        expect(
+          await RestoreStartupGate.hasPendingWork(appDataDirectory: root),
+          isTrue,
+        );
+        await expectLater(
+          _recoverAcrossColdRestart(appDataDirectory: root),
+          throwsA(
+            isA<StateError>().having(
+              (error) => error.message,
+              'message',
+              'restore_startup_snapshot_preparation_incomplete',
+            ),
+          ),
+        );
+        expect(await File('${root.path}/kelivo.db').exists(), isFalse);
+        await DataSync.prepareStartupSnapshotRestore(
+          appDataDirectory: root,
+          snapshot: snapshot,
+        );
+        expect(
+          (await _recoverAcrossColdRestart(appDataDirectory: root))?.state,
+          RestoreReceiptState.committed,
+        );
+        await DatabaseInstallationGate.ensureReady(appDataDirectory: root);
+      },
+    );
+
+    test(
+      'startup snapshot reset abandons a published candidate and preserves the snapshot',
+      () async {
+        final snapshot = await _createSqliteBackupFixture(
+          root: root,
+          prefix: 'reset-after-publish',
+          settings: {},
+        );
+        final snapshotHash = await _fileSha256(snapshot);
+        await DataSync.prepareStartupSnapshotRestore(
+          appDataDirectory: root,
+          snapshot: snapshot,
+        );
+        final pending = (await RestoreStartupGate.inspect(
+          appDataDirectory: root,
+        ))!;
+        // Simulate interruption after candidate publication, before its guard
+        // was removed. A reset must end the whole attempt, not only its guard.
+        await File(
+          p.join(root.path, RestoreWorkspaceLock.snapshotRecoveryMarkerName),
+        ).writeAsString('preparing snapshot recovery');
+        await StartupRecoveryService.reset(appDataDirectory: root);
+        expect(await _recoverAcrossColdRestart(appDataDirectory: root), isNull);
+        await DatabaseInstallationGate.ensureReady(appDataDirectory: root);
+        final repository = ChatDatabaseRepository.open(
+          file: File('${root.path}/kelivo.db'),
+        );
+        try {
+          expect(
+            await repository.getMessagesRange(
+              'fixture-conversation',
+              start: 0,
+              limit: 10,
+            ),
+            isEmpty,
+          );
+        } finally {
+          await repository.close();
+        }
+        expect(await _fileSha256(snapshot), snapshotHash);
+        final archived = root
+            .listSync(recursive: true, followLinks: false)
+            .whereType<Directory>()
+            .where((entry) => p.basename(entry.path) == 'run_${pending.runId}')
+            .single;
+        expect(archived.path, contains('.kelivo_restore_failed_'));
+      },
+    );
 
     test('remapped conversations retain session output files', () async {
       final fixture = await _createSqliteBackupFixture(

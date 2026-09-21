@@ -30,7 +30,13 @@ class ThinkingSheenPalette {
     final opaque = _opaque(color);
     return ThinkingSheenPalette(
       base: opaque,
-      highlight: Color.lerp(opaque, Colors.white, isDark ? 0.82 : 0.78)!,
+      // Light mode lifts toward white. Dark ink is already bright, so the
+      // moving band has to go the other way or it disappears into the text.
+      highlight: Color.lerp(
+        opaque,
+        isDark ? Colors.black : Colors.white,
+        isDark ? 0.82 : 0.78,
+      )!,
     );
   }
 

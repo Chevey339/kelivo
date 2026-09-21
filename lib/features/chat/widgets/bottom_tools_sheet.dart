@@ -1,11 +1,16 @@
+import '../utils/prompt_injection_selection.dart';
 import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../../core/models/assistant.dart';
+import '../../../core/models/skills_binding.dart';
 import '../../../core/providers/assistant_provider.dart';
+import '../../../core/providers/instruction_injection_provider.dart';
+import '../../../core/services/chat/chat_service.dart';
 import '../../../core/services/haptics.dart';
+import '../../../core/services/skills/skills_service.dart';
 import '../../../icons/lucide_adapter.dart';
 import '../../../core/providers/settings_provider.dart';
 import '../../../core/providers/world_book_provider.dart';
@@ -21,6 +26,7 @@ import '../../workspace/widgets/skills/conversation_skills_sheet.dart';
 import '../utils/ensure_conversation.dart';
 import 'package:Kelivo/theme/app_semantic_colors.dart';
 import '../../../shared/widgets/section_card.dart';
+import '../../../theme/app_font_weights.dart';
 import 'tools_sheet_row.dart';
 
 /// Row that opens the session skills picker, and pushes the skills library on
@@ -193,18 +199,32 @@ class _LearningAndClearSection extends StatefulWidget {
 }
 
 class _LearningAndClearSectionState extends State<_LearningAndClearSection> {
+  String? _promptConversationId;
+
+  Future<String?> _promptScopeId() async {
+    if (_assistant()?.allowConversationPromptInjection != true) return null;
+    return _promptConversationId ??= await ensureConversationId(
+      context,
+      conversationId: widget.conversationId,
+      assistantId: widget.assistantId,
+    );
+  }
+
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       if (!mounted) return;
-      await context.read<WorldBookProvider>().initialize();
+      await Future.wait([
+        context.read<WorldBookProvider>().initialize(),
+        context.read<InstructionInjectionProvider>().initialize(),
+      ]);
     });
   }
 
-  Assistant? _assistant() {
+  Assistant? _assistant({bool listen = false}) {
     try {
-      final provider = context.read<AssistantProvider>();
+      final provider = Provider.of<AssistantProvider>(context, listen: listen);
       final id = widget.assistantId;
       if (id != null) return provider.getById(id);
       return provider.currentAssistant;
@@ -217,10 +237,11 @@ class _LearningAndClearSectionState extends State<_LearningAndClearSection> {
     Haptics.light();
     final id = await ensureConversationId(
       context,
-      conversationId: widget.conversationId,
+      conversationId: _promptConversationId ?? widget.conversationId,
       assistantId: widget.assistantId,
     );
     if (id == null || !mounted) return;
+    _promptConversationId = id;
     await showConversationSkillsSheet(
       context,
       conversationId: id,
@@ -233,10 +254,53 @@ class _LearningAndClearSectionState extends State<_LearningAndClearSection> {
     final l10n = AppLocalizations.of(context)!;
     final settings = context.watch<SettingsProvider>();
     final worldBookProvider = context.watch<WorldBookProvider>();
+    final injections = context.watch<InstructionInjectionProvider>();
+    final skills = context.watch<SkillsService>();
+    final chat = context.watch<ChatService>();
+    final assistant = _assistant(listen: true);
     final hasOcrModel =
         settings.ocrModelProvider != null && settings.ocrModelId != null;
     final hasWorldBooks = worldBookProvider.books.isNotEmpty;
+    final scoped = assistant?.allowConversationPromptInjection == true;
+    final scopeId = _promptConversationId ?? widget.conversationId;
+    Set<String> activeIds(PromptSelectionKind kind) => scoped && scopeId == null
+        ? <String>{}
+        : promptSelectionIds(
+            context,
+            kind: kind,
+            assistantId: widget.assistantId,
+            conversationId: scoped ? scopeId : null,
+          ).toSet();
+    final activeWorldBookIds = activeIds(PromptSelectionKind.worldBook);
+    final enabledWorldBookCount = worldBookProvider.books
+        .where((book) => book.enabled && activeWorldBookIds.contains(book.id))
+        .length;
+    final activeInstructionIds = activeIds(PromptSelectionKind.instruction);
+    final enabledInstructionCount = injections.items
+        .where((item) => activeInstructionIds.contains(item.id))
+        .length;
+    final skillBinding = SkillsBinding.fromExtras(
+      scopeId == null
+          ? const {}
+          : chat.getConversation(scopeId)?.extras ?? const {},
+    );
+    final enabledSkillCount = skills
+        .resolveForAssistant(
+          assistant,
+          conversationOverride: skillBinding.skillIds,
+        )
+        .length;
     final chevron = ToolsSheetRow.chevron(context);
+    Widget selectionTrailing(int enabled, int total) => enabled == 0
+        ? chevron
+        : Text(
+            '$enabled/$total',
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: AppFontWeights.medium,
+              color: Theme.of(context).colorScheme.primary,
+            ),
+          );
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -254,7 +318,7 @@ class _LearningAndClearSectionState extends State<_LearningAndClearSection> {
               unawaited(openSkillsPage(rootNav.context));
             });
           },
-          trailing: chevron,
+          trailing: selectionTrailing(enabledSkillCount, skills.skills.length),
         ),
         const SizedBox(height: 8),
         ToolsSheetRow(
@@ -262,9 +326,14 @@ class _LearningAndClearSectionState extends State<_LearningAndClearSection> {
           label: l10n.instructionInjectionTitle,
           onTap: () async {
             Haptics.light();
+            final scoped =
+                _assistant()?.allowConversationPromptInjection == true;
+            final scopeId = await _promptScopeId();
+            if (!context.mounted || (scoped && scopeId == null)) return;
             await showInstructionInjectionSheet(
               context,
               assistantId: widget.assistantId,
+              conversationId: scopeId,
             );
           },
           onLongPress: () {
@@ -279,7 +348,10 @@ class _LearningAndClearSectionState extends State<_LearningAndClearSection> {
               );
             });
           },
-          trailing: chevron,
+          trailing: selectionTrailing(
+            enabledInstructionCount,
+            injections.items.length,
+          ),
         ),
         if (hasWorldBooks) ...[
           const SizedBox(height: 8),
@@ -288,9 +360,14 @@ class _LearningAndClearSectionState extends State<_LearningAndClearSection> {
             label: l10n.worldBookTitle,
             onTap: () async {
               Haptics.light();
+              final scoped =
+                  _assistant()?.allowConversationPromptInjection == true;
+              final scopeId = await _promptScopeId();
+              if (!context.mounted || (scoped && scopeId == null)) return;
               await showWorldBookSheet(
                 context,
                 assistantId: widget.assistantId,
+                conversationId: scopeId,
               );
             },
             onLongPress: () {
@@ -303,7 +380,10 @@ class _LearningAndClearSectionState extends State<_LearningAndClearSection> {
                 );
               });
             },
-            trailing: chevron,
+            trailing: selectionTrailing(
+              enabledWorldBookCount,
+              worldBookProvider.books.length,
+            ),
           ),
         ],
         if (hasOcrModel) ...[

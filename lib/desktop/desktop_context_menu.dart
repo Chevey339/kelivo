@@ -32,7 +32,8 @@ Future<void> showDesktopContextMenuAt(
   required Offset globalPosition,
   required List<DesktopContextMenuItem> items,
 }) async {
-  final overlay = Overlay.maybeOf(context);
+  // Match the navigator used by showGeneralDialog, including nested panes.
+  final overlay = Navigator.of(context, rootNavigator: true).overlay;
   if (overlay == null) return;
   final overlayBox = overlay.context.findRenderObject() as RenderBox?;
   if (overlayBox == null) return;
@@ -51,7 +52,7 @@ Future<void> showDesktopContextMenuAt(
   const double gap = 8; // offset from cursor
   final cs = Theme.of(context).colorScheme;
   final isDark = Theme.of(context).brightness == Brightness.dark;
-  final padding = MediaQuery.of(context).padding;
+  final padding = MediaQuery.of(overlay.context).padding;
   final minX = padding.left + 8;
   final maxX = screen.width - padding.right - menuWidth - 8;
   final minY = padding.top + 8;
@@ -70,6 +71,7 @@ Future<void> showDesktopContextMenuAt(
 
   await showGeneralDialog<void>(
     context: context,
+    useRootNavigator: true,
     barrierLabel: 'context-menu',
     barrierDismissible: true,
     barrierColor: cs.scrim.withValues(alpha: 0.06),

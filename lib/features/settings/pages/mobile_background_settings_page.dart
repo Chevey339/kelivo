@@ -7,10 +7,9 @@ import 'package:provider/provider.dart';
 import '../../../core/models/mobile_background_settings.dart';
 import '../../../core/providers/settings_provider.dart';
 import '../../../core/services/mobile_background.dart';
-import 'package:lucide_icons_flutter/lucide_icons.dart';
+import '../../../icons/lucide_adapter.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../shared/widgets/ios_tactile.dart';
-import '../../../shared/widgets/ios_switch.dart';
 import '../../../shared/widgets/section_card.dart';
 import '../../../shared/widgets/option_sheet.dart';
 import '../../../shared/widgets/ios_settings_rows.dart';
@@ -123,23 +122,31 @@ class _MobileBackgroundSettingsPageState
         coordinator.lastError ??
         (nativeError.isEmpty ? l.backgroundNoError : nativeError);
 
+    final cs = Theme.of(context).colorScheme;
     return Scaffold(
+      backgroundColor: cs.surface,
       appBar: AppBar(
-        leading: IconButton(
-          icon: const Icon(LucideIcons.arrowLeft),
-          tooltip: l.settingsPageBackButton,
-          onPressed: () => Navigator.of(context).maybePop(),
+        leading: Tooltip(
+          message: l.settingsPageBackButton,
+          child: IosIconButton(
+            icon: Lucide.ArrowLeft,
+            color: cs.onSurface,
+            size: 22,
+            minSize: 44,
+            semanticLabel: l.settingsPageBackButton,
+            onTap: () => Navigator.of(context).maybePop(),
+          ),
         ),
         title: Text(l.backgroundSettingsTitle),
       ),
       body: ListView(
-        padding: const EdgeInsets.fromLTRB(16, 12, 16, 28),
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
         children: [
           SectionCard(
-            children: [
+            children: _withDividers([
               _toggle(
                 'execution',
-                LucideIcons.activity,
+                Lucide.Activity,
                 _android ? l.backgroundAndroidEnabled : l.backgroundIosEnabled,
                 _android
                     ? l.backgroundAndroidEnabledDetail
@@ -153,7 +160,7 @@ class _MobileBackgroundSettingsPageState
               ),
               _toggle(
                 'notifications',
-                LucideIcons.bell,
+                Lucide.Bell,
                 l.backgroundNotifications,
                 l.backgroundNotificationsDetail,
                 value.notificationsEnabled,
@@ -166,21 +173,21 @@ class _MobileBackgroundSettingsPageState
               ),
               _toggle(
                 'privacy',
-                LucideIcons.shield,
+                Lucide.Shield,
                 l.backgroundPrivacy,
                 l.backgroundPrivacyDetail,
                 value.privacyMode,
                 (on) => _save(value.copyWith(privacyMode: on)),
               ),
-            ],
+            ]),
           ),
           const SizedBox(height: 16),
           SectionCard(
-            children: [
+            children: _withDividers([
               if (_android) ...[
                 _toggle(
                   'overlay',
-                  LucideIcons.layers,
+                  Lucide.Layers,
                   l.backgroundOverlay,
                   l.backgroundOverlayDetail,
                   value.overlayEnabled,
@@ -193,7 +200,7 @@ class _MobileBackgroundSettingsPageState
                 ),
                 _toggle(
                   'liveUpdates',
-                  LucideIcons.zap,
+                  Lucide.Zap,
                   l.backgroundLiveUpdates,
                   status.flag('liveUpdatesSupported')
                       ? l.backgroundLiveUpdatesDetail
@@ -204,7 +211,7 @@ class _MobileBackgroundSettingsPageState
               ] else ...[
                 _toggle(
                   'liveActivities',
-                  LucideIcons.activity,
+                  Lucide.Activity,
                   l.backgroundLiveActivities,
                   status.flag('liveActivitiesSupported')
                       ? l.backgroundLiveActivitiesDetail
@@ -214,7 +221,7 @@ class _MobileBackgroundSettingsPageState
                 ),
                 _toggle(
                   'speech',
-                  LucideIcons.volume2,
+                  Lucide.Volume2,
                   l.backgroundSpeech,
                   l.backgroundSpeechDetail,
                   value.backgroundSpeechEnabled,
@@ -222,7 +229,7 @@ class _MobileBackgroundSettingsPageState
                 ),
                 _toggle(
                   'location',
-                  LucideIcons.mapPin,
+                  Lucide.MapPin,
                   l.backgroundLocation,
                   l.backgroundLocationDetail,
                   value.locationEnabled,
@@ -239,7 +246,7 @@ class _MobileBackgroundSettingsPageState
                 ),
                 _toggle(
                   'silentAudio',
-                  LucideIcons.audioLines,
+                  Lucide.AudioLines,
                   l.backgroundSilentAudio,
                   l.backgroundSilentAudioDetail,
                   value.silentAudioEnabled,
@@ -248,7 +255,7 @@ class _MobileBackgroundSettingsPageState
               ],
               IosNavRow(
                 key: const ValueKey('completionVisibility'),
-                icon: LucideIcons.timer,
+                icon: Lucide.Timer,
                 label: l.backgroundFinishVisibility,
                 subtitle: visibility(value.completionVisibility),
                 onTap: () async {
@@ -276,18 +283,19 @@ class _MobileBackgroundSettingsPageState
                   }
                 },
               ),
-              _footnote(l.backgroundFinishVisibilityDetail),
-            ],
+            ]),
           ),
+          IosSectionFooter(text: l.backgroundFinishVisibilityDetail),
           if (_android) ...[
             const SizedBox(height: 16),
             SectionCard(
               children: [
                 IosNavRow(
                   key: const ValueKey('overlayAppearance'),
-                  icon: LucideIcons.slidersHorizontal,
+                  icon: Lucide.SlidersHorizontal,
                   label: l.backgroundOverlayAppearance,
                   subtitle: l.backgroundOverlayAppearanceDetail,
+                  subtitleMaxLines: 2,
                   onTap: () => Navigator.of(context).push(
                     MaterialPageRoute<void>(
                       builder: (_) => BackgroundOverlaySettingsPage(
@@ -299,18 +307,17 @@ class _MobileBackgroundSettingsPageState
               ],
             ),
           ],
-          const SizedBox(height: 16),
+          IosSectionHeader(text: l.backgroundPermissionsTitle),
           SectionCard(
-            children: [
-              _heading(l.backgroundPermissionsTitle),
+            children: _withDividers([
               _action(
-                LucideIcons.bell,
+                Lucide.Bell,
                 l.backgroundNotificationsPermission,
                 grant(status.flag('notificationsAuthorized')),
                 () => _permission('notifications'),
               ),
               _action(
-                LucideIcons.settings,
+                Lucide.Settings,
                 _android
                     ? l.backgroundCompletionChannel
                     : l.backgroundNotificationChannels,
@@ -319,20 +326,20 @@ class _MobileBackgroundSettingsPageState
               ),
               if (_android) ...[
                 _action(
-                  LucideIcons.activity,
+                  Lucide.Activity,
                   l.backgroundOngoingChannel,
                   grant(status.flag('ongoingChannelEnabled')),
                   () => _open('ongoingChannel'),
                 ),
                 _action(
-                  LucideIcons.battery,
+                  Lucide.Battery,
                   l.backgroundBatteryOptimization,
                   grant(status.flag('batteryExempt')),
                   () => _open('battery'),
                   subtitle: l.backgroundBatteryOptimizationDetail,
                 ),
                 _action(
-                  LucideIcons.power,
+                  Lucide.Power,
                   l.backgroundAutostart,
                   l.backgroundPermissionUnknown,
                   () => _open('autostart'),
@@ -340,20 +347,20 @@ class _MobileBackgroundSettingsPageState
                       '${status.text('manufacturer')} · ${l.backgroundAutostartDetail}',
                 ),
                 _action(
-                  LucideIcons.layers,
+                  Lucide.Layers,
                   l.backgroundOverlay,
                   grant(status.flag('overlayAuthorized')),
                   () => _open('overlay'),
                 ),
                 _action(
-                  LucideIcons.zap,
+                  Lucide.Zap,
                   l.backgroundLiveUpdates,
                   grant(status.flag('liveUpdatesAuthorized')),
                   () => _open('liveUpdates'),
                 ),
               ] else ...[
                 _action(
-                  LucideIcons.mapPin,
+                  Lucide.MapPin,
                   l.backgroundLocationPermission,
                   location,
                   () => status.text('locationAuthorization') == 'notDetermined'
@@ -363,31 +370,30 @@ class _MobileBackgroundSettingsPageState
                 if (value.locationEnabled &&
                     status.text('locationAuthorization') == 'whenInUse')
                   _action(
-                    LucideIcons.mapPin,
+                    Lucide.MapPin,
                     l.backgroundLocationAlways,
                     '',
                     () => _permission('locationAlways'),
                     subtitle: l.backgroundLocationAlwaysDetail,
                   ),
                 _action(
-                  LucideIcons.activity,
+                  Lucide.Activity,
                   l.backgroundLiveActivities,
                   grant(status.flag('liveActivitiesEnabled')),
                   () => _open('app'),
                 ),
               ],
               _action(
-                LucideIcons.settings,
+                Lucide.Settings,
                 l.backgroundSystemSettings,
                 '',
                 () => _open('app'),
               ),
-            ],
+            ]),
           ),
-          const SizedBox(height: 16),
+          IosSectionHeader(text: l.backgroundRuntimeTitle),
           SectionCard(
-            children: [
-              _heading(l.backgroundRuntimeTitle),
+            children: _withDividers([
               _status(
                 l.backgroundTasks,
                 status.text('activeTasks').isEmpty
@@ -412,32 +418,22 @@ class _MobileBackgroundSettingsPageState
                 _status(l.backgroundAudioActive, active('silentAudioActive')),
               ],
               _status(l.backgroundLastError, error),
-            ],
+            ]),
           ),
-          _footnote(_android ? l.backgroundAndroidLimit : l.backgroundIosLimit),
+          IosSectionFooter(
+            text: _android ? l.backgroundAndroidLimit : l.backgroundIosLimit,
+          ),
         ],
       ),
     );
   }
 
-  Widget _heading(String text) => Padding(
-    padding: const EdgeInsets.fromLTRB(14, 12, 14, 4),
-    child: Align(
-      alignment: Alignment.centerLeft,
-      child: Text(text, style: const TextStyle(fontWeight: FontWeight.w600)),
-    ),
-  );
-
-  Widget _footnote(String text) => Padding(
-    padding: const EdgeInsets.all(14),
-    child: Text(
-      text,
-      style: TextStyle(
-        fontSize: 12,
-        color: Theme.of(context).colorScheme.onSurfaceVariant,
-      ),
-    ),
-  );
+  List<Widget> _withDividers(List<Widget> rows) => [
+    for (var i = 0; i < rows.length; i++) ...[
+      if (i > 0) const IosRowDivider(),
+      rows[i],
+    ],
+  ];
 
   Widget _toggle(
     String key,
@@ -446,37 +442,13 @@ class _MobileBackgroundSettingsPageState
     String detail,
     bool value,
     Future<void> Function(bool) change,
-  ) => Padding(
-    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-    child: Row(
-      crossAxisAlignment: CrossAxisAlignment.center,
-      children: [
-        Icon(icon, size: 21),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(title, style: const TextStyle(fontSize: 15)),
-              const SizedBox(height: 4),
-              Text(
-                detail,
-                style: TextStyle(
-                  fontSize: 12,
-                  color: Theme.of(context).colorScheme.onSurfaceVariant,
-                ),
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(width: 10),
-        IosSwitch(
-          key: ValueKey(key),
-          value: value,
-          onChanged: (value) => unawaited(change(value)),
-        ),
-      ],
-    ),
+  ) => IosSwitchRow(
+    key: ValueKey(key),
+    icon: icon,
+    label: title,
+    subtitle: detail,
+    value: value,
+    onChanged: (value) => unawaited(change(value)),
   );
 
   Widget _action(
@@ -485,64 +457,44 @@ class _MobileBackgroundSettingsPageState
     String detail,
     Future<void> Function() action, {
     String? subtitle,
-  }) => IosCardPress(
-    borderRadius: BorderRadius.circular(12),
+  }) => IosNavRow(
+    icon: icon,
+    label: title,
+    detailText: detail.isEmpty ? null : detail,
+    subtitle: subtitle,
+    subtitleMaxLines: subtitle == null ? 1 : null,
     onTap: () => unawaited(action()),
-    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-    child: Row(
-      children: [
-        Icon(icon, size: 21),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(title, style: const TextStyle(fontSize: 14)),
-              if (detail.isNotEmpty)
-                Text(
-                  detail,
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
-                  ),
-                ),
-              if (subtitle != null)
-                Padding(
-                  padding: const EdgeInsets.only(top: 3),
-                  child: Text(
-                    subtitle,
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Theme.of(context).colorScheme.onSurfaceVariant,
-                    ),
-                  ),
-                ),
-            ],
-          ),
-        ),
-        const Icon(LucideIcons.chevronRight, size: 16),
-      ],
-    ),
   );
 
-  Widget _status(String title, String detail) => Padding(
-    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
-    child: Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Expanded(child: Text(title, style: const TextStyle(fontSize: 13))),
-        const SizedBox(width: 12),
-        Flexible(
-          child: Text(
-            detail,
-            textAlign: TextAlign.end,
-            style: TextStyle(
-              fontSize: 12,
-              color: Theme.of(context).colorScheme.onSurfaceVariant,
+  Widget _status(String title, String detail) {
+    final cs = Theme.of(context).colorScheme;
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(
+            child: Text(
+              title,
+              style: TextStyle(
+                fontSize: 15,
+                color: cs.onSurface.withValues(alpha: 0.9),
+              ),
             ),
           ),
-        ),
-      ],
-    ),
-  );
+          const SizedBox(width: 12),
+          Flexible(
+            child: Text(
+              detail,
+              textAlign: TextAlign.end,
+              style: TextStyle(
+                fontSize: 13,
+                color: cs.onSurface.withValues(alpha: 0.6),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }

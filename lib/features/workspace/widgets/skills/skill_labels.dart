@@ -17,6 +17,8 @@ abstract final class SkillsKeys {
   static const export = ValueKey<String>('skills-detail-export');
   static const more = ValueKey<String>('skills-detail-more');
   static const bodyEmpty = ValueKey<String>('skills-detail-body-empty');
+  static const bodyLoading = ValueKey<String>('skills-detail-body-loading');
+  static const bodyTooLarge = ValueKey<String>('skills-detail-body-too-large');
   static const actions = ValueKey<String>('skills-detail-actions');
   static const emptyCtas = ValueKey<String>('skills-empty-ctas');
   static const editSave = ValueKey<String>('skills-edit-save');

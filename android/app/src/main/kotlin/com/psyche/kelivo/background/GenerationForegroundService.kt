@@ -28,7 +28,16 @@ class GenerationForegroundService : Service() {
             runtime.serviceStarted(this)
             if (intent?.action == STOP) runtime.stopTasks()
             else if (!runtime.shouldRunService()) stopGenerationService()
-            else acquireWakeLock()
+            else {
+                acquireWakeLock()
+                if (runtime.hasScheduledRuns) android.os.Handler(mainLooper).post {
+                    val app = application as KelivoApplication
+                    if (runtime.hasScheduledRuns) {
+                        app.engine // Shared engine: no second isolate or database owner.
+                        app.scheduledTasks.dispatchPending()
+                    }
+                }
+            }
         } catch (error: RuntimeException) {
             runtime.serviceFailed("foreground_service_failed: ${error.message}")
             stopGenerationService()

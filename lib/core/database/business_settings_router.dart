@@ -21,6 +21,8 @@ final class BusinessKeyRegistry {
     'window_height_v1',
     'window_pos_x_v1',
     'window_pos_y_v1',
+    'window_physical_pos_x_v1',
+    'window_physical_pos_y_v1',
     'window_maximized_v1',
     'desktop_hotkeys_commands_v1',
     'desktop_hotkeys_enabled_v1',
@@ -38,6 +40,7 @@ final class BusinessKeyRegistry {
   };
 
   static const preferenceKeys = <String>{
+    'desktop_scheduled_tasks_v1',
     'current_assistant_id_v1',
     'selected_model_v1',
     'per_chat_model_enabled_v1',
@@ -506,6 +509,8 @@ final class BusinessSettingsRouter {
             'generateConversationSummary',
             'appendCurrentTimeToUserMessage',
             'useIso8601TimeFormat',
+            'allowConversationSystemPrompt',
+            'allowConversationPromptInjection',
           },
           numbers: const {
             'temperature',
@@ -538,6 +543,8 @@ final class BusinessSettingsRouter {
             'id',
             'name',
             'apiKey',
+            'oauthProvider',
+            'oauthModelsSyncedAt',
             'baseUrl',
             'chatPath',
             'location',
@@ -565,7 +572,7 @@ final class BusinessSettingsRouter {
             'claudePromptCachingEnabled',
           },
           lists: const {'models', 'apiKeys', 'customHeaders', 'customBody'},
-          maps: const {'modelOverrides', 'keyManagement'},
+          maps: const {'modelOverrides', 'keyManagement', 'oauthCredentials'},
         );
         _validateProviderChildren(kind, payload);
         return;
@@ -800,6 +807,37 @@ final class BusinessSettingsRouter {
     BusinessEntityKind kind,
     Map<String, Object?> payload,
   ) {
+    final oauthProvider = payload['oauthProvider'];
+    if (oauthProvider != null &&
+        !{'chatgpt', 'grok', 'kimi', 'claude'}.contains(oauthProvider)) {
+      throw const FormatException('Invalid OAuth provider');
+    }
+    final credentials = payload['oauthCredentials'];
+    if (credentials is Map) {
+      _validateKnownFields(
+        kind,
+        _stringKeyedMap(credentials),
+        requiredStrings: const {
+          'accessToken',
+          'refreshToken',
+          'expiresAt',
+          'sessionId',
+        },
+        strings: const {
+          'email',
+          'accountId',
+          'plan',
+          'deviceId',
+          'organizationId',
+          'organizationName',
+        },
+        booleans: const {'requiresLogin'},
+      );
+      if (oauthProvider == null ||
+          DateTime.tryParse(credentials['expiresAt'] as String) == null) {
+        throw const FormatException('Invalid OAuth credentials');
+      }
+    }
     for (final child in _mappedObjects(payload['apiKeys'])) {
       _validateKnownFields(
         kind,
@@ -921,7 +959,14 @@ final class BusinessSettingsRouter {
           'caseSensitive',
           'constantActive',
         },
-        integers: const {'priority', 'injectDepth', 'scanDepth'},
+        integers: const {
+          'priority',
+          'injectDepth',
+          'scanDepth',
+          'sticky',
+          'cooldown',
+          'delay',
+        },
         lists: const {'keywords'},
       );
     }

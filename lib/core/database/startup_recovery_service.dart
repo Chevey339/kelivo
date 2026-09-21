@@ -6,6 +6,8 @@ import 'package:path/path.dart' as p;
 import 'package:sqlite3/sqlite3.dart' as sqlite;
 
 import '../services/backup/restore_durability.dart';
+import '../services/backup/restore_business_lease.dart';
+import '../services/backup/restore_workspace_lock.dart';
 import 'app_database.dart';
 import 'database_installation_gate.dart';
 
@@ -101,26 +103,56 @@ final class StartupRecoveryService {
   /// first.
   static Future<void> reset({
     required Directory appDataDirectory,
+    RestoreBusinessLease? businessLease,
     RestoreDurability? durability,
   }) async {
-    // Remove installation receipts (and any temps) first: rebuildFresh only
-    // recreates the database family, and admission rejects a receipt whose
-    // database has been rebuilt. Clearing them lets a fresh identity issue
-    // cleanly.
-    await _sweepReceiptTemporaries(appDataDirectory);
-    await for (final entity in appDataDirectory.list(followLinks: false)) {
-      final name = p.basename(entity.path);
-      if (name.startsWith(_receiptPrefix) && name.endsWith(_receiptSuffix)) {
-        await _deleteFileIfPresent(entity.path);
+    final resolvedDurability = durability ?? RestorePlatformDurability();
+    final ownedLease = businessLease == null
+        ? await RestoreBusinessLease.acquire(
+            appDataDirectory: appDataDirectory,
+            durability: resolvedDurability,
+          )
+        : null;
+    final lease = businessLease ?? ownedLease!;
+    try {
+      final expectedLeasePath = p.join(
+        appDataDirectory.absolute.path,
+        RestoreBusinessLease.leaseDirectoryName,
+        RestoreBusinessLease.lockFileName,
+      );
+      if (lease.isClosed ||
+          !p.equals(lease.lockFile.absolute.path, expectedLeasePath)) {
+        throw StateError('restore_startup_business_lease');
       }
+      final workspaceLock = RestoreWorkspaceLock(
+        appDataDirectory: appDataDirectory,
+        durability: resolvedDurability,
+      );
+      await workspaceLock.synchronized(() async {
+        // A reset supersedes the entire interrupted restore. Preserve its
+        // evidence outside admission, so a published candidate cannot replace
+        // the fresh database on the next launch. Keep admission blocked until
+        // both the new database and installation receipt are durable.
+        await workspaceLock.beginSnapshotRecoveryWhileLocked();
+        await _sweepReceiptTemporaries(appDataDirectory);
+        await for (final entity in appDataDirectory.list(followLinks: false)) {
+          final name = p.basename(entity.path);
+          if (name.startsWith(_receiptPrefix) &&
+              name.endsWith(_receiptSuffix)) {
+            await _deleteFileIfPresent(entity.path);
+          }
+        }
+        // Reset deletes the installed family instead of making another copy.
+        await DatabaseInstallationGate.rebuildFresh(
+          appDataDirectory: appDataDirectory,
+          durability: resolvedDurability,
+          preserveDisplacedCopy: false,
+        );
+        await workspaceLock.finishSnapshotRecoveryWhileLocked();
+      });
+    } finally {
+      await ownedLease?.close();
     }
-    // The confirmation dialog promises the data is permanently gone, so this
-    // is the one caller that must not leave a displaced copy behind.
-    await DatabaseInstallationGate.rebuildFresh(
-      appDataDirectory: appDataDirectory,
-      durability: durability,
-      preserveDisplacedCopy: false,
-    );
   }
 
   static Future<void> _copyDirectory(Directory source, Directory target) async {

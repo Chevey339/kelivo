@@ -1,3 +1,4 @@
+import '../../models/provider_oauth.dart';
 import 'package:uuid/uuid.dart';
 
 import '../../providers/settings_provider.dart';
@@ -13,6 +14,21 @@ Map<String, String>? providerSessionHeaders(
   Map<String, String>? extraHeaders,
 }) {
   final host = Uri.tryParse(config.baseUrl)?.host.toLowerCase();
+  if (config.isOAuth) {
+    final id = conversationId?.trim() ?? '';
+    final session = id.isEmpty ? const Uuid().v4() : id;
+    return {
+      if (config.oauthProvider == OAuthProvider.chatgpt) ...{
+        'session_id': session,
+        'conversation_id': session,
+        'x-client-request-id': session,
+      },
+      if (config.oauthProvider == OAuthProvider.grok) 'x-grok-conv-id': session,
+      if (config.oauthProvider == OAuthProvider.claude)
+        'X-Claude-Code-Session-Id': session,
+      ...?extraHeaders,
+    };
+  }
   if (host != 'opencode.ai') return extraHeaders;
   final id = conversationId?.trim() ?? '';
   return {

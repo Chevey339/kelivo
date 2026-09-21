@@ -10,7 +10,7 @@
 @objc class AppDelegate: FlutterAppDelegate {
    private let fileSaveHandler = NativeFileSaveHandler()
    private let backgroundGenerationHandler = MobileBackgroundHandler()
-   private let mcpOAuthHandler = IosMcpOAuthHandler()
+   private let oauthHandler = IosOAuthHandler()
    private let deviceLocalToolsHandler = DeviceLocalToolsHandler()
    private let iosTranslationHandler = IosTranslationHandler()
    private let incomingShareHandler = IosIncomingShareHandler()
@@ -60,10 +60,10 @@
 
       backgroundGenerationHandler.configure(messenger: controller.binaryMessenger)
 
-      let mcpOAuthChannel = FlutterMethodChannel(name: "app.mcp_oauth", binaryMessenger: controller.binaryMessenger)
-      mcpOAuthHandler.presentationAnchor = window
-      mcpOAuthChannel.setMethodCallHandler { [weak self] call, result in
-        self?.mcpOAuthHandler.handle(call: call, result: result)
+      let oauthChannel = FlutterMethodChannel(name: "app.oauth", binaryMessenger: controller.binaryMessenger)
+      oauthHandler.presentationAnchor = window
+      oauthChannel.setMethodCallHandler { [weak self] call, result in
+        self?.oauthHandler.handle(call: call, result: result)
       }
 
       let iosTranslationChannel = FlutterMethodChannel(name: "app.ios_translation", binaryMessenger: controller.binaryMessenger)
@@ -250,9 +250,10 @@ private struct NativeTranslationPresenter: View {
   }
 }
 
-private final class IosMcpOAuthHandler: NSObject, ASWebAuthenticationPresentationContextProviding {
+private final class IosOAuthHandler: NSObject, ASWebAuthenticationPresentationContextProviding {
   weak var presentationAnchor: UIWindow?
   private var session: ASWebAuthenticationSession?
+  private var sessionId: String?
 
   func handle(call: FlutterMethodCall, result: @escaping FlutterResult) {
     switch call.method {
@@ -266,7 +267,9 @@ private final class IosMcpOAuthHandler: NSObject, ASWebAuthenticationPresentatio
         let urlString = arguments?["url"] as? String,
         let url = URL(string: urlString),
         let callbackScheme = arguments?["callbackScheme"] as? String,
-        !callbackScheme.isEmpty
+        !callbackScheme.isEmpty,
+        let requestId = arguments?["sessionId"] as? String,
+        !requestId.isEmpty
       else {
         result(FlutterError(code: "invalid_arguments", message: "A valid authorization URL and callback scheme are required.", details: nil))
         return
@@ -276,7 +279,10 @@ private final class IosMcpOAuthHandler: NSObject, ASWebAuthenticationPresentatio
         url: url,
         callbackURLScheme: callbackScheme
       ) { [weak self] callbackURL, error in
-        self?.session = nil
+        if self?.sessionId == requestId {
+          self?.session = nil
+          self?.sessionId = nil
+        }
         if let callbackURL {
           result(callbackURL.absoluteString)
           return
@@ -294,13 +300,20 @@ private final class IosMcpOAuthHandler: NSObject, ASWebAuthenticationPresentatio
       authenticationSession.presentationContextProvider = self
       authenticationSession.prefersEphemeralWebBrowserSession = false
       session = authenticationSession
+      sessionId = requestId
       if !authenticationSession.start() {
         session = nil
+        sessionId = nil
         result(FlutterError(code: "authorization_failed", message: "Could not start the authorization session.", details: nil))
       }
     case "cancel":
-      session?.cancel()
-      session = nil
+      let arguments = call.arguments as? [String: Any]
+      if let requestId = arguments?["sessionId"] as? String, requestId == sessionId {
+        let previous = session
+        session = nil
+        sessionId = nil
+        previous?.cancel()
+      }
       result(nil)
     default:
       result(FlutterMethodNotImplemented)

@@ -6,6 +6,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'package:Kelivo/core/providers/settings_provider.dart';
 import 'package:Kelivo/core/services/api/chat_api_service.dart';
+import 'package:Kelivo/core/services/api/providers/openai/openai_vendor_compat.dart';
 import 'support/collect_generation.dart';
 
 ProviderConfig _moonshotConfig(String baseUrl) {
@@ -23,6 +24,11 @@ Future<Map<String, dynamic>> _captureMoonshotBody({
   required String modelId,
   required List<Map<String, dynamic>> messages,
   List<String>? userImagePaths,
+  String providerId = 'MoonshotTest',
+  int? thinkingBudget,
+  Map<String, dynamic>? extraBody,
+  Map<String, dynamic> modelOverrides = const {},
+  bool stream = false,
 }) async {
   late Map<String, dynamic> requestBody;
   final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
@@ -34,16 +40,19 @@ Future<Map<String, dynamic>> _captureMoonshotBody({
     requestBody = (jsonDecode(await utf8.decoder.bind(request).join()) as Map)
         .cast<String, dynamic>();
     request.response.statusCode = HttpStatus.ok;
-    request.response.headers.contentType = ContentType.json;
+    request.response.headers.contentType = stream
+        ? ContentType('text', 'event-stream')
+        : ContentType.json;
+    final response = jsonEncode({
+      'choices': [
+        {
+          (stream ? 'delta' : 'message'): {'content': 'ok'},
+          'finish_reason': 'stop',
+        },
+      ],
+    });
     request.response.write(
-      jsonEncode({
-        'choices': [
-          {
-            'message': {'content': 'ok'},
-            'finish_reason': 'stop',
-          },
-        ],
-      }),
+      stream ? 'data: $response\n\ndata: [DONE]\n\n' : response,
     );
     await request.response.close();
   });
@@ -51,17 +60,233 @@ Future<Map<String, dynamic>> _captureMoonshotBody({
   await ChatApiService.sendMessageStream(
     config: _moonshotConfig(
       'http://${server.address.address}:${server.port}/v1',
-    ),
+    ).copyWith(id: providerId, modelOverrides: modelOverrides),
     modelId: modelId,
     messages: messages,
     userImagePaths: userImagePaths,
-    stream: false,
+    stream: stream,
+    thinkingBudget: thinkingBudget,
+    extraBody: extraBody,
   ).toList();
   return requestBody;
 }
 
 void main() {
   group('Moonshot Kimi compatibility', () {
+    for (final modelId in [
+      'k3',
+      'k3-256k',
+      'kimi-for-coding',
+      'kimi-k2.8-preview',
+    ]) {
+      for (final budget in <int?>[null, -1, 0, 1024, 16000, 64000, 128000]) {
+        test('$modelId maps thinking budget $budget', () async {
+          final body = await _captureMoonshotBody(
+            modelId: modelId,
+            thinkingBudget: budget,
+            stream: true,
+            messages: const [
+              {'role': 'user', 'content': 'hello'},
+            ],
+          );
+          final expectedEffort = switch (budget) {
+            null || -1 || 0 => null,
+            1024 => 'low',
+            16000 => 'high',
+            _ => 'max',
+          };
+          expect(body['reasoning_effort'], expectedEffort);
+          expect(body['thinking'], budget == 0 ? {'type': 'disabled'} : null);
+        });
+      }
+    }
+
+    test(
+      'K2.8 resolves the upstream model and normalizes custom params',
+      () async {
+        final body = await _captureMoonshotBody(
+          modelId: 'my-model',
+          modelOverrides: const {
+            'my-model': {'apiModelId': 'kimi-for-coding'},
+          },
+          thinkingBudget: 1024,
+          extraBody: const {
+            'reasoning_effort': 'xhigh',
+            'temperature': 0.5,
+            'top_p': 0.8,
+            'n': 2,
+            'presence_penalty': 1,
+            'frequency_penalty': 1,
+          },
+          messages: const [
+            {'role': 'user', 'content': 'hello'},
+          ],
+        );
+        expect(body['model'], 'kimi-for-coding');
+        expect(body['reasoning_effort'], 'max');
+        for (final key in [
+          'temperature',
+          'top_p',
+          'n',
+          'presence_penalty',
+          'frequency_penalty',
+        ]) {
+          expect(body.containsKey(key), isFalse, reason: key);
+        }
+      },
+    );
+
+    test('HighSpeed keeps fixed thinking without unsupported effort', () async {
+      final body = await _captureMoonshotBody(
+        modelId: 'kimi-for-coding-highspeed',
+        thinkingBudget: 0,
+        extraBody: const {
+          'reasoning_effort': 'max',
+          'thinking': {'type': 'disabled'},
+        },
+        messages: const [
+          {'role': 'user', 'content': 'hello'},
+        ],
+      );
+      expect(body.containsKey('reasoning_effort'), isFalse);
+      expect(body.containsKey('thinking'), isFalse);
+    });
+
+    for (final custom in [
+      {'reasoning_effort': 'max'},
+      {
+        'thinking': {'type': 'enabled'},
+      },
+    ]) {
+      test('K2.8 custom $custom can override thinking off', () async {
+        final body = await _captureMoonshotBody(
+          modelId: 'kimi-for-coding',
+          thinkingBudget: 0,
+          extraBody: custom,
+          messages: const [
+            {'role': 'user', 'content': 'hello'},
+          ],
+        );
+        expect(body['thinking'], isNull);
+        expect(body['reasoning_effort'], custom['reasoning_effort']);
+      });
+    }
+
+    for (final modelId in [
+      'k3',
+      'kimi-for-coding',
+      'kimi-for-coding-highspeed',
+    ]) {
+      test('$modelId sends inline images and video', () async {
+        final body = await _captureMoonshotBody(
+          modelId: modelId,
+          messages: const [
+            {'role': 'user', 'content': 'describe'},
+          ],
+          userImagePaths: const [
+            'data:image/png;base64,QUJD',
+            'data:video/mp4;base64,REVG',
+          ],
+        );
+        expect(
+          (body['messages'] as List).single['content'],
+          containsAll([
+            {
+              'type': 'image_url',
+              'image_url': {'url': 'data:image/png;base64,QUJD'},
+            },
+            {
+              'type': 'video_url',
+              'video_url': {'url': 'data:video/mp4;base64,REVG'},
+            },
+          ]),
+        );
+      });
+    }
+
+    test('k3-256k rejects video input before sending', () async {
+      await expectLater(
+        _captureMoonshotBody(
+          modelId: 'k3-256k',
+          messages: const [
+            {'role': 'user', 'content': 'describe'},
+          ],
+          userImagePaths: const ['data:video/mp4;base64,REVG'],
+        ),
+        throwsUnsupportedError,
+      );
+    });
+
+    for (final modelId in [
+      'k3',
+      'k3-256k',
+      'kimi-for-coding',
+      'kimi-for-coding-highspeed',
+      'moonshotai/kimi-k2.8-preview',
+    ]) {
+      test('$modelId replays ordinary history on Kimi Code', () async {
+        final body = await _captureMoonshotBody(
+          modelId: modelId,
+          providerId: 'Kimi Code',
+          messages: const [
+            {'role': 'user', 'content': '第一轮问题'},
+            {
+              'role': 'assistant',
+              'content': '第一轮回答',
+              'reasoning_content': '第一轮完整思考\n保留原文',
+            },
+            {'role': 'user', 'content': '第二轮问题'},
+          ],
+        );
+        expect(body['model'], modelId);
+        expect((body['messages'] as List)[1], {
+          'role': 'assistant',
+          'content': '第一轮回答',
+          'reasoning_content': '第一轮完整思考\n保留原文',
+        });
+      });
+    }
+
+    test('Kimi Code aliases require Kimi provider identity', () {
+      for (final modelId in ['k3', 'k3-256k', ' K3-256K ']) {
+        for (final identity in [
+          ('api.kimi.com', 'custom'),
+          ('api.moonshot.ai', 'custom'),
+          ('api.moonshot.cn', 'custom'),
+          ('relay.example.com', 'kimi code'),
+          ('relay.example.com', 'moonshot'),
+        ]) {
+          final info = OpenAIProviderInfo(
+            host: identity.$1,
+            providerId: identity.$2,
+            upstreamModelId: modelId,
+          );
+          expect(
+            info.reasoningContentReplayPolicy,
+            ReasoningContentReplayPolicy.all,
+          );
+          expect(info.needsReasoningEcho, isTrue);
+        }
+      }
+      for (final identity in [
+        ('api.example.com', 'custom', 'k3-256k'),
+        ('api.kimi.com.example.com', 'custom', 'k3'),
+        ('api.kimi.com', 'kimi', 'k30'),
+        ('api.kimi.com', 'kimi', 'other-k3-256k'),
+      ]) {
+        final info = OpenAIProviderInfo(
+          host: identity.$1,
+          providerId: identity.$2,
+          upstreamModelId: identity.$3,
+        );
+        expect(
+          info.reasoningContentReplayPolicy,
+          ReasoningContentReplayPolicy.none,
+        );
+        expect(info.needsReasoningEcho, isFalse);
+      }
+    });
+
     test('kimi-k3 filters remote images from every input path', () async {
       final dir = await Directory.systemTemp.createTemp(
         'kelivo_kimi_k3_images_',
@@ -330,138 +555,163 @@ void main() {
       },
     );
 
-    test(
-      'kimi-k3 tool continuation preserves reasoning_content and assistant content',
-      () async {
-        final secondRequestCompleter = Completer<Map<String, dynamic>>();
-        final toolInvocations = <Map<String, dynamic>>[];
-        var requestCount = 0;
+    for (final modelId in [
+      'kimi-k3',
+      'k3',
+      'k3-256k',
+      'kimi-for-coding',
+      'kimi-for-coding-highspeed',
+    ]) {
+      for (final stream in [true, false]) {
+        test(
+          '$modelId tool continuation preserves reasoning_content and assistant content (stream=$stream)',
+          () async {
+            final secondRequestCompleter = Completer<Map<String, dynamic>>();
+            final toolInvocations = <Map<String, dynamic>>[];
+            var requestCount = 0;
 
-        final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
-        addTearDown(() async {
-          await server.close(force: true);
-        });
+            final server = await HttpServer.bind(
+              InternetAddress.loopbackIPv4,
+              0,
+            );
+            addTearDown(() async {
+              await server.close(force: true);
+            });
 
-        server.listen((request) async {
-          requestCount += 1;
-          final body =
-              jsonDecode(await utf8.decoder.bind(request).join())
-                  as Map<String, dynamic>;
+            server.listen((request) async {
+              requestCount += 1;
+              final body =
+                  jsonDecode(await utf8.decoder.bind(request).join())
+                      as Map<String, dynamic>;
 
-          request.response.statusCode = HttpStatus.ok;
-          request.response.headers.contentType = ContentType(
-            'text',
-            'event-stream',
-            charset: 'utf-8',
-          );
+              request.response.statusCode = HttpStatus.ok;
+              request.response.headers.contentType = stream
+                  ? ContentType('text', 'event-stream', charset: 'utf-8')
+                  : ContentType.json;
+              void writeCompletion(Map<String, dynamic> completion) {
+                final encoded = jsonEncode(completion);
+                request.response.write(stream ? 'data: $encoded\n\n' : encoded);
+              }
 
-          if (requestCount == 1) {
-            request.response.write(
-              'data: ${jsonEncode({
-                'id': 'cmpl-1',
-                'object': 'chat.completion.chunk',
-                'created': 0,
-                'model': 'kimi-k3',
-                'choices': [
-                  {
-                    'index': 0,
-                    'delta': {
-                      'role': 'assistant',
-                      'reasoning_content': '先判断日期',
-                      'content': '先查一下',
-                      'tool_calls': [
-                        {
-                          'index': 0,
-                          'id': 'call_1',
-                          'type': 'function',
-                          'function': {'name': 'date', 'arguments': '{}'},
-                        },
-                      ],
+              if (requestCount == 1) {
+                writeCompletion({
+                  'id': 'cmpl-1',
+                  'object': 'chat.completion.chunk',
+                  'created': 0,
+                  'model': modelId,
+                  'choices': [
+                    {
+                      'index': 0,
+                      (stream ? 'delta' : 'message'): {
+                        'role': 'assistant',
+                        'reasoning_content': '先判断日期',
+                        'content': '先查一下',
+                        'tool_calls': [
+                          {
+                            'index': 0,
+                            'id': 'call_1',
+                            'type': 'function',
+                            'function': {'name': 'date', 'arguments': '{}'},
+                          },
+                        ],
+                      },
+                      'finish_reason': 'tool_calls',
                     },
-                    'finish_reason': 'tool_calls',
-                  },
-                ],
-              })}\n\n',
-            );
-          } else {
-            if (!secondRequestCompleter.isCompleted) {
-              secondRequestCompleter.complete(body);
-            }
-            request.response.write(
-              'data: ${jsonEncode({
-                'id': 'cmpl-2',
-                'object': 'chat.completion.chunk',
-                'created': 0,
-                'model': 'kimi-k3',
-                'choices': [
-                  {
-                    'index': 0,
-                    'delta': {'role': 'assistant', 'content': '今天是 2026-03-27'},
-                    'finish_reason': 'stop',
-                  },
-                ],
-              })}\n\n',
-            );
-          }
+                  ],
+                });
+              } else {
+                if (!secondRequestCompleter.isCompleted) {
+                  secondRequestCompleter.complete(body);
+                }
+                writeCompletion({
+                  'id': 'cmpl-2',
+                  'object': 'chat.completion.chunk',
+                  'created': 0,
+                  'model': modelId,
+                  'choices': [
+                    {
+                      'index': 0,
+                      (stream ? 'delta' : 'message'): {
+                        'role': 'assistant',
+                        'content': '今天是 2026-03-27',
+                      },
+                      'finish_reason': 'stop',
+                    },
+                  ],
+                });
+              }
 
-          request.response.write('data: [DONE]\n\n');
-          await request.response.close();
-        });
+              if (stream) request.response.write('data: [DONE]\n\n');
+              await request.response.close();
+            });
 
-        final baseUrl = 'http://${server.address.address}:${server.port}/v1';
-        final chunks = await ChatApiService.sendMessageStream(
-          config: _moonshotConfig(baseUrl),
-          modelId: 'kimi-k3',
-          messages: const [
-            {'role': 'user', 'content': '今天几号？'},
-          ],
-          tools: const [
-            {
-              'type': 'function',
-              'function': {
-                'name': 'date',
-                'description': 'Get current date',
-                'parameters': {
-                  'type': 'object',
-                  'properties': <String, dynamic>{},
+            final baseUrl =
+                'http://${server.address.address}:${server.port}/v1';
+            final chunks = await ChatApiService.sendMessageStream(
+              config: _moonshotConfig(baseUrl),
+              modelId: modelId,
+              stream: stream,
+              thinkingBudget: 128000,
+              messages: const [
+                {'role': 'user', 'content': '今天几号？'},
+              ],
+              tools: const [
+                {
+                  'type': 'function',
+                  'function': {
+                    'name': 'date',
+                    'description': 'Get current date',
+                    'parameters': {
+                      'type': 'object',
+                      'properties': <String, dynamic>{},
+                    },
+                  },
                 },
+              ],
+              onToolCall: (name, args, {toolCallId}) async {
+                toolInvocations.add({'name': name, 'args': args});
+                return '2026-03-27';
               },
-            },
-          ],
-          onToolCall: (name, args, {toolCallId}) async {
-            toolInvocations.add({'name': name, 'args': args});
-            return '2026-03-27';
-          },
-        ).toList();
+            ).toList();
 
-        final secondBody = await secondRequestCompleter.future;
-        final messages = (secondBody['messages'] as List)
-            .cast<Map>()
-            .map((e) => e.cast<String, dynamic>())
-            .toList();
-        final assistantToolMessage = messages.firstWhere(
-          (m) => m['role'] == 'assistant' && m['tool_calls'] is List,
+            final secondBody = await secondRequestCompleter.future;
+            if (modelId == 'kimi-for-coding' ||
+                modelId == 'k3' ||
+                modelId == 'k3-256k') {
+              expect(secondBody['reasoning_effort'], 'max');
+            }
+            if (modelId == 'kimi-for-coding-highspeed') {
+              expect(secondBody.containsKey('reasoning_effort'), isFalse);
+            }
+            final messages = (secondBody['messages'] as List)
+                .cast<Map>()
+                .map((e) => e.cast<String, dynamic>())
+                .toList();
+            final assistantToolMessage = messages.firstWhere(
+              (m) => m['role'] == 'assistant' && m['tool_calls'] is List,
+            );
+            final toolMessage = messages.firstWhere((m) => m['role'] == 'tool');
+
+            expect(toolInvocations, [
+              {'name': 'date', 'args': <String, dynamic>{}},
+            ]);
+            expect(assistantToolMessage['content'], '先查一下');
+            expect(assistantToolMessage['reasoning_content'], '先判断日期');
+            expect(assistantToolMessage['tool_calls'], [
+              {
+                'id': 'call_1',
+                'type': 'function',
+                'function': {'name': 'date', 'arguments': '{}'},
+              },
+            ]);
+            expect(toolMessage['tool_call_id'], 'call_1');
+            expect(toolMessage['name'], 'date');
+            expect(toolMessage['content'], '2026-03-27');
+            expect(chunks.joinedContent, contains('今天是 2026-03-27'));
+          },
         );
-        final toolMessage = messages.firstWhere((m) => m['role'] == 'tool');
-
-        expect(toolInvocations, [
-          {'name': 'date', 'args': <String, dynamic>{}},
-        ]);
-        expect(assistantToolMessage['content'], '先查一下');
-        expect(assistantToolMessage['reasoning_content'], '先判断日期');
-        expect(assistantToolMessage['tool_calls'], [
-          {
-            'id': 'call_1',
-            'type': 'function',
-            'function': {'name': 'date', 'arguments': '{}'},
-          },
-        ]);
-        expect(toolMessage['tool_call_id'], 'call_1');
-        expect(toolMessage['name'], 'date');
-        expect(toolMessage['content'], '2026-03-27');
-        expect(chunks.joinedContent, contains('今天是 2026-03-27'));
-      },
-    );
+      }
+    }
 
     test('empty streamed tool call id is replaced with local id', () async {
       final toolCallIds = <String?>[];

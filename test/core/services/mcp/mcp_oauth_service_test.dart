@@ -3,7 +3,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:Kelivo/core/providers/mcp_provider.dart';
-import 'package:Kelivo/core/services/mcp/mcp_oauth_callback.dart';
+import 'package:Kelivo/core/services/auth/oauth_callback.dart';
 import 'package:Kelivo/core/services/mcp/mcp_oauth_http_client.dart';
 import 'package:Kelivo/core/services/mcp/mcp_oauth_http_client_io.dart'
     show isPublicMcpOAuthAddress;
@@ -14,7 +14,7 @@ import 'package:http/testing.dart';
 
 void main() {
   test('loopback callback listens before waitForCallback is called', () async {
-    final callback = await openMcpOAuthCallback(
+    final callback = await openOAuthCallback(
       Uri.parse('https://auth.example.com'),
     );
     final redirectUri = callback.redirectUri;
@@ -994,7 +994,7 @@ McpOAuthState _oauthState({
   refreshToken: 'refresh',
 );
 
-final class _FakeCallback implements McpOAuthCallback {
+final class _FakeCallback implements OAuthCallback {
   final Completer<Uri> _callback = Completer<Uri>();
 
   @override
@@ -1008,10 +1008,10 @@ final class _FakeCallback implements McpOAuthCallback {
   Future<Uri> authorize(
     Uri authorizationUrl,
     Duration timeout,
-    McpOAuthUrlLauncher launchAuthorizationUrl,
+    OAuthUrlLauncher launchAuthorizationUrl,
   ) async {
     if (!await launchAuthorizationUrl(authorizationUrl)) {
-      throw const McpOAuthCallbackException('launch failed');
+      throw const OAuthCallbackException('launch failed');
     }
     return waitForCallback(timeout);
   }

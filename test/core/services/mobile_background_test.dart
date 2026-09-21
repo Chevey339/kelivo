@@ -243,6 +243,7 @@ void main() {
         const MobileBackgroundSettings(notificationsEnabled: true),
         l10n,
       );
+      coordinator.didChangeAppLifecycleState(AppLifecycleState.resumed);
       coordinator.visibleConversation = () => 'visible';
       await start('a', conversationId: 'visible');
       await coordinator.finish('a', BackgroundTaskOutcome.completed);
@@ -340,6 +341,100 @@ void main() {
       expect(coordinator.activeTaskIds, {'b'});
       expect(notifications.single['body'], l10n.backgroundInterrupted);
       await coordinator.finish('b', BackgroundTaskOutcome.cancelled);
+    },
+  );
+  test(
+    'scheduled completion notifies once with the saved reply preview',
+    () async {
+      coordinator.didChangeAppLifecycleState(AppLifecycleState.detached);
+      coordinator.visibleConversation = () => 'scheduled-chat';
+      await coordinator.start(
+        id: 'scheduled',
+        conversationId: 'scheduled-chat',
+        title: 'Morning brief',
+        scheduled: true,
+        cancel: () async {},
+      );
+      final reply = List.filled(205, '👨‍👩‍👧‍👦').join();
+      await coordinator.finish(
+        'scheduled',
+        BackgroundTaskOutcome.completed,
+        replyPreview: reply,
+      );
+      await coordinator.finish(
+        'scheduled',
+        BackgroundTaskOutcome.completed,
+        replyPreview: reply,
+      );
+      expect(notifications, hasLength(1));
+      expect(notifications.single['id'], 'scheduled-chat');
+      expect(notifications.single['title'], 'Morning brief');
+      expect(
+        notifications.single['body'],
+        List.filled(200, '👨‍👩‍👧‍👦').join(),
+      );
+      expect(
+        order.indexOf('notification'),
+        lessThan(order.lastIndexOf('sync')),
+      );
+      expect(coordinator.settings.notificationsEnabled, isFalse);
+    },
+  );
+
+  test(
+    'scheduled notifications respect privacy and persisted outcomes',
+    () async {
+      await coordinator.configure(
+        const MobileBackgroundSettings(privacyMode: true),
+        l10n,
+      );
+      coordinator.didChangeAppLifecycleState(AppLifecycleState.paused);
+      Future<void> schedule(String id) => coordinator.start(
+        id: id,
+        conversationId: 'secret-chat',
+        title: 'Secret title',
+        scheduled: true,
+        cancel: () async {},
+      );
+      await schedule('success');
+      await coordinator.finish(
+        'success',
+        BackgroundTaskOutcome.completed,
+        replyPreview: 'Secret reply',
+      );
+      expect(notifications.single['title'], l10n.backgroundTaskTitle);
+      expect(notifications.single['body'], l10n.backgroundCompleted);
+      await schedule('unwritten');
+      await coordinator.finish(
+        'unwritten',
+        BackgroundTaskOutcome.completed,
+        resultPersisted: false,
+        replyPreview: 'Not saved',
+      );
+      await schedule('cancelled');
+      await coordinator.finish('cancelled', BackgroundTaskOutcome.cancelled);
+      expect(notifications, hasLength(1));
+    },
+  );
+
+  test(
+    'opening the scheduled conversation suppresses its completion notification',
+    () async {
+      coordinator.didChangeAppLifecycleState(AppLifecycleState.resumed);
+      coordinator.visibleConversation = () => 'visible';
+      await coordinator.start(
+        id: 'viewed-task',
+        conversationId: 'visible',
+        title: 'Visible task',
+        scheduled: true,
+        cancel: () async {},
+      );
+      await coordinator.finish(
+        'viewed-task',
+        BackgroundTaskOutcome.completed,
+        replyPreview: 'Already on screen',
+      );
+      expect(notifications, isEmpty);
     },
   );
 }

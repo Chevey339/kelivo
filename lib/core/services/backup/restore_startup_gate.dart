@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:path/path.dart' as p;
 
+import '../../database/database_installation_gate.dart';
 import 'restore_bundle_staging.dart';
 import 'restore_business_lease.dart';
 import 'restore_cutover_executor.dart';
@@ -70,6 +71,7 @@ final class RestoreStartupGate {
   static Future<bool> hasPendingWork({
     required Directory appDataDirectory,
   }) async {
+    if (await _snapshotRecoveryIncomplete(appDataDirectory)) return true;
     final workspaceRoot = RestoreWorkspaceLock(
       appDataDirectory: appDataDirectory,
     ).workspaceRoot;
@@ -304,6 +306,9 @@ final class RestoreStartupGate {
       durability: resolvedDurability,
     );
     try {
+      if (await _snapshotRecoveryIncomplete(appDataDirectory)) {
+        throw StateError('restore_startup_snapshot_preparation_incomplete');
+      }
       final workspaceType = await FileSystemEntity.type(
         workspaceLock.workspaceRoot.path,
         followLinks: false,
@@ -344,6 +349,12 @@ final class RestoreStartupGate {
             pending.receipt.state == RestoreReceiptState.rolledBack) {
           final terminal = await executor
               .revalidateTerminalWhileWorkspaceLocked(pending.receipt);
+          if (terminal.state == RestoreReceiptState.committed) {
+            await DatabaseInstallationGate.reconcileCommittedRestore(
+              appDataDirectory: appDataDirectory,
+              durability: resolvedDurability,
+            );
+          }
           onStage?.call(RestoreStartupStage.finishing);
           await workspaceLock.archiveTerminalRunWhileWorkspaceLocked(
             runId: pending.runId,
@@ -361,6 +372,12 @@ final class RestoreStartupGate {
         final terminal = await executor.revalidateTerminalWhileWorkspaceLocked(
           result,
         );
+        if (terminal.state == RestoreReceiptState.committed) {
+          await DatabaseInstallationGate.reconcileCommittedRestore(
+            appDataDirectory: appDataDirectory,
+            durability: resolvedDurability,
+          );
+        }
         onStage?.call(RestoreStartupStage.finishing);
         await workspaceLock.archiveTerminalRunWhileWorkspaceLocked(
           runId: pending.runId,
@@ -372,6 +389,18 @@ final class RestoreStartupGate {
       await ownedBusinessLease?.close();
     }
   }
+
+  static Future<bool> _snapshotRecoveryIncomplete(
+    Directory appDataDirectory,
+  ) async =>
+      await FileSystemEntity.type(
+        p.join(
+          appDataDirectory.path,
+          RestoreWorkspaceLock.snapshotRecoveryMarkerName,
+        ),
+        followLinks: false,
+      ) !=
+      FileSystemEntityType.notFound;
 
   static Future<String> _readRunId(File markerFile) async {
     if (await markerFile.length() != 32) {
