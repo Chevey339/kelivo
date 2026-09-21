@@ -15,6 +15,7 @@ import 'desktop/desktop_home_page.dart';
 import 'package:flutter/services.dart';
 import 'package:window_manager/window_manager.dart';
 import 'desktop/desktop_window_controller.dart';
+import 'core/services/linux_window_service.dart';
 import 'desktop/desktop_tray_controller.dart';
 import 'desktop/windows_paste_fix.dart';
 // import 'package:logging/logging.dart' as logging;
@@ -165,6 +166,11 @@ Future<void> main() async {
       }
       FlutterLogger.installGlobalHandlers();
       _initializeAndroidDisplayMode();
+      // The Linux runner starts hidden so decorations can be restored first.
+      // Show before the restore gate so progress and failure screens stay visible.
+      if (!kIsWeb && defaultTargetPlatform == TargetPlatform.linux) {
+        await _initDesktopWindow();
+      }
       final appDataDirectory = await AppDirectories.getAppDataDirectory();
       final RestoreReceipt? restoreOutcome;
       RestoreBusinessLease? businessLease;
@@ -224,7 +230,9 @@ Future<void> main() async {
             48 << 20; // ~48MB
       } catch (_) {}
       // Desktop (Windows) window setup: hide native title bar for custom Flutter bar
-      await _initDesktopWindow();
+      if (defaultTargetPlatform != TargetPlatform.linux) {
+        await _initDesktopWindow();
+      }
       // Avoid preloading all system fonts at launch (huge memory on desktop)
       // Debug logging and global error handlers were enabled previously for diagnosis.
       // They are commented out now per request to reduce log noise.
@@ -570,9 +578,25 @@ Future<void> _initDesktopWindow() async {
       await windowManager.ensureInitialized();
       await windowManager.setTitleBarStyle(TitleBarStyle.hidden);
     }
+    final linuxHideTitleBar =
+        LinuxWindowService.isSupported &&
+        ((await SharedPreferences.getInstance()).getBool(
+              LinuxWindowService.hideTitleBarKey,
+            ) ??
+            false);
     // Initialize and show desktop window with persisted size/position
-    await DesktopWindowController.instance.initializeAndShow(title: 'Kelivo');
+    await DesktopWindowController.instance.initializeAndShow(
+      title: 'Kelivo',
+      linuxHideTitleBar: linuxHideTitleBar,
+    );
   } catch (_) {
+    // A failed preference/geometry restore must not leave Linux invisible.
+    if (!kIsWeb && defaultTargetPlatform == TargetPlatform.linux) {
+      try {
+        await windowManager.show();
+        await windowManager.focus();
+      } catch (_) {}
+    }
     // Ignore on unsupported platforms.
   }
 }

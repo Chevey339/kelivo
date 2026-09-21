@@ -18,22 +18,26 @@ class _DisplaySettingsBody extends StatelessWidget {
             children: [
               _SettingsCard(
                 title: l10n.settingsPageDisplay,
-                children: const [
-                  _ColorModeRow(),
-                  _RowDivider(),
-                  _ThemeColorRow(),
-                  _RowDivider(),
-                  _ToggleRowPureBackground(),
-                  _RowDivider(),
-                  _ToggleRowLayeredSurfaces(),
-                  _RowDivider(),
-                  _ToggleRowLayeredSheetTiles(),
-                  _RowDivider(),
-                  _MessageStyleRow(),
-                  _RowDivider(),
-                  _AutoRetryRow(),
-                  _RowDivider(),
-                  _TopicPositionRow(),
+                children: [
+                  const _ColorModeRow(),
+                  const _RowDivider(),
+                  const _ThemeColorRow(),
+                  const _RowDivider(),
+                  const _ToggleRowPureBackground(),
+                  const _RowDivider(),
+                  const _ToggleRowLayeredSurfaces(),
+                  const _RowDivider(),
+                  const _ToggleRowLayeredSheetTiles(),
+                  const _RowDivider(),
+                  const _MessageStyleRow(),
+                  const _RowDivider(),
+                  const _AutoRetryRow(),
+                  const _RowDivider(),
+                  const _TopicPositionRow(),
+                  if (LinuxWindowService.isSupported) ...[
+                    const _RowDivider(),
+                    const _LinuxHideTitleBarRow(),
+                  ],
                 ],
               ),
               const SizedBox(height: 16),
@@ -913,6 +917,33 @@ class _TopicPositionRow extends StatelessWidget {
     return _LabeledRow(
       label: l10n.desktopDisplaySettingsTopicPositionTitle,
       trailing: const _TopicPositionDropdown(),
+    );
+  }
+}
+
+class _LinuxHideTitleBarRow extends StatelessWidget {
+  const _LinuxHideTitleBarRow();
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    final settings = context.watch<SettingsProvider>();
+    return _ToggleRow(
+      label: l10n.linuxHideTitleBarTitle,
+      tip: l10n.linuxHideTitleBarDescription,
+      value: settings.linuxHideTitleBar,
+      onChanged: (value) async {
+        try {
+          await settings.setLinuxHideTitleBar(value);
+        } catch (_) {
+          if (!context.mounted) return;
+          showAppSnackBar(
+            context,
+            message: l10n.linuxHideTitleBarError,
+            type: NotificationType.error,
+          );
+        }
+      },
     );
   }
 }

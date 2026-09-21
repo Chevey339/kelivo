@@ -66,6 +66,13 @@ void main() {
     final ios = ids(TargetPlatform.iOS);
     final android = ids(TargetPlatform.android, logs: true, dynamicColor: true);
     final desktop = ids(TargetPlatform.macOS);
+    for (final platform in TargetPlatform.values) {
+      expect(
+        ids(platform).contains('linuxHideTitleBarTitle'),
+        platform == TargetPlatform.linux,
+        reason: 'The title bar setting is Linux-only.',
+      );
+    }
     expect(ios, contains('scheduledTasks'));
     expect(ios, isNot(contains('hotkeys')));
     expect(ios, isNot(contains('logs')));

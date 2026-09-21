@@ -17,6 +17,7 @@ import '../core/providers/settings_provider.dart';
 import '../core/services/chat/chat_service.dart';
 import '../core/providers/model_provider.dart';
 import '../core/services/logging/flutter_logger.dart';
+import '../core/services/linux_window_service.dart';
 import '../core/services/model_override_resolver.dart';
 import '../core/services/provider_balance_service.dart';
 import 'model_fetch_dialog.dart' show showModelFetchDialog;

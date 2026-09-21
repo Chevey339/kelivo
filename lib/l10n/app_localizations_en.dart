@@ -4862,6 +4862,17 @@ class AppLocalizationsEn extends AppLocalizations {
   String get desktopSettingsFontsTitle => 'Fonts';
 
   @override
+  String get linuxHideTitleBarTitle => 'Hide system title bar';
+
+  @override
+  String get linuxHideTitleBarDescription =>
+      'Also hides window buttons. Use your window manager to move, resize, and close the window.';
+
+  @override
+  String get linuxHideTitleBarError =>
+      'Unable to change the title bar. Please try again.';
+
+  @override
   String get displaySettingsPageTrayTitle => 'System Tray';
 
   @override

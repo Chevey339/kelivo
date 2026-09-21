@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/widgets.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
@@ -852,6 +853,13 @@ class SettingsSearchIndex {
         'desktopDisplaySettingsTopicPositionTitle',
         SettingsSearchDestination.display,
         (l) => l.desktopDisplaySettingsTopicPositionTitle,
+      );
+    }
+    if (!kIsWeb && platform == TargetPlatform.linux) {
+      add(
+        'linuxHideTitleBarTitle',
+        SettingsSearchDestination.display,
+        (l) => l.linuxHideTitleBarTitle,
       );
     }
     if (desktop) {

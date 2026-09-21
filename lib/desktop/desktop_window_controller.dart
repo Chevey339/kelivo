@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:window_manager/window_manager.dart';
 
+import '../core/services/linux_window_service.dart';
 import 'window_size_manager.dart';
 import 'windows_window_geometry.dart';
 import 'windows_window_placement.dart';
@@ -44,7 +45,10 @@ class DesktopWindowController with WindowListener {
   Timer? _resizeDebounce;
   static const _debounceDuration = Duration(milliseconds: 400);
 
-  Future<void> initializeAndShow({String? title}) async {
+  Future<void> initializeAndShow({
+    String? title,
+    bool linuxHideTitleBar = false,
+  }) async {
     if (kIsWeb) return;
     if (!(defaultTargetPlatform == TargetPlatform.windows ||
         defaultTargetPlatform == TargetPlatform.macOS ||
@@ -53,6 +57,9 @@ class DesktopWindowController with WindowListener {
     }
 
     await windowManager.ensureInitialized();
+    if (LinuxWindowService.isSupported) {
+      await LinuxWindowService.setTitleBarHidden(linuxHideTitleBar);
+    }
     if (!_isWindows) _attachListeners();
     // Windows custom title bar is handled in main (TitleBarStyle.hidden)
 

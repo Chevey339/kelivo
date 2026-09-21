@@ -8899,6 +8899,24 @@ abstract class AppLocalizations {
   /// **'Fonts'**
   String get desktopSettingsFontsTitle;
 
+  /// No description provided for @linuxHideTitleBarTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Hide system title bar'**
+  String get linuxHideTitleBarTitle;
+
+  /// No description provided for @linuxHideTitleBarDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Also hides window buttons. Use your window manager to move, resize, and close the window.'**
+  String get linuxHideTitleBarDescription;
+
+  /// No description provided for @linuxHideTitleBarError.
+  ///
+  /// In en, this message translates to:
+  /// **'Unable to change the title bar. Please try again.'**
+  String get linuxHideTitleBarError;
+
   /// No description provided for @displaySettingsPageTrayTitle.
   ///
   /// In en, this message translates to:

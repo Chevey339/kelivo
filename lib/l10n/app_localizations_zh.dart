@@ -4670,6 +4670,15 @@ class AppLocalizationsZh extends AppLocalizations {
   String get desktopSettingsFontsTitle => '字体设置';
 
   @override
+  String get linuxHideTitleBarTitle => '隐藏系统标题栏';
+
+  @override
+  String get linuxHideTitleBarDescription => '同时隐藏窗口按钮。请通过窗口管理器移动、调整大小和关闭窗口。';
+
+  @override
+  String get linuxHideTitleBarError => '无法更改标题栏，请重试。';
+
+  @override
   String get displaySettingsPageTrayTitle => '托盘';
 
   @override
@@ -16194,6 +16203,15 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get desktopSettingsFontsTitle => '字体设置';
 
   @override
+  String get linuxHideTitleBarTitle => '隐藏系统标题栏';
+
+  @override
+  String get linuxHideTitleBarDescription => '同时隐藏窗口按钮。请通过窗口管理器移动、调整大小和关闭窗口。';
+
+  @override
+  String get linuxHideTitleBarError => '无法更改标题栏，请重试。';
+
+  @override
   String get displaySettingsPageTrayTitle => '托盘';
 
   @override
@@ -27641,6 +27659,15 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get desktopSettingsFontsTitle => '字體設定';
+
+  @override
+  String get linuxHideTitleBarTitle => '隱藏系統標題列';
+
+  @override
+  String get linuxHideTitleBarDescription => '同時隱藏視窗按鈕。請透過視窗管理員移動、調整大小和關閉視窗。';
+
+  @override
+  String get linuxHideTitleBarError => '無法變更標題列，請重試。';
 
   @override
   String get displaySettingsPageTrayTitle => '系統匣';

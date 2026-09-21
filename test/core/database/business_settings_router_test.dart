@@ -52,6 +52,10 @@ void main() {
           BusinessKeyDisposition.localOnly,
         );
         expect(
+          BusinessKeyRegistry.classify('linux_hide_title_bar_v1'),
+          BusinessKeyDisposition.localOnly,
+        );
+        expect(
           BusinessKeyRegistry.classify('pinned_chat_ids'),
           BusinessKeyDisposition.discarded,
         );

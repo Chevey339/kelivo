@@ -24,6 +24,7 @@ final class BusinessKeyRegistry {
     'window_physical_pos_x_v1',
     'window_physical_pos_y_v1',
     'window_maximized_v1',
+    'linux_hide_title_bar_v1',
     'desktop_hotkeys_commands_v1',
     'desktop_hotkeys_enabled_v1',
     'display_chat_font_scale_v1',
