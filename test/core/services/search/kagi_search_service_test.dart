@@ -80,6 +80,53 @@ void main() {
       expect(result.items.single.text, 'A cross-platform LLM client.');
     });
 
+    test('decodes result entities once while preserving literal text', () async {
+      const url = 'https://example.com/?q=apple&lang=en';
+      final service = KagiSearchService(
+        client: MockClient(
+          (_) async => http.Response(
+            jsonEncode({
+              'data': {
+                'search': [
+                  {
+                    'title': '  Steve Jobs | Apple, &amp; Facts  ',
+                    'url': url,
+                    'snippet':
+                        'Apple&#39;s history &#x2014; &quot;你好&quot; &#x1F680;',
+                  },
+                  {
+                    'title': 'List<String> &amp; Map<K, V>',
+                    'url': 'https://example.com/code',
+                    'snippet':
+                        'Literal <script> and </textarea>; '
+                        '&amp;lt;tag&amp;gt; &unknown;',
+                  },
+                ],
+              },
+            }),
+            200,
+            headers: {'content-type': 'application/json; charset=utf-8'},
+          ),
+        ),
+      );
+
+      final result = await service.search(
+        query: 'Steve Jobs',
+        commonOptions: const SearchCommonOptions(timeout: 1000),
+        serviceOptions: KagiOptions(id: 'kagi-entities', apiKey: 'kagi-key'),
+      );
+
+      expect(result.items, hasLength(2));
+      expect(result.items.first.title, 'Steve Jobs | Apple, & Facts');
+      expect(result.items.first.text, 'Apple\'s history — "你好" 🚀');
+      expect(result.items.first.url, url);
+      expect(result.items.last.title, 'List<String> & Map<K, V>');
+      expect(
+        result.items.last.text,
+        'Literal <script> and </textarea>; &lt;tag&gt; &unknown;',
+      );
+    });
+
     test('clamps the requested result limit to the Kagi API range', () async {
       final limits = <int>[];
       final service = KagiSearchService(

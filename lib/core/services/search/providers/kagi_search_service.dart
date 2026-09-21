@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
+import 'package:html/parser.dart' as html;
 
 import '../../../../l10n/app_localizations.dart';
 import '../search_service.dart';
@@ -80,14 +81,16 @@ class KagiSearchService extends SearchService<KagiOptions> {
       for (final item in results) {
         if (item is! Map) continue;
         final result = item.cast<String, dynamic>();
-        final title = (result['title'] ?? '').toString().trim();
+        final title = _decodeHtmlEntities(
+          (result['title'] ?? '').toString(),
+        ).trim();
         final url = (result['url'] ?? '').toString().trim();
         if (title.isEmpty || url.isEmpty) continue;
         items.add(
           SearchResultItem(
             title: title,
             url: url,
-            text: (result['snippet'] ?? '').toString(),
+            text: _decodeHtmlEntities((result['snippet'] ?? '').toString()),
           ),
         );
       }
@@ -96,6 +99,11 @@ class KagiSearchService extends SearchService<KagiOptions> {
     } catch (error) {
       throw Exception('Kagi search failed: $error');
     }
+  }
+
+  static String _decodeHtmlEntities(String text) {
+    // Preserve literal tags and code while decoding character references once.
+    return html.parseFragment(text.replaceAll('<', '&lt;')).text ?? '';
   }
 
   static Map<String, dynamic>? _decodePayload(String body) {
