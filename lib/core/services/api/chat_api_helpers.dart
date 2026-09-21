@@ -406,7 +406,7 @@ Future<String?> tryEncodeBase64File(
     if (resolved == null) return null;
     final file = File(resolved);
     if (!await file.exists()) return null;
-    return _encodeBase64File(resolved, withPrefix: withPrefix);
+    return await _encodeBase64File(resolved, withPrefix: withPrefix);
   } catch (_) {
     return null;
   }
