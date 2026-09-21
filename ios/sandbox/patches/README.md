@@ -23,6 +23,9 @@ in `build_ish.sh` so local and CI builds use the same source.
 - `0005-kernel-init-exit-status.patch` — the host iSH CLI returns the guest
   command's exit status after shutdown, so failed apk transactions and build
   validation cannot silently succeed.
+- `0006-kernel-uname-hostname-bounds.patch` — bound the host name copied into
+  Linux's 65-byte uname field and preserve its NUL terminator. Long macOS runner
+  names otherwise abort the host iSH CLI while preparing the Alpine rootfs.
 
 ## Rootfs compatibility overlay
 
