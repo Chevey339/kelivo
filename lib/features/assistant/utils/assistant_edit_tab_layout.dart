@@ -1,4 +1,3 @@
-const String assistantEditTabWorkspace = 'workspace';
 const String assistantEditTabBasic = 'basic';
 const String assistantEditTabPrompts = 'prompts';
 const String assistantEditTabMemory = 'memory';
@@ -19,7 +18,6 @@ const List<String> defaultAssistantEditTabIds = [
   assistantEditTabQuickPhrase,
   assistantEditTabCustom,
   assistantEditTabRegex,
-  assistantEditTabWorkspace,
 ];
 
 List<String> orderAssistantEditTabIds({

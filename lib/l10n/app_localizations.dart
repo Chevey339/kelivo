@@ -1576,12 +1576,6 @@ abstract class AppLocalizations {
   /// **'Assistant not found'**
   String get assistantEditPageNotFound;
 
-  /// No description provided for @assistantEditPageWorkspaceTab.
-  ///
-  /// In en, this message translates to:
-  /// **'Workspace'**
-  String get assistantEditPageWorkspaceTab;
-
   /// No description provided for @assistantEditPageBasicTab.
   ///
   /// In en, this message translates to:
@@ -17744,8 +17738,44 @@ abstract class AppLocalizations {
   /// No description provided for @workspaceEntryDefaultWorkspaceSubtitle.
   ///
   /// In en, this message translates to:
-  /// **'New conversations with this assistant start bound to this workspace.'**
+  /// **'New conversations use this workspace. Existing conversations stay unchanged.'**
   String get workspaceEntryDefaultWorkspaceSubtitle;
+
+  /// No description provided for @workspaceEntryDefaultWorkspaceUnset.
+  ///
+  /// In en, this message translates to:
+  /// **'Not set'**
+  String get workspaceEntryDefaultWorkspaceUnset;
+
+  /// No description provided for @workspaceEntryDefaultWorkspaceAutomaticSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'The first workspace you bind to a conversation will be remembered for new conversations.'**
+  String get workspaceEntryDefaultWorkspaceAutomaticSubtitle;
+
+  /// No description provided for @workspaceBindingRememberedDefault.
+  ///
+  /// In en, this message translates to:
+  /// **'Remembered as the default workspace for “{assistant}”. New conversations will use it.'**
+  String workspaceBindingRememberedDefault(String assistant);
+
+  /// No description provided for @workspaceBindingSuggestDefault.
+  ///
+  /// In en, this message translates to:
+  /// **'Use this workspace for future conversations with “{assistant}” too?'**
+  String workspaceBindingSuggestDefault(String assistant);
+
+  /// No description provided for @workspaceBindingUndoDefault.
+  ///
+  /// In en, this message translates to:
+  /// **'Undo'**
+  String get workspaceBindingUndoDefault;
+
+  /// No description provided for @workspaceBindingUseAsDefault.
+  ///
+  /// In en, this message translates to:
+  /// **'Set as default'**
+  String get workspaceBindingUseAsDefault;
 
   /// No description provided for @workspaceEntryNone.
   ///

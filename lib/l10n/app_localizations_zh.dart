@@ -786,9 +786,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get assistantEditPageNotFound => '助手不存在';
 
   @override
-  String get assistantEditPageWorkspaceTab => '工作区设置';
-
-  @override
   String get assistantEditPageBasicTab => '基础设置';
 
   @override
@@ -9448,7 +9445,30 @@ class AppLocalizationsZh extends AppLocalizations {
   String get workspaceEntryDefaultWorkspace => '默认工作区';
 
   @override
-  String get workspaceEntryDefaultWorkspaceSubtitle => '使用此助手的新对话将绑定到该工作区。';
+  String get workspaceEntryDefaultWorkspaceSubtitle => '新建对话时自动绑定，已有对话不受影响。';
+
+  @override
+  String get workspaceEntryDefaultWorkspaceUnset => '未设置';
+
+  @override
+  String get workspaceEntryDefaultWorkspaceAutomaticSubtitle =>
+      '首次为对话绑定工作区时，将记为此助手的默认工作区。';
+
+  @override
+  String workspaceBindingRememberedDefault(String assistant) {
+    return '已记为「$assistant」的默认工作区，新对话将自动使用。';
+  }
+
+  @override
+  String workspaceBindingSuggestDefault(String assistant) {
+    return '以后与「$assistant」的新对话也使用这个工作区？';
+  }
+
+  @override
+  String get workspaceBindingUndoDefault => '撤销';
+
+  @override
+  String get workspaceBindingUseAsDefault => '设为默认';
 
   @override
   String get workspaceEntryNone => '无';
@@ -12288,9 +12308,6 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get assistantEditPageNotFound => '助手不存在';
-
-  @override
-  String get assistantEditPageWorkspaceTab => '工作区设置';
 
   @override
   String get assistantEditPageBasicTab => '基础设置';
@@ -20878,7 +20895,30 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get workspaceEntryDefaultWorkspace => '默认工作区';
 
   @override
-  String get workspaceEntryDefaultWorkspaceSubtitle => '使用此助手的新对话将绑定到该工作区。';
+  String get workspaceEntryDefaultWorkspaceSubtitle => '新建对话时自动绑定，已有对话不受影响。';
+
+  @override
+  String get workspaceEntryDefaultWorkspaceUnset => '未设置';
+
+  @override
+  String get workspaceEntryDefaultWorkspaceAutomaticSubtitle =>
+      '首次为对话绑定工作区时，将记为此助手的默认工作区。';
+
+  @override
+  String workspaceBindingRememberedDefault(String assistant) {
+    return '已记为「$assistant」的默认工作区，新对话将自动使用。';
+  }
+
+  @override
+  String workspaceBindingSuggestDefault(String assistant) {
+    return '以后与「$assistant」的新对话也使用这个工作区？';
+  }
+
+  @override
+  String get workspaceBindingUndoDefault => '撤销';
+
+  @override
+  String get workspaceBindingUseAsDefault => '设为默认';
 
   @override
   String get workspaceEntryNone => '无';
@@ -23718,9 +23758,6 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get assistantEditPageNotFound => '助理不存在';
-
-  @override
-  String get assistantEditPageWorkspaceTab => '工作區設定';
 
   @override
   String get assistantEditPageBasicTab => '基礎設定';
@@ -32384,7 +32421,30 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get workspaceEntryDefaultWorkspace => '預設工作區';
 
   @override
-  String get workspaceEntryDefaultWorkspaceSubtitle => '使用此助手的新對話將綁定到此工作區。';
+  String get workspaceEntryDefaultWorkspaceSubtitle => '新建對話時自動綁定，已有對話不受影響。';
+
+  @override
+  String get workspaceEntryDefaultWorkspaceUnset => '未設定';
+
+  @override
+  String get workspaceEntryDefaultWorkspaceAutomaticSubtitle =>
+      '首次為對話綁定工作區時，將記為此助手的預設工作區。';
+
+  @override
+  String workspaceBindingRememberedDefault(String assistant) {
+    return '已記為「$assistant」的預設工作區，新對話將自動使用。';
+  }
+
+  @override
+  String workspaceBindingSuggestDefault(String assistant) {
+    return '以後與「$assistant」的新對話也使用這個工作區？';
+  }
+
+  @override
+  String get workspaceBindingUndoDefault => '復原';
+
+  @override
+  String get workspaceBindingUseAsDefault => '設為預設';
 
   @override
   String get workspaceEntryNone => '無';

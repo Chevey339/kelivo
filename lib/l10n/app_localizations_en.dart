@@ -809,9 +809,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get assistantEditPageNotFound => 'Assistant not found';
 
   @override
-  String get assistantEditPageWorkspaceTab => 'Workspace';
-
-  @override
   String get assistantEditPageBasicTab => 'Basic';
 
   @override
@@ -9863,7 +9860,30 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get workspaceEntryDefaultWorkspaceSubtitle =>
-      'New conversations with this assistant start bound to this workspace.';
+      'New conversations use this workspace. Existing conversations stay unchanged.';
+
+  @override
+  String get workspaceEntryDefaultWorkspaceUnset => 'Not set';
+
+  @override
+  String get workspaceEntryDefaultWorkspaceAutomaticSubtitle =>
+      'The first workspace you bind to a conversation will be remembered for new conversations.';
+
+  @override
+  String workspaceBindingRememberedDefault(String assistant) {
+    return 'Remembered as the default workspace for “$assistant”. New conversations will use it.';
+  }
+
+  @override
+  String workspaceBindingSuggestDefault(String assistant) {
+    return 'Use this workspace for future conversations with “$assistant” too?';
+  }
+
+  @override
+  String get workspaceBindingUndoDefault => 'Undo';
+
+  @override
+  String get workspaceBindingUseAsDefault => 'Set as default';
 
   @override
   String get workspaceEntryNone => 'None';

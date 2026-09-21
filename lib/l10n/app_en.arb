@@ -340,7 +340,6 @@
   "homePageDropToUpload": "Drop files to upload",
   "assistantEditPageTitle": "Assistant",
   "assistantEditPageNotFound": "Assistant not found",
-  "assistantEditPageWorkspaceTab": "Workspace",
   "assistantEditPageBasicTab": "Basic",
   "assistantEditPagePromptsTab": "Prompts",
   "assistantEditPageMcpTab": "MCP",
@@ -4360,7 +4359,23 @@
   "workspaceEntryManage": "Manage workspaces",
   "workspaceEntryCreate": "Create new workspace…",
   "workspaceEntryDefaultWorkspace": "Default workspace",
-  "workspaceEntryDefaultWorkspaceSubtitle": "New conversations with this assistant start bound to this workspace.",
+  "workspaceEntryDefaultWorkspaceSubtitle": "New conversations use this workspace. Existing conversations stay unchanged.",
+  "workspaceEntryDefaultWorkspaceUnset": "Not set",
+  "workspaceEntryDefaultWorkspaceAutomaticSubtitle": "The first workspace you bind to a conversation will be remembered for new conversations.",
+  "workspaceBindingRememberedDefault": "Remembered as the default workspace for “{assistant}”. New conversations will use it.",
+  "@workspaceBindingRememberedDefault": {
+    "placeholders": {
+      "assistant": { "type": "String" }
+    }
+  },
+  "workspaceBindingSuggestDefault": "Use this workspace for future conversations with “{assistant}” too?",
+  "@workspaceBindingSuggestDefault": {
+    "placeholders": {
+      "assistant": { "type": "String" }
+    }
+  },
+  "workspaceBindingUndoDefault": "Undo",
+  "workspaceBindingUseAsDefault": "Set as default",
   "workspaceEntryNone": "None",
   "workspaceEntryStartConversationFirst": "Start a conversation first",
   "workspaceEntryTooltip": "Workspace",
