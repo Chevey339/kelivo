@@ -1962,6 +1962,8 @@
   "searchProviderTinyFishDescription": "TinyFish Search API，支援地區與語言參數。需要 API Key。此處不支援 Fetch/Scrape。",
   "searchServiceNameAnySearch": "AnySearch",
   "searchProviderAnySearchDescription": "面向 AI 智慧代理的統一搜尋服務，可在網頁與專業資料來源間自動路由。API Key 可選。",
+  "searchServiceNameKagi": "Kagi",
+  "searchProviderKagiDescription": "Kagi 搜尋 API，提供 Kagi 的高級網頁搜尋結果。",
   "searchServiceNameKimi": "Kimi",
   "searchProviderKimiDescription": "Kimi 搜尋 API。Pro 傳回相關網頁正文片段，Basic 傳回標題、連結和摘要。",
   "searchServiceNameParallel": "Parallel",

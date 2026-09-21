@@ -10495,6 +10495,18 @@ abstract class AppLocalizations {
   /// **'Unified search for AI agents with automatic routing across web and specialist data sources. API key is optional.'**
   String get searchProviderAnySearchDescription;
 
+  /// No description provided for @searchServiceNameKagi.
+  ///
+  /// In en, this message translates to:
+  /// **'Kagi'**
+  String get searchServiceNameKagi;
+
+  /// No description provided for @searchProviderKagiDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Kagi Search API. Returns premium web search results from Kagi.'**
+  String get searchProviderKagiDescription;
+
   /// No description provided for @searchServiceNameKimi.
   ///
   /// In en, this message translates to:

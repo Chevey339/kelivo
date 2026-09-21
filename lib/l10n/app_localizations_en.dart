@@ -5735,6 +5735,13 @@ class AppLocalizationsEn extends AppLocalizations {
       'Unified search for AI agents with automatic routing across web and specialist data sources. API key is optional.';
 
   @override
+  String get searchServiceNameKagi => 'Kagi';
+
+  @override
+  String get searchProviderKagiDescription =>
+      'Kagi Search API. Returns premium web search results from Kagi.';
+
+  @override
   String get searchServiceNameKimi => 'Kimi';
 
   @override

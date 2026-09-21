@@ -2437,6 +2437,8 @@
   "searchProviderTinyFishDescription": "TinyFish Search API with region/language filters. Requires an API key. Fetch/Scrape is not supported here.",
   "searchServiceNameAnySearch": "AnySearch",
   "searchProviderAnySearchDescription": "Unified search for AI agents with automatic routing across web and specialist data sources. API key is optional.",
+  "searchServiceNameKagi": "Kagi",
+  "searchProviderKagiDescription": "Kagi Search API. Returns premium web search results from Kagi.",
   "searchServiceNameKimi": "Kimi",
   "searchProviderKimiDescription": "Kimi Search API. Pro returns relevant web content excerpts; Basic returns titles, links, and snippets.",
   "searchServiceNameParallel": "Parallel",

@@ -5509,6 +5509,12 @@ class AppLocalizationsZh extends AppLocalizations {
       '面向 AI 智能体的统一搜索服务，可在网页与专业数据源间自动路由。API Key 可选。';
 
   @override
+  String get searchServiceNameKagi => 'Kagi';
+
+  @override
+  String get searchProviderKagiDescription => 'Kagi 搜索 API，提供 Kagi 的高级网页搜索结果。';
+
+  @override
   String get searchServiceNameKimi => 'Kimi';
 
   @override
@@ -17076,6 +17082,12 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   @override
   String get searchProviderAnySearchDescription =>
       '面向 AI 智能体的统一搜索服务，可在网页与专业数据源间自动路由。API Key 可选。';
+
+  @override
+  String get searchServiceNameKagi => 'Kagi';
+
+  @override
+  String get searchProviderKagiDescription => 'Kagi 搜索 API，提供 Kagi 的高级网页搜索结果。';
 
   @override
   String get searchServiceNameKimi => 'Kimi';
@@ -28719,6 +28731,12 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   @override
   String get searchProviderAnySearchDescription =>
       '面向 AI 智慧代理的統一搜尋服務，可在網頁與專業資料來源間自動路由。API Key 可選。';
+
+  @override
+  String get searchServiceNameKagi => 'Kagi';
+
+  @override
+  String get searchProviderKagiDescription => 'Kagi 搜尋 API，提供 Kagi 的高級網頁搜尋結果。';
 
   @override
   String get searchServiceNameKimi => 'Kimi';
