@@ -11492,7 +11492,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get scheduledTasksPreparationCost =>
-      '提前准备会调用模型，可能产生额外费用。选择「跟随最新对话」时，新消息可能使已准备内容失效。即使结果未使用或请求被取消，仍可能计费；重新准备会再次调用模型。';
+      '提前准备会调用模型，可能产生额外费用。选择「跟随最新对话」时，到期前的新消息可能使已准备内容失效。即使结果未使用或请求被取消，仍可能计费；重新准备会再次调用模型。';
 
   @override
   String get scheduledTasksAllowPreparationTip =>
@@ -11500,7 +11500,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get scheduledTasksContextPolicyTip =>
-      '跟随最新对话：发送新消息、编辑消息或切换消息版本后，已准备内容会失效；重新准备会占用次数，并可能增加费用。\n\n使用准备时的快照：对话变化后仍保留已准备结果，内容不会包含后续聊天。';
+      '跟随最新对话：到期前发送新消息、编辑消息或切换消息版本后，已准备内容会失效；重新准备会占用次数，并可能增加费用。到期后，已保存的通知结果会原样补入对话。\n\n使用准备时的快照：对话变化后仍保留已准备结果，内容不会包含后续聊天。';
 
   @override
   String get scheduledTasksPreparationWindowTip =>
@@ -11534,6 +11534,86 @@ class AppLocalizationsZh extends AppLocalizations {
   @override
   String scheduledTasksMinutes(int count) {
     return '$count 分钟';
+  }
+
+  @override
+  String get scheduledTasksPreparationOff => '未开启准备';
+
+  @override
+  String get scheduledTasksPreparationQueued => '排队中';
+
+  @override
+  String get scheduledTasksPreparationQueuedDetail => '正在准备其他任务，随后按到期时间依次准备。';
+
+  @override
+  String get scheduledTasksPreparationIdle => '等待空闲';
+
+  @override
+  String get scheduledTasksPreparationIdleDetail => '等待当前回复完成或此任务的对话状态稳定后继续。';
+
+  @override
+  String get scheduledTasksPreparationWindowWaiting => '未到准备时间';
+
+  @override
+  String get scheduledTasksPreparationCooldownWaiting => '等待重试';
+
+  @override
+  String scheduledTasksPreparationRetryAt(String time) {
+    return '下次可尝试：$time';
+  }
+
+  @override
+  String get scheduledTasksPreparationLimitReached => '次数已用完';
+
+  @override
+  String scheduledTasksPreparationAttemptsUsed(int count, int limit) {
+    return '本次已尝试 $count/$limit 次，可在编辑任务中调整上限。';
+  }
+
+  @override
+  String get scheduledTasksPreparationHourlyLimit => '等待额度恢复';
+
+  @override
+  String get scheduledTasksPreparationHourlyLimitDetail =>
+      '已达到每小时准备次数上限，额度恢复后继续。';
+
+  @override
+  String get scheduledTasksPreparationUnavailable => '暂时无法准备';
+
+  @override
+  String get scheduledTasksPreparationReadFailed =>
+      '暂时无法读取任务信息，稍后会重新检查；具体原因见执行记录。';
+
+  @override
+  String get scheduledTasksPreparationResultRetained =>
+      '暂时无法校验上下文，已保留准备结果，稍后会重新检查。';
+
+  @override
+  String get scheduledTasksPreparationContextChanged => '对话内容或配置已变化，原准备结果已作废。';
+
+  @override
+  String get scheduledTasksPreparationPublishing => '待写入对话';
+
+  @override
+  String get scheduledTasksPreparationPublishingDetail =>
+      '等待当前回复结束后，将已保存的结果写入对话。';
+
+  @override
+  String get scheduledTasksPreparationPrompt => '准备提示词';
+
+  @override
+  String get scheduledTasksPreparationPromptTip =>
+      '仅在提前准备本任务时附加的系统提示词，与任务内容分开。可以自定义语气和要求，也可以留空，不附加准备提示词。无论如何设置，提前准备都不能使用工具或获取实时信息。到期前修改会使已准备的结果失效，再次准备可能产生额外模型费用。';
+
+  @override
+  String get scheduledTasksPreparationPromptEmpty => '留空则不附加准备提示词';
+
+  @override
+  String scheduledTasksPreparationPromptVariables(
+    String timeVariable,
+    String offsetVariable,
+  ) {
+    return '可用占位符：$timeVariable 为计划发送的本地时间，$offsetVariable 为该时间的 UTC 偏移。准备时会自动替换。';
   }
 }
 
@@ -22951,7 +23031,7 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get scheduledTasksPreparationCost =>
-      '提前准备会调用模型，可能产生额外费用。选择「跟随最新对话」时，新消息可能使已准备内容失效。即使结果未使用或请求被取消，仍可能计费；重新准备会再次调用模型。';
+      '提前准备会调用模型，可能产生额外费用。选择「跟随最新对话」时，到期前的新消息可能使已准备内容失效。即使结果未使用或请求被取消，仍可能计费；重新准备会再次调用模型。';
 
   @override
   String get scheduledTasksAllowPreparationTip =>
@@ -22959,7 +23039,7 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get scheduledTasksContextPolicyTip =>
-      '跟随最新对话：发送新消息、编辑消息或切换消息版本后，已准备内容会失效；重新准备会占用次数，并可能增加费用。\n\n使用准备时的快照：对话变化后仍保留已准备结果，内容不会包含后续聊天。';
+      '跟随最新对话：到期前发送新消息、编辑消息或切换消息版本后，已准备内容会失效；重新准备会占用次数，并可能增加费用。到期后，已保存的通知结果会原样补入对话。\n\n使用准备时的快照：对话变化后仍保留已准备结果，内容不会包含后续聊天。';
 
   @override
   String get scheduledTasksPreparationWindowTip =>
@@ -22993,6 +23073,86 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   @override
   String scheduledTasksMinutes(int count) {
     return '$count 分钟';
+  }
+
+  @override
+  String get scheduledTasksPreparationOff => '未开启准备';
+
+  @override
+  String get scheduledTasksPreparationQueued => '排队中';
+
+  @override
+  String get scheduledTasksPreparationQueuedDetail => '正在准备其他任务，随后按到期时间依次准备。';
+
+  @override
+  String get scheduledTasksPreparationIdle => '等待空闲';
+
+  @override
+  String get scheduledTasksPreparationIdleDetail => '等待当前回复完成或此任务的对话状态稳定后继续。';
+
+  @override
+  String get scheduledTasksPreparationWindowWaiting => '未到准备时间';
+
+  @override
+  String get scheduledTasksPreparationCooldownWaiting => '等待重试';
+
+  @override
+  String scheduledTasksPreparationRetryAt(String time) {
+    return '下次可尝试：$time';
+  }
+
+  @override
+  String get scheduledTasksPreparationLimitReached => '次数已用完';
+
+  @override
+  String scheduledTasksPreparationAttemptsUsed(int count, int limit) {
+    return '本次已尝试 $count/$limit 次，可在编辑任务中调整上限。';
+  }
+
+  @override
+  String get scheduledTasksPreparationHourlyLimit => '等待额度恢复';
+
+  @override
+  String get scheduledTasksPreparationHourlyLimitDetail =>
+      '已达到每小时准备次数上限，额度恢复后继续。';
+
+  @override
+  String get scheduledTasksPreparationUnavailable => '暂时无法准备';
+
+  @override
+  String get scheduledTasksPreparationReadFailed =>
+      '暂时无法读取任务信息，稍后会重新检查；具体原因见执行记录。';
+
+  @override
+  String get scheduledTasksPreparationResultRetained =>
+      '暂时无法校验上下文，已保留准备结果，稍后会重新检查。';
+
+  @override
+  String get scheduledTasksPreparationContextChanged => '对话内容或配置已变化，原准备结果已作废。';
+
+  @override
+  String get scheduledTasksPreparationPublishing => '待写入对话';
+
+  @override
+  String get scheduledTasksPreparationPublishingDetail =>
+      '等待当前回复结束后，将已保存的结果写入对话。';
+
+  @override
+  String get scheduledTasksPreparationPrompt => '准备提示词';
+
+  @override
+  String get scheduledTasksPreparationPromptTip =>
+      '仅在提前准备本任务时附加的系统提示词，与任务内容分开。可以自定义语气和要求，也可以留空，不附加准备提示词。无论如何设置，提前准备都不能使用工具或获取实时信息。到期前修改会使已准备的结果失效，再次准备可能产生额外模型费用。';
+
+  @override
+  String get scheduledTasksPreparationPromptEmpty => '留空则不附加准备提示词';
+
+  @override
+  String scheduledTasksPreparationPromptVariables(
+    String timeVariable,
+    String offsetVariable,
+  ) {
+    return '可用占位符：$timeVariable 为计划发送的本地时间，$offsetVariable 为该时间的 UTC 偏移。准备时会自动替换。';
   }
 }
 
@@ -34489,7 +34649,7 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get scheduledTasksPreparationCost =>
-      '提前準備會呼叫模型，可能產生額外費用。選擇「跟隨最新對話」時，新訊息可能使已準備內容失效。即使結果未使用或請求被取消，仍可能計費；重新準備會再次呼叫模型。';
+      '提前準備會呼叫模型，可能產生額外費用。選擇「跟隨最新對話」時，到期前的新訊息可能使已準備內容失效。即使結果未使用或請求被取消，仍可能計費；重新準備會再次呼叫模型。';
 
   @override
   String get scheduledTasksAllowPreparationTip =>
@@ -34497,7 +34657,7 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get scheduledTasksContextPolicyTip =>
-      '跟隨最新對話：傳送新訊息、編輯訊息或切換訊息版本後，已準備內容會失效；重新準備會占用次數，並可能增加費用。\n\n使用準備時的快照：對話變化後仍保留已準備結果，內容不會包含後續聊天。';
+      '跟隨最新對話：到期前傳送新訊息、編輯訊息或切換訊息版本後，已準備內容會失效；重新準備會占用次數，並可能增加費用。到期後，已儲存的通知結果會原樣補入對話。\n\n使用準備時的快照：對話變化後仍保留已準備結果，內容不會包含後續聊天。';
 
   @override
   String get scheduledTasksPreparationWindowTip =>
@@ -34531,5 +34691,85 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   @override
   String scheduledTasksMinutes(int count) {
     return '$count 分鐘';
+  }
+
+  @override
+  String get scheduledTasksPreparationOff => '未開啟準備';
+
+  @override
+  String get scheduledTasksPreparationQueued => '排隊中';
+
+  @override
+  String get scheduledTasksPreparationQueuedDetail => '正在準備其他任務，隨後按到期時間依次準備。';
+
+  @override
+  String get scheduledTasksPreparationIdle => '等待空閒';
+
+  @override
+  String get scheduledTasksPreparationIdleDetail => '等待目前回覆完成或此任務的對話狀態穩定後繼續。';
+
+  @override
+  String get scheduledTasksPreparationWindowWaiting => '未到準備時間';
+
+  @override
+  String get scheduledTasksPreparationCooldownWaiting => '等待重試';
+
+  @override
+  String scheduledTasksPreparationRetryAt(String time) {
+    return '下次可嘗試：$time';
+  }
+
+  @override
+  String get scheduledTasksPreparationLimitReached => '次數已用完';
+
+  @override
+  String scheduledTasksPreparationAttemptsUsed(int count, int limit) {
+    return '本次已嘗試 $count/$limit 次，可在編輯任務中調整上限。';
+  }
+
+  @override
+  String get scheduledTasksPreparationHourlyLimit => '等待額度恢復';
+
+  @override
+  String get scheduledTasksPreparationHourlyLimitDetail =>
+      '已達到每小時準備次數上限，額度恢復後繼續。';
+
+  @override
+  String get scheduledTasksPreparationUnavailable => '暫時無法準備';
+
+  @override
+  String get scheduledTasksPreparationReadFailed =>
+      '暫時無法讀取任務資訊，稍後會重新檢查；具體原因見執行記錄。';
+
+  @override
+  String get scheduledTasksPreparationResultRetained =>
+      '暫時無法校驗上下文，已保留準備結果，稍後會重新檢查。';
+
+  @override
+  String get scheduledTasksPreparationContextChanged => '對話內容或設定已變更，原準備結果已作廢。';
+
+  @override
+  String get scheduledTasksPreparationPublishing => '待寫入對話';
+
+  @override
+  String get scheduledTasksPreparationPublishingDetail =>
+      '等待目前回覆結束後，將已儲存的結果寫入對話。';
+
+  @override
+  String get scheduledTasksPreparationPrompt => '準備提示詞';
+
+  @override
+  String get scheduledTasksPreparationPromptTip =>
+      '僅在提前準備本任務時附加的系統提示詞，與任務內容分開。可以自訂語氣和要求，也可以留空，不附加準備提示詞。無論如何設定，提前準備都不能使用工具或取得即時資訊。到期前修改會使已準備的結果失效，再次準備可能產生額外模型費用。';
+
+  @override
+  String get scheduledTasksPreparationPromptEmpty => '留空則不附加準備提示詞';
+
+  @override
+  String scheduledTasksPreparationPromptVariables(
+    String timeVariable,
+    String offsetVariable,
+  ) {
+    return '可用佔位符：$timeVariable 為計劃傳送的本地時間，$offsetVariable 為該時間的 UTC 偏移。準備時會自動替換。';
   }
 }

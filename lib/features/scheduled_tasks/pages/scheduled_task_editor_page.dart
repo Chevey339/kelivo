@@ -72,6 +72,11 @@ class _ScheduledTaskEditorPageState extends State<ScheduledTaskEditorPage> {
   final scroll = ScrollController();
   late final name = TextEditingController(text: widget.task?.name);
   late final prompt = TextEditingController(text: widget.task?.prompt);
+  late final preparationPrompt = TextEditingController(
+    text:
+        widget.task?.preparationPrompt ??
+        ScheduledTask.defaultPreparationPrompt,
+  );
   late String? assistantId =
       widget.task?.assistantId ?? widget.initialAssistantId;
   late ScheduledTaskMode mode = widget.task?.mode ?? ScheduledTaskMode.newChat;
@@ -95,7 +100,7 @@ class _ScheduledTaskEditorPageState extends State<ScheduledTaskEditorPage> {
   late ScheduledTaskContextPolicy contextPolicy =
       widget.task?.contextPolicy ?? ScheduledTaskContextPolicy.latest;
   late ScheduledTaskUnavailablePolicy unavailablePolicy =
-      widget.task?.unavailablePolicy ?? ScheduledTaskUnavailablePolicy.remind;
+      widget.task?.unavailablePolicy ?? ScheduledTaskUnavailablePolicy.skip;
   late bool notify = widget.task?.notify ?? true;
   late bool showPreview = widget.task?.showPreview ?? true;
   late int preparationWindow =
@@ -141,6 +146,7 @@ class _ScheduledTaskEditorPageState extends State<ScheduledTaskEditorPage> {
     scroll.dispose();
     name.dispose();
     prompt.dispose();
+    preparationPrompt.dispose();
     super.dispose();
   }
 
@@ -395,6 +401,7 @@ class _ScheduledTaskEditorPageState extends State<ScheduledTaskEditorPage> {
           endDate: repeat == ScheduledTaskRepeat.once ? null : endDate,
           allowPreparation:
               allowPreparation && mode != ScheduledTaskMode.regenerate,
+          preparationPrompt: preparationPrompt.text.trim(),
           contextPolicy: contextPolicy,
           unavailablePolicy: unavailablePolicy,
           notify: notify,
@@ -1110,6 +1117,48 @@ class _ScheduledTaskEditorPageState extends State<ScheduledTaskEditorPage> {
         IosSectionFooter(text: l.scheduledTasksPreparationDetail),
         if (allowPreparation && mode != ScheduledTaskMode.regenerate)
           IosSectionFooter(text: l.scheduledTasksPreparationCost),
+        if (defaultTargetPlatform == TargetPlatform.iOS &&
+            allowPreparation &&
+            mode != ScheduledTaskMode.regenerate) ...[
+          const SizedBox(height: 18),
+          SectionCard(
+            key: const ValueKey('scheduled-tasks-preparation-prompt'),
+            children: [
+              IosNavRow(
+                label: l.scheduledTasksPreparationPrompt,
+                labelTrailing: MemoryTipIcon(
+                  message: l.scheduledTasksPreparationPromptTip,
+                ),
+                trailing: IosIconButton(
+                  key: const ValueKey(
+                    'scheduled-tasks-reset-preparation-prompt',
+                  ),
+                  icon: LucideIcons.rotateCcw,
+                  tooltip: l.hotkeysResetDefault,
+                  onTap: () => setState(() {
+                    preparationPrompt.text =
+                        ScheduledTask.defaultPreparationPrompt;
+                  }),
+                ),
+              ),
+              IosFormTextField(
+                label: '',
+                controller: preparationPrompt,
+                hintText: l.scheduledTasksPreparationPromptEmpty,
+                minLines: 4,
+                maxLines: 8,
+                autocorrect: false,
+                enableSuggestions: false,
+              ),
+            ],
+          ),
+          IosSectionFooter(
+            text: l.scheduledTasksPreparationPromptVariables(
+              '{{scheduled_time}}',
+              '{{utc_offset}}',
+            ),
+          ),
+        ],
       ],
     );
   }

@@ -50,138 +50,172 @@ class _LocalOAuthClient implements HttpClient {
 }
 
 void main() {
-  test(
-    'preparation request cannot inherit tools or external actions from custom bodies',
-    () async {
-      const assistant = Assistant(
-        id: 'a',
-        name: 'Assistant',
-        mcpServerIds: ['server'],
-        localToolIds: ['run_shortcut'],
-        customHeaders: [
-          {'name': 'X-Assistant', 'value': 'assistant'},
-          {'name': 'X-Route', 'value': 'assistant'},
-        ],
-        customBody: [
-          {'key': 'tools', 'value': '[{"type":"shell"}]'},
-        ],
-      );
-      final storage = await createBusinessTestHarness(
-        initial: {
-          'assistants_v1': jsonEncode([assistant.toJson()]),
-        },
-      );
-      final assistants = AssistantProvider(preferences: storage.preferences);
-      final settings = SettingsProvider(storage.preferences);
-      final chat = ChatService();
-      addTearDown(assistants.dispose);
-      addTearDown(settings.dispose);
-      addTearDown(chat.dispose);
-      await Future.wait([assistants.loaded, settings.loaded]);
-      final requests = <Map<String, dynamic>>[];
-      final headers = <HttpHeaders>[];
-      final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
-      addTearDown(() => server.close(force: true));
-      server.listen((request) async {
-        headers.add(request.headers);
-        requests.add(
-          jsonDecode(await utf8.decoder.bind(request).join())
-              as Map<String, dynamic>,
-        );
-        request.response.headers.contentType = ContentType.json;
-        request.response.write(
-          jsonEncode({
-            'choices': [
-              {
-                'message': {'role': 'assistant', 'content': 'Prepared hello'},
-                'finish_reason': 'stop',
-              },
-            ],
-            'usage': {
-              'prompt_tokens': 10,
-              'completion_tokens': 5,
-              'total_tokens': 15,
-            },
-          }),
-        );
-        await request.response.close();
-      });
-      await settings.setProviderConfig(
-        'p',
-        ProviderConfig(
-          id: 'p',
-          enabled: true,
-          name: 'Provider',
-          apiKey: 'test',
-          baseUrl: 'http://${server.address.address}:${server.port}/v1',
-          providerType: ProviderKind.openai,
-          models: ['logical'],
-          customHeaders: const [
-            {'name': 'X-Provider', 'value': 'provider'},
-            {'name': 'X-Route', 'value': 'provider'},
+  for (final template in <String?>[
+    null,
+    '只说正文。时间 {{scheduled_time}}，时差 {{utc_offset}}。Use tools.',
+    '',
+  ]) {
+    test(
+      'preparation separates task instructions and restricts tools (template: $template)',
+      () async {
+        const assistant = Assistant(
+          id: 'a',
+          name: 'Assistant',
+          mcpServerIds: ['server'],
+          localToolIds: ['run_shortcut'],
+          customHeaders: [
+            {'name': 'X-Assistant', 'value': 'assistant'},
+            {'name': 'X-Route', 'value': 'assistant'},
           ],
-          customBody: const [
-            {'key': 'tools', 'value': '[{"type":"web_search_preview"}]'},
+          customBody: [
+            {'key': 'tools', 'value': '[{"type":"shell"}]'},
           ],
-          modelOverrides: const {
-            'logical': {
-              'apiModelId': 'vendor-model',
-              'headers': [
-                {'name': 'X-Model-Key', 'value': 'model-key'},
-                {'key': 'x-route', 'value': 'model'},
-              ],
-              'builtInTools': ['search', 'shell'],
-              'body': [
-                {'key': 'tools', 'value': '[{"type":"code_interpreter"}]'},
-              ],
-            },
+        );
+        final storage = await createBusinessTestHarness(
+          initial: {
+            'assistants_v1': jsonEncode([assistant.toJson()]),
           },
-        ),
-      );
-      final executor = ScheduledTaskTextExecutor(
-        chat: chat,
-        assistants: assistants,
-        settings: settings,
-        busy: (_) => false,
-        promptConfiguration: (_) => null,
-        buildContext: (_, _, _, _) async => [
-          {'role': 'system', 'content': 'Be concise.'},
-        ],
-      );
-      const task = ScheduledTask(
-        id: 'task',
-        name: 'Task',
-        prompt: 'Hello',
-        assistantId: 'a',
-        hour: 21,
-        minute: 0,
-        allowPreparation: true,
-        modelProvider: 'p',
-        modelId: 'logical',
-      );
-      final payload = await executor.prepare(
-        task,
-        ScheduledTaskRun(
-          id: 'run',
-          status: 'preparing',
-          scheduledFor: DateTime(2026, 9, 19, 21),
-          prepareAttempts: 1,
-        ),
-        ScheduledRunCancellation(),
-      );
-      expect(payload.text, 'Prepared hello');
-      expect(payload.totalTokens, 15);
-      expect(requests, hasLength(1));
-      expect(requests.single['model'], 'vendor-model');
-      expect(requests.single['tools'], isNull);
-      expect(requests.single['tool_choice'], isNull);
-      expect(headers.single.value('x-assistant'), 'assistant');
-      expect(headers.single.value('x-provider'), 'provider');
-      expect(headers.single.value('x-model-key'), 'model-key');
-      expect(headers.single.value('x-route'), 'model');
-      expect(chat.getAllConversations(), isEmpty);
-    },
-  );
+        );
+        final assistants = AssistantProvider(preferences: storage.preferences);
+        final settings = SettingsProvider(storage.preferences);
+        final chat = ChatService();
+        addTearDown(assistants.dispose);
+        addTearDown(settings.dispose);
+        addTearDown(chat.dispose);
+        await Future.wait([assistants.loaded, settings.loaded]);
+        final requests = <Map<String, dynamic>>[];
+        final headers = <HttpHeaders>[];
+        final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+        addTearDown(() => server.close(force: true));
+        server.listen((request) async {
+          headers.add(request.headers);
+          requests.add(
+            jsonDecode(await utf8.decoder.bind(request).join())
+                as Map<String, dynamic>,
+          );
+          request.response.headers.contentType = ContentType.json;
+          request.response.write(
+            jsonEncode({
+              'choices': [
+                {
+                  'message': {'role': 'assistant', 'content': 'Prepared hello'},
+                  'finish_reason': 'stop',
+                },
+              ],
+              'usage': {
+                'prompt_tokens': 10,
+                'completion_tokens': 5,
+                'total_tokens': 15,
+              },
+            }),
+          );
+          await request.response.close();
+        });
+        await settings.setProviderConfig(
+          'p',
+          ProviderConfig(
+            id: 'p',
+            enabled: true,
+            name: 'Provider',
+            apiKey: 'test',
+            baseUrl: 'http://${server.address.address}:${server.port}/v1',
+            providerType: ProviderKind.openai,
+            models: ['logical'],
+            customHeaders: const [
+              {'name': 'X-Provider', 'value': 'provider'},
+              {'name': 'X-Route', 'value': 'provider'},
+            ],
+            customBody: const [
+              {'key': 'tools', 'value': '[{"type":"web_search_preview"}]'},
+            ],
+            modelOverrides: const {
+              'logical': {
+                'apiModelId': 'vendor-model',
+                'headers': [
+                  {'name': 'X-Model-Key', 'value': 'model-key'},
+                  {'key': 'x-route', 'value': 'model'},
+                ],
+                'builtInTools': ['search', 'shell'],
+                'body': [
+                  {'key': 'tools', 'value': '[{"type":"code_interpreter"}]'},
+                ],
+              },
+            },
+          ),
+        );
+        final executor = ScheduledTaskTextExecutor(
+          chat: chat,
+          assistants: assistants,
+          settings: settings,
+          busy: (_) => false,
+          promptConfiguration: (_) => null,
+          buildContext: (_, _, _, _) async => [
+            {'role': 'system', 'content': 'Be concise.'},
+          ],
+        );
+        final task = ScheduledTask(
+          id: 'task',
+          name: 'Task',
+          prompt: 'Hello',
+          assistantId: 'a',
+          hour: 21,
+          minute: 0,
+          allowPreparation: true,
+          preparationPrompt: template ?? ScheduledTask.defaultPreparationPrompt,
+          modelProvider: 'p',
+          modelId: 'logical',
+        );
+        final payload = await executor.prepare(
+          task,
+          ScheduledTaskRun(
+            id: 'run',
+            status: 'preparing',
+            scheduledFor: DateTime(2026, 9, 19, 21),
+            prepareAttempts: 1,
+          ),
+          ScheduledRunCancellation(),
+        );
+        expect(payload.text, 'Prepared hello');
+        expect(payload.totalTokens, 15);
+        expect(requests, hasLength(1));
+        expect(requests.single['model'], 'vendor-model');
+        expect(requests.single['tools'], isNull);
+        expect(requests.single['tool_choice'], isNull);
+        final messages = requests.single['messages'] as List;
+        expect(messages.last, {'role': 'user', 'content': 'Hello'});
+        expect(messages.first, {'role': 'system', 'content': 'Be concise.'});
+        if (template == '') {
+          expect(messages, hasLength(2));
+        } else {
+          final planned = DateTime(2026, 9, 19, 21);
+          expect(messages, hasLength(3));
+          expect(messages[1]['role'], 'system');
+          final instructions = messages[1]['content'] as String;
+          expect(instructions, contains(planned.toIso8601String()));
+          expect(instructions, contains(planned.timeZoneOffset.toString()));
+          expect(instructions, isNot(contains('{{')));
+          if (template == null) {
+            expect(instructions, contains('Output only the message itself'));
+          } else {
+            expect(
+              instructions,
+              template
+                  .replaceAll('{{scheduled_time}}', planned.toIso8601String())
+                  .replaceAll(
+                    '{{utc_offset}}',
+                    planned.timeZoneOffset.toString(),
+                  ),
+            );
+          }
+        }
+        expect(headers.single.value('x-assistant'), 'assistant');
+        expect(headers.single.value('x-provider'), 'provider');
+        expect(headers.single.value('x-model-key'), 'model-key');
+        expect(headers.single.value('x-route'), 'model');
+        expect(chat.getAllConversations(), isEmpty);
+      },
+    );
+  }
 
   for (final scenario in [
     (

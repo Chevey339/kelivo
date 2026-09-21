@@ -153,14 +153,17 @@ class ScheduledTaskTextExecutor implements ScheduledTaskPreparation {
     if (before != await revision(task)) {
       throw StateError('scheduled_context_changed');
     }
-    messages.add({
-      'role': 'user',
-      'content':
-          'Scheduled task, planned for ${run.scheduledFor!.toIso8601String()} '
-          '(UTC offset ${run.scheduledFor!.timeZoneOffset}). '
-          'Prepare a text response using only the supplied context. '
-          'No tools or current information are available; do not claim to have performed external actions.\n\n${task.prompt}',
-    });
+    final preparationPrompt = task.preparationPrompt
+        .replaceAll('{{scheduled_time}}', run.scheduledFor!.toIso8601String())
+        .replaceAll(
+          '{{utc_offset}}',
+          run.scheduledFor!.timeZoneOffset.toString(),
+        )
+        .trim();
+    if (preparationPrompt.isNotEmpty) {
+      messages.add({'role': 'system', 'content': preparationPrompt});
+    }
+    messages.add({'role': 'user', 'content': task.prompt});
     final requestId = '${run.id}:prepare:${run.prepareAttempts}';
     cancellation.onCancel = () async => ChatApiService.cancelRequest(requestId);
     cancellation.check();
@@ -203,6 +206,8 @@ class ScheduledTaskTextExecutor implements ScheduledTaskPreparation {
     ScheduledTaskRun run,
     ScheduledTaskPayload payload,
   ) async {
+    // Freeze the delivered body, not the existence of its owner and target.
+    _assistant(task);
     final conversation =
         _conversation(task) ??
         Conversation(
@@ -217,10 +222,8 @@ class ScheduledTaskTextExecutor implements ScheduledTaskPreparation {
     await chat.publishScheduledMessages(
       conversation: conversation,
       createConversation: task.mode == ScheduledTaskMode.newChat,
-      expectedContextRevision:
-          task.contextPolicy == ScheduledTaskContextPolicy.latest
-          ? (jsonDecode(payload.contextRevision) as Map)['chat'] as String?
-          : null,
+      // The coordinator validates latest-context results before their due
+      // time. Publication then restores that same, frozen notification body.
       instruction: ChatMessage(
         id: '${run.id}:instruction',
         conversationId: conversation.id,

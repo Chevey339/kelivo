@@ -12021,7 +12021,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get scheduledTasksPreparationCost =>
-      'Preparation calls the model and may cost extra. With “Follow latest conversation”, new messages can invalidate a prepared result. Unused or cancelled output may still be billed, and preparing again makes another model request.';
+      'Preparation calls the model and may cost extra. With “Follow latest conversation”, new messages before the due time can invalidate a prepared result. Unused or cancelled output may still be billed, and preparing again makes another model request.';
 
   @override
   String get scheduledTasksAllowPreparationTip =>
@@ -12029,7 +12029,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get scheduledTasksContextPolicyTip =>
-      'Follow latest conversation: new messages, edits or switching message versions invalidate the prepared result; preparing again uses another attempt and may cost extra.\n\nUse preparation snapshot: keep the prepared result even if the conversation changes. It will not reflect later messages.';
+      'Follow latest conversation: before the task is due, new messages, edits or switching message versions invalidate the prepared result; preparing again uses another attempt and may cost extra. Once due, the saved notification result is added to the chat unchanged.\n\nUse preparation snapshot: keep the prepared result even if the conversation changes. It will not reflect later messages.';
 
   @override
   String get scheduledTasksPreparationWindowTip =>
@@ -12075,5 +12075,90 @@ class AppLocalizationsEn extends AppLocalizations {
       one: '1 minute',
     );
     return '$_temp0';
+  }
+
+  @override
+  String get scheduledTasksPreparationOff => 'Preparation off';
+
+  @override
+  String get scheduledTasksPreparationQueued => 'Queued';
+
+  @override
+  String get scheduledTasksPreparationQueuedDetail =>
+      'Another task is being prepared. Eligible tasks continue in due-time order.';
+
+  @override
+  String get scheduledTasksPreparationIdle => 'Waiting for chat';
+
+  @override
+  String get scheduledTasksPreparationIdleDetail =>
+      'Preparation resumes after active replies finish and this task’s context settles.';
+
+  @override
+  String get scheduledTasksPreparationWindowWaiting =>
+      'Outside preparation window';
+
+  @override
+  String get scheduledTasksPreparationCooldownWaiting => 'Waiting to retry';
+
+  @override
+  String scheduledTasksPreparationRetryAt(String time) {
+    return 'Can retry after $time';
+  }
+
+  @override
+  String get scheduledTasksPreparationLimitReached => 'Attempt limit reached';
+
+  @override
+  String scheduledTasksPreparationAttemptsUsed(int count, int limit) {
+    return 'Used $count/$limit attempts for this occurrence. You can adjust the limit in task settings.';
+  }
+
+  @override
+  String get scheduledTasksPreparationHourlyLimit => 'Hourly limit reached';
+
+  @override
+  String get scheduledTasksPreparationHourlyLimitDetail =>
+      'The hourly preparation limit has been reached. Pending tasks resume when capacity is available.';
+
+  @override
+  String get scheduledTasksPreparationUnavailable => 'Preparation unavailable';
+
+  @override
+  String get scheduledTasksPreparationReadFailed =>
+      'Could not read task context. It will be checked again shortly; see execution history for details.';
+
+  @override
+  String get scheduledTasksPreparationResultRetained =>
+      'Context could not be checked. The prepared result is retained and will be checked again.';
+
+  @override
+  String get scheduledTasksPreparationContextChanged =>
+      'The conversation or task context changed, so the earlier result was discarded.';
+
+  @override
+  String get scheduledTasksPreparationPublishing => 'Waiting to add to chat';
+
+  @override
+  String get scheduledTasksPreparationPublishingDetail =>
+      'The saved result will be added to the conversation when the current reply finishes.';
+
+  @override
+  String get scheduledTasksPreparationPrompt => 'Preparation prompt';
+
+  @override
+  String get scheduledTasksPreparationPromptTip =>
+      'Extra system instructions used only when preparing this task in advance, separate from the task instructions. You can change the style or remove these instructions entirely. Tools and live information remain unavailable. Editing this prompt invalidates any result prepared before the due time; preparing it again may incur another model charge.';
+
+  @override
+  String get scheduledTasksPreparationPromptEmpty =>
+      'Leave empty to add no preparation instructions';
+
+  @override
+  String scheduledTasksPreparationPromptVariables(
+    String timeVariable,
+    String offsetVariable,
+  ) {
+    return 'Placeholders: $timeVariable is the planned local delivery time; $offsetVariable is its UTC offset. These are replaced when preparing the result.';
   }
 }

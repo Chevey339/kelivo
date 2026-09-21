@@ -89,6 +89,17 @@ class ScheduledTasksService extends ChangeNotifier {
   final DesktopScheduledTasks? _desktop;
   final PreparedScheduledTasks? _prepared;
   bool get isIOS => _prepared != null;
+  ScheduledTaskPreparationStatus? preparationStatus(ScheduledTask task) =>
+      _prepared?.preparationStatus(task);
+
+  Future<void> preparePendingTasks() async {
+    try {
+      await _prepared?.check(prepare: true);
+    } catch (e) {
+      _recordError(e);
+    }
+  }
+
   AppLocalizations localizations = lookupAppLocalizations(const Locale('en'));
   StreamSubscription<String>? _scheduledTapSubscription;
   Future<void> configurePreparation(

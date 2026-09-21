@@ -8,6 +8,16 @@ enum ScheduledTaskRepeat { once, daily, weekdays, custom }
 
 class ScheduledTask {
   static const defaultPreparationWindowMinutes = Duration.minutesPerDay;
+  static const defaultPreparationPrompt =
+      'The next user instruction is a scheduled message for this conversation. '
+      'Write the assistant message exactly as the user should receive it, '
+      'in the established language, tone and persona. Continue the conversation naturally. '
+      'Output only the message itself: no preface, execution report, or explanation '
+      'that this is scheduled, prepared in advance, or a text response.\n\n'
+      'The intended delivery time is {{scheduled_time}} (UTC offset {{utc_offset}}); '
+      'this is internal context, not text to repeat unless the user explicitly asks for it. '
+      'Use only the supplied context. Tools and live information are unavailable; '
+      'do not claim to have performed external actions.';
 
   const ScheduledTask({
     required this.id,
@@ -30,8 +40,9 @@ class ScheduledTask {
     this.endDate,
     this.exhausted = false,
     this.allowPreparation = false,
+    this.preparationPrompt = defaultPreparationPrompt,
     this.contextPolicy = ScheduledTaskContextPolicy.latest,
-    this.unavailablePolicy = ScheduledTaskUnavailablePolicy.remind,
+    this.unavailablePolicy = ScheduledTaskUnavailablePolicy.skip,
     this.notify = true,
     this.showPreview = true,
     this.preparationWindowMinutes = defaultPreparationWindowMinutes,
@@ -52,6 +63,7 @@ class ScheduledTask {
   final DateTime? onceDate, startDate, endDate;
   final bool exhausted;
   final bool allowPreparation, notify, showPreview;
+  final String preparationPrompt;
   final ScheduledTaskContextPolicy contextPolicy;
   final ScheduledTaskUnavailablePolicy unavailablePolicy;
   final int preparationWindowMinutes,
@@ -105,6 +117,7 @@ class ScheduledTask {
     startDate: startDate,
     endDate: endDate,
     allowPreparation: allowPreparation,
+    preparationPrompt: preparationPrompt,
     contextPolicy: contextPolicy,
     unavailablePolicy: unavailablePolicy,
     notify: notify,
@@ -135,11 +148,13 @@ class ScheduledTask {
     endDate: _parseDate(json['endDate']),
     exhausted: json['exhausted'] == true,
     allowPreparation: json['allowPreparation'] == true,
+    preparationPrompt:
+        json['preparationPrompt'] as String? ?? defaultPreparationPrompt,
     contextPolicy: ScheduledTaskContextPolicy.values.byName(
       json['contextPolicy'] as String? ?? 'latest',
     ),
     unavailablePolicy: ScheduledTaskUnavailablePolicy.values.byName(
-      json['unavailablePolicy'] as String? ?? 'remind',
+      json['unavailablePolicy'] as String? ?? 'skip',
     ),
     notify: json['notify'] != false,
     showPreview: json['showPreview'] != false,
@@ -180,6 +195,7 @@ class ScheduledTask {
     'startDate': dateKey(startDate),
     'endDate': dateKey(endDate),
     'allowPreparation': allowPreparation,
+    'preparationPrompt': preparationPrompt,
     'contextPolicy': contextPolicy.name,
     'unavailablePolicy': unavailablePolicy.name,
     'notify': notify,

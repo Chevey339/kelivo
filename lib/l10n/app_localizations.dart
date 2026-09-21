@@ -21570,7 +21570,7 @@ abstract class AppLocalizations {
   /// No description provided for @scheduledTasksPreparationCost.
   ///
   /// In en, this message translates to:
-  /// **'Preparation calls the model and may cost extra. With “Follow latest conversation”, new messages can invalidate a prepared result. Unused or cancelled output may still be billed, and preparing again makes another model request.'**
+  /// **'Preparation calls the model and may cost extra. With “Follow latest conversation”, new messages before the due time can invalidate a prepared result. Unused or cancelled output may still be billed, and preparing again makes another model request.'**
   String get scheduledTasksPreparationCost;
 
   /// No description provided for @scheduledTasksAllowPreparationTip.
@@ -21582,7 +21582,7 @@ abstract class AppLocalizations {
   /// No description provided for @scheduledTasksContextPolicyTip.
   ///
   /// In en, this message translates to:
-  /// **'Follow latest conversation: new messages, edits or switching message versions invalidate the prepared result; preparing again uses another attempt and may cost extra.\n\nUse preparation snapshot: keep the prepared result even if the conversation changes. It will not reflect later messages.'**
+  /// **'Follow latest conversation: before the task is due, new messages, edits or switching message versions invalidate the prepared result; preparing again uses another attempt and may cost extra. Once due, the saved notification result is added to the chat unchanged.\n\nUse preparation snapshot: keep the prepared result even if the conversation changes. It will not reflect later messages.'**
   String get scheduledTasksContextPolicyTip;
 
   /// No description provided for @scheduledTasksPreparationWindowTip.
@@ -21632,6 +21632,141 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'{count, plural, =1{1 minute} other{{count} minutes}}'**
   String scheduledTasksMinutes(int count);
+
+  /// No description provided for @scheduledTasksPreparationOff.
+  ///
+  /// In en, this message translates to:
+  /// **'Preparation off'**
+  String get scheduledTasksPreparationOff;
+
+  /// No description provided for @scheduledTasksPreparationQueued.
+  ///
+  /// In en, this message translates to:
+  /// **'Queued'**
+  String get scheduledTasksPreparationQueued;
+
+  /// No description provided for @scheduledTasksPreparationQueuedDetail.
+  ///
+  /// In en, this message translates to:
+  /// **'Another task is being prepared. Eligible tasks continue in due-time order.'**
+  String get scheduledTasksPreparationQueuedDetail;
+
+  /// No description provided for @scheduledTasksPreparationIdle.
+  ///
+  /// In en, this message translates to:
+  /// **'Waiting for chat'**
+  String get scheduledTasksPreparationIdle;
+
+  /// No description provided for @scheduledTasksPreparationIdleDetail.
+  ///
+  /// In en, this message translates to:
+  /// **'Preparation resumes after active replies finish and this task’s context settles.'**
+  String get scheduledTasksPreparationIdleDetail;
+
+  /// No description provided for @scheduledTasksPreparationWindowWaiting.
+  ///
+  /// In en, this message translates to:
+  /// **'Outside preparation window'**
+  String get scheduledTasksPreparationWindowWaiting;
+
+  /// No description provided for @scheduledTasksPreparationCooldownWaiting.
+  ///
+  /// In en, this message translates to:
+  /// **'Waiting to retry'**
+  String get scheduledTasksPreparationCooldownWaiting;
+
+  /// No description provided for @scheduledTasksPreparationRetryAt.
+  ///
+  /// In en, this message translates to:
+  /// **'Can retry after {time}'**
+  String scheduledTasksPreparationRetryAt(String time);
+
+  /// No description provided for @scheduledTasksPreparationLimitReached.
+  ///
+  /// In en, this message translates to:
+  /// **'Attempt limit reached'**
+  String get scheduledTasksPreparationLimitReached;
+
+  /// No description provided for @scheduledTasksPreparationAttemptsUsed.
+  ///
+  /// In en, this message translates to:
+  /// **'Used {count}/{limit} attempts for this occurrence. You can adjust the limit in task settings.'**
+  String scheduledTasksPreparationAttemptsUsed(int count, int limit);
+
+  /// No description provided for @scheduledTasksPreparationHourlyLimit.
+  ///
+  /// In en, this message translates to:
+  /// **'Hourly limit reached'**
+  String get scheduledTasksPreparationHourlyLimit;
+
+  /// No description provided for @scheduledTasksPreparationHourlyLimitDetail.
+  ///
+  /// In en, this message translates to:
+  /// **'The hourly preparation limit has been reached. Pending tasks resume when capacity is available.'**
+  String get scheduledTasksPreparationHourlyLimitDetail;
+
+  /// No description provided for @scheduledTasksPreparationUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'Preparation unavailable'**
+  String get scheduledTasksPreparationUnavailable;
+
+  /// No description provided for @scheduledTasksPreparationReadFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not read task context. It will be checked again shortly; see execution history for details.'**
+  String get scheduledTasksPreparationReadFailed;
+
+  /// No description provided for @scheduledTasksPreparationResultRetained.
+  ///
+  /// In en, this message translates to:
+  /// **'Context could not be checked. The prepared result is retained and will be checked again.'**
+  String get scheduledTasksPreparationResultRetained;
+
+  /// No description provided for @scheduledTasksPreparationContextChanged.
+  ///
+  /// In en, this message translates to:
+  /// **'The conversation or task context changed, so the earlier result was discarded.'**
+  String get scheduledTasksPreparationContextChanged;
+
+  /// No description provided for @scheduledTasksPreparationPublishing.
+  ///
+  /// In en, this message translates to:
+  /// **'Waiting to add to chat'**
+  String get scheduledTasksPreparationPublishing;
+
+  /// No description provided for @scheduledTasksPreparationPublishingDetail.
+  ///
+  /// In en, this message translates to:
+  /// **'The saved result will be added to the conversation when the current reply finishes.'**
+  String get scheduledTasksPreparationPublishingDetail;
+
+  /// No description provided for @scheduledTasksPreparationPrompt.
+  ///
+  /// In en, this message translates to:
+  /// **'Preparation prompt'**
+  String get scheduledTasksPreparationPrompt;
+
+  /// No description provided for @scheduledTasksPreparationPromptTip.
+  ///
+  /// In en, this message translates to:
+  /// **'Extra system instructions used only when preparing this task in advance, separate from the task instructions. You can change the style or remove these instructions entirely. Tools and live information remain unavailable. Editing this prompt invalidates any result prepared before the due time; preparing it again may incur another model charge.'**
+  String get scheduledTasksPreparationPromptTip;
+
+  /// No description provided for @scheduledTasksPreparationPromptEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'Leave empty to add no preparation instructions'**
+  String get scheduledTasksPreparationPromptEmpty;
+
+  /// No description provided for @scheduledTasksPreparationPromptVariables.
+  ///
+  /// In en, this message translates to:
+  /// **'Placeholders: {timeVariable} is the planned local delivery time; {offsetVariable} is its UTC offset. These are replaced when preparing the result.'**
+  String scheduledTasksPreparationPromptVariables(
+    String timeVariable,
+    String offsetVariable,
+  );
 }
 
 class _AppLocalizationsDelegate

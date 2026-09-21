@@ -55,7 +55,10 @@ class _Notifications implements ScheduledTaskNotifications {
 class _Preparation extends ScheduledTaskPreparation {
   String context = 'v1';
   bool busy = false, missing = false;
+  bool revisionFails = false;
+  final revisionFailures = <String>{};
   int calls = 0;
+  final preparedTasks = <String>[];
   Completer<void>? gate;
   ScheduledRunCancellation? cancellation;
   final published = <String, String>{};
@@ -63,6 +66,9 @@ class _Preparation extends ScheduledTaskPreparation {
   bool isBusy(ScheduledTask task) => busy;
   @override
   Future<String> revision(ScheduledTask task) async {
+    if (revisionFails || revisionFailures.contains(task.id)) {
+      throw StateError('database_busy');
+    }
     if (missing) throw StateError('conversation_missing');
     return context;
   }
@@ -74,6 +80,7 @@ class _Preparation extends ScheduledTaskPreparation {
     ScheduledRunCancellation cancellation,
   ) async {
     calls++;
+    preparedTasks.add(task.id);
     this.cancellation = cancellation;
     final original = context;
     await gate?.future;
@@ -183,6 +190,246 @@ void main() {
     scheduler.dispose();
   });
 
+  test(
+    'finishing one request drains earlier queued tasks without another trigger',
+    () async {
+      preparation.gate = Completer<void>();
+      await scheduler.save(
+        ScheduledTask.fromJson({...task(id: 'eleven').toJson(), 'hour': 11}),
+      );
+      await Future<void>.delayed(const Duration(milliseconds: 10));
+      await scheduler.save(
+        ScheduledTask.fromJson({...task(id: 'ten').toJson(), 'hour': 10}),
+      );
+      await scheduler.save(
+        ScheduledTask.fromJson({...task(id: 'eight').toJson(), 'hour': 8}),
+      );
+      expect(preparation.calls, 1);
+      expect(
+        scheduler.preparationStatus(
+          scheduler.tasks.firstWhere((t) => t.id == 'eleven'),
+        ),
+        ScheduledTaskPreparationStatus.preparing,
+      );
+      expect(
+        scheduler.preparationStatus(
+          scheduler.tasks.firstWhere((t) => t.id == 'eight'),
+        ),
+        ScheduledTaskPreparationStatus.queued,
+      );
+      preparation.gate!.complete();
+      for (var i = 0; i < 100 && preparation.calls < 3; i++) {
+        await Future<void>.delayed(const Duration(milliseconds: 5));
+      }
+      await settle();
+      expect(preparation.preparedTasks, ['eleven', 'eight', 'ten']);
+      expect(
+        scheduler.tasks.every((t) => t.runs.first.status == 'prepared'),
+        isTrue,
+      );
+      expect(
+        scheduler.tasks.map(scheduler.preparationStatus),
+        everyElement(ScheduledTaskPreparationStatus.prepared),
+      );
+    },
+  );
+
+  test(
+    'unrelated activity does not keep postponing an eligible queued task',
+    () async {
+      preparation.busy = true;
+      await scheduler.save(task());
+      expect(
+        scheduler.preparationStatus(scheduler.tasks.single),
+        ScheduledTaskPreparationStatus.waitingForChat,
+      );
+      preparation.busy = false;
+      for (var i = 0; i < 3; i++) {
+        await scheduler.activityChanged();
+        await Future<void>.delayed(const Duration(milliseconds: 400));
+      }
+      await settle();
+      expect(preparation.calls, 1);
+      expect(run().status, 'prepared');
+    },
+  );
+
+  test(
+    'a transient context read failure preserves prepared content and reports its cause',
+    () async {
+      await scheduler.save(task());
+      await settle();
+      final id = run().id;
+      preparation.revisionFails = true;
+      await scheduler.activityChanged();
+      expect(run().status, 'prepared');
+      expect(run().error, contains('database_busy'));
+      expect(notifications.pendingBodies[id], 'reply v1');
+      expect(store.payload(await store.readResults(), id)?.text, 'reply v1');
+      preparation.revisionFails = false;
+      await scheduler.activityChanged();
+      expect(run().error, isNull);
+      expect(preparation.calls, 1);
+    },
+  );
+
+  for (final change in [
+    {'showPreview': false},
+    {'notify': false},
+  ]) {
+    test(
+      'notification privacy still applies when context reads fail: $change',
+      () async {
+        await scheduler.save(task(once: true));
+        await settle();
+        final before = run();
+        expect(notifications.pendingBodies[before.id], 'reply v1');
+        preparation.revisionFails = true;
+        await scheduler.save(
+          ScheduledTask.fromJson({
+            ...scheduler.tasks.single.toJson(),
+            ...change,
+          }),
+        );
+        final expectedBody = change['notify'] == false ? null : 'hidden';
+        expect(notifications.pendingBodies[before.id], expectedBody);
+        expect(run().status, 'prepared');
+        expect(run().error, contains('database_busy'));
+        expect(run().prepareAttempts, before.prepareAttempts);
+        expect(
+          store.payload(await store.readResults(), before.id)?.text,
+          'reply v1',
+        );
+
+        now = now.add(const Duration(seconds: 31));
+        preparation.revisionFails = false;
+        await scheduler.check(validateContext: false);
+        expect(run().error, isNull);
+        expect(notifications.pendingBodies[before.id], expectedBody);
+        now = before.scheduledFor!;
+        await scheduler.check();
+        expect(preparation.published, {'${before.id}:result': 'reply v1'});
+        expect(preparation.calls, 1);
+      },
+    );
+  }
+
+  for (final change in ['context', 'read failure']) {
+    test(
+      'a due prepared result is published unchanged after $change on resume',
+      () async {
+        await scheduler.save(task(once: true));
+        await settle();
+        final id = run().id;
+        await scheduler.lifecycle(false);
+        now = DateTime(2026, 9, 20, 10);
+        if (change == 'context') preparation.context = 'v2';
+        if (change == 'read failure') preparation.revisionFails = true;
+        await scheduler.lifecycle(true);
+        expect(run().status, 'completed');
+        expect(preparation.published, {'$id:result': 'reply v1'});
+        expect(preparation.calls, 1);
+        await scheduler.check();
+        expect(preparation.published, hasLength(1));
+      },
+    );
+  }
+
+  test(
+    'context checks that fail before generation are visible without spending attempts',
+    () async {
+      preparation.revisionFails = true;
+      await scheduler.save(task());
+      expect(run().status, 'pending');
+      expect(run().error, contains('database_busy'));
+      expect(run().prepareAttempts, 0);
+      expect(preparation.calls, 0);
+      expect(
+        scheduler.preparationStatus(scheduler.tasks.single),
+        ScheduledTaskPreparationStatus.unavailable,
+      );
+    },
+  );
+
+  test(
+    'a failed earlier preflight does not block later tasks and retries after 30 seconds',
+    () async {
+      preparation.revisionFailures.add('eight');
+      await scheduler.save(
+        ScheduledTask.fromJson({...task(id: 'eight').toJson(), 'hour': 8}),
+      );
+      await scheduler.save(
+        ScheduledTask.fromJson({...task(id: 'eleven').toJson(), 'hour': 11}),
+      );
+      await settle();
+      expect(preparation.preparedTasks, ['eleven']);
+      preparation.revisionFailures.clear();
+      now = now.add(const Duration(seconds: 29));
+      await scheduler.check(prepare: true, validateContext: false);
+      expect(preparation.calls, 1);
+      now = now.add(const Duration(seconds: 1));
+      await scheduler.check(prepare: true, validateContext: false);
+      await settle();
+      expect(preparation.preparedTasks, ['eleven', 'eight']);
+    },
+  );
+
+  test(
+    'editing the preparation prompt invalidates the result while retaining its budget',
+    () async {
+      await scheduler.save(task());
+      await settle();
+      final id = run().id;
+      await scheduler.save(
+        ScheduledTask.fromJson({
+          ...scheduler.tasks.single.toJson(),
+          'preparationPrompt': '只输出一句自然的问候',
+        }),
+      );
+      expect(run().id, id);
+      expect(run().payloadId, isNull);
+      expect(run().prepareAttempts, 1);
+      expect(
+        scheduler.preparationStatus(scheduler.tasks.single),
+        ScheduledTaskPreparationStatus.cooldown,
+      );
+      expect(store.payload(await store.readResults(), id), isNull);
+      expect(notifications.pendingBodies[id], 'reminder');
+      now = now.add(const Duration(minutes: 10));
+      await scheduler.check(prepare: true);
+      await settle();
+      expect(preparation.calls, 2);
+      expect(run().prepareAttempts, 2);
+      expect(run().status, 'prepared');
+      preparation.context = 'v2';
+      await scheduler.activityChanged();
+      expect(
+        scheduler.preparationStatus(scheduler.tasks.single),
+        ScheduledTaskPreparationStatus.attemptsExhausted,
+      );
+    },
+  );
+
+  test(
+    'stopping the scheduler prevents a finishing request from draining the queue',
+    () async {
+      preparation.gate = Completer<void>();
+      await scheduler.save(task(id: 'first'));
+      await Future<void>.delayed(const Duration(milliseconds: 10));
+      await scheduler.save(task(id: 'second'));
+      scheduler.stop();
+      preparation.gate!.complete();
+      await settle();
+      expect(preparation.preparedTasks, ['first']);
+      expect(
+        scheduler.tasks
+            .expand((t) => t.runs)
+            .where((r) => r.status == 'prepared'),
+        isEmpty,
+      );
+    },
+  );
+
   for (final trigger in ['activity', 'resume', 'privacy']) {
     for (final policy in ScheduledTaskUnavailablePolicy.values) {
       test(
@@ -272,6 +519,10 @@ void main() {
       await settle();
       expect(preparation.calls, 0);
       expect(run().status, 'pending');
+      expect(
+        scheduler.preparationStatus(scheduler.tasks.single),
+        ScheduledTaskPreparationStatus.outsideWindow,
+      );
 
       now = DateTime(2026, 9, 19, 8);
       await scheduler.check(prepare: true);
@@ -751,6 +1002,12 @@ void main() {
         await settle();
       }
       expect(preparation.calls, 6);
+      expect(
+        scheduler.tasks
+            .where((t) => t.runs.first.status == 'pending')
+            .map(scheduler.preparationStatus),
+        everyElement(ScheduledTaskPreparationStatus.hourlyLimit),
+      );
       expect(
         scheduler.tasks
             .expand((t) => t.runs)

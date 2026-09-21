@@ -17,9 +17,14 @@ class ScheduledTaskTile extends StatelessWidget {
     required this.onChanged,
     required this.onTap,
     this.running = false,
+    this.preparationLabel,
+    this.preparationDetail,
+    this.prepared = false,
   });
   final String name, time, repeat, detail;
   final bool enabled, running;
+  final String? preparationLabel, preparationDetail;
+  final bool prepared;
   final ValueChanged<bool> onChanged;
   final VoidCallback onTap;
 
@@ -92,10 +97,74 @@ class ScheduledTaskTile extends StatelessWidget {
           const IosRowDivider(indent: 16),
           IosNavRow(
             label: detail,
+            labelTrailing: preparationLabel == null
+                ? null
+                : Padding(
+                    padding: const EdgeInsets.only(left: 8),
+                    child: ConstrainedBox(
+                      constraints: BoxConstraints(
+                        maxWidth: MediaQuery.sizeOf(context).width * .34,
+                      ),
+                      child: DecoratedBox(
+                        key: const ValueKey(
+                          'scheduled-task-preparation-status',
+                        ),
+                        decoration: BoxDecoration(
+                          color: prepared
+                              ? cs.primary.withValues(alpha: .1)
+                              : cs.onSurface.withValues(alpha: .06),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 5,
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              if (prepared) ...[
+                                Icon(
+                                  LucideIcons.check,
+                                  size: 13,
+                                  color: cs.primary,
+                                ),
+                                const SizedBox(width: 4),
+                              ],
+                              Flexible(
+                                child: Text(
+                                  preparationLabel!,
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w500,
+                                    color: prepared
+                                        ? cs.primary
+                                        : cs.onSurface.withValues(alpha: .65),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
             icon: running ? LucideIcons.loader : LucideIcons.clock,
             onTap: onTap,
             labelWeight: FontWeight.w400,
           ),
+          if (preparationDetail != null)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+              child: Text(
+                preparationDetail!,
+                style: TextStyle(
+                  fontSize: 12,
+                  height: 1.4,
+                  color: cs.onSurface.withValues(alpha: .55),
+                ),
+              ),
+            ),
         ],
       ),
     );
@@ -119,6 +188,8 @@ Widget scheduledTaskPreview() => Padding(
     time: '08:00',
     repeat: '每天',
     detail: '下次：明天 08:00',
+    preparationLabel: '结果已准备',
+    prepared: true,
     enabled: true,
     onChanged: (_) {},
     onTap: () {},

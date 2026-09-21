@@ -39,7 +39,9 @@ class PreparedScheduledTasks extends ChangeNotifier {
   bool loaded = false, foreground = true, _disposed = false;
   String? error;
   Timer? _timer;
-  DateTime? _lastActivity;
+  final _invalidatedAt = <String, DateTime>{};
+  final _contextRetryAt = <String, DateTime>{};
+  Map<String, ScheduledTaskPreparationStatus> _preparationStatuses = {};
   Duration? _offset;
   String? _preparingId;
   ScheduledRunCancellation? _cancellation;
@@ -108,11 +110,7 @@ class PreparedScheduledTasks extends ChangeNotifier {
     _timer = Timer.periodic(const Duration(seconds: 1), (_) {
       unawaited(
         check(
-          prepare:
-              foreground &&
-              (_lastActivity == null ||
-                  _now().difference(_lastActivity!) >=
-                      const Duration(seconds: 45)),
+          prepare: foreground,
           executeDue: foreground,
           validateContext: false,
         ).catchError(_recordError),
@@ -132,7 +130,6 @@ class PreparedScheduledTasks extends ChangeNotifier {
   }
 
   Future<void> activityChanged() async {
-    _lastActivity = _now();
     await check();
   }
 
@@ -147,6 +144,93 @@ class PreparedScheduledTasks extends ChangeNotifier {
       tasks.expand((t) => t.runs).where((r) => r.id == id).firstOrNull;
   ScheduledTaskPayload? _payload(String id) =>
       _run(id)?.payloadId == id ? _store.payload(_results, id) : null;
+
+  ScheduledTaskPreparationStatus preparationStatus(ScheduledTask task) {
+    if (!task.enabled || !task.canPrepare) {
+      return ScheduledTaskPreparationStatus.disabled;
+    }
+    final run = task.runs.where((r) => r.awaitingPublication).firstOrNull;
+    if (run == null) return ScheduledTaskPreparationStatus.waiting;
+    if (_payload(run.id) != null) {
+      return run.scheduledFor!.isAfter(_now())
+          ? ScheduledTaskPreparationStatus.prepared
+          : ScheduledTaskPreparationStatus.awaitingPublication;
+    }
+    if (run.status == 'preparing') {
+      return ScheduledTaskPreparationStatus.preparing;
+    }
+    return _preparationBlocker(task, run, _now()) ??
+        (run.error == null
+            ? ScheduledTaskPreparationStatus.waiting
+            : ScheduledTaskPreparationStatus.unavailable);
+  }
+
+  ScheduledTaskPreparationStatus? _preparationBlocker(
+    ScheduledTask task,
+    ScheduledTaskRun run,
+    DateTime now,
+  ) {
+    if (run.scheduledFor!.difference(now) >
+        Duration(minutes: task.preparationWindowMinutes)) {
+      return ScheduledTaskPreparationStatus.outsideWindow;
+    }
+    if (run.prepareAttempts >= task.maxPrepareAttempts) {
+      return ScheduledTaskPreparationStatus.attemptsExhausted;
+    }
+    if (run.lastPrepareAt != null &&
+        now.difference(run.lastPrepareAt!) <
+            Duration(minutes: task.preparationCooldownMinutes)) {
+      return ScheduledTaskPreparationStatus.cooldown;
+    }
+    if (List<int>.from(_results['attempts'] as List? ?? [])
+            .where(
+              (time) =>
+                  now.millisecondsSinceEpoch - time <
+                  const Duration(hours: 1).inMilliseconds,
+            )
+            .length >=
+        6) {
+      return ScheduledTaskPreparationStatus.hourlyLimit;
+    }
+    if (preparation == null ||
+        _onRun == null ||
+        _contextRetryAt[run.id]?.isAfter(now) == true) {
+      return ScheduledTaskPreparationStatus.unavailable;
+    }
+    if (preparation!.isBusy(task)) {
+      return ScheduledTaskPreparationStatus.waitingForChat;
+    }
+    if (_preparingId != null) return ScheduledTaskPreparationStatus.queued;
+    final invalidated = _invalidatedAt[run.id];
+    if (invalidated != null &&
+        now.difference(invalidated) < const Duration(seconds: 45)) {
+      return ScheduledTaskPreparationStatus.waitingForChat;
+    }
+    return null;
+  }
+
+  void _notifyPreparationStateChanges() {
+    if (_disposed) return;
+    final liveRuns = {
+      for (final task in tasks)
+        for (final run in task.runs)
+          if (run.awaitingPublication) run.id,
+    };
+    _invalidatedAt.removeWhere((id, _) => !liveRuns.contains(id));
+    _contextRetryAt.removeWhere((id, _) => !liveRuns.contains(id));
+    final next = {for (final task in tasks) task.id: preparationStatus(task)};
+    if (next.length == _preparationStatuses.length &&
+        next.entries.every((e) => _preparationStatuses[e.key] == e.value)) {
+      return;
+    }
+    _preparationStatuses = next;
+    notifyListeners();
+  }
+
+  void _setRunError(ScheduledTask task, ScheduledTaskRun run, String? error) {
+    if (run.error == error) return;
+    _replaceRun(task.id, run.update({'error': error}));
+  }
 
   Future<void> _commit() async {
     try {
@@ -221,16 +305,22 @@ class PreparedScheduledTasks extends ChangeNotifier {
     });
   }
 
-  Future<void> _invalidate(ScheduledTask task, ScheduledTaskRun run) async {
+  Future<void> _invalidate(
+    ScheduledTask task,
+    ScheduledTaskRun run, {
+    String error = 'preparation_context_changed',
+  }) async {
     await _cancelNotification(run.id);
     if (_preparingId == run.id) await _cancellation?.cancel();
     await _removePayload(run.id);
+    _invalidatedAt[run.id] = _now();
     var invalid = run.update({
       'status': 'pending',
       'payloadId': null,
       'contextRevision': null,
       'preparedAt': null,
       'notificationState': 'none',
+      'error': error,
     });
     if (run.scheduledFor!.isAfter(_now()) && task.enabled) {
       invalid = await _register(task, invalid, null);
@@ -384,249 +474,290 @@ class PreparedScheduledTasks extends ChangeNotifier {
     bool executeDue = false,
     bool validateContext = true,
     bool retryNotifications = false,
-  }) => _store.runExclusive(() async {
-    if (!loaded || _disposed || preparation == null) return;
-    final now = _now();
-    final before = tasks;
-    if (_offset != now.timeZoneOffset) {
-      _offset = now.timeZoneOffset;
-      _results = {..._results, 'timeZoneOffsetMinutes': _offset!.inMinutes};
-      await _store.writeResults(_results);
-      for (final task in tasks.toList()) {
-        for (final run in task.runs.where(
-          (r) => r.awaitingPublication && r.scheduledFor!.isAfter(now),
-        )) {
-          await _cancelNotification(run.id);
-          if (_preparingId == run.id) await _cancellation?.cancel();
-          await _removePayload(run.id);
-          _replaceRun(
-            task.id,
-            run.update({
-              'status': 'cancelled',
-              'payloadId': null,
-              'notificationState': 'none',
-            }),
-          );
-        }
-        _replace(
-          _task(task.id)!.withState(
-            nextRunAt: null,
-            scheduleRevision: task.scheduleRevision + 1,
-          ),
-        );
-      }
-    }
-    // Reconcile due results before arming a new occurrence or preparing content.
-    for (final original in tasks.toList()) {
-      var task = _task(original.id)!;
-      for (final originalRun
-          in task.runs.where((r) => r.awaitingPublication).toList()) {
-        var run = _run(originalRun.id)!;
-        if (!task.enabled) continue;
-        var payload = _payload(run.id);
-        final future = run.scheduledFor!.isAfter(now);
-        if ((validateContext || !future) &&
-            run.status != 'publishing' &&
-            (run.contextRevision != null || payload != null)) {
-          String? current;
-          try {
-            current = await preparation!.revision(task);
-          } catch (_) {}
-          // Target existence and task revision are checked even in snapshot mode.
-          final invalid =
-              current == null ||
-              run.taskRevision != task.revision ||
-              run.contextRevision != null &&
-                  !preparation!.sameConfiguration(
-                    run.contextRevision!,
-                    current,
-                  ) ||
-              task.contextPolicy == ScheduledTaskContextPolicy.latest &&
-                  current != run.contextRevision;
-          if (invalid) {
-            await _invalidate(task, run);
-            run = _run(run.id)!;
-            payload = null;
-          }
-        }
-        if (future) {
-          if (retryNotifications ||
-              run.notificationState == 'none' ||
-              !_pendingNotifications.contains(run.id) &&
-                  (run.notificationState != 'unavailable' ||
-                      retryNotifications)) {
-            _replaceRun(task.id, await _register(task, run, payload));
-          }
-          continue;
-        }
-        if (run.status == 'preparing') {
-          await _cancellation?.cancel();
-          _replaceRun(task.id, run.update({'status': 'pending'}));
-          run = _run(run.id)!;
-        }
-        if (preparation!.isBusy(task)) continue;
-        if (payload != null) {
-          // Durable publication intent survives a crash between chat commit and
-          // history update. The publisher uses stable message IDs transactionally.
-          _replaceRun(task.id, run.update({'status': 'publishing'}));
-          await _commit();
-          try {
-            final conversationId = await preparation!.publish(
-              task,
-              run,
-              payload,
-            );
-            _replaceRun(
-              task.id,
-              run.update({
-                'status': 'completed',
-                'conversationId': conversationId,
-                'preview': payload.text.characters.take(200).toString(),
-                'payloadId': null,
-                'error': null,
-              }),
-            );
-          } catch (e) {
-            if (e is StateError &&
-                (e.message == 'conversation_missing' ||
-                    e.message == 'scheduled_context_changed')) {
+  }) => _store
+      .runExclusive(() async {
+        if (!loaded || _disposed || preparation == null) return;
+        final now = _now();
+        final before = tasks;
+        if (_offset != now.timeZoneOffset) {
+          _offset = now.timeZoneOffset;
+          _results = {..._results, 'timeZoneOffsetMinutes': _offset!.inMinutes};
+          await _store.writeResults(_results);
+          for (final task in tasks.toList()) {
+            for (final run in task.runs.where(
+              (r) => r.awaitingPublication && r.scheduledFor!.isAfter(now),
+            )) {
+              await _cancelNotification(run.id);
+              if (_preparingId == run.id) await _cancellation?.cancel();
+              await _removePayload(run.id);
               _replaceRun(
                 task.id,
                 run.update({
-                  'status': 'failed',
+                  'status': 'cancelled',
                   'payloadId': null,
-                  'error': e.toString(),
+                  'notificationState': 'none',
                 }),
               );
+            }
+            _replace(
+              _task(task.id)!.withState(
+                nextRunAt: null,
+                scheduleRevision: task.scheduleRevision + 1,
+              ),
+            );
+          }
+        }
+        // Reconcile due results before arming a new occurrence or preparing content.
+        for (final original in tasks.toList()) {
+          var task = _task(original.id)!;
+          for (final originalRun
+              in task.runs.where((r) => r.awaitingPublication).toList()) {
+            var run = _run(originalRun.id)!;
+            if (!task.enabled) continue;
+            var payload = _payload(run.id);
+            final future = run.scheduledFor!.isAfter(now);
+            // Once due, this is the result already handed to the system for
+            // delivery. Later context/config changes must not erase that result.
+            final retryContext =
+                run.error?.startsWith('preparation_context_unavailable:') ==
+                    true &&
+                _contextRetryAt[run.id]?.isAfter(now) != true;
+            if (future &&
+                (validateContext || retryContext) &&
+                run.status != 'publishing' &&
+                (run.contextRevision != null || payload != null)) {
+              String? current;
+              try {
+                current = await preparation!.revision(task);
+              } catch (e) {
+                if (e is StateError &&
+                    const {
+                      'assistant_missing',
+                      'conversation_missing',
+                      'model_missing',
+                    }.contains(e.message)) {
+                  await _invalidate(task, run, error: e.toString());
+                } else {
+                  // A failed read proves nothing about freshness. Keep the saved
+                  // output and make the failure visible instead of deleting it.
+                  _contextRetryAt[run.id] = now.add(
+                    const Duration(seconds: 30),
+                  );
+                  _setRunError(
+                    task,
+                    run,
+                    'preparation_context_unavailable: $e',
+                  );
+                }
+              }
+              if (current != null) {
+                // Target existence and task revision are checked even in snapshot mode.
+                final invalid =
+                    run.taskRevision != task.revision ||
+                    run.contextRevision != null &&
+                        !preparation!.sameConfiguration(
+                          run.contextRevision!,
+                          current,
+                        ) ||
+                    task.contextPolicy == ScheduledTaskContextPolicy.latest &&
+                        current != run.contextRevision;
+                if (invalid) {
+                  await _invalidate(task, run);
+                } else if (run.error?.startsWith(
+                      'preparation_context_unavailable:',
+                    ) ==
+                    true) {
+                  _contextRetryAt.remove(run.id);
+                  _setRunError(task, run, null);
+                }
+              }
+              // Freshness reads must not gate notification privacy/cancellation.
+              // Use the updated run so registration also preserves read errors.
+              run = _run(run.id)!;
+              payload = _payload(run.id);
+            }
+            if (future) {
+              if (retryNotifications ||
+                  run.notificationState == 'none' ||
+                  !_pendingNotifications.contains(run.id) &&
+                      (run.notificationState != 'unavailable' ||
+                          retryNotifications)) {
+                _replaceRun(task.id, await _register(task, run, payload));
+              }
+              continue;
+            }
+            if (run.status == 'preparing') {
+              await _cancellation?.cancel();
+              _replaceRun(task.id, run.update({'status': 'pending'}));
+              run = _run(run.id)!;
+            }
+            if (preparation!.isBusy(task)) continue;
+            if (payload != null) {
+              // Durable publication intent survives a crash between chat commit and
+              // history update. The publisher uses stable message IDs transactionally.
+              _replaceRun(task.id, run.update({'status': 'publishing'}));
+              await _commit();
+              try {
+                final conversationId = await preparation!.publish(
+                  task,
+                  run,
+                  payload,
+                );
+                _replaceRun(
+                  task.id,
+                  run.update({
+                    'status': 'completed',
+                    'conversationId': conversationId,
+                    'preview': payload.text.characters.take(200).toString(),
+                    'payloadId': null,
+                    'error': null,
+                  }),
+                );
+              } catch (e) {
+                if (e is StateError &&
+                    (e.message == 'assistant_missing' ||
+                        e.message == 'conversation_missing' ||
+                        e.message == 'scheduled_context_changed')) {
+                  _replaceRun(
+                    task.id,
+                    run.update({
+                      'status': 'failed',
+                      'payloadId': null,
+                      'error': e.toString(),
+                    }),
+                  );
+                } else {
+                  rethrow;
+                }
+              }
+              await _commit();
+              await _removePayload(run.id);
+            } else if (foreground &&
+                _onRun != null &&
+                now.difference(run.scheduledFor!) <
+                    const Duration(seconds: 30) &&
+                !task.running) {
+              // Lifecycle and context checks must not consume the timer's chance
+              // to execute a due foreground task during its execution window.
+              if (!executeDue) continue;
+              await _cancelNotification(run.id);
+              _replaceRun(
+                task.id,
+                run.update({
+                  'status': 'running',
+                  'startedAt': now.millisecondsSinceEpoch,
+                }),
+              );
+              await _commit();
+              _onRun!(run.id, _task(task.id)!);
             } else {
-              rethrow;
+              _replaceRun(
+                task.id,
+                run.update({
+                  'status':
+                      task.notify &&
+                          task.unavailablePolicy ==
+                              ScheduledTaskUnavailablePolicy.remind
+                      ? 'reminded'
+                      : 'skipped',
+                }),
+              );
+            }
+            task = _task(task.id)!;
+          }
+          task = _task(task.id)!;
+          if (!task.enabled) continue;
+          if (task.runs.any((r) => r.awaitingPublication)) continue;
+          final next = nextScheduledTaskRun(task, now);
+          _replace(
+            task.withState(
+              nextRunAt: next,
+              enabled: next != null,
+              exhausted: next == null,
+            ),
+          );
+          if (next != null) {
+            task = _task(task.id)!;
+            final id =
+                'scheduled:${task.id}:${task.scheduleRevision}:${next.millisecondsSinceEpoch}';
+            if (!task.runs.any((r) => r.id == id)) {
+              var run = ScheduledTaskRun(
+                id: id,
+                status: 'pending',
+                scheduledFor: next,
+                taskRevision: task.revision,
+              );
+              run = await _register(task, run, null);
+              _replaceRun(task.id, run);
             }
           }
-          await _commit();
-          await _removePayload(run.id);
-        } else if (foreground &&
-            _onRun != null &&
-            now.difference(run.scheduledFor!) < const Duration(seconds: 30) &&
-            !task.running) {
-          // Lifecycle and context checks must not consume the timer's chance
-          // to execute a due foreground task during its execution window.
-          if (!executeDue) continue;
-          await _cancelNotification(run.id);
-          _replaceRun(
-            task.id,
-            run.update({
-              'status': 'running',
-              'startedAt': now.millisecondsSinceEpoch,
-            }),
-          );
-          await _commit();
-          _onRun!(run.id, _task(task.id)!);
-        } else {
-          _replaceRun(
-            task.id,
-            run.update({
-              'status':
-                  task.notify &&
-                      task.unavailablePolicy ==
-                          ScheduledTaskUnavailablePolicy.remind
-                  ? 'reminded'
-                  : 'skipped',
-            }),
-          );
         }
-        task = _task(task.id)!;
-      }
-      task = _task(task.id)!;
-      if (!task.enabled) continue;
-      if (task.runs.any((r) => r.awaitingPublication)) continue;
-      final next = nextScheduledTaskRun(task, now);
-      _replace(
-        task.withState(
-          nextRunAt: next,
-          enabled: next != null,
-          exhausted: next == null,
-        ),
-      );
-      if (next != null) {
-        task = _task(task.id)!;
-        final id =
-            'scheduled:${task.id}:${task.scheduleRevision}:${next.millisecondsSinceEpoch}';
-        if (!task.runs.any((r) => r.id == id)) {
-          var run = ScheduledTaskRun(
-            id: id,
-            status: 'pending',
-            scheduledFor: next,
-            taskRevision: task.revision,
+        if (!identical(before, tasks)) await _commit();
+        if (!prepare || _preparingId != null || _onRun == null) return;
+        final attempts = List<int>.from(_results['attempts'] as List? ?? [])
+          ..removeWhere(
+            (time) =>
+                now.millisecondsSinceEpoch - time >=
+                const Duration(hours: 1).inMilliseconds,
           );
-          run = await _register(task, run, null);
-          _replaceRun(task.id, run);
+        // One global request at a time, at most six attempts/hour across all tasks.
+        if (attempts.length >= 6) return;
+        final candidates =
+            tasks
+                .where(
+                  (t) =>
+                      t.enabled &&
+                      t.canPrepare &&
+                      !t.running &&
+                      !preparation!.isBusy(t) &&
+                      t.nextRunAt != null,
+                )
+                .toList()
+              ..sort((a, b) => a.nextRunAt!.compareTo(b.nextRunAt!));
+        for (final task in candidates) {
+          final run = task.runs
+              .where(
+                (r) =>
+                    r.status == 'pending' && r.scheduledFor == task.nextRunAt,
+              )
+              .firstOrNull;
+          if (run == null ||
+              !run.scheduledFor!.isAfter(now) ||
+              _preparationBlocker(task, run, now) != null) {
+            continue;
+          }
+          String revision;
+          try {
+            revision = await preparation!.revision(task);
+          } catch (e) {
+            _contextRetryAt[run.id] = now.add(const Duration(seconds: 30));
+            _setRunError(task, run, 'preparation_context_unavailable: $e');
+            await _commit();
+            continue;
+          }
+          _contextRetryAt.remove(run.id);
+          _invalidatedAt.remove(run.id);
+          attempts.add(now.millisecondsSinceEpoch);
+          _results = {..._results, 'attempts': attempts};
+          await _store.writeResults(_results);
+          final preparing = run.update({
+            'status': 'preparing',
+            'startedAt': now.millisecondsSinceEpoch,
+            'lastPrepareAt': now.millisecondsSinceEpoch,
+            'prepareAttempts': run.prepareAttempts + 1,
+            'taskRevision': task.revision,
+            'contextRevision': revision,
+            'error': null,
+          });
+          _replaceRun(task.id, preparing);
+          await _commit();
+          _preparingId = run.id;
+          final cancellation = _cancellation = ScheduledRunCancellation();
+          unawaited(_prepare(task, preparing, cancellation));
+          break;
         }
-      }
-    }
-    if (!identical(before, tasks)) await _commit();
-    if (!prepare || _preparingId != null || _onRun == null) return;
-    final attempts = List<int>.from(_results['attempts'] as List? ?? [])
-      ..removeWhere(
-        (time) =>
-            now.millisecondsSinceEpoch - time >=
-            const Duration(hours: 1).inMilliseconds,
-      );
-    // One global request at a time, at most six attempts/hour across all tasks.
-    if (attempts.length >= 6) return;
-    final candidates =
-        tasks
-            .where(
-              (t) =>
-                  t.enabled &&
-                  t.canPrepare &&
-                  !t.running &&
-                  !preparation!.isBusy(t) &&
-                  t.nextRunAt != null,
-            )
-            .toList()
-          ..sort((a, b) => a.nextRunAt!.compareTo(b.nextRunAt!));
-    for (final task in candidates) {
-      final run = task.runs
-          .where(
-            (r) => r.status == 'pending' && r.scheduledFor == task.nextRunAt,
-          )
-          .firstOrNull;
-      if (run == null ||
-          !run.scheduledFor!.isAfter(now) ||
-          run.scheduledFor!.difference(now) >
-              Duration(minutes: task.preparationWindowMinutes) ||
-          run.prepareAttempts >= task.maxPrepareAttempts ||
-          run.lastPrepareAt != null &&
-              now.difference(run.lastPrepareAt!) <
-                  Duration(minutes: task.preparationCooldownMinutes)) {
-        continue;
-      }
-      String revision;
-      try {
-        revision = await preparation!.revision(task);
-      } catch (e) {
-        continue;
-      }
-      attempts.add(now.millisecondsSinceEpoch);
-      _results = {..._results, 'attempts': attempts};
-      await _store.writeResults(_results);
-      final preparing = run.update({
-        'status': 'preparing',
-        'startedAt': now.millisecondsSinceEpoch,
-        'lastPrepareAt': now.millisecondsSinceEpoch,
-        'prepareAttempts': run.prepareAttempts + 1,
-        'taskRevision': task.revision,
-        'contextRevision': revision,
-        'error': null,
-      });
-      _replaceRun(task.id, preparing);
-      await _commit();
-      _preparingId = run.id;
-      final cancellation = _cancellation = ScheduledRunCancellation();
-      unawaited(_prepare(task, preparing, cancellation));
-      break;
-    }
-  });
+      })
+      .whenComplete(_notifyPreparationStateChanges);
 
   Future<void> _prepare(
     ScheduledTask task,
@@ -717,6 +848,13 @@ class PreparedScheduledTasks extends ChangeNotifier {
       }
       _preparingId = null;
       _cancellation = null;
+      // A completed/failed request releases the slot for the next eligible
+      // occurrence immediately. A blocked earlier task cannot hold the queue.
+      if (!_disposed && foreground && _onRun != null) {
+        unawaited(
+          check(prepare: true, validateContext: false).catchError(_recordError),
+        );
+      }
     }
   }
 

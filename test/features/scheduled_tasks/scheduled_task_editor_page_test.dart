@@ -11,12 +11,14 @@ import 'package:Kelivo/core/providers/assistant_provider.dart';
 import 'package:Kelivo/core/providers/settings_provider.dart';
 import 'package:Kelivo/core/services/chat/chat_service.dart';
 import 'package:Kelivo/core/services/scheduled_tasks_service.dart';
+import 'package:Kelivo/core/services/scheduled_task_preparation.dart';
 import 'package:Kelivo/features/home/widgets/assistant_avatar.dart';
 import 'package:Kelivo/features/scheduled_tasks/pages/scheduled_task_editor_page.dart';
 import 'package:Kelivo/features/scheduled_tasks/pages/scheduled_tasks_page.dart';
 import 'package:Kelivo/features/settings/widgets/memory_ui.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
 import 'package:Kelivo/shared/widgets/ios_settings_rows.dart';
+import 'package:Kelivo/shared/widgets/ios_form_text_field.dart';
 import 'package:Kelivo/shared/widgets/ios_tactile.dart';
 import 'package:Kelivo/theme/palettes.dart';
 import 'package:Kelivo/theme/theme_factory.dart';
@@ -25,6 +27,7 @@ import 'package:Kelivo/desktop/widgets/desktop_scheduled_task_form.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
 import '../../support/business_test_harness.dart';
@@ -49,6 +52,21 @@ class _IosEditorScheduledTasksService extends ScheduledTasksService {
 
   @override
   bool get isIOS => true;
+  int preparationChecks = 0;
+  ScheduledTaskPreparationStatus status =
+      ScheduledTaskPreparationStatus.prepared;
+  @override
+  ScheduledTaskPreparationStatus? preparationStatus(ScheduledTask task) =>
+      status;
+  @override
+  Future<void> preparePendingTasks() async {
+    preparationChecks++;
+  }
+
+  void updateStatus(ScheduledTaskPreparationStatus value) {
+    status = value;
+    notifyListeners();
+  }
 }
 
 void main() {
@@ -185,23 +203,31 @@ void main() {
     );
   }
 
-  Widget app(Widget child, {bool dark = false, String locale = 'en'}) =>
-      MultiProvider(
-        providers: [
-          ChangeNotifierProvider<SettingsProvider>.value(value: settings),
-          ChangeNotifierProvider<AssistantProvider>.value(value: assistants),
-          ChangeNotifierProvider<ChatService>.value(value: chat),
-        ],
-        child: MaterialApp(
-          locale: Locale(locale),
-          supportedLocales: AppLocalizations.supportedLocales,
-          localizationsDelegates: AppLocalizations.localizationsDelegates,
-          theme: theme(dark),
-          builder: (_, child) =>
-              RepaintBoundary(key: boundaryKey, child: child!),
-          home: child,
-        ),
-      );
+  Widget app(
+    Widget child, {
+    bool dark = false,
+    String locale = 'en',
+    double scale = 1,
+  }) => MultiProvider(
+    providers: [
+      ChangeNotifierProvider<SettingsProvider>.value(value: settings),
+      ChangeNotifierProvider<AssistantProvider>.value(value: assistants),
+      ChangeNotifierProvider<ChatService>.value(value: chat),
+    ],
+    child: MaterialApp(
+      locale: Locale(locale),
+      supportedLocales: AppLocalizations.supportedLocales,
+      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      theme: theme(dark),
+      builder: (context, child) => MediaQuery(
+        data: MediaQuery.of(
+          context,
+        ).copyWith(textScaler: TextScaler.linear(scale)),
+        child: RepaintBoundary(key: boundaryKey, child: child!),
+      ),
+      home: child,
+    ),
+  );
 
   Widget editor({ScheduledTask? task}) => ScheduledTaskEditorPage(
     task: task ?? initial,
@@ -259,6 +285,184 @@ void main() {
     (390.0, 'zh', false),
     (390.0, 'zh', true),
   ]) {
+    testWidgets(
+      'iOS list shows live preparation status beside the next time ($width, $locale, dark=$dark)',
+      (tester) async {
+        tester.view.physicalSize = Size(width, 844);
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.reset);
+        service.dispose();
+        final ios = _IosEditorScheduledTasksService(channel: channel);
+        service = ios;
+        initial = ScheduledTask.fromJson({
+          ...initial.toStoredJson(),
+          'allowPreparation': true,
+          'runs': [
+            ScheduledTaskRun(
+              id: 'next',
+              status: 'prepared',
+              scheduledFor: DateTime(2026, 9, 22, 8, 30),
+              notificationState: 'registered',
+              lastPrepareAt: DateTime(2026, 9, 21, 20),
+              prepareAttempts: 2,
+            ).toJson(),
+          ],
+        });
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+            .setMockMethodCallHandler(
+              channel,
+              (_) async => {
+                'exactAlarms': true,
+                'tasks': [
+                  jsonEncode({
+                    ...initial.toStoredJson(),
+                    'nextRunAt': DateTime(
+                      2026,
+                      9,
+                      22,
+                      8,
+                      30,
+                    ).millisecondsSinceEpoch,
+                  }),
+                ],
+              },
+            );
+        await tester.pumpWidget(
+          app(
+            ScheduledTasksPage(service: service),
+            locale: locale,
+            dark: dark,
+          ),
+        );
+        await tester.pumpAndSettle();
+        final l = lookupAppLocalizations(Locale(locale));
+        expect(ios.preparationChecks, 1);
+        final badge = find.byKey(
+          const ValueKey('scheduled-task-preparation-status'),
+        );
+        expect(
+          find.descendant(
+            of: badge,
+            matching: find.text(l.scheduledTasksPrepared),
+          ),
+          findsOneWidget,
+        );
+        final nextRow = find.ancestor(
+          of: badge,
+          matching: find.byType(IosNavRow),
+        );
+        expect(tester.widget<IosNavRow>(nextRow).label, contains('08:30'));
+        expect(badge.hitTestable(), findsOneWidget);
+        await capture(
+          tester,
+          'ios-list-ready-${width.toInt()}-$locale-${dark ? 'dark' : 'light'}',
+        );
+        final states = {
+          ScheduledTaskPreparationStatus.queued: (
+            l.scheduledTasksPreparationQueued,
+            l.scheduledTasksPreparationQueuedDetail,
+          ),
+          ScheduledTaskPreparationStatus.cooldown: (
+            l.scheduledTasksPreparationCooldownWaiting,
+            l.scheduledTasksPreparationRetryAt(
+              DateFormat.Md(
+                l.localeName,
+              ).add_Hm().format(DateTime(2026, 9, 21, 20, 10)),
+            ),
+          ),
+          ScheduledTaskPreparationStatus.attemptsExhausted: (
+            l.scheduledTasksPreparationLimitReached,
+            l.scheduledTasksPreparationAttemptsUsed(2, 2),
+          ),
+          ScheduledTaskPreparationStatus.unavailable: (
+            l.scheduledTasksPreparationUnavailable,
+            l.scheduledTasksPreparationReadFailed,
+          ),
+        };
+        for (final entry in states.entries) {
+          ios.updateStatus(entry.key);
+          await tester.pumpAndSettle();
+          expect(find.text(entry.value.$1), findsOneWidget);
+          expect(find.text(entry.value.$2), findsOneWidget);
+          expect(tester.takeException(), isNull);
+        }
+        await capture(
+          tester,
+          'ios-list-blocked-${width.toInt()}-$locale-${dark ? 'dark' : 'light'}',
+        );
+        await tester.pumpWidget(
+          app(
+            ScheduledTasksPage(service: service),
+            locale: locale,
+            dark: dark,
+            scale: 1.6,
+          ),
+        );
+        await tester.pumpAndSettle();
+        expect(tester.takeException(), isNull);
+      },
+      variant: TargetPlatformVariant({TargetPlatform.iOS}),
+    );
+
+    testWidgets(
+      'iOS preparation prompt can be edited, reset and saved ($width, $locale, dark=$dark)',
+      (tester) async {
+        tester.view.physicalSize = Size(width, 844);
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.reset);
+        await tester.pumpWidget(
+          app(
+            editor(
+              task: ScheduledTask.fromJson({
+                ...initial.toJson(),
+                'allowPreparation': true,
+                'preparationPrompt': 'Custom preparation',
+              }),
+            ),
+            locale: locale,
+            dark: dark,
+          ),
+        );
+        await tester.pumpAndSettle();
+        final card = find.byKey(
+          const ValueKey('scheduled-tasks-preparation-prompt'),
+        );
+        await tester.ensureVisible(card);
+        await tester.pumpAndSettle();
+        final field = find.descendant(
+          of: card,
+          matching: find.byType(TextField),
+        );
+        expect(
+          tester.widget<TextField>(field).controller!.text,
+          'Custom preparation',
+        );
+        await tap(
+          tester,
+          find.byKey(
+            const ValueKey('scheduled-tasks-reset-preparation-prompt'),
+          ),
+        );
+        expect(
+          tester.widget<TextField>(field).controller!.text,
+          ScheduledTask.defaultPreparationPrompt,
+        );
+        await Scrollable.ensureVisible(tester.element(card), alignment: .5);
+        await tester.pumpAndSettle();
+        await capture(
+          tester,
+          'ios-preparation-prompt-${width.toInt()}-$locale-${dark ? 'dark' : 'light'}',
+        );
+        const custom = '只输出助手消息。\n时间 {{scheduled_time}} / {{utc_offset}}';
+        await tester.enterText(field, custom);
+        await tap(tester, find.byKey(const ValueKey('scheduled-tasks-action')));
+        expect(saved!.preparationPrompt, custom);
+        expect(saved!.prompt, initial.prompt);
+        expect(tester.takeException(), isNull);
+      },
+      variant: TargetPlatformVariant({TargetPlatform.iOS}),
+    );
+
     testWidgets(
       'iOS preparation help leaves settings unchanged ($width, $locale, dark=$dark)',
       (tester) async {
@@ -381,6 +585,49 @@ void main() {
       variant: TargetPlatformVariant({TargetPlatform.iOS}),
     );
   }
+
+  testWidgets(
+    'new iOS tasks default to skip and permit an empty preparation prompt',
+    (tester) async {
+      await tester.pumpWidget(
+        app(
+          ScheduledTaskEditorPage(
+            assistants: assistants.assistants,
+            initialAssistantId: assistant.id,
+            onSave: (value) async => saved = value,
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      final l = lookupAppLocalizations(const Locale('en'));
+      Finder fieldWithLabel(String label) => find.descendant(
+        of: find.byWidgetPredicate(
+          (w) => w is IosFormTextField && w.label == label,
+        ),
+        matching: find.byType(TextField),
+      );
+      await tester.enterText(fieldWithLabel(l.scheduledTasksName), 'Task');
+      await tester.enterText(
+        fieldWithLabel(l.scheduledTasksPrompt),
+        'Say hello',
+      );
+      final card = find.byKey(
+        const ValueKey('scheduled-tasks-preparation-prompt'),
+      );
+      await tester.ensureVisible(card);
+      await tester.pumpAndSettle();
+      await tester.enterText(
+        find.descendant(of: card, matching: find.byType(TextField)),
+        '',
+      );
+      await tap(tester, find.byKey(const ValueKey('scheduled-tasks-action')));
+      expect(saved!.unavailablePolicy, ScheduledTaskUnavailablePolicy.skip);
+      expect(saved!.preparationPrompt, isEmpty);
+      expect(saved!.allowPreparation, isTrue);
+      expect(tester.takeException(), isNull);
+    },
+    variant: TargetPlatformVariant({TargetPlatform.iOS}),
+  );
 
   testWidgets(
     'iOS editor saves preparation limits and preview preferences in the same task',

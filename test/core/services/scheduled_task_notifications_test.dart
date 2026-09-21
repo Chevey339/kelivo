@@ -91,8 +91,23 @@ void main() {
     },
   );
   test('reminder explicitly differs from a prepared result', () async {
-    await notifications.schedule(task, run, null);
+    await notifications.schedule(
+      ScheduledTask.fromJson({...task.toJson(), 'unavailablePolicy': 'remind'}),
+      run,
+      null,
+    );
     expect((calls.single.arguments as Map)['body'], 'Reminder');
     expect((calls.single.arguments as Map)['prepared'], isFalse);
   });
+  test(
+    'the default skips missing results but still notifies prepared content',
+    () async {
+      await notifications.schedule(task, run, null);
+      expect(calls.single.method, 'cancel');
+      calls.clear();
+      await notifications.schedule(task, run, payload);
+      expect(calls.single.method, 'schedule');
+      expect((calls.single.arguments as Map)['body'], payload.text);
+    },
+  );
 }

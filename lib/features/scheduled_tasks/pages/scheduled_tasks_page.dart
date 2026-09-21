@@ -11,6 +11,7 @@ import '../widgets/scheduled_tasks_scaffold.dart';
 import 'scheduled_task_editor_page.dart';
 import '../../../core/services/notification_service.dart';
 import '../../../core/services/scheduled_tasks_service.dart';
+import '../../../core/services/scheduled_task_preparation.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../shared/widgets/form_sheet.dart';
@@ -61,16 +62,21 @@ class _ScheduledTasksPageState extends State<ScheduledTasksPage>
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     service.addListener(_changed);
-    unawaited(service.refresh());
+    unawaited(_refresh());
   }
 
   void _changed() {
     if (mounted) setState(() {});
   }
 
+  Future<void> _refresh() async {
+    await service.refresh();
+    if (mounted) await service.preparePendingTasks();
+  }
+
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed) unawaited(service.refresh());
+    if (state == AppLifecycleState.resumed) unawaited(_refresh());
   }
 
   @override
@@ -311,6 +317,9 @@ class _ScheduledTasksPageState extends State<ScheduledTasksPage>
     _ => l.scheduledTasksFailed,
   };
   String _error(String value, AppLocalizations l) {
+    if (value == 'preparation_context_changed') {
+      return l.scheduledTasksPreparationContextChanged;
+    }
     if (value.contains('user_interaction_required')) {
       return l.scheduledTasksNeedsInput;
     }
@@ -428,10 +437,75 @@ class _ScheduledTasksPageState extends State<ScheduledTasksPage>
         !task.running) {
       return l.scheduledTasksWaitingPermission;
     }
-    final base = _desktopTaskDetail(task, l);
-    final pending = task.runs.where((r) => r.awaitingPublication).firstOrNull;
-    if (!service.isIOS || pending == null || !task.enabled) return base;
-    return '$base\n${_status(pending.status, l)} · ${pending.notificationState == 'registered' ? l.scheduledTasksNotificationRegistered : l.scheduledTasksNotificationUnavailable}';
+    return _desktopTaskDetail(task, l);
+  }
+
+  String? _preparationLabel(ScheduledTask task, AppLocalizations l) {
+    if (!service.isIOS || !task.enabled) return null;
+    return switch (service.preparationStatus(task)) {
+      ScheduledTaskPreparationStatus.disabled => l.scheduledTasksPreparationOff,
+      ScheduledTaskPreparationStatus.preparing => l.scheduledTasksPreparing,
+      ScheduledTaskPreparationStatus.prepared => l.scheduledTasksPrepared,
+      ScheduledTaskPreparationStatus.awaitingPublication =>
+        l.scheduledTasksPreparationPublishing,
+      ScheduledTaskPreparationStatus.waitingForChat =>
+        l.scheduledTasksPreparationIdle,
+      ScheduledTaskPreparationStatus.queued =>
+        l.scheduledTasksPreparationQueued,
+      ScheduledTaskPreparationStatus.outsideWindow =>
+        l.scheduledTasksPreparationWindowWaiting,
+      ScheduledTaskPreparationStatus.cooldown =>
+        l.scheduledTasksPreparationCooldownWaiting,
+      ScheduledTaskPreparationStatus.attemptsExhausted =>
+        l.scheduledTasksPreparationLimitReached,
+      ScheduledTaskPreparationStatus.hourlyLimit =>
+        l.scheduledTasksPreparationHourlyLimit,
+      ScheduledTaskPreparationStatus.unavailable =>
+        l.scheduledTasksPreparationUnavailable,
+      _ => l.scheduledTasksPendingPreparation,
+    };
+  }
+
+  String? _preparationDetail(ScheduledTask task, AppLocalizations l) {
+    if (!service.isIOS || !task.enabled) return null;
+    final run = task.runs.where((r) => r.awaitingPublication).firstOrNull;
+    final status = service.preparationStatus(task);
+    if (status == ScheduledTaskPreparationStatus.prepared) {
+      if (run?.error?.startsWith('preparation_context_unavailable:') == true) {
+        return l.scheduledTasksPreparationResultRetained;
+      }
+      if (task.notify && run?.notificationState != 'registered') {
+        return l.scheduledTasksNotificationUnavailable;
+      }
+      return null;
+    }
+    return switch (status) {
+      ScheduledTaskPreparationStatus.queued =>
+        l.scheduledTasksPreparationQueuedDetail,
+      ScheduledTaskPreparationStatus.waitingForChat =>
+        l.scheduledTasksPreparationIdleDetail,
+      ScheduledTaskPreparationStatus.attemptsExhausted =>
+        l.scheduledTasksPreparationAttemptsUsed(
+          run?.prepareAttempts ?? 0,
+          task.maxPrepareAttempts,
+        ),
+      ScheduledTaskPreparationStatus.hourlyLimit =>
+        l.scheduledTasksPreparationHourlyLimitDetail,
+      ScheduledTaskPreparationStatus.cooldown when run?.lastPrepareAt != null =>
+        l.scheduledTasksPreparationRetryAt(
+          _date(
+            run!.lastPrepareAt!.add(
+              Duration(minutes: task.preparationCooldownMinutes),
+            ),
+            l,
+          ),
+        ),
+      ScheduledTaskPreparationStatus.unavailable =>
+        l.scheduledTasksPreparationReadFailed,
+      ScheduledTaskPreparationStatus.awaitingPublication =>
+        l.scheduledTasksPreparationPublishingDetail,
+      _ => null,
+    };
   }
 
   @override
@@ -498,6 +572,11 @@ class _ScheduledTasksPageState extends State<ScheduledTasksPage>
               time: task.timeLabel,
               repeat: _repeatLabel(task, l),
               detail: _taskDetail(task, l),
+              preparationLabel: _preparationLabel(task, l),
+              preparationDetail: _preparationDetail(task, l),
+              prepared:
+                  service.preparationStatus(task) ==
+                  ScheduledTaskPreparationStatus.prepared,
               enabled: task.enabled,
               running: task.running,
               onTap: () => _details(task),
