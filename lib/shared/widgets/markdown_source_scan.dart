@@ -4,6 +4,8 @@ final class MarkdownSourceScan {
   String _source = '';
   bool appended = true;
   bool hasBrackets = false;
+  bool hasImageMarker = false;
+  bool hasCitationPrefix = false;
   bool hasHtml = false;
   bool hasCarriageReturns = false;
   bool needsPreprocessing = false;
@@ -15,12 +17,16 @@ final class MarkdownSourceScan {
     final start = appended ? _source.length : 0;
     if (!appended) {
       hasBrackets = hasHtml = hasCarriageReturns = needsPreprocessing = false;
+      hasImageMarker = hasCitationPrefix = false;
     }
     scannedCodeUnits += source.length - start;
     for (var i = start; i < source.length; i++) {
       switch (source.codeUnitAt(i)) {
         case 0x5b: // [ starts image and citation syntax.
           hasBrackets = needsPreprocessing = true;
+          hasImageMarker |= i > 0 && source.codeUnitAt(i - 1) == 0x21;
+        case 0x43 || 0x63: // Every supported citation starts with [c or [C.
+          hasCitationPrefix |= i > 0 && source.codeUnitAt(i - 1) == 0x5b;
         case 0x3c: // < starts HTML, including details blocks.
           hasHtml = needsPreprocessing = true;
         case 0x0d:
