@@ -11448,14 +11448,14 @@ class AppLocalizationsZh extends AppLocalizations {
   String get scheduledTasksPreparationWindow => '最多提前';
 
   @override
-  String get scheduledTasksPreparationAttempts => '每次执行最多准备次数';
+  String get scheduledTasksPreparationAttempts => '自动准备次数上限';
 
   @override
   String get scheduledTasksPreparationCooldown => '准备最小间隔（分钟）';
 
   @override
   String get scheduledTasksPreparationBudget =>
-      '所有任务合计最多同时准备一个，每小时最多尝试六次，取消的请求也计入次数。';
+      '所有任务合计最多同时准备一个。每小时累计尝试六次后暂停自动准备，取消的请求也计入次数；「立刻准备」不受次数上限限制。';
 
   @override
   String get scheduledTasksPreparing => '正在准备结果';
@@ -11504,15 +11504,15 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get scheduledTasksPreparationWindowTip =>
-      '允许在任务到期前多久开始准备，最长 24 小时。例如第二天早上提醒，前一天中午打开 Kelivo 时就有机会准备。时间越长，准备机会越多，但内容也可能更早过时。不会改变任务时间，也不代表能在后台定时运行。「立刻准备」可跳过这项自动等待，次数上限仍然有效。';
+      '允许在任务到期前多久开始准备，最长 24 小时。例如第二天早上提醒，前一天中午打开 Kelivo 时就有机会准备。时间越长，准备机会越多，但内容也可能更早过时。不会改变任务时间，也不代表能在后台定时运行。「立刻准备」不受这项自动等待和准备次数上限限制。';
 
   @override
   String get scheduledTasksPreparationAttemptsTip =>
-      '同一次任务允许尝试准备的总次数，包含首次、失败和取消的请求。次数越多，重试机会越多，也可能多花钱。这是次数限制，不是费用上限。';
+      '本次累计尝试达到上限后，自动准备会暂停。首次、失败、取消和手动准备都计入尝试记录；「立刻准备」不受此上限限制。尝试越多，可能产生的模型费用越多，这不是费用上限。';
 
   @override
   String get scheduledTasksPreparationCooldownTip =>
-      '同一次任务两次开始准备之间，至少间隔多少分钟。间隔越长，重复请求越少。重试仍需 App 有运行机会，不是在后台设定一个定时器。「立刻准备」可跳过这项自动等待，次数上限仍然有效。';
+      '同一次任务两次开始准备之间，至少间隔多少分钟。间隔越长，重复请求越少。重试仍需 App 有运行机会，不是在后台设定一个定时器。「立刻准备」不受这项自动等待和准备次数上限限制。';
 
   @override
   String get scheduledTasksUnavailableTip =>
@@ -11563,19 +11563,19 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
-  String get scheduledTasksPreparationLimitReached => '次数已用完';
+  String get scheduledTasksPreparationLimitReached => '自动准备次数已用完';
 
   @override
   String scheduledTasksPreparationAttemptsUsed(int count, int limit) {
-    return '本次已尝试 $count/$limit 次，可在编辑任务中调整上限。';
+    return '本次已尝试 $count 次，自动准备上限为 $limit 次。可使用「立刻准备」继续。';
   }
 
   @override
-  String get scheduledTasksPreparationHourlyLimit => '等待额度恢复';
+  String get scheduledTasksPreparationHourlyLimit => '自动准备已达小时上限';
 
   @override
   String get scheduledTasksPreparationHourlyLimitDetail =>
-      '已达到每小时准备次数上限，额度恢复后继续。';
+      '已达到每小时准备次数上限，自动准备将在额度恢复后继续；仍可使用「立刻准备」。';
 
   @override
   String get scheduledTasksPreparationUnavailable => '暂时无法准备';
@@ -11621,7 +11621,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get scheduledTasksPrepareNowDetail =>
-      '立刻准备下一次内容，到原定时间再发送。准备会调用模型，可能产生费用；已有准备结果时会直接复用。';
+      '立刻准备下一次内容，到原定时间再发送。不受自动准备的等待时间和次数上限限制，会调用模型并可能产生费用；已有准备结果时直接复用。';
 
   @override
   String get scheduledTasksPrepareNowReady => '本次结果已经准备好，无需再次调用模型。';
@@ -23017,14 +23017,14 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get scheduledTasksPreparationWindow => '最多提前';
 
   @override
-  String get scheduledTasksPreparationAttempts => '每次执行最多准备次数';
+  String get scheduledTasksPreparationAttempts => '自动准备次数上限';
 
   @override
   String get scheduledTasksPreparationCooldown => '准备最小间隔（分钟）';
 
   @override
   String get scheduledTasksPreparationBudget =>
-      '所有任务合计最多同时准备一个，每小时最多尝试六次，取消的请求也计入次数。';
+      '所有任务合计最多同时准备一个。每小时累计尝试六次后暂停自动准备，取消的请求也计入次数；「立刻准备」不受次数上限限制。';
 
   @override
   String get scheduledTasksPreparing => '正在准备结果';
@@ -23073,15 +23073,15 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get scheduledTasksPreparationWindowTip =>
-      '允许在任务到期前多久开始准备，最长 24 小时。例如第二天早上提醒，前一天中午打开 Kelivo 时就有机会准备。时间越长，准备机会越多，但内容也可能更早过时。不会改变任务时间，也不代表能在后台定时运行。「立刻准备」可跳过这项自动等待，次数上限仍然有效。';
+      '允许在任务到期前多久开始准备，最长 24 小时。例如第二天早上提醒，前一天中午打开 Kelivo 时就有机会准备。时间越长，准备机会越多，但内容也可能更早过时。不会改变任务时间，也不代表能在后台定时运行。「立刻准备」不受这项自动等待和准备次数上限限制。';
 
   @override
   String get scheduledTasksPreparationAttemptsTip =>
-      '同一次任务允许尝试准备的总次数，包含首次、失败和取消的请求。次数越多，重试机会越多，也可能多花钱。这是次数限制，不是费用上限。';
+      '本次累计尝试达到上限后，自动准备会暂停。首次、失败、取消和手动准备都计入尝试记录；「立刻准备」不受此上限限制。尝试越多，可能产生的模型费用越多，这不是费用上限。';
 
   @override
   String get scheduledTasksPreparationCooldownTip =>
-      '同一次任务两次开始准备之间，至少间隔多少分钟。间隔越长，重复请求越少。重试仍需 App 有运行机会，不是在后台设定一个定时器。「立刻准备」可跳过这项自动等待，次数上限仍然有效。';
+      '同一次任务两次开始准备之间，至少间隔多少分钟。间隔越长，重复请求越少。重试仍需 App 有运行机会，不是在后台设定一个定时器。「立刻准备」不受这项自动等待和准备次数上限限制。';
 
   @override
   String get scheduledTasksUnavailableTip =>
@@ -23132,19 +23132,19 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   }
 
   @override
-  String get scheduledTasksPreparationLimitReached => '次数已用完';
+  String get scheduledTasksPreparationLimitReached => '自动准备次数已用完';
 
   @override
   String scheduledTasksPreparationAttemptsUsed(int count, int limit) {
-    return '本次已尝试 $count/$limit 次，可在编辑任务中调整上限。';
+    return '本次已尝试 $count 次，自动准备上限为 $limit 次。可使用「立刻准备」继续。';
   }
 
   @override
-  String get scheduledTasksPreparationHourlyLimit => '等待额度恢复';
+  String get scheduledTasksPreparationHourlyLimit => '自动准备已达小时上限';
 
   @override
   String get scheduledTasksPreparationHourlyLimitDetail =>
-      '已达到每小时准备次数上限，额度恢复后继续。';
+      '已达到每小时准备次数上限，自动准备将在额度恢复后继续；仍可使用「立刻准备」。';
 
   @override
   String get scheduledTasksPreparationUnavailable => '暂时无法准备';
@@ -23190,7 +23190,7 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get scheduledTasksPrepareNowDetail =>
-      '立刻准备下一次内容，到原定时间再发送。准备会调用模型，可能产生费用；已有准备结果时会直接复用。';
+      '立刻准备下一次内容，到原定时间再发送。不受自动准备的等待时间和次数上限限制，会调用模型并可能产生费用；已有准备结果时直接复用。';
 
   @override
   String get scheduledTasksPrepareNowReady => '本次结果已经准备好，无需再次调用模型。';
@@ -34665,14 +34665,14 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get scheduledTasksPreparationWindow => '最多提前';
 
   @override
-  String get scheduledTasksPreparationAttempts => '每次執行最多準備次數';
+  String get scheduledTasksPreparationAttempts => '自動準備次數上限';
 
   @override
   String get scheduledTasksPreparationCooldown => '準備最小間隔（分鐘）';
 
   @override
   String get scheduledTasksPreparationBudget =>
-      '所有任務合計最多同時準備一個，每小時最多嘗試六次，取消的請求也計入次數。';
+      '所有任務合計最多同時準備一個。每小時累計嘗試六次後暫停自動準備，取消的請求也計入次數；「立刻準備」不受次數上限限制。';
 
   @override
   String get scheduledTasksPreparing => '正在準備結果';
@@ -34721,15 +34721,15 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get scheduledTasksPreparationWindowTip =>
-      '允許在任務到期前多久開始準備，最長 24 小時。例如第二天早上提醒，前一天中午開啟 Kelivo 時就有機會準備。時間越長，準備機會越多，但內容也可能更早過時。不會改變任務時間，也不代表能在背景定時執行。「立刻準備」可跳過這項自動等待，次數上限仍然有效。';
+      '允許在任務到期前多久開始準備，最長 24 小時。例如第二天早上提醒，前一天中午開啟 Kelivo 時就有機會準備。時間越長，準備機會越多，但內容也可能更早過時。不會改變任務時間，也不代表能在背景定時執行。「立刻準備」不受這項自動等待和準備次數上限限制。';
 
   @override
   String get scheduledTasksPreparationAttemptsTip =>
-      '同一次任務允許嘗試準備的總次數，包含首次、失敗和取消的請求。次數越多，重試機會越多，也可能多花錢。這是次數限制，不是費用上限。';
+      '本次累計嘗試達到上限後，自動準備會暫停。首次、失敗、取消和手動準備都計入嘗試記錄；「立刻準備」不受此上限限制。嘗試越多，可能產生的模型費用越多，這不是費用上限。';
 
   @override
   String get scheduledTasksPreparationCooldownTip =>
-      '同一次任務兩次開始準備之間，至少間隔多少分鐘。間隔越長，重複請求越少。重試仍需 App 有執行機會，不是在背景設定一個計時器。「立刻準備」可跳過這項自動等待，次數上限仍然有效。';
+      '同一次任務兩次開始準備之間，至少間隔多少分鐘。間隔越長，重複請求越少。重試仍需 App 有執行機會，不是在背景設定一個計時器。「立刻準備」不受這項自動等待和準備次數上限限制。';
 
   @override
   String get scheduledTasksUnavailableTip =>
@@ -34780,19 +34780,19 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   }
 
   @override
-  String get scheduledTasksPreparationLimitReached => '次數已用完';
+  String get scheduledTasksPreparationLimitReached => '自動準備次數已用完';
 
   @override
   String scheduledTasksPreparationAttemptsUsed(int count, int limit) {
-    return '本次已嘗試 $count/$limit 次，可在編輯任務中調整上限。';
+    return '本次已嘗試 $count 次，自動準備上限為 $limit 次。可使用「立刻準備」繼續。';
   }
 
   @override
-  String get scheduledTasksPreparationHourlyLimit => '等待額度恢復';
+  String get scheduledTasksPreparationHourlyLimit => '自動準備已達小時上限';
 
   @override
   String get scheduledTasksPreparationHourlyLimitDetail =>
-      '已達到每小時準備次數上限，額度恢復後繼續。';
+      '已達到每小時準備次數上限，自動準備將在額度恢復後繼續；仍可使用「立刻準備」。';
 
   @override
   String get scheduledTasksPreparationUnavailable => '暫時無法準備';
@@ -34838,7 +34838,7 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get scheduledTasksPrepareNowDetail =>
-      '立刻準備下一次內容，到原定時間再傳送。準備會呼叫模型，可能產生費用；已有準備結果時會直接重用。';
+      '立刻準備下一次內容，到原定時間再傳送。不受自動準備的等待時間和次數上限限制，會呼叫模型並可能產生費用；已有準備結果時直接重用。';
 
   @override
   String get scheduledTasksPrepareNowReady => '本次結果已經準備好，無需再次呼叫模型。';

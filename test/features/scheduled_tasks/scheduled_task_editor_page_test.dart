@@ -786,7 +786,7 @@ void main() {
       }
       await tester.ensureVisible(find.text('24 hours'));
       await tap(tester, find.text('24 hours'));
-      await tapRow(tester, 'Attempts per occurrence');
+      await tapRow(tester, 'Automatic attempt limit');
       await tap(tester, find.text('3').last);
       await toggle('Show result text in notifications');
       await tap(tester, find.byKey(const ValueKey('scheduled-tasks-action')));

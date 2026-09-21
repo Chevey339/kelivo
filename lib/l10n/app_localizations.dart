@@ -21486,7 +21486,7 @@ abstract class AppLocalizations {
   /// No description provided for @scheduledTasksPreparationAttempts.
   ///
   /// In en, this message translates to:
-  /// **'Attempts per occurrence'**
+  /// **'Automatic attempt limit'**
   String get scheduledTasksPreparationAttempts;
 
   /// No description provided for @scheduledTasksPreparationCooldown.
@@ -21498,7 +21498,7 @@ abstract class AppLocalizations {
   /// No description provided for @scheduledTasksPreparationBudget.
   ///
   /// In en, this message translates to:
-  /// **'At most one preparation at a time and six attempts per hour across all tasks. Cancelled attempts count toward the limit.'**
+  /// **'At most one preparation at a time across all tasks. Automatic preparation pauses after six total attempts per hour, including cancelled requests. Prepare now is not limited by attempt counts.'**
   String get scheduledTasksPreparationBudget;
 
   /// No description provided for @scheduledTasksPreparing.
@@ -21588,19 +21588,19 @@ abstract class AppLocalizations {
   /// No description provided for @scheduledTasksPreparationWindowTip.
   ///
   /// In en, this message translates to:
-  /// **'How far ahead of the scheduled time preparation may begin, up to 24 hours. For example, opening Kelivo at noon can prepare the next morning’s reminder. A larger window gives more chances to prepare, but the result may be less current. It does not change the scheduled time or guarantee background execution. Prepare now bypasses this automatic waiting period; attempt limits still apply.'**
+  /// **'How far ahead of the scheduled time preparation may begin, up to 24 hours. For example, opening Kelivo at noon can prepare the next morning’s reminder. A larger window gives more chances to prepare, but the result may be less current. It does not change the scheduled time or guarantee background execution. Prepare now bypasses this automatic waiting period and all attempt limits.'**
   String get scheduledTasksPreparationWindowTip;
 
   /// No description provided for @scheduledTasksPreparationAttemptsTip.
   ///
   /// In en, this message translates to:
-  /// **'Maximum preparation attempts for one occurrence, including the first attempt, failures and cancellations. More attempts allow more retries but may cost more. This limits attempts, not spending.'**
+  /// **'Automatic preparation pauses when this occurrence reaches the total attempt limit. First attempts, failures, cancellations and manual preparation all count in the record. Prepare now can still run after this limit is reached. More attempts may incur more model charges; this is not a spending limit.'**
   String get scheduledTasksPreparationAttemptsTip;
 
   /// No description provided for @scheduledTasksPreparationCooldownTip.
   ///
   /// In en, this message translates to:
-  /// **'Minimum time between the start of preparation attempts for the same occurrence. Waiting longer reduces repeated requests. A retry still needs the app to be able to run; it is not a background timer. Prepare now bypasses this automatic waiting period; attempt limits still apply.'**
+  /// **'Minimum time between the start of preparation attempts for the same occurrence. Waiting longer reduces repeated requests. A retry still needs the app to be able to run; it is not a background timer. Prepare now bypasses this automatic waiting period and all attempt limits.'**
   String get scheduledTasksPreparationCooldownTip;
 
   /// No description provided for @scheduledTasksUnavailableTip.
@@ -21684,25 +21684,25 @@ abstract class AppLocalizations {
   /// No description provided for @scheduledTasksPreparationLimitReached.
   ///
   /// In en, this message translates to:
-  /// **'Attempt limit reached'**
+  /// **'Automatic attempt limit reached'**
   String get scheduledTasksPreparationLimitReached;
 
   /// No description provided for @scheduledTasksPreparationAttemptsUsed.
   ///
   /// In en, this message translates to:
-  /// **'Used {count}/{limit} attempts for this occurrence. You can adjust the limit in task settings.'**
+  /// **'This occurrence has used {count} attempts; the automatic limit is {limit}. Use Prepare now to continue manually.'**
   String scheduledTasksPreparationAttemptsUsed(int count, int limit);
 
   /// No description provided for @scheduledTasksPreparationHourlyLimit.
   ///
   /// In en, this message translates to:
-  /// **'Hourly limit reached'**
+  /// **'Automatic hourly limit reached'**
   String get scheduledTasksPreparationHourlyLimit;
 
   /// No description provided for @scheduledTasksPreparationHourlyLimitDetail.
   ///
   /// In en, this message translates to:
-  /// **'The hourly preparation limit has been reached. Pending tasks resume when capacity is available.'**
+  /// **'Automatic preparation is paused until hourly capacity is available. You can still use Prepare now.'**
   String get scheduledTasksPreparationHourlyLimitDetail;
 
   /// No description provided for @scheduledTasksPreparationUnavailable.
@@ -21777,7 +21777,7 @@ abstract class AppLocalizations {
   /// No description provided for @scheduledTasksPrepareNowDetail.
   ///
   /// In en, this message translates to:
-  /// **'Prepare the next result now and deliver it at the scheduled time. This may incur model charges. An existing prepared result is reused.'**
+  /// **'Prepare the next result now and deliver it at the scheduled time. Automatic waiting periods and attempt limits do not apply. This may incur model charges. An existing prepared result is reused.'**
   String get scheduledTasksPrepareNowDetail;
 
   /// No description provided for @scheduledTasksPrepareNowReady.

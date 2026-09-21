@@ -176,7 +176,7 @@ class PreparedScheduledTasks extends ChangeNotifier {
             Duration(minutes: task.preparationWindowMinutes)) {
       return ScheduledTaskPreparationStatus.outsideWindow;
     }
-    if (run.prepareAttempts >= task.maxPrepareAttempts) {
+    if (!manual && run.prepareAttempts >= task.maxPrepareAttempts) {
       return ScheduledTaskPreparationStatus.attemptsExhausted;
     }
     if (!manual &&
@@ -185,7 +185,7 @@ class PreparedScheduledTasks extends ChangeNotifier {
             Duration(minutes: task.preparationCooldownMinutes)) {
       return ScheduledTaskPreparationStatus.cooldown;
     }
-    if (_recentAttempts(now).length >= 6) {
+    if (!manual && _recentAttempts(now).length >= 6) {
       return ScheduledTaskPreparationStatus.hourlyLimit;
     }
     if (preparation == null ||
@@ -215,8 +215,8 @@ class PreparedScheduledTasks extends ChangeNotifier {
           )
           .toList();
 
-  /// Explicit preparation targets one upcoming occurrence. Waiting periods are
-  /// automatic scheduling policy; cost limits and single-flight still apply.
+  /// Explicit preparation targets one upcoming occurrence. Waiting periods and
+  /// attempt limits govern automatic preparation only; single-flight still applies.
   Future<ScheduledTaskPreparationStatus> prepareNow(String taskId) async {
     await load();
     await check();
@@ -740,7 +740,7 @@ class PreparedScheduledTasks extends ChangeNotifier {
         if (!identical(before, tasks)) await _commit();
         if (!prepare || _preparingId != null || _onRun == null) return;
         final attempts = _recentAttempts(now);
-        // One global request at a time, at most six attempts/hour across all tasks.
+        // One request at a time; automatic preparation pauses at six attempts/hour.
         if (attempts.length >= 6) return;
         final candidates =
             tasks

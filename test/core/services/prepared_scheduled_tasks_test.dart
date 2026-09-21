@@ -227,7 +227,7 @@ void main() {
   );
 
   test(
-    'prepare now bypasses cooldown but keeps the occurrence attempt limit',
+    'prepare now bypasses cooldown and an exhausted occurrence attempt limit',
     () async {
       await scheduler.save(task());
       await settle();
@@ -242,11 +242,31 @@ void main() {
       expect(run().prepareAttempts, 2);
       expect(notifications.pendingBodies[id], 'reply v2');
       preparation.context = 'v3';
+      await scheduler.check(prepare: true);
+      expect(preparation.calls, 2);
       expect(
-        await scheduler.prepareNow('task'),
+        scheduler.preparationStatus(scheduler.tasks.single),
         ScheduledTaskPreparationStatus.attemptsExhausted,
       );
-      expect(preparation.calls, 2);
+      expect(
+        await scheduler.prepareNow('task'),
+        ScheduledTaskPreparationStatus.preparing,
+      );
+      await settle();
+      expect(preparation.calls, 3);
+      expect(run().prepareAttempts, 3);
+      expect(run().id, id);
+      expect(notifications.pendingBodies[id], 'reply v3');
+      expect(preparation.published, isEmpty);
+
+      // Manual work does not reset the budget or resume automatic requests.
+      preparation.context = 'v4';
+      await scheduler.check(prepare: true);
+      expect(preparation.calls, 3);
+      expect(
+        scheduler.preparationStatus(scheduler.tasks.single),
+        ScheduledTaskPreparationStatus.attemptsExhausted,
+      );
     },
   );
 
@@ -316,17 +336,44 @@ void main() {
     },
   );
 
-  test('manual preparation still enforces the global hourly limit', () async {
+  test('manual preparation bypasses the global hourly limit', () async {
     for (var i = 0; i < 6; i++) {
       await scheduler.save(task(id: '$i'));
       await settle();
     }
     await scheduler.save(task(id: 'manual'));
     expect(
-      await scheduler.prepareNow('manual'),
+      scheduler.preparationStatus(scheduler.tasks.last),
       ScheduledTaskPreparationStatus.hourlyLimit,
     );
-    expect(preparation.calls, 6);
+    expect(
+      await scheduler.prepareNow('manual'),
+      ScheduledTaskPreparationStatus.preparing,
+    );
+    await settle();
+    expect(preparation.calls, 7);
+    expect(preparation.preparedTasks.last, 'manual');
+    final prepared = scheduler.tasks.last.runs.single;
+    expect(prepared.status, 'prepared');
+    expect(notifications.pendingBodies[prepared.id], 'reply v1');
+
+    await scheduler.save(task(id: 'automatic'));
+    await settle();
+    expect(preparation.calls, 7);
+    expect(
+      scheduler.preparationStatus(scheduler.tasks.last),
+      ScheduledTaskPreparationStatus.hourlyLimit,
+    );
+
+    preparation.context = 'v2';
+    expect(
+      await scheduler.prepareNow('manual'),
+      ScheduledTaskPreparationStatus.preparing,
+    );
+    await settle();
+    expect(preparation.calls, 8);
+    expect(preparation.preparedTasks.last, 'manual');
+    expect(notifications.pendingBodies[prepared.id], 'reply v2');
   });
 
   for (final change in [

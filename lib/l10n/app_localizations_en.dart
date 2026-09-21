@@ -11975,14 +11975,14 @@ class AppLocalizationsEn extends AppLocalizations {
   String get scheduledTasksPreparationWindow => 'Prepare up to';
 
   @override
-  String get scheduledTasksPreparationAttempts => 'Attempts per occurrence';
+  String get scheduledTasksPreparationAttempts => 'Automatic attempt limit';
 
   @override
   String get scheduledTasksPreparationCooldown => 'Minimum interval (minutes)';
 
   @override
   String get scheduledTasksPreparationBudget =>
-      'At most one preparation at a time and six attempts per hour across all tasks. Cancelled attempts count toward the limit.';
+      'At most one preparation at a time across all tasks. Automatic preparation pauses after six total attempts per hour, including cancelled requests. Prepare now is not limited by attempt counts.';
 
   @override
   String get scheduledTasksPreparing => 'Preparing result';
@@ -12033,15 +12033,15 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get scheduledTasksPreparationWindowTip =>
-      'How far ahead of the scheduled time preparation may begin, up to 24 hours. For example, opening Kelivo at noon can prepare the next morning’s reminder. A larger window gives more chances to prepare, but the result may be less current. It does not change the scheduled time or guarantee background execution. Prepare now bypasses this automatic waiting period; attempt limits still apply.';
+      'How far ahead of the scheduled time preparation may begin, up to 24 hours. For example, opening Kelivo at noon can prepare the next morning’s reminder. A larger window gives more chances to prepare, but the result may be less current. It does not change the scheduled time or guarantee background execution. Prepare now bypasses this automatic waiting period and all attempt limits.';
 
   @override
   String get scheduledTasksPreparationAttemptsTip =>
-      'Maximum preparation attempts for one occurrence, including the first attempt, failures and cancellations. More attempts allow more retries but may cost more. This limits attempts, not spending.';
+      'Automatic preparation pauses when this occurrence reaches the total attempt limit. First attempts, failures, cancellations and manual preparation all count in the record. Prepare now can still run after this limit is reached. More attempts may incur more model charges; this is not a spending limit.';
 
   @override
   String get scheduledTasksPreparationCooldownTip =>
-      'Minimum time between the start of preparation attempts for the same occurrence. Waiting longer reduces repeated requests. A retry still needs the app to be able to run; it is not a background timer. Prepare now bypasses this automatic waiting period; attempt limits still apply.';
+      'Minimum time between the start of preparation attempts for the same occurrence. Waiting longer reduces repeated requests. A retry still needs the app to be able to run; it is not a background timer. Prepare now bypasses this automatic waiting period and all attempt limits.';
 
   @override
   String get scheduledTasksUnavailableTip =>
@@ -12107,19 +12107,21 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get scheduledTasksPreparationLimitReached => 'Attempt limit reached';
+  String get scheduledTasksPreparationLimitReached =>
+      'Automatic attempt limit reached';
 
   @override
   String scheduledTasksPreparationAttemptsUsed(int count, int limit) {
-    return 'Used $count/$limit attempts for this occurrence. You can adjust the limit in task settings.';
+    return 'This occurrence has used $count attempts; the automatic limit is $limit. Use Prepare now to continue manually.';
   }
 
   @override
-  String get scheduledTasksPreparationHourlyLimit => 'Hourly limit reached';
+  String get scheduledTasksPreparationHourlyLimit =>
+      'Automatic hourly limit reached';
 
   @override
   String get scheduledTasksPreparationHourlyLimitDetail =>
-      'The hourly preparation limit has been reached. Pending tasks resume when capacity is available.';
+      'Automatic preparation is paused until hourly capacity is available. You can still use Prepare now.';
 
   @override
   String get scheduledTasksPreparationUnavailable => 'Preparation unavailable';
@@ -12167,7 +12169,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get scheduledTasksPrepareNowDetail =>
-      'Prepare the next result now and deliver it at the scheduled time. This may incur model charges. An existing prepared result is reused.';
+      'Prepare the next result now and deliver it at the scheduled time. Automatic waiting periods and attempt limits do not apply. This may incur model charges. An existing prepared result is reused.';
 
   @override
   String get scheduledTasksPrepareNowReady =>
