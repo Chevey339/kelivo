@@ -112,6 +112,7 @@ void main() {
     await tester.tap(find.text('Morning briefing'));
     await tester.pumpAndSettle();
     expect(find.text('Run now'), findsOneWidget);
+    expect(find.text('Prepare now'), findsNothing);
     await tester.tap(find.text('Run now'));
     await tester.pumpAndSettle();
     expect(calls.any((c) => c.method == 'runNow'), isTrue);

@@ -13,6 +13,7 @@
    private let oauthHandler = IosOAuthHandler()
    private let deviceLocalToolsHandler = DeviceLocalToolsHandler()
    private let iosTranslationHandler = IosTranslationHandler()
+   private let scheduledTaskNotifications = ScheduledTaskNotifications()
    private let incomingShareHandler = IosIncomingShareHandler()
 
   override func application(
@@ -59,6 +60,7 @@
       }
 
       backgroundGenerationHandler.configure(messenger: controller.binaryMessenger)
+      scheduledTaskNotifications.configure(messenger: controller.binaryMessenger)
 
       let oauthChannel = FlutterMethodChannel(name: "app.oauth", binaryMessenger: controller.binaryMessenger)
       oauthHandler.presentationAnchor = window
@@ -131,6 +133,21 @@
       }
     }
     return super.application(application, didFinishLaunchingWithOptions: launchOptions)
+  }
+
+  override func userNotificationCenter(
+    _ center: UNUserNotificationCenter,
+    willPresent notification: UNNotification,
+    withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void
+  ) {
+    // In the foreground the shared scheduler can execute the due task. Avoid
+    // displaying its fallback reminder immediately before its result arrives.
+    if notification.request.identifier.hasPrefix("scheduled-task:"),
+       notification.request.content.userInfo["scheduledPrepared"] as? Bool == false {
+      completionHandler([])
+      return
+    }
+    super.userNotificationCenter(center, willPresent: notification, withCompletionHandler: completionHandler)
   }
 
   override func applicationWillTerminate(_ application: UIApplication) {

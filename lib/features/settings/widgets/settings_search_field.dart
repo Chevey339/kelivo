@@ -25,7 +25,7 @@ class SettingsSearchField extends StatelessWidget {
     this.onSubmitted,
     this.onClear,
     this.reveal = 1,
-    this.editing = 1,
+    this.editing = const AlwaysStoppedAnimation(1),
   });
 
   final TextEditingController? controller;
@@ -34,7 +34,7 @@ class SettingsSearchField extends StatelessWidget {
   final ValueChanged<String>? onSubmitted;
   final VoidCallback? onClear;
   final double reveal;
-  final double editing;
+  final Animation<double> editing;
 
   @override
   Widget build(BuildContext context) {
@@ -55,6 +55,17 @@ class SettingsSearchField extends StatelessWidget {
       overflow: TextOverflow.ellipsis,
       style: hintStyle,
     );
+    final hasText = controller?.text.isNotEmpty ?? false;
+    // A query and the resting hint must not overlap while the field returns.
+    // An empty input can crossfade directly because both hints are identical.
+    final inputOpacity = hasText
+        ? editing.drive(CurveTween(curve: const Interval(0.5, 1)))
+        : editing;
+    final placeholderOpacity = hasText
+        ? ReverseAnimation(
+            editing,
+          ).drive(CurveTween(curve: const Interval(0.5, 1)))
+        : ReverseAnimation(editing);
 
     return ClipRRect(
       borderRadius: settingsSearchFieldRadius,
@@ -81,8 +92,8 @@ class SettingsSearchField extends StatelessWidget {
                         : Stack(
                             alignment: Alignment.centerLeft,
                             children: [
-                              Opacity(
-                                opacity: editing,
+                              FadeTransition(
+                                opacity: inputOpacity,
                                 child: TextField(
                                   controller: controller,
                                   focusNode: focusNode,
@@ -107,19 +118,18 @@ class SettingsSearchField extends StatelessWidget {
                                   ),
                                 ),
                               ),
-                              if (editing < 1)
-                                IgnorePointer(
-                                  child: Opacity(
-                                    opacity: 1 - editing,
-                                    child: placeholder,
-                                  ),
+                              IgnorePointer(
+                                child: FadeTransition(
+                                  opacity: placeholderOpacity,
+                                  child: placeholder,
                                 ),
+                              ),
                             ],
                           ),
                   ),
-                  if (controller != null && controller!.text.isNotEmpty)
-                    Opacity(
-                      opacity: editing,
+                  if (hasText)
+                    FadeTransition(
+                      opacity: inputOpacity,
                       child: IosIconButton(
                         icon: LucideIcons.circleX,
                         size: 16,

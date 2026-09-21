@@ -34,6 +34,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import 'desktop_workspace_button.dart';
+import 'workspace_default_notice.dart';
 
 class WorkspaceSection extends StatefulWidget {
   const WorkspaceSection({
@@ -122,13 +123,19 @@ class _WorkspaceSectionState extends State<WorkspaceSection> {
     final provider = context.read<WorkspaceProvider>();
     final id = await _ensureConversationId();
     if (id == null || !mounted) return;
-    await bindConversationWorkspace(
+    final notice = await bindConversationWorkspace(
       context.read<ChatService>(),
+      assistants: context.read<AssistantProvider>(),
       conversationId: id,
       workspace: workspace,
     );
     if (!mounted) return;
     unawaited(provider.touchLastUsed(workspace.id));
+    showWorkspaceDefaultNotice(
+      context,
+      notice: notice,
+      workspaceId: workspace.id,
+    );
   }
 
   Future<void> _unbind() => _writeBinding(const WorkspaceBinding());

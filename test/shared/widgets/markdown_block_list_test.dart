@@ -8,6 +8,56 @@ import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  testWidgets('scrolling inside the same visible blocks retains cached paint', (
+    tester,
+  ) async {
+    final scroll = ScrollController();
+    addTearDown(scroll.dispose);
+    final painted = <int>[];
+    final blocks = IncrementalMarkdownDocument().update(
+      List.generate(20, (i) => 'block $i').join('\n\n'),
+    );
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: Align(
+            alignment: Alignment.topLeft,
+            child: SizedBox(
+              width: 200,
+              height: 200,
+              child: SingleChildScrollView(
+                controller: scroll,
+                child: RepaintBoundary(
+                  child: MarkdownBlockList(
+                    blocks: blocks,
+                    signature: 0,
+                    itemBuilder: (_, i) => _PaintProbe(
+                      index: i,
+                      painted: painted,
+                      child: const SizedBox(
+                        width: 200,
+                        height: 100,
+                        child: ColoredBox(color: Colors.blue),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    painted.clear();
+    scroll.jumpTo(10);
+    await tester.pump();
+    expect(painted, isEmpty);
+    scroll.jumpTo(110);
+    await tester.pump();
+    expect(painted, contains(3));
+  });
+
   for (final nested in [false, true]) {
     testWidgets(
       'collapse paints every visible block in the current frame (nested: $nested)',

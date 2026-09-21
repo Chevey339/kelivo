@@ -1897,6 +1897,76 @@ class ChatDatabaseRepository {
     );
   }
 
+  /// Reads only row metadata, never long message bodies or attachment content.
+  /// Covers edits to old messages as well as selected versions and truncation.
+  Future<String?> scheduledContextRevision(String conversationId) async {
+    final conversation = await getConversation(conversationId);
+    if (conversation == null) return null;
+    final rows = await _db
+        .customSelect(
+          'SELECT id, message_order, COALESCE(updated_at, timestamp) AS revision '
+          'FROM message_rows WHERE conversation_id = ? ORDER BY message_order',
+          variables: [Variable.withString(conversationId)],
+        )
+        .get();
+    return sha256
+        .convert(
+          utf8.encode(
+            jsonEncode({
+              'assistant': conversation.assistantId,
+              'versions': conversation.versionSelections,
+              'truncate': conversation.truncateIndex,
+              'summary': conversation.summary,
+              'extras': conversation.extras,
+              'model': [
+                conversation.chatModelProvider,
+                conversation.chatModelId,
+              ],
+              'messages': [for (final row in rows) row.data],
+            }),
+          ),
+        )
+        .toString();
+  }
+
+  Future<Conversation> publishScheduledMessages({
+    required Conversation conversation,
+    required ChatMessage instruction,
+    required ChatMessage response,
+    required bool createConversation,
+    String? expectedContextRevision,
+  }) => _db.transaction(() async {
+    final existing = await getMessage(response.id);
+    if (existing != null) {
+      return (await getConversation(existing.conversationId))!;
+    }
+    var current = await getConversation(conversation.id);
+    if (current == null) {
+      if (!createConversation) throw StateError('conversation_missing');
+      await putConversation(conversation);
+      current = conversation;
+    }
+    if (current.assistantId != conversation.assistantId) {
+      throw StateError('conversation_missing');
+    }
+    if (expectedContextRevision != null &&
+        await scheduledContextRevision(current.id) != expectedContextRevision) {
+      throw StateError('scheduled_context_changed');
+    }
+    final afterInstruction = await _appendLinearMessageToConversation(
+      conversation: current,
+      message: instruction,
+      touchUpdatedAt: true,
+      selectVersion: false,
+    );
+    return _appendLinearMessageToConversation(
+      conversation: afterInstruction,
+      message: response,
+      touchUpdatedAt: true,
+      selectVersion: false,
+    );
+  });
+
   Future<Conversation?> getConversation(String id) async {
     return _observer.measure(
       ChatDatabaseOperation.queryConversation,
@@ -4063,8 +4133,7 @@ class ChatDatabaseRepository {
         );
       END;
     ''');
-    // Rare direct payload rewrites (e.g. sandbox path migration). Normal
-    // checkpoints delete+insert parts instead.
+    // Payload updates include streaming checkpoints and sandbox path rewrites.
     await _db.customStatement('''
       CREATE TRIGGER IF NOT EXISTS message_search_fts_update
       AFTER UPDATE OF payload, conversation_id, kind ON message_part_rows
@@ -4091,7 +4160,7 @@ class ChatDatabaseRepository {
     ''');
     // Streaming checkpoints defer FTS; when is_streaming flips to 0, index the
     // text parts present at that moment. The subsequent part rewrite (if any)
-    // then delete+inserts under the finalized gate.
+    // then updates changed parts under the finalized gate.
     await _db.customStatement('''
       CREATE TRIGGER IF NOT EXISTS message_search_fts_finalize
       AFTER UPDATE OF is_streaming ON message_rows
@@ -4791,9 +4860,12 @@ class ChatDatabaseRepository {
       message = message.copyWith(reasoningText: effectiveReasoningText);
     }
     final parts = _partsForPersistence(message, toolEvents);
-    await (_db.delete(
-      _db.messagePartRows,
-    )..where((row) => row.revisionId.equals(message.id))).go();
+    await (_db.delete(_db.messagePartRows)..where(
+          (row) =>
+              row.revisionId.equals(message.id) &
+              row.ordinal.isBiggerOrEqualValue(parts.length),
+        ))
+        .go();
     var ordinal = 0;
     final now = DateTime.now().toUtc();
     final updatedAt = now.isBefore(message.timestamp) ? message.timestamp : now;
@@ -4809,6 +4881,24 @@ class ChatDatabaseRepository {
             payload: part.encodePayload(),
             createdAt: message.timestamp,
             updatedAt: updatedAt,
+          ),
+          onConflict: DoUpdate<MessagePartRows, MessagePartRow>.withExcluded(
+            (old, incoming) => MessagePartRowsCompanion.custom(
+              conversationId: incoming.conversationId,
+              kind: incoming.kind,
+              payload: incoming.payload,
+              createdAt: incoming.createdAt,
+              updatedAt: incoming.updatedAt,
+            ),
+            target: [
+              _db.messagePartRows.revisionId,
+              _db.messagePartRows.ordinal,
+            ],
+            where: (old, incoming) =>
+                old.kind.isNotExp(incoming.kind) |
+                old.payload.isNotExp(incoming.payload) |
+                old.conversationId.isNotExp(incoming.conversationId) |
+                old.createdAt.isNotExp(incoming.createdAt),
           ),
         );
       }

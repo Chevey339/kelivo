@@ -89,6 +89,8 @@ class StreamingContentNotifier {
     String content,
     int totalTokens, {
     List<MessagePart>? parts,
+    String? reasoningText,
+    DateTime? reasoningStartAt,
     List<int>? contentSplitOffsets,
     List<int>? reasoningCountAtSplit,
     List<int>? toolCountAtSplit,
@@ -104,6 +106,8 @@ class StreamingContentNotifier {
         content: content,
         totalTokens: totalTokens,
         parts: parts ?? current.parts,
+        reasoningText: reasoningText,
+        reasoningStartAt: reasoningStartAt,
         contentSplitOffsets: contentSplitOffsets ?? current.contentSplitOffsets,
         reasoningCountAtSplit:
             reasoningCountAtSplit ?? current.reasoningCountAtSplit,

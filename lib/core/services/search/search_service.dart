@@ -28,6 +28,7 @@ import 'providers/kagi_search_service.dart';
 import 'providers/doubao_search_service.dart';
 import 'providers/kelivo_search_service.dart';
 import 'providers/parallel_search_service.dart';
+import 'providers/kimi_search_service.dart';
 import 'providers/you_search_service.dart';
 
 // Base interface for all search services
@@ -111,6 +112,8 @@ abstract class SearchService<T extends SearchServiceOptions> {
         return KelivoSearchService() as SearchService;
       case ParallelOptions _:
         return ParallelSearchService() as SearchService;
+      case KimiOptions _:
+        return KimiSearchService() as SearchService;
       case YouSearchOptions _:
         return YouSearchService() as SearchService;
       default:
@@ -177,7 +180,7 @@ class SearchCommonOptions {
   final int resultSize;
   final int timeout;
 
-  const SearchCommonOptions({this.resultSize = 10, this.timeout = 5000});
+  const SearchCommonOptions({this.resultSize = 10, this.timeout = 30000});
 
   Map<String, dynamic> toJson() => {
     'resultSize': resultSize,
@@ -187,7 +190,7 @@ class SearchCommonOptions {
   factory SearchCommonOptions.fromJson(Map<String, dynamic> json) =>
       SearchCommonOptions(
         resultSize: json['resultSize'] ?? 10,
-        timeout: json['timeout'] ?? 5000,
+        timeout: json['timeout'] ?? 30000,
       );
 }
 
@@ -271,6 +274,8 @@ abstract class SearchServiceOptions {
         return KelivoOptions.fromJson(json);
       case 'parallel':
         return ParallelOptions.fromJson(json);
+      case 'kimi':
+        return KimiOptions.fromJson(json);
       case 'you':
         return YouSearchOptions.fromJson(json);
       default:
@@ -1110,6 +1115,44 @@ class ParallelOptions extends SearchServiceOptions {
         mode: normalizeMode(json['mode']),
         extraApiKeys: SearchServiceOptions.parseExtraApiKeys(json),
       );
+}
+
+class KimiOptions extends SearchServiceOptions {
+  static const String defaultMode = 'pro';
+  static const List<String> modes = ['pro', 'basic'];
+
+  final String apiKey;
+  final String mode;
+
+  KimiOptions({
+    required super.id,
+    required this.apiKey,
+    this.mode = defaultMode,
+    super.extraApiKeys,
+  });
+
+  static String normalizeMode(String? value) {
+    final mode = (value ?? '').trim();
+    return modes.contains(mode) ? mode : defaultMode;
+  }
+
+  static String modeLabel(String mode) => mode == 'basic' ? 'Basic' : 'Pro';
+
+  @override
+  Map<String, dynamic> toJson() => {
+    'type': 'kimi',
+    'id': id,
+    'apiKey': apiKey,
+    'mode': mode,
+    if (extraApiKeys.isNotEmpty) 'apiKeys': extraApiKeys,
+  };
+
+  factory KimiOptions.fromJson(Map<String, dynamic> json) => KimiOptions(
+    id: json['id'],
+    apiKey: json['apiKey'] ?? '',
+    mode: normalizeMode(json['mode']),
+    extraApiKeys: SearchServiceOptions.parseExtraApiKeys(json),
+  );
 }
 
 class YouSearchOptions extends SearchServiceOptions {

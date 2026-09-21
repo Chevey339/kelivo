@@ -164,6 +164,7 @@ void main() {
         final firstWriteStarted = Completer<void>();
         final releaseFirstWrite = Completer<void>();
         final allChunksConsumed = Completer<void>();
+        final finalizationStarted = Completer<void>();
         final streamDone = Completer<void>();
         final writes = <int>[];
         final writer = LatestWinsCheckpointWriter<int>(
@@ -191,6 +192,7 @@ void main() {
           },
           onError: (error, stackTrace) async => fail('$error'),
           onDone: () async {
+            finalizationStarted.complete();
             await writer.finalize(() async => writes.add(consumed));
             streamDone.complete();
           },
@@ -210,6 +212,9 @@ void main() {
         expect(writes, hasLength(1));
         expect(streamDone.isCompleted, isFalse);
 
+        // Stream delivery may yield before onDone. Wait until finalize has
+        // dropped the pending checkpoint before releasing the in-flight write.
+        await finalizationStarted.future.timeout(const Duration(seconds: 1));
         releaseFirstWrite.complete();
         await streamDone.future.timeout(const Duration(seconds: 1));
         await closing;

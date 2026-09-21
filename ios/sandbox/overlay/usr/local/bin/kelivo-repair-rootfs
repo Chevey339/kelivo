@@ -1,0 +1,21 @@
+#!/bin/sh
+set -eu
+
+# apk preserves the existing world and records files, versions and dependencies.
+# This also adopts the bash/coreutils files shipped by older rootfs builders.
+set -- alpine-release musl bash coreutils
+apk --wait 60 --no-cache add --upgrade "$@"
+
+# Registered packages may have missing or damaged files at the same version.
+# Include dependencies: Bash's libraries and the split coreutils packages.
+apk --wait 60 --no-cache fix --reinstall --depends "$@"
+
+apk info --installed "$@"
+test -s /etc/alpine-release
+grep -qx 'ID=alpine' /etc/os-release
+grep -qx 'ID=alpine' /usr/lib/os-release
+
+# Readiness requires usable commands, not only package database entries.
+/bin/bash --noprofile --norc -c 'test -n "$BASH_VERSION"'
+/bin/ls --version >/dev/null
+/usr/bin/env --version >/dev/null

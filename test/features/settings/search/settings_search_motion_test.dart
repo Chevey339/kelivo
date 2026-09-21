@@ -43,11 +43,12 @@ void main() {
   Future<GlobalKey> pumpSettings(
     WidgetTester tester, {
     Brightness brightness = Brightness.light,
+    TargetPlatform platform = TargetPlatform.iOS,
     bool reduceMotion = false,
     Size size = const Size(390, 844),
     FakeViewPadding padding = const FakeViewPadding(top: 47, bottom: 34),
   }) async {
-    debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
+    debugDefaultTargetPlatformOverride = platform;
     addTearDown(() => debugDefaultTargetPlatformOverride = null);
     tester.view.devicePixelRatio = 1;
     tester.view.physicalSize = size;
@@ -107,6 +108,362 @@ void main() {
   ScrollController scroll(WidgetTester tester) => tester
       .widget<CustomScrollView>(find.byType(CustomScrollView).first)
       .controller!;
+
+  Future<void> openSearch(WidgetTester tester) async {
+    await pumpSettings(tester);
+    scroll(tester).jumpTo(0);
+    await tester.pumpAndSettle();
+    await tester.tap(find.byType(SettingsSearchEntry));
+    await tester.pumpAndSettle();
+  }
+
+  testWidgets('opening does not recreate the input on animation ticks', (
+    tester,
+  ) async {
+    try {
+      await pumpSettings(tester);
+      scroll(tester).jumpTo(0);
+      await tester.pumpAndSettle();
+      await tester.tap(find.byType(SettingsSearchEntry));
+      await tester.pump();
+      var previous = tester.widget<TextField>(find.byType(TextField));
+      var replacements = 0;
+      for (var i = 0; i < 20; i++) {
+        await tester.pump(const Duration(milliseconds: 10));
+        final current = tester.widget<TextField>(find.byType(TextField));
+        if (!identical(previous, current)) replacements++;
+        previous = current;
+      }
+      expect(replacements, 0);
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
+    } finally {
+      debugDefaultTargetPlatformOverride = null;
+    }
+  });
+
+  testWidgets('keyboard focus waits until the field finishes moving', (
+    tester,
+  ) async {
+    try {
+      await pumpSettings(tester);
+      scroll(tester).jumpTo(0);
+      await tester.pumpAndSettle();
+      await tester.tap(find.byType(SettingsSearchEntry));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 200));
+      await tester.pump();
+      expect(tester.testTextInput.isVisible, isFalse);
+      await tester.pumpAndSettle();
+      expect(tester.testTextInput.isVisible, isTrue);
+    } finally {
+      debugDefaultTargetPlatformOverride = null;
+    }
+  });
+
+  testWidgets('right swipe follows the finger and a short swipe rebounds', (
+    tester,
+  ) async {
+    try {
+      await openSearch(tester);
+      await tester.enterText(find.byType(TextField), '字体');
+      await tester.pumpAndSettle();
+      final view = find.byType(SettingsSearchView);
+      final target = tester.getRect(surface(view));
+      final origin = tester.getRect(surface(find.byType(SettingsSearchEntry)));
+      final inputState = tester.state(find.byType(EditableText));
+      final navigator = tester.state<NavigatorState>(find.byType(Navigator));
+      final gesture = await tester.startGesture(const Offset(30, 320));
+      await gesture.moveBy(const Offset(24, 0));
+      await tester.pump();
+      final start = tester.getRect(surface(view));
+      await gesture.moveBy(
+        const Offset(78, 0),
+        timeStamp: const Duration(milliseconds: 200),
+      );
+      await tester.pump();
+      final moving = tester.getRect(surface(view));
+      expect(
+        moving.top - start.top,
+        closeTo((origin.top - target.top) * 0.2, 0.1),
+      );
+      expect(navigator.userGestureInProgress, isTrue);
+      expect(tester.state(find.byType(EditableText)), same(inputState));
+      await gesture.up(timeStamp: const Duration(milliseconds: 500));
+      await tester.pump();
+      expect(tester.getRect(surface(view)).top, closeTo(moving.top, 0.1));
+      await tester.pump(const Duration(milliseconds: 80));
+      expect(
+        tester.getRect(surface(view)).top,
+        inExclusiveRange(target.top, moving.top),
+      );
+      await tester.pumpAndSettle();
+      expect(tester.getRect(surface(view)), target);
+      expect(
+        tester.widget<TextField>(find.byType(TextField)).controller!.text,
+        '字体',
+      );
+      expect(tester.testTextInput.isVisible, isTrue);
+      expect(navigator.userGestureInProgress, isFalse);
+      await tester.tap(find.text('取消'));
+      await tester.pumpAndSettle();
+      expect(view, findsNothing);
+    } finally {
+      debugDefaultTargetPlatformOverride = null;
+    }
+  });
+
+  testWidgets('right swipe dismisses with animation and restores the entry', (
+    tester,
+  ) async {
+    try {
+      await openSearch(tester);
+      final view = find.byType(SettingsSearchView);
+      final origin = tester.getRect(surface(find.byType(SettingsSearchEntry)));
+      final navigator = tester.state<NavigatorState>(find.byType(Navigator));
+      final gesture = await tester.startGesture(const Offset(30, 320));
+      await gesture.moveBy(const Offset(24, 0));
+      await tester.pump();
+      await gesture.moveBy(
+        const Offset(230, 0),
+        timeStamp: const Duration(milliseconds: 300),
+      );
+      await tester.pump();
+      final moving = tester.getRect(surface(view));
+      await gesture.up(timeStamp: const Duration(milliseconds: 600));
+      await tester.pump();
+      expect(view, findsOneWidget);
+      expect(tester.getRect(surface(view)).top, closeTo(moving.top, 0.1));
+      await tester.pump(const Duration(milliseconds: 50));
+      expect(
+        tester.getRect(surface(view)).top,
+        inExclusiveRange(moving.top, origin.top),
+      );
+      expect(tester.testTextInput.isVisible, isFalse);
+      await tester.pumpAndSettle();
+      expect(view, findsNothing);
+      expect(navigator.userGestureInProgress, isFalse);
+      expect(tester.getRect(surface(find.byType(SettingsSearchEntry))), origin);
+      await tester.tap(find.byType(SettingsSearchEntry));
+      await tester.pumpAndSettle();
+      expect(view, findsOneWidget);
+      expect(tester.takeException(), isNull);
+    } finally {
+      debugDefaultTargetPlatformOverride = null;
+    }
+  });
+
+  testWidgets(
+    'cancelled swipe restores search and does not leave navigation busy',
+    (tester) async {
+      try {
+        await openSearch(tester);
+        final view = find.byType(SettingsSearchView);
+        final target = tester.getRect(surface(view));
+        final navigator = tester.state<NavigatorState>(find.byType(Navigator));
+        final gesture = await tester.startGesture(const Offset(30, 320));
+        await gesture.moveBy(const Offset(24, 0));
+        await tester.pump();
+        await gesture.moveBy(const Offset(230, 0));
+        await tester.pump();
+        expect(tester.getRect(surface(view)).top, greaterThan(target.top));
+        await gesture.cancel();
+        await tester.pumpAndSettle();
+        expect(tester.getRect(surface(view)), target);
+        expect(navigator.userGestureInProgress, isFalse);
+        expect(tester.testTextInput.isVisible, isTrue);
+        await tester.binding.handlePopRoute();
+        await tester.pumpAndSettle();
+        expect(view, findsNothing);
+        expect(tester.takeException(), isNull);
+      } finally {
+        debugDefaultTargetPlatformOverride = null;
+      }
+    },
+  );
+
+  for (final platform in [TargetPlatform.iOS, TargetPlatform.android]) {
+    testWidgets('a short fast swipe dismisses on ${platform.name}', (
+      tester,
+    ) async {
+      try {
+        await pumpSettings(tester, platform: platform);
+        scroll(tester).jumpTo(0);
+        await tester.pumpAndSettle();
+        await tester.tap(find.byType(SettingsSearchEntry));
+        await tester.pumpAndSettle();
+        await tester.flingFrom(
+          const Offset(30, 320),
+          const Offset(110, 0),
+          1500,
+        );
+        await tester.pumpAndSettle();
+        expect(find.byType(SettingsSearchView), findsNothing);
+        expect(find.byType(SettingsSearchEntry).hitTestable(), findsOneWidget);
+        expect(tester.takeException(), isNull);
+      } finally {
+        debugDefaultTargetPlatformOverride = null;
+      }
+    });
+  }
+
+  testWidgets('a full-width cancelled swipe still returns to search', (
+    tester,
+  ) async {
+    try {
+      await openSearch(tester);
+      final view = find.byType(SettingsSearchView);
+      final target = tester.getRect(surface(view));
+      final navigator = tester.state<NavigatorState>(find.byType(Navigator));
+      final gesture = await tester.startGesture(const Offset(1, 320));
+      await gesture.moveBy(const Offset(24, 0));
+      await tester.pump();
+      await gesture.moveBy(const Offset(390, 0));
+      await tester.pump();
+      expect(view, findsOneWidget);
+      expect(navigator.userGestureInProgress, isTrue);
+      await gesture.cancel();
+      await tester.pumpAndSettle();
+      expect(tester.getRect(surface(view)), target);
+      expect(navigator.userGestureInProgress, isFalse);
+      expect(tester.takeException(), isNull);
+    } finally {
+      debugDefaultTargetPlatformOverride = null;
+    }
+  });
+
+  testWidgets('system back during a swipe closes once and allows reopening', (
+    tester,
+  ) async {
+    try {
+      await openSearch(tester);
+      final navigator = tester.state<NavigatorState>(find.byType(Navigator));
+      final gesture = await tester.startGesture(const Offset(30, 320));
+      await gesture.moveBy(const Offset(24, 0));
+      await tester.pump();
+      await gesture.moveBy(const Offset(80, 0));
+      await tester.pump();
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      await gesture.up();
+      expect(find.byType(SettingsSearchView), findsNothing);
+      expect(navigator.userGestureInProgress, isFalse);
+      await tester.tap(find.byType(SettingsSearchEntry));
+      await tester.pumpAndSettle();
+      expect(find.byType(SettingsSearchView), findsOneWidget);
+      expect(tester.testTextInput.isVisible, isTrue);
+      expect(tester.takeException(), isNull);
+    } finally {
+      debugDefaultTargetPlatformOverride = null;
+    }
+  });
+
+  testWidgets('vertical scrolling and input selection do not dismiss search', (
+    tester,
+  ) async {
+    try {
+      await openSearch(tester);
+      final view = find.byType(SettingsSearchView);
+      final target = tester.getRect(surface(view));
+      await tester.enterText(find.byType(TextField), '设置');
+      await tester.pumpAndSettle();
+      await tester.dragFrom(const Offset(130, 350), const Offset(0, -140));
+      await tester.pumpAndSettle();
+      final list = tester.widget<ListView>(
+        find.descendant(of: view, matching: find.byType(ListView)),
+      );
+      expect(list.controller!.offset, greaterThan(0));
+      await tester.drag(find.byType(TextField), const Offset(100, 0));
+      await tester.pumpAndSettle();
+      expect(tester.getRect(surface(view)), target);
+      expect(
+        tester.widget<TextField>(find.byType(TextField)).controller!.text,
+        '设置',
+      );
+      expect(
+        tester
+            .state<NavigatorState>(find.byType(Navigator))
+            .userGestureInProgress,
+        isFalse,
+      );
+      expect(tester.takeException(), isNull);
+    } finally {
+      debugDefaultTargetPlatformOverride = null;
+    }
+  });
+
+  testWidgets('disposing the navigator during a swipe releases the gesture', (
+    tester,
+  ) async {
+    try {
+      await openSearch(tester);
+      final gesture = await tester.startGesture(const Offset(30, 320));
+      await gesture.moveBy(const Offset(24, 0));
+      await tester.pump();
+      await gesture.moveBy(const Offset(80, 0));
+      await tester.pump();
+      await tester.pumpWidget(const SizedBox());
+      await gesture.up();
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
+    } finally {
+      debugDefaultTargetPlatformOverride = null;
+    }
+  });
+
+  testWidgets('reduced motion also finishes an interactive dismissal', (
+    tester,
+  ) async {
+    try {
+      await pumpSettings(tester, reduceMotion: true);
+      scroll(tester).jumpTo(0);
+      await tester.pumpAndSettle();
+      await tester.tap(find.byType(SettingsSearchEntry));
+      await tester.pumpAndSettle();
+      await tester.dragFrom(const Offset(30, 320), const Offset(260, 0));
+      await tester.pumpAndSettle();
+      expect(find.byType(SettingsSearchView), findsNothing);
+      expect(
+        tester
+            .state<NavigatorState>(find.byType(Navigator))
+            .userGestureInProgress,
+        isFalse,
+      );
+      expect(tester.takeException(), isNull);
+    } finally {
+      debugDefaultTargetPlatformOverride = null;
+    }
+  });
+
+  testWidgets('a left swipe does not move search or dismiss the keyboard', (
+    tester,
+  ) async {
+    try {
+      await openSearch(tester);
+      final view = find.byType(SettingsSearchView);
+      final target = tester.getRect(surface(view));
+      final gesture = await tester.startGesture(const Offset(300, 320));
+      await gesture.moveBy(const Offset(-24, 0));
+      await tester.pump();
+      await gesture.moveBy(const Offset(-150, 0));
+      await tester.pump();
+      expect(tester.getRect(surface(view)), target);
+      expect(tester.testTextInput.isVisible, isTrue);
+      expect(
+        tester
+            .state<NavigatorState>(find.byType(Navigator))
+            .userGestureInProgress,
+        isFalse,
+      );
+      await gesture.up();
+      await tester.pumpAndSettle();
+      expect(view, findsOneWidget);
+      expect(tester.testTextInput.isVisible, isTrue);
+      expect(tester.takeException(), isNull);
+    } finally {
+      debugDefaultTargetPlatformOverride = null;
+    }
+  });
 
   testWidgets('collapsing actually shrinks the field and fades its content', (
     tester,
@@ -303,6 +660,28 @@ void main() {
           );
           await tester.pumpAndSettle();
           await record('results', hold: 900);
+          final gesture = await tester.startGesture(const Offset(30, 320));
+          await gesture.moveBy(const Offset(24, 0));
+          await tester.pump();
+          for (var i = 1; i <= 6; i++) {
+            await gesture.moveBy(
+              const Offset(24, 0),
+              timeStamp: Duration(milliseconds: i * 60),
+            );
+            await tester.pump(const Duration(milliseconds: 60));
+            expect(tester.state(editable), same(inputState));
+            expect(tester.getRect(find.byType(SettingsPage)), settingsBounds);
+            await record('swiping', hold: 60);
+          }
+          await gesture.up(timeStamp: const Duration(milliseconds: 600));
+          await tester.pump();
+          for (var i = 0; i < 8; i++) {
+            await tester.pump(const Duration(milliseconds: 30));
+            await record('rebounding');
+          }
+          await tester.pumpAndSettle();
+          expect(tester.getRect(surface(view)), top);
+          await record('rebounded', hold: 400);
           await tester.tap(find.text('取消'));
           await tester.pump();
           for (var i = 0; i < 9; i++) {

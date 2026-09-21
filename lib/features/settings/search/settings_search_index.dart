@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/widgets.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
@@ -447,7 +448,9 @@ class SettingsSearchIndex {
         keywords: 'storage cache cleanup database 存储 儲存 缓存 快取 空间 空間 清理 数据库 資料庫',
       );
     }
-    if (desktop || platform == TargetPlatform.android) {
+    if (desktop ||
+        platform == TargetPlatform.android ||
+        platform == TargetPlatform.iOS) {
       add(
         'scheduledTasks',
         SettingsSearchDestination.scheduledTasks,
@@ -850,6 +853,13 @@ class SettingsSearchIndex {
         'desktopDisplaySettingsTopicPositionTitle',
         SettingsSearchDestination.display,
         (l) => l.desktopDisplaySettingsTopicPositionTitle,
+      );
+    }
+    if (!kIsWeb && platform == TargetPlatform.linux) {
+      add(
+        'linuxHideTitleBarTitle',
+        SettingsSearchDestination.display,
+        (l) => l.linuxHideTitleBarTitle,
       );
     }
     if (desktop) {

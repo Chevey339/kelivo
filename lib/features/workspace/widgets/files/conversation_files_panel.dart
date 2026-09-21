@@ -3,6 +3,7 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:Kelivo/core/models/workspace.dart';
+import 'package:Kelivo/core/providers/assistant_provider.dart';
 import 'package:Kelivo/core/models/workspace_binding.dart';
 import 'package:Kelivo/core/providers/workspace_provider.dart';
 import 'package:Kelivo/core/services/chat/chat_service.dart';
@@ -14,6 +15,7 @@ import 'package:Kelivo/features/settings/widgets/custom_theme_widgets.dart';
 import 'package:Kelivo/features/workspace/widgets/files/file_browser.dart';
 import 'package:Kelivo/features/workspace/widgets/files/file_browser_ops.dart';
 import 'package:Kelivo/features/workspace/widgets/workspace_picker.dart';
+import 'package:Kelivo/features/workspace/widgets/workspace_default_notice.dart';
 import 'package:Kelivo/icons/lucide_adapter.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
 import 'package:Kelivo/features/workspace/workspace_layout.dart';
@@ -135,13 +137,15 @@ class ConversationFilesPanelState extends State<ConversationFilesPanel> {
     final chosen = await pickWorkspaceForConversation(context);
     if (chosen == null || !mounted) return;
     final provider = context.read<WorkspaceProvider>();
-    await bindConversationWorkspace(
+    final notice = await bindConversationWorkspace(
       context.read<ChatService>(),
+      assistants: context.read<AssistantProvider>(),
       conversationId: widget.conversationId,
       workspace: chosen,
     );
     unawaited(provider.touchLastUsed(chosen.id));
     if (!mounted) return;
+    showWorkspaceDefaultNotice(context, notice: notice, workspaceId: chosen.id);
     await load();
   }
 

@@ -128,6 +128,8 @@ Future<Map<String, Object?>> runScheduledTask(
       assistant: assistant,
       modelOverride: modelOverride,
       onGenerationStarted: onStarted,
+      scheduledNotify: task.notify,
+      scheduledPreview: task.showPreview,
     );
   } else {
     result = await viewModel.sendScheduledMessage(
@@ -136,6 +138,8 @@ Future<Map<String, Object?>> runScheduledTask(
       assistant: assistant,
       modelOverride: modelOverride,
       onGenerationStarted: onStarted,
+      scheduledNotify: task.notify,
+      scheduledPreview: task.showPreview,
     );
   }
   if (cancellation.cancelled) await cancellation.cancel();

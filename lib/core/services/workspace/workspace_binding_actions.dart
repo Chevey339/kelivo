@@ -23,22 +23,50 @@ Map<String, dynamic> workspaceExtrasForNewConversation({
   ).applyTo({});
 }
 
-/// Binds [conversationId] to [workspace], starting in its default cwd.
-///
-/// Only the conversation changes. [Assistant.defaultWorkspaceId] is the
-/// template new conversations copy, so it is only ever set explicitly.
-Future<void> bindConversationWorkspace(
+typedef WorkspaceDefaultNotice = ({
+  Assistant assistant,
+  bool automaticallyRemembered,
+});
+
+/// Binds the conversation and handles the assistant's one-time default setup.
+Future<WorkspaceDefaultNotice?> bindConversationWorkspace(
   ChatService chat, {
+  required AssistantProvider assistants,
   required String conversationId,
   required Workspace workspace,
-}) {
-  return chat.updateConversationExtras(
+}) async {
+  await assistants.loaded;
+  await chat.updateConversationExtras(
     conversationId,
     WorkspaceBinding(
       workspaceId: workspace.id,
       cwd: workspace.defaultCwd,
     ).applyTo,
   );
+  final conversation = chat.getConversation(conversationId);
+  if (conversation == null ||
+      chat.isTemporaryConversation(conversationId) ||
+      WorkspaceBinding.fromExtras(conversation.extras).workspaceId !=
+          workspace.id) {
+    return null;
+  }
+  final assistantId = conversation.assistantId;
+  final assistant = assistantId == null
+      ? null
+      : assistants.getById(assistantId);
+  if (assistant == null ||
+      (assistant.defaultWorkspaceId?.isNotEmpty ?? false) ||
+      assistant.defaultWorkspaceSetup == DefaultWorkspaceSetup.completed) {
+    return null;
+  }
+  final automaticallyRemembered =
+      assistant.defaultWorkspaceSetup == DefaultWorkspaceSetup.automatic;
+  final updated = assistant.copyWith(
+    defaultWorkspaceId: automaticallyRemembered ? workspace.id : null,
+    defaultWorkspaceSetup: DefaultWorkspaceSetup.completed,
+  );
+  await assistants.updateAssistant(updated);
+  return (assistant: updated, automaticallyRemembered: automaticallyRemembered);
 }
 
 /// Clears [Assistant.defaultWorkspaceId] on every assistant bound to [workspaceId].

@@ -613,6 +613,30 @@ class _SearchServiceEditorPageState extends State<SearchServiceEditorPage> {
         ),
       ];
     }
+    if (service is KimiOptions) {
+      return [
+        field(
+          key: 'apiKey',
+          label: l10n.searchServicesDialogApiKey,
+          obscure: true,
+          validator: requiredApiKey,
+        ),
+        _buildMultiKeyEntry(context),
+        _SearchEditorDropdown(
+          key: const ValueKey('search-service-field-mode'),
+          label: l10n.searchServicesDialogSearchMode,
+          value: KimiOptions.normalizeMode(_text('mode')),
+          items: [
+            for (final mode in KimiOptions.modes)
+              (value: mode, label: KimiOptions.modeLabel(mode)),
+          ],
+          onChanged: (value) {
+            _controller('mode').text = value;
+            _markDirty();
+          },
+        ),
+      ];
+    }
     if (service is YouSearchOptions) {
       return [
         field(
@@ -1231,6 +1255,9 @@ class _SearchServiceEditorPageState extends State<SearchServiceEditorPage> {
     } else if (service is ParallelOptions) {
       _putController('apiKey', service.apiKey);
       _putController('mode', service.mode);
+    } else if (service is KimiOptions) {
+      _putController('apiKey', service.apiKey);
+      _putController('mode', service.mode);
     } else if (service is YouSearchOptions) {
       _putController('apiKey', service.apiKey);
       _putController('contentMode', service.contentMode);
@@ -1434,6 +1461,13 @@ class _SearchServiceEditorPageState extends State<SearchServiceEditorPage> {
           apiKey: _text('apiKey'),
           extraApiKeys: _extraApiKeys,
           mode: ParallelOptions.normalizeMode(_text('mode')),
+        );
+      case 'kimi':
+        return KimiOptions(
+          id: _serviceId,
+          apiKey: _text('apiKey'),
+          extraApiKeys: _extraApiKeys,
+          mode: KimiOptions.normalizeMode(_text('mode')),
         );
       case 'you':
         return YouSearchOptions(
@@ -2468,6 +2502,7 @@ String _typeForService(SearchServiceOptions service) {
   if (service is TinyFishOptions) return 'tinyfish';
   if (service is AnySearchOptions) return 'anysearch';
   if (service is ParallelOptions) return 'parallel';
+  if (service is KimiOptions) return 'kimi';
   if (service is YouSearchOptions) return 'you';
   if (service is KelivoOptions) return 'kelivo';
   return 'bing_local';
@@ -2526,6 +2561,8 @@ SearchServiceOptions _defaultService(String type, String id) {
       return AnySearchOptions(id: id, apiKey: '');
     case 'parallel':
       return ParallelOptions(id: id, apiKey: '');
+    case 'kimi':
+      return KimiOptions(id: id, apiKey: '');
     case 'you':
       return YouSearchOptions(id: id, apiKey: '');
     case 'kelivo':
@@ -2584,6 +2621,8 @@ String _serviceTypeName(BuildContext context, String type) {
       return l10n.searchServiceNameAnySearch;
     case 'parallel':
       return l10n.searchServiceNameParallel;
+    case 'kimi':
+      return l10n.searchServiceNameKimi;
     case 'you':
       return l10n.searchServiceNameYou;
     case 'kelivo':
@@ -2617,6 +2656,7 @@ const _providerTypes = <({String type, String brand})>[
   (type: 'tinyfish', brand: 'tinyfish'),
   (type: 'anysearch', brand: 'anysearch'),
   (type: 'parallel', brand: 'parallel'),
+  (type: 'kimi', brand: 'kimi'),
   (type: 'you', brand: 'you'),
 ];
 

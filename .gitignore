@@ -68,3 +68,7 @@ internationalization.md
 /skills-lock.json
 /.scratch/
 /.grok/
+
+# Local iOS profiling tools and device measurements
+/docs/performance/ios-device-*/
+/tool/ios_performance/

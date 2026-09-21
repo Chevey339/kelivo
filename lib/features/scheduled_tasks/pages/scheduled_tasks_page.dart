@@ -11,6 +11,7 @@ import '../widgets/scheduled_tasks_scaffold.dart';
 import 'scheduled_task_editor_page.dart';
 import '../../../core/services/notification_service.dart';
 import '../../../core/services/scheduled_tasks_service.dart';
+import '../../../core/services/scheduled_task_preparation.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../shared/widgets/form_sheet.dart';
@@ -61,16 +62,21 @@ class _ScheduledTasksPageState extends State<ScheduledTasksPage>
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     service.addListener(_changed);
-    unawaited(service.refresh());
+    unawaited(_refresh());
   }
 
   void _changed() {
     if (mounted) setState(() {});
   }
 
+  Future<void> _refresh() async {
+    await service.refresh();
+    if (mounted) await service.preparePendingTasks();
+  }
+
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed) unawaited(service.refresh());
+    if (state == AppLifecycleState.resumed) unawaited(_refresh());
   }
 
   @override
@@ -113,7 +119,9 @@ class _ScheduledTasksPageState extends State<ScheduledTasksPage>
   }
 
   Future<void> _save(ScheduledTask task, {bool? enabled}) async {
-    if (!service.isDesktop && (enabled ?? task.enabled)) {
+    if (service.isIOS && task.notify && (enabled ?? task.enabled)) {
+      await service.requestPermission();
+    } else if (!service.isDesktop && (enabled ?? task.enabled)) {
       await widget.requestNotificationsPermission();
     }
     await service.save(task, enabled: enabled);
@@ -131,6 +139,12 @@ class _ScheduledTasksPageState extends State<ScheduledTasksPage>
           value: 'run',
           icon: LucideIcons.play,
           label: l.scheduledTasksRunNow,
+        ),
+      if (service.isIOS && !original.running)
+        OptionSheetItem(
+          value: 'prepare',
+          icon: LucideIcons.sparkles,
+          label: l.scheduledTasksPrepareNow,
         ),
       OptionSheetItem(
         value: 'history',
@@ -170,11 +184,57 @@ class _ScheduledTasksPageState extends State<ScheduledTasksPage>
           context,
           title: original.name,
           items: items,
+          footer: service.isIOS && !original.running
+              ? IosSectionFooter(text: l.scheduledTasksPrepareNowDetail)
+              : null,
         );
       }
     }
     if (!mounted) return;
     switch (action) {
+      case 'prepare':
+        await _perform(() async {
+          if (original.notify) await service.requestPermission();
+          final status = await service.prepareNow(original.id);
+          if (!mounted) return;
+          final task =
+              service.tasks.where((t) => t.id == original.id).firstOrNull ??
+              original;
+          final run = task.runs.where((r) => r.awaitingPublication).firstOrNull;
+          final message = switch (status) {
+            ScheduledTaskPreparationStatus.prepared =>
+              l.scheduledTasksPrepareNowReady,
+            ScheduledTaskPreparationStatus.preparing =>
+              l.scheduledTasksPrepareNowStarted,
+            ScheduledTaskPreparationStatus.queued =>
+              l.scheduledTasksPrepareNowBusy,
+            ScheduledTaskPreparationStatus.waitingForChat =>
+              l.scheduledTasksPrepareNowChatBusy,
+            ScheduledTaskPreparationStatus.attemptsExhausted =>
+              l.scheduledTasksPreparationAttemptsUsed(
+                run?.prepareAttempts ?? 0,
+                task.maxPrepareAttempts,
+              ),
+            ScheduledTaskPreparationStatus.hourlyLimit =>
+              l.scheduledTasksPreparationHourlyLimitDetail,
+            ScheduledTaskPreparationStatus.disabled =>
+              l.scheduledTasksPrepareNowDisabled,
+            ScheduledTaskPreparationStatus.unavailable =>
+              run?.error == null
+                  ? l.scheduledTasksPrepareNowUnavailable
+                  : _error(run!.error!, l),
+            _ => l.scheduledTasksPrepareNowNoUpcoming,
+          };
+          showAppSnackBar(
+            context,
+            message: message,
+            type:
+                status == ScheduledTaskPreparationStatus.prepared ||
+                    status == ScheduledTaskPreparationStatus.preparing
+                ? NotificationType.success
+                : NotificationType.warning,
+          );
+        });
       case 'run':
         await _perform(() async {
           if (!service.isDesktop) await widget.requestNotificationsPermission();
@@ -219,7 +279,7 @@ class _ScheduledTasksPageState extends State<ScheduledTasksPage>
                       children: [
                         IosNavRow(
                           label: _status(run.status, l),
-                          detailText: _date(run.startedAt, l),
+                          detailText: _date(run.displayTime, l),
                           icon: run.status == 'completed'
                               ? LucideIcons.check
                               : LucideIcons.clock,
@@ -299,10 +359,19 @@ class _ScheduledTasksPageState extends State<ScheduledTasksPage>
   String _status(String status, AppLocalizations l) => switch (status) {
     'completed' => l.scheduledTasksCompleted,
     'running' => l.scheduledTasksRunning,
+    'pending' => l.scheduledTasksPendingPreparation,
+    'preparing' => l.scheduledTasksPreparing,
+    'prepared' || 'publishing' => l.scheduledTasksPrepared,
+    'reminded' => l.scheduledTasksReminded,
+    'skipped' => l.scheduledTasksSkipped,
+    'cancelled' => l.scheduledTasksCancelled,
     'interrupted' => l.scheduledTasksInterrupted,
     _ => l.scheduledTasksFailed,
   };
   String _error(String value, AppLocalizations l) {
+    if (value == 'preparation_context_changed') {
+      return l.scheduledTasksPreparationContextChanged;
+    }
     if (value.contains('user_interaction_required')) {
       return l.scheduledTasksNeedsInput;
     }
@@ -321,10 +390,14 @@ class _ScheduledTasksPageState extends State<ScheduledTasksPage>
     }
     if (value.contains('model_missing')) return l.scheduledTasksModelMissing;
     if (value.contains('in_flight')) return l.scheduledTasksChatBusy;
+    if (value.startsWith('preparation_context_unavailable:')) {
+      return l.scheduledTasksPreparationReadFailed;
+    }
     return value;
   }
 
-  String _taskDetail(ScheduledTask task, AppLocalizations l) => task.running
+  String _desktopTaskDetail(ScheduledTask task, AppLocalizations l) =>
+      task.running
       ? l.scheduledTasksRunning
       : task.exhausted
       ? l.scheduledTasksFinished
@@ -411,6 +484,85 @@ class _ScheduledTasksPageState extends State<ScheduledTasksPage>
     );
   }
 
+  String _taskDetail(ScheduledTask task, AppLocalizations l) {
+    if (!service.isIOS &&
+        !service.isDesktop &&
+        !service.exactAlarms &&
+        task.enabled &&
+        !task.running) {
+      return l.scheduledTasksWaitingPermission;
+    }
+    return _desktopTaskDetail(task, l);
+  }
+
+  String? _preparationLabel(ScheduledTask task, AppLocalizations l) {
+    if (!service.isIOS || !task.enabled) return null;
+    return switch (service.preparationStatus(task)) {
+      ScheduledTaskPreparationStatus.disabled => l.scheduledTasksPreparationOff,
+      ScheduledTaskPreparationStatus.preparing => l.scheduledTasksPreparing,
+      ScheduledTaskPreparationStatus.prepared => l.scheduledTasksPrepared,
+      ScheduledTaskPreparationStatus.awaitingPublication =>
+        l.scheduledTasksPreparationPublishing,
+      ScheduledTaskPreparationStatus.waitingForChat =>
+        l.scheduledTasksPreparationIdle,
+      ScheduledTaskPreparationStatus.queued =>
+        l.scheduledTasksPreparationQueued,
+      ScheduledTaskPreparationStatus.outsideWindow =>
+        l.scheduledTasksPreparationWindowWaiting,
+      ScheduledTaskPreparationStatus.cooldown =>
+        l.scheduledTasksPreparationCooldownWaiting,
+      ScheduledTaskPreparationStatus.attemptsExhausted =>
+        l.scheduledTasksPreparationLimitReached,
+      ScheduledTaskPreparationStatus.hourlyLimit =>
+        l.scheduledTasksPreparationHourlyLimit,
+      ScheduledTaskPreparationStatus.unavailable =>
+        l.scheduledTasksPreparationUnavailable,
+      _ => l.scheduledTasksPendingPreparation,
+    };
+  }
+
+  String? _preparationDetail(ScheduledTask task, AppLocalizations l) {
+    if (!service.isIOS || !task.enabled) return null;
+    final run = task.runs.where((r) => r.awaitingPublication).firstOrNull;
+    final status = service.preparationStatus(task);
+    if (status == ScheduledTaskPreparationStatus.prepared) {
+      if (run?.error?.startsWith('preparation_context_unavailable:') == true) {
+        return l.scheduledTasksPreparationResultRetained;
+      }
+      if (task.notify && run?.notificationState != 'registered') {
+        return l.scheduledTasksNotificationUnavailable;
+      }
+      return null;
+    }
+    return switch (status) {
+      ScheduledTaskPreparationStatus.queued =>
+        l.scheduledTasksPreparationQueuedDetail,
+      ScheduledTaskPreparationStatus.waitingForChat =>
+        l.scheduledTasksPreparationIdleDetail,
+      ScheduledTaskPreparationStatus.attemptsExhausted =>
+        l.scheduledTasksPreparationAttemptsUsed(
+          run?.prepareAttempts ?? 0,
+          task.maxPrepareAttempts,
+        ),
+      ScheduledTaskPreparationStatus.hourlyLimit =>
+        l.scheduledTasksPreparationHourlyLimitDetail,
+      ScheduledTaskPreparationStatus.cooldown when run?.lastPrepareAt != null =>
+        l.scheduledTasksPreparationRetryAt(
+          _date(
+            run!.lastPrepareAt!.add(
+              Duration(minutes: task.preparationCooldownMinutes),
+            ),
+            l,
+          ),
+        ),
+      ScheduledTaskPreparationStatus.unavailable =>
+        l.scheduledTasksPreparationReadFailed,
+      ScheduledTaskPreparationStatus.awaitingPublication =>
+        l.scheduledTasksPreparationPublishingDetail,
+      _ => null,
+    };
+  }
+
   @override
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context)!;
@@ -474,17 +626,9 @@ class _ScheduledTasksPageState extends State<ScheduledTasksPage>
               name: task.name,
               time: task.timeLabel,
               repeat: _repeatLabel(task, l),
-              detail: task.running
-                  ? l.scheduledTasksRunning
-                  : task.exhausted
-                  ? l.scheduledTasksFinished
-                  : !task.enabled
-                  ? l.scheduledTasksPaused
-                  : !service.isDesktop && !service.exactAlarms
-                  ? l.scheduledTasksWaitingPermission
-                  : task.nextRunAt == null
-                  ? l.scheduledTasksWaitingPermission
-                  : l.scheduledTasksNextRun(_date(task.nextRunAt!, l)),
+              detail: _taskDetail(task, l),
+              preparationLabel: _preparationLabel(task, l),
+              preparationDetail: _preparationDetail(task, l),
               enabled: task.enabled,
               running: task.running,
               onTap: () => _details(task),
@@ -495,9 +639,24 @@ class _ScheduledTasksPageState extends State<ScheduledTasksPage>
           ],
           IosSectionFooter(
             key: const ValueKey('scheduled-tasks-description'),
-            text: l.scheduledTasksDescription,
+            text: service.isIOS
+                ? l.scheduledTasksIOSDetail
+                : l.scheduledTasksDescription,
           ),
-          ...[
+          if (service.isIOS) ...[
+            const SizedBox(height: 24),
+            SectionCard(
+              key: const ValueKey('scheduled-tasks-notification-permission'),
+              children: [
+                IosNavRow(
+                  label: l.scheduledTasksNotificationPermission,
+                  icon: LucideIcons.bell,
+                  onTap: () => _perform(service.requestPermission),
+                ),
+              ],
+            ),
+          ],
+          if (!service.isIOS) ...[
             const SizedBox(height: 24),
             SectionCard(
               key: const ValueKey('scheduled-tasks-background-settings'),
