@@ -21588,7 +21588,7 @@ abstract class AppLocalizations {
   /// No description provided for @scheduledTasksPreparationWindowTip.
   ///
   /// In en, this message translates to:
-  /// **'How far ahead of the scheduled time preparation may begin, up to 24 hours. For example, opening Kelivo at noon can prepare the next morning’s reminder. A larger window gives more chances to prepare, but the result may be less current. It does not change the scheduled time or guarantee background execution.'**
+  /// **'How far ahead of the scheduled time preparation may begin, up to 24 hours. For example, opening Kelivo at noon can prepare the next morning’s reminder. A larger window gives more chances to prepare, but the result may be less current. It does not change the scheduled time or guarantee background execution. Prepare now bypasses this automatic waiting period; attempt limits still apply.'**
   String get scheduledTasksPreparationWindowTip;
 
   /// No description provided for @scheduledTasksPreparationAttemptsTip.
@@ -21600,7 +21600,7 @@ abstract class AppLocalizations {
   /// No description provided for @scheduledTasksPreparationCooldownTip.
   ///
   /// In en, this message translates to:
-  /// **'Minimum time between the start of preparation attempts for the same occurrence. Waiting longer reduces repeated requests. A retry still needs the app to be able to run; it is not a background timer.'**
+  /// **'Minimum time between the start of preparation attempts for the same occurrence. Waiting longer reduces repeated requests. A retry still needs the app to be able to run; it is not a background timer. Prepare now bypasses this automatic waiting period; attempt limits still apply.'**
   String get scheduledTasksPreparationCooldownTip;
 
   /// No description provided for @scheduledTasksUnavailableTip.
@@ -21767,6 +21767,60 @@ abstract class AppLocalizations {
     String timeVariable,
     String offsetVariable,
   );
+
+  /// No description provided for @scheduledTasksPrepareNow.
+  ///
+  /// In en, this message translates to:
+  /// **'Prepare now'**
+  String get scheduledTasksPrepareNow;
+
+  /// No description provided for @scheduledTasksPrepareNowDetail.
+  ///
+  /// In en, this message translates to:
+  /// **'Prepare the next result now and deliver it at the scheduled time. This may incur model charges. An existing prepared result is reused.'**
+  String get scheduledTasksPrepareNowDetail;
+
+  /// No description provided for @scheduledTasksPrepareNowReady.
+  ///
+  /// In en, this message translates to:
+  /// **'The next result is already prepared. No additional model request was made.'**
+  String get scheduledTasksPrepareNowReady;
+
+  /// No description provided for @scheduledTasksPrepareNowStarted.
+  ///
+  /// In en, this message translates to:
+  /// **'Preparing the next result for its scheduled time.'**
+  String get scheduledTasksPrepareNowStarted;
+
+  /// No description provided for @scheduledTasksPrepareNowBusy.
+  ///
+  /// In en, this message translates to:
+  /// **'Another task is being prepared. Please try again when it finishes.'**
+  String get scheduledTasksPrepareNowBusy;
+
+  /// No description provided for @scheduledTasksPrepareNowChatBusy.
+  ///
+  /// In en, this message translates to:
+  /// **'Please wait for the current reply to finish, then try again.'**
+  String get scheduledTasksPrepareNowChatBusy;
+
+  /// No description provided for @scheduledTasksPrepareNowDisabled.
+  ///
+  /// In en, this message translates to:
+  /// **'Enable this task and advance preparation first. Regenerate tasks cannot be prepared in advance.'**
+  String get scheduledTasksPrepareNowDisabled;
+
+  /// No description provided for @scheduledTasksPrepareNowUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'Preparation is not available yet. Please try again shortly.'**
+  String get scheduledTasksPrepareNowUnavailable;
+
+  /// No description provided for @scheduledTasksPrepareNowNoUpcoming.
+  ///
+  /// In en, this message translates to:
+  /// **'There is no upcoming occurrence to prepare. Check the task time and enabled state.'**
+  String get scheduledTasksPrepareNowNoUpcoming;
 }
 
 class _AppLocalizationsDelegate

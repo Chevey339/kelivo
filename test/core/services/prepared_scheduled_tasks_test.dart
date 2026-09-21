@@ -191,6 +191,182 @@ void main() {
   });
 
   test(
+    'prepare now targets only the selected occurrence outside its automatic window',
+    () async {
+      for (final id in ['earlier', 'selected']) {
+        await scheduler.save(
+          ScheduledTask.fromJson({
+            ...task(id: id).toJson(),
+            'hour': id == 'earlier' ? 8 : 11,
+            'preparationWindowMinutes': 5,
+          }),
+        );
+      }
+      final before = scheduler.tasks.last;
+      expect(preparation.calls, 0);
+      expect(
+        await scheduler.prepareNow('selected'),
+        ScheduledTaskPreparationStatus.preparing,
+      );
+      await settle();
+      expect(preparation.preparedTasks, ['selected']);
+      final prepared = scheduler.tasks.firstWhere((t) => t.id == 'selected');
+      expect(prepared.nextRunAt, before.nextRunAt);
+      expect(prepared.runs.single.id, before.runs.single.id);
+      expect(prepared.runs.single.prepareAttempts, 1);
+      expect(prepared.runs.single.status, 'prepared');
+      expect(notifications.pendingBodies[prepared.runs.single.id], 'reply v1');
+      expect(preparation.published, isEmpty);
+      expect(executions, isEmpty);
+      expect(
+        await scheduler.prepareNow('selected'),
+        ScheduledTaskPreparationStatus.prepared,
+      );
+      expect(preparation.calls, 1);
+    },
+  );
+
+  test(
+    'prepare now bypasses cooldown but keeps the occurrence attempt limit',
+    () async {
+      await scheduler.save(task());
+      await settle();
+      final id = run().id;
+      preparation.context = 'v2';
+      expect(
+        await scheduler.prepareNow('task'),
+        ScheduledTaskPreparationStatus.preparing,
+      );
+      await settle();
+      expect(run().id, id);
+      expect(run().prepareAttempts, 2);
+      expect(notifications.pendingBodies[id], 'reply v2');
+      preparation.context = 'v3';
+      expect(
+        await scheduler.prepareNow('task'),
+        ScheduledTaskPreparationStatus.attemptsExhausted,
+      );
+      expect(preparation.calls, 2);
+    },
+  );
+
+  test(
+    'repeated manual preparation is single-flight and reports busy work',
+    () async {
+      for (final id in ['one', 'two']) {
+        await scheduler.save(
+          ScheduledTask.fromJson({
+            ...task(id: id).toJson(),
+            'preparationWindowMinutes': 5,
+          }),
+        );
+      }
+      preparation.gate = Completer<void>();
+      final results = await Future.wait([
+        scheduler.prepareNow('one'),
+        scheduler.prepareNow('one'),
+      ]);
+      expect(results, everyElement(ScheduledTaskPreparationStatus.preparing));
+      expect(
+        await scheduler.prepareNow('two'),
+        ScheduledTaskPreparationStatus.queued,
+      );
+      expect(preparation.preparedTasks, ['one']);
+      preparation.gate!.complete();
+      await settle();
+      preparation.busy = true;
+      expect(
+        await scheduler.prepareNow('two'),
+        ScheduledTaskPreparationStatus.waitingForChat,
+      );
+      preparation.busy = false;
+      expect(
+        await scheduler.prepareNow('two'),
+        ScheduledTaskPreparationStatus.preparing,
+      );
+      await settle();
+      expect(preparation.preparedTasks, ['one', 'two']);
+    },
+  );
+
+  test(
+    'manual preflight failure records its reason and can be retried immediately',
+    () async {
+      await scheduler.save(
+        ScheduledTask.fromJson({
+          ...task().toJson(),
+          'preparationWindowMinutes': 5,
+        }),
+      );
+      preparation.revisionFails = true;
+      expect(
+        await scheduler.prepareNow('task'),
+        ScheduledTaskPreparationStatus.unavailable,
+      );
+      expect(run().error, contains('database_busy'));
+      expect(run().prepareAttempts, 0);
+      preparation.revisionFails = false;
+      expect(
+        await scheduler.prepareNow('task'),
+        ScheduledTaskPreparationStatus.preparing,
+      );
+      await settle();
+      expect(run().error, isNull);
+      expect(run().prepareAttempts, 1);
+    },
+  );
+
+  test('manual preparation still enforces the global hourly limit', () async {
+    for (var i = 0; i < 6; i++) {
+      await scheduler.save(task(id: '$i'));
+      await settle();
+    }
+    await scheduler.save(task(id: 'manual'));
+    expect(
+      await scheduler.prepareNow('manual'),
+      ScheduledTaskPreparationStatus.hourlyLimit,
+    );
+    expect(preparation.calls, 6);
+  });
+
+  for (final change in [
+    {'enabled': false},
+    {'allowPreparation': false},
+    {'mode': 'regenerate', 'messageId': 'question'},
+  ]) {
+    test('manual preparation respects task eligibility: $change', () async {
+      await scheduler.save(
+        ScheduledTask.fromJson({...task().toJson(), ...change}),
+      );
+      expect(
+        await scheduler.prepareNow('task'),
+        ScheduledTaskPreparationStatus.disabled,
+      );
+      expect(preparation.calls, 0);
+      expect(executions, isEmpty);
+    });
+  }
+
+  test(
+    'manual preparation does not start a model request after a one-off task is due',
+    () async {
+      await scheduler.save(
+        ScheduledTask.fromJson({
+          ...task(once: true).toJson(),
+          'preparationWindowMinutes': 5,
+        }),
+      );
+      now = DateTime(2026, 9, 19, 21);
+      expect(
+        await scheduler.prepareNow('task'),
+        ScheduledTaskPreparationStatus.waiting,
+      );
+      expect(preparation.calls, 0);
+      expect(executions, isEmpty);
+    },
+  );
+
+  test(
     'finishing one request drains earlier queued tasks without another trigger',
     () async {
       preparation.gate = Completer<void>();

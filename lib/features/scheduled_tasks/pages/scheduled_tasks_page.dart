@@ -140,6 +140,12 @@ class _ScheduledTasksPageState extends State<ScheduledTasksPage>
           icon: LucideIcons.play,
           label: l.scheduledTasksRunNow,
         ),
+      if (service.isIOS && !original.running)
+        OptionSheetItem(
+          value: 'prepare',
+          icon: LucideIcons.sparkles,
+          label: l.scheduledTasksPrepareNow,
+        ),
       OptionSheetItem(
         value: 'history',
         icon: LucideIcons.history,
@@ -178,11 +184,57 @@ class _ScheduledTasksPageState extends State<ScheduledTasksPage>
           context,
           title: original.name,
           items: items,
+          footer: service.isIOS && !original.running
+              ? IosSectionFooter(text: l.scheduledTasksPrepareNowDetail)
+              : null,
         );
       }
     }
     if (!mounted) return;
     switch (action) {
+      case 'prepare':
+        await _perform(() async {
+          if (original.notify) await service.requestPermission();
+          final status = await service.prepareNow(original.id);
+          if (!mounted) return;
+          final task =
+              service.tasks.where((t) => t.id == original.id).firstOrNull ??
+              original;
+          final run = task.runs.where((r) => r.awaitingPublication).firstOrNull;
+          final message = switch (status) {
+            ScheduledTaskPreparationStatus.prepared =>
+              l.scheduledTasksPrepareNowReady,
+            ScheduledTaskPreparationStatus.preparing =>
+              l.scheduledTasksPrepareNowStarted,
+            ScheduledTaskPreparationStatus.queued =>
+              l.scheduledTasksPrepareNowBusy,
+            ScheduledTaskPreparationStatus.waitingForChat =>
+              l.scheduledTasksPrepareNowChatBusy,
+            ScheduledTaskPreparationStatus.attemptsExhausted =>
+              l.scheduledTasksPreparationAttemptsUsed(
+                run?.prepareAttempts ?? 0,
+                task.maxPrepareAttempts,
+              ),
+            ScheduledTaskPreparationStatus.hourlyLimit =>
+              l.scheduledTasksPreparationHourlyLimitDetail,
+            ScheduledTaskPreparationStatus.disabled =>
+              l.scheduledTasksPrepareNowDisabled,
+            ScheduledTaskPreparationStatus.unavailable =>
+              run?.error == null
+                  ? l.scheduledTasksPrepareNowUnavailable
+                  : _error(run!.error!, l),
+            _ => l.scheduledTasksPrepareNowNoUpcoming,
+          };
+          showAppSnackBar(
+            context,
+            message: message,
+            type:
+                status == ScheduledTaskPreparationStatus.prepared ||
+                    status == ScheduledTaskPreparationStatus.preparing
+                ? NotificationType.success
+                : NotificationType.warning,
+          );
+        });
       case 'run':
         await _perform(() async {
           if (!service.isDesktop) await widget.requestNotificationsPermission();
@@ -338,6 +390,9 @@ class _ScheduledTasksPageState extends State<ScheduledTasksPage>
     }
     if (value.contains('model_missing')) return l.scheduledTasksModelMissing;
     if (value.contains('in_flight')) return l.scheduledTasksChatBusy;
+    if (value.startsWith('preparation_context_unavailable:')) {
+      return l.scheduledTasksPreparationReadFailed;
+    }
     return value;
   }
 
@@ -574,9 +629,6 @@ class _ScheduledTasksPageState extends State<ScheduledTasksPage>
               detail: _taskDetail(task, l),
               preparationLabel: _preparationLabel(task, l),
               preparationDetail: _preparationDetail(task, l),
-              prepared:
-                  service.preparationStatus(task) ==
-                  ScheduledTaskPreparationStatus.prepared,
               enabled: task.enabled,
               running: task.running,
               onTap: () => _details(task),

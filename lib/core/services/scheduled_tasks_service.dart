@@ -100,6 +100,12 @@ class ScheduledTasksService extends ChangeNotifier {
     }
   }
 
+  Future<ScheduledTaskPreparationStatus> prepareNow(String taskId) async {
+    final prepared = _prepared;
+    if (prepared == null) return ScheduledTaskPreparationStatus.disabled;
+    return prepared.prepareNow(taskId);
+  }
+
   AppLocalizations localizations = lookupAppLocalizations(const Locale('en'));
   StreamSubscription<String>? _scheduledTapSubscription;
   Future<void> configurePreparation(
@@ -408,7 +414,9 @@ class ScheduledTasksService extends ChangeNotifier {
   Future<void> requestPermission() async {
     if (_prepared case final prepared?) {
       await prepared.notifications.requestPermission();
-      await prepared.lifecycle(true);
+      // Permission changes refresh delivery without starting automatic work or
+      // changing lifecycle state ahead of an explicit preparation request.
+      await prepared.check(retryNotifications: true);
     } else if (!isDesktop) {
       await _channel.invokeMethod<void>('permission');
     }

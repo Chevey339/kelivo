@@ -11504,7 +11504,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get scheduledTasksPreparationWindowTip =>
-      '允许在任务到期前多久开始准备，最长 24 小时。例如第二天早上提醒，前一天中午打开 Kelivo 时就有机会准备。时间越长，准备机会越多，但内容也可能更早过时。不会改变任务时间，也不代表能在后台定时运行。';
+      '允许在任务到期前多久开始准备，最长 24 小时。例如第二天早上提醒，前一天中午打开 Kelivo 时就有机会准备。时间越长，准备机会越多，但内容也可能更早过时。不会改变任务时间，也不代表能在后台定时运行。「立刻准备」可跳过这项自动等待，次数上限仍然有效。';
 
   @override
   String get scheduledTasksPreparationAttemptsTip =>
@@ -11512,7 +11512,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get scheduledTasksPreparationCooldownTip =>
-      '同一次任务两次开始准备之间，至少间隔多少分钟。间隔越长，重复请求越少。重试仍需 App 有运行机会，不是在后台设定一个定时器。';
+      '同一次任务两次开始准备之间，至少间隔多少分钟。间隔越长，重复请求越少。重试仍需 App 有运行机会，不是在后台设定一个定时器。「立刻准备」可跳过这项自动等待，次数上限仍然有效。';
 
   @override
   String get scheduledTasksUnavailableTip =>
@@ -11615,6 +11615,36 @@ class AppLocalizationsZh extends AppLocalizations {
   ) {
     return '可用占位符：$timeVariable 为计划发送的本地时间，$offsetVariable 为该时间的 UTC 偏移。准备时会自动替换。';
   }
+
+  @override
+  String get scheduledTasksPrepareNow => '立刻准备';
+
+  @override
+  String get scheduledTasksPrepareNowDetail =>
+      '立刻准备下一次内容，到原定时间再发送。准备会调用模型，可能产生费用；已有准备结果时会直接复用。';
+
+  @override
+  String get scheduledTasksPrepareNowReady => '本次结果已经准备好，无需再次调用模型。';
+
+  @override
+  String get scheduledTasksPrepareNowStarted => '正在准备下一次内容，将在计划时间发布。';
+
+  @override
+  String get scheduledTasksPrepareNowBusy => '正在准备其他任务，请等待完成后再试。';
+
+  @override
+  String get scheduledTasksPrepareNowChatBusy => '请等待当前回复结束后，再尝试准备。';
+
+  @override
+  String get scheduledTasksPrepareNowDisabled =>
+      '请先启用任务和「允许提前准备」。重新生成模式不支持提前准备。';
+
+  @override
+  String get scheduledTasksPrepareNowUnavailable => '暂时无法开始准备，请稍后再试。';
+
+  @override
+  String get scheduledTasksPrepareNowNoUpcoming =>
+      '没有可提前准备的下一次任务，请检查任务时间和启用状态。';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hans`).
@@ -23043,7 +23073,7 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get scheduledTasksPreparationWindowTip =>
-      '允许在任务到期前多久开始准备，最长 24 小时。例如第二天早上提醒，前一天中午打开 Kelivo 时就有机会准备。时间越长，准备机会越多，但内容也可能更早过时。不会改变任务时间，也不代表能在后台定时运行。';
+      '允许在任务到期前多久开始准备，最长 24 小时。例如第二天早上提醒，前一天中午打开 Kelivo 时就有机会准备。时间越长，准备机会越多，但内容也可能更早过时。不会改变任务时间，也不代表能在后台定时运行。「立刻准备」可跳过这项自动等待，次数上限仍然有效。';
 
   @override
   String get scheduledTasksPreparationAttemptsTip =>
@@ -23051,7 +23081,7 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get scheduledTasksPreparationCooldownTip =>
-      '同一次任务两次开始准备之间，至少间隔多少分钟。间隔越长，重复请求越少。重试仍需 App 有运行机会，不是在后台设定一个定时器。';
+      '同一次任务两次开始准备之间，至少间隔多少分钟。间隔越长，重复请求越少。重试仍需 App 有运行机会，不是在后台设定一个定时器。「立刻准备」可跳过这项自动等待，次数上限仍然有效。';
 
   @override
   String get scheduledTasksUnavailableTip =>
@@ -23154,6 +23184,36 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   ) {
     return '可用占位符：$timeVariable 为计划发送的本地时间，$offsetVariable 为该时间的 UTC 偏移。准备时会自动替换。';
   }
+
+  @override
+  String get scheduledTasksPrepareNow => '立刻准备';
+
+  @override
+  String get scheduledTasksPrepareNowDetail =>
+      '立刻准备下一次内容，到原定时间再发送。准备会调用模型，可能产生费用；已有准备结果时会直接复用。';
+
+  @override
+  String get scheduledTasksPrepareNowReady => '本次结果已经准备好，无需再次调用模型。';
+
+  @override
+  String get scheduledTasksPrepareNowStarted => '正在准备下一次内容，将在计划时间发布。';
+
+  @override
+  String get scheduledTasksPrepareNowBusy => '正在准备其他任务，请等待完成后再试。';
+
+  @override
+  String get scheduledTasksPrepareNowChatBusy => '请等待当前回复结束后，再尝试准备。';
+
+  @override
+  String get scheduledTasksPrepareNowDisabled =>
+      '请先启用任务和「允许提前准备」。重新生成模式不支持提前准备。';
+
+  @override
+  String get scheduledTasksPrepareNowUnavailable => '暂时无法开始准备，请稍后再试。';
+
+  @override
+  String get scheduledTasksPrepareNowNoUpcoming =>
+      '没有可提前准备的下一次任务，请检查任务时间和启用状态。';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hant`).
@@ -34661,7 +34721,7 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get scheduledTasksPreparationWindowTip =>
-      '允許在任務到期前多久開始準備，最長 24 小時。例如第二天早上提醒，前一天中午開啟 Kelivo 時就有機會準備。時間越長，準備機會越多，但內容也可能更早過時。不會改變任務時間，也不代表能在背景定時執行。';
+      '允許在任務到期前多久開始準備，最長 24 小時。例如第二天早上提醒，前一天中午開啟 Kelivo 時就有機會準備。時間越長，準備機會越多，但內容也可能更早過時。不會改變任務時間，也不代表能在背景定時執行。「立刻準備」可跳過這項自動等待，次數上限仍然有效。';
 
   @override
   String get scheduledTasksPreparationAttemptsTip =>
@@ -34669,7 +34729,7 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get scheduledTasksPreparationCooldownTip =>
-      '同一次任務兩次開始準備之間，至少間隔多少分鐘。間隔越長，重複請求越少。重試仍需 App 有執行機會，不是在背景設定一個計時器。';
+      '同一次任務兩次開始準備之間，至少間隔多少分鐘。間隔越長，重複請求越少。重試仍需 App 有執行機會，不是在背景設定一個計時器。「立刻準備」可跳過這項自動等待，次數上限仍然有效。';
 
   @override
   String get scheduledTasksUnavailableTip =>
@@ -34772,4 +34832,34 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   ) {
     return '可用佔位符：$timeVariable 為計劃傳送的本地時間，$offsetVariable 為該時間的 UTC 偏移。準備時會自動替換。';
   }
+
+  @override
+  String get scheduledTasksPrepareNow => '立刻準備';
+
+  @override
+  String get scheduledTasksPrepareNowDetail =>
+      '立刻準備下一次內容，到原定時間再傳送。準備會呼叫模型，可能產生費用；已有準備結果時會直接重用。';
+
+  @override
+  String get scheduledTasksPrepareNowReady => '本次結果已經準備好，無需再次呼叫模型。';
+
+  @override
+  String get scheduledTasksPrepareNowStarted => '正在準備下一次內容，將在計劃時間發佈。';
+
+  @override
+  String get scheduledTasksPrepareNowBusy => '正在準備其他任務，請等待完成後再試。';
+
+  @override
+  String get scheduledTasksPrepareNowChatBusy => '請等待目前回覆結束後，再嘗試準備。';
+
+  @override
+  String get scheduledTasksPrepareNowDisabled =>
+      '請先啟用任務和「允許提前準備」。重新生成模式不支援提前準備。';
+
+  @override
+  String get scheduledTasksPrepareNowUnavailable => '暫時無法開始準備，請稍後再試。';
+
+  @override
+  String get scheduledTasksPrepareNowNoUpcoming =>
+      '沒有可提前準備的下一次任務，請檢查任務時間和啟用狀態。';
 }

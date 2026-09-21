@@ -168,33 +168,29 @@ class PreparedScheduledTasks extends ChangeNotifier {
   ScheduledTaskPreparationStatus? _preparationBlocker(
     ScheduledTask task,
     ScheduledTaskRun run,
-    DateTime now,
-  ) {
-    if (run.scheduledFor!.difference(now) >
-        Duration(minutes: task.preparationWindowMinutes)) {
+    DateTime now, {
+    bool manual = false,
+  }) {
+    if (!manual &&
+        run.scheduledFor!.difference(now) >
+            Duration(minutes: task.preparationWindowMinutes)) {
       return ScheduledTaskPreparationStatus.outsideWindow;
     }
     if (run.prepareAttempts >= task.maxPrepareAttempts) {
       return ScheduledTaskPreparationStatus.attemptsExhausted;
     }
-    if (run.lastPrepareAt != null &&
+    if (!manual &&
+        run.lastPrepareAt != null &&
         now.difference(run.lastPrepareAt!) <
             Duration(minutes: task.preparationCooldownMinutes)) {
       return ScheduledTaskPreparationStatus.cooldown;
     }
-    if (List<int>.from(_results['attempts'] as List? ?? [])
-            .where(
-              (time) =>
-                  now.millisecondsSinceEpoch - time <
-                  const Duration(hours: 1).inMilliseconds,
-            )
-            .length >=
-        6) {
+    if (_recentAttempts(now).length >= 6) {
       return ScheduledTaskPreparationStatus.hourlyLimit;
     }
     if (preparation == null ||
         _onRun == null ||
-        _contextRetryAt[run.id]?.isAfter(now) == true) {
+        !manual && _contextRetryAt[run.id]?.isAfter(now) == true) {
       return ScheduledTaskPreparationStatus.unavailable;
     }
     if (preparation!.isBusy(task)) {
@@ -202,11 +198,60 @@ class PreparedScheduledTasks extends ChangeNotifier {
     }
     if (_preparingId != null) return ScheduledTaskPreparationStatus.queued;
     final invalidated = _invalidatedAt[run.id];
-    if (invalidated != null &&
+    if (!manual &&
+        invalidated != null &&
         now.difference(invalidated) < const Duration(seconds: 45)) {
       return ScheduledTaskPreparationStatus.waitingForChat;
     }
     return null;
+  }
+
+  List<int> _recentAttempts(DateTime now) =>
+      List<int>.from(_results['attempts'] as List? ?? [])
+          .where(
+            (time) =>
+                now.millisecondsSinceEpoch - time <
+                const Duration(hours: 1).inMilliseconds,
+          )
+          .toList();
+
+  /// Explicit preparation targets one upcoming occurrence. Waiting periods are
+  /// automatic scheduling policy; cost limits and single-flight still apply.
+  Future<ScheduledTaskPreparationStatus> prepareNow(String taskId) async {
+    await load();
+    await check();
+    return _store
+        .runExclusive(() async {
+          final task = _task(taskId);
+          if (task == null || !task.enabled || !task.canPrepare) {
+            return ScheduledTaskPreparationStatus.disabled;
+          }
+          final now = _now();
+          final run = task.runs
+              .where(
+                (r) =>
+                    r.awaitingPublication && r.scheduledFor == task.nextRunAt,
+              )
+              .firstOrNull;
+          if (run == null || !run.scheduledFor!.isAfter(now)) {
+            return ScheduledTaskPreparationStatus.waiting;
+          }
+          if (_payload(run.id) != null) {
+            return ScheduledTaskPreparationStatus.prepared;
+          }
+          if (run.status == 'preparing') {
+            return ScheduledTaskPreparationStatus.preparing;
+          }
+          final blocked = _preparationBlocker(task, run, now, manual: true);
+          if (blocked != null) return blocked;
+          if (_disposed || task.running) {
+            return ScheduledTaskPreparationStatus.unavailable;
+          }
+          return await _startPreparation(task, run, now, _recentAttempts(now))
+              ? ScheduledTaskPreparationStatus.preparing
+              : ScheduledTaskPreparationStatus.unavailable;
+        })
+        .whenComplete(_notifyPreparationStateChanges);
   }
 
   void _notifyPreparationStateChanges() {
@@ -694,12 +739,7 @@ class PreparedScheduledTasks extends ChangeNotifier {
         }
         if (!identical(before, tasks)) await _commit();
         if (!prepare || _preparingId != null || _onRun == null) return;
-        final attempts = List<int>.from(_results['attempts'] as List? ?? [])
-          ..removeWhere(
-            (time) =>
-                now.millisecondsSinceEpoch - time >=
-                const Duration(hours: 1).inMilliseconds,
-          );
+        final attempts = _recentAttempts(now);
         // One global request at a time, at most six attempts/hour across all tasks.
         if (attempts.length >= 6) return;
         final candidates =
@@ -726,38 +766,47 @@ class PreparedScheduledTasks extends ChangeNotifier {
               _preparationBlocker(task, run, now) != null) {
             continue;
           }
-          String revision;
-          try {
-            revision = await preparation!.revision(task);
-          } catch (e) {
-            _contextRetryAt[run.id] = now.add(const Duration(seconds: 30));
-            _setRunError(task, run, 'preparation_context_unavailable: $e');
-            await _commit();
-            continue;
-          }
-          _contextRetryAt.remove(run.id);
-          _invalidatedAt.remove(run.id);
-          attempts.add(now.millisecondsSinceEpoch);
-          _results = {..._results, 'attempts': attempts};
-          await _store.writeResults(_results);
-          final preparing = run.update({
-            'status': 'preparing',
-            'startedAt': now.millisecondsSinceEpoch,
-            'lastPrepareAt': now.millisecondsSinceEpoch,
-            'prepareAttempts': run.prepareAttempts + 1,
-            'taskRevision': task.revision,
-            'contextRevision': revision,
-            'error': null,
-          });
-          _replaceRun(task.id, preparing);
-          await _commit();
-          _preparingId = run.id;
-          final cancellation = _cancellation = ScheduledRunCancellation();
-          unawaited(_prepare(task, preparing, cancellation));
-          break;
+          if (await _startPreparation(task, run, now, attempts)) break;
         }
       })
       .whenComplete(_notifyPreparationStateChanges);
+
+  Future<bool> _startPreparation(
+    ScheduledTask task,
+    ScheduledTaskRun run,
+    DateTime now,
+    List<int> attempts,
+  ) async {
+    String revision;
+    try {
+      revision = await preparation!.revision(task);
+    } catch (e) {
+      _contextRetryAt[run.id] = now.add(const Duration(seconds: 30));
+      _setRunError(task, run, 'preparation_context_unavailable: $e');
+      await _commit();
+      return false;
+    }
+    _contextRetryAt.remove(run.id);
+    _invalidatedAt.remove(run.id);
+    attempts.add(now.millisecondsSinceEpoch);
+    _results = {..._results, 'attempts': attempts};
+    await _store.writeResults(_results);
+    final preparing = run.update({
+      'status': 'preparing',
+      'startedAt': now.millisecondsSinceEpoch,
+      'lastPrepareAt': now.millisecondsSinceEpoch,
+      'prepareAttempts': run.prepareAttempts + 1,
+      'taskRevision': task.revision,
+      'contextRevision': revision,
+      'error': null,
+    });
+    _replaceRun(task.id, preparing);
+    await _commit();
+    _preparingId = run.id;
+    final cancellation = _cancellation = ScheduledRunCancellation();
+    unawaited(_prepare(task, preparing, cancellation));
+    return true;
+  }
 
   Future<void> _prepare(
     ScheduledTask task,

@@ -20,6 +20,7 @@ import 'package:Kelivo/l10n/app_localizations.dart';
 import 'package:Kelivo/shared/widgets/ios_settings_rows.dart';
 import 'package:Kelivo/shared/widgets/ios_form_text_field.dart';
 import 'package:Kelivo/shared/widgets/ios_tactile.dart';
+import 'package:Kelivo/shared/widgets/snackbar.dart';
 import 'package:Kelivo/theme/palettes.dart';
 import 'package:Kelivo/theme/theme_factory.dart';
 import 'package:flutter/material.dart';
@@ -61,6 +62,15 @@ class _IosEditorScheduledTasksService extends ScheduledTasksService {
   @override
   Future<void> preparePendingTasks() async {
     preparationChecks++;
+  }
+
+  final preparedIds = <String>[];
+  var manualStatus = ScheduledTaskPreparationStatus.preparing;
+  @override
+  Future<ScheduledTaskPreparationStatus> prepareNow(String taskId) async {
+    preparedIds.add(taskId);
+    updateStatus(manualStatus);
+    return manualStatus;
   }
 
   void updateStatus(ScheduledTaskPreparationStatus value) {
@@ -109,6 +119,11 @@ void main() {
   });
 
   setUp(() async {
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(
+          const MethodChannel('haptic_feedback'),
+          (_) async => null,
+        );
     storage = await BusinessTestHarness.create(
       initial: {
         'assistants_v1': jsonEncode([assistant.toJson(), other.toJson()]),
@@ -181,6 +196,8 @@ void main() {
   });
 
   tearDown(() async {
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(const MethodChannel('haptic_feedback'), null);
     service.dispose();
     chat.dispose();
     settings.dispose();
@@ -286,7 +303,7 @@ void main() {
     (390.0, 'zh', true),
   ]) {
     testWidgets(
-      'iOS list shows live preparation status beside the next time ($width, $locale, dark=$dark)',
+      'iOS list shows a quiet status in the task summary ($width, $locale, dark=$dark)',
       (tester) async {
         tester.view.physicalSize = Size(width, 844);
         tester.view.devicePixelRatio = 1;
@@ -347,11 +364,19 @@ void main() {
           ),
           findsOneWidget,
         );
-        final nextRow = find.ancestor(
-          of: badge,
-          matching: find.byType(IosNavRow),
+        expect(
+          find.ancestor(of: badge, matching: find.byType(IosNavRow)),
+          findsNothing,
+        );
+        final nextRow = find.byWidgetPredicate(
+          (w) => w is IosNavRow && w.label.contains('08:30'),
         );
         expect(tester.widget<IosNavRow>(nextRow).label, contains('08:30'));
+        expect(
+          tester.getBottomLeft(badge).dy,
+          lessThan(tester.getTopLeft(nextRow).dy),
+        );
+        expect(tester.widget<IosNavRow>(nextRow).labelTrailing, isNull);
         expect(badge.hitTestable(), findsOneWidget);
         await capture(
           tester,
@@ -398,6 +423,57 @@ void main() {
             scale: 1.6,
           ),
         );
+        await tester.pumpAndSettle();
+        expect(tester.takeException(), isNull);
+      },
+      variant: TargetPlatformVariant({TargetPlatform.iOS}),
+    );
+
+    testWidgets(
+      'iOS task menu prepares the selected task ($width, $locale, dark=$dark)',
+      (tester) async {
+        tester.view.physicalSize = Size(width, 844);
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.reset);
+        service.dispose();
+        final ios = _IosEditorScheduledTasksService(channel: channel);
+        service = ios;
+        await tester.pumpWidget(
+          app(
+            ScheduledTasksPage(service: service),
+            locale: locale,
+            dark: dark,
+          ),
+        );
+        await tester.pumpAndSettle();
+        final l = lookupAppLocalizations(Locale(locale));
+        await tester.tap(find.text(initial.name));
+        await tester.pumpAndSettle();
+        for (final label in [
+          l.scheduledTasksRunNow,
+          l.scheduledTasksPrepareNow,
+          l.scheduledTasksHistory,
+          l.scheduledTasksEdit,
+          l.scheduledTasksDelete,
+        ]) {
+          expect(find.text(label), findsOneWidget);
+        }
+        expect(find.text(l.scheduledTasksPrepareNowDetail), findsOneWidget);
+        await capture(
+          tester,
+          'ios-prepare-menu-${width.toInt()}-$locale-${dark ? 'dark' : 'light'}',
+        );
+        await tester.tap(find.text(l.scheduledTasksPrepareNow));
+        await tester.pumpAndSettle();
+        expect(ios.preparedIds, ['task']);
+        expect(find.text(l.scheduledTasksPreparing), findsOneWidget);
+        expect(
+          AppSnackBarManager().activeToasts.any(
+            (t) => t.notification.message == l.scheduledTasksPrepareNowStarted,
+          ),
+          isTrue,
+        );
+        await tester.pump(const Duration(seconds: 4));
         await tester.pumpAndSettle();
         expect(tester.takeException(), isNull);
       },
@@ -585,6 +661,39 @@ void main() {
       variant: TargetPlatformVariant({TargetPlatform.iOS}),
     );
   }
+
+  testWidgets(
+    'manual preparation reports busy work without claiming it has started',
+    (tester) async {
+      service.dispose();
+      final ios = _IosEditorScheduledTasksService(channel: channel)
+        ..manualStatus = ScheduledTaskPreparationStatus.queued;
+      service = ios;
+      await tester.pumpWidget(app(ScheduledTasksPage(service: service)));
+      await tester.pumpAndSettle();
+      final l = lookupAppLocalizations(const Locale('en'));
+      await tester.tap(find.text(initial.name));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text(l.scheduledTasksPrepareNow));
+      await tester.pumpAndSettle();
+      expect(ios.preparedIds, ['task']);
+      expect(
+        AppSnackBarManager().activeToasts.any(
+          (t) => t.notification.message == l.scheduledTasksPrepareNowBusy,
+        ),
+        isTrue,
+      );
+      expect(
+        AppSnackBarManager().activeToasts.any(
+          (t) => t.notification.message == l.scheduledTasksPrepareNowStarted,
+        ),
+        isFalse,
+      );
+      await tester.pump(const Duration(seconds: 4));
+      await tester.pumpAndSettle();
+    },
+    variant: TargetPlatformVariant({TargetPlatform.iOS}),
+  );
 
   testWidgets(
     'new iOS tasks default to skip and permit an empty preparation prompt',

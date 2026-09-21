@@ -5277,9 +5277,9 @@
   "scheduledTasksPreparationCost": "Preparation calls the model and may cost extra. With “Follow latest conversation”, new messages before the due time can invalidate a prepared result. Unused or cancelled output may still be billed, and preparing again makes another model request.",
   "scheduledTasksAllowPreparationTip": "Generate the next result before its scheduled time, while Kelivo can run. The result stays out of the chat until it is due. Preparation uses text only, without tools, attachments or custom request bodies. It may incur model charges.",
   "scheduledTasksContextPolicyTip": "Follow latest conversation: before the task is due, new messages, edits or switching message versions invalidate the prepared result; preparing again uses another attempt and may cost extra. Once due, the saved notification result is added to the chat unchanged.\n\nUse preparation snapshot: keep the prepared result even if the conversation changes. It will not reflect later messages.",
-  "scheduledTasksPreparationWindowTip": "How far ahead of the scheduled time preparation may begin, up to 24 hours. For example, opening Kelivo at noon can prepare the next morning’s reminder. A larger window gives more chances to prepare, but the result may be less current. It does not change the scheduled time or guarantee background execution.",
+  "scheduledTasksPreparationWindowTip": "How far ahead of the scheduled time preparation may begin, up to 24 hours. For example, opening Kelivo at noon can prepare the next morning’s reminder. A larger window gives more chances to prepare, but the result may be less current. It does not change the scheduled time or guarantee background execution. Prepare now bypasses this automatic waiting period; attempt limits still apply.",
   "scheduledTasksPreparationAttemptsTip": "Maximum preparation attempts for one occurrence, including the first attempt, failures and cancellations. More attempts allow more retries but may cost more. This limits attempts, not spending.",
-  "scheduledTasksPreparationCooldownTip": "Minimum time between the start of preparation attempts for the same occurrence. Waiting longer reduces repeated requests. A retry still needs the app to be able to run; it is not a background timer.",
+  "scheduledTasksPreparationCooldownTip": "Minimum time between the start of preparation attempts for the same occurrence. Waiting longer reduces repeated requests. A retry still needs the app to be able to run; it is not a background timer. Prepare now bypasses this automatic waiting period; attempt limits still apply.",
   "scheduledTasksUnavailableTip": "If no prepared result is available and the task cannot run when due, send a reminder or skip the occurrence. A reminder contains no generated answer and requires notifications to be enabled. If Kelivo is open when the task is due, it can run the task then.",
   "scheduledTasksNotifyTip": "Allow result notifications and fallback reminders. Turning this off does not stop the task or model calls, and does not prevent preparation charges. System notification permission is also required.",
   "scheduledTasksShowPreviewTip": "Show the prepared result text in the notification, including on the lock screen if allowed by system settings. Turn this off to show a generic notice; the full result remains available in the chat. Global notification privacy settings also apply.",
@@ -5335,5 +5335,14 @@
         "type": "String"
       }
     }
-  }
+  },
+  "scheduledTasksPrepareNow": "Prepare now",
+  "scheduledTasksPrepareNowDetail": "Prepare the next result now and deliver it at the scheduled time. This may incur model charges. An existing prepared result is reused.",
+  "scheduledTasksPrepareNowReady": "The next result is already prepared. No additional model request was made.",
+  "scheduledTasksPrepareNowStarted": "Preparing the next result for its scheduled time.",
+  "scheduledTasksPrepareNowBusy": "Another task is being prepared. Please try again when it finishes.",
+  "scheduledTasksPrepareNowChatBusy": "Please wait for the current reply to finish, then try again.",
+  "scheduledTasksPrepareNowDisabled": "Enable this task and advance preparation first. Regenerate tasks cannot be prepared in advance.",
+  "scheduledTasksPrepareNowUnavailable": "Preparation is not available yet. Please try again shortly.",
+  "scheduledTasksPrepareNowNoUpcoming": "There is no upcoming occurrence to prepare. Check the task time and enabled state."
 }

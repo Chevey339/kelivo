@@ -12033,7 +12033,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get scheduledTasksPreparationWindowTip =>
-      'How far ahead of the scheduled time preparation may begin, up to 24 hours. For example, opening Kelivo at noon can prepare the next morning’s reminder. A larger window gives more chances to prepare, but the result may be less current. It does not change the scheduled time or guarantee background execution.';
+      'How far ahead of the scheduled time preparation may begin, up to 24 hours. For example, opening Kelivo at noon can prepare the next morning’s reminder. A larger window gives more chances to prepare, but the result may be less current. It does not change the scheduled time or guarantee background execution. Prepare now bypasses this automatic waiting period; attempt limits still apply.';
 
   @override
   String get scheduledTasksPreparationAttemptsTip =>
@@ -12041,7 +12041,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get scheduledTasksPreparationCooldownTip =>
-      'Minimum time between the start of preparation attempts for the same occurrence. Waiting longer reduces repeated requests. A retry still needs the app to be able to run; it is not a background timer.';
+      'Minimum time between the start of preparation attempts for the same occurrence. Waiting longer reduces repeated requests. A retry still needs the app to be able to run; it is not a background timer. Prepare now bypasses this automatic waiting period; attempt limits still apply.';
 
   @override
   String get scheduledTasksUnavailableTip =>
@@ -12161,4 +12161,39 @@ class AppLocalizationsEn extends AppLocalizations {
   ) {
     return 'Placeholders: $timeVariable is the planned local delivery time; $offsetVariable is its UTC offset. These are replaced when preparing the result.';
   }
+
+  @override
+  String get scheduledTasksPrepareNow => 'Prepare now';
+
+  @override
+  String get scheduledTasksPrepareNowDetail =>
+      'Prepare the next result now and deliver it at the scheduled time. This may incur model charges. An existing prepared result is reused.';
+
+  @override
+  String get scheduledTasksPrepareNowReady =>
+      'The next result is already prepared. No additional model request was made.';
+
+  @override
+  String get scheduledTasksPrepareNowStarted =>
+      'Preparing the next result for its scheduled time.';
+
+  @override
+  String get scheduledTasksPrepareNowBusy =>
+      'Another task is being prepared. Please try again when it finishes.';
+
+  @override
+  String get scheduledTasksPrepareNowChatBusy =>
+      'Please wait for the current reply to finish, then try again.';
+
+  @override
+  String get scheduledTasksPrepareNowDisabled =>
+      'Enable this task and advance preparation first. Regenerate tasks cannot be prepared in advance.';
+
+  @override
+  String get scheduledTasksPrepareNowUnavailable =>
+      'Preparation is not available yet. Please try again shortly.';
+
+  @override
+  String get scheduledTasksPrepareNowNoUpcoming =>
+      'There is no upcoming occurrence to prepare. Check the task time and enabled state.';
 }
