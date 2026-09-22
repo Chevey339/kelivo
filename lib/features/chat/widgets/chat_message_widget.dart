@@ -7,6 +7,7 @@ import 'dart:ui' as ui;
 import 'dart:math' as math;
 import 'package:flutter/services.dart';
 import '../../../core/services/haptics.dart';
+import '../../../shared/widgets/optional_shader_mask.dart';
 import 'package:provider/provider.dart';
 import 'dart:io';
 import 'package:open_filex/open_filex.dart';
@@ -482,6 +483,7 @@ IconData? _localToolIconFor(String name, Map<String, dynamic> args) {
     LocalToolNames.calendarQuery => Lucide.Calendar,
     LocalToolNames.calendarCreate => Lucide.CalendarPlus,
     LocalToolNames.currentLocation => Lucide.MapPin,
+    LocalToolNames.phoneControl => Lucide.Smartphone,
     LocalToolNames.weather => Lucide.CloudSun,
     LocalToolNames.healthSummary => Lucide.HeartPulse,
     LocalToolNames.remindersQuery => Lucide.ListTodo,
@@ -514,6 +516,7 @@ String? _localToolTitleFor(
     LocalToolNames.calendarCreate =>
       l10n.assistantEditLocalToolCalendarCreateTitle,
     LocalToolNames.currentLocation => l10n.assistantEditLocalToolLocationTitle,
+    LocalToolNames.phoneControl => l10n.phoneControlTitle,
     LocalToolNames.weather => l10n.assistantEditLocalToolWeatherTitle,
     LocalToolNames.healthSummary => l10n.assistantEditLocalToolHealthTitle,
     LocalToolNames.remindersQuery =>
@@ -3251,6 +3254,9 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
               OAuthMessageRecovery(error: error),
             // Action buttons (hidden while generating)
             AnimatedSwitcher(
+              // Completion previously remounted the row at its final height.
+              // Keep that geometry while retaining the expensive Markdown tree.
+              key: ValueKey(('assistant-actions', widget.message.isStreaming)),
               duration: const Duration(milliseconds: 220),
               switchInCurve: Curves.easeOutCubic,
               switchOutCurve: Curves.easeInCubic,
@@ -4460,15 +4466,10 @@ class _ScrollingReasoningPreviewState
 
   @override
   Widget build(BuildContext context) {
-    Widget scroller = SingleChildScrollView(
-      controller: _scroll,
-      physics: _hasOverflow
-          ? const BouncingScrollPhysics()
-          : const NeverScrollableScrollPhysics(),
-      child: widget.child,
-    );
-    if (_hasOverflow) {
-      scroller = ShaderMask(
+    return ConstrainedBox(
+      constraints: BoxConstraints(maxHeight: widget.maxHeight),
+      child: OptionalShaderMask(
+        enabled: _hasOverflow,
         shaderCallback: (rect) {
           final height = rect.height;
           const topFade = 12.0;
@@ -4488,12 +4489,13 @@ class _ScrollingReasoningPreviewState
           ).createShader(rect);
         },
         blendMode: BlendMode.dstIn,
-        child: scroller,
-      );
-    }
-    return ConstrainedBox(
-      constraints: BoxConstraints(maxHeight: widget.maxHeight),
-      child: scroller,
+        child: SingleChildScrollView(
+          controller: _scroll,
+          // Keep the renderer and ScrollPosition mounted when overflow changes.
+          physics: const BouncingScrollPhysics(),
+          child: widget.child,
+        ),
+      ),
     );
   }
 }

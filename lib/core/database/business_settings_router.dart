@@ -24,6 +24,7 @@ final class BusinessKeyRegistry {
     'window_physical_pos_x_v1',
     'window_physical_pos_y_v1',
     'window_maximized_v1',
+    'linux_hide_title_bar_v1',
     'desktop_hotkeys_commands_v1',
     'desktop_hotkeys_enabled_v1',
     'display_chat_font_scale_v1',
@@ -41,6 +42,7 @@ final class BusinessKeyRegistry {
 
   static const preferenceKeys = <String>{
     'desktop_scheduled_tasks_v1',
+    'scheduled_task_results_v1',
     'current_assistant_id_v1',
     'selected_model_v1',
     'per_chat_model_enabled_v1',
@@ -1002,6 +1004,7 @@ final class BusinessSettingsRouter {
       case 'ollama':
       case 'jina':
       case 'doubao':
+      case 'kagi':
         _validateKnownFields(
           kind,
           payload,
@@ -1083,6 +1086,7 @@ final class BusinessSettingsRouter {
           stringLists: const {'apiKeys'},
         );
       case 'parallel':
+      case 'kimi':
         _validateKnownFields(
           kind,
           payload,

@@ -809,9 +809,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get assistantEditPageNotFound => 'Assistant not found';
 
   @override
-  String get assistantEditPageWorkspaceTab => 'Workspace';
-
-  @override
   String get assistantEditPageBasicTab => 'Basic';
 
   @override
@@ -4873,6 +4870,17 @@ class AppLocalizationsEn extends AppLocalizations {
   String get desktopSettingsFontsTitle => 'Fonts';
 
   @override
+  String get linuxHideTitleBarTitle => 'Hide system title bar';
+
+  @override
+  String get linuxHideTitleBarDescription =>
+      'Also hides window buttons. Use your window manager to move, resize, and close the window.';
+
+  @override
+  String get linuxHideTitleBarError =>
+      'Unable to change the title bar. Please try again.';
+
+  @override
   String get displaySettingsPageTrayTitle => 'System Tray';
 
   @override
@@ -5733,6 +5741,20 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get searchProviderAnySearchDescription =>
       'Unified search for AI agents with automatic routing across web and specialist data sources. API key is optional.';
+
+  @override
+  String get searchServiceNameKagi => 'Kagi';
+
+  @override
+  String get searchProviderKagiDescription =>
+      'Kagi Search API. Returns premium web search results from Kagi.';
+
+  @override
+  String get searchServiceNameKimi => 'Kimi';
+
+  @override
+  String get searchProviderKimiDescription =>
+      'Kimi Search API. Pro returns relevant web content excerpts; Basic returns titles, links, and snippets.';
 
   @override
   String get searchServiceNameParallel => 'Parallel';
@@ -9864,7 +9886,30 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get workspaceEntryDefaultWorkspaceSubtitle =>
-      'New conversations with this assistant start bound to this workspace.';
+      'New conversations use this workspace. Existing conversations stay unchanged.';
+
+  @override
+  String get workspaceEntryDefaultWorkspaceUnset => 'Not set';
+
+  @override
+  String get workspaceEntryDefaultWorkspaceAutomaticSubtitle =>
+      'The first workspace you bind to a conversation will be remembered for new conversations.';
+
+  @override
+  String workspaceBindingRememberedDefault(String assistant) {
+    return 'Remembered as the default workspace for “$assistant”. New conversations will use it.';
+  }
+
+  @override
+  String workspaceBindingSuggestDefault(String assistant) {
+    return 'Use this workspace for future conversations with “$assistant” too?';
+  }
+
+  @override
+  String get workspaceBindingUndoDefault => 'Undo';
+
+  @override
+  String get workspaceBindingUseAsDefault => 'Set as default';
 
   @override
   String get workspaceEntryNone => 'None';
@@ -11902,4 +11947,332 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get oauthPromptCachingHelp =>
       'Reuse context across messages and choose how long the cache is retained.';
+
+  @override
+  String get scheduledTasksPreparation => 'Execution and notifications';
+
+  @override
+  String get scheduledTasksAllowPreparation => 'Allow advance preparation';
+
+  @override
+  String get scheduledTasksPreparationDetail =>
+      'Advance preparation is for text tasks that do not need current information. It cannot use tools or attachments, or perform external actions.';
+
+  @override
+  String get scheduledTasksIOSDetail =>
+      'iOS background limits prevent Kelivo from waking at a set time to run a model. Instead, content is prepared while the app can run, and the system shows a notification at the scheduled time. Only the next occurrence is prepared. Preparation may not finish after leaving the app; reopen Kelivo to prepare subsequent occurrences.';
+
+  @override
+  String get scheduledTasksContextPolicy => 'Conversation context';
+
+  @override
+  String get scheduledTasksContextLatest => 'Follow the latest conversation';
+
+  @override
+  String get scheduledTasksContextSnapshot => 'Use the prepared snapshot';
+
+  @override
+  String get scheduledTasksUnavailable => 'When unable to execute';
+
+  @override
+  String get scheduledTasksRemind => 'Send a reminder only';
+
+  @override
+  String get scheduledTasksSkip => 'Skip this occurrence';
+
+  @override
+  String get scheduledTasksNotify => 'Result notifications';
+
+  @override
+  String get scheduledTasksShowPreview => 'Show result text in notifications';
+
+  @override
+  String get scheduledTasksPreparationWindow => 'Prepare up to';
+
+  @override
+  String get scheduledTasksPreparationAttempts => 'Automatic attempt limit';
+
+  @override
+  String get scheduledTasksPreparationCooldown => 'Minimum interval (minutes)';
+
+  @override
+  String get scheduledTasksPreparationBudget =>
+      'At most one preparation at a time across all tasks. Automatic preparation pauses after six total attempts per hour, including cancelled requests. Prepare now is not limited by attempt counts.';
+
+  @override
+  String get scheduledTasksPreparing => 'Preparing result';
+
+  @override
+  String get scheduledTasksPrepared => 'Result prepared';
+
+  @override
+  String get scheduledTasksPendingPreparation => 'Result not prepared yet';
+
+  @override
+  String get scheduledTasksNotificationRegistered => 'Notification scheduled';
+
+  @override
+  String get scheduledTasksNotificationUnavailable =>
+      'Notification not scheduled';
+
+  @override
+  String get scheduledTasksReminded => 'Due · reminder only';
+
+  @override
+  String get scheduledTasksSkipped => 'Skipped';
+
+  @override
+  String get scheduledTasksCancelled => 'Cancelled';
+
+  @override
+  String get scheduledTasksReminderBody =>
+      'Your scheduled task is due. Open Kelivo to continue.';
+
+  @override
+  String get scheduledTasksResultBody => 'Your scheduled task result is ready.';
+
+  @override
+  String get scheduledTasksNotificationPermission => 'Allow task notifications';
+
+  @override
+  String get scheduledTasksPreparationCost =>
+      'Preparation calls the model and may cost extra. With “Follow latest conversation”, new messages before the due time can invalidate a prepared result. Unused or cancelled output may still be billed, and preparing again makes another model request.';
+
+  @override
+  String get scheduledTasksAllowPreparationTip =>
+      'Generate the next result before its scheduled time, while Kelivo can run. The result stays out of the chat until it is due. Preparation uses text only, without tools, attachments or custom request bodies. It may incur model charges.';
+
+  @override
+  String get scheduledTasksContextPolicyTip =>
+      'Follow latest conversation: before the task is due, new messages, edits or switching message versions invalidate the prepared result; preparing again uses another attempt and may cost extra. Once due, the saved notification result is added to the chat unchanged.\n\nUse preparation snapshot: keep the prepared result even if the conversation changes. It will not reflect later messages.';
+
+  @override
+  String get scheduledTasksPreparationWindowTip =>
+      'How far ahead of the scheduled time preparation may begin, up to 24 hours. For example, opening Kelivo at noon can prepare the next morning’s reminder. A larger window gives more chances to prepare, but the result may be less current. It does not change the scheduled time or guarantee background execution. Prepare now bypasses this automatic waiting period and all attempt limits.';
+
+  @override
+  String get scheduledTasksPreparationAttemptsTip =>
+      'Automatic preparation pauses when this occurrence reaches the total attempt limit. First attempts, failures, cancellations and manual preparation all count in the record. Prepare now can still run after this limit is reached. More attempts may incur more model charges; this is not a spending limit.';
+
+  @override
+  String get scheduledTasksPreparationCooldownTip =>
+      'Minimum time between the start of preparation attempts for the same occurrence. Waiting longer reduces repeated requests. A retry still needs the app to be able to run; it is not a background timer. Prepare now bypasses this automatic waiting period and all attempt limits.';
+
+  @override
+  String get scheduledTasksUnavailableTip =>
+      'If no prepared result is available and the task cannot run when due, send a reminder or skip the occurrence. A reminder contains no generated answer and requires notifications to be enabled. If Kelivo is open when the task is due, it can run the task then.';
+
+  @override
+  String get scheduledTasksNotifyTip =>
+      'Allow result notifications and fallback reminders. Turning this off does not stop the task or model calls, and does not prevent preparation charges. System notification permission is also required.';
+
+  @override
+  String get scheduledTasksShowPreviewTip =>
+      'Show the prepared result text in the notification, including on the lock screen if allowed by system settings. Turn this off to show a generic notice; the full result remains available in the chat. Global notification privacy settings also apply.';
+
+  @override
+  String scheduledTasksHours(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count hours',
+      one: '1 hour',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String scheduledTasksMinutes(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count minutes',
+      one: '1 minute',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get scheduledTasksPreparationOff => 'Preparation off';
+
+  @override
+  String get scheduledTasksPreparationQueued => 'Queued';
+
+  @override
+  String get scheduledTasksPreparationQueuedDetail =>
+      'Another task is being prepared. Eligible tasks continue in due-time order.';
+
+  @override
+  String get scheduledTasksPreparationIdle => 'Waiting for chat';
+
+  @override
+  String get scheduledTasksPreparationIdleDetail =>
+      'Preparation resumes after active replies finish and this task’s context settles.';
+
+  @override
+  String get scheduledTasksPreparationWindowWaiting =>
+      'Outside preparation window';
+
+  @override
+  String get scheduledTasksPreparationCooldownWaiting => 'Waiting to retry';
+
+  @override
+  String scheduledTasksPreparationRetryAt(String time) {
+    return 'Can retry after $time';
+  }
+
+  @override
+  String get scheduledTasksPreparationLimitReached =>
+      'Automatic attempt limit reached';
+
+  @override
+  String scheduledTasksPreparationAttemptsUsed(int count, int limit) {
+    return 'This occurrence has used $count attempts; the automatic limit is $limit. Use Prepare now to continue manually.';
+  }
+
+  @override
+  String get scheduledTasksPreparationHourlyLimit =>
+      'Automatic hourly limit reached';
+
+  @override
+  String get scheduledTasksPreparationHourlyLimitDetail =>
+      'Automatic preparation is paused until hourly capacity is available. You can still use Prepare now.';
+
+  @override
+  String get scheduledTasksPreparationUnavailable => 'Preparation unavailable';
+
+  @override
+  String get scheduledTasksPreparationReadFailed =>
+      'Could not read task context. It will be checked again shortly; see execution history for details.';
+
+  @override
+  String get scheduledTasksPreparationResultRetained =>
+      'Context could not be checked. The prepared result is retained and will be checked again.';
+
+  @override
+  String get scheduledTasksPreparationContextChanged =>
+      'The conversation or task context changed, so the earlier result was discarded.';
+
+  @override
+  String get scheduledTasksPreparationPublishing => 'Waiting to add to chat';
+
+  @override
+  String get scheduledTasksPreparationPublishingDetail =>
+      'The saved result will be added to the conversation when the current reply finishes.';
+
+  @override
+  String get scheduledTasksPreparationPrompt => 'Preparation prompt';
+
+  @override
+  String get scheduledTasksPreparationPromptTip =>
+      'Extra system instructions used only when preparing this task in advance, separate from the task instructions. You can change the style or remove these instructions entirely. Tools and live information remain unavailable. Editing this prompt invalidates any result prepared before the due time; preparing it again may incur another model charge.';
+
+  @override
+  String get scheduledTasksPreparationPromptEmpty =>
+      'Leave empty to add no preparation instructions';
+
+  @override
+  String scheduledTasksPreparationPromptVariables(
+    String timeVariable,
+    String offsetVariable,
+  ) {
+    return 'Placeholders: $timeVariable is the planned local delivery time; $offsetVariable is its UTC offset. These are replaced when preparing the result.';
+  }
+
+  @override
+  String get scheduledTasksPrepareNow => 'Prepare now';
+
+  @override
+  String get scheduledTasksPrepareNowDetail =>
+      'Prepare the next result now and deliver it at the scheduled time. Automatic waiting periods and attempt limits do not apply. This may incur model charges. An existing prepared result is reused.';
+
+  @override
+  String get scheduledTasksPrepareNowReady =>
+      'The next result is already prepared. No additional model request was made.';
+
+  @override
+  String get scheduledTasksPrepareNowStarted =>
+      'Preparing the next result for its scheduled time.';
+
+  @override
+  String get scheduledTasksPrepareNowBusy =>
+      'Another task is being prepared. Please try again when it finishes.';
+
+  @override
+  String get scheduledTasksPrepareNowChatBusy =>
+      'Please wait for the current reply to finish, then try again.';
+
+  @override
+  String get scheduledTasksPrepareNowDisabled =>
+      'Enable this task and advance preparation first. Regenerate tasks cannot be prepared in advance.';
+
+  @override
+  String get scheduledTasksPrepareNowUnavailable =>
+      'Preparation is not available yet. Please try again shortly.';
+
+  @override
+  String get scheduledTasksPrepareNowNoUpcoming =>
+      'There is no upcoming occurrence to prepare. Check the task time and enabled state.';
+
+  @override
+  String get phoneControlTitle => 'Phone Control';
+
+  @override
+  String get phoneControlSubtitle =>
+      'Read the screen and perform actions through Accessibility';
+
+  @override
+  String get phoneControlAccessibilityService => 'Accessibility service';
+
+  @override
+  String get phoneControlOpenSettings => 'Open accessibility settings';
+
+  @override
+  String get phoneControlRefresh => 'Refresh status';
+
+  @override
+  String get phoneControlChecking => 'Checking service status…';
+
+  @override
+  String get phoneControlReady => 'Enabled and connected';
+
+  @override
+  String get phoneControlDisabled => 'Not enabled';
+
+  @override
+  String get phoneControlDisconnected =>
+      'Enabled, but not connected. Try turning the service off and on in system settings, then refresh.';
+
+  @override
+  String get phoneControlStatusUnavailable =>
+      'Unable to read service status. Refresh to try again.';
+
+  @override
+  String get phoneControlSettingsUnavailable =>
+      'Unable to open settings. Open Android Settings → Accessibility manually.';
+
+  @override
+  String get phoneControlUsageTitle => 'How it works';
+
+  @override
+  String get phoneControlDisclosure =>
+      'For phone control tasks you request in a conversation, the assistant can read the current screen, tap, enter text, scroll, navigate, and open apps. Screen content is sent to the model provider configured for that conversation and is saved in its tool results. Password fields are hidden. This service does not continuously record screen content. You can turn off this tool for the assistant, or disable the service in system settings at any time.';
+
+  @override
+  String get phoneControlAssistantTitle => 'Enable the tool for your assistant';
+
+  @override
+  String get phoneControlAssistantHint =>
+      'Both permissions are required: enable Kelivo phone control in system Accessibility settings, then enable Phone Control under your assistant’s Local Tools (also available in the chat tools menu). Each assistant is configured separately. Keep the phone unlocked while running a task.';
+
+  @override
+  String get phoneControlRestrictedTitle => 'Accessibility switch unavailable?';
+
+  @override
+  String get phoneControlRestrictedHint =>
+      'For some downloaded APKs, Android requires “Allow restricted settings” in the app info menu first. Tap to open Kelivo’s app info, then return to Accessibility settings.';
+
+  @override
+  String get phoneControlEnableAssistant =>
+      'Allow this assistant to use phone control';
 }

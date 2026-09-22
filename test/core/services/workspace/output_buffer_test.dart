@@ -1,5 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:math';
+import 'dart:typed_data';
 
 import 'package:flutter_test/flutter_test.dart';
 
@@ -7,6 +9,49 @@ import 'package:Kelivo/core/services/workspace/output_buffer.dart';
 
 void main() {
   group('BoundedStreamBuffer', () {
+    test('retains the exact head and tail for arbitrary chunk boundaries', () {
+      final random = Random(20260920);
+      for (final limit in [0, 1, 2, 3, 63, 64, 65, 1024]) {
+        final source = <int>[];
+        final buffer = BoundedStreamBuffer(maxBytes: limit);
+        for (var step = 0; step < 80; step++) {
+          final chunk = Uint8List.fromList(
+            List.generate(random.nextInt(3000), (_) => random.nextInt(256)),
+          );
+          source.addAll(chunk);
+          buffer.add(chunk);
+          // Capture must not alias buffers reused by stream producers.
+          chunk.fillRange(0, chunk.length, 0);
+          final half = limit ~/ 2;
+          final expected = source.length <= limit
+              ? source
+              : [...source.take(half), ...source.skip(source.length - half)];
+          expect(buffer.bytes, expected, reason: 'limit=$limit step=$step');
+          expect(buffer.totalBytes, source.length);
+          expect(buffer.truncated, source.length > limit);
+          final snapshot = buffer.bytes;
+          snapshot.fillRange(0, snapshot.length, 255);
+          expect(
+            buffer.bytes,
+            expected,
+            reason: 'returned bytes must be owned',
+          );
+        }
+      }
+    });
+
+    test('text caches cannot outlive append or the first truncation', () {
+      final buffer = BoundedStreamBuffer(maxBytes: 8);
+      buffer.add(utf8.encode('abcd'));
+      expect(buffer.text, 'abcd');
+      buffer.add(utf8.encode('efgh'));
+      expect(buffer.text, 'abcdefgh');
+      buffer.add(utf8.encode('ij'));
+      expect(buffer.text, 'abcdghij');
+      buffer.add(utf8.encode('klmnop'));
+      expect(buffer.text, 'abcdmnop');
+    });
+
     test('keeps head and tail when the stream exceeds maxBytes', () {
       final buffer = BoundedStreamBuffer(maxBytes: 128);
       buffer.add(utf8.encode('H' * 80));

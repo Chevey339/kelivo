@@ -786,9 +786,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get assistantEditPageNotFound => '助手不存在';
 
   @override
-  String get assistantEditPageWorkspaceTab => '工作区设置';
-
-  @override
   String get assistantEditPageBasicTab => '基础设置';
 
   @override
@@ -4681,6 +4678,15 @@ class AppLocalizationsZh extends AppLocalizations {
   String get desktopSettingsFontsTitle => '字体设置';
 
   @override
+  String get linuxHideTitleBarTitle => '隐藏系统标题栏';
+
+  @override
+  String get linuxHideTitleBarDescription => '同时隐藏窗口按钮。请通过窗口管理器移动、调整大小和关闭窗口。';
+
+  @override
+  String get linuxHideTitleBarError => '无法更改标题栏，请重试。';
+
+  @override
   String get displaySettingsPageTrayTitle => '托盘';
 
   @override
@@ -5509,6 +5515,19 @@ class AppLocalizationsZh extends AppLocalizations {
   @override
   String get searchProviderAnySearchDescription =>
       '面向 AI 智能体的统一搜索服务，可在网页与专业数据源间自动路由。API Key 可选。';
+
+  @override
+  String get searchServiceNameKagi => 'Kagi';
+
+  @override
+  String get searchProviderKagiDescription => 'Kagi 搜索 API，提供 Kagi 的高级网页搜索结果。';
+
+  @override
+  String get searchServiceNameKimi => 'Kimi';
+
+  @override
+  String get searchProviderKimiDescription =>
+      'Kimi 搜索 API。Pro 返回相关网页正文片段，Basic 返回标题、链接和摘要。';
 
   @override
   String get searchServiceNameParallel => 'Parallel';
@@ -9449,7 +9468,30 @@ class AppLocalizationsZh extends AppLocalizations {
   String get workspaceEntryDefaultWorkspace => '默认工作区';
 
   @override
-  String get workspaceEntryDefaultWorkspaceSubtitle => '使用此助手的新对话将绑定到该工作区。';
+  String get workspaceEntryDefaultWorkspaceSubtitle => '新建对话时自动绑定，已有对话不受影响。';
+
+  @override
+  String get workspaceEntryDefaultWorkspaceUnset => '未设置';
+
+  @override
+  String get workspaceEntryDefaultWorkspaceAutomaticSubtitle =>
+      '首次为对话绑定工作区时，将记为此助手的默认工作区。';
+
+  @override
+  String workspaceBindingRememberedDefault(String assistant) {
+    return '已记为「$assistant」的默认工作区，新对话将自动使用。';
+  }
+
+  @override
+  String workspaceBindingSuggestDefault(String assistant) {
+    return '以后与「$assistant」的新对话也使用这个工作区？';
+  }
+
+  @override
+  String get workspaceBindingUndoDefault => '撤销';
+
+  @override
+  String get workspaceBindingUseAsDefault => '设为默认';
 
   @override
   String get workspaceEntryNone => '无';
@@ -11377,6 +11419,304 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get oauthPromptCachingHelp => '复用多轮对话中的上下文，可设置缓存保留时长。';
+
+  @override
+  String get scheduledTasksPreparation => '执行与通知';
+
+  @override
+  String get scheduledTasksAllowPreparation => '允许提前准备';
+
+  @override
+  String get scheduledTasksPreparationDetail =>
+      '提前准备适合不依赖实时信息的文字任务，不会使用工具、附件或执行外部操作。';
+
+  @override
+  String get scheduledTasksIOSDetail =>
+      '受 iOS 后台限制，Kelivo 不能在指定时间自动唤醒并运行模型。此功能会在 App 可运行时提前准备内容，由系统到点展示通知。每次仅准备下一次结果；离开 App 后不保证准备完成，后续任务需再次打开 Kelivo 才能补充。';
+
+  @override
+  String get scheduledTasksContextPolicy => '对话上下文';
+
+  @override
+  String get scheduledTasksContextLatest => '跟随最新对话';
+
+  @override
+  String get scheduledTasksContextSnapshot => '使用准备时的快照';
+
+  @override
+  String get scheduledTasksUnavailable => '无法执行时';
+
+  @override
+  String get scheduledTasksRemind => '仅发送提醒';
+
+  @override
+  String get scheduledTasksSkip => '跳过本次';
+
+  @override
+  String get scheduledTasksNotify => '结果通知';
+
+  @override
+  String get scheduledTasksShowPreview => '通知显示结果正文';
+
+  @override
+  String get scheduledTasksPreparationWindow => '最多提前';
+
+  @override
+  String get scheduledTasksPreparationAttempts => '自动准备次数上限';
+
+  @override
+  String get scheduledTasksPreparationCooldown => '准备最小间隔（分钟）';
+
+  @override
+  String get scheduledTasksPreparationBudget =>
+      '所有任务合计最多同时准备一个。每小时累计尝试六次后暂停自动准备，取消的请求也计入次数；「立刻准备」不受次数上限限制。';
+
+  @override
+  String get scheduledTasksPreparing => '正在准备结果';
+
+  @override
+  String get scheduledTasksPrepared => '结果已准备';
+
+  @override
+  String get scheduledTasksPendingPreparation => '本次尚未准备';
+
+  @override
+  String get scheduledTasksNotificationRegistered => '通知已登记';
+
+  @override
+  String get scheduledTasksNotificationUnavailable => '通知未登记';
+
+  @override
+  String get scheduledTasksReminded => '已到期 · 仅提醒';
+
+  @override
+  String get scheduledTasksSkipped => '已跳过';
+
+  @override
+  String get scheduledTasksCancelled => '已取消';
+
+  @override
+  String get scheduledTasksReminderBody => '定时任务已到期，打开 Kelivo 继续。';
+
+  @override
+  String get scheduledTasksResultBody => '定时任务结果已准备好。';
+
+  @override
+  String get scheduledTasksNotificationPermission => '允许任务通知';
+
+  @override
+  String get scheduledTasksPreparationCost =>
+      '提前准备会调用模型，可能产生额外费用。选择「跟随最新对话」时，到期前的新消息可能使已准备内容失效。即使结果未使用或请求被取消，仍可能计费；重新准备会再次调用模型。';
+
+  @override
+  String get scheduledTasksAllowPreparationTip =>
+      '在 Kelivo 可运行时，提前生成下一次任务的结果，到期前不会显示在聊天中。仅使用文字，不使用工具、附件或自定义请求体；调用模型可能产生费用。';
+
+  @override
+  String get scheduledTasksContextPolicyTip =>
+      '跟随最新对话：到期前发送新消息、编辑消息或切换消息版本后，已准备内容会失效；重新准备会占用次数，并可能增加费用。到期后，已保存的通知结果会原样补入对话。\n\n使用准备时的快照：对话变化后仍保留已准备结果，内容不会包含后续聊天。';
+
+  @override
+  String get scheduledTasksPreparationWindowTip =>
+      '允许在任务到期前多久开始准备，最长 24 小时。例如第二天早上提醒，前一天中午打开 Kelivo 时就有机会准备。时间越长，准备机会越多，但内容也可能更早过时。不会改变任务时间，也不代表能在后台定时运行。「立刻准备」不受这项自动等待和准备次数上限限制。';
+
+  @override
+  String get scheduledTasksPreparationAttemptsTip =>
+      '本次累计尝试达到上限后，自动准备会暂停。首次、失败、取消和手动准备都计入尝试记录；「立刻准备」不受此上限限制。尝试越多，可能产生的模型费用越多，这不是费用上限。';
+
+  @override
+  String get scheduledTasksPreparationCooldownTip =>
+      '同一次任务两次开始准备之间，至少间隔多少分钟。间隔越长，重复请求越少。重试仍需 App 有运行机会，不是在后台设定一个定时器。「立刻准备」不受这项自动等待和准备次数上限限制。';
+
+  @override
+  String get scheduledTasksUnavailableTip =>
+      '到期时没有可用结果、也无法运行任务，就发送提醒或跳过本次。提醒不包含模型生成的回答，且需要开启通知。如果到期时 Kelivo 正在打开运行，可直接执行任务。';
+
+  @override
+  String get scheduledTasksNotifyTip =>
+      '允许发送结果通知和无法执行时的提醒。关闭后仍会执行任务、调用模型，提前准备也仍可能产生费用。还需要允许系统通知权限。';
+
+  @override
+  String get scheduledTasksShowPreviewTip =>
+      '在通知中显示已生成的结果，系统设置允许时也会显示在锁屏上。关闭后只显示通用提示，完整结果仍可在聊天中查看；同时遵循全局通知隐私设置。';
+
+  @override
+  String scheduledTasksHours(int count) {
+    return '$count 小时';
+  }
+
+  @override
+  String scheduledTasksMinutes(int count) {
+    return '$count 分钟';
+  }
+
+  @override
+  String get scheduledTasksPreparationOff => '未开启准备';
+
+  @override
+  String get scheduledTasksPreparationQueued => '排队中';
+
+  @override
+  String get scheduledTasksPreparationQueuedDetail => '正在准备其他任务，随后按到期时间依次准备。';
+
+  @override
+  String get scheduledTasksPreparationIdle => '等待空闲';
+
+  @override
+  String get scheduledTasksPreparationIdleDetail => '等待当前回复完成或此任务的对话状态稳定后继续。';
+
+  @override
+  String get scheduledTasksPreparationWindowWaiting => '未到准备时间';
+
+  @override
+  String get scheduledTasksPreparationCooldownWaiting => '等待重试';
+
+  @override
+  String scheduledTasksPreparationRetryAt(String time) {
+    return '下次可尝试：$time';
+  }
+
+  @override
+  String get scheduledTasksPreparationLimitReached => '自动准备次数已用完';
+
+  @override
+  String scheduledTasksPreparationAttemptsUsed(int count, int limit) {
+    return '本次已尝试 $count 次，自动准备上限为 $limit 次。可使用「立刻准备」继续。';
+  }
+
+  @override
+  String get scheduledTasksPreparationHourlyLimit => '自动准备已达小时上限';
+
+  @override
+  String get scheduledTasksPreparationHourlyLimitDetail =>
+      '已达到每小时准备次数上限，自动准备将在额度恢复后继续；仍可使用「立刻准备」。';
+
+  @override
+  String get scheduledTasksPreparationUnavailable => '暂时无法准备';
+
+  @override
+  String get scheduledTasksPreparationReadFailed =>
+      '暂时无法读取任务信息，稍后会重新检查；具体原因见执行记录。';
+
+  @override
+  String get scheduledTasksPreparationResultRetained =>
+      '暂时无法校验上下文，已保留准备结果，稍后会重新检查。';
+
+  @override
+  String get scheduledTasksPreparationContextChanged => '对话内容或配置已变化，原准备结果已作废。';
+
+  @override
+  String get scheduledTasksPreparationPublishing => '待写入对话';
+
+  @override
+  String get scheduledTasksPreparationPublishingDetail =>
+      '等待当前回复结束后，将已保存的结果写入对话。';
+
+  @override
+  String get scheduledTasksPreparationPrompt => '准备提示词';
+
+  @override
+  String get scheduledTasksPreparationPromptTip =>
+      '仅在提前准备本任务时附加的系统提示词，与任务内容分开。可以自定义语气和要求，也可以留空，不附加准备提示词。无论如何设置，提前准备都不能使用工具或获取实时信息。到期前修改会使已准备的结果失效，再次准备可能产生额外模型费用。';
+
+  @override
+  String get scheduledTasksPreparationPromptEmpty => '留空则不附加准备提示词';
+
+  @override
+  String scheduledTasksPreparationPromptVariables(
+    String timeVariable,
+    String offsetVariable,
+  ) {
+    return '可用占位符：$timeVariable 为计划发送的本地时间，$offsetVariable 为该时间的 UTC 偏移。准备时会自动替换。';
+  }
+
+  @override
+  String get scheduledTasksPrepareNow => '立刻准备';
+
+  @override
+  String get scheduledTasksPrepareNowDetail =>
+      '立刻准备下一次内容，到原定时间再发送。不受自动准备的等待时间和次数上限限制，会调用模型并可能产生费用；已有准备结果时直接复用。';
+
+  @override
+  String get scheduledTasksPrepareNowReady => '本次结果已经准备好，无需再次调用模型。';
+
+  @override
+  String get scheduledTasksPrepareNowStarted => '正在准备下一次内容，将在计划时间发布。';
+
+  @override
+  String get scheduledTasksPrepareNowBusy => '正在准备其他任务，请等待完成后再试。';
+
+  @override
+  String get scheduledTasksPrepareNowChatBusy => '请等待当前回复结束后，再尝试准备。';
+
+  @override
+  String get scheduledTasksPrepareNowDisabled =>
+      '请先启用任务和「允许提前准备」。重新生成模式不支持提前准备。';
+
+  @override
+  String get scheduledTasksPrepareNowUnavailable => '暂时无法开始准备，请稍后再试。';
+
+  @override
+  String get scheduledTasksPrepareNowNoUpcoming =>
+      '没有可提前准备的下一次任务，请检查任务时间和启用状态。';
+
+  @override
+  String get phoneControlTitle => '手机控制';
+
+  @override
+  String get phoneControlSubtitle => '通过无障碍读取屏幕并执行操作';
+
+  @override
+  String get phoneControlAccessibilityService => '无障碍服务';
+
+  @override
+  String get phoneControlOpenSettings => '前往无障碍设置';
+
+  @override
+  String get phoneControlRefresh => '刷新状态';
+
+  @override
+  String get phoneControlChecking => '正在检查服务状态…';
+
+  @override
+  String get phoneControlReady => '已启用并连接';
+
+  @override
+  String get phoneControlDisabled => '未启用';
+
+  @override
+  String get phoneControlDisconnected => '已启用，但尚未连接。请在系统设置中关闭再开启服务，然后刷新状态。';
+
+  @override
+  String get phoneControlStatusUnavailable => '无法读取服务状态，请刷新后重试。';
+
+  @override
+  String get phoneControlSettingsUnavailable =>
+      '无法打开设置，请手动进入 Android 系统设置 → 无障碍。';
+
+  @override
+  String get phoneControlUsageTitle => '使用说明';
+
+  @override
+  String get phoneControlDisclosure =>
+      '在对话中发起手机控制任务后，助手可以读取当前屏幕、点击、输入、滑动、导航和打开应用。屏幕内容会发送给当前对话配置的模型服务商，并保存在对话的工具结果中。密码字段会隐藏，服务不会持续记录屏幕内容。你可以随时关闭助手的此项工具，或在系统设置中停用服务。';
+
+  @override
+  String get phoneControlAssistantTitle => '还需开启助手工具';
+
+  @override
+  String get phoneControlAssistantHint =>
+      '需要同时完成两项设置：在系统无障碍设置中启用“Kelivo 手机控制”，并在要使用的助手 → 本地工具中开启“手机控制”（也可从对话工具菜单开启）。每个助手单独配置，执行任务时请保持手机解锁。';
+
+  @override
+  String get phoneControlRestrictedTitle => '无法开启无障碍？';
+
+  @override
+  String get phoneControlRestrictedHint =>
+      '部分下载的 APK 需要先在应用信息右上角菜单中选择“允许受限制的设置”。点击打开 Kelivo 应用信息，完成后再返回无障碍设置。';
+
+  @override
+  String get phoneControlEnableAssistant => '允许此助手使用手机控制';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hans`).
@@ -12159,9 +12499,6 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get assistantEditPageNotFound => '助手不存在';
-
-  @override
-  String get assistantEditPageWorkspaceTab => '工作区设置';
 
   @override
   String get assistantEditPageBasicTab => '基础设置';
@@ -16056,6 +16393,15 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get desktopSettingsFontsTitle => '字体设置';
 
   @override
+  String get linuxHideTitleBarTitle => '隐藏系统标题栏';
+
+  @override
+  String get linuxHideTitleBarDescription => '同时隐藏窗口按钮。请通过窗口管理器移动、调整大小和关闭窗口。';
+
+  @override
+  String get linuxHideTitleBarError => '无法更改标题栏，请重试。';
+
+  @override
   String get displaySettingsPageTrayTitle => '托盘';
 
   @override
@@ -16810,6 +17156,19 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   @override
   String get searchProviderAnySearchDescription =>
       '面向 AI 智能体的统一搜索服务，可在网页与专业数据源间自动路由。API Key 可选。';
+
+  @override
+  String get searchServiceNameKagi => 'Kagi';
+
+  @override
+  String get searchProviderKagiDescription => 'Kagi 搜索 API，提供 Kagi 的高级网页搜索结果。';
+
+  @override
+  String get searchServiceNameKimi => 'Kimi';
+
+  @override
+  String get searchProviderKimiDescription =>
+      'Kimi 搜索 API。Pro 返回相关网页正文片段，Basic 返回标题、链接和摘要。';
 
   @override
   String get searchServiceNameParallel => 'Parallel';
@@ -20750,7 +21109,30 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get workspaceEntryDefaultWorkspace => '默认工作区';
 
   @override
-  String get workspaceEntryDefaultWorkspaceSubtitle => '使用此助手的新对话将绑定到该工作区。';
+  String get workspaceEntryDefaultWorkspaceSubtitle => '新建对话时自动绑定，已有对话不受影响。';
+
+  @override
+  String get workspaceEntryDefaultWorkspaceUnset => '未设置';
+
+  @override
+  String get workspaceEntryDefaultWorkspaceAutomaticSubtitle =>
+      '首次为对话绑定工作区时，将记为此助手的默认工作区。';
+
+  @override
+  String workspaceBindingRememberedDefault(String assistant) {
+    return '已记为「$assistant」的默认工作区，新对话将自动使用。';
+  }
+
+  @override
+  String workspaceBindingSuggestDefault(String assistant) {
+    return '以后与「$assistant」的新对话也使用这个工作区？';
+  }
+
+  @override
+  String get workspaceBindingUndoDefault => '撤销';
+
+  @override
+  String get workspaceBindingUseAsDefault => '设为默认';
 
   @override
   String get workspaceEntryNone => '无';
@@ -22678,6 +23060,304 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get oauthPromptCachingHelp => '复用多轮对话中的上下文，可设置缓存保留时长。';
+
+  @override
+  String get scheduledTasksPreparation => '执行与通知';
+
+  @override
+  String get scheduledTasksAllowPreparation => '允许提前准备';
+
+  @override
+  String get scheduledTasksPreparationDetail =>
+      '提前准备适合不依赖实时信息的文字任务，不会使用工具、附件或执行外部操作。';
+
+  @override
+  String get scheduledTasksIOSDetail =>
+      '受 iOS 后台限制，Kelivo 不能在指定时间自动唤醒并运行模型。此功能会在 App 可运行时提前准备内容，由系统到点展示通知。每次仅准备下一次结果；离开 App 后不保证准备完成，后续任务需再次打开 Kelivo 才能补充。';
+
+  @override
+  String get scheduledTasksContextPolicy => '对话上下文';
+
+  @override
+  String get scheduledTasksContextLatest => '跟随最新对话';
+
+  @override
+  String get scheduledTasksContextSnapshot => '使用准备时的快照';
+
+  @override
+  String get scheduledTasksUnavailable => '无法执行时';
+
+  @override
+  String get scheduledTasksRemind => '仅发送提醒';
+
+  @override
+  String get scheduledTasksSkip => '跳过本次';
+
+  @override
+  String get scheduledTasksNotify => '结果通知';
+
+  @override
+  String get scheduledTasksShowPreview => '通知显示结果正文';
+
+  @override
+  String get scheduledTasksPreparationWindow => '最多提前';
+
+  @override
+  String get scheduledTasksPreparationAttempts => '自动准备次数上限';
+
+  @override
+  String get scheduledTasksPreparationCooldown => '准备最小间隔（分钟）';
+
+  @override
+  String get scheduledTasksPreparationBudget =>
+      '所有任务合计最多同时准备一个。每小时累计尝试六次后暂停自动准备，取消的请求也计入次数；「立刻准备」不受次数上限限制。';
+
+  @override
+  String get scheduledTasksPreparing => '正在准备结果';
+
+  @override
+  String get scheduledTasksPrepared => '结果已准备';
+
+  @override
+  String get scheduledTasksPendingPreparation => '本次尚未准备';
+
+  @override
+  String get scheduledTasksNotificationRegistered => '通知已登记';
+
+  @override
+  String get scheduledTasksNotificationUnavailable => '通知未登记';
+
+  @override
+  String get scheduledTasksReminded => '已到期 · 仅提醒';
+
+  @override
+  String get scheduledTasksSkipped => '已跳过';
+
+  @override
+  String get scheduledTasksCancelled => '已取消';
+
+  @override
+  String get scheduledTasksReminderBody => '定时任务已到期，打开 Kelivo 继续。';
+
+  @override
+  String get scheduledTasksResultBody => '定时任务结果已准备好。';
+
+  @override
+  String get scheduledTasksNotificationPermission => '允许任务通知';
+
+  @override
+  String get scheduledTasksPreparationCost =>
+      '提前准备会调用模型，可能产生额外费用。选择「跟随最新对话」时，到期前的新消息可能使已准备内容失效。即使结果未使用或请求被取消，仍可能计费；重新准备会再次调用模型。';
+
+  @override
+  String get scheduledTasksAllowPreparationTip =>
+      '在 Kelivo 可运行时，提前生成下一次任务的结果，到期前不会显示在聊天中。仅使用文字，不使用工具、附件或自定义请求体；调用模型可能产生费用。';
+
+  @override
+  String get scheduledTasksContextPolicyTip =>
+      '跟随最新对话：到期前发送新消息、编辑消息或切换消息版本后，已准备内容会失效；重新准备会占用次数，并可能增加费用。到期后，已保存的通知结果会原样补入对话。\n\n使用准备时的快照：对话变化后仍保留已准备结果，内容不会包含后续聊天。';
+
+  @override
+  String get scheduledTasksPreparationWindowTip =>
+      '允许在任务到期前多久开始准备，最长 24 小时。例如第二天早上提醒，前一天中午打开 Kelivo 时就有机会准备。时间越长，准备机会越多，但内容也可能更早过时。不会改变任务时间，也不代表能在后台定时运行。「立刻准备」不受这项自动等待和准备次数上限限制。';
+
+  @override
+  String get scheduledTasksPreparationAttemptsTip =>
+      '本次累计尝试达到上限后，自动准备会暂停。首次、失败、取消和手动准备都计入尝试记录；「立刻准备」不受此上限限制。尝试越多，可能产生的模型费用越多，这不是费用上限。';
+
+  @override
+  String get scheduledTasksPreparationCooldownTip =>
+      '同一次任务两次开始准备之间，至少间隔多少分钟。间隔越长，重复请求越少。重试仍需 App 有运行机会，不是在后台设定一个定时器。「立刻准备」不受这项自动等待和准备次数上限限制。';
+
+  @override
+  String get scheduledTasksUnavailableTip =>
+      '到期时没有可用结果、也无法运行任务，就发送提醒或跳过本次。提醒不包含模型生成的回答，且需要开启通知。如果到期时 Kelivo 正在打开运行，可直接执行任务。';
+
+  @override
+  String get scheduledTasksNotifyTip =>
+      '允许发送结果通知和无法执行时的提醒。关闭后仍会执行任务、调用模型，提前准备也仍可能产生费用。还需要允许系统通知权限。';
+
+  @override
+  String get scheduledTasksShowPreviewTip =>
+      '在通知中显示已生成的结果，系统设置允许时也会显示在锁屏上。关闭后只显示通用提示，完整结果仍可在聊天中查看；同时遵循全局通知隐私设置。';
+
+  @override
+  String scheduledTasksHours(int count) {
+    return '$count 小时';
+  }
+
+  @override
+  String scheduledTasksMinutes(int count) {
+    return '$count 分钟';
+  }
+
+  @override
+  String get scheduledTasksPreparationOff => '未开启准备';
+
+  @override
+  String get scheduledTasksPreparationQueued => '排队中';
+
+  @override
+  String get scheduledTasksPreparationQueuedDetail => '正在准备其他任务，随后按到期时间依次准备。';
+
+  @override
+  String get scheduledTasksPreparationIdle => '等待空闲';
+
+  @override
+  String get scheduledTasksPreparationIdleDetail => '等待当前回复完成或此任务的对话状态稳定后继续。';
+
+  @override
+  String get scheduledTasksPreparationWindowWaiting => '未到准备时间';
+
+  @override
+  String get scheduledTasksPreparationCooldownWaiting => '等待重试';
+
+  @override
+  String scheduledTasksPreparationRetryAt(String time) {
+    return '下次可尝试：$time';
+  }
+
+  @override
+  String get scheduledTasksPreparationLimitReached => '自动准备次数已用完';
+
+  @override
+  String scheduledTasksPreparationAttemptsUsed(int count, int limit) {
+    return '本次已尝试 $count 次，自动准备上限为 $limit 次。可使用「立刻准备」继续。';
+  }
+
+  @override
+  String get scheduledTasksPreparationHourlyLimit => '自动准备已达小时上限';
+
+  @override
+  String get scheduledTasksPreparationHourlyLimitDetail =>
+      '已达到每小时准备次数上限，自动准备将在额度恢复后继续；仍可使用「立刻准备」。';
+
+  @override
+  String get scheduledTasksPreparationUnavailable => '暂时无法准备';
+
+  @override
+  String get scheduledTasksPreparationReadFailed =>
+      '暂时无法读取任务信息，稍后会重新检查；具体原因见执行记录。';
+
+  @override
+  String get scheduledTasksPreparationResultRetained =>
+      '暂时无法校验上下文，已保留准备结果，稍后会重新检查。';
+
+  @override
+  String get scheduledTasksPreparationContextChanged => '对话内容或配置已变化，原准备结果已作废。';
+
+  @override
+  String get scheduledTasksPreparationPublishing => '待写入对话';
+
+  @override
+  String get scheduledTasksPreparationPublishingDetail =>
+      '等待当前回复结束后，将已保存的结果写入对话。';
+
+  @override
+  String get scheduledTasksPreparationPrompt => '准备提示词';
+
+  @override
+  String get scheduledTasksPreparationPromptTip =>
+      '仅在提前准备本任务时附加的系统提示词，与任务内容分开。可以自定义语气和要求，也可以留空，不附加准备提示词。无论如何设置，提前准备都不能使用工具或获取实时信息。到期前修改会使已准备的结果失效，再次准备可能产生额外模型费用。';
+
+  @override
+  String get scheduledTasksPreparationPromptEmpty => '留空则不附加准备提示词';
+
+  @override
+  String scheduledTasksPreparationPromptVariables(
+    String timeVariable,
+    String offsetVariable,
+  ) {
+    return '可用占位符：$timeVariable 为计划发送的本地时间，$offsetVariable 为该时间的 UTC 偏移。准备时会自动替换。';
+  }
+
+  @override
+  String get scheduledTasksPrepareNow => '立刻准备';
+
+  @override
+  String get scheduledTasksPrepareNowDetail =>
+      '立刻准备下一次内容，到原定时间再发送。不受自动准备的等待时间和次数上限限制，会调用模型并可能产生费用；已有准备结果时直接复用。';
+
+  @override
+  String get scheduledTasksPrepareNowReady => '本次结果已经准备好，无需再次调用模型。';
+
+  @override
+  String get scheduledTasksPrepareNowStarted => '正在准备下一次内容，将在计划时间发布。';
+
+  @override
+  String get scheduledTasksPrepareNowBusy => '正在准备其他任务，请等待完成后再试。';
+
+  @override
+  String get scheduledTasksPrepareNowChatBusy => '请等待当前回复结束后，再尝试准备。';
+
+  @override
+  String get scheduledTasksPrepareNowDisabled =>
+      '请先启用任务和「允许提前准备」。重新生成模式不支持提前准备。';
+
+  @override
+  String get scheduledTasksPrepareNowUnavailable => '暂时无法开始准备，请稍后再试。';
+
+  @override
+  String get scheduledTasksPrepareNowNoUpcoming =>
+      '没有可提前准备的下一次任务，请检查任务时间和启用状态。';
+
+  @override
+  String get phoneControlTitle => '手机控制';
+
+  @override
+  String get phoneControlSubtitle => '通过无障碍读取屏幕并执行操作';
+
+  @override
+  String get phoneControlAccessibilityService => '无障碍服务';
+
+  @override
+  String get phoneControlOpenSettings => '前往无障碍设置';
+
+  @override
+  String get phoneControlRefresh => '刷新状态';
+
+  @override
+  String get phoneControlChecking => '正在检查服务状态…';
+
+  @override
+  String get phoneControlReady => '已启用并连接';
+
+  @override
+  String get phoneControlDisabled => '未启用';
+
+  @override
+  String get phoneControlDisconnected => '已启用，但尚未连接。请在系统设置中关闭再开启服务，然后刷新状态。';
+
+  @override
+  String get phoneControlStatusUnavailable => '无法读取服务状态，请刷新后重试。';
+
+  @override
+  String get phoneControlSettingsUnavailable =>
+      '无法打开设置，请手动进入 Android 系统设置 → 无障碍。';
+
+  @override
+  String get phoneControlUsageTitle => '使用说明';
+
+  @override
+  String get phoneControlDisclosure =>
+      '在对话中发起手机控制任务后，助手可以读取当前屏幕、点击、输入、滑动、导航和打开应用。屏幕内容会发送给当前对话配置的模型服务商，并保存在对话的工具结果中。密码字段会隐藏，服务不会持续记录屏幕内容。你可以随时关闭助手的此项工具，或在系统设置中停用服务。';
+
+  @override
+  String get phoneControlAssistantTitle => '还需开启助手工具';
+
+  @override
+  String get phoneControlAssistantHint =>
+      '需要同时完成两项设置：在系统无障碍设置中启用“Kelivo 手机控制”，并在要使用的助手 → 本地工具中开启“手机控制”（也可从对话工具菜单开启）。每个助手单独配置，执行任务时请保持手机解锁。';
+
+  @override
+  String get phoneControlRestrictedTitle => '无法开启无障碍？';
+
+  @override
+  String get phoneControlRestrictedHint =>
+      '部分下载的 APK 需要先在应用信息右上角菜单中选择“允许受限制的设置”。点击打开 Kelivo 应用信息，完成后再返回无障碍设置。';
+
+  @override
+  String get phoneControlEnableAssistant => '允许此助手使用手机控制';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hant`).
@@ -23460,9 +24140,6 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get assistantEditPageNotFound => '助理不存在';
-
-  @override
-  String get assistantEditPageWorkspaceTab => '工作區設定';
 
   @override
   String get assistantEditPageBasicTab => '基礎設定';
@@ -27356,6 +28033,15 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get desktopSettingsFontsTitle => '字體設定';
 
   @override
+  String get linuxHideTitleBarTitle => '隱藏系統標題列';
+
+  @override
+  String get linuxHideTitleBarDescription => '同時隱藏視窗按鈕。請透過視窗管理員移動、調整大小和關閉視窗。';
+
+  @override
+  String get linuxHideTitleBarError => '無法變更標題列，請重試。';
+
+  @override
   String get displaySettingsPageTrayTitle => '系統匣';
 
   @override
@@ -28185,6 +28871,19 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   @override
   String get searchProviderAnySearchDescription =>
       '面向 AI 智慧代理的統一搜尋服務，可在網頁與專業資料來源間自動路由。API Key 可選。';
+
+  @override
+  String get searchServiceNameKagi => 'Kagi';
+
+  @override
+  String get searchProviderKagiDescription => 'Kagi 搜尋 API，提供 Kagi 的高級網頁搜尋結果。';
+
+  @override
+  String get searchServiceNameKimi => 'Kimi';
+
+  @override
+  String get searchProviderKimiDescription =>
+      'Kimi 搜尋 API。Pro 傳回相關網頁正文片段，Basic 傳回標題、連結和摘要。';
 
   @override
   String get searchServiceNameParallel => 'Parallel';
@@ -32127,7 +32826,30 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get workspaceEntryDefaultWorkspace => '預設工作區';
 
   @override
-  String get workspaceEntryDefaultWorkspaceSubtitle => '使用此助手的新對話將綁定到此工作區。';
+  String get workspaceEntryDefaultWorkspaceSubtitle => '新建對話時自動綁定，已有對話不受影響。';
+
+  @override
+  String get workspaceEntryDefaultWorkspaceUnset => '未設定';
+
+  @override
+  String get workspaceEntryDefaultWorkspaceAutomaticSubtitle =>
+      '首次為對話綁定工作區時，將記為此助手的預設工作區。';
+
+  @override
+  String workspaceBindingRememberedDefault(String assistant) {
+    return '已記為「$assistant」的預設工作區，新對話將自動使用。';
+  }
+
+  @override
+  String workspaceBindingSuggestDefault(String assistant) {
+    return '以後與「$assistant」的新對話也使用這個工作區？';
+  }
+
+  @override
+  String get workspaceBindingUndoDefault => '復原';
+
+  @override
+  String get workspaceBindingUseAsDefault => '設為預設';
 
   @override
   String get workspaceEntryNone => '無';
@@ -34058,4 +34780,302 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get oauthPromptCachingHelp => '重用多輪對話中的上下文，可設定快取保留時間。';
+
+  @override
+  String get scheduledTasksPreparation => '執行與通知';
+
+  @override
+  String get scheduledTasksAllowPreparation => '允許提前準備';
+
+  @override
+  String get scheduledTasksPreparationDetail =>
+      '提前準備適合不依賴即時資訊的文字任務，不會使用工具、附件或執行外部操作。';
+
+  @override
+  String get scheduledTasksIOSDetail =>
+      '受 iOS 背景限制，Kelivo 不能在指定時間自動喚醒並執行模型。此功能會在 App 可執行時提前準備內容，由系統到點顯示通知。每次僅準備下一次結果；離開 App 後不保證準備完成，後續任務需再次開啟 Kelivo 才能補充。';
+
+  @override
+  String get scheduledTasksContextPolicy => '對話上下文';
+
+  @override
+  String get scheduledTasksContextLatest => '跟隨最新對話';
+
+  @override
+  String get scheduledTasksContextSnapshot => '使用準備時的快照';
+
+  @override
+  String get scheduledTasksUnavailable => '無法執行時';
+
+  @override
+  String get scheduledTasksRemind => '僅傳送提醒';
+
+  @override
+  String get scheduledTasksSkip => '略過本次';
+
+  @override
+  String get scheduledTasksNotify => '結果通知';
+
+  @override
+  String get scheduledTasksShowPreview => '通知顯示結果全文';
+
+  @override
+  String get scheduledTasksPreparationWindow => '最多提前';
+
+  @override
+  String get scheduledTasksPreparationAttempts => '自動準備次數上限';
+
+  @override
+  String get scheduledTasksPreparationCooldown => '準備最小間隔（分鐘）';
+
+  @override
+  String get scheduledTasksPreparationBudget =>
+      '所有任務合計最多同時準備一個。每小時累計嘗試六次後暫停自動準備，取消的請求也計入次數；「立刻準備」不受次數上限限制。';
+
+  @override
+  String get scheduledTasksPreparing => '正在準備結果';
+
+  @override
+  String get scheduledTasksPrepared => '結果已準備';
+
+  @override
+  String get scheduledTasksPendingPreparation => '本次尚未準備';
+
+  @override
+  String get scheduledTasksNotificationRegistered => '通知已登記';
+
+  @override
+  String get scheduledTasksNotificationUnavailable => '通知未登記';
+
+  @override
+  String get scheduledTasksReminded => '已到期 · 僅提醒';
+
+  @override
+  String get scheduledTasksSkipped => '已略過';
+
+  @override
+  String get scheduledTasksCancelled => '已取消';
+
+  @override
+  String get scheduledTasksReminderBody => '定時任務已到期，開啟 Kelivo 繼續。';
+
+  @override
+  String get scheduledTasksResultBody => '定時任務結果已準備好。';
+
+  @override
+  String get scheduledTasksNotificationPermission => '允許任務通知';
+
+  @override
+  String get scheduledTasksPreparationCost =>
+      '提前準備會呼叫模型，可能產生額外費用。選擇「跟隨最新對話」時，到期前的新訊息可能使已準備內容失效。即使結果未使用或請求被取消，仍可能計費；重新準備會再次呼叫模型。';
+
+  @override
+  String get scheduledTasksAllowPreparationTip =>
+      '在 Kelivo 可執行時，提前產生下一次任務的結果，到期前不會顯示在聊天中。僅使用文字，不使用工具、附件或自訂請求內容；呼叫模型可能產生費用。';
+
+  @override
+  String get scheduledTasksContextPolicyTip =>
+      '跟隨最新對話：到期前傳送新訊息、編輯訊息或切換訊息版本後，已準備內容會失效；重新準備會占用次數，並可能增加費用。到期後，已儲存的通知結果會原樣補入對話。\n\n使用準備時的快照：對話變化後仍保留已準備結果，內容不會包含後續聊天。';
+
+  @override
+  String get scheduledTasksPreparationWindowTip =>
+      '允許在任務到期前多久開始準備，最長 24 小時。例如第二天早上提醒，前一天中午開啟 Kelivo 時就有機會準備。時間越長，準備機會越多，但內容也可能更早過時。不會改變任務時間，也不代表能在背景定時執行。「立刻準備」不受這項自動等待和準備次數上限限制。';
+
+  @override
+  String get scheduledTasksPreparationAttemptsTip =>
+      '本次累計嘗試達到上限後，自動準備會暫停。首次、失敗、取消和手動準備都計入嘗試記錄；「立刻準備」不受此上限限制。嘗試越多，可能產生的模型費用越多，這不是費用上限。';
+
+  @override
+  String get scheduledTasksPreparationCooldownTip =>
+      '同一次任務兩次開始準備之間，至少間隔多少分鐘。間隔越長，重複請求越少。重試仍需 App 有執行機會，不是在背景設定一個計時器。「立刻準備」不受這項自動等待和準備次數上限限制。';
+
+  @override
+  String get scheduledTasksUnavailableTip =>
+      '到期時沒有可用結果、也無法執行任務，就傳送提醒或略過本次。提醒不包含模型產生的回答，且需要開啟通知。如果到期時 Kelivo 正在開啟執行，可直接執行任務。';
+
+  @override
+  String get scheduledTasksNotifyTip =>
+      '允許傳送結果通知和無法執行時的提醒。關閉後仍會執行任務、呼叫模型，提前準備也仍可能產生費用。還需要允許系統通知權限。';
+
+  @override
+  String get scheduledTasksShowPreviewTip =>
+      '在通知中顯示已產生的結果，系統設定允許時也會顯示在鎖定畫面上。關閉後只顯示一般提示，完整結果仍可在聊天中查看；同時遵循全域通知隱私設定。';
+
+  @override
+  String scheduledTasksHours(int count) {
+    return '$count 小時';
+  }
+
+  @override
+  String scheduledTasksMinutes(int count) {
+    return '$count 分鐘';
+  }
+
+  @override
+  String get scheduledTasksPreparationOff => '未開啟準備';
+
+  @override
+  String get scheduledTasksPreparationQueued => '排隊中';
+
+  @override
+  String get scheduledTasksPreparationQueuedDetail => '正在準備其他任務，隨後按到期時間依次準備。';
+
+  @override
+  String get scheduledTasksPreparationIdle => '等待空閒';
+
+  @override
+  String get scheduledTasksPreparationIdleDetail => '等待目前回覆完成或此任務的對話狀態穩定後繼續。';
+
+  @override
+  String get scheduledTasksPreparationWindowWaiting => '未到準備時間';
+
+  @override
+  String get scheduledTasksPreparationCooldownWaiting => '等待重試';
+
+  @override
+  String scheduledTasksPreparationRetryAt(String time) {
+    return '下次可嘗試：$time';
+  }
+
+  @override
+  String get scheduledTasksPreparationLimitReached => '自動準備次數已用完';
+
+  @override
+  String scheduledTasksPreparationAttemptsUsed(int count, int limit) {
+    return '本次已嘗試 $count 次，自動準備上限為 $limit 次。可使用「立刻準備」繼續。';
+  }
+
+  @override
+  String get scheduledTasksPreparationHourlyLimit => '自動準備已達小時上限';
+
+  @override
+  String get scheduledTasksPreparationHourlyLimitDetail =>
+      '已達到每小時準備次數上限，自動準備將在額度恢復後繼續；仍可使用「立刻準備」。';
+
+  @override
+  String get scheduledTasksPreparationUnavailable => '暫時無法準備';
+
+  @override
+  String get scheduledTasksPreparationReadFailed =>
+      '暫時無法讀取任務資訊，稍後會重新檢查；具體原因見執行記錄。';
+
+  @override
+  String get scheduledTasksPreparationResultRetained =>
+      '暫時無法校驗上下文，已保留準備結果，稍後會重新檢查。';
+
+  @override
+  String get scheduledTasksPreparationContextChanged => '對話內容或設定已變更，原準備結果已作廢。';
+
+  @override
+  String get scheduledTasksPreparationPublishing => '待寫入對話';
+
+  @override
+  String get scheduledTasksPreparationPublishingDetail =>
+      '等待目前回覆結束後，將已儲存的結果寫入對話。';
+
+  @override
+  String get scheduledTasksPreparationPrompt => '準備提示詞';
+
+  @override
+  String get scheduledTasksPreparationPromptTip =>
+      '僅在提前準備本任務時附加的系統提示詞，與任務內容分開。可以自訂語氣和要求，也可以留空，不附加準備提示詞。無論如何設定，提前準備都不能使用工具或取得即時資訊。到期前修改會使已準備的結果失效，再次準備可能產生額外模型費用。';
+
+  @override
+  String get scheduledTasksPreparationPromptEmpty => '留空則不附加準備提示詞';
+
+  @override
+  String scheduledTasksPreparationPromptVariables(
+    String timeVariable,
+    String offsetVariable,
+  ) {
+    return '可用佔位符：$timeVariable 為計劃傳送的本地時間，$offsetVariable 為該時間的 UTC 偏移。準備時會自動替換。';
+  }
+
+  @override
+  String get scheduledTasksPrepareNow => '立刻準備';
+
+  @override
+  String get scheduledTasksPrepareNowDetail =>
+      '立刻準備下一次內容，到原定時間再傳送。不受自動準備的等待時間和次數上限限制，會呼叫模型並可能產生費用；已有準備結果時直接重用。';
+
+  @override
+  String get scheduledTasksPrepareNowReady => '本次結果已經準備好，無需再次呼叫模型。';
+
+  @override
+  String get scheduledTasksPrepareNowStarted => '正在準備下一次內容，將在計劃時間發佈。';
+
+  @override
+  String get scheduledTasksPrepareNowBusy => '正在準備其他任務，請等待完成後再試。';
+
+  @override
+  String get scheduledTasksPrepareNowChatBusy => '請等待目前回覆結束後，再嘗試準備。';
+
+  @override
+  String get scheduledTasksPrepareNowDisabled =>
+      '請先啟用任務和「允許提前準備」。重新生成模式不支援提前準備。';
+
+  @override
+  String get scheduledTasksPrepareNowUnavailable => '暫時無法開始準備，請稍後再試。';
+
+  @override
+  String get scheduledTasksPrepareNowNoUpcoming =>
+      '沒有可提前準備的下一次任務，請檢查任務時間和啟用狀態。';
+
+  @override
+  String get phoneControlTitle => '手機控制';
+
+  @override
+  String get phoneControlSubtitle => '透過無障礙讀取畫面並執行操作';
+
+  @override
+  String get phoneControlAccessibilityService => '無障礙服務';
+
+  @override
+  String get phoneControlOpenSettings => '前往無障礙設定';
+
+  @override
+  String get phoneControlRefresh => '重新整理狀態';
+
+  @override
+  String get phoneControlChecking => '正在檢查服務狀態…';
+
+  @override
+  String get phoneControlReady => '已啟用並連線';
+
+  @override
+  String get phoneControlDisabled => '未啟用';
+
+  @override
+  String get phoneControlDisconnected => '已啟用，但尚未連線。請在系統設定中關閉再開啟服務，然後重新整理狀態。';
+
+  @override
+  String get phoneControlStatusUnavailable => '無法讀取服務狀態，請重新整理後重試。';
+
+  @override
+  String get phoneControlSettingsUnavailable =>
+      '無法開啟設定，請手動進入 Android 系統設定 → 無障礙。';
+
+  @override
+  String get phoneControlUsageTitle => '使用說明';
+
+  @override
+  String get phoneControlDisclosure =>
+      '在對話中發起手機控制任務後，助手可以讀取目前畫面、點擊、輸入、滑動、導覽和開啟應用程式。畫面內容會傳送給目前對話設定的模型服務商，並儲存在對話的工具結果中。密碼欄位會隱藏，服務不會持續記錄畫面內容。你可以隨時關閉助手的此項工具，或在系統設定中停用服務。';
+
+  @override
+  String get phoneControlAssistantTitle => '還需開啟助手工具';
+
+  @override
+  String get phoneControlAssistantHint =>
+      '需要同時完成兩項設定：在系統無障礙設定中啟用「Kelivo 手機控制」，並在要使用的助手 → 本地工具中開啟「手機控制」（也可從對話工具選單開啟）。每個助手單獨設定，執行任務時請保持手機解鎖。';
+
+  @override
+  String get phoneControlRestrictedTitle => '無法開啟無障礙？';
+
+  @override
+  String get phoneControlRestrictedHint =>
+      '部分下載的 APK 需要先在應用程式資訊右上角選單中選擇「允許受限制的設定」。點擊開啟 Kelivo 應用程式資訊，完成後再返回無障礙設定。';
+
+  @override
+  String get phoneControlEnableAssistant => '允許此助手使用手機控制';
 }

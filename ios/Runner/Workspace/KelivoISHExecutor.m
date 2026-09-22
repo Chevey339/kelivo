@@ -29,10 +29,13 @@
 #include <poll.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 
 static const NSTimeInterval kDrainGraceSeconds = 1.0;
 static const NSTimeInterval kKillGraceSeconds = 2.0;
 static const NSTimeInterval kReaderJoinSeconds = 1.5;
+static const size_t kOutputChunkBytes = 64 * 1024;
+static const uint64_t kOutputIntervalNanos = 16 * NSEC_PER_MSEC;
 
 #pragma mark - Context
 
@@ -495,15 +498,19 @@ static dispatch_queue_t _readerQueue;
         }
     }
 
-    task_start(task);
-    current = saved;
-    if (keepStdinOpen) started();
-
+    // Register both readers before a fast guest can exit. A zero-count group
+    // must never be mistaken for drained output during startup.
     int stdoutReadFd = [ctx stdoutPipe][0];
     int stderrReadFd = [ctx stderrPipe][0];
     [ctx adoptReadEnd:stdoutReadFd isStdErr:NO];
-    [self startReaderForPipe:stdoutReadFd context:ctx isStdErr:NO];
     [ctx adoptReadEnd:stderrReadFd isStdErr:YES];
+    dispatch_group_enter(ctx.readersGroup);
+    dispatch_group_enter(ctx.readersGroup);
+
+    task_start(task);
+    current = saved;
+    if (keepStdinOpen) started();
+    [self startReaderForPipe:stdoutReadFd context:ctx isStdErr:NO];
     [self startReaderForPipe:stderrReadFd context:ctx isStdErr:YES];
 
     if (ctx.cancelled) {
@@ -513,17 +520,18 @@ static dispatch_queue_t _readerQueue;
 
     if (timeout == 0) return;
     int capturedPid = ctx.guestPid;
+    __weak KelivoISHRunContext *timedContext = ctx;
     dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(timeout * NSEC_PER_SEC)),
                    dispatch_get_global_queue(QOS_CLASS_DEFAULT, 0), ^{
         KelivoISHRunContext *still;
         @synchronized (_byPid) {
-            still = _byPid[@(capturedPid)];
+            still = timedContext;
             // Always stamp timedOut if the run is still live. processDidExit
             // can flip `exited` in the same window the timeout fires (the
             // guest often dies from the kill we are about to send, or a
             // previous finalize is mid-drain). Skipping the flag here was
             // reporting exit=-1 with timedOut=false.
-            if (!still || still.didFinalize) return;
+            if (!still || _byPid[@(capturedPid)] != still || still.didFinalize) return;
             still.timedOut = YES;
         }
         if (!still.exited) {
@@ -546,6 +554,10 @@ static dispatch_queue_t _readerQueue;
     if (!ctx) return;
     ctx.exitCode = exitCode;
     ctx.exited = YES;
+    dispatch_group_notify(ctx.readersGroup, dispatch_get_global_queue(QOS_CLASS_DEFAULT, 0), ^{
+        [self finalizeContext:ctx];
+    });
+    // Retain the bounded drain grace for children that inherit the pipes.
     dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(kDrainGraceSeconds * NSEC_PER_SEC)),
                    dispatch_get_global_queue(QOS_CLASS_DEFAULT, 0), ^{
         [self finalizeContext:ctx];
@@ -584,7 +596,6 @@ static dispatch_queue_t _readerQueue;
 }
 
 + (void)startReaderForPipe:(int)fd context:(KelivoISHRunContext *)ctx isStdErr:(BOOL)isStdErr {
-    dispatch_group_enter(ctx.readersGroup);
     dispatch_async(_readerQueue, ^{
         [self readPipe:fd context:ctx isStdErr:isStdErr];
         dispatch_group_leave(ctx.readersGroup);
@@ -592,31 +603,46 @@ static dispatch_queue_t _readerQueue;
 }
 
 + (void)readPipe:(int)fd context:(KelivoISHRunContext *)ctx isStdErr:(BOOL)isStdErr {
-    char buffer[4096];
+    char buffer[kOutputChunkBytes];
+    NSMutableData *pending = [NSMutableData dataWithCapacity:kOutputChunkBytes];
+    uint64_t lastEmission = 0;
     struct pollfd pfd = {.fd = fd, .events = POLLIN};
     for (;;) {
         if (isStdErr ? ctx.stderrAbort : ctx.stdoutAbort) break;
-        int pr = poll(&pfd, 1, 500);
+        uint64_t now = clock_gettime_nsec_np(CLOCK_UPTIME_RAW);
+        if (pending.length > 0 &&
+            (pending.length == kOutputChunkBytes || now - lastEmission >= kOutputIntervalNanos)) {
+            @autoreleasepool {
+                if (ctx.chunk) ctx.chunk(ctx.runId, isStdErr, [pending copy]);
+                [pending setLength:0];
+            }
+            lastEmission = now;
+        }
+        int waitMs = pending.length == 0 ? 500 :
+            (int)((kOutputIntervalNanos - (now - lastEmission) + NSEC_PER_MSEC - 1) / NSEC_PER_MSEC);
+        int pr = poll(&pfd, 1, waitMs);
         if (pr < 0) {
             if (errno == EINTR) continue;
             break;
         }
         if (pr == 0) {
-            if (ctx.exited || ctx.didFinalize) break;
+            if (pending.length == 0 && (ctx.exited || ctx.didFinalize)) break;
             continue;
         }
         if ((pfd.revents & (POLLHUP | POLLERR)) && !(pfd.revents & POLLIN)) break;
-        ssize_t n = read(fd, buffer, sizeof(buffer));
+        ssize_t n = read(fd, buffer, kOutputChunkBytes - pending.length);
         if (n > 0) {
-            if (ctx.chunk) {
-                NSData *data = [NSData dataWithBytes:buffer length:(NSUInteger)n];
-                ctx.chunk(ctx.runId, isStdErr, data);
-            }
+            [pending appendBytes:buffer length:(NSUInteger)n];
         } else if (n == 0) {
             break;
         } else {
             if (errno == EAGAIN || errno == EWOULDBLOCK) continue;
             break;
+        }
+    }
+    if (pending.length > 0 && ctx.chunk) {
+        @autoreleasepool {
+            ctx.chunk(ctx.runId, isStdErr, [pending copy]);
         }
     }
     [ctx closeOwnedReadEnd:isStdErr];

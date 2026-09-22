@@ -17,9 +17,12 @@ class ScheduledTaskTile extends StatelessWidget {
     required this.onChanged,
     required this.onTap,
     this.running = false,
+    this.preparationLabel,
+    this.preparationDetail,
   });
   final String name, time, repeat, detail;
   final bool enabled, running;
+  final String? preparationLabel, preparationDetail;
   final ValueChanged<bool> onChanged;
   final VoidCallback onTap;
 
@@ -74,6 +77,32 @@ class ScheduledTaskTile extends StatelessWidget {
                             ),
                           ],
                         ),
+                        if (preparationLabel != null) ...[
+                          const SizedBox(height: 6),
+                          Semantics(
+                            key: const ValueKey(
+                              'scheduled-task-preparation-status',
+                            ),
+                            liveRegion: true,
+                            child: Text(
+                              preparationLabel!,
+                              style: TextStyle(
+                                fontSize: 12,
+                                height: 1.4,
+                                color: cs.onSurface.withValues(alpha: .55),
+                              ),
+                            ),
+                          ),
+                          if (preparationDetail != null)
+                            Text(
+                              preparationDetail!,
+                              style: TextStyle(
+                                fontSize: 12,
+                                height: 1.4,
+                                color: cs.onSurface.withValues(alpha: .55),
+                              ),
+                            ),
+                        ],
                       ],
                     ),
                   ),
@@ -119,6 +148,7 @@ Widget scheduledTaskPreview() => Padding(
     time: '08:00',
     repeat: '每天',
     detail: '下次：明天 08:00',
+    preparationLabel: '结果已准备',
     enabled: true,
     onChanged: (_) {},
     onTap: () {},

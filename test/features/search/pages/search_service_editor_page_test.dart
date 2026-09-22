@@ -363,6 +363,32 @@ void main() {
     expect((result!.service! as TavilyOptions).apiKey, 'new-key');
   });
 
+  testWidgets('saves edited Kagi credentials from the full page', (
+    tester,
+  ) async {
+    SearchServiceEditorResult? result;
+    await _pumpEditor(
+      tester,
+      initialService: KagiOptions(
+        id: 'kagi',
+        apiKey: 'old-key',
+        extraApiKeys: const ['backup-key'],
+      ),
+      onResult: (value) => result = value,
+    );
+
+    await tester.enterText(_apiKeyField(), 'new-key');
+    await tester.tap(find.byIcon(Lucide.Check));
+    await tester.pumpAndSettle();
+
+    expect(result?.deleted, isFalse);
+    expect(result?.service, isA<KagiOptions>());
+    final saved = result!.service! as KagiOptions;
+    expect(saved.id, 'kagi');
+    expect(saved.apiKey, 'new-key');
+    expect(saved.extraApiKeys, ['backup-key']);
+  });
+
   testWidgets('preserves Firecrawl sources and categories when saving', (
     tester,
   ) async {
@@ -432,6 +458,65 @@ void main() {
     expect(saved.mode, ParallelOptions.defaultMode);
   });
 
+  testWidgets('selects Kimi from the add page and defaults to Pro', (
+    tester,
+  ) async {
+    SearchServiceEditorResult? result;
+    await _pumpEditor(tester, onResult: (value) => result = value);
+
+    await tester.dragUntilVisible(
+      find.text('Kimi'),
+      find.byType(ListView),
+      const Offset(0, -240),
+    );
+    await tester.tap(find.text('Kimi'));
+    await tester.pumpAndSettle();
+
+    await tester.enterText(_apiKeyField(), 'kimi-key');
+    await tester.tap(find.byIcon(Lucide.Check));
+    await tester.pumpAndSettle();
+
+    expect(result?.service, isA<KimiOptions>());
+    final saved = result!.service! as KimiOptions;
+    expect(saved.apiKey, 'kimi-key');
+    expect(saved.mode, 'pro');
+  });
+
+  testWidgets('edits Kimi mode and preserves its extra API keys', (
+    tester,
+  ) async {
+    SearchServiceEditorResult? result;
+    await _pumpEditor(
+      tester,
+      initialService: KimiOptions(
+        id: 'kimi',
+        apiKey: 'kimi-key',
+        extraApiKeys: const ['extra-key'],
+      ),
+      onResult: (value) => result = value,
+    );
+
+    final modeField = find.byKey(const ValueKey('search-service-field-mode'));
+    await tester.dragUntilVisible(
+      modeField,
+      find.byType(ListView),
+      const Offset(0, -240),
+    );
+    await tester.tap(modeField);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Basic').last);
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byIcon(Lucide.Check));
+    await tester.pumpAndSettle();
+
+    final saved = result!.service! as KimiOptions;
+    expect(saved.id, 'kimi');
+    expect(saved.apiKey, 'kimi-key');
+    expect(saved.mode, 'basic');
+    expect(saved.extraApiKeys, ['extra-key']);
+  });
+
   testWidgets('selects You.com from the add page and saves', (tester) async {
     SearchServiceEditorResult? result;
     await _pumpEditor(tester, onResult: (value) => result = value);
@@ -452,6 +537,27 @@ void main() {
     final saved = result!.service! as YouSearchOptions;
     expect(saved.apiKey, 'you-key');
     expect(saved.contentMode, YouSearchOptions.defaultContentMode);
+  });
+
+  testWidgets('selects Kagi from the add page and saves', (tester) async {
+    SearchServiceEditorResult? result;
+    await _pumpEditor(tester, onResult: (value) => result = value);
+
+    await tester.dragUntilVisible(
+      find.text('Kagi'),
+      find.byType(ListView),
+      const Offset(0, -240),
+    );
+    await tester.tap(find.text('Kagi'));
+    await tester.pumpAndSettle();
+
+    await tester.enterText(_apiKeyField(), 'kagi-key');
+    await tester.tap(find.byIcon(Lucide.Check));
+    await tester.pumpAndSettle();
+
+    expect(result?.service, isA<KagiOptions>());
+    final saved = result!.service! as KagiOptions;
+    expect(saved.apiKey, 'kagi-key');
   });
 
   testWidgets('selects Brave from the add page and keeps web mode', (

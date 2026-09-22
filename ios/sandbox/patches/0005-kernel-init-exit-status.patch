@@ -1,0 +1,40 @@
+--- a/kernel/exit.c
++++ b/kernel/exit.c
+@@ -14,7 +14,7 @@
+ #include "fs/fd.h"
+ #include "fs/tty.h"
+ 
+-static void halt_system(void);
++static void halt_system(int status);
+ 
+ // Weak default: overridden by main.c in CLI builds.
+ // In iOS/Xcode builds where main.c is not linked into libish.a,
+@@ -170,7 +170,7 @@
+ 
+         if (parent == NULL) {
+             // init died
+-            halt_system();
++            halt_system(status);
+         } else {
+             leader->zombie = true;
+             notify(&parent->group->child_exit);
+@@ -400,7 +400,7 @@
+ }
+ 
+ // always called from init process
+-static void halt_system(void) {
++static void halt_system(int status) {
+     int max_iterations = 10; // Timeout: wait maximum 10 seconds
+     for (int state = 0; state < 3; state++) {
+         int tasks_found = 0;
+@@ -453,7 +453,9 @@
+     // (stuck in JIT loops after do_exit_group force cleanup) keep
+     // the host process alive indefinitely. _exit is safe here since
+     // init dying means we're shutting down completely.
+-    _exit(0);
++    // Preserve the init command's result for the host CLI used by builds.
++    // Guest wait status encodes signals in the low byte and exits above it.
++    _exit((status & 0x7f) ? 128 + (status & 0x7f) : (status >> 8) & 0xff);
+ }
+ 
+ dword_t sys_exit(dword_t status) {

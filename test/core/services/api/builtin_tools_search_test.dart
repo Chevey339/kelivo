@@ -134,12 +134,86 @@ void main() {
       );
     });
 
-    test('Chat builder preserves provider-specific search formats', () {
+    test('Grok native search requires Responses API', () {
+      for (final useResponseApi in [false, true]) {
+        final cfg = _cfg(
+          baseUrl: 'https://api.x.ai/v1',
+          useResponseApi: useResponseApi,
+          modelId: 'grok-4.5',
+        );
+        expect(
+          BuiltInToolsHelper.supportsBuiltInSearchForModel(
+            cfg: cfg,
+            modelId: 'grok-4.5',
+          ),
+          useResponseApi,
+        );
+        expect(
+          BuiltInToolsHelper.isBuiltInSearchEnabled(
+            cfg: cfg,
+            modelId: 'grok-4.5',
+          ),
+          useResponseApi,
+        );
+        expect(
+          BuiltInToolsHelper.supportsSearch(
+            kind: ProviderKind.openai,
+            useResponseApi: useResponseApi,
+            modelId: 'grok-4.5',
+          ),
+          useResponseApi,
+        );
+      }
+    });
+
+    test('Grok on OpenRouter keeps provider-native search in both modes', () {
+      for (final useResponseApi in [false, true]) {
+        final cfg = _cfg(
+          baseUrl: 'https://openrouter.ai/api/v1',
+          useResponseApi: useResponseApi,
+          modelId: 'x-ai/grok-4.5',
+        );
+        expect(
+          BuiltInToolsHelper.supportsBuiltInSearchForModel(
+            cfg: cfg,
+            modelId: 'x-ai/grok-4.5',
+          ),
+          isTrue,
+        );
+        final payload = useResponseApi
+            ? BuiltInToolsHelper.buildResponsesTools(
+                cfg: cfg,
+                modelId: 'x-ai/grok-4.5',
+                upstreamModelId: 'x-ai/grok-4.5',
+              )
+            : BuiltInToolsHelper.buildChatCompletionsTools(
+                cfg: cfg,
+                modelId: 'x-ai/grok-4.5',
+                upstreamModelId: 'x-ai/grok-4.5',
+              );
+        expect(payload.tools, [
+          {'type': 'openrouter:web_search'},
+        ]);
+        expect(payload.body, isEmpty);
+      }
+    });
+
+    test('Grok Chat builder omits retired live search parameters', () {
       final grok = _cfg(
         baseUrl: 'https://api.x.ai/v1',
         useResponseApi: false,
-        modelId: 'grok-4',
+        modelId: 'grok-4.5',
       );
+      final payload = BuiltInToolsHelper.buildChatCompletionsTools(
+        cfg: grok,
+        modelId: 'grok-4.5',
+        upstreamModelId: 'grok-4.5',
+      );
+      expect(payload.tools, isEmpty);
+      expect(payload.body, isEmpty);
+    });
+
+    test('Chat builder preserves provider-specific search formats', () {
       final dashScope = _cfg(
         baseUrl: 'https://dashscope.aliyuncs.com/compatible-mode/v1',
         useResponseApi: false,
@@ -156,14 +230,6 @@ void main() {
         modelId: 'glm-5',
       );
 
-      expect(
-        BuiltInToolsHelper.buildChatCompletionsTools(
-          cfg: grok,
-          modelId: 'grok-4',
-          upstreamModelId: 'grok-4',
-        ).body['search_parameters'],
-        <String, dynamic>{'mode': 'auto', 'return_citations': true},
-      );
       expect(
         BuiltInToolsHelper.buildChatCompletionsTools(
           cfg: dashScope,

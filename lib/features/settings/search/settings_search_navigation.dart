@@ -22,6 +22,7 @@ import '../pages/memory_settings_page.dart';
 import '../pages/message_style_settings_page.dart';
 import '../pages/mobile_background_settings_page.dart';
 import '../pages/network_proxy_page.dart';
+import '../pages/phone_control_settings_page.dart';
 import '../pages/sponsor_page.dart';
 import '../pages/storage_space_page.dart';
 import '../pages/theme_advanced_settings_page.dart';
@@ -51,6 +52,7 @@ Future<void> openMobileSettingsSearchResult(
     SettingsSearchDestination.background =>
       const MobileBackgroundSettingsPage(),
     SettingsSearchDestination.assistant => const AssistantSettingsPage(),
+    SettingsSearchDestination.phoneControl => const PhoneControlSettingsPage(),
     SettingsSearchDestination.providers => const ProvidersPage(),
     SettingsSearchDestination.defaultModel => const DefaultModelPage(),
     SettingsSearchDestination.search => const SearchServicesPage(),

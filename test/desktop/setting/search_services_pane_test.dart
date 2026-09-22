@@ -79,6 +79,122 @@ void main() {
     expect((created! as ParallelOptions).mode, 'turbo');
   });
 
+  testWidgets('desktop add dialog saves Kagi credentials', (tester) async {
+    SearchServiceOptions? created;
+    await _pumpDialogHost(
+      tester,
+      onOpen: (context) async {
+        created = await showDesktopAddSearchServiceDialog(context);
+      },
+    );
+
+    await tester.tap(find.text('Open'));
+    await tester.pumpAndSettle();
+
+    await _selectServiceType(tester, 'Kagi');
+    await tester.enterText(find.byType(TextField).last, 'kagi-key');
+    await tester.tap(find.text('Add'));
+    await tester.pumpAndSettle();
+
+    expect(created, isA<KagiOptions>());
+    expect((created! as KagiOptions).apiKey, 'kagi-key');
+  });
+
+  testWidgets('desktop edit dialog updates Kagi credentials', (tester) async {
+    SearchServiceOptions? updated;
+    await _pumpDialogHost(
+      tester,
+      onOpen: (context) async {
+        updated = await showDesktopEditSearchServiceDialog(
+          context,
+          KagiOptions(
+            id: 'kagi',
+            apiKey: 'old-key',
+            extraApiKeys: const ['backup-key'],
+          ),
+        );
+      },
+    );
+
+    await tester.tap(find.text('Open'));
+    await tester.pumpAndSettle();
+
+    await tester.enterText(find.byType(TextField).first, 'new-key');
+    await tester.tap(find.text('Save'));
+    await tester.pumpAndSettle();
+
+    expect(updated, isA<KagiOptions>());
+    final saved = updated! as KagiOptions;
+    expect(saved.id, 'kagi');
+    expect(saved.apiKey, 'new-key');
+    expect(saved.extraApiKeys, ['backup-key']);
+  });
+  testWidgets(
+    'desktop add dialog saves Kimi with the selected mode',
+    (tester) async {
+      SearchServiceOptions? created;
+      await _pumpDialogHost(
+        tester,
+        onOpen: (context) async {
+          created = await showDesktopAddSearchServiceDialog(context);
+        },
+      );
+
+      await tester.tap(find.text('Open'));
+      await tester.pumpAndSettle();
+      await _selectServiceType(tester, 'Kimi');
+      await tester.enterText(find.byType(TextField), 'kimi-key');
+      await tester.tap(find.text('Pro'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Basic').last);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Add'));
+      await tester.pumpAndSettle();
+
+      final saved = created! as KimiOptions;
+      expect(saved.apiKey, 'kimi-key');
+      expect(saved.mode, 'basic');
+    },
+    variant: TargetPlatformVariant({TargetPlatform.macOS}),
+  );
+
+  testWidgets(
+    'desktop edit dialog preserves Kimi keys and changes mode',
+    (tester) async {
+      SearchServiceOptions? updated;
+      await _pumpDialogHost(
+        tester,
+        onOpen: (context) async {
+          updated = await showDesktopEditSearchServiceDialog(
+            context,
+            KimiOptions(
+              id: 'kimi',
+              apiKey: 'kimi-key',
+              mode: 'basic',
+              extraApiKeys: const ['extra-key'],
+            ),
+          );
+        },
+      );
+
+      await tester.tap(find.text('Open'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Basic'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Pro').last);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Save'));
+      await tester.pumpAndSettle();
+
+      final saved = updated! as KimiOptions;
+      expect(saved.id, 'kimi');
+      expect(saved.apiKey, 'kimi-key');
+      expect(saved.mode, 'pro');
+      expect(saved.extraApiKeys, ['extra-key']);
+    },
+    variant: TargetPlatformVariant({TargetPlatform.macOS}),
+  );
+
   testWidgets('desktop edit dialog saves You.com content mode', (tester) async {
     SearchServiceOptions? updated;
     await _pumpDialogHost(

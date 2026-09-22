@@ -31,6 +31,18 @@ void main() {
       expect(openAINormalizeReasoningEffort('off', 'mimo-v2.5-pro'), 'none');
       expect(openAINormalizeReasoningEffort('xhigh', 'mimo-v2.5-pro'), 'high');
       expect(openAINormalizeReasoningEffort('max', 'xiaomi/mimo-v2.5'), 'high');
+      expect(openAINormalizeReasoningEffort('off', 'mimo-v2.6-pro'), 'none');
+      expect(
+        openAINormalizeReasoningEffort('xhigh', 'mimo-v2.6-flash'),
+        'high',
+      );
+      expect(
+        openAINormalizeReasoningEffort(
+          'max',
+          'xiaomi/mimo-v2.6-pro-ultraspeed',
+        ),
+        'high',
+      );
     });
 
     test('streams reasoning text and cached token usage', () async {

@@ -42,6 +42,7 @@ import '../../theme/custom_theme.dart';
 import '../../theme/chat_bubble_style.dart';
 import '../models/tool_schema_override.dart';
 import '../services/app_exit_flush.dart';
+import '../services/linux_window_service.dart';
 
 // Desktop: topic list position
 enum DesktopTopicPosition { left, right }
@@ -1268,6 +1269,10 @@ class SettingsProvider extends ChangeNotifier {
             );
     _desktopAutoSwitchTopics =
         prefs.getBool(_displayDesktopAutoSwitchTopicsKey) ?? false;
+    _linuxHideTitleBar =
+        LinuxWindowService.isSupported &&
+        (localPreferences.getBool(LinuxWindowService.hideTitleBarKey) ?? false);
+
     // Desktop: tray settings (default enabled on desktop platforms)
     final trayPref = prefs.getBool(_displayDesktopShowTrayKey);
     if (trayPref == null) {
@@ -1693,16 +1698,20 @@ class SettingsProvider extends ChangeNotifier {
   Future<void> setTtsServices(List<TtsServiceOptions> v) async {
     _ttsServices = List.unmodifiable(v);
     final prefs = _preferences;
-    final list = v.map((e) => e.toJson()).toList();
-    await prefs.setString(_ttsServicesKey, jsonEncode(list));
-    if (_selectedTtsServiceId != null &&
-        !_ttsServices.any((service) => service.id == _selectedTtsServiceId)) {
+    final selectionMissing =
+        _selectedTtsServiceId != null &&
+        !_ttsServices.any((service) => service.id == _selectedTtsServiceId);
+    if (selectionMissing) {
       _selectedTtsServiceId = _ttsServices.isEmpty
           ? null
           : _ttsServices.first.id;
-      await _persistSelectedTtsServiceId(prefs);
     }
     notifyListeners();
+    final list = v.map((e) => e.toJson()).toList();
+    await prefs.setString(_ttsServicesKey, jsonEncode(list));
+    if (selectionMissing) {
+      await _persistSelectedTtsServiceId(prefs);
+    }
   }
 
   Future<void> setTtsServiceSelected(int index) async {
@@ -1754,13 +1763,13 @@ class SettingsProvider extends ChangeNotifier {
           ? null
           : _asrServices.first.id;
     }
+    notifyListeners();
     final prefs = _preferences;
     await prefs.setString(
       _asrServicesKey,
       jsonEncode(_asrServices.map((service) => service.toJson()).toList()),
     );
     await _persistSelectedAsrServiceId(prefs);
-    notifyListeners();
   }
 
   Future<void> setSelectedAsrServiceId(String? id) async {
@@ -5334,6 +5343,17 @@ Requirements:
     await prefs.setBool(_displayDesktopAutoSwitchTopicsKey, v);
   }
 
+  bool _linuxHideTitleBar = false;
+  bool get linuxHideTitleBar => _linuxHideTitleBar;
+  Future<void> setLinuxHideTitleBar(bool value) async {
+    if (!LinuxWindowService.isSupported || _linuxHideTitleBar == value) return;
+    await LinuxWindowService.setTitleBarHidden(value);
+    final localPreferences = await SharedPreferences.getInstance();
+    await localPreferences.setBool(LinuxWindowService.hideTitleBarKey, value);
+    _linuxHideTitleBar = value;
+    notifyListeners();
+  }
+
   // Desktop-only: show system tray icon
   bool _desktopShowTray = false;
   bool get desktopShowTray => _desktopShowTray;
@@ -5822,6 +5842,7 @@ Requirements:
     copy._collapseLongUserMessages = _collapseLongUserMessages;
     copy._collapseLongUserMessageChars = _collapseLongUserMessageChars;
     copy._desktopAutoSwitchTopics = _desktopAutoSwitchTopics;
+    copy._linuxHideTitleBar = _linuxHideTitleBar;
     copy._desktopShowTray = _desktopShowTray;
     copy._desktopMinimizeToTrayOnClose = _desktopMinimizeToTrayOnClose;
     copy._usePureBackground = _usePureBackground;

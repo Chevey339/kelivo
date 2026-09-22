@@ -306,7 +306,7 @@ class _RenderBlockColumn extends RenderFlex {
       );
 
   List<RenderBox>? _semanticChildren;
-  Rect? _paintedClip;
+  List<RenderBox> _paintedChildren = const [];
   bool _hasPainted = false;
   bool _cullToViewport;
   set cullToViewport(bool value) {
@@ -353,7 +353,14 @@ class _RenderBlockColumn extends RenderFlex {
     // A descendant can sit behind another RepaintBoundary. Dirty its own
     // cached paint when its viewport changes, even if the document's outer
     // observer did not move (for example, a details block above it collapsed).
-    if (_hasPainted && _paintedClip != clips.paint) markNeedsPaint();
+    // The display list contains whole children, not a clip to this rectangle.
+    // Moving within the same set of visible children can reuse cached paint
+    // (including expensive custom-font glyphs). Entering/leaving children must
+    // still invalidate in this frame, including behind nested boundaries.
+    if (_hasPainted &&
+        !listEquals(_paintedChildren, _childrenNearViewport(clips.paint))) {
+      markNeedsPaint();
+    }
     final next = _childrenNearViewport(clips.semantics);
     final previous = _semanticChildren ?? const <RenderBox>[];
     if (next.length != previous.length ||
@@ -398,15 +405,10 @@ class _RenderBlockColumn extends RenderFlex {
   @override
   void defaultPaint(PaintingContext context, Offset offset) {
     _hasPainted = true;
-    final visible = _paintedClip = _clips.paint;
-    var child = firstChild;
-    while (child != null) {
+    _paintedChildren = _childrenNearViewport(_clips.paint);
+    for (final child in _paintedChildren) {
       final data = child.parentData! as FlexParentData;
-      if (visible == null ||
-          visible.overlaps(child.paintBounds.shift(data.offset))) {
-        context.paintChild(child, offset + data.offset);
-      }
-      child = data.nextSibling;
+      context.paintChild(child, offset + data.offset);
     }
   }
 }

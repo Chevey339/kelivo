@@ -110,6 +110,7 @@ void main() {
         'jina',
         'perplexity',
         'bocha',
+        'kagi',
         'serper',
         'grok',
         'querit',

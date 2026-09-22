@@ -109,6 +109,11 @@ void main() {
       expect(openAINormalizeReasoningEffort('off', 'grok-4.6'), 'low');
       expect(openAINormalizeReasoningEffort('xhigh', 'grok-4.6'), 'xhigh');
       expect(openAINormalizeReasoningEffort('max', 'x-ai/grok-4.6'), 'xhigh');
+      expect(openAINormalizeReasoningEffort('off', 'grok-4.7'), 'low');
+      expect(openAINormalizeReasoningEffort('xhigh', 'grok-4.7'), 'xhigh');
+      expect(openAINormalizeReasoningEffort('max', 'x-ai/grok-4.7'), 'xhigh');
+      expect(openAISupportsXhighReasoning('grok-4.7'), isTrue);
+      expect(openAISupportsMaxReasoning('grok-4.5'), isFalse);
       expect(openAINormalizeReasoningEffort('off', 'deepseek-v4-pro'), 'off');
       expect(
         openAINormalizeReasoningEffort('medium', 'deepseek-v4-flash'),
@@ -329,7 +334,7 @@ void main() {
       expect(maxBody.containsKey('temperature'), isFalse);
     });
 
-    test('Grok 4.6 Responses keeps xhigh and clamps off to low', () async {
+    test('Grok 4.6 and 4.7 Responses keep xhigh and clamp off to low', () async {
       late Map<String, dynamic> requestBody;
       final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
       addTearDown(() async {
@@ -362,33 +367,43 @@ void main() {
         await request.response.close();
       });
 
-      final offChunks = await ChatApiService.sendMessageStream(
-        config: _openAIConfig(
-          'http://${server.address.address}:${server.port}/v1',
-          useResponseApi: true,
-        ),
-        modelId: 'grok-4.6',
-        messages: const [
-          {'role': 'user', 'content': 'hello'},
-        ],
-        thinkingBudget: 0,
-      ).toList();
-      expect(offChunks.isGenerationDone, isTrue);
-      expect((requestBody['reasoning'] as Map)['effort'], 'low');
+      for (final modelId in const ['grok-4.6', 'grok-4.7', 'x-ai/grok-4.7']) {
+        final offChunks = await ChatApiService.sendMessageStream(
+          config: _openAIConfig(
+            'http://${server.address.address}:${server.port}/v1',
+            useResponseApi: true,
+          ),
+          modelId: modelId,
+          messages: const [
+            {'role': 'user', 'content': 'hello'},
+          ],
+          thinkingBudget: 0,
+        ).toList();
+        expect(offChunks.isGenerationDone, isTrue, reason: modelId);
+        expect(
+          (requestBody['reasoning'] as Map)['effort'],
+          'low',
+          reason: modelId,
+        );
 
-      final xhighChunks = await ChatApiService.sendMessageStream(
-        config: _openAIConfig(
-          'http://${server.address.address}:${server.port}/v1',
-          useResponseApi: true,
-        ),
-        modelId: 'grok-4.6',
-        messages: const [
-          {'role': 'user', 'content': 'hello'},
-        ],
-        thinkingBudget: 64000,
-      ).toList();
-      expect(xhighChunks.isGenerationDone, isTrue);
-      expect((requestBody['reasoning'] as Map)['effort'], 'xhigh');
+        final xhighChunks = await ChatApiService.sendMessageStream(
+          config: _openAIConfig(
+            'http://${server.address.address}:${server.port}/v1',
+            useResponseApi: true,
+          ),
+          modelId: modelId,
+          messages: const [
+            {'role': 'user', 'content': 'hello'},
+          ],
+          thinkingBudget: 64000,
+        ).toList();
+        expect(xhighChunks.isGenerationDone, isTrue, reason: modelId);
+        expect(
+          (requestBody['reasoning'] as Map)['effort'],
+          'xhigh',
+          reason: modelId,
+        );
+      }
     });
 
     test('Grok Responses streams reasoning text and clamps off to low', () async {

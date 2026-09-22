@@ -106,7 +106,7 @@ for f in "$SLICE_DIR/libish.a" "$SLICE_DIR/libish_emu.a" "$SLICE_DIR/libfakefs.a
         break
     fi
 done
-if [ ! -x "$BUILD_DIR/fakefsify" ]; then
+if [ ! -x "$BUILD_DIR/fakefsify" ] || [ ! -x "$BUILD_DIR/ish" ]; then
     need_ish=1
 fi
 if [ ! -d "$BUILD_DIR/include" ] || [ -z "$(ls -A "$BUILD_DIR/include" 2>/dev/null)" ]; then
@@ -151,6 +151,7 @@ stamp_outputs() {
     [ -f "$SLICE_DIR/.kelivo-ish-build" ] && stamp+=("$SLICE_DIR/.kelivo-ish-build")
     [ -s "$RESOURCES_DIR/libvdso.so.elf" ] && stamp+=("$RESOURCES_DIR/libvdso.so.elf")
     [ -x "$BUILD_DIR/fakefsify" ] && stamp+=("$BUILD_DIR/fakefsify")
+    [ -x "$BUILD_DIR/ish" ] && stamp+=("$BUILD_DIR/ish")
     [ -f "$BUILD_DIR/include/ish/cpu-offsets.h" ] && stamp+=("$BUILD_DIR/include/ish/cpu-offsets.h")
     [ -s "$ZIP_PATH" ] && stamp+=("$ZIP_PATH")
     for file in manifest.plist files/lib/wasm-polyfill.js files/lib/fetch-polyfill.js; do

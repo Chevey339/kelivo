@@ -145,7 +145,21 @@ class _SearchSettingsSheet extends StatelessWidget {
           cfg: cfg,
           modelId: modelId,
         );
-    final builtInMode = hasBuiltInSearch;
+    Future<void> setExternalSearchEnabled(bool value) async {
+      if (value &&
+          cfg != null &&
+          providerKey != null &&
+          (modelId ?? '').isNotEmpty) {
+        await _setBuiltInSearchEnabled(
+          settings: settingsNotifier,
+          providerCfg: cfg,
+          providerKey: providerKey,
+          modelId: modelId!,
+          enabled: false,
+        );
+      }
+      await assistantNotifier.setSearchEnabledForCurrentAssistant(value);
+    }
 
     final maxHeight = MediaQuery.of(context).size.height * 0.8;
     return SafeArea(
@@ -346,69 +360,64 @@ class _SearchSettingsSheet extends StatelessWidget {
                     ),
                 ],
 
-                // Toggle card
-                if (!builtInMode) ...[
-                  IosCardPress(
-                    borderRadius: BorderRadius.circular(14),
-                    baseColor: sheetTileColor(context),
-                    duration: const Duration(milliseconds: 260),
-                    onTap: () {
-                      Haptics.light();
-                      context
-                          .read<AssistantProvider>()
-                          .setSearchEnabledForCurrentAssistant(!enabled);
-                    },
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 6,
-                    ),
-                    child: Row(
-                      children: [
-                        Icon(Lucide.Globe, size: 20, color: cs.primary),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Text(
-                                l10n.searchSettingsSheetWebSearchTitle,
-                                style: TextStyle(
-                                  fontSize: 14,
-                                  fontWeight: AppFontWeights.emphasis,
-                                ),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ],
-                          ),
-                        ),
-                        IconButton(
-                          tooltip:
-                              l10n.searchSettingsSheetOpenSearchServicesTooltip,
-                          icon: Icon(Lucide.Settings, size: 20),
-                          onPressed: () {
-                            Navigator.of(context).push(
-                              MaterialPageRoute(
-                                builder: (_) => const SearchServicesPage(),
-                              ),
-                            );
-                          },
-                        ),
-                        const SizedBox(width: 4),
-                        IosSwitch(
-                          value: enabled,
-                          onChanged: (v) => context
-                              .read<AssistantProvider>()
-                              .setSearchEnabledForCurrentAssistant(v),
-                        ),
-                      ],
-                    ),
+                // External search remains available while built-in search is
+                // active so users can switch modes in one step.
+                IosCardPress(
+                  borderRadius: BorderRadius.circular(14),
+                  baseColor: sheetTileColor(context),
+                  duration: const Duration(milliseconds: 260),
+                  onTap: () async {
+                    Haptics.light();
+                    await setExternalSearchEnabled(!enabled);
+                  },
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 6,
                   ),
-                  const SizedBox(height: 14),
-                ],
+                  child: Row(
+                    children: [
+                      Icon(Lucide.Globe, size: 20, color: cs.primary),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              l10n.searchSettingsSheetWebSearchTitle,
+                              style: TextStyle(
+                                fontSize: 14,
+                                fontWeight: AppFontWeights.emphasis,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ],
+                        ),
+                      ),
+                      IconButton(
+                        tooltip:
+                            l10n.searchSettingsSheetOpenSearchServicesTooltip,
+                        icon: Icon(Lucide.Settings, size: 20),
+                        onPressed: () {
+                          Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (_) => const SearchServicesPage(),
+                            ),
+                          );
+                        },
+                      ),
+                      const SizedBox(width: 4),
+                      IosSwitch(
+                        value: enabled,
+                        onChanged: setExternalSearchEnabled,
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 14),
                 // Services list (iOS-style rows like learning mode)
-                if (!builtInMode && services.isNotEmpty) ...[
+                if (services.isNotEmpty) ...[
                   ...List.generate(services.length, (i) {
                     final s = services[i];
                     final bool isSelected = i == selected;
@@ -423,11 +432,11 @@ class _SearchSettingsSheet extends StatelessWidget {
                           borderRadius: BorderRadius.circular(14),
                           baseColor: sheetTileColor(context),
                           duration: const Duration(milliseconds: 260),
-                          onTap: () {
+                          onTap: () async {
                             Haptics.light();
-                            context
-                                .read<SettingsProvider>()
-                                .setSearchServiceSelected(i);
+                            await settingsNotifier.setSearchServiceSelected(i);
+                            await setExternalSearchEnabled(true);
+                            if (!context.mounted) return;
                             Navigator.of(context).maybePop();
                           },
                           padding: const EdgeInsets.symmetric(horizontal: 12),
@@ -459,7 +468,7 @@ class _SearchSettingsSheet extends StatelessWidget {
                     );
                   }),
                   const SizedBox(height: 8),
-                ] else if (!builtInMode) ...[
+                ] else ...[
                   Text(
                     l10n.searchSettingsSheetNoServicesMessage,
                     style: TextStyle(
@@ -502,6 +511,7 @@ class _BrandBadge extends StatelessWidget {
     if (s is PerplexityOptions) return 'perplexity';
     if (s is BochaOptions) return 'bocha';
     if (s is DoubaoOptions) return 'doubao';
+    if (s is KagiOptions) return 'kagi';
     if (s is SerperOptions) return 'serper';
     if (s is GrokOptions) return 'grok';
     if (s is StepFunOptions) return 'stepfun';
@@ -509,6 +519,7 @@ class _BrandBadge extends StatelessWidget {
     if (s is TinyFishOptions) return 'tinyfish';
     if (s is AnySearchOptions) return 'anysearch';
     if (s is ParallelOptions) return 'parallel';
+    if (s is KimiOptions) return 'kimi';
     if (s is YouSearchOptions) return 'you';
     if (s is KelivoOptions) return 'kelivo';
     return 'search';

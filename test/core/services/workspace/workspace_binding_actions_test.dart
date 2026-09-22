@@ -109,6 +109,7 @@ void main() {
 
     await bindConversationWorkspace(
       chat,
+      assistants: assistants,
       conversationId: conversation.id,
       workspace: sampleWorkspace('ws-new'),
     );
@@ -120,6 +121,155 @@ void main() {
     expect(binding.cwd, 'src');
     expect(assistants.getById('asst-2')!.defaultWorkspaceId, 'ws-keep');
   });
+
+  test(
+    'first binding remembers only the conversation assistant default',
+    () async {
+      final assistantId = await assistants.addAssistant(name: 'New');
+      await assistants.setCurrentAssistant('asst-2');
+      final conversation = await chat.createConversation(
+        assistantId: assistantId,
+      );
+      final notice = await bindConversationWorkspace(
+        chat,
+        assistants: assistants,
+        conversationId: conversation.id,
+        workspace: sampleWorkspace('first'),
+      );
+      expect(notice?.automaticallyRemembered, isTrue);
+      expect(assistants.getById(assistantId)!.defaultWorkspaceId, 'first');
+      expect(assistants.getById('asst-2')!.defaultWorkspaceId, 'ws-keep');
+
+      for (final id in [
+        conversation.id,
+        (await chat.createDraftConversation(assistantId: assistantId)).id,
+      ]) {
+        expect(
+          await bindConversationWorkspace(
+            chat,
+            assistants: assistants,
+            conversationId: id,
+            workspace: sampleWorkspace('second'),
+          ),
+          isNull,
+        );
+        expect(
+          WorkspaceBinding.fromExtras(
+            chat.getConversation(id)!.extras,
+          ).workspaceId,
+          'second',
+        );
+        expect(assistants.getById(assistantId)!.defaultWorkspaceId, 'first');
+      }
+    },
+  );
+
+  test(
+    'old assistant gets one suggestion without changing its default',
+    () async {
+      final conversation = await chat.createConversation(assistantId: 'asst-1');
+      final notice = await bindConversationWorkspace(
+        chat,
+        assistants: assistants,
+        conversationId: conversation.id,
+        workspace: sampleWorkspace('first'),
+      );
+      expect(notice?.automaticallyRemembered, isFalse);
+      expect(assistants.getById('asst-1')!.defaultWorkspaceId, isNull);
+
+      final reloaded = AssistantProvider(preferences: harness.preferences);
+      await reloaded.loaded;
+      addTearDown(reloaded.dispose);
+      expect(
+        await bindConversationWorkspace(
+          chat,
+          assistants: reloaded,
+          conversationId: conversation.id,
+          workspace: sampleWorkspace('second'),
+        ),
+        isNull,
+      );
+      expect(reloaded.getById('asst-1')!.defaultWorkspaceId, isNull);
+    },
+  );
+
+  test('explicit None is retained even before the first binding', () async {
+    final assistantId = await assistants.addAssistant(name: 'No default');
+    await assistants.updateAssistant(
+      assistants.getById(assistantId)!.copyWith(clearDefaultWorkspaceId: true),
+    );
+    final conversation = await chat.createConversation(
+      assistantId: assistantId,
+    );
+    expect(
+      await bindConversationWorkspace(
+        chat,
+        assistants: assistants,
+        conversationId: conversation.id,
+        workspace: sampleWorkspace('workspace'),
+      ),
+      isNull,
+    );
+    expect(assistants.getById(assistantId)!.defaultWorkspaceId, isNull);
+  });
+
+  test('unbinding a conversation does not rearm default setup', () async {
+    final assistantId = await assistants.addAssistant(name: 'New');
+    final conversation = await chat.createDraftConversation(
+      assistantId: assistantId,
+    );
+    await bindConversationWorkspace(
+      chat,
+      assistants: assistants,
+      conversationId: conversation.id,
+      workspace: sampleWorkspace('first'),
+    );
+    await chat.updateConversationExtras(
+      conversation.id,
+      const WorkspaceBinding().applyTo,
+    );
+    expect(assistants.getById(assistantId)!.defaultWorkspaceId, 'first');
+    expect(
+      await bindConversationWorkspace(
+        chat,
+        assistants: assistants,
+        conversationId: conversation.id,
+        workspace: sampleWorkspace('second'),
+      ),
+      isNull,
+    );
+    expect(assistants.getById(assistantId)!.defaultWorkspaceId, 'first');
+  });
+
+  test(
+    'temporary and assistantless chats do not initialize a default',
+    () async {
+      final assistantId = await assistants.addAssistant(name: 'New');
+      final conversations = [
+        await chat.createConversation(),
+        await chat.createDraftConversation(
+          assistantId: assistantId,
+          temporary: true,
+        ),
+      ];
+      for (final conversation in conversations) {
+        expect(
+          await bindConversationWorkspace(
+            chat,
+            assistants: assistants,
+            conversationId: conversation.id,
+            workspace: sampleWorkspace('workspace'),
+          ),
+          isNull,
+        );
+      }
+      expect(assistants.getById(assistantId)!.defaultWorkspaceId, isNull);
+      expect(
+        assistants.getById(assistantId)!.defaultWorkspaceSetup,
+        DefaultWorkspaceSetup.automatic,
+      );
+    },
+  );
 
   test('deleting a workspace clears matching assistant defaults', () async {
     final workspace = await workspaces.create(name: 'Doomed');
@@ -134,6 +284,17 @@ void main() {
 
     expect(assistants.getById('asst-1')!.defaultWorkspaceId, isNull);
     expect(assistants.getById('asst-2')!.defaultWorkspaceId, isNull);
+    final conversation = await chat.createConversation(assistantId: 'asst-1');
+    expect(
+      await bindConversationWorkspace(
+        chat,
+        assistants: assistants,
+        conversationId: conversation.id,
+        workspace: sampleWorkspace('replacement'),
+      ),
+      isNull,
+    );
+    expect(assistants.getById('asst-1')!.defaultWorkspaceId, isNull);
   });
 
   test('new assistants default to no workspace', () async {

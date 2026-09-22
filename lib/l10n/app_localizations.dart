@@ -1576,12 +1576,6 @@ abstract class AppLocalizations {
   /// **'Assistant not found'**
   String get assistantEditPageNotFound;
 
-  /// No description provided for @assistantEditPageWorkspaceTab.
-  ///
-  /// In en, this message translates to:
-  /// **'Workspace'**
-  String get assistantEditPageWorkspaceTab;
-
   /// No description provided for @assistantEditPageBasicTab.
   ///
   /// In en, this message translates to:
@@ -8917,6 +8911,24 @@ abstract class AppLocalizations {
   /// **'Fonts'**
   String get desktopSettingsFontsTitle;
 
+  /// No description provided for @linuxHideTitleBarTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Hide system title bar'**
+  String get linuxHideTitleBarTitle;
+
+  /// No description provided for @linuxHideTitleBarDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Also hides window buttons. Use your window manager to move, resize, and close the window.'**
+  String get linuxHideTitleBarDescription;
+
+  /// No description provided for @linuxHideTitleBarError.
+  ///
+  /// In en, this message translates to:
+  /// **'Unable to change the title bar. Please try again.'**
+  String get linuxHideTitleBarError;
+
   /// No description provided for @displaySettingsPageTrayTitle.
   ///
   /// In en, this message translates to:
@@ -10494,6 +10506,30 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Unified search for AI agents with automatic routing across web and specialist data sources. API key is optional.'**
   String get searchProviderAnySearchDescription;
+
+  /// No description provided for @searchServiceNameKagi.
+  ///
+  /// In en, this message translates to:
+  /// **'Kagi'**
+  String get searchServiceNameKagi;
+
+  /// No description provided for @searchProviderKagiDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Kagi Search API. Returns premium web search results from Kagi.'**
+  String get searchProviderKagiDescription;
+
+  /// No description provided for @searchServiceNameKimi.
+  ///
+  /// In en, this message translates to:
+  /// **'Kimi'**
+  String get searchServiceNameKimi;
+
+  /// No description provided for @searchProviderKimiDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Kimi Search API. Pro returns relevant web content excerpts; Basic returns titles, links, and snippets.'**
+  String get searchProviderKimiDescription;
 
   /// No description provided for @searchServiceNameParallel.
   ///
@@ -17744,8 +17780,44 @@ abstract class AppLocalizations {
   /// No description provided for @workspaceEntryDefaultWorkspaceSubtitle.
   ///
   /// In en, this message translates to:
-  /// **'New conversations with this assistant start bound to this workspace.'**
+  /// **'New conversations use this workspace. Existing conversations stay unchanged.'**
   String get workspaceEntryDefaultWorkspaceSubtitle;
+
+  /// No description provided for @workspaceEntryDefaultWorkspaceUnset.
+  ///
+  /// In en, this message translates to:
+  /// **'Not set'**
+  String get workspaceEntryDefaultWorkspaceUnset;
+
+  /// No description provided for @workspaceEntryDefaultWorkspaceAutomaticSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'The first workspace you bind to a conversation will be remembered for new conversations.'**
+  String get workspaceEntryDefaultWorkspaceAutomaticSubtitle;
+
+  /// No description provided for @workspaceBindingRememberedDefault.
+  ///
+  /// In en, this message translates to:
+  /// **'Remembered as the default workspace for “{assistant}”. New conversations will use it.'**
+  String workspaceBindingRememberedDefault(String assistant);
+
+  /// No description provided for @workspaceBindingSuggestDefault.
+  ///
+  /// In en, this message translates to:
+  /// **'Use this workspace for future conversations with “{assistant}” too?'**
+  String workspaceBindingSuggestDefault(String assistant);
+
+  /// No description provided for @workspaceBindingUndoDefault.
+  ///
+  /// In en, this message translates to:
+  /// **'Undo'**
+  String get workspaceBindingUndoDefault;
+
+  /// No description provided for @workspaceBindingUseAsDefault.
+  ///
+  /// In en, this message translates to:
+  /// **'Set as default'**
+  String get workspaceBindingUseAsDefault;
 
   /// No description provided for @workspaceEntryNone.
   ///
@@ -21356,6 +21428,531 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Reuse context across messages and choose how long the cache is retained.'**
   String get oauthPromptCachingHelp;
+
+  /// No description provided for @scheduledTasksPreparation.
+  ///
+  /// In en, this message translates to:
+  /// **'Execution and notifications'**
+  String get scheduledTasksPreparation;
+
+  /// No description provided for @scheduledTasksAllowPreparation.
+  ///
+  /// In en, this message translates to:
+  /// **'Allow advance preparation'**
+  String get scheduledTasksAllowPreparation;
+
+  /// No description provided for @scheduledTasksPreparationDetail.
+  ///
+  /// In en, this message translates to:
+  /// **'Advance preparation is for text tasks that do not need current information. It cannot use tools or attachments, or perform external actions.'**
+  String get scheduledTasksPreparationDetail;
+
+  /// No description provided for @scheduledTasksIOSDetail.
+  ///
+  /// In en, this message translates to:
+  /// **'iOS background limits prevent Kelivo from waking at a set time to run a model. Instead, content is prepared while the app can run, and the system shows a notification at the scheduled time. Only the next occurrence is prepared. Preparation may not finish after leaving the app; reopen Kelivo to prepare subsequent occurrences.'**
+  String get scheduledTasksIOSDetail;
+
+  /// No description provided for @scheduledTasksContextPolicy.
+  ///
+  /// In en, this message translates to:
+  /// **'Conversation context'**
+  String get scheduledTasksContextPolicy;
+
+  /// No description provided for @scheduledTasksContextLatest.
+  ///
+  /// In en, this message translates to:
+  /// **'Follow the latest conversation'**
+  String get scheduledTasksContextLatest;
+
+  /// No description provided for @scheduledTasksContextSnapshot.
+  ///
+  /// In en, this message translates to:
+  /// **'Use the prepared snapshot'**
+  String get scheduledTasksContextSnapshot;
+
+  /// No description provided for @scheduledTasksUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'When unable to execute'**
+  String get scheduledTasksUnavailable;
+
+  /// No description provided for @scheduledTasksRemind.
+  ///
+  /// In en, this message translates to:
+  /// **'Send a reminder only'**
+  String get scheduledTasksRemind;
+
+  /// No description provided for @scheduledTasksSkip.
+  ///
+  /// In en, this message translates to:
+  /// **'Skip this occurrence'**
+  String get scheduledTasksSkip;
+
+  /// No description provided for @scheduledTasksNotify.
+  ///
+  /// In en, this message translates to:
+  /// **'Result notifications'**
+  String get scheduledTasksNotify;
+
+  /// No description provided for @scheduledTasksShowPreview.
+  ///
+  /// In en, this message translates to:
+  /// **'Show result text in notifications'**
+  String get scheduledTasksShowPreview;
+
+  /// No description provided for @scheduledTasksPreparationWindow.
+  ///
+  /// In en, this message translates to:
+  /// **'Prepare up to'**
+  String get scheduledTasksPreparationWindow;
+
+  /// No description provided for @scheduledTasksPreparationAttempts.
+  ///
+  /// In en, this message translates to:
+  /// **'Automatic attempt limit'**
+  String get scheduledTasksPreparationAttempts;
+
+  /// No description provided for @scheduledTasksPreparationCooldown.
+  ///
+  /// In en, this message translates to:
+  /// **'Minimum interval (minutes)'**
+  String get scheduledTasksPreparationCooldown;
+
+  /// No description provided for @scheduledTasksPreparationBudget.
+  ///
+  /// In en, this message translates to:
+  /// **'At most one preparation at a time across all tasks. Automatic preparation pauses after six total attempts per hour, including cancelled requests. Prepare now is not limited by attempt counts.'**
+  String get scheduledTasksPreparationBudget;
+
+  /// No description provided for @scheduledTasksPreparing.
+  ///
+  /// In en, this message translates to:
+  /// **'Preparing result'**
+  String get scheduledTasksPreparing;
+
+  /// No description provided for @scheduledTasksPrepared.
+  ///
+  /// In en, this message translates to:
+  /// **'Result prepared'**
+  String get scheduledTasksPrepared;
+
+  /// No description provided for @scheduledTasksPendingPreparation.
+  ///
+  /// In en, this message translates to:
+  /// **'Result not prepared yet'**
+  String get scheduledTasksPendingPreparation;
+
+  /// No description provided for @scheduledTasksNotificationRegistered.
+  ///
+  /// In en, this message translates to:
+  /// **'Notification scheduled'**
+  String get scheduledTasksNotificationRegistered;
+
+  /// No description provided for @scheduledTasksNotificationUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'Notification not scheduled'**
+  String get scheduledTasksNotificationUnavailable;
+
+  /// No description provided for @scheduledTasksReminded.
+  ///
+  /// In en, this message translates to:
+  /// **'Due · reminder only'**
+  String get scheduledTasksReminded;
+
+  /// No description provided for @scheduledTasksSkipped.
+  ///
+  /// In en, this message translates to:
+  /// **'Skipped'**
+  String get scheduledTasksSkipped;
+
+  /// No description provided for @scheduledTasksCancelled.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancelled'**
+  String get scheduledTasksCancelled;
+
+  /// No description provided for @scheduledTasksReminderBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Your scheduled task is due. Open Kelivo to continue.'**
+  String get scheduledTasksReminderBody;
+
+  /// No description provided for @scheduledTasksResultBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Your scheduled task result is ready.'**
+  String get scheduledTasksResultBody;
+
+  /// No description provided for @scheduledTasksNotificationPermission.
+  ///
+  /// In en, this message translates to:
+  /// **'Allow task notifications'**
+  String get scheduledTasksNotificationPermission;
+
+  /// No description provided for @scheduledTasksPreparationCost.
+  ///
+  /// In en, this message translates to:
+  /// **'Preparation calls the model and may cost extra. With “Follow latest conversation”, new messages before the due time can invalidate a prepared result. Unused or cancelled output may still be billed, and preparing again makes another model request.'**
+  String get scheduledTasksPreparationCost;
+
+  /// No description provided for @scheduledTasksAllowPreparationTip.
+  ///
+  /// In en, this message translates to:
+  /// **'Generate the next result before its scheduled time, while Kelivo can run. The result stays out of the chat until it is due. Preparation uses text only, without tools, attachments or custom request bodies. It may incur model charges.'**
+  String get scheduledTasksAllowPreparationTip;
+
+  /// No description provided for @scheduledTasksContextPolicyTip.
+  ///
+  /// In en, this message translates to:
+  /// **'Follow latest conversation: before the task is due, new messages, edits or switching message versions invalidate the prepared result; preparing again uses another attempt and may cost extra. Once due, the saved notification result is added to the chat unchanged.\n\nUse preparation snapshot: keep the prepared result even if the conversation changes. It will not reflect later messages.'**
+  String get scheduledTasksContextPolicyTip;
+
+  /// No description provided for @scheduledTasksPreparationWindowTip.
+  ///
+  /// In en, this message translates to:
+  /// **'How far ahead of the scheduled time preparation may begin, up to 24 hours. For example, opening Kelivo at noon can prepare the next morning’s reminder. A larger window gives more chances to prepare, but the result may be less current. It does not change the scheduled time or guarantee background execution. Prepare now bypasses this automatic waiting period and all attempt limits.'**
+  String get scheduledTasksPreparationWindowTip;
+
+  /// No description provided for @scheduledTasksPreparationAttemptsTip.
+  ///
+  /// In en, this message translates to:
+  /// **'Automatic preparation pauses when this occurrence reaches the total attempt limit. First attempts, failures, cancellations and manual preparation all count in the record. Prepare now can still run after this limit is reached. More attempts may incur more model charges; this is not a spending limit.'**
+  String get scheduledTasksPreparationAttemptsTip;
+
+  /// No description provided for @scheduledTasksPreparationCooldownTip.
+  ///
+  /// In en, this message translates to:
+  /// **'Minimum time between the start of preparation attempts for the same occurrence. Waiting longer reduces repeated requests. A retry still needs the app to be able to run; it is not a background timer. Prepare now bypasses this automatic waiting period and all attempt limits.'**
+  String get scheduledTasksPreparationCooldownTip;
+
+  /// No description provided for @scheduledTasksUnavailableTip.
+  ///
+  /// In en, this message translates to:
+  /// **'If no prepared result is available and the task cannot run when due, send a reminder or skip the occurrence. A reminder contains no generated answer and requires notifications to be enabled. If Kelivo is open when the task is due, it can run the task then.'**
+  String get scheduledTasksUnavailableTip;
+
+  /// No description provided for @scheduledTasksNotifyTip.
+  ///
+  /// In en, this message translates to:
+  /// **'Allow result notifications and fallback reminders. Turning this off does not stop the task or model calls, and does not prevent preparation charges. System notification permission is also required.'**
+  String get scheduledTasksNotifyTip;
+
+  /// No description provided for @scheduledTasksShowPreviewTip.
+  ///
+  /// In en, this message translates to:
+  /// **'Show the prepared result text in the notification, including on the lock screen if allowed by system settings. Turn this off to show a generic notice; the full result remains available in the chat. Global notification privacy settings also apply.'**
+  String get scheduledTasksShowPreviewTip;
+
+  /// No description provided for @scheduledTasksHours.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 hour} other{{count} hours}}'**
+  String scheduledTasksHours(int count);
+
+  /// No description provided for @scheduledTasksMinutes.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 minute} other{{count} minutes}}'**
+  String scheduledTasksMinutes(int count);
+
+  /// No description provided for @scheduledTasksPreparationOff.
+  ///
+  /// In en, this message translates to:
+  /// **'Preparation off'**
+  String get scheduledTasksPreparationOff;
+
+  /// No description provided for @scheduledTasksPreparationQueued.
+  ///
+  /// In en, this message translates to:
+  /// **'Queued'**
+  String get scheduledTasksPreparationQueued;
+
+  /// No description provided for @scheduledTasksPreparationQueuedDetail.
+  ///
+  /// In en, this message translates to:
+  /// **'Another task is being prepared. Eligible tasks continue in due-time order.'**
+  String get scheduledTasksPreparationQueuedDetail;
+
+  /// No description provided for @scheduledTasksPreparationIdle.
+  ///
+  /// In en, this message translates to:
+  /// **'Waiting for chat'**
+  String get scheduledTasksPreparationIdle;
+
+  /// No description provided for @scheduledTasksPreparationIdleDetail.
+  ///
+  /// In en, this message translates to:
+  /// **'Preparation resumes after active replies finish and this task’s context settles.'**
+  String get scheduledTasksPreparationIdleDetail;
+
+  /// No description provided for @scheduledTasksPreparationWindowWaiting.
+  ///
+  /// In en, this message translates to:
+  /// **'Outside preparation window'**
+  String get scheduledTasksPreparationWindowWaiting;
+
+  /// No description provided for @scheduledTasksPreparationCooldownWaiting.
+  ///
+  /// In en, this message translates to:
+  /// **'Waiting to retry'**
+  String get scheduledTasksPreparationCooldownWaiting;
+
+  /// No description provided for @scheduledTasksPreparationRetryAt.
+  ///
+  /// In en, this message translates to:
+  /// **'Can retry after {time}'**
+  String scheduledTasksPreparationRetryAt(String time);
+
+  /// No description provided for @scheduledTasksPreparationLimitReached.
+  ///
+  /// In en, this message translates to:
+  /// **'Automatic attempt limit reached'**
+  String get scheduledTasksPreparationLimitReached;
+
+  /// No description provided for @scheduledTasksPreparationAttemptsUsed.
+  ///
+  /// In en, this message translates to:
+  /// **'This occurrence has used {count} attempts; the automatic limit is {limit}. Use Prepare now to continue manually.'**
+  String scheduledTasksPreparationAttemptsUsed(int count, int limit);
+
+  /// No description provided for @scheduledTasksPreparationHourlyLimit.
+  ///
+  /// In en, this message translates to:
+  /// **'Automatic hourly limit reached'**
+  String get scheduledTasksPreparationHourlyLimit;
+
+  /// No description provided for @scheduledTasksPreparationHourlyLimitDetail.
+  ///
+  /// In en, this message translates to:
+  /// **'Automatic preparation is paused until hourly capacity is available. You can still use Prepare now.'**
+  String get scheduledTasksPreparationHourlyLimitDetail;
+
+  /// No description provided for @scheduledTasksPreparationUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'Preparation unavailable'**
+  String get scheduledTasksPreparationUnavailable;
+
+  /// No description provided for @scheduledTasksPreparationReadFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not read task context. It will be checked again shortly; see execution history for details.'**
+  String get scheduledTasksPreparationReadFailed;
+
+  /// No description provided for @scheduledTasksPreparationResultRetained.
+  ///
+  /// In en, this message translates to:
+  /// **'Context could not be checked. The prepared result is retained and will be checked again.'**
+  String get scheduledTasksPreparationResultRetained;
+
+  /// No description provided for @scheduledTasksPreparationContextChanged.
+  ///
+  /// In en, this message translates to:
+  /// **'The conversation or task context changed, so the earlier result was discarded.'**
+  String get scheduledTasksPreparationContextChanged;
+
+  /// No description provided for @scheduledTasksPreparationPublishing.
+  ///
+  /// In en, this message translates to:
+  /// **'Waiting to add to chat'**
+  String get scheduledTasksPreparationPublishing;
+
+  /// No description provided for @scheduledTasksPreparationPublishingDetail.
+  ///
+  /// In en, this message translates to:
+  /// **'The saved result will be added to the conversation when the current reply finishes.'**
+  String get scheduledTasksPreparationPublishingDetail;
+
+  /// No description provided for @scheduledTasksPreparationPrompt.
+  ///
+  /// In en, this message translates to:
+  /// **'Preparation prompt'**
+  String get scheduledTasksPreparationPrompt;
+
+  /// No description provided for @scheduledTasksPreparationPromptTip.
+  ///
+  /// In en, this message translates to:
+  /// **'Extra system instructions used only when preparing this task in advance, separate from the task instructions. You can change the style or remove these instructions entirely. Tools and live information remain unavailable. Editing this prompt invalidates any result prepared before the due time; preparing it again may incur another model charge.'**
+  String get scheduledTasksPreparationPromptTip;
+
+  /// No description provided for @scheduledTasksPreparationPromptEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'Leave empty to add no preparation instructions'**
+  String get scheduledTasksPreparationPromptEmpty;
+
+  /// No description provided for @scheduledTasksPreparationPromptVariables.
+  ///
+  /// In en, this message translates to:
+  /// **'Placeholders: {timeVariable} is the planned local delivery time; {offsetVariable} is its UTC offset. These are replaced when preparing the result.'**
+  String scheduledTasksPreparationPromptVariables(
+    String timeVariable,
+    String offsetVariable,
+  );
+
+  /// No description provided for @scheduledTasksPrepareNow.
+  ///
+  /// In en, this message translates to:
+  /// **'Prepare now'**
+  String get scheduledTasksPrepareNow;
+
+  /// No description provided for @scheduledTasksPrepareNowDetail.
+  ///
+  /// In en, this message translates to:
+  /// **'Prepare the next result now and deliver it at the scheduled time. Automatic waiting periods and attempt limits do not apply. This may incur model charges. An existing prepared result is reused.'**
+  String get scheduledTasksPrepareNowDetail;
+
+  /// No description provided for @scheduledTasksPrepareNowReady.
+  ///
+  /// In en, this message translates to:
+  /// **'The next result is already prepared. No additional model request was made.'**
+  String get scheduledTasksPrepareNowReady;
+
+  /// No description provided for @scheduledTasksPrepareNowStarted.
+  ///
+  /// In en, this message translates to:
+  /// **'Preparing the next result for its scheduled time.'**
+  String get scheduledTasksPrepareNowStarted;
+
+  /// No description provided for @scheduledTasksPrepareNowBusy.
+  ///
+  /// In en, this message translates to:
+  /// **'Another task is being prepared. Please try again when it finishes.'**
+  String get scheduledTasksPrepareNowBusy;
+
+  /// No description provided for @scheduledTasksPrepareNowChatBusy.
+  ///
+  /// In en, this message translates to:
+  /// **'Please wait for the current reply to finish, then try again.'**
+  String get scheduledTasksPrepareNowChatBusy;
+
+  /// No description provided for @scheduledTasksPrepareNowDisabled.
+  ///
+  /// In en, this message translates to:
+  /// **'Enable this task and advance preparation first. Regenerate tasks cannot be prepared in advance.'**
+  String get scheduledTasksPrepareNowDisabled;
+
+  /// No description provided for @scheduledTasksPrepareNowUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'Preparation is not available yet. Please try again shortly.'**
+  String get scheduledTasksPrepareNowUnavailable;
+
+  /// No description provided for @scheduledTasksPrepareNowNoUpcoming.
+  ///
+  /// In en, this message translates to:
+  /// **'There is no upcoming occurrence to prepare. Check the task time and enabled state.'**
+  String get scheduledTasksPrepareNowNoUpcoming;
+
+  /// No description provided for @phoneControlTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Phone Control'**
+  String get phoneControlTitle;
+
+  /// No description provided for @phoneControlSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Read the screen and perform actions through Accessibility'**
+  String get phoneControlSubtitle;
+
+  /// No description provided for @phoneControlAccessibilityService.
+  ///
+  /// In en, this message translates to:
+  /// **'Accessibility service'**
+  String get phoneControlAccessibilityService;
+
+  /// No description provided for @phoneControlOpenSettings.
+  ///
+  /// In en, this message translates to:
+  /// **'Open accessibility settings'**
+  String get phoneControlOpenSettings;
+
+  /// No description provided for @phoneControlRefresh.
+  ///
+  /// In en, this message translates to:
+  /// **'Refresh status'**
+  String get phoneControlRefresh;
+
+  /// No description provided for @phoneControlChecking.
+  ///
+  /// In en, this message translates to:
+  /// **'Checking service status…'**
+  String get phoneControlChecking;
+
+  /// No description provided for @phoneControlReady.
+  ///
+  /// In en, this message translates to:
+  /// **'Enabled and connected'**
+  String get phoneControlReady;
+
+  /// No description provided for @phoneControlDisabled.
+  ///
+  /// In en, this message translates to:
+  /// **'Not enabled'**
+  String get phoneControlDisabled;
+
+  /// No description provided for @phoneControlDisconnected.
+  ///
+  /// In en, this message translates to:
+  /// **'Enabled, but not connected. Try turning the service off and on in system settings, then refresh.'**
+  String get phoneControlDisconnected;
+
+  /// No description provided for @phoneControlStatusUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'Unable to read service status. Refresh to try again.'**
+  String get phoneControlStatusUnavailable;
+
+  /// No description provided for @phoneControlSettingsUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'Unable to open settings. Open Android Settings → Accessibility manually.'**
+  String get phoneControlSettingsUnavailable;
+
+  /// No description provided for @phoneControlUsageTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'How it works'**
+  String get phoneControlUsageTitle;
+
+  /// No description provided for @phoneControlDisclosure.
+  ///
+  /// In en, this message translates to:
+  /// **'For phone control tasks you request in a conversation, the assistant can read the current screen, tap, enter text, scroll, navigate, and open apps. Screen content is sent to the model provider configured for that conversation and is saved in its tool results. Password fields are hidden. This service does not continuously record screen content. You can turn off this tool for the assistant, or disable the service in system settings at any time.'**
+  String get phoneControlDisclosure;
+
+  /// No description provided for @phoneControlAssistantTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Enable the tool for your assistant'**
+  String get phoneControlAssistantTitle;
+
+  /// No description provided for @phoneControlAssistantHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Both permissions are required: enable Kelivo phone control in system Accessibility settings, then enable Phone Control under your assistant’s Local Tools (also available in the chat tools menu). Each assistant is configured separately. Keep the phone unlocked while running a task.'**
+  String get phoneControlAssistantHint;
+
+  /// No description provided for @phoneControlRestrictedTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Accessibility switch unavailable?'**
+  String get phoneControlRestrictedTitle;
+
+  /// No description provided for @phoneControlRestrictedHint.
+  ///
+  /// In en, this message translates to:
+  /// **'For some downloaded APKs, Android requires “Allow restricted settings” in the app info menu first. Tap to open Kelivo’s app info, then return to Accessibility settings.'**
+  String get phoneControlRestrictedHint;
+
+  /// No description provided for @phoneControlEnableAssistant.
+  ///
+  /// In en, this message translates to:
+  /// **'Allow this assistant to use phone control'**
+  String get phoneControlEnableAssistant;
 }
 
 class _AppLocalizationsDelegate
