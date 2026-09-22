@@ -116,6 +116,12 @@ void main() {
         expect(settings.supportsMaxReasoning('OpenAI', 'grok-4.5'), isFalse);
         expect(settings.supportsXhighReasoning('OpenAI', 'grok-4.6'), isTrue);
         expect(settings.supportsMaxReasoning('OpenAI', 'grok-4.6'), isFalse);
+        expect(settings.supportsXhighReasoning('OpenAI', 'grok-4.7'), isTrue);
+        expect(settings.supportsMaxReasoning('OpenAI', 'grok-4.7'), isFalse);
+        expect(
+          settings.supportsXhighReasoning('OpenRouter', 'x-ai/grok-4.7'),
+          isTrue,
+        );
         expect(
           settings.supportsXhighReasoning('OpenAI', 'deepseek-v4-pro'),
           isFalse,

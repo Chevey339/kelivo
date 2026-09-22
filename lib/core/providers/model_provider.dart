@@ -20,9 +20,11 @@ class ModelRegistry {
   // Vision-capable models (text + image input).
   // Qwen vision is intentional and precise (see [_isQwenVisionModel]): not
   // every Qwen 3.7 Max id is multimodal.
+  // MiMo image input is v2-omni, exact v2.5 (not v2.5-pro), and the v2.6
+  // family (pro / flash / ultraspeed), which are natively multimodal.
   static final RegExp vision = RegExp(
     // GPT family incl. 4o, 4.1, 5 (exclude gpt-5-chat), and OpenAI o* series
-    r'(gpt-4o|gpt-4\.1|gpt-5(?!-chat)|gpt-6|o\d|gemini|claude|kimi-k2([-.])(?:5|6|7)|kimi-k3(?:$|[/_:@.-])|muse-spark-1(?:$|[/_:@.-])|doubao.+(?:1([-.])(?:6|8)|seed-2|seed-evolving)|grok-4|step-3|intern-s1|minimax-m3(?:$|[/_:@])|mimo-v2(?:-omni(?:$|[/_:@])|\.5(?:$|[/_:@]))|sensenova-6\.7-flash-lite)',
+    r'(gpt-4o|gpt-4\.1|gpt-5(?!-chat)|gpt-6|o\d|gemini|claude|kimi-k2([-.])(?:5|6|7)|kimi-k3(?:$|[/_:@.-])|muse-spark-1(?:$|[/_:@.-])|doubao.+(?:1([-.])(?:6|8)|seed-2|seed-evolving)|grok-4|step-3|intern-s1|minimax-m3(?:$|[/_:@])|mimo-v2(?:-omni(?:$|[/_:@])|\.5(?:$|[/_:@])|\.6(?:$|[/_:@.-]))|sensenova-6\.7-flash-lite)',
     caseSensitive: false,
   );
   // Tool-using models
