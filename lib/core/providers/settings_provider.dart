@@ -1694,16 +1694,20 @@ class SettingsProvider extends ChangeNotifier {
   Future<void> setTtsServices(List<TtsServiceOptions> v) async {
     _ttsServices = List.unmodifiable(v);
     final prefs = _preferences;
-    final list = v.map((e) => e.toJson()).toList();
-    await prefs.setString(_ttsServicesKey, jsonEncode(list));
-    if (_selectedTtsServiceId != null &&
-        !_ttsServices.any((service) => service.id == _selectedTtsServiceId)) {
+    final selectionMissing =
+        _selectedTtsServiceId != null &&
+        !_ttsServices.any((service) => service.id == _selectedTtsServiceId);
+    if (selectionMissing) {
       _selectedTtsServiceId = _ttsServices.isEmpty
           ? null
           : _ttsServices.first.id;
-      await _persistSelectedTtsServiceId(prefs);
     }
     notifyListeners();
+    final list = v.map((e) => e.toJson()).toList();
+    await prefs.setString(_ttsServicesKey, jsonEncode(list));
+    if (selectionMissing) {
+      await _persistSelectedTtsServiceId(prefs);
+    }
   }
 
   Future<void> setTtsServiceSelected(int index) async {
@@ -1755,13 +1759,13 @@ class SettingsProvider extends ChangeNotifier {
           ? null
           : _asrServices.first.id;
     }
+    notifyListeners();
     final prefs = _preferences;
     await prefs.setString(
       _asrServicesKey,
       jsonEncode(_asrServices.map((service) => service.toJson()).toList()),
     );
     await _persistSelectedAsrServiceId(prefs);
-    notifyListeners();
   }
 
   Future<void> setSelectedAsrServiceId(String? id) async {

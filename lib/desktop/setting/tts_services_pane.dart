@@ -74,11 +74,8 @@ class _DesktopTtsServicesPaneState extends State<DesktopTtsServicesPane> {
               // so we skip the System TTS card entirely.
               const SliverToBoxAdapter(child: SizedBox(height: 8)),
 
-              // Network TTS services list
-              SliverToBoxAdapter(child: _NetworkTtsList()),
-              const SliverToBoxAdapter(
-                child: AsrServicesSection(desktop: true),
-              ),
+              const _NetworkTtsList(),
+              const AsrServicesSection(desktop: true),
             ],
           ),
         ),
@@ -87,7 +84,46 @@ class _DesktopTtsServicesPaneState extends State<DesktopTtsServicesPane> {
   }
 }
 
-class _NetworkTtsList extends StatelessWidget {
+class _NetworkTtsList extends StatefulWidget {
+  const _NetworkTtsList();
+
+  @override
+  State<_NetworkTtsList> createState() => _NetworkTtsListState();
+}
+
+class _NetworkTtsListState extends State<_NetworkTtsList> {
+  final Map<String, bool> _testing = <String, bool>{};
+  final Map<String, String?> _errors = <String, String?>{};
+
+  Future<void> _reorder(int oldIndex, int newIndex) async {
+    final settings = context.read<SettingsProvider>();
+    final updated = reorderVoiceServiceList(
+      settings.ttsServices,
+      oldIndex,
+      newIndex,
+    );
+    if (identical(updated, settings.ttsServices)) return;
+    await settings.setTtsServices(updated);
+  }
+
+  Future<void> _test(TtsServiceOptions service) async {
+    final id = service.id;
+    setState(() {
+      _testing[id] = true;
+      _errors[id] = null;
+    });
+    final demo = AppLocalizations.of(context)!.ttsServicesPageTestSpeechText;
+    final err = await context.read<TtsProvider>().testNetworkService(
+      service,
+      demo,
+    );
+    if (!mounted) return;
+    setState(() {
+      _testing[id] = false;
+      _errors[id] = err;
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     final sp = context.watch<SettingsProvider>();
@@ -95,50 +131,63 @@ class _NetworkTtsList extends StatelessWidget {
     if (services.isEmpty) {
       final cs = Theme.of(context).colorScheme;
       final l10n = AppLocalizations.of(context)!;
-      return Container(
-        padding: const EdgeInsets.symmetric(vertical: 40),
-        alignment: Alignment.center,
-        child: Text(
-          l10n.ttsServicesPageNoNetworkServices,
-          style: TextStyle(color: cs.onSurface.withValues(alpha: 0.6)),
+      return SliverToBoxAdapter(
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 40),
+          alignment: Alignment.center,
+          child: Text(
+            l10n.ttsServicesPageNoNetworkServices,
+            style: TextStyle(color: cs.onSurface.withValues(alpha: 0.6)),
+          ),
         ),
       );
     }
-    return Column(
-      children: [
-        for (int i = 0; i < services.length; i++)
-          Padding(
-            key: ValueKey('desktop-tts-service-${services[i].id}'),
-            padding: const EdgeInsets.only(bottom: 12),
+    return SliverReorderableList(
+      itemCount: services.length,
+      onReorderItem: _reorder,
+      onReorderStart: (_) => Tooltip.dismissAllToolTips(),
+      proxyDecorator: voiceServiceDragProxy,
+      itemBuilder: (context, index) {
+        final service = services[index];
+        return Padding(
+          key: ValueKey('desktop-tts-service-${service.id}'),
+          padding: const EdgeInsets.only(bottom: 12),
+          child: ReorderableDragStartListener(
+            index: index,
             child: _NetworkServiceCard(
-              service: services[i],
-              selected: sp.selectedTtsServiceId == services[i].id,
+              service: service,
+              selected: sp.selectedTtsServiceId == service.id,
+              testing: _testing[service.id] == true,
+              error: _errors[service.id],
               onTap: () async => context
                   .read<SettingsProvider>()
-                  .setSelectedTtsServiceId(services[i].id),
+                  .setSelectedTtsServiceId(service.id),
               onEdit: () async {
                 final settingsProvider = context.read<SettingsProvider>();
-                final updated = await _showEditNetworkDialog(
-                  context,
-                  services[i],
-                );
+                final updated = await _showEditNetworkDialog(context, service);
                 if (updated != null) {
                   final list = List<TtsServiceOptions>.from(
                     settingsProvider.ttsServices,
                   );
-                  list[i] = updated;
+                  final current = list.indexWhere(
+                    (item) => item.id == service.id,
+                  );
+                  if (current < 0) return;
+                  list[current] = updated;
                   await settingsProvider.setTtsServices(list);
                 }
               },
               onDelete: () async {
-                final sp = context.read<SettingsProvider>();
-                final list = List<TtsServiceOptions>.from(sp.ttsServices);
-                list.removeAt(i);
-                await sp.setTtsServices(list);
+                final settings = context.read<SettingsProvider>();
+                final list = List<TtsServiceOptions>.from(settings.ttsServices)
+                  ..removeWhere((item) => item.id == service.id);
+                await settings.setTtsServices(list);
               },
+              onTest: () => _test(service),
             ),
           ),
-      ],
+        );
+      },
     );
   }
 }
@@ -147,23 +196,27 @@ class _NetworkServiceCard extends StatefulWidget {
   const _NetworkServiceCard({
     required this.service,
     required this.selected,
+    required this.testing,
+    required this.error,
     required this.onTap,
     required this.onEdit,
     required this.onDelete,
+    required this.onTest,
   });
   final TtsServiceOptions service;
   final bool selected;
+  final bool testing;
+  final String? error;
   final VoidCallback onTap;
   final VoidCallback onEdit;
   final VoidCallback onDelete;
+  final VoidCallback onTest;
   @override
   State<_NetworkServiceCard> createState() => _NetworkServiceCardState();
 }
 
 class _NetworkServiceCardState extends State<_NetworkServiceCard> {
   bool _hover = false;
-  bool _testing = false;
-  String? _error;
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
@@ -222,26 +275,10 @@ class _NetworkServiceCardState extends State<_NetworkServiceCard> {
                       context,
                     )!.ttsServicesPageTestVoiceTooltip,
                     child: _SmallIconBtn(
-                      icon: _testing
+                      icon: widget.testing
                           ? lucide.Lucide.Loader
                           : lucide.Lucide.Volume2,
-                      onTap: () async {
-                        setState(() {
-                          _testing = true;
-                          _error = null;
-                        });
-                        final demo = AppLocalizations.of(
-                          context,
-                        )!.ttsServicesPageTestSpeechText;
-                        final err = await context
-                            .read<TtsProvider>()
-                            .testNetworkService(widget.service, demo);
-                        if (!mounted) return;
-                        setState(() {
-                          _testing = false;
-                          _error = err;
-                        });
-                      },
+                      onTap: widget.onTest,
                     ),
                   ),
                   const SizedBox(width: 6),
@@ -252,9 +289,9 @@ class _NetworkServiceCardState extends State<_NetworkServiceCard> {
                   // no check icon on desktop
                 ],
               ),
-              if (_error != null && _error!.isNotEmpty) ...[
+              if (widget.error != null && widget.error!.isNotEmpty) ...[
                 const SizedBox(height: 8),
-                _ErrorInline(message: _error!),
+                _ErrorInline(message: widget.error!),
               ],
             ],
           ),

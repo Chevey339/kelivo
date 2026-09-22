@@ -115,72 +115,106 @@ class _AsrServicesSectionState extends State<AsrServicesSection> {
     }
   }
 
+  Future<void> _reorderServices(int oldIndex, int newIndex) async {
+    final settings = context.read<SettingsProvider>();
+    final updated = reorderVoiceServiceList(
+      settings.asrServices,
+      oldIndex,
+      newIndex,
+    );
+    if (identical(updated, settings.asrServices)) return;
+    await settings.setAsrServices(updated);
+  }
+
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
     final settings = context.watch<SettingsProvider>();
     final services = settings.asrServices;
 
-    return Padding(
-      padding: EdgeInsets.only(top: widget.desktop ? 28 : 0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          VoiceServiceSectionHeader(
-            title: l10n.asrServicesSectionTitle,
-            addTooltip: l10n.asrServicesAddTooltip,
-            onAdd: _addService,
-            desktop: widget.desktop,
+    return SliverMainAxisGroup(
+      slivers: [
+        SliverPadding(
+          padding: EdgeInsets.only(top: widget.desktop ? 28 : 0),
+          sliver: SliverToBoxAdapter(
+            child: VoiceServiceSectionHeader(
+              title: l10n.asrServicesSectionTitle,
+              addTooltip: l10n.asrServicesAddTooltip,
+              onAdd: _addService,
+              desktop: widget.desktop,
+            ),
           ),
-          SizedBox(height: widget.desktop ? 16 : 0),
-          if (services.isEmpty)
-            _EmptyAsrState(desktop: widget.desktop)
-          else if (!widget.desktop)
-            VoiceServiceMobileCard(
-              children: [
-                for (var index = 0; index < services.length; index++) ...[
-                  _AsrServiceCard(
-                    key: ValueKey('asr-service-${services[index].id}'),
-                    service: services[index],
-                    selected:
-                        settings.selectedAsrServiceId == services[index].id,
-                    desktop: false,
+        ),
+        if (widget.desktop)
+          const SliverToBoxAdapter(child: SizedBox(height: 16)),
+        if (services.isEmpty)
+          SliverToBoxAdapter(child: _EmptyAsrState(desktop: widget.desktop))
+        else if (widget.desktop)
+          SliverReorderableList(
+            itemCount: services.length,
+            onReorderItem: _reorderServices,
+            onReorderStart: (_) => Tooltip.dismissAllToolTips(),
+            proxyDecorator: voiceServiceDragProxy,
+            itemBuilder: (context, index) {
+              final service = services[index];
+              return Padding(
+                key: ValueKey('asr-service-${service.id}'),
+                padding: EdgeInsets.only(
+                  bottom: index == services.length - 1 ? 0 : 12,
+                ),
+                child: ReorderableDragStartListener(
+                  index: index,
+                  child: _AsrServiceCard(
+                    service: service,
+                    selected: settings.selectedAsrServiceId == service.id,
+                    desktop: true,
                     modelManager: _modelManager,
                     onSelect: () =>
-                        settings.setSelectedAsrServiceId(services[index].id),
-                    onEdit: () => _editService(services[index]),
-                    onDelete: () => _deleteService(services[index]),
+                        settings.setSelectedAsrServiceId(service.id),
+                    onEdit: () => _editService(service),
+                    onDelete: () => _deleteService(service),
                   ),
-                  if (index != services.length - 1)
-                    voiceServiceMobileDivider(context),
-                ],
-              ],
-            )
-          else
-            Column(
-              children: [
-                for (var index = 0; index < services.length; index++)
-                  Padding(
-                    key: ValueKey('asr-service-${services[index].id}'),
-                    padding: EdgeInsets.only(
-                      bottom: index == services.length - 1 ? 0 : 12,
+                ),
+              );
+            },
+          )
+        else
+          VoiceServiceCardSliver(
+            sliver: SliverReorderableList(
+              itemCount: services.length,
+              onReorderItem: _reorderServices,
+              onReorderStart: (_) {
+                Tooltip.dismissAllToolTips();
+                Haptics.light();
+              },
+              proxyDecorator: voiceServiceDragProxy,
+              itemBuilder: (context, index) {
+                final service = services[index];
+                return Column(
+                  key: ValueKey('asr-service-${service.id}'),
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    ReorderableDelayedDragStartListener(
+                      index: index,
+                      child: _AsrServiceCard(
+                        service: service,
+                        selected: settings.selectedAsrServiceId == service.id,
+                        desktop: false,
+                        modelManager: _modelManager,
+                        onSelect: () =>
+                            settings.setSelectedAsrServiceId(service.id),
+                        onEdit: () => _editService(service),
+                        onDelete: () => _deleteService(service),
+                      ),
                     ),
-                    child: _AsrServiceCard(
-                      service: services[index],
-                      selected:
-                          settings.selectedAsrServiceId == services[index].id,
-                      desktop: widget.desktop,
-                      modelManager: _modelManager,
-                      onSelect: () =>
-                          settings.setSelectedAsrServiceId(services[index].id),
-                      onEdit: () => _editService(services[index]),
-                      onDelete: () => _deleteService(services[index]),
-                    ),
-                  ),
-              ],
+                    if (index != services.length - 1)
+                      voiceServiceMobileDivider(context),
+                  ],
+                );
+              },
             ),
-        ],
-      ),
+          ),
+      ],
     );
   }
 }
@@ -230,7 +264,6 @@ class _EmptyAsrState extends StatelessWidget {
 
 class _AsrServiceCard extends StatefulWidget {
   const _AsrServiceCard({
-    super.key,
     required this.service,
     required this.selected,
     required this.desktop,
