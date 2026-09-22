@@ -25,7 +25,6 @@ import 'theme/palettes.dart';
 import 'theme/custom_theme.dart';
 import 'package:provider/provider.dart';
 import 'package:dynamic_color/dynamic_color.dart';
-import 'package:flutter_displaymode/flutter_displaymode.dart';
 import 'core/providers/user_provider.dart';
 import 'core/providers/settings_provider.dart';
 import 'core/providers/mcp_provider.dart';
@@ -112,8 +111,6 @@ final RouteObserver<ModalRoute<dynamic>> routeObserver =
 bool _didCheckUpdates = false; // one-time update check flag
 bool _didEnsureAssistants = false; // ensure defaults after l10n ready
 bool _didWireWorkspace = false;
-AppLifecycleListener? _displayModeLifecycleListener;
-const MethodChannel _displayModeChannel = MethodChannel('app.display_mode');
 
 void _wireWorkspaceServices(BuildContext ctx) {
   try {
@@ -165,7 +162,6 @@ Future<void> main() async {
         } catch (_) {}
       }
       FlutterLogger.installGlobalHandlers();
-      _initializeAndroidDisplayMode();
       // The Linux runner starts hidden so decorations can be restored first.
       // Show before the restore gate so progress and failure screens stay visible.
       if (!kIsWeb && defaultTargetPlatform == TargetPlatform.linux) {
@@ -357,35 +353,6 @@ Future<void> main() async {
       },
     ),
   );
-}
-
-void _initializeAndroidDisplayMode() {
-  if (!Platform.isAndroid || _displayModeLifecycleListener != null) return;
-
-  // Some Android variants clear refresh-rate requests in background.
-  _displayModeLifecycleListener = AppLifecycleListener(
-    onResume: _requestHighRefreshRate,
-  );
-  _requestHighRefreshRate();
-}
-
-void _requestHighRefreshRate() {
-  unawaited(_applyAndroidHighRefreshRate());
-}
-
-Future<void> _applyAndroidHighRefreshRate() async {
-  try {
-    final handledNatively =
-        await _displayModeChannel.invokeMethod<bool>(
-          'requestHighRefreshRate',
-        ) ??
-        false;
-    if (!handledNatively) {
-      await FlutterDisplayMode.setHighRefreshRate();
-    }
-  } catch (error) {
-    debugPrint('[DisplayMode] High refresh rate request failed: $error');
-  }
 }
 
 enum _AdmissionRecovery { none, rebuilt, remigrate }
