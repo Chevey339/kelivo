@@ -96,6 +96,7 @@ class SettingsProvider extends ChangeNotifier {
     'Gemini',
     'STA1N API',
     'OpenRouter',
+    'Requesty',
     'KelivoIN',
     '10dian-API',
     'DeepSeek',
@@ -7056,6 +7057,7 @@ class ProviderConfig {
     if (k.contains('tensdaq')) return 'https://tensdaq-api.x-aio.com/v1';
     if (k.contains('kelivoin')) return 'https://api.psycheas.top/v1';
     if (k.contains('openrouter')) return 'https://openrouter.ai/api/v1';
+    if (k.contains('requesty')) return 'https://router.requesty.ai/v1';
     if (k.contains('vercel')) return 'https://ai-gateway.vercel.sh/v1';
     if (k.contains('aihubmix')) return 'https://aihubmix.com/v1';
     if (k.contains('sta1n')) return 'https://sta1n.ai/v1';

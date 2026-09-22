@@ -51,9 +51,7 @@ class OpenAIProvider extends BaseProvider {
     final key = ProviderManager._effectiveApiKey(cfg);
     final client = providerHttpClient(cfg);
     try {
-      final uri = Uri.parse(
-        "${cfg.baseUrl.replaceFirst(RegExp(r'/+$'), '')}/models",
-      );
+      final baseUrl = cfg.baseUrl.replaceFirst(RegExp(r'/+$'), '');
       final headers = <String, String>{};
       if (key.isNotEmpty) headers['Authorization'] = 'Bearer $key';
       final mergedHeaders = _Http.modelListHeaders(cfg, headers);
@@ -61,22 +59,29 @@ class OpenAIProvider extends BaseProvider {
       if (ollamaIds != null) {
         return [for (final id in ollamaIds) _resolver.spec(cfg, id)];
       }
-      final res = await client.get(uri, headers: mergedHeaders);
-      if (res.statusCode >= 200 && res.statusCode < 300) {
+      // Requesty publishes curated managed policies (short stable ids) at
+      // /models/managed on top of the full vendor/model catalog at /models.
+      // List the managed ids first, then append the catalog.
+      final paths = isRequestyProvider(cfg)
+          ? const ['/models/managed', '/models']
+          : const ['/models'];
+      final seen = <String>{};
+      final models = <ModelSpec>[];
+      for (final path in paths) {
+        final res = await client.get(
+          Uri.parse('$baseUrl$path'),
+          headers: mergedHeaders,
+        );
+        if (res.statusCode < 200 || res.statusCode >= 300) continue;
         final data = (jsonDecode(res.body)['data'] as List?) ?? [];
-        return [
-          for (final e in data)
-            if (e is Map && e['id'] is String)
-              _resolver
-                  .resolve(
-                    cfg,
-                    e['id'] as String,
-                    displayName: e['id'] as String,
-                  )
-                  .spec,
-        ];
+        for (final e in data) {
+          if (e is Map && e['id'] is String && seen.add(e['id'] as String)) {
+            final id = e['id'] as String;
+            models.add(_resolver.resolve(cfg, id, displayName: id).spec);
+          }
+        }
       }
-      return [];
+      return models;
     } finally {
       client.close();
     }
