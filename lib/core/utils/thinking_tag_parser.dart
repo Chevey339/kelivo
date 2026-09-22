@@ -1,4 +1,4 @@
-import '../../../core/models/message_part.dart';
+import '../models/message_part.dart';
 
 class ThinkingTagParseResult {
   const ThinkingTagParseResult({
@@ -253,5 +253,40 @@ class ThinkingTagParser {
       visibleContent: visible.toString().trim(),
       thinkingTexts: List.unmodifiable(thinkingTexts),
     );
+  }
+
+  /// Utility-text variant of [parseLegacyInlineBlocks]: same visible content,
+  /// but an unclosed open tag (e.g. thinking truncated before its close tag)
+  /// discards the remainder instead of exposing raw CoT. For titles, summaries
+  /// and suggestions.
+  static String stripUtilityThinking(String input) {
+    final visible = StringBuffer();
+    var cursor = 0;
+
+    while (cursor < input.length) {
+      final openMatch = _legacyThinkOpenTagRe.firstMatch(
+        input.substring(cursor),
+      );
+      if (openMatch == null) {
+        visible.write(input.substring(cursor));
+        break;
+      }
+
+      final openStart = cursor + openMatch.start;
+      final openEnd = cursor + openMatch.end;
+      final tagName = openMatch.group(1)?.toLowerCase();
+      final closeTag = tagName == null ? '<channel|>' : '</$tagName>';
+      final closeStart = input.toLowerCase().indexOf(closeTag, openEnd);
+
+      if (closeStart == -1) {
+        visible.write(input.substring(cursor, openStart));
+        break;
+      }
+
+      visible.write(input.substring(cursor, openStart));
+      cursor = closeStart + closeTag.length;
+    }
+
+    return visible.toString().trim();
   }
 }

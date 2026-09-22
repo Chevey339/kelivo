@@ -28,6 +28,7 @@ import '../../../shared/widgets/option_sheet.dart';
 import '../../../shared/widgets/section_card.dart';
 import '../../assistant/widgets/assistant_select_sheet.dart';
 import '../../home/utils/model_display_helper.dart';
+import '../../../core/utils/model_resolution.dart';
 import '../../home/widgets/assistant_avatar.dart';
 import '../../home/widgets/model_icon.dart';
 import '../../model/widgets/model_select_sheet.dart';

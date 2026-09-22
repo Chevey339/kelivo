@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:Kelivo/features/chat/utils/thinking_tag_parser.dart';
+import 'package:Kelivo/core/utils/thinking_tag_parser.dart';
 
 void main() {
   group('ThinkingTagParser', () {
@@ -73,6 +73,60 @@ void main() {
 
       expect(parsed.visibleContent, input);
       expect(parsed.thinkingTexts, isEmpty);
+    });
+  });
+
+  group('ThinkingTagParser.stripUtilityThinking', () {
+    test('strips closed think blocks and keeps visible text', () {
+      expect(
+        ThinkingTagParser.stripUtilityThinking(
+          '<think>reasoning here</think>answer',
+        ),
+        'answer',
+      );
+    });
+
+    test('strips multiple mixed think blocks', () {
+      expect(
+        ThinkingTagParser.stripUtilityThinking(
+          '<think>a</think>mid<thought>b</thought>end',
+        ),
+        'midend',
+      );
+    });
+
+    test('discards a truncated think block instead of exposing CoT', () {
+      expect(
+        ThinkingTagParser.stripUtilityThinking('<think>partial reasoning'),
+        isEmpty,
+      );
+      expect(
+        ThinkingTagParser.stripUtilityThinking('visible <think>partial'),
+        'visible',
+      );
+    });
+
+    test('discards a mismatched close tag as a truncated block', () {
+      expect(
+        ThinkingTagParser.stripUtilityThinking('<think>reasoning</thought>'),
+        isEmpty,
+      );
+    });
+
+    test('strips Gemma thought channels', () {
+      expect(
+        ThinkingTagParser.stripUtilityThinking(
+          '<|channel>thought\nreasoning here\n<channel|>\nanswer',
+        ),
+        'answer',
+      );
+    });
+
+    test('trims plain text and keeps it intact', () {
+      expect(
+        ThinkingTagParser.stripUtilityThinking('  just a normal message  '),
+        'just a normal message',
+      );
     });
   });
 

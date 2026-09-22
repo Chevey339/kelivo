@@ -19,7 +19,7 @@ import '../../../shared/widgets/ios_tactile.dart';
 import '../../../shared/widgets/model_tag_wrap.dart';
 import '../../../desktop/desktop_home_page.dart' show DesktopHomePage;
 import '../../home/controllers/home_page_controller.dart';
-import '../../home/utils/model_display_helper.dart';
+import '../../../core/utils/model_resolution.dart';
 import '../../provider/widgets/provider_avatar.dart';
 import '../../provider/widgets/provider_balance_badge.dart';
 import '../../../core/services/model_override_resolver.dart';

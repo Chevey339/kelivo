@@ -1,6 +1,6 @@
 import "../../../support/business_test_harness.dart";
 import 'package:Kelivo/core/models/chat_input_data.dart';
-import 'package:Kelivo/features/home/utils/model_display_helper.dart';
+import 'package:Kelivo/core/utils/model_resolution.dart';
 import 'package:Kelivo/core/providers/assistant_provider.dart';
 import 'package:Kelivo/core/providers/settings_provider.dart';
 import 'package:Kelivo/features/home/widgets/chat_input_bar.dart';

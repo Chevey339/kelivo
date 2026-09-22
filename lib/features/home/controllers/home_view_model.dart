@@ -11,6 +11,7 @@ import '../../../core/providers/assistant_provider.dart';
 import '../../../core/providers/settings_provider.dart';
 import '../../../core/services/api/chat_api_service.dart';
 import '../../../core/services/chat/chat_service.dart';
+import '../../../core/services/chat/title_generation_service.dart';
 import '../../../core/services/model_override_payload_parser.dart';
 import '../../../core/services/logging/flutter_logger.dart';
 import '../../../core/services/memory/memory_pipeline.dart';
@@ -21,7 +22,7 @@ import '../../chat/widgets/chat_message_widget.dart' show ToolUIPart;
 import '../services/message_builder_service.dart';
 import '../services/message_generation_service.dart';
 import '../services/chat_suggestion_service.dart';
-import '../utils/model_display_helper.dart';
+import '../../../core/utils/model_resolution.dart';
 import 'chat_actions.dart';
 import 'file_processing_indicator_controller.dart';
 import 'chat_controller.dart';
@@ -274,10 +275,25 @@ class HomeViewModel extends ChangeNotifier {
   }
 
   void _onMaybeGenerateTitle(String conversationId) {
-    _runBackgroundTask(
-      BackgroundTaskKind.title,
-      _maybeGenerateTitleFor(conversationId),
-    );
+    _runBackgroundTask(BackgroundTaskKind.title, () async {
+      final service = TitleGenerationService(
+        chatService: _chatService,
+        settings: _contextProvider.read<SettingsProvider>(),
+        assistants: _contextProvider.read<AssistantProvider>(),
+      );
+      final title = await service.generate(
+        conversationId,
+        locale: Localizations.localeOf(_contextProvider).toLanguageTag(),
+        defaultTitle: getTitleForLocale(_contextProvider),
+      );
+      if (title == null) return;
+      if (currentConversation?.id == conversationId) {
+        _chatController.updateCurrentConversation(
+          _chatService.getConversation(conversationId),
+        );
+        notifyListeners();
+      }
+    }());
   }
 
   void _onMaybeGenerateSummary(String conversationId) {
@@ -1512,13 +1528,6 @@ class HomeViewModel extends ChangeNotifier {
   Future<void> debugMaybeGenerateSummaryFor(String conversationId) =>
       _maybeGenerateSummaryFor(conversationId);
 
-  /// Test entry for [_maybeGenerateTitleFor].
-  @visibleForTesting
-  Future<void> debugMaybeGenerateTitleFor(
-    String conversationId, {
-    bool force = false,
-  }) => _maybeGenerateTitleFor(conversationId, force: force);
-
   @visibleForTesting
   static int computeClearContextRemainingMessageCount({
     required int totalMessages,
@@ -1529,91 +1538,6 @@ class HomeViewModel extends ChangeNotifier {
         ? 0
         : truncateIndex;
     return totalMessages - safeTruncateIndex;
-  }
-
-  // ============================================================================
-  // Title Generation
-  // ============================================================================
-
-  /// Generate title for a conversation if needed.
-  Future<void> _maybeGenerateTitleFor(
-    String conversationId, {
-    bool force = false,
-  }) async {
-    final convo = _chatService.getConversation(conversationId);
-    if (convo == null) return;
-    if (!force &&
-        convo.title.isNotEmpty &&
-        convo.title != getTitleForLocale(_contextProvider)) {
-      return;
-    }
-
-    final settings = _contextProvider.read<SettingsProvider>();
-    if (!settings.isTitleGenerationEnabled) return;
-
-    final assistantProvider = _contextProvider.read<AssistantProvider>();
-
-    // Get assistant for this conversation
-    final assistant = convo.assistantId != null
-        ? assistantProvider.getById(convo.assistantId!)
-        : assistantProvider.currentAssistant;
-    final chatModel = resolveChatModel(
-      settings,
-      conversation: convo,
-      assistant: assistant,
-    );
-    final provKey = settings.titleModelProvider ?? chatModel.providerKey;
-    final mdlId = settings.titleModelId ?? chatModel.modelId;
-    if (provKey == null || mdlId == null) return;
-    final cfg = settings.getProviderConfig(provKey);
-    final budget = settings.titleGenerationThinkingBudgetFor(
-      assistant?.thinkingBudget,
-    );
-    final locale = Localizations.localeOf(_contextProvider).toLanguageTag();
-
-    // Build content from messages (shared with the side drawer title path;
-    // both cache and paging paths collect the same ~3000-char tail window)
-    final content = await _chatService.generateTitleSource(convo.id);
-
-    String prompt = settings.titlePrompt
-        .replaceAll('{locale}', locale)
-        .replaceAll('{content}', content);
-
-    try {
-      final title = (await ChatApiService.generateText(
-        conversationId: convo.id,
-        config: cfg,
-        modelId: mdlId,
-        prompt: prompt,
-        thinkingBudget: budget,
-        skipImageParsing: true,
-      )).trim();
-      if (title.isNotEmpty) {
-        await _chatService.renameConversation(convo.id, title);
-        if (currentConversation?.id == convo.id) {
-          _chatController.updateCurrentConversation(
-            _chatService.getConversation(convo.id),
-          );
-          notifyListeners();
-        }
-      } else {
-        onBackgroundTaskError?.call(BackgroundTaskKind.title, 'empty_response');
-      }
-    } catch (e) {
-      FlutterLogger.log(
-        '[TitleGen] Generation failed: $e',
-        tag: 'HomeViewModel',
-      );
-      onBackgroundTaskError?.call(BackgroundTaskKind.title, e);
-    }
-  }
-
-  /// Force generate title for the current conversation.
-  Future<void> generateTitle({bool force = false}) async {
-    final cid = currentConversation?.id;
-    if (cid != null) {
-      await _maybeGenerateTitleFor(cid, force: force);
-    }
   }
 
   // ============================================================================
