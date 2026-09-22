@@ -337,15 +337,6 @@ class SettingsSearchIndex {
             'background keep alive notification live activity 后台 後台 保活 灵动岛 靈動島',
       );
     }
-    if (!kIsWeb && platform == TargetPlatform.android) {
-      add(
-        'phoneControl',
-        SettingsSearchDestination.phoneControl,
-        (l) => l.phoneControlTitle,
-        page: true,
-        keywords: 'phone control accessibility 手机控制 手機控制 无障碍 無障礙',
-      );
-    }
     add(
       'assistant',
       SettingsSearchDestination.assistant,
@@ -436,6 +427,15 @@ class SettingsSearchIndex {
       page: true,
       keywords: 'memory remember 记忆 記憶 长期 長期',
     );
+    if (!kIsWeb && platform == TargetPlatform.android) {
+      add(
+        'phoneControl',
+        SettingsSearchDestination.phoneControl,
+        (l) => l.phoneControlTitle,
+        page: true,
+        keywords: 'phone control accessibility 手机控制 手機控制 无障碍 無障礙',
+      );
+    }
     add(
       'networkProxy',
       SettingsSearchDestination.networkProxy,

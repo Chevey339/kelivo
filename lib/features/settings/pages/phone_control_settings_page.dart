@@ -6,6 +6,7 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../../../l10n/app_localizations.dart';
 import '../../../shared/widgets/ios_settings_rows.dart';
+import '../../../shared/widgets/ios_tactile.dart';
 import '../../../shared/widgets/section_card.dart';
 import '../../../shared/widgets/snackbar.dart';
 import '../../../theme/theme_factory.dart';
@@ -125,6 +126,7 @@ class PhoneControlSettingsView extends StatelessWidget {
         ? l10n.phoneControlDisconnected
         : l10n.phoneControlDisabled;
     Widget info(String title, String text) => SectionCard(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Padding(
           padding: const EdgeInsets.all(16),
@@ -143,19 +145,29 @@ class PhoneControlSettingsView extends StatelessWidget {
       ],
     );
     return Scaffold(
+      backgroundColor: cs.surface,
       appBar: AppBar(
         title: Text(l10n.phoneControlTitle),
-        leading: IconButton(
-          icon: const Icon(LucideIcons.arrowLeft),
+        leading: IosIconButton(
+          icon: LucideIcons.arrowLeft,
+          color: cs.onSurface,
+          size: 22,
+          minSize: 44,
+          semanticLabel: l10n.settingsPageBackButton,
           tooltip: l10n.settingsPageBackButton,
-          onPressed: () => Navigator.of(context).maybePop(),
+          onTap: () => Navigator.of(context).maybePop(),
         ),
         actions: [
-          IconButton(
-            icon: const Icon(LucideIcons.refreshCw),
+          IosIconButton(
+            icon: LucideIcons.refreshCw,
+            color: cs.onSurface,
+            size: 22,
+            minSize: 44,
+            semanticLabel: l10n.phoneControlRefresh,
             tooltip: l10n.phoneControlRefresh,
-            onPressed: onRefresh,
+            onTap: onRefresh,
           ),
+          const SizedBox(width: 12),
         ],
       ),
       body: SafeArea(

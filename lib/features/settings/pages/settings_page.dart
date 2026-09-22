@@ -170,15 +170,6 @@ class SettingsPage extends StatelessWidget {
           header(l10n.settingsPageGeneralSection, first: true),
           SectionCard(
             children: [
-              if (DeviceLocalTools.phoneControlSupported) ...[
-                _iosNavRow(
-                  context,
-                  icon: Lucide.Smartphone,
-                  label: l10n.phoneControlTitle,
-                  onTap: () => PhoneControlSettingsPage.open(context),
-                ),
-                _iosDivider(context),
-              ],
               _iosNavRow(
                 context,
                 icon: Lucide.SunMoon,
@@ -338,6 +329,15 @@ class SettingsPage extends StatelessWidget {
                 },
               ),
               _iosDivider(context),
+              if (DeviceLocalTools.phoneControlSupported) ...[
+                _iosNavRow(
+                  context,
+                  icon: Lucide.Smartphone,
+                  label: l10n.phoneControlTitle,
+                  onTap: () => PhoneControlSettingsPage.open(context),
+                ),
+                _iosDivider(context),
+              ],
               _iosNavRow(
                 context,
                 icon: Lucide.Zap,
