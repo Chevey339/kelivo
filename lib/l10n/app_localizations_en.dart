@@ -4622,6 +4622,14 @@ class AppLocalizationsEn extends AppLocalizations {
       'Collapse reasoning after finish';
 
   @override
+  String get displaySettingsPageShowCollapsedReasoningPreviewTitle =>
+      'Show Current Thought When Collapsed';
+
+  @override
+  String get displaySettingsPageShowCollapsedReasoningPreviewSubtitle =>
+      'Show the latest thought with animation while a thinking card is collapsed';
+
+  @override
   String get displaySettingsPageCollapseThinkingStepsTitle =>
       'Collapse Thinking Steps';
 
