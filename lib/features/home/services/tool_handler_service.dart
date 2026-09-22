@@ -526,6 +526,21 @@ class ToolHandlerService {
           }
         }
 
+        // Re-read phone-control permission on every call so disabling it also
+        // stops a tool loop that was built with an older assistant snapshot.
+        if (name == LocalToolNames.phoneControl) {
+          final current = assistant == null
+              ? null
+              : assistantProvider.getById(assistant.id);
+          if (current == null || !current.localToolIds.contains(name)) {
+            return _toolError(
+              error: 'permission_denied',
+              message: 'Phone control is disabled for this assistant.',
+              tool: name,
+            );
+          }
+        }
+
         // Local tools
         final localResult = await LocalToolsService.tryHandleToolCall(
           name,

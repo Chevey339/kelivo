@@ -12205,4 +12205,66 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get scheduledTasksPrepareNowNoUpcoming =>
       'There is no upcoming occurrence to prepare. Check the task time and enabled state.';
+
+  @override
+  String get phoneControlTitle => 'Phone Control';
+
+  @override
+  String get phoneControlSubtitle =>
+      'Read the screen and perform actions through Accessibility';
+
+  @override
+  String get phoneControlAccessibilityService => 'Accessibility service';
+
+  @override
+  String get phoneControlOpenSettings => 'Open accessibility settings';
+
+  @override
+  String get phoneControlRefresh => 'Refresh status';
+
+  @override
+  String get phoneControlChecking => 'Checking service status…';
+
+  @override
+  String get phoneControlReady => 'Enabled and connected';
+
+  @override
+  String get phoneControlDisabled => 'Not enabled';
+
+  @override
+  String get phoneControlDisconnected =>
+      'Enabled, but not connected. Try turning the service off and on in system settings, then refresh.';
+
+  @override
+  String get phoneControlStatusUnavailable =>
+      'Unable to read service status. Refresh to try again.';
+
+  @override
+  String get phoneControlSettingsUnavailable =>
+      'Unable to open settings. Open Android Settings → Accessibility manually.';
+
+  @override
+  String get phoneControlUsageTitle => 'How it works';
+
+  @override
+  String get phoneControlDisclosure =>
+      'For phone control tasks you request in a conversation, the assistant can read the current screen, tap, enter text, scroll, navigate, and open apps. Screen content is sent to the model provider configured for that conversation and is saved in its tool results. Password fields are hidden. This service does not continuously record screen content. You can turn off this tool for the assistant, or disable the service in system settings at any time.';
+
+  @override
+  String get phoneControlAssistantTitle => 'Enable the tool for your assistant';
+
+  @override
+  String get phoneControlAssistantHint =>
+      'Both permissions are required: enable Kelivo phone control in system Accessibility settings, then enable Phone Control under your assistant’s Local Tools (also available in the chat tools menu). Each assistant is configured separately. Keep the phone unlocked while running a task.';
+
+  @override
+  String get phoneControlRestrictedTitle => 'Accessibility switch unavailable?';
+
+  @override
+  String get phoneControlRestrictedHint =>
+      'For some downloaded APKs, Android requires “Allow restricted settings” in the app info menu first. Tap to open Kelivo’s app info, then return to Accessibility settings.';
+
+  @override
+  String get phoneControlEnableAssistant =>
+      'Allow this assistant to use phone control';
 }

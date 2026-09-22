@@ -26,6 +26,7 @@ class IosNavRow extends StatelessWidget {
     this.destructive = false,
     this.labelWeight,
     this.iconColor,
+    this.haptics = true,
   });
 
   final IconData? icon;
@@ -51,6 +52,7 @@ class IosNavRow extends StatelessWidget {
   /// [AppFontWeights.medium].
   final FontWeight? labelWeight;
   final Color? iconColor;
+  final bool haptics;
 
   @override
   Widget build(BuildContext context) {
@@ -66,7 +68,7 @@ class IosNavRow extends StatelessWidget {
       borderRadius: BorderRadius.zero,
       pressedBlendStrength: 0,
       pressedScale: 1.0,
-      haptics: interactive,
+      haptics: interactive && haptics,
       onTap: onTap,
       onLongPress: onLongPress,
       child: Padding(

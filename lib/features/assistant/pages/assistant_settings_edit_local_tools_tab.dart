@@ -148,6 +148,20 @@ class _LocalToolsTab extends StatelessWidget {
                     toggleTool(LocalToolNames.currentLocation, value),
               ),
             ],
+            if (DeviceLocalTools.phoneControlSupported) ...[
+              _iosDivider(context),
+              _LocalToolRow(
+                icon: Lucide.Smartphone,
+                title: l10n.phoneControlTitle,
+                subtitle: l10n.phoneControlSubtitle,
+                enabled: assistant.localToolIds.contains(
+                  LocalToolNames.phoneControl,
+                ),
+                onChanged: (value) =>
+                    toggleTool(LocalToolNames.phoneControl, value),
+                onOpenSettings: () => PhoneControlSettingsPage.open(context),
+              ),
+            ],
             if (DeviceLocalTools.iosDeviceToolsSupported)
               FutureBuilder<bool>(
                 future: DeviceLocalTools.prefetchIosCapabilities(),
@@ -246,6 +260,7 @@ class _LocalToolRow extends StatelessWidget {
     required this.subtitle,
     required this.enabled,
     required this.onChanged,
+    this.onOpenSettings,
   });
 
   final IconData icon;
@@ -253,6 +268,7 @@ class _LocalToolRow extends StatelessWidget {
   final String subtitle;
   final bool enabled;
   final ValueChanged<bool> onChanged;
+  final VoidCallback? onOpenSettings;
 
   @override
   Widget build(BuildContext context) {
@@ -308,6 +324,12 @@ class _LocalToolRow extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(width: 10),
+                  if (onOpenSettings != null)
+                    IconButton(
+                      icon: const Icon(Lucide.Settings, size: 18),
+                      tooltip: AppLocalizations.of(context)!.phoneControlTitle,
+                      onPressed: onOpenSettings,
+                    ),
                   IosSwitch(value: enabled, onChanged: onChanged),
                 ],
               ),

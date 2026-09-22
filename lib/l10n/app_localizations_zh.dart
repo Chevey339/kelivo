@@ -11651,6 +11651,64 @@ class AppLocalizationsZh extends AppLocalizations {
   @override
   String get scheduledTasksPrepareNowNoUpcoming =>
       '没有可提前准备的下一次任务，请检查任务时间和启用状态。';
+
+  @override
+  String get phoneControlTitle => '手机控制';
+
+  @override
+  String get phoneControlSubtitle => '通过无障碍读取屏幕并执行操作';
+
+  @override
+  String get phoneControlAccessibilityService => '无障碍服务';
+
+  @override
+  String get phoneControlOpenSettings => '前往无障碍设置';
+
+  @override
+  String get phoneControlRefresh => '刷新状态';
+
+  @override
+  String get phoneControlChecking => '正在检查服务状态…';
+
+  @override
+  String get phoneControlReady => '已启用并连接';
+
+  @override
+  String get phoneControlDisabled => '未启用';
+
+  @override
+  String get phoneControlDisconnected => '已启用，但尚未连接。请在系统设置中关闭再开启服务，然后刷新状态。';
+
+  @override
+  String get phoneControlStatusUnavailable => '无法读取服务状态，请刷新后重试。';
+
+  @override
+  String get phoneControlSettingsUnavailable =>
+      '无法打开设置，请手动进入 Android 系统设置 → 无障碍。';
+
+  @override
+  String get phoneControlUsageTitle => '使用说明';
+
+  @override
+  String get phoneControlDisclosure =>
+      '在对话中发起手机控制任务后，助手可以读取当前屏幕、点击、输入、滑动、导航和打开应用。屏幕内容会发送给当前对话配置的模型服务商，并保存在对话的工具结果中。密码字段会隐藏，服务不会持续记录屏幕内容。你可以随时关闭助手的此项工具，或在系统设置中停用服务。';
+
+  @override
+  String get phoneControlAssistantTitle => '还需开启助手工具';
+
+  @override
+  String get phoneControlAssistantHint =>
+      '需要同时完成两项设置：在系统无障碍设置中启用“Kelivo 手机控制”，并在要使用的助手 → 本地工具中开启“手机控制”（也可从对话工具菜单开启）。每个助手单独配置，执行任务时请保持手机解锁。';
+
+  @override
+  String get phoneControlRestrictedTitle => '无法开启无障碍？';
+
+  @override
+  String get phoneControlRestrictedHint =>
+      '部分下载的 APK 需要先在应用信息右上角菜单中选择“允许受限制的设置”。点击打开 Kelivo 应用信息，完成后再返回无障碍设置。';
+
+  @override
+  String get phoneControlEnableAssistant => '允许此助手使用手机控制';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hans`).
@@ -23226,6 +23284,64 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   @override
   String get scheduledTasksPrepareNowNoUpcoming =>
       '没有可提前准备的下一次任务，请检查任务时间和启用状态。';
+
+  @override
+  String get phoneControlTitle => '手机控制';
+
+  @override
+  String get phoneControlSubtitle => '通过无障碍读取屏幕并执行操作';
+
+  @override
+  String get phoneControlAccessibilityService => '无障碍服务';
+
+  @override
+  String get phoneControlOpenSettings => '前往无障碍设置';
+
+  @override
+  String get phoneControlRefresh => '刷新状态';
+
+  @override
+  String get phoneControlChecking => '正在检查服务状态…';
+
+  @override
+  String get phoneControlReady => '已启用并连接';
+
+  @override
+  String get phoneControlDisabled => '未启用';
+
+  @override
+  String get phoneControlDisconnected => '已启用，但尚未连接。请在系统设置中关闭再开启服务，然后刷新状态。';
+
+  @override
+  String get phoneControlStatusUnavailable => '无法读取服务状态，请刷新后重试。';
+
+  @override
+  String get phoneControlSettingsUnavailable =>
+      '无法打开设置，请手动进入 Android 系统设置 → 无障碍。';
+
+  @override
+  String get phoneControlUsageTitle => '使用说明';
+
+  @override
+  String get phoneControlDisclosure =>
+      '在对话中发起手机控制任务后，助手可以读取当前屏幕、点击、输入、滑动、导航和打开应用。屏幕内容会发送给当前对话配置的模型服务商，并保存在对话的工具结果中。密码字段会隐藏，服务不会持续记录屏幕内容。你可以随时关闭助手的此项工具，或在系统设置中停用服务。';
+
+  @override
+  String get phoneControlAssistantTitle => '还需开启助手工具';
+
+  @override
+  String get phoneControlAssistantHint =>
+      '需要同时完成两项设置：在系统无障碍设置中启用“Kelivo 手机控制”，并在要使用的助手 → 本地工具中开启“手机控制”（也可从对话工具菜单开启）。每个助手单独配置，执行任务时请保持手机解锁。';
+
+  @override
+  String get phoneControlRestrictedTitle => '无法开启无障碍？';
+
+  @override
+  String get phoneControlRestrictedHint =>
+      '部分下载的 APK 需要先在应用信息右上角菜单中选择“允许受限制的设置”。点击打开 Kelivo 应用信息，完成后再返回无障碍设置。';
+
+  @override
+  String get phoneControlEnableAssistant => '允许此助手使用手机控制';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hant`).
@@ -34880,4 +34996,62 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   @override
   String get scheduledTasksPrepareNowNoUpcoming =>
       '沒有可提前準備的下一次任務，請檢查任務時間和啟用狀態。';
+
+  @override
+  String get phoneControlTitle => '手機控制';
+
+  @override
+  String get phoneControlSubtitle => '透過無障礙讀取畫面並執行操作';
+
+  @override
+  String get phoneControlAccessibilityService => '無障礙服務';
+
+  @override
+  String get phoneControlOpenSettings => '前往無障礙設定';
+
+  @override
+  String get phoneControlRefresh => '重新整理狀態';
+
+  @override
+  String get phoneControlChecking => '正在檢查服務狀態…';
+
+  @override
+  String get phoneControlReady => '已啟用並連線';
+
+  @override
+  String get phoneControlDisabled => '未啟用';
+
+  @override
+  String get phoneControlDisconnected => '已啟用，但尚未連線。請在系統設定中關閉再開啟服務，然後重新整理狀態。';
+
+  @override
+  String get phoneControlStatusUnavailable => '無法讀取服務狀態，請重新整理後重試。';
+
+  @override
+  String get phoneControlSettingsUnavailable =>
+      '無法開啟設定，請手動進入 Android 系統設定 → 無障礙。';
+
+  @override
+  String get phoneControlUsageTitle => '使用說明';
+
+  @override
+  String get phoneControlDisclosure =>
+      '在對話中發起手機控制任務後，助手可以讀取目前畫面、點擊、輸入、滑動、導覽和開啟應用程式。畫面內容會傳送給目前對話設定的模型服務商，並儲存在對話的工具結果中。密碼欄位會隱藏，服務不會持續記錄畫面內容。你可以隨時關閉助手的此項工具，或在系統設定中停用服務。';
+
+  @override
+  String get phoneControlAssistantTitle => '還需開啟助手工具';
+
+  @override
+  String get phoneControlAssistantHint =>
+      '需要同時完成兩項設定：在系統無障礙設定中啟用「Kelivo 手機控制」，並在要使用的助手 → 本地工具中開啟「手機控制」（也可從對話工具選單開啟）。每個助手單獨設定，執行任務時請保持手機解鎖。';
+
+  @override
+  String get phoneControlRestrictedTitle => '無法開啟無障礙？';
+
+  @override
+  String get phoneControlRestrictedHint =>
+      '部分下載的 APK 需要先在應用程式資訊右上角選單中選擇「允許受限制的設定」。點擊開啟 Kelivo 應用程式資訊，完成後再返回無障礙設定。';
+
+  @override
+  String get phoneControlEnableAssistant => '允許此助手使用手機控制';
 }

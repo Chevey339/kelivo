@@ -21833,6 +21833,114 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'There is no upcoming occurrence to prepare. Check the task time and enabled state.'**
   String get scheduledTasksPrepareNowNoUpcoming;
+
+  /// No description provided for @phoneControlTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Phone Control'**
+  String get phoneControlTitle;
+
+  /// No description provided for @phoneControlSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Read the screen and perform actions through Accessibility'**
+  String get phoneControlSubtitle;
+
+  /// No description provided for @phoneControlAccessibilityService.
+  ///
+  /// In en, this message translates to:
+  /// **'Accessibility service'**
+  String get phoneControlAccessibilityService;
+
+  /// No description provided for @phoneControlOpenSettings.
+  ///
+  /// In en, this message translates to:
+  /// **'Open accessibility settings'**
+  String get phoneControlOpenSettings;
+
+  /// No description provided for @phoneControlRefresh.
+  ///
+  /// In en, this message translates to:
+  /// **'Refresh status'**
+  String get phoneControlRefresh;
+
+  /// No description provided for @phoneControlChecking.
+  ///
+  /// In en, this message translates to:
+  /// **'Checking service status…'**
+  String get phoneControlChecking;
+
+  /// No description provided for @phoneControlReady.
+  ///
+  /// In en, this message translates to:
+  /// **'Enabled and connected'**
+  String get phoneControlReady;
+
+  /// No description provided for @phoneControlDisabled.
+  ///
+  /// In en, this message translates to:
+  /// **'Not enabled'**
+  String get phoneControlDisabled;
+
+  /// No description provided for @phoneControlDisconnected.
+  ///
+  /// In en, this message translates to:
+  /// **'Enabled, but not connected. Try turning the service off and on in system settings, then refresh.'**
+  String get phoneControlDisconnected;
+
+  /// No description provided for @phoneControlStatusUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'Unable to read service status. Refresh to try again.'**
+  String get phoneControlStatusUnavailable;
+
+  /// No description provided for @phoneControlSettingsUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'Unable to open settings. Open Android Settings → Accessibility manually.'**
+  String get phoneControlSettingsUnavailable;
+
+  /// No description provided for @phoneControlUsageTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'How it works'**
+  String get phoneControlUsageTitle;
+
+  /// No description provided for @phoneControlDisclosure.
+  ///
+  /// In en, this message translates to:
+  /// **'For phone control tasks you request in a conversation, the assistant can read the current screen, tap, enter text, scroll, navigate, and open apps. Screen content is sent to the model provider configured for that conversation and is saved in its tool results. Password fields are hidden. This service does not continuously record screen content. You can turn off this tool for the assistant, or disable the service in system settings at any time.'**
+  String get phoneControlDisclosure;
+
+  /// No description provided for @phoneControlAssistantTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Enable the tool for your assistant'**
+  String get phoneControlAssistantTitle;
+
+  /// No description provided for @phoneControlAssistantHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Both permissions are required: enable Kelivo phone control in system Accessibility settings, then enable Phone Control under your assistant’s Local Tools (also available in the chat tools menu). Each assistant is configured separately. Keep the phone unlocked while running a task.'**
+  String get phoneControlAssistantHint;
+
+  /// No description provided for @phoneControlRestrictedTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Accessibility switch unavailable?'**
+  String get phoneControlRestrictedTitle;
+
+  /// No description provided for @phoneControlRestrictedHint.
+  ///
+  /// In en, this message translates to:
+  /// **'For some downloaded APKs, Android requires “Allow restricted settings” in the app info menu first. Tap to open Kelivo’s app info, then return to Accessibility settings.'**
+  String get phoneControlRestrictedHint;
+
+  /// No description provided for @phoneControlEnableAssistant.
+  ///
+  /// In en, this message translates to:
+  /// **'Allow this assistant to use phone control'**
+  String get phoneControlEnableAssistant;
 }
 
 class _AppLocalizationsDelegate

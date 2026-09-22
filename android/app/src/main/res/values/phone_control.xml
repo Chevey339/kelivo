@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="phone_control_service_label">Kelivo phone control</string>
+    <string name="phone_control_service_description">Allows assistants you enable to read the current screen and perform taps, text input, scrolling, and navigation for your phone control tasks. Screen content is sent to the model provider configured for the conversation. You can disable this service at any time in Accessibility settings.</string>
+</resources>

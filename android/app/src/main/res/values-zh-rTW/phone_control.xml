@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="phone_control_service_label">Kelivo 手機控制</string>
+    <string name="phone_control_service_description">允許你已開啟此工具的助手讀取目前畫面，並為手機控制任務執行點擊、輸入、滑動和導覽。畫面內容會傳送給目前對話設定的模型服務商。你可以隨時在無障礙設定中關閉此服務。</string>
+</resources>

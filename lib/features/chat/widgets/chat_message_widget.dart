@@ -482,6 +482,7 @@ IconData? _localToolIconFor(String name, Map<String, dynamic> args) {
     LocalToolNames.calendarQuery => Lucide.Calendar,
     LocalToolNames.calendarCreate => Lucide.CalendarPlus,
     LocalToolNames.currentLocation => Lucide.MapPin,
+    LocalToolNames.phoneControl => Lucide.Smartphone,
     LocalToolNames.weather => Lucide.CloudSun,
     LocalToolNames.healthSummary => Lucide.HeartPulse,
     LocalToolNames.remindersQuery => Lucide.ListTodo,
@@ -514,6 +515,7 @@ String? _localToolTitleFor(
     LocalToolNames.calendarCreate =>
       l10n.assistantEditLocalToolCalendarCreateTitle,
     LocalToolNames.currentLocation => l10n.assistantEditLocalToolLocationTitle,
+    LocalToolNames.phoneControl => l10n.phoneControlTitle,
     LocalToolNames.weather => l10n.assistantEditLocalToolWeatherTitle,
     LocalToolNames.healthSummary => l10n.assistantEditLocalToolHealthTitle,
     LocalToolNames.remindersQuery =>

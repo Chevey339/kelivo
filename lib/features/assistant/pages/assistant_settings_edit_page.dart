@@ -67,6 +67,7 @@ import 'assistant_regex_tab.dart';
 import 'assistant_settings_edit_skills_tab.dart';
 import '../widgets/assistant_default_workspace_row.dart';
 import 'health_data_settings_page.dart';
+import '../../settings/pages/phone_control_settings_page.dart';
 import 'package:Kelivo/theme/app_semantic_colors.dart';
 import 'package:Kelivo/shared/widgets/section_card.dart';
 

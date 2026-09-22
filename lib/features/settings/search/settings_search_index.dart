@@ -19,6 +19,7 @@ enum SettingsSearchDestination {
   autoRetry,
   haptics,
   background,
+  phoneControl,
   assistant,
   providers,
   defaultModel,
@@ -61,6 +62,7 @@ extension SettingsSearchDestinationDetails on SettingsSearchDestination {
     SettingsSearchDestination.haptics =>
       l.displaySettingsPageHapticsSettingsTitle,
     SettingsSearchDestination.background => l.backgroundSettingsTitle,
+    SettingsSearchDestination.phoneControl => l.phoneControlTitle,
     SettingsSearchDestination.assistant => l.settingsPageAssistant,
     SettingsSearchDestination.providers => l.settingsPageProviders,
     SettingsSearchDestination.defaultModel => l.settingsPageDefaultModel,
@@ -99,6 +101,7 @@ extension SettingsSearchDestinationDetails on SettingsSearchDestination {
     SettingsSearchDestination.autoRetry => LucideIcons.refreshCw,
     SettingsSearchDestination.haptics => LucideIcons.vibrate,
     SettingsSearchDestination.background => LucideIcons.activity,
+    SettingsSearchDestination.phoneControl => LucideIcons.smartphone,
     SettingsSearchDestination.assistant => LucideIcons.bot,
     SettingsSearchDestination.providers => LucideIcons.boxes,
     SettingsSearchDestination.defaultModel => LucideIcons.heart,
@@ -332,6 +335,15 @@ class SettingsSearchIndex {
         page: true,
         keywords:
             'background keep alive notification live activity 后台 後台 保活 灵动岛 靈動島',
+      );
+    }
+    if (!kIsWeb && platform == TargetPlatform.android) {
+      add(
+        'phoneControl',
+        SettingsSearchDestination.phoneControl,
+        (l) => l.phoneControlTitle,
+        page: true,
+        keywords: 'phone control accessibility 手机控制 手機控制 无障碍 無障礙',
       );
     }
     add(
