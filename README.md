@@ -98,7 +98,7 @@ The [User Guide](https://kelivo.psycheas.top/guide) (Chinese) covers providers, 
 ### 🧠 Models and Providers
 
 - **Native protocols**: OpenAI Chat Completions and Responses API, Google Gemini and Vertex AI, and Anthropic Claude, plus any OpenAI-compatible endpoint, including self-hosted models.
-- **Built-in presets** for OpenAI, Gemini, Claude, DeepSeek, OpenRouter, SiliconFlow, Alibaba Cloud, Zhipu AI, xAI, ByteDance and more.
+- **Built-in presets** for OpenAI, Gemini, Claude, DeepSeek, OpenRouter, Requesty, SiliconFlow, Alibaba Cloud, Zhipu AI, xAI, ByteDance and more.
 - **Account sign-in**: use a ChatGPT (Codex), Grok or Kimi Code account directly. Kelivo syncs the available models and shows your usage limits.
 - **Model capabilities**: set input and output modalities, tool use and reasoning per model. Choose a reasoning level from off to maximum, or set a custom token budget.
 - **Provider-side tools**, where supported: native web search, URL context, code execution, code interpreter and image generation.

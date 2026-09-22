@@ -105,7 +105,12 @@ void main() {
         'Grok',
         'ByteDance',
       ];
-      const migratedOrder = <String>[...legacyOrder, '随想AI中转站', 'MaruCode'];
+      const migratedOrder = <String>[
+        ...legacyOrder,
+        'Requesty',
+        '随想AI中转站',
+        'MaruCode',
+      ];
       await repository.replaceSnapshot(
         BusinessSettingsRouter.normalizeAndRoute({
           'providers_order_v1': legacyOrder,
@@ -125,6 +130,11 @@ void main() {
       expect(maruCode.enabled, isFalse);
       expect(maruCode.providerType, ProviderKind.openai);
       expect(maruCode.baseUrl, 'https://api.muteki.site/v1');
+
+      final requesty = settings.getProviderConfig('Requesty');
+      expect(requesty.enabled, isFalse);
+      expect(requesty.providerType, ProviderKind.openai);
+      expect(requesty.baseUrl, 'https://router.requesty.ai/v1');
 
       final reloaded = SettingsProvider(BusinessPreferences(repository));
       await reloaded.loaded;

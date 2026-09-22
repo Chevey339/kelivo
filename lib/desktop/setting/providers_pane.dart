@@ -300,6 +300,7 @@ class _DesktopProvidersBodyState extends State<_DesktopProvidersBody> {
       (name: l10n.providersPageSiliconFlowName, key: 'SiliconFlow'),
       (name: 'Gemini', key: 'Gemini'),
       (name: 'OpenRouter', key: 'OpenRouter'),
+      (name: 'Requesty', key: 'Requesty'),
       (name: 'KelivoIN', key: 'KelivoIN'),
       (name: 'Tensdaq', key: 'Tensdaq'),
       (name: 'DeepSeek', key: 'DeepSeek'),
