@@ -10,7 +10,7 @@ import '../../../theme/app_semantic_colors.dart';
 /// Read the live origin again on dismissal, including after rotation.
 typedef SettingsSearchOrigin = Rect? Function();
 
-const settingsSearchFieldRadius = BorderRadius.all(Radius.circular(18));
+const settingsSearchFieldRadius = BorderRadius.all(Radius.circular(14));
 
 double settingsSearchFieldHeight(BuildContext context) =>
     math.max(40, MediaQuery.textScalerOf(context).scale(15) * 1.25 + 16);
@@ -73,7 +73,7 @@ class SettingsSearchField extends StatelessWidget {
         key: const ValueKey('settings-search-field-surface'),
         height: height * reveal,
         child: ColoredBox(
-          color: context.appColors.surfaceCardFill,
+          color: context.appColors.surfaceFill,
           child: OverflowBox(
             minHeight: height,
             maxHeight: height,
