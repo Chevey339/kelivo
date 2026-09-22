@@ -44,6 +44,7 @@ class BrandAssets {
         MapEntry(RegExp(r'tinyfish'), 'tinyfish-color.svg'),
         MapEntry(RegExp(r'fish.?audio|fishaudio'), 'fish-audio.svg'),
         MapEntry(RegExp(r'openrouter'), 'openrouter.svg'),
+        MapEntry(RegExp(r'requesty'), 'requesty-color.svg'),
         MapEntry(RegExp(r'metaso|秘塔'), 'metaso-color.svg'),
         MapEntry(RegExp(r'meta'), 'meta-color.svg'),
         MapEntry(RegExp(r'tencent'), 'hunyuan-color.svg'),
@@ -124,6 +125,11 @@ class BrandAssets {
       id: 'openrouter',
       label: 'OpenRouter',
       asset: 'assets/icons/openrouter.svg',
+    ),
+    BrandIconOption(
+      id: 'requesty',
+      label: 'Requesty',
+      asset: 'assets/icons/requesty-color.svg',
     ),
     BrandIconOption(
       id: 'zhipu',

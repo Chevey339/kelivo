@@ -139,6 +139,7 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
         'Gemini',
         'SiliconFlow',
         'OpenRouter',
+        'Requesty',
         'DeepSeek',
         'Tensdaq',
         'AIhubmix',

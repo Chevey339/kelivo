@@ -98,7 +98,7 @@ Kelivo 不只是聊天。模型可以联网搜索、调用 MCP 服务器、按�
 ### 🧠 模型与供应商
 
 - **原生协议**：支持 OpenAI Chat Completions 与 Responses API、Google Gemini 与 Vertex AI、Anthropic Claude，并兼容任何 OpenAI 兼容接口，包括自部署的模型。
-- **内置预设**：OpenAI、Gemini、Claude、DeepSeek、OpenRouter、硅基流动、阿里云千问、智谱、xAI、火山引擎等。
+- **内置预设**：OpenAI、Gemini、Claude、DeepSeek、OpenRouter、Requesty、硅基流动、阿里云千问、智谱、xAI、火山引擎等。
 - **账号登录**：直接使用 ChatGPT（Codex）、Grok 或 Kimi Code 账号，自动同步可用模型并显示用量额度。
 - **模型能力**：按模型设置输入输出模态、工具调用和推理能力；思维链强度可从关闭调到最高，也可以自定义 token 预算。
 - **供应商内置工具**（视供应商支持情况）：原生联网搜索、URL 上下文、代码执行、代码解释器和图像生成。

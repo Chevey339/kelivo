@@ -223,27 +223,37 @@ class OpenAIProvider extends BaseProvider {
     final key = ProviderManager._effectiveApiKey(cfg);
     final client = _Http.clientFor(cfg);
     try {
-      final uri = Uri.parse('${cfg.baseUrl}/models');
       final headers = <String, String>{};
       if (key.isNotEmpty) headers['Authorization'] = 'Bearer $key';
-      final res = await client.get(
-        uri,
-        headers: _Http.modelListHeaders(cfg, headers),
-      );
-      if (res.statusCode >= 200 && res.statusCode < 300) {
+      // Requesty publishes curated managed policies (short stable ids) at
+      // /models/managed on top of the full vendor/model catalog at /models.
+      // List the managed ids first, then append the catalog.
+      final paths = isRequestyProvider(cfg)
+          ? const ['/models/managed', '/models']
+          : const ['/models'];
+      final seen = <String>{};
+      final models = <ModelInfo>[];
+      for (final path in paths) {
+        final res = await client.get(
+          Uri.parse('${cfg.baseUrl}$path'),
+          headers: _Http.modelListHeaders(cfg, headers),
+        );
+        if (res.statusCode < 200 || res.statusCode >= 300) continue;
         final data = (jsonDecode(res.body)['data'] as List?) ?? [];
-        return [
-          for (final e in data)
-            if (e is Map && e['id'] is String)
+        for (final e in data) {
+          if (e is Map && e['id'] is String && seen.add(e['id'] as String)) {
+            models.add(
               ModelRegistry.infer(
                 ModelInfo(
                   id: e['id'] as String,
                   displayName: e['id'] as String,
                 ),
               ),
-        ];
+            );
+          }
+        }
       }
-      return [];
+      return models;
     } finally {
       client.close();
     }

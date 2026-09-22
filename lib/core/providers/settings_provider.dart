@@ -80,6 +80,7 @@ class SettingsProvider extends ChangeNotifier {
     'SiliconFlow',
     'Gemini',
     'OpenRouter',
+    'Requesty',
     'KelivoIN',
     'Tensdaq',
     'DeepSeek',
@@ -6458,6 +6459,7 @@ class ProviderConfig {
     if (k.contains('tensdaq')) return 'https://tensdaq-api.x-aio.com/v1';
     if (k.contains('kelivoin')) return 'https://text.pollinations.ai/openai';
     if (k.contains('openrouter')) return 'https://openrouter.ai/api/v1';
+    if (k.contains('requesty')) return 'https://router.requesty.ai/v1';
     if (k.contains('aihubmix')) return 'https://aihubmix.com/v1';
     if (k.contains('随想')) return 'https://sui-xiang.com/v1';
     if (k.contains('marucode') || k.contains('muteki')) {
