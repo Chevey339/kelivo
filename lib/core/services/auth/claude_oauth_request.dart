@@ -3,13 +3,68 @@ import 'dart:ffi';
 import 'dart:io';
 
 import 'package:crypto/crypto.dart';
+import 'package:flutter/foundation.dart';
 import 'package:hashlib/hashlib.dart' show XXHash64;
 
 import '../../models/provider_oauth.dart';
 import '../../providers/settings_provider.dart';
 
-// OMP 6f2c14b3, providers/claude-code-fingerprint.ts and anthropic.ts.
-const claudeCodeVersion = '2.1.257';
+// OMP 2282226655, providers/claude-code-fingerprint.ts and anthropic.ts.
+const defaultClaudeCodeVersion = '2.1.280';
+String _claudeCodeVersion = defaultClaudeCodeVersion;
+String get claudeCodeVersion => _claudeCodeVersion;
+
+/// Retain a newer server-required version for this process. Only an explicit
+/// version rejection may change the version; unrelated errors stay untouched.
+/// Returns whether the rejected request can be retried with a newer version,
+/// including when another in-flight request has already adopted it.
+bool adoptRequiredClaudeCodeVersion(
+  String errorBody, {
+  String? requestVersion,
+}) {
+  try {
+    final body = jsonDecode(errorBody);
+    if (body is! Map) return false;
+    final error = body['error'];
+    if (error is! Map) return false;
+    final details = error['details'];
+    if (details is! Map ||
+        details['error_code'] != 'claude_code_version_too_old') {
+      return false;
+    }
+    final message = error['message'];
+    if (message is! String) return false;
+    final required = RegExp(
+      r'\bversion (\d+\.\d+\.\d+) or newer is required\b',
+      caseSensitive: false,
+    ).firstMatch(message)?.group(1);
+    if (required == null ||
+        _compareClaudeVersions(required, requestVersion ?? claudeCodeVersion) <=
+            0) {
+      return false;
+    }
+    if (_compareClaudeVersions(required, claudeCodeVersion) > 0) {
+      _claudeCodeVersion = required;
+    }
+    return true;
+  } on FormatException {
+    return false;
+  }
+}
+
+int _compareClaudeVersions(String a, String b) {
+  final left = a.split('.').map(BigInt.parse).toList();
+  final right = b.split('.').map(BigInt.parse).toList();
+  for (var i = 0; i < 3; i++) {
+    final comparison = left[i].compareTo(right[i]);
+    if (comparison != 0) return comparison;
+  }
+  return 0;
+}
+
+@visibleForTesting
+void resetClaudeCodeVersion() => _claudeCodeVersion = defaultClaudeCodeVersion;
+
 const claudeCodeSdkVersion = '0.112.1';
 const claudeCodeSystemInstruction =
     "You are Claude Code, Anthropic's official CLI for Claude.";

@@ -127,20 +127,22 @@ void main() {
       expect(body['output_config'], {'effort': 'max'});
     });
 
-    test('Opus 5 uses summarized adaptive thinking and max effort', () async {
-      final body = await captureClaudeRequestBody(
-        modelId: 'claude-opus-5',
-        thinkingBudget: 128000,
-        temperature: 0.7,
-        topP: 0.8,
-      );
+    for (final model in ['claude-opus-5', 'claude-opus-5-5']) {
+      test('$model uses summarized adaptive thinking and max effort', () async {
+        final body = await captureClaudeRequestBody(
+          modelId: model,
+          thinkingBudget: 128000,
+          temperature: 0.7,
+          topP: 0.8,
+        );
 
-      expect(body['thinking'], {'type': 'adaptive', 'display': 'summarized'});
-      expect(body['output_config'], {'effort': 'max'});
-      expect(body['max_tokens'], 128000);
-      expect(body.containsKey('temperature'), isFalse);
-      expect(body.containsKey('top_p'), isFalse);
-    });
+        expect(body['thinking'], {'type': 'adaptive', 'display': 'summarized'});
+        expect(body['output_config'], {'effort': 'max'});
+        expect(body['max_tokens'], 128000);
+        expect(body.containsKey('temperature'), isFalse);
+        expect(body.containsKey('top_p'), isFalse);
+      });
+    }
 
     test('Sonnet 5 can disable thinking but still rejects sampling', () async {
       final body = await captureClaudeRequestBody(
