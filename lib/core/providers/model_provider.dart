@@ -3,14 +3,14 @@ export '../models/model_spec.dart';
 
 import 'dart:convert';
 import 'dart:io' show HttpException;
-import 'package:http/http.dart' as http;
 import 'settings_provider.dart';
-import '../services/network/dio_http_client.dart';
+import '../services/network/provider_http_client.dart';
 import '../services/api_key_manager.dart';
 import '../services/api/provider_request_headers.dart';
 import '../services/model_override_payload_parser.dart';
 import '../services/custom_request_merger.dart';
 import 'package:Kelivo/secrets/fallback.dart';
+import '../services/api/embedding/embedding_api_service.dart';
 import '../services/api/google_service_account_auth.dart';
 import '../models/model_spec.dart';
 import '../services/model_spec/model_spec_resolver.dart';
@@ -32,35 +32,13 @@ class _Http {
       ),
     );
   }
-
-  static http.Client clientFor(ProviderConfig cfg) {
-    final enabled = cfg.proxyEnabled == true;
-    final host = (cfg.proxyHost ?? '').trim();
-    final portStr = (cfg.proxyPort ?? '').trim();
-    final user = (cfg.proxyUsername ?? '').trim();
-    final pass = (cfg.proxyPassword ?? '').trim();
-    if (enabled && host.isNotEmpty && portStr.isNotEmpty) {
-      final port = int.tryParse(portStr) ?? 8080;
-      return DioHttpClient(
-        proxy: NetworkProxyConfig(
-          enabled: true,
-          type: ProviderConfig.resolveProxyType(cfg.proxyType),
-          host: host,
-          port: port,
-          username: user.isEmpty ? null : user,
-          password: pass.isEmpty ? null : pass,
-        ),
-      );
-    }
-    return DioHttpClient();
-  }
 }
 
 class OpenAIProvider extends BaseProvider {
   @override
   Future<List<ModelSpec>> listModels(ProviderConfig cfg) async {
     final key = ProviderManager._effectiveApiKey(cfg);
-    final client = _Http.clientFor(cfg);
+    final client = providerHttpClient(cfg);
     try {
       final uri = Uri.parse('${cfg.baseUrl}/models');
       final headers = <String, String>{};
@@ -95,7 +73,7 @@ class ClaudeProvider extends BaseProvider {
   @override
   Future<List<ModelSpec>> listModels(ProviderConfig cfg) async {
     final key = ProviderManager._effectiveApiKey(cfg);
-    final client = _Http.clientFor(cfg);
+    final client = providerHttpClient(cfg);
     try {
       final uri = Uri.parse('${cfg.baseUrl}/models');
       final headers = <String, String>{'anthropic-version': anthropicVersion};
@@ -144,7 +122,7 @@ class GoogleProvider extends BaseProvider {
 
   @override
   Future<List<ModelSpec>> listModels(ProviderConfig cfg) async {
-    final client = _Http.clientFor(cfg);
+    final client = providerHttpClient(cfg);
     try {
       final url = _buildUrl(cfg);
       final headers = <String, String>{};
@@ -304,6 +282,14 @@ class ProviderManager {
     String modelId, {
     bool useStream = false,
   }) async {
+    if (ModelSpecResolver.instance.spec(cfg, modelId).isEmbedding) {
+      await EmbeddingApiService.embed(
+        config: cfg,
+        modelId: modelId,
+        inputs: const ['hello'],
+      );
+      return;
+    }
     cfg = await ProviderOAuthService.instance.resolve(cfg);
     if (cfg.oauthProvider == OAuthProvider.chatgpt) useStream = true;
     if (cfg.oauthProvider == OAuthProvider.kimi &&
@@ -316,7 +302,7 @@ class ProviderManager {
       explicitType: cfg.providerType,
     );
     final client = ProviderOAuthService.instance.authenticatedClient(
-      _Http.clientFor(cfg),
+      providerHttpClient(cfg),
       cfg,
     );
     try {

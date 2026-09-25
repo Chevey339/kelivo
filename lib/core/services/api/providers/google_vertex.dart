@@ -158,7 +158,7 @@ Stream<StreamChunk> sendGoogleVertexClaudeStream({
   final proj = (config.projectId ?? '').trim();
   final endpoint = stream ? 'streamRawPredict' : 'rawPredict';
   final url = Uri.parse(
-    '${_vertexClaudeOrigin(config, loc)}/v1/projects/$proj/locations/$loc/publishers/anthropic/models/$upstreamId:$endpoint',
+    '${vertexOrigin(config, loc)}/v1/projects/$proj/locations/$loc/publishers/anthropic/models/$upstreamId:$endpoint',
   );
 
   final requestHeaders = <String, String>{'Content-Type': 'application/json'};
@@ -659,7 +659,7 @@ Stream<StreamChunk> sendGoogleVertexClaudeStream({
 
 /// Official Vertex hosts follow [location]; a custom [ProviderConfig.baseUrl]
 /// (tests, gateways) is used as the origin instead.
-String _vertexClaudeOrigin(ProviderConfig config, String loc) {
+String vertexOrigin(ProviderConfig config, String loc) {
   final raw = config.baseUrl.trim();
   final host = (Uri.tryParse(raw)?.host ?? '').toLowerCase();
   final official =
