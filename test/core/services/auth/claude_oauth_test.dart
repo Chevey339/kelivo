@@ -793,14 +793,14 @@ void main() {
     },
   );
 
-  // Generated independently with Python hashlib/xxhash (OMP 2282226655), including
-  // a UTF-16 surrogate at fingerprint index 4 and a Unicode request body.
+  // Generated independently with Python hashlib/xxhash, with system before
+  // messages, a UTF-16 surrogate at fingerprint index 4 and a Unicode body.
   for (final vector in [
-    ('Hello', '790', '48ad2'),
-    ('编码测试🙂cache校验字符串with emoji', '05c', '3e8a3'),
+    ('Hello', '790', 'b8f6c'),
+    ('编码测试🙂cache校验字符串with emoji', '05c', 'a1994'),
   ]) {
     test(
-      'Claude billing fingerprint and cch match the Bun oracle for ${vector.$1}',
+      'Claude billing fingerprint and cch match independent vectors for ${vector.$1}',
       () {
         final encoded = encodeClaudeOAuthRequest(
           {

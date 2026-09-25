@@ -293,11 +293,11 @@ String encodeClaudeOAuthRequest(
     if (budget + 4000 > raised) thinking['budget_tokens'] = raised - 4000;
   }
   if (cache != null) _cacheClaudeRequest(system, tools, messages, cache);
-  // Match the Claude Code/OMP serialization order before computing cch.
+  // Serialize system before messages, then compute cch from that exact payload.
   const order = [
     'model',
-    'messages',
     'system',
+    'messages',
     'tools',
     'metadata',
     'max_tokens',

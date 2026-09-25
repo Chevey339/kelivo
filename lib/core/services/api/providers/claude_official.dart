@@ -321,13 +321,13 @@ Stream<StreamChunk> sendClaudeStream(
       final body = <String, dynamic>{
         'model': upstreamModelId,
         'max_tokens': maxTokens ?? spec.maxOutput ?? 64000,
-        'messages': convo,
-        'stream': stream,
-        if (systemPrompt.isNotEmpty) 'system': systemPrompt,
         if (config.claudePromptCachingEnabled == true)
           'cache_control': ProviderConfig.claudePromptCacheControl(
             config.claudePromptCachingTtl,
           ),
+        if (systemPrompt.isNotEmpty) 'system': systemPrompt,
+        'messages': convo,
+        'stream': stream,
         if (temperature != null) 'temperature': temperature,
         if (topP != null) 'top_p': topP,
         if (allTools.isNotEmpty) 'tools': allTools,

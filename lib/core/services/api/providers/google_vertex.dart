@@ -427,10 +427,10 @@ Stream<StreamChunk> sendGoogleVertexClaudeStream({
       final spec = ModelSpecResolver.instance.spec(config, modelId);
       final body = <String, dynamic>{
         'anthropic_version': 'vertex-2023-10-16',
-        'messages': convo,
-        'stream': stream,
         'max_tokens': maxTokens ?? spec.maxOutput ?? 64000,
         if (systemPrompt.isNotEmpty) 'system': systemPrompt,
+        'messages': convo,
+        'stream': stream,
         if (temperature != null) 'temperature': temperature,
         if (topP != null) 'top_p': topP,
         if (allTools.isNotEmpty) 'tools': allTools,
