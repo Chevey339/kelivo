@@ -209,14 +209,16 @@ class _MarkdownWithCodeHighlightState extends State<MarkdownWithCodeHighlight> {
       );
       _sourceScan.update(_renderText);
       _metadataSource = _renderText;
-      if (_sourceScan.hasBrackets) {
+      if (_sourceScan.hasImageMarker) {
         _sanitizedText = _sanitizeImageLinks(_renderText);
         _imageUrls = _extractImageUrls(_sanitizedText);
-        _documentCitationIds = _citationIds(_sanitizedText);
       } else {
         _sanitizedText = _renderText;
-        _imageUrls = _documentCitationIds = const [];
+        _imageUrls = const [];
       }
+      _documentCitationIds = _sourceScan.hasCitationPrefix
+          ? _citationIds(_sanitizedText)
+          : const [];
       // Image URL rewriting can change an earlier prefix as a link closes.
       // Share the prefix proof only when both inputs reached the splitter raw.
       _metadataAppended =

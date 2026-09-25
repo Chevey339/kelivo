@@ -15,6 +15,7 @@ void main() {
       final firecrawl = BrandAssets.assetForName('Firecrawl');
       final tinyFish = BrandAssets.assetForName('TinyFish');
       final anySearch = BrandAssets.assetForName('AnySearch');
+      final kagi = BrandAssets.assetForName('Kagi');
       final parallel = BrandAssets.assetForName('Parallel');
       final you = BrandAssets.assetForName('You.com');
       final azure = BrandAssets.assetForName('Azure');
@@ -23,6 +24,7 @@ void main() {
       expect(firecrawl, 'assets/icons/firecrawl-color.svg');
       expect(tinyFish, 'assets/icons/tinyfish-color.svg');
       expect(anySearch, 'assets/icons/anysearch.svg');
+      expect(kagi, 'assets/icons/kagi-color.svg');
       expect(parallel, 'assets/icons/parallel.svg');
       expect(you, 'assets/icons/you.svg');
       expect(azure, 'assets/icons/azure-speech.svg');
@@ -31,6 +33,7 @@ void main() {
       expect(BrandAssets.selectableAssetOrNull(firecrawl!), firecrawl);
       expect(BrandAssets.selectableAssetOrNull(tinyFish!), tinyFish);
       expect(BrandAssets.selectableAssetOrNull(anySearch!), anySearch);
+      expect(BrandAssets.selectableAssetOrNull(kagi!), kagi);
       expect(BrandAssets.selectableAssetOrNull(parallel!), parallel);
       expect(BrandAssets.selectableAssetOrNull(you!), you);
     });

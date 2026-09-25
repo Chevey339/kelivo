@@ -92,6 +92,21 @@ if(PLUGIN_BUNDLED_LIBRARIES)
     COMPONENT Runtime)
 endif()
 
+# Bundle the MSVC runtime DLLs next to the executable so machines with a
+# missing or outdated VC++ redist still launch (see #369, #761).
+# SKIP disables the module's own install() rule: its relative default "bin"
+# destination fails to evaluate against this project's generator-expression
+# install prefix (it lands as a literal "$<TARGET_FILE_DIR:...>/bin"), and the
+# DLLs also need to sit at the flat bundle root. We install them ourselves.
+set(CMAKE_INSTALL_SYSTEM_RUNTIME_LIBS_NO_WARNINGS TRUE)
+set(CMAKE_INSTALL_SYSTEM_RUNTIME_LIBS_SKIP TRUE)
+include(InstallRequiredSystemLibraries)
+if(CMAKE_INSTALL_SYSTEM_RUNTIME_LIBS)
+  install(FILES ${CMAKE_INSTALL_SYSTEM_RUNTIME_LIBS}
+    DESTINATION "${INSTALL_BUNDLE_LIB_DIR}"
+    COMPONENT Runtime)
+endif()
+
 # Copy the native assets provided by the build.dart from all packages.
 set(NATIVE_ASSETS_DIR "${PROJECT_BUILD_DIR}native_assets/windows/")
 install(DIRECTORY "${NATIVE_ASSETS_DIR}"

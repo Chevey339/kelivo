@@ -11,6 +11,7 @@ import 'package:Kelivo/shared/widgets/snackbar.dart';
 
 import 'health_data_selection.dart';
 import 'local_tools_service.dart';
+import '../../settings/pages/phone_control_settings_page.dart';
 
 /// Flips one entry of [Assistant.localToolIds], asking for the OS permission
 /// the tool needs first.
@@ -39,6 +40,25 @@ Future<void> setLocalToolEnabled(
 
   if (!value) {
     await write(false);
+    return;
+  }
+
+  if (toolId == LocalToolNames.phoneControl) {
+    if (!DeviceLocalTools.phoneControlSupported) return;
+    final allowed = await PhoneControlSettingsPage.open(
+      context,
+      requestEnable: true,
+    );
+    if (allowed != true || !context.mounted) return;
+    // The settings route can remain open while the assistant is edited elsewhere.
+    final provider = context.read<AssistantProvider>();
+    final current = provider.getById(assistant.id);
+    if (current == null) return;
+    await provider.updateAssistant(
+      current.copyWith(
+        localToolIds: {...current.localToolIds, toolId}.toList(),
+      ),
+    );
     return;
   }
 

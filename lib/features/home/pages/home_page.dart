@@ -769,6 +769,9 @@ class _HomePageState extends State<HomePage>
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
+    // Modal routes disable tickers only after an opaque route covers us.
+    // Keep streaming visible behind translucent dialogs and bottom sheets.
+    _controller.onHomeVisibilityChanged(TickerMode.valuesOf(context).enabled);
     final route = ModalRoute.of(context);
     if (route != null) {
       routeObserver.subscribe(this, route);
@@ -1276,7 +1279,6 @@ class _HomePageState extends State<HomePage>
           ? const ChatAssistantBackground(
               desktop: true,
               includeSurfaceFill: true,
-              applyMaskStrength: false,
               pinnedToBackdrop: true,
             )
           : null,
@@ -1318,7 +1320,9 @@ class _HomePageState extends State<HomePage>
                 child: Builder(
                   builder: (context) {
                     Widget input = _buildChatInputBar(context, isTablet: true);
-                    input = Center(
+                    input = Align(
+                      alignment: Alignment.bottomCenter,
+                      heightFactor: 1,
                       child: ConstrainedBox(
                         constraints: const BoxConstraints(
                           maxWidth: ChatLayoutConstants.maxInputWidth,
@@ -1343,7 +1347,6 @@ class _HomePageState extends State<HomePage>
     return const ChatAssistantBackground(
       desktop: true,
       includeSurfaceFill: true,
-      applyMaskStrength: false,
     );
   }
 
@@ -1589,6 +1592,7 @@ class _HomePageState extends State<HomePage>
       hasQueuedInput: _controller.currentQueuedInput != null,
       queuedPreviewText: _controller.currentQueuedInput?.input.text,
       onCancelQueuedInput: _controller.cancelQueuedMessage,
+      onExpandedChanged: _controller.setInputBarExpanded,
       onQuickPhrase: _showQuickPhraseMenu,
       onLongPressQuickPhrase: () {
         Navigator.of(

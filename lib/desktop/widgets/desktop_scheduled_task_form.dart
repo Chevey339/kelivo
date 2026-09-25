@@ -12,18 +12,20 @@ class DesktopScheduledTaskRow extends StatelessWidget {
     required this.label,
     required this.child,
     this.expandControl = false,
+    this.labelTrailing,
   });
 
   final String label;
   final Widget child;
   final bool expandControl;
+  final Widget? labelTrailing;
 
   @override
   Widget build(BuildContext context) => Padding(
     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
     child: LayoutBuilder(
       builder: (context, constraints) {
-        final text = Text(
+        final labelText = Text(
           label,
           style: TextStyle(
             fontSize: 14,
@@ -32,6 +34,14 @@ class DesktopScheduledTaskRow extends StatelessWidget {
             ).colorScheme.onSurface.withValues(alpha: .9),
           ),
         );
+        final text = labelTrailing == null
+            ? labelText
+            : Row(
+                children: [
+                  Expanded(child: labelText),
+                  labelTrailing!,
+                ],
+              );
         if (constraints.maxWidth < 420) {
           return Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,

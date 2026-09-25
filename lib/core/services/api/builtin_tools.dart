@@ -295,7 +295,8 @@ abstract class BuiltInToolsHelper {
         return true;
       case ProviderKind.openai:
         if (isOpenRouterProvider(cfg)) return true;
-        if (isGrokProvider(cfg)) return true;
+        // Native Grok search is only available as Responses tools.
+        if (isGrokProvider(cfg)) return cfg.useResponseApi == true;
         if (cfg.useResponseApi == true) return true;
         if (isDashScopeProvider(cfg)) return true;
         if (isArkProvider(cfg)) return true;
@@ -325,7 +326,6 @@ abstract class BuiltInToolsHelper {
   }) {
     final configured = _configuredTools(cfg, modelId, configuredTools);
     final tools = <Map<String, dynamic>>[];
-    final body = <String, dynamic>{};
 
     void add(Map<String, dynamic> tool) {
       final type = (tool['type'] ?? '').toString();
@@ -362,8 +362,9 @@ abstract class BuiltInToolsHelper {
       return BuiltInToolsRequestPayload(tools: tools);
     }
     if (isGrokProvider(cfg)) {
-      body['search_parameters'] = {'mode': 'auto', 'return_citations': true};
-      return BuiltInToolsRequestPayload(tools: tools, body: body);
+      add({'type': 'web_search'});
+      add({'type': 'x_search'});
+      return BuiltInToolsRequestPayload(tools: tools);
     }
     if (!supportsBuiltInSearchForModel(cfg: cfg, modelId: modelId)) {
       return BuiltInToolsRequestPayload(tools: tools);
@@ -427,16 +428,6 @@ abstract class BuiltInToolsHelper {
     }
     if (!configured.contains(BuiltInToolNames.search)) {
       return const BuiltInToolsRequestPayload();
-    }
-    if (isGrokProvider(cfg)) {
-      return const BuiltInToolsRequestPayload(
-        body: <String, dynamic>{
-          'search_parameters': <String, dynamic>{
-            'mode': 'auto',
-            'return_citations': true,
-          },
-        },
-      );
     }
     if (isDashScopeProvider(cfg)) {
       final options = dashScopeSearchOptionsFromOverride(

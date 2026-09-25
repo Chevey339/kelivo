@@ -125,7 +125,7 @@ void main() {
   }) async {
     if (menu) {
       await tester.runAsync(() async {
-        ScheduledTasksService.configureDesktop(storage.preferences);
+        ScheduledTasksService.configureDevice(storage.preferences);
         await ScheduledTasksService.instance.refresh();
       });
     }

@@ -111,7 +111,7 @@ class _ReasoningRule {
 /// Central guesser for model-id-derived capability and reasoning defaults.
 class ModelDefaultsGuesser {
   static final RegExp _vision = RegExp(
-    r'(gpt-4o|gpt-4\.1|gpt-5(?!-chat)|gpt-6|o\d|gemini|claude|kimi-k2([-.])(?:5|6|7)|kimi-k3(?:$|[/_:@.-])|muse-spark-1(?:$|[/_:@.-])|doubao.+(?:1([-.])(?:6|8)|seed-2|seed-evolving)|grok-4|step-3|intern-s1|minimax-m3(?:$|[/_:@])|mimo-v2(?:-omni(?:$|[/_:@])|\.5(?:$|[/_:@]))|sensenova-6\.7-flash-lite)',
+    r'(gpt-4o|gpt-4\.1|gpt-5(?!-chat)|gpt-6|o\d|gemini|claude|kimi-k2([-.])(?:5|6|7)|kimi-k3(?:$|[/_:@.-])|muse-spark-1(?:$|[/_:@.-])|doubao.+(?:1([-.])(?:6|8)|seed-2|seed-evolving)|grok-4|step-3|intern-s1|minimax-m3(?:$|[/_:@])|mimo-v2(?:-omni(?:$|[/_:@])|\.5(?:$|[/_:@])|\.6(?:$|[/_:@.-]))|sensenova-6\.7-flash-lite)',
     caseSensitive: false,
   );
 
@@ -158,7 +158,7 @@ class ModelDefaultsGuesser {
     _ReasoningRule(matches: (id) => id.contains('deepseek'), apply: _deepSeek),
     _ReasoningRule(matches: _isMimoV2, apply: _mimo),
     _ReasoningRule(
-      matches: (id) => _matches(id, r'(^|[/_:@])grok-4\.6(?:$|[-.])'),
+      matches: (id) => _matches(id, r'(^|[/_:@])grok-4\.(?:6|7)(?:$|[-.])'),
       apply: _grok46,
     ),
     _ReasoningRule(

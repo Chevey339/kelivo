@@ -1,3 +1,5 @@
+import '../../../utils/utf16_safe_cut.dart';
+import '../../chat/utils/thinking_tag_parser.dart';
 import 'package:Kelivo/core/providers/external_mounts_provider.dart';
 import 'dart:convert';
 import 'dart:io';
@@ -163,6 +165,100 @@ class MessageBuilderService {
   /// Keyed by path, validated with (modified + size) to avoid stale reuse.
   final Map<String, _DocTextCacheEntry> _docTextCache =
       <String, _DocTextCacheEntry>{};
+
+  /// Read-only, bounded context for a result that will be published later.
+  /// In particular, World Book timers and prompt/memory receipts are not written.
+  Future<List<Map<String, dynamic>>> buildDetachedTextContext({
+    required Assistant assistant,
+    required Conversation? conversation,
+    required String modelId,
+    required SettingsProvider settings,
+  }) async {
+    final limit = assistant.limitContextMessages
+        ? assistant.contextMessageSize.clamp(1, 64)
+        : 64;
+    final history = conversation == null
+        ? <ChatMessage>[]
+        : await chatService.loadSelectedContextMessages(
+            conversation.id,
+            truncateIndex: conversation.truncateIndex,
+            limit: limit,
+          );
+    if (history.any((m) => m.isStreaming)) throw StateError('in_flight');
+    final messages = <Map<String, dynamic>>[];
+    var remaining = 32000;
+    for (final message in history.reversed) {
+      if (message.role != 'user' && message.role != 'assistant') continue;
+      if (remaining <= 0) break;
+      final raw = message.role == 'assistant'
+          ? ThinkingTagParser.parseWithRanges(message.content).visibleContent
+          : message.content;
+      if (raw.trim().isEmpty) continue;
+      final text = truncateHeadTailUtf16Safe(
+        raw,
+        remaining,
+        marker: '\n[…truncated…]\n',
+      );
+      remaining -= text.length;
+      messages.insert(0, {'role': message.role, 'content': text});
+    }
+    if (conversation == null) {
+      for (final message in assistant.presetMessages) {
+        messages.add({'role': message.role, 'content': message.content});
+      }
+    }
+    final promptConversation =
+        conversation ??
+        Conversation(
+          title: '',
+          assistantId: assistant.id,
+          extras:
+              chatService.newConversationExtras?.call(assistant.id) ?? const {},
+        );
+    injectSystemPrompt(
+      messages,
+      assistant,
+      modelId,
+      conversation: promptConversation,
+    );
+    if (conversation?.summary?.trim().isNotEmpty == true &&
+        conversation!.truncateIndex < 0 &&
+        conversation.lastSummarizedMessageCount ==
+            await chatService.resolveMessageCount(conversation.id)) {
+      _appendToSystemMessage(
+        messages,
+        'Conversation summary:\n${conversation.summary}',
+        source: ContextSource.systemPrompt,
+      );
+    }
+    final memory = await detachedMemoryPrefix(
+      assistant: assistant,
+      settings: settings,
+    );
+    if (memory.isNotEmpty) {
+      _appendToSystemMessage(
+        messages,
+        memory,
+        source: ContextSource.memoryRules,
+      );
+    }
+    await injectInstructionPrompts(
+      messages,
+      assistant.id,
+      conversation: promptConversation,
+      conversationScoped: assistant.allowConversationPromptInjection,
+    );
+    await injectWorldBookPrompts(
+      messages,
+      assistant.id,
+      conversation: promptConversation,
+      conversationScoped: assistant.allowConversationPromptInjection,
+      sourceMessages: history,
+      persistActivation: false,
+    );
+    stripInternalRevisionIds(messages);
+    return messages;
+  }
 
   /// Collapse message versions to show only selected version per group.
   List<ChatMessage> collapseVersions(
@@ -1242,7 +1338,7 @@ class MessageBuilderService {
       if (assistant == null || _repo == null) return;
       final current = assistant.enableMemory && !_legacyMemoryMode(settings)
           ? pass?.currentSnapshot ??
-                await _currentMemorySnapshot(
+                await currentMemorySnapshot(
                   assistant: assistant,
                   lang: settings.resolvedMemoryPromptLang,
                   settings: settings,
@@ -1425,6 +1521,42 @@ class MessageBuilderService {
     }
   }
 
+  /// Exact, read-only memory input for preparation and its revision check.
+  /// Tool instructions and time-dependent templates are omitted because
+  /// detached preparation cannot use memory-management tools.
+  Future<String> detachedMemoryPrefix({
+    required Assistant assistant,
+    required SettingsProvider settings,
+  }) async {
+    if (!assistant.enableMemory) return '';
+    if (settings.legacyMemoryMode) return _legacyMemoryBlock(assistant.id);
+    final snapshot = await currentMemorySnapshot(
+      assistant: assistant,
+      lang: settings.resolvedMemoryPromptLang,
+      settings: settings,
+    );
+    return snapshot != null && !snapshot.isEmpty ? snapshot.prefix : '';
+  }
+
+  Future<String> _legacyMemoryBlock(String assistantId) async {
+    final memories = contextProvider.read<MemoryProvider>();
+    await memories.initialize();
+    final buf = StringBuffer();
+    buf.writeln('## Memories');
+    buf.writeln(
+      'These are memories that you can reference in the future conversations.',
+    );
+    buf.writeln('<memories>');
+    for (final memory in memories.getForAssistant(assistantId)) {
+      buf.writeln('<record>');
+      buf.writeln('<id>${memory.id}</id>');
+      buf.writeln('<content>${memory.content}</content>');
+      buf.writeln('</record>');
+    }
+    buf.writeln('</memories>');
+    return buf.toString();
+  }
+
   /// Drop a v2 snapshot that was frozen into history while the new memory
   /// system was on. The stored freeze row is left intact so switching back
   /// still hits prompt cache / hash gating.
@@ -1444,7 +1576,7 @@ class MessageBuilderService {
   /// distinct from the hash, which is a perfectly good hash of two empty
   /// blocks. Always a full snapshot: a superseded one is stripped from history
   /// rather than left in place for an update block to correct.
-  Future<MemorySnapshotState?> _currentMemorySnapshot({
+  Future<MemorySnapshotState?> currentMemorySnapshot({
     required Assistant assistant,
     required MemoryPromptLang lang,
     SettingsProvider? settings,
@@ -1489,7 +1621,7 @@ class MessageBuilderService {
       return _noMemoryPrefix;
     }
 
-    final current = await _currentMemorySnapshot(
+    final current = await currentMemorySnapshot(
       assistant: assistant,
       lang: lang,
       settings: settings,
@@ -1668,23 +1800,9 @@ class MessageBuilderService {
   }) async {
     if (assistant.enableMemory) {
       final resolved = settings ?? contextProvider.read<SettingsProvider>();
-      final mp = contextProvider.read<MemoryProvider>();
-      await mp.initialize();
-      final mems = mp.getForAssistant(assistant.id);
+      final memory = await _legacyMemoryBlock(assistant.id);
       final currentHour = _formatCurrentHour(DateTime.now());
-      final buf = StringBuffer();
-      buf.writeln('## Memories');
-      buf.writeln(
-        'These are memories that you can reference in the future conversations.',
-      );
-      buf.writeln('<memories>');
-      for (final m in mems) {
-        buf.writeln('<record>');
-        buf.writeln('<id>${m.id}</id>');
-        buf.writeln('<content>${m.content}</content>');
-        buf.writeln('</record>');
-      }
-      buf.writeln('</memories>');
+      final buf = StringBuffer(memory);
       final template = resolved.resolvedMemoryPromptLang == MemoryPromptLang.zh
           ? resolved.legacyMemoryPromptZh
           : resolved.legacyMemoryPromptEn;

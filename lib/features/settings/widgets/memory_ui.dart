@@ -77,6 +77,53 @@ String memoryScopeLabel(
   return l10n.memoryEntryScopeAssistantNamed(assistantName);
 }
 
+/// Compact info icon: tap or long-press shows [message], matching the
+/// legacy-memory toggle on the assistant Memory tab.
+class MemoryTipIcon extends StatefulWidget {
+  const MemoryTipIcon({super.key, required this.message});
+
+  final String message;
+
+  @override
+  State<MemoryTipIcon> createState() => _MemoryTipIconState();
+}
+
+class _MemoryTipIconState extends State<MemoryTipIcon> {
+  final _tooltipKey = GlobalKey<TooltipState>();
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return Tooltip(
+      key: _tooltipKey,
+      message: widget.message,
+      triggerMode: TooltipTriggerMode.tap,
+      waitDuration: const Duration(milliseconds: 250),
+      showDuration: const Duration(seconds: 8),
+      preferBelow: true,
+      constraints: const BoxConstraints(maxWidth: 280),
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        // Own the tap so a surrounding settings row does not activate.
+        onTap: () => _tooltipKey.currentState?.ensureTooltipVisible(),
+        onLongPress: () => _tooltipKey.currentState?.ensureTooltipVisible(),
+        child: SizedBox(
+          width: 28,
+          height: 28,
+          child: Center(
+            child: Icon(
+              Lucide.BadgeInfo,
+              size: 16,
+              color: cs.onSurface.withValues(alpha: 0.45),
+              semanticLabel: widget.message,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 /// Human-readable label for a pipeline / tool outcome code.
 ///
 /// Known codes map to l10n strings. Prefixed codes such as

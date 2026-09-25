@@ -13,13 +13,9 @@ import 'package:Kelivo/l10n/app_localizations.dart';
 import 'package:Kelivo/shared/widgets/ios_settings_rows.dart';
 import 'package:Kelivo/shared/widgets/ios_tile_button.dart';
 import 'package:Kelivo/shared/widgets/option_sheet.dart';
-import 'package:Kelivo/shared/widgets/section_card.dart';
 
-class AssistantSettingsEditWorkspaceTab extends StatelessWidget {
-  const AssistantSettingsEditWorkspaceTab({
-    super.key,
-    required this.assistantId,
-  });
+class AssistantDefaultWorkspaceRow extends StatelessWidget {
+  const AssistantDefaultWorkspaceRow({super.key, required this.assistantId});
 
   final String assistantId;
 
@@ -33,7 +29,11 @@ class AssistantSettingsEditWorkspaceTab extends StatelessWidget {
   String _defaultWorkspaceLabel(BuildContext context, Assistant assistant) {
     final l10n = AppLocalizations.of(context)!;
     final id = assistant.defaultWorkspaceId;
-    if (id == null || id.isEmpty) return l10n.workspaceEntryNone;
+    if (id == null || id.isEmpty) {
+      return assistant.defaultWorkspaceSetup == DefaultWorkspaceSetup.automatic
+          ? l10n.workspaceEntryDefaultWorkspaceUnset
+          : l10n.workspaceEntryNone;
+    }
     try {
       final workspace = context.watch<WorkspaceProvider>().byId(id);
       if (workspace == null) return l10n.workspaceEntryNone;
@@ -53,6 +53,7 @@ class AssistantSettingsEditWorkspaceTab extends StatelessWidget {
       workspaces = context.read<WorkspaceProvider>().workspaces;
     } catch (_) {}
     final currentId = assistant.defaultWorkspaceId ?? '';
+    var manageWorkspaces = false;
 
     final selected = await showOptionSheet<String>(
       context,
@@ -76,10 +77,36 @@ class AssistantSettingsEditWorkspaceTab extends StatelessWidget {
                 : l10n.workspaceFilesKindManaged,
           ),
       ],
+      footer: Builder(
+        builder: (pickerContext) => Padding(
+          padding: const EdgeInsets.only(top: 12),
+          child: IosTileButton(
+            key: manageKey,
+            icon: Lucide.FolderOpen,
+            label: l10n.workspaceEntryManage,
+            onTap: () {
+              manageWorkspaces = true;
+              Navigator.of(pickerContext).pop();
+            },
+          ),
+        ),
+      ),
     );
-    if (selected == null || !context.mounted) return;
-    await context.read<AssistantProvider>().updateAssistant(
-      assistant.copyWith(
+    if (!context.mounted) return;
+    if (manageWorkspaces) {
+      await openWorkspacesPage(context);
+      return;
+    }
+    if (selected == null) return;
+    if (selected.isNotEmpty &&
+        context.read<WorkspaceProvider>().byId(selected) == null) {
+      return;
+    }
+    final assistants = context.read<AssistantProvider>();
+    final current = assistants.getById(assistantId);
+    if (current == null) return;
+    await assistants.updateAssistant(
+      current.copyWith(
         clearDefaultWorkspaceId: selected.isEmpty,
         defaultWorkspaceId: selected.isEmpty ? null : selected,
       ),
@@ -92,29 +119,18 @@ class AssistantSettingsEditWorkspaceTab extends StatelessWidget {
     final assistant = context.watch<AssistantProvider>().getById(assistantId);
     if (assistant == null) return const SizedBox.shrink();
 
-    return ListView(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 20),
-      children: [
-        SectionCard(
-          children: [
-            IosNavRow(
-              key: defaultWorkspaceKey,
-              icon: Lucide.FolderCode,
-              label: l10n.workspaceEntryDefaultWorkspace,
-              subtitle: l10n.workspaceEntryDefaultWorkspaceSubtitle,
-              detailText: _defaultWorkspaceLabel(context, assistant),
-              onTap: () => unawaited(_pickDefaultWorkspace(context, assistant)),
-            ),
-          ],
-        ),
-        const SizedBox(height: 16),
-        IosTileButton(
-          key: manageKey,
-          icon: Lucide.FolderOpen,
-          label: l10n.workspaceEntryManage,
-          onTap: () => unawaited(openWorkspacesPage(context)),
-        ),
-      ],
+    return IosNavRow(
+      key: defaultWorkspaceKey,
+      icon: Lucide.FolderCode,
+      label: l10n.workspaceEntryDefaultWorkspace,
+      subtitle:
+          assistant.defaultWorkspaceSetup == DefaultWorkspaceSetup.automatic &&
+              (assistant.defaultWorkspaceId?.isEmpty ?? true)
+          ? l10n.workspaceEntryDefaultWorkspaceAutomaticSubtitle
+          : l10n.workspaceEntryDefaultWorkspaceSubtitle,
+      subtitleMaxLines: null,
+      detailText: _defaultWorkspaceLabel(context, assistant),
+      onTap: () => unawaited(_pickDefaultWorkspace(context, assistant)),
     );
   }
 }

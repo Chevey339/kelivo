@@ -7,6 +7,24 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:Kelivo/core/services/workspace/tool_run_registry.dart';
 
 void main() {
+  test('unobserved pending lines freeze correctly when streams interleave', () {
+    final run = ToolRun(toolCallId: 'lazy-tail', toolName: 'shell');
+    addTearDown(run.dispose);
+    run.appendStdout(utf8.encode('old'));
+    run.appendStderr(utf8.encode('warning'));
+    run.appendStdout(utf8.encode('\rnew'));
+    run.appendStderr(utf8.encode('\nsecond warning'));
+    run.appendStdout(utf8.encode(' result\nnext'));
+    expect(run.tailLines, ['new result', 'warning', 'second warning', 'next']);
+    final snapshot = run.tailLines;
+    run.appendStdout(utf8.encode(' line'));
+    expect(snapshot.last, 'next');
+    expect(run.tailLines.last, 'next line');
+    run.complete(status: ToolRunStatus.succeeded, exitCode: 0);
+    expect(run.stdoutSoFar, 'new result\nnext line');
+    expect(run.stderrSoFar, 'warning\nsecond warning');
+  });
+
   test('coalesces notifications to once per 50 ms and flushes on complete', () {
     fakeAsync((async) {
       final run = ToolRun(toolCallId: 'c1', toolName: 'shell', command: 'echo');

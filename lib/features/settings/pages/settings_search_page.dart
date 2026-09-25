@@ -35,6 +35,95 @@ class _SettingsSearchRoute extends PopupRoute<void> {
   final SettingsSearchOrigin origin;
   final VoidCallback onColorMode;
   final bool reduceMotion;
+  late final CurvedAnimation _motion;
+  bool _dragging = false;
+  bool _gestureInProgress = false;
+  FocusNode? _dragFocus;
+
+  @override
+  Animation<double> createAnimation() {
+    final animation = super.createAnimation();
+    _motion = CurvedAnimation(
+      parent: animation,
+      curve: Curves.easeOutCubic,
+      reverseCurve: Curves.easeInCubic,
+    );
+    return animation;
+  }
+
+  void _startDrag(DragStartDetails details) {
+    if (!isCurrent || controller!.isAnimating || _gestureInProgress) return;
+    _dragging = true;
+  }
+
+  void _updateDrag(DragUpdateDetails details, double width) {
+    if (!_dragging || !isCurrent) return;
+    if (!_gestureInProgress) {
+      if (details.primaryDelta! <= 0) return;
+      _gestureInProgress = true;
+      _dragFocus = FocusManager.instance.primaryFocus;
+      controller!.addStatusListener(_handleGestureStatus);
+      navigator!.didStartUserGesture();
+    }
+    controller!.value -= details.primaryDelta! / width;
+  }
+
+  void _endDrag({double velocity = 0, bool cancelled = false}) {
+    if (!_dragging) return;
+    _dragging = false;
+    if (!_gestureInProgress) return;
+    final dismiss = isCurrent
+        ? !cancelled &&
+              (velocity.abs() >= 700 ? velocity > 0 : controller!.value < 0.5)
+        : !isActive;
+    final duration = Duration(milliseconds: reduceMotion ? 0 : 220);
+    if (dismiss) {
+      if (isCurrent) navigator!.pop();
+      if (controller!.isAnimating) {
+        controller!.animateBack(
+          0,
+          duration: duration,
+          curve: Curves.easeOutCubic,
+        );
+      }
+    } else {
+      controller!.animateTo(1, duration: duration, curve: Curves.easeOutCubic);
+    }
+    if (!controller!.isAnimating) _stopGesture();
+  }
+
+  void _handleGestureStatus(AnimationStatus status) {
+    if ((status == AnimationStatus.dismissed && !isCurrent) ||
+        (!_dragging && status == AnimationStatus.completed)) {
+      _stopGesture();
+    }
+  }
+
+  void _stopGesture() {
+    if (!_gestureInProgress) return;
+    _dragging = false;
+    _gestureInProgress = false;
+    controller!.removeStatusListener(_handleGestureStatus);
+    navigator!.didStopUserGesture();
+    final focus = _dragFocus;
+    _dragFocus = null;
+    if (isCurrent && focus != null) {
+      // Navigator suspends this route's focus during a back gesture. Restore
+      // the original input only after a cancelled gesture has settled.
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (isCurrent && focus.context != null && focus.canRequestFocus) {
+          focus.requestFocus();
+        }
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    _stopGesture();
+    _motion.dispose();
+    super.dispose();
+  }
 
   @override
   Color? get barrierColor => null;
@@ -44,7 +133,7 @@ class _SettingsSearchRoute extends PopupRoute<void> {
   String? get barrierLabel => null;
   @override
   Duration get transitionDuration =>
-      Duration(milliseconds: reduceMotion ? 0 : 360);
+      Duration(milliseconds: reduceMotion ? 0 : 300);
   @override
   Duration get reverseTransitionDuration =>
       Duration(milliseconds: reduceMotion ? 0 : 300);
@@ -54,10 +143,29 @@ class _SettingsSearchRoute extends PopupRoute<void> {
     BuildContext context,
     Animation<double> animation,
     Animation<double> secondaryAnimation,
-  ) => SettingsSearchPage(
-    onColorMode: onColorMode,
-    origin: origin,
-    transition: animation,
+  ) => Listener(
+    // An accepted DragGestureRecognizer reports pointer cancellation as an
+    // end, so catch it before the recognizer can commit a dismissal.
+    onPointerCancel: (_) => _endDrag(cancelled: true),
+    child: GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onHorizontalDragStart: _startDrag,
+      onHorizontalDragUpdate: (details) =>
+          _updateDrag(details, MediaQuery.sizeOf(context).width),
+      onHorizontalDragEnd: (details) =>
+          _endDrag(velocity: details.primaryVelocity!),
+      onHorizontalDragCancel: () => _endDrag(cancelled: true),
+      child: ValueListenableBuilder<bool>(
+        valueListenable: navigator!.userGestureInProgressNotifier,
+        builder: (context, dragging, _) => SettingsSearchPage(
+          onColorMode: onColorMode,
+          origin: origin,
+          // Stay linear through the drag and its settling animation. Switching
+          // back to the route curve mid-flight would make the field jump.
+          transition: dragging ? animation : _motion,
+        ),
+      ),
+    ),
   );
 }
 

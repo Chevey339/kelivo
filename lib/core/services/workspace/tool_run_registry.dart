@@ -79,18 +79,20 @@ class ToolRun extends ChangeNotifier {
   }
 
   void _updatePendingTail({required bool stderr}) {
-    final line = (stderr ? _stderr : _stdout).currentLine;
-    if (line.isNotEmpty) _updateTail(line, stderr: stderr, complete: false);
+    final output = stderr ? _stderr : _stdout;
+    if (output.hasCurrentLine) {
+      _updateTail(null, stderr: stderr, complete: false);
+    }
   }
 
   void _updateTail(
-    String text, {
+    String? text, {
     required bool stderr,
     required bool complete,
   }) {
     var line = stderr ? _stderrTail : _stdoutTail;
     if (line == null) {
-      line = _TailLine(text);
+      line = _TailLine(text, stderr ? _stderr : _stdout);
       _tailLines.add(line);
       if (_tailLines.length > maxTailLines) {
         final removed = _tailLines.removeAt(0);
@@ -98,7 +100,7 @@ class ToolRun extends ChangeNotifier {
         if (identical(removed, _stderrTail)) _stderrTail = null;
       }
     } else {
-      line.text = text;
+      line.completedText = text;
     }
     if (stderr) {
       _stderrTail = complete ? null : line;
@@ -108,6 +110,7 @@ class ToolRun extends ChangeNotifier {
   }
 
   void _scheduleNotify() {
+    if (!hasListeners) return;
     _notifyTimer ??= Timer(notifyInterval, () {
       _notifyTimer = null;
       notifyListeners();
@@ -123,9 +126,14 @@ class ToolRun extends ChangeNotifier {
 }
 
 class _TailLine {
-  _TailLine(this.text);
+  _TailLine(this.completedText, this.output);
 
-  String text;
+  String? completedText;
+  final ShellOutputBuffer output;
+
+  // Resolve an unfinished line only when the UI reads it. Completed lines
+  // freeze their text before the decoder advances to the next line.
+  String get text => completedText ?? output.currentLine;
 }
 
 /// Process-lifetime registry of tool runs. Finished runs are kept until the

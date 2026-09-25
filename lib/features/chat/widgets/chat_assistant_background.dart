@@ -10,9 +10,9 @@ import 'chat_gradient_background.dart';
 
 /// Shared assistant wallpaper + surface-mask gradient for chat surfaces.
 ///
-/// Mobile uses a 0.20→0.50 mask multiplied by
-/// [SettingsProvider.chatBackgroundMaskStrength]. Desktop keeps a fixed
-/// 0.08→0.36 mask (`applyMaskStrength: false`) so the look stays byte-identical.
+/// Mobile uses a 0.20→0.50 mask; desktop/tablet uses a lighter 0.08→0.36 mask.
+/// All image tinting scales with [SettingsProvider.chatBackgroundMaskStrength]
+/// so zero shows the unmodified wallpaper in either layout.
 class ChatAssistantBackground extends StatelessWidget {
   const ChatAssistantBackground({
     super.key,
@@ -20,7 +20,6 @@ class ChatAssistantBackground extends StatelessWidget {
     this.pinnedToBackdrop = false,
     this.includeSurfaceFill = false,
     this.expand = true,
-    this.applyMaskStrength = true,
   });
 
   /// Desktop chat uses a lighter mask so the wallpaper stays more visible.
@@ -34,9 +33,6 @@ class ChatAssistantBackground extends StatelessWidget {
   /// When false, an empty background is [SizedBox.shrink] (home mobile body).
   final bool expand;
 
-  /// When false, ignore [SettingsProvider.chatBackgroundMaskStrength].
-  final bool applyMaskStrength;
-
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
@@ -45,9 +41,9 @@ class ChatAssistantBackground extends StatelessWidget {
       return ChatGradientBackground(pinned: pinnedToBackdrop);
     }
     final bg = assistant?.background;
-    final maskStrength = applyMaskStrength
-        ? context.watch<SettingsProvider>().chatBackgroundMaskStrength
-        : 1.0;
+    final maskStrength = context
+        .watch<SettingsProvider>()
+        .chatBackgroundMaskStrength;
     final empty = expand ? const SizedBox.expand() : const SizedBox.shrink();
 
     if (bg == null || bg.trim().isEmpty) {
@@ -109,7 +105,11 @@ class ChatAssistantBackground extends StatelessWidget {
           fit: StackFit.expand,
           children: [
             ColoredBox(color: cs.surface),
-            if (imageWidget != null) Opacity(opacity: 0.9, child: imageWidget),
+            if (imageWidget != null)
+              Opacity(
+                opacity: (1.0 - 0.1 * maskStrength).clamp(0.0, 1.0),
+                child: imageWidget,
+              ),
             mask,
           ],
         ),
@@ -122,7 +122,7 @@ class ChatAssistantBackground extends StatelessWidget {
           image: provider!,
           fit: BoxFit.cover,
           colorFilter: ColorFilter.mode(
-            cs.shadow.withValues(alpha: 0.04),
+            cs.shadow.withValues(alpha: (0.04 * maskStrength).clamp(0.0, 1.0)),
             BlendMode.srcATop,
           ),
         ),

@@ -52,6 +52,10 @@ void main() {
           BusinessKeyDisposition.localOnly,
         );
         expect(
+          BusinessKeyRegistry.classify('linux_hide_title_bar_v1'),
+          BusinessKeyDisposition.localOnly,
+        );
+        expect(
           BusinessKeyRegistry.classify('pinned_chat_ids'),
           BusinessKeyDisposition.discarded,
         );
@@ -99,6 +103,8 @@ void main() {
           'pinned_models_v1': jsonEncode(['first/model-a']),
           'plugin_future_key_v1': <String>['one', 'two'],
           'flutter_log_enabled_v1': true,
+          'window_physical_pos_x_v1': -3600.0,
+          'window_physical_pos_y_v1': 200.0,
           'pinned_chat_ids': <String>['chat-1'],
         };
 
@@ -117,6 +123,8 @@ void main() {
         expect(exported['pinned_models_v1'], <String>['first/model-a']);
         expect(exported['plugin_future_key_v1'], <String>['one', 'two']);
         expect(exported['flutter_log_enabled_v1'], isNull);
+        expect(exported['window_physical_pos_x_v1'], isNull);
+        expect(exported['window_physical_pos_y_v1'], isNull);
         expect(exported['pinned_chat_ids'], isNull);
 
         final providers = snapshot.entities[BusinessEntityKind.provider]!;
@@ -778,6 +786,38 @@ void main() {
             'search_services_v1',
           ),
         ),
+      );
+    });
+
+    test('accepts and preserves Kagi search credentials', () {
+      final snapshot = BusinessSettingsRouter.normalizeAndRoute({
+        'search_services_v1': jsonEncode([
+          {
+            'id': 'kagi-1',
+            'type': 'kagi',
+            'apiKey': 'primary-key',
+            'apiKeys': ['backup-key'],
+          },
+        ]),
+      });
+
+      final exported = BusinessSettingsRouter.exportSnapshot(snapshot);
+      expect(jsonDecode(exported['search_services_v1']! as String), [
+        {
+          'id': 'kagi-1',
+          'type': 'kagi',
+          'apiKey': 'primary-key',
+          'apiKeys': ['backup-key'],
+        },
+      ]);
+
+      expect(
+        () => BusinessSettingsRouter.normalizeAndRoute({
+          'search_services_v1': jsonEncode([
+            {'id': 'kagi-invalid', 'type': 'kagi', 'apiKey': 123},
+          ]),
+        }),
+        throwsA(isA<FormatException>()),
       );
     });
 

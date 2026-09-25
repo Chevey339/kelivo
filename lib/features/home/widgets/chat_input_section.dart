@@ -71,6 +71,7 @@ class ChatInputSection extends StatelessWidget {
     this.hasQueuedInput = false,
     this.queuedPreviewText,
     this.onCancelQueuedInput,
+    this.onExpandedChanged,
     this.onQuickPhrase,
     this.onLongPressQuickPhrase,
     this.onToggleOcr,
@@ -116,6 +117,7 @@ class ChatInputSection extends StatelessWidget {
   final bool hasQueuedInput;
   final String? queuedPreviewText;
   final VoidCallback? onCancelQueuedInput;
+  final ValueChanged<bool>? onExpandedChanged;
   final VoidCallback? onQuickPhrase;
   final VoidCallback? onLongPressQuickPhrase;
   final VoidCallback? onToggleOcr;
@@ -231,6 +233,7 @@ class ChatInputSection extends StatelessWidget {
       hasQueuedInput: hasQueuedInput,
       queuedPreviewText: queuedPreviewText,
       onCancelQueuedInput: onCancelQueuedInput,
+      onExpandedChanged: onExpandedChanged,
       showToolsButton: _shouldShowToolsButton(pk, mid),
       toolsActive: _isToolsActive(context, a, workspaceBound),
       showQuickPhraseButton: _hasQuickPhrases(context, a),
@@ -284,7 +287,7 @@ class ChatInputSection extends StatelessWidget {
               onTap: () => WorkspaceNavigation.openEnvironmentPage(context),
             ),
           ),
-        bar,
+        Flexible(child: bar),
       ],
     );
   }

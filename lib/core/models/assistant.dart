@@ -6,6 +6,8 @@ import 'reasoning_request.dart';
 
 enum MemorySmartAddMode { batched, perItem }
 
+enum DefaultWorkspaceSetup { automatic, suggest, completed }
+
 enum MemoryWriteScope {
   alwaysGlobal,
   alwaysAssistant,
@@ -55,6 +57,13 @@ class Assistant {
   final List<String> localToolIds; // enabled local tool IDs
   /// Default workspace for new conversations started with this assistant.
   final String? defaultWorkspaceId;
+
+  /// New assistants remember the first binding; existing assistants only suggest it.
+  final DefaultWorkspaceSetup defaultWorkspaceSetup;
+
+  /// Runtime-only identity for default-workspace edits, including selecting the
+  /// same value. Unrelated edits preserve it; it is not serialized.
+  final Object? defaultWorkspaceChangeToken;
 
   /// Enabled skill IDs. `null` means every installed skill is available.
   final List<String>? skillIds;
@@ -112,6 +121,8 @@ class Assistant {
     this.mcpServerIds = const <String>[],
     this.localToolIds = const <String>[],
     this.defaultWorkspaceId,
+    this.defaultWorkspaceSetup = DefaultWorkspaceSetup.automatic,
+    this.defaultWorkspaceChangeToken,
     this.skillIds,
     this.healthDataTypeIds = HealthDataTypeIds.defaultSelected,
     this.background,
@@ -159,6 +170,7 @@ class Assistant {
     List<String>? mcpServerIds,
     List<String>? localToolIds,
     String? defaultWorkspaceId,
+    DefaultWorkspaceSetup? defaultWorkspaceSetup,
     List<String>? skillIds,
     List<String>? healthDataTypeIds,
     String? background,
@@ -221,6 +233,17 @@ class Assistant {
       defaultWorkspaceId: clearDefaultWorkspaceId
           ? null
           : (defaultWorkspaceId ?? this.defaultWorkspaceId),
+      defaultWorkspaceSetup:
+          defaultWorkspaceSetup ??
+          (clearDefaultWorkspaceId || defaultWorkspaceId != null
+              ? DefaultWorkspaceSetup.completed
+              : this.defaultWorkspaceSetup),
+      defaultWorkspaceChangeToken:
+          clearDefaultWorkspaceId ||
+              defaultWorkspaceId != null ||
+              defaultWorkspaceSetup != null
+          ? Object()
+          : defaultWorkspaceChangeToken,
       skillIds: clearSkillIds ? null : (skillIds ?? this.skillIds),
       healthDataTypeIds: healthDataTypeIds ?? this.healthDataTypeIds,
       background: clearBackground ? null : (background ?? this.background),
@@ -279,6 +302,7 @@ class Assistant {
     'mcpServerIds': mcpServerIds,
     'localToolIds': localToolIds,
     'defaultWorkspaceId': defaultWorkspaceId,
+    'defaultWorkspaceSetup': defaultWorkspaceSetup.name,
     'skillIds': skillIds,
     'healthDataTypeIds': healthDataTypeIds,
     'background': background,
@@ -340,6 +364,13 @@ class Assistant {
     localToolIds:
         (json['localToolIds'] as List?)?.cast<String>() ?? const <String>[],
     defaultWorkspaceId: json['defaultWorkspaceId'] as String?,
+    defaultWorkspaceSetup:
+        DefaultWorkspaceSetup.values
+            .where((value) => value.name == json['defaultWorkspaceSetup'])
+            .firstOrNull ??
+        ((json['defaultWorkspaceId'] as String?)?.isNotEmpty == true
+            ? DefaultWorkspaceSetup.completed
+            : DefaultWorkspaceSetup.suggest),
     skillIds: json['skillIds'] == null
         ? null
         : (json['skillIds'] as List).map((e) => e.toString()).toList(),

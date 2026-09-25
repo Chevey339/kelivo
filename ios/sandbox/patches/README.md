@@ -20,6 +20,12 @@ in `build_ish.sh` so local and CI builds use the same source.
 - `0004-kernel-node-random-seed.patch` — keep Node's emulation flags but
   randomize its seed per exec, so `--predictable` does not make concurrent npm
   processes reuse cache temporary filenames. Explicit seeds remain respected.
+- `0005-kernel-init-exit-status.patch` — the host iSH CLI returns the guest
+  command's exit status after shutdown, so failed apk transactions and build
+  validation cannot silently succeed.
+- `0006-kernel-uname-hostname-bounds.patch` — bound the host name copied into
+  Linux's 65-byte uname field and preserve its NUL terminator. Long macOS runner
+  names otherwise abort the host iSH CLI while preparing the Alpine rootfs.
 
 ## Rootfs compatibility overlay
 
@@ -35,3 +41,17 @@ HTTP parser in JavaScript; it is not a general WebAssembly engine or a browser.
 Run the opt-in `MCP_STDIO_NODE_SMOKE` checks in
 `integration_test/workspace/mcp_stdio_ios_test.dart` on a prepared, disposable
 simulator (or use `--no-uninstall` to preserve an existing app's data).
+
+## Rootfs packages
+
+Rootfs generation runs apk through the host iSH CLI on an Apple Silicon Mac.
+apk preserves the official minirootfs world and owns package installation,
+including dependency resolution, file ownership records and install scripts.
+The shared `overlay/usr/local/bin/kelivo-repair-rootfs` transaction also repairs
+installed environments in place when the user selects Update or Repair.
+The app publishes the new rootfs version only after that transaction succeeds.
+
+After generating artifacts, run
+`flutter test test/core/services/sandbox/ios_rootfs_artifact_test.dart`.
+The disposable-simulator regression is
+`integration_test/workspace/ios_rootfs_packages_test.dart`.

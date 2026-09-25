@@ -8,6 +8,30 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  testWidgets('ancestor repaint reuses the unchanged paragraph drawing', (
+    tester,
+  ) async {
+    final background = ValueNotifier(Colors.white);
+    var paints = 0;
+    await tester.pumpWidget(
+      MaterialApp(
+        home: ValueListenableBuilder<Color>(
+          valueListenable: background,
+          builder: (_, color, child) => ColoredBox(color: color, child: child),
+          child: StreamingRichText(
+            text: _PaintObservedText('中文 paragraph', onPaint: () => paints++),
+          ),
+        ),
+      ),
+    );
+    expect(paints, greaterThan(0));
+    paints = 0;
+    background.value = Colors.blue;
+    await tester.pump();
+    expect(paints, 0);
+    await tester.pumpWidget(const SizedBox.shrink());
+    background.dispose();
+  });
   const visualFont = String.fromEnvironment('KELIVO_VISUAL_FONT');
   const emojiFont = String.fromEnvironment('KELIVO_VISUAL_EMOJI_FONT');
   setUpAll(() async {
@@ -258,7 +282,7 @@ void main() {
             final originalHeight = tester
                 .getSize(find.byKey(contentKey))
                 .height;
-            scroll.jumpTo(480);
+            scroll.jumpTo(480.0.clamp(0.0, scroll.position.maxScrollExtent));
             await tester.pump();
             final before = await pixels(
               '${selectable ? 'selectable' : 'rich'}-before-$dark-$hardBreaks',
@@ -286,5 +310,34 @@ void main() {
         );
       }
     }
+  }
+}
+
+class _PaintObservedText extends Text {
+  const _PaintObservedText(super.data, {required this.onPaint});
+  final VoidCallback onPaint;
+
+  @override
+  Widget build(BuildContext context) =>
+      _PaintObserver(onPaint: onPaint, child: super.build(context));
+}
+
+class _PaintObserver extends SingleChildRenderObjectWidget {
+  const _PaintObserver({required this.onPaint, required super.child});
+  final VoidCallback onPaint;
+
+  @override
+  RenderObject createRenderObject(BuildContext context) =>
+      _RenderPaintObserver(onPaint);
+}
+
+class _RenderPaintObserver extends RenderProxyBox {
+  _RenderPaintObserver(this.onPaint);
+  final VoidCallback onPaint;
+
+  @override
+  void paint(PaintingContext context, Offset offset) {
+    onPaint();
+    super.paint(context, offset);
   }
 }

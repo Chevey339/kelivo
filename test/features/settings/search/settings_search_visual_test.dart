@@ -7,6 +7,8 @@ import 'package:Kelivo/l10n/app_localizations.dart';
 import 'package:Kelivo/theme/palettes.dart';
 import 'package:Kelivo/theme/theme_factory.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart'
+    show debugDefaultTargetPlatformOverride;
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -80,6 +82,10 @@ void main() {
       testWidgets('${scenario.name} ${brightness.name} fits and renders', (
         tester,
       ) async {
+        debugDefaultTargetPlatformOverride = scenario.name == 'desktop'
+            ? TargetPlatform.macOS
+            : TargetPlatform.iOS;
+        addTearDown(() => debugDefaultTargetPlatformOverride = null);
         tester.view.physicalSize = scenario.size;
         tester.view.devicePixelRatio = 1;
         addTearDown(tester.view.resetPhysicalSize);
@@ -140,6 +146,14 @@ void main() {
           field.right,
           lessThanOrEqualTo(scenario.size.width - scenario.insets.right),
         );
+        final surface = tester.getRect(
+          find.byKey(const ValueKey('settings-search-field-surface')),
+        );
+        expect(
+          tester.getRect(find.byType(EditableText)).center.dy,
+          closeTo(surface.center.dy, 0.5),
+          reason: 'Input text must stay vertically centered on every platform',
+        );
         if (output != null) {
           await tester.runAsync(() async {
             final boundary =
@@ -154,6 +168,7 @@ void main() {
             image.dispose();
           });
         }
+        debugDefaultTargetPlatformOverride = null;
       });
     }
   }

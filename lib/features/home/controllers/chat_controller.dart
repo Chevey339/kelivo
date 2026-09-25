@@ -1,12 +1,12 @@
 import 'dart:async';
 import 'dart:math' as math;
 import 'package:flutter/foundation.dart';
-import 'package:flutter/scheduler.dart';
 import '../../../core/database/chat_database_repository.dart';
 import '../../../core/models/chat_message.dart';
 import '../../../core/models/conversation.dart';
 import '../../../core/services/chat/chat_service.dart';
 import '../../../core/services/screen_wakelock.dart';
+import '../../../core/utils/scheduler_idle.dart';
 import 'message_render_model.dart';
 
 /// Initial window for a conversation switch, loaded by
@@ -319,10 +319,8 @@ class ChatController extends ChangeNotifier {
   void _scheduleIdleCacheBackfill(String conversationId) {
     final Future<void> task;
     try {
-      task = SchedulerBinding.instance.scheduleTask(
-        () => backfillCurrentConversationCache(conversationId),
-        Priority.idle,
-        debugLabel: 'chat.idleCacheBackfill',
+      task = waitForSchedulerIdle().then(
+        (_) => backfillCurrentConversationCache(conversationId),
       );
     } catch (_) {
       // No scheduler binding (bare unit tests): warm-up is optional.
@@ -1181,7 +1179,10 @@ class ChatController extends ChangeNotifier {
   ///
   /// This groups messages by their groupId and returns only the message
   /// at the selected version index for each group.
-  List<ChatMessage> collapseVersions(List<ChatMessage> items) {
+  List<ChatMessage> collapseVersions(
+    List<ChatMessage> items, {
+    Map<String, int>? selections,
+  }) {
     final Map<String, List<ChatMessage>> byGroup =
         <String, List<ChatMessage>>{};
     final List<String> order = <String>[];
@@ -1204,7 +1205,7 @@ class ChatController extends ChangeNotifier {
     final out = <ChatMessage>[];
     for (final gid in order) {
       final vers = byGroup[gid]!;
-      final sel = _versionSelections[gid];
+      final sel = (selections ?? _versionSelections)[gid];
       ChatMessage? selected;
       if (sel != null) {
         for (final candidate in vers) {

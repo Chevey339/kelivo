@@ -27,6 +27,8 @@ class ShellOutputBuffer {
 
   String get currentLine => _line.text;
 
+  bool get hasCurrentLine => _line.totalBytes > 0;
+
   bool get truncated =>
       _completedLineTruncated ||
       _completed.totalBytes + _line.totalBytes > maxBytes;

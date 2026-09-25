@@ -78,6 +78,10 @@ class BackgroundRuntime(private val context: Context) {
         private set
     var service: GenerationForegroundService? = null
         private set
+    /** Phone control gestures are real touches: a capsule above the target app
+     * would receive them and reopen Kelivo. Cleared when the tasks end. */
+    var phoneControlActive = false
+        private set
     private val overlay by lazy { BackgroundOverlay(context, this, prefs) }
 
     fun enabled(key: String) = settings[key] == true
@@ -147,6 +151,11 @@ class BackgroundRuntime(private val context: Context) {
         if (activity.get() === value) activity.clear()
     }
 
+    fun phoneControlStarted() {
+        phoneControlActive = true
+        overlay.refresh()
+    }
+
     fun setForeground(value: Boolean) {
         foreground = value
         if (value) blocked = false
@@ -167,6 +176,7 @@ class BackgroundRuntime(private val context: Context) {
         tasks = (args["tasks"] as? List<*>)?.mapNotNull {
             (it as? Map<*, *>)?.let(BackgroundTask::fromMap)?.takeIf { task -> task.id.isNotEmpty() }
         } ?: emptyList()
+        if (tasks.isEmpty()) phoneControlActive = false
         if ((!wasEnabled && enabled("androidEnabled")) ||
             (foreground && tasks.any { it.id !in previousIds })) blocked = false
         if (!wasPrivate && enabled("privacyMode")) {

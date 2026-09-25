@@ -58,6 +58,71 @@ void main() {
   }
 
   testWidgets(
+    'caught-up and hidden streams do no presentation work until woken',
+    (tester) async {
+      final settings = SettingsProvider(createBusinessTestPreferences());
+      var current = 'conversation-1';
+      final controller = StreamController(
+        onStateChanged: () {},
+        getSettingsProvider: () => settings,
+        getCurrentConversationId: () => current,
+      );
+      addTearDown(controller.dispose);
+      var calls = 0;
+      var content = 'a';
+      void publish() => controller.scheduleThrottledUpdate(
+        'message',
+        'conversation-1',
+        () {
+          calls++;
+          return content;
+        },
+        updateMessageInList: (_, _, _) {},
+        totalTokens: 0,
+      );
+      publish();
+      await tester.pump(const Duration(milliseconds: 50));
+      expect(calls, 1);
+      for (var i = 0; i < 20; i++) {
+        await tester.pump(const Duration(milliseconds: 50));
+      }
+      expect(calls, 1);
+      controller.setPresentationEnabled(false);
+      content = 'b';
+      publish();
+      await tester.pump(const Duration(seconds: 1));
+      expect(calls, 1);
+      controller.setPresentationEnabled(true);
+      await tester.pump(const Duration(milliseconds: 50));
+      expect(calls, 2);
+      expect(
+        controller.streamingContentNotifier
+            .getNotifier('message')
+            .value
+            .content,
+        'b',
+      );
+      current = 'other';
+      controller.refreshPresentation();
+      content = 'c';
+      publish();
+      await tester.pump(const Duration(seconds: 1));
+      expect(calls, 2);
+      current = 'conversation-1';
+      controller.refreshPresentation();
+      await tester.pump(const Duration(milliseconds: 50));
+      expect(calls, 3);
+      expect(
+        controller.streamingContentNotifier
+            .getNotifier('message')
+            .value
+            .content,
+        'c',
+      );
+    },
+  );
+
+  testWidgets(
     'reasoning chunks coalesce into one notifier update per 50ms tick',
     (tester) async {
       final settings = SettingsProvider(createBusinessTestPreferences());

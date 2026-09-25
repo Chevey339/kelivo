@@ -1,8 +1,12 @@
 import 'dart:async';
 import 'dart:io';
 
+import 'package:path/path.dart' as p;
+
 import 'package:Kelivo/core/models/environment_state.dart';
 import 'package:Kelivo/core/providers/environment_provider.dart';
+import 'package:Kelivo/core/services/sandbox/guest_script_runner.dart';
+import 'package:Kelivo/core/services/sandbox/ios_ish_runtime.dart';
 import 'package:Kelivo/core/services/sandbox/rootfs_disk_usage.dart';
 import 'package:Kelivo/core/services/sandbox/workspace_channel.dart';
 
@@ -23,10 +27,20 @@ class IosRootfsManager implements EnvironmentManager {
     required this.channel,
     required this.env,
     Future<Directory> Function()? alpineRootfsDir,
-  }) : _alpineRootfsDir = alpineRootfsDir ?? iosAlpineRootfsDir;
+    Future<int> Function(String script)? runInGuest,
+  }) : _alpineRootfsDir = alpineRootfsDir ?? iosAlpineRootfsDir,
+       _runInGuest =
+           runInGuest ??
+           ((script) => runGuestScript(
+             IosIshRuntime(channel: channel),
+             script,
+             timeout: const Duration(minutes: 10),
+           ));
 
   final WorkspaceChannel channel;
   final Future<Directory> Function() _alpineRootfsDir;
+  final Future<int> Function(String script) _runInGuest;
+  Future<void>? _installFuture;
 
   @override
   final EnvironmentProvider env;
@@ -85,6 +99,14 @@ class IosRootfsManager implements EnvironmentManager {
   Future<void> _install({
     void Function(EnvironmentState)? onProgress,
     required bool force,
+  }) => _installFuture ??= _performInstall(
+    onProgress: onProgress,
+    force: force,
+  ).whenComplete(() => _installFuture = null);
+
+  Future<void> _performInstall({
+    void Function(EnvironmentState)? onProgress,
+    required bool force,
   }) async {
     _onProgress = onProgress;
     try {
@@ -92,19 +114,17 @@ class IosRootfsManager implements EnvironmentManager {
       final bundled = probe.bundledVersion;
       final installed = probe.installed == true;
       final sameVersion = probe.rootfsVersion == probe.bundledVersion;
-      if (!force && installed && sameVersion) {
-        if (probe.needsRestart == true) {
-          await _set(
-            EnvironmentState(
-              phase: EnvironmentPhase.needsRestart,
-              distro: 'alpine',
-              version: bundled,
-              arch: 'arm64',
-            ),
-          );
-        } else {
-          await _setReady(bundled, probe.rootfsDir);
-        }
+      final requiresRepair = force || env.state.errorMessage == 'patch_failed';
+      if (probe.needsRestart == true) {
+        await _set(env.state.copyWith(phase: EnvironmentPhase.needsRestart));
+        return;
+      }
+      if (!requiresRepair && installed && sameVersion) {
+        await _setReady(bundled, probe.rootfsDir);
+        return;
+      }
+      if (installed) {
+        await _repairInstalled(probe);
         return;
       }
 
@@ -145,6 +165,46 @@ class IosRootfsManager implements EnvironmentManager {
       }
     } finally {
       _onProgress = null;
+    }
+  }
+
+  Future<void> _repairInstalled(ProbeResult probe) async {
+    final dir = probe.rootfsDir ?? (await _alpineRootfsDir()).path;
+    final version = probe.bundledVersion;
+    await _set(
+      env.state.copyWith(
+        phase: EnvironmentPhase.patching,
+        distro: 'alpine',
+        version: probe.rootfsVersion,
+        arch: 'arm64',
+        rootfsDir: dir,
+        availableVersion: version,
+        clearErrorMessage: true,
+      ),
+    );
+    try {
+      // Boot applies the bundled script through the guest VFS, including to
+      // existing environments. apk keeps the user's world and installed tools.
+      final exitCode = await _runInGuest(
+        '/bin/sh /usr/local/bin/kelivo-repair-rootfs',
+      );
+      if (exitCode != 0 || version == null || version.isEmpty) {
+        throw StateError('rootfs repair failed');
+      }
+      // This app-owned marker is outside fakefs data/. Publish it only after
+      // the guest transaction and release-file checks have succeeded.
+      final pending = File(p.join(dir, '.version.pending'));
+      await pending.writeAsString('$version\n', flush: true);
+      await pending.rename(p.join(dir, '.version'));
+      await _setReady(version, dir);
+    } catch (_) {
+      await _set(
+        env.state.copyWith(
+          phase: EnvironmentPhase.error,
+          errorMessage: 'patch_failed',
+          clearProgress: true,
+        ),
+      );
     }
   }
 

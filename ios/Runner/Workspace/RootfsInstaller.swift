@@ -39,7 +39,7 @@ final class RootfsInstaller {
   static let shared = RootfsInstaller()
   static let resourceName = "alpine-rootfs"
   static let bundledVersionKey = "KelivoBundledRootfsVersion"
-  static let fallbackBundledVersion = "alpine-3.21.3-r4"
+  static let fallbackBundledVersion = "alpine-3.21.3-r5"
 
   /// Set when reset/replace happens after `become_first_process`. Never cleared
   /// in-process — the kernel cannot remount a new fakefs tree.

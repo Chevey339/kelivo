@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 /// Manages desktop window size/position persistence and defaults.
@@ -18,9 +19,14 @@ class WindowSizeManager {
   static const String _kHeight = 'window_height_v1';
   static const String _kPosX = 'window_pos_x_v1';
   static const String _kPosY = 'window_pos_y_v1';
+  static const String _kPhysicalPosX = 'window_physical_pos_x_v1';
+  static const String _kPhysicalPosY = 'window_physical_pos_y_v1';
   static const String _kMaximized = 'window_maximized_v1';
 
   const WindowSizeManager();
+
+  bool get _usesPhysicalPosition =>
+      defaultTargetPlatform == TargetPlatform.windows;
 
   Size _clamp(Size s) {
     final w = s.width.clamp(minWindowWidth, maxWindowWidth);
@@ -44,8 +50,10 @@ class WindowSizeManager {
 
   Future<Offset?> getPosition() async {
     final prefs = await SharedPreferences.getInstance();
-    final x = prefs.getDouble(_kPosX);
-    final y = prefs.getDouble(_kPosY);
+    // Old Windows positions were logical pixels without their original DPI.
+    // Start afresh instead of interpreting those values as physical pixels.
+    final x = prefs.getDouble(_usesPhysicalPosition ? _kPhysicalPosX : _kPosX);
+    final y = prefs.getDouble(_usesPhysicalPosition ? _kPhysicalPosY : _kPosY);
     if (x == null || y == null) return null;
     // Simple sanity: avoid infinities
     if (!x.isFinite || !y.isFinite) return null;
@@ -55,10 +63,11 @@ class WindowSizeManager {
     // the window completely off-screen (which makes the app appear
     // "unopenable" until the prefs are manually deleted).
     const maxAbsCoord = 10000.0;
-    if (x < -maxAbsCoord ||
-        x > maxAbsCoord ||
-        y < -maxAbsCoord ||
-        y > maxAbsCoord) {
+    if (!_usesPhysicalPosition &&
+        (x < -maxAbsCoord ||
+            x > maxAbsCoord ||
+            y < -maxAbsCoord ||
+            y > maxAbsCoord)) {
       return null;
     }
 
@@ -70,8 +79,8 @@ class WindowSizeManager {
     final x = offset.dx;
     final y = offset.dy;
     if (x.isFinite && y.isFinite) {
-      await prefs.setDouble(_kPosX, x);
-      await prefs.setDouble(_kPosY, y);
+      await prefs.setDouble(_usesPhysicalPosition ? _kPhysicalPosX : _kPosX, x);
+      await prefs.setDouble(_usesPhysicalPosition ? _kPhysicalPosY : _kPosY, y);
     }
   }
 

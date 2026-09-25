@@ -7,6 +7,7 @@ import 'package:Kelivo/features/settings/widgets/asr_services_section.dart';
 import 'package:Kelivo/features/settings/widgets/voice_service_widgets.dart';
 import 'package:Kelivo/icons/lucide_adapter.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -259,6 +260,88 @@ void main() {
     expect(statusRect.left, nameRect.left);
     expect(statusRect.right, nameRect.right);
   });
+
+  testWidgets('mobile reorders speech recognition after a long press', (
+    tester,
+  ) async {
+    final settings = SettingsProvider(createBusinessTestPreferences());
+    await settings.loaded;
+    await settings.setAsrServices([
+      SystemAsrOptions(id: 'alpha', name: 'Alpha ASR'),
+      SystemAsrOptions(id: 'beta', name: 'Beta ASR'),
+    ]);
+    final fixture = _ModelManagerFixture.create();
+    addTearDown(fixture.dispose);
+    await _pumpSection(
+      tester,
+      settings: settings,
+      modelManager: fixture.manager,
+    );
+
+    final first = tester.getCenter(find.text('Alpha ASR'));
+    final second = tester.getCenter(find.text('Beta ASR'));
+    final quick = await tester.startGesture(first);
+    await quick.moveBy(Offset(0, second.dy - first.dy + 24));
+    await quick.up();
+    await tester.pumpAndSettle();
+    expect(settings.asrServices.map((service) => service.id), [
+      'alpha',
+      'beta',
+    ]);
+
+    final drag = await tester.startGesture(
+      tester.getCenter(find.text('Alpha ASR')),
+    );
+    await tester.pump(kLongPressTimeout);
+    final distance = second.dy - first.dy + 40;
+    for (double dy = 8; dy <= distance; dy += 8) {
+      await drag.moveTo(first + Offset(0, dy));
+      await tester.pump(const Duration(milliseconds: 30));
+    }
+    await drag.up();
+    await tester.pumpAndSettle();
+
+    expect(settings.asrServices.map((service) => service.id), [
+      'beta',
+      'alpha',
+    ]);
+  });
+
+  testWidgets('desktop reorders speech recognition by dragging a card', (
+    tester,
+  ) async {
+    final settings = SettingsProvider(createBusinessTestPreferences());
+    await settings.loaded;
+    await settings.setAsrServices([
+      SystemAsrOptions(id: 'alpha', name: 'Alpha ASR'),
+      SystemAsrOptions(id: 'beta', name: 'Beta ASR'),
+    ]);
+    final fixture = _ModelManagerFixture.create();
+    addTearDown(fixture.dispose);
+    await _pumpSection(
+      tester,
+      settings: settings,
+      modelManager: fixture.manager,
+      desktop: true,
+    );
+
+    final first = tester.getCenter(find.text('Alpha ASR'));
+    final second = tester.getCenter(find.text('Beta ASR'));
+    final drag = await tester.startGesture(first);
+    await tester.pump();
+    final distance = second.dy - first.dy + 40;
+    for (double dy = 8; dy <= distance; dy += 8) {
+      await drag.moveTo(first + Offset(0, dy));
+      await tester.pump(const Duration(milliseconds: 30));
+    }
+    await drag.up();
+    await tester.pumpAndSettle();
+
+    expect(settings.asrServices.map((service) => service.id), [
+      'beta',
+      'alpha',
+    ]);
+  });
 }
 
 Future<void> _pumpSection(
@@ -279,12 +362,16 @@ Future<void> _pumpSection(
         ],
         supportedLocales: AppLocalizations.supportedLocales,
         home: Scaffold(
-          body: SingleChildScrollView(
-            padding: const EdgeInsets.all(16),
-            child: AsrServicesSection(
-              desktop: desktop,
-              modelManager: modelManager,
-            ),
+          body: CustomScrollView(
+            slivers: [
+              SliverPadding(
+                padding: const EdgeInsets.all(16),
+                sliver: AsrServicesSection(
+                  desktop: desktop,
+                  modelManager: modelManager,
+                ),
+              ),
+            ],
           ),
         ),
       ),

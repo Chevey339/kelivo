@@ -111,7 +111,7 @@
 	<key>io.flutter.embedded_views_preview</key>
 	<true/>
 	<key>KelivoBundledRootfsVersion</key>
-	<string>alpine-3.21.3-r4</string>
+	<string>alpine-3.21.3-r5</string>
 	<key>KelivoShareAppGroup</key>
 	<string>group.psyche.kelivo</string>
 	<key>CFBundleDocumentTypes</key>

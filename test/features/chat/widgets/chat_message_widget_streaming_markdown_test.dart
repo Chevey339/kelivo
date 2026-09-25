@@ -45,6 +45,47 @@ String _allRichTextPlainText(WidgetTester tester) {
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
+  testWidgets('reasoning overflow retains the Markdown renderer', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      _buildHarness(
+        child: SizedBox(
+          width: 360,
+          child: ChatMessageWidget(
+            message: ChatMessage(
+              id: 'reasoning-overflow',
+              role: 'assistant',
+              content: '',
+              conversationId: 'conversation-1',
+              isStreaming: true,
+            ),
+            reasoningText: List.generate(
+              80,
+              (i) => 'Paragraph $i **bold** 中文。',
+            ).join('\n\n'),
+            reasoningLoading: true,
+            showModelIcon: false,
+          ),
+        ),
+      ),
+    );
+    final markdown = find.byType(MarkdownWithCodeHighlight);
+    expect(markdown, findsOneWidget);
+    final first = tester.state(markdown);
+    final position = tester
+        .state<ScrollableState>(find.byType(Scrollable))
+        .position;
+    // The first layout detects overflow and enables its edge fade next frame.
+    await tester.pump();
+    expect(tester.state(markdown), same(first));
+    expect(
+      tester.state<ScrollableState>(find.byType(Scrollable)).position,
+      same(position),
+    );
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
   testWidgets('ChatMessageWidget preserves table scroll when streaming ends', (
     tester,
   ) async {

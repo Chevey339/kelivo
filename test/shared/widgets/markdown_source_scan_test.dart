@@ -44,4 +44,32 @@ void main() {
       expect(scan.needsPreprocessing, isTrue, reason: marker);
     }
   });
+
+  test('image and citation hints survive every stream partition', () {
+    for (final source in [
+      '正文 ![image](/tmp/a b.png)',
+      '正文 [cite:abc]',
+      '正文 [CITATION](abc)',
+      '正文 [Citation:abc]',
+    ]) {
+      for (var split = 0; split <= source.length; split++) {
+        final scan = MarkdownSourceScan()
+          ..update(source.substring(0, split))
+          ..update(source);
+        expect(scan.hasImageMarker, source.contains('!['));
+        expect(scan.hasCitationPrefix, !source.contains('!['));
+        expect(scan.scannedCodeUnits, source.length);
+      }
+    }
+  });
+
+  test('ordinary links skip image and citation work and edits reset hints', () {
+    final scan = MarkdownSourceScan()
+      ..update('![image](a) [CITE:abc]')
+      ..update('中文 [link](https://example.com)');
+    expect(scan.hasBrackets, isTrue);
+    expect(scan.needsPreprocessing, isTrue);
+    expect(scan.hasImageMarker, isFalse);
+    expect(scan.hasCitationPrefix, isFalse);
+  });
 }

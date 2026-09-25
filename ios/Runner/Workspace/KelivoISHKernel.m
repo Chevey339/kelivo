@@ -110,6 +110,12 @@ static bool kelivo_reverse_context_path(const char *host, char *out, size_t size
 @property (nonatomic) int pid;
 @property (nonatomic) pid_t_ pgid;
 @property (nonatomic) struct tty *tty;
+@property (nonatomic, strong) NSMutableArray<NSData *> *pendingOutput;
+@property (nonatomic, strong) NSMutableData *pendingTail;
+@property (nonatomic, strong) dispatch_source_t outputTimer;
+@property (nonatomic) BOOL outputScheduled;
+@property (nonatomic) BOOL outputImmediate;
+@property (nonatomic) BOOL hasDeliveredOutput;
 @end
 
 @implementation KelivoISHPtySession
@@ -117,7 +123,8 @@ static bool kelivo_reverse_context_path(const char *host, char *out, size_t size
 
 @interface KelivoISHKernel ()
 - (void)noteGuestExitWithPid:(int)pid code:(int)code;
-- (void)deliverPtyData:(NSData *)data ttyNum:(int)ttyNum;
+- (void)queuePtyBytes:(const void *)bytes length:(size_t)length ttyNum:(int)ttyNum;
+- (void)flushPtyOutput:(KelivoISHPtySession *)session;
 @end
 
 /// iSH `do_exit` passes the Linux wait(2) status (exit << 8, or signal in the
@@ -147,11 +154,9 @@ static void kelivo_handle_process_exit(struct task *task, int code) {
 static int kelivo_pty_write(struct tty *tty, const void *buf, size_t len, bool blocking) {
     (void)blocking;
     if (len == 0) return 0;
-    NSData *data = [NSData dataWithBytes:buf length:len];
-    int num = tty->num;
-    dispatch_async(dispatch_get_main_queue(), ^{
-        [[KelivoISHKernel shared] deliverPtyData:data ttyNum:num];
-    });
+    @autoreleasepool {
+        [[KelivoISHKernel shared] queuePtyBytes:buf length:len ttyNum:tty->num];
+    }
     return (int)len;
 }
 
@@ -742,6 +747,15 @@ static void KelivoDnsReachabilityChanged(SCNetworkReachabilityRef target,
             session.pid = current->pid;
             session.pgid = current->group->pgid;
             session.tty = tty;
+            session.pendingOutput = [NSMutableArray array];
+            session.outputTimer = dispatch_source_create(DISPATCH_SOURCE_TYPE_TIMER, 0, 0, dispatch_get_main_queue());
+            __weak KelivoISHPtySession *outputSession = session;
+            dispatch_source_set_timer(session.outputTimer, DISPATCH_TIME_FOREVER, DISPATCH_TIME_FOREVER, 0);
+            dispatch_source_set_event_handler(session.outputTimer, ^{
+                KelivoISHPtySession *active = outputSession;
+                if (active) [self flushPtyOutput:active];
+            });
+            dispatch_resume(session.outputTimer);
             [_ptyLock lock];
             self->_ptyBySession[sessionId] = session;
             self->_ptyByPid[@(session.pid)] = session;
@@ -785,21 +799,74 @@ static void KelivoDnsReachabilityChanged(SCNetworkReachabilityRef target,
     [KelivoISHExecutor killGuestPid:session.pid groupId:session.pgid];
 }
 
-- (void)deliverPtyData:(NSData *)data ttyNum:(int)ttyNum {
+// The guest can write one character at a time (including terminal echo).
+// Copy into bounded packets before posting to the main queue, and preserve
+// every byte. The first packet is immediate; subsequent bursts wait <=16 ms.
+- (void)queuePtyBytes:(const void *)bytes length:(size_t)length ttyNum:(int)ttyNum {
+    static const NSUInteger packetBytes = 64 * 1024;
     [_ptyLock lock];
     KelivoISHPtySession *session = _ptyByTtyNum[@(ttyNum)];
+    if (!session) { [_ptyLock unlock]; return; }
+    const uint8_t *cursor = bytes;
+    while (length > 0) {
+        if (!session.pendingTail) {
+            session.pendingTail = [NSMutableData dataWithCapacity:packetBytes];
+        }
+        NSUInteger count = MIN(length, packetBytes - session.pendingTail.length);
+        [session.pendingTail appendBytes:cursor length:count];
+        cursor += count;
+        length -= count;
+        if (session.pendingTail.length == packetBytes) {
+            [session.pendingOutput addObject:session.pendingTail];
+            session.pendingTail = nil;
+        }
+    }
+    BOOL immediate = !session.hasDeliveredOutput || session.pendingOutput.count > 0;
+    if (!session.outputScheduled || (immediate && !session.outputImmediate)) {
+        session.outputScheduled = YES;
+        session.outputImmediate = immediate;
+        dispatch_source_set_timer(session.outputTimer,
+            dispatch_time(DISPATCH_TIME_NOW, immediate ? 0 : 16 * NSEC_PER_MSEC),
+            DISPATCH_TIME_FOREVER, 0);
+    }
+    [_ptyLock unlock];
+}
+
+// Only called with _ptyLock held. Detached buffers are never mutated again.
+static NSArray<NSData *> *kelivo_take_pty_output(KelivoISHPtySession *session) {
+    NSMutableArray<NSData *> *packets = session.pendingOutput;
+    if (session.pendingTail.length > 0) [packets addObject:session.pendingTail];
+    session.pendingOutput = [NSMutableArray array];
+    session.pendingTail = nil;
+    session.outputScheduled = NO;
+    session.outputImmediate = NO;
+    session.hasDeliveredOutput = YES;
+    return packets;
+}
+
+- (void)flushPtyOutput:(KelivoISHPtySession *)session {
+    [_ptyLock lock];
+    // A cancelled timer can already be queued. Never deliver into a reopened
+    // session, even if its string ID or guest TTY number has been reused.
+    if (_ptyBySession[session.sessionId] != session) { [_ptyLock unlock]; return; }
+    dispatch_source_set_timer(session.outputTimer, DISPATCH_TIME_FOREVER, DISPATCH_TIME_FOREVER, 0);
+    NSArray<NSData *> *packets = kelivo_take_pty_output(session);
     NSString *sessionId = session.sessionId;
     KelivoISHPtyDataHandler handler = self.ptyDataHandler;
     [_ptyLock unlock];
     if (sessionId && handler) {
-        handler(sessionId, data);
+        for (NSData *packet in packets) handler(sessionId, packet);
     }
 }
 
 - (void)noteGuestExitWithPid:(int)pid code:(int)code {
     [_ptyLock lock];
     KelivoISHPtySession *session = _ptyByPid[@(pid)];
+    NSArray<NSData *> *packets = nil;
     if (session) {
+        dispatch_source_cancel(session.outputTimer);
+        session.outputTimer = nil;
+        packets = kelivo_take_pty_output(session);
         [_ptyBySession removeObjectForKey:session.sessionId];
         [_ptyByPid removeObjectForKey:@(pid)];
         if (session.tty) {
@@ -808,7 +875,12 @@ static void KelivoDnsReachabilityChanged(SCNetworkReachabilityRef target,
     }
     NSString *sessionId = session.sessionId;
     KelivoISHPtyExitHandler handler = self.ptyExitHandler;
+    KelivoISHPtyDataHandler dataHandler = self.ptyDataHandler;
     [_ptyLock unlock];
+    // Flush before exit so ChannelPtySession cannot close ahead of its tail.
+    if (sessionId && dataHandler) {
+        for (NSData *packet in packets) dataHandler(sessionId, packet);
+    }
     if (sessionId && handler) {
         handler(sessionId, code);
     }

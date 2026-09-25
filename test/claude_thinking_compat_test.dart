@@ -307,6 +307,20 @@ final _claudeCases = <_ClaudeCase>[
     },
   ),
   _ClaudeCase(
+    name: 'Opus 5.5 max effort and 128k default max_tokens',
+    modelId: 'claude-opus-5-5',
+    thinkingBudget: 128000,
+    temperature: 0.7,
+    topP: 0.8,
+    verify: (body) {
+      expect(body['thinking'], {'type': 'adaptive', 'display': 'summarized'});
+      expect(body['output_config'], {'effort': 'max'});
+      expect(body['max_tokens'], 128000);
+      expect(body.containsKey('temperature'), isFalse);
+      expect(body.containsKey('top_p'), isFalse);
+    },
+  ),
+  _ClaudeCase(
     name: 'Sonnet 5 can disable thinking but still rejects sampling',
     modelId: 'claude-sonnet-5',
     thinkingBudget: 0,

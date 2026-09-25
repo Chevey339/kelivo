@@ -4,6 +4,44 @@ import 'package:Kelivo/core/models/assistant.dart';
 
 void main() {
   group('Assistant workspace fields', () {
+    test('new assistants remember once, existing assistants only suggest', () {
+      const fresh = Assistant(id: 'new', name: 'New');
+      expect(fresh.defaultWorkspaceSetup, DefaultWorkspaceSetup.automatic);
+      expect(
+        Assistant.fromJson(fresh.toJson()).defaultWorkspaceSetup,
+        DefaultWorkspaceSetup.automatic,
+      );
+      expect(
+        Assistant.fromJson({'id': 'old', 'name': 'Old'}).defaultWorkspaceSetup,
+        DefaultWorkspaceSetup.suggest,
+      );
+      expect(
+        Assistant.fromJson({
+          'id': 'old',
+          'name': 'Old',
+          'defaultWorkspaceId': 'workspace',
+        }).defaultWorkspaceSetup,
+        DefaultWorkspaceSetup.completed,
+      );
+    });
+
+    test('explicitly setting or clearing a default finishes setup', () {
+      const fresh = Assistant(id: 'new', name: 'New');
+      for (final configured in [
+        fresh.copyWith(defaultWorkspaceId: 'workspace'),
+        fresh.copyWith(clearDefaultWorkspaceId: true),
+      ]) {
+        expect(
+          Assistant.fromJson(configured.toJson()).defaultWorkspaceSetup,
+          DefaultWorkspaceSetup.completed,
+        );
+      }
+      expect(
+        fresh.copyWith(name: 'Renamed').defaultWorkspaceSetup,
+        DefaultWorkspaceSetup.automatic,
+      );
+    });
+
     test('skillIds null means all skills and round-trips', () {
       const assistant = Assistant(
         id: 'a',

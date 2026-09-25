@@ -32,6 +32,8 @@ IconData localToolIcon(String id) {
       return Lucide.CalendarPlus;
     case LocalToolNames.currentLocation:
       return Lucide.MapPin;
+    case LocalToolNames.phoneControl:
+      return Lucide.Smartphone;
     case LocalToolNames.weather:
       return Lucide.CloudSun;
     case LocalToolNames.healthSummary:
@@ -67,6 +69,8 @@ String localToolTitle(AppLocalizations l10n, String id) {
       return l10n.assistantEditLocalToolCalendarCreateTitle;
     case LocalToolNames.currentLocation:
       return l10n.assistantEditLocalToolLocationTitle;
+    case LocalToolNames.phoneControl:
+      return l10n.phoneControlTitle;
     case LocalToolNames.weather:
       return l10n.assistantEditLocalToolWeatherTitle;
     case LocalToolNames.healthSummary:

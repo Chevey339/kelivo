@@ -9,6 +9,7 @@
 /* Begin PBXBuildFile section */
 		W5A0000000000000000000E1 /* RootfsPatch.bundle in Resources */ = {isa = PBXBuildFile; fileRef = W5A0000000000000000000E2 /* RootfsPatch.bundle */; };
 		BF9A3901DAAB4F128F61AA02 /* MobileBackgroundHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = BF9A3901DAAB4F128F61AA01 /* MobileBackgroundHandler.swift */; };
+		CBCC0F40B115447D832DF102 /* ScheduledTaskNotifications.swift in Sources */ = {isa = PBXBuildFile; fileRef = CBCC0F40B115447D832DF101 /* ScheduledTaskNotifications.swift */; };
 		W5A0000000000000000E001 /* KelivoISHEnvironment.m in Sources */ = {isa = PBXBuildFile; fileRef = W5A0000000000000000E003 /* KelivoISHEnvironment.m */; };
 		W5A0000000000000000F001 /* KelivoISHFilesystem.m in Sources */ = {isa = PBXBuildFile; fileRef = W5A0000000000000000F003 /* KelivoISHFilesystem.m */; };
 		W5D0000000000000000F001 /* KelivoISHMountTarget.m in Sources */ = {isa = PBXBuildFile; fileRef = W5D0000000000000000F003 /* KelivoISHMountTarget.m */; };
@@ -102,6 +103,7 @@
 /* Begin PBXFileReference section */
 		W5A0000000000000000000E2 /* RootfsPatch.bundle */ = {isa = PBXFileReference; lastKnownFileType = wrapper.cfbundle; name = RootfsPatch.bundle; path = sandbox/resources/RootfsPatch.bundle; sourceTree = SOURCE_ROOT; };
 		BF9A3901DAAB4F128F61AA01 /* MobileBackgroundHandler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileBackgroundHandler.swift; sourceTree = "<group>"; };
+		CBCC0F40B115447D832DF101 /* ScheduledTaskNotifications.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScheduledTaskNotifications.swift; sourceTree = "<group>"; };
 		W5A0000000000000000E002 /* KelivoISHEnvironment.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = KelivoISHEnvironment.h; sourceTree = "<group>"; };
 		W5A0000000000000000F002 /* KelivoISHFilesystem.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = KelivoISHFilesystem.h; sourceTree = "<group>"; };
 		W5D0000000000000000F002 /* KelivoISHMountTarget.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = KelivoISHMountTarget.h; sourceTree = "<group>"; };
@@ -316,6 +318,7 @@
 				1498D2331E8E89220040F4C2 /* GeneratedPluginRegistrant.m */,
 				74858FAE1ED2DC5600515810 /* AppDelegate.swift */,
 				BF9A3901DAAB4F128F61AA01 /* MobileBackgroundHandler.swift */,
+				CBCC0F40B115447D832DF101 /* ScheduledTaskNotifications.swift */,
 				A10000000000000000000010 /* KelivoGenerationActivityAttributes.swift */,
 				A2DT00000000000000000020 /* DeviceTools */,
 				W5A0000000000000000000C1 /* Workspace */,
@@ -667,7 +670,9 @@
 				"$(SRCROOT)/sandbox/patches/0002-fs-fake-bind-stat-device.patch",
 				"$(SRCROOT)/sandbox/patches/0003-kernel-host-managed-lifetime.patch",
 				"$(SRCROOT)/sandbox/patches/0004-kernel-node-random-seed.patch",
+				"$(SRCROOT)/sandbox/patches/0005-kernel-init-exit-status.patch",
 				"$(SRCROOT)/sandbox/prepare_alpine_rootfs.sh",
+				"$(SRCROOT)/sandbox/overlay/usr/local/bin/kelivo-repair-rootfs",
 				"$(SRCROOT)/sandbox/resources/VERSION",
 			);
 			name = "Ensure Workspace Sandbox Artifacts";
@@ -677,6 +682,7 @@
 				"$(SRCROOT)/sandbox/build/$(PLATFORM_NAME)/libfakefs.a",
 				"$(SRCROOT)/sandbox/build/$(PLATFORM_NAME)/.kelivo-ish-build",
 				"$(SRCROOT)/sandbox/build/fakefsify",
+				"$(SRCROOT)/sandbox/build/ish",
 				"$(SRCROOT)/sandbox/build/include/ish/cpu-offsets.h",
 				"$(SRCROOT)/sandbox/resources/alpine-rootfs.zip",
 				"$(SRCROOT)/sandbox/resources/libvdso.so.elf",
@@ -738,6 +744,7 @@
 				A10000000000000000000001 /* KelivoGenerationActivityAttributes.swift in Sources */,
 				74858FAF1ED2DC5600515810 /* AppDelegate.swift in Sources */,
 				BF9A3901DAAB4F128F61AA02 /* MobileBackgroundHandler.swift in Sources */,
+				CBCC0F40B115447D832DF102 /* ScheduledTaskNotifications.swift in Sources */,
 				A2DT00000000000000000001 /* DeviceLocalToolsHandler.swift in Sources */,
 				A2DT00000000000000000006 /* DeviceToolsSupport.swift in Sources */,
 				A2DT00000000000000000002 /* LocationToolHandler.swift in Sources */,

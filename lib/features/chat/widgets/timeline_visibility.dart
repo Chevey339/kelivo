@@ -565,7 +565,7 @@ const double _estimateAskUserSubmitHeight = 38;
 const double _estimateAskUserAnsweredGap = 3;
 const double _estimateAskUserAnsweredPad = 4;
 
-/// Matches [_AskUserOptionRow]: 13px / 1.25, max 3 lines, minHeight 40.
+/// Matches [_AskUserOptionRow]: 13px / 1.25, unlimited lines, minHeight 40.
 double _estimateAskUserOptionRowHeight(
   String label, {
   required double textWidth,
@@ -578,7 +578,6 @@ double _estimateAskUserOptionRowHeight(
     fontSize: fontSize,
     height: 1.25,
     maxWidth: optionTextWidth,
-    maxLines: 3,
     fontWeight: FontWeight.w500,
   );
   return math.max(
@@ -592,7 +591,6 @@ double _askUserLayoutHeight(
   required double fontSize,
   required double height,
   required double maxWidth,
-  int? maxLines,
   FontWeight? fontWeight,
 }) {
   if (text.trim().isEmpty) return fontSize * height;
@@ -606,8 +604,6 @@ double _askUserLayoutHeight(
       ),
     ),
     textDirection: TextDirection.ltr,
-    maxLines: maxLines,
-    ellipsis: maxLines == null ? null : '…',
   )..layout(maxWidth: math.max(1.0, maxWidth));
   try {
     return math.max(fontSize * height, painter.height);

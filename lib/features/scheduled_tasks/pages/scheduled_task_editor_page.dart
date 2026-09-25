@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart' show defaultTargetPlatform;
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
@@ -30,6 +31,7 @@ import '../../home/utils/model_display_helper.dart';
 import '../../home/widgets/assistant_avatar.dart';
 import '../../home/widgets/model_icon.dart';
 import '../../model/widgets/model_select_sheet.dart';
+import '../../settings/widgets/memory_ui.dart' show MemoryTipIcon;
 import '../widgets/scheduled_target_picker.dart';
 import '../widgets/scheduled_tasks_scaffold.dart';
 import '../widgets/scheduled_weekday_selector.dart';
@@ -70,6 +72,11 @@ class _ScheduledTaskEditorPageState extends State<ScheduledTaskEditorPage> {
   final scroll = ScrollController();
   late final name = TextEditingController(text: widget.task?.name);
   late final prompt = TextEditingController(text: widget.task?.prompt);
+  late final preparationPrompt = TextEditingController(
+    text:
+        widget.task?.preparationPrompt ??
+        ScheduledTask.defaultPreparationPrompt,
+  );
   late String? assistantId =
       widget.task?.assistantId ?? widget.initialAssistantId;
   late ScheduledTaskMode mode = widget.task?.mode ?? ScheduledTaskMode.newChat;
@@ -87,6 +94,20 @@ class _ScheduledTaskEditorPageState extends State<ScheduledTaskEditorPage> {
   late DateTime? onceDate = widget.task?.onceDate;
   late DateTime? startDate = widget.task?.startDate;
   late DateTime? endDate = widget.task?.endDate;
+  late bool allowPreparation =
+      widget.task?.allowPreparation ??
+      (defaultTargetPlatform == TargetPlatform.iOS);
+  late ScheduledTaskContextPolicy contextPolicy =
+      widget.task?.contextPolicy ?? ScheduledTaskContextPolicy.latest;
+  late ScheduledTaskUnavailablePolicy unavailablePolicy =
+      widget.task?.unavailablePolicy ?? ScheduledTaskUnavailablePolicy.skip;
+  late bool notify = widget.task?.notify ?? true;
+  late bool showPreview = widget.task?.showPreview ?? true;
+  late int preparationWindow =
+      widget.task?.preparationWindowMinutes ??
+      ScheduledTask.defaultPreparationWindowMinutes;
+  late int preparationAttempts = widget.task?.maxPrepareAttempts ?? 2;
+  late int preparationCooldown = widget.task?.preparationCooldownMinutes ?? 10;
   String? messagePreview;
   String? error;
   bool busy = false;
@@ -125,6 +146,7 @@ class _ScheduledTaskEditorPageState extends State<ScheduledTaskEditorPage> {
     scroll.dispose();
     name.dispose();
     prompt.dispose();
+    preparationPrompt.dispose();
     super.dispose();
   }
 
@@ -377,6 +399,16 @@ class _ScheduledTaskEditorPageState extends State<ScheduledTaskEditorPage> {
           onceDate: repeat == ScheduledTaskRepeat.once ? onceDate : null,
           startDate: repeat == ScheduledTaskRepeat.once ? null : startDate,
           endDate: repeat == ScheduledTaskRepeat.once ? null : endDate,
+          allowPreparation:
+              allowPreparation && mode != ScheduledTaskMode.regenerate,
+          preparationPrompt: preparationPrompt.text.trim(),
+          contextPolicy: contextPolicy,
+          unavailablePolicy: unavailablePolicy,
+          notify: notify,
+          showPreview: showPreview,
+          preparationWindowMinutes: preparationWindow,
+          maxPrepareAttempts: preparationAttempts,
+          preparationCooldownMinutes: preparationCooldown,
         ),
       );
       if (mounted) Navigator.pop(context);
@@ -607,6 +639,7 @@ class _ScheduledTaskEditorPageState extends State<ScheduledTaskEditorPage> {
         TargetPlatform.macOS ||
         TargetPlatform.windows ||
         TargetPlatform.linux => l.scheduledTasksDesktopExecutionDetail,
+        TargetPlatform.iOS => l.scheduledTasksIOSDetail,
         _ => l.scheduledTasksExecutionDetail,
       },
     ),
@@ -614,7 +647,11 @@ class _ScheduledTaskEditorPageState extends State<ScheduledTaskEditorPage> {
 
   Widget _mobileLayout(AppLocalizations l) => Column(
     crossAxisAlignment: CrossAxisAlignment.stretch,
-    children: [..._taskFields(l), ..._scheduleFields(l, first: false)],
+    children: [
+      ..._taskFields(l),
+      ..._scheduleFields(l, first: false),
+      _preparationFields(l),
+    ],
   );
 
   Widget _tabletLayout(AppLocalizations l) => Row(
@@ -630,7 +667,7 @@ class _ScheduledTaskEditorPageState extends State<ScheduledTaskEditorPage> {
       Expanded(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: _scheduleFields(l, first: true),
+          children: [..._scheduleFields(l, first: true), _preparationFields(l)],
         ),
       ),
     ],
@@ -899,6 +936,229 @@ class _ScheduledTaskEditorPageState extends State<ScheduledTaskEditorPage> {
           ],
         ),
         _desktopHelp(l.scheduledTasksDesktopExecutionDetail),
+        _preparationFields(l),
+      ],
+    );
+  }
+
+  Widget _option<T>(
+    String label,
+    T selected,
+    Map<T, String> choices,
+    ValueChanged<T> save, {
+    required String tip,
+  }) {
+    if (_desktop) {
+      return DesktopScheduledTaskRow(
+        label: label,
+        labelTrailing: MemoryTipIcon(message: tip),
+        child: DesktopSelectDropdown<T>(
+          value: selected,
+          options: [
+            for (final e in choices.entries)
+              DesktopSelectOption(value: e.key, label: e.value),
+          ],
+          onSelected: (value) => setState(() => save(value)),
+        ),
+      );
+    }
+    return IosNavRow(
+      label: label,
+      labelTrailing: MemoryTipIcon(message: tip),
+      detailText: selected is int ? choices[selected] : null,
+      subtitle: selected is int ? null : choices[selected],
+      subtitleMaxLines: 2,
+      onTap: () async {
+        final value = await showOptionSheet<T>(
+          context,
+          title: label,
+          selected: selected,
+          items: [
+            for (final e in choices.entries)
+              OptionSheetItem(value: e.key, label: e.value),
+          ],
+        );
+        if (mounted && value != null) setState(() => save(value));
+      },
+    );
+  }
+
+  Widget _toggle(
+    String label,
+    bool value,
+    ValueChanged<bool> save, {
+    required String tip,
+  }) => _desktop
+      ? DesktopScheduledTaskRow(
+          label: label,
+          labelTrailing: MemoryTipIcon(message: tip),
+          child: IosSwitch(
+            value: value,
+            onChanged: (v) => setState(() => save(v)),
+          ),
+        )
+      : IosSwitchRow(
+          label: label,
+          labelTrailing: MemoryTipIcon(message: tip),
+          value: value,
+          onChanged: (v) => setState(() => save(v)),
+        );
+
+  Widget _preparationFields(AppLocalizations l) {
+    final fields = <Widget>[
+      if (mode != ScheduledTaskMode.regenerate)
+        _toggle(
+          l.scheduledTasksAllowPreparation,
+          allowPreparation,
+          (v) => allowPreparation = v,
+          tip: l.scheduledTasksAllowPreparationTip,
+        ),
+      if (allowPreparation && mode != ScheduledTaskMode.regenerate) ...[
+        _option(
+          l.scheduledTasksContextPolicy,
+          contextPolicy,
+          {
+            ScheduledTaskContextPolicy.latest: l.scheduledTasksContextLatest,
+            ScheduledTaskContextPolicy.snapshot:
+                l.scheduledTasksContextSnapshot,
+          },
+          (v) => contextPolicy = v,
+          tip: l.scheduledTasksContextPolicyTip,
+        ),
+        _option(
+          l.scheduledTasksPreparationWindow,
+          preparationWindow,
+          {
+            for (final v in {
+              preparationWindow,
+              30,
+              60,
+              120,
+              240,
+              360,
+              480,
+              720,
+              1080,
+              1440,
+            }.toList()..sort())
+              v: v % 60 == 0
+                  ? l.scheduledTasksHours(v ~/ 60)
+                  : l.scheduledTasksMinutes(v),
+          },
+          (v) => preparationWindow = v,
+          tip: l.scheduledTasksPreparationWindowTip,
+        ),
+        _option(
+          l.scheduledTasksPreparationAttempts,
+          preparationAttempts,
+          {for (var v = 1; v <= 5; v++) v: '$v'},
+          (v) => preparationAttempts = v,
+          tip:
+              '${l.scheduledTasksPreparationAttemptsTip}\n\n${l.scheduledTasksPreparationBudget}',
+        ),
+        _option(
+          l.scheduledTasksPreparationCooldown,
+          preparationCooldown,
+          {
+            for (final v in {
+              preparationCooldown,
+              1,
+              5,
+              10,
+              30,
+              60,
+            }.toList()..sort())
+              v: '$v',
+          },
+          (v) => preparationCooldown = v,
+          tip: l.scheduledTasksPreparationCooldownTip,
+        ),
+      ],
+      _option(
+        l.scheduledTasksUnavailable,
+        unavailablePolicy,
+        {
+          ScheduledTaskUnavailablePolicy.remind: l.scheduledTasksRemind,
+          ScheduledTaskUnavailablePolicy.skip: l.scheduledTasksSkip,
+        },
+        (v) => unavailablePolicy = v,
+        tip: l.scheduledTasksUnavailableTip,
+      ),
+      _toggle(
+        l.scheduledTasksNotify,
+        notify,
+        (v) => notify = v,
+        tip: l.scheduledTasksNotifyTip,
+      ),
+      if (notify)
+        _toggle(
+          l.scheduledTasksShowPreview,
+          showPreview,
+          (v) => showPreview = v,
+          tip: l.scheduledTasksShowPreviewTip,
+        ),
+    ];
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        IosSectionHeader(text: l.scheduledTasksPreparation),
+        if (_desktop)
+          DesktopScheduledTaskSection(children: fields)
+        else
+          SectionCard(
+            key: const ValueKey('scheduled-tasks-preparation-settings'),
+            children: [
+              for (var i = 0; i < fields.length; i++) ...[
+                if (i > 0) const IosRowDivider(indent: 12),
+                fields[i],
+              ],
+            ],
+          ),
+        IosSectionFooter(text: l.scheduledTasksPreparationDetail),
+        if (allowPreparation && mode != ScheduledTaskMode.regenerate)
+          IosSectionFooter(text: l.scheduledTasksPreparationCost),
+        if (defaultTargetPlatform == TargetPlatform.iOS &&
+            allowPreparation &&
+            mode != ScheduledTaskMode.regenerate) ...[
+          const SizedBox(height: 18),
+          SectionCard(
+            key: const ValueKey('scheduled-tasks-preparation-prompt'),
+            children: [
+              IosNavRow(
+                label: l.scheduledTasksPreparationPrompt,
+                labelTrailing: MemoryTipIcon(
+                  message: l.scheduledTasksPreparationPromptTip,
+                ),
+                trailing: IosIconButton(
+                  key: const ValueKey(
+                    'scheduled-tasks-reset-preparation-prompt',
+                  ),
+                  icon: LucideIcons.rotateCcw,
+                  tooltip: l.hotkeysResetDefault,
+                  onTap: () => setState(() {
+                    preparationPrompt.text =
+                        ScheduledTask.defaultPreparationPrompt;
+                  }),
+                ),
+              ),
+              IosFormTextField(
+                label: '',
+                controller: preparationPrompt,
+                hintText: l.scheduledTasksPreparationPromptEmpty,
+                minLines: 4,
+                maxLines: 8,
+                autocorrect: false,
+                enableSuggestions: false,
+              ),
+            ],
+          ),
+          IosSectionFooter(
+            text: l.scheduledTasksPreparationPromptVariables(
+              '{{scheduled_time}}',
+              '{{utc_offset}}',
+            ),
+          ),
+        ],
       ],
     );
   }

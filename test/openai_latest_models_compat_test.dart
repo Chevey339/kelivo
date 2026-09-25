@@ -141,6 +141,8 @@ void main() {
         ('muse-spark-1.1', 'low'),
         ('grok-4.5', 'low'),
         ('grok-4.6', 'low'),
+        ('grok-4.7', 'low'),
+        ('x-ai/grok-4.7', 'low'),
       ];
       for (final (modelId, effort) in cases) {
         final body = await _captureChatBody(

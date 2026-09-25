@@ -1,4 +1,3 @@
-import 'dart:collection';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
@@ -14,9 +13,12 @@ class BoundedStreamBuffer {
   final int maxBytes;
   final int _half;
   final BytesBuilder _head = BytesBuilder(copy: true);
-  final ListQueue<int> _tail = ListQueue<int>();
+  Uint8List? _tail;
+  int _tailNext = 0;
   bool _truncated = false;
   int _totalBytes = 0;
+  String? _cachedText;
+  String? _headText;
 
   int get totalBytes => _totalBytes;
 
@@ -25,38 +27,67 @@ class BoundedStreamBuffer {
   void add(List<int> bytes) {
     if (bytes.isEmpty) return;
     _totalBytes += bytes.length;
+    _cachedText = null;
     if (!_truncated) {
-      _head.add(bytes);
-      if (_head.length <= maxBytes) return;
-      final all = _head.takeBytes();
-      _head.add(all.sublist(0, _half));
-      _tail.addAll(all.sublist(_half));
+      if (_head.length + bytes.length <= maxBytes) {
+        _head.add(bytes);
+        return;
+      }
+      final previous = _head.takeBytes();
+      final headLength = previous.length < _half ? previous.length : _half;
+      _head.add(Uint8List.sublistView(previous, 0, headLength));
+      if (headLength < _half) {
+        _head.add(bytes.sublist(0, _half - headLength));
+      }
+      _tail = Uint8List(_half);
       _truncated = true;
-      _trimTail();
+      _appendTail(previous);
+      _appendTail(bytes);
       return;
     }
-    _tail.addAll(bytes);
-    _trimTail();
+    _appendTail(bytes);
   }
 
-  void _trimTail() {
-    while (_tail.length > _half) {
-      _tail.removeFirst();
+  void _appendTail(List<int> bytes) {
+    if (_half == 0 || bytes.isEmpty) return;
+    final tail = _tail!;
+    if (bytes.length >= _half) {
+      tail.setRange(0, _half, bytes, bytes.length - _half);
+      _tailNext = 0;
+      return;
     }
+    final first = bytes.length < _half - _tailNext
+        ? bytes.length
+        : _half - _tailNext;
+    tail.setRange(_tailNext, _tailNext + first, bytes);
+    if (first < bytes.length) {
+      tail.setRange(0, bytes.length - first, bytes, first);
+    }
+    _tailNext = (_tailNext + bytes.length) % _half;
+  }
+
+  Uint8List _tailBytes() {
+    final tail = _tail!;
+    if (_tailNext == 0) return tail;
+    return Uint8List(_half)
+      ..setRange(0, _half - _tailNext, tail, _tailNext)
+      ..setRange(_half - _tailNext, _half, tail);
   }
 
   /// Retained bytes (head, or head + tail when truncated). At most [maxBytes].
   Uint8List get bytes {
     if (!_truncated) return Uint8List.fromList(_head.toBytes());
     final head = _head.toBytes();
-    final out = Uint8List(head.length + _tail.length);
+    final out = Uint8List(head.length + _half);
     out.setAll(0, head);
-    out.setAll(head.length, _tail);
+    out.setAll(head.length, _tailBytes());
     return out;
   }
 
   /// UTF-8 decode of [bytes] that never starts/ends mid-sequence.
-  String get text {
+  String get text => _cachedText ??= _decodeText();
+
+  String _decodeText() {
     if (!_truncated) {
       return _decodeUtf8(
         _head.toBytes(),
@@ -64,13 +95,13 @@ class BoundedStreamBuffer {
         dropTrailing: false,
       );
     }
-    final head = _decodeUtf8(
+    final head = _headText ??= _decodeUtf8(
       _head.toBytes(),
       dropLeading: false,
       dropTrailing: true,
     );
     final tail = _decodeUtf8(
-      Uint8List.fromList(_tail.toList(growable: false)),
+      _tailBytes(),
       dropLeading: true,
       dropTrailing: false,
     );

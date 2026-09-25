@@ -432,12 +432,6 @@ void main() {
     testWidgets(
       'notification tap closes settings and opens the saved conversation',
       (tester) async {
-        // FakeAsync cannot advance to a frame while idle tasks continuously
-        // reschedule zero-delay timers during the route-pop animation.
-        final previousStrategy = tester.binding.schedulingStrategy;
-        tester.binding.schedulingStrategy =
-            ({required priority, required scheduler}) => true;
-        addTearDown(() => tester.binding.schedulingStrategy = previousStrategy);
         await runAsMobile(() async {
           final service = _ControlledChatService({
             'conv-a': [_message('conv-a', 0)],

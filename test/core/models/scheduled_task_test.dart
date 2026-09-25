@@ -4,6 +4,68 @@ import 'package:Kelivo/core/models/scheduled_task.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  test(
+    'new tasks skip unavailable runs and preserve an explicit reminder choice',
+    () {
+      const task = ScheduledTask(
+        id: 't',
+        name: 'Task',
+        prompt: 'Hi',
+        assistantId: 'a',
+        hour: 8,
+        minute: 0,
+      );
+      expect(task.unavailablePolicy, ScheduledTaskUnavailablePolicy.skip);
+      expect(
+        ScheduledTask.fromJson(
+          task.toJson()..remove('unavailablePolicy'),
+        ).unavailablePolicy,
+        ScheduledTaskUnavailablePolicy.skip,
+      );
+      expect(
+        ScheduledTask.fromJson({
+          ...task.toJson(),
+          'unavailablePolicy': 'remind',
+        }).unavailablePolicy,
+        ScheduledTaskUnavailablePolicy.remind,
+      );
+    },
+  );
+
+  test(
+    'custom and empty preparation prompts survive persistence and state updates',
+    () {
+      const task = ScheduledTask(
+        id: 't',
+        name: 'Task',
+        prompt: 'Hi',
+        assistantId: 'a',
+        hour: 8,
+        minute: 0,
+      );
+      expect(
+        ScheduledTask.fromJson(
+          task.toJson()..remove('preparationPrompt'),
+        ).preparationPrompt,
+        ScheduledTask.defaultPreparationPrompt,
+      );
+      for (final prompt in ['只输出正文，发送时间为 {{scheduled_time}}', '']) {
+        final decoded = ScheduledTask.fromJson({
+          ...task.toJson(),
+          'preparationPrompt': prompt,
+        });
+        final updated = decoded.withState(
+          nextRunAt: DateTime(2026, 9, 22, 8),
+          revision: 2,
+        );
+        expect(
+          ScheduledTask.fromJson(updated.toStoredJson()).preparationPrompt,
+          prompt,
+        );
+      }
+    },
+  );
+
   test('schedule settings retain target, model and local calendar dates', () {
     final task = ScheduledTask(
       id: 'schedule',

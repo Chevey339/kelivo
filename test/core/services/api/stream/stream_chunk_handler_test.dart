@@ -10,6 +10,32 @@ import 'package:Kelivo/core/services/api/stream/stream_chunk_handler.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  test('materialized snapshots survive later appends and text boundaries', () {
+    final handler = StreamChunkHandler();
+    handler.handle(const ReasoningDelta(id: 'r', text: 'plan'));
+    handler.handle(const TextDelta(id: 't', text: 'before'));
+    final before = handler.parts;
+    handler.handle(const TextDelta(id: 't', text: '\n'));
+    handler.handle(const TextDelta(id: 't', text: '\uD83D'));
+    handler.handle(const TextDelta(id: 't', text: '\uDE42'));
+    final after = handler.parts;
+    expect((before.last as TextPart).text, 'before');
+    expect(identical(before.first, after.first), true);
+    expect(identical(after, handler.parts), true);
+    handler.handle(const TextEnd('t'));
+    handler.handle(const TextDelta(id: 't', text: 'next'));
+    handler.handle(const ReasoningDelta(id: 'r', text: ' finished'));
+    expect(
+      handler.toResult().parts.whereType<ReasoningPart>().single.text,
+      'plan finished',
+    );
+    expect(handler.toResult().parts.whereType<TextPart>().map((p) => p.text), [
+      'before\n\uD83D\uDE42',
+      'next',
+    ]);
+    expect((before.first as ReasoningPart).text, 'plan');
+  });
+
   test(
     'a hosted card keeps its input when the result lands a response later',
     () {

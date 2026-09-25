@@ -346,16 +346,10 @@ build_vdso_once() {
     log_success "guest VDSO copied"
 }
 
-build_fakefsify() {
+build_host_tools() {
     local BUILD_DIR="$ISH_DIR/build-native"
-    if [ -x "$OUTPUT_DIR/fakefsify" ]; then
-        log_info "host fakefsify already in $OUTPUT_DIR"
-        return
-    fi
-    if [ -x "$BUILD_DIR/tools/fakefsify" ]; then
-        mkdir -p "$OUTPUT_DIR"
-        cp "$BUILD_DIR/tools/fakefsify" "$OUTPUT_DIR/fakefsify"
-        log_info "host fakefsify copied from existing native build"
+    if [ -x "$OUTPUT_DIR/fakefsify" ] && [ -x "$OUTPUT_DIR/ish" ]; then
+        log_info "host iSH tools already in $OUTPUT_DIR"
         return
     fi
 
@@ -366,7 +360,7 @@ build_fakefsify() {
     local host_sdk
     host_sdk="$(xcrun --sdk macosx --show-sdk-path)"
     if [ ! -f "$BUILD_DIR/build.ninja" ]; then
-        log_info "Configuring native meson build (host fakefsify)..."
+        log_info "Configuring native meson build (host iSH tools)..."
         env -u IPHONEOS_DEPLOYMENT_TARGET SDKROOT="$host_sdk" meson setup "$BUILD_DIR" \
             --buildtype=release \
             -Dlog="" \
@@ -374,12 +368,15 @@ build_fakefsify() {
             -Dengine=asbestos \
             -Dguest_arch=arm64
     fi
-    log_info "Building host fakefsify..."
-    env -u IPHONEOS_DEPLOYMENT_TARGET SDKROOT="$host_sdk" ninja -C "$BUILD_DIR" tools/fakefsify
+    log_info "Building host iSH tools..."
+    # Upstream main.c includes this generated header without a Meson edge.
+    env -u IPHONEOS_DEPLOYMENT_TARGET SDKROOT="$host_sdk" ninja -C "$BUILD_DIR" cpu-offsets.h
+    env -u IPHONEOS_DEPLOYMENT_TARGET SDKROOT="$host_sdk" ninja -C "$BUILD_DIR" tools/fakefsify ish
     mkdir -p "$OUTPUT_DIR"
     cp "$BUILD_DIR/tools/fakefsify" "$OUTPUT_DIR/fakefsify"
+    cp "$BUILD_DIR/ish" "$OUTPUT_DIR/ish"
     cd "$SCRIPT_DIR"
-    log_success "host fakefsify built"
+    log_success "host iSH tools built"
 }
 
 copy_sdk_libs() {
@@ -515,7 +512,7 @@ main() {
     [ -n "$headers_from" ] || log_error "no SDK built"
     copy_headers "$headers_from"
     build_vdso_once
-    build_fakefsify
+    build_host_tools
     # Keep the compatibility scripts exactly aligned with the pinned iSH.
     local patch_bundle="$ISH_DIR/app/RootfsPatch.bundle"
     [ -s "$patch_bundle/manifest.plist" ] || log_error "RootfsPatch manifest missing"

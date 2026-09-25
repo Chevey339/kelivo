@@ -98,5 +98,42 @@ void main() {
         );
       },
     );
+
+    test('MiMo V2.6 and Grok 4.7 infer documented abilities', () {
+      for (final id in const [
+        'mimo-v2.6',
+        'mimo-v2.6-pro',
+        'mimo-v2.6-flash',
+        'mimo-v2.6-pro-ultraspeed',
+        'xiaomi/mimo-v2.6-pro',
+        'mimo-v2.5',
+        'mimo-v2-omni',
+        'grok-4.7',
+        'x-ai/grok-4.7',
+      ]) {
+        final model = _guess(id);
+        expect(model.input, contains(Modality.image), reason: id);
+        expect(model.output, isNot(contains(Modality.image)), reason: id);
+        expect(model.abilities, contains(ModelAbility.tool), reason: id);
+        expect(model.abilities, contains(ModelAbility.reasoning), reason: id);
+      }
+
+      final textOnlyPro = _guess('mimo-v2.5-pro');
+      expect(textOnlyPro.input, isNot(contains(Modality.image)));
+      expect(
+        textOnlyPro.abilities,
+        containsAll([ModelAbility.tool, ModelAbility.reasoning]),
+      );
+      for (final id in const ['grok-4.7', 'x-ai/grok-4.7']) {
+        final reasoning = _guess(id).reasoning!;
+        expect(reasoning.levels, [
+          ReasoningLevel.low,
+          ReasoningLevel.medium,
+          ReasoningLevel.high,
+          ReasoningLevel.xhigh,
+        ], reason: id);
+        expect(reasoning.canDisable, isFalse, reason: id);
+      }
+    });
   });
 }

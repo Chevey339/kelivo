@@ -172,6 +172,36 @@ class ChatApiService {
     return out;
   }
 
+  /// Apply request restrictions after resolving credentials. OAuth resolution
+  /// reloads the stored provider, so a caller's filtered copy is not sufficient.
+  static ProviderConfig _textOnlyConfig(ProviderConfig config, String modelId) {
+    final raw = config.modelOverrides[modelId];
+    final override = raw is Map ? raw : const <String, dynamic>{};
+    return config.copyWith(
+      customBody: const [],
+      modelOverrides: {
+        modelId: {
+          for (final key in [
+            'apiModelId',
+            'api_model_id',
+            'type',
+            'headers',
+            'abilities',
+            'reasoning',
+            'sampling',
+            'contextWindow',
+            'maxOutput',
+            'oauthProtocol',
+          ])
+            if (override.containsKey(key)) key: override[key],
+          'builtInTools': <String>[],
+          'input': ['text'],
+          'output': ['text'],
+        },
+      },
+    );
+  }
+
   static http.Client _clientFor(ProviderConfig cfg, CancelToken cancelToken) {
     final enabled = cfg.proxyEnabled == true;
     final host = (cfg.proxyHost ?? '').trim();
@@ -216,6 +246,8 @@ class ChatApiService {
     bool builtInSearchOnly = false,
     bool skipImageParsing = false,
     bool parseMarkdownImageLinks = true,
+    // Disallow media, tools and body overrides for detached text generation.
+    bool textOnly = false,
     AutoRetryOptions? retryOverride,
   }) async* {
     final sessionToken = CancelToken();
@@ -241,6 +273,7 @@ class ChatApiService {
         ),
       ]);
       if (sessionToken.isCancelled) return;
+      if (textOnly) config = _textOnlyConfig(config, modelId);
       if (config.oauthProvider == OAuthProvider.chatgpt) stream = true;
       if (config.oauthProvider == OAuthProvider.kimi &&
           (config.modelOverrides[modelId] as Map?)?['oauthProtocol'] ==
@@ -258,21 +291,21 @@ class ChatApiService {
         explicitType: config.providerType,
       );
       final useOpenAIImagesApi =
+          !textOnly &&
           kind == ProviderKind.openai &&
           allowImagesApiRouting &&
           shouldUseOpenAIImagesApi(config, modelId);
-      final useZhipuLayoutParsing = shouldUseZhipuLayoutParsing(
-        config,
-        modelId,
-      );
+      final useZhipuLayoutParsing =
+          !textOnly && shouldUseZhipuLayoutParsing(config, modelId);
       final unicodeSafeMessages = _sanitizeMessages(messages);
       final spec = _stripSpecForRequest(
         spec: ModelSpecResolver.instance.spec(config, modelId),
         keepImages:
-            skipImageParsing ||
-            ocrActive ||
-            useOpenAIImagesApi ||
-            useZhipuLayoutParsing,
+            !textOnly &&
+            (skipImageParsing ||
+                ocrActive ||
+                useOpenAIImagesApi ||
+                useZhipuLayoutParsing),
       );
       final safeMessages = await stripUnsupportedMediaFromMessages(
         unicodeSafeMessages,
@@ -281,6 +314,7 @@ class ChatApiService {
       final safeUserImagePaths = userImagePaths == null
           ? null
           : _filterUserMediaPaths(userImagePaths, spec);
+      final toolHandler = textOnly ? null : onToolCall;
 
       final imageOutput = ModelSpecResolver.instance
           .spec(config, modelId)
@@ -325,17 +359,18 @@ class ChatApiService {
           temperature: temperature,
           topP: topP,
           maxTokens: maxTokens,
-          tools: tools,
-          onToolCall: onToolCall == null
+          tools: textOnly ? null : tools,
+          onToolCall: toolHandler == null
               ? null
               : (name, args, {toolCallId}) => toolCancellation.run(
-                  () => onToolCall(name, args, toolCallId: toolCallId),
+                  () => toolHandler(name, args, toolCallId: toolCallId),
                 ),
           extraHeaders: sessionHeaders,
-          extraBody: extraBody,
+          extraBody: textOnly ? null : extraBody,
           stream: stream,
           builtInSearchOnly: builtInSearchOnly,
-          skipImageParsing: skipImageParsing || !parseMarkdownImageLinks,
+          skipImageParsing:
+              textOnly || skipImageParsing || !parseMarkdownImageLinks,
           kind: kind,
           useOpenAIImagesApi: useOpenAIImagesApi,
           useZhipuLayoutParsing: useZhipuLayoutParsing,
@@ -588,6 +623,7 @@ class ChatApiService {
     bool builtInSearchOnly = false,
     bool skipImageParsing = false,
     bool parseMarkdownImageLinks = true,
+    bool textOnly = false,
     AutoRetryOptions? retryOverride,
     void Function(RetryPending? pending)? onRetry,
   }) async {
@@ -615,6 +651,7 @@ class ChatApiService {
       builtInSearchOnly: builtInSearchOnly,
       skipImageParsing: skipImageParsing,
       parseMarkdownImageLinks: parseMarkdownImageLinks,
+      textOnly: textOnly,
       retryOverride: retryOverride,
     )) {
       if (chunk is RetryAttemptStart) {

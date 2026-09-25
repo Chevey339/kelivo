@@ -71,6 +71,16 @@ class DeviceLocalToolsHandler(private val context: Context) {
         channel.setMethodCallHandler { call, result ->
             val argsJson = call.arguments as? String ?: "{}"
             when (call.method) {
+                "phoneControlStatus" -> result.success(PhoneControlService.status(context))
+                "phoneControl" -> PhoneControlService.execute(argsJson) { result.success(it) }
+                "openAccessibilitySettings" -> {
+                    try {
+                        activity.startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
+                        result.success(null)
+                    } catch (e: Exception) {
+                        result.error("SETTINGS_UNAVAILABLE", e.message, null)
+                    }
+                }
                 "hasUsageStatsPermission" -> result.success(hasUsageStatsPermission())
                 "openUsageAccessSettings" -> {
                     openUsageAccessSettings()

@@ -384,8 +384,6 @@ class _SearchContent extends StatelessWidget {
       sp,
       ap,
     );
-    final builtInMode = builtInEnabled;
-
     final rows = <Widget>[];
 
     // 1) Cancel item at top
@@ -438,27 +436,26 @@ class _SearchContent extends StatelessWidget {
       }
     }
 
-    // 3) External services list (hidden when url_context is active)
-    if (!builtInMode) {
-      for (int i = 0; i < services.length; i++) {
-        final s = services[i];
-        final svc = SearchService.getService(s);
-        final name = svc.name;
-        final isSelectedActive = enabled && (i == selected);
-        rows.add(
-          _RowItem(
-            leading: _BrandIcon(name: name),
-            label: name,
-            selected: isSelectedActive,
-            onTap: () async {
-              await settingsNotifier.setSearchServiceSelected(i);
-              await _disableBuiltInSearch(sp, ap);
-              await ap.setSearchEnabledForCurrentAssistant(true);
-              done();
-            },
-          ),
-        );
-      }
+    // 3) External services remain available so users can switch directly from
+    // built-in search. Selecting one keeps the two modes mutually exclusive.
+    for (int i = 0; i < services.length; i++) {
+      final s = services[i];
+      final svc = SearchService.getService(s);
+      final name = svc.name;
+      final isSelectedActive = enabled && (i == selected);
+      rows.add(
+        _RowItem(
+          leading: _BrandIcon(name: name),
+          label: name,
+          selected: isSelectedActive,
+          onTap: () async {
+            await settingsNotifier.setSearchServiceSelected(i);
+            await _disableBuiltInSearch(sp, ap);
+            await ap.setSearchEnabledForCurrentAssistant(true);
+            done();
+          },
+        ),
+      );
     }
 
     return Padding(

@@ -82,6 +82,23 @@ void main() {
       });
     });
 
+    test('skips the built-in tool parts that precede the text part', () {
+      final payload = collectGeminiThoughtSignatureFromParts([
+        {
+          'toolCall': {'name': 'google_search'},
+          'thoughtSignature': 'sig-tool-call',
+        },
+        {
+          'toolResponse': {'name': 'google_search'},
+          'thoughtSignature': 'sig-tool-response',
+        },
+        {'text': '', 'thoughtSignature': 'sig-text'},
+      ]);
+      expect(jsonDecode(payload), {
+        'text': {'k': 'thoughtSignature', 'v': 'sig-text'},
+      });
+    });
+
     test('decodes bare JSON and the legacy comment alike', () {
       final fresh = decodeGeminiThoughtSignature(
         '{"text":{"k":"thoughtSignature","v":"sig-new"}}',

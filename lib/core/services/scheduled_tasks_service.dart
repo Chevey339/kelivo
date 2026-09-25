@@ -6,6 +6,12 @@ import '../models/scheduled_task.dart';
 import '../database/business_preferences.dart';
 import 'desktop_scheduled_tasks.dart';
 import 'scheduled_task_store.dart';
+import 'prepared_scheduled_tasks.dart';
+import 'scheduled_task_preparation.dart';
+import 'scheduled_task_notifications.dart';
+import 'notification_service.dart';
+import '../../l10n/app_localizations.dart';
+import 'package:flutter/widgets.dart';
 
 class ScheduledRunCancellation {
   bool cancelled = false;
@@ -31,9 +37,13 @@ class ScheduledTasksService extends ChangeNotifier {
   ScheduledTasksService({
     MethodChannel? channel,
     DesktopScheduledTasks? desktop,
+    PreparedScheduledTasks? prepared,
   }) : _channel = channel ?? const MethodChannel('app.scheduled_tasks'),
-       _desktop = desktop {
-    if (desktop == null) {
+       _desktop = desktop,
+       _prepared = prepared {
+    if (prepared != null) {
+      prepared.addListener(_preparedChanged);
+    } else if (desktop == null) {
       _channel.setMethodCallHandler(_handle);
     } else {
       desktop.addListener(_desktopChanged);
@@ -42,6 +52,7 @@ class ScheduledTasksService extends ChangeNotifier {
   static bool get supported =>
       !kIsWeb &&
       switch (defaultTargetPlatform) {
+        TargetPlatform.iOS ||
         TargetPlatform.android ||
         TargetPlatform.macOS ||
         TargetPlatform.windows ||
@@ -53,9 +64,22 @@ class ScheduledTasksService extends ChangeNotifier {
 
   /// Bind the admitted database before mounting the app. Desktop task writes
   /// participate in the same restore fence and exit flush as other settings.
-  static void configureDesktop(BusinessPreferences preferences) {
+  static void configureDevice(BusinessPreferences preferences) {
     if (!supported || defaultTargetPlatform == TargetPlatform.android) return;
     _instance.dispose();
+    if (defaultTargetPlatform == TargetPlatform.iOS) {
+      _instance = ScheduledTasksService(
+        prepared: PreparedScheduledTasks(
+          store: ScheduledTaskStore(preferences),
+          notifications: IosScheduledTaskNotifications(
+            reminderBody: () =>
+                _instance.localizations.scheduledTasksReminderBody,
+            resultBody: () => _instance.localizations.scheduledTasksResultBody,
+          ),
+        ),
+      );
+      return;
+    }
     _instance = ScheduledTasksService(
       desktop: DesktopScheduledTasks(store: ScheduledTaskStore(preferences)),
     );
@@ -63,6 +87,87 @@ class ScheduledTasksService extends ChangeNotifier {
 
   final MethodChannel _channel;
   final DesktopScheduledTasks? _desktop;
+  final PreparedScheduledTasks? _prepared;
+  bool get isIOS => _prepared != null;
+  ScheduledTaskPreparationStatus? preparationStatus(ScheduledTask task) =>
+      _prepared?.preparationStatus(task);
+
+  Future<void> preparePendingTasks() async {
+    try {
+      await _prepared?.check(prepare: true);
+    } catch (e) {
+      _recordError(e);
+    }
+  }
+
+  Future<ScheduledTaskPreparationStatus> prepareNow(String taskId) async {
+    final prepared = _prepared;
+    if (prepared == null) return ScheduledTaskPreparationStatus.disabled;
+    return prepared.prepareNow(taskId);
+  }
+
+  AppLocalizations localizations = lookupAppLocalizations(const Locale('en'));
+  StreamSubscription<String>? _scheduledTapSubscription;
+  Future<void> configurePreparation(
+    ScheduledTaskPreparation preparation,
+  ) async {
+    _prepared?.preparation = preparation;
+  }
+
+  Future<void> updateNotificationPrivacy(bool hideContent) async {
+    final notifications = _prepared?.notifications;
+    if (notifications is! IosScheduledTaskNotifications ||
+        notifications.hideContent == hideContent) {
+      return;
+    }
+    notifications.hideContent = hideContent;
+    try {
+      await _prepared?.check(retryNotifications: true);
+    } catch (e) {
+      _recordError(e);
+    }
+  }
+
+  Future<void> reconcileBeforeSend() => _prepared?.check() ?? Future.value();
+  Future<void> activityChanged() async {
+    try {
+      await _prepared?.activityChanged();
+    } catch (e) {
+      _recordError(e);
+    }
+  }
+
+  Future<void> lifecycle(bool active) async {
+    try {
+      await _prepared?.lifecycle(active);
+    } catch (e) {
+      _recordError(e);
+    }
+  }
+
+  Future<void> _openScheduledRun(String id) async {
+    try {
+      final conversationId = await _prepared?.notificationTapped(id);
+      if (conversationId != null) {
+        NotificationService.openConversation(
+          conversationId,
+          messageId: '$id:result',
+        );
+      }
+    } catch (e) {
+      _recordError(e);
+    }
+  }
+
+  void _preparedChanged() {
+    if (_disposed) return;
+    tasks = _prepared!.tasks;
+    loaded = _prepared.loaded;
+    error = _prepared.error;
+    exactAlarms = true;
+    notifyListeners();
+  }
+
   bool get isDesktop => _desktop != null;
   ScheduledTaskExecutor? _executor;
   final _active = <String, ScheduledRunCancellation>{};
@@ -75,7 +180,20 @@ class ScheduledTasksService extends ChangeNotifier {
   Future<void> attach(ScheduledTaskExecutor executor) async {
     _executor = executor;
     try {
-      if (_desktop case final desktop?) {
+      if (_prepared case final prepared?) {
+        await NotificationService.ensureInitialized();
+        await prepared.start((id, task) {
+          final cancellation = ScheduledRunCancellation();
+          _active[id] = cancellation;
+          unawaited(_execute(id, task, cancellation));
+        });
+        await _scheduledTapSubscription?.cancel();
+        _scheduledTapSubscription = NotificationService.scheduledRunTaps.listen(
+          (id) => unawaited(_openScheduledRun(id)),
+        );
+        final pending = NotificationService.takePendingScheduledRunId();
+        if (pending != null) unawaited(_openScheduledRun(pending));
+      } else if (_desktop case final desktop?) {
         await desktop.start((id, task) {
           final cancellation = ScheduledRunCancellation();
           _active[id] = cancellation;
@@ -94,6 +212,8 @@ class ScheduledTasksService extends ChangeNotifier {
     if (!identical(_executor, executor)) return;
     _executor = null;
     _desktop?.stop();
+    _prepared?.stop();
+    unawaited(_scheduledTapSubscription?.cancel());
     for (final cancellation in _active.values.toList()) {
       unawaited(cancellation.cancel().catchError(_recordError));
     }
@@ -147,13 +267,14 @@ class ScheduledTasksService extends ChangeNotifier {
         task,
         cancellation,
         (conversationId) =>
+            _prepared?.updateRun(id, {'conversationId': conversationId}) ??
             _desktop?.updateRun(id, {'conversationId': conversationId}) ??
             _channel.invokeMethod<void>('conversation', {
               'runId': id,
               'conversationId': conversationId,
             }),
       );
-      result = await (isDesktop
+      result = await (isDesktop || isIOS
           ? execution.timeout(
               const Duration(minutes: 10),
               onTimeout: () {
@@ -170,7 +291,9 @@ class ScheduledTasksService extends ChangeNotifier {
       result = {'status': 'failed', 'error': e.toString()};
     }
     try {
-      if (_desktop case final desktop?) {
+      if (_prepared case final prepared?) {
+        await prepared.updateRun(id, result);
+      } else if (_desktop case final desktop?) {
         await desktop.updateRun(id, result);
       } else {
         await _channel.invokeMethod<void>('finish', {'runId': id, ...result});
@@ -200,7 +323,10 @@ class ScheduledTasksService extends ChangeNotifier {
 
   Future<void> refresh() async {
     try {
-      if (_desktop case final desktop?) {
+      if (_prepared case final prepared?) {
+        await prepared.load();
+        _preparedChanged();
+      } else if (_desktop case final desktop?) {
         await desktop.load();
         _desktopChanged();
       } else {
@@ -221,7 +347,14 @@ class ScheduledTasksService extends ChangeNotifier {
   @override
   void dispose() {
     _disposed = true;
-    if (_desktop case final desktop?) {
+    unawaited(_scheduledTapSubscription?.cancel());
+    if (_prepared case final prepared?) {
+      prepared.removeListener(_preparedChanged);
+      prepared.dispose();
+      for (final cancellation in _active.values.toList()) {
+        unawaited(cancellation.cancel().catchError(_recordError));
+      }
+    } else if (_desktop case final desktop?) {
       desktop.removeListener(_desktopChanged);
       desktop.dispose();
       for (final cancellation in _active.values.toList()) {
@@ -234,6 +367,10 @@ class ScheduledTasksService extends ChangeNotifier {
   }
 
   Future<void> save(ScheduledTask task, {bool? enabled}) async {
+    if (_prepared case final prepared?) {
+      await prepared.save(task, enabled: enabled);
+      return;
+    }
     if (_desktop case final desktop?) {
       await desktop.save(task, enabled: enabled);
       return;
@@ -247,6 +384,10 @@ class ScheduledTasksService extends ChangeNotifier {
   }
 
   Future<void> delete(String id) async {
+    if (_prepared case final prepared?) {
+      await prepared.delete(id);
+      return;
+    }
     if (_desktop case final desktop?) {
       await desktop.delete(id);
       return;
@@ -257,6 +398,10 @@ class ScheduledTasksService extends ChangeNotifier {
   }
 
   Future<void> runNow(String id) async {
+    if (_prepared case final prepared?) {
+      await prepared.runNow(id);
+      return;
+    }
     if (_desktop case final desktop?) {
       await desktop.runNow(id);
       return;
@@ -267,6 +412,13 @@ class ScheduledTasksService extends ChangeNotifier {
   }
 
   Future<void> requestPermission() async {
-    if (!isDesktop) await _channel.invokeMethod<void>('permission');
+    if (_prepared case final prepared?) {
+      await prepared.notifications.requestPermission();
+      // Permission changes refresh delivery without starting automatic work or
+      // changing lifecycle state ahead of an explicit preparation request.
+      await prepared.check(retryNotifications: true);
+    } else if (!isDesktop) {
+      await _channel.invokeMethod<void>('permission');
+    }
   }
 }

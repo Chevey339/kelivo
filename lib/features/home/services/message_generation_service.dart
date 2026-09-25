@@ -47,7 +47,6 @@ typedef OnConversationLoadingChanged =
 typedef OnScrollToBottom = void Function();
 typedef OnShowError = void Function(String message);
 typedef OnShowWarning = void Function(String message);
-typedef OnHapticFeedback = void Function();
 
 const String conversationIdHeaderName = 'X-Conversation-Id';
 const String _conversationIdHeaderNameLower = 'x-conversation-id';
@@ -140,7 +139,6 @@ class MessageGenerationService {
   OnScrollToBottom? onScrollToBottom;
   OnShowError? onShowError;
   OnShowWarning? onShowWarning;
-  OnHapticFeedback? onHapticFeedback;
 
   /// Called when file processing starts for the assistant message [messageId].
   void Function(String messageId)? onFileProcessingStarted;
@@ -770,6 +768,8 @@ class MessageGenerationService {
     required bool generateTitleOnFinish,
     String? generationRunId,
     bool scheduled = false,
+    bool scheduledNotify = true,
+    bool scheduledPreview = true,
   }) {
     final bool ocrActive = settings.ocrActive;
 
@@ -799,6 +799,8 @@ class MessageGenerationService {
       generateTitleOnFinish: generateTitleOnFinish,
       generationRunId: generationRunId,
       scheduled: scheduled,
+      scheduledNotify: scheduledNotify,
+      scheduledPreview: scheduledPreview,
     );
   }
 

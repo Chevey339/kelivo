@@ -6,6 +6,7 @@ import 'package:Kelivo/core/models/conversation.dart';
 import 'package:Kelivo/core/models/chat_message.dart';
 import 'package:Kelivo/core/models/message_part.dart';
 import 'package:Kelivo/core/models/workspace_binding.dart';
+import 'package:Kelivo/core/providers/assistant_provider.dart';
 import 'package:Kelivo/core/providers/settings_provider.dart';
 import 'package:Kelivo/core/providers/workspace_provider.dart';
 import 'package:Kelivo/core/services/chat/chat_service.dart';
@@ -13,6 +14,7 @@ import 'package:Kelivo/features/workspace/widgets/files/conversation_files_panel
 import 'package:Kelivo/features/workspace/widgets/files/file_browser.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
 import 'package:Kelivo/shared/widgets/segmented_tabs.dart';
+import 'package:Kelivo/shared/widgets/snackbar.dart';
 import 'package:Kelivo/utils/app_directories.dart';
 import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
@@ -45,7 +47,7 @@ class _FakePathProviderPlatform extends PathProviderPlatform {
 class _FakeChatService extends ChatService {
   _FakeChatService(this.conversation, [this.messages = const []]);
 
-  final Conversation? conversation;
+  Conversation? conversation;
   final List<ChatMessage> messages;
 
   @override
@@ -66,6 +68,17 @@ class _FakeChatService extends ChatService {
   Conversation? getConversation(String id) {
     if (conversation == null) return null;
     return conversation!.id == id ? conversation : null;
+  }
+
+  @override
+  Future<void> updateConversationExtras(
+    String conversationId,
+    Map<String, dynamic> Function(Map<String, dynamic> current) update,
+  ) async {
+    final current = getConversation(conversationId);
+    if (current == null) return;
+    conversation = current.copyWith(extras: update(Map.of(current.extras)));
+    notifyListeners();
   }
 }
 
@@ -120,6 +133,7 @@ void main() {
     required String conversationId,
     ConversationFilesTab initialTab = ConversationFilesTab.attachments,
     List<ChatMessage> messages = const [],
+    AssistantProvider? assistants,
   }) {
     return MultiProvider(
       providers: [
@@ -130,19 +144,70 @@ void main() {
           value: _FakeChatService(conversation, messages),
         ),
         ChangeNotifierProvider<WorkspaceProvider>.value(value: workspaces),
+        if (assistants != null)
+          ChangeNotifierProvider<AssistantProvider>.value(value: assistants),
       ],
       child: MaterialApp(
         localizationsDelegates: AppLocalizations.localizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
-        home: Scaffold(
-          body: ConversationFilesPanel(
-            conversationId: conversationId,
-            initialTab: initialTab,
+        home: AppSnackBarOverlay(
+          child: Scaffold(
+            body: ConversationFilesPanel(
+              conversationId: conversationId,
+              initialTab: initialTab,
+            ),
           ),
         ),
       ),
     );
   }
+
+  testWidgets('binding from files remembers the assistant default too', (
+    tester,
+  ) async {
+    final workspace = await tester.runAsync(
+      () => workspaces.create(name: 'Desk'),
+    );
+    if (workspace == null) fail('workspace create failed');
+    final created = await tester.runAsync(() async {
+      final assistants = AssistantProvider(
+        preferences: createBusinessTestPreferences(),
+      );
+      await assistants.loaded;
+      final id = await assistants.addAssistant(name: 'Coder');
+      return (assistants, id);
+    });
+    if (created == null) fail('assistant create failed');
+    final (assistants, assistantId) = created;
+    addTearDown(assistants.dispose);
+    final conversation = Conversation(title: 'Chat', assistantId: assistantId);
+    await tester.pumpWidget(
+      harness(
+        conversation: conversation,
+        conversationId: conversation.id,
+        initialTab: ConversationFilesTab.workspace,
+        assistants: assistants,
+      ),
+    );
+    await _awaitPanel(tester);
+    await tester.tap(find.byKey(ConversationFilesPanel.bindCtaKey));
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.byKey(ValueKey<String>('workspace-section-pick-${workspace.id}')),
+    );
+    for (var i = 0; i < 30; i++) {
+      await tester.pump(const Duration(milliseconds: 50));
+      await tester.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 10)),
+      );
+      if (find.text('Undo').evaluate().isNotEmpty) break;
+    }
+    expect(assistants.getById(assistantId)!.defaultWorkspaceId, workspace.id);
+    expect(find.text('Undo'), findsOneWidget);
+    await _awaitPanel(tester);
+    await tester.pump(const Duration(seconds: 9));
+    await tester.pumpAndSettle();
+  });
 
   testWidgets('shows attachments outputs and unbound workspace hint', (
     tester,

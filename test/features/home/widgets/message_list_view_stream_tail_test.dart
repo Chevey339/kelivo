@@ -12,6 +12,7 @@ import 'package:Kelivo/features/home/services/ask_user_interaction_service.dart'
 import 'package:Kelivo/features/home/services/tool_approval_service.dart';
 import 'package:Kelivo/features/home/widgets/message_list_view.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
+import 'package:Kelivo/shared/widgets/markdown_with_highlight.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
@@ -50,6 +51,12 @@ void main() {
 
     final position = state.scrollController.position;
     expect(position.maxScrollExtent - position.pixels, lessThan(1));
+    final markdown = find.descendant(
+      of: find.byKey(const ValueKey<String>('timeline-slot:$_streamingId')),
+      matching: find.byType(MarkdownWithCodeHighlight),
+    );
+    expect(markdown, findsOneWidget);
+    final renderer = tester.state(markdown);
 
     // The terminal widget is taller than the streaming one (action bar, token
     // stats), and it arrives after isGenerating已经变成 false.
@@ -62,6 +69,7 @@ void main() {
     final trace = <double>[];
     for (var i = 0; i < 30; i++) {
       await tester.pump(const Duration(milliseconds: 16));
+      expect(tester.state(markdown), same(renderer));
       trace.add(tester.getTopLeft(anchor).dy);
     }
 

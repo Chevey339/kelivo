@@ -382,6 +382,55 @@ void main() {
     expect(decoder.textThoughtSigVal, 'text-sig');
   });
 
+  test(
+    'a built-in tool round keeps the text signature, not the toolCall one',
+    () {
+      // A google_search round answers with toolCall, toolResponse and only then
+      // the text part that carries the turn's own signature. Replaying the
+      // toolCall's signature on a text part is rejected as invalid.
+      final decoder = GoogleStreamDecoder(
+        isGemini3: true,
+        persistThoughtSigs: true,
+      );
+      decoder.accept(
+        _event(
+          _candidate(
+            parts: [
+              <String, dynamic>{
+                'toolCall': <String, dynamic>{'name': 'google_search'},
+                'thoughtSignature': 'sig-tool-call',
+              },
+            ],
+          ),
+        ),
+      );
+      decoder.accept(
+        _event(
+          _candidate(
+            parts: [
+              <String, dynamic>{
+                'toolResponse': <String, dynamic>{'name': 'google_search'},
+                'thoughtSignature': 'sig-tool-response',
+              },
+            ],
+          ),
+        ),
+      );
+      decoder.accept(
+        _event(
+          _candidate(
+            parts: [
+              <String, dynamic>{'text': 'Grounded answer.'},
+              <String, dynamic>{'text': '', 'thoughtSignature': 'sig-text'},
+            ],
+          ),
+        ),
+      );
+
+      expect(decoder.textThoughtSigVal, 'sig-text');
+    },
+  );
+
   test('malformed frame keeps parsed chunks and later text still decodes', () {
     final decoder = GoogleStreamDecoder();
     final first = decoder.accept(

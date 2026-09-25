@@ -39,3 +39,31 @@ DateTime? nextScheduledTaskRun(ScheduledTask task, DateTime after) {
   }
   throw StateError('invalid_schedule');
 }
+
+void validateScheduledTask(ScheduledTask task) {
+  if (task.id.isEmpty ||
+      task.id.length > 128 ||
+      task.name.trim().isEmpty ||
+      task.name.trim().length > 200 ||
+      task.assistantId.trim().isEmpty ||
+      task.prompt.trim().length > 32000 ||
+      task.mode != ScheduledTaskMode.regenerate && task.prompt.trim().isEmpty ||
+      task.mode != ScheduledTaskMode.newChat &&
+          (task.conversationId ?? '').trim().isEmpty ||
+      task.mode == ScheduledTaskMode.regenerate &&
+          (task.messageId ?? '').trim().isEmpty ||
+      (task.modelProvider == null) != (task.modelId == null) ||
+      task.modelId != null &&
+          ((task.modelId!.trim().isEmpty) ||
+              task.modelProvider!.trim().isEmpty)) {
+    throw ArgumentError('invalid_task');
+  }
+  if (task.preparationWindowMinutes < 1 ||
+      task.preparationWindowMinutes > 1440 ||
+      task.maxPrepareAttempts < 1 ||
+      task.maxPrepareAttempts > 5 ||
+      task.preparationCooldownMinutes < 1 ||
+      task.preparationCooldownMinutes > 1440) {
+    throw ArgumentError('invalid_preparation_options');
+  }
+}

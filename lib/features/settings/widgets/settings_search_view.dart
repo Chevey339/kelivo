@@ -45,7 +45,6 @@ class _SettingsSearchViewState extends State<SettingsSearchView> {
   final _controller = TextEditingController();
   final _focusNode = FocusNode();
   final _scrollController = ScrollController();
-  late CurvedAnimation _motion;
   List<SettingsSearchItem> _results = const [];
   bool _focusRequested = false;
   bool _closing = false;
@@ -55,12 +54,7 @@ class _SettingsSearchViewState extends State<SettingsSearchView> {
   @override
   void initState() {
     super.initState();
-    _motion = CurvedAnimation(
-      parent: widget.transition,
-      curve: Curves.easeOutCubic,
-      reverseCurve: Curves.easeInCubic,
-    );
-    widget.transition.addListener(_onTransition);
+    widget.transition.addStatusListener(_onTransition);
     _focusNode.onKeyEvent = (_, event) {
       if (event is KeyDownEvent &&
           event.logicalKey == LogicalKeyboardKey.arrowDown &&
@@ -70,18 +64,16 @@ class _SettingsSearchViewState extends State<SettingsSearchView> {
       }
       return KeyEventResult.ignored;
     };
-    _onTransition();
+    _onTransition(widget.transition.status);
   }
 
-  void _onTransition() {
-    if (widget.transition.status == AnimationStatus.reverse) {
+  void _onTransition(AnimationStatus status) {
+    if (status == AnimationStatus.reverse) {
       _closing = true;
       _focusNode.unfocus();
       return;
     }
-    if (widget.autofocus &&
-        !_focusRequested &&
-        widget.transition.value >= 0.45) {
+    if (widget.autofocus && !_focusRequested && widget.transition.value == 1) {
       _focusRequested = true;
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted && !_closing) _focusNode.requestFocus();
@@ -96,22 +88,15 @@ class _SettingsSearchViewState extends State<SettingsSearchView> {
       _results = widget.index.search(_controller.text);
     }
     if (widget.transition != oldWidget.transition) {
-      oldWidget.transition.removeListener(_onTransition);
-      _motion.dispose();
-      _motion = CurvedAnimation(
-        parent: widget.transition,
-        curve: Curves.easeOutCubic,
-        reverseCurve: Curves.easeInCubic,
-      );
-      widget.transition.addListener(_onTransition);
-      _onTransition();
+      oldWidget.transition.removeStatusListener(_onTransition);
+      widget.transition.addStatusListener(_onTransition);
+      _onTransition(widget.transition.status);
     }
   }
 
   @override
   void dispose() {
-    widget.transition.removeListener(_onTransition);
-    _motion.dispose();
+    widget.transition.removeStatusListener(_onTransition);
     _controller.dispose();
     _focusNode.dispose();
     _scrollController.dispose();
@@ -172,29 +157,43 @@ class _SettingsSearchViewState extends State<SettingsSearchView> {
             ),
             fieldHeight,
           );
+          // Geometry changes each frame; the input and button only rebuild for
+          // real state changes (query, theme, locale, or viewport).
+          final field = SettingsSearchField(
+            controller: _controller,
+            focusNode: _focusNode,
+            editing: widget.transition,
+            onChanged: _search,
+            onSubmitted: _submit,
+            onClear: () {
+              _controller.clear();
+              _search('');
+              _focusNode.requestFocus();
+            },
+          );
+          final cancel = IosIconButton(
+            builder: (color) => Text(
+              l10n.settingsSearchCancel,
+              style: cancelStyle.copyWith(color: color),
+            ),
+            color: cs.primary,
+            minSize: 40,
+            padding: const EdgeInsets.symmetric(horizontal: 8),
+            onTap: _close,
+          );
           return AnimatedBuilder(
-            animation: _motion,
-            child: _buildResults(context, items),
+            animation: widget.transition,
+            child: RepaintBoundary(child: _buildResults(context, items)),
             builder: (context, results) {
-              final progress = _motion.value;
+              final progress = widget.transition.value;
               final origin = widget.origin?.call();
               final rect = Rect.lerp(origin ?? target, target, progress)!;
-              final backgroundOpacity = const Interval(
-                0,
-                0.65,
-                curve: Curves.easeOut,
-              ).transform(progress);
-              final contentOpacity = const Interval(
-                0.45,
-                1,
-                curve: Curves.easeOut,
-              ).transform(progress);
               return Stack(
                 children: [
                   if (widget.backgroundColor != null)
                     Positioned.fill(
                       child: Opacity(
-                        opacity: backgroundOpacity,
+                        opacity: progress,
                         child: ColoredBox(color: widget.backgroundColor!),
                       ),
                     ),
@@ -218,7 +217,7 @@ class _SettingsSearchViewState extends State<SettingsSearchView> {
                       ignoring: progress < 1,
                       child: Opacity(
                         key: const ValueKey('settings-search-results'),
-                        opacity: contentOpacity,
+                        opacity: progress,
                         child: Transform.translate(
                           offset: Offset(0, 12 * (1 - progress)),
                           child: results,
@@ -226,21 +225,7 @@ class _SettingsSearchViewState extends State<SettingsSearchView> {
                       ),
                     ),
                   ),
-                  Positioned.fromRect(
-                    rect: rect,
-                    child: SettingsSearchField(
-                      controller: _controller,
-                      focusNode: _focusNode,
-                      editing: progress,
-                      onChanged: _search,
-                      onSubmitted: _submit,
-                      onClear: () {
-                        _controller.clear();
-                        _search('');
-                        _focusNode.requestFocus();
-                      },
-                    ),
-                  ),
+                  Positioned.fromRect(rect: rect, child: field),
                   Positioned(
                     top: top,
                     right: insets.right + 12,
@@ -248,19 +233,7 @@ class _SettingsSearchViewState extends State<SettingsSearchView> {
                     height: fieldHeight,
                     child: IgnorePointer(
                       ignoring: progress < 0.15,
-                      child: Opacity(
-                        opacity: progress,
-                        child: IosIconButton(
-                          builder: (color) => Text(
-                            l10n.settingsSearchCancel,
-                            style: cancelStyle.copyWith(color: color),
-                          ),
-                          color: cs.primary,
-                          minSize: 40,
-                          padding: const EdgeInsets.symmetric(horizontal: 8),
-                          onTap: _close,
-                        ),
-                      ),
+                      child: Opacity(opacity: progress, child: cancel),
                     ),
                   ),
                 ],

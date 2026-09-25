@@ -64,6 +64,15 @@ class WorkspaceToolsService {
 
   static const int _previewLimit = WorkspaceToolMetadata.previewMaxChars;
   static const int _changedFilesCap = 50;
+  static const String _androidShellHint =
+      'Uses the Shell path configured in Environment > PRoot settings; '
+      'when unset, prefers /bin/bash if available, otherwise /bin/sh. '
+      'This is not an interactive shell; do not assume ~/.bashrc is loaded.';
+
+  static String get _shellInvocation =>
+      defaultTargetPlatform == TargetPlatform.android
+      ? 'configured shell -lc'
+      : 'sh -lc';
 
   final ToolRunRegistry registry;
   final WorkspaceRuntimeProvider runtimeProvider;
@@ -194,14 +203,16 @@ class WorkspaceToolsService {
       _fn(
         'shell',
         [
-          'Fresh non-interactive sh -lc per call; no cwd/env persists. Chain with &&.',
+          'Fresh non-interactive $_shellInvocation per call; no cwd/env persists. Chain with &&.',
+          if (defaultTargetPlatform == TargetPlatform.android)
+            _androidShellHint,
           'Use non-interactive flags (e.g. -y). Output is capped; long output is saved',
           'to $outputHint. Network is available on mobile sandboxes.',
         ],
         {
           'command': {
             'type': 'string',
-            'description': 'Shell command to run with sh -lc.',
+            'description': 'Shell command to run with $_shellInvocation.',
           },
           'cwd': {
             'type': 'string',
@@ -387,7 +398,7 @@ class WorkspaceToolsService {
       ..writeln();
     if (ctx.workspace.isToolEnabled('shell')) {
       buf.writeln(
-        'shell is one-shot: a fresh non-interactive sh -lc each call. '
+        'shell is one-shot: a fresh non-interactive $_shellInvocation each call. '
         'No cd or env persists. Chain with &&. Use non-interactive flags (-y). '
         'Output is capped; long output is saved to $outputsHint.',
       );

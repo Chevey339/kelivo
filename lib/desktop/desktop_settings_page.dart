@@ -19,6 +19,7 @@ import '../core/providers/model_provider.dart';
 import '../core/services/logging/flutter_logger.dart';
 import '../core/services/model_catalog/model_catalog_service.dart';
 import '../core/services/model_spec/model_spec_resolver.dart';
+import '../core/services/linux_window_service.dart';
 import '../core/services/provider_balance_service.dart';
 import 'model_fetch_dialog.dart' show showModelFetchDialog;
 import 'widgets/desktop_select_dropdown.dart';

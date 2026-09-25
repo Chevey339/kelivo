@@ -119,6 +119,17 @@ void main() {
             modelId: 'any-chat-model',
             oauth: null,
             providerName: null,
+            expected: false,
+          ),
+          (
+            name: 'Grok host Responses',
+            id: 'Custom',
+            baseUrl: 'https://api.x.ai/v1',
+            kind: ProviderKind.openai,
+            useResponseApi: true,
+            modelId: 'any-chat-model',
+            oauth: null,
+            providerName: null,
             expected: true,
           ),
           (
@@ -130,7 +141,7 @@ void main() {
             modelId: 'any-chat-model',
             oauth: OAuthProvider.grok,
             providerName: null,
-            expected: true,
+            expected: false,
           ),
           (
             name: 'DashScope chat completions',
@@ -256,13 +267,43 @@ void main() {
   });
 
   group('host wire shapes', () {
-    test('Chat Completions keeps provider-specific search formats', () {
+    test('Grok Chat builder omits retired live search parameters', () {
       final grok = _cfg(
         id: 'Grok',
         baseUrl: 'https://api.x.ai/v1',
         kind: ProviderKind.openai,
         modelId: 'any-chat-model',
       );
+      final payload = BuiltInToolsHelper.buildChatCompletionsTools(
+        cfg: grok,
+        modelId: 'grok-4.5',
+        upstreamModelId: 'grok-4.5',
+      );
+      expect(payload.tools, isEmpty);
+      expect(payload.body, isEmpty);
+    });
+
+    test('Grok Responses builder sends web and X search tools', () {
+      final grok = _cfg(
+        id: 'Grok',
+        baseUrl: 'https://api.x.ai/v1',
+        kind: ProviderKind.openai,
+        useResponseApi: true,
+        modelId: 'grok-4.7',
+      );
+      final payload = BuiltInToolsHelper.buildResponsesTools(
+        cfg: grok,
+        modelId: 'grok-4.7',
+        upstreamModelId: 'grok-4.7',
+      );
+      expect(payload.tools, [
+        {'type': 'web_search'},
+        {'type': 'x_search'},
+      ]);
+      expect(payload.body, isEmpty);
+    });
+
+    test('Chat builder preserves provider-specific search formats', () {
       final dashScope = _cfg(
         id: 'DashScope',
         baseUrl: 'https://dashscope.aliyuncs.com/compatible-mode/v1',
@@ -282,14 +323,6 @@ void main() {
         modelId: 'glm-4',
       );
 
-      expect(
-        BuiltInToolsHelper.buildChatCompletionsTools(
-          cfg: grok,
-          modelId: 'any-chat-model',
-          upstreamModelId: 'any-chat-model',
-        ).body['search_parameters'],
-        <String, dynamic>{'mode': 'auto', 'return_citations': true},
-      );
       expect(
         BuiltInToolsHelper.buildChatCompletionsTools(
           cfg: dashScope,

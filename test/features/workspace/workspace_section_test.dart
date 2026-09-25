@@ -5,6 +5,7 @@ import 'package:Kelivo/desktop/workspace_dialog.dart';
 import 'package:Kelivo/core/database/app_database.dart';
 import 'package:Kelivo/core/database/extension_entity_store.dart';
 import 'package:Kelivo/core/models/conversation.dart';
+import 'package:Kelivo/core/models/assistant.dart';
 import 'package:Kelivo/core/models/workspace_binding.dart';
 import 'package:Kelivo/core/providers/assistant_provider.dart';
 import 'package:Kelivo/core/providers/environment_provider.dart';
@@ -13,11 +14,13 @@ import 'package:Kelivo/core/providers/workspace_provider.dart';
 import 'package:Kelivo/core/services/chat/chat_service.dart';
 import 'package:Kelivo/core/services/sandbox/environment_manager.dart';
 import 'package:Kelivo/core/services/workspace/workspace_runtime.dart';
+import 'package:Kelivo/core/services/workspace/workspace_binding_actions.dart';
 import 'package:Kelivo/features/chat/widgets/tools_sheet_row.dart';
 import 'package:Kelivo/features/workspace/pages/workspace_files_page.dart';
 import 'package:Kelivo/features/workspace/widgets/files/file_browser.dart';
 import 'package:Kelivo/features/workspace/widgets/workspace_picker.dart';
 import 'package:Kelivo/features/workspace/widgets/workspace_section.dart';
+import 'package:Kelivo/features/workspace/widgets/workspace_default_notice.dart';
 import 'package:Kelivo/icons/lucide_adapter.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
 import 'package:Kelivo/shared/widgets/custom_bottom_sheet.dart';
@@ -686,6 +689,251 @@ void main() {
     expect(assistants.getById(assistantId)!.defaultWorkspaceId, workspace.id);
     debugDefaultTargetPlatformOverride = null;
   });
+
+  testWidgets('first binding can undo the default without unbinding the chat', (
+    tester,
+  ) async {
+    final workspace = await tester.runAsync(
+      () => workspaces.create(name: 'Desk'),
+    );
+    if (workspace == null) fail('workspace create failed');
+    final (assistants, assistantId) = await createAssistant(tester);
+    final chat = _FakeChatService(
+      Conversation(title: 'Chat', assistantId: assistantId),
+    );
+    final l10n = await pumpSection(tester, chat: chat, assistants: assistants);
+
+    await tester.tap(find.byKey(WorkspaceSection.bindKey));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(WorkspaceSection.pickKey(workspace.id)));
+    for (var i = 0; i < 30; i++) {
+      await tester.pump(const Duration(milliseconds: 50));
+      await tester.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 10)),
+      );
+      if (find
+          .text(l10n.workspaceBindingRememberedDefault('Coder'))
+          .evaluate()
+          .isNotEmpty) {
+        break;
+      }
+    }
+    await tester.pumpAndSettle();
+    expect(assistants.getById(assistantId)!.defaultWorkspaceId, workspace.id);
+    expect(
+      find.text(l10n.workspaceBindingRememberedDefault('Coder')),
+      findsOneWidget,
+    );
+    await tester.tap(find.text(l10n.workspaceBindingUndoDefault));
+    await tester.pumpAndSettle();
+    expect(assistants.getById(assistantId)!.defaultWorkspaceId, isNull);
+    expect(
+      WorkspaceBinding.fromExtras(chat.conversation!.extras).workspaceId,
+      workspace.id,
+    );
+    expect(
+      await tester.runAsync(
+        () => bindConversationWorkspace(
+          chat,
+          assistants: assistants,
+          conversationId: chat.conversation!.id,
+          workspace: workspace,
+        ),
+      ),
+      isNull,
+    );
+    await tester.pump(const Duration(seconds: 9));
+    await tester.pumpAndSettle();
+  });
+
+  testWidgets('old assistant suggestion sets the default only when tapped', (
+    tester,
+  ) async {
+    final workspace = await tester.runAsync(
+      () => workspaces.create(name: 'Desk'),
+    );
+    if (workspace == null) fail('workspace create failed');
+    final (assistants, assistantId) = await createAssistant(tester);
+    await tester.runAsync(
+      () => assistants.updateAssistant(
+        assistants
+            .getById(assistantId)!
+            .copyWith(defaultWorkspaceSetup: DefaultWorkspaceSetup.suggest),
+      ),
+    );
+    final chat = _FakeChatService(
+      Conversation(title: 'Chat', assistantId: assistantId),
+    );
+    final l10n = await pumpSection(tester, chat: chat, assistants: assistants);
+    final notice = await tester.runAsync(
+      () => bindConversationWorkspace(
+        chat,
+        assistants: assistants,
+        conversationId: chat.conversation!.id,
+        workspace: workspace,
+      ),
+    );
+    showWorkspaceDefaultNotice(
+      tester.element(find.byType(Scaffold)),
+      notice: notice,
+      workspaceId: workspace.id,
+    );
+    await tester.pumpAndSettle();
+    expect(assistants.getById(assistantId)!.defaultWorkspaceId, isNull);
+    expect(
+      find.text(l10n.workspaceBindingSuggestDefault('Coder')),
+      findsOneWidget,
+    );
+    await tester.tap(find.text(l10n.workspaceBindingUseAsDefault));
+    await tester.pumpAndSettle();
+    expect(assistants.getById(assistantId)!.defaultWorkspaceId, workspace.id);
+    await tester.pump(const Duration(seconds: 9));
+    await tester.pumpAndSettle();
+  });
+
+  for (final setup in [
+    DefaultWorkspaceSetup.automatic,
+    DefaultWorkspaceSetup.suggest,
+  ]) {
+    for (final changeBeforeNotice in [false, true]) {
+      testWidgets(
+        '$setup toast survives search changes ${changeBeforeNotice ? 'before' : 'after'} display',
+        (tester) async {
+          final workspace = await tester.runAsync(
+            () => workspaces.create(name: 'Desk'),
+          );
+          if (workspace == null) fail('workspace create failed');
+          final (assistants, assistantId) = await createAssistant(tester);
+          await tester.runAsync(() async {
+            await assistants.setCurrentAssistant(assistantId);
+            await assistants.updateAssistant(
+              assistants
+                  .getById(assistantId)!
+                  .copyWith(defaultWorkspaceSetup: setup),
+            );
+          });
+          final chat = _FakeChatService(
+            Conversation(title: 'Chat', assistantId: assistantId),
+          );
+          final l10n = await pumpSection(
+            tester,
+            chat: chat,
+            assistants: assistants,
+          );
+          final notice = await tester.runAsync(
+            () => bindConversationWorkspace(
+              chat,
+              assistants: assistants,
+              conversationId: chat.conversation!.id,
+              workspace: workspace,
+            ),
+          );
+          if (changeBeforeNotice) {
+            await tester.runAsync(
+              () => assistants.setSearchEnabledForCurrentAssistant(true),
+            );
+          }
+          showWorkspaceDefaultNotice(
+            tester.element(find.byType(Scaffold)),
+            notice: notice,
+            workspaceId: workspace.id,
+          );
+          await tester.pumpAndSettle();
+          if (!changeBeforeNotice) {
+            await tester.runAsync(
+              () => assistants.setSearchEnabledForCurrentAssistant(true),
+            );
+          }
+          final remembered = setup == DefaultWorkspaceSetup.automatic;
+          final action = find.text(
+            remembered
+                ? l10n.workspaceBindingUndoDefault
+                : l10n.workspaceBindingUseAsDefault,
+          );
+          final actionVisible = action.evaluate().isNotEmpty;
+          if (actionVisible) {
+            await tester.tap(action);
+            await tester.pumpAndSettle();
+          }
+          await tester.pump(const Duration(seconds: 9));
+          await tester.pumpAndSettle();
+
+          expect(actionVisible, isTrue);
+          final current = assistants.getById(assistantId)!;
+          expect(current.defaultWorkspaceId, remembered ? null : workspace.id);
+          expect(current.searchEnabled, isTrue);
+          expect(
+            WorkspaceBinding.fromExtras(chat.conversation!.extras).workspaceId,
+            workspace.id,
+          );
+        },
+      );
+    }
+
+    testWidgets('stale $setup toast cannot overwrite an explicit choice', (
+      tester,
+    ) async {
+      final workspace = await tester.runAsync(
+        () => workspaces.create(name: 'Desk'),
+      );
+      if (workspace == null) fail('workspace create failed');
+      final (assistants, assistantId) = await createAssistant(tester);
+      await tester.runAsync(
+        () => assistants.updateAssistant(
+          assistants
+              .getById(assistantId)!
+              .copyWith(defaultWorkspaceSetup: setup),
+        ),
+      );
+      final chat = _FakeChatService(
+        Conversation(title: 'Chat', assistantId: assistantId),
+      );
+      final l10n = await pumpSection(
+        tester,
+        chat: chat,
+        assistants: assistants,
+      );
+      final notice = await tester.runAsync(
+        () => bindConversationWorkspace(
+          chat,
+          assistants: assistants,
+          conversationId: chat.conversation!.id,
+          workspace: workspace,
+        ),
+      );
+      showWorkspaceDefaultNotice(
+        tester.element(find.byType(Scaffold)),
+        notice: notice,
+        workspaceId: workspace.id,
+      );
+      await tester.pumpAndSettle();
+      final remembered = setup == DefaultWorkspaceSetup.automatic;
+      await tester.runAsync(
+        () => assistants.updateAssistant(
+          assistants
+              .getById(assistantId)!
+              .copyWith(
+                defaultWorkspaceId: remembered ? workspace.id : null,
+                clearDefaultWorkspaceId: !remembered,
+              ),
+        ),
+      );
+      await tester.tap(
+        find.text(
+          remembered
+              ? l10n.workspaceBindingUndoDefault
+              : l10n.workspaceBindingUseAsDefault,
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(
+        assistants.getById(assistantId)!.defaultWorkspaceId,
+        remembered ? workspace.id : null,
+      );
+      await tester.pump(const Duration(seconds: 9));
+      await tester.pumpAndSettle();
+    });
+  }
 
   testWidgets('follows conversation id changes after local draft was created', (
     tester,

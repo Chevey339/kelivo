@@ -193,6 +193,7 @@ class Lucide {
   static const IconData ChartColumnBig = lucide.LucideIcons.chartColumnBig;
   static const IconData Maximize = lucide.LucideIcons.maximize;
   static const IconData Maximize2 = lucide.LucideIcons.maximize2;
+  static const IconData Minimize2 = lucide.LucideIcons.minimize2;
   static const IconData FolderOpen = lucide.LucideIcons.folderOpen;
   static const IconData FolderPlus = lucide.LucideIcons.folderPlus;
   static const IconData FileQuestion = lucide.LucideIcons.fileQuestionMark;

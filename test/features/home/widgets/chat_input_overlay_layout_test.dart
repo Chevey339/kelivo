@@ -31,7 +31,7 @@ void main() {
     expect(tester.getTopLeft(find.byKey(overlayKey)).dy, 550);
   });
 
-  testWidgets('底部覆盖层内的居中包装不会把输入框推到中间', (tester) async {
+  testWidgets('底部覆盖层最高只到顶栏下方，不会压住标题', (tester) async {
     const overlayKey = Key('overlay');
 
     await tester.pumpWidget(
@@ -43,16 +43,15 @@ void main() {
             child: ChatInputOverlayLayout(
               topInset: 100,
               content: ColoredBox(color: Colors.blue),
-              bottomOverlay: Center(
-                child: SizedBox(key: overlayKey, width: 200, height: 50),
-              ),
+              bottomOverlay: SizedBox(key: overlayKey, width: 200, height: 900),
             ),
           ),
         ),
       ),
     );
 
-    expect(tester.getTopLeft(find.byKey(overlayKey)).dy, 550);
+    expect(tester.getTopLeft(find.byKey(overlayKey)).dy, 112);
+    expect(tester.getBottomLeft(find.byKey(overlayKey)).dy, 600);
   });
 
   testWidgets('输入框层位于前景遮罩上方', (tester) async {
