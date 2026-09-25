@@ -14,6 +14,9 @@ class ModelGuess {
   final int? maxOutput;
   final ReasoningReplayPolicy? replay;
   final ReasoningReplayField? replayField;
+  final bool dynamicWebSearch;
+  final bool remoteImageUrls;
+  final bool promptCacheControl;
 
   const ModelGuess({
     required this.type,
@@ -25,6 +28,9 @@ class ModelGuess {
     this.maxOutput,
     this.replay,
     this.replayField,
+    this.dynamicWebSearch = false,
+    this.remoteImageUrls = true,
+    this.promptCacheControl = false,
   });
 
   @override
@@ -40,7 +46,10 @@ class ModelGuess {
             sampling == other.sampling &&
             maxOutput == other.maxOutput &&
             replay == other.replay &&
-            replayField == other.replayField);
+            replayField == other.replayField &&
+            dynamicWebSearch == other.dynamicWebSearch &&
+            remoteImageUrls == other.remoteImageUrls &&
+            promptCacheControl == other.promptCacheControl);
   }
 
   @override
@@ -54,6 +63,9 @@ class ModelGuess {
     maxOutput,
     replay,
     replayField,
+    dynamicWebSearch,
+    remoteImageUrls,
+    promptCacheControl,
   );
 }
 
@@ -277,6 +289,9 @@ class ModelDefaultsGuesser {
       maxOutput: maxOutput,
       replay: replay,
       replayField: replayField,
+      dynamicWebSearch: _isClaudeDynamicSearchGeneration(id),
+      remoteImageUrls: !_isKimiK3Wire(id),
+      promptCacheControl: _isClaudeRoute(id),
     );
   }
 
@@ -426,6 +441,23 @@ String _normalizeGuesserId(String modelId) {
   }
   return id.substring(0, at);
 }
+
+/// Anthropic dynamic-filtering search / fetch tool versions (2026-03-18).
+bool _isClaudeDynamicSearchGeneration(String id) {
+  if (id.contains('mythos') || id.contains('fable')) return true;
+  return _isClaude5(id) ||
+      _matches(id, r'claude-opus-4[-.][678](?:$|[._:@/-])') ||
+      _matches(id, r'claude-sonnet-4[-.]6(?:$|[._:@/-])');
+}
+
+/// K3 rejects remote image URLs (local and data URLs still work). K2.x on the
+/// same host accepts them, so this is a model rule, not a host rule.
+bool _isKimiK3Wire(String id) =>
+    _isKimiCodeK3Alias(id) || _matches(id, r'(^|[/_:@])kimi-k3(?:$|[-.:])');
+
+/// OpenRouter accepts `cache_control` only on Claude / Anthropic routes.
+bool _isClaudeRoute(String id) =>
+    id.contains('claude') || id.contains('anthropic/');
 
 bool _isKimiFamily(String id) => id.contains('kimi') || _isKimiCodeK3Alias(id);
 

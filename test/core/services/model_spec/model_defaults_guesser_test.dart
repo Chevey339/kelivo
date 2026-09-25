@@ -679,4 +679,69 @@ void main() {
       expect(ModelDefaultsGuesser.guess('minimax-m3').reasoning, isNull);
     });
   });
+
+  group('request quirks', () {
+    test('dynamic web search follows the Claude generation', () {
+      for (final id in const [
+        'claude-opus-4-6',
+        'claude-opus-4-7',
+        'claude-opus-4.8',
+        'claude-sonnet-4-6',
+        'claude-fable-5',
+        'claude-fable-5-1',
+        'claude-mythos-preview',
+        'claude-opus-5',
+        'claude-opus-5-5',
+        'claude-sonnet-5',
+      ]) {
+        expect(
+          ModelDefaultsGuesser.guess(id).dynamicWebSearch,
+          isTrue,
+          reason: id,
+        );
+      }
+      for (final id in const ['claude-sonnet-4-20250514', 'gpt-5.5']) {
+        expect(
+          ModelDefaultsGuesser.guess(id).dynamicWebSearch,
+          isFalse,
+          reason: id,
+        );
+      }
+    });
+
+    test('only the K3 wire rejects remote image URLs', () {
+      for (final id in const [
+        'k3',
+        'k3-256k',
+        'kimi-k3',
+        'moonshotai/kimi-k3',
+      ]) {
+        expect(
+          ModelDefaultsGuesser.guess(id).remoteImageUrls,
+          isFalse,
+          reason: id,
+        );
+      }
+      for (final id in const ['kimi-k2.6', 'gpt-5.5']) {
+        expect(
+          ModelDefaultsGuesser.guess(id).remoteImageUrls,
+          isTrue,
+          reason: id,
+        );
+      }
+    });
+
+    test('prompt cache control marks Claude routes', () {
+      expect(
+        ModelDefaultsGuesser.guess(
+          'anthropic/claude-opus-5',
+        ).promptCacheControl,
+        isTrue,
+      );
+      expect(
+        ModelDefaultsGuesser.guess('openai/gpt-5.5').promptCacheControl,
+        isFalse,
+      );
+    });
+  });
 }

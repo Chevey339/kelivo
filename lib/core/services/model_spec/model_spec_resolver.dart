@@ -24,6 +24,9 @@ enum ModelSpecField {
   contextWindow,
   maxOutput,
   pricing,
+  dynamicWebSearch,
+  remoteImageUrls,
+  promptCacheControl,
 }
 
 @immutable
@@ -230,7 +233,13 @@ class ModelSpecResolver {
       contextWindow: contextWindow,
       maxOutput: maxOutput,
       pricing: pricing,
+      dynamicWebSearch: guess.dynamicWebSearch,
+      remoteImageUrls: guess.remoteImageUrls,
+      promptCacheControl: guess.promptCacheControl,
     );
+    sources[ModelSpecField.dynamicWebSearch] = SpecSource.guess;
+    sources[ModelSpecField.remoteImageUrls] = SpecSource.guess;
+    sources[ModelSpecField.promptCacheControl] = SpecSource.guess;
     final spec = ov.applyTo(base, applyDisplayName: true);
     _markOverrideSources(ov, sources);
 
@@ -674,6 +683,15 @@ class ModelSpecResolver {
     }
     if (ov.pricing != null) {
       sources[ModelSpecField.pricing] = SpecSource.override;
+    }
+    if (ov.dynamicWebSearch != null) {
+      sources[ModelSpecField.dynamicWebSearch] = SpecSource.override;
+    }
+    if (ov.remoteImageUrls != null) {
+      sources[ModelSpecField.remoteImageUrls] = SpecSource.override;
+    }
+    if (ov.promptCacheControl != null) {
+      sources[ModelSpecField.promptCacheControl] = SpecSource.override;
     }
     final reasoning = ov.reasoning;
     if (reasoning == null || reasoning.isEmpty) return;

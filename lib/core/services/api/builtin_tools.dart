@@ -139,10 +139,6 @@ abstract class BuiltInToolsHelper {
     return host == _dashScopeHost;
   }
 
-  static String _normalizedModelId(String? modelId) {
-    return modelId?.trim().toLowerCase() ?? '';
-  }
-
   static int? _readIntish(Object? raw) {
     if (raw is int) return raw;
     if (raw is String) return int.tryParse(raw.trim());
@@ -572,34 +568,13 @@ abstract class BuiltInToolsHelper {
     return mo;
   }
 
-  /// Anthropic search/fetch tool types differ by model generation.
-  static bool claudeGenerationSupportsDynamicSearchTools(String? modelId) {
-    final normalized = _normalizedModelId(modelId);
-    return normalized.contains('mythos') ||
-        normalized.contains('fable') ||
-        const <String>{
-          'claude-fable-5-1',
-          'claude-fable-5',
-          'claude-opus-5',
-          'claude-opus-4-8',
-          'claude-opus-4-7',
-          'claude-opus-4-6',
-          'claude-sonnet-5',
-          'claude-sonnet-4-6',
-        }.contains(normalized);
-  }
-
   static String claudeBuiltInSearchToolType({
     required ProviderConfig? cfg,
     required String? modelId,
   }) {
     // Tool type version differs by Claude generation (2026-03-18 vs 2025-03-05).
-    final upstreamModelId = BuiltInToolNames.effectiveModelId(
-      cfg: cfg,
-      modelId: modelId,
-    );
     return isClaudeDynamicWebSearchEnabled(cfg: cfg, modelId: modelId) &&
-            claudeGenerationSupportsDynamicSearchTools(upstreamModelId)
+            ModelSpecResolver.instance.spec(cfg!, modelId!).dynamicWebSearch
         ? claudeSearchToolTypeDynamic
         : claudeSearchToolTypeBasic;
   }

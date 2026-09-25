@@ -202,4 +202,34 @@ void main() {
       contains(BuiltInToolNames.urlContext),
     );
   });
+
+  test('request quirks override, persist and reset', () async {
+    final cfg = _cfg(models: const ['kimi-k3']);
+    final settings = await _settings(cfg);
+    final controller = ModelSpecFormController(
+      config: cfg,
+      modelKey: 'kimi-k3',
+      isNew: false,
+    );
+    addTearDown(controller.dispose);
+    expect(controller.spec.remoteImageUrls, isFalse);
+    expect(
+      controller.sourceOf(ModelSpecField.remoteImageUrls),
+      SpecSource.guess,
+    );
+
+    controller.setRemoteImageUrls(true);
+    expect(controller.spec.remoteImageUrls, isTrue);
+    expect(controller.isOverridden(ModelSpecField.remoteImageUrls), isTrue);
+    expect(await controller.save(settings), isTrue);
+    final saved = settings.getProviderConfig(cfg.id);
+    expect((saved.modelOverrides['kimi-k3'] as Map)['remoteImageUrls'], isTrue);
+    expect(
+      ModelSpecResolver.instance.spec(saved, 'kimi-k3').remoteImageUrls,
+      isTrue,
+    );
+
+    controller.reset(ModelSpecField.remoteImageUrls);
+    expect(controller.spec.remoteImageUrls, isFalse);
+  });
 }

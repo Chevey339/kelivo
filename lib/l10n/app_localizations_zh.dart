@@ -3817,6 +3817,30 @@ class AppLocalizationsZh extends AppLocalizations {
   String get modelSpecFormSampling => '采样';
 
   @override
+  String get modelSpecFormRequestQuirks => '请求兼容';
+
+  @override
+  String get modelSpecFormDynamicWebSearch => '动态过滤搜索工具';
+
+  @override
+  String get modelSpecFormDynamicWebSearchSubtitle =>
+      '开启动态过滤时，使用 2026-03-18 版网页搜索与抓取工具';
+
+  @override
+  String get modelSpecFormRemoteImageUrls => '远程图片链接';
+
+  @override
+  String get modelSpecFormRemoteImageUrlsSubtitle =>
+      '直接发送 http(s) 图片链接；关闭后丢弃远程链接，只发送本地图片';
+
+  @override
+  String get modelSpecFormPromptCacheControl => '提示缓存标记';
+
+  @override
+  String get modelSpecFormPromptCacheControlSubtitle =>
+      '开启提示缓存时，在 OpenRouter 请求中加入 cache_control';
+
+  @override
   String get modelSpecFormSamplingAlways => '始终保留';
 
   @override
@@ -15950,6 +15974,30 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get modelSpecFormSampling => '采样';
 
   @override
+  String get modelSpecFormRequestQuirks => '请求兼容';
+
+  @override
+  String get modelSpecFormDynamicWebSearch => '动态过滤搜索工具';
+
+  @override
+  String get modelSpecFormDynamicWebSearchSubtitle =>
+      '开启动态过滤时，使用 2026-03-18 版网页搜索与抓取工具';
+
+  @override
+  String get modelSpecFormRemoteImageUrls => '远程图片链接';
+
+  @override
+  String get modelSpecFormRemoteImageUrlsSubtitle =>
+      '直接发送 http(s) 图片链接；关闭后丢弃远程链接，只发送本地图片';
+
+  @override
+  String get modelSpecFormPromptCacheControl => '提示缓存标记';
+
+  @override
+  String get modelSpecFormPromptCacheControlSubtitle =>
+      '开启提示缓存时，在 OpenRouter 请求中加入 cache_control';
+
+  @override
   String get modelSpecFormSamplingAlways => '始终保留';
 
   @override
@@ -28007,6 +28055,30 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get modelSpecFormSampling => '取樣';
+
+  @override
+  String get modelSpecFormRequestQuirks => '請求相容';
+
+  @override
+  String get modelSpecFormDynamicWebSearch => '動態過濾搜尋工具';
+
+  @override
+  String get modelSpecFormDynamicWebSearchSubtitle =>
+      '開啟動態過濾時，使用 2026-03-18 版網頁搜尋與擷取工具';
+
+  @override
+  String get modelSpecFormRemoteImageUrls => '遠端圖片連結';
+
+  @override
+  String get modelSpecFormRemoteImageUrlsSubtitle =>
+      '直接傳送 http(s) 圖片連結；關閉後捨棄遠端連結，只傳送本機圖片';
+
+  @override
+  String get modelSpecFormPromptCacheControl => '提示快取標記';
+
+  @override
+  String get modelSpecFormPromptCacheControlSubtitle =>
+      '開啟提示快取時，在 OpenRouter 請求中加入 cache_control';
 
   @override
   String get modelSpecFormSamplingAlways => '始終保留';

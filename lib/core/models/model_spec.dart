@@ -178,6 +178,8 @@ double? _asDouble(dynamic raw) {
   return null;
 }
 
+bool? _asBool(dynamic raw) => raw is bool ? raw : null;
+
 String? _asNonEmptyString(dynamic raw) {
   if (raw == null) return null;
   final s = raw.toString().trim();
@@ -618,6 +620,15 @@ class ModelSpec {
   final List<Map<String, String>> body;
   final List<String> builtInTools;
 
+  /// Accepts Anthropic's dynamic-filtering web search / fetch tool versions.
+  final bool dynamicWebSearch;
+
+  /// Accepts `http(s)` image URLs; otherwise images must be inlined.
+  final bool remoteImageUrls;
+
+  /// Accepts Anthropic-style `cache_control` on an OpenAI-compatible route.
+  final bool promptCacheControl;
+
   String get upstreamId => apiModelId ?? id;
 
   bool get supportsTool => abilities.contains(ModelAbility.tool);
@@ -648,6 +659,9 @@ class ModelSpec {
     List<Map<String, String>> headers = const [],
     List<Map<String, String>> body = const [],
     List<String> builtInTools = const [],
+    this.dynamicWebSearch = false,
+    this.remoteImageUrls = true,
+    this.promptCacheControl = false,
   }) : input = _normalizeInputModalities(input),
        output = _normalizeOutputModalities(output, type),
        abilities = _normalizeAbilities(abilities, type),
@@ -671,6 +685,9 @@ class ModelSpec {
     List<Map<String, String>>? headers,
     List<Map<String, String>>? body,
     List<String>? builtInTools,
+    bool? dynamicWebSearch,
+    bool? remoteImageUrls,
+    bool? promptCacheControl,
   }) {
     return ModelSpec(
       id: id ?? this.id,
@@ -688,6 +705,9 @@ class ModelSpec {
       headers: headers ?? this.headers,
       body: body ?? this.body,
       builtInTools: builtInTools ?? this.builtInTools,
+      dynamicWebSearch: dynamicWebSearch ?? this.dynamicWebSearch,
+      remoteImageUrls: remoteImageUrls ?? this.remoteImageUrls,
+      promptCacheControl: promptCacheControl ?? this.promptCacheControl,
     );
   }
 
@@ -710,7 +730,10 @@ class ModelSpec {
             pricing == other.pricing &&
             _rowsEqual(headers, other.headers) &&
             _rowsEqual(body, other.body) &&
-            listEquals(builtInTools, other.builtInTools));
+            listEquals(builtInTools, other.builtInTools) &&
+            dynamicWebSearch == other.dynamicWebSearch &&
+            remoteImageUrls == other.remoteImageUrls &&
+            promptCacheControl == other.promptCacheControl);
   }
 
   @override
@@ -730,6 +753,9 @@ class ModelSpec {
     _rowsHash(headers),
     _rowsHash(body),
     Object.hashAll(builtInTools),
+    dynamicWebSearch,
+    remoteImageUrls,
+    promptCacheControl,
   );
 }
 
@@ -753,6 +779,9 @@ class ModelSpecOverride {
     'contextWindow',
     'maxOutput',
     'pricing',
+    'dynamicWebSearch',
+    'remoteImageUrls',
+    'promptCacheControl',
   };
 
   final String? apiModelId;
@@ -769,6 +798,9 @@ class ModelSpecOverride {
   final List<Map<String, String>>? headers;
   final List<Map<String, String>>? body;
   final List<String>? builtInTools;
+  final bool? dynamicWebSearch;
+  final bool? remoteImageUrls;
+  final bool? promptCacheControl;
   final Map<String, dynamic> extra;
 
   const ModelSpecOverride({
@@ -786,6 +818,9 @@ class ModelSpecOverride {
     this.headers,
     this.body,
     this.builtInTools,
+    this.dynamicWebSearch,
+    this.remoteImageUrls,
+    this.promptCacheControl,
     this.extra = const {},
   });
 
@@ -804,6 +839,9 @@ class ModelSpecOverride {
       headers == null &&
       body == null &&
       builtInTools == null &&
+      dynamicWebSearch == null &&
+      remoteImageUrls == null &&
+      promptCacheControl == null &&
       extra.isEmpty;
 
   ModelSpecOverride copyWith({
@@ -835,6 +873,12 @@ class ModelSpecOverride {
     bool clearBody = false,
     List<String>? builtInTools,
     bool clearBuiltInTools = false,
+    bool? dynamicWebSearch,
+    bool clearDynamicWebSearch = false,
+    bool? remoteImageUrls,
+    bool clearRemoteImageUrls = false,
+    bool? promptCacheControl,
+    bool clearPromptCacheControl = false,
     Map<String, dynamic>? extra,
   }) {
     return ModelSpecOverride(
@@ -856,6 +900,15 @@ class ModelSpecOverride {
       builtInTools: clearBuiltInTools
           ? null
           : (builtInTools ?? this.builtInTools),
+      dynamicWebSearch: clearDynamicWebSearch
+          ? null
+          : (dynamicWebSearch ?? this.dynamicWebSearch),
+      remoteImageUrls: clearRemoteImageUrls
+          ? null
+          : (remoteImageUrls ?? this.remoteImageUrls),
+      promptCacheControl: clearPromptCacheControl
+          ? null
+          : (promptCacheControl ?? this.promptCacheControl),
       extra: extra ?? this.extra,
     );
   }
@@ -886,6 +939,9 @@ class ModelSpecOverride {
       builtInTools: _parseStringList(
         map['builtInTools'] ?? map['built_in_tools'],
       ),
+      dynamicWebSearch: _asBool(map['dynamicWebSearch']),
+      remoteImageUrls: _asBool(map['remoteImageUrls']),
+      promptCacheControl: _asBool(map['promptCacheControl']),
       extra: extra,
     );
   }
@@ -907,6 +963,9 @@ class ModelSpecOverride {
       if (contextWindow != null) 'contextWindow': contextWindow,
       if (maxOutput != null) 'maxOutput': maxOutput,
       if (pricing != null) 'pricing': pricing!.toJson(),
+      if (dynamicWebSearch != null) 'dynamicWebSearch': dynamicWebSearch,
+      if (remoteImageUrls != null) 'remoteImageUrls': remoteImageUrls,
+      if (promptCacheControl != null) 'promptCacheControl': promptCacheControl,
       ...extra,
     };
   }
@@ -935,6 +994,9 @@ class ModelSpecOverride {
       headers: headers ?? base.headers,
       body: body ?? base.body,
       builtInTools: builtInTools ?? base.builtInTools,
+      dynamicWebSearch: dynamicWebSearch ?? base.dynamicWebSearch,
+      remoteImageUrls: remoteImageUrls ?? base.remoteImageUrls,
+      promptCacheControl: promptCacheControl ?? base.promptCacheControl,
     );
     return next == base ? base : next;
   }
@@ -1023,6 +1085,9 @@ class ModelSpecOverride {
             _nullableRowsEqual(headers, other.headers) &&
             _nullableRowsEqual(body, other.body) &&
             listEquals(builtInTools, other.builtInTools) &&
+            dynamicWebSearch == other.dynamicWebSearch &&
+            remoteImageUrls == other.remoteImageUrls &&
+            promptCacheControl == other.promptCacheControl &&
             _deepEquals(extra, other.extra));
   }
 
@@ -1042,6 +1107,7 @@ class ModelSpecOverride {
     headers == null ? null : _rowsHash(headers!),
     body == null ? null : _rowsHash(body!),
     builtInTools == null ? null : Object.hashAll(builtInTools!),
+    Object.hash(dynamicWebSearch, remoteImageUrls, promptCacheControl),
     _deepHash(extra),
   );
 

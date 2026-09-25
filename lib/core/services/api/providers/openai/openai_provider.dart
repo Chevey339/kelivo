@@ -135,8 +135,7 @@ Stream<StreamChunk> sendOpenAIStream(
   final wantsImageOutput = spec.output.contains(Modality.image);
   final bool canImageInput = spec.input.contains(Modality.image);
   final vendor = VendorDefaults.forProvider(config);
-  final bool allowRemoteImages =
-      canImageInput && !disallowsRemoteImageUrls(upstreamModelId);
+  final bool allowRemoteImages = canImageInput && spec.remoteImageUrls;
   // OpenRouter documents delta-style `reasoning_details` chunks that must be
   // concatenated in order, so cumulative-snapshot detection is disabled for
   // it; other providers may resend the full array-so-far with each chunk.
@@ -582,11 +581,7 @@ Stream<StreamChunk> sendOpenAIStream(
       KimiFormulaSearch.mergeTools(body, kimiFormulaTools),
     );
   }
-  applyOpenRouterClaudePromptCaching(
-    body,
-    config: config,
-    upstreamModelId: upstreamModelId,
-  );
+  applyOpenRouterClaudePromptCaching(body, config: config, spec: spec);
 
   applyOpenAIResolvedRequest(
     body,

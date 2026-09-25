@@ -416,29 +416,4 @@ void main() {
       );
     });
   });
-
-  group('Claude search tool versions', () {
-    test('generation helper picks the 2026-03-18 tool for current ids', () {
-      for (final id in const [
-        'claude-opus-4-7',
-        'claude-opus-4-8',
-        'claude-sonnet-4-6',
-        'claude-fable-5',
-        'claude-mythos-preview',
-        'claude-opus-5',
-      ]) {
-        expect(
-          BuiltInToolsHelper.claudeGenerationSupportsDynamicSearchTools(id),
-          isTrue,
-          reason: id,
-        );
-      }
-      expect(
-        BuiltInToolsHelper.claudeGenerationSupportsDynamicSearchTools(
-          'claude-sonnet-4-20250514',
-        ),
-        isFalse,
-      );
-    });
-  });
 }

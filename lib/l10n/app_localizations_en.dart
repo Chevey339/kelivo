@@ -3956,6 +3956,30 @@ class AppLocalizationsEn extends AppLocalizations {
   String get modelSpecFormSampling => 'Sampling';
 
   @override
+  String get modelSpecFormRequestQuirks => 'Request compatibility';
+
+  @override
+  String get modelSpecFormDynamicWebSearch => 'Dynamic filtering search tools';
+
+  @override
+  String get modelSpecFormDynamicWebSearchSubtitle =>
+      'When dynamic filtering is on, send the 2026-03-18 web search and fetch tools';
+
+  @override
+  String get modelSpecFormRemoteImageUrls => 'Remote image links';
+
+  @override
+  String get modelSpecFormRemoteImageUrlsSubtitle =>
+      'Send http(s) image links as-is; when off, remote links are dropped and only local images are sent';
+
+  @override
+  String get modelSpecFormPromptCacheControl => 'Prompt cache marker';
+
+  @override
+  String get modelSpecFormPromptCacheControlSubtitle =>
+      'When prompt caching is on, add cache_control to OpenRouter requests';
+
+  @override
   String get modelSpecFormSamplingAlways => 'Always';
 
   @override

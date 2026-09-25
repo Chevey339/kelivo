@@ -7267,6 +7267,48 @@ abstract class AppLocalizations {
   /// **'Sampling'**
   String get modelSpecFormSampling;
 
+  /// No description provided for @modelSpecFormRequestQuirks.
+  ///
+  /// In en, this message translates to:
+  /// **'Request compatibility'**
+  String get modelSpecFormRequestQuirks;
+
+  /// No description provided for @modelSpecFormDynamicWebSearch.
+  ///
+  /// In en, this message translates to:
+  /// **'Dynamic filtering search tools'**
+  String get modelSpecFormDynamicWebSearch;
+
+  /// No description provided for @modelSpecFormDynamicWebSearchSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'When dynamic filtering is on, send the 2026-03-18 web search and fetch tools'**
+  String get modelSpecFormDynamicWebSearchSubtitle;
+
+  /// No description provided for @modelSpecFormRemoteImageUrls.
+  ///
+  /// In en, this message translates to:
+  /// **'Remote image links'**
+  String get modelSpecFormRemoteImageUrls;
+
+  /// No description provided for @modelSpecFormRemoteImageUrlsSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Send http(s) image links as-is; when off, remote links are dropped and only local images are sent'**
+  String get modelSpecFormRemoteImageUrlsSubtitle;
+
+  /// No description provided for @modelSpecFormPromptCacheControl.
+  ///
+  /// In en, this message translates to:
+  /// **'Prompt cache marker'**
+  String get modelSpecFormPromptCacheControl;
+
+  /// No description provided for @modelSpecFormPromptCacheControlSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'When prompt caching is on, add cache_control to OpenRouter requests'**
+  String get modelSpecFormPromptCacheControlSubtitle;
+
   /// No description provided for @modelSpecFormSamplingAlways.
   ///
   /// In en, this message translates to:

@@ -92,36 +92,16 @@ bool isRemoteHttpUrl(String source) {
   return normalized.startsWith('http://') || normalized.startsWith('https://');
 }
 
-/// K3 rejects remote image URLs (local/data still work). This is a K3 wire
-/// constraint, not a Moonshot host rule — K2.x on the same host accepts
-/// remotes. Guesser has no `allowRemoteImageUrls` field yet.
-bool disallowsRemoteImageUrls(String modelId) {
-  final id = modelId.trim().toLowerCase();
-  if (id == 'k3' || id == 'k3-256k') return true;
-  return RegExp(r'(^|[/_:@])kimi-k3(?:$|[-.:])').hasMatch(id);
-}
-
-bool _isClaudeModelId(String modelId) {
-  final normalized = modelId.trim().toLowerCase();
-  return normalized.contains('claude') || normalized.contains('anthropic/');
-}
-
-bool _shouldCacheClaudeSystemPrompt(
-  ProviderConfig config,
-  String upstreamModelId,
-) {
-  // OpenRouter `cache_control` is accepted only on Claude/Anthropic routes.
-  return config.claudePromptCachingEnabled == true &&
-      BuiltInToolsHelper.isOpenRouterProvider(config) &&
-      _isClaudeModelId(upstreamModelId);
-}
-
 void applyOpenRouterClaudePromptCaching(
   Map<String, dynamic> body, {
   required ProviderConfig config,
-  required String upstreamModelId,
+  required ModelSpec spec,
 }) {
-  if (!_shouldCacheClaudeSystemPrompt(config, upstreamModelId)) return;
+  if (config.claudePromptCachingEnabled != true ||
+      !BuiltInToolsHelper.isOpenRouterProvider(config) ||
+      !spec.promptCacheControl) {
+    return;
+  }
   body['cache_control'] = ProviderConfig.claudePromptCacheControl(
     config.claudePromptCachingTtl,
   );

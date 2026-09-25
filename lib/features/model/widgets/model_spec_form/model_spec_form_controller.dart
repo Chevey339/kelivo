@@ -135,6 +135,9 @@ class ModelSpecFormController extends ChangeNotifier {
       ModelSpecField.contextWindow => draft.contextWindow != null,
       ModelSpecField.maxOutput => draft.maxOutput != null,
       ModelSpecField.pricing => draft.pricing != null,
+      ModelSpecField.dynamicWebSearch => draft.dynamicWebSearch != null,
+      ModelSpecField.remoteImageUrls => draft.remoteImageUrls != null,
+      ModelSpecField.promptCacheControl => draft.promptCacheControl != null,
     };
   }
 
@@ -185,6 +188,12 @@ class ModelSpecFormController extends ChangeNotifier {
       case ModelSpecField.pricing:
         draft = draft.copyWith(clearPricing: true);
         _syncPricingControllers(base.pricing);
+      case ModelSpecField.dynamicWebSearch:
+        draft = draft.copyWith(clearDynamicWebSearch: true);
+      case ModelSpecField.remoteImageUrls:
+        draft = draft.copyWith(clearRemoteImageUrls: true);
+      case ModelSpecField.promptCacheControl:
+        draft = draft.copyWith(clearPromptCacheControl: true);
     }
     _changed();
   }
@@ -369,6 +378,21 @@ class ModelSpecFormController extends ChangeNotifier {
 
   void setReplayField(ReasoningReplayField replayField) {
     _patchReasoning((current) => current.copyWith(replayField: replayField));
+    _changed();
+  }
+
+  void setDynamicWebSearch(bool value) {
+    draft = draft.copyWith(dynamicWebSearch: value);
+    _changed();
+  }
+
+  void setRemoteImageUrls(bool value) {
+    draft = draft.copyWith(remoteImageUrls: value);
+    _changed();
+  }
+
+  void setPromptCacheControl(bool value) {
+    draft = draft.copyWith(promptCacheControl: value);
     _changed();
   }
 
@@ -767,6 +791,9 @@ class ModelSpecFormController extends ChangeNotifier {
     'contextWindow',
     'maxOutput',
     'pricing',
+    'dynamicWebSearch',
+    'remoteImageUrls',
+    'promptCacheControl',
     'headers',
     'body',
     'builtInTools',
