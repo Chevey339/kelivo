@@ -353,7 +353,7 @@ class ProviderManager {
               };
         // Merge custom body overrides
         final extra = _customBody(cfg, modelId);
-        if (extra.isNotEmpty) body.addAll(extra);
+        CustomRequestMerger.applyBody(body, extra);
         // Merge custom headers overrides
         // SiliconFlow fallback key for built-in free models when no API key provided
         String apiKey = _effectiveApiKey(cfg);
@@ -413,7 +413,7 @@ class ProviderManager {
           if (useStream) 'stream': true,
         };
         final extra = _customBody(cfg, modelId);
-        if (extra.isNotEmpty) body.addAll(extra);
+        CustomRequestMerger.applyBody(body, extra);
         final headers = <String, String>{
           'x-api-key': _effectiveApiKey(cfg),
           'anthropic-version': ClaudeProvider.anthropicVersion,
@@ -524,7 +524,7 @@ class ProviderManager {
         }
         headers.addAll(_customHeaders(cfg, modelId));
         final extra = _customBody(cfg, modelId);
-        if (extra.isNotEmpty) body.addAll(extra);
+        CustomRequestMerger.applyBody(body, extra);
         final res = await client.post(
           Uri.parse(url),
           headers: headers,

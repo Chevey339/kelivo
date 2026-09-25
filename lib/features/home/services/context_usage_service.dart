@@ -399,6 +399,8 @@ class ContextUsageService extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Callers do not await this, so a failure falls back to an estimate
+  /// instead of escaping as an uncaught error.
   Future<void> recordUsage({
     required String conversationId,
     required String providerKey,
@@ -409,22 +411,40 @@ class ContextUsageService extends ChangeNotifier {
     Object? requestConfiguration,
     int? requestRevision,
   }) async {
-    if (_disposed || usage.promptTokens <= 0) return;
-    // Callers do not await this; pin the revision before the memory read so a
-    // change made meanwhile invalidates the anchor instead of adopting it.
-    final revision = _chatService.contextRevision(conversationId);
-    final before = _resolvedIdentity(conversationId);
-    if (before == null) return;
-    final String? memoryHash;
     try {
-      memoryHash = await _readMemoryHash(before);
+      await _recordUsage(
+        conversationId: conversationId,
+        providerKey: providerKey,
+        modelId: modelId,
+        usage: usage,
+        assistantMessage: assistantMessage,
+        requestConfiguration: requestConfiguration,
+        requestRevision: requestRevision,
+      );
     } catch (_) {
       if (!_disposed) {
         _clearExactAnchor(conversationId);
         unawaited(refresh(conversationId, force: true));
       }
-      return;
     }
+  }
+
+  Future<void> _recordUsage({
+    required String conversationId,
+    required String providerKey,
+    required String modelId,
+    required TokenUsage usage,
+    required ChatMessage assistantMessage,
+    required Object? requestConfiguration,
+    required int? requestRevision,
+  }) async {
+    if (_disposed || usage.promptTokens <= 0) return;
+    // Pin the revision before the memory read so a change made meanwhile
+    // invalidates the anchor instead of adopting it.
+    final revision = _chatService.contextRevision(conversationId);
+    final before = _resolvedIdentity(conversationId);
+    if (before == null) return;
+    final memoryHash = await _readMemoryHash(before);
     if (_disposed) return;
     _memorySnapshotHashes[conversationId] = memoryHash;
     final resolved = _resolvedIdentity(conversationId);

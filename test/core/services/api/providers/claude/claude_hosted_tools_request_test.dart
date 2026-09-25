@@ -135,6 +135,13 @@ void main() {
         ),
         isFalse,
       );
+      expect(
+        BuiltInToolsHelper.supportsClaudeDynamicWebSearchForModel(
+          cfg: official,
+          modelId: 'claude-haiku-4-5',
+        ),
+        isFalse,
+      );
     });
 
     test('official Claude built-in search can switch to 20260209', () async {

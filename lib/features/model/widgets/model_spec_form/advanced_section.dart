@@ -4,6 +4,7 @@ import '../../../../core/services/model_spec/model_spec_resolver.dart';
 import '../../../../l10n/app_localizations.dart';
 import '../../../provider/widgets/provider_custom_request_editor.dart';
 import 'model_spec_form_controller.dart';
+import 'request_quirks_section.dart';
 import 'spec_field_header.dart';
 
 class AdvancedSection extends StatelessWidget {
@@ -64,6 +65,7 @@ class AdvancedSection extends StatelessWidget {
                 onBodyChanged: (rows) async => controller.setBody(rows),
               ),
             ),
+            RequestQuirksSection(controller: controller),
           ],
         );
       },

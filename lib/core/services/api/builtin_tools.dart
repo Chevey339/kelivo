@@ -497,7 +497,8 @@ abstract class BuiltInToolsHelper {
     required String? modelId,
   }) {
     return _isChatModel(cfg, modelId) &&
-        _claudeUpstreamModelId(cfg: cfg, modelId: modelId) != null;
+        _claudeUpstreamModelId(cfg: cfg, modelId: modelId) != null &&
+        ModelSpecResolver.instance.spec(cfg!, modelId!).dynamicWebSearch;
   }
 
   /// Persisted marker for the dynamic-filtering web search opt-in. Kept as a
@@ -573,8 +574,7 @@ abstract class BuiltInToolsHelper {
     required String? modelId,
   }) {
     // Tool type version differs by Claude generation (2026-03-18 vs 2025-03-05).
-    return isClaudeDynamicWebSearchEnabled(cfg: cfg, modelId: modelId) &&
-            ModelSpecResolver.instance.spec(cfg!, modelId!).dynamicWebSearch
+    return isClaudeDynamicWebSearchEnabled(cfg: cfg, modelId: modelId)
         ? claudeSearchToolTypeDynamic
         : claudeSearchToolTypeBasic;
   }

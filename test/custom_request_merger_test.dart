@@ -62,7 +62,7 @@ void main() {
       expect(merged, {'X-Conversation-Id': 'conversation-123'});
     });
 
-    test('shallow merges body and parses configured string values', () {
+    test('deep merges body layers and parses configured string values', () {
       final merged = CustomRequestMerger.mergeBody(
         assistant: const {
           'shared': 'assistant',
@@ -84,7 +84,11 @@ void main() {
       expect(merged['shared'], 'model');
       expect(merged['assistantOnly'], 3);
       expect(merged['providerOnly'], isTrue);
-      expect(merged['nested'], {'model': true});
+      expect(merged['nested'], {
+        'assistant': true,
+        'provider': true,
+        'model': true,
+      });
       expect(merged, containsPair('nullable', null));
     });
 
@@ -110,11 +114,25 @@ void main() {
 
       expect(body['generationConfig'], {
         'maxOutputTokens': 8192,
-        'thinkingConfig': {'thinkingBudget': 0, 'includeThoughts': true},
+        'thinkingConfig': {'thinkingBudget': 0},
         'responseMimeType': 'application/json',
       });
       expect(body['tools'], isEmpty);
       expect(body, containsPair('temperature', null));
+    });
+
+    test('applyBody replaces reasoning objects whole', () {
+      final body = <String, dynamic>{
+        'thinking': {'type': 'enabled', 'budget_tokens': 4096},
+        'reasoning': {'effort': 'high'},
+      };
+      CustomRequestMerger.applyBody(body, {
+        'thinking': {'type': 'disabled'},
+        'reasoning': {'enabled': false},
+      });
+
+      expect(body['thinking'], {'type': 'disabled'});
+      expect(body['reasoning'], {'enabled': false});
     });
   });
 }
