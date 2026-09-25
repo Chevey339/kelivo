@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import '../../../core/services/incoming_share_service.dart';
 import 'composer_attachment_card.dart';
 import 'dart:collection';
@@ -30,6 +31,7 @@ import '../../../core/services/api/chat_api_service.dart';
 import '../../../core/utils/multimodal_input_utils.dart';
 import '../../../utils/brand_assets.dart';
 import '../../../utils/sandbox_path_resolver.dart';
+import '../../../shared/widgets/interactive_drawer.dart';
 import '../../../shared/widgets/ios_tactile.dart';
 import '../../../shared/widgets/snackbar.dart';
 import '../../../utils/app_directories.dart';
@@ -140,6 +142,7 @@ class ChatInputBar extends StatefulWidget {
     this.hasQueuedInput = false,
     this.queuedPreviewText,
     this.onCancelQueuedInput,
+    this.onExpandedChanged,
     this.reasoningActive = false,
     this.reasoningBudget,
     this.supportsReasoning = true,
@@ -197,6 +200,10 @@ class ChatInputBar extends StatefulWidget {
   final bool hasQueuedInput;
   final String? queuedPreviewText;
   final VoidCallback? onCancelQueuedInput;
+
+  /// Reports when the composer starts filling the chat area and when it has
+  /// finished shrinking back, so the host can ignore its transient heights.
+  final ValueChanged<bool>? onExpandedChanged;
   final bool reasoningActive;
   final int? reasoningBudget;
   final bool supportsReasoning;
@@ -237,9 +244,32 @@ class ChatInputBar extends StatefulWidget {
 }
 
 class _ChatInputBarState extends State<ChatInputBar>
-    with WidgetsBindingObserver {
+    with WidgetsBindingObserver, SingleTickerProviderStateMixin {
   late TextEditingController _controller;
-  bool _isExpanded = false; // Track expand/collapse state for input field
+
+  // Expanding grows the whole composer to fill the height its host allows,
+  // so attachments, tools and send stay in reach while editing long text.
+  static const int _collapsedMaxLines = 5;
+  static const double _expandButtonExtent = 28; // 16 glyph + 2 × 6 padding
+  bool _isExpanded = false;
+  bool _canExpand = false;
+  bool _expandCheckScheduled = false;
+  double _expandFromHeight = 0;
+  // Text area height around the editable line box (padding + decoration),
+  // measured while collapsed so the collapse can aim at an exact height.
+  double _textAreaChrome = 0;
+  InteractiveDrawerController? _hostDrawer;
+  final GlobalKey _composerKey = GlobalKey();
+  final GlobalKey _textAreaKey = GlobalKey();
+  late final AnimationController _expandController = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 320),
+  )..addStatusListener(_handleExpandStatus);
+  late final CurvedAnimation _expandProgress = CurvedAnimation(
+    parent: _expandController,
+    curve: Curves.easeOutCubic,
+    reverseCurve: Curves.easeInCubic,
+  );
   // The ASR provider owns microphone capture. This widget only owns the
   // composer presentation and an exact snapshot used by Cancel.
   final List<double> _voiceLevels = <double>[];
@@ -612,6 +642,11 @@ class _ChatInputBarState extends State<ChatInputBar>
     _processingImageIds.clear();
     _failedImageIds.clear();
     widget.mediaController?._unbind(this);
+    // A host told the composer is expanded must hear it ended, or it keeps
+    // ignoring the input bar's height after this one is replaced.
+    if (!_expandController.isDismissed) widget.onExpandedChanged?.call(false);
+    _expandProgress.dispose();
+    _expandController.dispose();
     if (widget.controller == null) {
       _controller.dispose();
     }
@@ -654,15 +689,109 @@ class _ChatInputBarState extends State<ChatInputBar>
     return l10n.chatInputBarHint;
   }
 
-  /// Returns the number of lines in the input text (minimum 1).
-  int get _lineCount {
-    final text = _controller.text;
-    if (text.isEmpty) return 1;
-    return text.split('\n').length;
+  // ---------------------------------------------------------------------------
+  // Expanded editing
+  // ---------------------------------------------------------------------------
+
+  /// True from the moment expansion starts until the collapse animation ends.
+  bool get _expandedLayout => _isExpanded || !_expandController.isDismissed;
+
+  RenderEditable? _findRenderEditable() {
+    RenderEditable? found;
+    void visit(RenderObject node) {
+      if (found != null) return;
+      if (node is RenderEditable) {
+        found = node;
+        return;
+      }
+      node.visitChildren(visit);
+    }
+
+    final root = _textAreaKey.currentContext?.findRenderObject();
+    if (root != null) visit(root);
+    return found;
   }
 
-  /// Whether to show the expand/collapse button (when text has 3+ lines).
-  bool get _showExpandButton => _lineCount >= 3;
+  /// Offers expansion once the collapsed field wraps onto a third line.
+  void _scheduleExpandCheck() {
+    if (_expandCheckScheduled) return;
+    _expandCheckScheduled = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _expandCheckScheduled = false;
+      if (!mounted || _expandedLayout) return;
+      final editable = _findRenderEditable();
+      if (editable == null || !editable.hasSize) return;
+      // Judge the text at the width it has while the button is shown. The
+      // button narrows the field, and a long unbreakable word can then wrap
+      // onto fewer lines, so measuring the current width would let the
+      // button toggle itself on and off every frame.
+      final buttonWidth = _canExpand
+          ? editable.size.width
+          : editable.size.width -
+                (_expandButtonExtent + AppSpacing.xs - AppSpacing.md);
+      final canExpand =
+          editable.getMaxIntrinsicHeight(buttonWidth) >
+          editable.preferredLineHeight * 2.5;
+      if (canExpand != _canExpand) setState(() => _canExpand = canExpand);
+    });
+  }
+
+  void _setExpanded(bool expanded) {
+    if (expanded == _isExpanded) return;
+    final composer = _composerKey.currentContext?.findRenderObject();
+    final textArea = _textAreaKey.currentContext?.findRenderObject();
+    final editable = _findRenderEditable();
+    if (composer is RenderBox &&
+        composer.hasSize &&
+        textArea is RenderBox &&
+        textArea.hasSize &&
+        editable != null &&
+        editable.hasSize) {
+      if (!expanded) {
+        // Animate back to exactly the height the collapsed field will take
+        // for the current text, which may differ from where expansion began.
+        final line = editable.preferredLineHeight;
+        final collapsedText = editable
+            .getMaxIntrinsicHeight(editable.size.width)
+            .clamp(line, line * _collapsedMaxLines);
+        _expandFromHeight =
+            composer.size.height -
+            textArea.size.height +
+            _textAreaChrome +
+            collapsedText;
+      } else if (_expandController.isDismissed) {
+        _expandFromHeight = composer.size.height;
+        _textAreaChrome = textArea.size.height - editable.size.height;
+      }
+    }
+    if (expanded && _expandController.isDismissed) {
+      widget.onExpandedChanged?.call(true);
+    }
+    setState(() => _isExpanded = expanded);
+    if (expanded) {
+      _expandController.forward();
+      widget.focusNode?.requestFocus();
+    } else {
+      _expandController.reverse();
+    }
+  }
+
+  void _handleExpandStatus(AnimationStatus status) {
+    if (!mounted) return;
+    if (status == AnimationStatus.completed) {
+      _ensureCaretVisible();
+    } else if (status == AnimationStatus.dismissed) {
+      setState(() {});
+      widget.onExpandedChanged?.call(false);
+    }
+  }
+
+  void _handleExpandedPop(bool didPop, Object? _) {
+    // An open drawer's own PopScope takes this back press; Flutter notifies
+    // every PopScope, so collapsing too would spend one press on two things.
+    if (didPop || !(_hostDrawer?.isClosed ?? true)) return;
+    _setExpanded(false);
+  }
 
   // ---------------------------------------------------------------------------
   // Voice input
@@ -1007,6 +1136,14 @@ class _ChatInputBarState extends State<ChatInputBar>
         widget.mediaController?.sharedDraftAction.value = null;
         _discardImageState(submittedImageIds);
         setState(() {});
+        // Collapse once the cleared text is laid out, so the animation lands
+        // on the empty field's height. A rejected send keeps the editor open
+        // for the restored draft.
+        if (_isExpanded) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted) _setExpanded(false);
+          });
+        }
         // Keep focus on desktop so user can continue typing
         try {
           if (Platform.isMacOS || Platform.isWindows || Platform.isLinux) {
@@ -1266,6 +1403,14 @@ class _ChatInputBarState extends State<ChatInputBar>
         key == LogicalKeyboardKey.arrowLeft ||
         key == LogicalKeyboardKey.arrowRight;
     final isPasteV = key == LogicalKeyboardKey.keyV;
+
+    final imeComposing =
+        _controller.value.composing.isValid &&
+        !_controller.value.composing.isCollapsed;
+    if (key == LogicalKeyboardKey.escape && _isExpanded && !imeComposing) {
+      if (isDown) _setExpanded(false);
+      return KeyEventResult.handled;
+    }
 
     // Enter handling on tablet/desktop: configurable shortcut
     if (isEnter && isTabletOrDesktop) {
@@ -2581,516 +2726,584 @@ class _ChatInputBarState extends State<ChatInputBar>
     final hasImages = _images.isNotEmpty;
     final hasDocs = _docs.isNotEmpty;
     _supportsImagesApiRouting(context);
-    final size = MediaQuery.sizeOf(context);
-    final viewInsets = MediaQuery.viewInsetsOf(context);
-    final bool isMobileLayout = size.width < AppBreakpoints.tablet;
-    final double visibleHeight = size.height - viewInsets.bottom;
-    final double attachmentPreviewHeight = (hasDocs || hasImages)
-        ? AppSpacing.sm +
-              ComposerAttachmentCard.heightFor(context) +
-              AppSpacing.xxs
-        : 0;
-    const double baseChromeHeight = 120; // padding + action row + chrome buffer
-    double maxInputHeight = double.infinity;
-    if (isMobileLayout) {
-      final double available =
-          visibleHeight - attachmentPreviewHeight - baseChromeHeight;
-      final double softCap = visibleHeight * 0.45;
-      if (available > 0) {
-        maxInputHeight = math.min(softCap, available);
-        maxInputHeight = math.min(available, math.max(80.0, maxInputHeight));
-      } else {
-        maxInputHeight = math.max(80.0, softCap);
-      }
-    }
-    // Cap text field height on mobile so expanded input stays above the keyboard.
-    final BoxConstraints textFieldConstraints =
-        (isMobileLayout && maxInputHeight.isFinite && maxInputHeight > 0)
-        ? BoxConstraints(maxHeight: maxInputHeight)
-        : const BoxConstraints();
+    final bool isMobileLayout =
+        MediaQuery.sizeOf(context).width < AppBreakpoints.tablet;
+    final expandedLayout = _expandedLayout;
+    if (!expandedLayout) _scheduleExpandCheck();
+    _hostDrawer = InteractiveDrawer.maybeControllerOf(context);
 
-    return SafeArea(
-      top: false,
-      left: false,
-      right: false,
-      bottom: true,
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(
-          AppSpacing.sm,
-          AppSpacing.xxs,
-          AppSpacing.sm,
-          AppSpacing.xs,
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            if (widget.hasQueuedInput) ...[
-              _QueuedInputBanner(
-                label: AppLocalizations.of(context)!.chatInputBarQueuedPending,
-                previewText: widget.queuedPreviewText,
-                cancelLabel: AppLocalizations.of(
-                  context,
-                )!.chatInputBarQueuedCancel,
-                onCancel: widget.onCancelQueuedInput,
-              ),
-              const SizedBox(height: AppSpacing.xs),
-            ],
-            Stack(
-              clipBehavior: Clip.none,
-              children: [
-                // Main input container with iOS-like frosted glass effect
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(20),
-                  child: BackdropFilter(
-                    filter: ui.ImageFilter.blur(sigmaX: 14, sigmaY: 14),
-                    child: Container(
-                      decoration: BoxDecoration(
-                        // Translucent background over blurred content
-                        color: inputFillColor,
+    return PopScope(
+      canPop: !_isExpanded,
+      onPopInvokedWithResult: _handleExpandedPop,
+      child: SafeArea(
+        top: false,
+        left: false,
+        right: false,
+        bottom: true,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(
+            AppSpacing.sm,
+            AppSpacing.xxs,
+            AppSpacing.sm,
+            AppSpacing.xs,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (widget.hasQueuedInput) ...[
+                _QueuedInputBanner(
+                  label: AppLocalizations.of(
+                    context,
+                  )!.chatInputBarQueuedPending,
+                  previewText: widget.queuedPreviewText,
+                  cancelLabel: AppLocalizations.of(
+                    context,
+                  )!.chatInputBarQueuedCancel,
+                  onCancel: widget.onCancelQueuedInput,
+                ),
+                const SizedBox(height: AppSpacing.xs),
+              ],
+              Flexible(
+                child: Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    // Main input container with iOS-like frosted glass effect
+                    _buildExpandingComposer(
+                      expandedLayout,
+                      ClipRRect(
+                        key: _composerKey,
                         borderRadius: BorderRadius.circular(20),
-                        // Use previous gray border for better contrast on white
-                        border: Border.all(
-                          color: isDark
-                              ? theme.colorScheme.onSurface.withValues(
-                                  alpha: 0.10,
-                                )
-                              : theme.colorScheme.outline.withValues(
-                                  alpha: 0.20,
-                                ),
-                          width: 1,
-                        ),
-                      ),
-                      child: Column(
-                        children: [
-                          if (widget.mediaController != null) ...[
-                            ValueListenableBuilder<ShareImportProgress?>(
-                              valueListenable:
-                                  widget.mediaController!.shareImport,
-                              builder: (context, progress, _) =>
-                                  progress == null
-                                  ? const SizedBox.shrink()
-                                  : ComposerImportProgress(
-                                      progress: progress,
-                                      onCancel: () => widget
-                                          .mediaController!
-                                          .cancelShareImport
-                                          ?.call(),
-                                    ),
+                        child: BackdropFilter(
+                          filter: ui.ImageFilter.blur(sigmaX: 14, sigmaY: 14),
+                          child: Container(
+                            decoration: BoxDecoration(
+                              // Translucent background over blurred content
+                              color: inputFillColor,
+                              borderRadius: BorderRadius.circular(20),
+                              // Use previous gray border for better contrast on white
+                              border: Border.all(
+                                color: isDark
+                                    ? theme.colorScheme.onSurface.withValues(
+                                        alpha: 0.10,
+                                      )
+                                    : theme.colorScheme.outline.withValues(
+                                        alpha: 0.20,
+                                      ),
+                                width: 1,
+                              ),
                             ),
-                            if (isMobileLayout &&
-                                (hasText || hasDocs || hasImages))
-                              ValueListenableBuilder<VoidCallback?>(
-                                valueListenable:
-                                    widget.mediaController!.sharedDraftAction,
-                                builder: (context, onMove, _) => onMove == null
-                                    ? const SizedBox.shrink()
-                                    : Padding(
-                                        padding: const EdgeInsets.fromLTRB(
-                                          12,
-                                          8,
-                                          8,
-                                          0,
-                                        ),
-                                        child: Row(
-                                          children: [
-                                            Text(
-                                              AppLocalizations.of(
-                                                context,
-                                              )!.incomingShareTitle,
-                                              style: TextStyle(
-                                                fontSize: 12,
-                                                color: theme
-                                                    .colorScheme
-                                                    .onSurfaceVariant,
-                                              ),
-                                            ),
-                                            const Spacer(),
-                                            IosCardPress(
-                                              onTap: onMove,
-                                              haptics: false,
-                                              baseColor: Colors.transparent,
-                                              borderRadius:
-                                                  BorderRadius.circular(8),
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                if (widget.mediaController != null) ...[
+                                  ValueListenableBuilder<ShareImportProgress?>(
+                                    valueListenable:
+                                        widget.mediaController!.shareImport,
+                                    builder: (context, progress, _) =>
+                                        progress == null
+                                        ? const SizedBox.shrink()
+                                        : ComposerImportProgress(
+                                            progress: progress,
+                                            onCancel: () => widget
+                                                .mediaController!
+                                                .cancelShareImport
+                                                ?.call(),
+                                          ),
+                                  ),
+                                  if (isMobileLayout &&
+                                      (hasText || hasDocs || hasImages))
+                                    ValueListenableBuilder<VoidCallback?>(
+                                      valueListenable: widget
+                                          .mediaController!
+                                          .sharedDraftAction,
+                                      builder: (context, onMove, _) =>
+                                          onMove == null
+                                          ? const SizedBox.shrink()
+                                          : Padding(
                                               padding:
-                                                  const EdgeInsets.symmetric(
-                                                    horizontal: 8,
-                                                    vertical: 6,
+                                                  const EdgeInsets.fromLTRB(
+                                                    12,
+                                                    8,
+                                                    8,
+                                                    0,
                                                   ),
                                               child: Row(
-                                                mainAxisSize: MainAxisSize.min,
                                                 children: [
                                                   Text(
                                                     AppLocalizations.of(
                                                       context,
-                                                    )!.incomingShareMoveTo,
+                                                    )!.incomingShareTitle,
                                                     style: TextStyle(
                                                       fontSize: 12,
                                                       color: theme
                                                           .colorScheme
-                                                          .primary,
-                                                      fontWeight:
-                                                          AppFontWeights.medium,
+                                                          .onSurfaceVariant,
                                                     ),
                                                   ),
-                                                  const SizedBox(width: 4),
-                                                  Icon(
-                                                    Lucide.ArrowRight,
-                                                    size: 14,
-                                                    color: theme
-                                                        .colorScheme
-                                                        .primary,
+                                                  const Spacer(),
+                                                  IosCardPress(
+                                                    onTap: onMove,
+                                                    haptics: false,
+                                                    baseColor:
+                                                        Colors.transparent,
+                                                    borderRadius:
+                                                        BorderRadius.circular(
+                                                          8,
+                                                        ),
+                                                    padding:
+                                                        const EdgeInsets.symmetric(
+                                                          horizontal: 8,
+                                                          vertical: 6,
+                                                        ),
+                                                    child: Row(
+                                                      mainAxisSize:
+                                                          MainAxisSize.min,
+                                                      children: [
+                                                        Text(
+                                                          AppLocalizations.of(
+                                                            context,
+                                                          )!.incomingShareMoveTo,
+                                                          style: TextStyle(
+                                                            fontSize: 12,
+                                                            color: theme
+                                                                .colorScheme
+                                                                .primary,
+                                                            fontWeight:
+                                                                AppFontWeights
+                                                                    .medium,
+                                                          ),
+                                                        ),
+                                                        const SizedBox(
+                                                          width: 4,
+                                                        ),
+                                                        Icon(
+                                                          Lucide.ArrowRight,
+                                                          size: 14,
+                                                          color: theme
+                                                              .colorScheme
+                                                              .primary,
+                                                        ),
+                                                      ],
+                                                    ),
                                                   ),
                                                 ],
                                               ),
                                             ),
-                                          ],
+                                    ),
+                                ],
+                                if (hasDocs || hasImages)
+                                  _buildInlineAttachmentPreviews(
+                                    context,
+                                    isDark,
+                                  ),
+                                // Input field with expand/collapse button. The
+                                // collapsed field may shrink when the host is short;
+                                // the expanded one takes every spare pixel.
+                                Flexible(
+                                  fit: expandedLayout
+                                      ? FlexFit.tight
+                                      : FlexFit.loose,
+                                  child: Stack(
+                                    key: _textAreaKey,
+                                    fit: expandedLayout
+                                        ? StackFit.expand
+                                        : StackFit.loose,
+                                    children: [
+                                      Padding(
+                                        padding: EdgeInsetsDirectional.fromSTEB(
+                                          AppSpacing.md,
+                                          AppSpacing.xxs,
+                                          expandedLayout || _canExpand
+                                              ? _expandButtonExtent +
+                                                    AppSpacing.xs
+                                              : AppSpacing.md,
+                                          AppSpacing.xs,
+                                        ),
+                                        child: Focus(
+                                          onKeyEvent: _handleKeyEvent,
+                                          child: Builder(
+                                            builder: (ctx) {
+                                              // Desktop: show a right-click context menu with paste/cut/copy/select all
+                                              // Future<void> _showDesktopContextMenu(Offset globalPos) async {
+                                              //   bool isDesktop = false;
+                                              //   try { isDesktop = Platform.isMacOS || Platform.isWindows || Platform.isLinux; } catch (_) {}
+                                              //   if (!isDesktop) return;
+                                              //   // Ensure input has focus so operations apply correctly
+                                              //   try { widget.focusNode?.requestFocus(); } catch (_) {}
+                                              //
+                                              //   final sel = _controller.selection;
+                                              //   final hasSelection = sel.isValid && !sel.isCollapsed;
+                                              //   final hasText = _controller.text.isNotEmpty;
+                                              //
+                                              //   final l10n = MaterialLocalizations.of(ctx);
+                                              //   await showDesktopContextMenuAt(
+                                              //     ctx,
+                                              //     globalPosition: globalPos,
+                                              //     items: [
+                                              //       DesktopContextMenuItem(
+                                              //         icon: Lucide.Clipboard,
+                                              //         label: l10n.pasteButtonLabel,
+                                              //         onTap: () async {
+                                              //           await _handlePasteFromClipboard();
+                                              //         },
+                                              //       ),
+                                              //       DesktopContextMenuItem(
+                                              //         icon: Lucide.Cut,
+                                              //         label: l10n.cutButtonLabel,
+                                              //         onTap: () async {
+                                              //           final s = _controller.selection;
+                                              //           if (s.isValid && !s.isCollapsed) {
+                                              //             final text = _controller.text.substring(s.start, s.end);
+                                              //             try { await Clipboard.setData(ClipboardData(text: text)); } catch (_) {}
+                                              //             final newText = _controller.text.replaceRange(s.start, s.end, '');
+                                              //             _controller.value = TextEditingValue(
+                                              //               text: newText,
+                                              //               selection: TextSelection.collapsed(offset: s.start),
+                                              //             );
+                                              //             setState(() {});
+                                              //           }
+                                              //         },
+                                              //       ),
+                                              //       DesktopContextMenuItem(
+                                              //         icon: Lucide.Copy,
+                                              //         label: l10n.copyButtonLabel,
+                                              //         onTap: () async {
+                                              //           final s2 = _controller.selection;
+                                              //           if (s2.isValid && !s2.isCollapsed) {
+                                              //             final text = _controller.text.substring(s2.start, s2.end);
+                                              //             try { await Clipboard.setData(ClipboardData(text: text)); } catch (_) {}
+                                              //           }
+                                              //         },
+                                              //       ),
+                                              //       // DesktopContextMenuItem(
+                                              //       //   // icon: Lucide.TextSelect,
+                                              //       //   label: l10n.selectAllButtonLabel,
+                                              //       //   onTap: () {
+                                              //       //     if (hasText) {
+                                              //       //       _controller.selection = TextSelection(baseOffset: 0, extentOffset: _controller.text.length);
+                                              //       //       setState(() {});
+                                              //       //     }
+                                              //       //   },
+                                              //       // ),
+                                              //     ],
+                                              //   );
+                                              // }
+
+                                              final enterToSend = context
+                                                  .watch<SettingsProvider>()
+                                                  .enterToSendOnMobile;
+                                              return GestureDetector(
+                                                behavior: HitTestBehavior
+                                                    .deferToChild,
+                                                // onSecondaryTapDown: (details) {
+                                                //   // _showDesktopContextMenu(details.globalPosition);
+                                                // },
+                                                child: TextField(
+                                                  controller: _controller,
+                                                  focusNode: widget.focusNode,
+                                                  onChanged: _onTextChanged,
+                                                  contentInsertionConfiguration:
+                                                      ContentInsertionConfiguration(
+                                                        onContentInserted:
+                                                            _handleInsertedContent,
+                                                        allowedMimeTypes:
+                                                            const [
+                                                              'image/png',
+                                                              'image/jpeg',
+                                                              'image/jpg',
+                                                              'image/gif',
+                                                              'image/webp',
+                                                            ],
+                                                      ),
+                                                  readOnly:
+                                                      _composerLocked ||
+                                                      _ownsVoiceSession,
+                                                  minLines: expandedLayout
+                                                      ? null
+                                                      : 1,
+                                                  maxLines: expandedLayout
+                                                      ? null
+                                                      : _collapsedMaxLines,
+                                                  expands: expandedLayout,
+                                                  // On mobile, optionally show "Send" on the return key and submit on tap.
+                                                  // Still keep multiline so pasted text preserves line breaks.
+                                                  keyboardType:
+                                                      TextInputType.multiline,
+                                                  textInputAction: enterToSend
+                                                      ? TextInputAction.send
+                                                      : TextInputAction.newline,
+                                                  onSubmitted: enterToSend
+                                                      ? (_) => unawaited(
+                                                          _handleSend(),
+                                                        )
+                                                      : null,
+                                                  // Custom context menu: use instance method to avoid flickering
+                                                  // caused by recreating the callback on every build.
+                                                  // See: https://github.com/flutter/flutter/issues/150551
+                                                  contextMenuBuilder:
+                                                      _buildContextMenu,
+                                                  autofocus: false,
+                                                  decoration: InputDecoration(
+                                                    hintText: _hint(context),
+                                                    hintStyle: TextStyle(
+                                                      color: theme
+                                                          .colorScheme
+                                                          .onSurface
+                                                          .withValues(
+                                                            alpha: 0.45,
+                                                          ),
+                                                    ),
+                                                    border: InputBorder.none,
+                                                    contentPadding:
+                                                        const EdgeInsets.symmetric(
+                                                          vertical: 2,
+                                                        ),
+                                                  ),
+                                                  style: TextStyle(
+                                                    color: theme
+                                                        .colorScheme
+                                                        .onSurface,
+                                                    fontSize:
+                                                        (Platform.isWindows ||
+                                                            Platform.isLinux ||
+                                                            Platform.isMacOS)
+                                                        ? 14
+                                                        : 15,
+                                                  ),
+                                                  cursorColor:
+                                                      theme.colorScheme.primary,
+                                                ),
+                                              );
+                                            },
+                                          ),
                                         ),
                                       ),
-                              ),
-                          ],
-                          if (hasDocs || hasImages)
-                            _buildInlineAttachmentPreviews(context, isDark),
-                          // Input field with expand/collapse button
-                          Stack(
-                            children: [
-                              Padding(
-                                padding: const EdgeInsets.fromLTRB(
-                                  AppSpacing.md,
-                                  AppSpacing.xxs,
-                                  AppSpacing.md,
-                                  AppSpacing.xs,
-                                ),
-                                child: ConstrainedBox(
-                                  constraints: textFieldConstraints,
-                                  child: Focus(
-                                    onKeyEvent: _handleKeyEvent,
-                                    child: Builder(
-                                      builder: (ctx) {
-                                        // Desktop: show a right-click context menu with paste/cut/copy/select all
-                                        // Future<void> _showDesktopContextMenu(Offset globalPos) async {
-                                        //   bool isDesktop = false;
-                                        //   try { isDesktop = Platform.isMacOS || Platform.isWindows || Platform.isLinux; } catch (_) {}
-                                        //   if (!isDesktop) return;
-                                        //   // Ensure input has focus so operations apply correctly
-                                        //   try { widget.focusNode?.requestFocus(); } catch (_) {}
-                                        //
-                                        //   final sel = _controller.selection;
-                                        //   final hasSelection = sel.isValid && !sel.isCollapsed;
-                                        //   final hasText = _controller.text.isNotEmpty;
-                                        //
-                                        //   final l10n = MaterialLocalizations.of(ctx);
-                                        //   await showDesktopContextMenuAt(
-                                        //     ctx,
-                                        //     globalPosition: globalPos,
-                                        //     items: [
-                                        //       DesktopContextMenuItem(
-                                        //         icon: Lucide.Clipboard,
-                                        //         label: l10n.pasteButtonLabel,
-                                        //         onTap: () async {
-                                        //           await _handlePasteFromClipboard();
-                                        //         },
-                                        //       ),
-                                        //       DesktopContextMenuItem(
-                                        //         icon: Lucide.Cut,
-                                        //         label: l10n.cutButtonLabel,
-                                        //         onTap: () async {
-                                        //           final s = _controller.selection;
-                                        //           if (s.isValid && !s.isCollapsed) {
-                                        //             final text = _controller.text.substring(s.start, s.end);
-                                        //             try { await Clipboard.setData(ClipboardData(text: text)); } catch (_) {}
-                                        //             final newText = _controller.text.replaceRange(s.start, s.end, '');
-                                        //             _controller.value = TextEditingValue(
-                                        //               text: newText,
-                                        //               selection: TextSelection.collapsed(offset: s.start),
-                                        //             );
-                                        //             setState(() {});
-                                        //           }
-                                        //         },
-                                        //       ),
-                                        //       DesktopContextMenuItem(
-                                        //         icon: Lucide.Copy,
-                                        //         label: l10n.copyButtonLabel,
-                                        //         onTap: () async {
-                                        //           final s2 = _controller.selection;
-                                        //           if (s2.isValid && !s2.isCollapsed) {
-                                        //             final text = _controller.text.substring(s2.start, s2.end);
-                                        //             try { await Clipboard.setData(ClipboardData(text: text)); } catch (_) {}
-                                        //           }
-                                        //         },
-                                        //       ),
-                                        //       // DesktopContextMenuItem(
-                                        //       //   // icon: Lucide.TextSelect,
-                                        //       //   label: l10n.selectAllButtonLabel,
-                                        //       //   onTap: () {
-                                        //       //     if (hasText) {
-                                        //       //       _controller.selection = TextSelection(baseOffset: 0, extentOffset: _controller.text.length);
-                                        //       //       setState(() {});
-                                        //       //     }
-                                        //       //   },
-                                        //       // ),
-                                        //     ],
-                                        //   );
-                                        // }
-
-                                        final enterToSend = context
-                                            .watch<SettingsProvider>()
-                                            .enterToSendOnMobile;
-                                        return GestureDetector(
-                                          behavior:
-                                              HitTestBehavior.deferToChild,
-                                          // onSecondaryTapDown: (details) {
-                                          //   // _showDesktopContextMenu(details.globalPosition);
-                                          // },
-                                          child: TextField(
-                                            controller: _controller,
-                                            focusNode: widget.focusNode,
-                                            onChanged: _onTextChanged,
-                                            contentInsertionConfiguration:
-                                                ContentInsertionConfiguration(
-                                                  onContentInserted:
-                                                      _handleInsertedContent,
-                                                  allowedMimeTypes: const [
-                                                    'image/png',
-                                                    'image/jpeg',
-                                                    'image/jpg',
-                                                    'image/gif',
-                                                    'image/webp',
-                                                  ],
-                                                ),
-                                            readOnly:
-                                                _composerLocked ||
-                                                _ownsVoiceSession,
-                                            minLines: 1,
-                                            maxLines: _isExpanded ? 25 : 5,
-                                            // On mobile, optionally show "Send" on the return key and submit on tap.
-                                            // Still keep multiline so pasted text preserves line breaks.
-                                            keyboardType:
-                                                TextInputType.multiline,
-                                            textInputAction: enterToSend
-                                                ? TextInputAction.send
-                                                : TextInputAction.newline,
-                                            onSubmitted: enterToSend
-                                                ? (_) =>
-                                                      unawaited(_handleSend())
-                                                : null,
-                                            // Custom context menu: use instance method to avoid flickering
-                                            // caused by recreating the callback on every build.
-                                            // See: https://github.com/flutter/flutter/issues/150551
-                                            contextMenuBuilder:
-                                                _buildContextMenu,
-                                            autofocus: false,
-                                            decoration: InputDecoration(
-                                              hintText: _hint(context),
-                                              hintStyle: TextStyle(
-                                                color: theme
-                                                    .colorScheme
-                                                    .onSurface
-                                                    .withValues(alpha: 0.45),
-                                              ),
-                                              border: InputBorder.none,
-                                              contentPadding:
-                                                  const EdgeInsets.symmetric(
-                                                    vertical: 2,
-                                                  ),
-                                            ),
-                                            style: TextStyle(
-                                              color:
-                                                  theme.colorScheme.onSurface,
-                                              fontSize:
-                                                  (Platform.isWindows ||
-                                                      Platform.isLinux ||
-                                                      Platform.isMacOS)
-                                                  ? 14
-                                                  : 15,
-                                            ),
-                                            cursorColor:
-                                                theme.colorScheme.primary,
-                                          ),
-                                        );
-                                      },
-                                    ),
-                                  ),
-                                ),
-                              ),
-                              // Expand/Collapse icon button (only shown when 3+ lines)
-                              if (_showExpandButton)
-                                Positioned(
-                                  top: 10,
-                                  right: 12,
-                                  child: GestureDetector(
-                                    onTap: () {
-                                      setState(
-                                        () => _isExpanded = !_isExpanded,
-                                      );
-                                      _ensureCaretVisible();
-                                    },
-                                    child: Icon(
-                                      _isExpanded
-                                          ? Lucide.ChevronsDownUp
-                                          : Lucide.ChevronsUpDown,
-                                      size: 16,
-                                      color: theme.colorScheme.onSurface
-                                          .withValues(alpha: 0.45),
-                                    ),
-                                  ),
-                                ),
-                            ],
-                          ),
-                          // Bottom buttons row (no divider)
-                          Padding(
-                            padding: const EdgeInsets.fromLTRB(
-                              AppSpacing.xs,
-                              0,
-                              AppSpacing.xs,
-                              AppSpacing.xs,
-                            ),
-                            child: AnimatedSwitcher(
-                              duration: const Duration(milliseconds: 260),
-                              switchInCurve: Curves.easeOutCubic,
-                              switchOutCurve: Curves.easeInCubic,
-                              transitionBuilder: (child, anim) =>
-                                  FadeTransition(
-                                    opacity: anim,
-                                    child: SlideTransition(
-                                      position: Tween<Offset>(
-                                        begin: const Offset(0, 0.35),
-                                        end: Offset.zero,
-                                      ).animate(anim),
-                                      child: child,
-                                    ),
-                                  ),
-                              child: _ownsVoiceSession
-                                  ? _buildVoiceRecordingRow(context, theme)
-                                  : Row(
-                                      key: const ValueKey('actions'),
-                                      mainAxisAlignment:
-                                          MainAxisAlignment.spaceBetween,
-                                      children: [
-                                        // Responsive left action bar that overflows into a + menu on desktop
-                                        Expanded(
-                                          child: _buildResponsiveLeftActions(
-                                            context,
+                                      if (expandedLayout || _canExpand)
+                                        PositionedDirectional(
+                                          top: 2,
+                                          end: 6,
+                                          child: IosIconButton(
+                                            icon: _isExpanded
+                                                ? Lucide.Minimize2
+                                                : Lucide.Maximize2,
+                                            size: 16,
+                                            color: theme.colorScheme.onSurface
+                                                .withValues(alpha: 0.45),
+                                            tooltip: _isExpanded
+                                                ? AppLocalizations.of(
+                                                    context,
+                                                  )!.chatInputBarCollapse
+                                                : AppLocalizations.of(
+                                                    context,
+                                                  )!.chatInputBarExpand,
+                                            onTap: () =>
+                                                _setExpanded(!_isExpanded),
                                           ),
                                         ),
-                                        Row(
-                                          children: [
-                                            if (widget.showMoreButton) ...[
-                                              _CompactIconButton(
-                                                tooltip: AppLocalizations.of(
-                                                  context,
-                                                )!.chatInputBarMoreTooltip,
-                                                icon: Lucide.Plus,
-                                                active: widget.moreOpen,
-                                                onTap: _composerLocked
-                                                    ? null
-                                                    : widget.onMore,
-                                                childBuilder: (c) =>
-                                                    AnimatedSwitcher(
-                                                      duration: const Duration(
-                                                        milliseconds: 200,
-                                                      ),
-                                                      transitionBuilder:
-                                                          (
-                                                            child,
-                                                            anim,
-                                                          ) => RotationTransition(
-                                                            turns:
-                                                                Tween<double>(
-                                                                  begin: 0.85,
-                                                                  end: 1,
-                                                                ).animate(anim),
-                                                            child:
-                                                                FadeTransition(
-                                                                  opacity: anim,
-                                                                  child: child,
-                                                                ),
-                                                          ),
-                                                      child: Icon(
-                                                        widget.moreOpen
-                                                            ? Lucide.X
-                                                            : Lucide.Plus,
-                                                        key: ValueKey(
-                                                          widget.moreOpen
-                                                              ? 'close'
-                                                              : 'add',
-                                                        ),
-                                                        size: 20,
-                                                        color: c,
-                                                      ),
+                                    ],
+                                  ),
+                                ),
+                                // Bottom buttons row (no divider)
+                                Padding(
+                                  padding: const EdgeInsets.fromLTRB(
+                                    AppSpacing.xs,
+                                    0,
+                                    AppSpacing.xs,
+                                    AppSpacing.xs,
+                                  ),
+                                  child: AnimatedSwitcher(
+                                    duration: const Duration(milliseconds: 260),
+                                    switchInCurve: Curves.easeOutCubic,
+                                    switchOutCurve: Curves.easeInCubic,
+                                    transitionBuilder: (child, anim) =>
+                                        FadeTransition(
+                                          opacity: anim,
+                                          child: SlideTransition(
+                                            position: Tween<Offset>(
+                                              begin: const Offset(0, 0.35),
+                                              end: Offset.zero,
+                                            ).animate(anim),
+                                            child: child,
+                                          ),
+                                        ),
+                                    child: _ownsVoiceSession
+                                        ? _buildVoiceRecordingRow(
+                                            context,
+                                            theme,
+                                          )
+                                        : Row(
+                                            key: const ValueKey('actions'),
+                                            mainAxisAlignment:
+                                                MainAxisAlignment.spaceBetween,
+                                            children: [
+                                              // Responsive left action bar that overflows into a + menu on desktop
+                                              Expanded(
+                                                child:
+                                                    _buildResponsiveLeftActions(
+                                                      context,
                                                     ),
                                               ),
-                                              const SizedBox(width: 8),
-                                            ],
-                                            if (showVoiceInput) ...[
-                                              _CompactIconButton(
-                                                tooltip: AppLocalizations.of(
-                                                  context,
-                                                )!.chatInputBarVoiceInputTooltip,
-                                                icon: Lucide.Mic,
-                                                onTap:
-                                                    _composerLocked ||
-                                                        widget.loading
-                                                    ? null
-                                                    : () => unawaited(
-                                                        _startVoiceInput(),
+                                              Row(
+                                                children: [
+                                                  if (widget
+                                                      .showMoreButton) ...[
+                                                    _CompactIconButton(
+                                                      tooltip: AppLocalizations.of(
+                                                        context,
+                                                      )!.chatInputBarMoreTooltip,
+                                                      icon: Lucide.Plus,
+                                                      active: widget.moreOpen,
+                                                      onTap: _composerLocked
+                                                          ? null
+                                                          : widget.onMore,
+                                                      childBuilder: (c) => AnimatedSwitcher(
+                                                        duration:
+                                                            const Duration(
+                                                              milliseconds: 200,
+                                                            ),
+                                                        transitionBuilder:
+                                                            (
+                                                              child,
+                                                              anim,
+                                                            ) => RotationTransition(
+                                                              turns:
+                                                                  Tween<double>(
+                                                                    begin: 0.85,
+                                                                    end: 1,
+                                                                  ).animate(
+                                                                    anim,
+                                                                  ),
+                                                              child:
+                                                                  FadeTransition(
+                                                                    opacity:
+                                                                        anim,
+                                                                    child:
+                                                                        child,
+                                                                  ),
+                                                            ),
+                                                        child: Icon(
+                                                          widget.moreOpen
+                                                              ? Lucide.X
+                                                              : Lucide.Plus,
+                                                          key: ValueKey(
+                                                            widget.moreOpen
+                                                                ? 'close'
+                                                                : 'add',
+                                                          ),
+                                                          size: 20,
+                                                          color: c,
+                                                        ),
                                                       ),
+                                                    ),
+                                                    const SizedBox(width: 8),
+                                                  ],
+                                                  if (showVoiceInput) ...[
+                                                    _CompactIconButton(
+                                                      tooltip: AppLocalizations.of(
+                                                        context,
+                                                      )!.chatInputBarVoiceInputTooltip,
+                                                      icon: Lucide.Mic,
+                                                      onTap:
+                                                          _composerLocked ||
+                                                              widget.loading
+                                                          ? null
+                                                          : () => unawaited(
+                                                              _startVoiceInput(),
+                                                            ),
+                                                    ),
+                                                    const SizedBox(width: 8),
+                                                  ],
+                                                  _CompactSendButton(
+                                                    enabled:
+                                                        (hasText ||
+                                                            hasImages ||
+                                                            hasDocs) &&
+                                                        !_hasUnreadyImages &&
+                                                        !widget.loading,
+                                                    loading: widget.loading,
+                                                    onSend: _handleSend,
+                                                    onStop: widget.loading
+                                                        ? widget.onStop
+                                                        : null,
+                                                    color: theme
+                                                        .colorScheme
+                                                        .primary,
+                                                    icon: Lucide.ArrowUp,
+                                                    tooltip: widget
+                                                        .sendButtonTooltip,
+                                                  ),
+                                                ],
                                               ),
-                                              const SizedBox(width: 8),
                                             ],
-                                            _CompactSendButton(
-                                              enabled:
-                                                  (hasText ||
-                                                      hasImages ||
-                                                      hasDocs) &&
-                                                  !_hasUnreadyImages &&
-                                                  !widget.loading,
-                                              loading: widget.loading,
-                                              onSend: _handleSend,
-                                              onStop: widget.loading
-                                                  ? widget.onStop
-                                                  : null,
-                                              color: theme.colorScheme.primary,
-                                              icon: Lucide.ArrowUp,
-                                              tooltip: widget.sendButtonTooltip,
-                                            ),
-                                          ],
-                                        ),
-                                      ],
-                                    ),
+                                          ),
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
-                        ],
+                        ),
                       ),
                     ),
-                  ),
+                    if (_imageModeActive)
+                      PositionedDirectional(
+                        top: -12,
+                        start: AppSpacing.sm,
+                        child: _ImageModePill(
+                          label: AppLocalizations.of(
+                            context,
+                          )!.chatInputBarImageMode,
+                          closeTooltip: AppLocalizations.of(
+                            context,
+                          )!.chatInputBarDisableImageModeTooltip,
+                          onClose: _composerLocked
+                              ? null
+                              : () {
+                                  final key = _imageModeModelKey;
+                                  if (key == null) return;
+                                  setState(() {
+                                    _dismissedImageModeModelKey = key;
+                                  });
+                                },
+                        ),
+                      ),
+                  ],
                 ),
-                if (_imageModeActive)
-                  PositionedDirectional(
-                    top: -12,
-                    start: AppSpacing.sm,
-                    child: _ImageModePill(
-                      label: AppLocalizations.of(
-                        context,
-                      )!.chatInputBarImageMode,
-                      closeTooltip: AppLocalizations.of(
-                        context,
-                      )!.chatInputBarDisableImageModeTooltip,
-                      onClose: _composerLocked
-                          ? null
-                          : () {
-                              final key = _imageModeModelKey;
-                              if (key == null) return;
-                              setState(() {
-                                _dismissedImageModeModelKey = key;
-                              });
-                            },
-                    ),
-                  ),
-              ],
-            ),
-          ],
+              ),
+            ],
+          ),
         ),
       ),
+    );
+  }
+
+  /// Keeps the collapsed composer at its natural height; while expanded it
+  /// grows from [_expandFromHeight] to all the height its host allows.
+  ///
+  /// The wrappers stay in the tree either way: the composer holds overlay
+  /// portals (tooltips), and moving it under a [LayoutBuilder] on toggle would
+  /// re-attach them mid-layout, which the framework rejects.
+  Widget _buildExpandingComposer(bool expandedLayout, Widget composer) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        assert(
+          constraints.hasBoundedHeight,
+          'ChatInputBar needs a host that bounds its height.',
+        );
+        return AnimatedBuilder(
+          animation: _expandProgress,
+          builder: (context, child) => SizedBox(
+            height: expandedLayout
+                ? ui.lerpDouble(
+                    _expandFromHeight,
+                    constraints.maxHeight,
+                    _expandProgress.value,
+                  )
+                : null,
+            child: child,
+          ),
+          child: composer,
+        );
+      },
     );
   }
 }

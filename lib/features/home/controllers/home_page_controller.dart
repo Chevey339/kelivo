@@ -256,6 +256,7 @@ class HomePageController extends ChangeNotifier {
 
   // Input bar measurement
   double _inputBarHeight = 72;
+  bool _inputBarExpanded = false;
 
   UserMessageEditState? _userMessageEditState;
 
@@ -2457,7 +2458,14 @@ class HomePageController extends ChangeNotifier {
     } catch (_) {}
   }
 
+  /// While the composer fills the chat area its height says nothing about
+  /// the space the message list must keep clear, so it is not measured.
+  void setInputBarExpanded(bool expanded) {
+    _inputBarExpanded = expanded;
+  }
+
   void measureInputBar() {
+    if (_inputBarExpanded) return;
     try {
       final ctx = _inputBarKey.currentContext;
       if (ctx == null) return;
