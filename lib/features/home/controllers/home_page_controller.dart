@@ -412,8 +412,26 @@ class HomePageController extends ChangeNotifier {
       onStateChanged: () => notifyListeners(),
       getSettingsProvider: () => _context.read<SettingsProvider>(),
       getCurrentConversationId: () => currentConversation?.id,
-      onStreamTick: () => _scrollCtrl.autoScrollToBottomIfNeeded(),
+      onStreamTick: _handleStreamTick,
     );
+  }
+
+  /// Minimum gap between generation haptics. Stream ticks arrive every 50ms;
+  /// pulsing on each one blurs into a continuous buzz.
+  static const Duration _generateHapticInterval = Duration(milliseconds: 100);
+  final Stopwatch _generateHapticClock = Stopwatch();
+
+  void _handleStreamTick() {
+    _scrollCtrl.autoScrollToBottomIfNeeded();
+    if (!_context.read<SettingsProvider>().hapticsOnGenerate) return;
+    if (_generateHapticClock.isRunning &&
+        _generateHapticClock.elapsed < _generateHapticInterval) {
+      return;
+    }
+    _generateHapticClock
+      ..reset()
+      ..start();
+    Haptics.light();
   }
 
   void _initializeServices() {
