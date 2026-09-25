@@ -247,6 +247,12 @@ Stream<StreamChunk> runOpenAIResponsesToolFollowUps({
         if (maxTokens != null) 'max_output_tokens': maxTokens,
         if (responsesIncludeParam != null) 'include': responsesIncludeParam,
       };
+      applyOpenAIResolvedRequest(
+        body2,
+        spec: spec,
+        reasoning: reasoning,
+        transport: ReasoningTransport.responses,
+      );
       final extraCfg = customBody(config, modelId, assistantBody: extraBody);
       if (extraCfg.isNotEmpty) body2.addAll(extraCfg);
       try {
@@ -257,12 +263,6 @@ Stream<StreamChunk> runOpenAIResponsesToolFollowUps({
           );
         }
       } catch (_) {}
-      applyOpenAIResolvedRequest(
-        body2,
-        spec: spec,
-        reasoning: reasoning,
-        transport: ReasoningTransport.responses,
-      );
 
       final req2 = http.Request('POST', url);
       req2.headers.addAll(

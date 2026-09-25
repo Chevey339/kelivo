@@ -817,6 +817,12 @@ Stream<StreamChunk> runOpenAIChatCompletionsToolFollowUps({
       };
       applyMaxTokens(body2);
       maybeAddStreamingUsageOptions(body2, stream: true, config: config);
+      applyOpenAIResolvedRequest(
+        body2,
+        spec: spec,
+        reasoning: reasoning,
+        transport: ReasoningTransport.chatCompletions,
+      );
       if (extraBodyCfg.isNotEmpty) {
         body2.addAll(extraBodyCfg);
       }
@@ -826,12 +832,6 @@ Stream<StreamChunk> runOpenAIChatCompletionsToolFollowUps({
         config: config,
         modelId: modelId,
         upstreamModelId: upstreamModelId,
-      );
-      applyOpenAIResolvedRequest(
-        body2,
-        spec: spec,
-        reasoning: reasoning,
-        transport: ReasoningTransport.chatCompletions,
       );
       final req2 = http.Request('POST', url);
       req2.headers.addAll(

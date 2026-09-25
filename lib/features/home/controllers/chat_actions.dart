@@ -2663,17 +2663,21 @@ class ChatActions {
       durationMs: finalDurationMs,
     );
     final usage = state.usage;
-    if (usage != null) {
+    final usageService = contextUsage;
+    if (usage != null && usageService != null) {
       final assistant = state.ctx.assistant;
-      await contextUsage?.recordUsage(
-        conversationId: conversationId,
-        providerKey: state.ctx.providerKey,
-        modelId: state.ctx.modelId,
-        assistantId: assistant is Assistant ? assistant.id : null,
-        usage: usage,
-        assistantMessage: finalizedMessage,
-        requestConfiguration: state.ctx.contextUsageConfiguration,
-        requestRevision: state.ctx.contextUsageRevision,
+      // Persisting the reply must not wait on usage bookkeeping.
+      unawaited(
+        usageService.recordUsage(
+          conversationId: conversationId,
+          providerKey: state.ctx.providerKey,
+          modelId: state.ctx.modelId,
+          assistantId: assistant is Assistant ? assistant.id : null,
+          usage: usage,
+          assistantMessage: finalizedMessage,
+          requestConfiguration: state.ctx.contextUsageConfiguration,
+          requestRevision: state.ctx.contextUsageRevision,
+        ),
       );
     }
     try {

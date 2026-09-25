@@ -435,7 +435,6 @@ Stream<StreamChunk> sendGoogleVertexClaudeStream({
         if (allTools.isNotEmpty) 'tools': allTools,
         if (allTools.isNotEmpty) 'tool_choice': {'type': 'auto'},
       };
-      body.addAll(customBody(config, modelId, assistantBody: extraBody));
       applyReasoning(
         body,
         spec,
@@ -449,6 +448,8 @@ Stream<StreamChunk> sendGoogleVertexClaudeStream({
         resolution,
         transport: ReasoningTransport.anthropicMessages,
       );
+      // Custom body keys win over the reasoning dialect.
+      body.addAll(customBody(config, modelId, assistantBody: extraBody));
       applyAnthropicMessagesProtocolConstraints(body);
 
       final httpRequest = http.Request('POST', url);

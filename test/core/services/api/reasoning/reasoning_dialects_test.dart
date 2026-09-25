@@ -200,7 +200,11 @@ Map<String, dynamic> _expectedBody({
         };
       }
       return {
-        'thinking': {'type': 'enabled', 'budget_tokens': budget},
+        'thinking': {
+          'type': 'enabled',
+          // Anthropic's minimum budget.
+          'budget_tokens': budget == null || budget < 1024 ? 1024 : budget,
+        },
       };
     case ReasoningDialect.anthropicAdaptiveEffort:
       if (effective == ReasoningLevel.off) {

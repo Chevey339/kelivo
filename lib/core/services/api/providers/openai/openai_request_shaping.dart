@@ -60,7 +60,7 @@ void _appendChatTool(Map<String, dynamic> body, Map<String, dynamic> tool) {
   body['tool_choice'] ??= 'auto';
 }
 
-/// Single request-body hook: after extraBody merge, immediately before encode.
+/// Reasoning and sampling shaping; callers merge the custom body afterwards.
 void applyOpenAIResolvedRequest(
   Map<String, dynamic> body, {
   required ModelSpec spec,

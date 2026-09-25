@@ -333,10 +333,6 @@ Stream<StreamChunk> sendClaudeStream(
         if (allTools.isNotEmpty) 'tool_choice': {'type': 'auto'},
         if (hasCodeExecution && container != null) 'container': container!.id,
       };
-      final extraClaude = customBody(config, modelId, assistantBody: extraBody);
-      if (extraClaude.isNotEmpty) {
-        body.addAll(extraClaude);
-      }
       applyReasoning(
         body,
         spec,
@@ -350,6 +346,11 @@ Stream<StreamChunk> sendClaudeStream(
         resolution,
         transport: ReasoningTransport.anthropicMessages,
       );
+      // Custom body keys win over the reasoning dialect.
+      final extraClaude = customBody(config, modelId, assistantBody: extraBody);
+      if (extraClaude.isNotEmpty) {
+        body.addAll(extraClaude);
+      }
       applyAnthropicMessagesProtocolConstraints(body);
 
       http.Request buildRequest() {

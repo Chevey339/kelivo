@@ -587,7 +587,15 @@ Stream<StreamChunk> sendOpenAIStream(
     upstreamModelId: upstreamModelId,
   );
 
-  // Merge custom body keys (override takes precedence)
+  applyOpenAIResolvedRequest(
+    body,
+    spec: spec,
+    reasoning: reasoning,
+    transport: config.useResponseApi == true
+        ? ReasoningTransport.responses
+        : ReasoningTransport.chatCompletions,
+  );
+  // Custom body keys go last so they win over the reasoning dialect.
   final extraBodyCfg = customBody(config, modelId, assistantBody: extraBody);
   if (extraBodyCfg.isNotEmpty) {
     body.addAll(extraBodyCfg);
@@ -603,14 +611,6 @@ Stream<StreamChunk> sendOpenAIStream(
       configuredTools: configuredBuiltInTools,
     );
   }
-  applyOpenAIResolvedRequest(
-    body,
-    spec: spec,
-    reasoning: reasoning,
-    transport: config.useResponseApi == true
-        ? ReasoningTransport.responses
-        : ReasoningTransport.chatCompletions,
-  );
   request.body = jsonEncode(body);
 
   final response = await client.send(request);

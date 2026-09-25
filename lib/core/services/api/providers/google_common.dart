@@ -569,8 +569,6 @@ Stream<StreamChunk> sendGoogleStream(
       if (toolsArr.isNotEmpty) 'tools': toolsArr,
       if (geminiToolConfig != null) 'toolConfig': geminiToolConfig,
     };
-    final extraG = customBody(config, modelId, assistantBody: extraBody);
-    if (extraG.isNotEmpty) baseBody.addAll(extraG);
     final spec = effective;
     applyReasoning(
       baseBody,
@@ -585,6 +583,9 @@ Stream<StreamChunk> sendGoogleStream(
       resolution,
       transport: ReasoningTransport.geminiGenerateContent,
     );
+    // Custom body keys win over the reasoning dialect.
+    final extraG = customBody(config, modelId, assistantBody: extraBody);
+    if (extraG.isNotEmpty) baseBody.addAll(extraG);
 
     TokenUsage? totalUsage;
     List<Map<String, dynamic>> currentContents =
@@ -1076,10 +1077,6 @@ Stream<StreamChunk> sendGoogleStream(
         assistantHeaders: extraHeaders,
       );
       request.headers.addAll(headers);
-      final extra = customBody(config, modelId, assistantBody: extraBody);
-      if (extra.isNotEmpty) {
-        body.addAll(extra);
-      }
       final spec = effective;
       applyReasoning(
         body,
@@ -1094,6 +1091,11 @@ Stream<StreamChunk> sendGoogleStream(
         resolution,
         transport: ReasoningTransport.geminiGenerateContent,
       );
+      // Custom body keys win over the reasoning dialect.
+      final extra = customBody(config, modelId, assistantBody: extraBody);
+      if (extra.isNotEmpty) {
+        body.addAll(extra);
+      }
       body['contents'] = _googleApiContents(convo);
       request.body = jsonEncode(body);
 

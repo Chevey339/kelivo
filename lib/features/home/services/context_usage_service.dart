@@ -410,6 +410,9 @@ class ContextUsageService extends ChangeNotifier {
     int? requestRevision,
   }) async {
     if (_disposed || usage.promptTokens <= 0) return;
+    // Callers do not await this; pin the revision before the memory read so a
+    // change made meanwhile invalidates the anchor instead of adopting it.
+    final revision = _chatService.contextRevision(conversationId);
     final before = _resolvedIdentity(conversationId);
     if (before == null) return;
     final String? memoryHash;
@@ -424,9 +427,9 @@ class ContextUsageService extends ChangeNotifier {
     }
     if (_disposed) return;
     _memorySnapshotHashes[conversationId] = memoryHash;
-    final revision = _chatService.contextRevision(conversationId);
     final resolved = _resolvedIdentity(conversationId);
     if (requestRevision != revision ||
+        _chatService.contextRevision(conversationId) != revision ||
         requestConfiguration == null ||
         resolved == null ||
         resolved.providerKey != providerKey ||

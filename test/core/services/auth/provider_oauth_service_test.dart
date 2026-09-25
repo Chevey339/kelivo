@@ -804,7 +804,8 @@ void main() {
             'effort': 'high',
             'keep': 'all',
           },
-          thinking: {'type': 'enabled', 'effort': 'low'},
+          // Custom body keys win over the discovered dialect.
+          thinking: {'type': 'enabled', 'effort': 'high', 'keep': 'all'},
         ),
       ]) {
         final requests = <http.Request>[];

@@ -49,6 +49,8 @@ const Map<ReasoningLevel, int> _fixedBudgets = {
   ReasoningLevel.max: 32000,
 };
 
+const int _anthropicMinBudget = 1024;
+
 const List<String> _chatSamplingKeys = [
   'temperature',
   'top_p',
@@ -94,8 +96,8 @@ ReasoningResolution resolveReasoning(ModelSpec spec, ReasoningRequest request) {
   );
 }
 
-/// Writes the effective dialect shape into [body]. Runs after extraBody merge
-/// and is the only writer of reasoning keys. Mutates and returns [body].
+/// Writes the effective dialect shape into [body]. Runs before the custom body
+/// merge, so user-set keys override the dialect. Mutates and returns [body].
 ///
 /// No-op when the model has no reasoning ability or dialect == none.
 ///
@@ -410,9 +412,13 @@ void _writeAnthropicBudget(
     body['thinking'] = <String, dynamic>{'type': 'disabled'};
     return;
   }
+  final budget = resolution.budget;
   body['thinking'] = <String, dynamic>{
     'type': 'enabled',
-    'budget_tokens': resolution.budget,
+    // Anthropic rejects budgets below 1024 (e.g. the fixed `minimal` 512).
+    'budget_tokens': budget == null || budget < _anthropicMinBudget
+        ? _anthropicMinBudget
+        : budget,
   };
 }
 
@@ -690,10 +696,21 @@ void _deepMerge(
       final merged = _asMutableMap(existing);
       _deepMerge(merged, incoming);
       target[key] = merged;
-    } else if (incoming is Map) {
-      target[key] = _asMutableMap(incoming);
     } else {
-      target[key] = incoming;
+      target[key] = _deepCopy(incoming);
     }
   }
+}
+
+/// Patches live on a memoized [ModelSpec]; the request body must never share
+/// nested maps or lists with it, or later body edits would rewrite the spec.
+dynamic _deepCopy(dynamic value) {
+  if (value is Map) {
+    return <String, dynamic>{
+      for (final entry in value.entries)
+        entry.key.toString(): _deepCopy(entry.value),
+    };
+  }
+  if (value is List) return [for (final item in value) _deepCopy(item)];
+  return value;
 }

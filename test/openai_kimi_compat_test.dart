@@ -133,13 +133,14 @@ void main() {
         );
         expect(body['model'], 'kimi-for-coding');
         expect(body['thinking'], {'type': 'enabled', 'effort': 'low'});
-        expect(body.containsKey('reasoning_effort'), isFalse);
+        // Custom body keys win over the dialect.
+        expect(body['reasoning_effort'], 'xhigh');
         expect(body['temperature'], 0.5);
         expect(body['n'], 2);
       },
     );
 
-    test('HighSpeed keeps fixed thinking without unsupported effort', () async {
+    test('HighSpeed custom body overrides the dialect', () async {
       final body = await _captureMoonshotBody(
         modelId: 'kimi-for-coding-highspeed',
         thinkingBudget: 0,
@@ -151,7 +152,7 @@ void main() {
           {'role': 'user', 'content': 'hello'},
         ],
       );
-      expect(body.containsKey('reasoning_effort'), isFalse);
+      expect(body['reasoning_effort'], 'max');
       expect(body['thinking'], {'type': 'disabled'});
     });
 
@@ -161,7 +162,7 @@ void main() {
         'thinking': {'type': 'enabled'},
       },
     ]) {
-      test('K2.8 custom $custom cannot override explicit off', () async {
+      test('K2.8 custom $custom overrides explicit off', () async {
         final body = await _captureMoonshotBody(
           modelId: 'kimi-for-coding',
           thinkingBudget: 0,
@@ -170,8 +171,9 @@ void main() {
             {'role': 'user', 'content': 'hello'},
           ],
         );
-        expect(body['thinking'], {'type': 'disabled'});
-        expect(body.containsKey('reasoning_effort'), isFalse);
+        for (final entry in custom.entries) {
+          expect(body[entry.key], entry.value);
+        }
       });
     }
 

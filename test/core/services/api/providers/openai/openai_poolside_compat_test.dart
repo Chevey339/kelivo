@@ -114,7 +114,7 @@ void main() {
       expect(auto.containsKey('chat_template_kwargs'), isFalse);
     });
 
-    test('unrelated extraBody keys survive the post-merge hook', () async {
+    test('custom body replaces the dialect top-level key', () async {
       final body = await _captureBody(
         modelId: 'poolside/laguna-s-2.1',
         thinkingBudget: 128000,
@@ -122,10 +122,7 @@ void main() {
           'chat_template_kwargs': {'foo': 'bar'},
         },
       );
-      expect(body['chat_template_kwargs'], {
-        'foo': 'bar',
-        'enable_thinking': true,
-      });
+      expect(body['chat_template_kwargs'], {'foo': 'bar'});
     });
 
     test(
