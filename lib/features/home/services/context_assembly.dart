@@ -1,10 +1,9 @@
-import 'dart:convert';
-
 import '../../../core/models/chat_message.dart';
 import '../../../core/models/message_part.dart';
 import '../../../core/models/model_spec.dart';
 import '../../../core/models/token_usage.dart';
 import '../../../core/providers/settings_provider.dart';
+import '../../../core/services/logging/context_log_models.dart';
 import '../../../core/utils/multimodal_input_utils.dart';
 import '../../../core/utils/token_estimator.dart';
 import 'message_builder_service.dart';
@@ -23,6 +22,12 @@ class ContextAssemblyPreview {
     required this.historyText,
     required this.tools,
     required this.images,
+    this.memoryText = '',
+    this.worldBookText = '',
+    this.skillsText = '',
+    this.workspaceText = '',
+    this.searchText = '',
+    this.mcpTools = const [],
   });
 
   final String systemText;
@@ -30,6 +35,62 @@ class ContextAssemblyPreview {
   final String historyText;
   final List<Map<String, dynamic>> tools;
   final List<ContextImageRef> images;
+  final String memoryText;
+  final String worldBookText;
+  final String skillsText;
+  final String workspaceText;
+  final String searchText;
+  final List<Map<String, dynamic>> mcpTools;
+
+  /// Attribute the assembled, trimmed payload by origin, not by message role.
+  /// World books can occupy any role; memory snapshots live in user messages.
+  factory ContextAssemblyPreview.fromApiMessages({
+    required List<Map<String, dynamic>> apiMessages,
+    required List<Map<String, dynamic>> tools,
+    required Set<String> mcpToolNames,
+    required List<ContextImageRef> images,
+  }) {
+    final text = <ContextSource, StringBuffer>{};
+    for (final message in apiMessages) {
+      for (final segment in segmentsFromTaggedMessage(
+        message,
+        estimateTokenCounts: false,
+        elideDataUris: false,
+      )) {
+        text.putIfAbsent(segment.source, StringBuffer.new).write(segment.text);
+      }
+      final reasoning = message['reasoning_content'];
+      if (reasoning is String) {
+        text
+            .putIfAbsent(ContextSource.chatHistory, StringBuffer.new)
+            .write(reasoning);
+      }
+    }
+    String content(List<ContextSource> sources) =>
+        sources.map((source) => text[source]?.toString() ?? '').join();
+    bool isMcp(Map<String, dynamic> tool) =>
+        mcpToolNames.contains((tool['function'] as Map?)?['name']);
+    return ContextAssemblyPreview(
+      systemText: content([ContextSource.systemPrompt]),
+      injectionsText: content([ContextSource.instructionInjection]),
+      historyText: content([
+        ContextSource.chatHistory,
+        ContextSource.toolCall,
+        ContextSource.toolResult,
+      ]),
+      memoryText: content([
+        ContextSource.memoryRules,
+        ContextSource.memorySnapshot,
+      ]),
+      worldBookText: content([ContextSource.worldBook]),
+      skillsText: content([ContextSource.skills]),
+      workspaceText: content([ContextSource.workspace]),
+      searchText: content([ContextSource.searchPrompt]),
+      tools: tools.where((tool) => !isMcp(tool)).toList(),
+      mcpTools: tools.where(isMcp).toList(),
+      images: images,
+    );
+  }
 }
 
 typedef ContextAssemblyPreviewFn =
@@ -41,22 +102,9 @@ typedef ContextAssemblyPreviewFn =
     });
 
 class ContextEstimateJob {
-  const ContextEstimateJob({
-    required this.systemText,
-    required this.injectionsText,
-    required this.historyText,
-    required this.draftText,
-    required this.tools,
-    required this.images,
-    required this.kind,
-  });
+  const ContextEstimateJob({required this.preview, required this.kind});
 
-  final String systemText;
-  final String injectionsText;
-  final String historyText;
-  final String draftText;
-  final List<Map<String, dynamic>> tools;
-  final List<ContextImageRef> images;
+  final ContextAssemblyPreview preview;
   final ProviderKind kind;
 }
 
@@ -67,7 +115,12 @@ class ContextEstimateResult {
     required this.history,
     required this.tools,
     required this.attachments,
-    required this.draft,
+    required this.memory,
+    required this.worldBook,
+    required this.skills,
+    required this.workspace,
+    required this.search,
+    required this.mcpTools,
   });
 
   final int system;
@@ -75,12 +128,18 @@ class ContextEstimateResult {
   final int history;
   final int tools;
   final int attachments;
-  final int draft;
+  final int memory;
+  final int worldBook;
+  final int skills;
+  final int workspace;
+  final int search;
+  final int mcpTools;
 }
 
 ContextEstimateResult estimateContextBuckets(ContextEstimateJob job) {
   var attachments = 0;
-  for (final image in job.images) {
+  final preview = job.preview;
+  for (final image in preview.images) {
     attachments += estimateImageTokens(
       job.kind,
       width: image.width,
@@ -88,56 +147,18 @@ ContextEstimateResult estimateContextBuckets(ContextEstimateJob job) {
     );
   }
   return ContextEstimateResult(
-    system: estimateTokens(job.systemText),
-    injections: estimateTokens(job.injectionsText),
-    history: estimateTokens(job.historyText),
-    tools: estimateToolsTokens(job.tools),
+    system: estimateTokens(preview.systemText),
+    injections: estimateTokens(preview.injectionsText),
+    history: estimateTokens(preview.historyText),
+    tools: estimateToolsTokens(preview.tools),
+    memory: estimateTokens(preview.memoryText),
+    worldBook: estimateTokens(preview.worldBookText),
+    skills: estimateTokens(preview.skillsText),
+    workspace: estimateTokens(preview.workspaceText),
+    search: estimateTokens(preview.searchText),
+    mcpTools: estimateToolsTokens(preview.mcpTools),
     attachments: attachments,
-    draft: estimateTokens(job.draftText),
   );
-}
-
-String firstSystemContent(List<Map<String, dynamic>> apiMessages) {
-  if (apiMessages.isEmpty) return '';
-  final first = apiMessages.first;
-  if ((first['role'] ?? '').toString() != 'system') return '';
-  return (first['content'] ?? '').toString();
-}
-
-String injectionsAfterSystem(String systemBefore, String systemAfter) {
-  if (systemAfter == systemBefore) return '';
-  if (systemBefore.isNotEmpty && systemAfter.startsWith(systemBefore)) {
-    return systemAfter.substring(systemBefore.length);
-  }
-  return systemAfter;
-}
-
-String historyTextFromApiMessages(List<Map<String, dynamic>> apiMessages) {
-  final buf = StringBuffer();
-  for (final message in apiMessages) {
-    if ((message['role'] ?? '').toString() == 'system') continue;
-    final content = message['content'];
-    if (content is String && content.isNotEmpty) {
-      buf.write(content);
-    } else if (content is List) {
-      for (final part in content) {
-        if (part is! Map) continue;
-        final text = part['text'];
-        if (text is String && text.isNotEmpty) buf.write(text);
-      }
-    }
-    final reasoning = message['reasoning_content'];
-    if (reasoning is String && reasoning.isNotEmpty) {
-      buf.write(reasoning);
-    }
-    final toolCalls = message['tool_calls'];
-    if (toolCalls != null) {
-      try {
-        buf.write(jsonEncode(toolCalls));
-      } catch (_) {}
-    }
-  }
-  return buf.toString();
 }
 
 List<ContextImageRef> imageRefsFromApiMessages(

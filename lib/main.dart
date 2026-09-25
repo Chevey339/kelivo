@@ -717,12 +717,19 @@ class MyApp extends StatelessWidget {
           create: (_) => WorldBookProvider(preferences: businessPreferences),
         ),
         ChangeNotifierProvider(
+          create: (_) => MemoryProviderV2(
+            repository: MemoryRepository(businessPreferences),
+            chatRepository: databaseLease.chatRepository,
+          ),
+        ),
+        ChangeNotifierProvider(
           create: (ctx) => ContextUsageService(
             chatService: ctx.read<ChatService>(),
             settings: ctx.read<SettingsProvider>(),
             assistants: ctx.read<AssistantProvider>(),
             instructions: ctx.read<InstructionInjectionProvider>(),
             worldBooks: ctx.read<WorldBookProvider>(),
+            memories: ctx.read<MemoryProviderV2>(),
           ),
         ),
         ChangeNotifierProvider(
@@ -746,12 +753,6 @@ class MyApp extends StatelessWidget {
         ),
         ChangeNotifierProvider(
           create: (_) => MemoryProvider(preferences: businessPreferences),
-        ),
-        ChangeNotifierProvider(
-          create: (_) => MemoryProviderV2(
-            repository: MemoryRepository(businessPreferences),
-            chatRepository: databaseLease.chatRepository,
-          ),
         ),
         Provider<ExtensionEntityStore>.value(
           value: databaseLease.extensionEntityStore,

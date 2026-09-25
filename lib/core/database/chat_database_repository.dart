@@ -7333,6 +7333,15 @@ class ChatDatabaseRepository {
 
   // —— Memory system V1 read path (§13.3) ——
 
+  /// Read one consistent set of inputs for prompt injection and usage caching.
+  Future<({List<UserProfileField> profile, List<MemoryEntry> memories})>
+  readMemorySnapshotData({required String assistantId}) => _db.transaction(
+    () async => (
+      profile: await readProfileFields(),
+      memories: await queryVisibleMemories(assistantId: assistantId),
+    ),
+  );
+
   /// Visible memories for [assistantId]: `status='active'` (unless
   /// [includeArchived]) and `(scope='global' OR (scope='assistant' AND
   /// assistant_id = :aid))`. When [assistantId] is null, only global rows

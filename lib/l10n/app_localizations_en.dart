@@ -3205,16 +3205,34 @@ class AppLocalizationsEn extends AppLocalizations {
   String get contextUsageStateNone => 'No data yet';
 
   @override
-  String get contextUsageBucketSystem => 'System';
+  String get contextUsageBucketSystem => 'System prompt';
 
   @override
-  String get contextUsageBucketInjections => 'Injections';
+  String get contextUsageBucketInjections => 'Instruction injections';
 
   @override
-  String get contextUsageBucketHistory => 'History';
+  String get contextUsageBucketHistory => 'Messages';
 
   @override
-  String get contextUsageBucketTools => 'Tools';
+  String get contextUsageBucketTools => 'Built-in tools';
+
+  @override
+  String get contextUsageBucketMemory => 'Memory';
+
+  @override
+  String get contextUsageBucketWorldBook => 'World books';
+
+  @override
+  String get contextUsageBucketSkills => 'Skills';
+
+  @override
+  String get contextUsageBucketWorkspace => 'Workspace';
+
+  @override
+  String get contextUsageBucketSearch => 'Search prompt';
+
+  @override
+  String get contextUsageBucketMcpTools => 'MCP tools';
 
   @override
   String get contextUsageBucketAttachments => 'Attachments';

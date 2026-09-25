@@ -318,7 +318,8 @@ void main() {
             modelId: 'model',
             assistantId: 'assistant',
           );
-          expect(result.injectionsText, contains('TIMED_LORE'));
+          expect(result.worldBookText, contains('TIMED_LORE'));
+          expect(result.injectionsText, isNot(contains('TIMED_LORE')));
         }
 
         for (var i = 0; i < 3; i++) {
@@ -621,6 +622,7 @@ void main() {
           'model',
           conversation: scenario.$2,
         );
+        builder.stripInternalRevisionIds(messages);
         expect(messages.first, {'role': 'system', 'content': scenario.$3});
         expect(messages, hasLength(2));
       }
@@ -846,6 +848,7 @@ void main() {
         ];
         await builder.injectWorldBookPrompts(messages, 'assistant');
         expect(messages.first['content'], 'BEFORE\nBASE\nAFTER');
+        builder.stripInternalRevisionIds(messages);
         expect(messages[1], {'role': 'assistant', 'content': 'TOP'});
         expect(messages[messages.length - 2]['content'], contains('BOTTOM'));
         expect(messages.last, {'role': 'user', 'content': 'hello'});

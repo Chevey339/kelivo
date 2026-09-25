@@ -368,6 +368,20 @@ class _ChatInputBarState extends State<ChatInputBar>
   // Instance method for onChanged to avoid recreating the callback on every build
   void _onTextChanged(String _) => setState(() {});
 
+  String? _usageDraftConversationId;
+  String? _usageDraftText;
+
+  void _syncUsageDraft() {
+    if (!mounted) return;
+    final id = widget.conversationId;
+    if (id == null || id.isEmpty) return;
+    final text = _controller.text;
+    if (_usageDraftConversationId == id && _usageDraftText == text) return;
+    _usageDraftConversationId = id;
+    _usageDraftText = text;
+    context.read<ContextUsageService?>()?.updateDraft(id, text);
+  }
+
   void _addImages(List<String> paths) {
     if (paths.isEmpty) return;
     setState(() {
@@ -574,6 +588,8 @@ class _ChatInputBarState extends State<ChatInputBar>
   void initState() {
     super.initState();
     _controller = widget.controller ?? TextEditingController();
+    _controller.addListener(_syncUsageDraft);
+    WidgetsBinding.instance.addPostFrameCallback((_) => _syncUsageDraft());
     widget.mediaController?._bind(this);
     widget.asrProvider?.addListener(_handleAsrChanged);
     WidgetsBinding.instance.addObserver(this);
@@ -604,6 +620,7 @@ class _ChatInputBarState extends State<ChatInputBar>
 
   @override
   void dispose() {
+    _controller.removeListener(_syncUsageDraft);
     WidgetsBinding.instance.removeObserver(this);
     _stopVoiceLevelSampling();
     final asr = widget.asrProvider;
@@ -634,6 +651,9 @@ class _ChatInputBarState extends State<ChatInputBar>
     super.didUpdateWidget(oldWidget);
     final previousConversationId = oldWidget.conversationId;
     final nextConversationId = widget.conversationId;
+    if (previousConversationId != nextConversationId) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _syncUsageDraft());
+    }
     if (previousConversationId != null &&
         nextConversationId != null &&
         previousConversationId != nextConversationId) {

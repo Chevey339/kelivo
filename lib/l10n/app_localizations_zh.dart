@@ -3088,16 +3088,34 @@ class AppLocalizationsZh extends AppLocalizations {
   String get contextUsageStateNone => '暂无数据';
 
   @override
-  String get contextUsageBucketSystem => '系统';
+  String get contextUsageBucketSystem => '系统提示词';
 
   @override
-  String get contextUsageBucketInjections => '注入';
+  String get contextUsageBucketInjections => '指令注入';
 
   @override
-  String get contextUsageBucketHistory => '历史';
+  String get contextUsageBucketHistory => '历史消息';
 
   @override
-  String get contextUsageBucketTools => '工具';
+  String get contextUsageBucketTools => '内置工具';
+
+  @override
+  String get contextUsageBucketMemory => '记忆';
+
+  @override
+  String get contextUsageBucketWorldBook => '世界书';
+
+  @override
+  String get contextUsageBucketSkills => '技能';
+
+  @override
+  String get contextUsageBucketWorkspace => '工作区';
+
+  @override
+  String get contextUsageBucketSearch => '搜索提示';
+
+  @override
+  String get contextUsageBucketMcpTools => 'MCP 工具';
 
   @override
   String get contextUsageBucketAttachments => '附件';
@@ -14863,16 +14881,34 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get contextUsageStateNone => '暂无数据';
 
   @override
-  String get contextUsageBucketSystem => '系统';
+  String get contextUsageBucketSystem => '系统提示词';
 
   @override
-  String get contextUsageBucketInjections => '注入';
+  String get contextUsageBucketInjections => '指令注入';
 
   @override
-  String get contextUsageBucketHistory => '历史';
+  String get contextUsageBucketHistory => '历史消息';
 
   @override
-  String get contextUsageBucketTools => '工具';
+  String get contextUsageBucketTools => '内置工具';
+
+  @override
+  String get contextUsageBucketMemory => '记忆';
+
+  @override
+  String get contextUsageBucketWorldBook => '世界书';
+
+  @override
+  String get contextUsageBucketSkills => '技能';
+
+  @override
+  String get contextUsageBucketWorkspace => '工作区';
+
+  @override
+  String get contextUsageBucketSearch => '搜索提示';
+
+  @override
+  String get contextUsageBucketMcpTools => 'MCP 工具';
 
   @override
   String get contextUsageBucketAttachments => '附件';
@@ -26564,16 +26600,34 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get contextUsageStateNone => '暫無資料';
 
   @override
-  String get contextUsageBucketSystem => '系統';
+  String get contextUsageBucketSystem => '系統提示詞';
 
   @override
-  String get contextUsageBucketInjections => '注入';
+  String get contextUsageBucketInjections => '指令注入';
 
   @override
-  String get contextUsageBucketHistory => '歷史';
+  String get contextUsageBucketHistory => '歷史訊息';
 
   @override
-  String get contextUsageBucketTools => '工具';
+  String get contextUsageBucketTools => '內建工具';
+
+  @override
+  String get contextUsageBucketMemory => '記憶';
+
+  @override
+  String get contextUsageBucketWorldBook => '世界書';
+
+  @override
+  String get contextUsageBucketSkills => '技能';
+
+  @override
+  String get contextUsageBucketWorkspace => '工作區';
+
+  @override
+  String get contextUsageBucketSearch => '搜尋提示';
+
+  @override
+  String get contextUsageBucketMcpTools => 'MCP 工具';
 
   @override
   String get contextUsageBucketAttachments => '附件';

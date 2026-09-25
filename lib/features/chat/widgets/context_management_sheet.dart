@@ -63,32 +63,41 @@ class ContextManagementSheet extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 16),
-          ContextUsageHeader(
-            conversationId: conversationId,
-            draftText: draftText,
+          Flexible(
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  ContextUsageHeader(
+                    conversationId: conversationId,
+                    draftText: draftText,
+                  ),
+                  const SizedBox(height: 16),
+                  _OptionRow(
+                    icon: Lucide.package2,
+                    label: l10n.compressContext,
+                    description: l10n.compressContextDesc,
+                    onTap: () {
+                      Haptics.light();
+                      onCompress?.call();
+                    },
+                  ),
+                  const SizedBox(height: 8),
+                  _OptionRow(
+                    icon: Lucide.Eraser,
+                    label: l10n.bottomToolsSheetClearContext,
+                    description: l10n.clearContextDesc,
+                    trailing: messageCountLabel,
+                    onTap: () {
+                      Haptics.light();
+                      onClear?.call();
+                    },
+                  ),
+                  const SizedBox(height: 8),
+                ],
+              ),
+            ),
           ),
-          const SizedBox(height: 16),
-          _OptionRow(
-            icon: Lucide.package2,
-            label: l10n.compressContext,
-            description: l10n.compressContextDesc,
-            onTap: () {
-              Haptics.light();
-              onCompress?.call();
-            },
-          ),
-          const SizedBox(height: 8),
-          _OptionRow(
-            icon: Lucide.Eraser,
-            label: l10n.bottomToolsSheetClearContext,
-            description: l10n.clearContextDesc,
-            trailing: messageCountLabel,
-            onTap: () {
-              Haptics.light();
-              onClear?.call();
-            },
-          ),
-          const SizedBox(height: 8),
         ],
       ),
     );

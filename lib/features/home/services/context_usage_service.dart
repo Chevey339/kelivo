@@ -4,6 +4,7 @@ import 'dart:isolate';
 
 import 'package:flutter/foundation.dart';
 
+import '../../../core/database/chat_database_repository.dart';
 import '../../../core/models/assistant.dart';
 import '../../../core/models/chat_message.dart';
 import '../../../core/models/conversation.dart';
@@ -12,20 +13,46 @@ import '../../../core/models/model_spec.dart';
 import '../../../core/models/token_usage.dart';
 import '../../../core/providers/assistant_provider.dart';
 import '../../../core/providers/instruction_injection_provider.dart';
+import '../../../core/providers/memory_provider_v2.dart';
 import '../../../core/providers/settings_provider.dart';
 import '../../../core/providers/world_book_provider.dart';
 import '../../../core/services/chat/chat_service.dart';
+import '../../../core/services/memory/memory_snapshot.dart';
 import '../../../core/services/model_catalog/model_catalog_service.dart';
 import '../../../core/services/model_spec/model_spec_resolver.dart';
-import '../../../core/utils/token_estimator.dart';
 import '../utils/model_display_helper.dart';
 import 'context_assembly.dart';
+import 'draft_token_counter.dart';
 
 enum ContextUsageState { none, computing, exact, estimated, stale }
 
+typedef ContextUsageConfiguration = ({
+  Object settings,
+  String? memorySnapshotHash,
+});
+
+Future<String?> readContextMemorySnapshotHash({
+  required ChatDatabaseRepository? repository,
+  required SettingsProvider settings,
+  required Assistant? assistant,
+}) async {
+  if (repository == null ||
+      settings.legacyMemoryMode ||
+      assistant?.enableMemory != true) {
+    return null;
+  }
+  final snapshot = await readMemorySnapshot(
+    repository: repository,
+    assistantId: assistant!.id,
+    lang: settings.resolvedMemoryPromptLang,
+    maxItems: settings.memoryInjectionMaxItems,
+  );
+  return snapshot.isEmpty ? null : snapshot.hash;
+}
+
 /// Capture before assembling a request. Only matching request-time settings
 /// can anchor the current context to that response's usage.
-Object contextUsageConfiguration({
+ContextUsageConfiguration contextUsageConfiguration({
   required SettingsProvider settings,
   required ProviderConfig config,
   required String providerKey,
@@ -35,41 +62,46 @@ Object contextUsageConfiguration({
   required WorldBookProvider? worldBooks,
   Conversation? conversation,
   String? assistantId,
+  String? memorySnapshotHash,
 }) => (
-  providerKey,
-  modelId,
-  assistant?.id ?? assistantId,
-  ProviderConfig.classify(providerKey, explicitType: config.providerType),
-  ModelSpecResolver.instance.spec(config, modelId),
-  jsonEncode(assistant?.toJson()),
-  settings.legacyMemoryMode,
-  settings.resolvedMemoryPromptLang,
-  settings.memoryRulesPromptEn,
-  settings.memoryRulesPromptZh,
-  settings.legacyMemoryPromptEn,
-  settings.legacyMemoryPromptZh,
-  instructions?.promptFor(
-        assistant?.id ?? assistantId,
-        instructionIds: assistant?.allowConversationPromptInjection == true
-            ? ConversationPromptSettings.fromExtras(
-                conversation?.extras ?? const {},
-              ).instructionIds
-            : null,
-      ) ??
-      '',
-  jsonEncode(
-    worldBooks
-            ?.activeBooksFor(
-              assistant?.id ?? assistantId,
-              bookIds: assistant?.allowConversationPromptInjection == true
-                  ? ConversationPromptSettings.fromExtras(
-                      conversation?.extras ?? const {},
-                    ).worldBookIds
-                  : null,
-            )
-            .map((book) => book.toJson())
-            .toList() ??
-        const [],
+  memorySnapshotHash: memorySnapshotHash,
+  settings: (
+    providerKey,
+    modelId,
+    assistant?.id ?? assistantId,
+    ProviderConfig.classify(providerKey, explicitType: config.providerType),
+    ModelSpecResolver.instance.spec(config, modelId),
+    jsonEncode(assistant?.toJson()),
+    settings.legacyMemoryMode,
+    settings.memoryInjectionMaxItems,
+    settings.resolvedMemoryPromptLang,
+    settings.memoryRulesPromptEn,
+    settings.memoryRulesPromptZh,
+    settings.legacyMemoryPromptEn,
+    settings.legacyMemoryPromptZh,
+    instructions?.promptFor(
+          assistant?.id ?? assistantId,
+          instructionIds: assistant?.allowConversationPromptInjection == true
+              ? ConversationPromptSettings.fromExtras(
+                  conversation?.extras ?? const {},
+                ).instructionIds
+              : null,
+        ) ??
+        '',
+    jsonEncode(
+      worldBooks
+              ?.activeBooksFor(
+                assistant?.id ?? assistantId,
+                bookIds: assistant?.allowConversationPromptInjection == true
+                    ? ConversationPromptSettings.fromExtras(
+                        conversation?.extras ?? const {},
+                      ).worldBookIds
+                    : null,
+              )
+              .map((book) => book.toJson())
+              .toList() ??
+          const [],
+    ),
   ),
 );
 
@@ -81,6 +113,12 @@ class ContextUsageBuckets {
     this.tools = 0,
     this.attachments = 0,
     this.draft = 0,
+    this.memory = 0,
+    this.worldBook = 0,
+    this.skills = 0,
+    this.workspace = 0,
+    this.search = 0,
+    this.mcpTools = 0,
   });
 
   final int system;
@@ -89,8 +127,25 @@ class ContextUsageBuckets {
   final int tools;
   final int attachments;
   final int draft;
+  final int memory;
+  final int worldBook;
+  final int skills;
+  final int workspace;
+  final int search;
+  final int mcpTools;
 
-  int get nonDraftTotal => system + injections + history + tools + attachments;
+  int get nonDraftTotal =>
+      system +
+      injections +
+      history +
+      tools +
+      attachments +
+      memory +
+      worldBook +
+      skills +
+      workspace +
+      search +
+      mcpTools;
 
   int get total => nonDraftTotal + draft;
 
@@ -101,6 +156,12 @@ class ContextUsageBuckets {
     int? tools,
     int? attachments,
     int? draft,
+    int? memory,
+    int? worldBook,
+    int? skills,
+    int? workspace,
+    int? search,
+    int? mcpTools,
   }) {
     return ContextUsageBuckets(
       system: system ?? this.system,
@@ -109,6 +170,12 @@ class ContextUsageBuckets {
       tools: tools ?? this.tools,
       attachments: attachments ?? this.attachments,
       draft: draft ?? this.draft,
+      memory: memory ?? this.memory,
+      worldBook: worldBook ?? this.worldBook,
+      skills: skills ?? this.skills,
+      workspace: workspace ?? this.workspace,
+      search: search ?? this.search,
+      mcpTools: mcpTools ?? this.mcpTools,
     );
   }
 }
@@ -125,6 +192,12 @@ ContextUsageBuckets? calibrateContextUsageBuckets({
     estimated.history,
     estimated.tools,
     estimated.attachments,
+    estimated.memory,
+    estimated.worldBook,
+    estimated.skills,
+    estimated.workspace,
+    estimated.search,
+    estimated.mcpTools,
   ];
   final estimatedNonDraft = values.fold<int>(0, (sum, value) => sum + value);
   if (estimatedNonDraft <= 0) return null;
@@ -133,12 +206,18 @@ ContextUsageBuckets? calibrateContextUsageBuckets({
       (value * anchorTotal / estimatedNonDraft).round(),
   ];
   var residual = anchorTotal - scaled.fold<int>(0, (sum, value) => sum + value);
-  if (residual != 0) {
+  while (residual != 0) {
     var largest = 0;
     for (var i = 1; i < scaled.length; i++) {
       if (scaled[i] > scaled[largest]) largest = i;
     }
-    scaled[largest] += residual;
+    // With many small categories, rounding can exceed the anchor by more than
+    // a single bucket. Distribute that correction without negative counts.
+    final correction = residual < -scaled[largest]
+        ? -scaled[largest]
+        : residual;
+    scaled[largest] += correction;
+    residual -= correction;
   }
   return ContextUsageBuckets(
     system: scaled[0],
@@ -147,6 +226,12 @@ ContextUsageBuckets? calibrateContextUsageBuckets({
     tools: scaled[3],
     attachments: scaled[4],
     draft: estimated.draft,
+    memory: scaled[5],
+    worldBook: scaled[6],
+    skills: scaled[7],
+    workspace: scaled[8],
+    search: scaled[9],
+    mcpTools: scaled[10],
   );
 }
 
@@ -219,6 +304,7 @@ class ContextUsageService extends ChangeNotifier {
     required this._assistants,
     required this._instructions,
     required this._worldBooks,
+    this._memories,
     this._assemble,
     this._staleRefreshDelay = const Duration(milliseconds: 800),
     Future<T> Function<T>(T Function() computation)? runEstimate,
@@ -227,6 +313,7 @@ class ContextUsageService extends ChangeNotifier {
     _assistants.addListener(_onSettingsOrAssistantChanged);
     _instructions.addListener(_onSettingsOrAssistantChanged);
     _worldBooks.addListener(_onSettingsOrAssistantChanged);
+    _memories?.addListener(_onMemoryChanged);
     ModelCatalogService.instance.addListener(_onSettingsOrAssistantChanged);
   }
 
@@ -235,6 +322,7 @@ class ContextUsageService extends ChangeNotifier {
   final AssistantProvider _assistants;
   final InstructionInjectionProvider _instructions;
   final WorldBookProvider _worldBooks;
+  final MemoryProviderV2? _memories;
   ContextAssemblyPreviewFn? _assemble;
   final Duration _staleRefreshDelay;
   final Future<T> Function<T>(T Function() computation) _runEstimate;
@@ -242,9 +330,12 @@ class ContextUsageService extends ChangeNotifier {
   final Map<String, ContextUsageSnapshot> _snapshots =
       <String, ContextUsageSnapshot>{};
   final Map<String, int> _inFlight = <String, int>{};
+  final Map<String, int> _memoryChecks = <String, int>{};
   final Map<String, Timer> _debounce = <String, Timer>{};
   final Map<String, _ExactAnchor> _anchors = <String, _ExactAnchor>{};
   final Map<String, Object?> _snapshotConfigurations = <String, Object?>{};
+  final Map<String, String?> _memorySnapshotHashes = {};
+  final Map<String, DraftTokenCounter> _draftCounters = {};
 
   String? _activeConversationId;
   VoidCallback? _revisionListener;
@@ -264,6 +355,22 @@ class ContextUsageService extends ChangeNotifier {
 
   void bindAssembler(ContextAssemblyPreviewFn assemble) {
     _assemble = assemble;
+  }
+
+  /// Queues only the composer contribution; counting runs off the UI thread.
+  void updateDraft(String conversationId, String text) {
+    if (_disposed) return;
+    _draftCounters
+        .putIfAbsent(
+          conversationId,
+          () => DraftTokenCounter(
+            onCountChanged: (_) {
+              final snapshot = _snapshots[conversationId];
+              if (snapshot != null) _foldDraft(conversationId, snapshot);
+            },
+          ),
+        )
+        .update(text);
   }
 
   void setActiveConversation(String? conversationId) {
@@ -292,7 +399,7 @@ class ContextUsageService extends ChangeNotifier {
     notifyListeners();
   }
 
-  void recordUsage({
+  Future<void> recordUsage({
     required String conversationId,
     required String providerKey,
     required String modelId,
@@ -301,8 +408,22 @@ class ContextUsageService extends ChangeNotifier {
     required ChatMessage assistantMessage,
     Object? requestConfiguration,
     int? requestRevision,
-  }) {
-    if (usage.promptTokens <= 0) return;
+  }) async {
+    if (_disposed || usage.promptTokens <= 0) return;
+    final before = _resolvedIdentity(conversationId);
+    if (before == null) return;
+    final String? memoryHash;
+    try {
+      memoryHash = await _readMemoryHash(before);
+    } catch (_) {
+      if (!_disposed) {
+        _clearExactAnchor(conversationId);
+        unawaited(refresh(conversationId, force: true));
+      }
+      return;
+    }
+    if (_disposed) return;
+    _memorySnapshotHashes[conversationId] = memoryHash;
     final revision = _chatService.contextRevision(conversationId);
     final resolved = _resolvedIdentity(conversationId);
     if (requestRevision != revision ||
@@ -324,7 +445,7 @@ class ContextUsageService extends ChangeNotifier {
     );
     final window = spec.contextWindow;
     final previous = _snapshots[conversationId];
-    final draft = previous?.buckets.draft ?? 0;
+    final draft = _draftCounters[conversationId]?.tokens ?? 0;
     final computedAt = DateTime.now();
     final storedAssistantId = resolved.assistantId;
     final configuration = requestConfiguration;
@@ -356,43 +477,66 @@ class ContextUsageService extends ChangeNotifier {
     unawaited(refresh(conversationId, force: true));
   }
 
+  /// Omitted [draftText] preserves the latest input; an explicit empty string
+  /// clears it. Background refreshes never own the input field's state.
   Future<void> refresh(
     String conversationId, {
-    String draftText = '',
+    String? draftText,
     bool force = false,
   }) async {
-    final resolved = _resolvedIdentity(conversationId);
-    if (resolved == null) return;
-    final existing = _snapshots[conversationId];
-    if (!force &&
-        existing != null &&
-        _isFresh(existing, conversationId, resolved)) {
-      _foldDraft(conversationId, existing, draftText);
-      return;
+    if (_disposed) return;
+    // Capture edits before any await so overlapping background work sees them.
+    if (draftText != null) {
+      updateDraft(conversationId, draftText);
     }
-
+    final initial = _resolvedIdentity(conversationId);
+    if (initial == null) return;
     final revision = _chatService.contextRevision(conversationId);
-    final generation = (_inFlight[conversationId] ?? 0) + 1;
-    _inFlight[conversationId] = generation;
-    final keepExact = _anchorMatches(conversationId, revision, resolved);
-    _snapshotConfigurations[conversationId] = resolved.configuration;
-    if (!keepExact) {
-      _snapshots[conversationId] = ContextUsageSnapshot(
-        state: ContextUsageState.computing,
-        buckets: existing?.buckets ?? const ContextUsageBuckets(),
-        usedTokens: existing?.usedTokens ?? 0,
-        contextWindow: resolved.contextWindow,
-        conversationId: conversationId,
-        revision: revision,
-        providerKey: resolved.providerKey,
-        modelId: resolved.modelId,
-        assistantId: resolved.assistantId,
-        computedAt: existing?.computedAt ?? DateTime.now(),
-      );
-      notifyListeners();
-    }
-
+    final check = (_memoryChecks[conversationId] ?? 0) + 1;
+    _memoryChecks[conversationId] = check;
+    int? generation;
     try {
+      await _draftCounters[conversationId]?.flush();
+      if (_disposed || _memoryChecks[conversationId] != check) return;
+      final memoryHash = await _readMemoryHash(initial);
+      if (_disposed || _memoryChecks[conversationId] != check) return;
+      if (_chatService.contextRevision(conversationId) != revision ||
+          _resolvedIdentity(conversationId)?.configuration !=
+              initial.configuration) {
+        _scheduleRefresh(conversationId);
+        return;
+      }
+      _memorySnapshotHashes[conversationId] = memoryHash;
+      final resolved = _resolvedIdentity(conversationId)!;
+      final existing = _snapshots[conversationId];
+      if (!force &&
+          existing != null &&
+          _isFresh(existing, conversationId, resolved)) {
+        _foldDraft(conversationId, existing);
+        return;
+      }
+
+      // A cache hit must not cancel an already-running forced recalibration.
+      generation = (_inFlight[conversationId] ?? 0) + 1;
+      _inFlight[conversationId] = generation;
+      final keepExact = _anchorMatches(conversationId, revision, resolved);
+      _snapshotConfigurations[conversationId] = resolved.configuration;
+      if (!keepExact) {
+        _snapshots[conversationId] = ContextUsageSnapshot(
+          state: ContextUsageState.computing,
+          buckets: existing?.buckets ?? const ContextUsageBuckets(),
+          usedTokens: existing?.usedTokens ?? 0,
+          contextWindow: resolved.contextWindow,
+          conversationId: conversationId,
+          revision: revision,
+          providerKey: resolved.providerKey,
+          modelId: resolved.modelId,
+          assistantId: resolved.assistantId,
+          computedAt: existing?.computedAt ?? DateTime.now(),
+        );
+        notifyListeners();
+      }
+
       final assemble = _assemble;
       final preview = assemble == null
           ? const ContextAssemblyPreview(
@@ -409,20 +553,27 @@ class ContextUsageService extends ChangeNotifier {
               assistantId: resolved.assistantId,
             );
       if (_disposed || _inFlight[conversationId] != generation) return;
-      final job = ContextEstimateJob(
-        systemText: preview.systemText,
-        injectionsText: preview.injectionsText,
-        historyText: preview.historyText,
-        draftText: draftText,
-        tools: preview.tools,
-        images: preview.images,
-        kind: resolved.kind,
-      );
+      final job = ContextEstimateJob(preview: preview, kind: resolved.kind);
       final estimated = await _runEstimate(() => estimateContextBuckets(job));
+      if (_disposed || _inFlight[conversationId] != generation) return;
+      final latestMemoryHash = await _readMemoryHash(resolved);
       if (_disposed || _inFlight[conversationId] != generation) return;
       if (_chatService.contextRevision(conversationId) != revision) return;
       if (_resolvedIdentity(conversationId)?.configuration !=
           resolved.configuration) {
+        return;
+      }
+      if (latestMemoryHash != memoryHash) {
+        _memorySnapshotHashes[conversationId] = latestMemoryHash;
+        _clearExactAnchor(conversationId);
+        final snapshot = _snapshots[conversationId];
+        if (snapshot != null) {
+          _snapshots[conversationId] = snapshot.copyWith(
+            state: ContextUsageState.stale,
+          );
+          notifyListeners();
+        }
+        _scheduleRefresh(conversationId);
         return;
       }
       final buckets = ContextUsageBuckets(
@@ -431,7 +582,13 @@ class ContextUsageService extends ChangeNotifier {
         history: estimated.history,
         tools: estimated.tools,
         attachments: estimated.attachments,
-        draft: estimated.draft,
+        draft: _draftCounters[conversationId]?.tokens ?? 0,
+        memory: estimated.memory,
+        worldBook: estimated.worldBook,
+        skills: estimated.skills,
+        workspace: estimated.workspace,
+        search: estimated.search,
+        mcpTools: estimated.mcpTools,
       );
       _snapshots[conversationId] = _snapshotFromEstimate(
         conversationId: conversationId,
@@ -441,9 +598,15 @@ class ContextUsageService extends ChangeNotifier {
       );
       notifyListeners();
     } catch (_) {
-      if (_disposed || _inFlight[conversationId] != generation) return;
+      if (_disposed ||
+          (generation == null
+              ? _memoryChecks[conversationId] != check
+              : _inFlight[conversationId] != generation)) {
+        return;
+      }
       final fallback = _snapshots[conversationId];
-      if (fallback != null && fallback.state == ContextUsageState.computing) {
+      _clearExactAnchor(conversationId);
+      if (fallback != null && fallback.state != ContextUsageState.none) {
         _snapshots[conversationId] = fallback.copyWith(
           state: ContextUsageState.stale,
         );
@@ -459,12 +622,17 @@ class ContextUsageService extends ChangeNotifier {
     _assistants.removeListener(_onSettingsOrAssistantChanged);
     _instructions.removeListener(_onSettingsOrAssistantChanged);
     _worldBooks.removeListener(_onSettingsOrAssistantChanged);
+    _memories?.removeListener(_onMemoryChanged);
     ModelCatalogService.instance.removeListener(_onSettingsOrAssistantChanged);
     _unlistenRevision();
     for (final timer in _debounce.values) {
       timer.cancel();
     }
     _debounce.clear();
+    for (final counter in _draftCounters.values) {
+      counter.dispose();
+    }
+    _draftCounters.clear();
     super.dispose();
   }
 
@@ -541,12 +709,8 @@ class ContextUsageService extends ChangeNotifier {
     _anchors.remove(conversationId);
   }
 
-  void _foldDraft(
-    String conversationId,
-    ContextUsageSnapshot existing,
-    String draftText,
-  ) {
-    final draftTokens = estimateTokens(draftText);
+  void _foldDraft(String conversationId, ContextUsageSnapshot existing) {
+    final draftTokens = _draftCounters[conversationId]?.tokens ?? 0;
     if (existing.buckets.draft == draftTokens) return;
     final usedWithoutDraft = existing.usedTokens - existing.buckets.draft;
     _snapshots[conversationId] = existing.copyWith(
@@ -612,6 +776,18 @@ class ContextUsageService extends ChangeNotifier {
     _syncResolvedIdentity();
   }
 
+  void _onMemoryChanged() {
+    final id = _activeConversationId;
+    if (id != null) unawaited(refresh(id));
+  }
+
+  Future<String?> _readMemoryHash(_ResolvedIdentity identity) =>
+      readContextMemorySnapshotHash(
+        repository: _chatService.chatRepositoryOrNull,
+        settings: _settings,
+        assistant: identity.assistant,
+      );
+
   void _syncResolvedIdentity() {
     final id = _activeConversationId;
     if (id == null) return;
@@ -667,6 +843,7 @@ class ContextUsageService extends ChangeNotifier {
         explicitType: cfg.providerType,
       ),
       spec: spec,
+      assistant: assistant,
       configuration: contextUsageConfiguration(
         settings: _settings,
         config: cfg,
@@ -677,6 +854,7 @@ class ContextUsageService extends ChangeNotifier {
         instructions: _instructions,
         worldBooks: _worldBooks,
         conversation: conversation,
+        memorySnapshotHash: _memorySnapshotHashes[conversationId],
       ),
     );
   }
@@ -709,6 +887,7 @@ class _ResolvedIdentity {
     required this.assistantId,
     required this.kind,
     required this.spec,
+    required this.assistant,
     required this.configuration,
   });
 
@@ -717,6 +896,7 @@ class _ResolvedIdentity {
   final String? assistantId;
   final ProviderKind kind;
   final ModelSpec spec;
+  final Assistant? assistant;
   final Object configuration;
 
   int? get contextWindow => spec.contextWindow;

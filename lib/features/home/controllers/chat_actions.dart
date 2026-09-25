@@ -2614,7 +2614,7 @@ class ChatActions {
     final usage = state.usage;
     if (usage != null) {
       final assistant = state.ctx.assistant;
-      contextUsage?.recordUsage(
+      await contextUsage?.recordUsage(
         conversationId: conversationId,
         providerKey: state.ctx.providerKey,
         modelId: state.ctx.modelId,

@@ -48,13 +48,87 @@ void expectSegment(
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
+  for (final width in [320.0, 720.0]) {
+    for (final brightness in Brightness.values) {
+      for (final language in ['en', 'zh']) {
+        testWidgets('detailed legend fits $width $brightness $language', (
+          tester,
+        ) async {
+          tester.view.devicePixelRatio = 1;
+          tester.view.physicalSize = Size(width, 800);
+          addTearDown(tester.view.resetPhysicalSize);
+          addTearDown(tester.view.resetDevicePixelRatio);
+          const buckets = ContextUsageBuckets(
+            history: 76000,
+            tools: 2000,
+            mcpTools: 1000,
+            skills: 500,
+            system: 1300,
+            memory: 400,
+            worldBook: 200,
+            injections: 792,
+            workspace: 300,
+            search: 100,
+            attachments: 258,
+            draft: 50,
+          );
+          await tester.pumpWidget(
+            MaterialApp(
+              theme: ThemeData(brightness: brightness),
+              locale: Locale(language),
+              localizationsDelegates: AppLocalizations.localizationsDelegates,
+              supportedLocales: AppLocalizations.supportedLocales,
+              home: Scaffold(
+                body: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: ContextUsageBreakdown(
+                    snapshot: usageSnap(
+                      buckets: buckets,
+                      used: buckets.total,
+                      window: 1000000,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          );
+          for (final key in [
+            'memory',
+            'worldBook',
+            'skills',
+            'workspace',
+            'search',
+            'tools',
+            'mcpTools',
+          ]) {
+            expect(
+              find.byKey(ValueKey('context-usage-bucket-$key')),
+              findsOneWidget,
+            );
+          }
+          expect(find.text('0%'), findsNothing);
+          expect(find.text('<0.1%'), findsWidgets);
+          expect(find.text('7.6%'), findsOneWidget);
+          expect(tester.takeException(), isNull);
+          final segments = buildContextUsageSegments(
+            usageSnap(buckets: buckets, used: buckets.total, window: 1000000),
+          );
+          expect(
+            segments.fold<int>(0, (sum, segment) => sum + segment.tokens),
+            1000000,
+          );
+        });
+      }
+    }
+  }
+
   test('segments with a window are proportional to the window', () {
     final segments = buildContextUsageSegments(usageSnap());
     expect(segments, hasLength(7));
-    expectSegment(segments[0], key: 'system', tokens: 10, fraction: 0.01);
-    expectSegment(segments[1], key: 'injections', tokens: 8, fraction: 0.008);
-    expectSegment(segments[2], key: 'history', tokens: 70, fraction: 0.07);
-    expectSegment(segments[3], key: 'tools', tokens: 6, fraction: 0.006);
+    expectSegment(segments[2], key: 'system', tokens: 10, fraction: 0.01);
+    expectSegment(segments[3], key: 'injections', tokens: 8, fraction: 0.008);
+    expectSegment(segments[0], key: 'history', tokens: 70, fraction: 0.07);
+    expectSegment(segments[1], key: 'tools', tokens: 6, fraction: 0.006);
     expectSegment(segments[4], key: 'attachments', tokens: 7, fraction: 0.007);
     expectSegment(segments[5], key: 'draft', tokens: 9, fraction: 0.009);
     expectSegment(segments[6], key: 'freeSpace', tokens: 890, fraction: 0.89);
@@ -63,10 +137,10 @@ void main() {
   test('segments without a window are proportional to used total', () {
     final segments = buildContextUsageSegments(usageSnap(window: null));
     expect(segments, hasLength(6));
-    expectSegment(segments[0], key: 'system', tokens: 10, fraction: 10 / 110);
-    expectSegment(segments[1], key: 'injections', tokens: 8, fraction: 8 / 110);
-    expectSegment(segments[2], key: 'history', tokens: 70, fraction: 70 / 110);
-    expectSegment(segments[3], key: 'tools', tokens: 6, fraction: 6 / 110);
+    expectSegment(segments[2], key: 'system', tokens: 10, fraction: 10 / 110);
+    expectSegment(segments[3], key: 'injections', tokens: 8, fraction: 8 / 110);
+    expectSegment(segments[0], key: 'history', tokens: 70, fraction: 70 / 110);
+    expectSegment(segments[1], key: 'tools', tokens: 6, fraction: 6 / 110);
     expectSegment(
       segments[4],
       key: 'attachments',
@@ -82,10 +156,10 @@ void main() {
       usageSnap(state: ContextUsageState.exact, calibrated: true),
     );
     expect(segments, hasLength(7));
-    expectSegment(segments[0], key: 'system', tokens: 10, fraction: 0.01);
-    expectSegment(segments[1], key: 'injections', tokens: 8, fraction: 0.008);
-    expectSegment(segments[2], key: 'history', tokens: 70, fraction: 0.07);
-    expectSegment(segments[3], key: 'tools', tokens: 6, fraction: 0.006);
+    expectSegment(segments[2], key: 'system', tokens: 10, fraction: 0.01);
+    expectSegment(segments[3], key: 'injections', tokens: 8, fraction: 0.008);
+    expectSegment(segments[0], key: 'history', tokens: 70, fraction: 0.07);
+    expectSegment(segments[1], key: 'tools', tokens: 6, fraction: 0.006);
     expectSegment(segments[4], key: 'attachments', tokens: 7, fraction: 0.007);
     expectSegment(segments[5], key: 'draft', tokens: 9, fraction: 0.009);
     expectSegment(segments[6], key: 'freeSpace', tokens: 890, fraction: 0.89);
@@ -175,7 +249,7 @@ void main() {
       find.byKey(const ValueKey('context-usage-bucket-freeSpace')),
       findsNothing,
     );
-    expect(find.text('History'), findsOneWidget);
+    expect(find.text('Messages'), findsOneWidget);
     expect(find.text('40'), findsOneWidget);
     expect(find.textContaining('%'), findsNothing);
   });
@@ -194,9 +268,9 @@ void main() {
       ),
     );
 
-    expect(find.text('4%'), findsOneWidget);
-    expect(find.text('1%'), findsOneWidget);
-    expect(find.text('96%'), findsOneWidget);
+    expect(find.text('4.0%'), findsOneWidget);
+    expect(find.text('0.5%'), findsOneWidget);
+    expect(find.text('95.5%'), findsOneWidget);
     expect(find.text('Free space'), findsOneWidget);
     expect(
       find.byKey(const ValueKey('context-usage-bucket-freeSpace')),
@@ -221,7 +295,7 @@ void main() {
 
     expect(find.text('Used'), findsOneWidget);
     expect(find.text('250'), findsOneWidget);
-    expect(find.text('25%'), findsOneWidget);
+    expect(find.text('25.0%'), findsOneWidget);
     expect(find.text('Exact (from last response)'), findsOneWidget);
     expect(
       find.byKey(const ValueKey('context-usage-bucket-used')),
@@ -256,8 +330,8 @@ void main() {
     );
 
     expect(find.text('Exact (breakdown scaled from estimate)'), findsOneWidget);
-    expect(find.text('System'), findsOneWidget);
-    expect(find.text('History'), findsOneWidget);
+    expect(find.text('System prompt'), findsOneWidget);
+    expect(find.text('Messages'), findsOneWidget);
     expect(find.text('Draft'), findsOneWidget);
     expect(find.text('Used'), findsNothing);
     expect(

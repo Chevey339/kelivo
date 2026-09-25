@@ -45,7 +45,11 @@ class _ContextUsageHeaderState extends State<ContextUsageHeader> {
     final id = _conversationId;
     final usage = context.read<ContextUsageService?>();
     if (id == null || usage == null) return;
-    await usage.refresh(id, draftText: widget.draftText, force: force);
+    await usage.refresh(
+      id,
+      draftText: force ? null : widget.draftText,
+      force: force,
+    );
   }
 
   Future<void> _openSetWindow(ContextUsageSnapshot snapshot) async {

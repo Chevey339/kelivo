@@ -255,7 +255,7 @@ void main() {
       usage.setActiveConversation(conversation.id);
       final sentRevision = chat.contextRevision(conversation.id);
       final sentConfiguration = requestConfiguration(providers);
-      void respond() => usage.recordUsage(
+      Future<void> respond() => usage.recordUsage(
         conversationId: conversation.id,
         providerKey: 'TestProvider',
         modelId: 'window-model',
@@ -270,14 +270,14 @@ void main() {
         const [],
       );
       expect(chat.contextRevision(conversation.id), sentRevision);
-      respond();
+      await respond();
       await usage.refresh(conversation.id, force: true);
       expect(usage.current!.state, ContextUsageState.exact);
       expect(usage.current!.usedTokens, 10);
 
       await chat.setSelectedVersion(conversation.id, groupId, second.version);
       expect(chat.contextRevision(conversation.id), sentRevision + 1);
-      respond();
+      await respond();
       await usage.refresh(conversation.id, force: true);
       expect(usage.current!.state, ContextUsageState.estimated);
       expect(usage.current!.usedTokens, 100);
@@ -333,7 +333,7 @@ void main() {
         conversation: conversation,
       );
       final sentRevision = chat.contextRevision(conversation.id);
-      void respond() => usage.recordUsage(
+      Future<void> respond() => usage.recordUsage(
         conversationId: conversation.id,
         providerKey: 'TestProvider',
         modelId: 'window-model',
@@ -347,7 +347,7 @@ void main() {
           conversationId: conversation.id,
         ),
       );
-      respond();
+      await respond();
       await usage.refresh(conversation.id, force: true);
       expect(usage.snapshot(conversation.id)!.state, ContextUsageState.exact);
       expect(usage.snapshot(conversation.id)!.usedTokens, 10);
@@ -362,7 +362,7 @@ void main() {
         ContextUsageState.estimated,
       );
       expect(usage.snapshot(conversation.id)!.usedTokens, 100);
-      respond();
+      await respond();
       await usage.refresh(conversation.id, force: true);
       expect(
         usage.snapshot(conversation.id)!.state,
@@ -444,7 +444,7 @@ void main() {
             ),
       );
       usage.setActiveConversation(conversation.id);
-      usage.recordUsage(
+      await usage.recordUsage(
         conversationId: conversation.id,
         providerKey: 'TestProvider',
         modelId: 'window-model',
@@ -523,7 +523,7 @@ void main() {
         content: 'x',
         conversationId: conversation.id,
       );
-      void respond() => usage.recordUsage(
+      Future<void> respond() => usage.recordUsage(
         requestRevision: chat.contextRevision(conversation.id),
         conversationId: conversation.id,
         providerKey: 'TestProvider',
@@ -533,7 +533,7 @@ void main() {
         usage: const TokenUsage(promptTokens: 9, completionTokens: 1),
         assistantMessage: reply,
       );
-      respond();
+      await respond();
       await waitUntil(() => usage.current?.calibrated == true);
       expect(usage.current!.state, ContextUsageState.exact);
       expect(usage.current!.usedTokens, 10);
@@ -543,7 +543,7 @@ void main() {
             .getById(assistantId)!
             .copyWith(systemPrompt: tokenWords(100)),
       );
-      respond();
+      await respond();
       await waitUntil(
         () => usage.current?.state == ContextUsageState.estimated,
       );
@@ -594,7 +594,7 @@ void main() {
       await settings.setMemoryRulesPromptEn(tokenWords(100));
       await usage.refresh(conversation.id);
       expect(usage.current!.usedTokens, 100);
-      usage.recordUsage(
+      await usage.recordUsage(
         requestRevision: chat.contextRevision(conversation.id),
         conversationId: conversation.id,
         providerKey: 'TestProvider',
@@ -624,7 +624,7 @@ void main() {
       assistants: providers.assistants,
     );
     final conversation = await chat.createDraftConversation(title: 'A');
-    usage.recordUsage(
+    await usage.recordUsage(
       requestRevision: chat.contextRevision(conversation.id),
       conversationId: conversation.id,
       providerKey: 'TestProvider',
@@ -706,7 +706,7 @@ void main() {
         assistantId: id,
       );
       usage.setActiveConversation(conversation.id);
-      usage.recordUsage(
+      await usage.recordUsage(
         requestRevision: chat.contextRevision(conversation.id),
         requestConfiguration: requestConfiguration(
           providers,
@@ -747,6 +747,7 @@ void main() {
       final chat = await createChat();
       final providers = await createProviders();
       final pending = Completer<ContextAssemblyPreview>();
+      final assembling = Completer<void>();
       var calls = 0;
       final usage = createUsage(
         chat: chat,
@@ -760,7 +761,10 @@ void main() {
               required assistantId,
             }) async {
               calls++;
-              if (calls == 1) return pending.future;
+              if (calls == 1) {
+                assembling.complete();
+                return pending.future;
+              }
               return const ContextAssemblyPreview(
                 systemText: 'new',
                 injectionsText: '',
@@ -773,6 +777,7 @@ void main() {
       final conversation = await chat.createDraftConversation(title: 'A');
       usage.setActiveConversation(conversation.id);
       final first = usage.refresh(conversation.id);
+      await assembling.future;
       final cfg = providers.settings.getProviderConfig('TestProvider');
       await providers.settings.setProviderConfig(
         'TestProvider',
@@ -846,7 +851,7 @@ void main() {
       reasoningText: reasoning,
     );
 
-    usage.recordUsage(
+    await usage.recordUsage(
       requestRevision: chat.contextRevision(conversation.id),
       requestConfiguration: requestConfiguration(
         providers,
@@ -886,7 +891,7 @@ void main() {
       reasoningText: 'hidden thoughts',
     );
 
-    usage.recordUsage(
+    await usage.recordUsage(
       requestRevision: chat.contextRevision(conversation.id),
       requestConfiguration: requestConfiguration(
         providers,
@@ -945,7 +950,7 @@ void main() {
       const reasoning = 'plan';
       const toolJson = '{"name":"search"}';
 
-      usage.recordUsage(
+      await usage.recordUsage(
         requestRevision: chat.contextRevision(conversation.id),
         requestConfiguration: requestConfiguration((
           settings: settings,
@@ -968,7 +973,7 @@ void main() {
         10 + estimateTokens(content),
       );
 
-      usage.recordUsage(
+      await usage.recordUsage(
         requestRevision: chat.contextRevision(conversation.id),
         requestConfiguration: requestConfiguration((
           settings: settings,
@@ -1006,7 +1011,7 @@ void main() {
       final conversation = await chat.createConversation(title: 'A');
       const hugeTool = '{"name":"search","result":"xxxxxxxxxxxxxxxxxxxxxxxx"}';
 
-      usage.recordUsage(
+      await usage.recordUsage(
         requestRevision: chat.contextRevision(conversation.id),
         requestConfiguration: requestConfiguration(
           providers,
@@ -1059,7 +1064,7 @@ void main() {
     );
     final conversation = await chat.createConversation(title: 'A');
 
-    usage.recordUsage(
+    await usage.recordUsage(
       requestRevision: chat.contextRevision(conversation.id),
       requestConfiguration: requestConfiguration(
         providers,
@@ -1121,7 +1126,7 @@ void main() {
       );
       final conversation = await chat.createConversation(title: 'A');
 
-      usage.recordUsage(
+      await usage.recordUsage(
         requestRevision: chat.contextRevision(conversation.id),
         requestConfiguration: requestConfiguration((
           settings: settings,
@@ -1145,7 +1150,7 @@ void main() {
       );
       expect(usage.snapshot(conversation.id)!.usedTokens, 105);
 
-      usage.recordUsage(
+      await usage.recordUsage(
         requestRevision: chat.contextRevision(conversation.id),
         requestConfiguration: requestConfiguration((
           settings: settings,
@@ -1198,7 +1203,7 @@ void main() {
     final conversation = await chat.createConversation(title: 'A');
     const anchor = 41646;
 
-    usage.recordUsage(
+    await usage.recordUsage(
       requestRevision: chat.contextRevision(conversation.id),
       requestConfiguration: requestConfiguration(
         providers,
@@ -1253,7 +1258,7 @@ void main() {
     );
     final conversation = await chat.createConversation(title: 'A');
 
-    usage.recordUsage(
+    await usage.recordUsage(
       requestRevision: chat.contextRevision(conversation.id),
       requestConfiguration: requestConfiguration(
         providers,
@@ -1320,7 +1325,7 @@ void main() {
     );
     final conversation = await chat.createDraftConversation(title: 'A');
     usage.setActiveConversation(conversation.id);
-    usage.recordUsage(
+    await usage.recordUsage(
       requestRevision: chat.contextRevision(conversation.id),
       requestConfiguration: requestConfiguration(
         providers,
@@ -1377,7 +1382,7 @@ void main() {
     );
     final conversation = await chat.createConversation(title: 'A');
 
-    usage.recordUsage(
+    await usage.recordUsage(
       requestRevision: chat.contextRevision(conversation.id),
       requestConfiguration: requestConfiguration(
         providers,

@@ -9,10 +9,16 @@ import '../../theme/app_font_weights.dart';
 
 abstract final class ContextUsagePalette {
   static const Color system = Color(0xFF8E8E93);
-  static const Color injections = Color(0xFF2FBF71);
+  static const Color injections = Color(0xFFEC4899);
   static const Color history = Color(0xFF3B82F6);
   static const Color tools = Color(0xFFF59E0B);
-  static const Color attachments = Color(0xFFE0A61A);
+  static const Color memory = Color(0xFF14B8A6);
+  static const Color worldBook = Color(0xFF22C55E);
+  static const Color skills = Color(0xFFEAB308);
+  static const Color workspace = Color(0xFF64748B);
+  static const Color search = Color(0xFF06B6D4);
+  static const Color mcpTools = Color(0xFFF97316);
+  static const Color attachments = Color(0xFFB08968);
   static const Color draft = Color(0xFFA855F7);
 
   static Color track(ColorScheme cs) => cs.onSurface.withValues(alpha: 0.12);
@@ -23,6 +29,12 @@ abstract final class ContextUsagePalette {
       'injections' => injections,
       'history' => history,
       'tools' => tools,
+      'memory' => memory,
+      'worldBook' => worldBook,
+      'skills' => skills,
+      'workspace' => workspace,
+      'search' => search,
+      'mcpTools' => mcpTools,
       'attachments' => attachments,
       'draft' => draft,
       'used' => cs.primary,
@@ -86,6 +98,12 @@ String contextUsageSegmentLabel(AppLocalizations l10n, String key) {
     'injections' => l10n.contextUsageBucketInjections,
     'history' => l10n.contextUsageBucketHistory,
     'tools' => l10n.contextUsageBucketTools,
+    'memory' => l10n.contextUsageBucketMemory,
+    'worldBook' => l10n.contextUsageBucketWorldBook,
+    'skills' => l10n.contextUsageBucketSkills,
+    'workspace' => l10n.contextUsageBucketWorkspace,
+    'search' => l10n.contextUsageBucketSearch,
+    'mcpTools' => l10n.contextUsageBucketMcpTools,
     'attachments' => l10n.contextUsageBucketAttachments,
     'draft' => l10n.contextUsageBucketDraft,
     'used' => l10n.contextUsageBucketUsed,
@@ -120,10 +138,16 @@ List<ContextUsageSegment> buildContextUsageSegments(
   final items = <ContextUsageSegment>[];
   if (useBuckets) {
     for (final entry in [
-      (key: 'system', tokens: buckets.system),
-      (key: 'injections', tokens: buckets.injections),
       (key: 'history', tokens: buckets.history),
       (key: 'tools', tokens: buckets.tools),
+      (key: 'mcpTools', tokens: buckets.mcpTools),
+      (key: 'skills', tokens: buckets.skills),
+      (key: 'system', tokens: buckets.system),
+      (key: 'memory', tokens: buckets.memory),
+      (key: 'worldBook', tokens: buckets.worldBook),
+      (key: 'injections', tokens: buckets.injections),
+      (key: 'workspace', tokens: buckets.workspace),
+      (key: 'search', tokens: buckets.search),
       (key: 'attachments', tokens: buckets.attachments),
       (key: 'draft', tokens: buckets.draft),
     ]) {
@@ -284,10 +308,12 @@ class _ContextUsageStackedBarPainter extends CustomPainter {
     for (var i = 0; i < segments.length; i++) {
       final width = size.width * segments[i].fraction;
       if (width <= 0) continue;
+      // Keep small sources visible instead of consuming them with the gap.
+      final gap = math.min(_gap, width * 0.2);
       var left = x;
       var right = x + width;
-      if (i > 0) left += _gap / 2;
-      if (i < segments.length - 1) right -= _gap / 2;
+      if (i > 0) left += gap / 2;
+      if (i < segments.length - 1) right -= gap / 2;
       if (right > left) {
         canvas.drawRect(
           Rect.fromLTRB(left, 0, right, size.height),
@@ -335,7 +361,9 @@ class ContextUsageLegend extends StatelessWidget {
             label: contextUsageSegmentLabel(l10n, segments[i].key),
             tokens: segments[i].tokens,
             percent: showPercent
-                ? '${(segments[i].fraction * 100).round()}%'
+                ? (segments[i].fraction < 0.001
+                      ? '<0.1%'
+                      : '${(segments[i].fraction * 100).toStringAsFixed(1)}%')
                 : null,
           ),
         ],
@@ -392,7 +420,7 @@ class _LegendRow extends StatelessWidget {
         if (percent != null) ...[
           const SizedBox(width: 8),
           SizedBox(
-            width: 36,
+            width: 46,
             child: Text(percent!, textAlign: TextAlign.end, style: valueStyle),
           ),
         ],
@@ -418,6 +446,7 @@ class ContextUsageBreakdown extends StatelessWidget {
         : buildContextUsageSegments(snapshot!);
 
     return Column(
+      mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         ContextUsageSummaryHeader(snapshot: snapshot, trailing: headerTrailing),

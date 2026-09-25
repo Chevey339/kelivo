@@ -1998,6 +1998,8 @@ class _HomePageState extends State<HomePage>
         return SafeArea(
           top: false,
           child: ContextManagementSheet(
+            conversationId: _controller.currentConversation?.id,
+            draftText: _inputController.text,
             messageCountLabel: _controller.contextMessageCountLabel(),
             onCompress: () async {
               await Navigator.of(ctx).maybePop();

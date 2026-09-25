@@ -295,7 +295,7 @@ void main() {
         modelId: 'opaque',
       );
 
-  void record(PreparedGeneration prepared) => usage.recordUsage(
+  Future<void> record(PreparedGeneration prepared) => usage.recordUsage(
     conversationId: conversationId,
     providerKey: 'Test',
     modelId: 'opaque',
@@ -308,7 +308,7 @@ void main() {
 
   Future<PreparedGeneration> anchor() async {
     final prepared = await prepare();
-    record(prepared);
+    await record(prepared);
     await usage.refresh(conversationId, force: true);
     expect(usage.snapshot(conversationId)!.state, ContextUsageState.exact);
     expect(usage.snapshot(conversationId)!.usedTokens, 10);
@@ -360,7 +360,7 @@ void main() {
             usage.snapshot(conversationId)!.usedTokens,
             greaterThanOrEqualTo(100),
           );
-          record(prepared);
+          await record(prepared);
           await usage.refresh(conversationId, force: true);
           expect(
             usage.snapshot(conversationId)!.state,
@@ -423,7 +423,7 @@ void main() {
             contains(WorldBookActivation.extrasKey),
           );
           if (editAt == 'after_preparation') await editHistory();
-          record(prepared);
+          await record(prepared);
           await usage.refresh(conversationId, force: true);
           if (editAt == 'none') {
             expect(prepared.contextUsageRevision, before + 1);

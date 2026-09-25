@@ -38,7 +38,7 @@ class _RecordingUsage extends ContextUsageService {
   @override
   Future<void> refresh(
     String conversationId, {
-    String draftText = '',
+    String? draftText,
     bool force = false,
   }) async {
     refreshCalls++;
@@ -147,5 +147,36 @@ void main() {
       find.byKey(const ValueKey('context-usage-bucket-tools')),
       findsNothing,
     );
+
+    // All sources on a short phone must remain reachable by scrolling.
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(320, 440);
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    const detailed = ContextUsageBuckets(
+      history: 40,
+      system: 12,
+      memory: 5,
+      worldBook: 5,
+      skills: 5,
+      workspace: 5,
+      search: 5,
+      tools: 5,
+      mcpTools: 5,
+      injections: 5,
+      attachments: 5,
+      draft: 5,
+    );
+    usage.seeded = usage.seeded!.copyWith(
+      buckets: detailed,
+      usedTokens: detailed.total,
+    );
+    usage.notifyListeners();
+    await tester.pump();
+    expect(tester.takeException(), isNull);
+    await tester.ensureVisible(find.text('Clear Context'));
+    await tester.pumpAndSettle();
+    expect(find.text('Clear Context').hitTestable(), findsOneWidget);
+    expect(tester.takeException(), isNull);
   });
 }

@@ -27,6 +27,7 @@ class _RecordingUsage extends ContextUsageService {
   ContextUsageSnapshot? seeded;
   int refreshCalls = 0;
   bool? lastForce;
+  String? lastDraft;
 
   @override
   ContextUsageSnapshot? get current => seeded;
@@ -37,11 +38,12 @@ class _RecordingUsage extends ContextUsageService {
   @override
   Future<void> refresh(
     String conversationId, {
-    String draftText = '',
+    String? draftText,
     bool force = false,
   }) async {
     refreshCalls++;
     lastForce = force;
+    lastDraft = draftText;
   }
 }
 
@@ -204,6 +206,14 @@ void main() {
       findsOneWidget,
     );
     expect(find.text('Estimated'), findsOneWidget);
+    expect(usage.lastDraft, 'hello');
+    await tester.tap(find.byTooltip('Refresh'));
+    await tester.pump();
+    expect(usage.lastForce, isTrue);
+    expect(
+      usage.lastDraft,
+      isNull,
+    ); // Refresh must use the live composer state.
   });
 
   testWidgets('shows set context window when the window is null', (

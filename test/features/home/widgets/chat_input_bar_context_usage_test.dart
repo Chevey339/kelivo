@@ -14,6 +14,24 @@ import 'package:Kelivo/shared/widgets/context_usage_ring.dart';
 
 import '../../../support/business_test_harness.dart';
 
+class _RecordingUsage extends ContextUsageService {
+  _RecordingUsage({
+    required super.chatService,
+    required super.settings,
+    required super.assistants,
+    required super.instructions,
+    required super.worldBooks,
+  });
+
+  final drafts = <String, String>{};
+
+  @override
+  void updateDraft(String conversationId, String text) {
+    drafts[conversationId] = text;
+    super.updateDraft(conversationId, text);
+  }
+}
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
@@ -21,7 +39,7 @@ void main() {
     ({
       SettingsProvider settings,
       AssistantProvider assistants,
-      ContextUsageService usage,
+      _RecordingUsage usage,
     })
   >
   createProviders() async {
@@ -37,7 +55,7 @@ void main() {
     final worldBooks = WorldBookProvider(
       preferences: createBusinessTestPreferences(),
     );
-    final usage = ContextUsageService(
+    final usage = _RecordingUsage(
       chatService: ChatService(),
       settings: settings,
       assistants: assistants,
@@ -48,7 +66,6 @@ void main() {
     addTearDown(settings.dispose);
     addTearDown(instructions.dispose);
     addTearDown(worldBooks.dispose);
-    addTearDown(usage.dispose);
     return (settings: settings, assistants: assistants, usage: usage);
   }
 
@@ -72,7 +89,7 @@ void main() {
         providers: [
           ChangeNotifierProvider<SettingsProvider>.value(value: settings),
           ChangeNotifierProvider<AssistantProvider>.value(value: assistants),
-          ChangeNotifierProvider<ContextUsageService>.value(value: usage),
+          ChangeNotifierProvider<ContextUsageService>(create: (_) => usage),
         ],
         child: MaterialApp(
           locale: const Locale('en'),
@@ -93,6 +110,41 @@ void main() {
       ),
     );
   }
+
+  testWidgets(
+    'composer edits and programmatic clear update the draft contribution',
+    (tester) async {
+      final providers = await createProviders();
+      final controller = TextEditingController(text: 'initial draft');
+      final focusNode = FocusNode();
+      addTearDown(controller.dispose);
+      addTearDown(focusNode.dispose);
+      await pumpBar(
+        tester,
+        settings: providers.settings,
+        assistants: providers.assistants,
+        usage: providers.usage,
+        controller: controller,
+        focusNode: focusNode,
+        surfaceSize: const Size(1024, 768),
+      );
+      await tester.pump();
+      expect(providers.usage.drafts['c1'], 'initial draft');
+
+      await tester.enterText(find.byType(EditableText).first, 'edited draft');
+      await tester.pump();
+      expect(providers.usage.drafts['c1'], 'edited draft');
+
+      controller.clear(); // Also the path used when submitting a message.
+      await tester.pump();
+      expect(providers.usage.drafts['c1'], '');
+
+      controller.text = 'restored after a failed send';
+      await tester.pump();
+      expect(providers.usage.drafts['c1'], 'restored after a failed send');
+      expect(tester.takeException(), isNull);
+    },
+  );
 
   testWidgets('hides the context usage ring on a mobile-width layout', (
     tester,

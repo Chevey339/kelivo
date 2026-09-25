@@ -44,7 +44,6 @@ Future<void> showContextUsagePopover(
     width: (size.width - 16).clamp(260.0, 720.0),
     builder: (ctx, handle) => _ContextUsagePopoverContent(
       conversationId: conversationId,
-      draftText: draftText,
       onRequestSetWindow: () async {
         requestSetWindow = true;
         await handle.close();
@@ -63,19 +62,17 @@ Future<void> showContextUsagePopover(
     modelKey: snap.modelId,
   );
   if (saved == true && context.mounted) {
-    await usage.refresh(conversationId, draftText: draftText, force: true);
+    await usage.refresh(conversationId, force: true);
   }
 }
 
 class _ContextUsagePopoverContent extends StatelessWidget {
   const _ContextUsagePopoverContent({
     required this.conversationId,
-    required this.draftText,
     required this.onRequestSetWindow,
   });
 
   final String conversationId;
-  final String draftText;
   final Future<void> Function() onRequestSetWindow;
 
   @override
@@ -105,11 +102,7 @@ class _ContextUsagePopoverContent extends StatelessWidget {
                 semanticLabel: l10n.contextUsageRefresh,
                 icon: Lucide.RefreshCw,
                 size: 16,
-                onTap: () => usage.refresh(
-                  conversationId,
-                  draftText: draftText,
-                  force: true,
-                ),
+                onTap: () => usage.refresh(conversationId, force: true),
               ),
             ),
             if (showSetWindow) ...[

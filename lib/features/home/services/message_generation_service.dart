@@ -79,8 +79,6 @@ class UnprocessedRequestContext {
     required this.mcpRouteSnapshot,
     required this.workspaceAttachments,
     required this.cfg,
-    required this.systemText,
-    required this.injectionsText,
   });
 
   final List<Map<String, dynamic>> apiMessages;
@@ -90,8 +88,6 @@ class UnprocessedRequestContext {
   final McpToolRouteSnapshot? mcpRouteSnapshot;
   final List<AttachmentInfo> workspaceAttachments;
   final ProviderConfig cfg;
-  final String systemText;
-  final String injectionsText;
 }
 
 class PreparedGeneration {
@@ -224,7 +220,6 @@ class MessageGenerationService {
       modelId,
       conversation: promptConversation,
     );
-    final systemText = firstSystemContent(apiMessages);
     await messageBuilderService.injectMemoryAndRecentChats(
       apiMessages,
       assistant,
@@ -310,10 +305,6 @@ class MessageGenerationService {
     );
 
     messageBuilderService.applyContextLimit(apiMessages, assistant);
-    final injectionsText = injectionsAfterSystem(
-      systemText,
-      firstSystemContent(apiMessages),
-    );
 
     final mcpRouteSnapshot = generationController.captureMcpToolRoutes(
       assistant,
@@ -336,8 +327,6 @@ class MessageGenerationService {
       mcpRouteSnapshot: mcpRouteSnapshot,
       workspaceAttachments: workspaceAttachments,
       cfg: cfg,
-      systemText: systemText,
-      injectionsText: injectionsText,
     );
   }
 
@@ -367,10 +356,24 @@ class MessageGenerationService {
       syncWorkspaceAttachments: false,
       persistWorldBookActivation: false,
     );
-    return ContextAssemblyPreview(
-      systemText: packed.systemText,
-      injectionsText: packed.injectionsText,
-      historyText: historyTextFromApiMessages(packed.apiMessages),
+    // Reuse the send path to include the live memory snapshot and frozen user
+    // prompts. Previewing must never freeze a draft, run OCR, or write extras.
+    await messageBuilderService.processUserMessagesForApi(
+      packed.apiMessages,
+      settings,
+      assistant,
+      conversation: conversation,
+      sourceMessages: messages,
+      previewOnly: true,
+    );
+    return ContextAssemblyPreview.fromApiMessages(
+      apiMessages: packed.apiMessages,
+      mcpToolNames: {
+        for (final tool in packed.toolDefs)
+          if (tool['function'] case {'name': final String name})
+            if (packed.mcpRouteSnapshot?.containsExposedName(name) ?? false)
+              name,
+      },
       tools: packed.toolDefs,
       images: imageRefsFromApiMessages(
         packed.apiMessages,
@@ -403,7 +406,7 @@ class MessageGenerationService {
     final worldBooks = contextProvider.read<WorldBookProvider?>();
     await instructions?.initialize();
     await worldBooks?.initialize();
-    final requestConfiguration = contextUsageConfiguration(
+    final configuration = contextUsageConfiguration(
       settings: settings,
       config: settings.getProviderConfig(providerKey),
       providerKey: providerKey,
@@ -416,6 +419,14 @@ class MessageGenerationService {
           ? null
           : chatService.getConversation(currentConversation.id) ??
                 currentConversation,
+    );
+    final requestConfiguration = (
+      settings: configuration.settings,
+      memorySnapshotHash: await readContextMemorySnapshotHash(
+        repository: chatService.chatRepositoryOrNull,
+        settings: settings,
+        assistant: assistant,
+      ),
     );
     final packed = await assembleUnprocessedRequestContext(
       messages: messages,

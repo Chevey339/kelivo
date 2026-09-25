@@ -5923,26 +5923,62 @@ abstract class AppLocalizations {
   /// No description provided for @contextUsageBucketSystem.
   ///
   /// In en, this message translates to:
-  /// **'System'**
+  /// **'System prompt'**
   String get contextUsageBucketSystem;
 
   /// No description provided for @contextUsageBucketInjections.
   ///
   /// In en, this message translates to:
-  /// **'Injections'**
+  /// **'Instruction injections'**
   String get contextUsageBucketInjections;
 
   /// No description provided for @contextUsageBucketHistory.
   ///
   /// In en, this message translates to:
-  /// **'History'**
+  /// **'Messages'**
   String get contextUsageBucketHistory;
 
   /// No description provided for @contextUsageBucketTools.
   ///
   /// In en, this message translates to:
-  /// **'Tools'**
+  /// **'Built-in tools'**
   String get contextUsageBucketTools;
+
+  /// No description provided for @contextUsageBucketMemory.
+  ///
+  /// In en, this message translates to:
+  /// **'Memory'**
+  String get contextUsageBucketMemory;
+
+  /// No description provided for @contextUsageBucketWorldBook.
+  ///
+  /// In en, this message translates to:
+  /// **'World books'**
+  String get contextUsageBucketWorldBook;
+
+  /// No description provided for @contextUsageBucketSkills.
+  ///
+  /// In en, this message translates to:
+  /// **'Skills'**
+  String get contextUsageBucketSkills;
+
+  /// No description provided for @contextUsageBucketWorkspace.
+  ///
+  /// In en, this message translates to:
+  /// **'Workspace'**
+  String get contextUsageBucketWorkspace;
+
+  /// No description provided for @contextUsageBucketSearch.
+  ///
+  /// In en, this message translates to:
+  /// **'Search prompt'**
+  String get contextUsageBucketSearch;
+
+  /// No description provided for @contextUsageBucketMcpTools.
+  ///
+  /// In en, this message translates to:
+  /// **'MCP tools'**
+  String get contextUsageBucketMcpTools;
 
   /// No description provided for @contextUsageBucketAttachments.
   ///
