@@ -16,7 +16,7 @@ import 'theme_settings_page.dart';
 import '../../../theme/palettes.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../shared/widgets/ios_switch.dart';
-import '../widgets/memory_ui.dart';
+import '../../../shared/widgets/tip_icon.dart';
 import '../../../core/services/haptics.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:Kelivo/theme/app_font_weights.dart';
@@ -1317,7 +1317,7 @@ Widget _iosSwitchRow(
             },
           ),
         ),
-        if (tip != null) MemoryTipIcon(message: tip),
+        if (tip != null) TipIcon(message: tip),
         const SizedBox(width: 12),
         IosSwitch(value: value, onChanged: onChanged),
       ],
@@ -1576,6 +1576,17 @@ class ChatItemDisplaySettingsPage extends StatelessWidget {
                 value: sp.showProducedFiles,
                 onChanged: (v) =>
                     context.read<SettingsProvider>().setShowProducedFiles(v),
+              ),
+              _iosDivider(context),
+              _iosSwitchRow(
+                context,
+                icon: Lucide.Lightbulb,
+                label: l10n.displaySettingsShowReasoningLevelBadge,
+                tip: l10n.displaySettingsShowReasoningLevelBadgeSubtitle,
+                value: sp.showReasoningLevelBadge,
+                onChanged: (v) => context
+                    .read<SettingsProvider>()
+                    .setShowReasoningLevelBadge(v),
               ),
             ],
           ),

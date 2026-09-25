@@ -436,6 +436,16 @@ class AppLocalizationsZh extends AppLocalizations {
   String get statsPageLaunchCount => '应用启动次数';
 
   @override
+  String statsPageCost(String currency) {
+    return '费用 ($currency)';
+  }
+
+  @override
+  String statsPageModelsWithoutPricing(int count) {
+    return '$count 个模型无定价';
+  }
+
+  @override
   String get statsPageUsageTrendTitle => '用量趋势';
 
   @override
@@ -732,10 +742,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get homePagePleaseSelectModel => '请先选择模型';
 
   @override
-  String get homePageAudioAttachmentUnsupported =>
-      '当前模型不支持音频附件，请切换到支持音频输入的模型或移除音频文件后重试。';
-
-  @override
   String get homePagePleaseSetupTranslateModel => '请先设置翻译模型';
 
   @override
@@ -966,7 +972,13 @@ class AppLocalizationsZh extends AppLocalizations {
   String get assistantEditStreamOutputDescription => '是否启用消息的流式输出';
 
   @override
-  String get assistantEditThinkingBudgetTitle => '思考预算';
+  String get assistantEditThinkingBudgetTitle => '思考';
+
+  @override
+  String get assistantEditReasoningFollowDefault => '跟随模型默认';
+
+  @override
+  String get assistantEditReasoningClampedSubtitle => '实际档位会按各模型的能力收敛';
 
   @override
   String get assistantEditConfigureButton => '配置';
@@ -2324,57 +2336,93 @@ class AppLocalizationsZh extends AppLocalizations {
   String get messageMoreSheetDeleteAllVersions => '删除全部版本';
 
   @override
-  String get reasoningBudgetSheetOff => '关闭';
-
-  @override
-  String get reasoningBudgetSheetAuto => '自动';
-
-  @override
-  String get reasoningBudgetSheetLight => '轻度推理';
-
-  @override
-  String get reasoningBudgetSheetMedium => '中度推理';
-
-  @override
-  String get reasoningBudgetSheetHeavy => '重度推理';
-
-  @override
-  String get reasoningBudgetSheetXhigh => '极限推理';
-
-  @override
-  String get reasoningBudgetSheetMax => '全力推理';
-
-  @override
   String get reasoningBudgetSheetTitle => '思维链强度';
 
   @override
-  String reasoningBudgetSheetCurrentLevel(String level) {
-    return '当前档位：$level';
+  String get reasoningLevelSheetTitle => '推理';
+
+  @override
+  String get reasoningLevelAuto => '自动';
+
+  @override
+  String get reasoningLevelAutoSubtitle => '使用模型或供应商的默认设置';
+
+  @override
+  String get reasoningLevelOff => '关闭';
+
+  @override
+  String get reasoningLevelOffSubtitle => '关闭推理，直接回答';
+
+  @override
+  String get reasoningLevelMinimal => '最低';
+
+  @override
+  String get reasoningLevelMinimalSubtitle => '使用极少推理来回答问题';
+
+  @override
+  String get reasoningLevelLow => '低';
+
+  @override
+  String get reasoningLevelLowSubtitle => '使用少量推理来回答问题';
+
+  @override
+  String get reasoningLevelMedium => '中';
+
+  @override
+  String get reasoningLevelMediumSubtitle => '使用较多推理来回答问题';
+
+  @override
+  String get reasoningLevelHigh => '高';
+
+  @override
+  String get reasoningLevelHighSubtitle => '使用大量推理来回答问题，适合复杂问题';
+
+  @override
+  String get reasoningLevelXhigh => '极高';
+
+  @override
+  String get reasoningLevelXhighSubtitle => '使用很高推理深度，适合更复杂的问题';
+
+  @override
+  String get reasoningLevelMax => '最大';
+
+  @override
+  String get reasoningLevelMaxSubtitle => '使用最大推理深度，适合最复杂的问题';
+
+  @override
+  String get reasoningLevelFollowModelDefaultSubtitle => '使用模型或助手未设置时的默认档位';
+
+  @override
+  String get reasoningLevelNoReasoning => '此模型不支持推理';
+
+  @override
+  String get reasoningLevelCustomBudget => '自定义推理预算';
+
+  @override
+  String get reasoningLevelCustomBudgetHint => '例如：2048';
+
+  @override
+  String get reasoningLevelCompactMin => 'min';
+
+  @override
+  String get reasoningLevelCompactLow => 'low';
+
+  @override
+  String get reasoningLevelCompactMid => 'mid';
+
+  @override
+  String get reasoningLevelCompactHigh => 'high';
+
+  @override
+  String get reasoningLevelCompactXhigh => 'xhigh';
+
+  @override
+  String get reasoningLevelCompactMax => 'max';
+
+  @override
+  String reasoningLevelBudgetTokens(String budget) {
+    return '$budget tokens';
   }
-
-  @override
-  String get reasoningBudgetSheetOffSubtitle => '关闭推理功能，直接回答';
-
-  @override
-  String get reasoningBudgetSheetAutoSubtitle => '由模型自动决定推理级别';
-
-  @override
-  String get reasoningBudgetSheetLightSubtitle => '使用少量推理来回答问题';
-
-  @override
-  String get reasoningBudgetSheetMediumSubtitle => '使用较多推理来回答问题';
-
-  @override
-  String get reasoningBudgetSheetHeavySubtitle => '使用大量推理来回答问题，适合复杂问题';
-
-  @override
-  String get reasoningBudgetSheetXhighSubtitle => '使用最大推理深度，适合最复杂的问题';
-
-  @override
-  String get reasoningBudgetSheetCustomLabel => '自定义推理预算';
-
-  @override
-  String get reasoningBudgetSheetCustomHint => '例如：2048 (-1 自动，0 关闭)';
 
   @override
   String chatMessageWidgetFileNotFound(String fileName) {
@@ -3016,6 +3064,83 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatInputBarCollapse => '收起';
 
   @override
+  String get contextUsageTitle => '上下文窗口';
+
+  @override
+  String get contextUsageStateExact => '精确（来自上次响应）';
+
+  @override
+  String get contextUsageStateExactCalibrated => '精确（分项按估算比例）';
+
+  @override
+  String get contextUsageStateEstimated => '估算';
+
+  @override
+  String get contextUsageStateStale => '已过时，正在更新…';
+
+  @override
+  String get contextUsageStateComputing => '计算中…';
+
+  @override
+  String get contextUsageStateNone => '暂无数据';
+
+  @override
+  String get contextUsageBucketSystem => '系统提示词';
+
+  @override
+  String get contextUsageBucketInjections => '指令注入';
+
+  @override
+  String get contextUsageBucketHistory => '历史消息';
+
+  @override
+  String get contextUsageBucketTools => '内置工具';
+
+  @override
+  String get contextUsageBucketMemory => '记忆';
+
+  @override
+  String get contextUsageBucketWorldBook => '世界书';
+
+  @override
+  String get contextUsageBucketSkills => '技能';
+
+  @override
+  String get contextUsageBucketWorkspace => '工作区';
+
+  @override
+  String get contextUsageBucketSearch => '搜索提示';
+
+  @override
+  String get contextUsageBucketMcpTools => 'MCP 工具';
+
+  @override
+  String get contextUsageBucketAttachments => '附件';
+
+  @override
+  String get contextUsageBucketDraft => '草稿';
+
+  @override
+  String get contextUsageBucketUsed => '已用';
+
+  @override
+  String get contextUsageFreeSpace => '剩余空间';
+
+  @override
+  String contextUsageUsedWindow(String used, String window, int percent) {
+    return '$used / $window ($percent%)';
+  }
+
+  @override
+  String get contextUsageNoWindow => '未设置上下文窗口';
+
+  @override
+  String get contextUsageSetWindow => '设置上下文窗口';
+
+  @override
+  String get contextUsageRefresh => '刷新';
+
+  @override
   String get mcpPageBackTooltip => '返回';
 
   @override
@@ -3369,11 +3494,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get modelDetailSheetModelIdHint => '必填，建议小写字母、数字、连字符';
 
   @override
-  String modelDetailSheetModelIdDisabledHint(String modelId) {
-    return '$modelId';
-  }
-
-  @override
   String get modelDetailSheetModelNameLabel => '模型名称';
 
   @override
@@ -3426,12 +3546,6 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get modelDetailSheetBuiltinToolsDescription => '内置工具取决于供应商和 API 模式。';
-
-  @override
-  String get modelDetailSheetSearchTool => '搜索';
-
-  @override
-  String get modelDetailSheetSearchToolDescription => '启用 Google 搜索集成';
 
   @override
   String get modelDetailSheetUrlContextTool => 'URL 上下文';
@@ -3504,9 +3618,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get modelDetailSheetInvalidIdError => '请输入有效的模型 ID（不少于2个字符）';
 
   @override
-  String get modelDetailSheetModelIdExistsError => '模型 ID 已存在';
-
-  @override
   String get modelDetailSheetHeaderKeyHint => 'Header Key';
 
   @override
@@ -3517,6 +3628,301 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get modelDetailSheetBodyJsonHint => 'Body JSON';
+
+  @override
+  String get modelSpecFormSourceCustom => '自定义';
+
+  @override
+  String get modelSpecFormSourceCatalog => '目录';
+
+  @override
+  String get modelSpecFormSourceInferred => '推断';
+
+  @override
+  String get modelSpecFormSourceDefault => '默认';
+
+  @override
+  String get modelSpecFormReset => '重置为默认';
+
+  @override
+  String get modelSpecFormModalitiesSection => '模态与能力';
+
+  @override
+  String get modelSpecFormImageType => '图像';
+
+  @override
+  String get modelSpecFormAudioMode => '音频';
+
+  @override
+  String get modelSpecFormVideoMode => '视频';
+
+  @override
+  String get modelSpecFormPdfMode => 'PDF';
+
+  @override
+  String get modelSpecFormStructuredOutputAbility => '结构化输出';
+
+  @override
+  String get modelSpecFormReasoningSection => '推理';
+
+  @override
+  String get modelSpecFormDialect => '推理方言';
+
+  @override
+  String get modelSpecFormDialectNone => '无';
+
+  @override
+  String get modelSpecFormDialectNoneSubtitle => '不写入推理字段';
+
+  @override
+  String get modelSpecFormDialectOpenaiReasoningEffort =>
+      'OpenAI reasoning effort';
+
+  @override
+  String get modelSpecFormDialectOpenaiReasoningEffortSubtitle =>
+      'reasoning_effort';
+
+  @override
+  String get modelSpecFormDialectOpenaiResponsesReasoning =>
+      'OpenAI Responses reasoning';
+
+  @override
+  String get modelSpecFormDialectOpenaiResponsesReasoningSubtitle =>
+      'reasoning.effort';
+
+  @override
+  String get modelSpecFormDialectOpenrouterReasoning => 'OpenRouter reasoning';
+
+  @override
+  String get modelSpecFormDialectOpenrouterReasoningSubtitle => 'reasoning';
+
+  @override
+  String get modelSpecFormDialectAnthropicBudget => 'Anthropic budget';
+
+  @override
+  String get modelSpecFormDialectAnthropicBudgetSubtitle =>
+      'thinking.budget_tokens';
+
+  @override
+  String get modelSpecFormDialectAnthropicAdaptiveEffort =>
+      'Anthropic adaptive effort';
+
+  @override
+  String get modelSpecFormDialectAnthropicAdaptiveEffortSubtitle =>
+      'thinking + output_config.effort';
+
+  @override
+  String get modelSpecFormDialectAnthropicEffort => 'Anthropic effort';
+
+  @override
+  String get modelSpecFormDialectAnthropicEffortSubtitle =>
+      'thinking + output_config.effort';
+
+  @override
+  String get modelSpecFormDialectGeminiThinkingBudget =>
+      'Gemini thinking budget';
+
+  @override
+  String get modelSpecFormDialectGeminiThinkingBudgetSubtitle =>
+      'thinkingConfig.thinkingBudget';
+
+  @override
+  String get modelSpecFormDialectGeminiThinkingLevel => 'Gemini thinking level';
+
+  @override
+  String get modelSpecFormDialectGeminiThinkingLevelSubtitle =>
+      'thinkingConfig.thinkingLevel';
+
+  @override
+  String get modelSpecFormDialectQwenEnableThinking => 'Qwen enable thinking';
+
+  @override
+  String get modelSpecFormDialectQwenEnableThinkingSubtitle =>
+      'enable_thinking';
+
+  @override
+  String get modelSpecFormDialectThinkingType => 'Thinking type';
+
+  @override
+  String get modelSpecFormDialectThinkingTypeSubtitle => 'thinking.type';
+
+  @override
+  String get modelSpecFormDialectSiliconflowEnableThinking =>
+      'SiliconFlow enable thinking';
+
+  @override
+  String get modelSpecFormDialectSiliconflowEnableThinkingSubtitle =>
+      'enable_thinking';
+
+  @override
+  String get modelSpecFormDialectInternThinkingMode => 'Intern thinking mode';
+
+  @override
+  String get modelSpecFormDialectInternThinkingModeSubtitle => 'thinking_mode';
+
+  @override
+  String get modelSpecFormDialectChatTemplateKwargs => 'Chat template kwargs';
+
+  @override
+  String get modelSpecFormDialectChatTemplateKwargsSubtitle =>
+      'chat_template_kwargs.enable_thinking';
+
+  @override
+  String get modelSpecFormDialectKimiThinking => 'Kimi thinking';
+
+  @override
+  String get modelSpecFormDialectKimiThinkingSubtitle => 'thinking';
+
+  @override
+  String get modelSpecFormDialectCustom => '自定义 JSON';
+
+  @override
+  String get modelSpecFormDialectCustomSubtitle => '按级别写入 JSON 补丁';
+
+  @override
+  String get modelSpecFormLevels => '支持的级别';
+
+  @override
+  String get modelSpecFormCanDisable => '允许关闭';
+
+  @override
+  String get modelSpecFormDefaultLevel => '默认级别';
+
+  @override
+  String get modelSpecFormBudgets => 'Token 预算';
+
+  @override
+  String modelSpecFormBudgetPlaceholder(String tokens) {
+    return '$tokens';
+  }
+
+  @override
+  String modelSpecFormCustomPatch(String level) {
+    return 'JSON 补丁（$level）';
+  }
+
+  @override
+  String get modelSpecFormCustomPatchHint => '例如 reasoning_effort: high';
+
+  @override
+  String get modelSpecFormInvalidJson => '自定义推理补丁必须是有效的 JSON 对象';
+
+  @override
+  String get modelSpecFormInvalidNumber => '请输入有效数字';
+
+  @override
+  String get modelSpecFormStrategySection => '策略';
+
+  @override
+  String get modelSpecFormSampling => '采样';
+
+  @override
+  String get modelSpecFormRequestQuirks => '请求兼容';
+
+  @override
+  String get modelSpecFormDynamicWebSearch => '动态过滤搜索工具';
+
+  @override
+  String get modelSpecFormDynamicWebSearchSubtitle =>
+      '开启动态过滤时，使用 2026-03-18 版网页搜索与抓取工具';
+
+  @override
+  String get modelSpecFormRemoteImageUrls => '远程图片链接';
+
+  @override
+  String get modelSpecFormRemoteImageUrlsSubtitle =>
+      '直接发送 http(s) 图片链接；关闭后丢弃远程链接，只发送本地图片';
+
+  @override
+  String get modelSpecFormPromptCacheControl => '提示缓存标记';
+
+  @override
+  String get modelSpecFormPromptCacheControlSubtitle =>
+      '开启提示缓存时，在 OpenRouter 请求中加入 cache_control';
+
+  @override
+  String get modelSpecFormSamplingAlways => '始终保留';
+
+  @override
+  String get modelSpecFormSamplingAlwaysSubtitle => '保留 temperature 等采样字段';
+
+  @override
+  String get modelSpecFormSamplingOnlyWhenReasoningOff => '仅在关闭推理时';
+
+  @override
+  String get modelSpecFormSamplingOnlyWhenReasoningOffSubtitle => '模型思考时移除采样字段';
+
+  @override
+  String get modelSpecFormSamplingNever => '从不';
+
+  @override
+  String get modelSpecFormSamplingNeverSubtitle => '始终移除采样字段';
+
+  @override
+  String get modelSpecFormReplay => '推理回放';
+
+  @override
+  String get modelSpecFormReplayNone => '无';
+
+  @override
+  String get modelSpecFormReplayNoneSubtitle => '不把先前推理发回模型';
+
+  @override
+  String get modelSpecFormReplayToolTurns => '工具轮次';
+
+  @override
+  String get modelSpecFormReplayToolTurnsSubtitle => '仅在工具调用轮次回放推理';
+
+  @override
+  String get modelSpecFormReplayAll => '全部';
+
+  @override
+  String get modelSpecFormReplayAllSubtitle => '每一轮后续请求都回放推理';
+
+  @override
+  String get modelSpecFormReplayField => '回放字段';
+
+  @override
+  String get modelSpecFormReplayFieldReasoningContent => 'reasoning_content';
+
+  @override
+  String get modelSpecFormReplayFieldReasoning => 'reasoning';
+
+  @override
+  String get modelSpecFormReplayFieldReasoningDetails => 'reasoning_details';
+
+  @override
+  String get modelSpecFormLimitsSection => '限额';
+
+  @override
+  String get modelSpecFormLimitsPricingSection => '限额与定价';
+
+  @override
+  String get modelSpecFormContextWindow => '上下文窗口';
+
+  @override
+  String get modelSpecFormMaxOutput => '最大输出';
+
+  @override
+  String get modelSpecFormPricingSection => '定价 / 1M';
+
+  @override
+  String get modelSpecFormPricingInput => '输入';
+
+  @override
+  String get modelSpecFormPricingOutput => '输出';
+
+  @override
+  String get modelSpecFormPricingCacheRead => '缓存读取';
+
+  @override
+  String get modelSpecFormPricingCacheWrite => '缓存写入';
+
+  @override
+  String get modelSpecFormCurrency => '货币';
+
+  @override
+  String get modelSpecFormAdvancedSection => '请求';
 
   @override
   String get modelSelectSheetSearchHint => '搜索模型或服务商';
@@ -3784,6 +4190,43 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get providersPageProviderAddedSnackbar => '已添加供应商';
+
+  @override
+  String get modelCatalogTitle => '模型目录';
+
+  @override
+  String modelCatalogSourceBundled(String date) {
+    return '内置快照 · $date';
+  }
+
+  @override
+  String modelCatalogSourceRemote(String date) {
+    return 'models.dev · 更新于 $date';
+  }
+
+  @override
+  String get modelCatalogAutoUpdate => '每 24 小时自动更新';
+
+  @override
+  String get modelCatalogRefresh => '立即更新';
+
+  @override
+  String get modelCatalogUpdated => '模型目录已更新';
+
+  @override
+  String modelCatalogRefreshFailed(String error) {
+    return '更新失败：$error';
+  }
+
+  @override
+  String modelCatalogProviderCount(int count) {
+    return '$count 个供应商';
+  }
+
+  @override
+  String modelCatalogModelCount(int count) {
+    return '$count 个模型';
+  }
 
   @override
   String get providerGroupsGroupLabel => '分组';
@@ -4449,6 +4892,13 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get displaySettingsPageShowToolCardsSubtitle => '关闭后，聊天中不再显示工具调用卡片';
+
+  @override
+  String get displaySettingsShowReasoningLevelBadge => '在推理按钮上显示档位';
+
+  @override
+  String get displaySettingsShowReasoningLevelBadgeSubtitle =>
+      '在输入栏的推理图标旁显示当前档位';
 
   @override
   String get displaySettingsPageAutoCollapseThinkingTitle => '自动折叠思考';
@@ -7627,6 +8077,21 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
+  String tokenDetailReasoningTokens(int count) {
+    return '$count tokens';
+  }
+
+  @override
+  String tokenDetailCacheWriteTokens(int count) {
+    return '$count 缓存写入 tokens';
+  }
+
+  @override
+  String tokenDetailCost(String amount) {
+    return '$amount';
+  }
+
+  @override
   String get debugPageTitle => 'Debug';
 
   @override
@@ -10441,21 +10906,6 @@ class AppLocalizationsZh extends AppLocalizations {
       '在回复底部显示工具创建或修改的文件。';
 
   @override
-  String get reasoningBudgetSliderLow => 'Low';
-
-  @override
-  String get reasoningBudgetSliderMedium => 'Medium';
-
-  @override
-  String get reasoningBudgetSliderHigh => 'High';
-
-  @override
-  String get reasoningBudgetSliderXhigh => 'XHigh';
-
-  @override
-  String get reasoningBudgetSliderMax => 'Max';
-
-  @override
   String get defaultModelPagePerChatModelTitle => '每个对话独立模型';
 
   @override
@@ -12143,6 +12593,16 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get statsPageLaunchCount => '应用启动次数';
 
   @override
+  String statsPageCost(String currency) {
+    return '费用 ($currency)';
+  }
+
+  @override
+  String statsPageModelsWithoutPricing(int count) {
+    return '$count 个模型无定价';
+  }
+
+  @override
   String get statsPageUsageTrendTitle => '用量趋势';
 
   @override
@@ -12439,10 +12899,6 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get homePagePleaseSelectModel => '请先选择模型';
 
   @override
-  String get homePageAudioAttachmentUnsupported =>
-      '当前模型不支持音频附件，请切换到支持音频输入的模型或移除音频文件后重试。';
-
-  @override
   String get homePagePleaseSetupTranslateModel => '请先设置翻译模型';
 
   @override
@@ -12673,7 +13129,13 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get assistantEditStreamOutputDescription => '是否启用消息的流式输出';
 
   @override
-  String get assistantEditThinkingBudgetTitle => '思考预算';
+  String get assistantEditThinkingBudgetTitle => '思考';
+
+  @override
+  String get assistantEditReasoningFollowDefault => '跟随模型默认';
+
+  @override
+  String get assistantEditReasoningClampedSubtitle => '实际档位会按各模型的能力收敛';
 
   @override
   String get assistantEditConfigureButton => '配置';
@@ -14031,57 +14493,93 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get messageMoreSheetDeleteAllVersions => '删除全部版本';
 
   @override
-  String get reasoningBudgetSheetOff => '关闭';
-
-  @override
-  String get reasoningBudgetSheetAuto => '自动';
-
-  @override
-  String get reasoningBudgetSheetLight => '轻度推理';
-
-  @override
-  String get reasoningBudgetSheetMedium => '中度推理';
-
-  @override
-  String get reasoningBudgetSheetHeavy => '重度推理';
-
-  @override
-  String get reasoningBudgetSheetXhigh => '极限推理';
-
-  @override
-  String get reasoningBudgetSheetMax => '全力推理';
-
-  @override
   String get reasoningBudgetSheetTitle => '思维链强度';
 
   @override
-  String reasoningBudgetSheetCurrentLevel(String level) {
-    return '当前档位：$level';
+  String get reasoningLevelSheetTitle => '推理';
+
+  @override
+  String get reasoningLevelAuto => '自动';
+
+  @override
+  String get reasoningLevelAutoSubtitle => '使用模型或供应商的默认设置';
+
+  @override
+  String get reasoningLevelOff => '关闭';
+
+  @override
+  String get reasoningLevelOffSubtitle => '关闭推理，直接回答';
+
+  @override
+  String get reasoningLevelMinimal => '最低';
+
+  @override
+  String get reasoningLevelMinimalSubtitle => '使用极少推理来回答问题';
+
+  @override
+  String get reasoningLevelLow => '低';
+
+  @override
+  String get reasoningLevelLowSubtitle => '使用少量推理来回答问题';
+
+  @override
+  String get reasoningLevelMedium => '中';
+
+  @override
+  String get reasoningLevelMediumSubtitle => '使用较多推理来回答问题';
+
+  @override
+  String get reasoningLevelHigh => '高';
+
+  @override
+  String get reasoningLevelHighSubtitle => '使用大量推理来回答问题，适合复杂问题';
+
+  @override
+  String get reasoningLevelXhigh => '极高';
+
+  @override
+  String get reasoningLevelXhighSubtitle => '使用很高推理深度，适合更复杂的问题';
+
+  @override
+  String get reasoningLevelMax => '最大';
+
+  @override
+  String get reasoningLevelMaxSubtitle => '使用最大推理深度，适合最复杂的问题';
+
+  @override
+  String get reasoningLevelFollowModelDefaultSubtitle => '使用模型或助手未设置时的默认档位';
+
+  @override
+  String get reasoningLevelNoReasoning => '此模型不支持推理';
+
+  @override
+  String get reasoningLevelCustomBudget => '自定义推理预算';
+
+  @override
+  String get reasoningLevelCustomBudgetHint => '例如：2048';
+
+  @override
+  String get reasoningLevelCompactMin => 'min';
+
+  @override
+  String get reasoningLevelCompactLow => 'low';
+
+  @override
+  String get reasoningLevelCompactMid => 'mid';
+
+  @override
+  String get reasoningLevelCompactHigh => 'high';
+
+  @override
+  String get reasoningLevelCompactXhigh => 'xhigh';
+
+  @override
+  String get reasoningLevelCompactMax => 'max';
+
+  @override
+  String reasoningLevelBudgetTokens(String budget) {
+    return '$budget tokens';
   }
-
-  @override
-  String get reasoningBudgetSheetOffSubtitle => '关闭推理功能，直接回答';
-
-  @override
-  String get reasoningBudgetSheetAutoSubtitle => '由模型自动决定推理级别';
-
-  @override
-  String get reasoningBudgetSheetLightSubtitle => '使用少量推理来回答问题';
-
-  @override
-  String get reasoningBudgetSheetMediumSubtitle => '使用较多推理来回答问题';
-
-  @override
-  String get reasoningBudgetSheetHeavySubtitle => '使用大量推理来回答问题，适合复杂问题';
-
-  @override
-  String get reasoningBudgetSheetXhighSubtitle => '使用最大推理深度，适合最复杂的问题';
-
-  @override
-  String get reasoningBudgetSheetCustomLabel => '自定义推理预算';
-
-  @override
-  String get reasoningBudgetSheetCustomHint => '例如：2048 (-1 自动，0 关闭)';
 
   @override
   String chatMessageWidgetFileNotFound(String fileName) {
@@ -14723,6 +15221,83 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get chatInputBarCollapse => '收起';
 
   @override
+  String get contextUsageTitle => '上下文窗口';
+
+  @override
+  String get contextUsageStateExact => '精确（来自上次响应）';
+
+  @override
+  String get contextUsageStateExactCalibrated => '精确（分项按估算比例）';
+
+  @override
+  String get contextUsageStateEstimated => '估算';
+
+  @override
+  String get contextUsageStateStale => '已过时，正在更新…';
+
+  @override
+  String get contextUsageStateComputing => '计算中…';
+
+  @override
+  String get contextUsageStateNone => '暂无数据';
+
+  @override
+  String get contextUsageBucketSystem => '系统提示词';
+
+  @override
+  String get contextUsageBucketInjections => '指令注入';
+
+  @override
+  String get contextUsageBucketHistory => '历史消息';
+
+  @override
+  String get contextUsageBucketTools => '内置工具';
+
+  @override
+  String get contextUsageBucketMemory => '记忆';
+
+  @override
+  String get contextUsageBucketWorldBook => '世界书';
+
+  @override
+  String get contextUsageBucketSkills => '技能';
+
+  @override
+  String get contextUsageBucketWorkspace => '工作区';
+
+  @override
+  String get contextUsageBucketSearch => '搜索提示';
+
+  @override
+  String get contextUsageBucketMcpTools => 'MCP 工具';
+
+  @override
+  String get contextUsageBucketAttachments => '附件';
+
+  @override
+  String get contextUsageBucketDraft => '草稿';
+
+  @override
+  String get contextUsageBucketUsed => '已用';
+
+  @override
+  String get contextUsageFreeSpace => '剩余空间';
+
+  @override
+  String contextUsageUsedWindow(String used, String window, int percent) {
+    return '$used / $window ($percent%)';
+  }
+
+  @override
+  String get contextUsageNoWindow => '未设置上下文窗口';
+
+  @override
+  String get contextUsageSetWindow => '设置上下文窗口';
+
+  @override
+  String get contextUsageRefresh => '刷新';
+
+  @override
   String get mcpPageBackTooltip => '返回';
 
   @override
@@ -15076,11 +15651,6 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get modelDetailSheetModelIdHint => '必填，建议小写字母、数字、连字符';
 
   @override
-  String modelDetailSheetModelIdDisabledHint(String modelId) {
-    return '$modelId';
-  }
-
-  @override
   String get modelDetailSheetModelNameLabel => '模型名称';
 
   @override
@@ -15133,12 +15703,6 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get modelDetailSheetBuiltinToolsDescription => '内置工具取决于供应商和 API 模式。';
-
-  @override
-  String get modelDetailSheetSearchTool => '搜索';
-
-  @override
-  String get modelDetailSheetSearchToolDescription => '启用 Google 搜索集成';
 
   @override
   String get modelDetailSheetUrlContextTool => 'URL 上下文';
@@ -15211,9 +15775,6 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get modelDetailSheetInvalidIdError => '请输入有效的模型 ID（不少于2个字符）';
 
   @override
-  String get modelDetailSheetModelIdExistsError => '模型 ID 已存在';
-
-  @override
   String get modelDetailSheetHeaderKeyHint => 'Header Key';
 
   @override
@@ -15224,6 +15785,301 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get modelDetailSheetBodyJsonHint => 'Body JSON';
+
+  @override
+  String get modelSpecFormSourceCustom => '自定义';
+
+  @override
+  String get modelSpecFormSourceCatalog => '目录';
+
+  @override
+  String get modelSpecFormSourceInferred => '推断';
+
+  @override
+  String get modelSpecFormSourceDefault => '默认';
+
+  @override
+  String get modelSpecFormReset => '重置为默认';
+
+  @override
+  String get modelSpecFormModalitiesSection => '模态与能力';
+
+  @override
+  String get modelSpecFormImageType => '图像';
+
+  @override
+  String get modelSpecFormAudioMode => '音频';
+
+  @override
+  String get modelSpecFormVideoMode => '视频';
+
+  @override
+  String get modelSpecFormPdfMode => 'PDF';
+
+  @override
+  String get modelSpecFormStructuredOutputAbility => '结构化输出';
+
+  @override
+  String get modelSpecFormReasoningSection => '推理';
+
+  @override
+  String get modelSpecFormDialect => '推理方言';
+
+  @override
+  String get modelSpecFormDialectNone => '无';
+
+  @override
+  String get modelSpecFormDialectNoneSubtitle => '不写入推理字段';
+
+  @override
+  String get modelSpecFormDialectOpenaiReasoningEffort =>
+      'OpenAI reasoning effort';
+
+  @override
+  String get modelSpecFormDialectOpenaiReasoningEffortSubtitle =>
+      'reasoning_effort';
+
+  @override
+  String get modelSpecFormDialectOpenaiResponsesReasoning =>
+      'OpenAI Responses reasoning';
+
+  @override
+  String get modelSpecFormDialectOpenaiResponsesReasoningSubtitle =>
+      'reasoning.effort';
+
+  @override
+  String get modelSpecFormDialectOpenrouterReasoning => 'OpenRouter reasoning';
+
+  @override
+  String get modelSpecFormDialectOpenrouterReasoningSubtitle => 'reasoning';
+
+  @override
+  String get modelSpecFormDialectAnthropicBudget => 'Anthropic budget';
+
+  @override
+  String get modelSpecFormDialectAnthropicBudgetSubtitle =>
+      'thinking.budget_tokens';
+
+  @override
+  String get modelSpecFormDialectAnthropicAdaptiveEffort =>
+      'Anthropic adaptive effort';
+
+  @override
+  String get modelSpecFormDialectAnthropicAdaptiveEffortSubtitle =>
+      'thinking + output_config.effort';
+
+  @override
+  String get modelSpecFormDialectAnthropicEffort => 'Anthropic effort';
+
+  @override
+  String get modelSpecFormDialectAnthropicEffortSubtitle =>
+      'thinking + output_config.effort';
+
+  @override
+  String get modelSpecFormDialectGeminiThinkingBudget =>
+      'Gemini thinking budget';
+
+  @override
+  String get modelSpecFormDialectGeminiThinkingBudgetSubtitle =>
+      'thinkingConfig.thinkingBudget';
+
+  @override
+  String get modelSpecFormDialectGeminiThinkingLevel => 'Gemini thinking level';
+
+  @override
+  String get modelSpecFormDialectGeminiThinkingLevelSubtitle =>
+      'thinkingConfig.thinkingLevel';
+
+  @override
+  String get modelSpecFormDialectQwenEnableThinking => 'Qwen enable thinking';
+
+  @override
+  String get modelSpecFormDialectQwenEnableThinkingSubtitle =>
+      'enable_thinking';
+
+  @override
+  String get modelSpecFormDialectThinkingType => 'Thinking type';
+
+  @override
+  String get modelSpecFormDialectThinkingTypeSubtitle => 'thinking.type';
+
+  @override
+  String get modelSpecFormDialectSiliconflowEnableThinking =>
+      'SiliconFlow enable thinking';
+
+  @override
+  String get modelSpecFormDialectSiliconflowEnableThinkingSubtitle =>
+      'enable_thinking';
+
+  @override
+  String get modelSpecFormDialectInternThinkingMode => 'Intern thinking mode';
+
+  @override
+  String get modelSpecFormDialectInternThinkingModeSubtitle => 'thinking_mode';
+
+  @override
+  String get modelSpecFormDialectChatTemplateKwargs => 'Chat template kwargs';
+
+  @override
+  String get modelSpecFormDialectChatTemplateKwargsSubtitle =>
+      'chat_template_kwargs.enable_thinking';
+
+  @override
+  String get modelSpecFormDialectKimiThinking => 'Kimi thinking';
+
+  @override
+  String get modelSpecFormDialectKimiThinkingSubtitle => 'thinking';
+
+  @override
+  String get modelSpecFormDialectCustom => '自定义 JSON';
+
+  @override
+  String get modelSpecFormDialectCustomSubtitle => '按级别写入 JSON 补丁';
+
+  @override
+  String get modelSpecFormLevels => '支持的级别';
+
+  @override
+  String get modelSpecFormCanDisable => '允许关闭';
+
+  @override
+  String get modelSpecFormDefaultLevel => '默认级别';
+
+  @override
+  String get modelSpecFormBudgets => 'Token 预算';
+
+  @override
+  String modelSpecFormBudgetPlaceholder(String tokens) {
+    return '$tokens';
+  }
+
+  @override
+  String modelSpecFormCustomPatch(String level) {
+    return 'JSON 补丁（$level）';
+  }
+
+  @override
+  String get modelSpecFormCustomPatchHint => '例如 reasoning_effort: high';
+
+  @override
+  String get modelSpecFormInvalidJson => '自定义推理补丁必须是有效的 JSON 对象';
+
+  @override
+  String get modelSpecFormInvalidNumber => '请输入有效数字';
+
+  @override
+  String get modelSpecFormStrategySection => '策略';
+
+  @override
+  String get modelSpecFormSampling => '采样';
+
+  @override
+  String get modelSpecFormRequestQuirks => '请求兼容';
+
+  @override
+  String get modelSpecFormDynamicWebSearch => '动态过滤搜索工具';
+
+  @override
+  String get modelSpecFormDynamicWebSearchSubtitle =>
+      '开启动态过滤时，使用 2026-03-18 版网页搜索与抓取工具';
+
+  @override
+  String get modelSpecFormRemoteImageUrls => '远程图片链接';
+
+  @override
+  String get modelSpecFormRemoteImageUrlsSubtitle =>
+      '直接发送 http(s) 图片链接；关闭后丢弃远程链接，只发送本地图片';
+
+  @override
+  String get modelSpecFormPromptCacheControl => '提示缓存标记';
+
+  @override
+  String get modelSpecFormPromptCacheControlSubtitle =>
+      '开启提示缓存时，在 OpenRouter 请求中加入 cache_control';
+
+  @override
+  String get modelSpecFormSamplingAlways => '始终保留';
+
+  @override
+  String get modelSpecFormSamplingAlwaysSubtitle => '保留 temperature 等采样字段';
+
+  @override
+  String get modelSpecFormSamplingOnlyWhenReasoningOff => '仅在关闭推理时';
+
+  @override
+  String get modelSpecFormSamplingOnlyWhenReasoningOffSubtitle => '模型思考时移除采样字段';
+
+  @override
+  String get modelSpecFormSamplingNever => '从不';
+
+  @override
+  String get modelSpecFormSamplingNeverSubtitle => '始终移除采样字段';
+
+  @override
+  String get modelSpecFormReplay => '推理回放';
+
+  @override
+  String get modelSpecFormReplayNone => '无';
+
+  @override
+  String get modelSpecFormReplayNoneSubtitle => '不把先前推理发回模型';
+
+  @override
+  String get modelSpecFormReplayToolTurns => '工具轮次';
+
+  @override
+  String get modelSpecFormReplayToolTurnsSubtitle => '仅在工具调用轮次回放推理';
+
+  @override
+  String get modelSpecFormReplayAll => '全部';
+
+  @override
+  String get modelSpecFormReplayAllSubtitle => '每一轮后续请求都回放推理';
+
+  @override
+  String get modelSpecFormReplayField => '回放字段';
+
+  @override
+  String get modelSpecFormReplayFieldReasoningContent => 'reasoning_content';
+
+  @override
+  String get modelSpecFormReplayFieldReasoning => 'reasoning';
+
+  @override
+  String get modelSpecFormReplayFieldReasoningDetails => 'reasoning_details';
+
+  @override
+  String get modelSpecFormLimitsSection => '限额';
+
+  @override
+  String get modelSpecFormLimitsPricingSection => '限额与定价';
+
+  @override
+  String get modelSpecFormContextWindow => '上下文窗口';
+
+  @override
+  String get modelSpecFormMaxOutput => '最大输出';
+
+  @override
+  String get modelSpecFormPricingSection => '定价 / 1M';
+
+  @override
+  String get modelSpecFormPricingInput => '输入';
+
+  @override
+  String get modelSpecFormPricingOutput => '输出';
+
+  @override
+  String get modelSpecFormPricingCacheRead => '缓存读取';
+
+  @override
+  String get modelSpecFormPricingCacheWrite => '缓存写入';
+
+  @override
+  String get modelSpecFormCurrency => '货币';
+
+  @override
+  String get modelSpecFormAdvancedSection => '请求';
 
   @override
   String get modelSelectSheetSearchHint => '搜索模型或服务商';
@@ -15491,6 +16347,43 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get providersPageProviderAddedSnackbar => '已添加供应商';
+
+  @override
+  String get modelCatalogTitle => '模型目录';
+
+  @override
+  String modelCatalogSourceBundled(String date) {
+    return '内置快照 · $date';
+  }
+
+  @override
+  String modelCatalogSourceRemote(String date) {
+    return 'models.dev · 更新于 $date';
+  }
+
+  @override
+  String get modelCatalogAutoUpdate => '每 24 小时自动更新';
+
+  @override
+  String get modelCatalogRefresh => '立即更新';
+
+  @override
+  String get modelCatalogUpdated => '模型目录已更新';
+
+  @override
+  String modelCatalogRefreshFailed(String error) {
+    return '更新失败：$error';
+  }
+
+  @override
+  String modelCatalogProviderCount(int count) {
+    return '$count 个供应商';
+  }
+
+  @override
+  String modelCatalogModelCount(int count) {
+    return '$count 个模型';
+  }
 
   @override
   String get providerGroupsGroupLabel => '分组';
@@ -16156,6 +17049,13 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get displaySettingsPageShowToolCardsSubtitle => '关闭后，聊天中不再显示工具调用卡片';
+
+  @override
+  String get displaySettingsShowReasoningLevelBadge => '在推理按钮上显示档位';
+
+  @override
+  String get displaySettingsShowReasoningLevelBadgeSubtitle =>
+      '在输入栏的推理图标旁显示当前档位';
 
   @override
   String get displaySettingsPageAutoCollapseThinkingTitle => '自动折叠思考';
@@ -19260,6 +20160,21 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   }
 
   @override
+  String tokenDetailReasoningTokens(int count) {
+    return '$count tokens';
+  }
+
+  @override
+  String tokenDetailCacheWriteTokens(int count) {
+    return '$count 缓存写入 tokens';
+  }
+
+  @override
+  String tokenDetailCost(String amount) {
+    return '$amount';
+  }
+
+  @override
   String get debugPageTitle => 'Debug';
 
   @override
@@ -22074,21 +22989,6 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
       '在回复底部显示工具创建或修改的文件。';
 
   @override
-  String get reasoningBudgetSliderLow => 'Low';
-
-  @override
-  String get reasoningBudgetSliderMedium => 'Medium';
-
-  @override
-  String get reasoningBudgetSliderHigh => 'High';
-
-  @override
-  String get reasoningBudgetSliderXhigh => 'XHigh';
-
-  @override
-  String get reasoningBudgetSliderMax => 'Max';
-
-  @override
   String get defaultModelPagePerChatModelTitle => '每个对话独立模型';
 
   @override
@@ -23776,6 +24676,16 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get statsPageLaunchCount => '應用啟動次數';
 
   @override
+  String statsPageCost(String currency) {
+    return '費用 ($currency)';
+  }
+
+  @override
+  String statsPageModelsWithoutPricing(int count) {
+    return '$count 個模型無定價';
+  }
+
+  @override
   String get statsPageUsageTrendTitle => '用量趨勢';
 
   @override
@@ -24072,10 +24982,6 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get homePagePleaseSelectModel => '請先選擇模型';
 
   @override
-  String get homePageAudioAttachmentUnsupported =>
-      '目前模型不支援音訊附件，請切換到支援音訊輸入的模型或移除音訊檔案後再試。';
-
-  @override
   String get homePagePleaseSetupTranslateModel => '請先設定翻譯模型';
 
   @override
@@ -24306,7 +25212,13 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get assistantEditStreamOutputDescription => '是否啟用訊息的串流輸出';
 
   @override
-  String get assistantEditThinkingBudgetTitle => '思考預算';
+  String get assistantEditThinkingBudgetTitle => '思考';
+
+  @override
+  String get assistantEditReasoningFollowDefault => '跟隨模型預設';
+
+  @override
+  String get assistantEditReasoningClampedSubtitle => '實際檔位會依各模型的能力收斂';
 
   @override
   String get assistantEditConfigureButton => '設定';
@@ -25664,57 +26576,93 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get messageMoreSheetDeleteAllVersions => '刪除全部版本';
 
   @override
-  String get reasoningBudgetSheetOff => '關閉';
-
-  @override
-  String get reasoningBudgetSheetAuto => '自動';
-
-  @override
-  String get reasoningBudgetSheetLight => '輕度推理';
-
-  @override
-  String get reasoningBudgetSheetMedium => '中度推理';
-
-  @override
-  String get reasoningBudgetSheetHeavy => '重度推理';
-
-  @override
-  String get reasoningBudgetSheetXhigh => '極限推理';
-
-  @override
-  String get reasoningBudgetSheetMax => '全力推理';
-
-  @override
   String get reasoningBudgetSheetTitle => '思維鏈強度';
 
   @override
-  String reasoningBudgetSheetCurrentLevel(String level) {
-    return '目前檔位：$level';
+  String get reasoningLevelSheetTitle => '推理';
+
+  @override
+  String get reasoningLevelAuto => '自動';
+
+  @override
+  String get reasoningLevelAutoSubtitle => '使用模型或供應商的預設設定';
+
+  @override
+  String get reasoningLevelOff => '關閉';
+
+  @override
+  String get reasoningLevelOffSubtitle => '關閉推理，直接回答';
+
+  @override
+  String get reasoningLevelMinimal => '最低';
+
+  @override
+  String get reasoningLevelMinimalSubtitle => '使用極少推理來回答問題';
+
+  @override
+  String get reasoningLevelLow => '低';
+
+  @override
+  String get reasoningLevelLowSubtitle => '使用少量推理來回答問題';
+
+  @override
+  String get reasoningLevelMedium => '中';
+
+  @override
+  String get reasoningLevelMediumSubtitle => '使用較多推理來回答問題';
+
+  @override
+  String get reasoningLevelHigh => '高';
+
+  @override
+  String get reasoningLevelHighSubtitle => '使用大量推理來回答問題，適合複雜問題';
+
+  @override
+  String get reasoningLevelXhigh => '極高';
+
+  @override
+  String get reasoningLevelXhighSubtitle => '使用很高推理深度，適合更複雜的問題';
+
+  @override
+  String get reasoningLevelMax => '最大';
+
+  @override
+  String get reasoningLevelMaxSubtitle => '使用最大推理深度，適合最複雜的問題';
+
+  @override
+  String get reasoningLevelFollowModelDefaultSubtitle => '使用模型或助手未設定時的預設檔位';
+
+  @override
+  String get reasoningLevelNoReasoning => '此模型不支援推理';
+
+  @override
+  String get reasoningLevelCustomBudget => '自訂推理預算';
+
+  @override
+  String get reasoningLevelCustomBudgetHint => '例如：2048';
+
+  @override
+  String get reasoningLevelCompactMin => 'min';
+
+  @override
+  String get reasoningLevelCompactLow => 'low';
+
+  @override
+  String get reasoningLevelCompactMid => 'mid';
+
+  @override
+  String get reasoningLevelCompactHigh => 'high';
+
+  @override
+  String get reasoningLevelCompactXhigh => 'xhigh';
+
+  @override
+  String get reasoningLevelCompactMax => 'max';
+
+  @override
+  String reasoningLevelBudgetTokens(String budget) {
+    return '$budget tokens';
   }
-
-  @override
-  String get reasoningBudgetSheetOffSubtitle => '關閉推理功能，直接回答';
-
-  @override
-  String get reasoningBudgetSheetAutoSubtitle => '由模型自動決定推理級別';
-
-  @override
-  String get reasoningBudgetSheetLightSubtitle => '使用少量推理來回答問題';
-
-  @override
-  String get reasoningBudgetSheetMediumSubtitle => '使用較多推理來回答問題';
-
-  @override
-  String get reasoningBudgetSheetHeavySubtitle => '使用大量推理來回答問題，適合複雜問題';
-
-  @override
-  String get reasoningBudgetSheetXhighSubtitle => '使用最大推理深度，適合最複雜的問題';
-
-  @override
-  String get reasoningBudgetSheetCustomLabel => '自訂推理預算';
-
-  @override
-  String get reasoningBudgetSheetCustomHint => '例如：2048 (-1 自動，0 關閉)';
 
   @override
   String chatMessageWidgetFileNotFound(String fileName) {
@@ -26356,6 +27304,83 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get chatInputBarCollapse => '收起';
 
   @override
+  String get contextUsageTitle => '上下文視窗';
+
+  @override
+  String get contextUsageStateExact => '精確（來自上次回應）';
+
+  @override
+  String get contextUsageStateExactCalibrated => '精確（分項按估算比例）';
+
+  @override
+  String get contextUsageStateEstimated => '估算';
+
+  @override
+  String get contextUsageStateStale => '已過時，正在更新…';
+
+  @override
+  String get contextUsageStateComputing => '計算中…';
+
+  @override
+  String get contextUsageStateNone => '暫無資料';
+
+  @override
+  String get contextUsageBucketSystem => '系統提示詞';
+
+  @override
+  String get contextUsageBucketInjections => '指令注入';
+
+  @override
+  String get contextUsageBucketHistory => '歷史訊息';
+
+  @override
+  String get contextUsageBucketTools => '內建工具';
+
+  @override
+  String get contextUsageBucketMemory => '記憶';
+
+  @override
+  String get contextUsageBucketWorldBook => '世界書';
+
+  @override
+  String get contextUsageBucketSkills => '技能';
+
+  @override
+  String get contextUsageBucketWorkspace => '工作區';
+
+  @override
+  String get contextUsageBucketSearch => '搜尋提示';
+
+  @override
+  String get contextUsageBucketMcpTools => 'MCP 工具';
+
+  @override
+  String get contextUsageBucketAttachments => '附件';
+
+  @override
+  String get contextUsageBucketDraft => '草稿';
+
+  @override
+  String get contextUsageBucketUsed => '已用';
+
+  @override
+  String get contextUsageFreeSpace => '剩餘空間';
+
+  @override
+  String contextUsageUsedWindow(String used, String window, int percent) {
+    return '$used / $window ($percent%)';
+  }
+
+  @override
+  String get contextUsageNoWindow => '未設定上下文視窗';
+
+  @override
+  String get contextUsageSetWindow => '設定上下文視窗';
+
+  @override
+  String get contextUsageRefresh => '重新整理';
+
+  @override
   String get mcpPageBackTooltip => '返回';
 
   @override
@@ -26709,11 +27734,6 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get modelDetailSheetModelIdHint => '必填，建議小寫字母、數字、連字號';
 
   @override
-  String modelDetailSheetModelIdDisabledHint(String modelId) {
-    return '$modelId';
-  }
-
-  @override
   String get modelDetailSheetModelNameLabel => '模型名稱';
 
   @override
@@ -26766,12 +27786,6 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get modelDetailSheetBuiltinToolsDescription => '內建工具取決於供應商和 API 模式。';
-
-  @override
-  String get modelDetailSheetSearchTool => '搜尋';
-
-  @override
-  String get modelDetailSheetSearchToolDescription => '啟用 Google 搜尋整合';
 
   @override
   String get modelDetailSheetUrlContextTool => 'URL 上下文';
@@ -26844,9 +27858,6 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get modelDetailSheetInvalidIdError => '請輸入有效的模型 ID（不少於2個字元）';
 
   @override
-  String get modelDetailSheetModelIdExistsError => '模型 ID 已存在';
-
-  @override
   String get modelDetailSheetHeaderKeyHint => 'Header Key';
 
   @override
@@ -26857,6 +27868,301 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get modelDetailSheetBodyJsonHint => 'Body JSON';
+
+  @override
+  String get modelSpecFormSourceCustom => '自訂';
+
+  @override
+  String get modelSpecFormSourceCatalog => '目錄';
+
+  @override
+  String get modelSpecFormSourceInferred => '推斷';
+
+  @override
+  String get modelSpecFormSourceDefault => '預設';
+
+  @override
+  String get modelSpecFormReset => '重設為預設';
+
+  @override
+  String get modelSpecFormModalitiesSection => '模態與能力';
+
+  @override
+  String get modelSpecFormImageType => '圖像';
+
+  @override
+  String get modelSpecFormAudioMode => '音訊';
+
+  @override
+  String get modelSpecFormVideoMode => '影片';
+
+  @override
+  String get modelSpecFormPdfMode => 'PDF';
+
+  @override
+  String get modelSpecFormStructuredOutputAbility => '結構化輸出';
+
+  @override
+  String get modelSpecFormReasoningSection => '推理';
+
+  @override
+  String get modelSpecFormDialect => '推理方言';
+
+  @override
+  String get modelSpecFormDialectNone => '無';
+
+  @override
+  String get modelSpecFormDialectNoneSubtitle => '不寫入推理欄位';
+
+  @override
+  String get modelSpecFormDialectOpenaiReasoningEffort =>
+      'OpenAI reasoning effort';
+
+  @override
+  String get modelSpecFormDialectOpenaiReasoningEffortSubtitle =>
+      'reasoning_effort';
+
+  @override
+  String get modelSpecFormDialectOpenaiResponsesReasoning =>
+      'OpenAI Responses reasoning';
+
+  @override
+  String get modelSpecFormDialectOpenaiResponsesReasoningSubtitle =>
+      'reasoning.effort';
+
+  @override
+  String get modelSpecFormDialectOpenrouterReasoning => 'OpenRouter reasoning';
+
+  @override
+  String get modelSpecFormDialectOpenrouterReasoningSubtitle => 'reasoning';
+
+  @override
+  String get modelSpecFormDialectAnthropicBudget => 'Anthropic budget';
+
+  @override
+  String get modelSpecFormDialectAnthropicBudgetSubtitle =>
+      'thinking.budget_tokens';
+
+  @override
+  String get modelSpecFormDialectAnthropicAdaptiveEffort =>
+      'Anthropic adaptive effort';
+
+  @override
+  String get modelSpecFormDialectAnthropicAdaptiveEffortSubtitle =>
+      'thinking + output_config.effort';
+
+  @override
+  String get modelSpecFormDialectAnthropicEffort => 'Anthropic effort';
+
+  @override
+  String get modelSpecFormDialectAnthropicEffortSubtitle =>
+      'thinking + output_config.effort';
+
+  @override
+  String get modelSpecFormDialectGeminiThinkingBudget =>
+      'Gemini thinking budget';
+
+  @override
+  String get modelSpecFormDialectGeminiThinkingBudgetSubtitle =>
+      'thinkingConfig.thinkingBudget';
+
+  @override
+  String get modelSpecFormDialectGeminiThinkingLevel => 'Gemini thinking level';
+
+  @override
+  String get modelSpecFormDialectGeminiThinkingLevelSubtitle =>
+      'thinkingConfig.thinkingLevel';
+
+  @override
+  String get modelSpecFormDialectQwenEnableThinking => 'Qwen enable thinking';
+
+  @override
+  String get modelSpecFormDialectQwenEnableThinkingSubtitle =>
+      'enable_thinking';
+
+  @override
+  String get modelSpecFormDialectThinkingType => 'Thinking type';
+
+  @override
+  String get modelSpecFormDialectThinkingTypeSubtitle => 'thinking.type';
+
+  @override
+  String get modelSpecFormDialectSiliconflowEnableThinking =>
+      'SiliconFlow enable thinking';
+
+  @override
+  String get modelSpecFormDialectSiliconflowEnableThinkingSubtitle =>
+      'enable_thinking';
+
+  @override
+  String get modelSpecFormDialectInternThinkingMode => 'Intern thinking mode';
+
+  @override
+  String get modelSpecFormDialectInternThinkingModeSubtitle => 'thinking_mode';
+
+  @override
+  String get modelSpecFormDialectChatTemplateKwargs => 'Chat template kwargs';
+
+  @override
+  String get modelSpecFormDialectChatTemplateKwargsSubtitle =>
+      'chat_template_kwargs.enable_thinking';
+
+  @override
+  String get modelSpecFormDialectKimiThinking => 'Kimi thinking';
+
+  @override
+  String get modelSpecFormDialectKimiThinkingSubtitle => 'thinking';
+
+  @override
+  String get modelSpecFormDialectCustom => '自訂 JSON';
+
+  @override
+  String get modelSpecFormDialectCustomSubtitle => '依級別寫入 JSON 補丁';
+
+  @override
+  String get modelSpecFormLevels => '支援的級別';
+
+  @override
+  String get modelSpecFormCanDisable => '允許關閉';
+
+  @override
+  String get modelSpecFormDefaultLevel => '預設級別';
+
+  @override
+  String get modelSpecFormBudgets => 'Token 預算';
+
+  @override
+  String modelSpecFormBudgetPlaceholder(String tokens) {
+    return '$tokens';
+  }
+
+  @override
+  String modelSpecFormCustomPatch(String level) {
+    return 'JSON 補丁（$level）';
+  }
+
+  @override
+  String get modelSpecFormCustomPatchHint => '例如 reasoning_effort: high';
+
+  @override
+  String get modelSpecFormInvalidJson => '自訂推理補丁必須是有效的 JSON 物件';
+
+  @override
+  String get modelSpecFormInvalidNumber => '請輸入有效數字';
+
+  @override
+  String get modelSpecFormStrategySection => '策略';
+
+  @override
+  String get modelSpecFormSampling => '取樣';
+
+  @override
+  String get modelSpecFormRequestQuirks => '請求相容';
+
+  @override
+  String get modelSpecFormDynamicWebSearch => '動態過濾搜尋工具';
+
+  @override
+  String get modelSpecFormDynamicWebSearchSubtitle =>
+      '開啟動態過濾時，使用 2026-03-18 版網頁搜尋與擷取工具';
+
+  @override
+  String get modelSpecFormRemoteImageUrls => '遠端圖片連結';
+
+  @override
+  String get modelSpecFormRemoteImageUrlsSubtitle =>
+      '直接傳送 http(s) 圖片連結；關閉後捨棄遠端連結，只傳送本機圖片';
+
+  @override
+  String get modelSpecFormPromptCacheControl => '提示快取標記';
+
+  @override
+  String get modelSpecFormPromptCacheControlSubtitle =>
+      '開啟提示快取時，在 OpenRouter 請求中加入 cache_control';
+
+  @override
+  String get modelSpecFormSamplingAlways => '始終保留';
+
+  @override
+  String get modelSpecFormSamplingAlwaysSubtitle => '保留 temperature 等取樣欄位';
+
+  @override
+  String get modelSpecFormSamplingOnlyWhenReasoningOff => '僅在關閉推理時';
+
+  @override
+  String get modelSpecFormSamplingOnlyWhenReasoningOffSubtitle => '模型思考時移除取樣欄位';
+
+  @override
+  String get modelSpecFormSamplingNever => '從不';
+
+  @override
+  String get modelSpecFormSamplingNeverSubtitle => '始終移除取樣欄位';
+
+  @override
+  String get modelSpecFormReplay => '推理回放';
+
+  @override
+  String get modelSpecFormReplayNone => '無';
+
+  @override
+  String get modelSpecFormReplayNoneSubtitle => '不把先前推理傳回模型';
+
+  @override
+  String get modelSpecFormReplayToolTurns => '工具輪次';
+
+  @override
+  String get modelSpecFormReplayToolTurnsSubtitle => '僅在工具呼叫輪次回放推理';
+
+  @override
+  String get modelSpecFormReplayAll => '全部';
+
+  @override
+  String get modelSpecFormReplayAllSubtitle => '每一輪後續請求都回放推理';
+
+  @override
+  String get modelSpecFormReplayField => '回放欄位';
+
+  @override
+  String get modelSpecFormReplayFieldReasoningContent => 'reasoning_content';
+
+  @override
+  String get modelSpecFormReplayFieldReasoning => 'reasoning';
+
+  @override
+  String get modelSpecFormReplayFieldReasoningDetails => 'reasoning_details';
+
+  @override
+  String get modelSpecFormLimitsSection => '限額';
+
+  @override
+  String get modelSpecFormLimitsPricingSection => '限額與定價';
+
+  @override
+  String get modelSpecFormContextWindow => '上下文視窗';
+
+  @override
+  String get modelSpecFormMaxOutput => '最大輸出';
+
+  @override
+  String get modelSpecFormPricingSection => '定價 / 1M';
+
+  @override
+  String get modelSpecFormPricingInput => '輸入';
+
+  @override
+  String get modelSpecFormPricingOutput => '輸出';
+
+  @override
+  String get modelSpecFormPricingCacheRead => '快取讀取';
+
+  @override
+  String get modelSpecFormPricingCacheWrite => '快取寫入';
+
+  @override
+  String get modelSpecFormCurrency => '貨幣';
+
+  @override
+  String get modelSpecFormAdvancedSection => '請求';
 
   @override
   String get modelSelectSheetSearchHint => '搜尋模型或供應商';
@@ -27124,6 +28430,43 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get providersPageProviderAddedSnackbar => '已新增供應商';
+
+  @override
+  String get modelCatalogTitle => '模型目錄';
+
+  @override
+  String modelCatalogSourceBundled(String date) {
+    return '內建快照 · $date';
+  }
+
+  @override
+  String modelCatalogSourceRemote(String date) {
+    return 'models.dev · 更新於 $date';
+  }
+
+  @override
+  String get modelCatalogAutoUpdate => '每 24 小時自動更新';
+
+  @override
+  String get modelCatalogRefresh => '立即更新';
+
+  @override
+  String get modelCatalogUpdated => '模型目錄已更新';
+
+  @override
+  String modelCatalogRefreshFailed(String error) {
+    return '更新失敗：$error';
+  }
+
+  @override
+  String modelCatalogProviderCount(int count) {
+    return '$count 個供應商';
+  }
+
+  @override
+  String modelCatalogModelCount(int count) {
+    return '$count 個模型';
+  }
 
   @override
   String get providerGroupsGroupLabel => '分組';
@@ -27788,6 +29131,13 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get displaySettingsPageShowToolCardsSubtitle => '關閉後，聊天中不再顯示工具呼叫卡片';
+
+  @override
+  String get displaySettingsShowReasoningLevelBadge => '在推理按鈕上顯示檔位';
+
+  @override
+  String get displaySettingsShowReasoningLevelBadgeSubtitle =>
+      '在輸入欄的推理圖示旁顯示目前檔位';
 
   @override
   String get displaySettingsPageAutoCollapseThinkingTitle => '自動折疊思考';
@@ -30968,6 +32318,21 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   }
 
   @override
+  String tokenDetailReasoningTokens(int count) {
+    return '$count tokens';
+  }
+
+  @override
+  String tokenDetailCacheWriteTokens(int count) {
+    return '$count 快取寫入 tokens';
+  }
+
+  @override
+  String tokenDetailCost(String amount) {
+    return '$amount';
+  }
+
+  @override
   String get debugPageTitle => 'Debug';
 
   @override
@@ -33782,21 +35147,6 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   @override
   String get displaySettingsPageShowProducedFilesSubtitle =>
       '在回覆底部顯示工具建立或修改的檔案。';
-
-  @override
-  String get reasoningBudgetSliderLow => 'Low';
-
-  @override
-  String get reasoningBudgetSliderMedium => 'Medium';
-
-  @override
-  String get reasoningBudgetSliderHigh => 'High';
-
-  @override
-  String get reasoningBudgetSliderXhigh => 'XHigh';
-
-  @override
-  String get reasoningBudgetSliderMax => 'Max';
 
   @override
   String get defaultModelPagePerChatModelTitle => '每個對話獨立模型';

@@ -1,6 +1,7 @@
 import 'package:Kelivo/features/chat/utils/prompt_injection_selection.dart';
 import 'package:Kelivo/features/home/widgets/world_book_sheet.dart';
 import 'package:Kelivo/features/home/services/message_generation_service.dart';
+import 'package:Kelivo/features/home/services/context_usage_service.dart';
 import 'package:Kelivo/features/home/controllers/generation_controller.dart';
 import 'package:Kelivo/features/home/controllers/stream_controller.dart'
     as stream_ctrl;
@@ -34,20 +35,26 @@ class _Chat extends ChatService {
   _Chat(this.repository);
   final ChatDatabaseRepository repository;
   final conversations = <String, Conversation>{};
+  final revisions = <String, int>{};
   int historyReads = 0;
+  int extrasWrites = 0;
 
   @override
   bool get initialized => true;
   @override
   Conversation? getConversation(String id) => conversations[id];
+  @override
+  int contextRevision(String conversationId) => revisions[conversationId] ?? 0;
 
   @override
   Future<void> updateConversationExtras(
     String id,
     Map<String, dynamic> Function(Map<String, dynamic>) update,
   ) async {
+    extrasWrites++;
     await repository.updateConversationExtras(id, update);
     conversations[id] = (await repository.getConversation(id))!;
+    revisions[id] = contextRevision(id) + 1;
     notifyListeners();
   }
 
@@ -79,6 +86,10 @@ class _Routes extends Fake implements McpToolRouteSnapshot {}
 class _Stream extends Fake implements stream_ctrl.StreamController {}
 
 class _Generation extends Fake implements GenerationController {
+  @override
+  Map<String, String>? buildCustomHeaders(Assistant? assistant) => null;
+  @override
+  Map<String, dynamic>? buildCustomBody(Assistant? assistant) => null;
   @override
   McpToolRouteSnapshot captureMcpToolRoutes(Assistant? assistant) => _Routes();
   @override
@@ -165,6 +176,181 @@ void main() {
       contextProvider: context,
     );
   }
+
+  testWidgets(
+    'prepared request carries its original configuration into generation',
+    (tester) async {
+      await mount(tester);
+      await tester.runAsync(() async {
+        const assistant = Assistant(
+          id: 'assistant',
+          name: 'A',
+          enableMemory: true,
+        );
+        await settings.setMemoryRulesPromptEn('ORIGINAL_RULES');
+        await settings.setMemoryPromptLang('en');
+        await injections.add(
+          const InstructionInjection(
+            id: 'instruction',
+            title: 'Instruction',
+            prompt: 'ORIGINAL_INSTRUCTION',
+          ),
+        );
+        await injections.setActiveIds([
+          'instruction',
+        ], assistantId: assistant.id);
+        final generation = MessageGenerationService(
+          chatService: chat,
+          messageBuilderService: builder,
+          generationController: _Generation(),
+          streamController: _Stream(),
+          contextProvider: context,
+        );
+        final prepared = await generation.prepareApiMessagesWithInjections(
+          messages: [],
+          versionSelections: {},
+          currentConversation: chat.getConversation('one'),
+          settings: settings,
+          assistant: assistant,
+          assistantId: assistant.id,
+          providerKey: 'test',
+          modelId: 'model',
+        );
+        expect(
+          prepared.apiMessages.first['content'],
+          contains('ORIGINAL_RULES'),
+        );
+        expect(
+          prepared.apiMessages.first['content'],
+          contains('ORIGINAL_INSTRUCTION'),
+        );
+        expect(prepared.contextUsageRevision, chat.contextRevision('one'));
+        expect(
+          prepared.contextUsageConfiguration,
+          contextUsageConfiguration(
+            settings: settings,
+            config: settings.getProviderConfig('test'),
+            providerKey: 'test',
+            modelId: 'model',
+            assistant: assistant,
+            instructions: injections,
+            worldBooks: books,
+            conversation: chat.getConversation('one'),
+          ),
+        );
+        await chat.updateConversationExtras(
+          'one',
+          (extras) => {...extras, 'changed': true},
+        );
+        await settings.setMemoryRulesPromptEn('CHANGED_RULES');
+        final ctx = generation.buildGenerationContext(
+          assistantMessage: ChatMessage(
+            role: 'assistant',
+            content: '',
+            conversationId: 'one',
+          ),
+          prepared: prepared,
+          userImagePaths: [],
+          allowImagesApiRouting: false,
+          providerKey: 'test',
+          modelId: 'model',
+          assistant: assistant,
+          settings: settings,
+          supportsReasoning: false,
+          enableReasoning: false,
+          generateTitleOnFinish: false,
+        );
+        expect(
+          ctx.contextUsageConfiguration,
+          prepared.contextUsageConfiguration,
+        );
+        expect(ctx.contextUsageRevision, prepared.contextUsageRevision);
+        expect(ctx.contextUsageRevision, isNot(chat.contextRevision('one')));
+        expect(
+          ctx.contextUsageConfiguration,
+          isNot(
+            contextUsageConfiguration(
+              settings: settings,
+              config: settings.getProviderConfig('test'),
+              providerKey: 'test',
+              modelId: 'model',
+              assistant: assistant,
+              instructions: injections,
+              worldBooks: books,
+              conversation: chat.getConversation('one'),
+            ),
+          ),
+        );
+      });
+    },
+  );
+
+  testWidgets(
+    'context previews inject timed lore without persisting activation',
+    (tester) async {
+      await mount(tester);
+      await tester.runAsync(() async {
+        await books.addBook(
+          const WorldBook(
+            id: 'timed',
+            entries: [
+              WorldBookEntry(
+                id: 'entry',
+                content: 'TIMED_LORE',
+                constantActive: true,
+                sticky: 2,
+              ),
+            ],
+          ),
+        );
+        await books.setActiveBookIds(['timed'], assistantId: 'assistant');
+        final generation = MessageGenerationService(
+          chatService: chat,
+          messageBuilderService: builder,
+          generationController: _Generation(),
+          streamController: _Stream(),
+          contextProvider: context,
+        );
+        Future<void> preview() async {
+          final result = await generation.previewContextAssembly(
+            conversationId: 'one',
+            providerKey: 'Test',
+            modelId: 'model',
+            assistantId: 'assistant',
+          );
+          expect(result.worldBookText, contains('TIMED_LORE'));
+          expect(result.injectionsText, isNot(contains('TIMED_LORE')));
+        }
+
+        for (var i = 0; i < 3; i++) {
+          await preview();
+        }
+        expect(chat.extrasWrites, 0);
+        expect((await repository.getConversation('one'))!.extras, {
+          'keep': true,
+        });
+
+        // A real request still records activation; later previews leave it alone.
+        await generation.assembleUnprocessedRequestContext(
+          messages: [],
+          versionSelections: {},
+          currentConversation: chat.getConversation('one'),
+          settings: settings,
+          assistant: null,
+          assistantId: 'assistant',
+          providerKey: 'Test',
+          modelId: 'model',
+        );
+        expect(chat.extrasWrites, 1);
+        expect(
+          (await repository.getConversation('one'))!.extras,
+          contains(WorldBookActivation.extrasKey),
+        );
+        await preview();
+        expect(chat.extrasWrites, 1);
+      });
+    },
+  );
 
   testWidgets(
     'preparation uses saved conversation prompts even when the controller snapshot is stale',
@@ -436,6 +622,7 @@ void main() {
           'model',
           conversation: scenario.$2,
         );
+        builder.stripInternalRevisionIds(messages);
         expect(messages.first, {'role': 'system', 'content': scenario.$3});
         expect(messages, hasLength(2));
       }
@@ -661,6 +848,7 @@ void main() {
         ];
         await builder.injectWorldBookPrompts(messages, 'assistant');
         expect(messages.first['content'], 'BEFORE\nBASE\nAFTER');
+        builder.stripInternalRevisionIds(messages);
         expect(messages[1], {'role': 'assistant', 'content': 'TOP'});
         expect(messages[messages.length - 2]['content'], contains('BOTTOM'));
         expect(messages.last, {'role': 'user', 'content': 'hello'});

@@ -329,9 +329,12 @@ void main() {
               if (scenario.provider == OAuthProvider.kimi &&
                   scenario.protocol == 'openai') ...{
                 'abilities': ['reasoning'],
-                'oauthThinkingRequired': true,
-                'oauthThinkingEfforts': ['high'],
-                'oauthThinkingDefaultEffort': 'high',
+                'reasoning': {
+                  'levels': ['high'],
+                  'canDisable': false,
+                  'defaultLevel': 'high',
+                  'dialect': 'kimiThinking',
+                },
               },
               if (scenario.custom)
                 'body': [

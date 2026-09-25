@@ -751,7 +751,7 @@ class CherryImporter {
         'contextMessageSize': ctxCount ?? 64,
         'limitContextMessages': true,
         'streamOutput': streamOutput ?? true,
-        'thinkingBudget': null,
+        'reasoning': null,
         'maxTokens': maxTokens,
         'systemPrompt': prompt,
         'messageTemplate': '{{ message }}',

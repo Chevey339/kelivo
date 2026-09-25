@@ -50,9 +50,48 @@ class CustomRequestMerger {
             : value;
       }
     }
-    merged.addAll(ModelOverridePayloadParser.customBodyFromRows(providerRows));
-    merged.addAll(model);
+    applyBody(
+      merged,
+      ModelOverridePayloadParser.customBodyFromRows(providerRows),
+    );
+    applyBody(merged, model);
     return merged;
+  }
+
+  /// Reasoning objects whose fields are mutually exclusive (`type: disabled`
+  /// vs `budget_tokens`, `thinkingLevel` vs `thinkingBudget`, `enabled` vs
+  /// `effort`), so a custom value replaces the generated one whole.
+  static const Set<String> _replacedWhole = {
+    'thinking',
+    'reasoning',
+    'thinkingConfig',
+  };
+
+  /// Merges the custom [body] into a built request [target]. Custom values
+  /// win; nested objects merge key by key so generated siblings (token
+  /// limits) survive a partial custom object. Lists, scalars and
+  /// [_replacedWhole] objects replace.
+  static void applyBody(
+    Map<String, dynamic> target,
+    Map<String, dynamic> body,
+  ) {
+    for (final entry in body.entries) {
+      final existing = target[entry.key];
+      final incoming = entry.value;
+      if (existing is Map &&
+          incoming is Map &&
+          !_replacedWhole.contains(entry.key)) {
+        final merged = <String, dynamic>{
+          for (final e in existing.entries) e.key.toString(): e.value,
+        };
+        applyBody(merged, {
+          for (final e in incoming.entries) e.key.toString(): e.value,
+        });
+        target[entry.key] = merged;
+      } else {
+        target[entry.key] = incoming;
+      }
+    }
   }
 
   static void _addHeadersCaseInsensitive(

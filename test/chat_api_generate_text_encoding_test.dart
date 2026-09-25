@@ -5,6 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'package:Kelivo/core/providers/settings_provider.dart';
 import 'package:Kelivo/core/services/api/chat_api_service.dart';
+import 'support/legacy_reasoning.dart';
 
 ProviderConfig _openAIConfig(String baseUrl) {
   return ProviderConfig(
@@ -106,7 +107,7 @@ Future<Map<String, dynamic>> _captureGenerateTextBody({
       ),
       modelId: modelId,
       prompt: 'summarize',
-      thinkingBudget: thinkingBudget,
+      reasoning: legacyBudget(thinkingBudget),
     );
   }
 
@@ -249,7 +250,11 @@ void main() {
 
       expect(title, '标题');
       expect(requestBody.containsKey('temperature'), isFalse);
-      expect(requestBody['generationConfig'], isA<Map>());
+      final generationConfig = requestBody['generationConfig'];
+      if (generationConfig != null) {
+        expect(generationConfig, isA<Map>());
+        expect((generationConfig as Map).containsKey('temperature'), isFalse);
+      }
     });
 
     test(
@@ -285,12 +290,12 @@ void main() {
           config: _openAIConfig(baseUrl),
           modelId: 'kimi-k2.7-code',
           prompt: 'summarize',
-          thinkingBudget: 0,
+          reasoning: legacyBudget(0),
         );
 
         expect(title, '标题');
         expect(requestBody['model'], 'kimi-k2.7-code');
-        expect(requestBody.containsKey('thinking'), isFalse);
+        expect(requestBody['thinking'], {'type': 'enabled'});
         expect(requestBody.containsKey('reasoning_effort'), isFalse);
         expect(requestBody.containsKey('temperature'), isFalse);
         expect(requestBody.containsKey('top_p'), isFalse);
@@ -394,7 +399,7 @@ void main() {
     );
 
     test(
-      'DashScope thinking-only models omit enable_thinking instead of disabling',
+      'DashScope thinking-only models stay enabled even when budget is off',
       () async {
         final enabledBody = await _captureGenerateTextBody(
           providerId: 'DashScopeCompatTest',
@@ -412,7 +417,7 @@ void main() {
         expect(enabledBody.containsKey('enable_thinking'), isFalse);
         expect(enabledBody['thinking_budget'], 2048);
         expect(disabledBody.containsKey('enable_thinking'), isFalse);
-        expect(disabledBody.containsKey('thinking_budget'), isFalse);
+        expect(disabledBody['thinking_budget'], isA<int>());
       },
     );
 

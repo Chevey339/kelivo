@@ -284,4 +284,56 @@ void main() {
       {'key': 'desktop', 'value': 'true'},
     ]);
   });
+
+  testWidgets(
+    'desktop provider model rows pin action icons to a shared right edge',
+    (tester) async {
+      final settings = await _buildSettings(tester);
+      addTearDown(settings.dispose);
+      await settings.setProviderConfig(
+        'ProviderA',
+        _providerConfig('ProviderA').copyWith(
+          models: const ['wide-ctx', 'narrow-ctx'],
+          modelOverrides: const {
+            'wide-ctx': {
+              'name': 'Wide Context',
+              'type': 'chat',
+              'input': ['text', 'image'],
+              'abilities': ['tool'],
+              'contextWindow': 1000000,
+            },
+            'narrow-ctx': {
+              'name': 'Narrow Context',
+              'type': 'chat',
+              'input': ['text', 'image'],
+              'abilities': ['tool'],
+              'contextWindow': 262144,
+            },
+          },
+        ),
+      );
+      await _pumpProviderSettings(tester, settings);
+
+      expect(find.text('1M'), findsOneWidget);
+      expect(find.text('262.1k'), findsOneWidget);
+
+      final wideSettings = tester.getRect(
+        find.byKey(const ValueKey('desktop-provider-model-settings-wide-ctx')),
+      );
+      final narrowSettings = tester.getRect(
+        find.byKey(
+          const ValueKey('desktop-provider-model-settings-narrow-ctx'),
+        ),
+      );
+      final wideRemove = tester.getRect(
+        find.byKey(const ValueKey('desktop-provider-model-remove-wide-ctx')),
+      );
+      final narrowRemove = tester.getRect(
+        find.byKey(const ValueKey('desktop-provider-model-remove-narrow-ctx')),
+      );
+
+      expect(wideSettings.right, closeTo(narrowSettings.right, 0.5));
+      expect(wideRemove.right, closeTo(narrowRemove.right, 0.5));
+    },
+  );
 }

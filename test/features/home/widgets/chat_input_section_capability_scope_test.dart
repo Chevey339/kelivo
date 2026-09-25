@@ -1,10 +1,14 @@
 import 'dart:convert';
 
 import 'package:Kelivo/core/providers/asr_provider.dart';
+import 'package:Kelivo/core/models/reasoning_request.dart';
+import 'package:Kelivo/core/models/model_spec.dart';
 import 'package:Kelivo/core/providers/assistant_provider.dart';
+import 'package:Kelivo/core/providers/instruction_injection_provider.dart';
 import 'package:Kelivo/core/providers/mcp_provider.dart';
 import 'package:Kelivo/core/providers/quick_phrase_provider.dart';
 import 'package:Kelivo/core/providers/settings_provider.dart';
+import 'package:Kelivo/core/providers/world_book_provider.dart';
 import 'package:Kelivo/features/home/widgets/chat_input_bar.dart';
 import 'package:Kelivo/features/home/widgets/chat_input_section.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
@@ -57,8 +61,10 @@ void main() {
     WidgetTester tester, {
     required AssistantProvider assistants,
     required bool isConversationOverride,
+    SettingsProvider? settingsOverride,
+    bool supportsReasoning = false,
   }) async {
-    final settings = SettingsProvider(preferences);
+    final settings = settingsOverride ?? SettingsProvider(preferences);
     await tester.pumpWidget(
       MultiProvider(
         providers: [
@@ -89,8 +95,9 @@ void main() {
               // The model in play supports neither tools nor reasoning, which
               // is what triggers the enforcement under test.
               isToolModel: (_, _) => false,
-              isReasoningModel: (_, _) => false,
-              isReasoningEnabled: (_) => true,
+              isReasoningModel: (_, _) => supportsReasoning,
+              isReasoningEnabled: (request) =>
+                  request.level != ReasoningLevel.off,
             ),
           ),
         ),
@@ -119,6 +126,85 @@ void main() {
     );
   });
 
+  testWidgets('composer badge and active state reflect the effective level', (
+    tester,
+  ) async {
+    late AssistantProvider assistants;
+    late SettingsProvider settings;
+    addTearDown(() => settings.dispose());
+    addTearDown(() => assistants.dispose());
+    tester.view.physicalSize = const Size(1200, 800);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    ProviderConfig config(bool canDisable) => ProviderConfig(
+      id: 'SomeProvider',
+      enabled: true,
+      name: 'Test',
+      apiKey: '',
+      baseUrl: '',
+      modelOverrides: {
+        'no-tools-model': {
+          'abilities': ['reasoning'],
+          'reasoning': {
+            'dialect': 'openaiReasoningEffort',
+            'levels': ['low', 'high'],
+            'canDisable': canDisable,
+          },
+        },
+      },
+    );
+    await tester.runAsync(() async {
+      final harness = await createBusinessTestHarness();
+      preferences = harness.preferences;
+      settings = SettingsProvider(preferences);
+      assistants = AssistantProvider(preferences: preferences);
+      await settings.loaded;
+      await assistants.loaded;
+      final id = await assistants.addAssistant(name: 'A');
+      await assistants.setCurrentAssistant(id);
+      await settings.setProviderConfig('SomeProvider', config(false));
+      await settings.setShowReasoningLevelBadge(true);
+      await assistants.updateAssistant(
+        assistants.currentAssistant!.copyWith(
+          reasoning: const ReasoningRequest(ReasoningLevel.max),
+        ),
+      );
+    });
+    // Background providers use the widget clock. Keep their store separate
+    // from the real-clock settings writes exercised with runAsync below.
+    preferences = createBusinessTestPreferences();
+    await pumpComposer(
+      tester,
+      assistants: assistants,
+      isConversationOverride: true,
+      settingsOverride: settings,
+      supportsReasoning: true,
+    );
+    ChatInputBar bar() =>
+        tester.widget<ChatInputBar>(find.byType(ChatInputBar));
+    expect(bar().reasoning!.level, ReasoningLevel.high);
+    expect(find.text('high'), findsOneWidget);
+    expect(find.text('max'), findsNothing);
+
+    await tester.runAsync(
+      () => assistants.updateAssistant(
+        assistants.currentAssistant!.copyWith(reasoning: ReasoningRequest.off),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(bar().reasoning!.level, ReasoningLevel.low);
+    expect(bar().reasoningActive, isTrue);
+    expect(find.text('low'), findsOneWidget);
+
+    await tester.runAsync(
+      () => settings.setProviderConfig('SomeProvider', config(true)),
+    );
+    await tester.pumpAndSettle();
+    expect(bar().reasoning!.level, ReasoningLevel.off);
+    expect(bar().reasoningActive, isFalse);
+  });
+
   testWidgets('the assistant\'s own model still disables what it cannot do', (
     tester,
   ) async {
@@ -131,5 +217,85 @@ void main() {
     );
 
     expect(assistants.currentAssistant?.mcpServerIds, isEmpty);
+  });
+
+  Future<void> pumpTabletComposer(
+    WidgetTester tester, {
+    required AssistantProvider assistants,
+    required String modelId,
+  }) async {
+    final settings = SettingsProvider(preferences);
+    await tester.pumpWidget(
+      MultiProvider(
+        providers: [
+          ChangeNotifierProvider.value(value: settings),
+          ChangeNotifierProvider.value(value: assistants),
+          ChangeNotifierProvider(create: (_) => AsrProvider()),
+          ChangeNotifierProvider(
+            create: (_) => McpProvider(preferences: preferences),
+          ),
+          ChangeNotifierProvider(
+            create: (_) => QuickPhraseProvider(preferences: preferences),
+          ),
+          ChangeNotifierProvider(
+            create: (_) => WorldBookProvider(preferences: preferences),
+          ),
+          ChangeNotifierProvider(
+            create: (_) =>
+                InstructionInjectionProvider(preferences: preferences),
+          ),
+        ],
+        child: MaterialApp(
+          theme: ThemeData(platform: TargetPlatform.android),
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: Scaffold(
+            body: ChatInputSection(
+              inputBarKey: GlobalKey(),
+              chatModelProviderKey: 'SomeProvider',
+              chatModelId: modelId,
+              inputFocus: FocusNode(),
+              inputController: TextEditingController(),
+              mediaController: ChatInputBarController(),
+              isTablet: true,
+              isLoading: false,
+              isToolModel: (_, _) => false,
+              isReasoningModel: (_, _) => false,
+              isReasoningEnabled: (_) => false,
+              onPickCamera: () {},
+              onPickPhotos: () {},
+              onUploadFiles: () {},
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+  }
+
+  testWidgets('tablet camera and photos stay available for a text-only model', (
+    tester,
+  ) async {
+    final assistants = await loadAssistantWithMcp(tester);
+    await pumpTabletComposer(
+      tester,
+      assistants: assistants,
+      modelId: 'mimo-v2.5-pro',
+    );
+    final bar = tester.widget<ChatInputBar>(find.byType(ChatInputBar));
+    expect(bar.onPickCamera, isNotNull);
+    expect(bar.onPickPhotos, isNotNull);
+    expect(bar.onUploadFiles, isNotNull);
+  });
+
+  testWidgets('tablet camera and photos show when the spec accepts image', (
+    tester,
+  ) async {
+    final assistants = await loadAssistantWithMcp(tester);
+    await pumpTabletComposer(tester, assistants: assistants, modelId: 'gpt-4o');
+    final bar = tester.widget<ChatInputBar>(find.byType(ChatInputBar));
+    expect(bar.onPickCamera, isNotNull);
+    expect(bar.onPickPhotos, isNotNull);
+    expect(bar.onUploadFiles, isNotNull);
   });
 }

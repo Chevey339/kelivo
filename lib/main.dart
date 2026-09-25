@@ -74,6 +74,8 @@ import 'core/database/startup_failure_report.dart';
 import 'core/services/backup/backup_activity.dart';
 import 'core/services/backup/local_snapshot_schedule.dart';
 import 'core/services/chat/chat_service.dart';
+import 'features/home/services/context_usage_service.dart';
+import 'core/services/model_catalog/model_catalog_service.dart';
 import 'core/services/app_exit_flush.dart';
 import 'core/services/backup/restore_archive_pruner.dart';
 import 'core/services/backup/restore_business_lease.dart';
@@ -334,6 +336,7 @@ Future<void> main() async {
       ScheduledTasksService.configureDevice(businessPreferences);
       // Best-effort trim of archived restore runs after a few cold starts.
       unawaited(_pruneRestoreArchive(appDataDirectory));
+      unawaited(ModelCatalogService.instance.maybeAutoRefresh());
       // Enable edge-to-edge to allow content under system bars (Android)
       SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
       // Start app (Flutter log capture is toggleable and off by default)
@@ -700,6 +703,29 @@ class MyApp extends StatelessWidget {
           ),
         ),
         ChangeNotifierProvider(
+          create: (_) =>
+              InstructionInjectionProvider(preferences: businessPreferences),
+        ),
+        ChangeNotifierProvider(
+          create: (_) => WorldBookProvider(preferences: businessPreferences),
+        ),
+        ChangeNotifierProvider(
+          create: (_) => MemoryProviderV2(
+            repository: MemoryRepository(businessPreferences),
+            chatRepository: databaseLease.chatRepository,
+          ),
+        ),
+        ChangeNotifierProvider(
+          create: (ctx) => ContextUsageService(
+            chatService: ctx.read<ChatService>(),
+            settings: ctx.read<SettingsProvider>(),
+            assistants: ctx.read<AssistantProvider>(),
+            instructions: ctx.read<InstructionInjectionProvider>(),
+            worldBooks: ctx.read<WorldBookProvider>(),
+            memories: ctx.read<MemoryProviderV2>(),
+          ),
+        ),
+        ChangeNotifierProvider(
           create: (_) => TagProvider(preferences: businessPreferences),
         ),
         ChangeNotifierProvider(
@@ -714,25 +740,12 @@ class MyApp extends StatelessWidget {
           create: (_) => QuickPhraseProvider(preferences: businessPreferences),
         ),
         ChangeNotifierProvider(
-          create: (_) =>
-              InstructionInjectionProvider(preferences: businessPreferences),
-        ),
-        ChangeNotifierProvider(
           create: (_) => InstructionInjectionGroupProvider(
             preferences: businessPreferences,
           ),
         ),
         ChangeNotifierProvider(
-          create: (_) => WorldBookProvider(preferences: businessPreferences),
-        ),
-        ChangeNotifierProvider(
           create: (_) => MemoryProvider(preferences: businessPreferences),
-        ),
-        ChangeNotifierProvider(
-          create: (_) => MemoryProviderV2(
-            repository: MemoryRepository(businessPreferences),
-            chatRepository: databaseLease.chatRepository,
-          ),
         ),
         Provider<ExtensionEntityStore>.value(
           value: databaseLease.extensionEntityStore,

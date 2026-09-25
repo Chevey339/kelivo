@@ -33,11 +33,9 @@ class ClaudeStreamDecoder implements StreamChunkDecoder {
   final Map<String, String> toolResults = <String, String>{};
 
   TokenUsage? _round;
+  final Map<String, dynamic> _roundUsageFields = {};
 
-  TokenUsage? get usage {
-    if (_round == null) return initialUsage;
-    return (initialUsage ?? const TokenUsage()).merge(_round!);
-  }
+  TokenUsage? get usage => _round?.asSnapshot() ?? initialUsage;
 
   String? lastStopReason;
 
@@ -409,9 +407,12 @@ class ClaudeStreamDecoder implements StreamChunkDecoder {
         obj['usage'] ??
         (obj['message'] is Map ? (obj['message'] as Map)['usage'] : null);
     if (rawUsage is Map) {
-      final parsed = claudeUsageFromMap(rawUsage.cast<String, dynamic>());
-      _round = (_round ?? const TokenUsage()).merge(parsed);
-      chunks.add(Usage(usage!));
+      _roundUsageFields.addAll(rawUsage.cast<String, dynamic>());
+      final parsed = claudeUsageFromMap(_roundUsageFields);
+      if (parsed.hasReportedTokens) {
+        _round = parsed;
+        chunks.add(Usage(usage!));
+      }
     }
     try {
       final delta = obj['delta'];
@@ -674,21 +675,23 @@ class ClaudeClientTool {
 }
 
 TokenUsage claudeUsageFromMap(Map<String, dynamic> usage) {
-  final inTok = _readClaudeUsageInt(usage['input_tokens']);
+  final cacheRead = _readClaudeUsageInt(usage['cache_read_input_tokens']);
+  final cacheWrite = _readClaudeUsageInt(usage['cache_creation_input_tokens']);
+  final uncached = _readClaudeUsageInt(usage['input_tokens']);
+  final inTok = uncached == null && cacheRead == null && cacheWrite == null
+      ? null
+      : (uncached ?? 0) + (cacheRead ?? 0) + (cacheWrite ?? 0);
   final outTok = _readClaudeUsageInt(usage['output_tokens']);
-  final cached =
-      _readClaudeUsageInt(usage['cache_read_input_tokens']) +
-      _readClaudeUsageInt(usage['cache_creation_input_tokens']);
   return TokenUsage(
     promptTokens: inTok,
     completionTokens: outTok,
-    cachedTokens: cached,
-    totalTokens: inTok + outTok,
+    cachedTokens: cacheRead,
+    cacheWriteTokens: cacheWrite,
   );
 }
 
-int _readClaudeUsageInt(dynamic value) {
+int? _readClaudeUsageInt(dynamic value) {
   if (value is num) return value.toInt();
-  if (value is String) return int.tryParse(value) ?? 0;
-  return 0;
+  if (value is String) return int.tryParse(value);
+  return null;
 }

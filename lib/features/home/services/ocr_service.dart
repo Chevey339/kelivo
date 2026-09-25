@@ -139,7 +139,7 @@ class OcrService {
         modelId: model,
         messages: messages,
         userImagePaths: imagePaths,
-        thinkingBudget: settings.ocrGenerationThinkingBudgetFor(null),
+        reasoning: settings.ocrGenerationReasoningFor(null),
         ocrActive: true,
         requestId: requestId,
       );

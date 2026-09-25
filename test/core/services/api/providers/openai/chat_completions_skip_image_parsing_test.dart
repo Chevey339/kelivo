@@ -1,5 +1,5 @@
+import 'package:Kelivo/core/models/model_spec.dart';
 import 'package:Kelivo/core/services/api/providers/openai/chat_completions_api.dart';
-import 'package:Kelivo/core/services/api/providers/openai/openai_vendor_compat.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
@@ -11,7 +11,7 @@ void main() {
       ],
       canImageInput: true,
       allowRemoteImages: true,
-      reasoningContentReplayPolicy: ReasoningContentReplayPolicy.none,
+      reasoningReplay: ReasoningReplayPolicy.none,
       skipImageParsing: true,
     );
 
@@ -28,7 +28,7 @@ void main() {
       ],
       canImageInput: true,
       allowRemoteImages: false,
-      reasoningContentReplayPolicy: ReasoningContentReplayPolicy.none,
+      reasoningReplay: ReasoningReplayPolicy.none,
     );
 
     final content = messages.single['content'];
@@ -51,11 +51,47 @@ void main() {
         ],
         canImageInput: true,
         allowRemoteImages: true,
-        reasoningContentReplayPolicy: ReasoningContentReplayPolicy.none,
+        reasoningReplay: ReasoningReplayPolicy.none,
         skipImageParsing: true,
       );
 
       expect(messages.single['content'], raw);
+    },
+  );
+
+  test(
+    'signed reasoning_details strip the parallel text echo without a model-id check',
+    () async {
+      final messages = await buildOpenAIChatCompletionMessages(
+        [
+          <String, dynamic>{
+            'role': 'assistant',
+            'content': 'ok',
+            'reasoning_content': 'unsigned echo',
+            'reasoning_details': [
+              {
+                'type': 'reasoning.text',
+                'text': 'think',
+                'signature': 'sig-1',
+                'format': 'anthropic-claude-v1',
+              },
+            ],
+          },
+        ],
+        canImageInput: false,
+        allowRemoteImages: false,
+        reasoningReplay: ReasoningReplayPolicy.all,
+      );
+
+      expect(messages.single.containsKey('reasoning_content'), isFalse);
+      expect(messages.single['reasoning_details'], [
+        {
+          'type': 'reasoning.text',
+          'text': 'think',
+          'signature': 'sig-1',
+          'format': 'anthropic-claude-v1',
+        },
+      ]);
     },
   );
 }

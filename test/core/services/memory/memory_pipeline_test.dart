@@ -7,6 +7,7 @@ import 'package:Kelivo/core/database/business_preferences.dart';
 import 'package:Kelivo/core/database/business_repository.dart';
 import 'package:Kelivo/core/database/chat_database_repository.dart';
 import 'package:Kelivo/core/models/assistant.dart';
+import 'package:Kelivo/core/models/reasoning_request.dart';
 import 'package:Kelivo/core/models/chat_message.dart';
 import 'package:Kelivo/core/models/message_part.dart';
 import 'package:Kelivo/core/models/memory_entry.dart';
@@ -114,7 +115,7 @@ void main() {
             required String modelId,
             required String prompt,
             String? conversationId,
-            int? thinkingBudget,
+            ReasoningRequest reasoning = ReasoningRequest.auto,
           }) async =>
               throw StateError('use processWindow llmCall in these tests'),
     );

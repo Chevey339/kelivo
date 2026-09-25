@@ -93,6 +93,8 @@ class _DisplaySettingsBody extends StatelessWidget {
                   _ToggleRowShowToolCards(),
                   _RowDivider(),
                   _ToggleRowShowProducedFiles(),
+                  _RowDivider(),
+                  _ToggleRowShowReasoningLevelBadge(),
                 ],
               ),
               const SizedBox(height: 16),
@@ -2610,6 +2612,22 @@ class _ToggleRowShowProducedFiles extends StatelessWidget {
   }
 }
 
+class _ToggleRowShowReasoningLevelBadge extends StatelessWidget {
+  const _ToggleRowShowReasoningLevelBadge();
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    final sp = context.watch<SettingsProvider>();
+    return _ToggleRow(
+      label: l10n.displaySettingsShowReasoningLevelBadge,
+      tip: l10n.displaySettingsShowReasoningLevelBadgeSubtitle,
+      value: sp.showReasoningLevelBadge,
+      onChanged: (v) =>
+          context.read<SettingsProvider>().setShowReasoningLevelBadge(v),
+    );
+  }
+}
+
 class _ToggleRowAutoCollapseThinking extends StatelessWidget {
   const _ToggleRowAutoCollapseThinking();
   @override
@@ -3164,7 +3182,7 @@ class _ToggleRow extends StatelessWidget {
               ],
             ),
           ),
-          if (tip != null) MemoryTipIcon(message: tip!),
+          if (tip != null) TipIcon(message: tip!),
           const SizedBox(width: 12),
           IosSwitch(value: value, onChanged: onChanged),
         ],

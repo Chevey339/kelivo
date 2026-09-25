@@ -1,0 +1,8940 @@
+{
+  "MiniMax-M2": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "MiniMax-M2.1": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "MiniMax-M2.5": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "MiniMax-M2.5-highspeed": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "MiniMax-M2.7": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "MiniMax-M2.7-highspeed": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "MiniMax-M3": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "acme/laguna-8b": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "agnes-image-1": {
+    "type": "image",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text",
+      "image"
+    ],
+    "abilities": []
+  },
+  "aion-labs/aion-2.0": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": []
+  },
+  "aion-labs/aion-3.0": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": []
+  },
+  "aion-labs/aion-3.0-mini": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": []
+  },
+  "aion-labs/aion-rp-llama-3.1-8b": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": []
+  },
+  "amazon/nova-2-lite-v1": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": []
+  },
+  "amazon/nova-lite-v1": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": []
+  },
+  "amazon/nova-micro-v1": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": []
+  },
+  "amazon/nova-premier-v1": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": []
+  },
+  "amazon/nova-pro-v1": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": []
+  },
+  "anthracite-org/magnum-v4-72b": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": []
+  },
+  "anthropic/claude-3-haiku": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "anthropic/claude-fable-5": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "anthropic/claude-fable-5.1": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "anthropic/claude-haiku-4.5": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "anthropic/claude-opus-4": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "anthropic/claude-opus-4.1": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "anthropic/claude-opus-4.5": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "anthropic/claude-opus-4.6": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "anthropic/claude-opus-4.7": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "anthropic/claude-opus-4.8": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "anthropic/claude-opus-5": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "anthropic/claude-sonnet-4": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "anthropic/claude-sonnet-4.5": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "anthropic/claude-sonnet-4.6": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "anthropic/claude-sonnet-5": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "arcee-ai/trinity-large-thinking": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": []
+  },
+  "baidu/ernie-4.5-vl-424b-a47b": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": []
+  },
+  "bytedance-seed/seed-1.6": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": []
+  },
+  "bytedance-seed/seed-1.6-flash": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": []
+  },
+  "bytedance-seed/seed-2-1-turbo": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": []
+  },
+  "bytedance-seed/seed-2.0-code": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": []
+  },
+  "bytedance-seed/seed-2.0-lite": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": []
+  },
+  "bytedance-seed/seed-2.0-mini": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": []
+  },
+  "bytedance/ui-tars-1.5-7b": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": []
+  },
+  "chatgpt-image-latest": {
+    "type": "image",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text",
+      "image"
+    ],
+    "abilities": []
+  },
+  "claude-3-5-sonnet": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "claude-3-5-sonnet-v2@20241022": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "claude-3-5-sonnet@20240620": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "claude-3-haiku@20240307": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "claude-fable-5": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "claude-fable-5-1": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "claude-fable-5-1@default": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "claude-fable-5@default": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "claude-haiku-4-5": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "claude-haiku-4-5-20251001": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "claude-haiku-4-5@20251001": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "claude-mythos-5": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "claude-opus-4-1@20250805": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "claude-opus-4-5": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "claude-opus-4-5-20251101": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "claude-opus-4-5@20251101": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "claude-opus-4-6": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "claude-opus-4-6@default": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "claude-opus-4-7": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "claude-opus-4-7@default": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "claude-opus-4-8": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "claude-opus-4-8@default": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "claude-opus-4.8": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "claude-opus-4@20250514": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "claude-opus-5": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "claude-opus-5@default": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "claude-sonnet-4-5": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "claude-sonnet-4-5-20250929": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "claude-sonnet-4-5@20250929": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "claude-sonnet-4-6": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "claude-sonnet-4-6@default": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "claude-sonnet-4.6": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "claude-sonnet-4@20250514": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "claude-sonnet-5": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "claude-sonnet-5@default": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "codestral-latest": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": []
+  },
+  "cognitivecomputations/dolphin-mistral-24b-venice-edition": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": []
+  },
+  "cohere/command-a": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": []
+  },
+  "cohere/command-r-08-2024": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": []
+  },
+  "cohere/command-r-plus-08-2024": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": []
+  },
+  "cohere/command-r7b-12-2024": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": []
+  },
+  "cohere/north-mini-code:free": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": []
+  },
+  "dall-e-2": {
+    "type": "image",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": []
+  },
+  "dall-e-3": {
+    "type": "image",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": []
+  },
+  "deep-research-max-preview-04-2026": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": []
+  },
+  "deep-research-preview-04-2026": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": []
+  },
+  "deepseek-ai/deepseek-v3.1-maas": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "deepseek-ai/deepseek-v3.2-maas": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "deepseek-chat": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool"
+    ]
+  },
+  "deepseek-flash": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "deepseek-r1": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "deepseek-reasoner": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "deepseek-v3.2": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "deepseek-v4-flash": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "deepseek-v4-flash-0731": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "deepseek-v4-flash-ga-260731": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "deepseek-v4-flash-vision-exp": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "deepseek-v4-pro": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "deepseek-v4-pro-ga-260813": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "deepseek/deepseek-chat": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool"
+    ]
+  },
+  "deepseek/deepseek-chat-v3-0324": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool"
+    ]
+  },
+  "deepseek/deepseek-chat-v3.1": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool"
+    ]
+  },
+  "deepseek/deepseek-flash": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "deepseek/deepseek-r1": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "deepseek/deepseek-r1-0528": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "deepseek/deepseek-r1-distill-llama-70b": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "deepseek/deepseek-v3.1-terminus": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "deepseek/deepseek-v3.2": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "deepseek/deepseek-v3.2-exp": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "deepseek/deepseek-v4-flash": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "deepseek/deepseek-v4-flash-0731": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "deepseek/deepseek-v4-flash-vision-exp": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "deepseek/deepseek-v4-pro": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "deepseek/deepseek-v4-pro-0813": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "deepseek/deepseek-v4.1-flash": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "devstral-2512": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": []
+  },
+  "devstral-latest": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": []
+  },
+  "devstral-medium-2507": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": []
+  },
+  "devstral-medium-latest": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": []
+  },
+  "devstral-small-2505": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": []
+  },
+  "devstral-small-2507": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": []
+  },
+  "dots-studio/dots-3-note-preview:free": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": []
+  },
+  "doubao-seed-1-6-251015": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "doubao-seed-1-6-flash-250828": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "doubao-seed-1-6-vision-250815": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "doubao-seed-1-8-251228": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "doubao-seed-2-0-code-preview-260215": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "doubao-seed-2-0-lite-260428": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "doubao-seed-2-0-mini-260428": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "doubao-seed-2-0-pro-260215": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "doubao-seed-2-1-pro-260628": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "doubao-seed-2-1-turbo-260628": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "doubao-seed-2.0-code": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "doubao-seed-2.0-pro": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "doubao-seed-2.1-turbo": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "doubao-seed-character-260628": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": []
+  },
+  "doubao-seed-evolving": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "gemini-2.5-computer-use-preview-10-2025": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "gemini-2.5-flash": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "gemini-2.5-flash-image": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text",
+      "image"
+    ],
+    "abilities": []
+  },
+  "gemini-2.5-flash-lite": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "gemini-2.5-flash-preview-tts": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool"
+    ]
+  },
+  "gemini-2.5-flash-tts": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool"
+    ]
+  },
+  "gemini-2.5-pro": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "gemini-2.5-pro-preview-tts": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool"
+    ]
+  },
+  "gemini-2.5-pro-tts": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool"
+    ]
+  },
+  "gemini-3-flash-preview": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "gemini-3-pro": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "gemini-3-pro-image": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text",
+      "image"
+    ],
+    "abilities": [
+      "reasoning"
+    ]
+  },
+  "gemini-3-pro-image-preview": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text",
+      "image"
+    ],
+    "abilities": [
+      "reasoning"
+    ]
+  },
+  "gemini-3.1-flash-image": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text",
+      "image"
+    ],
+    "abilities": [
+      "reasoning"
+    ]
+  },
+  "gemini-3.1-flash-image-preview": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text",
+      "image"
+    ],
+    "abilities": [
+      "reasoning"
+    ]
+  },
+  "gemini-3.1-flash-lite": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "gemini-3.1-flash-lite-image": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text",
+      "image"
+    ],
+    "abilities": [
+      "reasoning"
+    ]
+  },
+  "gemini-3.1-flash-lite-preview": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "gemini-3.1-flash-live-preview": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "gemini-3.1-flash-tts-preview": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "gemini-3.1-pro-preview": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "gemini-3.1-pro-preview-customtools": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "gemini-3.5-flash": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "gemini-3.5-flash-lite": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "gemini-3.5-live-translate-preview": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "gemini-3.6-flash": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "gemini-3.7-flash": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "gemini-3.8-flash": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "gemini-embedding-001": {
+    "type": "embedding",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": []
+  },
+  "gemini-embedding-2": {
+    "type": "embedding",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": []
+  },
+  "gemini-flash-latest": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "gemini-flash-lite-latest": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool"
+    ]
+  },
+  "gemini-omni-flash-preview": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool"
+    ]
+  },
+  "gemini-pro-latest": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "gemma-4": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "reasoning"
+    ]
+  },
+  "gemma-4-26b-a4b-it": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "reasoning"
+    ]
+  },
+  "gemma-4-31b-it": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "reasoning"
+    ]
+  },
+  "glm-4.5": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "glm-4.5-air": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "glm-4.5-flash": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "glm-4.5v": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "glm-4.6": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "glm-4.6v": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "glm-4.7": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "glm-4.7-flash": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "glm-4.7-flashx": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "glm-5": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "glm-5-2-260617": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "glm-5.1": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "glm-5.2": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "glm-5.3": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "glm-5.3-flash": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "glm-5v-turbo": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "google/gemini-2.5-flash": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "google/gemini-2.5-flash-image": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text",
+      "image"
+    ],
+    "abilities": []
+  },
+  "google/gemini-2.5-flash-lite": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "google/gemini-2.5-pro": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "google/gemini-2.5-pro-preview": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "google/gemini-3-flash-preview": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "google/gemini-3-pro-image": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text",
+      "image"
+    ],
+    "abilities": [
+      "reasoning"
+    ]
+  },
+  "google/gemini-3-pro-image-preview": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text",
+      "image"
+    ],
+    "abilities": [
+      "reasoning"
+    ]
+  },
+  "google/gemini-3.1-flash-image": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text",
+      "image"
+    ],
+    "abilities": [
+      "reasoning"
+    ]
+  },
+  "google/gemini-3.1-flash-image-preview": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text",
+      "image"
+    ],
+    "abilities": [
+      "reasoning"
+    ]
+  },
+  "google/gemini-3.1-flash-lite": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "google/gemini-3.1-flash-lite-image": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text",
+      "image"
+    ],
+    "abilities": [
+      "reasoning"
+    ]
+  },
+  "google/gemini-3.1-flash-lite-preview": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "google/gemini-3.1-pro-preview": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "google/gemini-3.1-pro-preview-customtools": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "google/gemini-3.5-flash": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "google/gemini-3.5-flash-lite": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "google/gemini-3.6-flash": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "google/gemini-3.7-flash": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "google/gemini-3.8-flash": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "google/gemma-2-27b-it": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": []
+  },
+  "google/gemma-3-12b-it": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": []
+  },
+  "google/gemma-3-27b-it": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": []
+  },
+  "google/gemma-3-4b-it": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": []
+  },
+  "google/gemma-4-26b-a4b-it": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "reasoning"
+    ]
+  },
+  "google/gemma-4-26b-a4b-it:free": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "reasoning"
+    ]
+  },
+  "google/gemma-4-27b": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "reasoning"
+    ]
+  },
+  "google/gemma-4-31b-it": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "reasoning"
+    ]
+  },
+  "google/gemma-4-31b-it:free": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "reasoning"
+    ]
+  },
+  "google/lyria-3-clip-preview": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": []
+  },
+  "google/lyria-3-pro-preview": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": []
+  },
+  "gpt-3.5-turbo": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": []
+  },
+  "gpt-4": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": []
+  },
+  "gpt-4-turbo": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": []
+  },
+  "gpt-4.1": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool"
+    ]
+  },
+  "gpt-4.1-mini": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool"
+    ]
+  },
+  "gpt-4.1-nano": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool"
+    ]
+  },
+  "gpt-4o": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool"
+    ]
+  },
+  "gpt-4o-2024-05-13": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool"
+    ]
+  },
+  "gpt-4o-2024-08-06": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool"
+    ]
+  },
+  "gpt-4o-2024-11-20": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool"
+    ]
+  },
+  "gpt-4o-mini": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool"
+    ]
+  },
+  "gpt-5": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "gpt-5-chat-latest": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": []
+  },
+  "gpt-5-codex": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "gpt-5-mini": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "gpt-5-nano": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "gpt-5-pro": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "gpt-5.1": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "gpt-5.1-chat-latest": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "gpt-5.1-codex": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "gpt-5.1-codex-max": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "gpt-5.1-pro": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "gpt-5.2": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "gpt-5.2-chat-latest": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "gpt-5.2-codex": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "gpt-5.2-pro": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "gpt-5.3-chat-latest": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "gpt-5.3-codex": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "gpt-5.3-codex-spark": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "gpt-5.3-pro": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "gpt-5.4": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "gpt-5.4-mini": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "gpt-5.4-nano": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "gpt-5.4-pro": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "gpt-5.5": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "gpt-5.5-codex": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "gpt-5.5-pro": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "gpt-5.6": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "gpt-5.6-luna": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "gpt-5.6-sol": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "gpt-5.6-terra": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "gpt-6-astra": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "gpt-image-1": {
+    "type": "image",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text",
+      "image"
+    ],
+    "abilities": []
+  },
+  "gpt-image-1-mini": {
+    "type": "image",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text",
+      "image"
+    ],
+    "abilities": []
+  },
+  "gpt-image-1.5": {
+    "type": "image",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text",
+      "image"
+    ],
+    "abilities": []
+  },
+  "gpt-image-2": {
+    "type": "image",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text",
+      "image"
+    ],
+    "abilities": []
+  },
+  "gpt-oss-120b": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "gpt-realtime-2.1": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": []
+  },
+  "grok-4.20-0309-non-reasoning": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "grok-4.20-0309-reasoning": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "grok-4.20-multi-agent-0309": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "grok-4.3": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "grok-4.5": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "grok-4.6": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "grok-build-0.1": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": []
+  },
+  "grok-imagine-image": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text",
+      "image"
+    ],
+    "abilities": []
+  },
+  "grok-imagine-image-2.0": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text",
+      "image"
+    ],
+    "abilities": []
+  },
+  "grok-imagine-image-quality": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text",
+      "image"
+    ],
+    "abilities": []
+  },
+  "grok-imagine-video": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": []
+  },
+  "grok-imagine-video-1.5": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": []
+  },
+  "gryphe/mythomax-l2-13b": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": []
+  },
+  "ibm-granite/granite-4.0-h-micro": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": []
+  },
+  "ibm-granite/granite-4.2-8b": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": []
+  },
+  "inception/mercury-2": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": []
+  },
+  "inception/mercury-2.5": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": []
+  },
+  "inclusionai/ling-3.0-flash": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": []
+  },
+  "inclusionai/ling-3.0-flash-fin": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": []
+  },
+  "inclusionai/ling-3.0-flash-fin:free": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": []
+  },
+  "inclusionai/ling-3.0-flash-sante:free": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": []
+  },
+  "inclusionai/ling-3.0-flash-vl": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": []
+  },
+  "inclusionai/ling-3.0-flash-vl:free": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": []
+  },
+  "inference-net/schematron-v2-small": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": []
+  },
+  "inference-net/schematron-v2-turbo": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": []
+  },
+  "intern-s1": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "jina-embeddings-v3": {
+    "type": "embedding",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": []
+  },
+  "k3": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "k3-256k": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "k30": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": []
+  },
+  "kimi-for-coding": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "kimi-for-coding-highspeed": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "kimi-for-coding-other": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": []
+  },
+  "kimi-k2-thinking": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "kimi-k2.5": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "kimi-k2.6": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "kimi-k2.7": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "kimi-k2.7-code": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "kimi-k2.7-code-highspeed": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "kimi-k2.8": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "kimi-k3": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "kwaipilot/kat-coder-pro-v2": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": []
+  },
+  "kwaipilot/kat-coder-pro-v2.5": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": []
+  },
+  "labs-devstral-small-2512": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": []
+  },
+  "laguna-70b": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "liquid/lfm-2.5-2.6b:free": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": []
+  },
+  "lyria-3-clip-preview": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": []
+  },
+  "lyria-3-pro-preview": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": []
+  },
+  "magistral-medium-latest": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": []
+  },
+  "magistral-small": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": []
+  },
+  "mancer/weaver": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": []
+  },
+  "meituan/longcat-2.0": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": []
+  },
+  "meta-llama/llama-3.1-70b-instruct": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": []
+  },
+  "meta-llama/llama-3.1-8b-instruct": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": []
+  },
+  "meta-llama/llama-3.2-1b-instruct": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": []
+  },
+  "meta-llama/llama-3.2-3b-instruct": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": []
+  },
+  "meta-llama/llama-3.3-70b-instruct": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": []
+  },
+  "meta-llama/llama-4-maverick": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": []
+  },
+  "meta-llama/llama-4-scout": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": []
+  },
+  "meta-llama/llama-guard-4-12b": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": []
+  },
+  "meta/llama-3.3-70b-instruct-maas": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": []
+  },
+  "meta/llama-4-maverick-17b-128e-instruct-maas": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": []
+  },
+  "meta/muse-glimmer-30b": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": []
+  },
+  "meta/muse-spark-1.1": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "meta/muse-spark-1.2": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "meta/muse-spark-1.2-contributor": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "meta/muse-spark-1.3": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "meta/muse-spark-1.3-contributor": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "microsoft/phi-4": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": []
+  },
+  "microsoft/wizardlm-2-8x22b": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": []
+  },
+  "mimo-v2": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "mimo-v2.5-pro": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "minimax-m2": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "minimax-m2.1": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "minimax-m3": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "minimax/minimax-01": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": []
+  },
+  "minimax/minimax-m1": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": []
+  },
+  "minimax/minimax-m2": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "minimax/minimax-m2-her": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "minimax/minimax-m2.1": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "minimax/minimax-m2.5": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "minimax/minimax-m2.7": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "minimax/minimax-m3": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "ministral-3b-latest": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": []
+  },
+  "ministral-8b-latest": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": []
+  },
+  "mistral-embed": {
+    "type": "embedding",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": []
+  },
+  "mistral-large-2411": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": []
+  },
+  "mistral-large-2512": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": []
+  },
+  "mistral-large-latest": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": []
+  },
+  "mistral-medium-2505": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": []
+  },
+  "mistral-medium-2508": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": []
+  },
+  "mistral-medium-2604": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": []
+  },
+  "mistral-medium-latest": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": []
+  },
+  "mistral-nemo": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": []
+  },
+  "mistral-small-2506": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": []
+  },
+  "mistral-small-2603": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": []
+  },
+  "mistral-small-latest": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": []
+  },
+  "mistralai/codestral-2508": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": []
+  },
+  "mistralai/devstral-2512": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": []
+  },
+  "mistralai/ministral-14b-2512": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": []
+  },
+  "mistralai/ministral-3b-2512": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": []
+  },
+  "mistralai/ministral-8b-2512": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": []
+  },
+  "mistralai/mistral-large": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": []
+  },
+  "mistralai/mistral-large-2407": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": []
+  },
+  "mistralai/mistral-large-2512": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": []
+  },
+  "mistralai/mistral-medium-3": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": []
+  },
+  "mistralai/mistral-medium-3-5": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": []
+  },
+  "mistralai/mistral-medium-3.1": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": []
+  },
+  "mistralai/mistral-nemo": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": []
+  },
+  "mistralai/mistral-saba": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": []
+  },
+  "mistralai/mistral-small-24b-instruct-2501": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": []
+  },
+  "mistralai/mistral-small-2603": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": []
+  },
+  "mistralai/mistral-small-3.1-24b-instruct": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": []
+  },
+  "mistralai/mistral-small-3.2-24b-instruct": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": []
+  },
+  "mistralai/mixtral-8x22b-instruct": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": []
+  },
+  "mistralai/voxtral-small-24b-2507": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": []
+  },
+  "moonshotai/kimi-for-coding:fast": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "moonshotai/kimi-k2": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "moonshotai/kimi-k2-0905": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "moonshotai/kimi-k2-thinking": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "moonshotai/kimi-k2-thinking-maas": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "moonshotai/kimi-k2.5": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "moonshotai/kimi-k2.6": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "moonshotai/kimi-k2.7-code": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "moonshotai/kimi-k2.8-preview": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "moonshotai/kimi-k3": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "morph/morph-v3-fast": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": []
+  },
+  "morph/morph-v3-large": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": []
+  },
+  "muse-spark-1": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "muse-spark-1.1": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "muse-spark-1.3": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "muse-spark-1.3-contributor": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "my-k3": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": []
+  },
+  "nex-agi/nex-n2.5-mini:free": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": []
+  },
+  "nex-agi/nex-n2.5-pro:free": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": []
+  },
+  "nousresearch/hermes-3-llama-3.1-405b": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": []
+  },
+  "nousresearch/hermes-3-llama-3.1-70b": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": []
+  },
+  "nousresearch/hermes-4-405b": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": []
+  },
+  "nvidia/nemotron-3-nano-30b-a3b": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": []
+  },
+  "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": []
+  },
+  "nvidia/nemotron-3-super-120b-a12b": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": []
+  },
+  "nvidia/nemotron-3-super-120b-a12b:free": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": []
+  },
+  "nvidia/nemotron-3-ultra-550b-a55b": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": []
+  },
+  "nvidia/nemotron-3-ultra-550b-a55b:free": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": []
+  },
+  "nvidia/nemotron-3.5-content-safety": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": []
+  },
+  "nvidia/nemotron-3.5-content-safety:free": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": []
+  },
+  "nvidia/nemotron-3.5-lightning": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": []
+  },
+  "nvidia/nemotron-3.5-lightning:free": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": []
+  },
+  "o1": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "o1-preview": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "o1-pro": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "o3": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "o3-mini": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "o3-pro": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "o4-mini": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "open-mistral-7b": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": []
+  },
+  "open-mistral-nemo": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": []
+  },
+  "open-mixtral-8x22b": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": []
+  },
+  "open-mixtral-8x7b": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": []
+  },
+  "openai/gpt-3.5-turbo": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": []
+  },
+  "openai/gpt-3.5-turbo-0613": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": []
+  },
+  "openai/gpt-3.5-turbo-16k": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": []
+  },
+  "openai/gpt-3.5-turbo-instruct": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": []
+  },
+  "openai/gpt-4": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": []
+  },
+  "openai/gpt-4-turbo": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": []
+  },
+  "openai/gpt-4.1": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool"
+    ]
+  },
+  "openai/gpt-4.1-mini": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool"
+    ]
+  },
+  "openai/gpt-4.1-nano": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool"
+    ]
+  },
+  "openai/gpt-4o": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool"
+    ]
+  },
+  "openai/gpt-4o-2024-05-13": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool"
+    ]
+  },
+  "openai/gpt-4o-2024-08-06": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool"
+    ]
+  },
+  "openai/gpt-4o-2024-11-20": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool"
+    ]
+  },
+  "openai/gpt-4o-mini": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool"
+    ]
+  },
+  "openai/gpt-4o-mini-2024-07-18": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool"
+    ]
+  },
+  "openai/gpt-5": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "openai/gpt-5-image": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text",
+      "image"
+    ],
+    "abilities": []
+  },
+  "openai/gpt-5-image-mini": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text",
+      "image"
+    ],
+    "abilities": []
+  },
+  "openai/gpt-5-mini": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "openai/gpt-5-nano": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "openai/gpt-5-pro": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "openai/gpt-5.1": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "openai/gpt-5.1-codex": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "openai/gpt-5.1-codex-max": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "openai/gpt-5.1-codex-mini": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "openai/gpt-5.2": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "openai/gpt-5.2-chat": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "openai/gpt-5.2-codex": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "openai/gpt-5.2-pro": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "openai/gpt-5.3-codex": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "openai/gpt-5.4": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "openai/gpt-5.4-image-2": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text",
+      "image"
+    ],
+    "abilities": []
+  },
+  "openai/gpt-5.4-mini": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "openai/gpt-5.4-nano": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "openai/gpt-5.4-pro": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "openai/gpt-5.5": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "openai/gpt-5.5-pro": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "openai/gpt-5.6-luna": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "openai/gpt-5.6-luna-pro": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "openai/gpt-5.6-sol": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "openai/gpt-5.6-sol-pro": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "openai/gpt-5.6-terra": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "openai/gpt-5.6-terra-pro": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "openai/gpt-6-astra": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "openai/gpt-6-astra-pro": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "openai/gpt-audio": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": []
+  },
+  "openai/gpt-audio-mini": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": []
+  },
+  "openai/gpt-chat-latest": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": []
+  },
+  "openai/gpt-oss-120b": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "openai/gpt-oss-120b-maas": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "openai/gpt-oss-20b": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "openai/gpt-oss-20b-maas": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "openai/gpt-oss-safeguard-20b": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "openai/o1": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "openai/o1-pro": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "openai/o3": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "openai/o3-mini": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "openai/o3-mini-high": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "openai/o3-pro": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "openai/o4-mini": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "openai/o4-mini-high": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "openrouter/auto": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": []
+  },
+  "openrouter/bodybuilder": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": []
+  },
+  "openrouter/free": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": []
+  },
+  "openrouter/fusion": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": []
+  },
+  "openrouter/pareto-code": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": []
+  },
+  "perceptron/perceptron-mk1": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": []
+  },
+  "perplexity/sonar": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": []
+  },
+  "perplexity/sonar-deep-research": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": []
+  },
+  "perplexity/sonar-pro": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": []
+  },
+  "perplexity/sonar-pro-search": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": []
+  },
+  "perplexity/sonar-reasoning-pro": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": []
+  },
+  "pixtral-12b": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": []
+  },
+  "pixtral-large-latest": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": []
+  },
+  "poolside/laguna-s-2.1": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "poolside/laguna-s-2.1:free": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "poolside/laguna-xs-2.1": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "poolside/laguna-xs-2.1:free": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "qvq-max": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": []
+  },
+  "qwen-flash": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": []
+  },
+  "qwen-max": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": []
+  },
+  "qwen-mt-plus": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": []
+  },
+  "qwen-mt-turbo": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": []
+  },
+  "qwen-omni-turbo": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": []
+  },
+  "qwen-omni-turbo-realtime": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": []
+  },
+  "qwen-plus": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": []
+  },
+  "qwen-plus-character-ja": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": []
+  },
+  "qwen-turbo": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": []
+  },
+  "qwen-vl-max": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": []
+  },
+  "qwen-vl-ocr": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": []
+  },
+  "qwen-vl-plus": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": []
+  },
+  "qwen/qwen-2.5-72b-instruct": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": []
+  },
+  "qwen/qwen-2.5-7b-instruct": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": []
+  },
+  "qwen/qwen-2.5-coder-32b-instruct": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": []
+  },
+  "qwen/qwen-plus": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": []
+  },
+  "qwen/qwen-plus-2025-07-28": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": []
+  },
+  "qwen/qwen2.5-vl-72b-instruct": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": []
+  },
+  "qwen/qwen3-14b": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "qwen/qwen3-235b-a22b": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "qwen/qwen3-235b-a22b-2507": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "qwen/qwen3-235b-a22b-instruct-2507-maas": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "qwen/qwen3-235b-a22b-thinking-2507": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "qwen/qwen3-30b-a3b": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "qwen/qwen3-30b-a3b-instruct-2507": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "qwen/qwen3-30b-a3b-thinking-2507": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "qwen/qwen3-32b": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "qwen/qwen3-8b": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "qwen/qwen3-coder": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "qwen/qwen3-coder-30b-a3b-instruct": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "qwen/qwen3-coder-flash": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "qwen/qwen3-coder-next": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "qwen/qwen3-coder-plus": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "qwen/qwen3-max": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "qwen/qwen3-max-thinking": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "qwen/qwen3-next-80b-a3b-instruct": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "qwen/qwen3-next-80b-a3b-thinking": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "qwen/qwen3-vl-235b-a22b-instruct": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "qwen/qwen3-vl-235b-a22b-thinking": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "qwen/qwen3-vl-30b-a3b-instruct": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "qwen/qwen3-vl-30b-a3b-thinking": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "qwen/qwen3-vl-32b-instruct": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "qwen/qwen3-vl-8b-instruct": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "qwen/qwen3-vl-8b-thinking": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "qwen/qwen3.5-122b-a10b": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "qwen/qwen3.5-27b": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "qwen/qwen3.5-35b-a3b": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "qwen/qwen3.5-397b-a17b": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "qwen/qwen3.5-9b": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "qwen/qwen3.5-flash-02-23": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "qwen/qwen3.5-plus-02-15": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "qwen/qwen3.5-plus-20260420": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "qwen/qwen3.6-27b": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "qwen/qwen3.6-35b-a3b": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "qwen/qwen3.6-flash": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "qwen/qwen3.6-max-preview": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "qwen/qwen3.6-plus": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "qwen/qwen3.7-flash": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "qwen/qwen3.7-max": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "qwen/qwen3.7-plus": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "qwen/qwen3.8-2.4t-a95b": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "qwen/qwen3.8-27b": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "qwen/qwen3.8-flash": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "qwen/qwen3.8-max-0902": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "qwen2-5-14b-instruct": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": []
+  },
+  "qwen2-5-32b-instruct": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": []
+  },
+  "qwen2-5-72b-instruct": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": []
+  },
+  "qwen2-5-7b-instruct": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": []
+  },
+  "qwen2-5-omni-7b": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": []
+  },
+  "qwen2-5-vl-72b-instruct": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": []
+  },
+  "qwen2-5-vl-7b-instruct": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": []
+  },
+  "qwen3-14b": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "qwen3-235b-a22b": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "qwen3-32b": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "qwen3-8b": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "qwen3-asr-flash": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "qwen3-coder-30b-a3b-instruct": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "qwen3-coder-480b-a35b-instruct": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "qwen3-coder-flash": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "qwen3-coder-plus": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "qwen3-embedding-8b": {
+    "type": "embedding",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": []
+  },
+  "qwen3-livetranslate-flash-realtime": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "qwen3-max": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "qwen3-next-80b-a3b-instruct": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "qwen3-next-80b-a3b-thinking": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "qwen3-omni-flash": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "qwen3-omni-flash-realtime": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "qwen3-thinking": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "qwen3-vl-235b-a22b": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "qwen3-vl-30b-a3b": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "qwen3-vl-plus": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "qwen3.5-122b-a10b": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "qwen3.5-27b": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "qwen3.5-35b-a3b": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "qwen3.5-397b-a17b": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "qwen3.5-plus": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "qwen3.6-27b": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "qwen3.6-35b-a3b": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "qwen3.6-flash": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "qwen3.6-max-preview": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "qwen3.6-plus": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "qwen3.7-flash": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "qwen3.7-max": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "qwen3.7-max-2026-05-17": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "qwen3.7-max-2026-05-20": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "qwen3.7-max-2026-06-08": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "qwen3.7-max-preview": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "qwen3.7-plus": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "qwen3.8-2.4t-a95b": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "qwen3.8-27b": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "qwen3.8-flash": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "qwen3.8-max": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "qwq-32b": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": []
+  },
+  "qwq-plus": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": []
+  },
+  "rekaai/reka-edge": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": []
+  },
+  "rekaai/reka-flash-3": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": []
+  },
+  "relace/relace-apply-3": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": []
+  },
+  "relace/relace-search": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": []
+  },
+  "sakana/fugu-max": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": []
+  },
+  "sakana/fugu-ultra": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": []
+  },
+  "sakana/fugu-ultra-v2": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": []
+  },
+  "sakana/sakana-namazu": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": []
+  },
+  "sao10k/l3-lunaris-8b": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "sao10k/l3.1-euryale-70b": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "sao10k/l3.3-euryale-70b": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "sensenova-6.7-flash-lite": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool"
+    ]
+  },
+  "sensenova-u1-fast": {
+    "type": "image",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": []
+  },
+  "step-1-32k": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": []
+  },
+  "step-2-16k": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": []
+  },
+  "step-3": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "step-3.5-flash": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "step-3.5-flash-2603": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "step-3.7-flash": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "step-tts-2": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": []
+  },
+  "stepaudio-2.5-asr": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": []
+  },
+  "stepaudio-2.5-tts": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": []
+  },
+  "stepfun/step-3.5-flash": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "stepfun/step-3.7-flash": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "tencent/hunyuan-a13b-instruct": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": []
+  },
+  "tencent/hy-mt2-1.8b": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": []
+  },
+  "tencent/hy-mt2-30b-a3b": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": []
+  },
+  "tencent/hy-mt2-7b": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": []
+  },
+  "tencent/hy3": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": []
+  },
+  "tencent/hy3-preview": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": []
+  },
+  "tencent/hy4-preview": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": []
+  },
+  "text-embedding-3-large": {
+    "type": "embedding",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": []
+  },
+  "text-embedding-3-small": {
+    "type": "embedding",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": []
+  },
+  "text-embedding-ada-002": {
+    "type": "embedding",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": []
+  },
+  "thedrummer/cydonia-24b-v4.1": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": []
+  },
+  "thedrummer/skyfall-36b-v2": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": []
+  },
+  "thedrummer/unslopnemo-12b": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": []
+  },
+  "thinkingmachines/inkling": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": []
+  },
+  "thinkingmachines/inkling-small": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": []
+  },
+  "thinkingmachines/inkling-small:free": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": []
+  },
+  "thinkingmachines/inkling:free": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": []
+  },
+  "undi95/remm-slerp-l2-13b": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": []
+  },
+  "upstage/solar-pro-3": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": []
+  },
+  "upstage/solar-pro4": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "veo-3.1-fast-generate-preview": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": []
+  },
+  "veo-3.1-generate-preview": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": []
+  },
+  "veo-3.1-lite-generate-preview": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": []
+  },
+  "voxtral-mini-latest": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": []
+  },
+  "voxtral-mini-tts-latest": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": []
+  },
+  "voxtral-small-latest": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": []
+  },
+  "writer/palmyra-x5": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": []
+  },
+  "x-ai/grok-4": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "x-ai/grok-4.20": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "x-ai/grok-4.20-multi-agent": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "x-ai/grok-4.3": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "x-ai/grok-4.5": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "x-ai/grok-4.6": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "x-ai/grok-build-0.1": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": []
+  },
+  "xai/grok-4.1-fast-non-reasoning": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "xai/grok-4.1-fast-reasoning": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "xai/grok-4.20-non-reasoning": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "xai/grok-4.20-reasoning": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "xai/grok-4.3": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "xai/grok-4.6": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "xiaomi/mimo-v2.5": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "xiaomi/mimo-v2.5-pro": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "z-ai/glm-4.5": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "z-ai/glm-4.5-air": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "z-ai/glm-4.5v": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "z-ai/glm-4.6": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "z-ai/glm-4.6v": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "z-ai/glm-4.7": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "z-ai/glm-4.7-flash": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "z-ai/glm-5": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "z-ai/glm-5-turbo": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "z-ai/glm-5.1": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "z-ai/glm-5.2": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "z-ai/glm-5.3": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "z-ai/glm-5.3-flash": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "z-ai/glm-5v-turbo": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "zai-glm-5-2": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "zai-org/glm-4.7-maas": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "zai-org/glm-5-maas": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "~anthropic/claude-fable-latest": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "~anthropic/claude-haiku-latest": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "~anthropic/claude-opus-latest": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "~anthropic/claude-sonnet-latest": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "~deepseek/deepseek-flash-latest": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "~deepseek/deepseek-pro-latest": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": []
+  },
+  "~deepseek/deepseek-v4-flash-latest": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "~google/gemini-flash-latest": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "~google/gemini-pro-latest": {
+    "type": "chat",
+    "input": [
+      "text",
+      "image"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": [
+      "tool",
+      "reasoning"
+    ]
+  },
+  "~moonshotai/kimi-latest": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": []
+  },
+  "~openai/gpt-astra-latest": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": []
+  },
+  "~openai/gpt-luna-latest": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": []
+  },
+  "~openai/gpt-mini-latest": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": []
+  },
+  "~openai/gpt-sol-latest": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": []
+  },
+  "~openai/gpt-terra-latest": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": []
+  },
+  "~x-ai/grok-latest": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": []
+  },
+  "~z-ai/glm-flash-latest": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": []
+  },
+  "~z-ai/glm-latest": {
+    "type": "chat",
+    "input": [
+      "text"
+    ],
+    "output": [
+      "text"
+    ],
+    "abilities": []
+  }
+}

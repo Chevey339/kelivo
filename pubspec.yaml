@@ -187,6 +187,7 @@ flutter:
     - assets/mermaid.min.js
     - assets/html/mark.html
     - assets/skills/skill-creator/
+    - assets/model_catalog/models_dev.json
   #   - images/a_dot_ham.jpeg
 
   # An image asset can refer to one or more resolution-specific "variants", see

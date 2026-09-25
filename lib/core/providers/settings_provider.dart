@@ -30,7 +30,10 @@ import '../services/screen_wakelock.dart';
 import '../../utils/app_directories.dart';
 import '../../utils/sandbox_path_resolver.dart';
 import '../../utils/avatar_cache.dart';
-import '../utils/openai_model_compat.dart';
+import '../models/assistant.dart';
+import '../models/model_spec.dart';
+import '../models/reasoning_request.dart';
+import '../services/model_spec/model_spec_resolver.dart';
 import '../../utils/provider_grouping_logic.dart';
 import '../../utils/brand_assets.dart';
 import '../../utils/image_compressor.dart';
@@ -128,7 +131,8 @@ class SettingsProvider extends ChangeNotifier {
   static const String _legacyCustomSeedColorKey = 'theme_custom_seed_v1';
   static const String _legacyCustomPrimaryOverrideKey =
       'theme_custom_primary_v1';
-  static const String _thinkingBudgetKey = 'thinking_budget_v1';
+  static const String _reasoningChoiceByModelKey =
+      'reasoning_choice_by_model_v1';
   static const String _titleGenerationThinkingEnabledKey =
       'title_generation_thinking_enabled_v1';
   static const String _summaryGenerationThinkingEnabledKey =
@@ -199,6 +203,8 @@ class SettingsProvider extends ChangeNotifier {
   static const String _displayShowToolCardsKey = 'display_show_tool_cards_v1';
   static const String _displayShowProducedFilesKey =
       'display_show_produced_files_v1';
+  static const String _displayShowReasoningLevelBadgeKey =
+      'display_show_reasoning_level_badge_v1';
   static const String _displayAutoCollapseThinkingKey =
       'display_auto_collapse_thinking_v1';
   static const String _displayCollapseThinkingStepsKey =
@@ -563,139 +569,22 @@ class SettingsProvider extends ChangeNotifier {
     return ProviderConfig.defaultsFor(key, displayName: defaultName);
   }
 
-  String resolveOpenAIUpstreamModelId(String providerKey, String modelId) {
-    final cfg = getProviderConfig(providerKey);
-    final kind = ProviderConfig.classify(
-      cfg.id,
-      explicitType: cfg.providerType,
-    );
-    if (kind != ProviderKind.openai) return modelId;
-    final rawOv = cfg.modelOverrides[modelId];
-    final ov = rawOv is Map ? rawOv.cast<String, dynamic>() : null;
-    return resolveApiModelIdOverride(ov, modelId);
-  }
-
   bool supportsXhighReasoning(String providerKey, String modelId) {
     final cfg = getProviderConfig(providerKey);
-    final kind = ProviderConfig.classify(
-      cfg.id,
-      explicitType: cfg.providerType,
-    );
-    switch (kind) {
-      case ProviderKind.openai:
-        final modelForCheck = resolveOpenAIUpstreamModelId(
-          providerKey,
-          modelId,
-        );
-        return openAISupportsXhighReasoning(modelForCheck);
-      case ProviderKind.claude:
-        final rawOv = cfg.modelOverrides[modelId];
-        final ov = rawOv is Map ? rawOv.cast<String, dynamic>() : null;
-        final modelForCheck = resolveApiModelIdOverride(ov, modelId);
-        return !ProviderConfig.isDeepSeekClaudeCompatible(
-              modelForCheck,
-              config: cfg,
-            ) &&
-            _claudeSupportsXhighReasoning(modelForCheck);
-      case ProviderKind.google:
-        return false;
-    }
+    return ModelSpecResolver.instance
+        .spec(cfg, modelId)
+        .reasoning
+        .levels
+        .contains(ReasoningLevel.xhigh);
   }
 
   bool supportsMaxReasoning(String providerKey, String modelId) {
     final cfg = getProviderConfig(providerKey);
-    final kind = ProviderConfig.classify(
-      cfg.id,
-      explicitType: cfg.providerType,
-    );
-    switch (kind) {
-      case ProviderKind.openai:
-        final modelForCheck = resolveOpenAIUpstreamModelId(
-          providerKey,
-          modelId,
-        );
-        return openAISupportsMaxReasoning(modelForCheck);
-      case ProviderKind.google:
-        return false;
-      case ProviderKind.claude:
-        final rawOv = cfg.modelOverrides[modelId];
-        final ov = rawOv is Map ? rawOv.cast<String, dynamic>() : null;
-        final modelForCheck = resolveApiModelIdOverride(ov, modelId);
-        return ProviderConfig.isDeepSeekClaudeCompatible(
-              modelForCheck,
-              config: cfg,
-            ) ||
-            _claudeSupportsMaxReasoning(modelForCheck);
-    }
-  }
-
-  bool supportsOpenAIXhighReasoning(String providerKey, String modelId) {
-    return supportsXhighReasoning(providerKey, modelId);
-  }
-
-  bool _claudeSupportsXhighReasoning(String modelId) {
-    final lower = modelId.trim().toLowerCase();
-    if (!lower.contains('claude-')) return false;
-    if (lower.contains('fable') || lower.contains('mythos')) return true;
-    if (RegExp(
-      r'claude-(?:opus|sonnet)-5(?:$|[._:@/-])',
-      caseSensitive: false,
-    ).hasMatch(lower)) {
-      return true;
-    }
-    final m = RegExp(
-      r'claude-(opus|sonnet)-(\d+)[-.](\d+)',
-      caseSensitive: false,
-    ).firstMatch(lower);
-    if (m == null) {
-      return lower.contains('claude-opus-4-7') ||
-          lower.contains('claude-opus-4.7') ||
-          lower.contains('claude-opus-4-8') ||
-          lower.contains('claude-opus-4.8');
-    }
-    final family = (m.group(1) ?? '').toLowerCase();
-    final major = int.tryParse(m.group(2) ?? '');
-    final minor = int.tryParse(m.group(3) ?? '');
-    if (major == null || minor == null) return false;
-    if (family == 'opus' && (major > 4 || (major == 4 && minor >= 7))) {
-      return true;
-    }
-    return false;
-  }
-
-  bool _claudeSupportsMaxReasoning(String modelId) {
-    final lower = modelId.trim().toLowerCase();
-    if (!lower.contains('claude-')) return false;
-    if (lower.contains('fable') || lower.contains('mythos')) return true;
-    if (RegExp(
-      r'claude-(?:opus|sonnet)-5(?:$|[._:@/-])',
-      caseSensitive: false,
-    ).hasMatch(lower)) {
-      return true;
-    }
-    final m = RegExp(
-      r'claude-(opus|sonnet)-(\d+)[-.](\d+)',
-      caseSensitive: false,
-    ).firstMatch(lower);
-    if (m == null) {
-      return lower.contains('claude-opus-4-7') ||
-          lower.contains('claude-opus-4.7') ||
-          lower.contains('claude-opus-4-8') ||
-          lower.contains('claude-opus-4.8') ||
-          lower.contains('claude-opus-4-6') ||
-          lower.contains('claude-opus-4.6') ||
-          lower.contains('claude-sonnet-4-6') ||
-          lower.contains('claude-sonnet-4.6');
-    }
-    final family = (m.group(1) ?? '').toLowerCase();
-    final major = int.tryParse(m.group(2) ?? '');
-    final minor = int.tryParse(m.group(3) ?? '');
-    if (major == null || minor == null) return false;
-    if (family == 'opus' && (major > 4 || (major == 4 && minor >= 7))) {
-      return true;
-    }
-    if (major == 4 && minor == 6) return true;
-    return false;
+    return ModelSpecResolver.instance
+        .spec(cfg, modelId)
+        .reasoning
+        .levels
+        .contains(ReasoningLevel.max);
   }
 
   // Explicitly ensure a provider config exists in memory (without persisting to storage).
@@ -963,8 +852,9 @@ class SettingsProvider extends ChangeNotifier {
     _learningModePrompt = (lmp == null || lmp.trim().isEmpty)
         ? defaultLearningModePrompt
         : lmp;
-    // load thinking budget (reasoning strength)
-    _thinkingBudget = prefs.getInt(_thinkingBudgetKey);
+    _reasoningChoiceByModel = _decodeReasoningChoiceByModel(
+      prefs.getString(_reasoningChoiceByModelKey),
+    );
     _titleGenerationThinkingEnabled =
         prefs.getBool(_titleGenerationThinkingEnabledKey) ?? false;
     _summaryGenerationThinkingEnabled =
@@ -1092,6 +982,8 @@ class SettingsProvider extends ChangeNotifier {
     _showThinkingCards = prefs.getBool(_displayShowThinkingCardsKey) ?? true;
     _showToolCards = prefs.getBool(_displayShowToolCardsKey) ?? true;
     _showProducedFiles = prefs.getBool(_displayShowProducedFilesKey) ?? true;
+    _showReasoningLevelBadge =
+        prefs.getBool(_displayShowReasoningLevelBadgeKey) ?? false;
     _autoCollapseThinking =
         prefs.getBool(_displayAutoCollapseThinkingKey) ?? true;
     _collapseThinkingSteps =
@@ -3442,6 +3334,13 @@ class SettingsProvider extends ChangeNotifier {
       await prefs.setStringList(_pinnedModelsKey, _pinnedModels.toList());
       changed = true;
     }
+    if (_reasoningChoiceByModel.containsKey(pinKey)) {
+      _reasoningChoiceByModel = Map<String, ReasoningRequest>.from(
+        _reasoningChoiceByModel,
+      )..remove(pinKey);
+      await _persistReasoningChoiceByModel();
+      changed = true;
+    }
     if (changed) notifyListeners();
   }
 
@@ -3508,6 +3407,13 @@ class SettingsProvider extends ChangeNotifier {
     _pinnedModels.removeWhere((entry) => entry.startsWith('$key::'));
     if (_pinnedModels.length != beforePinned) {
       await prefs.setStringList(_pinnedModelsKey, _pinnedModels.toList());
+    }
+    final nextReasoning = Map<String, ReasoningRequest>.from(
+      _reasoningChoiceByModel,
+    )..removeWhere((entry, _) => entry.startsWith('$key::'));
+    if (nextReasoning.length != _reasoningChoiceByModel.length) {
+      _reasoningChoiceByModel = nextReasoning;
+      await _persistReasoningChoiceByModel();
     }
 
     // Persist updates
@@ -3736,6 +3642,10 @@ Do not interpret or translate—only transcribe and describe what is visually pr
 
   bool _ocrEnabled = false;
   bool get ocrEnabled => _ocrEnabled;
+
+  /// OCR is enabled and a model is configured, so attached images become text.
+  bool get ocrActive =>
+      _ocrEnabled && _ocrModelProvider != null && _ocrModelId != null;
 
   Future<void> setOcrModel(String providerKey, String modelId) async {
     _ocrModelProvider = providerKey;
@@ -4040,18 +3950,67 @@ Requirements:
   Future<void> resetLearningModePrompt() async =>
       setLearningModePrompt(defaultLearningModePrompt);
 
-  // Reasoning strength / thinking budget
-  int?
-  _thinkingBudget; // null = not set, use provider defaults; -1 = auto; 0 = off; >0 = budget tokens
-  int? get thinkingBudget => _thinkingBudget;
-  Future<void> setThinkingBudget(int? budget) async {
-    _thinkingBudget = budget;
-    notifyListeners();
-    final prefs = _preferences;
-    if (budget == null) {
-      await prefs.remove(_thinkingBudgetKey);
+  Map<String, ReasoningRequest> _reasoningChoiceByModel =
+      <String, ReasoningRequest>{};
+
+  static String reasoningChoiceKey(String providerKey, String modelId) =>
+      '$providerKey::$modelId';
+
+  ReasoningRequest? reasoningChoiceFor(String providerKey, String modelId) {
+    return _reasoningChoiceByModel[reasoningChoiceKey(providerKey, modelId)];
+  }
+
+  Future<void> setReasoningChoice(
+    String providerKey,
+    String modelId,
+    ReasoningRequest? choice,
+  ) async {
+    final key = reasoningChoiceKey(providerKey, modelId);
+    final next = Map<String, ReasoningRequest>.from(_reasoningChoiceByModel);
+    if (choice == null) {
+      if (!next.containsKey(key)) return;
+      next.remove(key);
+    } else if (next[key] == choice) {
+      return;
     } else {
-      await prefs.setInt(_thinkingBudgetKey, budget);
+      next[key] = choice;
+    }
+    _reasoningChoiceByModel = next;
+    notifyListeners();
+    await _persistReasoningChoiceByModel();
+  }
+
+  Future<void> _persistReasoningChoiceByModel() async {
+    final prefs = _preferences;
+    if (_reasoningChoiceByModel.isEmpty) {
+      await prefs.remove(_reasoningChoiceByModelKey);
+      return;
+    }
+    await prefs.setString(
+      _reasoningChoiceByModelKey,
+      jsonEncode({
+        for (final e in _reasoningChoiceByModel.entries)
+          e.key: e.value.toJson(),
+      }),
+    );
+  }
+
+  static Map<String, ReasoningRequest> _decodeReasoningChoiceByModel(
+    String? raw,
+  ) {
+    if (raw == null || raw.isEmpty) return <String, ReasoningRequest>{};
+    try {
+      final decoded = jsonDecode(raw);
+      if (decoded is! Map) return <String, ReasoningRequest>{};
+      final out = <String, ReasoningRequest>{};
+      for (final entry in decoded.entries) {
+        final value = entry.value;
+        if (value is! Map) continue;
+        out[entry.key.toString()] = ReasoningRequest.fromJson(value);
+      }
+      return out;
+    } catch (_) {
+      return <String, ReasoningRequest>{};
     }
   }
 
@@ -4498,46 +4457,28 @@ Requirements:
   Future<void> resetMemoryMigratePromptEn() async =>
       setMemoryMigratePromptEn(MemoryPrompts.migrateEn);
 
-  int? titleGenerationThinkingBudgetFor(int? assistantBudget) {
-    return _backgroundThinkingBudgetFor(
-      _titleGenerationThinkingEnabled,
-      assistantBudget,
-    );
+  ReasoningRequest titleGenerationReasoningFor(Assistant? assistant) {
+    return _backgroundReasoningFor(_titleGenerationThinkingEnabled, assistant);
   }
 
-  int? summaryGenerationThinkingBudgetFor(int? assistantBudget) =>
-      _backgroundThinkingBudgetFor(
-        _summaryGenerationThinkingEnabled,
-        assistantBudget,
-      );
+  ReasoningRequest summaryGenerationReasoningFor(Assistant? assistant) =>
+      _backgroundReasoningFor(_summaryGenerationThinkingEnabled, assistant);
 
-  int? suggestionGenerationThinkingBudgetFor(int? assistantBudget) =>
-      _backgroundThinkingBudgetFor(
-        _suggestionGenerationThinkingEnabled,
-        assistantBudget,
-      );
+  ReasoningRequest suggestionGenerationReasoningFor(Assistant? assistant) =>
+      _backgroundReasoningFor(_suggestionGenerationThinkingEnabled, assistant);
 
-  int? compressGenerationThinkingBudgetFor(int? assistantBudget) =>
-      _backgroundThinkingBudgetFor(
-        _compressGenerationThinkingEnabled,
-        assistantBudget,
-      );
+  ReasoningRequest compressGenerationReasoningFor(Assistant? assistant) =>
+      _backgroundReasoningFor(_compressGenerationThinkingEnabled, assistant);
 
-  int? translateGenerationThinkingBudgetFor(int? assistantBudget) =>
-      _backgroundThinkingBudgetFor(
-        _translateGenerationThinkingEnabled,
-        assistantBudget,
-      );
+  ReasoningRequest translateGenerationReasoningFor(Assistant? assistant) =>
+      _backgroundReasoningFor(_translateGenerationThinkingEnabled, assistant);
 
-  int? ocrGenerationThinkingBudgetFor(int? assistantBudget) =>
-      _backgroundThinkingBudgetFor(
-        _ocrGenerationThinkingEnabled,
-        assistantBudget,
-      );
+  ReasoningRequest ocrGenerationReasoningFor(Assistant? assistant) =>
+      _backgroundReasoningFor(_ocrGenerationThinkingEnabled, assistant);
 
-  int? _backgroundThinkingBudgetFor(bool enabled, int? assistantBudget) {
-    if (!enabled) return 0;
-    return assistantBudget ?? _thinkingBudget;
+  ReasoningRequest _backgroundReasoningFor(bool enabled, Assistant? assistant) {
+    if (!enabled) return ReasoningRequest.off;
+    return assistant?.reasoning ?? ReasoningRequest.auto;
   }
 
   // Display settings: user avatar and model icon visibility
@@ -4678,6 +4619,16 @@ Requirements:
     _showProducedFiles = v;
     notifyListeners();
     await _preferences.setBool(_displayShowProducedFilesKey, v);
+  }
+
+  bool _showReasoningLevelBadge = false;
+  bool get showReasoningLevelBadge => _showReasoningLevelBadge;
+  Future<void> setShowReasoningLevelBadge(bool v) async {
+    if (_showReasoningLevelBadge == v) return;
+    _showReasoningLevelBadge = v;
+    notifyListeners();
+    final prefs = _preferences;
+    await prefs.setBool(_displayShowReasoningLevelBadgeKey, v);
   }
 
   // Display: auto-collapse reasoning/thinking section
@@ -5723,7 +5674,9 @@ Requirements:
     copy._ocrModelId = _ocrModelId;
     copy._ocrPrompt = _ocrPrompt;
     copy._ocrEnabled = _ocrEnabled;
-    copy._thinkingBudget = _thinkingBudget;
+    copy._reasoningChoiceByModel = Map<String, ReasoningRequest>.from(
+      _reasoningChoiceByModel,
+    );
     copy._titleGenerationThinkingEnabled = _titleGenerationThinkingEnabled;
     copy._summaryGenerationThinkingEnabled = _summaryGenerationThinkingEnabled;
     copy._suggestionGenerationThinkingEnabled =
@@ -5770,6 +5723,7 @@ Requirements:
     copy._showThinkingCards = _showThinkingCards;
     copy._showToolCards = _showToolCards;
     copy._showProducedFiles = _showProducedFiles;
+    copy._showReasoningLevelBadge = _showReasoningLevelBadge;
     copy._autoCollapseThinking = _autoCollapseThinking;
     copy._collapseThinkingSteps = _collapseThinkingSteps;
     copy._showToolResultSummary = _showToolResultSummary;
@@ -6126,16 +6080,6 @@ class ProviderConfig {
     return host.contains('deepseek.com') ||
         config.id.trim().toLowerCase().contains('deepseek') ||
         config.name.trim().toLowerCase().contains('deepseek');
-  }
-
-  /// Whether this config talks to DeepSeek's Claude-compatible endpoint,
-  /// which diverges from Anthropic on thinking/effort handling.
-  static bool isDeepSeekClaudeCompatible(
-    String modelId, {
-    ProviderConfig? config,
-  }) {
-    if (modelId.trim().toLowerCase().contains('deepseek')) return true;
-    return isDeepSeekConfig(config);
   }
 
   static const String claudePromptCachingTtl5m = '5m';

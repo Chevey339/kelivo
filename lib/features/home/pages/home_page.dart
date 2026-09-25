@@ -15,6 +15,7 @@ import '../../../shared/widgets/snackbar.dart';
 import '../../../theme/app_font_weights.dart';
 import '../../../theme/design_tokens.dart';
 import '../../../core/providers/settings_provider.dart';
+import '../../../core/services/model_spec/model_spec_resolver.dart';
 import '../../../core/providers/assistant_provider.dart';
 import '../../../core/providers/quick_phrase_provider.dart';
 import '../../../core/providers/instruction_injection_provider.dart';
@@ -28,7 +29,8 @@ import '../../../core/services/incoming_share_service.dart';
 import '../../../core/services/logging/flutter_logger.dart';
 import '../../../utils/platform_utils.dart';
 import '../../../desktop/search_provider_popover.dart';
-import '../../../desktop/reasoning_budget_popover.dart';
+import '../../../desktop/reasoning_level_popover.dart';
+import '../../../desktop/context_usage_popover.dart';
 import '../../../desktop/tools_popover.dart';
 import '../../../desktop/workspace_dialog.dart';
 import '../../../desktop/skills_popover.dart';
@@ -41,7 +43,7 @@ import '../../chat/widgets/bottom_tools_sheet.dart';
 import '../../chat/widgets/chat_tools_sheet.dart';
 import '../../chat/utils/ensure_conversation.dart';
 import '../../chat/widgets/context_management_sheet.dart';
-import '../../chat/widgets/reasoning_budget_sheet.dart';
+import '../../chat/widgets/reasoning_level_sheet.dart';
 import '../../search/widgets/search_settings_sheet.dart';
 import '../../chat/widgets/frosted/chat_frosted_backdrop.dart';
 import '../../chat/widgets/chat_assistant_background.dart';
@@ -1572,38 +1574,10 @@ class _HomePageState extends State<HomePage>
       },
       onOpenSearch: _openSearchSettings,
       onConfigureReasoning: () async {
-        final assistantProvider = context.read<AssistantProvider>();
-        final settingsProvider = context.read<SettingsProvider>();
-        final assistant = assistantProvider.currentAssistant;
-        if (assistant == null) return;
-        if (PlatformUtils.isDesktop) {
-          // Desktop popover keeps the legacy global-settings sync flow.
-          if (assistant.thinkingBudget != null) {
-            settingsProvider.setThinkingBudget(assistant.thinkingBudget);
-          }
-          await _openReasoningSettings();
-          if (!mounted) return;
-          final chosen = settingsProvider.thinkingBudget;
-          await assistantProvider.updateAssistant(
-            assistant.copyWith(thinkingBudget: chosen),
-          );
-          return;
-        }
-        // Mobile: seed the sheet via initialBudget instead of pre-writing
-        // global settings. setThinkingBudget notifies synchronously and would
-        // rebuild the home page (message list, input bar, drawer) on the
-        // first frames of the sheet's entrance animation, dropping frames.
-        int? chosen;
-        await _openReasoningSettings(
-          initialBudget: assistant.thinkingBudget,
-          onChanged: (v) => chosen = v,
-        );
-        if (!mounted) return;
-        if (chosen != null && chosen != assistant.thinkingBudget) {
-          await assistantProvider.updateAssistant(
-            assistant.copyWith(thinkingBudget: chosen),
-          );
-        }
+        await _openReasoningSettings();
+      },
+      onOpenContextUsage: () async {
+        await _openContextUsagePopover();
       },
       onSend: (text) async {
         final result = await _controller.sendMessage(text);
@@ -1848,25 +1822,42 @@ class _HomePageState extends State<HomePage>
     }
   }
 
-  Future<void> _openReasoningSettings({
-    int? initialBudget,
-    ValueChanged<int>? onChanged,
-  }) async {
+  Future<void> _openContextUsagePopover() async {
+    final conversationId = _controller.currentConversation?.id;
+    if (conversationId == null || conversationId.isEmpty) return;
+    await showContextUsagePopover(
+      context,
+      anchorKey: _inputBarKey,
+      conversationId: conversationId,
+      draftText: _inputController.text,
+    );
+  }
+
+  Future<void> _openReasoningSettings() async {
     final model = _resolvedChatModel();
+    final providerKey = model.providerKey;
+    final modelId = model.modelId;
+    if (providerKey == null || modelId == null) return;
+    final settings = context.read<SettingsProvider>();
+    final config = settings.getProviderConfig(providerKey);
+    if (!ModelSpecResolver.instance.spec(config, modelId).supportsReasoning) {
+      return;
+    }
+    final assistant = context.read<AssistantProvider>().currentAssistant;
     if (PlatformUtils.isDesktop) {
-      await showDesktopReasoningBudgetPopover(
+      await showDesktopReasoningLevelPopover(
         context,
         anchorKey: _inputBarKey,
-        modelProvider: model.providerKey,
-        modelId: model.modelId,
+        config: config,
+        modelId: modelId,
+        assistant: assistant,
       );
     } else {
-      await showReasoningBudgetSheet(
+      await showReasoningLevelSheet(
         context,
-        modelProvider: model.providerKey,
-        modelId: model.modelId,
-        initialBudget: initialBudget,
-        onChanged: onChanged,
+        config: config,
+        modelId: modelId,
+        assistant: assistant,
       );
     }
   }
@@ -2011,6 +2002,8 @@ class _HomePageState extends State<HomePage>
         return SafeArea(
           top: false,
           child: ContextManagementSheet(
+            conversationId: _controller.currentConversation?.id,
+            draftText: _inputController.text,
             messageCountLabel: _controller.contextMessageCountLabel(),
             onCompress: () async {
               await Navigator.of(ctx).maybePop();

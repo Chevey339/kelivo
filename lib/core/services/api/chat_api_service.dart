@@ -7,7 +7,7 @@ import '../../providers/settings_provider.dart';
 import '../../providers/model_provider.dart';
 import '../network/dio_http_client.dart';
 import '../../../utils/unicode_sanitizer.dart';
-import '../logging/context_log_models.dart';
+import '../../models/model_spec.dart';
 import '../../utils/multimodal_input_utils.dart';
 import 'generation/text_generation_result.dart';
 import 'generation/tool_loop_runner.dart';
@@ -15,13 +15,14 @@ import 'stream/stream_chunk.dart';
 import 'stream/stream_chunk_handler.dart';
 
 import '../../models/auto_retry_options.dart';
+import '../../models/reasoning_request.dart';
+import '../model_spec/model_spec_resolver.dart';
 import 'chat_api_helpers.dart';
 import 'provider_request_headers.dart';
 import 'providers/claude_official.dart';
 import 'providers/google_gemini.dart';
 import 'providers/google_vertex.dart';
 import 'providers/openai_chat_completions.dart';
-import 'providers/openai/openai_vendor_compat.dart';
 import 'providers/openai_images.dart';
 import 'providers/openai_responses.dart';
 import 'providers/zhipu_layout_parsing.dart';
@@ -46,13 +47,6 @@ class ChatApiService {
   @visibleForTesting
   static String normalizeClaudeImageMimeForTest(String mime) =>
       normalizeClaudeImageMime(mime);
-
-  @visibleForTesting
-  static bool isLongCatHostForTest(String baseUrl) => isLongCatHost(baseUrl);
-
-  @visibleForTesting
-  static bool shouldIncludeStreamingUsageOptionsForTest(String host) =>
-      shouldIncludeStreamingUsageOptions(host);
 
   static bool supportsOpenAIImagesApiRouting(
     ProviderConfig config,
@@ -101,25 +95,81 @@ class ChatApiService {
     return content;
   }
 
-  static Future<List<Map<String, dynamic>>> _stripImageInputsFromMessages(
+  static ModelSpec _stripSpecForRequest({
+    required ModelSpec spec,
+    required bool keepImages,
+  }) {
+    if (!keepImages || spec.supportsImageInput) return spec;
+    return spec.copyWith(input: [...spec.input, Modality.image]);
+  }
+
+  static String _mediaRefMime(InternalMediaRef ref) {
+    final explicit = ref.mime?.trim() ?? '';
+    if (explicit.isNotEmpty) return explicit;
+    return inferMediaMimeFromSource(ref.uri);
+  }
+
+  static bool _specAcceptsMime(ModelSpec spec, String mime) {
+    if (isImageMime(mime)) return spec.supportsImageInput;
+    if (isAudioMime(mime)) return spec.supportsAudioInput;
+    if (isVideoMime(mime)) return spec.supportsVideoInput;
+    return true;
+  }
+
+  static bool _specAcceptsMediaPath(ModelSpec spec, String path) {
+    final mime = inferMediaMimeFromSource(path);
+    if (mime.isEmpty) return spec.supportsImageInput;
+    return _specAcceptsMime(spec, mime);
+  }
+
+  static List<String> _filterUserMediaPaths(
+    List<String> paths,
+    ModelSpec spec,
+  ) {
+    return [
+      for (final path in paths)
+        if (_specAcceptsMediaPath(spec, path)) path,
+    ];
+  }
+
+  /// Drops image / audio / video the [spec] cannot accept. Documents stay.
+  @visibleForTesting
+  static Future<List<Map<String, dynamic>>> stripUnsupportedMediaFromMessages(
     List<Map<String, dynamic>> messages,
+    ModelSpec spec,
   ) async {
+    final keepImage = spec.supportsImageInput;
+    final keepAudio = spec.supportsAudioInput;
+    final keepVideo = spec.supportsVideoInput;
+    if (keepImage && keepAudio && keepVideo) return messages;
+
     final out = <Map<String, dynamic>>[];
     for (final message in messages) {
       final copy = Map<String, dynamic>.from(message);
-      copy.remove(multimodalInternalMediaPathsKey);
-      copy.remove(multimodalInternalRevisionIdKey);
-      copy.remove(kelivoContextSegmentsKey);
-      if (copy.containsKey('content')) {
+      if (copy.containsKey(multimodalInternalMediaPathsKey)) {
+        final refs = parseInternalMediaRefs(
+          copy[multimodalInternalMediaPathsKey],
+          includeUnavailable: true,
+        );
+        final kept = [
+          for (final ref in refs)
+            if (_specAcceptsMime(spec, _mediaRefMime(ref))) ref,
+        ];
+        if (kept.isEmpty) {
+          copy.remove(multimodalInternalMediaPathsKey);
+        } else if (kept.length != refs.length) {
+          copy[multimodalInternalMediaPathsKey] = encodeInternalMediaRefs(
+            kept,
+            includeUnavailable: true,
+          );
+        }
+      }
+      if (!keepImage && copy.containsKey('content')) {
         copy['content'] = await _stripImageInputsFromContent(copy['content']);
       }
       out.add(copy);
     }
     return out;
-  }
-
-  static bool _supportsImageInput(ProviderConfig config, String modelId) {
-    return effectiveModelInfo(config, modelId).input.contains(Modality.image);
   }
 
   /// Apply request restrictions after resolving credentials. OAuth resolution
@@ -134,15 +184,14 @@ class ChatApiService {
           for (final key in [
             'apiModelId',
             'api_model_id',
+            'type',
             'headers',
             'abilities',
-            'reasoningEffort',
-            'thinkingBudget',
+            'reasoning',
+            'sampling',
+            'contextWindow',
+            'maxOutput',
             'oauthProtocol',
-            'oauthThinkingMode',
-            'oauthThinkingRequired',
-            'oauthThinkingEfforts',
-            'oauthThinkingDefaultEffort',
           ])
             if (override.containsKey(key)) key: override[key],
           'builtInTools': <String>[],
@@ -181,7 +230,7 @@ class ChatApiService {
     required String modelId,
     required List<Map<String, dynamic>> messages,
     List<String>? userImagePaths,
-    int? thinkingBudget,
+    ReasoningRequest reasoning = ReasoningRequest.auto,
     double? temperature,
     double? topP,
     int? maxTokens,
@@ -249,25 +298,28 @@ class ChatApiService {
       final useZhipuLayoutParsing =
           !textOnly && shouldUseZhipuLayoutParsing(config, modelId);
       final unicodeSafeMessages = _sanitizeMessages(messages);
-      final stripUnsupportedImageInputs =
-          textOnly ||
-          !skipImageParsing &&
-              !ocrActive &&
-              !useOpenAIImagesApi &&
-              !useZhipuLayoutParsing &&
-              !_supportsImageInput(config, modelId);
-      final safeMessages = stripUnsupportedImageInputs
-          ? await _stripImageInputsFromMessages(unicodeSafeMessages)
-          : unicodeSafeMessages;
-      final safeUserImagePaths = stripUnsupportedImageInputs
-          ? const <String>[]
-          : userImagePaths;
+      final spec = _stripSpecForRequest(
+        spec: ModelSpecResolver.instance.spec(config, modelId),
+        keepImages:
+            !textOnly &&
+            (skipImageParsing ||
+                ocrActive ||
+                useOpenAIImagesApi ||
+                useZhipuLayoutParsing),
+      );
+      final safeMessages = await stripUnsupportedMediaFromMessages(
+        unicodeSafeMessages,
+        spec,
+      );
+      final safeUserImagePaths = userImagePaths == null
+          ? null
+          : _filterUserMediaPaths(userImagePaths, spec);
       final toolHandler = textOnly ? null : onToolCall;
 
-      final imageOutput = effectiveModelInfo(
-        config,
-        modelId,
-      ).output.contains(Modality.image);
+      final imageOutput = ModelSpecResolver.instance
+          .spec(config, modelId)
+          .output
+          .contains(Modality.image);
       final retryNetworkErrors =
           !useOpenAIImagesApi && !useZhipuLayoutParsing && !imageOutput;
       final emitRetryUi = options.enabled && options.maxRetries > 0;
@@ -303,7 +355,7 @@ class ChatApiService {
           modelId: modelId,
           messages: safeMessages,
           userImagePaths: safeUserImagePaths,
-          thinkingBudget: thinkingBudget,
+          reasoning: reasoning,
           temperature: temperature,
           topP: topP,
           maxTokens: maxTokens,
@@ -374,7 +426,7 @@ class ChatApiService {
     required String modelId,
     required List<Map<String, dynamic>> messages,
     List<String>? userImagePaths,
-    int? thinkingBudget,
+    ReasoningRequest reasoning = ReasoningRequest.auto,
     double? temperature,
     double? topP,
     int? maxTokens,
@@ -428,7 +480,7 @@ class ChatApiService {
             modelId,
             messages,
             userImagePaths: userImagePaths,
-            thinkingBudget: thinkingBudget,
+            reasoning: reasoning,
             temperature: temperature,
             topP: topP,
             maxTokens: maxTokens,
@@ -448,7 +500,7 @@ class ChatApiService {
             modelId,
             messages,
             userImagePaths: userImagePaths,
-            thinkingBudget: thinkingBudget,
+            reasoning: reasoning,
             temperature: temperature,
             topP: topP,
             maxTokens: maxTokens,
@@ -469,7 +521,7 @@ class ChatApiService {
           modelId,
           messages,
           userImagePaths: userImagePaths,
-          thinkingBudget: thinkingBudget,
+          reasoning: reasoning,
           temperature: temperature,
           topP: topP,
           maxTokens: maxTokens,
@@ -493,7 +545,7 @@ class ChatApiService {
             modelId: modelId,
             messages: messages,
             userImagePaths: userImagePaths,
-            thinkingBudget: thinkingBudget,
+            reasoning: reasoning,
             temperature: temperature,
             topP: topP,
             maxTokens: maxTokens,
@@ -512,7 +564,7 @@ class ChatApiService {
             modelId,
             messages,
             userImagePaths: userImagePaths,
-            thinkingBudget: thinkingBudget,
+            reasoning: reasoning,
             temperature: temperature,
             topP: topP,
             maxTokens: maxTokens,
@@ -531,7 +583,7 @@ class ChatApiService {
             modelId,
             messages,
             userImagePaths: userImagePaths,
-            thinkingBudget: thinkingBudget,
+            reasoning: reasoning,
             temperature: temperature,
             topP: topP,
             maxTokens: maxTokens,
@@ -556,7 +608,7 @@ class ChatApiService {
     required String modelId,
     required List<Map<String, dynamic>> messages,
     List<String>? userImagePaths,
-    int? thinkingBudget,
+    ReasoningRequest reasoning = ReasoningRequest.auto,
     double? temperature,
     double? topP,
     int? maxTokens,
@@ -583,7 +635,7 @@ class ChatApiService {
       modelId: modelId,
       messages: messages,
       userImagePaths: userImagePaths,
-      thinkingBudget: thinkingBudget,
+      reasoning: reasoning,
       temperature: temperature,
       topP: topP,
       maxTokens: maxTokens,
@@ -618,7 +670,7 @@ class ChatApiService {
     String? conversationId,
     Map<String, String>? extraHeaders,
     Map<String, dynamic>? extraBody,
-    int? thinkingBudget,
+    ReasoningRequest reasoning = ReasoningRequest.auto,
     bool skipImageParsing = false,
   }) async {
     final result = await generateMessage(
@@ -630,7 +682,7 @@ class ChatApiService {
       ],
       extraHeaders: extraHeaders,
       extraBody: extraBody,
-      thinkingBudget: thinkingBudget,
+      reasoning: reasoning,
       // Utility calls only ever want search; never image generation or a
       // code interpreter.
       builtInSearchOnly: true,

@@ -43,7 +43,7 @@ class _ProxyHttpOverrides extends HttpOverrides {
 
 void main() {
   group('DashScope Qwen3.6 built-in search', () {
-    test('Responses API support matrix only enables qwen3.6 models there', () {
+    test('DashScope search is available for any chat model on either API', () {
       final responsesPlus = _dashScopeConfig(
         useResponseApi: true,
         modelId: 'qwen3.6-plus',
@@ -55,6 +55,10 @@ void main() {
       final chatPlus = _dashScopeConfig(
         useResponseApi: false,
         modelId: 'qwen3.6-plus',
+      );
+      final chatGeneric = _dashScopeConfig(
+        useResponseApi: false,
+        modelId: 'qwen-max-latest',
       );
 
       expect(
@@ -76,7 +80,14 @@ void main() {
           cfg: chatPlus,
           modelId: 'qwen3.6-plus',
         ),
-        isFalse,
+        isTrue,
+      );
+      expect(
+        BuiltInToolsHelper.supportsBuiltInSearchForModel(
+          cfg: chatGeneric,
+          modelId: 'qwen-max-latest',
+        ),
+        isTrue,
       );
     });
 

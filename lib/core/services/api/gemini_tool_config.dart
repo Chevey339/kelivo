@@ -1,3 +1,9 @@
+/// Gemini 3 (AI Studio + Vertex) allows built-in tools to coexist with
+/// `function_declarations`. Earlier generations mutually exclude them.
+bool supportsMixedBuiltInAndFunctionTools(String upstreamModelId) {
+  return upstreamModelId.toLowerCase().contains('gemini-3');
+}
+
 bool shouldAttachGeminiFunctionCallingConfig(List<Map<String, dynamic>> tools) {
   for (final tool in tools) {
     if (!tool.containsKey('function_declarations')) continue;

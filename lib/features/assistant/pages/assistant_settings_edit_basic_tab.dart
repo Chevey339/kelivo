@@ -10,7 +10,6 @@ class _BasicSettingsTab extends StatefulWidget {
 
 class _BasicSettingsTabState extends State<_BasicSettingsTab> {
   late final TextEditingController _nameCtrl;
-  late final TextEditingController _thinkingCtrl;
   late final TextEditingController _maxTokensCtrl;
   late final TextEditingController _backgroundCtrl;
 
@@ -20,9 +19,6 @@ class _BasicSettingsTabState extends State<_BasicSettingsTab> {
     final ap = context.read<AssistantProvider>();
     final a = ap.getById(widget.assistantId)!;
     _nameCtrl = TextEditingController(text: a.name);
-    _thinkingCtrl = TextEditingController(
-      text: a.thinkingBudget?.toString() ?? '',
-    );
     _maxTokensCtrl = TextEditingController(text: a.maxTokens?.toString() ?? '');
     _backgroundCtrl = TextEditingController(text: a.background ?? '');
   }
@@ -34,7 +30,6 @@ class _BasicSettingsTabState extends State<_BasicSettingsTab> {
       final ap = context.read<AssistantProvider>();
       final a = ap.getById(widget.assistantId)!;
       _nameCtrl.text = a.name;
-      _thinkingCtrl.text = a.thinkingBudget?.toString() ?? '';
       _maxTokensCtrl.text = a.maxTokens?.toString() ?? '';
       _backgroundCtrl.text = a.background ?? '';
     }
@@ -43,7 +38,6 @@ class _BasicSettingsTabState extends State<_BasicSettingsTab> {
   @override
   void dispose() {
     _nameCtrl.dispose();
-    _thinkingCtrl.dispose();
     _maxTokensCtrl.dispose();
     _backgroundCtrl.dispose();
     super.dispose();
@@ -193,31 +187,28 @@ class _BasicSettingsTabState extends State<_BasicSettingsTab> {
                 onTap: () => _showContextMessagesSheet(context, a),
               ),
               _iosDivider(context),
-              // Thinking budget
+              // Thinking / reasoning default
               _iosNavRow(
                 context,
                 icon: Lucide.Brain,
                 label: l10n.assistantEditThinkingBudgetTitle,
-                detailText: a.thinkingBudget?.toString() ?? '-',
+                tip: l10n.assistantEditReasoningClampedSubtitle,
+                detailText: a.reasoning == null
+                    ? l10n.assistantEditReasoningFollowDefault
+                    : reasoningLevelLabel(l10n, a.reasoning!.level),
                 onTap: () async {
                   final assistantProvider = context.read<AssistantProvider>();
-                  // Seed via initialBudget instead of pre-writing global
-                  // settings: the synchronous notify would rebuild the page
-                  // during the sheet's entrance animation.
-                  int? chosen;
-                  await showReasoningBudgetSheet(
+                  final picked = await showAssistantReasoningPicker(
                     context,
-                    modelProvider: a.chatModelProvider,
-                    modelId: a.chatModelId,
-                    initialBudget: a.thinkingBudget,
-                    onChanged: (v) => chosen = v,
+                    current: a.reasoning,
                   );
-                  if (!context.mounted) return;
-                  if (chosen != null && chosen != a.thinkingBudget) {
-                    await assistantProvider.updateAssistant(
-                      a.copyWith(thinkingBudget: chosen),
-                    );
-                  }
+                  if (!context.mounted || picked == null) return;
+                  if (picked.request == a.reasoning) return;
+                  await assistantProvider.updateAssistant(
+                    picked.request == null
+                        ? a.copyWith(clearReasoning: true)
+                        : a.copyWith(reasoning: picked.request),
+                  );
                 },
               ),
               _iosDivider(context),

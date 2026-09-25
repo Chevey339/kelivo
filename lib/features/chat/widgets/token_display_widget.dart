@@ -16,14 +16,22 @@ class TokenDisplayWidget extends StatefulWidget {
     this.promptTokens,
     this.completionTokens,
     this.cachedTokens,
+    this.reasoningTokens,
+    this.cacheWriteTokens,
     this.durationMs,
+    this.providerId,
+    this.modelId,
   });
 
   final int totalTokens;
   final int? promptTokens;
   final int? completionTokens;
   final int? cachedTokens;
+  final int? reasoningTokens;
+  final int? cacheWriteTokens;
   final int? durationMs;
+  final String? providerId;
+  final String? modelId;
 
   @override
   State<TokenDisplayWidget> createState() => _TokenDisplayWidgetState();
@@ -55,9 +63,11 @@ class _TokenDisplayWidgetState extends State<TokenDisplayWidget>
   bool get _hasDetailData =>
       (widget.promptTokens != null && widget.promptTokens! > 0) ||
       (widget.completionTokens != null && widget.completionTokens! > 0) ||
+      (widget.reasoningTokens != null && widget.reasoningTokens! > 0) ||
+      (widget.cacheWriteTokens != null && widget.cacheWriteTokens! > 0) ||
       (widget.durationMs != null && widget.durationMs! > 0);
 
-  static const double _estimatedPopupHeight = 120;
+  static const double _estimatedPopupHeight = 180;
 
   /// Lazily create animation controller on first use (when popup actually opens).
   CurvedAnimation _ensureAnimation() {
@@ -156,7 +166,11 @@ class _TokenDisplayWidgetState extends State<TokenDisplayWidget>
                 promptTokens: widget.promptTokens,
                 completionTokens: widget.completionTokens,
                 cachedTokens: widget.cachedTokens,
+                reasoningTokens: widget.reasoningTokens,
+                cacheWriteTokens: widget.cacheWriteTokens,
                 durationMs: widget.durationMs,
+                providerId: widget.providerId,
+                modelId: widget.modelId,
               ),
             ),
           ),

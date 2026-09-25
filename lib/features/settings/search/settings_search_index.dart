@@ -631,6 +631,11 @@ class SettingsSearchIndex {
       (l) => l.displaySettingsPageShowProducedFilesTitle,
     );
     add(
+      'displaySettingsShowReasoningLevelBadge',
+      SettingsSearchDestination.chatDisplay,
+      (l) => l.displaySettingsShowReasoningLevelBadge,
+    );
+    add(
       'displaySettingsPageEnableDollarLatexTitle',
       SettingsSearchDestination.rendering,
       (l) => l.displaySettingsPageEnableDollarLatexTitle,

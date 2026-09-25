@@ -205,6 +205,73 @@ void main() {
     messageTemplate: '{{ message }}',
   );
 
+  test(
+    'context preview includes live memory without freezing or running OCR',
+    () async {
+      await seedAssistant(assistant.id);
+      await putEntry(
+        id: 'mem_preview',
+        content: 'User prefers concise answers.',
+      );
+      final conversation = await seedConversation('preview');
+      final message = await seedUserMessage(
+        id: 'preview-user',
+        conversationId: conversation.id,
+        content: 'question',
+        parts: const [
+          TextPart('question'),
+          ImagePart(uri: '/missing.png'),
+        ],
+      );
+      await settings.setOcrModel('Test', 'vision');
+      await settings.setOcrEnabled(true);
+      final service = buildService(
+        messages: [message],
+        ocrHandler: (paths, {revisionId, session, requestId}) async {
+          fail('Preview must not run OCR');
+        },
+        ocrPrefetch: ({required revisionIds, required imagePaths}) async {
+          fail('Preview must not prefetch OCR');
+        },
+      );
+      final apiMessages = service.buildApiMessages(
+        messages: [message],
+        versionSelections: {},
+        currentConversation: conversation,
+      );
+      await service.processUserMessagesForApi(
+        apiMessages,
+        settings,
+        assistant,
+        conversation: conversation,
+        sourceMessages: [message],
+        previewOnly: true,
+      );
+      final segments = segmentsFromTaggedMessage(apiMessages.single);
+      expect(
+        segments
+            .where((s) => s.source == ContextSource.memorySnapshot)
+            .map((s) => s.text)
+            .join(),
+        contains('User prefers concise answers.'),
+      );
+      expect(
+        segments
+            .where((s) => s.source == ContextSource.chatHistory)
+            .map((s) => s.text)
+            .join(),
+        'question',
+      );
+      expect(await chatRepository.getMessagePrompt(message.id), isNull);
+      expect(
+        (await chatRepository.getConversation(
+          conversation.id,
+        ))!.injectedMemoryHash,
+        isNull,
+      );
+    },
+  );
+
   group('§18.1 item 6 — §7.6 decision table', () {
     test('enableMemory off returns empty and writes nothing', () async {
       await seedAssistant('assistant-1');

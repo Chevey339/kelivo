@@ -1,4 +1,3 @@
-import '../../models/provider_oauth.dart';
 import 'dart:convert';
 import 'dart:io';
 
@@ -6,15 +5,13 @@ import 'package:Kelivo/secrets/fallback.dart';
 import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:http/http.dart' as http;
 
-import '../../providers/model_provider.dart';
 import '../../providers/settings_provider.dart';
 import '../../services/api_key_manager.dart';
 import '../../utils/multimodal_input_utils.dart';
-import '../../utils/openai_model_compat.dart';
 import '../../../utils/sandbox_path_resolver.dart';
 import '../logging/flutter_logger.dart';
 import '../model_override_payload_parser.dart';
-import '../model_override_resolver.dart';
+import '../model_spec/model_spec_resolver.dart';
 import '../custom_request_merger.dart';
 import 'builtin_tools.dart';
 import 'provider_request_headers.dart';
@@ -42,13 +39,11 @@ Future<String> decodeUtf8Stream(
 const String _aihubmixAppCode = 'ZKRT3588';
 
 /// Resolve the upstream/vendor model id for a given logical model key.
-/// When per-instance overrides specify `apiModelId`, that value is used for
-/// outbound HTTP requests and vendor-specific heuristics. Otherwise the
-/// logical `modelId` key is treated as the upstream id (backwards compatible).
+/// When the resolved spec carries `apiModelId`, that value is used for
+/// outbound HTTP requests. Otherwise the logical `modelId` key is used.
 String apiModelId(ProviderConfig cfg, String modelId) {
   try {
-    final ov = _modelOverride(cfg, modelId);
-    return resolveApiModelIdOverride(ov, modelId);
+    return ModelSpecResolver.instance.spec(cfg, modelId).apiModelId ?? modelId;
   } catch (_) {}
   return modelId;
 }
@@ -132,25 +127,6 @@ Map<String, dynamic> customBody(
 bool _isAihubmix(ProviderConfig cfg) {
   final base = cfg.baseUrl.toLowerCase();
   return base.contains('aihubmix.com');
-}
-
-// Resolve effective model info by respecting per-model overrides; fallback to inference
-ModelInfo effectiveModelInfo(ProviderConfig cfg, String modelId) {
-  final upstreamId = apiModelId(cfg, modelId);
-  final base = ModelRegistry.infer(
-    ModelInfo(id: upstreamId, displayName: upstreamId),
-  );
-  final ov = _modelOverride(cfg, modelId);
-  if (ov.isEmpty) return base;
-  try {
-    return ModelOverrideResolver.applyModelOverride(base, ov);
-  } catch (e, st) {
-    FlutterLogger.log(
-      '[ModelOverride] applyModelOverride failed: $e\n$st',
-      tag: 'ModelOverride',
-    );
-    return base;
-  }
 }
 
 String mimeFromPath(String path) {
@@ -438,242 +414,42 @@ String textFromContentParts(dynamic content) {
   return buffer.toString().trim();
 }
 
-bool isOff(int? budget) => (budget != null && budget != -1 && budget < 1024);
-String effortForBudget(int? budget) {
-  if (budget == null || budget == -1) return 'auto';
-  if (isOff(budget)) return 'off';
-  if (budget <= 2000) return 'low';
-  if (budget <= 20000) return 'medium';
-  return 'high';
-}
+/// Anthropic Messages API constraints, applied after [applyReasoning].
+///
+/// Thinking uses the default temperature and no top_k; top_p must be in
+/// `[0.95, 1.0]` or omitted. An explicit budget must stay below max_tokens.
+void applyAnthropicMessagesProtocolConstraints(Map<String, dynamic> body) {
+  final thinking = body['thinking'];
+  if (thinking is! Map) return;
+  final type = thinking['type']?.toString();
+  if (type != 'enabled' && type != 'adaptive') return;
 
-bool isClaudeReasoningEnabled(int? budget) => budget != 0;
+  body.remove('temperature');
+  body.remove('top_k');
 
-bool _isClaude5AdaptiveThinkingModel(String modelId) {
-  return RegExp(
-    r'claude-(?:opus|sonnet)-5(?:$|[._:@/-])',
-    caseSensitive: false,
-  ).hasMatch(modelId.trim());
-}
-
-bool _supportsClaudeAdaptiveThinking(String modelId) {
-  final lower = modelId.trim().toLowerCase();
-  if (!lower.contains('claude-')) return false;
-  if (lower.contains('fable') || lower.contains('mythos')) return true;
-  if (_isClaude5AdaptiveThinkingModel(lower)) return true;
-  final m = RegExp(
-    r'claude-(opus|sonnet)-(\d+)[-.](\d+)',
-    caseSensitive: false,
-  ).firstMatch(lower);
-  if (m != null) {
-    final major = int.tryParse(m.group(2) ?? '');
-    final minor = int.tryParse(m.group(3) ?? '');
-    if (major != null && minor != null) {
-      return major > 4 || (major == 4 && minor >= 6);
-    }
-  }
-  return lower.contains('4-6') || lower.contains('4.6');
-}
-
-bool _isClaudeAdaptiveOnlyThinkingModel(String modelId) {
-  final lower = modelId.trim().toLowerCase();
-  if (!lower.contains('claude-')) return false;
-  if (lower.contains('fable') || lower.contains('mythos')) return true;
-  if (_isClaude5AdaptiveThinkingModel(lower)) return true;
-  final m = RegExp(
-    r'claude-(opus|sonnet)-(\d+)[-.](\d+)',
-    caseSensitive: false,
-  ).firstMatch(lower);
-  if (m == null) {
-    return lower.contains('4-7') ||
-        lower.contains('4.7') ||
-        lower.contains('4-8') ||
-        lower.contains('4.8');
-  }
-  final family = (m.group(1) ?? '').toLowerCase();
-  final major = int.tryParse(m.group(2) ?? '');
-  final minor = int.tryParse(m.group(3) ?? '');
-  if (major == null || minor == null) return false;
-  if (major > 4) return true;
-  if (major < 4) return false;
-  if (family == 'opus' && minor >= 7) return true;
-  return false;
-}
-
-bool _isClaudeThinkingAlwaysOnModel(String modelId) {
-  final lower = modelId.trim().toLowerCase();
-  return lower.contains('claude-fable') || lower.contains('claude-mythos');
-}
-
-String _claudeEffortForBudget(int? budget) {
-  if (budget == null || budget == -1) return 'auto';
-  if (isOff(budget)) return 'off';
-  if (budget <= 2000) return 'low';
-  if (budget <= 20000) return 'medium';
-  if (budget <= 32000) return 'high';
-  if (budget <= 64000) return 'xhigh';
-  return 'max';
-}
-
-String _normalizeClaudeEffort(String effort, String modelId) {
-  final normalizedEffort = effort.trim().toLowerCase();
-  if (normalizedEffort.isEmpty) return effort;
-  if (normalizedEffort == 'auto' || normalizedEffort == 'off') {
-    return normalizedEffort;
+  final topP = body['top_p'];
+  if (topP is num && (topP < 0.95 || topP > 1.0)) {
+    body.remove('top_p');
   }
 
-  final lower = modelId.trim().toLowerCase();
-  final supportsXhigh =
-      _isClaude5AdaptiveThinkingModel(lower) ||
-      lower.contains('claude-opus-4-7') ||
-      lower.contains('claude-opus-4.7') ||
-      lower.contains('claude-opus-4-8') ||
-      lower.contains('claude-opus-4.8') ||
-      lower.contains('claude-fable') ||
-      lower.contains('claude-mythos');
-  final supportsMax =
-      supportsXhigh ||
-      lower.contains('claude-opus-4-6') ||
-      lower.contains('claude-opus-4.6') ||
-      lower.contains('claude-sonnet-4-6') ||
-      lower.contains('claude-sonnet-4.6') ||
-      lower.contains('mythos');
+  if (type != 'enabled') return;
 
-  switch (normalizedEffort) {
-    case 'max':
-      if (supportsMax) return 'max';
-      return supportsXhigh ? 'xhigh' : 'high';
-    case 'xhigh':
-      if (supportsXhigh) return 'xhigh';
-      if (supportsMax) return 'max';
-      return 'high';
-    case 'high':
-    case 'medium':
-    case 'low':
-      return normalizedEffort;
-    default:
-      return normalizedEffort;
-  }
-}
-
-Map<String, dynamic>? claudeThinkingConfig(
-  String modelId,
-  int? budget, {
-  ProviderConfig? config,
-}) {
-  if (config?.oauthProvider == OAuthProvider.kimi) {
-    final metadata = _modelOverride(config!, modelId);
-    if (!isClaudeReasoningEnabled(budget) &&
-        metadata['oauthThinkingRequired'] != true) {
-      return {'type': 'disabled'};
-    }
-    if (metadata['oauthThinkingMode'] == 'adaptive') {
-      return {'type': 'adaptive'};
-    }
-    return {
-      'type': 'enabled',
-      'budget_tokens': budget != null && budget > 0 ? budget : 2048,
-    };
-  }
-  if (_isClaudeThinkingAlwaysOnModel(modelId)) {
-    return <String, dynamic>{'type': 'adaptive', 'display': 'summarized'};
-  }
-  if (!isClaudeReasoningEnabled(budget)) {
-    return <String, dynamic>{'type': 'disabled'};
-  }
-  if (ProviderConfig.isDeepSeekClaudeCompatible(modelId, config: config)) {
-    return <String, dynamic>{'type': 'enabled'};
-  }
-  if (_supportsClaudeAdaptiveThinking(modelId)) {
-    return <String, dynamic>{'type': 'adaptive', 'display': 'summarized'};
-  }
-  if (budget != null && budget > 0) {
-    return <String, dynamic>{'type': 'enabled', 'budget_tokens': budget};
-  }
-  return <String, dynamic>{'type': 'disabled'};
-}
-
-Map<String, dynamic>? claudeOutputConfig(
-  String modelId,
-  int? budget, {
-  ProviderConfig? config,
-}) {
-  if (config?.oauthProvider == OAuthProvider.kimi) {
-    final metadata = _modelOverride(config!, modelId);
-    if (metadata['oauthThinkingMode'] != 'adaptive') return null;
-    var effort = _claudeEffortForBudget(budget);
-    if (effort == 'auto') return null;
-    if (effort == 'off') {
-      if (metadata['oauthThinkingRequired'] != true) return null;
-      effort = 'low';
-    }
-    return {
-      'effort': {'xhigh', 'max'}.contains(effort) ? 'high' : effort,
-    };
-  }
-  if (_isClaudeThinkingAlwaysOnModel(modelId)) {
-    // Adaptive thinking cannot be disabled. Omitting effort defaults to high,
-    // so UI "off" must send the lowest legal level instead.
-    var effort = _claudeEffortForBudget(budget);
-    if (effort == 'off') effort = 'low';
-    effort = _normalizeClaudeEffort(effort, modelId);
-    if (effort == 'auto') return null;
-    return <String, dynamic>{'effort': effort};
-  }
-  if (ProviderConfig.isDeepSeekClaudeCompatible(modelId, config: config)) {
-    if (!isClaudeReasoningEnabled(budget)) return null;
-    final effort = _claudeEffortForBudget(budget);
-    if (effort == 'auto' || effort == 'off') return null;
-    // Official Anthropic-format effort is low / high / max.
-    // medium and xhigh map to high.
-    // https://api-docs.deepseek.com/guides/thinking_mode
-    final mapped = switch (effort) {
-      'low' => 'low',
-      'max' => 'max',
-      _ => 'high',
-    };
-    return <String, dynamic>{'effort': mapped};
-  }
-  if (!_supportsClaudeAdaptiveThinking(modelId) ||
-      !isClaudeReasoningEnabled(budget)) {
-    return null;
-  }
-  final effort = _normalizeClaudeEffort(
-    _claudeEffortForBudget(budget),
-    modelId,
-  );
-  if (effort == 'auto' || effort == 'off') return null;
-  return <String, dynamic>{'effort': effort};
-}
-
-bool claudeShouldOmitSamplingParams(String modelId, int? budget) {
-  if (_isClaudeThinkingAlwaysOnModel(modelId)) return true;
-  final lower = modelId.trim().toLowerCase();
-  if (_isClaude5AdaptiveThinkingModel(lower) ||
-      lower.contains('claude-opus-4-8') ||
-      lower.contains('claude-opus-4.8')) {
-    return true;
-  }
-  return _isClaudeAdaptiveOnlyThinkingModel(modelId) &&
-      isClaudeReasoningEnabled(budget);
-}
-
-double? claudeCompatibleTopP(String modelId, int? budget, double? topP) {
-  if (topP == null) return null;
-  if (claudeShouldOmitSamplingParams(modelId, budget)) {
-    return null;
-  }
-  if (!isClaudeReasoningEnabled(budget)) {
-    return topP;
-  }
-  if (topP < 0.95 || topP > 1.0) {
-    FlutterLogger.log(
-      '[ClaudeCompat] Omit top_p=$topP because thinking requires 0.95 <= top_p <= 1.0.',
-      tag: 'ChatApiService',
-    );
-    return null;
-  }
-  return topP;
+  final rawBudget = thinking['budget_tokens'];
+  final rawMax = body['max_tokens'];
+  final budget = rawBudget is int
+      ? rawBudget
+      : rawBudget is num
+      ? rawBudget.toInt()
+      : null;
+  final maxTokens = rawMax is int
+      ? rawMax
+      : rawMax is num
+      ? rawMax.toInt()
+      : null;
+  if (budget == null || maxTokens == null || budget < maxTokens) return;
+  var next = maxTokens - 1024;
+  if (next < 1024) next = 1024;
+  thinking['budget_tokens'] = next;
 }
 
 // Clean JSON Schema for Google Gemini API strict validation

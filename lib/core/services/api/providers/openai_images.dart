@@ -5,36 +5,29 @@ import 'dart:io';
 import 'package:http/http.dart' as http;
 import 'package:http_parser/http_parser.dart';
 
+import '../../custom_request_merger.dart';
+import '../../../models/model_spec.dart';
 import '../../../models/token_usage.dart';
 import '../../../providers/settings_provider.dart';
 import '../../../utils/multimodal_input_utils.dart';
 import '../../../../utils/app_directories.dart';
 import '../../../../utils/sandbox_path_resolver.dart';
+import '../../model_spec/model_spec_resolver.dart';
 import '../chat_api_helpers.dart';
 import '../stream/stream_chunk.dart';
 import '../stream/stream_chunk_emit.dart';
 import '../stream/stream_chunk_ids.dart';
 
 bool shouldUseOpenAIImagesApi(ProviderConfig config, String modelId) {
-  final upstreamModelId = apiModelId(config, modelId).toLowerCase();
-  return _supportsOpenAIImageGenerations(upstreamModelId);
+  return ModelSpecResolver.instance.spec(config, modelId).type ==
+      ModelType.image;
 }
 
-bool _supportsOpenAIImageGenerations(String modelId) {
-  final normalized = modelId.toLowerCase();
-  return normalized.startsWith('gpt-image-') ||
-      normalized.startsWith('chatgpt-image-') ||
-      normalized.startsWith('agnes-image-') ||
-      normalized == 'sensenova-u1-fast' ||
-      normalized == 'dall-e-2' ||
-      normalized == 'dall-e-3';
-}
-
-bool _supportsOpenAIImageEdits(String modelId) {
-  final normalized = modelId.toLowerCase();
-  return normalized.startsWith('gpt-image-') ||
-      normalized.startsWith('chatgpt-image-') ||
-      normalized == 'dall-e-2';
+bool _supportsOpenAIImageEdits(ProviderConfig config, String modelId) {
+  return ModelSpecResolver.instance
+      .spec(config, modelId)
+      .input
+      .contains(Modality.image);
 }
 
 Uri _openAIImagesUrl(ProviderConfig config, String path) {
@@ -57,7 +50,7 @@ Stream<StreamChunk> sendOpenAIImagesStream(
   final outputMime = _openAIImagesOutputMime(config, modelId, extraBody);
   final upstreamModelId = apiModelId(config, modelId);
   if (input.imageRefs.isNotEmpty &&
-      !_supportsOpenAIImageEdits(upstreamModelId)) {
+      !_supportsOpenAIImageEdits(config, modelId)) {
     throw UnsupportedError(
       'OpenAI Images API model $upstreamModelId does not support image edits with input images.',
     );
@@ -485,7 +478,7 @@ void _applyOpenAIImagesExtraBody(
   Map<String, dynamic>? extraBody,
 ) {
   final custom = customBody(config, modelId, assistantBody: extraBody);
-  if (custom.isNotEmpty) body.addAll(custom);
+  CustomRequestMerger.applyBody(body, custom);
 }
 
 String _openAIImagesOutputMime(

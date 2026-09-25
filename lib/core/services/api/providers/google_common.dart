@@ -4,6 +4,7 @@ import 'dart:io';
 
 import 'package:http/http.dart' as http;
 
+import '../../custom_request_merger.dart';
 import '../../../models/token_usage.dart';
 import '../../../providers/model_provider.dart';
 import '../../../providers/settings_provider.dart';
@@ -13,7 +14,9 @@ import '../../../../utils/markdown_media_sanitizer.dart';
 import '../../../../utils/sandbox_path_resolver.dart';
 import '../builtin_tools.dart';
 import '../chat_api_helpers.dart';
+import '../../model_spec/model_spec_resolver.dart';
 import '../gemini_tool_config.dart';
+import '../reasoning/reasoning_dialects.dart';
 import '../generation/tool_loop_runner.dart';
 import '../google_service_account_auth.dart';
 import '../stream/sse_framing.dart';
@@ -64,161 +67,6 @@ List<Map<String, dynamic>> _buildGeminiToolsArray({
     }
   }
   return toolsArr;
-}
-
-bool _isGemma4Model(String modelId) {
-  return RegExp(
-    r'(^|[/:_-])gemma[-_]?4([._-]|$)',
-    caseSensitive: false,
-  ).hasMatch(modelId);
-}
-
-// Non-text Gemini variants: they do not share the text families' thinking
-// contract, so they never reach the pro/flash branches. Holding them out here
-// also stops the `-` terminator in the family patterns below from swallowing
-// the suffix and reading `gemini-3.1-flash-image` as plain `gemini-3.1-flash`.
-final _gemini3NonTextSuffix = RegExp(
-  r'(^|[-_/])(image|tts|live)([-._:@/]|$)',
-  caseSensitive: false,
-);
-
-// Gemini 3.x Flash Image and Flash-Lite Image do take a thinking level, but
-// only 'minimal' (the default) and 'high'. Every other image id -- the legacy
-// gemini-3-pro-image included -- stays on the raw-budget branch.
-// https://ai.google.dev/gemini-api/docs/generate-content/image-generation#controlling-thinking-levels
-final _gemini3FlashImageId = RegExp(
-  r'gemini-3(?:\.\d+)?-flash(-lite)?-image([._:@/-]|$)',
-  caseSensitive: false,
-);
-
-// Thresholds where a Gemini 3 family changed its thinking contract. Naming them
-// keeps the next release a one-line edit instead of a hunt for bare numbers.
-const _gemini3ProMediumMinor = 1; // pro gained 'medium' in 3.1
-const _gemini3FlashModernMinor =
-    5; // flash defaults to 'medium' and 64K from 3.5
-const _gemini3FlashNoMinimalMinor = 7; // flash dropped 'minimal' in 3.7
-
-// Budget presets the sheet offers: 1024 (light), 16000 (medium), 32000 (heavy).
-// These split them into the named thinking levels.
-const _gemini3LowBudgetCeiling = 8000;
-const _gemini3MediumBudgetCeiling = 24000;
-
-final _gemini3FlashId = RegExp(
-  r'gemini-3(?:\.(?<minor>\d+))?-flash([._:@/-]|$)',
-  caseSensitive: false,
-);
-final _gemini3ProId = RegExp(
-  r'gemini-3(?:\.(?<minor>\d+))?-pro(-preview)?([._:@/-]|$)',
-  caseSensitive: false,
-);
-final _gemini3FlashLiteId = RegExp(
-  r'gemini-3(?:\.\d+)?-flash-lite([._:@/-]|$)',
-  caseSensitive: false,
-);
-
-// Minor version behind a Gemini 3 id (0 for plain `gemini-3-`), or null when the
-// id is not that family. Matching by version keeps unreleased 3.x models on the
-// Gemini 3 branches instead of the Gemini 2.x fallback.
-int? _gemini3Minor(String modelId, RegExp family) {
-  if (_gemini3NonTextSuffix.hasMatch(modelId)) return null;
-  final match = family.firstMatch(modelId);
-  if (match == null) return null;
-  return int.tryParse(match.namedGroup('minor') ?? '0') ?? 0;
-}
-
-int? _gemini3FlashMinor(String modelId) =>
-    _gemini3Minor(modelId, _gemini3FlashId);
-
-int? _gemini3ProMinor(String modelId) => _gemini3Minor(modelId, _gemini3ProId);
-
-bool _isGemini3TextModel(String modelId) {
-  return modelId.contains(
-    RegExp(r'gemini-3(?:\.\d+)?-(?!pro-image)', caseSensitive: false),
-  );
-}
-
-bool _shouldOmitGeminiSamplingParams(String modelId) {
-  return _isGemini3TextModel(modelId);
-}
-
-Map<String, dynamic> _googleThinkingConfig(
-  String upstreamModelId,
-  int? budget,
-) {
-  final off = isOff(budget);
-  if (_isGemma4Model(upstreamModelId)) {
-    // Official toggle is thinkingLevel high/minimal. Omitting the config
-    // leaves thinking on; off must send minimal.
-    // https://ai.google.dev/gemma/docs/core/gemma_on_gemini_api
-    if (off) {
-      return const <String, dynamic>{
-        'includeThoughts': false,
-        'thinkingLevel': 'minimal',
-      };
-    }
-    return const <String, dynamic>{
-      'includeThoughts': true,
-      'thinkingLevel': 'high',
-    };
-  }
-
-  if (_gemini3FlashImageId.hasMatch(upstreamModelId)) {
-    // Only 'minimal' and 'high' exist here, so the light preset shares the
-    // 'minimal' floor with "off"; minimal still thinks, so "off" only hides
-    // the thoughts.
-    final level = !off && budget != null && budget >= _gemini3LowBudgetCeiling
-        ? 'high'
-        : 'minimal';
-    return {'includeThoughts': !off, 'thinkingLevel': level};
-  }
-
-  final proMinor = _gemini3ProMinor(upstreamModelId);
-  if (proMinor != null) {
-    // gemini-3-pro has only 'low' and 'high'; 3.1 added 'medium'.
-    final hasMedium = proMinor >= _gemini3ProMediumMinor;
-    String level = 'high';
-    if (off) {
-      level = 'low';
-    } else if (budget != null && budget > 0) {
-      if (budget < _gemini3LowBudgetCeiling) {
-        level = 'low';
-      } else if (budget < _gemini3MediumBudgetCeiling && hasMedium) {
-        level = 'medium';
-      }
-    }
-    // Gemini 3 always thinks, so "off" means hiding thoughts at the lowest level.
-    return {'includeThoughts': !off, 'thinkingLevel': level};
-  }
-
-  final flashMinor = _gemini3FlashMinor(upstreamModelId);
-  if (flashMinor != null) {
-    // Flash dropped 'minimal' in 3.7, so the floor there is 'low' instead.
-    final lowest = flashMinor >= _gemini3FlashNoMinimalMinor
-        ? 'low'
-        : 'minimal';
-    String level = _gemini3FlashLiteId.hasMatch(upstreamModelId)
-        ? lowest
-        : (flashMinor >= _gemini3FlashModernMinor ? 'medium' : 'high');
-    if (off) {
-      level = lowest;
-    } else if (budget != null && budget > 0) {
-      // Light (1024) -> low, Medium (16000) -> medium, Heavy (32000) -> high
-      if (budget < _gemini3LowBudgetCeiling) {
-        level = 'low';
-      } else if (budget < _gemini3MediumBudgetCeiling) {
-        level = 'medium';
-      } else {
-        level = 'high';
-      }
-    }
-    return {'includeThoughts': !off, 'thinkingLevel': level};
-  }
-  // Gemini 2.x and below: use thinkingBudget
-  if (off) return {'includeThoughts': false};
-  return {
-    'includeThoughts': true,
-    if (budget != null && budget >= 0) 'thinkingBudget': budget,
-  };
 }
 
 Map<String, dynamic>? _googleToolMetadata(Map<String, dynamic> message) {
@@ -346,28 +194,6 @@ Map<String, dynamic>? _googleApiPart(Map part) {
   return out;
 }
 
-int? _defaultGeminiMaxOutputTokens(String upstreamModelId) {
-  final flashMinor = _gemini3FlashMinor(upstreamModelId);
-  if (flashMinor != null && flashMinor >= _gemini3FlashModernMinor) {
-    return 65536;
-  }
-  return null;
-}
-
-bool _shouldRequestGoogleThoughts(
-  ProviderConfig config,
-  String modelId,
-  ModelInfo effective,
-) {
-  if (effective.abilities.contains(ModelAbility.reasoning)) return true;
-  final kind = ProviderConfig.classify(
-    config.id,
-    explicitType: config.providerType,
-  );
-  if (kind != ProviderKind.google) return false;
-  return apiModelId(config, modelId).toLowerCase().contains('gemini');
-}
-
 /// Gemini reports prompt-level blocks (safety filters etc.) in-band as
 /// `promptFeedback.blockReason` on a frame without candidates; surface those
 /// as a stream error instead of an empty "normal" completion.
@@ -439,7 +265,7 @@ Stream<StreamChunk> sendGoogleStream(
   String modelId,
   List<Map<String, dynamic>> messages, {
   List<String>? userImagePaths,
-  int? thinkingBudget,
+  ReasoningRequest reasoning = ReasoningRequest.auto,
   double? temperature,
   double? topP,
   int? maxTokens,
@@ -461,7 +287,7 @@ Stream<StreamChunk> sendGoogleStream(
       modelId: modelId,
       messages: messages,
       userImagePaths: userImagePaths,
-      thinkingBudget: thinkingBudget,
+      reasoning: reasoning,
       temperature: temperature,
       topP: topP,
       maxTokens: maxTokens,
@@ -477,13 +303,15 @@ Stream<StreamChunk> sendGoogleStream(
   }
 
   final upstreamModelId = apiModelId(config, modelId);
-  final bool isGemini3 = upstreamModelId.toLowerCase().contains('gemini-3');
-  final bool persistGeminiThoughtSigs = isGemini3;
+  final bool mixedBuiltInAndFunctionTools =
+      supportsMixedBuiltInAndFunctionTools(upstreamModelId);
   final builtIns = builtInTools(config, modelId);
   final enableYoutube = builtIns.contains(BuiltInToolNames.youtube);
   // Effective model features (includes user overrides)
-  final effective = effectiveModelInfo(config, modelId);
-  final isReasoning = _shouldRequestGoogleThoughts(config, modelId, effective);
+  final effective = ModelSpecResolver.instance.spec(config, modelId);
+  final bool persistGeminiThoughtSigs =
+      effective.reasoning.replay != ReasoningReplayPolicy.none;
+  final wantsImageOutput = effective.output.contains(Modality.image);
   // Non-streaming path: use generateContent
   if (!stream) {
     final isVertex = config.vertexAI == true;
@@ -714,25 +542,20 @@ Stream<StreamChunk> sendGoogleStream(
 
     final toolsArr = _buildGeminiToolsArray(
       builtIns: builtIns,
-      allowCoexistence: isGemini3,
+      allowCoexistence: mixedBuiltInAndFunctionTools,
       geminiTools: geminiTools,
     );
     final geminiToolConfig = buildGeminiToolConfig(
       tools: toolsArr,
-      isGemini3: isGemini3 && !isVertex,
+      isGemini3: mixedBuiltInAndFunctionTools && !isVertex,
     );
 
-    final thinkingConfig = isReasoning
-        ? _googleThinkingConfig(upstreamModelId, thinkingBudget)
-        : const <String, dynamic>{};
-    final defaultMaxOutputTokens = _defaultGeminiMaxOutputTokens(
-      upstreamModelId,
-    );
-    final omitSamplingParams = _shouldOmitGeminiSamplingParams(upstreamModelId);
     final generationConfig = <String, dynamic>{
-      if (maxTokens ?? defaultMaxOutputTokens case final resolvedMaxTokens?)
+      if (maxTokens ?? effective.maxOutput case final resolvedMaxTokens?)
         'maxOutputTokens': resolvedMaxTokens,
-      if (thinkingConfig.isNotEmpty) 'thinkingConfig': thinkingConfig,
+      if (temperature != null) 'temperature': temperature,
+      if (topP != null) 'topP': topP,
+      if (wantsImageOutput) 'responseModalities': ['TEXT', 'IMAGE'],
     };
 
     Map<String, dynamic> baseBody = {
@@ -743,15 +566,27 @@ Stream<StreamChunk> sendGoogleStream(
             {'text': systemPrompt},
           ],
         },
-      if (!omitSamplingParams && temperature != null)
-        'temperature': temperature,
-      if (!omitSamplingParams && topP != null) 'topP': topP,
       if (generationConfig.isNotEmpty) 'generationConfig': generationConfig,
       if (toolsArr.isNotEmpty) 'tools': toolsArr,
       if (geminiToolConfig != null) 'toolConfig': geminiToolConfig,
     };
+    final spec = effective;
+    applyReasoning(
+      baseBody,
+      spec,
+      reasoning,
+      transport: ReasoningTransport.geminiGenerateContent,
+    );
+    final resolution = resolveReasoning(spec, reasoning);
+    applySamplingPolicy(
+      baseBody,
+      spec,
+      resolution,
+      transport: ReasoningTransport.geminiGenerateContent,
+    );
+    // Custom body keys win over the reasoning dialect.
     final extraG = customBody(config, modelId, assistantBody: extraBody);
-    if (extraG.isNotEmpty) baseBody.addAll(extraG);
+    CustomRequestMerger.applyBody(baseBody, extraG);
 
     TokenUsage? totalUsage;
     List<Map<String, dynamic>> currentContents =
@@ -783,15 +618,8 @@ Stream<StreamChunk> sendGoogleStream(
         try {
           final u = (obj['usageMetadata'] as Map?)?.cast<String, dynamic>();
           if (u != null) {
-            final prompt = (u['promptTokenCount'] ?? 0) as int? ?? 0;
-            final completion = (u['candidatesTokenCount'] ?? 0) as int? ?? 0;
-            totalUsage = (totalUsage ?? const TokenUsage()).merge(
-              TokenUsage(
-                promptTokens: prompt,
-                completionTokens: completion,
-                cachedTokens: 0,
-              ),
-            );
+            final next = googleUsageFromMetadata(u);
+            if (next.hasReportedTokens) totalUsage = next.asSnapshot();
           }
         } catch (_) {}
         final candidates = (obj['candidates'] as List?) ?? const <dynamic>[];
@@ -1139,7 +967,6 @@ Stream<StreamChunk> sendGoogleStream(
     contents.add({'role': role, 'parts': parts});
   }
 
-  final wantsImageOutput = effective.output.contains(Modality.image);
   bool expectImage = wantsImageOutput;
   bool receivedImage = false;
 
@@ -1177,12 +1004,12 @@ Stream<StreamChunk> sendGoogleStream(
   }
   final toolsArr = _buildGeminiToolsArray(
     builtIns: builtIns,
-    allowCoexistence: isGemini3,
+    allowCoexistence: mixedBuiltInAndFunctionTools,
     geminiTools: geminiTools,
   );
   final geminiToolConfig = buildGeminiToolConfig(
     tools: toolsArr,
-    isGemini3: isGemini3 && !isVertex,
+    isGemini3: mixedBuiltInAndFunctionTools && !isVertex,
   );
 
   // Maintain a rolling conversation for multi-round tool calls
@@ -1206,29 +1033,12 @@ Stream<StreamChunk> sendGoogleStream(
       lastRoundCalls = [];
       lastRoundModelParts = [];
       retryMalformed = false;
-      final defaultMaxOutputTokens = _defaultGeminiMaxOutputTokens(
-        upstreamModelId,
-      );
-      final omitSamplingParams = _shouldOmitGeminiSamplingParams(
-        upstreamModelId,
-      );
       final gen = <String, dynamic>{
-        if (!omitSamplingParams && temperature != null)
-          'temperature': temperature,
-        if (!omitSamplingParams && topP != null) 'topP': topP,
-        if (maxTokens ?? defaultMaxOutputTokens case final resolvedMaxTokens?)
+        if (temperature != null) 'temperature': temperature,
+        if (topP != null) 'topP': topP,
+        if (maxTokens ?? effective.maxOutput case final resolvedMaxTokens?)
           'maxOutputTokens': resolvedMaxTokens,
-        // Enable IMAGE+TEXT output modalities when model is configured to output images
         if (wantsImageOutput) 'responseModalities': ['TEXT', 'IMAGE'],
-        if (isReasoning)
-          ...() {
-            final thinkingConfig = _googleThinkingConfig(
-              upstreamModelId,
-              thinkingBudget,
-            );
-            if (thinkingConfig.isEmpty) return const <String, dynamic>{};
-            return {'thinkingConfig': thinkingConfig};
-          }(),
       };
       final body = <String, dynamic>{
         'contents': convo,
@@ -1268,10 +1078,23 @@ Stream<StreamChunk> sendGoogleStream(
         assistantHeaders: extraHeaders,
       );
       request.headers.addAll(headers);
+      final spec = effective;
+      applyReasoning(
+        body,
+        spec,
+        reasoning,
+        transport: ReasoningTransport.geminiGenerateContent,
+      );
+      final resolution = resolveReasoning(spec, reasoning);
+      applySamplingPolicy(
+        body,
+        spec,
+        resolution,
+        transport: ReasoningTransport.geminiGenerateContent,
+      );
+      // Custom body keys win over the reasoning dialect.
       final extra = customBody(config, modelId, assistantBody: extraBody);
-      if (extra.isNotEmpty) {
-        body.addAll(extra);
-      }
+      CustomRequestMerger.applyBody(body, extra);
       body['contents'] = _googleApiContents(convo);
       request.body = jsonEncode(body);
 
@@ -1284,7 +1107,7 @@ Stream<StreamChunk> sendGoogleStream(
       final sse = resp.stream.transform(utf8.decoder);
       final sourceId = 'round-${streamRound++}';
       final decoder = GoogleStreamDecoder(
-        isGemini3: isGemini3,
+        isGemini3: mixedBuiltInAndFunctionTools,
         persistThoughtSigs: persistGeminiThoughtSigs,
         expectImage: expectImage,
         receivedImage: receivedImage,
@@ -1490,7 +1313,7 @@ Stream<StreamChunk> sendGoogleStream(
     onToolCall: onToolCall,
     append: (executed) {
       if (retryMalformed) return;
-      if (isGemini3) {
+      if (mixedBuiltInAndFunctionTools) {
         convo.add({'role': 'model', 'parts': lastRoundModelParts});
         final responseParts = <Map<String, dynamic>>[];
         for (final c in lastRoundCalls) {

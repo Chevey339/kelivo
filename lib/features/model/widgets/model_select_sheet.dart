@@ -10,7 +10,9 @@ import '../../../core/providers/assistant_provider.dart';
 import '../../../core/services/chat/chat_service.dart';
 import '../../../icons/lucide_adapter.dart';
 import 'package:flutter_svg/flutter_svg.dart';
-import 'model_detail_sheet.dart';
+import '../../../desktop/model_spec_edit_dialog.dart';
+import '../../../shared/responsive/screen_type_helper.dart';
+import '../pages/model_spec_edit_page.dart';
 import '../../provider/pages/provider_detail_page.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../utils/brand_assets.dart';
@@ -22,7 +24,7 @@ import '../../home/controllers/home_page_controller.dart';
 import '../../home/utils/model_display_helper.dart';
 import '../../provider/widgets/provider_avatar.dart';
 import '../../provider/widgets/provider_balance_badge.dart';
-import '../../../core/services/model_override_resolver.dart';
+import '../../../core/services/model_spec/model_spec_resolver.dart';
 import '../../../theme/app_font_weights.dart';
 import 'package:Kelivo/shared/widgets/section_card.dart';
 import 'package:Kelivo/theme/app_semantic_colors.dart';
@@ -48,12 +50,11 @@ bool _modelSelectorOpen = false;
 
 // Data class for compute function
 class _ModelProcessingData {
-  final Map<String, dynamic> providerConfigs;
+  final Map<String, ProviderConfig> providerConfigs;
   final Set<String> pinnedModels;
   final String currentModelKey;
   final List<String> providersOrder;
   final String? limitProviderKey;
-  final bool disableResolverPlatformLogging;
 
   _ModelProcessingData({
     required this.providerConfigs,
@@ -61,7 +62,6 @@ class _ModelProcessingData {
     required this.currentModelKey,
     required this.providersOrder,
     this.limitProviderKey,
-    required this.disableResolverPlatformLogging,
   });
 }
 
@@ -101,12 +101,7 @@ List<String> _buildDisplayProvidersOrder(
   );
 }
 
-// Static function for compute - must be top-level
 _ModelProcessingResult _processModelsInBackground(_ModelProcessingData data) {
-  if (data.disableResolverPlatformLogging) {
-    ModelOverrideResolver.setPlatformLoggingEnabled(false);
-    ModelOverrideResolver.setUnknownValueLoggingEnabled(false);
-  }
   final providers = data.limitProviderKey == null
       ? data.providerConfigs
       : {
@@ -115,55 +110,25 @@ _ModelProcessingResult _processModelsInBackground(_ModelProcessingData data) {
                 data.providerConfigs[data.limitProviderKey]!,
         };
 
-  // Build data map: providerKey -> (displayName, models)
   final Map<String, _ProviderGroup> groups = {};
 
   providers.forEach((key, cfg) {
-    // Skip disabled providers entirely so they can't be selected
-    if (!(cfg['enabled'] as bool)) return;
-    final models = cfg['models'] as List<dynamic>? ?? [];
-    if (models.isEmpty) return;
+    if (!cfg.enabled) return;
+    if (cfg.models.isEmpty) return;
 
-    final name = (cfg['name'] as String?) ?? '';
-    final overrides =
-        (cfg['overrides'] as Map?)?.map((k, v) => MapEntry(k.toString(), v)) ??
-        const <String, dynamic>{};
+    final name = cfg.name;
     final list = <_ModelItem>[
-      for (final id in models)
+      for (final mid in cfg.models)
         () {
-          final String mid = id.toString();
-          final rawOv = overrides[mid];
-          final Map<String, dynamic>? ov = rawOv is Map
-              ? {for (final e in rawOv.entries) e.key.toString(): e.value}
-              : null;
-          // Use upstream/api model id for inference when available so that
-          // brand assets and default capabilities stay accurate even when the
-          // logical key is a custom alias.
-          String baseId = mid;
-          if (ov != null) {
-            final raw = (ov['apiModelId'] ?? ov['api_model_id'])
-                ?.toString()
-                .trim();
-            if (raw != null && raw.isNotEmpty) baseId = raw;
-          }
-          ModelInfo base = ModelRegistry.infer(
-            ModelInfo(id: baseId, displayName: baseId),
-          );
-          if (ov != null) {
-            base = ModelOverrideResolver.applyModelOverride(
-              base,
-              ov,
-              applyDisplayName: true,
-            );
-          }
+          final spec = ModelSpecResolver.instance.spec(cfg, mid);
           return _ModelItem(
             providerKey: key,
             providerName: name.isNotEmpty ? name : key,
             id: mid,
-            info: base,
+            info: spec,
             pinned: data.pinnedModels.contains('$key::$mid'),
             selected: data.currentModelKey == '$key::$mid',
-            asset: _assetForNameStatic(baseId),
+            asset: _assetForNameStatic(spec.upstreamId),
           );
         }(),
     ];
@@ -184,14 +149,19 @@ _ModelProcessingResult _processModelsInBackground(_ModelProcessingData data) {
     if (g == null) continue;
     final found = g.items.firstWhere(
       (e) => e.id == mid,
-      orElse: () => _ModelItem(
-        providerKey: pk,
-        providerName: g.name,
-        id: mid,
-        info: ModelRegistry.infer(ModelInfo(id: mid, displayName: mid)),
-        pinned: true,
-        selected: data.currentModelKey == '$pk::$mid',
-      ),
+      orElse: () {
+        final cfg = data.providerConfigs[pk];
+        return _ModelItem(
+          providerKey: pk,
+          providerName: g.name,
+          id: mid,
+          info: cfg == null
+              ? ModelSpec(id: mid, displayName: mid)
+              : ModelSpecResolver.instance.spec(cfg, mid),
+          pinned: true,
+          selected: data.currentModelKey == '$pk::$mid',
+        );
+      },
     );
     favItems.add(found.copyWith(pinned: true));
   }
@@ -424,30 +394,9 @@ class _ModelSelectSheetState extends State<_ModelSelectSheet> {
   List<String> _orderedKeys = [];
   bool _autoScrolled = false; // ensure we only auto-scroll once per open
 
-  dynamic _sanitizeJsonValue(dynamic value) {
-    if (value == null || value is num || value is bool || value is String) {
-      return value;
-    }
-    if (value is Map) {
-      return {
-        for (final entry in value.entries)
-          entry.key.toString(): _sanitizeJsonValue(entry.value),
-      };
-    }
-    if (value is Iterable) {
-      return [for (final item in value) _sanitizeJsonValue(item)];
-    }
-    return value.toString();
-  }
-
-  Map<String, dynamic> _sanitizeOverrides(Map<String, dynamic> overrides) {
-    return {
-      for (final entry in overrides.entries)
-        entry.key.toString(): _sanitizeJsonValue(entry.value),
-    };
-  }
-
-  Map<String, dynamic> _buildProviderConfigsPayload(SettingsProvider settings) {
+  Map<String, ProviderConfig> _providerConfigsForPicker(
+    SettingsProvider settings,
+  ) {
     final keys = <String>{
       ...settings.providersOrder.where((e) => e.trim().isNotEmpty),
       ...settings.providerConfigs.keys.where((e) => e.trim().isNotEmpty),
@@ -456,17 +405,10 @@ class _ModelSelectSheetState extends State<_ModelSelectSheet> {
         widget.limitProviderKey!.trim().isNotEmpty) {
       keys.add(widget.limitProviderKey!);
     }
-    final out = <String, dynamic>{};
-    for (final key in keys) {
-      final cfg = settings.getProviderConfig(key, defaultName: key);
-      out[key] = {
-        'enabled': cfg.enabled,
-        'name': cfg.name,
-        'models': cfg.models,
-        'overrides': _sanitizeOverrides(cfg.modelOverrides),
-      };
-    }
-    return out;
+    return {
+      for (final key in keys)
+        key: settings.getProviderConfig(key, defaultName: key),
+    };
   }
 
   String _currentModelKey(
@@ -504,11 +446,10 @@ class _ModelSelectSheetState extends State<_ModelSelectSheet> {
     try {
       final settings = context.read<SettingsProvider>();
       final assistantProvider = context.read<AssistantProvider>();
-      final providerConfigs = _buildProviderConfigsPayload(settings);
+      final providerConfigs = _providerConfigsForPicker(settings);
 
       final currentKey = _currentModelKey(settings, assistantProvider);
 
-      // Prepare data for background processing
       final processingData = _ModelProcessingData(
         providerConfigs: providerConfigs,
         pinnedModels: settings.pinnedModels,
@@ -518,11 +459,9 @@ class _ModelSelectSheetState extends State<_ModelSelectSheet> {
           providerConfigs.keys,
         ),
         limitProviderKey: widget.limitProviderKey,
-        disableResolverPlatformLogging: true,
       );
 
-      // Process in background isolate
-      final result = await compute(_processModelsInBackground, processingData);
+      final result = _processModelsInBackground(processingData);
 
       if (mounted) {
         setState(() {
@@ -563,7 +502,7 @@ class _ModelSelectSheetState extends State<_ModelSelectSheet> {
   void _loadModelsSynchronously() {
     final settings = context.read<SettingsProvider>();
     final assistantProvider = context.read<AssistantProvider>();
-    final providerConfigs = _buildProviderConfigsPayload(settings);
+    final providerConfigs = _providerConfigsForPicker(settings);
 
     final currentKey = _currentModelKey(settings, assistantProvider);
 
@@ -576,7 +515,6 @@ class _ModelSelectSheetState extends State<_ModelSelectSheet> {
         providerConfigs.keys,
       ),
       limitProviderKey: widget.limitProviderKey,
-      disableResolverPlatformLogging: false,
     );
 
     final result = _processModelsInBackground(processingData);
@@ -1082,7 +1020,8 @@ class _ModelSelectSheetState extends State<_ModelSelectSheet> {
     }
 
     if (widget.limitProviderKey == null) {
-      final pinned = context.watch<SettingsProvider>().pinnedModels;
+      final settings = context.watch<SettingsProvider>();
+      final pinned = settings.pinnedModels;
       if (pinned.isNotEmpty) {
         final favs = <_ModelItem>[];
         for (final k in pinned) {
@@ -1098,7 +1037,10 @@ class _ModelSelectSheetState extends State<_ModelSelectSheet> {
               providerKey: pk,
               providerName: g.name,
               id: mid,
-              info: ModelRegistry.infer(ModelInfo(id: mid, displayName: mid)),
+              info: ModelSpecResolver.instance.spec(
+                settings.getProviderConfig(pk),
+                mid,
+              ),
               pinned: true,
               selected: false,
             ),
@@ -1441,11 +1383,19 @@ class _ModelSelectSheetState extends State<_ModelSelectSheet> {
           onTap: () =>
               Navigator.of(context).pop(ModelSelection(m.providerKey, m.id)),
           onLongPress: () async {
-            await showModelDetailSheet(
-              context,
-              providerKey: m.providerKey,
-              modelId: m.id,
-            );
+            if (ResponsiveHelper.isDesktop(context)) {
+              await showDesktopModelSpecEditDialog(
+                context,
+                providerKey: m.providerKey,
+                modelKey: m.id,
+              );
+            } else {
+              await showModelSpecEditPage(
+                context,
+                providerKey: m.providerKey,
+                modelKey: m.id,
+              );
+            }
             if (mounted) {
               _isLoading = true;
               setState(() {});
@@ -1708,7 +1658,7 @@ class _ModelItem {
   final String providerKey;
   final String providerName;
   final String id;
-  final ModelInfo info;
+  final ModelSpec info;
   final bool pinned;
   final bool selected;
   final String? asset; // pre-resolved avatar asset for performance
@@ -1902,30 +1852,9 @@ class _DesktopModelSelectDialogBodyState
     super.dispose();
   }
 
-  dynamic _sanitizeJsonValue(dynamic value) {
-    if (value == null || value is num || value is bool || value is String) {
-      return value;
-    }
-    if (value is Map) {
-      return {
-        for (final entry in value.entries)
-          entry.key.toString(): _sanitizeJsonValue(entry.value),
-      };
-    }
-    if (value is Iterable) {
-      return [for (final item in value) _sanitizeJsonValue(item)];
-    }
-    return value.toString();
-  }
-
-  Map<String, dynamic> _sanitizeOverrides(Map<String, dynamic> overrides) {
-    return {
-      for (final entry in overrides.entries)
-        entry.key.toString(): _sanitizeJsonValue(entry.value),
-    };
-  }
-
-  Map<String, dynamic> _buildProviderConfigsPayload(SettingsProvider settings) {
+  Map<String, ProviderConfig> _providerConfigsForPicker(
+    SettingsProvider settings,
+  ) {
     final keys = <String>{
       ...settings.providersOrder.where((e) => e.trim().isNotEmpty),
       ...settings.providerConfigs.keys.where((e) => e.trim().isNotEmpty),
@@ -1934,17 +1863,10 @@ class _DesktopModelSelectDialogBodyState
         widget.limitProviderKey!.trim().isNotEmpty) {
       keys.add(widget.limitProviderKey!);
     }
-    final out = <String, dynamic>{};
-    for (final key in keys) {
-      final cfg = settings.getProviderConfig(key, defaultName: key);
-      out[key] = {
-        'enabled': cfg.enabled,
-        'name': cfg.name,
-        'models': cfg.models,
-        'overrides': _sanitizeOverrides(cfg.modelOverrides),
-      };
-    }
-    return out;
+    return {
+      for (final key in keys)
+        key: settings.getProviderConfig(key, defaultName: key),
+    };
   }
 
   String _currentModelKey(
@@ -1967,7 +1889,7 @@ class _DesktopModelSelectDialogBodyState
   Future<void> _loadModels() async {
     final settings = context.read<SettingsProvider>();
     final assistantProvider = context.read<AssistantProvider>();
-    final providerConfigs = _buildProviderConfigsPayload(settings);
+    final providerConfigs = _providerConfigsForPicker(settings);
     final currentKey = _currentModelKey(settings, assistantProvider);
 
     final data = _ModelProcessingData(
@@ -1979,7 +1901,6 @@ class _DesktopModelSelectDialogBodyState
         providerConfigs.keys,
       ),
       limitProviderKey: widget.limitProviderKey,
-      disableResolverPlatformLogging: false,
     );
     // Synchronous processing is fast enough here
     final result = _processModelsInBackground(data);
@@ -2064,7 +1985,10 @@ class _DesktopModelSelectDialogBodyState
               providerKey: pk,
               providerName: g.name,
               id: mid,
-              info: ModelRegistry.infer(ModelInfo(id: mid, displayName: mid)),
+              info: ModelSpecResolver.instance.spec(
+                settings.getProviderConfig(pk),
+                mid,
+              ),
               pinned: true,
               selected: false,
             ),
@@ -2433,39 +2357,48 @@ class _DesktopModelSelectDialogBodyState
                 overflow: TextOverflow.ellipsis,
               ),
             ),
-            const SizedBox(width: 6),
-            ModelCapsulesRow(
-              model: m.info,
-              pillPadding: const EdgeInsets.symmetric(
-                horizontal: 5,
-                vertical: 2,
-              ),
-              bgOpacityDark: 0.18,
-              bgOpacityLight: 0.14,
-              borderOpacity: 0.22,
-              itemSpacing: 4,
-            ),
-            const SizedBox(width: 4),
-            Builder(
-              builder: (context) {
-                final pinnedNow = context.select<SettingsProvider, bool>(
-                  (s) => s.isModelPinned(m.providerKey, m.id),
-                );
-                final icon = pinnedNow ? Icons.favorite : Icons.favorite_border;
-                return Tooltip(
-                  message: l10n.modelSelectSheetFavoriteTooltip,
-                  child: IosIconButton(
-                    icon: icon,
-                    size: 16,
-                    color: cs.primary,
-                    onTap: () => context
-                        .read<SettingsProvider>()
-                        .togglePinModel(m.providerKey, m.id),
-                    padding: const EdgeInsets.all(3),
-                    minSize: 26,
+            const SizedBox(width: 8),
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                ModelCapsulesRow(
+                  model: m.info,
+                  alignment: WrapAlignment.end,
+                  pillPadding: const EdgeInsets.symmetric(
+                    horizontal: 5,
+                    vertical: 2,
                   ),
-                );
-              },
+                  bgOpacityDark: 0.18,
+                  bgOpacityLight: 0.14,
+                  borderOpacity: 0.22,
+                  itemSpacing: 4,
+                ),
+                const SizedBox(width: 4),
+                Builder(
+                  builder: (context) {
+                    final pinnedNow = context.select<SettingsProvider, bool>(
+                      (s) => s.isModelPinned(m.providerKey, m.id),
+                    );
+                    final icon = pinnedNow
+                        ? Icons.favorite
+                        : Icons.favorite_border;
+                    return IosIconButton(
+                      key: ValueKey(
+                        'desktop-model-favorite-${m.providerKey}::${m.id}',
+                      ),
+                      icon: icon,
+                      size: 16,
+                      color: cs.primary,
+                      tooltip: l10n.modelSelectSheetFavoriteTooltip,
+                      onTap: () => context
+                          .read<SettingsProvider>()
+                          .togglePinModel(m.providerKey, m.id),
+                      padding: const EdgeInsets.all(3),
+                      minSize: 26,
+                    );
+                  },
+                ),
+              ],
             ),
           ],
         ),

@@ -84,6 +84,12 @@ class ChatMessage extends HiveObject {
   @HiveField(19)
   final int? durationMs;
 
+  @HiveField(20)
+  final int? reasoningTokens;
+
+  @HiveField(21)
+  final int? cacheWriteTokens;
+
   ChatMessage({
     String? id,
     required this.role,
@@ -106,6 +112,8 @@ class ChatMessage extends HiveObject {
     this.completionTokens,
     this.cachedTokens,
     this.durationMs,
+    this.reasoningTokens,
+    this.cacheWriteTokens,
   }) : parts = List<MessagePart>.unmodifiable(
          parts ?? <MessagePart>[TextPart(content ?? '')],
        ),
@@ -270,6 +278,8 @@ class ChatMessage extends HiveObject {
     int? completionTokens,
     int? cachedTokens,
     int? durationMs,
+    int? reasoningTokens,
+    int? cacheWriteTokens,
   }) {
     final List<MessagePart>? nextParts;
     if (parts != null) {
@@ -301,6 +311,8 @@ class ChatMessage extends HiveObject {
       completionTokens: completionTokens ?? this.completionTokens,
       cachedTokens: cachedTokens ?? this.cachedTokens,
       durationMs: durationMs ?? this.durationMs,
+      reasoningTokens: reasoningTokens ?? this.reasoningTokens,
+      cacheWriteTokens: cacheWriteTokens ?? this.cacheWriteTokens,
     );
   }
 
@@ -331,6 +343,8 @@ class ChatMessage extends HiveObject {
       'completionTokens': completionTokens,
       'cachedTokens': cachedTokens,
       'durationMs': durationMs,
+      'reasoningTokens': reasoningTokens,
+      'cacheWriteTokens': cacheWriteTokens,
     };
   }
 
@@ -384,6 +398,8 @@ class ChatMessage extends HiveObject {
       completionTokens: json['completionTokens'] as int?,
       cachedTokens: json['cachedTokens'] as int?,
       durationMs: json['durationMs'] as int?,
+      reasoningTokens: json['reasoningTokens'] as int?,
+      cacheWriteTokens: json['cacheWriteTokens'] as int?,
     );
   }
 }

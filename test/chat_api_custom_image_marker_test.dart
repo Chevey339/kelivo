@@ -19,6 +19,17 @@ ProviderConfig _openAiConfig(String baseUrl, {bool useResponseApi = false}) {
   );
 }
 
+ProviderConfig _withVideoInput(ProviderConfig config, String modelId) {
+  return config.copyWith(
+    modelOverrides: {
+      ...config.modelOverrides,
+      modelId: const {
+        'input': ['text', 'image', 'video'],
+      },
+    },
+  );
+}
+
 Future<Map<String, dynamic>> _sendAndCaptureRequestBody(
   Future<List<dynamic>> Function(String baseUrl) sendRequest,
 ) async {
@@ -63,6 +74,60 @@ Future<Map<String, dynamic>> _sendAndCaptureRequestBody(
     fail('expected request body to be captured');
   }
   return captured;
+}
+
+Future<Map<String, dynamic>> _captureStreamingChatBody({String? host}) async {
+  late Map<String, dynamic> requestBody;
+  final server = await HttpServer.bind(
+    host == null ? InternetAddress.loopbackIPv4 : InternetAddress.loopbackIPv6,
+    0,
+  );
+  addTearDown(() async {
+    await server.close(force: true);
+  });
+  final baseUrl = host == null
+      ? 'http://${server.address.address}:${server.port}/v1'
+      : 'http://$host:${server.port}/v1';
+
+  server.listen((request) async {
+    requestBody = (jsonDecode(await utf8.decoder.bind(request).join()) as Map)
+        .cast<String, dynamic>();
+    request.response.statusCode = HttpStatus.ok;
+    request.response.headers.contentType = ContentType(
+      'text',
+      'event-stream',
+      charset: 'utf-8',
+    );
+    request.response.write(
+      'data: ${jsonEncode({
+        'choices': [
+          {
+            'index': 0,
+            'delta': {'role': 'assistant', 'content': 'ok'},
+            'finish_reason': 'stop',
+          },
+        ],
+      })}\n\n',
+    );
+    request.response.write('data: [DONE]\n\n');
+    await request.response.close();
+  });
+
+  await ChatApiService.sendMessageStream(
+    config: ProviderConfig(
+      id: 'OpenAITest',
+      enabled: true,
+      name: 'OpenAITest',
+      apiKey: 'test-key',
+      baseUrl: baseUrl,
+      providerType: ProviderKind.openai,
+    ),
+    modelId: 'gpt-4o',
+    messages: const [
+      {'role': 'user', 'content': 'hi'},
+    ],
+  ).toList();
+  return requestBody;
 }
 
 ProviderConfig _claudeConfig(String baseUrl) {
@@ -939,7 +1004,10 @@ void main() {
         await file.writeAsBytes(const [1, 2, 3, 4]);
 
         return ChatApiService.sendMessageStream(
-          config: _openAiConfig(baseUrl, useResponseApi: true),
+          config: _withVideoInput(
+            _openAiConfig(baseUrl, useResponseApi: true),
+            'gpt-4.1',
+          ),
           modelId: 'gpt-4.1',
           messages: [
             {
@@ -982,7 +1050,10 @@ void main() {
         videoPath = file.path;
 
         return ChatApiService.sendMessageStream(
-          config: _openAiConfig(baseUrl, useResponseApi: true),
+          config: _withVideoInput(
+            _openAiConfig(baseUrl, useResponseApi: true),
+            'gpt-4.1',
+          ),
           modelId: 'gpt-4.1',
           messages: [
             {
@@ -1016,7 +1087,10 @@ void main() {
     test('remote video URL stays as text, not input_image', () async {
       final body = await _sendAndCaptureResponsesBody((baseUrl) async {
         return ChatApiService.sendMessageStream(
-          config: _openAiConfig(baseUrl, useResponseApi: true),
+          config: _withVideoInput(
+            _openAiConfig(baseUrl, useResponseApi: true),
+            'gpt-4.1',
+          ),
           modelId: 'gpt-4.1',
           messages: [
             {
@@ -1484,7 +1558,10 @@ void main() {
         final body = await _captureProviderBody(
           (baseUrl) {
             return ChatApiService.sendMessageStream(
-              config: _claudeConfig(baseUrl),
+              config: _withVideoInput(
+                _claudeConfig(baseUrl),
+                'claude-sonnet-4-6',
+              ),
               modelId: 'claude-sonnet-4-6',
               messages: [
                 {
@@ -1535,7 +1612,10 @@ void main() {
         final body = await _captureProviderBody(
           (baseUrl) {
             return ChatApiService.sendMessageStream(
-              config: _claudeConfig(baseUrl),
+              config: _withVideoInput(
+                _claudeConfig(baseUrl),
+                'claude-sonnet-4-6',
+              ),
               modelId: 'claude-sonnet-4-6',
               messages: [
                 {
@@ -1689,35 +1769,24 @@ void main() {
     });
   });
 
-  group('LongCat host / streaming usage detection', () {
-    test('recognizes bare hostname and full URL', () {
-      expect(ChatApiService.isLongCatHostForTest('api.longcat.chat'), isTrue);
-      expect(
-        ChatApiService.isLongCatHostForTest('https://api.longcat.chat/v1'),
-        isTrue,
-      );
-      expect(ChatApiService.isLongCatHostForTest('api.openai.com'), isFalse);
+  group('streaming usage options', () {
+    test('includes stream_options on typical OpenAI hosts', () async {
+      final body = await _captureStreamingChatBody();
+      expect(body['stream_options'], {'include_usage': true});
     });
 
-    test('streaming usage options disabled for LongCat hostnames', () {
-      expect(
-        ChatApiService.shouldIncludeStreamingUsageOptionsForTest(
-          'api.longcat.chat',
-        ),
-        isFalse,
+    test('omits stream_options for LongCat hosts', () async {
+      final body = await _captureStreamingChatBody(
+        host: 'api.longcat.localhost',
       );
-      expect(
-        ChatApiService.shouldIncludeStreamingUsageOptionsForTest(
-          'https://api.longcat.chat',
-        ),
-        isFalse,
+      expect(body.containsKey('stream_options'), isFalse);
+    });
+
+    test('omits stream_options for OpenRouter hosts', () async {
+      final body = await _captureStreamingChatBody(
+        host: 'openrouter.localhost',
       );
-      expect(
-        ChatApiService.shouldIncludeStreamingUsageOptionsForTest(
-          'api.openai.com',
-        ),
-        isTrue,
-      );
+      expect(body.containsKey('stream_options'), isFalse);
     });
   });
 }

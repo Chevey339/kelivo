@@ -4,6 +4,7 @@ import 'dart:math';
 import 'package:crypto/crypto.dart';
 
 import '../../models/memory_entry.dart';
+import '../../models/reasoning_request.dart';
 import '../../providers/settings_provider.dart';
 import '../api/chat_api_service.dart';
 import 'memory_prompts.dart';
@@ -62,7 +63,7 @@ typedef LegacyMemoryTextGenerator =
       required ProviderConfig config,
       required String modelId,
       required String prompt,
-      int? thinkingBudget,
+      ReasoningRequest reasoning,
     });
 
 class LegacyMemoryMigrationService {
@@ -351,7 +352,7 @@ class LegacyMemoryMigrationService {
       config: config,
       modelId: modelId,
       prompt: prompt,
-      thinkingBudget: 0,
+      reasoning: ReasoningRequest.off,
     );
     final converted = parseResponse(
       response,

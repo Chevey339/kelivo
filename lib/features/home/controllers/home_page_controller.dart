@@ -12,6 +12,7 @@ import '../../../core/models/chat_input_data.dart';
 import '../../../core/models/chat_message.dart';
 import '../../../core/models/message_part.dart';
 import '../../../core/models/conversation.dart';
+import '../../../core/models/reasoning_request.dart';
 import '../../../core/models/workspace_binding.dart';
 import '../../../core/providers/workspace_provider.dart';
 import '../../../core/models/quick_phrase.dart';
@@ -47,6 +48,7 @@ import 'stream_controller.dart' as stream_ctrl;
 import 'generation_controller.dart';
 import 'scroll_controller.dart' as scroll_ctrl;
 import 'home_view_model.dart';
+import '../services/context_usage_service.dart';
 import '../services/message_builder_service.dart';
 import '../services/message_generation_service.dart';
 import '../services/local_tools_service.dart';
@@ -498,6 +500,13 @@ class HomePageController extends ChangeNotifier {
   }
 
   void _initializeViewModel() {
+    ContextUsageService? contextUsage;
+    try {
+      contextUsage = _context.read<ContextUsageService>();
+    } catch (_) {}
+    contextUsage?.bindAssembler(
+      _messageGenerationService.previewContextAssembly,
+    );
     _viewModel = HomeViewModel(
       chatService: _chatService,
       messageBuilderService: _messageBuilderService,
@@ -507,6 +516,7 @@ class HomePageController extends ChangeNotifier {
       chatController: _chatController,
       contextProvider: _context,
       getTitleForLocale: _titleForLocale,
+      contextUsage: contextUsage,
     );
     _viewModel.onBackgroundTaskError = _showBackgroundTaskFailure;
     _viewModel.addListener(() {
@@ -587,12 +597,7 @@ class HomePageController extends ChangeNotifier {
   }
 
   String _localizeGenerationError(AppLocalizations l10n, String error) {
-    switch (error) {
-      case 'audio_attachment_unsupported':
-        return l10n.homePageAudioAttachmentUnsupported;
-      default:
-        return '${l10n.generationInterrupted}: $error';
-    }
+    return '${l10n.generationInterrupted}: $error';
   }
 
   void _initializeScrollController() {
@@ -2809,10 +2814,8 @@ class HomePageController extends ChangeNotifier {
     return _generationController.isToolModel(providerKey, modelId);
   }
 
-  bool isReasoningEnabled(int? budget) {
-    if (budget == null) return true;
-    if (budget == -1) return true;
-    return budget >= 1024;
+  bool isReasoningEnabled(ReasoningRequest r) {
+    return _generationController.isReasoningEnabled(r);
   }
 
   // ============================================================================

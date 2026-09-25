@@ -1,3 +1,4 @@
+import '../../../custom_request_merger.dart';
 import '../../../../models/provider_oauth.dart';
 import 'dart:async';
 import 'dart:convert';
@@ -5,19 +6,21 @@ import 'dart:io';
 
 import 'package:http/http.dart' as http;
 
+import '../../../../models/model_spec.dart';
 import '../../../../models/token_usage.dart';
 import '../../../../providers/settings_provider.dart';
 import '../../../../../utils/app_directories.dart';
 import '../../../../../utils/sandbox_path_resolver.dart';
 import '../../chat_api_helpers.dart';
 import '../../generation/tool_loop_runner.dart';
+import '../../reasoning/reasoning_dialects.dart';
 import '../../stream/sse_decode_loop.dart';
 import '../../stream/sse_framing.dart';
 import '../../stream/stream_chunk.dart';
 import '../../stream/stream_chunk_emit.dart';
 import '../../stream/stream_chunk_ids.dart';
 import 'openai_tool_transcript.dart';
-import 'openai_vendor_compat.dart';
+import 'openai_request_shaping.dart';
 import 'responses_decoder.dart';
 
 List<Map<String, dynamic>> toResponsesToolsFormat(
@@ -185,7 +188,7 @@ Stream<StreamChunk> runOpenAIResponsesToolFollowUps({
   required String modelId,
   required String upstreamModelId,
   required Uri url,
-  required OpenAIProviderInfo info,
+  required ModelSpec spec,
   required List<Map<String, dynamic>> initialInput,
   required List<Map<String, dynamic>> firstOutputItems,
   required List<EmitToolCall> initialCalls,
@@ -198,9 +201,7 @@ Stream<StreamChunk> runOpenAIResponsesToolFollowUps({
   required double? temperature,
   required double? topP,
   required int? maxTokens,
-  required bool isReasoning,
-  required String effort,
-  required int? thinkingBudget,
+  required ReasoningRequest reasoning,
   required TokenUsage? initialUsage,
   required int streamRound,
   required int approxPromptTokens,
@@ -245,29 +246,16 @@ Stream<StreamChunk> runOpenAIResponsesToolFollowUps({
         if (temperature != null) 'temperature': temperature,
         if (topP != null) 'top_p': topP,
         if (maxTokens != null) 'max_output_tokens': maxTokens,
-        if (isReasoning && effort != 'off')
-          'reasoning': {
-            'summary': 'auto',
-            if (effort != 'auto') 'effort': effort,
-          },
         if (responsesIncludeParam != null) 'include': responsesIncludeParam,
       };
-      applyCompatibleResponsesReasoning(
+      applyOpenAIResolvedRequest(
         body2,
-        config: config,
-        modelId: modelId,
-        upstreamModelId: upstreamModelId,
-        isReasoning: isReasoning,
-        thinkingBudget: thinkingBudget,
+        spec: spec,
+        reasoning: reasoning,
+        transport: ReasoningTransport.responses,
       );
       final extraCfg = customBody(config, modelId, assistantBody: extraBody);
-      if (extraCfg.isNotEmpty) body2.addAll(extraCfg);
-      applyPoolsideThinkingIfNeeded(
-        body2,
-        info: info,
-        isReasoning: isReasoning,
-        thinkingBudget: thinkingBudget,
-      );
+      CustomRequestMerger.applyBody(body2, extraCfg);
       try {
         if (body2['tools'] is List) {
           final raw = (body2['tools'] as List).cast<dynamic>();
@@ -276,12 +264,6 @@ Stream<StreamChunk> runOpenAIResponsesToolFollowUps({
           );
         }
       } catch (_) {}
-      sanitizeOpenAIGpt5SamplingParams(
-        body2,
-        upstreamModelId,
-        fallbackEffort: effort,
-        isOpenRouter: info.isOpenRouter,
-      );
 
       final req2 = http.Request('POST', url);
       req2.headers.addAll(

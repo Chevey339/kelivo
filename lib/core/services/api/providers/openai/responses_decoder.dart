@@ -5,6 +5,7 @@ import '../../stream/sse_event.dart';
 import '../../stream/stream_chunk.dart';
 import '../../stream/stream_chunk_decoder.dart';
 import '../../stream/stream_chunk_ids.dart';
+import 'openai_request_shaping.dart';
 
 class ResponsesFunctionCall {
   ResponsesFunctionCall({
@@ -65,10 +66,7 @@ class ResponsesStreamDecoder implements StreamChunkDecoder {
   final StreamChunkIds _ids;
   TokenUsage? _round;
 
-  TokenUsage? get usage {
-    if (_round == null) return initialUsage;
-    return (initialUsage ?? const TokenUsage()).merge(_round!);
-  }
+  TokenUsage? get usage => _round?.asSnapshot() ?? initialUsage;
 
   bool completed = false;
   int approxCompletionChars = 0;
@@ -747,21 +745,7 @@ bool _isImageGenerationType(dynamic type) {
 }
 
 TokenUsage? _mergeUsage(TokenUsage? current, dynamic rawUsage) {
-  if (rawUsage is! Map) return current;
-  final details =
-      rawUsage['prompt_tokens_details'] ?? rawUsage['input_tokens_details'];
-  final cachedTokens = details is Map ? _readInt(details['cached_tokens']) : 0;
-  return (current ?? const TokenUsage()).merge(
-    TokenUsage(
-      promptTokens: _readInt(
-        rawUsage['prompt_tokens'] ?? rawUsage['input_tokens'],
-      ),
-      completionTokens: _readInt(
-        rawUsage['completion_tokens'] ?? rawUsage['output_tokens'],
-      ),
-      cachedTokens: cachedTokens,
-    ),
-  );
+  return mergeOpenAICompatibleUsage(current, rawUsage);
 }
 
 int _readInt(dynamic value) {

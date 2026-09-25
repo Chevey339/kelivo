@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../../core/models/chat_input_data.dart';
 import '../../../core/models/assistant.dart';
+import '../../../core/models/reasoning_request.dart';
 import '../../../core/models/chat_message.dart';
 import '../../../core/models/compress_context_options.dart';
 import '../../../core/models/conversation.dart';
@@ -11,13 +12,14 @@ import '../../../core/providers/assistant_provider.dart';
 import '../../../core/providers/settings_provider.dart';
 import '../../../core/services/api/chat_api_service.dart';
 import '../../../core/services/chat/chat_service.dart';
-import '../../../core/services/model_override_payload_parser.dart';
 import '../../../core/services/logging/flutter_logger.dart';
+import '../../../core/services/model_spec/model_spec_resolver.dart';
 import '../../../core/services/memory/memory_pipeline.dart';
 import '../../../core/services/memory/memory_trace.dart';
 import '../../../utils/utf16_safe_cut.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../chat/widgets/chat_message_widget.dart' show ToolUIPart;
+import '../services/context_usage_service.dart';
 import '../services/message_builder_service.dart';
 import '../services/message_generation_service.dart';
 import '../services/chat_suggestion_service.dart';
@@ -104,7 +106,8 @@ class HomeViewModel extends ChangeNotifier {
     required this._chatController,
     required this._contextProvider,
     required this.getTitleForLocale,
-  }) {
+    ContextUsageService? contextUsage,
+  }) : _contextUsage = contextUsage {
     // Initialize ChatActions
     _chatActions = ChatActions(
       chatService: _chatService,
@@ -114,6 +117,7 @@ class HomeViewModel extends ChangeNotifier {
       messageGenerationService: _messageGenerationService,
       contextProvider: _contextProvider,
       viewModel: this,
+      contextUsage: contextUsage,
     );
 
     // Wire up callbacks
@@ -144,6 +148,7 @@ class HomeViewModel extends ChangeNotifier {
   final stream_ctrl.StreamController _streamController;
   final ChatController _chatController;
   final BuildContext _contextProvider;
+  final ContextUsageService? _contextUsage;
   final ChatSuggestionService _suggestionService =
       const ChatSuggestionService();
   late final ChatActions _chatActions;
@@ -917,6 +922,10 @@ class HomeViewModel extends ChangeNotifier {
   // Public Methods - Conversation Management
   // ============================================================================
 
+  void _syncContextUsageConversation(String? conversationId) {
+    _contextUsage?.setActiveConversation(conversationId);
+  }
+
   /// Switch to an existing conversation.
   ///
   /// The caller flushes the current conversation's progress before invoking
@@ -930,6 +939,7 @@ class HomeViewModel extends ChangeNotifier {
     if (currentConversation?.id == id) return;
 
     _chatService.setCurrentConversation(id);
+    _syncContextUsageConversation(id);
     final convo = _chatService.getConversation(id);
     if (convo != null) {
       // Assistant preference persistence runs concurrently with the window
@@ -980,6 +990,7 @@ class HomeViewModel extends ChangeNotifier {
   void commitConversationSwitch(PreparedConversationSwitch prepared) {
     final id = prepared.conversation.id;
     _chatService.setCurrentConversation(id);
+    _syncContextUsageConversation(id);
     _chatController.commitConversationWindow(
       prepared.window,
       onDeferredGroupDataLoaded: notifyListeners,
@@ -1040,6 +1051,7 @@ class HomeViewModel extends ChangeNotifier {
     );
 
     _chatController.setDraftConversation(conversation);
+    _syncContextUsageConversation(conversation.id);
     _streamController.clearAllState(
       keepMessageIds: _chatActions.activeStreamingMessageIds,
     );
@@ -1102,6 +1114,7 @@ class HomeViewModel extends ChangeNotifier {
     );
 
     _chatController.setDraftConversation(conversation);
+    _syncContextUsageConversation(conversation.id);
     _streamController.clearAllState(
       keepMessageIds: _chatActions.activeStreamingMessageIds,
     );
@@ -1125,6 +1138,7 @@ class HomeViewModel extends ChangeNotifier {
 
     // Switch to the new conversation
     _chatService.setCurrentConversation(newConvo.id);
+    _syncContextUsageConversation(newConvo.id);
     await _chatController.setCurrentConversationAndLoad(newConvo);
     _restoreMessageUiState();
     onConversationSwitched?.call();
@@ -1222,9 +1236,7 @@ class HomeViewModel extends ChangeNotifier {
     if (provKey == null || mdlId == null) return 'no_model';
 
     final cfg = settings.getProviderConfig(provKey);
-    final budget = settings.compressGenerationThinkingBudgetFor(
-      assistant?.thinkingBudget,
-    );
+    final reasoning = settings.compressGenerationReasoningFor(assistant);
 
     var stage = 'prepare';
     var inputLength = summarizeInput.fold<int>(
@@ -1246,7 +1258,7 @@ class HomeViewModel extends ChangeNotifier {
             config: cfg,
             modelId: mdlId,
             prompt: prompt,
-            thinkingBudget: budget,
+            reasoning: reasoning,
             skipImageParsing: true,
           )).trim();
         },
@@ -1263,9 +1275,9 @@ class HomeViewModel extends ChangeNotifier {
     try {
       stage = 'prepare';
       final requestChars = compressRequestCharBudget(
-        contextWindowTokens: readModelContextWindowTokens(
-          ModelOverridePayloadParser.modelOverride(cfg.modelOverrides, mdlId),
-        ),
+        contextWindowTokens: ModelSpecResolver.instance
+            .spec(cfg, mdlId)
+            .contextWindow,
       );
       stage = 'chunk';
       final chunks = buildCompressRequestContents(
@@ -1332,6 +1344,7 @@ class HomeViewModel extends ChangeNotifier {
         );
 
         _chatService.setCurrentConversation(newConvo.id);
+        _syncContextUsageConversation(newConvo.id);
         await _chatController.setCurrentConversationAndLoad(
           _chatService.getConversation(newConvo.id) ?? newConvo,
         );
@@ -1358,6 +1371,7 @@ class HomeViewModel extends ChangeNotifier {
 
       // Switch to the new conversation
       _chatService.setCurrentConversation(newConvo.id);
+      _syncContextUsageConversation(newConvo.id);
       await _chatController.setCurrentConversationAndLoad(
         _chatService.getConversation(newConvo.id) ?? newConvo,
       );
@@ -1566,9 +1580,7 @@ class HomeViewModel extends ChangeNotifier {
     final mdlId = settings.titleModelId ?? chatModel.modelId;
     if (provKey == null || mdlId == null) return;
     final cfg = settings.getProviderConfig(provKey);
-    final budget = settings.titleGenerationThinkingBudgetFor(
-      assistant?.thinkingBudget,
-    );
+    final reasoning = settings.titleGenerationReasoningFor(assistant);
     final locale = Localizations.localeOf(_contextProvider).toLanguageTag();
 
     // Build content from messages (shared with the side drawer title path;
@@ -1585,7 +1597,7 @@ class HomeViewModel extends ChangeNotifier {
         config: cfg,
         modelId: mdlId,
         prompt: prompt,
-        thinkingBudget: budget,
+        reasoning: reasoning,
         skipImageParsing: true,
       )).trim();
       if (title.isNotEmpty) {
@@ -1638,9 +1650,7 @@ class HomeViewModel extends ChangeNotifier {
         ? assistantProvider.getById(convo.assistantId!)
         : assistantProvider.currentAssistant;
 
-    final budget = settings.summaryGenerationThinkingBudgetFor(
-      assistant?.thinkingBudget,
-    );
+    final reasoning = settings.summaryGenerationReasoningFor(assistant);
 
     final legacy = settings.legacyMemoryMode;
     if (legacy) {
@@ -1727,7 +1737,7 @@ class HomeViewModel extends ChangeNotifier {
         config: cfg,
         modelId: mdlId,
         prompt: prompt,
-        thinkingBudget: budget,
+        reasoning: reasoning,
         skipImageParsing: true,
       )).trim();
       traceStep?.appendResponse(summary);
@@ -1836,9 +1846,7 @@ class HomeViewModel extends ChangeNotifier {
     final mdlId = settings.suggestionModelId ?? chatModel.modelId;
     if (provKey == null || mdlId == null) return;
     final locale = Localizations.localeOf(_contextProvider).toLanguageTag();
-    final budget = settings.suggestionGenerationThinkingBudgetFor(
-      assistant?.thinkingBudget,
-    );
+    final reasoning = settings.suggestionGenerationReasoningFor(assistant);
 
     final request = Object();
     _suggestionRequests[conversationId] = request;
@@ -1880,7 +1888,7 @@ class HomeViewModel extends ChangeNotifier {
         messages: msgs,
         truncateIndex: truncateIndex,
         locale: locale,
-        thinkingBudget: budget,
+        reasoning: reasoning,
       );
       // An empty array is a valid decision to offer no suggestions.
       if (suggestions.isEmpty || !isCurrent()) return;
@@ -1933,8 +1941,8 @@ class HomeViewModel extends ChangeNotifier {
     return _generationController.isToolModel(providerKey, modelId);
   }
 
-  bool isReasoningEnabled(int? budget) {
-    return _generationController.isReasoningEnabled(budget);
+  bool isReasoningEnabled(ReasoningRequest r) {
+    return _generationController.isReasoningEnabled(r);
   }
 
   // ============================================================================

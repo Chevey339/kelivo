@@ -24,6 +24,13 @@ class _DesktopProvidersBodyState extends State<_DesktopProvidersBody> {
   bool _temporarilyCollapseGroupedProviders = false;
   bool _groupHeaderDragActive = false;
   bool _groupHeaderRestorePending = false;
+  final GlobalKey _catalogAnchorKey = GlobalKey();
+
+  @override
+  void initState() {
+    super.initState();
+    unawaited(ModelCatalogService.instance.ensureLoaded());
+  }
 
   @override
   void dispose() {
@@ -385,21 +392,45 @@ class _DesktopProvidersBodyState extends State<_DesktopProvidersBody> {
                 width: 256,
                 child: Column(
                   children: [
-                    _DesktopProvidersSearchField(
-                      controller: _searchController,
-                      hintText: l10n.providersPageSearchHint,
-                      onChanged: (value) {
-                        setState(() {
-                          _searchQuery = _normalizeSearchQuery(value);
-                        });
-                      },
-                      onClear: () {
-                        if (_searchController.text.isEmpty) return;
-                        _searchController.clear();
-                        setState(() {
-                          _searchQuery = '';
-                        });
-                      },
+                    Row(
+                      children: [
+                        Expanded(
+                          child: _DesktopProvidersSearchField(
+                            controller: _searchController,
+                            hintText: l10n.providersPageSearchHint,
+                            onChanged: (value) {
+                              setState(() {
+                                _searchQuery = _normalizeSearchQuery(value);
+                              });
+                            },
+                            onClear: () {
+                              if (_searchController.text.isEmpty) return;
+                              _searchController.clear();
+                              setState(() {
+                                _searchQuery = '';
+                              });
+                            },
+                          ),
+                        ),
+                        const SizedBox(width: 4),
+                        Tooltip(
+                          message: l10n.modelCatalogTitle,
+                          child: KeyedSubtree(
+                            key: _catalogAnchorKey,
+                            child: _IconBtn(
+                              icon: lucide.Lucide.BookOpen,
+                              onTap: () {
+                                unawaited(
+                                  showDesktopModelCatalogPopover(
+                                    context,
+                                    anchorKey: _catalogAnchorKey,
+                                  ),
+                                );
+                              },
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                     const SizedBox(height: 8),
                     Expanded(
@@ -4748,7 +4779,7 @@ class _DesktopProviderDetailPaneState extends State<DesktopProviderDetailPane> {
   // }
 
   Future<void> _createModel(BuildContext context) async {
-    final res = await showDesktopCreateModelDialog(
+    final res = await showDesktopCreateModelSpecDialog(
       context,
       providerKey: widget.providerKey,
     );
@@ -7047,49 +7078,19 @@ class _ModelRow extends StatelessWidget {
     final l10n = AppLocalizations.of(context)!;
     final sp = context.watch<SettingsProvider>();
     final cfg = sp.getProviderConfig(providerKey);
-    ModelInfo infer(String id) =>
-        ModelRegistry.infer(ModelInfo(id: id, displayName: id));
-    // Resolve upstream/api model id for inference + capsules
-    String baseId = modelId;
-    final rawOv = cfg.modelOverrides[modelId];
-    final Map<String, dynamic>? ov = rawOv is Map
-        ? {for (final e in rawOv.entries) e.key.toString(): e.value}
-        : null;
-    if (ov != null) {
-      final apiId = (ov['apiModelId'] ?? ov['api_model_id'])?.toString().trim();
-      if (apiId != null && apiId.isNotEmpty) {
-        baseId = apiId;
-      }
-    }
-
-    ModelInfo effective() {
-      final base = infer(baseId);
-      if (ov == null) return base;
-      return ModelOverrideResolver.applyModelOverride(base, ov);
-    }
-
-    final info = effective();
-    // Display label: prefer override name, then upstream model id, then logical key
-    String displayName = modelId;
-    if (ov != null) {
-      final overrideName = ov['name']?.toString().trim();
-      if (overrideName != null && overrideName.isNotEmpty) {
-        displayName = overrideName;
-      } else {
-        displayName = baseId;
-      }
-    } else {
-      displayName = baseId;
-    }
+    final resolved = ModelSpecResolver.instance.resolve(cfg, modelId);
+    final info = resolved.spec;
+    final baseId = info.upstreamId;
+    final displayName = resolved.override.displayName ?? baseId;
 
     return GestureDetector(
       onTap: isSelectionMode
           ? () => onSelectionChanged?.call(!isSelected)
           : cfg.isOAuth
-          ? () => showDesktopModelEditDialog(
+          ? () => showDesktopModelSpecEditDialog(
               context,
               providerKey: providerKey,
-              modelId: modelId,
+              modelKey: modelId,
             )
           : null,
       child: Container(
@@ -7161,55 +7162,61 @@ class _ModelRow extends StatelessWidget {
               ),
               const SizedBox(width: 8),
             ],
-            if (!isSelectionMode) ...[
-              ModelCapsulesRow(model: info),
-              const SizedBox(width: 8),
-              _IconBtn(
-                icon: lucide.Lucide.Settings2,
-                onTap: () async {
-                  await showDesktopModelEditDialog(
-                    context,
-                    providerKey: providerKey,
-                    modelId: modelId,
-                  );
-                },
-              ),
-              if (!cfg.isOAuth) ...[
-                const SizedBox(width: 4),
-                _IconBtn(
-                  icon: lucide.Lucide.Minus,
-                  onTap: () async {
-                    final sp = context.read<SettingsProvider>();
-                    final ap = context.read<AssistantProvider>();
-                    final chatService = context.read<ChatService>();
-                    final old = sp.getProviderConfig(providerKey);
-                    final list = List<String>.from(old.models)
-                      ..removeWhere((e) => e == modelId);
-                    await sp.setProviderConfig(
-                      providerKey,
-                      old.copyWith(models: list),
-                    );
-                    // Clear global and assistant-level model selections that reference the deleted model
-                    await sp.clearSelectionsForModel(providerKey, modelId);
-                    try {
-                      for (final a in ap.assistants) {
-                        if (a.chatModelProvider == providerKey &&
-                            a.chatModelId == modelId) {
-                          await ap.updateAssistant(
-                            a.copyWith(clearChatModel: true),
-                          );
-                        }
-                      }
-                      // Conversations can pin a model too.
-                      await chatService.clearConversationModelOverrides(
+            if (!isSelectionMode)
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  ModelCapsulesRow(model: info, alignment: WrapAlignment.end),
+                  const SizedBox(width: 8),
+                  _IconBtn(
+                    key: ValueKey('desktop-provider-model-settings-$modelId'),
+                    icon: lucide.Lucide.Settings2,
+                    onTap: () async {
+                      await showDesktopModelSpecEditDialog(
+                        context,
                         providerKey: providerKey,
-                        modelId: modelId,
+                        modelKey: modelId,
                       );
-                    } catch (_) {}
-                  },
-                ),
-              ],
-            ],
+                    },
+                  ),
+                  if (!cfg.isOAuth) ...[
+                    const SizedBox(width: 4),
+                    _IconBtn(
+                      key: ValueKey('desktop-provider-model-remove-$modelId'),
+                      icon: lucide.Lucide.Minus,
+                      onTap: () async {
+                        final sp = context.read<SettingsProvider>();
+                        final ap = context.read<AssistantProvider>();
+                        final chatService = context.read<ChatService>();
+                        final old = sp.getProviderConfig(providerKey);
+                        final list = List<String>.from(old.models)
+                          ..removeWhere((e) => e == modelId);
+                        await sp.setProviderConfig(
+                          providerKey,
+                          old.copyWith(models: list),
+                        );
+                        // Clear global and assistant-level model selections that reference the deleted model
+                        await sp.clearSelectionsForModel(providerKey, modelId);
+                        try {
+                          for (final a in ap.assistants) {
+                            if (a.chatModelProvider == providerKey &&
+                                a.chatModelId == modelId) {
+                              await ap.updateAssistant(
+                                a.copyWith(clearChatModel: true),
+                              );
+                            }
+                          }
+                          // Conversations can pin a model too.
+                          await chatService.clearConversationModelOverrides(
+                            providerKey: providerKey,
+                            modelId: modelId,
+                          );
+                        } catch (_) {}
+                      },
+                    ),
+                  ],
+                ],
+              ),
           ],
         ),
       ),

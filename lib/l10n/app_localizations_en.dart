@@ -452,6 +452,22 @@ class AppLocalizationsEn extends AppLocalizations {
   String get statsPageLaunchCount => 'App Launches';
 
   @override
+  String statsPageCost(String currency) {
+    return 'Cost ($currency)';
+  }
+
+  @override
+  String statsPageModelsWithoutPricing(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count models without pricing',
+      one: '$count model without pricing',
+    );
+    return '$_temp0';
+  }
+
+  @override
   String get statsPageUsageTrendTitle => 'Usage Trend';
 
   @override
@@ -752,10 +768,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get homePagePleaseSelectModel => 'Please select a model first';
 
   @override
-  String get homePageAudioAttachmentUnsupported =>
-      'The current model does not support audio attachments. Switch to a model that supports audio input or remove the audio file and try again.';
-
-  @override
   String get homePagePleaseSetupTranslateModel =>
       'Please set a translation model first';
 
@@ -1000,7 +1012,14 @@ class AppLocalizationsEn extends AppLocalizations {
       'Enable streaming responses';
 
   @override
-  String get assistantEditThinkingBudgetTitle => 'Thinking Budget';
+  String get assistantEditThinkingBudgetTitle => 'Thinking';
+
+  @override
+  String get assistantEditReasoningFollowDefault => 'Follow model default';
+
+  @override
+  String get assistantEditReasoningClampedSubtitle =>
+      'The actual level is clamped to what each model supports';
 
   @override
   String get assistantEditConfigureButton => 'Configure';
@@ -2400,63 +2419,102 @@ class AppLocalizationsEn extends AppLocalizations {
   String get messageMoreSheetDeleteAllVersions => 'Delete All Versions';
 
   @override
-  String get reasoningBudgetSheetOff => 'Off';
-
-  @override
-  String get reasoningBudgetSheetAuto => 'Auto';
-
-  @override
-  String get reasoningBudgetSheetLight => 'Light Reasoning';
-
-  @override
-  String get reasoningBudgetSheetMedium => 'Medium Reasoning';
-
-  @override
-  String get reasoningBudgetSheetHeavy => 'Heavy Reasoning';
-
-  @override
-  String get reasoningBudgetSheetXhigh => 'Extreme Reasoning';
-
-  @override
-  String get reasoningBudgetSheetMax => 'Maximum Reasoning';
-
-  @override
   String get reasoningBudgetSheetTitle => 'Reasoning Chain Strength';
 
   @override
-  String reasoningBudgetSheetCurrentLevel(String level) {
-    return 'Current Level: $level';
-  }
+  String get reasoningLevelSheetTitle => 'Reasoning';
 
   @override
-  String get reasoningBudgetSheetOffSubtitle =>
-      'Turn off reasoning, answer directly';
+  String get reasoningLevelAuto => 'Auto';
 
   @override
-  String get reasoningBudgetSheetAutoSubtitle =>
-      'Let the model decide reasoning level automatically';
+  String get reasoningLevelAutoSubtitle => 'Uses the model or provider default';
 
   @override
-  String get reasoningBudgetSheetLightSubtitle =>
+  String get reasoningLevelOff => 'Off';
+
+  @override
+  String get reasoningLevelOffSubtitle =>
+      'Turn off reasoning and answer directly';
+
+  @override
+  String get reasoningLevelMinimal => 'Minimal';
+
+  @override
+  String get reasoningLevelMinimalSubtitle =>
+      'Use the lightest reasoning to answer questions';
+
+  @override
+  String get reasoningLevelLow => 'Low';
+
+  @override
+  String get reasoningLevelLowSubtitle =>
       'Use light reasoning to answer questions';
 
   @override
-  String get reasoningBudgetSheetMediumSubtitle =>
+  String get reasoningLevelMedium => 'Medium';
+
+  @override
+  String get reasoningLevelMediumSubtitle =>
       'Use moderate reasoning to answer questions';
 
   @override
-  String get reasoningBudgetSheetHeavySubtitle =>
+  String get reasoningLevelHigh => 'High';
+
+  @override
+  String get reasoningLevelHighSubtitle =>
       'Use heavy reasoning for complex questions';
 
   @override
-  String get reasoningBudgetSheetXhighSubtitle =>
+  String get reasoningLevelXhigh => 'Extra High';
+
+  @override
+  String get reasoningLevelXhighSubtitle =>
+      'Use very high reasoning depth for harder problems';
+
+  @override
+  String get reasoningLevelMax => 'Max';
+
+  @override
+  String get reasoningLevelMaxSubtitle =>
       'Use maximum reasoning depth for the toughest problems';
 
   @override
-  String get reasoningBudgetSheetCustomLabel => 'Custom Reasoning Budget';
+  String get reasoningLevelFollowModelDefaultSubtitle =>
+      'Use the model\'s default when the assistant doesn\'t set one';
 
   @override
-  String get reasoningBudgetSheetCustomHint => 'e.g. 2048 (-1 auto, 0 off)';
+  String get reasoningLevelNoReasoning =>
+      'This model does not support reasoning';
+
+  @override
+  String get reasoningLevelCustomBudget => 'Custom Reasoning Budget';
+
+  @override
+  String get reasoningLevelCustomBudgetHint => 'Token budget, e.g. 2048';
+
+  @override
+  String get reasoningLevelCompactMin => 'min';
+
+  @override
+  String get reasoningLevelCompactLow => 'low';
+
+  @override
+  String get reasoningLevelCompactMid => 'mid';
+
+  @override
+  String get reasoningLevelCompactHigh => 'high';
+
+  @override
+  String get reasoningLevelCompactXhigh => 'xhigh';
+
+  @override
+  String get reasoningLevelCompactMax => 'max';
+
+  @override
+  String reasoningLevelBudgetTokens(String budget) {
+    return '$budget tokens';
+  }
 
   @override
   String chatMessageWidgetFileNotFound(String fileName) {
@@ -3122,6 +3180,84 @@ class AppLocalizationsEn extends AppLocalizations {
   String get chatInputBarCollapse => 'Collapse';
 
   @override
+  String get contextUsageTitle => 'Context window';
+
+  @override
+  String get contextUsageStateExact => 'Exact (from last response)';
+
+  @override
+  String get contextUsageStateExactCalibrated =>
+      'Exact (breakdown scaled from estimate)';
+
+  @override
+  String get contextUsageStateEstimated => 'Estimated';
+
+  @override
+  String get contextUsageStateStale => 'Stale, updating…';
+
+  @override
+  String get contextUsageStateComputing => 'Computing…';
+
+  @override
+  String get contextUsageStateNone => 'No data yet';
+
+  @override
+  String get contextUsageBucketSystem => 'System prompt';
+
+  @override
+  String get contextUsageBucketInjections => 'Instruction injections';
+
+  @override
+  String get contextUsageBucketHistory => 'Messages';
+
+  @override
+  String get contextUsageBucketTools => 'Built-in tools';
+
+  @override
+  String get contextUsageBucketMemory => 'Memory';
+
+  @override
+  String get contextUsageBucketWorldBook => 'World books';
+
+  @override
+  String get contextUsageBucketSkills => 'Skills';
+
+  @override
+  String get contextUsageBucketWorkspace => 'Workspace';
+
+  @override
+  String get contextUsageBucketSearch => 'Search prompt';
+
+  @override
+  String get contextUsageBucketMcpTools => 'MCP tools';
+
+  @override
+  String get contextUsageBucketAttachments => 'Attachments';
+
+  @override
+  String get contextUsageBucketDraft => 'Draft';
+
+  @override
+  String get contextUsageBucketUsed => 'Used';
+
+  @override
+  String get contextUsageFreeSpace => 'Free space';
+
+  @override
+  String contextUsageUsedWindow(String used, String window, int percent) {
+    return '$used / $window ($percent%)';
+  }
+
+  @override
+  String get contextUsageNoWindow => 'No context window';
+
+  @override
+  String get contextUsageSetWindow => 'Set context window';
+
+  @override
+  String get contextUsageRefresh => 'Refresh';
+
+  @override
   String get mcpPageBackTooltip => 'Back';
 
   @override
@@ -3490,11 +3626,6 @@ class AppLocalizationsEn extends AppLocalizations {
       'Required, suggest lowercase/digits/hyphens';
 
   @override
-  String modelDetailSheetModelIdDisabledHint(String modelId) {
-    return '$modelId';
-  }
-
-  @override
   String get modelDetailSheetModelNameLabel => 'Model Name';
 
   @override
@@ -3549,13 +3680,6 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get modelDetailSheetBuiltinToolsDescription =>
       'Built-in tools depend on the provider and API mode.';
-
-  @override
-  String get modelDetailSheetSearchTool => 'Search';
-
-  @override
-  String get modelDetailSheetSearchToolDescription =>
-      'Enable Google Search integration';
 
   @override
   String get modelDetailSheetUrlContextTool => 'URL Context';
@@ -3632,9 +3756,6 @@ class AppLocalizationsEn extends AppLocalizations {
       'Please enter a valid model ID (>=2 chars)';
 
   @override
-  String get modelDetailSheetModelIdExistsError => 'Model ID already exists';
-
-  @override
   String get modelDetailSheetHeaderKeyHint => 'Header Key';
 
   @override
@@ -3645,6 +3766,309 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get modelDetailSheetBodyJsonHint => 'Body JSON';
+
+  @override
+  String get modelSpecFormSourceCustom => 'Custom';
+
+  @override
+  String get modelSpecFormSourceCatalog => 'Catalog';
+
+  @override
+  String get modelSpecFormSourceInferred => 'Inferred';
+
+  @override
+  String get modelSpecFormSourceDefault => 'Default';
+
+  @override
+  String get modelSpecFormReset => 'Reset to default';
+
+  @override
+  String get modelSpecFormModalitiesSection => 'Modalities & abilities';
+
+  @override
+  String get modelSpecFormImageType => 'Image';
+
+  @override
+  String get modelSpecFormAudioMode => 'Audio';
+
+  @override
+  String get modelSpecFormVideoMode => 'Video';
+
+  @override
+  String get modelSpecFormPdfMode => 'PDF';
+
+  @override
+  String get modelSpecFormStructuredOutputAbility => 'Structured Output';
+
+  @override
+  String get modelSpecFormReasoningSection => 'Reasoning';
+
+  @override
+  String get modelSpecFormDialect => 'Dialect';
+
+  @override
+  String get modelSpecFormDialectNone => 'None';
+
+  @override
+  String get modelSpecFormDialectNoneSubtitle => 'No reasoning fields';
+
+  @override
+  String get modelSpecFormDialectOpenaiReasoningEffort =>
+      'OpenAI reasoning effort';
+
+  @override
+  String get modelSpecFormDialectOpenaiReasoningEffortSubtitle =>
+      'reasoning_effort';
+
+  @override
+  String get modelSpecFormDialectOpenaiResponsesReasoning =>
+      'OpenAI Responses reasoning';
+
+  @override
+  String get modelSpecFormDialectOpenaiResponsesReasoningSubtitle =>
+      'reasoning.effort';
+
+  @override
+  String get modelSpecFormDialectOpenrouterReasoning => 'OpenRouter reasoning';
+
+  @override
+  String get modelSpecFormDialectOpenrouterReasoningSubtitle => 'reasoning';
+
+  @override
+  String get modelSpecFormDialectAnthropicBudget => 'Anthropic budget';
+
+  @override
+  String get modelSpecFormDialectAnthropicBudgetSubtitle =>
+      'thinking.budget_tokens';
+
+  @override
+  String get modelSpecFormDialectAnthropicAdaptiveEffort =>
+      'Anthropic adaptive effort';
+
+  @override
+  String get modelSpecFormDialectAnthropicAdaptiveEffortSubtitle =>
+      'thinking + output_config.effort';
+
+  @override
+  String get modelSpecFormDialectAnthropicEffort => 'Anthropic effort';
+
+  @override
+  String get modelSpecFormDialectAnthropicEffortSubtitle =>
+      'thinking + output_config.effort';
+
+  @override
+  String get modelSpecFormDialectGeminiThinkingBudget =>
+      'Gemini thinking budget';
+
+  @override
+  String get modelSpecFormDialectGeminiThinkingBudgetSubtitle =>
+      'thinkingConfig.thinkingBudget';
+
+  @override
+  String get modelSpecFormDialectGeminiThinkingLevel => 'Gemini thinking level';
+
+  @override
+  String get modelSpecFormDialectGeminiThinkingLevelSubtitle =>
+      'thinkingConfig.thinkingLevel';
+
+  @override
+  String get modelSpecFormDialectQwenEnableThinking => 'Qwen enable thinking';
+
+  @override
+  String get modelSpecFormDialectQwenEnableThinkingSubtitle =>
+      'enable_thinking';
+
+  @override
+  String get modelSpecFormDialectThinkingType => 'Thinking type';
+
+  @override
+  String get modelSpecFormDialectThinkingTypeSubtitle => 'thinking.type';
+
+  @override
+  String get modelSpecFormDialectSiliconflowEnableThinking =>
+      'SiliconFlow enable thinking';
+
+  @override
+  String get modelSpecFormDialectSiliconflowEnableThinkingSubtitle =>
+      'enable_thinking';
+
+  @override
+  String get modelSpecFormDialectInternThinkingMode => 'Intern thinking mode';
+
+  @override
+  String get modelSpecFormDialectInternThinkingModeSubtitle => 'thinking_mode';
+
+  @override
+  String get modelSpecFormDialectChatTemplateKwargs => 'Chat template kwargs';
+
+  @override
+  String get modelSpecFormDialectChatTemplateKwargsSubtitle =>
+      'chat_template_kwargs.enable_thinking';
+
+  @override
+  String get modelSpecFormDialectKimiThinking => 'Kimi thinking';
+
+  @override
+  String get modelSpecFormDialectKimiThinkingSubtitle => 'thinking';
+
+  @override
+  String get modelSpecFormDialectCustom => 'Custom JSON';
+
+  @override
+  String get modelSpecFormDialectCustomSubtitle => 'Per-level JSON patch';
+
+  @override
+  String get modelSpecFormLevels => 'Supported levels';
+
+  @override
+  String get modelSpecFormCanDisable => 'Allow disabling';
+
+  @override
+  String get modelSpecFormDefaultLevel => 'Default level';
+
+  @override
+  String get modelSpecFormBudgets => 'Token budgets';
+
+  @override
+  String modelSpecFormBudgetPlaceholder(String tokens) {
+    return '$tokens';
+  }
+
+  @override
+  String modelSpecFormCustomPatch(String level) {
+    return 'JSON patch ($level)';
+  }
+
+  @override
+  String get modelSpecFormCustomPatchHint => 'e.g. reasoning_effort: high';
+
+  @override
+  String get modelSpecFormInvalidJson =>
+      'Custom reasoning patch must be a valid JSON object';
+
+  @override
+  String get modelSpecFormInvalidNumber => 'Please enter a valid number';
+
+  @override
+  String get modelSpecFormStrategySection => 'Strategy';
+
+  @override
+  String get modelSpecFormSampling => 'Sampling';
+
+  @override
+  String get modelSpecFormRequestQuirks => 'Request compatibility';
+
+  @override
+  String get modelSpecFormDynamicWebSearch => 'Dynamic filtering search tools';
+
+  @override
+  String get modelSpecFormDynamicWebSearchSubtitle =>
+      'When dynamic filtering is on, send the 2026-03-18 web search and fetch tools';
+
+  @override
+  String get modelSpecFormRemoteImageUrls => 'Remote image links';
+
+  @override
+  String get modelSpecFormRemoteImageUrlsSubtitle =>
+      'Send http(s) image links as-is; when off, remote links are dropped and only local images are sent';
+
+  @override
+  String get modelSpecFormPromptCacheControl => 'Prompt cache marker';
+
+  @override
+  String get modelSpecFormPromptCacheControlSubtitle =>
+      'When prompt caching is on, add cache_control to OpenRouter requests';
+
+  @override
+  String get modelSpecFormSamplingAlways => 'Always';
+
+  @override
+  String get modelSpecFormSamplingAlwaysSubtitle =>
+      'Keep temperature and other sampling fields';
+
+  @override
+  String get modelSpecFormSamplingOnlyWhenReasoningOff =>
+      'Only when reasoning is off';
+
+  @override
+  String get modelSpecFormSamplingOnlyWhenReasoningOffSubtitle =>
+      'Strip sampling fields while the model is thinking';
+
+  @override
+  String get modelSpecFormSamplingNever => 'Never';
+
+  @override
+  String get modelSpecFormSamplingNeverSubtitle =>
+      'Always strip sampling fields';
+
+  @override
+  String get modelSpecFormReplay => 'Reasoning replay';
+
+  @override
+  String get modelSpecFormReplayNone => 'None';
+
+  @override
+  String get modelSpecFormReplayNoneSubtitle =>
+      'Do not send prior reasoning back to the model';
+
+  @override
+  String get modelSpecFormReplayToolTurns => 'Tool turns';
+
+  @override
+  String get modelSpecFormReplayToolTurnsSubtitle =>
+      'Replay reasoning on tool-call turns';
+
+  @override
+  String get modelSpecFormReplayAll => 'All';
+
+  @override
+  String get modelSpecFormReplayAllSubtitle =>
+      'Replay reasoning on every follow-up turn';
+
+  @override
+  String get modelSpecFormReplayField => 'Replay field';
+
+  @override
+  String get modelSpecFormReplayFieldReasoningContent => 'reasoning_content';
+
+  @override
+  String get modelSpecFormReplayFieldReasoning => 'reasoning';
+
+  @override
+  String get modelSpecFormReplayFieldReasoningDetails => 'reasoning_details';
+
+  @override
+  String get modelSpecFormLimitsSection => 'Limits';
+
+  @override
+  String get modelSpecFormLimitsPricingSection => 'Limits & pricing';
+
+  @override
+  String get modelSpecFormContextWindow => 'Context window';
+
+  @override
+  String get modelSpecFormMaxOutput => 'Max output';
+
+  @override
+  String get modelSpecFormPricingSection => 'Pricing / 1M';
+
+  @override
+  String get modelSpecFormPricingInput => 'Input';
+
+  @override
+  String get modelSpecFormPricingOutput => 'Output';
+
+  @override
+  String get modelSpecFormPricingCacheRead => 'Cache read';
+
+  @override
+  String get modelSpecFormPricingCacheWrite => 'Cache write';
+
+  @override
+  String get modelSpecFormCurrency => 'Currency';
+
+  @override
+  String get modelSpecFormAdvancedSection => 'Request';
 
   @override
   String get modelSelectSheetSearchHint => 'Search models or providers';
@@ -3918,6 +4342,43 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get providersPageProviderAddedSnackbar => 'Provider added';
+
+  @override
+  String get modelCatalogTitle => 'Model catalog';
+
+  @override
+  String modelCatalogSourceBundled(String date) {
+    return 'Bundled snapshot · $date';
+  }
+
+  @override
+  String modelCatalogSourceRemote(String date) {
+    return 'models.dev · updated $date';
+  }
+
+  @override
+  String get modelCatalogAutoUpdate => 'Auto-update every 24 hours';
+
+  @override
+  String get modelCatalogRefresh => 'Update now';
+
+  @override
+  String get modelCatalogUpdated => 'Model catalog updated';
+
+  @override
+  String modelCatalogRefreshFailed(String error) {
+    return 'Update failed: $error';
+  }
+
+  @override
+  String modelCatalogProviderCount(int count) {
+    return '$count providers';
+  }
+
+  @override
+  String modelCatalogModelCount(int count) {
+    return '$count models';
+  }
 
   @override
   String get providerGroupsGroupLabel => 'Group';
@@ -4612,6 +5073,14 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get displaySettingsPageShowToolCardsSubtitle =>
       'When off, tool-use cards are hidden in chat.';
+
+  @override
+  String get displaySettingsShowReasoningLevelBadge =>
+      'Show reasoning level on the button';
+
+  @override
+  String get displaySettingsShowReasoningLevelBadgeSubtitle =>
+      'Show the current level next to the reasoning icon in the input bar';
 
   @override
   String get displaySettingsPageAutoCollapseThinkingTitle =>
@@ -7956,6 +8425,21 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String tokenDetailReasoningTokens(int count) {
+    return '$count tokens';
+  }
+
+  @override
+  String tokenDetailCacheWriteTokens(int count) {
+    return '$count cache write tokens';
+  }
+
+  @override
+  String tokenDetailCost(String amount) {
+    return '$amount';
+  }
+
+  @override
   String get debugPageTitle => 'Debug';
 
   @override
@@ -10910,21 +11394,6 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get displaySettingsPageShowProducedFilesSubtitle =>
       'Show files created or modified by tools below replies.';
-
-  @override
-  String get reasoningBudgetSliderLow => 'Low';
-
-  @override
-  String get reasoningBudgetSliderMedium => 'Medium';
-
-  @override
-  String get reasoningBudgetSliderHigh => 'High';
-
-  @override
-  String get reasoningBudgetSliderXhigh => 'XHigh';
-
-  @override
-  String get reasoningBudgetSliderMax => 'Max';
 
   @override
   String get defaultModelPagePerChatModelTitle => 'Per-Chat Model';

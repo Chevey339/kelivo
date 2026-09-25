@@ -15,14 +15,14 @@ import 'package:image_picker/image_picker.dart';
 import '../../../icons/lucide_adapter.dart';
 import '../../../core/providers/model_provider.dart';
 import '../../../core/providers/assistant_provider.dart';
-import '../../model/widgets/model_detail_sheet.dart';
+import '../../model/pages/model_spec_edit_page.dart';
 import '../../model/widgets/model_select_sheet.dart';
 import '../widgets/share_provider_sheet.dart';
 import '../widgets/provider_group_picker_sheet.dart';
 import 'package:flutter_slidable/flutter_slidable.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../core/services/logging/flutter_logger.dart';
-import '../../../core/services/model_override_resolver.dart';
+import '../../../core/services/model_spec/model_spec_resolver.dart';
 import '../../../shared/widgets/snackbar.dart';
 import '../../../shared/widgets/model_tag_wrap.dart';
 import '../../../shared/widgets/ios_checkbox.dart';
@@ -2478,7 +2478,7 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
                   padding: compact ? iconButtonPadding : textButtonPadding,
                   colorScheme: cs,
                   onTap: () async {
-                    await showCreateModelSheet(
+                    await showCreateModelSpecPage(
                       context,
                       providerKey: widget.keyName,
                     );
@@ -3372,19 +3372,21 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
             Future<void> loadModels() async {
               try {
                 if (restrictToFree) {
-                  final list = <ModelInfo>[
-                    ModelRegistry.infer(
-                      ModelInfo(
-                        id: 'THUDM/GLM-4-9B-0414',
-                        displayName: 'THUDM/GLM-4-9B-0414',
-                      ),
-                    ),
-                    ModelRegistry.infer(
-                      ModelInfo(
-                        id: 'Qwen/Qwen3-8B',
-                        displayName: 'Qwen/Qwen3-8B',
-                      ),
-                    ),
+                  final list = <ModelSpec>[
+                    ModelSpecResolver.instance
+                        .resolve(
+                          cfg,
+                          'THUDM/GLM-4-9B-0414',
+                          displayName: 'THUDM/GLM-4-9B-0414',
+                        )
+                        .spec,
+                    ModelSpecResolver.instance
+                        .resolve(
+                          cfg,
+                          'Qwen/Qwen3-8B',
+                          displayName: 'Qwen/Qwen3-8B',
+                        )
+                        .spec,
                   ];
                   setLocal(() {
                     items = list;
@@ -3419,16 +3421,16 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
                 .models
                 .toSet();
             final query = controller.text.trim().toLowerCase();
-            final filtered = <ModelInfo>[
+            final filtered = <ModelSpec>[
               for (final m in items)
-                if (m is ModelInfo &&
+                if (m is ModelSpec &&
                     (query.isEmpty ||
                         m.id.toLowerCase().contains(query) ||
                         m.displayName.toLowerCase().contains(query)))
                   m,
             ];
 
-            String groupFor(ModelInfo m) {
+            String groupFor(ModelSpec m) {
               return ModelGrouping.groupFor(
                 m,
                 embeddingsLabel: l10n.providerDetailPageEmbeddingsGroupTitle,
@@ -3436,7 +3438,7 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
               );
             }
 
-            final Map<String, List<ModelInfo>> grouped = {};
+            final Map<String, List<ModelSpec>> grouped = {};
             for (final m in filtered) {
               final g = groupFor(m);
               (grouped[g] ??= []).add(m);
@@ -3579,9 +3581,9 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
                                         final q = controller.text
                                             .trim()
                                             .toLowerCase();
-                                        final filteredNow = <ModelInfo>[
+                                        final filteredNow = <ModelSpec>[
                                           for (final m in items)
-                                            if (m is ModelInfo &&
+                                            if (m is ModelSpec &&
                                                 (q.isEmpty ||
                                                     m.id.toLowerCase().contains(
                                                       q,
@@ -4046,14 +4048,8 @@ class _ModelCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
     final cs = Theme.of(context).colorScheme;
-    final resolved = _resolveBaseAndOverride(context);
-    final effective = resolved.ov == null
-        ? resolved.base
-        : _applyModelOverride(
-            resolved.base,
-            resolved.ov!,
-            applyDisplayName: true,
-          );
+    final resolved = _resolveModel(context);
+    final effective = resolved.spec;
     String displayName = effective.displayName.trim();
     if (displayName.isEmpty) displayName = modelId;
     final Widget? detectionIndicator = isDetecting
@@ -4113,7 +4109,7 @@ class _ModelCard extends StatelessWidget {
                   ),
                   const SizedBox(width: 12),
                 ],
-                _BrandAvatar(name: resolved.baseId, size: 28),
+                _BrandAvatar(name: resolved.upstreamId, size: 28),
                 const SizedBox(width: 10),
                 Expanded(
                   child: Column(
@@ -4144,10 +4140,10 @@ class _ModelCard extends StatelessWidget {
                     semanticLabel: l10n.providerDetailPageEditTooltip,
                     haptics: false,
                     onTap: () async {
-                      await showModelDetailSheet(
+                      await showModelSpecEditPage(
                         context,
                         providerKey: providerKey,
-                        modelId: modelId,
+                        modelKey: modelId,
                       );
                     },
                   ),
@@ -4160,42 +4156,23 @@ class _ModelCard extends StatelessWidget {
     );
   }
 
-  ModelInfo _infer(String id) {
-    // build a minimal ModelInfo and let registry infer
-    return ModelRegistry.infer(ModelInfo(id: id, displayName: id));
-  }
-
-  _ResolvedModelOverride _resolveBaseAndOverride(BuildContext context) {
-    final configs = context.watch<SettingsProvider>().providerConfigs;
-    final cfg = configs[providerKey];
-    if (cfg == null) {
-      final base = _infer(modelId);
-      return _ResolvedModelOverride(base: base, ov: null, baseId: modelId);
-    }
-    final rawOv = cfg.modelOverrides[modelId];
-    final Map<String, dynamic>? ov = rawOv is Map
-        ? {for (final e in rawOv.entries) e.key.toString(): e.value}
-        : null;
-    String baseId = modelId;
-    if (ov != null) {
-      final raw = (ov['apiModelId'] ?? ov['api_model_id'])?.toString().trim();
-      if (raw != null && raw.isNotEmpty) baseId = raw;
-    }
-    final base = _infer(baseId);
-    return _ResolvedModelOverride(base: base, ov: ov, baseId: baseId);
+  _ResolvedListedModel _resolveModel(BuildContext context) {
+    final cfg = context.watch<SettingsProvider>().getProviderConfig(
+      providerKey,
+    );
+    final resolved = ModelSpecResolver.instance.resolve(cfg, modelId);
+    return _ResolvedListedModel(
+      spec: resolved.spec,
+      upstreamId: resolved.spec.upstreamId,
+    );
   }
 }
 
-class _ResolvedModelOverride {
-  const _ResolvedModelOverride({
-    required this.base,
-    required this.ov,
-    required this.baseId,
-  });
+class _ResolvedListedModel {
+  const _ResolvedListedModel({required this.spec, required this.upstreamId});
 
-  final ModelInfo base;
-  final Map<String, dynamic>? ov;
-  final String baseId;
+  final ModelSpec spec;
+  final String upstreamId;
 }
 
 class _ConnectionTestDialog extends StatefulWidget {
@@ -4514,30 +4491,6 @@ Future<String?> showModelPickerForTest(
     initialModelId: initialModelId,
   );
   return sel?.modelId;
-}
-
-ModelInfo _applyModelOverride(
-  ModelInfo base,
-  Map<String, dynamic> ov, {
-  bool applyDisplayName = false,
-}) {
-  try {
-    return ModelOverrideResolver.applyModelOverride(
-      base,
-      ov,
-      applyDisplayName: applyDisplayName,
-    );
-  } catch (e, st) {
-    FlutterLogger.log(
-      '[ModelOverride] applyModelOverride failed: $e\n$st',
-      tag: 'ModelOverride',
-    );
-    assert(() {
-      debugPrint('[ModelOverride] applyModelOverride failed: $e');
-      return true;
-    }());
-    return base;
-  }
 }
 
 // Using flutter_slidable for reliable swipe actions with confirm + undo.

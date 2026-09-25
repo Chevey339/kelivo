@@ -196,6 +196,22 @@
   "statsPageOutputTokens": "Output Tokens",
   "statsPageCachedTokens": "Cached Tokens",
   "statsPageLaunchCount": "App Launches",
+  "statsPageCost": "Cost ({currency})",
+  "@statsPageCost": {
+    "placeholders": {
+      "currency": {
+        "type": "String"
+      }
+    }
+  },
+  "statsPageModelsWithoutPricing": "{count, plural, one{{count} model without pricing} other{{count} models without pricing}}",
+  "@statsPageModelsWithoutPricing": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "statsPageUsageTrendTitle": "Usage Trend",
   "statsPageModelUsageTitle": "Model Usage",
   "statsPageAssistantUsageTitle": "Assistant Usage",
@@ -316,7 +332,6 @@
   "displaySettingsPageLanguageChineseLabel": "Simplified Chinese",
   "displaySettingsPageLanguageEnglishLabel": "English",
   "homePagePleaseSelectModel": "Please select a model first",
-  "homePageAudioAttachmentUnsupported": "The current model does not support audio attachments. Switch to a model that supports audio input or remove the audio file and try again.",
   "homePagePleaseSetupTranslateModel": "Please set a translation model first",
   "homePageTranslating": "Translating...",
   "homePageTranslateFailed": "Translation failed: {error}",
@@ -406,7 +421,9 @@
   "assistantEditContextMessagesDescription": "How many recent messages to keep in context",
   "assistantEditStreamOutputTitle": "Stream Output",
   "assistantEditStreamOutputDescription": "Enable streaming responses",
-  "assistantEditThinkingBudgetTitle": "Thinking Budget",
+  "assistantEditThinkingBudgetTitle": "Thinking",
+  "assistantEditReasoningFollowDefault": "Follow model default",
+  "assistantEditReasoningClampedSubtitle": "The actual level is clamped to what each model supports",
   "assistantEditConfigureButton": "Configure",
   "assistantEditMaxTokensTitle": "Max Tokens",
   "assistantEditMaxTokensDescription": "Leave empty for unlimited",
@@ -1007,30 +1024,42 @@
   "messageMoreSheetCreateBranch": "Create Branch",
   "messageMoreSheetDelete": "Delete This Version",
   "messageMoreSheetDeleteAllVersions": "Delete All Versions",
-  "reasoningBudgetSheetOff": "Off",
-  "reasoningBudgetSheetAuto": "Auto",
-  "reasoningBudgetSheetLight": "Light Reasoning",
-  "reasoningBudgetSheetMedium": "Medium Reasoning",
-  "reasoningBudgetSheetHeavy": "Heavy Reasoning",
-  "reasoningBudgetSheetXhigh": "Extreme Reasoning",
-  "reasoningBudgetSheetMax": "Maximum Reasoning",
   "reasoningBudgetSheetTitle": "Reasoning Chain Strength",
-  "reasoningBudgetSheetCurrentLevel": "Current Level: {level}",
-  "@reasoningBudgetSheetCurrentLevel": {
+  "reasoningLevelSheetTitle": "Reasoning",
+  "reasoningLevelAuto": "Auto",
+  "reasoningLevelAutoSubtitle": "Uses the model or provider default",
+  "reasoningLevelOff": "Off",
+  "reasoningLevelOffSubtitle": "Turn off reasoning and answer directly",
+  "reasoningLevelMinimal": "Minimal",
+  "reasoningLevelMinimalSubtitle": "Use the lightest reasoning to answer questions",
+  "reasoningLevelLow": "Low",
+  "reasoningLevelLowSubtitle": "Use light reasoning to answer questions",
+  "reasoningLevelMedium": "Medium",
+  "reasoningLevelMediumSubtitle": "Use moderate reasoning to answer questions",
+  "reasoningLevelHigh": "High",
+  "reasoningLevelHighSubtitle": "Use heavy reasoning for complex questions",
+  "reasoningLevelXhigh": "Extra High",
+  "reasoningLevelXhighSubtitle": "Use very high reasoning depth for harder problems",
+  "reasoningLevelMax": "Max",
+  "reasoningLevelMaxSubtitle": "Use maximum reasoning depth for the toughest problems",
+  "reasoningLevelFollowModelDefaultSubtitle": "Use the model's default when the assistant doesn't set one",
+  "reasoningLevelNoReasoning": "This model does not support reasoning",
+  "reasoningLevelCustomBudget": "Custom Reasoning Budget",
+  "reasoningLevelCustomBudgetHint": "Token budget, e.g. 2048",
+  "reasoningLevelCompactMin": "min",
+  "reasoningLevelCompactLow": "low",
+  "reasoningLevelCompactMid": "mid",
+  "reasoningLevelCompactHigh": "high",
+  "reasoningLevelCompactXhigh": "xhigh",
+  "reasoningLevelCompactMax": "max",
+  "reasoningLevelBudgetTokens": "{budget} tokens",
+  "@reasoningLevelBudgetTokens": {
     "placeholders": {
-      "level": {
+      "budget": {
         "type": "String"
       }
     }
   },
-  "reasoningBudgetSheetOffSubtitle": "Turn off reasoning, answer directly",
-  "reasoningBudgetSheetAutoSubtitle": "Let the model decide reasoning level automatically",
-  "reasoningBudgetSheetLightSubtitle": "Use light reasoning to answer questions",
-  "reasoningBudgetSheetMediumSubtitle": "Use moderate reasoning to answer questions",
-  "reasoningBudgetSheetHeavySubtitle": "Use heavy reasoning for complex questions",
-  "reasoningBudgetSheetXhighSubtitle": "Use maximum reasoning depth for the toughest problems",
-  "reasoningBudgetSheetCustomLabel": "Custom Reasoning Budget",
-  "reasoningBudgetSheetCustomHint": "e.g. 2048 (-1 auto, 0 off)",
   "chatMessageWidgetFileNotFound": "File not found: {fileName}",
   "@chatMessageWidgetFileNotFound": {
     "placeholders": {
@@ -1396,6 +1425,45 @@
   "chatInputBarInsertNewline": "Newline",
   "chatInputBarExpand": "Expand",
   "chatInputBarCollapse": "Collapse",
+  "contextUsageTitle": "Context window",
+  "contextUsageStateExact": "Exact (from last response)",
+  "contextUsageStateExactCalibrated": "Exact (breakdown scaled from estimate)",
+  "contextUsageStateEstimated": "Estimated",
+  "contextUsageStateStale": "Stale, updating…",
+  "contextUsageStateComputing": "Computing…",
+  "contextUsageStateNone": "No data yet",
+  "contextUsageBucketSystem": "System prompt",
+  "contextUsageBucketInjections": "Instruction injections",
+  "contextUsageBucketHistory": "Messages",
+  "contextUsageBucketTools": "Built-in tools",
+  "contextUsageBucketMemory": "Memory",
+  "contextUsageBucketWorldBook": "World books",
+  "contextUsageBucketSkills": "Skills",
+  "contextUsageBucketWorkspace": "Workspace",
+  "contextUsageBucketSearch": "Search prompt",
+  "contextUsageBucketMcpTools": "MCP tools",
+  "contextUsageBucketAttachments": "Attachments",
+  "contextUsageBucketDraft": "Draft",
+  "contextUsageBucketUsed": "Used",
+  "contextUsageFreeSpace": "Free space",
+  "contextUsageUsedWindow": "{used} / {window} ({percent}%)",
+  "@contextUsageUsedWindow": {
+    "description": "Context usage summary: used tokens, window size, and percent",
+    "placeholders": {
+      "used": {
+        "type": "String"
+      },
+      "window": {
+        "type": "String"
+      },
+      "percent": {
+        "type": "int"
+      }
+    }
+  },
+  "contextUsageNoWindow": "No context window",
+  "contextUsageSetWindow": "Set context window",
+  "contextUsageRefresh": "Refresh",
   "mcpPageBackTooltip": "Back",
   "mcpPageAddMcpTooltip": "Add MCP",
   "mcpPageNoServers": "No MCP servers",
@@ -1587,14 +1655,6 @@
   "modelDetailSheetBuiltinToolsTab": "Built-in Tools",
   "modelDetailSheetModelIdLabel": "Model ID",
   "modelDetailSheetModelIdHint": "Required, suggest lowercase/digits/hyphens",
-  "modelDetailSheetModelIdDisabledHint": "{modelId}",
-  "@modelDetailSheetModelIdDisabledHint": {
-    "placeholders": {
-      "modelId": {
-        "type": "String"
-      }
-    }
-  },
   "modelDetailSheetModelNameLabel": "Model Name",
   "modelDetailSheetModelTypeLabel": "Model Type",
   "modelDetailSheetChatType": "Chat",
@@ -1613,8 +1673,6 @@
   "modelDetailSheetSaveFailedMessage": "Save failed. Please try again.",
   "modelDetailSheetAddBody": "Add Body",
   "modelDetailSheetBuiltinToolsDescription": "Built-in tools depend on the provider and API mode.",
-  "modelDetailSheetSearchTool": "Search",
-  "modelDetailSheetSearchToolDescription": "Enable Google Search integration",
   "modelDetailSheetUrlContextTool": "URL Context",
   "modelDetailSheetUrlContextToolDescription": "Enable URL content ingestion",
   "modelDetailSheetCodeExecutionTool": "Code Execution",
@@ -1636,11 +1694,115 @@
   "modelDetailSheetAddButton": "Add",
   "modelDetailSheetConfirmButton": "Confirm",
   "modelDetailSheetInvalidIdError": "Please enter a valid model ID (>=2 chars)",
-  "modelDetailSheetModelIdExistsError": "Model ID already exists",
   "modelDetailSheetHeaderKeyHint": "Header Key",
   "modelDetailSheetHeaderValueHint": "Header Value",
   "modelDetailSheetBodyKeyHint": "Body Key",
   "modelDetailSheetBodyJsonHint": "Body JSON",
+  "modelSpecFormSourceCustom": "Custom",
+  "modelSpecFormSourceCatalog": "Catalog",
+  "modelSpecFormSourceInferred": "Inferred",
+  "modelSpecFormSourceDefault": "Default",
+  "modelSpecFormReset": "Reset to default",
+  "modelSpecFormModalitiesSection": "Modalities & abilities",
+  "modelSpecFormImageType": "Image",
+  "modelSpecFormAudioMode": "Audio",
+  "modelSpecFormVideoMode": "Video",
+  "modelSpecFormPdfMode": "PDF",
+  "modelSpecFormStructuredOutputAbility": "Structured Output",
+  "modelSpecFormReasoningSection": "Reasoning",
+  "modelSpecFormDialect": "Dialect",
+  "modelSpecFormDialectNone": "None",
+  "modelSpecFormDialectNoneSubtitle": "No reasoning fields",
+  "modelSpecFormDialectOpenaiReasoningEffort": "OpenAI reasoning effort",
+  "modelSpecFormDialectOpenaiReasoningEffortSubtitle": "reasoning_effort",
+  "modelSpecFormDialectOpenaiResponsesReasoning": "OpenAI Responses reasoning",
+  "modelSpecFormDialectOpenaiResponsesReasoningSubtitle": "reasoning.effort",
+  "modelSpecFormDialectOpenrouterReasoning": "OpenRouter reasoning",
+  "modelSpecFormDialectOpenrouterReasoningSubtitle": "reasoning",
+  "modelSpecFormDialectAnthropicBudget": "Anthropic budget",
+  "modelSpecFormDialectAnthropicBudgetSubtitle": "thinking.budget_tokens",
+  "modelSpecFormDialectAnthropicAdaptiveEffort": "Anthropic adaptive effort",
+  "modelSpecFormDialectAnthropicAdaptiveEffortSubtitle": "thinking + output_config.effort",
+  "modelSpecFormDialectAnthropicEffort": "Anthropic effort",
+  "modelSpecFormDialectAnthropicEffortSubtitle": "thinking + output_config.effort",
+  "modelSpecFormDialectGeminiThinkingBudget": "Gemini thinking budget",
+  "modelSpecFormDialectGeminiThinkingBudgetSubtitle": "thinkingConfig.thinkingBudget",
+  "modelSpecFormDialectGeminiThinkingLevel": "Gemini thinking level",
+  "modelSpecFormDialectGeminiThinkingLevelSubtitle": "thinkingConfig.thinkingLevel",
+  "modelSpecFormDialectQwenEnableThinking": "Qwen enable thinking",
+  "modelSpecFormDialectQwenEnableThinkingSubtitle": "enable_thinking",
+  "modelSpecFormDialectThinkingType": "Thinking type",
+  "modelSpecFormDialectThinkingTypeSubtitle": "thinking.type",
+  "modelSpecFormDialectSiliconflowEnableThinking": "SiliconFlow enable thinking",
+  "modelSpecFormDialectSiliconflowEnableThinkingSubtitle": "enable_thinking",
+  "modelSpecFormDialectInternThinkingMode": "Intern thinking mode",
+  "modelSpecFormDialectInternThinkingModeSubtitle": "thinking_mode",
+  "modelSpecFormDialectChatTemplateKwargs": "Chat template kwargs",
+  "modelSpecFormDialectChatTemplateKwargsSubtitle": "chat_template_kwargs.enable_thinking",
+  "modelSpecFormDialectKimiThinking": "Kimi thinking",
+  "modelSpecFormDialectKimiThinkingSubtitle": "thinking",
+  "modelSpecFormDialectCustom": "Custom JSON",
+  "modelSpecFormDialectCustomSubtitle": "Per-level JSON patch",
+  "modelSpecFormLevels": "Supported levels",
+  "modelSpecFormCanDisable": "Allow disabling",
+  "modelSpecFormDefaultLevel": "Default level",
+  "modelSpecFormBudgets": "Token budgets",
+  "modelSpecFormBudgetPlaceholder": "{tokens}",
+  "@modelSpecFormBudgetPlaceholder": {
+    "placeholders": {
+      "tokens": {
+        "type": "String"
+      }
+    }
+  },
+  "modelSpecFormCustomPatch": "JSON patch ({level})",
+  "@modelSpecFormCustomPatch": {
+    "placeholders": {
+      "level": {
+        "type": "String"
+      }
+    }
+  },
+  "modelSpecFormCustomPatchHint": "e.g. reasoning_effort: high",
+  "modelSpecFormInvalidJson": "Custom reasoning patch must be a valid JSON object",
+  "modelSpecFormInvalidNumber": "Please enter a valid number",
+  "modelSpecFormStrategySection": "Strategy",
+  "modelSpecFormSampling": "Sampling",
+  "modelSpecFormRequestQuirks": "Request compatibility",
+  "modelSpecFormDynamicWebSearch": "Dynamic filtering search tools",
+  "modelSpecFormDynamicWebSearchSubtitle": "When dynamic filtering is on, send the 2026-03-18 web search and fetch tools",
+  "modelSpecFormRemoteImageUrls": "Remote image links",
+  "modelSpecFormRemoteImageUrlsSubtitle": "Send http(s) image links as-is; when off, remote links are dropped and only local images are sent",
+  "modelSpecFormPromptCacheControl": "Prompt cache marker",
+  "modelSpecFormPromptCacheControlSubtitle": "When prompt caching is on, add cache_control to OpenRouter requests",
+  "modelSpecFormSamplingAlways": "Always",
+  "modelSpecFormSamplingAlwaysSubtitle": "Keep temperature and other sampling fields",
+  "modelSpecFormSamplingOnlyWhenReasoningOff": "Only when reasoning is off",
+  "modelSpecFormSamplingOnlyWhenReasoningOffSubtitle": "Strip sampling fields while the model is thinking",
+  "modelSpecFormSamplingNever": "Never",
+  "modelSpecFormSamplingNeverSubtitle": "Always strip sampling fields",
+  "modelSpecFormReplay": "Reasoning replay",
+  "modelSpecFormReplayNone": "None",
+  "modelSpecFormReplayNoneSubtitle": "Do not send prior reasoning back to the model",
+  "modelSpecFormReplayToolTurns": "Tool turns",
+  "modelSpecFormReplayToolTurnsSubtitle": "Replay reasoning on tool-call turns",
+  "modelSpecFormReplayAll": "All",
+  "modelSpecFormReplayAllSubtitle": "Replay reasoning on every follow-up turn",
+  "modelSpecFormReplayField": "Replay field",
+  "modelSpecFormReplayFieldReasoningContent": "reasoning_content",
+  "modelSpecFormReplayFieldReasoning": "reasoning",
+  "modelSpecFormReplayFieldReasoningDetails": "reasoning_details",
+  "modelSpecFormLimitsSection": "Limits",
+  "modelSpecFormLimitsPricingSection": "Limits & pricing",
+  "modelSpecFormContextWindow": "Context window",
+  "modelSpecFormMaxOutput": "Max output",
+  "modelSpecFormPricingSection": "Pricing / 1M",
+  "modelSpecFormPricingInput": "Input",
+  "modelSpecFormPricingOutput": "Output",
+  "modelSpecFormPricingCacheRead": "Cache read",
+  "modelSpecFormPricingCacheWrite": "Cache write",
+  "modelSpecFormCurrency": "Currency",
+  "modelSpecFormAdvancedSection": "Request",
   "modelSelectSheetSearchHint": "Search models or providers",
   "modelSelectSheetFavoritesSection": "Favorites",
   "modelSelectSheetFollowAssistant": "Follow assistant",
@@ -1741,6 +1903,50 @@
   "providersPageAddTooltip": "Add",
   "providersPageSearchHint": "Search providers or groups",
   "providersPageProviderAddedSnackbar": "Provider added",
+  "modelCatalogTitle": "Model catalog",
+  "modelCatalogSourceBundled": "Bundled snapshot · {date}",
+  "@modelCatalogSourceBundled": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "modelCatalogSourceRemote": "models.dev · updated {date}",
+  "@modelCatalogSourceRemote": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "modelCatalogAutoUpdate": "Auto-update every 24 hours",
+  "modelCatalogRefresh": "Update now",
+  "modelCatalogUpdated": "Model catalog updated",
+  "modelCatalogRefreshFailed": "Update failed: {error}",
+  "@modelCatalogRefreshFailed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "modelCatalogProviderCount": "{count} providers",
+  "@modelCatalogProviderCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "modelCatalogModelCount": "{count} models",
+  "@modelCatalogModelCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "providerGroupsGroupLabel": "Group",
   "providerGroupsOther": "Other",
   "providerGroupsOtherUngroupedOption": "Other (Ungrouped)",
@@ -2033,6 +2239,8 @@
   "displaySettingsPageShowThinkingCardsSubtitle": "When off, thinking-process cards are hidden in chat.",
   "displaySettingsPageShowToolCardsTitle": "Show Tool Cards",
   "displaySettingsPageShowToolCardsSubtitle": "When off, tool-use cards are hidden in chat.",
+  "displaySettingsShowReasoningLevelBadge": "Show reasoning level on the button",
+  "displaySettingsShowReasoningLevelBadgeSubtitle": "Show the current level next to the reasoning icon in the input bar",
   "displaySettingsPageAutoCollapseThinkingTitle": "Auto-collapse Thinking",
   "displaySettingsPageAutoCollapseThinkingSubtitle": "Collapse reasoning after finish",
   "displaySettingsPageCollapseThinkingStepsTitle": "Collapse Thinking Steps",
@@ -3392,6 +3600,30 @@
     "placeholders": {
       "count": {
         "type": "int"
+      }
+    }
+  },
+  "tokenDetailReasoningTokens": "{count} tokens",
+  "@tokenDetailReasoningTokens": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "tokenDetailCacheWriteTokens": "{count} cache write tokens",
+  "@tokenDetailCacheWriteTokens": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "tokenDetailCost": "{amount}",
+  "@tokenDetailCost": {
+    "placeholders": {
+      "amount": {
+        "type": "String"
       }
     }
   },
@@ -4853,11 +5085,6 @@
   "workspaceToolFilesTruncated": "Only some files are listed.",
   "displaySettingsPageShowProducedFilesTitle": "Show Files Below Replies",
   "displaySettingsPageShowProducedFilesSubtitle": "Show files created or modified by tools below replies.",
-  "reasoningBudgetSliderLow": "Low",
-  "reasoningBudgetSliderMedium": "Medium",
-  "reasoningBudgetSliderHigh": "High",
-  "reasoningBudgetSliderXhigh": "XHigh",
-  "reasoningBudgetSliderMax": "Max",
   "defaultModelPagePerChatModelTitle": "Per-Chat Model",
   "defaultModelPagePerChatModelSubtitle": "On: picking a model in a chat applies to that chat only. Off: it becomes the current assistant's model, so every chat using that assistant follows it.",
   "googleFontsTitle": "Google Fonts",

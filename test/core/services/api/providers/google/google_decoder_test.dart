@@ -555,4 +555,25 @@ void main() {
     expect(second.usage!.totalTokens, 120);
     expect(silent.chunks.whereType<Usage>(), isEmpty);
   });
+
+  test('usage maps thoughts and cached content tokens', () {
+    final decoder = GoogleStreamDecoder();
+    decoder.accept(
+      _event(<String, dynamic>{
+        'usageMetadata': <String, dynamic>{
+          'promptTokenCount': 80,
+          'candidatesTokenCount': 12,
+          'thoughtsTokenCount': 9,
+          'cachedContentTokenCount': 4,
+          'totalTokenCount': 101,
+        },
+      }),
+    );
+
+    expect(decoder.usage!.promptTokens, 80);
+    expect(decoder.usage!.completionTokens, 21);
+    expect(decoder.usage!.reasoningTokens, 9);
+    expect(decoder.usage!.cachedTokens, 4);
+    expect(decoder.usage!.totalTokens, 101);
+  });
 }

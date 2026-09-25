@@ -29,6 +29,7 @@ final class BusinessKeyRegistry {
     'desktop_hotkeys_enabled_v1',
     'display_chat_font_scale_v1',
     'flutter_log_enabled_v1',
+    'model_catalog_auto_update_v1',
   };
 
   static const discardedKeys = <String>{
@@ -108,7 +109,7 @@ final class BusinessKeyRegistry {
     'suggestion_insert_on_tap_only_v1',
     'compress_model_v1',
     'compress_prompt_v1',
-    'thinking_budget_v1',
+    'reasoning_choice_by_model_v1',
     'image_cropper_enabled_v1',
     'image_upload_quality_v1',
     'image_compress_custom_quality_v1',
@@ -518,11 +519,11 @@ final class BusinessSettingsRouter {
             'temperature',
             'topP',
             'contextMessageSize',
-            'thinkingBudget',
             'maxTokens',
             'recentChatsSummaryMessageCount',
             'memoryOrganizeEveryNTurns',
           },
+          maps: const {'reasoning'},
           lists: const {
             'customHeaders',
             'customBody',

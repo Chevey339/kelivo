@@ -428,10 +428,11 @@ void main() {
           },
         }),
       );
-      expect(decoder.usage!.promptTokens, 25);
+      expect(decoder.usage!.promptTokens, 40);
       expect(decoder.usage!.completionTokens, 1);
-      expect(decoder.usage!.cachedTokens, 15);
-      expect(start.chunks.whereType<Usage>().single.usage.promptTokens, 25);
+      expect(decoder.usage!.cachedTokens, 5);
+      expect(decoder.usage!.cacheWriteTokens, 10);
+      expect(start.chunks.whereType<Usage>().single.usage.promptTokens, 40);
 
       final delta = decoder.accept(
         _event('message_delta', {
@@ -440,15 +441,17 @@ void main() {
           'usage': {'output_tokens': 15},
         }),
       );
-      expect(decoder.usage!.promptTokens, 25);
+      expect(decoder.usage!.promptTokens, 40);
       expect(decoder.usage!.completionTokens, 15);
-      expect(decoder.usage!.cachedTokens, 15);
-      expect(decoder.usage!.totalTokens, 40);
+      expect(decoder.usage!.cachedTokens, 5);
+      expect(decoder.usage!.cacheWriteTokens, 10);
+      expect(decoder.usage!.totalTokens, 55);
       final streamed = delta.chunks.whereType<Usage>().single.usage;
-      expect(streamed.promptTokens, 25);
+      expect(streamed.promptTokens, 40);
       expect(streamed.completionTokens, 15);
-      expect(streamed.cachedTokens, 15);
-      expect(streamed.totalTokens, 40);
+      expect(streamed.cachedTokens, 5);
+      expect(streamed.cacheWriteTokens, 10);
+      expect(streamed.totalTokens, 55);
     },
   );
 

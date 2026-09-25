@@ -1,42 +1,21 @@
-import 'package:Kelivo/core/providers/model_provider.dart';
+import 'package:Kelivo/core/models/model_spec.dart';
+import 'package:Kelivo/core/services/model_spec/model_defaults_guesser.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+ModelGuess _guess(String id) => ModelDefaultsGuesser.guess(id);
+
 void main() {
-  group('ModelRegistry Qwen / Doubao matrix', () {
+  group('ModelDefaultsGuesser Qwen / Doubao matrix', () {
     test('Qwen vision is precise for 3.7/3.8', () {
-      final plus = ModelRegistry.infer(
-        ModelInfo(id: 'qwen3.7-plus', displayName: 'qwen3.7-plus'),
-      );
-      final flash = ModelRegistry.infer(
-        ModelInfo(id: 'qwen3.7-flash', displayName: 'qwen3.7-flash'),
-      );
-      final visionMax = ModelRegistry.infer(
-        ModelInfo(
-          id: 'qwen3.7-max-2026-06-08',
-          displayName: 'qwen3.7-max-2026-06-08',
-        ),
-      );
-      final plainMax = ModelRegistry.infer(
-        ModelInfo(id: 'qwen3.7-max', displayName: 'qwen3.7-max'),
-      );
-      final earlyMax = ModelRegistry.infer(
-        ModelInfo(
-          id: 'qwen3.7-max-2026-05-20',
-          displayName: 'qwen3.7-max-2026-05-20',
-        ),
-      );
-      final q38 = ModelRegistry.infer(
-        ModelInfo(id: 'qwen3.8-max', displayName: 'qwen3.8-max'),
-      );
-      final q38Flash = ModelRegistry.infer(
-        ModelInfo(id: 'qwen3.8-flash', displayName: 'qwen3.8-flash'),
-      );
-      final q3827b = ModelRegistry.infer(
-        ModelInfo(id: 'qwen3.8-27b', displayName: 'qwen3.8-27b'),
-      );
-      final q3824t = ModelRegistry.infer(
-        ModelInfo(id: 'qwen3.8-2.4t-a95b', displayName: 'qwen3.8-2.4t-a95b'),
-      );
+      final plus = _guess('qwen3.7-plus');
+      final flash = _guess('qwen3.7-flash');
+      final visionMax = _guess('qwen3.7-max-2026-06-08');
+      final plainMax = _guess('qwen3.7-max');
+      final earlyMax = _guess('qwen3.7-max-2026-05-20');
+      final q38 = _guess('qwen3.8-max');
+      final q38Flash = _guess('qwen3.8-flash');
+      final q3827b = _guess('qwen3.8-27b');
+      final q3824t = _guess('qwen3.8-2.4t-a95b');
 
       expect(plus.input, contains(Modality.image));
       expect(flash.input, contains(Modality.image));
@@ -52,27 +31,11 @@ void main() {
     });
 
     test('DeepSeek Flash is multimodal; V4 Pro stays text-only', () {
-      final flash = ModelRegistry.infer(
-        ModelInfo(id: 'deepseek-flash', displayName: 'deepseek-flash'),
-      );
-      final namespaced = ModelRegistry.infer(
-        ModelInfo(
-          id: 'deepseek/deepseek-flash',
-          displayName: 'deepseek/deepseek-flash',
-        ),
-      );
-      final legacyFlash = ModelRegistry.infer(
-        ModelInfo(id: 'deepseek-v4-flash', displayName: 'deepseek-v4-flash'),
-      );
-      final legacyVision = ModelRegistry.infer(
-        ModelInfo(
-          id: 'deepseek-v4-flash-vision-exp',
-          displayName: 'deepseek-v4-flash-vision-exp',
-        ),
-      );
-      final pro = ModelRegistry.infer(
-        ModelInfo(id: 'deepseek-v4-pro', displayName: 'deepseek-v4-pro'),
-      );
+      final flash = _guess('deepseek-flash');
+      final namespaced = _guess('deepseek/deepseek-flash');
+      final legacyFlash = _guess('deepseek-v4-flash');
+      final legacyVision = _guess('deepseek-v4-flash-vision-exp');
+      final pro = _guess('deepseek-v4-pro');
 
       expect(flash.input, contains(Modality.image));
       expect(namespaced.input, contains(Modality.image));
@@ -98,7 +61,7 @@ void main() {
         'doubao-seed-2.1-turbo',
         'doubao-seed-evolving',
       ]) {
-        final model = ModelRegistry.infer(ModelInfo(id: id, displayName: id));
+        final model = _guess(id);
         expect(model.input, contains(Modality.image), reason: id);
         expect(model.abilities, contains(ModelAbility.tool), reason: id);
         expect(model.abilities, contains(ModelAbility.reasoning), reason: id);
@@ -108,18 +71,10 @@ void main() {
     test(
       'GPT-6 Astra, Muse 1.3 and GLM-5.3-Flash infer documented abilities',
       () {
-        final astra = ModelRegistry.infer(
-          ModelInfo(id: 'gpt-6-astra', displayName: 'gpt-6-astra'),
-        );
-        final muse = ModelRegistry.infer(
-          ModelInfo(id: 'muse-spark-1.3', displayName: 'muse-spark-1.3'),
-        );
-        final glmFlash = ModelRegistry.infer(
-          ModelInfo(id: 'glm-5.3-flash', displayName: 'glm-5.3-flash'),
-        );
-        final glm53 = ModelRegistry.infer(
-          ModelInfo(id: 'glm-5.3', displayName: 'glm-5.3'),
-        );
+        final astra = _guess('gpt-6-astra');
+        final muse = _guess('muse-spark-1.3');
+        final glmFlash = _guess('glm-5.3-flash');
+        final glm53 = _guess('glm-5.3');
 
         expect(astra.input, contains(Modality.image));
         expect(
@@ -156,21 +111,29 @@ void main() {
         'grok-4.7',
         'x-ai/grok-4.7',
       ]) {
-        final model = ModelRegistry.infer(ModelInfo(id: id, displayName: id));
+        final model = _guess(id);
         expect(model.input, contains(Modality.image), reason: id);
         expect(model.output, isNot(contains(Modality.image)), reason: id);
         expect(model.abilities, contains(ModelAbility.tool), reason: id);
         expect(model.abilities, contains(ModelAbility.reasoning), reason: id);
       }
 
-      final textOnlyPro = ModelRegistry.infer(
-        ModelInfo(id: 'mimo-v2.5-pro', displayName: 'mimo-v2.5-pro'),
-      );
+      final textOnlyPro = _guess('mimo-v2.5-pro');
       expect(textOnlyPro.input, isNot(contains(Modality.image)));
       expect(
         textOnlyPro.abilities,
         containsAll([ModelAbility.tool, ModelAbility.reasoning]),
       );
+      for (final id in const ['grok-4.7', 'x-ai/grok-4.7']) {
+        final reasoning = _guess(id).reasoning!;
+        expect(reasoning.levels, [
+          ReasoningLevel.low,
+          ReasoningLevel.medium,
+          ReasoningLevel.high,
+          ReasoningLevel.xhigh,
+        ], reason: id);
+        expect(reasoning.canDisable, isFalse, reason: id);
+      }
     });
   });
 }

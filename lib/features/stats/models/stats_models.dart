@@ -1,3 +1,5 @@
+import '../../../core/utils/model_cost.dart';
+
 enum StatsDateRangePreset {
   allTime,
   last30Days,
@@ -110,6 +112,8 @@ class StatsSummary {
     required this.outputTokens,
     required this.cachedTokens,
     required this.launchCount,
+    this.costByCurrency = const {},
+    this.modelsWithoutPricing = 0,
   });
 
   final int totalConversations;
@@ -118,6 +122,8 @@ class StatsSummary {
   final int outputTokens;
   final int cachedTokens;
   final int launchCount;
+  final Map<String, double> costByCurrency;
+  final int modelsWithoutPricing;
 }
 
 class StatsRankItem {
@@ -126,12 +132,14 @@ class StatsRankItem {
     required this.label,
     required this.value,
     this.providerId,
+    this.cost,
   });
 
   final String id;
   final String label;
   final int value;
   final String? providerId;
+  final ModelCost? cost;
 }
 
 class StatsHeatmapDay {
