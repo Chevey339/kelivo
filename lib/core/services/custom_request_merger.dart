@@ -55,6 +55,31 @@ class CustomRequestMerger {
     return merged;
   }
 
+  /// Merges the custom [body] into a built request [target]. Custom values
+  /// win; nested objects merge key by key so generated siblings (token
+  /// limits, thinking config) survive a partial custom object. Lists and
+  /// scalars replace.
+  static void applyBody(
+    Map<String, dynamic> target,
+    Map<String, dynamic> body,
+  ) {
+    for (final entry in body.entries) {
+      final existing = target[entry.key];
+      final incoming = entry.value;
+      if (existing is Map && incoming is Map) {
+        final merged = <String, dynamic>{
+          for (final e in existing.entries) e.key.toString(): e.value,
+        };
+        applyBody(merged, {
+          for (final e in incoming.entries) e.key.toString(): e.value,
+        });
+        target[entry.key] = merged;
+      } else {
+        target[entry.key] = incoming;
+      }
+    }
+  }
+
   static void _addHeadersCaseInsensitive(
     Map<String, String> target,
     Map<String, String> layer,

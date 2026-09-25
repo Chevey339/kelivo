@@ -5,6 +5,7 @@ import 'dart:io';
 import 'package:http/http.dart' as http;
 import 'package:http_parser/http_parser.dart';
 
+import '../../custom_request_merger.dart';
 import '../../../models/model_spec.dart';
 import '../../../models/token_usage.dart';
 import '../../../providers/settings_provider.dart';
@@ -477,7 +478,7 @@ void _applyOpenAIImagesExtraBody(
   Map<String, dynamic>? extraBody,
 ) {
   final custom = customBody(config, modelId, assistantBody: extraBody);
-  if (custom.isNotEmpty) body.addAll(custom);
+  CustomRequestMerger.applyBody(body, custom);
 }
 
 String _openAIImagesOutputMime(

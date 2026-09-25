@@ -87,5 +87,34 @@ void main() {
       expect(merged['nested'], {'model': true});
       expect(merged, containsPair('nullable', null));
     });
+
+    test('applyBody lets custom values win and keeps generated siblings', () {
+      final body = <String, dynamic>{
+        'generationConfig': {
+          'maxOutputTokens': 8192,
+          'thinkingConfig': {'thinkingBudget': 1024, 'includeThoughts': true},
+        },
+        'tools': [
+          {'type': 'web_search'},
+        ],
+        'temperature': 0.2,
+      };
+      CustomRequestMerger.applyBody(body, {
+        'generationConfig': {
+          'responseMimeType': 'application/json',
+          'thinkingConfig': {'thinkingBudget': 0},
+        },
+        'tools': <Object>[],
+        'temperature': null,
+      });
+
+      expect(body['generationConfig'], {
+        'maxOutputTokens': 8192,
+        'thinkingConfig': {'thinkingBudget': 0, 'includeThoughts': true},
+        'responseMimeType': 'application/json',
+      });
+      expect(body['tools'], isEmpty);
+      expect(body, containsPair('temperature', null));
+    });
   });
 }

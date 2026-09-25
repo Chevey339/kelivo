@@ -4,6 +4,7 @@ import 'dart:io';
 
 import 'package:http/http.dart' as http;
 
+import '../../custom_request_merger.dart';
 import '../../../models/token_usage.dart';
 import '../../../providers/model_provider.dart';
 import '../../../providers/settings_provider.dart';
@@ -585,7 +586,7 @@ Stream<StreamChunk> sendGoogleStream(
     );
     // Custom body keys win over the reasoning dialect.
     final extraG = customBody(config, modelId, assistantBody: extraBody);
-    if (extraG.isNotEmpty) baseBody.addAll(extraG);
+    CustomRequestMerger.applyBody(baseBody, extraG);
 
     TokenUsage? totalUsage;
     List<Map<String, dynamic>> currentContents =
@@ -1093,9 +1094,7 @@ Stream<StreamChunk> sendGoogleStream(
       );
       // Custom body keys win over the reasoning dialect.
       final extra = customBody(config, modelId, assistantBody: extraBody);
-      if (extra.isNotEmpty) {
-        body.addAll(extra);
-      }
+      CustomRequestMerger.applyBody(body, extra);
       body['contents'] = _googleApiContents(convo);
       request.body = jsonEncode(body);
 

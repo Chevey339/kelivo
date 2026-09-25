@@ -1,3 +1,4 @@
+import '../../../custom_request_merger.dart';
 import '../../../../models/provider_oauth.dart';
 import 'dart:async';
 import 'dart:convert';
@@ -823,9 +824,7 @@ Stream<StreamChunk> runOpenAIChatCompletionsToolFollowUps({
         reasoning: reasoning,
         transport: ReasoningTransport.chatCompletions,
       );
-      if (extraBodyCfg.isNotEmpty) {
-        body2.addAll(extraBodyCfg);
-      }
+      CustomRequestMerger.applyBody(body2, extraBodyCfg);
       // Built-in tools run after the custom body and merge by type.
       applyChatCompletionsBuiltInTools(
         body2,

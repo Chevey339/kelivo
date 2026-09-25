@@ -4,6 +4,7 @@ import 'dart:io';
 
 import 'package:http/http.dart' as http;
 
+import '../../custom_request_merger.dart';
 import '../../../models/token_usage.dart';
 import '../../../providers/settings_provider.dart';
 import '../../../utils/multimodal_input_utils.dart';
@@ -449,7 +450,10 @@ Stream<StreamChunk> sendGoogleVertexClaudeStream({
         transport: ReasoningTransport.anthropicMessages,
       );
       // Custom body keys win over the reasoning dialect.
-      body.addAll(customBody(config, modelId, assistantBody: extraBody));
+      CustomRequestMerger.applyBody(
+        body,
+        customBody(config, modelId, assistantBody: extraBody),
+      );
       applyAnthropicMessagesProtocolConstraints(body);
 
       final httpRequest = http.Request('POST', url);

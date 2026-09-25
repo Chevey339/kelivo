@@ -1,3 +1,4 @@
+import '../../../custom_request_merger.dart';
 import '../../../../models/provider_oauth.dart';
 import 'dart:async';
 import 'dart:convert';
@@ -597,9 +598,7 @@ Stream<StreamChunk> sendOpenAIStream(
   );
   // Custom body keys go last so they win over the reasoning dialect.
   final extraBodyCfg = customBody(config, modelId, assistantBody: extraBody);
-  if (extraBodyCfg.isNotEmpty) {
-    body.addAll(extraBodyCfg);
-  }
+  CustomRequestMerger.applyBody(body, extraBodyCfg);
   // Built-in tools run after the custom body and merge by type so custom
   // function tools and provider server tools coexist.
   if (config.useResponseApi != true) {

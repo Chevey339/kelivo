@@ -1,3 +1,4 @@
+import '../../../custom_request_merger.dart';
 import '../../../../models/provider_oauth.dart';
 import 'dart:async';
 import 'dart:convert';
@@ -254,7 +255,7 @@ Stream<StreamChunk> runOpenAIResponsesToolFollowUps({
         transport: ReasoningTransport.responses,
       );
       final extraCfg = customBody(config, modelId, assistantBody: extraBody);
-      if (extraCfg.isNotEmpty) body2.addAll(extraCfg);
+      CustomRequestMerger.applyBody(body2, extraCfg);
       try {
         if (body2['tools'] is List) {
           final raw = (body2['tools'] as List).cast<dynamic>();

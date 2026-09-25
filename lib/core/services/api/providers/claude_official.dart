@@ -1,3 +1,4 @@
+import '../../custom_request_merger.dart';
 import '../../../models/provider_oauth.dart';
 import '../../auth/claude_oauth_request.dart';
 import 'dart:async';
@@ -348,9 +349,7 @@ Stream<StreamChunk> sendClaudeStream(
       );
       // Custom body keys win over the reasoning dialect.
       final extraClaude = customBody(config, modelId, assistantBody: extraBody);
-      if (extraClaude.isNotEmpty) {
-        body.addAll(extraClaude);
-      }
+      CustomRequestMerger.applyBody(body, extraClaude);
       applyAnthropicMessagesProtocolConstraints(body);
 
       http.Request buildRequest() {
