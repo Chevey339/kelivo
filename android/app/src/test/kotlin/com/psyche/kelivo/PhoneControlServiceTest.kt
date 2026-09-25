@@ -147,7 +147,7 @@ class PhoneControlServiceTest {
             contentChangeTypes = AccessibilityEvent.CONTENT_CHANGE_TYPE_SUBTREE
             eventTime = SystemClock.uptimeMillis()
         })
-        assertEquals("STALE_SCREEN", call(action("tap", snapshot).put("x", 10).put("y", 10)).getString("error"))
+        assertEquals("STALE_SCREEN", call(action("tap", snapshot).put("node_id", "n0")).getString("error"))
     }
 
     @Test fun noisyLayoutEventsRevalidateTheTreeWithoutRejectingUnchangedContent() {
@@ -269,28 +269,52 @@ class PhoneControlServiceTest {
         assertFalse(call("read_screen").has("error"))
     }
 
-    @Test fun textOnlyChangesInvalidateCoordinateActions() {
-        val snapshot = call("read_screen")
-        shadowOf(service).setRootInActiveWindow(node("Different text"))
+    private fun changeRoot(value: AccessibilityNodeInfo) {
+        shadowOf(service).setRootInActiveWindow(value)
         service.onAccessibilityEvent(AccessibilityEvent.obtain(AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED).apply {
             eventTime = SystemClock.uptimeMillis()
-            contentChangeTypes = AccessibilityEvent.CONTENT_CHANGE_TYPE_TEXT
+            contentChangeTypes = AccessibilityEvent.CONTENT_CHANGE_TYPE_SUBTREE
         })
-        val result = call(action("tap", snapshot).put("x", 10).put("y", 10))
-        assertEquals("STALE_SCREEN", result.getString("error"))
-        assertTrue(shadowOf(service).gesturesDispatched.isEmpty())
     }
 
-    @Test @Config(sdk = [35]) fun stateDescriptionChangesInvalidateCoordinates() {
+    @Test fun textOnlyChangesInvalidateNodeActions() {
+        root.addAction(AccessibilityNodeInfo.ACTION_CLICK)
+        shadowOf(root).setRefreshReturnValue(true)
+        val snapshot = call("read_screen")
+        changeRoot(node("Different text"))
+        assertEquals("STALE_SCREEN", call(action("tap", snapshot).put("node_id", "n0")).getString("error"))
+        assertTrue(shadowOf(root).performedActions.isEmpty())
+    }
+
+    @Test fun layoutDriftDoesNotInvalidateNodeActions() {
+        root.addAction(AccessibilityNodeInfo.ACTION_CLICK)
+        val snapshot = call("read_screen")
+        val moved = node("Screen").apply {
+            setBoundsInScreen(Rect(4, 3, 104, 103))
+            addAction(AccessibilityNodeInfo.ACTION_CLICK)
+        }
+        shadowOf(moved).setRefreshReturnValue(true)
+        changeRoot(moved)
+        val result = call(action("tap", snapshot).put("node_id", "n0"))
+        assertFalse(result.optString("error"), result.optString("error").startsWith("STALE_"))
+    }
+
+    @Test fun coordinateGesturesSurviveContentChangesButNotAnotherApp() {
+        shadowOf(service).setCanDispatchGestures(false)
+        var snapshot = call("read_screen")
+        changeRoot(node("New video"))
+        assertEquals("GESTURE_REJECTED", call(action("swipe", snapshot)
+            .put("x", 10).put("y", 90).put("end_x", 10).put("end_y", 10)).getString("error"))
+        snapshot = call("read_screen")
+        changeRoot(node("Other").apply { packageName = "other.app" })
+        assertEquals("STALE_SCREEN", call(action("tap", snapshot).put("x", 10).put("y", 10)).getString("error"))
+    }
+
+    @Test @Config(sdk = [35]) fun stateDescriptionChangesInvalidateNodeActions() {
         root.stateDescription = "Not connected"
         val snapshot = call("read_screen")
-        shadowOf(service).setRootInActiveWindow(node("Screen").apply { stateDescription = "Connected" })
-        service.onAccessibilityEvent(AccessibilityEvent.obtain(AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED).apply {
-            eventTime = SystemClock.uptimeMillis()
-            contentChangeTypes = AccessibilityEvent.CONTENT_CHANGE_TYPE_STATE_DESCRIPTION
-        })
-        assertEquals("STALE_SCREEN", call(action("tap", snapshot).put("x", 10).put("y", 10)).getString("error"))
-        assertTrue(shadowOf(service).gesturesDispatched.isEmpty())
+        changeRoot(node("Screen").apply { stateDescription = "Connected" })
+        assertEquals("STALE_SCREEN", call(action("tap", snapshot).put("node_id", "n0")).getString("error"))
     }
 
     @Test fun aSwitchChangedSinceReadCannotBeClickedEvenWithoutAnEvent() {
@@ -307,18 +331,6 @@ class PhoneControlServiceTest {
         }.get(3, TimeUnit.SECONDS)
         assertEquals("STALE_NODE", call(action("tap", snapshot).put("node_id", "n0")).getString("error"))
         assertTrue(shadowOf(root).performedActions.isEmpty())
-    }
-
-    @Test fun eventArrivingDuringValidationPreventsAGesture() {
-        val snapshot = call("read_screen")
-        QueryServiceShadow.query = {
-            service.onAccessibilityEvent(AccessibilityEvent.obtain(AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED).apply {
-                eventTime = SystemClock.uptimeMillis()
-                contentChangeTypes = AccessibilityEvent.CONTENT_CHANGE_TYPE_TEXT
-            })
-        }
-        assertEquals("STALE_SCREEN", call(action("tap", snapshot).put("x", 10).put("y", 10)).getString("error"))
-        assertTrue(shadowOf(service).gesturesDispatched.isEmpty())
     }
 
     @Test fun blockedQueryDoesNotBlockMainAndInterruptCancelsQueuedActions() {
