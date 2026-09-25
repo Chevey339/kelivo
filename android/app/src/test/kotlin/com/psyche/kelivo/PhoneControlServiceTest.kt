@@ -150,25 +150,33 @@ class PhoneControlServiceTest {
         assertEquals("STALE_SCREEN", call(action("tap", snapshot).put("node_id", "n0")).getString("error"))
     }
 
+    private fun clickable(value: AccessibilityNodeInfo) = value.apply {
+        addAction(AccessibilityNodeInfo.ACTION_CLICK)
+        shadowOf(this).setRefreshReturnValue(true)
+    }
+
+    private fun assertClicked(result: JSONObject, target: AccessibilityNodeInfo) {
+        assertTrue(result.toString(), result.optBoolean("success"))
+        assertEquals(listOf(AccessibilityNodeInfo.ACTION_CLICK), shadowOf(target).performedActions)
+    }
+
     @Test fun noisyLayoutEventsRevalidateTheTreeWithoutRejectingUnchangedContent() {
-        shadowOf(service).setCanDispatchGestures(false)
+        clickable(root)
         val snapshot = call("read_screen")
         service.onAccessibilityEvent(AccessibilityEvent.obtain(AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED).apply {
             contentChangeTypes = AccessibilityEvent.CONTENT_CHANGE_TYPE_SUBTREE
             eventTime = SystemClock.uptimeMillis()
         })
-        val result = call(action("tap", snapshot).put("x", 10).put("y", 10))
-        assertEquals("GESTURE_REJECTED", result.getString("error"))
+        assertClicked(call(action("tap", snapshot).put("node_id", "n0")), root)
     }
 
     @Test fun aDelayedOldEventCannotInvalidateANewerRead() {
-        shadowOf(service).setCanDispatchGestures(false)
+        clickable(root)
         val snapshot = call("read_screen")
         service.onAccessibilityEvent(AccessibilityEvent.obtain(AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED).apply {
             eventTime = SystemClock.uptimeMillis() - 1
         })
-        val result = call(action("tap", snapshot).put("x", 10).put("y", 10))
-        assertEquals("GESTURE_REJECTED", result.getString("error"))
+        assertClicked(call(action("tap", snapshot).put("node_id", "n0")), root)
     }
 
     @Test fun snapshotExpiresAndCannotBeUsedInAnotherApp() {
@@ -287,16 +295,11 @@ class PhoneControlServiceTest {
     }
 
     @Test fun layoutDriftDoesNotInvalidateNodeActions() {
-        root.addAction(AccessibilityNodeInfo.ACTION_CLICK)
+        clickable(root)
         val snapshot = call("read_screen")
-        val moved = node("Screen").apply {
-            setBoundsInScreen(Rect(4, 3, 104, 103))
-            addAction(AccessibilityNodeInfo.ACTION_CLICK)
-        }
-        shadowOf(moved).setRefreshReturnValue(true)
+        val moved = clickable(node("Screen").apply { setBoundsInScreen(Rect(4, 3, 104, 103)) })
         changeRoot(moved)
-        val result = call(action("tap", snapshot).put("node_id", "n0"))
-        assertFalse(result.optString("error"), result.optString("error").startsWith("STALE_"))
+        assertClicked(call(action("tap", snapshot).put("node_id", "n0")), moved)
     }
 
     @Test fun coordinateGesturesSurviveContentChangesButNotAnotherApp() {
