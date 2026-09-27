@@ -657,7 +657,8 @@ Stream<StreamChunk> sendGoogleVertexClaudeStream({
   );
 }
 
-/// Official Vertex hosts follow [location]; a custom [ProviderConfig.baseUrl]
+/// Official Vertex hosts follow [location] (global, the `us` / `eu`
+/// multi-regions, or a single region); a custom [ProviderConfig.baseUrl]
 /// (tests, gateways) is used as the origin instead.
 String vertexOrigin(ProviderConfig config, String loc) {
   final raw = config.baseUrl.trim();
@@ -667,11 +668,15 @@ String vertexOrigin(ProviderConfig config, String loc) {
       host.isEmpty ||
       host == 'generativelanguage.googleapis.com' ||
       host == 'aiplatform.googleapis.com' ||
-      host.endsWith('-aiplatform.googleapis.com');
+      host.endsWith('-aiplatform.googleapis.com') ||
+      RegExp(r'^aiplatform\.[a-z]+\.rep\.googleapis\.com$').hasMatch(host);
   if (official) {
-    final regional = loc.toLowerCase() == 'global'
-        ? 'aiplatform.googleapis.com'
-        : '$loc-aiplatform.googleapis.com';
+    final l = loc.toLowerCase();
+    final regional = switch (l) {
+      'global' => 'aiplatform.googleapis.com',
+      'us' || 'eu' => 'aiplatform.$l.rep.googleapis.com',
+      _ => '$l-aiplatform.googleapis.com',
+    };
     return 'https://$regional';
   }
   return raw.endsWith('/') ? raw.substring(0, raw.length - 1) : raw;

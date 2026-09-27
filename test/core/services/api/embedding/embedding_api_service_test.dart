@@ -40,6 +40,7 @@ ProviderConfig _cfg(
   ProviderKind kind, {
   Map<String, dynamic> overrides = const {},
   bool vertex = false,
+  String location = 'us-central1',
   List<ApiKeyConfig>? apiKeys,
 }) {
   return ProviderConfig(
@@ -56,7 +57,7 @@ ProviderConfig _cfg(
       'embed-model': {'type': 'embedding', ...overrides},
     },
     vertexAI: vertex ? true : null,
-    location: vertex ? 'us-central1' : null,
+    location: vertex ? location : null,
     projectId: vertex ? 'proj' : null,
   );
 }
@@ -186,45 +187,49 @@ void main() {
     });
   });
 
-  test('Vertex Gemini Embedding 2 uses global embedContent', () async {
-    server.respond = (body) => {
-      'embedding': {
-        'values': [3, 4],
-      },
-      'usageMetadata': {'promptTokenCount': 2},
-    };
-    final result = await EmbeddingApiService.embed(
-      config: _cfg(
-        server.origin,
-        ProviderKind.google,
-        vertex: true,
-        overrides: {'apiModelId': 'gemini-embedding-2'},
-      ),
-      modelId: 'embed-model',
-      inputs: const ['a', 'b'],
-      task: EmbeddingTask.query,
-      dimensions: 512,
-    );
+  test(
+    'Vertex Gemini Embedding 2 uses embedContent in the configured location',
+    () async {
+      server.respond = (body) => {
+        'embedding': {
+          'values': [3, 4],
+        },
+        'usageMetadata': {'promptTokenCount': 2},
+      };
+      final result = await EmbeddingApiService.embed(
+        config: _cfg(
+          server.origin,
+          ProviderKind.google,
+          vertex: true,
+          location: 'eu',
+          overrides: {'apiModelId': 'gemini-embedding-2'},
+        ),
+        modelId: 'embed-model',
+        inputs: const ['a', 'b'],
+        task: EmbeddingTask.query,
+        dimensions: 512,
+      );
 
-    expect(result.vectors, [
-      [3.0, 4.0],
-      [3.0, 4.0],
-    ]);
-    expect(result.promptTokens, 4);
-    final first = server.requests.first;
-    expect(
-      first.path,
-      '/v1/projects/proj/locations/global/publishers/google/models/gemini-embedding-2:embedContent',
-    );
-    expect(first.body, {
-      'content': {
-        'parts': [
-          {'text': 'task: search result | query: a'},
-        ],
-      },
-      'outputDimensionality': 512,
-    });
-  });
+      expect(result.vectors, [
+        [3.0, 4.0],
+        [3.0, 4.0],
+      ]);
+      expect(result.promptTokens, 4);
+      final first = server.requests.first;
+      expect(
+        first.path,
+        '/v1/projects/proj/locations/eu/publishers/google/models/gemini-embedding-2:embedContent',
+      );
+      expect(first.body, {
+        'content': {
+          'parts': [
+            {'text': 'task: search result | query: a'},
+          ],
+        },
+        'outputDimensionality': 512,
+      });
+    },
+  );
 
   test('Vertex authenticates with the selected multi-key entry', () async {
     server.respond = (_) => {
@@ -271,6 +276,16 @@ void main() {
       'https://us-central1-aiplatform.googleapis.com',
     );
     expect(vertexOrigin(cfg, 'global'), 'https://aiplatform.googleapis.com');
+    expect(vertexOrigin(cfg, 'eu'), 'https://aiplatform.eu.rep.googleapis.com');
+    final multiRegion = _cfg(
+      'https://aiplatform.us.rep.googleapis.com',
+      ProviderKind.google,
+      vertex: true,
+    );
+    expect(
+      vertexOrigin(multiRegion, 'eu'),
+      'https://aiplatform.eu.rep.googleapis.com',
+    );
     final psc = _cfg(
       'https://xyz-aiplatform.p.googleapis.com',
       ProviderKind.google,
@@ -339,7 +354,7 @@ void main() {
     expect(server.requests.first.headers['authorization'], 'Bearer test-key');
   });
 
-  test('provider-level chat body stays out of embedding requests', () async {
+  test('provider body keeps embedding fields and drops chat fields', () async {
     server.respond = (_) => {
       'data': [
         {
@@ -352,13 +367,26 @@ void main() {
       config: _cfg('${server.origin}/v1', ProviderKind.openai).copyWith(
         customBody: const [
           {'key': 'temperature', 'value': '0.2'},
+          {'key': 'dimensions', 'value': '256'},
+          {'key': 'user', 'value': 'provider'},
         ],
+        modelOverrides: {
+          'embed-model': {
+            'type': 'embedding',
+            'body': [
+              {'key': 'user', 'value': 'model'},
+            ],
+          },
+        },
       ),
       modelId: 'embed-model',
       inputs: const ['a'],
     );
 
-    expect(server.requests.single.body.containsKey('temperature'), isFalse);
+    final body = server.requests.single.body;
+    expect(body.containsKey('temperature'), isFalse);
+    expect(body['dimensions'], 256);
+    expect(body['user'], 'model');
   });
 
   test('a response missing vectors fails instead of misaligning', () async {

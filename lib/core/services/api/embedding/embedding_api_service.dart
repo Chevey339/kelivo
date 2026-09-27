@@ -42,6 +42,43 @@ class EmbeddingApiService {
   /// Vertex `gemini-embedding-*` models accept one instance per `:predict`.
   static const int _vertexBatchSize = 1;
 
+  /// Top-level fields that only mean something to chat requests.
+  static const Set<String> _chatOnlyBodyKeys = {
+    'messages',
+    'contents',
+    'system',
+    'systemInstruction',
+    'stream',
+    'stream_options',
+    'temperature',
+    'top_p',
+    'top_k',
+    'min_p',
+    'max_tokens',
+    'max_completion_tokens',
+    'presence_penalty',
+    'frequency_penalty',
+    'repetition_penalty',
+    'stop',
+    'seed',
+    'n',
+    'logprobs',
+    'top_logprobs',
+    'logit_bias',
+    'tools',
+    'tool_choice',
+    'parallel_tool_calls',
+    'response_format',
+    'reasoning',
+    'reasoning_effort',
+    'thinking',
+    'enable_thinking',
+    'thinking_budget',
+    'chat_template_kwargs',
+    'generationConfig',
+    'safetySettings',
+  };
+
   static Future<EmbeddingResult> embed({
     required ProviderConfig config,
     required String modelId,
@@ -196,9 +233,10 @@ class EmbeddingApiService {
       if (token != null && token.isNotEmpty) 'Authorization': 'Bearer $token',
       'X-Goog-User-Project': proj,
     };
+    final loc = config.location!.trim();
     if (_takesInstructions(upstream)) {
-      // Served only at the global location, one input per `:embedContent`.
-      const loc = 'global';
+      // One input per `:embedContent`; served at global and the `us` / `eu`
+      // multi-regions.
       final json = await _post(
         client,
         Uri.parse(
@@ -221,7 +259,6 @@ class EmbeddingApiService {
         promptTokens: _geminiPromptTokens(json),
       );
     }
-    final loc = config.location!.trim();
     final json = await _post(
       client,
       Uri.parse(
@@ -258,9 +295,14 @@ class EmbeddingApiService {
     Map<String, dynamic> body, {
     required Map<String, String> baseHeaders,
   }) async {
-    // Only the model's own body: provider-level rows are written for chat
-    // requests, and embedding APIs reject unknown fields such as
-    // `temperature`.
+    // Provider rows apply to every model, but chat-only fields among them
+    // would make embedding APIs reject the request. The model's own body is
+    // written for this model and applies as is, last.
+    CustomRequestMerger.applyBody(
+      body,
+      ModelOverridePayloadParser.customBodyFromRows(config.customBody)
+        ..removeWhere((key, _) => _chatOnlyBodyKeys.contains(key)),
+    );
     CustomRequestMerger.applyBody(
       body,
       ModelOverridePayloadParser.customBody(
