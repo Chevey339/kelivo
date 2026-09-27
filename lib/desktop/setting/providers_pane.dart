@@ -430,6 +430,23 @@ class _DesktopProvidersBodyState extends State<_DesktopProvidersBody> {
                             ),
                           ),
                         ),
+                        const SizedBox(width: 4),
+                        Tooltip(
+                          message: l10n.providersPageImportTooltip,
+                          child: _IconBtn(
+                            icon: lucide.Lucide.cloudDownload,
+                            onTap: () async {
+                              final keys =
+                                  await showDesktopImportProviderDialog(
+                                    context,
+                                  );
+                              if (!mounted || keys == null || keys.isEmpty) {
+                                return;
+                              }
+                              setState(() => _selectedKey = keys.first);
+                            },
+                          ),
+                        ),
                       ],
                     ),
                     const SizedBox(height: 8),
