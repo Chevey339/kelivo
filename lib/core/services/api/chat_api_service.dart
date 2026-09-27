@@ -5,7 +5,7 @@ import 'package:dio/dio.dart';
 import 'package:http/http.dart' as http;
 import '../../providers/settings_provider.dart';
 import '../../providers/model_provider.dart';
-import '../network/dio_http_client.dart';
+import '../network/provider_http_client.dart';
 import '../../../utils/unicode_sanitizer.dart';
 import '../../models/model_spec.dart';
 import '../../utils/multimodal_input_utils.dart';
@@ -200,29 +200,6 @@ class ChatApiService {
         },
       },
     );
-  }
-
-  static http.Client _clientFor(ProviderConfig cfg, CancelToken cancelToken) {
-    final enabled = cfg.proxyEnabled == true;
-    final host = (cfg.proxyHost ?? '').trim();
-    final portStr = (cfg.proxyPort ?? '').trim();
-    final user = (cfg.proxyUsername ?? '').trim();
-    final pass = (cfg.proxyPassword ?? '').trim();
-    if (enabled && host.isNotEmpty && portStr.isNotEmpty) {
-      final port = int.tryParse(portStr) ?? 8080;
-      return DioHttpClient(
-        proxy: NetworkProxyConfig(
-          enabled: true,
-          type: ProviderConfig.resolveProxyType(cfg.proxyType),
-          host: host,
-          port: port,
-          username: user.isEmpty ? null : user,
-          password: pass.isEmpty ? null : pass,
-        ),
-        cancelToken: cancelToken,
-      );
-    }
-    return DioHttpClient(cancelToken: cancelToken);
   }
 
   static Stream<StreamChunk> sendMessageStream({
@@ -449,7 +426,7 @@ class ChatApiService {
     final cancelToken = CancelToken();
     _bridgeCancel(sessionToken, cancelToken);
     final client = ProviderOAuthService.instance.authenticatedClient(
-      _clientFor(config, cancelToken),
+      providerHttpClient(config, cancelToken: cancelToken),
       config,
     );
     try {
