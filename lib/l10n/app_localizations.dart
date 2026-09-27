@@ -22131,6 +22131,12 @@ abstract class AppLocalizations {
   /// **'Resets {time}'**
   String oauthResetsAt(String time);
 
+  /// No description provided for @oauthUsedValue.
+  ///
+  /// In en, this message translates to:
+  /// **'Used {value}'**
+  String oauthUsedValue(String value);
+
   /// No description provided for @oauthNetworkError.
   ///
   /// In en, this message translates to:

@@ -4339,6 +4339,7 @@
   "oauthDays": "{count} 天窗口",
   "oauthWindow": "用量窗口",
   "oauthResetsAt": "重置于 {time}",
+  "oauthUsedValue": "已用 {value}",
   "oauthNetworkError": "连接失败，请检查网络后重试。",
   "oauthInvalidResponse": "授权未完成，请重试。",
   "oauthTimeout": "授权超时，请重试。",

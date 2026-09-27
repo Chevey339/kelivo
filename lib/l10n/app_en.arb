@@ -5451,6 +5451,14 @@
   },
   "oauthWindow": "Usage window",
   "oauthResetsAt": "Resets {time}",
+  "oauthUsedValue": "Used {value}",
+  "@oauthUsedValue": {
+    "placeholders": {
+      "value": {
+        "type": "String"
+      }
+    }
+  },
   "@oauthResetsAt": {
     "placeholders": {
       "time": {

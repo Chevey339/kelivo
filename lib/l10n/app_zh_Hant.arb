@@ -4339,6 +4339,7 @@
   "oauthDays": "{count} 天視窗",
   "oauthWindow": "用量視窗",
   "oauthResetsAt": "重設於 {time}",
+  "oauthUsedValue": "已用 {value}",
   "oauthNetworkError": "連線失敗，請檢查網路後重試。",
   "oauthInvalidResponse": "授權未完成，請重試。",
   "oauthTimeout": "授權逾時，請重試。",

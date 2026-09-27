@@ -290,7 +290,7 @@ void main() {
         );
         await tester.pumpAndSettle();
         expect(tester.takeException(), isNull);
-        expect(find.text('62%'), findsOneWidget);
+        expect(find.text('Used 62%'), findsOneWidget);
         expect(find.text('Available usage resets: 2'), findsOneWidget);
         expect(find.text('—'), findsOneWidget);
         await tester.tap(find.text('Usage details'));
@@ -674,7 +674,7 @@ void main() {
       );
       await tester.pumpAndSettle();
       expect(find.text('account@example.com'), findsOneWidget);
-      expect(find.text('62%'), findsOneWidget);
+      expect(find.text('Used 62%'), findsOneWidget);
       expect(find.text('API Key'), findsNothing);
       expect(tester.takeException(), isNull);
       await snapshot(
@@ -1279,7 +1279,7 @@ void main() {
       );
       await tester.pumpAndSettle();
       expect(find.text('Extra usage'), findsOneWidget);
-      expect(find.text('\$2.49'), findsOneWidget);
+      expect(find.text('Used \$2.49'), findsOneWidget);
       expect(find.text('0%'), findsNothing);
       expect(tester.takeException(), isNull);
     },

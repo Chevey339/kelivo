@@ -11810,6 +11810,11 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
+  String oauthUsedValue(String value) {
+    return '已用 $value';
+  }
+
+  @override
   String get oauthNetworkError => '连接失败，请检查网络后重试。';
 
   @override
@@ -23896,6 +23901,11 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   @override
   String oauthResetsAt(String time) {
     return '重置于 $time';
+  }
+
+  @override
+  String oauthUsedValue(String value) {
+    return '已用 $value';
   }
 
   @override
@@ -36064,6 +36074,11 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   @override
   String oauthResetsAt(String time) {
     return '重設於 $time';
+  }
+
+  @override
+  String oauthUsedValue(String value) {
+    return '已用 $value';
   }
 
   @override

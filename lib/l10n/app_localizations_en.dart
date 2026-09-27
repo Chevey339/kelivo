@@ -12351,6 +12351,11 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String oauthUsedValue(String value) {
+    return 'Used $value';
+  }
+
+  @override
   String get oauthNetworkError =>
       'Could not connect. Check your network and try again.';
 
