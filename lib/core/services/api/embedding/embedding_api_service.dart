@@ -306,9 +306,10 @@ class EmbeddingApiService {
   /// `taskType`, and on Vertex are served by `:embedContent`; 001 predates
   /// both.
   static bool _takesInstructions(String upstream) {
-    final id = upstream.toLowerCase().split('/').last;
-    return id.startsWith('gemini-embedding-') &&
-        !id.startsWith('gemini-embedding-001');
+    final match = RegExp(
+      r'^gemini-embedding-(\d+)',
+    ).firstMatch(upstream.toLowerCase().split('/').last);
+    return match != null && int.parse(match.group(1)!) >= 2;
   }
 
   static String _instruct(String text, EmbeddingTask? task) => switch (task) {

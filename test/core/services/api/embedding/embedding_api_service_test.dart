@@ -271,6 +271,38 @@ void main() {
       'https://us-central1-aiplatform.googleapis.com',
     );
     expect(vertexOrigin(cfg, 'global'), 'https://aiplatform.googleapis.com');
+    final psc = _cfg(
+      'https://xyz-aiplatform.p.googleapis.com',
+      ProviderKind.google,
+      vertex: true,
+    );
+    expect(
+      vertexOrigin(psc, 'us-central1'),
+      'https://xyz-aiplatform.p.googleapis.com',
+    );
+  });
+
+  test('experimental 001-era embedding ids keep taskType', () async {
+    server.respond = (body) => {
+      'embeddings': [
+        {
+          'values': [1],
+        },
+      ],
+    };
+    await EmbeddingApiService.embed(
+      config: _cfg(
+        '${server.origin}/v1beta',
+        ProviderKind.google,
+        overrides: {'apiModelId': 'gemini-embedding-exp-03-07'},
+      ),
+      modelId: 'embed-model',
+      inputs: const ['a'],
+      task: EmbeddingTask.query,
+    );
+
+    final request = server.requests.single.body['requests'][0] as Map;
+    expect(request['taskType'], 'RETRIEVAL_QUERY');
   });
 
   test('Vertex sends one instance per predict call', () async {

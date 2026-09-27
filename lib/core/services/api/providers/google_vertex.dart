@@ -663,7 +663,11 @@ String vertexOrigin(ProviderConfig config, String loc) {
   final raw = config.baseUrl.trim();
   final host = (Uri.tryParse(raw)?.host ?? '').toLowerCase();
   // Switching a Gemini provider to Vertex keeps its Gemini API base URL.
-  final official = host.isEmpty || host.endsWith('.googleapis.com');
+  final official =
+      host.isEmpty ||
+      host == 'generativelanguage.googleapis.com' ||
+      host == 'aiplatform.googleapis.com' ||
+      host.endsWith('-aiplatform.googleapis.com');
   if (official) {
     final regional = loc.toLowerCase() == 'global'
         ? 'aiplatform.googleapis.com'
