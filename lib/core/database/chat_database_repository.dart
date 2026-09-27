@@ -10,6 +10,7 @@ import 'package:sqlite3/sqlite3.dart' as sqlite;
 import 'package:uuid/uuid.dart';
 
 import '../models/chat_message.dart';
+import '../models/token_usage.dart';
 import '../models/conversation.dart';
 import '../models/message_part.dart';
 import '../utils/multimodal_input_utils.dart';
@@ -3501,9 +3502,9 @@ class ChatDatabaseRepository {
         COALESCE(SUM(m.prompt_tokens), 0) AS input_tokens,
         COALESCE(SUM(m.completion_tokens), 0) AS output_tokens,
         COALESCE(SUM(m.cached_tokens), 0) AS cached_tokens,
-        COALESCE(SUM(CASE WHEN COALESCE(m.prompt_tokens, 0) = 0
-          AND COALESCE(m.completion_tokens, 0) = 0
-          THEN COALESCE(m.total_tokens, 0) ELSE 0 END), 0) AS uncategorized_tokens
+        COALESCE(SUM(MAX(COALESCE(m.total_tokens, 0)
+          - COALESCE(m.prompt_tokens, 0)
+          - COALESCE(m.completion_tokens, 0), 0)), 0) AS uncategorized_tokens
       FROM message_rows m
       WHERE m.timestamp >= ? AND m.timestamp < ?
         AND (NULLIF(TRIM(m.provider_id), '') IS NOT NULL
@@ -5974,6 +5975,7 @@ class ChatDatabaseRepository {
             current?.extrasJson ?? '{}',
             reasoningTokens: message.reasoningTokens,
             cacheWriteTokens: message.cacheWriteTokens,
+            finishUsage: message.finishUsage,
           ),
         ),
       ),
@@ -7107,6 +7109,11 @@ class ChatDatabaseRepository {
       durationMs: row.durationMs,
       reasoningTokens: _tokenExtraInt(extras, _reasoningTokensExtraKey),
       cacheWriteTokens: _tokenExtraInt(extras, _cacheWriteTokensExtraKey),
+      finishUsage: extras[_finishUsageExtraKey] is Map
+          ? TokenUsage.fromJson(
+              Map<String, dynamic>.from(extras[_finishUsageExtraKey] as Map),
+            )
+          : null,
     );
   }
 
@@ -7357,6 +7364,7 @@ class ChatDatabaseRepository {
           '{}',
           reasoningTokens: message.reasoningTokens,
           cacheWriteTokens: message.cacheWriteTokens,
+          finishUsage: message.finishUsage,
         ),
       ),
       messageOrder: messageOrder,
@@ -7411,6 +7419,7 @@ class ChatDatabaseRepository {
 
   static const _reasoningTokensExtraKey = 'tokens.reasoning';
   static const _cacheWriteTokensExtraKey = 'tokens.cacheWrite';
+  static const _finishUsageExtraKey = 'tokens.finish';
 
   int? _tokenExtraInt(Map<String, dynamic> extras, String key) {
     final value = extras[key];
@@ -7424,6 +7433,7 @@ class ChatDatabaseRepository {
     String existing, {
     int? reasoningTokens,
     int? cacheWriteTokens,
+    TokenUsage? finishUsage,
   }) {
     final extras = Map<String, dynamic>.from(_decodeExtrasJson(existing));
     if (reasoningTokens != null) {
@@ -7431,6 +7441,9 @@ class ChatDatabaseRepository {
     }
     if (cacheWriteTokens != null) {
       extras[_cacheWriteTokensExtraKey] = cacheWriteTokens;
+    }
+    if (finishUsage != null) {
+      extras[_finishUsageExtraKey] = finishUsage.toJson();
     }
     if (extras.isEmpty) return '{}';
     return jsonEncode(extras);

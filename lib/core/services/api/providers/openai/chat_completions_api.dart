@@ -836,6 +836,7 @@ Stream<StreamChunk> runOpenAIChatCompletionsToolFollowUps({
       ];
     },
     sendFollowUp: () async* {
+      usage = const TokenUsage();
       final body2 = <String, dynamic>{
         'model': upstreamModelId,
         'messages': await buildOpenAIChatCompletionMessages(
@@ -992,6 +993,7 @@ Stream<StreamChunk> runOpenAIChatCompletionsNonStreamToolFollowUps({
       ];
     },
     sendFollowUp: () async* {
+      usage = const TokenUsage();
       final req = http.Request('POST', url);
       req.headers.addAll(
         customHeaders(

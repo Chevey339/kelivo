@@ -1,11 +1,13 @@
 import '../../../support/business_test_harness.dart';
 import 'package:Kelivo/core/models/chat_message.dart';
 import 'package:Kelivo/core/models/message_part.dart';
+import 'package:Kelivo/core/models/token_usage.dart';
 import 'package:Kelivo/core/providers/settings_provider.dart';
 import 'package:Kelivo/core/providers/tts_provider.dart';
 import 'package:Kelivo/features/chat/pages/image_viewer_page.dart';
 import 'package:Kelivo/features/chat/widgets/chat_message_widget.dart';
 import 'package:Kelivo/features/chat/widgets/timeline_projection.dart';
+import 'package:Kelivo/features/chat/widgets/token_display_widget.dart';
 import 'package:Kelivo/features/home/controllers/stream_controller.dart';
 import 'package:Kelivo/features/home/services/ask_user_interaction_service.dart';
 import 'package:Kelivo/features/home/services/tool_approval_service.dart';
@@ -18,12 +20,14 @@ import 'package:shared_preferences/shared_preferences.dart';
 Widget _buildHarness({
   required Widget child,
   Brightness brightness = Brightness.light,
+  SettingsProvider? settings,
 }) {
   SharedPreferences.setMockInitialValues(const {});
   return MultiProvider(
     providers: [
       ChangeNotifierProvider(
-        create: (_) => SettingsProvider(createBusinessTestPreferences()),
+        create: (_) =>
+            settings ?? SettingsProvider(createBusinessTestPreferences()),
       ),
       ChangeNotifierProvider(
         create: (_) =>
@@ -52,6 +56,50 @@ void expectAbove(WidgetTester tester, Finder upper, Finder lower) {
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+
+  testWidgets('token footer switches between finish and total usage', (
+    tester,
+  ) async {
+    final settings = SettingsProvider(createBusinessTestPreferences());
+    await settings.loaded;
+    final message = ChatMessage(
+      role: 'assistant',
+      conversationId: 'c',
+      content: 'done',
+      totalTokens: 350,
+      promptTokens: 300,
+      completionTokens: 50,
+      cachedTokens: 70,
+      cacheWriteTokens: 30,
+      reasoningTokens: 5,
+      finishUsage: const TokenUsage(
+        promptTokens: 200,
+        completionTokens: 30,
+        cachedTokens: 60,
+      ),
+    );
+    await tester.pumpWidget(
+      _buildHarness(
+        settings: settings,
+        child: ChatMessageWidget(message: message, showModelIcon: false),
+      ),
+    );
+    await tester.pumpAndSettle();
+    for (final enabled in [false, true, false]) {
+      await settings.setShowTotalTokens(enabled);
+      await tester.pumpAndSettle();
+      final display = tester.widget<TokenDisplayWidget>(
+        find.byType(TokenDisplayWidget),
+      );
+      expect(display.totalTokens, enabled ? 350 : 230);
+      expect(display.promptTokens, enabled ? 300 : 200);
+      expect(display.completionTokens, enabled ? 50 : 30);
+      expect(display.cachedTokens, enabled ? 70 : 60);
+      expect(display.cacheWriteTokens, enabled ? 30 : 0);
+      expect(display.reasoningTokens, enabled ? 5 : 0);
+      expect(message.totalTokens, 350);
+    }
+  });
 
   for (final brightness in Brightness.values) {
     testWidgets(

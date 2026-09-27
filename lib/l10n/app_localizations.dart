@@ -9277,6 +9277,18 @@ abstract class AppLocalizations {
   /// **'Show Token & Context Stats'**
   String get displaySettingsPageShowTokenStatsTitle;
 
+  /// No description provided for @displaySettingsPageShowTotalTokensTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Show tokens for the entire turn'**
+  String get displaySettingsPageShowTotalTokensTitle;
+
+  /// No description provided for @displaySettingsPageShowTotalTokensSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Sum usage across all API requests in a reply. When off, show only the final request. Statistics always include all requests.'**
+  String get displaySettingsPageShowTotalTokensSubtitle;
+
   /// No description provided for @displaySettingsPageShowTokenStatsSubtitle.
   ///
   /// In en, this message translates to:

@@ -88,6 +88,8 @@ class _DisplaySettingsBody extends StatelessWidget {
                   _RowDivider(),
                   _ToggleRowShowTokenStats(),
                   _RowDivider(),
+                  _ToggleRowShowTotalTokens(),
+                  _RowDivider(),
                   _ToggleRowShowThinkingCards(),
                   _RowDivider(),
                   _ToggleRowShowToolCards(),
@@ -2456,6 +2458,21 @@ class _ToggleRowShowTokenStats extends StatelessWidget {
       label: l10n.displaySettingsPageShowTokenStatsTitle,
       value: sp.showTokenStats,
       onChanged: (v) => context.read<SettingsProvider>().setShowTokenStats(v),
+    );
+  }
+}
+
+class _ToggleRowShowTotalTokens extends StatelessWidget {
+  const _ToggleRowShowTotalTokens();
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    final sp = context.watch<SettingsProvider>();
+    return _ToggleRow(
+      label: l10n.displaySettingsPageShowTotalTokensTitle,
+      tip: l10n.displaySettingsPageShowTotalTokensSubtitle,
+      value: sp.showTotalTokens,
+      onChanged: (v) => context.read<SettingsProvider>().setShowTotalTokens(v),
     );
   }
 }

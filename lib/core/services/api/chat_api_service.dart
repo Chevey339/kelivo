@@ -603,6 +603,7 @@ class ChatApiService {
     bool textOnly = false,
     AutoRetryOptions? retryOverride,
     void Function(RetryPending? pending)? onRetry,
+    void Function(Usage update)? onUsage,
   }) async {
     final handler = StreamChunkHandler(
       onRetry: onRetry == null ? null : (pending) => onRetry(pending),
@@ -635,6 +636,7 @@ class ChatApiService {
         onRetry?.call(null);
       }
       handler.handle(chunk);
+      if (chunk is Usage) onUsage?.call(chunk);
     }
     return handler.toResult();
   }

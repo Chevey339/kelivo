@@ -244,9 +244,13 @@ final class Annotations extends StreamChunk {
 }
 
 final class Usage extends StreamChunk {
-  const Usage(this.usage);
+  const Usage(this.usage, {this.startsRequest = false});
 
   final TokenUsage usage;
+
+  /// The first usage snapshot of another API request in this turn.
+  /// Later snapshots replace counters within that request; they are not deltas.
+  final bool startsRequest;
 }
 
 final class Finish extends StreamChunk {

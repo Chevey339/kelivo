@@ -2760,6 +2760,10 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
     final showModelTimestamp = context.select<SettingsProvider, bool>(
       (s) => s.showModelTimestamp,
     );
+    final showTotalTokens = context.select<SettingsProvider, bool>(
+      (s) => s.showTotalTokens,
+    );
+    final finishUsage = showTotalTokens ? null : widget.message.finishUsage;
     final enableAssistantMarkdown = context.select<SettingsProvider, bool>(
       (s) => s.enableAssistantMarkdown,
     );
@@ -3443,12 +3447,24 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
                               widget.message.totalTokens != null) ...[
                             const Spacer(),
                             TokenDisplayWidget(
-                              totalTokens: widget.message.totalTokens!,
-                              promptTokens: widget.message.promptTokens,
-                              completionTokens: widget.message.completionTokens,
-                              cachedTokens: widget.message.cachedTokens,
-                              reasoningTokens: widget.message.reasoningTokens,
-                              cacheWriteTokens: widget.message.cacheWriteTokens,
+                              totalTokens:
+                                  finishUsage?.totalTokens ??
+                                  widget.message.totalTokens!,
+                              promptTokens:
+                                  finishUsage?.promptTokens ??
+                                  widget.message.promptTokens,
+                              completionTokens:
+                                  finishUsage?.completionTokens ??
+                                  widget.message.completionTokens,
+                              cachedTokens:
+                                  finishUsage?.cachedTokens ??
+                                  widget.message.cachedTokens,
+                              reasoningTokens:
+                                  finishUsage?.reasoningTokens ??
+                                  widget.message.reasoningTokens,
+                              cacheWriteTokens:
+                                  finishUsage?.cacheWriteTokens ??
+                                  widget.message.cacheWriteTokens,
                               durationMs: widget.message.durationMs,
                               providerId: widget.message.providerId,
                               modelId: widget.message.modelId,

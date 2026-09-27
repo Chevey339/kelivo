@@ -82,6 +82,16 @@ class TokenUsage {
     totalTokens: totalTokens,
   );
 
+  /// Adds separate API requests. Within one request, use [merge] instead.
+  TokenUsage operator +(TokenUsage other) => TokenUsage(
+    promptTokens: promptTokens + other.promptTokens,
+    completionTokens: completionTokens + other.completionTokens,
+    cachedTokens: cachedTokens + other.cachedTokens,
+    reasoningTokens: reasoningTokens + other.reasoningTokens,
+    cacheWriteTokens: cacheWriteTokens + other.cacheWriteTokens,
+    totalTokens: totalTokens + other.totalTokens,
+  );
+
   Map<String, dynamic> toJson() {
     return <String, dynamic>{
       if (_promptTokens != null) 'promptTokens': _promptTokens,

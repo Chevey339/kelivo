@@ -43,5 +43,16 @@ void main() {
     await tester.tap(reasoningBadge);
     await tester.pumpAndSettle();
     expect(settings.showReasoningLevelBadge, isTrue);
+
+    final totalTokens = find.text('Show tokens for the entire turn');
+    await tester.scrollUntilVisible(
+      totalTokens,
+      -200,
+      scrollable: find.byType(Scrollable).first,
+    );
+    expect(settings.showTotalTokens, isFalse);
+    await tester.tap(totalTokens);
+    await tester.pumpAndSettle();
+    expect(settings.showTotalTokens, isTrue);
   });
 }

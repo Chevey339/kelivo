@@ -185,6 +185,10 @@ void main() {
       expect(result.usage!.reasoningTokens, 0);
       expect(result.usage!.promptTokens, gemini ? 200 : 5000);
       expect(result.usage!.completionTokens, gemini ? 30 : 100);
+      expect(result.totalUsage!.promptTokens, gemini ? 300 : 9000);
+      expect(result.totalUsage!.completionTokens, gemini ? 550 : 200);
+      expect(result.totalUsage!.reasoningTokens, gemini ? 500 : 0);
+      expect(result.totalUsage!.cacheWriteTokens, gemini ? 0 : 3000);
     });
   }
 

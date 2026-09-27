@@ -611,6 +611,7 @@ Stream<StreamChunk> sendGoogleStream(
     yield* runProviderToolRounds(
       retryRound: retryRound,
       sendRound: () async* {
+        totalUsage = null;
         pendingCalls = [];
         lastParts = [];
         lastFunctionCallParts = [];
@@ -1054,6 +1055,8 @@ Stream<StreamChunk> sendGoogleStream(
   yield* runProviderToolRounds(
     retryRound: retryRound,
     sendRound: () async* {
+      usage = null;
+      totalTokens = 0;
       pendingCalls = [];
       lastRoundCalls = [];
       lastRoundModelParts = [];

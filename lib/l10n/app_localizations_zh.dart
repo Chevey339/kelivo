@@ -4878,6 +4878,13 @@ class AppLocalizationsZh extends AppLocalizations {
   String get displaySettingsPageShowTokenStatsTitle => '显示Token和上下文统计';
 
   @override
+  String get displaySettingsPageShowTotalTokensTitle => '显示整轮累计 Token';
+
+  @override
+  String get displaySettingsPageShowTotalTokensSubtitle =>
+      '累计显示本次回复中所有 API 请求的用量。关闭时仅显示最后一次请求；统计页面始终包含所有请求。';
+
+  @override
   String get displaySettingsPageShowTokenStatsSubtitle => '显示 token 用量与消息数量';
 
   @override
@@ -17046,6 +17053,13 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get displaySettingsPageShowTokenStatsTitle => '显示Token和上下文统计';
 
   @override
+  String get displaySettingsPageShowTotalTokensTitle => '显示整轮累计 Token';
+
+  @override
+  String get displaySettingsPageShowTotalTokensSubtitle =>
+      '累计显示本次回复中所有 API 请求的用量。关闭时仅显示最后一次请求；统计页面始终包含所有请求。';
+
+  @override
   String get displaySettingsPageShowTokenStatsSubtitle => '显示 token 用量与消息数量';
 
   @override
@@ -29137,6 +29151,13 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get displaySettingsPageShowTokenStatsTitle => '顯示Token和上下文統計';
+
+  @override
+  String get displaySettingsPageShowTotalTokensTitle => '顯示整輪累計 Token';
+
+  @override
+  String get displaySettingsPageShowTotalTokensSubtitle =>
+      '累計顯示本次回覆中所有 API 請求的用量。關閉時僅顯示最後一次請求；統計頁面始終包含所有請求。';
 
   @override
   String get displaySettingsPageShowTokenStatsSubtitle => '顯示 token 用量與訊息數量';

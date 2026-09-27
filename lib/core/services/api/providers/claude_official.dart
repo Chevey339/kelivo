@@ -324,6 +324,7 @@ Stream<StreamChunk> sendClaudeStream(
   yield* runProviderToolRounds(
     retryRound: retryRound,
     sendRound: () async* {
+      totalUsage = null;
       final spec = ModelSpecResolver.instance.spec(config, modelId);
       final body = <String, dynamic>{
         'model': upstreamModelId,

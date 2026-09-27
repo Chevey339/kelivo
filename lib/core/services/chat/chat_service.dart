@@ -3788,6 +3788,9 @@ class ChatService extends ChangeNotifier {
         completionTokens: message.completionTokens,
         cachedTokens: message.cachedTokens,
         durationMs: message.durationMs,
+        reasoningTokens: message.reasoningTokens,
+        cacheWriteTokens: message.cacheWriteTokens,
+        finishUsage: message.finishUsage,
       );
       await addMessageDirectly(targetConversationId, forked);
       cloned.add(forked);

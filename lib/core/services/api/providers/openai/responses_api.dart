@@ -255,6 +255,7 @@ Stream<StreamChunk> runOpenAIResponsesToolFollowUps({
       ];
     },
     sendFollowUp: () async* {
+      usage = const TokenUsage();
       final body2 = <String, dynamic>{
         'model': upstreamModelId,
         'input': currentInput,

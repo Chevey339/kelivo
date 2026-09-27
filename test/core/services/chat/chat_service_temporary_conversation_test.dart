@@ -1,6 +1,7 @@
 import 'package:Kelivo/core/models/message_part.dart';
 import 'package:Kelivo/core/models/chat_message.dart';
 import 'package:Kelivo/core/models/conversation.dart';
+import 'package:Kelivo/core/models/token_usage.dart';
 import 'dart:async';
 import 'dart:io';
 
@@ -1380,6 +1381,58 @@ void main() {
           preserveVersions: preserveVersions,
         );
         expect(fork.chatSuggestions, isEmpty);
+      });
+    }
+
+    for (final mode in ['plain', 'fromMessages', 'withVersions']) {
+      test('fork preserves total and finish usage ($mode)', () async {
+        final service = createService();
+        final source = await service.createConversation(title: 'Source');
+        const finish = TokenUsage(
+          promptTokens: 200,
+          completionTokens: 30,
+          cachedTokens: 60,
+        );
+        final message = ChatMessage(
+          role: 'assistant',
+          content: 'answer',
+          conversationId: source.id,
+          totalTokens: 350,
+          promptTokens: 300,
+          completionTokens: 50,
+          cachedTokens: 70,
+          cacheWriteTokens: 30,
+          reasoningTokens: 5,
+          finishUsage: finish,
+        );
+        await service.addMessageDirectly(source.id, message);
+
+        final fork = mode == 'fromMessages'
+            ? await service.forkConversationFromMessages(
+                title: source.title,
+                assistantId: source.assistantId,
+                sourceMessages: [message],
+              )
+            : await service.forkConversationAtRevision(
+                sourceConversationId: source.id,
+                sourceRevisionId: message.id,
+                title: 'Fork',
+                preserveVersions: mode == 'withVersions',
+              );
+
+        void expectUsage(ChatMessage copied) {
+          expect(copied.id, isNot(message.id));
+          expect(copied.conversationId, fork.id);
+          expect(copied.finishUsage?.toJson(), finish.toJson());
+          expect(copied.tokenUsage.toJson(), message.tokenUsage.toJson());
+        }
+
+        expectUsage((await service.loadMessages(fork.id)).single);
+        await service.close();
+        services.remove(service);
+        final reopened = createService();
+        await reopened.init();
+        expectUsage((await reopened.loadMessages(fork.id)).single);
       });
     }
 

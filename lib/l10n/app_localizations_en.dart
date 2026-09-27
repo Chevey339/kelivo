@@ -5057,6 +5057,14 @@ class AppLocalizationsEn extends AppLocalizations {
       'Show Token & Context Stats';
 
   @override
+  String get displaySettingsPageShowTotalTokensTitle =>
+      'Show tokens for the entire turn';
+
+  @override
+  String get displaySettingsPageShowTotalTokensSubtitle =>
+      'Sum usage across all API requests in a reply. When off, show only the final request. Statistics always include all requests.';
+
+  @override
   String get displaySettingsPageShowTokenStatsSubtitle =>
       'Show token usage and message count';
 

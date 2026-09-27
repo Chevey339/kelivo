@@ -467,6 +467,7 @@ Stream<StreamChunk> sendGoogleVertexClaudeStream({
   yield* runProviderToolRounds(
     retryRound: retryRound,
     sendRound: () async* {
+      totalUsage = null;
       pendingCalls = [];
       lastStreamResults = [];
       lastText = '';

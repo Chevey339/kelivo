@@ -9,6 +9,30 @@ import '../stream/stream_chunk_emit.dart';
 typedef StreamRoundRunner =
     Stream<StreamChunk> Function(Stream<StreamChunk> Function() sendRound);
 
+/// Tag the first usage of each HTTP round, including non-stream responses
+/// whose usage is only available after parsing. Tagging happens outside the
+/// retry runner so bookkeeping cannot disable retries of empty failed attempts.
+/// Hosts reset [usageOf] for each request so it never returns an earlier round.
+Stream<StreamChunk> _withRequestUsage(
+  Stream<StreamChunk> source,
+  TokenUsage? Function()? usageOf,
+) async* {
+  var startsRequest = true;
+  await for (final chunk in source) {
+    if (chunk is Usage) {
+      yield Usage(chunk.usage, startsRequest: startsRequest);
+      startsRequest = false;
+    } else {
+      yield chunk;
+    }
+  }
+  final usage = usageOf?.call();
+  if (usage != null || startsRequest) {
+    // Missing usage must not count the preceding request again.
+    yield Usage(usage ?? const TokenUsage(), startsRequest: startsRequest);
+  }
+}
+
 final class ExecutedClientTool {
   const ExecutedClientTool({
     required this.call,
@@ -99,7 +123,10 @@ Stream<StreamChunk> runClientToolFollowUps({
       totalTokens: totalTokens,
     );
     await append(executed);
-    yield* retryRound?.call(sendFollowUp) ?? sendFollowUp();
+    yield* _withRequestUsage(
+      retryRound?.call(sendFollowUp) ?? sendFollowUp(),
+      usageOf,
+    );
     calls = takeCallsAfterRound();
   }
   yield* finish();
@@ -121,7 +148,10 @@ Stream<StreamChunk> runProviderToolRounds({
   TokenUsage? Function()? usageOf,
 }) async* {
   while (true) {
-    yield* retryRound?.call(sendRound) ?? sendRound();
+    yield* _withRequestUsage(
+      retryRound?.call(sendRound) ?? sendRound(),
+      usageOf,
+    );
     final calls = takeCalls();
     if (calls.isEmpty && !continueWithoutCalls()) {
       yield* finish();

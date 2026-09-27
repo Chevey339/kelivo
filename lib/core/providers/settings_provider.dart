@@ -188,6 +188,8 @@ class SettingsProvider extends ChangeNotifier {
   static const String _displayShowModelNameTimestampKey =
       'display_show_model_name_timestamp_v1';
   static const String _displayShowTokenStatsKey = 'display_show_token_stats_v1';
+  static const String _displayShowTotalTokensKey =
+      'display_show_total_tokens_v1';
   static const String _displayShowUserNameTimestampKey =
       'display_show_user_name_timestamp_v1';
   static const String _displayShowUserNameKey = 'display_show_user_name_v1';
@@ -965,6 +967,7 @@ class SettingsProvider extends ChangeNotifier {
     _showModelNameTimestamp =
         prefs.getBool(_displayShowModelNameTimestampKey) ?? true;
     _showTokenStats = prefs.getBool(_displayShowTokenStatsKey) ?? true;
+    _showTotalTokens = prefs.getBool(_displayShowTotalTokensKey) ?? false;
     _showUserNameTimestamp =
         prefs.getBool(_displayShowUserNameTimestampKey) ?? true;
     // new split settings: default to the legacy combined setting value for backward compat
@@ -4589,6 +4592,16 @@ Requirements:
     await prefs.setBool(_displayShowTokenStatsKey, v);
   }
 
+  // Display only: statistics always use the whole turn's usage.
+  bool _showTotalTokens = false;
+  bool get showTotalTokens => _showTotalTokens;
+  Future<void> setShowTotalTokens(bool v) async {
+    if (_showTotalTokens == v) return;
+    _showTotalTokens = v;
+    notifyListeners();
+    await _preferences.setBool(_displayShowTotalTokensKey, v);
+  }
+
   // Display: show thinking-process cards in chat (default on)
   bool _showThinkingCards = true;
   bool get showThinkingCards => _showThinkingCards;
@@ -5714,6 +5727,7 @@ Requirements:
     copy._showModelIcon = _showModelIcon;
     copy._showModelNameTimestamp = _showModelNameTimestamp;
     copy._showTokenStats = _showTokenStats;
+    copy._showTotalTokens = _showTotalTokens;
     copy._showUserNameTimestamp = _showUserNameTimestamp;
     copy._showUserMessageActions = _showUserMessageActions;
     copy._showUserName = _showUserName;

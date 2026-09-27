@@ -843,7 +843,6 @@ Stream<StreamChunk> sendOpenAIStream(
       <int, Map<String, String>>{}; // index -> {call_id,name,args,series_id}
   List<Map<String, dynamic>> lastResponseOutputItems =
       const <Map<String, dynamic>>[];
-  String? finishReason;
   var streamRound = 0;
   final responsesDecoder = config.useResponseApi == true
       ? ResponsesStreamDecoder(
@@ -996,170 +995,14 @@ Stream<StreamChunk> sendOpenAIStream(
         toolAcc
           ..clear()
           ..addAll(decoder.toolCalls);
-        finishReason = decoder.finishReason;
         usage = decoder.usage ?? usage;
         if (usage != null) totalTokens = usage.totalTokens;
         approxCompletionChars = decoder.approxCompletionChars;
         reasoningBuffer = decoder.reasoningEcho;
         assistantContentBuffer = decoder.assistantContent;
-        if (data == '[DONE]') {
-          for (final chunk in decoder.onClosed()) {
-            yield chunk;
-          }
-          if (effectiveOnToolCall != null && toolAcc.isNotEmpty) {
-            yield* runOpenAIChatCompletionsToolFollowUps(
-              client: client,
-              config: config,
-              modelId: modelId,
-              upstreamModelId: upstreamModelId,
-              url: url,
-              spec: spec,
-              messages: messages,
-              firstToolAcc: toolAcc,
-              firstAssistantContent: assistantContentBuffer,
-              firstReasoning: reasoningBuffer,
-              firstReasoningDetails:
-                  decoder.reasoningDetails ??
-                  reasoningDetailsBuffer.detailsOrNull,
-              onToolCall: effectiveOnToolCall,
-              userImagePaths: userImagePaths,
-              canImageInput: canImageInput,
-              allowRemoteImages: allowRemoteImages,
-              skipImageParsing: skipImageParsing,
-              reasoning: reasoning,
-              temperature: temperature,
-              topP: topP,
-              tools: tools,
-              extraBodyCfg: extraBodyCfg,
-              extraHeaders: extraHeaders,
-              wantsImageOutput: wantsImageOutput,
-              needsReasoningEcho: needsReasoningEcho,
-              reasoningDetailsAllowSnapshots: reasoningDetailsAllowSnapshots,
-              applyMaxTokens: setMaxTokens,
-              initialUsage: usage,
-              streamRound: streamRound,
-              approxPromptTokens: approxPromptTokens,
-              approxCompletionChars: approxCompletionChars,
-              includeReasoningDetailsOnDone: true,
-              retryRound: retryRound,
-            );
-            return;
-          }
-          final approxTotal =
-              approxPromptTokens + approxTokensFromChars(approxCompletionChars);
-          yield* emitDone(
-            ids: StreamChunkIds('finish'),
-            reasoningDetails:
-                decoder.reasoningDetails ??
-                reasoningDetailsBuffer.detailsOrNull,
-            usage: usage,
-            totalTokens: usage?.totalTokens ?? approxTotal,
-          );
-          return;
-        }
-      }
-
-      // Some providers (e.g., OpenRouter) may omit the [DONE] sentinel
-      // and only send finish_reason on the last delta. If we see a
-      // definitive finish that's not tool_calls, end the stream now so
-      // the UI can persist the message.
-      // XinLiu compatibility: Execute tools immediately if we have finish_reason='tool_calls' and accumulated calls
-      if (config.useResponseApi != true &&
-          finishReason == 'tool_calls' &&
-          toolAcc.isNotEmpty &&
-          effectiveOnToolCall != null) {
-        for (final chunk in chatDecoder.onClosed()) {
-          yield chunk;
-        }
-        yield* runOpenAIChatCompletionsToolFollowUps(
-          client: client,
-          config: config,
-          modelId: modelId,
-          upstreamModelId: upstreamModelId,
-          url: url,
-          spec: spec,
-          messages: messages,
-          firstToolAcc: toolAcc,
-          firstAssistantContent: assistantContentBuffer,
-          firstReasoning: reasoningBuffer,
-          firstReasoningDetails:
-              chatDecoder.reasoningDetails ??
-              reasoningDetailsBuffer.detailsOrNull,
-          onToolCall: effectiveOnToolCall,
-          userImagePaths: userImagePaths,
-          canImageInput: canImageInput,
-          allowRemoteImages: allowRemoteImages,
-          skipImageParsing: skipImageParsing,
-          reasoning: reasoning,
-          temperature: temperature,
-          topP: topP,
-          tools: tools,
-          extraBodyCfg: extraBodyCfg,
-          extraHeaders: extraHeaders,
-          wantsImageOutput: wantsImageOutput,
-          needsReasoningEcho: needsReasoningEcho,
-          reasoningDetailsAllowSnapshots: reasoningDetailsAllowSnapshots,
-          applyMaxTokens: setMaxTokens,
-          initialUsage: usage,
-          streamRound: streamRound,
-          approxPromptTokens: approxPromptTokens,
-          approxCompletionChars: approxCompletionChars,
-          includeReasoningDetailsOnDone: true,
-          retryRound: retryRound,
-        );
-        return;
-      }
-      // XinLiu compatibility: Don't end early if we have accumulated tool calls
-      if (config.useResponseApi != true &&
-          finishReason != null &&
-          finishReason != 'tool_calls') {
-        final bool hasPendingToolCalls =
-            toolAcc.isNotEmpty || toolAccResp.isNotEmpty;
-        final pendingHandler = effectiveOnToolCall;
-        if (hasPendingToolCalls && pendingHandler != null) {
-          // Some providers (like XinLiu/iflow.cn) may return tool_calls with finish_reason='stop'
-          // and may not send a [DONE] marker. Execute tools immediately in this case.
-          for (final chunk in chatDecoder.onClosed()) {
-            yield chunk;
-          }
-          yield* runOpenAIChatCompletionsToolFollowUps(
-            client: client,
-            config: config,
-            modelId: modelId,
-            upstreamModelId: upstreamModelId,
-            url: url,
-            spec: spec,
-            messages: messages,
-            firstToolAcc: toolAcc,
-            firstAssistantContent: assistantContentBuffer,
-            firstReasoning: reasoningBuffer,
-            firstReasoningDetails:
-                chatDecoder.reasoningDetails ??
-                reasoningDetailsBuffer.detailsOrNull,
-            onToolCall: pendingHandler,
-            userImagePaths: userImagePaths,
-            canImageInput: canImageInput,
-            allowRemoteImages: allowRemoteImages,
-            skipImageParsing: skipImageParsing,
-            reasoning: reasoning,
-            temperature: temperature,
-            topP: topP,
-            tools: tools,
-            extraBodyCfg: extraBodyCfg,
-            extraHeaders: extraHeaders,
-            wantsImageOutput: wantsImageOutput,
-            needsReasoningEcho: needsReasoningEcho,
-            reasoningDetailsAllowSnapshots: reasoningDetailsAllowSnapshots,
-            applyMaxTokens: setMaxTokens,
-            initialUsage: usage,
-            streamRound: streamRound,
-            approxPromptTokens: approxPromptTokens,
-            approxCompletionChars: approxCompletionChars,
-            includeReasoningDetailsOnDone: false,
-            retryRound: retryRound,
-          );
-          return;
-        }
+        // Usage can arrive after finish_reason, including tool_calls. Drain
+        // through [DONE] or EOF before starting the next API request.
+        if (data == '[DONE]') break;
       }
     } on ProviderOAuthException {
       rethrow;
@@ -1175,12 +1018,52 @@ Stream<StreamChunk> sendOpenAIStream(
     }
   }
 
-  // Fallback: provider closed SSE without sending [DONE]
+  // Close the first request after [DONE] or EOF, then continue client tools.
   for (final chunk in chatDecoder?.onClosed() ?? const <StreamChunk>[]) {
     yield chunk;
   }
   for (final chunk in responsesDecoder?.onClosed() ?? const <StreamChunk>[]) {
     yield chunk;
+  }
+  if (chatDecoder != null &&
+      effectiveOnToolCall != null &&
+      toolAcc.isNotEmpty) {
+    yield* runOpenAIChatCompletionsToolFollowUps(
+      client: client,
+      config: config,
+      modelId: modelId,
+      upstreamModelId: upstreamModelId,
+      url: url,
+      spec: spec,
+      messages: messages,
+      firstToolAcc: toolAcc,
+      firstAssistantContent: assistantContentBuffer,
+      firstReasoning: reasoningBuffer,
+      firstReasoningDetails:
+          chatDecoder.reasoningDetails ?? reasoningDetailsBuffer.detailsOrNull,
+      onToolCall: effectiveOnToolCall,
+      userImagePaths: userImagePaths,
+      canImageInput: canImageInput,
+      allowRemoteImages: allowRemoteImages,
+      skipImageParsing: skipImageParsing,
+      reasoning: reasoning,
+      temperature: temperature,
+      topP: topP,
+      tools: tools,
+      extraBodyCfg: extraBodyCfg,
+      extraHeaders: extraHeaders,
+      wantsImageOutput: wantsImageOutput,
+      needsReasoningEcho: needsReasoningEcho,
+      reasoningDetailsAllowSnapshots: reasoningDetailsAllowSnapshots,
+      applyMaxTokens: setMaxTokens,
+      initialUsage: usage,
+      streamRound: streamRound,
+      approxPromptTokens: approxPromptTokens,
+      approxCompletionChars: approxCompletionChars,
+      includeReasoningDetailsOnDone: true,
+      retryRound: retryRound,
+    );
+    return;
   }
   final approxTotal =
       usage?.totalTokens ??

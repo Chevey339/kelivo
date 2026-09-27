@@ -10,6 +10,44 @@ import 'package:Kelivo/core/services/api/stream/stream_chunk_handler.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  test(
+    'sum requests once while merging partial and repeated usage updates',
+    () {
+      final handler = StreamChunkHandler();
+      handler.handle(
+        const Usage(
+          TokenUsage(promptTokens: 100, cachedTokens: 10, cacheWriteTokens: 30),
+        ),
+      );
+      handler.handle(
+        const Usage(TokenUsage(completionTokens: 20, reasoningTokens: 5)),
+      );
+      handler.handle(
+        const Usage(TokenUsage(completionTokens: 20, reasoningTokens: 5)),
+      );
+      handler.handle(
+        const Usage(TokenUsage(promptTokens: 200), startsRequest: true),
+      );
+      handler.handle(const Usage(TokenUsage(completionTokens: 30)));
+      handler.handle(const Finish());
+      final result = handler.toResult();
+      expect(result.usage!.totalTokens, 230);
+      expect(result.usage!.cacheWriteTokens, 0);
+      expect(result.usage!.reasoningTokens, 0);
+      expect(result.totalUsage!.toJson(), {
+        'promptTokens': 300,
+        'completionTokens': 50,
+        'cachedTokens': 10,
+        'cacheWriteTokens': 30,
+        'reasoningTokens': 5,
+        'totalTokens': 350,
+      });
+      final nonStreamHandler = StreamChunkHandler()..handleResult(result);
+      expect(nonStreamHandler.totalUsage!.totalTokens, 350);
+      expect(nonStreamHandler.usage!.totalTokens, 230);
+    },
+  );
+
   test('materialized snapshots survive later appends and text boundaries', () {
     final handler = StreamChunkHandler();
     handler.handle(const ReasoningDelta(id: 'r', text: 'plan'));

@@ -220,8 +220,9 @@ Map<String, dynamic> _chunkSnapshot(StreamChunk chunk) {
             },
       ],
     },
-    Usage(:final usage) => <String, dynamic>{
+    Usage(:final usage, :final startsRequest) => <String, dynamic>{
       'type': 'usage',
+      if (startsRequest) 'startsRequest': true,
       'promptTokens': usage.promptTokens,
       'completionTokens': usage.completionTokens,
       'cachedTokens': usage.cachedTokens,

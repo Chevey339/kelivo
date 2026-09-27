@@ -11,7 +11,6 @@ import '../../../core/models/message_part.dart';
 import '../../../utils/app_directories.dart';
 import '../../../utils/sandbox_path_resolver.dart';
 import '../../../core/models/conversation.dart';
-import '../../../core/models/token_usage.dart';
 import '../../../core/providers/assistant_provider.dart';
 import '../../../core/providers/settings_provider.dart';
 import '../../../core/models/reasoning_request.dart';
@@ -515,11 +514,12 @@ class ChatActions {
     return base.copyWith(
       parts: _assistantPartsForState(state),
       totalTokens: state.totalTokens,
-      promptTokens: state.usage?.promptTokens,
-      completionTokens: state.usage?.completionTokens,
-      cachedTokens: state.usage?.cachedTokens,
-      reasoningTokens: state.usage?.reasoningTokens,
-      cacheWriteTokens: state.usage?.cacheWriteTokens,
+      promptTokens: state.totalUsage?.promptTokens,
+      completionTokens: state.totalUsage?.completionTokens,
+      cachedTokens: state.totalUsage?.cachedTokens,
+      reasoningTokens: state.totalUsage?.reasoningTokens,
+      cacheWriteTokens: state.totalUsage?.cacheWriteTokens,
+      finishUsage: state.usage,
       // copyWith keeps base.durationMs when this resolves to null.
       durationMs: _elapsedMsFrom(state.streamStartedAt),
     );
@@ -2226,6 +2226,11 @@ class ChatActions {
             parseMarkdownImageLinks:
                 ctx.settings.sendMarkdownImageLinksAsImages,
             onRetry: (pending) => _setRetryStatus(state, pending),
+            onUsage: (update) {
+              state.partsHandler.handle(update);
+              _applyUsage(state);
+              _scheduleStreamingCheckpoint(state);
+            },
           );
           _setRetryStatus(state, null);
           state.streamStartedAt ??= DateTime.now();
@@ -2239,7 +2244,7 @@ class ChatActions {
             for (final part in state.partsHandler.parts)
               if (part is ReasoningPart && part.text.isNotEmpty) part.text,
           ].join();
-          if (result.usage != null) _applyUsage(state, result.usage!);
+          _applyUsage(state);
           if (result.reasoningDetails != null) {
             streamController.setReasoningDetails(
               state.messageId,
@@ -2348,8 +2353,9 @@ class ChatActions {
       case ServerToolEnd() || ToolCallResult() || Annotations():
         await _handleToolResultsChunk(chunk, state);
         _scheduleStreamingCheckpoint(state);
-      case Usage(:final usage):
-        _applyUsage(state, usage);
+      case Usage():
+        _applyUsage(state);
+        _scheduleStreamingCheckpoint(state);
       case ProviderArtifact(:final kind, :final payload):
         await chatService.setProviderArtifact(state.messageId, kind, payload);
       case Finish():
@@ -2371,9 +2377,9 @@ class ChatActions {
     }
   }
 
-  void _applyUsage(stream_ctrl.StreamingState state, TokenUsage usage) {
-    state.usage = (state.usage ?? const TokenUsage()).merge(usage);
-    state.totalTokens = state.usage!.totalTokens;
+  void _applyUsage(stream_ctrl.StreamingState state) {
+    state.usage = state.partsHandler.usage;
+    state.totalTokens = state.totalUsage?.totalTokens ?? 0;
   }
 
   Future<void> _markGenerationStreaming(
@@ -2512,9 +2518,9 @@ class ChatActions {
         partsBuilder: (visibleText) =>
             _assistantPartsForState(state, visibleText: visibleText),
         totalTokens: state.totalTokens,
-        promptTokens: state.usage?.promptTokens,
-        completionTokens: state.usage?.completionTokens,
-        cachedTokens: state.usage?.cachedTokens,
+        promptTokens: state.totalUsage?.promptTokens,
+        completionTokens: state.totalUsage?.completionTokens,
+        cachedTokens: state.totalUsage?.cachedTokens,
         durationMs: _elapsedMsFrom(state.streamStartedAt),
         updateMessageInList: (id, content, tokens) {
           onContentUpdated?.call(id, content, tokens);
@@ -2627,11 +2633,11 @@ class ChatActions {
 
     // Compute final duration
     final finalDurationMs = _elapsedMsFrom(state.streamStartedAt);
-    final finalPromptTokens = state.usage?.promptTokens;
-    final finalCompletionTokens = state.usage?.completionTokens;
-    final finalCachedTokens = state.usage?.cachedTokens;
-    final finalReasoningTokens = state.usage?.reasoningTokens;
-    final finalCacheWriteTokens = state.usage?.cacheWriteTokens;
+    final finalPromptTokens = state.totalUsage?.promptTokens;
+    final finalCompletionTokens = state.totalUsage?.completionTokens;
+    final finalCachedTokens = state.totalUsage?.cachedTokens;
+    final finalReasoningTokens = state.totalUsage?.reasoningTokens;
+    final finalCacheWriteTokens = state.totalUsage?.cacheWriteTokens;
 
     // Flush final content to the streaming notifier before async operations.
     // This ensures any intermediate rebuild (e.g., from isProcessingFiles change

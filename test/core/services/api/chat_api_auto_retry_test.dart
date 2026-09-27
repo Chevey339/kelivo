@@ -5,6 +5,7 @@ import 'package:Kelivo/core/models/auto_retry_options.dart';
 import 'package:Kelivo/core/providers/settings_provider.dart';
 import 'package:Kelivo/core/services/api/chat_api_service.dart';
 import 'package:Kelivo/core/services/api/stream/stream_chunk.dart';
+import 'package:Kelivo/core/services/api/stream/stream_chunk_handler.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 ProviderConfig _openAIConfig(
@@ -60,6 +61,73 @@ Future<HttpServer> _dropConnectionServer(void Function() onRequest) async {
 }
 
 void main() {
+  test(
+    'non-stream usage is delivered before a later tool request fails',
+    () async {
+      var requests = 0;
+      final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+      addTearDown(() => server.close(force: true));
+      server.listen((request) async {
+        requests++;
+        await request.drain<void>();
+        if (requests == 1) {
+          request.response.headers.contentType = ContentType.json;
+          request.response.write(
+            jsonEncode({
+              'choices': [
+                {
+                  'message': {
+                    'role': 'assistant',
+                    'tool_calls': [
+                      {
+                        'id': 'call-1',
+                        'type': 'function',
+                        'function': {'name': 'lookup', 'arguments': '{}'},
+                      },
+                    ],
+                  },
+                  'finish_reason': 'tool_calls',
+                },
+              ],
+              'usage': {'prompt_tokens': 100, 'completion_tokens': 20},
+            }),
+          );
+        } else {
+          request.response.statusCode = HttpStatus.serviceUnavailable;
+          request.response.write('unavailable');
+        }
+        await request.response.close();
+      });
+      final captured = StreamChunkHandler();
+      await expectLater(
+        ChatApiService.generateMessage(
+          config: _openAIConfig(
+            'http://${server.address.address}:${server.port}/v1',
+          ),
+          modelId: 'gpt-4o-mini',
+          messages: const [
+            {'role': 'user', 'content': 'look up'},
+          ],
+          tools: const [
+            {
+              'type': 'function',
+              'function': {
+                'name': 'lookup',
+                'parameters': {'type': 'object', 'properties': {}},
+              },
+            },
+          ],
+          onToolCall: (name, arguments, {toolCallId}) async => 'ok',
+          retryOverride: const AutoRetryOptions.defaults(),
+          onUsage: captured.handle,
+        ),
+        throwsA(isA<HttpException>()),
+      );
+      expect(requests, 2);
+      expect(captured.totalUsage!.totalTokens, 120);
+    },
+  );
+
   test('image generation does not retry status-less network errors', () async {
     var requests = 0;
     final server = await _dropConnectionServer(() => requests++);
@@ -251,6 +319,12 @@ void main() {
               ],
             };
       request.response.write('data: ${jsonEncode(data)}\n\n');
+      request.response.write(
+        'data: ${jsonEncode({
+          'choices': [],
+          'usage': {'prompt_tokens': requests == 1 ? 100 : 200, 'completion_tokens': requests == 1 ? 20 : 30},
+        })}\n\n',
+      );
       request.response.write('data: [DONE]\n\n');
       await request.response.close();
     });
@@ -281,6 +355,9 @@ void main() {
 
     expect(requests, 3);
     expect(toolCalls, 1);
+    final result = StreamChunkHandler.collect(chunks);
+    expect(result.usage!.totalTokens, 230);
+    expect(result.totalUsage!.totalTokens, 350);
     expect(chunks.whereType<RetryPending>(), hasLength(1));
     expect(chunks.whereType<RetryAttemptStart>(), hasLength(1));
     expect(

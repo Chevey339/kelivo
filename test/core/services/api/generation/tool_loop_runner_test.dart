@@ -198,11 +198,15 @@ void main() {
       expect(result.usage!.promptTokens, 900);
       expect(result.usage!.completionTokens, 70);
       expect(result.usage!.totalTokens, 970);
+      expect(
+        result.totalUsage!.totalTokens,
+        snapshots.fold<int>(0, (sum, usage) => sum + usage.totalTokens),
+      );
       expect(chunks.whereType<Usage>().length, greaterThan(3));
     },
   );
 
-  test('a silent round neither zeros nor double-counts prior usage', () async {
+  test('a silent round does not double-count prior usage', () async {
     const first = TokenUsage(
       promptTokens: 100,
       completionTokens: 20,
@@ -217,6 +221,7 @@ void main() {
     TokenUsage? usage;
     final chunks = await runProviderToolRounds(
       sendRound: () async* {
+        usage = null;
         sends += 1;
         if (sends == 1) {
           usage = first;
@@ -249,6 +254,7 @@ void main() {
     expect(result.usage!.promptTokens, 600);
     expect(result.usage!.completionTokens, 30);
     expect(result.usage!.totalTokens, 630);
+    expect(result.totalUsage!.totalTokens, 750);
   });
 
   test(

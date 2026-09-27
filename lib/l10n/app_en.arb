@@ -2234,6 +2234,8 @@
   "displaySettingsPageChatModelIconTitle": "Chat Model Icon",
   "displaySettingsPageChatModelIconSubtitle": "Show model icon in chat messages",
   "displaySettingsPageShowTokenStatsTitle": "Show Token & Context Stats",
+  "displaySettingsPageShowTotalTokensTitle": "Show tokens for the entire turn",
+  "displaySettingsPageShowTotalTokensSubtitle": "Sum usage across all API requests in a reply. When off, show only the final request. Statistics always include all requests.",
   "displaySettingsPageShowTokenStatsSubtitle": "Show token usage and message count",
   "displaySettingsPageShowThinkingCardsTitle": "Show Thinking Cards",
   "displaySettingsPageShowThinkingCardsSubtitle": "When off, thinking-process cards are hidden in chat.",

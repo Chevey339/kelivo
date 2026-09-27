@@ -1617,6 +1617,8 @@ class GenerationContext {
 class StreamingState {
   StreamingState(this.ctx)
     : _content = StreamTextBuffer(ctx.assistantMessage.content),
+      totalTokens = ctx.assistantMessage.totalTokens ?? 0,
+      _previousUsage = ctx.assistantMessage.tokenUsage,
       partsHandler = StreamChunkHandler(seed: ctx.assistantMessage.parts);
 
   final GenerationContext ctx;
@@ -1625,8 +1627,17 @@ class StreamingState {
   set fullContentRaw(String text) => _content.value = text;
   bool get hasContent => !_content.isEmpty;
   void appendContent(String delta) => _content.add(delta);
-  int totalTokens = 0;
+  int totalTokens;
   TokenUsage? usage;
+  final TokenUsage _previousUsage;
+  TokenUsage? get totalUsage {
+    final current = partsHandler.totalUsage ?? usage;
+    // Answering a tool question can resume the same persisted message.
+    return _previousUsage.hasReportedTokens
+        ? _previousUsage + (current ?? const TokenUsage())
+        : current;
+  }
+
   final StreamTextBuffer _bufferedReasoning = StreamTextBuffer();
   String get bufferedReasoning => _bufferedReasoning.value;
   set bufferedReasoning(String text) => _bufferedReasoning.value = text;

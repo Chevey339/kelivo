@@ -1550,6 +1550,16 @@ class ChatItemDisplaySettingsPage extends StatelessWidget {
               _iosDivider(context),
               _iosSwitchRow(
                 context,
+                icon: Lucide.Calculator,
+                label: l10n.displaySettingsPageShowTotalTokensTitle,
+                tip: l10n.displaySettingsPageShowTotalTokensSubtitle,
+                value: sp.showTotalTokens,
+                onChanged: (v) =>
+                    context.read<SettingsProvider>().setShowTotalTokens(v),
+              ),
+              _iosDivider(context),
+              _iosSwitchRow(
+                context,
                 icon: Lucide.Sparkles,
                 label: l10n.displaySettingsPageShowThinkingCardsTitle,
                 tip: l10n.displaySettingsPageShowThinkingCardsSubtitle,

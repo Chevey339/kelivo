@@ -2,6 +2,7 @@ import 'package:hive/hive.dart';
 import 'package:uuid/uuid.dart';
 
 import 'message_part.dart';
+import 'token_usage.dart';
 
 part 'chat_message.g.dart';
 
@@ -90,6 +91,18 @@ class ChatMessage extends HiveObject {
   @HiveField(21)
   final int? cacheWriteTokens;
 
+  /// Latest API request only; the scalar token fields contain the whole turn.
+  final TokenUsage? finishUsage;
+
+  TokenUsage get tokenUsage => TokenUsage(
+    promptTokens: promptTokens,
+    completionTokens: completionTokens,
+    cachedTokens: cachedTokens,
+    reasoningTokens: reasoningTokens,
+    cacheWriteTokens: cacheWriteTokens,
+    totalTokens: totalTokens,
+  );
+
   ChatMessage({
     String? id,
     required this.role,
@@ -114,6 +127,7 @@ class ChatMessage extends HiveObject {
     this.durationMs,
     this.reasoningTokens,
     this.cacheWriteTokens,
+    this.finishUsage,
   }) : parts = List<MessagePart>.unmodifiable(
          parts ?? <MessagePart>[TextPart(content ?? '')],
        ),
@@ -280,6 +294,7 @@ class ChatMessage extends HiveObject {
     int? durationMs,
     int? reasoningTokens,
     int? cacheWriteTokens,
+    TokenUsage? finishUsage,
   }) {
     final List<MessagePart>? nextParts;
     if (parts != null) {
@@ -313,6 +328,7 @@ class ChatMessage extends HiveObject {
       durationMs: durationMs ?? this.durationMs,
       reasoningTokens: reasoningTokens ?? this.reasoningTokens,
       cacheWriteTokens: cacheWriteTokens ?? this.cacheWriteTokens,
+      finishUsage: finishUsage ?? this.finishUsage,
     );
   }
 
@@ -345,6 +361,7 @@ class ChatMessage extends HiveObject {
       'durationMs': durationMs,
       'reasoningTokens': reasoningTokens,
       'cacheWriteTokens': cacheWriteTokens,
+      if (finishUsage != null) 'finishUsage': finishUsage!.toJson(),
     };
   }
 
@@ -400,6 +417,11 @@ class ChatMessage extends HiveObject {
       durationMs: json['durationMs'] as int?,
       reasoningTokens: json['reasoningTokens'] as int?,
       cacheWriteTokens: json['cacheWriteTokens'] as int?,
+      finishUsage: json['finishUsage'] is Map
+          ? TokenUsage.fromJson(
+              Map<String, dynamic>.from(json['finishUsage'] as Map),
+            )
+          : null,
     );
   }
 }

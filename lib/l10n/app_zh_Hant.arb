@@ -1734,6 +1734,8 @@
   "displaySettingsPageChatModelIconTitle": "聊天列表模型圖示",
   "displaySettingsPageChatModelIconSubtitle": "是否在聊天訊息中顯示模型圖示",
   "displaySettingsPageShowTokenStatsTitle": "顯示Token和上下文統計",
+  "displaySettingsPageShowTotalTokensTitle": "顯示整輪累計 Token",
+  "displaySettingsPageShowTotalTokensSubtitle": "累計顯示本次回覆中所有 API 請求的用量。關閉時僅顯示最後一次請求；統計頁面始終包含所有請求。",
   "displaySettingsPageShowTokenStatsSubtitle": "顯示 token 用量與訊息數量",
   "displaySettingsPageShowThinkingCardsTitle": "顯示思考卡片",
   "displaySettingsPageShowThinkingCardsSubtitle": "關閉後，聊天中不再顯示思考過程卡片",

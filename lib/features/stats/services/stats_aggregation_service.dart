@@ -290,11 +290,11 @@ class StatsAggregationService {
         }
         final inputTokens = message.promptTokens ?? 0;
         final outputTokens = message.completionTokens ?? 0;
-        final legacyTotalTokens = message.totalTokens ?? 0;
+        final totalTokens = message.totalTokens ?? 0;
         final cachedTokens = message.cachedTokens ?? 0;
-        final uncategorizedTokens =
-            inputTokens == 0 && outputTokens == 0 && legacyTotalTokens > 0
-            ? legacyTotalTokens
+        final knownTokens = inputTokens + outputTokens;
+        final uncategorizedTokens = totalTokens > knownTokens
+            ? totalTokens - knownTokens
             : 0;
         final providerId = message.providerId?.trim();
         if ((providerId == null || providerId.isEmpty) &&
