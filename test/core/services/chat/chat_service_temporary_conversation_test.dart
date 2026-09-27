@@ -1230,6 +1230,159 @@ void main() {
   });
 
   group('ChatService fork conversations', () {
+    for (final preserveVersions in [false, true]) {
+      for (final selectedVersion in [0, 1]) {
+        test(
+          'latest reply suggestions survive fork and restart '
+          '(preserveVersions: $preserveVersions, version: $selectedVersion)',
+          () async {
+            final service = createService();
+            final source = await service.createConversation(title: 'Source');
+            await service.addMessage(
+              conversationId: source.id,
+              role: 'user',
+              content: 'question',
+            );
+            final original = await service.addMessage(
+              conversationId: source.id,
+              role: 'assistant',
+              content: 'original answer',
+            );
+            final edited = (await service.appendMessageVersion(
+              messageId: original.id,
+              content: 'edited answer',
+            ))!;
+            await service.setSelectedVersion(
+              source.id,
+              original.groupId ?? original.id,
+              selectedVersion,
+            );
+            const suggestions = ['Explain more', 'Give an example'];
+            await service.updateConversationSuggestions(source.id, suggestions);
+            final selected = selectedVersion == 0 ? original : edited;
+
+            final fork = await service.forkConversationAtRevision(
+              sourceConversationId: source.id,
+              sourceRevisionId: selected.id,
+              title: 'Fork',
+              preserveVersions: preserveVersions,
+            );
+
+            expect(fork.chatSuggestions, suggestions);
+            expect(
+              (await service.loadActiveTimelineMessages(fork.id)).last.content,
+              selected.content,
+            );
+            expect(
+              service.getConversation(source.id)!.chatSuggestions,
+              suggestions,
+            );
+
+            await service.close();
+            services.remove(service);
+            final reopened = createService();
+            await reopened.init();
+            expect(
+              reopened.getConversation(fork.id)!.chatSuggestions,
+              suggestions,
+            );
+            await reopened.clearConversationSuggestions(fork.id);
+            expect(reopened.getConversation(fork.id)!.chatSuggestions, isEmpty);
+            expect(
+              reopened.getConversation(source.id)!.chatSuggestions,
+              suggestions,
+            );
+          },
+        );
+      }
+
+      test(
+        'suggestions are not copied to earlier messages or unselected versions '
+        '(preserveVersions: $preserveVersions)',
+        () async {
+          final service = createService();
+          final source = await service.createConversation(title: 'Source');
+          final earlier = await service.addMessage(
+            conversationId: source.id,
+            role: 'assistant',
+            content: 'earlier answer',
+          );
+          final question = await service.addMessage(
+            conversationId: source.id,
+            role: 'user',
+            content: 'next question',
+          );
+          final original = await service.addMessage(
+            conversationId: source.id,
+            role: 'assistant',
+            content: 'original answer',
+          );
+          final selected = (await service.appendMessageVersion(
+            messageId: original.id,
+            content: 'selected answer',
+          ))!;
+          // A later revision of an earlier group is not the conversation tail.
+          final revisedEarlier = (await service.appendMessageVersion(
+            messageId: earlier.id,
+            content: 'revised earlier answer',
+          ))!;
+          const suggestions = ['Follow up on the selected answer'];
+          await service.updateConversationSuggestions(source.id, suggestions);
+
+          for (final target in [earlier, revisedEarlier, question, original]) {
+            final fork = await service.forkConversationAtRevision(
+              sourceConversationId: source.id,
+              sourceRevisionId: target.id,
+              title: 'Fork',
+              preserveVersions: preserveVersions,
+            );
+            expect(fork.chatSuggestions, isEmpty, reason: target.content);
+          }
+          final latestFork = await service.forkConversationAtRevision(
+            sourceConversationId: source.id,
+            sourceRevisionId: selected.id,
+            title: 'Fork',
+            preserveVersions: preserveVersions,
+          );
+          expect(latestFork.chatSuggestions, suggestions);
+
+          await service.addMessage(
+            conversationId: source.id,
+            role: 'user',
+            content: 'already continued',
+          );
+          final earlierFork = await service.forkConversationAtRevision(
+            sourceConversationId: source.id,
+            sourceRevisionId: selected.id,
+            title: 'Fork',
+            preserveVersions: preserveVersions,
+          );
+          expect(earlierFork.chatSuggestions, isEmpty);
+        },
+      );
+
+      test('suggestions are not copied from a streaming reply '
+          '(preserveVersions: $preserveVersions)', () async {
+        final service = createService();
+        final source = await service.createConversation(title: 'Source');
+        final reply = await service.addMessage(
+          conversationId: source.id,
+          role: 'assistant',
+          content: 'partial answer',
+          isStreaming: true,
+        );
+        await service.updateConversationSuggestions(source.id, ['stale']);
+
+        final fork = await service.forkConversationAtRevision(
+          sourceConversationId: source.id,
+          sourceRevisionId: reply.id,
+          title: 'Fork',
+          preserveVersions: preserveVersions,
+        );
+        expect(fork.chatSuggestions, isEmpty);
+      });
+    }
+
     test(
       'fork copies selected path as plain single-version messages',
       () async {

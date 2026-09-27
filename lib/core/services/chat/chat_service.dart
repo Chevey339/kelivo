@@ -3691,6 +3691,13 @@ class ChatService extends ChangeNotifier {
     final sourceMessages = await _repo.getMessagesByIds([
       for (final slot in window.slots.take(targetIndex + 1)) slot.revisionId,
     ]);
+    // Older messages and other versions must not inherit the latest suggestions.
+    final suggestions =
+        targetMessage.role == 'assistant' &&
+            !targetMessage.isStreaming &&
+            window.slots.last.revisionId == sourceRevisionId
+        ? List<String>.of(source.chatSuggestions)
+        : const <String>[];
     final sourceExtras = Map<String, dynamic>.from(source.extras);
     final persisted = await createConversation(
       title: source.title,
@@ -3701,6 +3708,9 @@ class ChatService extends ChangeNotifier {
     _messageOrderIds[persisted.id] = <String>[];
     _messageCounts[persisted.id] = 0;
     await _cloneMessagesInto(persisted.id, sourceMessages);
+    if (suggestions.isNotEmpty) {
+      await updateConversationSuggestions(persisted.id, suggestions);
+    }
     _currentConversationId = persisted.id;
     notifyListeners();
     return getConversation(persisted.id) ?? persisted;

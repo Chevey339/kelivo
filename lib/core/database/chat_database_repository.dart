@@ -4485,6 +4485,20 @@ class ChatDatabaseRepository {
         sourceRow,
         includeMessageIds: false,
       );
+      var suggestions = const <String>[];
+      if (source.chatSuggestions.isNotEmpty &&
+          target.role == 'assistant' &&
+          !target.isStreaming) {
+        // Suggestions belong to the selected reply at the conversation tail.
+        final tail = await loadLinearMessageWindow(
+          conversationId: sourceId,
+          limit: 1,
+        );
+        if (tail.slots.isNotEmpty &&
+            tail.slots.single.revisionId == targetRevisionId) {
+          suggestions = List<String>.of(source.chatSuggestions);
+        }
+      }
       final keptSourceGroupIds = {
         for (final row in kept) row.groupId ?? row.id,
       };
@@ -4507,6 +4521,7 @@ class ChatDatabaseRepository {
                 updatedAt: now,
                 assistantId: assistantId,
                 versionSelections: selections,
+                chatSuggestions: suggestions,
                 messageIds: [
                   for (final message in kept) messageIdMap[message.id]!,
                 ],
