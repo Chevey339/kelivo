@@ -115,6 +115,7 @@ List<Map<String, dynamic>> openaiToolResultMessages(
         'tool_call_id': openaiTranscriptCallId(item.call),
         'name': item.call.name,
         'content': item.content,
+        if (item.metadata != null) 'metadata': item.metadata,
       },
   ];
 }

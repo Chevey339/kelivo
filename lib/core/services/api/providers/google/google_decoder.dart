@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import '../../../../../utils/mcp_structured_image.dart';
 import '../../../../models/token_usage.dart';
 import '../../stream/sse_event.dart';
 import '../../stream/stream_chunk.dart';
@@ -13,7 +14,7 @@ class GoogleFunctionCall {
     this.apiId,
     required this.name,
     required this.args,
-    this.result = '',
+    this.result,
     this.thoughtSigKey,
     this.thoughtSigVal,
     required this.part,
@@ -23,7 +24,7 @@ class GoogleFunctionCall {
   final String? apiId;
   final String name;
   final Map<String, dynamic> args;
-  String result;
+  ClientToolResult? result;
   final String? thoughtSigKey;
   final dynamic thoughtSigVal;
   final Map<String, dynamic> part;

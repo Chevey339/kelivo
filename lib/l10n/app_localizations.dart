@@ -17641,6 +17641,12 @@ abstract class AppLocalizations {
   /// **'Read file'**
   String get workspaceToolTitleReadFile;
 
+  /// No description provided for @workspaceToolTitleViewImage.
+  ///
+  /// In en, this message translates to:
+  /// **'View image'**
+  String get workspaceToolTitleViewImage;
+
   /// No description provided for @workspaceToolTitleWriteFile.
   ///
   /// In en, this message translates to:
@@ -19934,6 +19940,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Read files with line numbers and paging.'**
   String get workspaceToolHelpRead;
+
+  /// No description provided for @workspaceToolHelpViewImage.
+  ///
+  /// In en, this message translates to:
+  /// **'Let the model inspect an image from the workspace.'**
+  String get workspaceToolHelpViewImage;
 
   /// No description provided for @workspaceToolHelpWrite.
   ///

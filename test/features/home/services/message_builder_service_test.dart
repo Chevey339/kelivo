@@ -1,3 +1,6 @@
+import 'dart:convert';
+import 'dart:io';
+
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -66,6 +69,34 @@ ChatMessage _message({
 }
 
 void main() {
+  test(
+    'inlineLocalImages leaves view_image error text and snapshots to the provider',
+    () async {
+      final service = MessageBuilderService(
+        chatService: _FakeChatService(const {}),
+        contextProvider: _FakeBuildContext(),
+      );
+      final dir = await Directory.systemTemp.createTemp('image_error_history_');
+      addTearDown(() => dir.delete(recursive: true));
+      final file = File('${dir.path}/private.png');
+      await file.writeAsBytes([1, 2, 3]);
+      final error = jsonEncode({
+        'error': 'path_error',
+        'message': '/invalid/![](${file.path})',
+      });
+      final snapshot = '![](${file.path})';
+      final messages = <Map<String, dynamic>>[
+        {'role': 'tool', 'name': 'view_image', 'content': error},
+        {'role': 'tool', 'name': 'view_image', 'content': snapshot},
+        {'role': 'user', 'content': snapshot},
+      ];
+      await service.inlineLocalImages(messages);
+      expect(messages[0]['content'], error);
+      expect(messages[1]['content'], snapshot);
+      expect(messages[2]['content'], contains('data:image/png;base64,AQID'));
+    },
+  );
+
   test('collapseVersions 按真实版本号选择消息', () {
     final service = MessageBuilderService(
       chatService: _FakeChatService(const {}),

@@ -397,7 +397,7 @@ void main() {
       var enabled = true;
       final tools = WorkspaceToolsService(isToolEnabled: (_, _) => enabled);
       final context = ctx();
-      expect(tools.buildToolDefinitions(context), hasLength(7));
+      expect(tools.buildToolDefinitions(context), hasLength(8));
       enabled = false;
       expect(
         jsonOf(

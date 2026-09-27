@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import '../../../../utils/mcp_structured_image.dart';
 import '../../../models/token_usage.dart';
 import '../chat_api_helpers.dart';
@@ -69,7 +71,7 @@ Stream<StreamChunk> executeClientTools({
 Stream<StreamChunk> runClientToolFollowUps({
   required List<EmitToolCall> initialCalls,
   required ToolCallHandler onToolCall,
-  required void Function(List<ExecutedClientTool> executed) append,
+  required FutureOr<void> Function(List<ExecutedClientTool> executed) append,
   required Stream<StreamChunk> Function() sendFollowUp,
   required List<EmitToolCall> Function() takeCallsAfterRound,
   required Stream<StreamChunk> Function() finish,
@@ -96,7 +98,7 @@ Stream<StreamChunk> runClientToolFollowUps({
       usage: usage,
       totalTokens: totalTokens,
     );
-    append(executed);
+    await append(executed);
     yield* retryRound?.call(sendFollowUp) ?? sendFollowUp();
     calls = takeCallsAfterRound();
   }
@@ -109,7 +111,7 @@ Stream<StreamChunk> runClientToolFollowUps({
 Stream<StreamChunk> runProviderToolRounds({
   required Stream<StreamChunk> Function() sendRound,
   required List<EmitToolCall> Function() takeCalls,
-  required void Function(List<ExecutedClientTool> executed) append,
+  required FutureOr<void> Function(List<ExecutedClientTool> executed) append,
   required bool Function() continueWithoutCalls,
   required Stream<StreamChunk> Function() finish,
   ToolCallHandler? onToolCall,
@@ -141,7 +143,7 @@ Stream<StreamChunk> runProviderToolRounds({
         totalTokens: totalTokens,
       );
     }
-    append(executed);
+    await append(executed);
   }
 }
 

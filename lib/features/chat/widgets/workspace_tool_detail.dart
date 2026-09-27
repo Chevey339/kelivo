@@ -303,6 +303,7 @@ class _UnifiedDetailState extends State<_UnifiedDetail> {
   String _primarySectionLabel(AppLocalizations l10n) {
     return switch (widget.part.toolName) {
       'read_file' ||
+      'view_image' ||
       'write_file' ||
       'edit_file' ||
       'list_dir' => l10n.workspaceToolSectionPath,

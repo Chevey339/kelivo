@@ -11,9 +11,11 @@ import '../../../providers/settings_provider.dart';
 import '../../../utils/multimodal_input_utils.dart';
 import '../../../../utils/app_directories.dart';
 import '../../../../utils/markdown_media_sanitizer.dart';
+import '../../../../utils/mcp_structured_image.dart';
 import '../../../../utils/sandbox_path_resolver.dart';
 import '../builtin_tools.dart';
 import '../chat_api_helpers.dart';
+import '../tool_result_content.dart';
 import '../../model_spec/model_spec_resolver.dart';
 import '../gemini_tool_config.dart';
 import '../reasoning/reasoning_dialects.dart';
@@ -143,11 +145,18 @@ void _ensureGeminiFunctionCallThoughtSig(List<Map<String, dynamic>> parts) {
   }
 }
 
-Map<String, dynamic> _googleFunctionResponsePartFromToolMessage(
-  Map<String, dynamic> message,
-) {
+Future<List<Map<String, dynamic>>> _googleFunctionResponsePartsFromToolMessage(
+  Map<String, dynamic> message, {
+  required bool canImageInput,
+}) async {
   final name = (message['name'] ?? '').toString();
-  final content = (message['content'] ?? '').toString();
+  final result = await ToolResultContent.read(
+    name,
+    (message['content'] ?? '').toString(),
+    metadata: (message['metadata'] as Map?)?.cast<String, dynamic>(),
+    canImageInput: canImageInput,
+  );
+  final content = result.text;
   Map<String, dynamic> response;
   try {
     response = (jsonDecode(content) as Map).cast<String, dynamic>();
@@ -164,7 +173,7 @@ Map<String, dynamic> _googleFunctionResponsePartFromToolMessage(
   if (id != null && id.isNotEmpty) {
     (part['functionResponse'] as Map<String, dynamic>)['id'] = id;
   }
-  return part;
+  return [part, ...result.googleImageParts];
 }
 
 List<Map<String, dynamic>> _googleApiContents(
@@ -345,7 +354,10 @@ Stream<StreamChunk> sendGoogleStream(
       if (roleRaw == 'tool') {
         contents.add({
           'role': 'user',
-          'parts': [_googleFunctionResponsePartFromToolMessage(msg)],
+          'parts': await _googleFunctionResponsePartsFromToolMessage(
+            msg,
+            canImageInput: effective.input.contains(Modality.image),
+          ),
         });
         continue;
       }
@@ -738,7 +750,16 @@ Stream<StreamChunk> sendGoogleStream(
       executeAfterRound: true,
       emitCalls: true,
       onToolCall: onToolCall,
-      append: (executed) {
+      append: (executed) async {
+        final results = [
+          for (final item in executed)
+            await ToolResultContent.read(
+              item.call.name,
+              item.content,
+              metadata: item.metadata,
+              canImageInput: effective.input.contains(Modality.image),
+            ),
+        ];
         currentContents = [
           ...currentContents,
           {'role': 'model', 'parts': lastParts},
@@ -749,7 +770,7 @@ Stream<StreamChunk> sendGoogleStream(
                 <String, dynamic>{
                   'functionResponse': {
                     'name': executed[i].call.name,
-                    'response': {'result': executed[i].content},
+                    'response': {'result': results[i].text},
                     if (i < lastFunctionCallParts.length &&
                         lastFunctionCallParts[i] is Map &&
                         ((lastFunctionCallParts[i] as Map)['functionCall']
@@ -761,6 +782,7 @@ Stream<StreamChunk> sendGoogleStream(
                               as Map)['id'],
                   },
                 },
+              for (final result in results) ...result.googleImageParts,
             ],
           },
         ];
@@ -817,7 +839,10 @@ Stream<StreamChunk> sendGoogleStream(
     if (roleRaw == 'tool') {
       contents.add({
         'role': 'user',
-        'parts': [_googleFunctionResponsePartFromToolMessage(msg)],
+        'parts': await _googleFunctionResponsePartsFromToolMessage(
+          msg,
+          canImageInput: effective.input.contains(Modality.image),
+        ),
       });
       continue;
     }
@@ -1184,7 +1209,7 @@ Stream<StreamChunk> sendGoogleStream(
               decoder.isClientFunctionCall(chunk.id) &&
               onToolCall != null) {
             final call = decoder.functionCallById(chunk.id)!;
-            if (call.result.isEmpty) {
+            if (call.result == null) {
               final emitCall = emitToolCall(
                 id: call.id,
                 name: call.name,
@@ -1208,7 +1233,10 @@ Stream<StreamChunk> sendGoogleStream(
                 totalTokens: decoder.usage?.totalTokens ?? 0,
               )) {
                 if (resultChunk is ToolCallResult) {
-                  call.result = (resultChunk.output ?? '').toString();
+                  call.result = ClientToolResult(
+                    (resultChunk.output ?? '').toString(),
+                    metadata: resultChunk.metadata,
+                  );
                 }
                 yield resultChunk;
               }
@@ -1311,14 +1339,21 @@ Stream<StreamChunk> sendGoogleStream(
     continueWithoutCalls: () => retryMalformed,
     executeAfterRound: false,
     onToolCall: onToolCall,
-    append: (executed) {
+    append: (executed) async {
       if (retryMalformed) return;
       if (mixedBuiltInAndFunctionTools) {
         convo.add({'role': 'model', 'parts': lastRoundModelParts});
         final responseParts = <Map<String, dynamic>>[];
         for (final c in lastRoundCalls) {
           final name = (c['name'] ?? '').toString();
-          final resText = (c['result'] ?? '').toString();
+          final toolResult = c['result'] as ClientToolResult?;
+          final result = await ToolResultContent.read(
+            name,
+            toolResult?.content ?? '',
+            metadata: toolResult?.metadata,
+            canImageInput: effective.input.contains(Modality.image),
+          );
+          final resText = result.text;
           final apiId = c['apiId'] as String?;
           Map<String, dynamic> responseObj;
           try {
@@ -1333,6 +1368,7 @@ Stream<StreamChunk> sendGoogleStream(
               if (apiId != null) 'id': apiId,
             },
           });
+          responseParts.addAll(result.googleImageParts);
         }
         convo.add({'role': 'user', 'parts': responseParts});
         return;
@@ -1341,7 +1377,14 @@ Stream<StreamChunk> sendGoogleStream(
         final name = (c['name'] ?? '').toString();
         final args =
             (c['args'] as Map<String, dynamic>? ?? const <String, dynamic>{});
-        final resText = (c['result'] ?? '').toString();
+        final toolResult = c['result'] as ClientToolResult?;
+        final result = await ToolResultContent.read(
+          name,
+          toolResult?.content ?? '',
+          metadata: toolResult?.metadata,
+          canImageInput: effective.input.contains(Modality.image),
+        );
+        final resText = result.text;
         final thoughtSigKey = c['thoughtSigKey'] as String?;
         final thoughtSigVal = c['thoughtSigVal'];
 
@@ -1368,6 +1411,7 @@ Stream<StreamChunk> sendGoogleStream(
             {
               'functionResponse': {'name': name, 'response': responseObj},
             },
+            ...result.googleImageParts,
           ],
         });
       }

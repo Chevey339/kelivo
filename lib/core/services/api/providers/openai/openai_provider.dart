@@ -16,6 +16,7 @@ import '../../../model_spec/model_spec_resolver.dart';
 import '../../../model_spec/vendor_defaults.dart';
 import '../../builtin_tools.dart';
 import '../../chat_api_helpers.dart';
+import '../../tool_result_content.dart';
 import '../../generation/tool_loop_runner.dart';
 import '../../kimi_formula_search.dart';
 import '../../reasoning/reasoning_dialects.dart';
@@ -261,7 +262,12 @@ Stream<StreamChunk> sendOpenAIStream(
           input.add({
             'type': 'function_call_output',
             'call_id': toolCallId,
-            'output': content,
+            'output': (await ToolResultContent.read(
+              (m['name'] ?? '').toString(),
+              content,
+              metadata: (m['metadata'] as Map?)?.cast<String, dynamic>(),
+              canImageInput: canImageInput,
+            )).responsesOutput,
           });
         }
         continue;
@@ -688,6 +694,48 @@ Stream<StreamChunk> sendOpenAIStream(
         );
         final ids = StreamChunkIds('finish');
         yield* emitImages(images, ids: ids);
+        final outputItems = <Map<String, dynamic>>[
+          if (rawOutput is List)
+            for (final item in rawOutput.whereType<Map>())
+              item.cast<String, dynamic>(),
+        ];
+        final calls = responsesCallsFromOutput(outputItems);
+        if (calls.isNotEmpty && effectiveOnToolCall != null) {
+          yield* emitDelta(
+            ids: ids,
+            content: outText,
+            reasoning: reasoningText,
+            usage: usage,
+          );
+          yield* runOpenAIResponsesToolFollowUps(
+            client: client,
+            config: config,
+            modelId: modelId,
+            upstreamModelId: upstreamModelId,
+            url: url,
+            spec: spec,
+            initialInput: responsesInitialInput,
+            firstOutputItems: outputItems,
+            initialCalls: calls,
+            responsesToolsSpec: responsesToolsSpec,
+            responsesInstructions: responsesInstructions,
+            responsesIncludeParam: responsesIncludeParam,
+            onToolCall: effectiveOnToolCall,
+            extraHeaders: extraHeaders,
+            extraBody: extraBody,
+            temperature: temperature,
+            topP: topP,
+            maxTokens: maxTokens,
+            reasoning: reasoning,
+            initialUsage: usage,
+            streamRound: 1,
+            approxPromptTokens: (jsonEncode(messages).length / 4).round(),
+            approxCompletionChars: outText.length,
+            stream: false,
+            retryRound: retryRound,
+          );
+          return;
+        }
         yield* emitDone(
           ids: ids,
           content: outText,

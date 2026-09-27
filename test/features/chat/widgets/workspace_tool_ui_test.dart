@@ -141,6 +141,7 @@ void main() {
       const cases = <(String, IconData, String)>[
         ('shell', Lucide.Terminal, 'Run command'),
         ('read_file', Lucide.FileText, 'Read file'),
+        ('view_image', Lucide.Image, 'View image'),
         ('write_file', Lucide.FilePlus, 'Write file'),
         ('edit_file', Lucide.FilePen, 'Edit file'),
         ('list_dir', Lucide.FolderOpen, 'List directory'),

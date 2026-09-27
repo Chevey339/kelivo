@@ -3,6 +3,7 @@ import 'dart:convert';
 import '../../../../utils/multimodal_input_utils.dart';
 import '../../../../../utils/sandbox_path_resolver.dart';
 import '../../chat_api_helpers.dart';
+import '../../tool_result_content.dart';
 import 'claude_container.dart';
 
 /// Provider artifact kind under which a Claude turn's responses are stored
@@ -92,6 +93,7 @@ class ClaudeHistory {
     required this.replayServerToolBlocks,
     required this.skipRedactedThinkingBlocks,
     this.skipImageParsing = false,
+    this.canImageInput = true,
     this.userImagePaths,
   });
 
@@ -101,6 +103,7 @@ class ClaudeHistory {
   final bool replayServerToolBlocks;
   final bool skipRedactedThinkingBlocks;
   final bool skipImageParsing;
+  final bool canImageInput;
   final List<String>? userImagePaths;
 
   /// The container the conversation's last code execution ran in, stored
@@ -244,7 +247,12 @@ class ClaudeHistory {
           pendingResults.add({
             'type': 'tool_result',
             'tool_use_id': id,
-            'content': claudeToolResultContent((m['content'] ?? '').toString()),
+            'content': (await ToolResultContent.read(
+              (m['name'] ?? '').toString(),
+              (m['content'] ?? '').toString(),
+              metadata: (m['metadata'] as Map?)?.cast<String, dynamic>(),
+              canImageInput: canImageInput,
+            )).claudeContent,
           });
         }
         continue;

@@ -9810,6 +9810,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get workspaceToolTitleReadFile => 'Read file';
 
   @override
+  String get workspaceToolTitleViewImage => 'View image';
+
+  @override
   String get workspaceToolTitleWriteFile => 'Write file';
 
   @override
@@ -11119,6 +11122,10 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get workspaceToolHelpRead =>
       'Read files with line numbers and paging.';
+
+  @override
+  String get workspaceToolHelpViewImage =>
+      'Let the model inspect an image from the workspace.';
 
   @override
   String get workspaceToolHelpWrite =>

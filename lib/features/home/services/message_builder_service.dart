@@ -2376,6 +2376,12 @@ class MessageBuilderService {
   /// Convert local Markdown image links to inline base64 for model context.
   Future<void> inlineLocalImages(List<Map<String, dynamic>> apiMessages) async {
     for (int i = 0; i < apiMessages.length; i++) {
+      // view_image snapshots are resolved from successful result metadata at
+      // the provider boundary. Error text can contain untrusted image links.
+      if (apiMessages[i]['role'] == 'tool' &&
+          apiMessages[i]['name'] == 'view_image') {
+        continue;
+      }
       final s = (apiMessages[i]['content'] ?? '').toString();
       if (s.isNotEmpty) {
         apiMessages[i]['content'] =

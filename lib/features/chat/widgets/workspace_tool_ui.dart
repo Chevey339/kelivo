@@ -150,6 +150,7 @@ String workspaceToolTitle(AppLocalizations l10n, String toolName) {
   return switch (toolName) {
     'shell' => l10n.workspaceToolTitleShell,
     'read_file' => l10n.workspaceToolTitleReadFile,
+    'view_image' => l10n.workspaceToolTitleViewImage,
     'write_file' => l10n.workspaceToolTitleWriteFile,
     'edit_file' => l10n.workspaceToolTitleEditFile,
     'list_dir' => l10n.workspaceToolTitleListDir,
@@ -163,6 +164,7 @@ IconData workspaceToolIcon(String toolName) {
   return switch (toolName) {
     'shell' => Lucide.Terminal,
     'read_file' => Lucide.FileText,
+    'view_image' => Lucide.Image,
     'write_file' => Lucide.FilePlus,
     'edit_file' => Lucide.FilePen,
     'list_dir' => Lucide.FolderOpen,
@@ -951,7 +953,7 @@ class WorkspaceToolCardBody extends StatelessWidget {
     final extra = pending == null ? _extra(context, liveRun, meta) : null;
     final showEnv =
         meta?.status == 'error' && meta?.code == 'environment_not_ready';
-    final summary = pending == null
+    final summary = pending == null && part.toolName != 'view_image'
         ? _WorkspaceToolSummary(part: part, meta: meta, run: liveRun)
         : null;
     final pendingBlock = pending == null

@@ -93,7 +93,7 @@ void main() {
       settings,
       assistant,
       'openai',
-      'gpt',
+      'gpt-4.1',
       false,
       isToolModel: (_, __) => true,
     );
@@ -109,12 +109,24 @@ void main() {
       settings,
       assistant,
       'openai',
-      'gpt',
+      'gpt-4.1',
       false,
       isToolModel: (_, __) => true,
       workspaceContext: context(),
     );
     expect(withCtx.map(nameOf), containsAll(WorkspaceToolsService.toolNames));
+
+    final textOnly = service.buildToolDefinitions(
+      settings,
+      assistant,
+      'openai',
+      'gpt',
+      false,
+      isToolModel: (_, __) => true,
+      workspaceContext: context(),
+    );
+    expect(textOnly.map(nameOf), isNot(contains('view_image')));
+    expect(textOnly.map(nameOf), contains('read_file'));
 
     final noTools = service.buildToolDefinitions(
       settings,

@@ -9,6 +9,7 @@ import 'package:uuid/uuid.dart';
 import '../../../features/home/services/tool_approval_service.dart';
 import '../../../utils/app_directories.dart';
 import '../../../utils/mcp_structured_image.dart';
+import '../../../utils/sandbox_path_resolver.dart';
 import '../api/tool_call_cancellation.dart';
 import '../../models/workspace_binding.dart';
 import '../../models/external_mount.dart';
@@ -23,6 +24,7 @@ import 'host_file_tools.dart';
 import 'output_buffer.dart';
 import 'tool_run_registry.dart';
 import 'workspace_paths.dart';
+import 'workspace_image.dart';
 import 'workspace_runtime.dart';
 import 'workspace_session_sync.dart';
 import 'workspace_tool_context.dart';
@@ -55,6 +57,7 @@ class WorkspaceToolsService {
   static const Set<String> toolNames = {
     'shell',
     'read_file',
+    'view_image',
     'write_file',
     'edit_file',
     'list_dir',
@@ -244,6 +247,21 @@ class WorkspaceToolsService {
           'limit': {
             'type': 'integer',
             'description': 'Maximum number of lines to return.',
+          },
+        },
+        ['path'],
+      ),
+      _fn(
+        'view_image',
+        [
+          'View a local image file when visual inspection is needed. Use this for images already on disk.',
+          'Paths: ${vocab.join(', ')}. Supports PNG, JPEG, GIF, WebP, and BMP; animated images use the first frame.',
+          'Returns image content to inspect. Large images are resized to at most 2048 pixels on the longest edge.',
+        ],
+        {
+          'path': {
+            'type': 'string',
+            'description': 'Local filesystem path to an image file.',
           },
         },
         ['path'],
@@ -501,6 +519,8 @@ class WorkspaceToolsService {
           );
         case 'read_file':
           return await _handleReadFile(ctx, args);
+        case 'view_image':
+          return await _handleViewImage(ctx, args);
         case 'write_file':
           return await _handleWriteFile(
             ctx,
@@ -885,6 +905,63 @@ class WorkspaceToolsService {
       status: metaStatus,
     );
     return ClientToolResult(jsonEncode(payload), metadata: meta.toJson());
+  }
+
+  Future<Object?> _handleViewImage(
+    WorkspaceToolContext ctx,
+    Map<String, dynamic> args,
+  ) async {
+    const tool = 'view_image';
+    final path = args['path'];
+    if (path is! String || path.trim().isEmpty) {
+      return _errorResult(
+        tool: tool,
+        error: 'invalid_arguments',
+        message: 'path must be a non-empty string',
+      );
+    }
+    try {
+      final resolved = await ctx.paths.resolveReal(path, cwd: ctx.cwd);
+      ToolCallCancellation.current?.throwIfCancelled();
+      if (ctx.paths.sandboxed && resolved.zone == WorkspaceZone.outside) {
+        throw const PathResolutionException('Path is outside sandbox zones');
+      }
+      final image = await WorkspaceImage.read(resolved.hostPath);
+      ToolCallCancellation.current?.throwIfCancelled();
+      final imagesDir = await AppDirectories.getImagesDirectory();
+      await imagesDir.create(recursive: true);
+      final extension = image.mime == 'image/png' ? 'png' : 'jpg';
+      final snapshot = File(
+        p.join(imagesDir.path, 'view_image_${const Uuid().v4()}.$extension'),
+      );
+      await snapshot.writeAsBytes(image.bytes);
+      final uri = SandboxPathResolver.canonicalize(snapshot.path);
+      await _markToolsUsed(
+        ctx,
+        conversationId: ctx.conversationId,
+        status: 'ok',
+      );
+      return ClientToolResult(
+        'Image (${image.width} x ${image.height}).\n![](${encodeMarkdownImageDestination(uri)})',
+        metadata: {
+          ...WorkspaceToolMetadata(
+            tool: tool,
+            status: 'ok',
+            path: resolved.modelPath,
+            files: [_fileFor(ctx, resolved)],
+          ).toJson(),
+          kMcpResultMetadataKey: mcpResultMetadata([uri]),
+        },
+      );
+    } on HostFileException catch (e) {
+      return _errorResult(
+        tool: tool,
+        error: 'view_image_failed',
+        message: e.message,
+      );
+    } on PathResolutionException catch (e) {
+      return _errorResult(tool: tool, error: 'path_error', message: e.message);
+    }
   }
 
   Future<Object?> _handleReadFile(
@@ -1469,10 +1546,12 @@ class WorkspaceToolsService {
       'type': 'function',
       'function': <String, dynamic>{
         'name': name,
+        if (name == 'view_image') 'strict': false,
         'description': description.join(' '),
         'parameters': <String, dynamic>{
           'type': 'object',
           'properties': properties,
+          if (name == 'view_image') 'additionalProperties': false,
           if (required.isNotEmpty) 'required': required,
         },
       },

@@ -12,6 +12,7 @@ import '../../../../providers/settings_provider.dart';
 import '../../../../utils/multimodal_input_utils.dart';
 import '../../../../../utils/sandbox_path_resolver.dart';
 import '../../chat_api_helpers.dart';
+import '../../tool_result_content.dart';
 import '../../generation/tool_loop_runner.dart';
 import '../../reasoning/reasoning_dialects.dart';
 import '../../stream/sse_decode_loop.dart';
@@ -270,6 +271,16 @@ Future<List<Map<String, dynamic>>> buildOpenAIChatCompletionMessages(
     }
   }
   final pendingAssistantMediaUrls = <String>[];
+  final pendingToolImageParts = <Map<String, dynamic>>[];
+  void flushToolImages() {
+    if (pendingToolImageParts.isEmpty) return;
+    out.add({
+      'role': 'user',
+      'content': [...pendingToolImageParts],
+    });
+    pendingToolImageParts.clear();
+  }
+
   final pendingAssistantVideoUrls = <String>{};
   final toolTurnIds = <int>{};
   final messageTurnIds = <int>[];
@@ -293,6 +304,8 @@ Future<List<Map<String, dynamic>>> buildOpenAIChatCompletionMessages(
         ? textFromContentParts(originalContent)
         : (originalContent ?? '').toString();
     final role = (m['role'] ?? 'user').toString();
+    // Complete the entire batch of tool replies before adding a user image.
+    if (role != 'tool') flushToolImages();
     final isAssistant = role == 'assistant';
     final internalMediaRefs = parseInternalMediaRefs(
       m[multimodalInternalMediaPathsKey],
@@ -548,10 +561,34 @@ Future<List<Map<String, dynamic>>> buildOpenAIChatCompletionMessages(
       continue;
     }
 
-    if (role == 'tool' ||
-        (role == 'assistant' &&
-            outMsg['tool_calls'] is List &&
-            (outMsg['tool_calls'] as List).isNotEmpty)) {
+    if (role == 'tool') {
+      final result = await ToolResultContent.read(
+        (m['name'] ?? '').toString(),
+        raw,
+        metadata: (m['metadata'] as Map?)?.cast<String, dynamic>(),
+        canImageInput: canImageInput,
+      );
+      outMsg['content'] = result.text;
+      out.add(outMsg);
+      if (result.imageUrls.isNotEmpty) {
+        pendingToolImageParts.add({
+          'type': 'text',
+          'text': 'Image returned by view_image (${m['tool_call_id']}):',
+        });
+        pendingToolImageParts.addAll([
+          for (final url in result.imageUrls)
+            {
+              'type': 'image_url',
+              'image_url': {'url': url, 'detail': 'high'},
+            },
+        ]);
+      }
+      continue;
+    }
+
+    if ((role == 'assistant' &&
+        outMsg['tool_calls'] is List &&
+        (outMsg['tool_calls'] as List).isNotEmpty)) {
       outMsg['content'] = raw;
       out.add(outMsg);
       continue;
@@ -725,6 +762,7 @@ Future<List<Map<String, dynamic>>> buildOpenAIChatCompletionMessages(
     }
     out.add(outMsg);
   }
+  flushToolImages();
   return out;
 }
 

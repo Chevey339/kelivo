@@ -12,6 +12,7 @@ import '../../../../providers/settings_provider.dart';
 import '../../../../../utils/app_directories.dart';
 import '../../../../../utils/sandbox_path_resolver.dart';
 import '../../chat_api_helpers.dart';
+import '../../tool_result_content.dart';
 import '../../generation/tool_loop_runner.dart';
 import '../../reasoning/reasoning_dialects.dart';
 import '../../stream/sse_decode_loop.dart';
@@ -182,6 +183,18 @@ String responsesReasoningText(dynamic rawOutput) {
   return buffer.toString();
 }
 
+List<EmitToolCall> responsesCallsFromOutput(List<Map<String, dynamic>> output) {
+  return responsesCallsFromIndexMap({
+    for (var i = 0; i < output.length; i++)
+      if (output[i]['type'] == 'function_call')
+        i: {
+          'call_id': (output[i]['call_id'] ?? '').toString(),
+          'name': (output[i]['name'] ?? '').toString(),
+          'args': (output[i]['arguments'] ?? '{}').toString(),
+        },
+  });
+}
+
 Stream<StreamChunk> runOpenAIResponsesToolFollowUps({
   required http.Client client,
   required ProviderConfig config,
@@ -206,6 +219,7 @@ Stream<StreamChunk> runOpenAIResponsesToolFollowUps({
   required int streamRound,
   required int approxPromptTokens,
   required int approxCompletionChars,
+  bool stream = true,
   StreamRoundRunner? retryRound,
 }) async* {
   var usage = initialUsage;
@@ -220,7 +234,8 @@ Stream<StreamChunk> runOpenAIResponsesToolFollowUps({
   yield* runClientToolFollowUps(
     initialCalls: initialCalls,
     onToolCall: onToolCall,
-    append: (executed) {
+    emitCalls: !stream,
+    append: (executed) async {
       currentInput = [
         ...currentInput,
         ...withResponsesFunctionCallItems(outputItemsForAppend, [
@@ -230,7 +245,12 @@ Stream<StreamChunk> runOpenAIResponsesToolFollowUps({
           <String, dynamic>{
             'type': 'function_call_output',
             'call_id': openaiTranscriptCallId(item.call),
-            'output': item.content,
+            'output': (await ToolResultContent.read(
+              item.call.name,
+              item.content,
+              metadata: item.metadata,
+              canImageInput: spec.input.contains(Modality.image),
+            )).responsesOutput,
           },
       ];
     },
@@ -238,7 +258,7 @@ Stream<StreamChunk> runOpenAIResponsesToolFollowUps({
       final body2 = <String, dynamic>{
         'model': upstreamModelId,
         'input': currentInput,
-        'stream': true,
+        'stream': stream,
         if (responsesToolsSpec.isNotEmpty) 'tools': responsesToolsSpec,
         if (responsesToolsSpec.isNotEmpty) 'tool_choice': 'auto',
         if (responsesInstructions.isNotEmpty)
@@ -273,7 +293,7 @@ Stream<StreamChunk> runOpenAIResponsesToolFollowUps({
           baseHeaders: <String, String>{
             'Authorization': 'Bearer ${apiKeyForRequest(config, modelId)}',
             'Content-Type': 'application/json',
-            'Accept': 'text/event-stream',
+            'Accept': stream ? 'text/event-stream' : 'application/json',
           },
           assistantHeaders: extraHeaders,
         ),
@@ -293,27 +313,80 @@ Stream<StreamChunk> runOpenAIResponsesToolFollowUps({
       } catch (e) {
         throw HttpException('Follow-up request failed: $e');
       }
-      final s2 = rethrowFollowUpStreamErrors(
-        resp2.stream.transform(utf8.decoder),
-      );
-      final followUpDecoder = ResponsesStreamDecoder(
-        initialUsage: usage,
-        sourceId: 'round-${round++}',
-      );
-      yield* decodeSseEvents(parseSseEventStrings(s2), followUpDecoder);
-      usage = followUpDecoder.usage ?? usage;
-      chars += followUpDecoder.approxCompletionChars;
-      outputItemsForAppend = followUpDecoder.outputItems;
-      final respCalls2 = <int, Map<String, String>>{
-        for (final call in followUpDecoder.takeFunctionCalls())
-          call.index: call.toIndexFields(),
-      };
-      lastCalls = responsesCallsFromIndexMap(respCalls2);
+      final respCalls2 = <int, Map<String, String>>{};
+      if (!stream) {
+        final raw = await decodeUtf8Stream(resp2.stream);
+        throwIfInBandStreamError(raw);
+        final obj = jsonDecode(raw) as Map;
+        final output = obj['output'] ?? obj['response']?['output'];
+        outputItemsForAppend = [
+          if (output is List)
+            for (final item in output.whereType<Map>())
+              item.cast<String, dynamic>(),
+        ];
+        lastCalls = responsesCallsFromOutput(outputItemsForAppend);
+        usage =
+            openaiUsageFromObj({
+              'usage': obj['usage'] ?? obj['response']?['usage'],
+            }) ??
+            usage;
+        final text = StringBuffer();
+        for (final item in outputItemsForAppend) {
+          if (item['type'] == 'message' && item['content'] is List) {
+            for (final part in (item['content'] as List).whereType<Map>()) {
+              if (part['type'] == 'output_text' || part['type'] == 'text') {
+                text.write(part['text'] ?? '');
+              }
+            }
+          }
+          if (isResponsesImageGenerationType(item['type'])) {
+            final source = responsesImageGenerationSource(item);
+            if (source.isNotEmpty) {
+              final saved = isRemoteHttpUrl(source)
+                  ? (
+                      uri: source,
+                      mimeType: mimeTypeFromImageUri(source) ?? 'image/png',
+                    )
+                  : await saveResponsesImageGeneration(
+                      source,
+                      outputFormat: item['output_format']?.toString(),
+                    );
+              if (saved != null) {
+                yield* emitImages([saved], ids: StreamChunkIds('round-$round'));
+              }
+            }
+          }
+        }
+        if (text.isEmpty) text.write(obj['output_text'] ?? '');
+        chars += text.length;
+        yield* emitDelta(
+          ids: StreamChunkIds('round-${round++}'),
+          content: text.toString(),
+          reasoning: responsesReasoningText(output),
+          usage: usage,
+        );
+      } else {
+        final s2 = rethrowFollowUpStreamErrors(
+          resp2.stream.transform(utf8.decoder),
+        );
+        final followUpDecoder = ResponsesStreamDecoder(
+          initialUsage: usage,
+          sourceId: 'round-${round++}',
+        );
+        yield* decodeSseEvents(parseSseEventStrings(s2), followUpDecoder);
+        usage = followUpDecoder.usage ?? usage;
+        chars += followUpDecoder.approxCompletionChars;
+        outputItemsForAppend = followUpDecoder.outputItems;
+        respCalls2.addAll({
+          for (final call in followUpDecoder.takeFunctionCalls())
+            call.index: call.toIndexFields(),
+        });
+        lastCalls = responsesCallsFromIndexMap(respCalls2);
+      }
       if (lastCalls.isEmpty) return;
-      final sorted2 = respCalls2.keys.toList()..sort();
       final currentSig = [
-        for (final idx2 in sorted2)
-          '${respCalls2[idx2]!['name'] ?? ''}:${respCalls2[idx2]!['args'] ?? ''}',
+        for (final call in lastCalls)
+          '${call.name}:${jsonEncode(call.arguments)}',
       ].join('|');
       if (currentSig == lastToolSignature) {
         consecutiveDupeCount += 1;

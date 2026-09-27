@@ -8,11 +8,13 @@ import 'dart:io';
 import 'package:http/http.dart' as http;
 
 import '../../../models/token_usage.dart';
+import '../../../models/model_spec.dart';
 import '../../../providers/settings_provider.dart';
 import '../../../utils/multimodal_input_utils.dart';
 import '../../../../utils/mcp_structured_image.dart';
 import '../builtin_tools.dart';
 import '../chat_api_helpers.dart';
+import '../tool_result_content.dart';
 import '../../model_spec/model_spec_resolver.dart';
 import '../reasoning/reasoning_dialects.dart';
 import '../generation/tool_loop_runner.dart';
@@ -86,10 +88,15 @@ Stream<StreamChunk> sendClaudeStream(
     );
   }
 
+  final canImageInput = ModelSpecResolver.instance
+      .spec(config, modelId)
+      .input
+      .contains(Modality.image);
   final history = ClaudeHistory(
     replayServerToolBlocks: replayServerToolBlocks,
     skipRedactedThinkingBlocks: skipRedactedThinkingBlocks,
     skipImageParsing: skipImageParsing,
+    canImageInput: canImageInput,
     userImagePaths: userImagePaths,
   );
   final initialMessages = await history.build(nonSystemMessages);
@@ -553,7 +560,10 @@ Stream<StreamChunk> sendClaudeStream(
                 if (resultChunk is ToolCallResult) {
                   decoder.recordToolResult(
                     tool.id,
-                    (resultChunk.output ?? '').toString(),
+                    ClientToolResult(
+                      (resultChunk.output ?? '').toString(),
+                      metadata: resultChunk.metadata,
+                    ),
                   );
                 }
                 yield resultChunk;
@@ -608,20 +618,25 @@ Stream<StreamChunk> sendClaudeStream(
           ),
       ];
       for (final tool in decoder.clientTools.values) {
-        var res = toolResultsContent[tool.id] ?? '';
-        if (res.isEmpty && onToolCall != null) {
+        var res = toolResultsContent[tool.id];
+        if (res == null && onToolCall != null) {
           res = ClientToolResult.fromHandler(
             await onToolCall(
               tool.name,
               tool.decodedArguments,
               toolCallId: tool.id,
             ),
-          ).content;
+          );
         }
         lastStreamResults.add({
           'type': 'tool_result',
           'tool_use_id': tool.id,
-          'content': claudeToolResultContent(res),
+          'content': (await ToolResultContent.read(
+            tool.name,
+            res?.content ?? '',
+            metadata: res?.metadata,
+            canImageInput: canImageInput,
+          )).claudeContent,
         });
       }
     },
@@ -630,7 +645,7 @@ Stream<StreamChunk> sendClaudeStream(
     executeAfterRound: !stream,
     emitCalls: !stream,
     onToolCall: onToolCall,
-    append: (executed) {
+    append: (executed) async {
       if (pauseTurn) {
         convo = [
           ...convo,
@@ -645,7 +660,12 @@ Stream<StreamChunk> sendClaudeStream(
                 <String, dynamic>{
                   'type': 'tool_result',
                   'tool_use_id': item.call.id,
-                  'content': claudeToolResultContent(item.content),
+                  'content': (await ToolResultContent.read(
+                    item.call.name,
+                    item.content,
+                    metadata: item.metadata,
+                    canImageInput: canImageInput,
+                  )).claudeContent,
                 },
             ];
       convo = [
