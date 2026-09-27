@@ -122,8 +122,8 @@ Future<String?> maybeVertexAccessToken(ProviderConfig cfg) async {
     final jsonStr = (cfg.serviceAccountJson ?? '').trim();
     if (jsonStr.isEmpty) {
       // Fallback: some users may paste a temporary OAuth token into apiKey
-      if (cfg.apiKey.isNotEmpty) return cfg.apiKey;
-      return null;
+      final key = effectiveApiKey(cfg);
+      return key.isEmpty ? null : key;
     }
     try {
       return await GoogleServiceAccountAuth.getAccessTokenFromJson(jsonStr);
@@ -662,10 +662,8 @@ Stream<StreamChunk> sendGoogleVertexClaudeStream({
 String vertexOrigin(ProviderConfig config, String loc) {
   final raw = config.baseUrl.trim();
   final host = (Uri.tryParse(raw)?.host ?? '').toLowerCase();
-  final official =
-      host.isEmpty ||
-      host == 'aiplatform.googleapis.com' ||
-      host.endsWith('-aiplatform.googleapis.com');
+  // Switching a Gemini provider to Vertex keeps its Gemini API base URL.
+  final official = host.isEmpty || host.endsWith('.googleapis.com');
   if (official) {
     final regional = loc.toLowerCase() == 'global'
         ? 'aiplatform.googleapis.com'

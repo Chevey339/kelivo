@@ -8,6 +8,7 @@ import 'package:http/http.dart' as http;
 import '../../../providers/settings_provider.dart';
 import '../../auth/provider_oauth_service.dart';
 import '../../custom_request_merger.dart';
+import '../../model_override_payload_parser.dart';
 import '../../network/provider_http_client.dart';
 import '../chat_api_helpers.dart';
 import '../provider_request_headers.dart';
@@ -110,7 +111,6 @@ class EmbeddingApiService {
     final body = <String, dynamic>{
       'model': apiModelId(config, modelId),
       'input': inputs,
-      'encoding_format': 'float',
       'dimensions': ?dimensions,
     };
     final json = await _post(
@@ -147,6 +147,7 @@ class EmbeddingApiService {
     int? dimensions,
   }) async {
     final upstream = apiModelId(config, modelId);
+    final instructed = _takesInstructions(upstream);
     final body = <String, dynamic>{
       'requests': [
         for (final text in inputs)
@@ -154,10 +155,10 @@ class EmbeddingApiService {
             'model': 'models/$upstream',
             'content': {
               'parts': [
-                {'text': text},
+                {'text': instructed ? _instruct(text, task) : text},
               ],
             },
-            'taskType': ?_geminiTaskType(task),
+            if (!instructed) 'taskType': ?_geminiTaskType(task),
             'outputDimensionality': ?dimensions,
           },
       ],
@@ -176,6 +177,7 @@ class EmbeddingApiService {
         for (final e in (json['embeddings'] as List? ?? const []))
           _vector((e as Map)['values']),
       ],
+      promptTokens: _geminiPromptTokens(json),
     );
   }
 
@@ -187,18 +189,39 @@ class EmbeddingApiService {
     EmbeddingTask? task,
     int? dimensions,
   }) async {
-    final loc = config.location!.trim();
     final proj = config.projectId!.trim();
     final upstream = apiModelId(config, modelId);
-    final body = <String, dynamic>{
-      'instances': [
-        for (final text in inputs)
-          {'content': text, 'task_type': ?_geminiTaskType(task)},
-      ],
-      if (dimensions != null)
-        'parameters': {'outputDimensionality': dimensions},
-    };
     final token = await maybeVertexAccessToken(config);
+    final headers = {
+      if (token != null && token.isNotEmpty) 'Authorization': 'Bearer $token',
+      'X-Goog-User-Project': proj,
+    };
+    if (_takesInstructions(upstream)) {
+      // Served only at the global location, one input per `:embedContent`.
+      const loc = 'global';
+      final json = await _post(
+        client,
+        Uri.parse(
+          '${vertexOrigin(config, loc)}/v1/projects/$proj/locations/$loc/publishers/google/models/$upstream:embedContent',
+        ),
+        config,
+        modelId,
+        {
+          'content': {
+            'parts': [
+              {'text': _instruct(inputs.single, task)},
+            ],
+          },
+          'outputDimensionality': ?dimensions,
+        },
+        baseHeaders: headers,
+      );
+      return EmbeddingResult(
+        vectors: [_vector((json['embedding'] as Map?)?['values'])],
+        promptTokens: _geminiPromptTokens(json),
+      );
+    }
+    final loc = config.location!.trim();
     final json = await _post(
       client,
       Uri.parse(
@@ -206,19 +229,23 @@ class EmbeddingApiService {
       ),
       config,
       modelId,
-      body,
-      baseHeaders: {
-        if (token != null && token.isNotEmpty) 'Authorization': 'Bearer $token',
-        'X-Goog-User-Project': proj,
+      {
+        'instances': [
+          for (final text in inputs)
+            {'content': text, 'task_type': ?_geminiTaskType(task)},
+        ],
+        if (dimensions != null)
+          'parameters': {'outputDimensionality': dimensions},
       },
+      baseHeaders: headers,
     );
-    var tokens = 0;
+    int? tokens;
     final vectors = <List<double>>[];
     for (final p in (json['predictions'] as List? ?? const [])) {
       final embeddings = (p as Map)['embeddings'] as Map;
       vectors.add(_vector(embeddings['values']));
-      final stats = embeddings['statistics'];
-      if (stats is Map) tokens += (stats['token_count'] as num?)?.toInt() ?? 0;
+      final count = (embeddings['statistics'] as Map?)?['token_count'] as num?;
+      if (count != null) tokens = (tokens ?? 0) + count.toInt();
     }
     return EmbeddingResult(vectors: vectors, promptTokens: tokens);
   }
@@ -231,7 +258,18 @@ class EmbeddingApiService {
     Map<String, dynamic> body, {
     required Map<String, String> baseHeaders,
   }) async {
-    CustomRequestMerger.applyBody(body, customBody(config, modelId));
+    // Only the model's own body: provider-level rows are written for chat
+    // requests, and embedding APIs reject unknown fields such as
+    // `temperature`.
+    CustomRequestMerger.applyBody(
+      body,
+      ModelOverridePayloadParser.customBody(
+        ModelOverridePayloadParser.modelOverride(
+          config.modelOverrides,
+          modelId,
+        ),
+      ),
+    );
     final res = await client.post(
       url,
       headers: customHeaders(
@@ -244,8 +282,11 @@ class EmbeddingApiService {
     if (res.statusCode < 200 || res.statusCode >= 300) {
       throw HttpException('HTTP ${res.statusCode}: ${res.body}');
     }
-    return (jsonDecode(utf8.decode(res.bodyBytes)) as Map)
-        .cast<String, dynamic>();
+    final json = jsonDecode(utf8.decode(res.bodyBytes));
+    if (json is! Map) {
+      throw FormatException('Embedding response is not a JSON object.', json);
+    }
+    return json.cast<String, dynamic>();
   }
 
   static List<double> _vector(Object? raw) {
@@ -260,6 +301,26 @@ class EmbeddingApiService {
     EmbeddingTask.document => 'RETRIEVAL_DOCUMENT',
     null => null,
   };
+
+  /// `gemini-embedding-2` and later take the task as a text prefix instead of
+  /// `taskType`, and on Vertex are served by `:embedContent`; 001 predates
+  /// both.
+  static bool _takesInstructions(String upstream) {
+    final id = upstream.toLowerCase().split('/').last;
+    return id.startsWith('gemini-embedding-') &&
+        !id.startsWith('gemini-embedding-001');
+  }
+
+  static String _instruct(String text, EmbeddingTask? task) => switch (task) {
+    EmbeddingTask.query => 'task: search result | query: $text',
+    EmbeddingTask.document => 'title: none | text: $text',
+    null => text,
+  };
+
+  static int? _geminiPromptTokens(Map<String, dynamic> json) {
+    final usage = json['usageMetadata'];
+    return usage is Map ? (usage['promptTokenCount'] as num?)?.toInt() : null;
+  }
 
   static bool _isVertex(ProviderConfig config) =>
       config.vertexAI == true &&

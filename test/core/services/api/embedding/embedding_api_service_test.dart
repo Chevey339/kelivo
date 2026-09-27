@@ -3,9 +3,11 @@ import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:Kelivo/core/models/api_keys.dart';
 import 'package:Kelivo/core/providers/model_provider.dart';
 import 'package:Kelivo/core/providers/settings_provider.dart';
 import 'package:Kelivo/core/services/api/embedding/embedding_api_service.dart';
+import 'package:Kelivo/core/services/api/providers/google_vertex.dart';
 
 class _Server {
   _Server._(this._server);
@@ -38,12 +40,15 @@ ProviderConfig _cfg(
   ProviderKind kind, {
   Map<String, dynamic> overrides = const {},
   bool vertex = false,
+  List<ApiKeyConfig>? apiKeys,
 }) {
   return ProviderConfig(
     id: 'Embed',
     enabled: true,
     name: 'Embed',
-    apiKey: 'test-key',
+    apiKey: apiKeys == null ? 'test-key' : '',
+    multiKeyEnabled: apiKeys != null,
+    apiKeys: apiKeys,
     baseUrl: baseUrl,
     providerType: kind,
     models: const ['embed-model'],
@@ -110,7 +115,7 @@ void main() {
     expect(first.headers['x-custom'], 'yes');
     expect(first.body['model'], 'text-embedding-3-small');
     expect(first.body['dimensions'], 256);
-    expect(first.body['encoding_format'], 'float');
+    expect(first.body.containsKey('encoding_format'), isFalse);
     expect(first.body['user'], 'kelivo');
   });
 
@@ -150,6 +155,124 @@ void main() {
     });
   });
 
+  test('Gemini Embedding 2 takes the task as a text prefix', () async {
+    server.respond = (body) => {
+      'embeddings': [
+        for (final _ in body['requests'] as List)
+          {
+            'values': [1],
+          },
+      ],
+      'usageMetadata': {'promptTokenCount': 7},
+    };
+    final result = await EmbeddingApiService.embed(
+      config: _cfg(
+        '${server.origin}/v1beta',
+        ProviderKind.google,
+        overrides: {'apiModelId': 'gemini-embedding-2'},
+      ),
+      modelId: 'embed-model',
+      inputs: const ['a'],
+      task: EmbeddingTask.document,
+    );
+
+    expect(result.promptTokens, 7);
+    final request = server.requests.single.body['requests'][0] as Map;
+    expect(request.containsKey('taskType'), isFalse);
+    expect(request['content'], {
+      'parts': [
+        {'text': 'title: none | text: a'},
+      ],
+    });
+  });
+
+  test('Vertex Gemini Embedding 2 uses global embedContent', () async {
+    server.respond = (body) => {
+      'embedding': {
+        'values': [3, 4],
+      },
+      'usageMetadata': {'promptTokenCount': 2},
+    };
+    final result = await EmbeddingApiService.embed(
+      config: _cfg(
+        server.origin,
+        ProviderKind.google,
+        vertex: true,
+        overrides: {'apiModelId': 'gemini-embedding-2'},
+      ),
+      modelId: 'embed-model',
+      inputs: const ['a', 'b'],
+      task: EmbeddingTask.query,
+      dimensions: 512,
+    );
+
+    expect(result.vectors, [
+      [3.0, 4.0],
+      [3.0, 4.0],
+    ]);
+    expect(result.promptTokens, 4);
+    final first = server.requests.first;
+    expect(
+      first.path,
+      '/v1/projects/proj/locations/global/publishers/google/models/gemini-embedding-2:embedContent',
+    );
+    expect(first.body, {
+      'content': {
+        'parts': [
+          {'text': 'task: search result | query: a'},
+        ],
+      },
+      'outputDimensionality': 512,
+    });
+  });
+
+  test('Vertex authenticates with the selected multi-key entry', () async {
+    server.respond = (_) => {
+      'predictions': [
+        {
+          'embeddings': {
+            'values': [1],
+          },
+        },
+      ],
+    };
+    await EmbeddingApiService.embed(
+      config: _cfg(
+        server.origin,
+        ProviderKind.google,
+        vertex: true,
+        apiKeys: [
+          const ApiKeyConfig(
+            id: 'k1',
+            key: 'pooled-token',
+            createdAt: 1,
+            updatedAt: 1,
+          ),
+        ],
+      ),
+      modelId: 'embed-model',
+      inputs: const ['a'],
+    );
+
+    expect(
+      server.requests.single.headers['authorization'],
+      'Bearer pooled-token',
+    );
+  });
+
+  test('Vertex origin replaces a kept Gemini API base URL', () {
+    final cfg = _cfg(
+      'https://generativelanguage.googleapis.com/v1beta',
+      ProviderKind.google,
+      vertex: true,
+    );
+    expect(
+      vertexOrigin(cfg, 'us-central1'),
+      'https://us-central1-aiplatform.googleapis.com',
+    );
+    expect(vertexOrigin(cfg, 'global'), 'https://aiplatform.googleapis.com');
+  });
+
   test('Vertex sends one instance per predict call', () async {
     server.respond = (body) => {
       'predictions': [
@@ -182,6 +305,40 @@ void main() {
       {'content': 'a', 'task_type': 'RETRIEVAL_DOCUMENT'},
     ]);
     expect(server.requests.first.headers['authorization'], 'Bearer test-key');
+  });
+
+  test('provider-level chat body stays out of embedding requests', () async {
+    server.respond = (_) => {
+      'data': [
+        {
+          'index': 0,
+          'embedding': [1],
+        },
+      ],
+    };
+    await EmbeddingApiService.embed(
+      config: _cfg('${server.origin}/v1', ProviderKind.openai).copyWith(
+        customBody: const [
+          {'key': 'temperature', 'value': '0.2'},
+        ],
+      ),
+      modelId: 'embed-model',
+      inputs: const ['a'],
+    );
+
+    expect(server.requests.single.body.containsKey('temperature'), isFalse);
+  });
+
+  test('a response missing vectors fails instead of misaligning', () async {
+    server.respond = (_) => {'data': <Object>[]};
+    await expectLater(
+      EmbeddingApiService.embed(
+        config: _cfg('${server.origin}/v1', ProviderKind.openai),
+        modelId: 'embed-model',
+        inputs: const ['a'],
+      ),
+      throwsFormatException,
+    );
   });
 
   test('Anthropic has no embeddings endpoint', () {
