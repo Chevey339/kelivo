@@ -18,6 +18,8 @@ class TokenDetailPopup extends StatelessWidget {
     this.reasoningTokens,
     this.cacheWriteTokens,
     this.durationMs,
+    this.firstTokenMs,
+    this.totalCompletionTokens,
     this.providerId,
     this.modelId,
   });
@@ -28,6 +30,11 @@ class TokenDetailPopup extends StatelessWidget {
   final int? reasoningTokens;
   final int? cacheWriteTokens;
   final int? durationMs;
+  final int? firstTokenMs;
+
+  /// Output across the whole generation, matching [durationMs], even when
+  /// the token rows are configured to show only the final API request.
+  final int? totalCompletionTokens;
   final String? providerId;
   final String? modelId;
 
@@ -80,16 +87,29 @@ class TokenDetailPopup extends StatelessWidget {
       );
     }
 
-    if (completionTokens != null &&
-        completionTokens! > 0 &&
+    final speedTokens = totalCompletionTokens ?? completionTokens;
+    if (speedTokens != null &&
+        speedTokens > 0 &&
         durationMs != null &&
         durationMs! > 0) {
       final durationSec = durationMs! / 1000.0;
-      final tokPerSec = completionTokens! / durationSec;
+      final tokPerSec = speedTokens / durationSec;
       rows.add(
         _buildRow(
           icon: Lucide.Zap,
           text: l10n.tokenDetailSpeed(tokPerSec.toStringAsFixed(1)),
+          cs: cs,
+        ),
+      );
+    }
+
+    if (firstTokenMs != null && firstTokenMs! >= 0) {
+      rows.add(
+        _buildRow(
+          icon: Lucide.Timer,
+          text: l10n.tokenDetailFirstToken(
+            (firstTokenMs! / 1000.0).toStringAsFixed(2),
+          ),
           cs: cs,
         ),
       );
@@ -138,17 +158,19 @@ class TokenDetailPopup extends StatelessWidget {
             ),
           ],
         ),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              for (int i = 0; i < rows.length; i++) ...[
-                if (i > 0) const SizedBox(height: 4),
-                rows[i],
+        child: SingleChildScrollView(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                for (int i = 0; i < rows.length; i++) ...[
+                  if (i > 0) const SizedBox(height: 4),
+                  rows[i],
+                ],
               ],
-            ],
+            ),
           ),
         ),
       ),

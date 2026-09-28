@@ -1618,6 +1618,7 @@ class StreamingState {
   StreamingState(this.ctx)
     : _content = StreamTextBuffer(ctx.assistantMessage.content),
       totalTokens = ctx.assistantMessage.totalTokens ?? 0,
+      firstTokenMs = ctx.assistantMessage.firstTokenMs,
       _previousUsage = ctx.assistantMessage.tokenUsage,
       partsHandler = StreamChunkHandler(seed: ctx.assistantMessage.parts);
 
@@ -1646,7 +1647,48 @@ class StreamingState {
   bool finishHandled = false;
   bool terminalPersisted = false;
   bool titleQueued = false;
-  DateTime? streamStartedAt;
+  DateTime? requestStartedAt;
+  DateTime? requestFinishedAt;
+  int? firstTokenMs;
+
+  /// Whole-generation elapsed time, including waiting and reasoning. A tool
+  /// answer can resume the same message, so keep time spent in earlier runs.
+  int? get durationMs {
+    final previous = ctx.assistantMessage.durationMs;
+    final elapsed = _requestElapsedMs(requestFinishedAt ?? DateTime.now());
+    return elapsed == null ? previous : (previous ?? 0) + elapsed;
+  }
+
+  int? _requestElapsedMs(DateTime end) {
+    final start = requestStartedAt;
+    if (start == null) return null;
+    final elapsed = end.difference(start).inMilliseconds;
+    // Device clock rollback must not persist a negative duration.
+    return elapsed < 0 ? null : elapsed;
+  }
+
+  void recordFirstOutput(StreamChunk chunk) {
+    if (firstTokenMs != null ||
+        requestFinishedAt != null ||
+        ctx.assistantMessage.durationMs != null) {
+      return;
+    }
+    final hasOutput = switch (chunk) {
+      TextDelta(:final text) || ReasoningDelta(:final text) => text.isNotEmpty,
+      ToolCallStart(:final toolName) ||
+      ServerToolStart(:final toolName) => toolName.isNotEmpty,
+      ToolCallDelta(:final toolNameDelta, :final inputDelta) =>
+        toolNameDelta.isNotEmpty || inputDelta.isNotEmpty,
+      ServerToolInputDelta(:final inputDelta) => inputDelta.isNotEmpty,
+      ImageDelta(:final data) || ImageSnapshot(:final data) => data.isNotEmpty,
+      GeneratedFile(:final uri) => uri.isNotEmpty,
+      _ => false,
+    };
+    if (hasOutput) firstTokenMs = _requestElapsedMs(DateTime.now());
+  }
+
+  /// Freeze before UI draining, persistence or cancellation cleanup.
+  void finishRequestTiming() => requestFinishedAt ??= DateTime.now();
   int? generationStateRevision;
   bool generationStreamingStarted = false;
   final Map<String, String> pendingToolNames = <String, String>{};

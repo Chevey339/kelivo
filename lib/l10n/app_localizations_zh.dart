@@ -8079,6 +8079,11 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
+  String tokenDetailFirstToken(String value) {
+    return '${value}s（首字）';
+  }
+
+  @override
   String tokenDetailTotalTokens(int count) {
     return '$count tokens';
   }
@@ -20177,6 +20182,11 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   @override
   String tokenDetailDuration(String value) {
     return '${value}s';
+  }
+
+  @override
+  String tokenDetailFirstToken(String value) {
+    return '${value}s（首字）';
   }
 
   @override
@@ -32353,6 +32363,11 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   @override
   String tokenDetailDuration(String value) {
     return '${value}s';
+  }
+
+  @override
+  String tokenDetailFirstToken(String value) {
+    return '${value}s（首字）';
   }
 
   @override

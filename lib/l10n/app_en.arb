@@ -3597,6 +3597,14 @@
       }
     }
   },
+  "tokenDetailFirstToken": "{value}s (first token)",
+  "@tokenDetailFirstToken": {
+    "placeholders": {
+      "value": {
+        "type": "String"
+      }
+    }
+  },
   "tokenDetailTotalTokens": "{count} tokens",
   "@tokenDetailTotalTokens": {
     "placeholders": {

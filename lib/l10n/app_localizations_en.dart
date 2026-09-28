@@ -8428,6 +8428,11 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String tokenDetailFirstToken(String value) {
+    return '${value}s (first token)';
+  }
+
+  @override
   String tokenDetailTotalTokens(int count) {
     return '$count tokens';
   }

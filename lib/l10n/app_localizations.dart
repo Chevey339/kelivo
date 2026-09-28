@@ -15277,6 +15277,12 @@ abstract class AppLocalizations {
   /// **'{value}s'**
   String tokenDetailDuration(String value);
 
+  /// No description provided for @tokenDetailFirstToken.
+  ///
+  /// In en, this message translates to:
+  /// **'{value}s (first token)'**
+  String tokenDetailFirstToken(String value);
+
   /// No description provided for @tokenDetailTotalTokens.
   ///
   /// In en, this message translates to:

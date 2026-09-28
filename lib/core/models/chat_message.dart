@@ -85,6 +85,10 @@ class ChatMessage extends HiveObject {
   @HiveField(19)
   final int? durationMs;
 
+  /// Request start to first streamed output, including reasoning or tool input.
+  /// Null when first-token timing was not observed (for example, non-streaming).
+  final int? firstTokenMs;
+
   @HiveField(20)
   final int? reasoningTokens;
 
@@ -125,6 +129,7 @@ class ChatMessage extends HiveObject {
     this.completionTokens,
     this.cachedTokens,
     this.durationMs,
+    this.firstTokenMs,
     this.reasoningTokens,
     this.cacheWriteTokens,
     this.finishUsage,
@@ -292,6 +297,7 @@ class ChatMessage extends HiveObject {
     int? completionTokens,
     int? cachedTokens,
     int? durationMs,
+    int? firstTokenMs,
     int? reasoningTokens,
     int? cacheWriteTokens,
     TokenUsage? finishUsage,
@@ -326,6 +332,7 @@ class ChatMessage extends HiveObject {
       completionTokens: completionTokens ?? this.completionTokens,
       cachedTokens: cachedTokens ?? this.cachedTokens,
       durationMs: durationMs ?? this.durationMs,
+      firstTokenMs: firstTokenMs ?? this.firstTokenMs,
       reasoningTokens: reasoningTokens ?? this.reasoningTokens,
       cacheWriteTokens: cacheWriteTokens ?? this.cacheWriteTokens,
       finishUsage: finishUsage ?? this.finishUsage,
@@ -359,6 +366,7 @@ class ChatMessage extends HiveObject {
       'completionTokens': completionTokens,
       'cachedTokens': cachedTokens,
       'durationMs': durationMs,
+      'firstTokenMs': firstTokenMs,
       'reasoningTokens': reasoningTokens,
       'cacheWriteTokens': cacheWriteTokens,
       if (finishUsage != null) 'finishUsage': finishUsage!.toJson(),
@@ -415,6 +423,7 @@ class ChatMessage extends HiveObject {
       completionTokens: json['completionTokens'] as int?,
       cachedTokens: json['cachedTokens'] as int?,
       durationMs: json['durationMs'] as int?,
+      firstTokenMs: json['firstTokenMs'] as int?,
       reasoningTokens: json['reasoningTokens'] as int?,
       cacheWriteTokens: json['cacheWriteTokens'] as int?,
       finishUsage: json['finishUsage'] is Map

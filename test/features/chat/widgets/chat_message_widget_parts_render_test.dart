@@ -72,6 +72,8 @@ void main() {
       cachedTokens: 70,
       cacheWriteTokens: 30,
       reasoningTokens: 5,
+      durationMs: 5000,
+      firstTokenMs: 250,
       finishUsage: const TokenUsage(
         promptTokens: 200,
         completionTokens: 30,
@@ -97,6 +99,9 @@ void main() {
       expect(display.cachedTokens, enabled ? 70 : 60);
       expect(display.cacheWriteTokens, enabled ? 30 : 0);
       expect(display.reasoningTokens, enabled ? 5 : 0);
+      expect(display.durationMs, 5000);
+      expect(display.firstTokenMs, 250);
+      expect(display.totalCompletionTokens, 50);
       expect(message.totalTokens, 350);
     }
   });

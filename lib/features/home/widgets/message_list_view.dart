@@ -1551,6 +1551,7 @@ class _MessageListViewState extends State<MessageListView> {
         old.completionTokens != current.completionTokens ||
         old.cachedTokens != current.cachedTokens ||
         old.durationMs != current.durationMs ||
+        old.firstTokenMs != current.firstTokenMs ||
         _partsIdentityChanged(old.parts, current.parts);
   }
 

@@ -115,7 +115,7 @@ void main() {
 
   for (final fail in [false, true]) {
     testWidgets(
-      'terminal persistence keeps total and finish usage (fail=$fail)',
+      'terminal persistence keeps usage and request timing (fail=$fail)',
       (tester) async {
         final service = _ThrowingFinalizeChatService(failCompletion: false);
         final settings = SettingsProvider(createBusinessTestPreferences());
@@ -179,6 +179,21 @@ void main() {
             generateTitleOnFinish: false,
           ),
         );
+        state.requestStartedAt = DateTime.now().subtract(
+          const Duration(seconds: 30),
+        );
+        await actions.debugHandleStreamChunk(
+          const ReasoningDelta(id: 'reasoning', text: 'thinking'),
+          state,
+        );
+        final firstTokenMs = state.firstTokenMs;
+        expect(firstTokenMs, inInclusiveRange(30000, 31000));
+        await actions.debugHandleStreamChunk(
+          const TextDelta(id: 'text', text: 'done'),
+          state,
+        );
+        expect(state.firstTokenMs, firstTokenMs);
+        await tester.pump(const Duration(milliseconds: 500));
         await actions.debugHandleStreamChunk(
           const Usage(
             TokenUsage(
@@ -214,6 +229,9 @@ void main() {
         expect(saved.finishUsage!.totalTokens, 230);
         expect(saved.finishUsage!.reasoningTokens, 0);
         expect(saved.isStreaming, isFalse);
+        expect(saved.firstTokenMs, firstTokenMs);
+        expect(saved.durationMs, inInclusiveRange(30000, 31000));
+        expect(state.durationMs, saved.durationMs);
         expect(state.usage!.totalTokens, 230);
       },
     );

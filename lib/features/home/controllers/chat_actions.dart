@@ -496,15 +496,6 @@ class ChatActions {
     );
   }
 
-  /// Elapsed milliseconds since [start], or null when unknown or when a
-  /// device clock rollback made the difference negative (the message_rows
-  /// CHECK constraint rejects negative durations).
-  int? _elapsedMsFrom(DateTime? start) {
-    if (start == null) return null;
-    final elapsed = DateTime.now().difference(start).inMilliseconds;
-    return elapsed < 0 ? null : elapsed;
-  }
-
   ChatMessage _streamingMessageSnapshot(stream_ctrl.StreamingState state) {
     final messageId = state.messageId;
     final index = _messages.indexWhere((message) => message.id == messageId);
@@ -520,8 +511,8 @@ class ChatActions {
       reasoningTokens: state.totalUsage?.reasoningTokens,
       cacheWriteTokens: state.totalUsage?.cacheWriteTokens,
       finishUsage: state.usage,
-      // copyWith keeps base.durationMs when this resolves to null.
-      durationMs: _elapsedMsFrom(state.streamStartedAt),
+      durationMs: state.durationMs,
+      firstTokenMs: state.firstTokenMs,
     );
   }
 
@@ -869,11 +860,15 @@ class ChatActions {
   Future<void> debugHandleStreamChunk(
     StreamChunk chunk,
     stream_ctrl.StreamingState state,
-  ) => _handleStreamChunk(chunk, state);
+  ) {
+    state.recordFirstOutput(chunk);
+    return _handleStreamChunk(chunk, state);
+  }
 
   @visibleForTesting
   static StreamSubscription<T> listenSequentiallyToStream<T>({
     required Stream<T> stream,
+    void Function(T chunk)? onReceived,
     required Future<void> Function(T chunk) onData,
     required Future<void> Function(Object error, StackTrace stackTrace) onError,
     required Future<void> Function() onDone,
@@ -964,6 +959,8 @@ class ChatActions {
     sourceSubscription = stream.listen(
       (chunk) {
         if (terminalQueued) return;
+        // Synchronous arrival observers must run before any queued async work.
+        onReceived?.call(chunk);
         enqueue((data: chunk, error: null, stackTrace: null, done: false));
       },
       onError: (Object error, StackTrace stackTrace) {
@@ -2028,7 +2025,10 @@ class ChatActions {
       streamController.markStreamingEnded(visibleStreaming.id);
       streamController.cleanupTimers(visibleStreaming.id);
       final cancelState = _streamingStates[visibleStreaming.id];
-      if (cancelState != null) _setRetryStatus(cancelState, null);
+      if (cancelState != null) {
+        cancelState.finishRequestTiming();
+        _setRetryStatus(cancelState, null);
+      }
       final index = _messages.indexWhere((m) => m.id == visibleStreaming.id);
       final visibleMessage = index == -1 ? visibleStreaming : _messages[index];
       if (chatController.publishTerminalMessage(visibleMessage)) {
@@ -2199,6 +2199,7 @@ class ChatActions {
         await _cancelSubscriptionWithTimeout(previousSub);
       }
 
+      state.requestStartedAt = DateTime.now();
       if (!ctx.streamOutput) {
         try {
           final result = await ChatApiService.generateMessage(
@@ -2232,8 +2233,8 @@ class ChatActions {
               _scheduleStreamingCheckpoint(state);
             },
           );
+          state.finishRequestTiming();
           _setRetryStatus(state, null);
-          state.streamStartedAt ??= DateTime.now();
           await _markGenerationStreaming(state);
           state.partsHandler.handleResult(result);
           state.fullContentRaw = [
@@ -2292,6 +2293,7 @@ class ChatActions {
 
       final sub = listenSequentiallyToStream<StreamChunk>(
         stream: stream,
+        onReceived: state.recordFirstOutput,
         onData: (chunk) => _handleStreamChunk(chunk, state),
         onError: (error, stackTrace) => _handleStreamError(error, state),
         onDone: () => _handleStreamDone(state),
@@ -2495,7 +2497,6 @@ class ChatActions {
     final conversationId = state.conversationId;
 
     _recordContent(state, chunkContent);
-    state.streamStartedAt ??= DateTime.now();
 
     // End reasoning when content starts
     if (state.ctx.streamOutput && chunkContent.isNotEmpty) {
@@ -2521,7 +2522,7 @@ class ChatActions {
         promptTokens: state.totalUsage?.promptTokens,
         completionTokens: state.totalUsage?.completionTokens,
         cachedTokens: state.totalUsage?.cachedTokens,
-        durationMs: _elapsedMsFrom(state.streamStartedAt),
+        durationMs: state.durationMs,
         updateMessageInList: (id, content, tokens) {
           onContentUpdated?.call(id, content, tokens);
         },
@@ -2599,6 +2600,7 @@ class ChatActions {
     stream_ctrl.StreamingState state, {
     bool generateTitle = true,
   }) async {
+    state.finishRequestTiming();
     final messageId = state.messageId;
     final conversationId = state.conversationId;
 
@@ -2632,7 +2634,7 @@ class ChatActions {
     final processedContent = _transformAssistantContent(state);
 
     // Compute final duration
-    final finalDurationMs = _elapsedMsFrom(state.streamStartedAt);
+    final finalDurationMs = state.durationMs;
     final finalPromptTokens = state.totalUsage?.promptTokens;
     final finalCompletionTokens = state.totalUsage?.completionTokens;
     final finalCachedTokens = state.totalUsage?.cachedTokens;
@@ -2744,6 +2746,7 @@ class ChatActions {
     )) {
       return;
     }
+    state.finishRequestTiming();
     state.finishHandled = true;
     final oauthFailure =
         e is ProviderOAuthException &&
@@ -2811,6 +2814,7 @@ class ChatActions {
 
   /// Handle stream done callback.
   Future<void> _handleStreamDone(stream_ctrl.StreamingState state) async {
+    state.finishRequestTiming();
     final conversationId = state.conversationId;
     final messageId = state.messageId;
 

@@ -5976,6 +5976,7 @@ class ChatDatabaseRepository {
             reasoningTokens: message.reasoningTokens,
             cacheWriteTokens: message.cacheWriteTokens,
             finishUsage: message.finishUsage,
+            firstTokenMs: message.firstTokenMs,
           ),
         ),
       ),
@@ -7107,6 +7108,7 @@ class ChatDatabaseRepository {
       completionTokens: row.completionTokens,
       cachedTokens: row.cachedTokens,
       durationMs: row.durationMs,
+      firstTokenMs: _tokenExtraInt(extras, _firstTokenMsExtraKey),
       reasoningTokens: _tokenExtraInt(extras, _reasoningTokensExtraKey),
       cacheWriteTokens: _tokenExtraInt(extras, _cacheWriteTokensExtraKey),
       finishUsage: extras[_finishUsageExtraKey] is Map
@@ -7365,6 +7367,7 @@ class ChatDatabaseRepository {
           reasoningTokens: message.reasoningTokens,
           cacheWriteTokens: message.cacheWriteTokens,
           finishUsage: message.finishUsage,
+          firstTokenMs: message.firstTokenMs,
         ),
       ),
       messageOrder: messageOrder,
@@ -7420,6 +7423,7 @@ class ChatDatabaseRepository {
   static const _reasoningTokensExtraKey = 'tokens.reasoning';
   static const _cacheWriteTokensExtraKey = 'tokens.cacheWrite';
   static const _finishUsageExtraKey = 'tokens.finish';
+  static const _firstTokenMsExtraKey = 'timing.firstTokenMs';
 
   int? _tokenExtraInt(Map<String, dynamic> extras, String key) {
     final value = extras[key];
@@ -7434,6 +7438,7 @@ class ChatDatabaseRepository {
     int? reasoningTokens,
     int? cacheWriteTokens,
     TokenUsage? finishUsage,
+    int? firstTokenMs,
   }) {
     final extras = Map<String, dynamic>.from(_decodeExtrasJson(existing));
     if (reasoningTokens != null) {
@@ -7444,6 +7449,9 @@ class ChatDatabaseRepository {
     }
     if (finishUsage != null) {
       extras[_finishUsageExtraKey] = finishUsage.toJson();
+    }
+    if (firstTokenMs != null) {
+      extras[_firstTokenMsExtraKey] = firstTokenMs;
     }
     if (extras.isEmpty) return '{}';
     return jsonEncode(extras);
