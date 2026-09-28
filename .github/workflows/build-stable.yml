@@ -460,6 +460,7 @@ jobs:
           sudo apt-get install -y \
             clang cmake ninja-build pkg-config libgtk-3-dev \
             libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev \
+            gstreamer1.0-plugins-base gstreamer1.0-tools \
             gstreamer1.0-plugins-good gstreamer1.0-plugins-bad \
             rpm patchelf libfuse2 file \
             libkeybinder-3.0-dev libayatana-appindicator3-dev
@@ -495,51 +496,11 @@ jobs:
           cd build/linux/x64/release/bundle
           tar -czf ../../../../../Kelivo_linux_${VERSION}.tar.gz .
       - name: 📦 创建 AppImage
-        run: |
-          # 下载 appimagetool
-          wget -O appimagetool "https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-x86_64.AppImage"
-          chmod +x appimagetool
-          
-          # 创建 AppDir 结构
-          mkdir -p AppDir/usr/bin
-          mkdir -p AppDir/usr/lib
-          mkdir -p AppDir/usr/share/icons/hicolor/256x256/apps
-          cp -r build/linux/x64/release/bundle/* AppDir/usr/bin/
-          
-          # 创建 AppRun 脚本
-          cat > AppDir/AppRun << 'EOF'
-          #!/bin/bash
-          SELF=$(readlink -f "$0")
-          HERE=${SELF%/*}
-          export PATH="${HERE}/usr/bin:${PATH}"
-          export LD_LIBRARY_PATH="${HERE}/usr/lib:${LD_LIBRARY_PATH}"
-          exec "${HERE}/usr/bin/kelivo" "$@"
-          EOF
-          chmod +x AppDir/AppRun
-          
-          # 创建 desktop 文件
-          cat > AppDir/kelivo.desktop << EOF
-          [Desktop Entry]
-          Name=Kelivo
-          Exec=kelivo
-          Icon=kelivo
-          Type=Application
-          Categories=Utility;
-          EOF
-          
-          ICON_SOURCE="linux/kelivo.png"
-          if [ ! -f "$ICON_SOURCE" ]; then
-            ICON_SOURCE="assets/app_icon.png"
-          fi
-          if [ ! -f "$ICON_SOURCE" ]; then
-            echo "❌ Icon source not found"
-            exit 1
-          fi
-          install -Dm644 "$ICON_SOURCE" AppDir/kelivo.png
-          install -Dm644 "$ICON_SOURCE" "AppDir/usr/share/icons/hicolor/256x256/apps/kelivo.png"
-          
-          # 构建 AppImage
-          ARCH=x86_64 ./appimagetool AppDir Kelivo_linux_${VERSION}.AppImage
+        run: bash tool/build_appimage.sh build/linux/x64/release/bundle "$VERSION"
+
+      - name: 🧪 验证 AppImage 启动及 GStreamer 依赖
+        run: bash tool/test_appimage.sh "Kelivo-${VERSION}-x86_64.AppImage"
+
       - name: 📦 创建 DEB 包
         run: |
           # 创建 DEB 目录结构
@@ -702,7 +663,7 @@ jobs:
           prerelease: ${{ github.event.inputs.prerelease }}
           files: |
             Kelivo_linux_*.tar.gz
-            Kelivo_linux_*.AppImage
+            Kelivo-*-x86_64.AppImage
             Kelivo_linux_*_amd64.deb
             Kelivo_linux_*.rpm
       - name: 📤 上传构建产物 (tar.gz)
@@ -715,7 +676,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: Linux-AppImage
-          path: Kelivo_linux_*.AppImage
+          path: Kelivo-*-x86_64.AppImage
 
       - name: 📤 上传构建产物 (DEB)
         uses: actions/upload-artifact@v4
