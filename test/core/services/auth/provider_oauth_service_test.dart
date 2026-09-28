@@ -3,12 +3,14 @@ import 'package:Kelivo/core/database/business_preferences.dart';
 import 'dart:async';
 import 'dart:convert';
 
+import 'package:Kelivo/core/models/compress_context_options.dart';
 import 'package:Kelivo/core/models/model_spec.dart';
 import 'package:Kelivo/core/providers/settings_provider.dart';
 import 'package:Kelivo/core/services/auth/provider_oauth_service.dart';
 import 'package:Kelivo/core/services/api/providers/openai/openai_provider.dart';
 import 'package:Kelivo/core/services/api/providers/claude_official.dart';
 import 'package:Kelivo/core/services/api/stream/stream_chunk.dart';
+import 'package:Kelivo/core/services/model_spec/model_spec_resolver.dart';
 import 'package:Kelivo/features/provider/widgets/share_provider_sheet.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
@@ -1180,32 +1182,94 @@ void main() {
   });
 
   test(
-    'Grok discovery writes effort levels and the client only strips summary',
+    'Grok sync keeps API models alongside Fast and sends its inference id',
     () async {
       final service = ProviderOAuthService(
-        clientFactory: (_) => MockClient(
-          (_) async => jsonResponse({
+        clientFactory: (_) => MockClient((request) async {
+          if (request.url.host == 'api.x.ai') {
+            expect(request.url.path, '/v1/models');
+            return jsonResponse({
+              'data': [
+                {
+                  'id': 'grok-4.7',
+                  'supported_reasoning_levels': ['low', 'medium', 'high'],
+                },
+                {'id': 'grok-build', 'supports_reasoning': false},
+                {'id': 'grok-4.20-0309-reasoning'},
+                {'id': 'grok-imagine-image'},
+              ],
+            });
+          }
+          expect(
+            request.url.toString(),
+            'https://cli-chat-proxy.grok.com/v1/models-v2',
+          );
+          return jsonResponse({
             'data': [
               {
-                'id': 'grok-4.20',
-                'supports_reasoning': true,
-                'supported_reasoning_levels': ['low', 'high'],
+                'id': 'grok-4.7',
+                'reasoningEfforts': ['low', 'high'],
               },
-              {'id': 'grok-build', 'supports_reasoning': false},
+              {
+                'id': 'fast-picker-key',
+                'model': 'grok-4.7-build-fast',
+                'name': 'Grok 4.7 Fast',
+                'contextWindow': 500000,
+                'reasoningEfforts': [
+                  {'value': 'low'},
+                  {'value': 'medium'},
+                  {'value': 'high', 'default': true},
+                  {'value': 'xhigh'},
+                ],
+              },
             ],
-          }),
-        ),
+          });
+        }),
       )..bind(settings);
       final original = config(provider: OAuthProvider.grok, expired: false);
       await settings.setProviderConfig(original.id, original);
+      final discovered = await service.models(original);
+      expect(
+        discovered
+            .singleWhere((m) => m.id == 'grok-4.7-build-fast')
+            .contextWindow,
+        500000,
+      );
       await service.syncModels(original.id);
       final synced = settings.providerConfigs[original.id]!;
-      expect(synced.modelOverrides['grok-4.20']['reasoning'], {
+      expect(synced.models, [
+        'grok-4.7',
+        'grok-4.7-build-fast',
+        'grok-build',
+        'grok-4.20-0309-reasoning',
+      ]);
+      expect(synced.modelOverrides['grok-4.7']['reasoning'], {
         'levels': ['low', 'high'],
         'dialect': 'openaiResponsesReasoning',
       });
       expect(
-        synced.modelOverrides['grok-4.20']['abilities'],
+        synced.modelOverrides['grok-4.7-build-fast']['name'],
+        'Grok 4.7 Fast',
+      );
+      expect(synced.modelOverrides['grok-4.7-build-fast']['reasoning'], {
+        'levels': ['low', 'medium', 'high', 'xhigh'],
+        'dialect': 'openaiResponsesReasoning',
+      });
+      expect(
+        synced.modelOverrides['grok-4.7-build-fast']['contextWindow'],
+        500000,
+      );
+      final fastSpec = ModelSpecResolver.instance.spec(
+        synced,
+        'grok-4.7-build-fast',
+      );
+      expect(fastSpec.contextWindow, 500000);
+      expect(
+        compressRequestCharBudget(contextWindowTokens: fastSpec.contextWindow),
+        100000,
+      );
+      expect(
+        synced.modelOverrides['grok-4.7-build-fast']['abilities'],
         contains('reasoning'),
       );
       expect(
@@ -1229,18 +1293,59 @@ void main() {
       await sendOpenAIStream(
         client,
         await service.resolve(synced),
-        'grok-build',
+        'grok-4.7-build-fast',
         [
           {'role': 'user', 'content': 'Hi'},
         ],
-        extraBody: {
-          'reasoning': {'effort': 'high', 'summary': 'auto'},
-        },
+        reasoning: legacyBudget(64000),
       ).toList();
+      expect(requests.single.url.toString(), 'https://api.x.ai/v1/responses');
+      expect(requests.single.headers['Authorization'], 'Bearer access');
       final body = jsonDecode(requests.single.body) as Map;
-      expect(body['reasoning'], {'effort': 'high'});
+      expect(body['model'], 'grok-4.7-build-fast');
+      expect(body['reasoning'], {'effort': 'xhigh'});
       expect(body['store'], false);
       expect(body['include'], contains('reasoning.encrypted_content'));
+    },
+  );
+
+  test(
+    'Grok sync preserves limits when the catalog omits valid context metadata',
+    () async {
+      for (final value in [null, 0, -1, 0.5, 'invalid']) {
+        final service = ProviderOAuthService(
+          clientFactory: (_) => MockClient(
+            (request) async => jsonResponse({
+              'data': request.url.path.endsWith('models-v2')
+                  ? [
+                      {
+                        'model': 'grok-4.7-build-fast',
+                        if (value != null) 'contextWindow': value,
+                      },
+                    ]
+                  : [],
+            }),
+          ),
+        )..bind(settings);
+        addTearDown(service.dispose);
+        final original = config(provider: OAuthProvider.grok, expired: false)
+            .copyWith(
+              modelOverrides: {
+                'grok-4.7-build-fast': {'contextWindow': 64000},
+              },
+            );
+        await settings.setProviderConfig(original.id, original);
+        final discovered = await service.models(original);
+        expect(discovered.single.contextWindow, 64000, reason: '$value');
+        await service.syncModels(original.id);
+        expect(
+          settings
+              .providerConfigs[original.id]!
+              .modelOverrides['grok-4.7-build-fast']['contextWindow'],
+          64000,
+          reason: '$value',
+        );
+      }
     },
   );
 }

@@ -393,6 +393,7 @@ class ProviderOAuthService extends ChangeNotifier {
         existing: overrides[model.id],
         model: model,
         reasoning: oauthDiscoveredReasoning(provider, row),
+        contextWindow: _oauthContextWindow(row),
         extra: {
           if (provider == OAuthProvider.kimi)
             'oauthProtocol': kimiOAuthProtocol(row),
@@ -525,6 +526,7 @@ Map<String, dynamic> mergeOAuthModelOverride({
   required Object? existing,
   required ModelSpec model,
   ReasoningSpecOverride? reasoning,
+  int? contextWindow,
   Map<String, dynamic> extra = const {},
 }) {
   final current = existing is Map
@@ -540,6 +542,7 @@ Map<String, dynamic> mergeOAuthModelOverride({
         output: List<Modality>.from(model.output),
         abilities: List<ModelAbility>.from(model.abilities),
         reasoning: _mergeReasoningOverride(current.reasoning, reasoning),
+        contextWindow: contextWindow,
         extra: nextExtra,
       )
       .toJson();
@@ -611,12 +614,21 @@ String? _oauthDefaultLevel(Map<String, dynamic> row) {
   return null;
 }
 
+int? _oauthContextWindow(Map<String, dynamic> row) {
+  final value = oauthNumber(row['context_window']);
+  if (value == null || value <= 0 || value != value.truncateToDouble()) {
+    return null;
+  }
+  return value.toInt();
+}
+
 ModelSpec _oauthDiscoveredSpec(ModelSpec resolved, Map<String, dynamic> row) {
   final imageIn =
       row['supports_image_in'] == true ||
       (row['input_modalities'] as List? ?? const []).contains('image');
   final support = oauthRowReasoningSupport(row);
   return resolved.copyWith(
+    contextWindow: _oauthContextWindow(row),
     input: <Modality>[...resolved.input, if (imageIn) Modality.image],
     abilities: <ModelAbility>[
       ...resolved.abilities.where(
