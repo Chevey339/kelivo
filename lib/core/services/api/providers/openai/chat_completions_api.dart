@@ -12,6 +12,7 @@ import '../../../../providers/settings_provider.dart';
 import '../../../../utils/multimodal_input_utils.dart';
 import '../../../../../utils/sandbox_path_resolver.dart';
 import '../../chat_api_helpers.dart';
+import '../../native_input_attachments.dart';
 import '../../tool_result_content.dart';
 import '../../generation/tool_loop_runner.dart';
 import '../../reasoning/reasoning_dialects.dart';
@@ -89,6 +90,10 @@ Map<String, dynamic> copyChatCompletionMessage(Map<String, dynamic> m) {
     } else {
       out[multimodalInternalMediaPathsKey] = mediaPaths;
     }
+  }
+  final documents = m[multimodalInternalDocumentPathsKey];
+  if (documents != null) {
+    out[multimodalInternalDocumentPathsKey] = documents;
   }
   final revisionId = m[multimodalInternalRevisionIdKey];
   if (revisionId != null) {
@@ -252,6 +257,7 @@ openaiVisibleOutputFromMessage(Map<String, dynamic>? cmsg) {
 Future<List<Map<String, dynamic>>> buildOpenAIChatCompletionMessages(
   List<Map<String, dynamic>> messages, {
   List<String>? userMediaPaths,
+  required NativeInputAttachments nativeInputs,
   required bool canImageInput,
   required bool allowRemoteImages,
   required ReasoningReplayPolicy reasoningReplay,
@@ -307,6 +313,24 @@ Future<List<Map<String, dynamic>>> buildOpenAIChatCompletionMessages(
     // Complete the entire batch of tool replies before adding a user image.
     if (role != 'tool') flushToolImages();
     final isAssistant = role == 'assistant';
+    final nativeParts = await nativeInputs.build(
+      m,
+      userPaths: i == lastUserIndex ? userMediaPaths : null,
+    );
+    void addMessage(Map<String, dynamic> message) {
+      if (nativeParts.isNotEmpty) {
+        final content = message['content'];
+        message['content'] = [
+          if (content is List)
+            ...content
+          else if (content is String && content.isNotEmpty)
+            {'type': 'text', 'text': content},
+          ...nativeParts,
+        ];
+      }
+      out.add(message);
+    }
+
     final internalMediaRefs = parseInternalMediaRefs(
       m[multimodalInternalMediaPathsKey],
     );
@@ -514,7 +538,10 @@ Future<List<Map<String, dynamic>>> buildOpenAIChatCompletionMessages(
           final bool isInlineUrl =
               isRemoteHttpUrl(mediaPath) || mediaPath.startsWith('data:');
           final String mime = mimeForInternalMediaRef(mediaRef);
-          if (isAudioMime(mime)) continue;
+          if (isAudioMime(mime) ||
+              (role == 'user' && (isVideoMime(mime) || isPdfMime(mime)))) {
+            continue;
+          }
           final bool isVideo = isVideoMime(mime);
           final String? dataUrl = isInlineUrl
               ? mediaPath
@@ -551,13 +578,13 @@ Future<List<Map<String, dynamic>>> buildOpenAIChatCompletionMessages(
         }
       }
       outMsg['content'] = content;
-      out.add(outMsg);
+      addMessage(outMsg);
       continue;
     }
 
     if (role == 'system') {
       outMsg['content'] = raw;
-      out.add(outMsg);
+      addMessage(outMsg);
       continue;
     }
 
@@ -569,7 +596,7 @@ Future<List<Map<String, dynamic>>> buildOpenAIChatCompletionMessages(
         canImageInput: canImageInput,
       );
       outMsg['content'] = result.text;
-      out.add(outMsg);
+      addMessage(outMsg);
       if (result.imageUrls.isNotEmpty) {
         pendingToolImageParts.add({
           'type': 'text',
@@ -590,7 +617,7 @@ Future<List<Map<String, dynamic>>> buildOpenAIChatCompletionMessages(
         outMsg['tool_calls'] is List &&
         (outMsg['tool_calls'] as List).isNotEmpty)) {
       outMsg['content'] = raw;
-      out.add(outMsg);
+      addMessage(outMsg);
       continue;
     }
 
@@ -608,7 +635,7 @@ Future<List<Map<String, dynamic>>> buildOpenAIChatCompletionMessages(
         !hasInternalMedia &&
         !shouldAttachAssistantMedia) {
       outMsg['content'] = raw;
-      out.add(outMsg);
+      addMessage(outMsg);
       continue;
     }
 
@@ -623,7 +650,7 @@ Future<List<Map<String, dynamic>>> buildOpenAIChatCompletionMessages(
     );
     if (!canImageInput) {
       outMsg['content'] = parsed.text;
-      out.add(outMsg);
+      addMessage(outMsg);
       continue;
     }
 
@@ -722,7 +749,10 @@ Future<List<Map<String, dynamic>>> buildOpenAIChatCompletionMessages(
       if (!seenSources.add(normalized)) continue;
       final bool isInlineUrl = isRemoteHttpUrl(p) || p.startsWith('data:');
       final String mime = mimeForInternalMediaRef(mediaRef);
-      if (isAudioMime(mime)) continue;
+      if (isAudioMime(mime) ||
+          (role == 'user' && (isVideoMime(mime) || isPdfMime(mime)))) {
+        continue;
+      }
       final bool isVideo = isVideoMime(mime);
       final String? dataUrl = isInlineUrl
           ? p
@@ -760,7 +790,7 @@ Future<List<Map<String, dynamic>>> buildOpenAIChatCompletionMessages(
     } else {
       outMsg['content'] = parts.isEmpty ? raw : parts;
     }
-    out.add(outMsg);
+    addMessage(outMsg);
   }
   flushToolImages();
   return out;
@@ -842,6 +872,11 @@ Stream<StreamChunk> runOpenAIChatCompletionsToolFollowUps({
         'messages': await buildOpenAIChatCompletionMessages(
           currentMessages,
           userMediaPaths: userImagePaths,
+          nativeInputs: NativeInputAttachments(
+            config: config,
+            spec: spec,
+            protocol: NativeInputProtocol.chatCompletions,
+          ),
           canImageInput: canImageInput,
           allowRemoteImages: allowRemoteImages,
           reasoningReplay: spec.reasoning.replay,
@@ -1011,6 +1046,11 @@ Stream<StreamChunk> runOpenAIChatCompletionsNonStreamToolFollowUps({
       reqBody['messages'] = await buildOpenAIChatCompletionMessages(
         currentMessages,
         userMediaPaths: userImagePaths,
+        nativeInputs: NativeInputAttachments(
+          config: config,
+          spec: spec,
+          protocol: NativeInputProtocol.chatCompletions,
+        ),
         canImageInput: canImageInput,
         allowRemoteImages: allowRemoteImages,
         reasoningReplay: spec.reasoning.replay,

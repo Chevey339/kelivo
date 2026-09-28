@@ -1,3 +1,4 @@
+import 'package:Kelivo/core/services/api/native_input_attachments.dart';
 import 'dart:convert';
 import 'dart:io';
 
@@ -214,6 +215,18 @@ List<String> _imagePayloads(dynamic value) {
   }
   return out;
 }
+
+final _nativeInputs = NativeInputAttachments(
+  config: ProviderConfig(
+    id: 'test',
+    enabled: true,
+    name: 'test',
+    apiKey: '',
+    baseUrl: 'https://api.example.com/v1',
+  ),
+  spec: ModelSpec(id: 'test', displayName: 'test'),
+  protocol: NativeInputProtocol.chatCompletions,
+);
 
 void main() {
   test(
@@ -537,6 +550,7 @@ void main() {
             'content': 'ordinary text',
           },
         ],
+        nativeInputs: _nativeInputs,
         canImageInput: true,
         allowRemoteImages: false,
         reasoningReplay: ReasoningReplayPolicy.none,

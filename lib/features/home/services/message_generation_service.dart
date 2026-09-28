@@ -363,6 +363,9 @@ class MessageGenerationService {
       conversation: conversation,
       sourceMessages: messages,
       previewOnly: true,
+      nativePdfInput: ModelSpecResolver.instance
+          .spec(packed.cfg, modelId)
+          .supportsPdfInput,
     );
     return ContextAssemblyPreview.fromApiMessages(
       apiMessages: packed.apiMessages,
@@ -451,6 +454,9 @@ class MessageGenerationService {
     final workspaceContext = packed.workspaceContext;
     final mcpRouteSnapshot = packed.mcpRouteSnapshot;
     final workspaceAttachments = packed.workspaceAttachments;
+    final nativePdfInput = ModelSpecResolver.instance
+        .spec(cfg, modelId)
+        .supportsPdfInput;
     final sandboxDataFiles = BuiltInToolsHelper.sendsDataFilesToSandbox(
       cfg: cfg,
       modelId: modelId,
@@ -477,6 +483,7 @@ class MessageGenerationService {
               conversation: currentConversation,
               sourceMessages: messages,
               sandboxDataFiles: sandboxDataFiles,
+              nativePdfInput: nativePdfInput,
               workspaceAttachments: localAttachments,
             )
         ? processingMessageId
@@ -494,6 +501,7 @@ class MessageGenerationService {
             conversation: currentConversation,
             sourceMessages: messages,
             sandboxDataFiles: sandboxDataFiles,
+            nativePdfInput: nativePdfInput,
             workspaceAttachments: localAttachments,
           );
     } on AttachmentRequiresWorkspace catch (e) {

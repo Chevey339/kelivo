@@ -1,3 +1,5 @@
+import 'package:Kelivo/core/services/api/native_input_attachments.dart';
+import 'package:Kelivo/core/providers/settings_provider.dart';
 import 'package:Kelivo/core/models/model_spec.dart';
 import 'package:Kelivo/core/services/api/providers/openai/chat_completions_api.dart';
 import 'package:Kelivo/core/services/api/providers/openai/openai_tool_transcript.dart';
@@ -6,6 +8,18 @@ import 'package:flutter_test/flutter_test.dart';
 const _extraContent = <String, dynamic>{
   'google': <String, dynamic>{'thought_signature': 'sig-create-memory'},
 };
+
+final _nativeInputs = NativeInputAttachments(
+  config: ProviderConfig(
+    id: 'test',
+    enabled: true,
+    name: 'test',
+    apiKey: '',
+    baseUrl: 'https://api.example.com/v1',
+  ),
+  spec: ModelSpec(id: 'test', displayName: 'test'),
+  protocol: NativeInputProtocol.chatCompletions,
+);
 
 void main() {
   test('same-turn follow-up echoes extra_content from streamed tool acc', () {
@@ -124,6 +138,7 @@ void main() {
             'content': 'what did you remember?',
           },
         ],
+        nativeInputs: _nativeInputs,
         canImageInput: false,
         allowRemoteImages: false,
         reasoningReplay: ReasoningReplayPolicy.none,
@@ -176,6 +191,7 @@ void main() {
             },
           },
         ],
+        nativeInputs: _nativeInputs,
         canImageInput: false,
         allowRemoteImages: false,
         reasoningReplay: ReasoningReplayPolicy.none,

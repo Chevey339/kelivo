@@ -14,6 +14,7 @@ import '../../../utils/multimodal_input_utils.dart';
 import '../../../../utils/mcp_structured_image.dart';
 import '../builtin_tools.dart';
 import '../chat_api_helpers.dart';
+import '../native_input_attachments.dart';
 import '../tool_result_content.dart';
 import '../../model_spec/model_spec_resolver.dart';
 import '../reasoning/reasoning_dialects.dart';
@@ -97,6 +98,11 @@ Stream<StreamChunk> sendClaudeStream(
     skipRedactedThinkingBlocks: skipRedactedThinkingBlocks,
     skipImageParsing: skipImageParsing,
     canImageInput: canImageInput,
+    nativeInputs: NativeInputAttachments(
+      config: config,
+      spec: ModelSpecResolver.instance.spec(config, modelId),
+      protocol: NativeInputProtocol.claude,
+    ),
     userImagePaths: userImagePaths,
   );
   final initialMessages = await history.build(nonSystemMessages);

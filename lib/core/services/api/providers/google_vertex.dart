@@ -13,6 +13,7 @@ import '../../../../utils/mcp_structured_image.dart';
 import '../../../../utils/sandbox_path_resolver.dart';
 import '../builtin_tools.dart';
 import '../chat_api_helpers.dart';
+import '../native_input_attachments.dart';
 import '../tool_result_content.dart';
 import '../../model_spec/model_spec_resolver.dart';
 import '../reasoning/reasoning_dialects.dart';
@@ -206,7 +207,8 @@ Stream<StreamChunk> sendGoogleVertexClaudeStream({
   final initialMessages = <Map<String, dynamic>>[];
   for (int i = 0; i < nonSystemMessages.length; i++) {
     final m = nonSystemMessages[i];
-    final isLast = i == nonSystemMessages.length - 1;
+    final isLast =
+        i == nonSystemMessages.lastIndexWhere((m) => m['role'] == 'user');
     final roleName = (m['role'] ?? 'user').toString();
     final raw = (m['content'] ?? '').toString();
     if (roleName == 'tool') {
@@ -265,10 +267,18 @@ Stream<StreamChunk> sendGoogleVertexClaudeStream({
     final hasInternalMedia = internalMediaRefs.isNotEmpty;
     final hasAttachedImages =
         isLast && roleName == 'user' && (userImagePaths?.isNotEmpty == true);
+    final nativeParts = await NativeInputAttachments(
+      config: config,
+      spec: ModelSpecResolver.instance.spec(config, modelId),
+      protocol: NativeInputProtocol.claude,
+    ).build(m, userPaths: isLast ? userImagePaths : null);
 
     if ((roleName == 'user' || roleName == 'assistant') &&
-        (hasMarkdownImages || hasInternalMedia || hasAttachedImages)) {
-      final parts = <Map<String, dynamic>>[];
+        (hasMarkdownImages ||
+            hasInternalMedia ||
+            hasAttachedImages ||
+            nativeParts.isNotEmpty)) {
+      final parts = <Map<String, dynamic>>[...nativeParts];
       final seenSources = <String>{};
       String normalizeSrc(String src) {
         if (src.startsWith('http') || src.startsWith('data:')) return src;

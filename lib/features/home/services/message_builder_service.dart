@@ -72,6 +72,12 @@ const MemoryPrefixResolution _noMemoryPrefix = (
 /// temporary ones are never written there, so without a pass-scoped record each
 /// message would look like the first and re-inject the same snapshot.
 class MemoryInjectionPass {
+  MemoryInjectionPass({this.retainedSnapshotCarriers});
+
+  /// Frozen snapshot carriers actually retained in this request. A null value
+  /// lets standalone prompt resolution consult the stored history instead.
+  final Set<String>? retainedSnapshotCarriers;
+
   /// Revision ids that received a memory block during this request.
   final Set<String> snapshotCarriers = <String>{};
 
@@ -733,7 +739,12 @@ class MessageBuilderService {
       return ChatInputData(text: text.trim(), imagePaths: mediaPaths);
     }
     final images = <String>[];
-    final docs = <DocumentAttachment>[];
+    final docs = [
+      for (final ref in parseInternalDocumentRefs(
+        message[multimodalInternalDocumentPathsKey],
+      ))
+        DocumentAttachment(path: ref.uri, fileName: ref.name, mime: ref.mime),
+    ];
     for (final ref in mediaRefs) {
       final path = ref.uri;
       final mime = (ref.mime != null && ref.mime!.trim().isNotEmpty)
@@ -777,6 +788,7 @@ class MessageBuilderService {
     Conversation? conversation,
     List<ChatMessage>? sourceMessages,
     bool sandboxDataFiles = false,
+    bool nativePdfInput = false,
     Map<String, AttachmentInfo> workspaceAttachments = const {},
   }) {
     final bool ocrActive =
@@ -805,6 +817,7 @@ class MessageBuilderService {
       final mediaPaths = <String>{};
       for (final document in parsed.documents) {
         final mime = _effectiveAttachmentMime(document);
+        if (nativePdfInput && isPdfMime(mime)) continue;
         if (isVideoMime(mime) || isAudioMime(mime)) {
           final path = document.path.trim();
           if (path.isNotEmpty) mediaPaths.add(path);
@@ -847,6 +860,7 @@ class MessageBuilderService {
     Conversation? conversation,
     List<ChatMessage>? sourceMessages,
     bool sandboxDataFiles = false,
+    bool nativePdfInput = false,
     bool previewOnly = false,
     Map<String, AttachmentInfo> workspaceAttachments = const {},
   }) async {
@@ -881,9 +895,38 @@ class MessageBuilderService {
         if (isPersistedUserMessage(message))
           (message[internalRevisionIdKey] ?? '').toString().trim(),
     ];
-    final frozenPrompts = _repo == null
+    final storedPrompts = _repo == null
         ? null
         : await _repo!.getMessagePrompts(persistedRevisionIds);
+
+    // Decide which frozen prompts survive before any memory injection. A PDF
+    // sent natively drops its extracted text and the snapshot frozen with it;
+    // that database row must no longer count as memory in this request.
+    final nativePdfRevisionIds = <String>{};
+    if (nativePdfInput) {
+      for (final message in apiMessages) {
+        if (!isPersistedUserMessage(message)) continue;
+        final revisionId = message[internalRevisionIdKey].toString().trim();
+        final chatMessage = _resolveChatMessage(
+          revisionId: revisionId,
+          conversation: conversation,
+          sourceMessages: sourceMessages,
+        );
+        final input = chatMessage != null
+            ? parseInputFromMessage(chatMessage)
+            : parseInputFromApiMap(message);
+        if (input.documents.any(
+          (d) => isPdfMime(_effectiveAttachmentMime(d)),
+        )) {
+          nativePdfRevisionIds.add(revisionId);
+        }
+      }
+    }
+    final frozenPrompts = {
+      if (storedPrompts != null)
+        for (final entry in storedPrompts.entries)
+          if (!nativePdfRevisionIds.contains(entry.key)) entry.key: entry.value,
+    };
 
     // Prefetch OCR only for messages that still need generation (no freeze yet).
     OcrPrepareSession? ocrSession;
@@ -895,7 +938,7 @@ class MessageBuilderService {
         final revisionId = (message[internalRevisionIdKey] ?? '')
             .toString()
             .trim();
-        if (frozenPrompts?.containsKey(revisionId) ?? false) continue;
+        if (frozenPrompts.containsKey(revisionId)) continue;
         final revisionForParse = revisionId;
         final chatForParse = _resolveChatMessage(
           revisionId: revisionForParse,
@@ -987,7 +1030,12 @@ class MessageBuilderService {
       }
     }
 
-    final injectionPass = MemoryInjectionPass();
+    final injectionPass = MemoryInjectionPass(
+      retainedSnapshotCarriers: {
+        for (final entry in frozenPrompts.entries)
+          if (entry.value.carriesMemorySnapshot) entry.key,
+      },
+    );
 
     // Revision ids whose payload really came from memory injection. Format
     // alone must never decide this: a user who pastes a snapshot copied out of
@@ -1008,15 +1056,32 @@ class MessageBuilderService {
       final parsedUser = chatMessageForParts != null
           ? parseInputFromMessage(chatMessageForParts)
           : parseInputFromApiMap(apiMessages[i]);
+      final hasNativePdf = nativePdfRevisionIds.contains(revisionId);
       final hasWorkspaceDocuments = parsedUser.documents.any(
-        (d) => workspaceAttachments.containsKey(d.path),
+        (d) =>
+            workspaceAttachments.containsKey(d.path) &&
+            !(nativePdfInput && isPdfMime(_effectiveAttachmentMime(d))),
       );
       // A local workspace already owns these documents. Do not additionally
       // upload them to a provider's code-execution sandbox.
       if (hasWorkspaceDocuments) {
-        final remaining = parseInternalDocumentRefs(
-          apiMessages[i][multimodalInternalDocumentPathsKey],
-        ).where((ref) => !workspaceAttachments.containsKey(ref.uri)).toList();
+        final remaining =
+            parseInternalDocumentRefs(
+                  apiMessages[i][multimodalInternalDocumentPathsKey],
+                )
+                .where(
+                  (ref) =>
+                      !workspaceAttachments.containsKey(ref.uri) ||
+                      (nativePdfInput &&
+                          isPdfMime(
+                            resolveMediaAttachmentMime(
+                              explicitMime: ref.mime,
+                              fileName: ref.name,
+                              path: ref.uri,
+                            ),
+                          )),
+                )
+                .toList();
         if (remaining.isEmpty) {
           apiMessages[i].remove(multimodalInternalDocumentPathsKey);
         } else {
@@ -1113,8 +1178,8 @@ class MessageBuilderService {
         lastUserImagePaths = List<String>.of(parsedUser.imagePaths);
       }
 
-      // Prefer frozen promptContent — never recompute (§8.3).
-      final existing = frozenPrompts?[revisionId];
+      // Reuse only the frozen prompts retained for this request.
+      final existing = frozenPrompts[revisionId];
       if (existing != null) {
         final sendPayload = _legacyAwareFrozenPayload(
           payload: existing.payload,
@@ -1148,6 +1213,8 @@ class MessageBuilderService {
       final filePrompts = StringBuffer();
       var leftToSandbox = false;
       for (final d in parsedUser.documents) {
+        final effectiveMime = _effectiveAttachmentMime(d);
+        if (nativePdfInput && isPdfMime(effectiveMime)) continue;
         final local = workspaceAttachments[d.path];
         if (local != null) {
           leftToSandbox = true;
@@ -1158,7 +1225,6 @@ class MessageBuilderService {
           );
           continue;
         }
-        final effectiveMime = _effectiveAttachmentMime(d);
         if (isVideoMime(effectiveMime) || isAudioMime(effectiveMime)) {
           continue;
         }
@@ -1179,7 +1245,7 @@ class MessageBuilderService {
       }
 
       String merged = (filePrompts.toString() + cleanedUser).trim();
-      var canFreezePrompt = !previewOnly && !leftToSandbox;
+      var canFreezePrompt = !previewOnly && !leftToSandbox && !hasNativePdf;
 
       if (!previewOnly && ocrActive && ocrHandler != null) {
         final ocrTargets = parsedUser.imagePaths
@@ -1642,11 +1708,14 @@ class MessageBuilderService {
       if (revisionId.isEmpty || revisionId == currentMessageId) continue;
       historyUserIds.add(revisionId);
     }
+    final retainedCarriers = pass?.retainedSnapshotCarriers;
     final hasSnapshot =
         historyUserIds.any(
           (id) => pass?.snapshotCarriers.contains(id) ?? false,
         ) ||
-        await repo.anyPromptCarriesMemorySnapshot(historyUserIds);
+        (retainedCarriers != null
+            ? historyUserIds.any(retainedCarriers.contains)
+            : await repo.anyPromptCarriesMemorySnapshot(historyUserIds));
 
     // CRITICAL: compare against the prior hash BEFORE any write (appendix §6).
     // Writing first makes currentHash == injectedMemoryHash and no change is

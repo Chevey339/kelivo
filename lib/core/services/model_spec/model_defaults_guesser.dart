@@ -245,6 +245,37 @@ class ModelDefaultsGuesser {
       }
     }
 
+    // The catalog remains authoritative; these cover manually added models
+    // and relays without a catalog entry.
+    if (!forceEmbedding && !draft.output.contains(Modality.image)) {
+      if (_matches(
+            id,
+            r'(^|/)gemini-(1\.5-|[2-9][.-]|flash-latest|pro-latest)',
+          ) &&
+          !id.contains('tts') &&
+          !id.contains('live') &&
+          !id.contains('audio')) {
+        draft.input.addAll([Modality.audio, Modality.video, Modality.pdf]);
+      } else if (_matches(
+        id,
+        r'(^|/)claude-(3[.-]7-|(?:sonnet|opus|haiku|fable|mythos)-[4-9])',
+      )) {
+        draft.input.add(Modality.pdf);
+      } else if (_matches(id, r'(^|/)gpt-(audio(?:-|$)|4o(?:-mini)?-audio)')) {
+        draft.input.add(Modality.audio);
+      } else if (_matches(
+            id,
+            r'(^|/)gpt-(4o(?:-|$)|4\.1(?:-|$)|[5-9](?:[.-]|$))',
+          ) &&
+          draft.input.contains(Modality.image) &&
+          !id.contains('transcribe') &&
+          !id.contains('realtime')) {
+        draft.input.add(Modality.pdf);
+      } else if (_matches(id, r'(^|/)qwen[^/]*-omni(?:-|$)')) {
+        draft.input.addAll([Modality.audio, Modality.video]);
+      }
+    }
+
     final normalized = ModelSpec(
       id: spec.id,
       displayName: spec.displayName,

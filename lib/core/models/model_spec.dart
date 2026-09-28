@@ -641,6 +641,8 @@ class ModelSpec {
 
   bool get supportsVideoInput => input.contains(Modality.video);
 
+  bool get supportsPdfInput => input.contains(Modality.pdf);
+
   bool get isEmbedding => type == ModelType.embedding;
 
   ModelSpec({

@@ -15,6 +15,7 @@ import '../../../../utils/mcp_structured_image.dart';
 import '../../../../utils/sandbox_path_resolver.dart';
 import '../builtin_tools.dart';
 import '../chat_api_helpers.dart';
+import '../native_input_attachments.dart';
 import '../tool_result_content.dart';
 import '../../model_spec/model_spec_resolver.dart';
 import '../gemini_tool_config.dart';
@@ -378,8 +379,15 @@ Stream<StreamChunk> sendGoogleStream(
         if (parts.isNotEmpty) contents.add({'role': 'model', 'parts': parts});
         continue;
       }
-      final isLast = i == messages.length - 1;
+      final isLast = i == messages.lastIndexWhere((m) => m['role'] == 'user');
       final parts = <Map<String, dynamic>>[];
+      parts.addAll(
+        await NativeInputAttachments(
+          config: config,
+          spec: effective,
+          protocol: NativeInputProtocol.gemini,
+        ).build(msg, userPaths: isLast ? userImagePaths : null),
+      );
       final meta = _geminiHistoryMeta(msg);
       final raw = meta.cleanedText;
       final seenSources = <String>{};
@@ -449,6 +457,13 @@ Stream<StreamChunk> sendGoogleStream(
         if (supplementalRefs.isNotEmpty) {
           for (final mediaRef in supplementalRefs) {
             final p = mediaRef.uri;
+            final inputMime = mimeForInternalMediaRef(mediaRef);
+            if (role == 'user' &&
+                (isAudioMime(inputMime) ||
+                    isVideoMime(inputMime) ||
+                    isPdfMime(inputMime))) {
+              continue;
+            }
             final normalized = normalizeSrc(p);
             if (!seenSources.add(normalized)) continue;
             if (p.startsWith('data:')) {
@@ -862,8 +877,15 @@ Stream<StreamChunk> sendGoogleStream(
       if (parts.isNotEmpty) contents.add({'role': 'model', 'parts': parts});
       continue;
     }
-    final isLast = i == messages.length - 1;
+    final isLast = i == messages.lastIndexWhere((m) => m['role'] == 'user');
     final parts = <Map<String, dynamic>>[];
+    parts.addAll(
+      await NativeInputAttachments(
+        config: config,
+        spec: effective,
+        protocol: NativeInputProtocol.gemini,
+      ).build(msg, userPaths: isLast ? userImagePaths : null),
+    );
     final meta = _geminiHistoryMeta(msg);
     final raw = meta.cleanedText;
     final seenSources = <String>{};
@@ -938,6 +960,13 @@ Stream<StreamChunk> sendGoogleStream(
       if (supplementalRefs.isNotEmpty) {
         for (final mediaRef in supplementalRefs) {
           final p = mediaRef.uri;
+          final inputMime = mimeForInternalMediaRef(mediaRef);
+          if (role == 'user' &&
+              (isAudioMime(inputMime) ||
+                  isVideoMime(inputMime) ||
+                  isPdfMime(inputMime))) {
+            continue;
+          }
           final normalized = normalizeSrc(p);
           if (!seenSources.add(normalized)) continue;
           if (p.startsWith('data:')) {

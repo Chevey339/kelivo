@@ -38,6 +38,44 @@ void main() {
   });
 
   group('ModelSpecResolver', () {
+    test(
+      'default inputs respect transport while explicit overrides remain editable',
+      () {
+        final config = _cfg(
+          id: 'proxy',
+          kind: ProviderKind.openai,
+          baseUrl: 'https://proxy.example.com',
+        );
+        expect(
+          resolver.spec(config, 'gemini-3-flash-preview').input,
+          containsAll([Modality.audio, Modality.video, Modality.pdf]),
+        );
+        final responses = config.copyWith(useResponseApi: true);
+        expect(resolver.spec(responses, 'gemini-3-flash-preview').input, [
+          Modality.text,
+          Modality.image,
+          Modality.pdf,
+        ]);
+        final claude = config.copyWith(providerType: ProviderKind.claude);
+        expect(resolver.spec(claude, 'gemini-3-flash-preview').input, [
+          Modality.text,
+          Modality.image,
+          Modality.pdf,
+        ]);
+        final overridden = responses.copyWith(
+          modelOverrides: {
+            'gemini-3-flash-preview': {
+              'input': ['text', 'audio'],
+            },
+          },
+        );
+        expect(resolver.spec(overridden, 'gemini-3-flash-preview').input, [
+          Modality.text,
+          Modality.audio,
+        ]);
+      },
+    );
+
     test('catalog beats guesser for gpt-5.1 levels and limits', () {
       final resolved = resolver.resolve(_openai(), 'gpt-5.1');
       final spec = resolved.spec;

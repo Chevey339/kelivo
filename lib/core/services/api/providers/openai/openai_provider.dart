@@ -16,6 +16,7 @@ import '../../../model_spec/model_spec_resolver.dart';
 import '../../../model_spec/vendor_defaults.dart';
 import '../../builtin_tools.dart';
 import '../../chat_api_helpers.dart';
+import '../../native_input_attachments.dart';
 import '../../tool_result_content.dart';
 import '../../generation/tool_loop_runner.dart';
 import '../../kimi_formula_search.dart';
@@ -273,6 +274,29 @@ Stream<StreamChunk> sendOpenAIStream(
         continue;
       }
 
+      final nativeParts =
+          await NativeInputAttachments(
+            config: config,
+            spec: spec,
+            protocol: NativeInputProtocol.responses,
+          ).build(
+            m,
+            userPaths: i == lastResponsesUserIndex ? userImagePaths : null,
+          );
+      void addMessage(Map<String, dynamic> message) {
+        if (nativeParts.isNotEmpty) {
+          final content = message['content'];
+          message['content'] = [
+            if (content is List)
+              ...content
+            else if (content is String && content.isNotEmpty)
+              {'type': 'input_text', 'text': content},
+            ...nativeParts,
+          ];
+        }
+        input.add(message);
+      }
+
       final isAssistant = roleRaw == 'assistant';
 
       // Handle assistant messages with tool_calls - convert to function_call format
@@ -347,7 +371,7 @@ Stream<StreamChunk> sendOpenAIStream(
               ],
             });
           } else {
-            input.add({'role': roleRaw, 'content': parsed.text});
+            addMessage({'role': roleRaw, 'content': parsed.text});
           }
           continue;
         }
@@ -411,6 +435,7 @@ Stream<StreamChunk> sendOpenAIStream(
           final p = mediaRef.uri;
           final String mime = mimeForInternalMediaRef(mediaRef);
           final bool isAv = isAudioMime(mime) || isVideoMime(mime);
+          if ((isAv || isPdfMime(mime)) && !isAssistant) continue;
           if (isAv) {
             // Responses path has no first-class A/V input parts here; never
             // encode video/audio as input_image. Keep a text reference for both
@@ -475,7 +500,7 @@ Stream<StreamChunk> sendOpenAIStream(
             'content': assistantContent,
           });
         } else {
-          input.add({'role': roleRaw, 'content': parts});
+          addMessage({'role': roleRaw, 'content': parts});
         }
       } else {
         // No images
@@ -490,7 +515,7 @@ Stream<StreamChunk> sendOpenAIStream(
             ],
           });
         } else {
-          input.add({'role': roleRaw, 'content': raw});
+          addMessage({'role': roleRaw, 'content': raw});
         }
       }
     }
@@ -550,6 +575,11 @@ Stream<StreamChunk> sendOpenAIStream(
     final mm = await buildOpenAIChatCompletionMessages(
       messages,
       userMediaPaths: userImagePaths,
+      nativeInputs: NativeInputAttachments(
+        config: config,
+        spec: spec,
+        protocol: NativeInputProtocol.chatCompletions,
+      ),
       canImageInput: canImageInput,
       allowRemoteImages: allowRemoteImages,
       reasoningReplay: spec.reasoning.replay,

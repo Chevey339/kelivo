@@ -37,34 +37,87 @@ void main() {
       expect(ids.length, fixture.length);
     });
 
-    test('guesser reproduces the old ModelRegistry.infer fixture', () {
-      final ids = modelSpecCorpusIds();
-      for (final id in ids) {
-        final raw = fixture[id];
-        expect(raw, isA<Map>(), reason: 'missing fixture for $id');
-        final expected = Map<String, dynamic>.from(raw as Map);
-        final guess = ModelDefaultsGuesser.guess(id);
-        final expectedType = _isImagesApiId(id)
-            ? ModelType.image
-            : _byName(ModelType.values, expected['type'] as String);
-        expect(guess.type, expectedType, reason: id);
-        expect(
-          [for (final m in guess.input) m.name],
-          expected['input'],
-          reason: id,
-        );
-        expect(
-          [for (final m in guess.output) m.name],
-          expected['output'],
-          reason: id,
-        );
-        expect(
-          [for (final a in guess.abilities) a.name],
-          expected['abilities'],
-          reason: id,
-        );
-      }
-    });
+    test(
+      'guesser preserves historical text/image capabilities and abilities',
+      () {
+        final ids = modelSpecCorpusIds();
+        for (final id in ids) {
+          final raw = fixture[id];
+          expect(raw, isA<Map>(), reason: 'missing fixture for $id');
+          final expected = Map<String, dynamic>.from(raw as Map);
+          final guess = ModelDefaultsGuesser.guess(id);
+          final expectedType = _isImagesApiId(id)
+              ? ModelType.image
+              : _byName(ModelType.values, expected['type'] as String);
+          expect(guess.type, expectedType, reason: id);
+          expect(
+            [
+              for (final m in guess.input)
+                if (m == Modality.text || m == Modality.image) m.name,
+            ],
+            expected['input'],
+            reason: id,
+          );
+          expect(
+            [for (final m in guess.output) m.name],
+            expected['output'],
+            reason: id,
+          );
+          expect(
+            [for (final a in guess.abilities) a.name],
+            expected['abilities'],
+            reason: id,
+          );
+        }
+      },
+    );
+  });
+
+  test('known chat families infer native file input modes', () {
+    for (final id in [
+      'gemini-2.5-pro',
+      'google/gemini-3-flash-preview',
+      'gemini-flash-latest',
+    ]) {
+      expect(
+        ModelDefaultsGuesser.guess(id).input,
+        containsAll([Modality.audio, Modality.video, Modality.pdf]),
+        reason: id,
+      );
+    }
+    for (final id in [
+      'claude-sonnet-4-6',
+      'anthropic/claude-opus-4.6',
+      'gpt-4o',
+      'gpt-4.1',
+      'gpt-5.4',
+    ]) {
+      expect(
+        ModelDefaultsGuesser.guess(id).input,
+        contains(Modality.pdf),
+        reason: id,
+      );
+    }
+    expect(
+      ModelDefaultsGuesser.guess('gpt-audio-1.5').input,
+      contains(Modality.audio),
+    );
+    expect(
+      ModelDefaultsGuesser.guess('qwen3-omni-flash').input,
+      containsAll([Modality.audio, Modality.video]),
+    );
+    for (final id in [
+      'gemini-3.1-flash-image',
+      'gemini-2.5-flash-preview-tts',
+      'text-embedding-3-small',
+      'claude-2',
+    ]) {
+      expect(
+        ModelDefaultsGuesser.guess(id).input,
+        isNot(contains(Modality.pdf)),
+        reason: id,
+      );
+    }
   });
 
   group('Images API type', () {

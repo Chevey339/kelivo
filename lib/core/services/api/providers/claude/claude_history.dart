@@ -3,6 +3,7 @@ import 'dart:convert';
 import '../../../../utils/multimodal_input_utils.dart';
 import '../../../../../utils/sandbox_path_resolver.dart';
 import '../../chat_api_helpers.dart';
+import '../../native_input_attachments.dart';
 import '../../tool_result_content.dart';
 import 'claude_container.dart';
 
@@ -92,6 +93,7 @@ class ClaudeHistory {
   ClaudeHistory({
     required this.replayServerToolBlocks,
     required this.skipRedactedThinkingBlocks,
+    required this.nativeInputs,
     this.skipImageParsing = false,
     this.canImageInput = true,
     this.userImagePaths,
@@ -104,6 +106,7 @@ class ClaudeHistory {
   final bool skipRedactedThinkingBlocks;
   final bool skipImageParsing;
   final bool canImageInput;
+  final NativeInputAttachments nativeInputs;
   final List<String>? userImagePaths;
 
   /// The container the conversation's last code execution ran in, stored
@@ -310,7 +313,7 @@ class ClaudeHistory {
         await _plainMessage(
           m,
           role,
-          isLast: i == messages.length - 1,
+          isLast: i == messages.lastIndexWhere((m) => m['role'] == 'user'),
           carriedImages: carriedImages,
         ),
       );
@@ -453,8 +456,15 @@ class ClaudeHistory {
     final raw = (m['content'] ?? '').toString();
     final hasAttachedImages =
         isLast && role == 'user' && (userImagePaths?.isNotEmpty == true);
+    final nativeParts = await nativeInputs.build(
+      m,
+      userPaths: isLast ? userImagePaths : null,
+    );
     if (role != 'user' ||
-        !(_hasMedia(m) || hasAttachedImages || carriedImages.isNotEmpty)) {
+        !(_hasMedia(m) ||
+            hasAttachedImages ||
+            carriedImages.isNotEmpty ||
+            nativeParts.isNotEmpty)) {
       return {'role': role, 'content': raw};
     }
 
@@ -467,6 +477,7 @@ class ClaudeHistory {
       ],
       ...split.text,
       ...split.images,
+      ...nativeParts,
     ];
     carriedImages.clear();
     return {'role': role, 'content': parts.isEmpty ? raw : parts};

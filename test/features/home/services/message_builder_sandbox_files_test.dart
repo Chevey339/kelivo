@@ -7,6 +7,7 @@ import 'package:flutter_test/flutter_test.dart';
 // ignore: depend_on_referenced_packages
 import 'package:path_provider_platform_interface/path_provider_platform_interface.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:syncfusion_flutter_pdf/pdf.dart';
 
 import 'package:Kelivo/core/database/app_database.dart';
 import 'package:Kelivo/core/database/chat_database_repository.dart';
@@ -141,6 +142,62 @@ void main() {
       final content = apiMessages.single['content'] as String;
       expect(content, contains('region,amount'));
       expect(content, contains('read me'));
+    },
+  );
+
+  test(
+    'native PDF bypasses extraction and workspace routing even from API refs',
+    () async {
+      final s = await setUpService();
+      final uri = '${tempDir.path}/report.pdf';
+      final apiMessages = <Map<String, dynamic>>[
+        {
+          'role': 'user',
+          'content': 'Read this PDF',
+          MessageBuilderService.internalRevisionIdKey: 'pdf-user',
+          multimodalInternalDocumentPathsKey: [
+            encodeInternalDocumentRef((
+              uri: uri,
+              name: 'report.pdf',
+              mime: 'application/pdf',
+            )),
+          ],
+        },
+      ];
+      final workspace = {
+        uri: AttachmentInfo(
+          name: 'report.pdf',
+          sourceUri: uri,
+          size: 8,
+          modelPath: '/chat/attachments/report.pdf',
+        ),
+      };
+      expect(
+        s.service.hasPendingAttachmentWork(apiMessages, s.settings),
+        isTrue,
+      );
+      expect(
+        s.service.hasPendingAttachmentWork(
+          apiMessages,
+          s.settings,
+          nativePdfInput: true,
+        ),
+        isFalse,
+      );
+      await s.service.processUserMessagesForApi(
+        apiMessages,
+        s.settings,
+        null,
+        nativePdfInput: true,
+        workspaceAttachments: workspace,
+      );
+      expect(apiMessages.single['content'], 'Read this PDF');
+      expect(
+        parseInternalDocumentRefs(
+          apiMessages.single[multimodalInternalDocumentPathsKey],
+        ).single.uri,
+        uri,
+      );
     },
   );
 
@@ -301,6 +358,7 @@ void main() {
 
     Future<String> replay({
       required bool sandboxDataFiles,
+      bool nativePdfInput = false,
       Map<String, AttachmentInfo> workspaceAttachments = const {},
     }) async {
       final apiMessages = service.buildApiMessages(
@@ -315,6 +373,7 @@ void main() {
         conversation: convo,
         sourceMessages: [stored],
         sandboxDataFiles: sandboxDataFiles,
+        nativePdfInput: nativePdfInput,
         workspaceAttachments: workspaceAttachments,
       );
       return apiMessages.single['content'] as String;
@@ -343,6 +402,46 @@ void main() {
       expect(await replay(sandboxDataFiles: false), contains('region,amount'));
       expect(await replay(sandboxDataFiles: true), contains('region,amount'));
     });
+
+    test(
+      'PDF switches between native bytes and extraction without stale frozen text',
+      () async {
+        final document = PdfDocument();
+        document.pages.add().graphics.drawString(
+          'Original PDF text',
+          PdfStandardFont(PdfFontFamily.helvetica, 12),
+        );
+        final pdf = File('${tempDir.path}/report.pdf');
+        await pdf.writeAsBytes(await document.save());
+        document.dispose();
+        stored = await chatService.addMessage(
+          conversationId: convo.id,
+          role: 'user',
+          content: 'analyse PDF',
+          parts: [
+            const TextPart('analyse PDF'),
+            FilePart(
+              uri: pdf.path,
+              name: 'report.pdf',
+              mime: 'application/pdf',
+            ),
+          ],
+        );
+        expect(
+          await replay(sandboxDataFiles: false, nativePdfInput: true),
+          'analyse PDF',
+        );
+        expect(await repo.getMessagePrompt(stored.id), isNull);
+        final extracted = await replay(sandboxDataFiles: false);
+        expect(extracted, contains('Original PDF text'));
+        expect(
+          await replay(sandboxDataFiles: false, nativePdfInput: true),
+          'analyse PDF',
+        );
+        expect((await repo.getMessagePrompt(stored.id))!.payload, extracted);
+        expect(await replay(sandboxDataFiles: false), extracted);
+      },
+    );
 
     test(
       'binding and unbinding workspace does not freeze local paths into ordinary chat',
