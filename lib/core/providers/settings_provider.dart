@@ -1,4 +1,6 @@
 import '../services/auth/provider_oauth_service.dart';
+import '../models/provider_plugin.dart';
+import '../models/provider_plugin_session.dart';
 import '../models/mobile_background_settings.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -6040,6 +6042,9 @@ class ProviderConfig {
   final String name;
   final String apiKey;
   final OAuthProvider? oauthProvider;
+  final ProviderPluginManifest? providerPlugin;
+  final ProviderPluginSession? providerPluginSession;
+  bool get isPluginOAuth => providerPlugin?.oauth != null;
   final ProviderOAuthCredentials? oauthCredentials;
   final DateTime? oauthModelsSyncedAt;
   bool get isOAuth => oauthProvider != null;
@@ -6133,6 +6138,8 @@ class ProviderConfig {
     required this.name,
     required this.apiKey,
     this.oauthProvider,
+    this.providerPlugin,
+    this.providerPluginSession,
     this.oauthCredentials,
     this.oauthModelsSyncedAt,
     required this.baseUrl,
@@ -6175,6 +6182,8 @@ class ProviderConfig {
     String? name,
     String? apiKey,
     OAuthProvider? oauthProvider,
+    Object? providerPlugin = _sentinel,
+    Object? providerPluginSession = _sentinel,
     Object? oauthCredentials = _sentinel,
     DateTime? oauthModelsSyncedAt,
     String? baseUrl,
@@ -6212,6 +6221,12 @@ class ProviderConfig {
     name: name ?? this.name,
     apiKey: apiKey ?? this.apiKey,
     oauthProvider: oauthProvider ?? this.oauthProvider,
+    providerPlugin: identical(providerPlugin, _sentinel)
+        ? this.providerPlugin
+        : providerPlugin as ProviderPluginManifest?,
+    providerPluginSession: identical(providerPluginSession, _sentinel)
+        ? this.providerPluginSession
+        : providerPluginSession as ProviderPluginSession?,
     oauthCredentials: identical(oauthCredentials, _sentinel)
         ? this.oauthCredentials
         : oauthCredentials as ProviderOAuthCredentials?,
@@ -6260,6 +6275,9 @@ class ProviderConfig {
     'name': name,
     'apiKey': apiKey,
     if (oauthProvider != null) 'oauthProvider': oauthProvider!.name,
+    if (providerPlugin != null) 'providerPlugin': providerPlugin!.toJson(),
+    if (providerPluginSession != null)
+      'providerPluginSession': providerPluginSession!.toJson(),
     if (oauthCredentials != null)
       'oauthCredentials': oauthCredentials!.toJson(),
     if (oauthModelsSyncedAt != null)
@@ -6305,6 +6323,16 @@ class ProviderConfig {
     oauthProvider: json['oauthProvider'] == null
         ? null
         : OAuthProvider.values.byName(json['oauthProvider'] as String),
+    providerPlugin: json['providerPlugin'] == null
+        ? null
+        : ProviderPluginManifest.fromJson(
+            (json['providerPlugin'] as Map).cast<String, dynamic>(),
+          ),
+    providerPluginSession: json['providerPluginSession'] == null
+        ? null
+        : ProviderPluginSession.fromJson(
+            (json['providerPluginSession'] as Map).cast<String, dynamic>(),
+          ),
     oauthCredentials: json['oauthCredentials'] is Map
         ? ProviderOAuthCredentials.fromJson(
             (json['oauthCredentials'] as Map).cast<String, dynamic>(),

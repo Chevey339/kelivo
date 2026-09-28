@@ -14,6 +14,7 @@ import '../../../shared/widgets/ios_form_text_field.dart';
 import '../../../theme/app_font_weights.dart';
 import '../../../theme/app_semantic_colors.dart';
 import 'provider_avatar.dart';
+import 'provider_plugins_panel.dart';
 
 String oauthErrorText(BuildContext context, Object error) {
   final l = AppLocalizations.of(context)!;
@@ -363,6 +364,8 @@ class _OAuthLoginPanelState extends State<OAuthLoginPanel> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        if (widget.provider == null) const ProviderPluginsPanel(),
+        if (widget.provider == null) const SizedBox(height: 16),
         SectionCard(
           dividers: true,
           children: [

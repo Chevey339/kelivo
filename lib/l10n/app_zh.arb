@@ -4448,5 +4448,21 @@
   "phoneControlAssistantHint": "需要同时完成两项设置：在系统无障碍设置中启用“Kelivo 手机控制”，并在要使用的助手 → 本地工具中开启“手机控制”（也可从对话工具菜单开启）。每个助手单独配置，执行任务时请保持手机解锁。",
   "phoneControlRestrictedTitle": "无法开启无障碍？",
   "phoneControlRestrictedHint": "部分下载的 APK 需要先在应用信息右上角菜单中选择“允许受限制的设置”。点击打开 Kelivo 应用信息，完成后再返回无障碍设置。",
-  "phoneControlEnableAssistant": "允许此助手使用手机控制"
+  "phoneControlEnableAssistant": "允许此助手使用手机控制",
+  "providerPluginTitle": "供应商插件",
+  "providerPluginImport": "导入供应商插件",
+  "providerPluginInstall": "安装",
+  "providerPluginRemove": "移除插件及账号",
+  "providerPluginCopy": "复制插件 JSON",
+  "providerPluginModels": "获取模型",
+  "providerPluginLogout": "退出本地登录",
+  "providerPluginSignedOut": "需要登录",
+  "providerPluginSignedIn": "已登录",
+  "providerPluginSave": "保存",
+  "providerPluginCancel": "取消",
+  "providerPluginInvalid": "供应商插件无效",
+  "providerPluginOperationFailed": "供应商插件操作失败",
+  "providerPluginVersion": "版本",
+  "providerPluginProtocol": "协议",
+  "providerPluginTrust": "这是未经验证的第三方供应商。你发给它的对话将发送到其 API。安装前请核对下方实际的 API、授权地址和请求权限。OAuth 凭据沿用 Kelivo 的本地及可迁移备份存储方式；复制插件 JSON 不会包含凭据。"
 }

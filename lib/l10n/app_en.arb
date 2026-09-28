@@ -5611,5 +5611,21 @@
   "phoneControlAssistantHint": "Both permissions are required: enable Kelivo phone control in system Accessibility settings, then enable Phone Control under your assistant’s Local Tools (also available in the chat tools menu). Each assistant is configured separately. Keep the phone unlocked while running a task.",
   "phoneControlRestrictedTitle": "Accessibility switch unavailable?",
   "phoneControlRestrictedHint": "For some downloaded APKs, Android requires “Allow restricted settings” in the app info menu first. Tap to open Kelivo’s app info, then return to Accessibility settings.",
-  "phoneControlEnableAssistant": "Allow this assistant to use phone control"
+  "phoneControlEnableAssistant": "Allow this assistant to use phone control",
+  "providerPluginTitle": "Provider plugins",
+  "providerPluginImport": "Import provider plugin",
+  "providerPluginInstall": "Install",
+  "providerPluginRemove": "Remove plugin and account",
+  "providerPluginCopy": "Copy plugin JSON",
+  "providerPluginModels": "Fetch models",
+  "providerPluginLogout": "Sign out locally",
+  "providerPluginSignedOut": "Sign-in required",
+  "providerPluginSignedIn": "Signed in",
+  "providerPluginSave": "Save",
+  "providerPluginCancel": "Cancel",
+  "providerPluginInvalid": "Invalid provider plugin",
+  "providerPluginOperationFailed": "Provider plugin operation failed",
+  "providerPluginVersion": "Version",
+  "providerPluginProtocol": "Protocol",
+  "providerPluginTrust": "This is an unverified third-party provider. Its API will receive the conversations you send to it. Review the actual API and authorization URLs and requested scopes before installing. OAuth credentials use Kelivo's existing local and portable-backup storage; copying plugin JSON never includes credentials."
 }

@@ -22793,6 +22793,102 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Allow this assistant to use phone control'**
   String get phoneControlEnableAssistant;
+
+  /// No description provided for @providerPluginTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Provider plugins'**
+  String get providerPluginTitle;
+
+  /// No description provided for @providerPluginImport.
+  ///
+  /// In en, this message translates to:
+  /// **'Import provider plugin'**
+  String get providerPluginImport;
+
+  /// No description provided for @providerPluginInstall.
+  ///
+  /// In en, this message translates to:
+  /// **'Install'**
+  String get providerPluginInstall;
+
+  /// No description provided for @providerPluginRemove.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove plugin and account'**
+  String get providerPluginRemove;
+
+  /// No description provided for @providerPluginCopy.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy plugin JSON'**
+  String get providerPluginCopy;
+
+  /// No description provided for @providerPluginModels.
+  ///
+  /// In en, this message translates to:
+  /// **'Fetch models'**
+  String get providerPluginModels;
+
+  /// No description provided for @providerPluginLogout.
+  ///
+  /// In en, this message translates to:
+  /// **'Sign out locally'**
+  String get providerPluginLogout;
+
+  /// No description provided for @providerPluginSignedOut.
+  ///
+  /// In en, this message translates to:
+  /// **'Sign-in required'**
+  String get providerPluginSignedOut;
+
+  /// No description provided for @providerPluginSignedIn.
+  ///
+  /// In en, this message translates to:
+  /// **'Signed in'**
+  String get providerPluginSignedIn;
+
+  /// No description provided for @providerPluginSave.
+  ///
+  /// In en, this message translates to:
+  /// **'Save'**
+  String get providerPluginSave;
+
+  /// No description provided for @providerPluginCancel.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel'**
+  String get providerPluginCancel;
+
+  /// No description provided for @providerPluginInvalid.
+  ///
+  /// In en, this message translates to:
+  /// **'Invalid provider plugin'**
+  String get providerPluginInvalid;
+
+  /// No description provided for @providerPluginOperationFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Provider plugin operation failed'**
+  String get providerPluginOperationFailed;
+
+  /// No description provided for @providerPluginVersion.
+  ///
+  /// In en, this message translates to:
+  /// **'Version'**
+  String get providerPluginVersion;
+
+  /// No description provided for @providerPluginProtocol.
+  ///
+  /// In en, this message translates to:
+  /// **'Protocol'**
+  String get providerPluginProtocol;
+
+  /// No description provided for @providerPluginTrust.
+  ///
+  /// In en, this message translates to:
+  /// **'This is an unverified third-party provider. Its API will receive the conversations you send to it. Review the actual API and authorization URLs and requested scopes before installing. OAuth credentials use Kelivo\'s existing local and portable-backup storage; copying plugin JSON never includes credentials.'**
+  String get providerPluginTrust;
 }
 
 class _AppLocalizationsDelegate
