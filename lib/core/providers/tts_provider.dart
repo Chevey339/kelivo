@@ -801,11 +801,15 @@ class TtsProvider extends ChangeNotifier {
     return _networkCache.putIfAbsent(index, () {
       final resolved = _resolvedNetworkChunks[index];
       if (resolved != null) return Future<NetworkTtsResult>.value(resolved);
-      return NetworkTtsService.synthesize(
+      final synthesis = NetworkTtsService.synthesize(
         options: service,
         text: _chunks[index].text,
         cancelled: () => session != _sessionId,
       );
+      // Prefetch may fail before playback awaits it, or outlive its session.
+      // Keep the original future so the queue still receives failures on await.
+      synthesis.ignore();
+      return synthesis;
     });
   }
 

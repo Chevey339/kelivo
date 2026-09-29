@@ -45,7 +45,10 @@ class FlutterLogger {
     _originalFlutterOnError = FlutterError.onError;
     FlutterError.onError = (FlutterErrorDetails details) {
       try {
-        log(details.toString().trimRight(), tag: 'FlutterError');
+        log(
+          '${details.exceptionAsString()}\n${details.stack ?? ''}'.trimRight(),
+          tag: 'FlutterError',
+        );
       } catch (_) {}
 
       final original = _originalFlutterOnError;
