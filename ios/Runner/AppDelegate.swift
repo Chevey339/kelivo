@@ -365,7 +365,7 @@ private final class NativeFileSaveHandler: NSObject, UIDocumentPickerDelegate {
       return
     }
 
-    let rawSourcePath = (args["sourcePath"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+    let rawSourcePath = (args["sourcePath"] as? String) ?? ""
     guard !rawSourcePath.isEmpty else {
       result(FlutterError(code: "invalid_args", message: "Missing sourcePath.", details: nil))
       return

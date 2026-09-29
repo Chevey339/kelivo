@@ -444,28 +444,34 @@ class FileBrowserState extends State<FileBrowser> {
     required String name,
   }) async {
     final zipName = _safeFileName(name.isEmpty ? widget.rootLabel : name);
-    final temp = File(
-      p.join(
-        Directory.systemTemp.path,
-        'kelivo-$zipName-${DateTime.now().microsecondsSinceEpoch}.zip',
-      ),
-    );
-    await _runMutation(
-      ZipDirectoryMutation(
-        rootPath: _rootPath,
-        sourcePath: dir.path,
-        destPath: temp.path,
-      ),
-    );
-    if (!mounted) return null;
-    return (file: temp, fileName: '$zipName.zip');
+    final tempDir = await Directory.systemTemp.createTemp('kelivo_export_');
+    final temp = File(p.join(tempDir.path, '$zipName.zip'));
+    try {
+      await _runMutation(
+        ZipDirectoryMutation(
+          rootPath: _rootPath,
+          sourcePath: dir.path,
+          destPath: temp.path,
+        ),
+      );
+      if (mounted) return (file: temp, fileName: '$zipName.zip');
+    } catch (_) {
+      await tempDir.delete(recursive: true);
+      rethrow;
+    }
+    await tempDir.delete(recursive: true);
+    return null;
   }
 
   Future<void> _exportDirectory(Directory dir, {required String name}) async {
     try {
       final zipped = await _zipDirectory(dir, name: name);
       if (zipped == null) return;
-      await _exportFile(zipped.file, fileName: zipped.fileName);
+      try {
+        await _exportFile(zipped.file, fileName: zipped.fileName);
+      } finally {
+        await zipped.file.parent.delete(recursive: true);
+      }
     } catch (e) {
       await _handleError(e);
     }
