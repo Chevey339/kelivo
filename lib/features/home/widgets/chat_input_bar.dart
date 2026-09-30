@@ -3409,6 +3409,17 @@ class _ChatInputBarState extends State<ChatInputBar>
                                                     ),
                                                     const SizedBox(width: 8),
                                                   ],
+                                                  if (!isMobileLayout &&
+                                                      (widget
+                                                              .conversationId
+                                                              ?.isNotEmpty ??
+                                                          false))
+                                                    _ContextUsageInputControl(
+                                                      onTap: _composerLocked
+                                                          ? null
+                                                          : widget
+                                                                .onOpenContextUsage,
+                                                    ),
                                                   if (showVoiceInput) ...[
                                                     _CompactIconButton(
                                                       tooltip: AppLocalizations.of(
@@ -3425,17 +3436,6 @@ class _ChatInputBarState extends State<ChatInputBar>
                                                     ),
                                                     const SizedBox(width: 8),
                                                   ],
-                                                  if (!isMobileLayout &&
-                                                      (widget
-                                                              .conversationId
-                                                              ?.isNotEmpty ??
-                                                          false))
-                                                    _ContextUsageInputControl(
-                                                      onTap: _composerLocked
-                                                          ? null
-                                                          : widget
-                                                                .onOpenContextUsage,
-                                                    ),
                                                   _CompactSendButton(
                                                     enabled:
                                                         (hasText ||
