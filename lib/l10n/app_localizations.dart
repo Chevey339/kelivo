@@ -5824,6 +5824,42 @@ abstract class AppLocalizations {
   /// **'Recognizing…'**
   String get chatInputBarVoiceTranscribing;
 
+  /// No description provided for @chatInputBarVoiceAttachAudioTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Stop and attach as audio'**
+  String get chatInputBarVoiceAttachAudioTooltip;
+
+  /// No description provided for @chatInputBarVoiceSendAudioTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Send recording'**
+  String get chatInputBarVoiceSendAudioTooltip;
+
+  /// No description provided for @chatInputBarVoiceSavingAudio.
+  ///
+  /// In en, this message translates to:
+  /// **'Saving audio…'**
+  String get chatInputBarVoiceSavingAudio;
+
+  /// No description provided for @audioClipPlayTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Play audio'**
+  String get audioClipPlayTooltip;
+
+  /// No description provided for @audioClipPauseTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Pause'**
+  String get audioClipPauseTooltip;
+
+  /// No description provided for @audioClipPlaybackFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t play this audio'**
+  String get audioClipPlaybackFailed;
+
   /// No description provided for @chatInputBarImageProcessing.
   ///
   /// In en, this message translates to:

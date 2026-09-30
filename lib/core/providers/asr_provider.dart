@@ -23,6 +23,14 @@ typedef LocalModelInstalledChecker = Future<bool> Function(String modelId);
 
 /// Coordinates microphone capture with the selected system, local, or cloud
 /// recognizer. Settings own configuration; this provider owns one live session.
+///
+/// Every non-system session also keeps the raw PCM, so a recording can end as
+/// an audio clip for models that accept audio natively instead of as text.
+///
+/// Each recording owns an [_AsrSession]; ending one detaches it before its
+/// asynchronous cleanup, and only the current or winding-down session may
+/// write the public state. Late work of an old recording therefore can never
+/// truncate, reset, or overwrite the next one.
 class AsrProvider extends ChangeNotifier {
   AsrProvider({
     SettingsProvider? settingsProvider,
@@ -66,13 +74,10 @@ class AsrProvider extends ChangeNotifier {
 
   AsrSessionState _state = AsrSessionState.idle;
   AsrServiceOptions? _activeService;
-  AsrAudioCapture? _capture;
-  StreamSubscription<Uint8List>? _captureSubscription;
-  StreamSubscription<String>? _partialSubscription;
-  CloudAsrSession? _cloudSession;
-  BytesBuilder? _localAudio;
-  Future<void> _audioWriteTail = Future<void>.value();
-  Completer<void>? _captureDone;
+  _AsrSession? _session;
+  // The session being wound down after [_session] was detached from it; it
+  // alone may publish the final state once its cleanup finishes.
+  _AsrSession? _ending;
   final Map<String, bool> _localAvailability = <String, bool>{};
   bool _systemUnavailable = false;
   bool _disposed = false;
@@ -128,37 +133,30 @@ class AsrProvider extends ChangeNotifier {
     }
   }
 
-  String? _backgroundAudioOwner;
-
-  Future<bool> _claimCaptureAudio(int generation) async {
-    final owner = 'capture:$generation';
+  Future<bool> _claimCaptureAudio(_AsrSession session) async {
+    final owner = 'capture:${session.generation}';
     await MobileBackgroundCoordinator.instance.setAudioOwner(owner, true);
-    if (!_isCurrent(generation)) {
+    if (!_isCurrent(session)) {
       await MobileBackgroundCoordinator.instance.setAudioOwner(owner, false);
       return false;
     }
-    _backgroundAudioOwner = owner;
+    session.audioOwner = owner;
     return true;
   }
 
-  void _releaseSystemAudio() {
-    final owner = _backgroundAudioOwner;
-    _backgroundAudioOwner = null;
-    if (owner != null) {
-      unawaited(
-        MobileBackgroundCoordinator.instance.setAudioOwner(owner, false),
-      );
-    }
-  }
-
-  Future<void> start(AsrServiceOptions options) async {
+  /// Starts a session. A null [options] records without recognition; such a
+  /// session can only end through [finishAudio].
+  Future<void> start(AsrServiceOptions? options) async {
     _ensureNotDisposed();
     if (isActive) throw StateError('An ASR session is already active.');
-    if (!options.isConfigured) {
+    if (options != null && !options.isConfigured) {
       throw StateError('${options.name} is not configured.');
     }
 
-    final generation = ++_generation;
+    final session = _AsrSession(++_generation, options);
+    _session = session;
+    // A failed session may still be cleaning up; it no longer owns the state.
+    _ending = null;
     _activeService = options;
     _state = AsrSessionState.connecting;
     _transcript = '';
@@ -169,7 +167,7 @@ class AsrProvider extends ChangeNotifier {
     try {
       if (options is SherpaOnnxAsrOptions) {
         final installed = await _localModelInstalledChecker(options.modelId);
-        if (!_isCurrent(generation)) return;
+        if (!_isCurrent(session)) return;
         _localAvailability[options.modelId] = installed;
         if (!installed) {
           throw StateError('The selected offline ASR model is not downloaded.');
@@ -177,46 +175,37 @@ class AsrProvider extends ChangeNotifier {
       }
 
       if (options is SystemAsrOptions) {
-        if (!await _claimCaptureAudio(generation)) return;
+        if (!await _claimCaptureAudio(session)) return;
         final started = await _systemService.start(
           localeId: options.localeId.trim().isEmpty ? null : options.localeId,
           onTranscript: (text, _) {
-            if (!_isCurrent(generation)) return;
+            if (!_isCurrent(session)) return;
             _transcript = text.trim();
             notifyListeners();
           },
           onSoundLevel: (level) {
-            if (!_isCurrent(generation)) return;
+            if (!_isCurrent(session)) return;
             _soundLevel = _normalizeSystemLevel(level);
             notifyListeners();
           },
           onError: (asrError) {
-            if (!_isCurrent(generation)) return;
-            _fail(asrError.message);
-            final owner = _backgroundAudioOwner;
-            _backgroundAudioOwner = null;
+            if (!_isCurrent(session)) return;
             unawaited(
-              _systemService.cancel().whenComplete(() async {
-                if (owner != null) {
-                  await MobileBackgroundCoordinator.instance.setAudioOwner(
-                    owner,
-                    false,
-                  );
-                }
-              }),
+              _failSession(session, asrError.message, cancelSystem: true),
             );
-            _activeService = null;
           },
           onDone: () {
-            if (!_isCurrent(generation)) return;
-            _releaseSystemAudio();
+            // finish() drives its own session to idle.
+            if (!_isCurrent(session) || session.finishing) return;
+            _session = null;
+            unawaited(_release(session, cancelRemote: true));
             _state = AsrSessionState.idle;
             _activeService = null;
             _soundLevel = 0;
             notifyListeners();
           },
         );
-        if (!_isCurrent(generation)) return;
+        if (!_isCurrent(session)) return;
         if (!started) {
           _systemUnavailable = true;
           throw StateError('System speech recognition is unavailable.');
@@ -230,63 +219,56 @@ class AsrProvider extends ChangeNotifier {
       }
 
       final capture = _audioCaptureFactory();
-      _capture = capture;
+      session.capture = capture;
       final hasPermission = await capture.hasPermission();
-      if (!_isCurrent(generation)) {
-        await _cancelStaleCapture(capture);
-        return;
-      }
+      if (!_isCurrent(session)) return;
       if (!hasPermission) {
         throw StateError('Microphone permission was not granted.');
       }
 
-      if (options is SherpaOnnxAsrOptions) {
-        _localAudio = BytesBuilder(copy: false);
-      } else {
-        final session = await _cloudSessionStarter(options);
-        if (!_isCurrent(generation)) {
-          await _cancelStaleCloudSession(session);
+      if (options != null && options is! SherpaOnnxAsrOptions) {
+        final cloud = await _cloudSessionStarter(options);
+        if (!_isCurrent(session)) {
+          await _cancelStaleCloudSession(cloud);
           return;
         }
-        _cloudSession = session;
-        _partialSubscription = session.partialTranscripts.listen(
+        session.cloud = cloud;
+        session.partialSubscription = cloud.partialTranscripts.listen(
           (text) {
-            if (!_isCurrent(generation)) return;
+            if (!_isCurrent(session)) return;
             _transcript = text.trim();
             notifyListeners();
           },
           onError: (Object exception, StackTrace stackTrace) {
-            if (_isCurrent(generation)) {
-              _failActiveSession(generation, exception.toString());
+            if (_isCurrent(session)) {
+              unawaited(_failSession(session, exception.toString()));
             }
           },
         );
       }
 
-      final sampleRate = _sampleRateOf(options);
-      if (!await _claimCaptureAudio(generation)) {
-        await _cancelStaleCapture(capture);
-        return;
-      }
-      final stream = await capture.start(sampleRate: sampleRate);
-      if (!_isCurrent(generation)) {
+      session.sampleRate = _sampleRateOf(options);
+      if (!await _claimCaptureAudio(session)) return;
+      final stream = await capture.start(sampleRate: session.sampleRate);
+      if (!_isCurrent(session)) {
+        // Cleanup may have run while the recorder was still starting.
         await _cancelStaleCapture(capture);
         return;
       }
       final done = Completer<void>();
-      _captureDone = done;
-      _captureSubscription = stream.listen(
+      session.captureDone = done;
+      session.captureSubscription = stream.listen(
         (chunk) {
-          if (!_isCurrent(generation)) return;
+          if (!_isCurrent(session)) return;
           _soundLevel = normalizedPcm16Level(chunk);
-          _localAudio?.add(chunk);
-          final session = _cloudSession;
-          if (session != null) {
-            _audioWriteTail = _audioWriteTail
-                .then((_) => session.addPcm16(chunk))
+          session.pcm.add(chunk);
+          final cloud = session.cloud;
+          if (cloud != null) {
+            session.writeTail = session.writeTail
+                .then((_) => cloud.addPcm16(chunk))
                 .catchError((Object exception, StackTrace stackTrace) {
-                  if (_isCurrent(generation)) {
-                    _failActiveSession(generation, exception.toString());
+                  if (_isCurrent(session)) {
+                    unawaited(_failSession(session, exception.toString()));
                   }
                 });
           }
@@ -294,8 +276,8 @@ class AsrProvider extends ChangeNotifier {
         },
         onError: (Object exception, StackTrace stackTrace) {
           if (!done.isCompleted) done.complete();
-          if (_isCurrent(generation)) {
-            _failActiveSession(generation, exception.toString());
+          if (_isCurrent(session)) {
+            unawaited(_failSession(session, exception.toString()));
           }
         },
         onDone: () {
@@ -306,78 +288,126 @@ class AsrProvider extends ChangeNotifier {
       _state = AsrSessionState.listening;
       notifyListeners();
     } catch (error) {
-      if (!_isCurrent(generation)) return;
-      await _releaseSession(cancelRemote: true, cancelCapture: true);
-      _fail(_messageOf(error));
+      if (!_isCurrent(session)) return;
+      await _failSession(session, error);
       rethrow;
+    } finally {
+      // A session superseded mid-start never reached anyone who would free it.
+      if (!_isCurrent(session) && !identical(_ending, session)) {
+        unawaited(_release(session, cancelRemote: true));
+      }
     }
   }
 
   Future<String> finish() async {
     _ensureNotDisposed();
-    if (!isActive) return _transcript.trim();
-    final generation = _generation;
+    final session = _session;
+    if (session == null || !isActive) return _transcript.trim();
+    session.finishing = true;
     _state = AsrSessionState.transcribing;
     _soundLevel = 0;
     notifyListeners();
 
     try {
-      final options = _activeService;
+      final options = session.options;
       if (options is SystemAsrOptions) {
         await _systemService.stop();
-        await _finishSystemSession(generation);
+        await _finishSystemSession(session);
       } else {
-        await _capture?.stop();
-        await _captureDone?.future.timeout(
-          const Duration(seconds: 2),
-          onTimeout: () {},
-        );
-        await _audioWriteTail;
+        await session.stopCapture();
+        if (!_isCurrent(session)) return '';
+        // Read after the stream closed so the last chunks' writes are included.
+        await session.writeTail;
+        final String? text;
         if (options is SherpaOnnxAsrOptions) {
-          final pcm = _localAudio?.takeBytes() ?? Uint8List(0);
-          _transcript = (await _localTranscriber(options, pcm)).trim();
+          text = (await _localTranscriber(
+            options,
+            session.pcm.takeBytes(),
+          )).trim();
         } else {
-          final session = _cloudSession;
-          if (session != null) {
-            _transcript = (await session.finish()).trim();
-          }
+          final cloud = session.cloud;
+          text = cloud == null ? null : (await cloud.finish()).trim();
         }
+        if (!_isCurrent(session)) return '';
+        if (text != null) _transcript = text;
       }
-      if (_isCurrent(generation)) {
-        await _releaseSession(cancelRemote: false, cancelCapture: false);
+      if (!_isCurrent(session)) return '';
+      final transcript = _transcript.trim();
+      await _windDown(session, cancelRemote: false, () {
         _state = AsrSessionState.idle;
         _activeService = null;
-        notifyListeners();
-      }
-      return _transcript.trim();
+      });
+      return transcript;
     } catch (error) {
-      if (_isCurrent(generation)) {
-        await _releaseSession(cancelRemote: true, cancelCapture: true);
-        _fail(_messageOf(error));
+      await _failSession(session, error);
+      rethrow;
+    }
+  }
+
+  /// Ends capture and returns the recording as WAV without recognizing it.
+  /// Unavailable for system recognition, which never exposes raw audio.
+  Future<Uint8List> finishAudio() async {
+    _ensureNotDisposed();
+    final session = _session;
+    if (session == null ||
+        !isListening ||
+        session.options is SystemAsrOptions) {
+      throw StateError('No raw audio is being recorded.');
+    }
+    session.finishing = true;
+    _state = AsrSessionState.transcribing;
+    _transcript = '';
+    _soundLevel = 0;
+    notifyListeners();
+
+    try {
+      await session.stopCapture();
+      if (!_isCurrent(session)) {
+        throw StateError('The recording was cancelled.');
       }
+      final wav = pcm16MonoToWav(
+        session.pcm.takeBytes(),
+        sampleRate: session.sampleRate,
+      );
+      // Cancels the cloud recognition this recording no longer needs.
+      await _windDown(session, cancelRemote: true, () {
+        _state = AsrSessionState.idle;
+        _activeService = null;
+      });
+      return wav;
+    } catch (error) {
+      await _failSession(session, error);
       rethrow;
     }
   }
 
   Future<void> cancel() async {
-    if (_disposed ||
-        (!isActive &&
-            _capture == null &&
-            _cloudSession == null &&
-            _activeService == null)) {
+    if (_disposed) return;
+    final session = _session;
+    if (session == null) {
+      // An ending already in progress settles the state itself.
+      if (_ending != null || _state == AsrSessionState.idle) return;
+      _state = AsrSessionState.idle;
+      _activeService = null;
+      _transcript = '';
+      _error = null;
+      _soundLevel = 0;
+      notifyListeners();
       return;
     }
-    ++_generation;
-    if (_activeService is SystemAsrOptions) {
-      await _systemService.cancel();
-    }
-    await _releaseSession(cancelRemote: true, cancelCapture: true);
-    _state = AsrSessionState.idle;
-    _activeService = null;
-    _transcript = '';
-    _error = null;
-    _soundLevel = 0;
-    notifyListeners();
+    await _windDown(
+      session,
+      cancelRemote: true,
+      cancelCapture: true,
+      cancelSystem: session.options is SystemAsrOptions,
+      () {
+        _state = AsrSessionState.idle;
+        _activeService = null;
+        _transcript = '';
+        _error = null;
+        _soundLevel = 0;
+      },
+    );
   }
 
   void clearError() {
@@ -387,45 +417,88 @@ class AsrProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> _finishSystemSession(int generation) async {
+  Future<void> _finishSystemSession(_AsrSession session) async {
     final deadline = DateTime.now().add(const Duration(seconds: 2));
-    while (_isCurrent(generation) &&
+    while (_isCurrent(session) &&
         _systemService.state == SystemAsrState.stopping &&
         DateTime.now().isBefore(deadline)) {
       await Future<void>.delayed(const Duration(milliseconds: 40));
     }
     // Never expose Provider idle while the native service still guards an
     // active session. Some platforms omit the final done status after stop.
-    if (_isCurrent(generation) &&
+    if (_isCurrent(session) &&
         _systemService.state == SystemAsrState.stopping) {
       await _systemService.cancel();
     }
   }
 
-  Future<void> _releaseSession({
+  /// Detaches [session], frees it, then applies [settle] unless a newer
+  /// session or ending took over meanwhile. The state stays active until
+  /// then, so no new recording can start on top of the cleanup.
+  Future<void> _windDown(
+    _AsrSession session,
+    void Function() settle, {
     required bool cancelRemote,
-    required bool cancelCapture,
+    bool cancelCapture = false,
+    bool cancelSystem = false,
   }) async {
-    final audioOwner = _backgroundAudioOwner;
-    _backgroundAudioOwner = null;
+    if (!_isCurrent(session)) return;
+    _session = null;
+    _ending = session;
     try {
-      final capture = _capture;
-      final cloud = _cloudSession;
-      _capture = null;
-      _cloudSession = null;
-      _localAudio = null;
-      _captureDone = null;
-      final captureSubscription = _captureSubscription;
-      final partialSubscription = _partialSubscription;
-      _captureSubscription = null;
-      _partialSubscription = null;
-      await captureSubscription?.cancel();
-      await partialSubscription?.cancel();
+      if (cancelSystem) await _systemService.cancel();
+    } finally {
+      await _release(
+        session,
+        cancelRemote: cancelRemote,
+        cancelCapture: cancelCapture,
+      );
+      if (!_disposed && identical(_ending, session)) {
+        _ending = null;
+        settle();
+        notifyListeners();
+      }
+    }
+  }
+
+  /// Publishes the failure at once, then frees the session.
+  Future<void> _failSession(
+    _AsrSession session,
+    Object error, {
+    bool cancelSystem = false,
+  }) async {
+    if (!_isCurrent(session)) return;
+    _session = null;
+    _ending = session;
+    _fail(_messageOf(error));
+    try {
+      if (cancelSystem) await _systemService.cancel();
+    } catch (_) {
+    } finally {
+      await _release(session, cancelRemote: true, cancelCapture: true);
+      if (!_disposed && identical(_ending, session)) {
+        _ending = null;
+        _activeService = null;
+      }
+    }
+  }
+
+  Future<void> _release(
+    _AsrSession session, {
+    required bool cancelRemote,
+    bool cancelCapture = true,
+  }) async {
+    if (session.released) return;
+    session.released = true;
+    try {
+      await session.captureSubscription?.cancel();
+      await session.partialSubscription?.cancel();
       if (cancelRemote) {
         try {
-          await cloud?.cancel();
+          await session.cloud?.cancel();
         } catch (_) {}
       }
+      final capture = session.capture;
       if (capture != null) {
         try {
           if (cancelCapture) await capture.cancel();
@@ -434,8 +507,8 @@ class AsrProvider extends ChangeNotifier {
           await capture.dispose();
         } catch (_) {}
       }
-      _audioWriteTail = Future<void>.value();
     } finally {
+      final audioOwner = session.audioOwner;
       if (audioOwner != null) {
         await MobileBackgroundCoordinator.instance.setAudioOwner(
           audioOwner,
@@ -476,7 +549,8 @@ class AsrProvider extends ChangeNotifier {
     }
   }
 
-  bool _isCurrent(int generation) => !_disposed && generation == _generation;
+  bool _isCurrent(_AsrSession session) =>
+      !_disposed && identical(_session, session);
 
   void _fail(String message) {
     if (_disposed) return;
@@ -486,17 +560,8 @@ class AsrProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  void _failActiveSession(int generation, String message) {
-    if (!_isCurrent(generation)) return;
-    _fail(_messageOf(message));
-    unawaited(
-      _releaseSession(cancelRemote: true, cancelCapture: true).then((_) {
-        if (_isCurrent(generation)) _activeService = null;
-      }),
-    );
-  }
-
-  static int _sampleRateOf(AsrServiceOptions options) => switch (options) {
+  static int _sampleRateOf(AsrServiceOptions? options) => switch (options) {
+    null => 16000,
     SherpaOnnxAsrOptions() => options.sampleRate,
     OpenAiRealtimeAsrOptions() => options.sampleRate,
     DashScopeAsrOptions() => options.sampleRate,
@@ -529,14 +594,37 @@ class AsrProvider extends ChangeNotifier {
     _disposed = true;
     _settingsProvider?.removeListener(_handleSettingsChanged);
     unawaited(_systemService.dispose());
-    final capture = _capture;
-    final cloud = _cloudSession;
-    _capture = null;
-    _cloudSession = null;
-    unawaited(_captureSubscription?.cancel());
-    unawaited(_partialSubscription?.cancel());
-    if (capture != null) unawaited(capture.dispose());
-    if (cloud != null) unawaited(cloud.cancel());
+    final session = _session;
+    _session = null;
+    if (session != null) unawaited(_release(session, cancelRemote: true));
     super.dispose();
+  }
+}
+
+/// Resources of one recording, freed only through [AsrProvider._release].
+final class _AsrSession {
+  _AsrSession(this.generation, this.options);
+
+  final int generation;
+  final AsrServiceOptions? options;
+  final BytesBuilder pcm = BytesBuilder(copy: false);
+  int sampleRate = 0;
+  AsrAudioCapture? capture;
+  CloudAsrSession? cloud;
+  StreamSubscription<Uint8List>? captureSubscription;
+  StreamSubscription<String>? partialSubscription;
+  Completer<void>? captureDone;
+  // Cloud writes of this recording only; never shared with the next one.
+  Future<void> writeTail = Future<void>.value();
+  String? audioOwner;
+  bool finishing = false;
+  bool released = false;
+
+  Future<void> stopCapture() async {
+    await capture?.stop();
+    await captureDone?.future.timeout(
+      const Duration(seconds: 2),
+      onTimeout: () {},
+    );
   }
 }

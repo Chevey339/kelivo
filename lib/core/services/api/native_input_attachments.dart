@@ -3,11 +3,30 @@ import 'dart:io';
 import '../../models/model_spec.dart';
 import '../../providers/settings_provider.dart';
 import '../../utils/multimodal_input_utils.dart';
+import '../model_spec/model_spec_resolver.dart';
 import '../../../utils/sandbox_path_resolver.dart';
 import 'builtin_tools.dart';
 import 'chat_api_helpers.dart';
 
 enum NativeInputProtocol { chatCompletions, responses, claude, gemini }
+
+/// Whether a user audio attachment reaches [modelId] as audio. Mirrors the
+/// request routing in ChatApiService: only Chat Completions and Gemini carry
+/// audio parts.
+bool acceptsNativeAudioInput(ProviderConfig config, String modelId) {
+  if (!ModelSpecResolver.instance.spec(config, modelId).supportsAudioInput) {
+    return false;
+  }
+  return switch (ProviderConfig.classify(
+    config.id,
+    explicitType: config.providerType,
+  )) {
+    ProviderKind.openai => config.useResponseApi != true,
+    ProviderKind.google =>
+      !(config.vertexAI == true && modelId.toLowerCase().startsWith('claude-')),
+    ProviderKind.claude => false,
+  };
+}
 
 /// Serializes user attachments independently of image input. In particular,
 /// enabling audio or PDF must work even when image input is disabled.

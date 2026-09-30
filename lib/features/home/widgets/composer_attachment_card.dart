@@ -8,6 +8,7 @@ import '../../../core/services/incoming_share_service.dart';
 import '../../../icons/lucide_adapter.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../shared/utils/format_bytes.dart';
+import '../../../shared/widgets/audio_clip_player.dart';
 import '../../../shared/widgets/ios_tactile.dart';
 import '../../../theme/app_font_weights.dart';
 
@@ -62,7 +63,8 @@ class _ComposerAttachmentCardState extends State<ComposerAttachmentCard> {
         .extension(file.fileName)
         .replaceFirst('.', '')
         .toUpperCase();
-    final icon = file.mime.startsWith('audio/')
+    final audio = file.mime.startsWith('audio/');
+    final icon = audio
         ? Lucide.FileAudio
         : file.mime.startsWith('video/')
         ? Lucide.FileVideo
@@ -95,37 +97,21 @@ class _ComposerAttachmentCardState extends State<ComposerAttachmentCard> {
           children: [
             Padding(
               padding: const EdgeInsets.fromLTRB(7, 7, 7, 6),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(icon, size: 19, color: cs.primary),
-                  const SizedBox(height: 5),
-                  Text(
-                    file.fileName,
-                    maxLines: 2,
-                    textAlign: TextAlign.center,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      fontSize: 11,
-                      height: 1.2,
-                      fontWeight: AppFontWeights.medium,
-                      color: cs.onSurface,
+              child: audio
+                  ? AudioClipPlayer(
+                      path: file.path,
+                      builder: (context, button, time) => _details(
+                        context,
+                        extension: extension,
+                        leading: button,
+                        footer: time,
+                      ),
+                    )
+                  : _details(
+                      context,
+                      extension: extension,
+                      leading: Icon(icon, size: 19, color: cs.primary),
                     ),
-                  ),
-                  const Spacer(),
-                  FutureBuilder<int?>(
-                    future: _size,
-                    builder: (context, snapshot) => Text(
-                      snapshot.data == null
-                          ? extension
-                          : formatBytes(snapshot.data!),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(fontSize: 9, color: cs.onSurfaceVariant),
-                    ),
-                  ),
-                ],
-              ),
             ),
             Positioned(
               top: 0,
@@ -145,6 +131,54 @@ class _ComposerAttachmentCardState extends State<ComposerAttachmentCard> {
           ],
         ),
       ),
+    );
+  }
+
+  /// [footer] replaces the size line, e.g. with a playing clip's time.
+  Widget _details(
+    BuildContext context, {
+    required String extension,
+    required Widget leading,
+    String? footer,
+  }) {
+    final cs = Theme.of(context).colorScheme;
+    final footerStyle = TextStyle(fontSize: 9, color: cs.onSurfaceVariant);
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        leading,
+        const SizedBox(height: 5),
+        Text(
+          widget.file.fileName,
+          maxLines: 2,
+          textAlign: TextAlign.center,
+          overflow: TextOverflow.ellipsis,
+          style: TextStyle(
+            fontSize: 11,
+            height: 1.2,
+            fontWeight: AppFontWeights.medium,
+            color: cs.onSurface,
+          ),
+        ),
+        const Spacer(),
+        if (footer != null)
+          Text(
+            footer,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: footerStyle,
+          )
+        else
+          FutureBuilder<int?>(
+            future: _size,
+            builder: (context, snapshot) => Text(
+              snapshot.data == null ? extension : formatBytes(snapshot.data!),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: footerStyle,
+            ),
+          ),
+      ],
     );
   }
 }

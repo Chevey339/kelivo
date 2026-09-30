@@ -32,6 +32,8 @@ import '../../../core/providers/assistant_provider.dart';
 import '../../../core/services/search/search_service.dart';
 import '../../../core/services/api/builtin_tools.dart';
 import '../../../core/services/api/chat_api_service.dart';
+import '../../../core/services/api/native_input_attachments.dart';
+import '../../../core/services/asr/asr_service_options.dart';
 import '../../../core/utils/multimodal_input_utils.dart';
 import '../../../utils/brand_assets.dart';
 import '../../../utils/sandbox_path_resolver.dart';
@@ -289,6 +291,14 @@ class _ChatInputBarState extends State<ChatInputBar>
   TextEditingValue? _voiceBaseValue;
   bool _ownsVoiceSession = false;
   bool _finishingVoice = false;
+  // Fixed when a recording starts: whether it runs a recognizer (otherwise it
+  // only records), and whether it can end as an audio attachment.
+  bool _voiceTranscribes = true;
+  bool _voiceCanSaveAudio = false;
+  bool _savingVoiceAudio = false;
+  // Bumped when a recording starts or is cancelled, so a finish that resolves
+  // late can tell its recording is gone and must not touch the draft.
+  int _voiceSessionSerial = 0;
   String? _lastReportedVoiceError;
   final List<_DraftImage> _images = <_DraftImage>[];
   final Queue<_ImageProcessingTask> _imageProcessingQueue =
@@ -555,6 +565,7 @@ class _ChatInputBarState extends State<ChatInputBar>
   void _restoreInput(ChatInputData input) {
     setState(() {
       _draftReplacementRevision++;
+      _abandonVoiceSession();
       _pendingImagePasteIds.clear();
       _pendingTextPasteIds.clear();
       _discardImageState(_images.map((image) => image.id));
@@ -594,6 +605,7 @@ class _ChatInputBarState extends State<ChatInputBar>
     widget.mediaController?.sharedDraftAction.value = null;
     setState(() {
       _draftReplacementRevision++;
+      _abandonVoiceSession();
       _controller.clear();
       _pendingImagePasteIds.clear();
       _pendingTextPasteIds.clear();
@@ -697,6 +709,7 @@ class _ChatInputBarState extends State<ChatInputBar>
       _submitSerial++;
       _isSubmitting = false;
       _draftReplacementRevision++;
+      _abandonVoiceSession();
     }
     if (!identical(oldWidget.asrProvider, widget.asrProvider)) {
       _stopVoiceLevelSampling();
@@ -827,35 +840,55 @@ class _ChatInputBarState extends State<ChatInputBar>
   // Voice input
   // ---------------------------------------------------------------------------
 
+  bool _modelAcceptsAudio(SettingsProvider settings) {
+    final providerKey = widget.chatModelProviderKey;
+    final modelId = widget.chatModelId;
+    if (providerKey == null || modelId == null) return false;
+    return acceptsNativeAudioInput(
+      settings.getProviderConfig(providerKey),
+      modelId,
+    );
+  }
+
   Future<void> _startVoiceInput() async {
     final asr = widget.asrProvider;
-    final selected = context.read<SettingsProvider>().selectedAsrService;
+    final settings = context.read<SettingsProvider>();
+    final selected = settings.selectedAsrService;
+    final recognizer = selected != null && asr != null && asr.canUse(selected)
+        ? selected
+        : null;
+    final canSaveAudio =
+        recognizer is! SystemAsrOptions && _modelAcceptsAudio(settings);
     if (_composerLocked ||
         widget.loading ||
         _ownsVoiceSession ||
         asr == null ||
         asr.isActive ||
-        selected == null ||
-        !asr.canUse(selected)) {
+        (recognizer == null && !canSaveAudio)) {
       return;
     }
 
+    final serial = ++_voiceSessionSerial;
     _voiceBaseValue = _controller.value;
     _ownsVoiceSession = true;
     _finishingVoice = false;
+    _voiceTranscribes = recognizer != null;
+    _voiceCanSaveAudio = canSaveAudio;
     _lastReportedVoiceError = null;
     _voiceLevels.clear();
     setState(() {});
     widget.focusNode?.unfocus();
 
     try {
-      await asr.start(selected);
-      if (mounted && _ownsVoiceSession && asr.isListening) {
+      await asr.start(recognizer);
+      if (mounted && serial == _voiceSessionSerial && asr.isListening) {
         _startVoiceLevelSampling();
       }
     } catch (error) {
+      // A failed start can throw after its cleanup, when the user may already
+      // be recording again; only this attempt's own state may be undone.
+      if (!mounted || serial != _voiceSessionSerial) return;
       _stopVoiceLevelSampling();
-      if (!mounted) return;
       // Provider failures normally arrive through its listener first. This is
       // the fallback for errors raised before the provider can publish state.
       if (_ownsVoiceSession) {
@@ -946,8 +979,27 @@ class _ChatInputBarState extends State<ChatInputBar>
     return '$base$separator$spoken';
   }
 
+  /// Drops the recording when its draft is replaced (conversation switch,
+  /// restore, clear). The replacement owns the draft now, so nothing from the
+  /// recording — text, audio, or a send — may reach it.
+  void _abandonVoiceSession() {
+    if (!_ownsVoiceSession) return;
+    _voiceSessionSerial++;
+    _stopVoiceLevelSampling();
+    _voiceBaseValue = null;
+    _ownsVoiceSession = false;
+    _finishingVoice = false;
+    _savingVoiceAudio = false;
+    _voiceLevels.clear();
+    final asr = widget.asrProvider;
+    if (asr != null) {
+      unawaited(asr.cancel().catchError((Object _) {}));
+    }
+  }
+
   Future<void> _cancelVoiceInput() async {
     if (!_ownsVoiceSession) return;
+    _voiceSessionSerial++;
     _stopVoiceLevelSampling();
     final asr = widget.asrProvider;
     final original = _voiceBaseValue;
@@ -968,12 +1020,14 @@ class _ChatInputBarState extends State<ChatInputBar>
     final asr = widget.asrProvider;
     if (!_ownsVoiceSession || _finishingVoice || asr == null) return;
     _stopVoiceLevelSampling();
+    final serial = _voiceSessionSerial;
+    bool superseded() => !mounted || serial != _voiceSessionSerial;
     _finishingVoice = true;
     setState(() {});
 
     try {
       final transcript = await asr.finish();
-      if (!mounted) return;
+      if (superseded()) return;
       _applyVoiceTranscript(transcript);
       final detectedSpeech = transcript.trim().isNotEmpty;
       _voiceBaseValue = null;
@@ -988,7 +1042,7 @@ class _ChatInputBarState extends State<ChatInputBar>
         await _handleSend();
       }
     } catch (error) {
-      if (!mounted) return;
+      if (superseded()) return;
       if (_ownsVoiceSession) {
         _voiceBaseValue = null;
         _ownsVoiceSession = false;
@@ -997,8 +1051,100 @@ class _ChatInputBarState extends State<ChatInputBar>
       }
       if (_lastReportedVoiceError == null) _reportVoiceFailure(error);
     } finally {
+      if (!superseded()) {
+        _finishingVoice = false;
+        setState(() {});
+      }
+    }
+  }
+
+  /// Ends the recording as a WAV attachment instead of text, restoring any
+  /// live transcript the recognizer already wrote into the draft.
+  Future<void> _finishVoiceAsAudio({required bool sendAfter}) async {
+    final asr = widget.asrProvider;
+    if (!_ownsVoiceSession || _finishingVoice || asr == null) return;
+    _stopVoiceLevelSampling();
+    final original = _voiceBaseValue;
+    final serial = _voiceSessionSerial;
+    bool superseded() => !mounted || serial != _voiceSessionSerial;
+    _finishingVoice = true;
+    _savingVoiceAudio = true;
+    setState(() {});
+
+    void endSession() {
+      _voiceBaseValue = null;
+      _ownsVoiceSession = false;
       _finishingVoice = false;
-      if (mounted) setState(() {});
+      _savingVoiceAudio = false;
+      _voiceLevels.clear();
+    }
+
+    try {
+      final wav = await asr.finishAudio();
+      if (superseded()) return;
+      // Under ~0.25 s of 16 kHz PCM16 holds no usable speech.
+      final hasAudio = wav.length > 44 + 8000;
+      final attachment = hasAudio ? await _saveVoiceRecording(wav) : null;
+      // Cancelled or abandoned while saving: the file has no owner.
+      if (superseded()) {
+        if (attachment != null) {
+          unawaited(_deleteUnclaimedVoiceRecording(attachment.path));
+        }
+        return;
+      }
+      if (original != null) _controller.value = original;
+      endSession();
+      if (attachment != null) _docs.add(attachment);
+      setState(() {});
+      if (attachment == null) {
+        _reportNoSpeech();
+      } else if (sendAfter) {
+        await _handleSend();
+      }
+    } catch (error) {
+      if (superseded()) return;
+      if (original != null) _controller.value = original;
+      endSession();
+      setState(() {});
+      if (_lastReportedVoiceError == null) _reportVoiceFailure(error);
+    }
+  }
+
+  Future<void> _deleteUnclaimedVoiceRecording(String path) async {
+    try {
+      await File(path).delete();
+    } catch (error) {
+      debugPrint(
+        '[ChatInputBar] Failed to delete unclaimed recording $path: $error',
+      );
+    }
+  }
+
+  Future<DocumentAttachment> _saveVoiceRecording(Uint8List wav) async {
+    final dir = await AppDirectories.getUploadDirectory();
+    await dir.create(recursive: true);
+    final now = DateTime.now();
+    String two(int value) => value.toString().padLeft(2, '0');
+    final baseName =
+        'voice_${now.year}${two(now.month)}${two(now.day)}_'
+        '${two(now.hour)}${two(now.minute)}${two(now.second)}';
+    var counter = 0;
+    while (true) {
+      final suffix = counter == 0 ? '' : '($counter)';
+      final file = File(p.join(dir.path, '$baseName$suffix.wav'));
+      try {
+        await file.create(exclusive: true);
+      } on FileSystemException {
+        if (!await file.exists()) rethrow;
+        counter++;
+        continue;
+      }
+      await file.writeAsBytes(wav, flush: true);
+      return DocumentAttachment(
+        path: file.path,
+        fileName: p.basename(file.path),
+        mime: 'audio/wav',
+      );
     }
   }
 
@@ -1071,7 +1217,9 @@ class _ChatInputBarState extends State<ChatInputBar>
                 child: _finishingVoice
                     ? _VoiceTranscribingIndicator(
                         key: const ValueKey('voice-transcribing-indicator'),
-                        label: l10n.chatInputBarVoiceTranscribing,
+                        label: _savingVoiceAudio
+                            ? l10n.chatInputBarVoiceSavingAudio
+                            : l10n.chatInputBarVoiceTranscribing,
                         color: theme.colorScheme.onSurface.withValues(
                           alpha: 0.72,
                         ),
@@ -1090,12 +1238,19 @@ class _ChatInputBarState extends State<ChatInputBar>
             ),
           ),
         ),
-        // Stop: finish recording and transcribe into the input field
+        // Stop: finish recording into the draft — transcribed text, or the
+        // audio itself when no recognizer runs
         _CompactIconButton(
-          tooltip: l10n.chatInputBarVoiceStopTooltip,
+          tooltip: _voiceTranscribes
+              ? l10n.chatInputBarVoiceStopTooltip
+              : l10n.chatInputBarVoiceAttachAudioTooltip,
           icon: Lucide.Square,
           onTap: canFinish
-              ? () => unawaited(_finishVoiceInput(sendAfter: false))
+              ? () => unawaited(
+                  _voiceTranscribes
+                      ? _finishVoiceInput(sendAfter: false)
+                      : _finishVoiceAsAudio(sendAfter: false),
+                )
               : null,
           childBuilder: (c) => Center(
             child: Container(
@@ -1108,14 +1263,31 @@ class _ChatInputBarState extends State<ChatInputBar>
             ),
           ),
         ),
+        // Save as audio: skip recognition and attach the recording itself
+        if (_voiceTranscribes && _voiceCanSaveAudio) ...[
+          const SizedBox(width: 8),
+          _CompactIconButton(
+            tooltip: l10n.chatInputBarVoiceAttachAudioTooltip,
+            icon: Lucide.AudioLines,
+            onTap: canFinish
+                ? () => unawaited(_finishVoiceAsAudio(sendAfter: false))
+                : null,
+          ),
+        ],
         const SizedBox(width: 8),
-        // Send: transcribe and send the message right away
+        // Send: transcribe (or attach the audio) and send right away
         _CompactSendButton(
           enabled: canFinish,
-          onSend: () => unawaited(_finishVoiceInput(sendAfter: true)),
+          onSend: () => unawaited(
+            _voiceTranscribes
+                ? _finishVoiceInput(sendAfter: true)
+                : _finishVoiceAsAudio(sendAfter: true),
+          ),
           color: theme.colorScheme.primary,
           icon: Lucide.Check,
-          tooltip: l10n.chatInputBarVoiceSendTooltip,
+          tooltip: _voiceTranscribes
+              ? l10n.chatInputBarVoiceSendTooltip
+              : l10n.chatInputBarVoiceSendAudioTooltip,
         ),
       ],
     );
@@ -2752,9 +2924,9 @@ class _ChatInputBarState extends State<ChatInputBar>
     final asr = widget.asrProvider;
     final showVoiceInput =
         asr != null &&
-        selectedAsrService != null &&
-        asr.canUse(selectedAsrService) &&
-        !asr.isActive;
+        !asr.isActive &&
+        ((selectedAsrService != null && asr.canUse(selectedAsrService)) ||
+            _modelAcceptsAudio(settings));
     final isDark = theme.brightness == Brightness.dark;
     final inputFillColor = _inputFillColor(
       theme: theme,

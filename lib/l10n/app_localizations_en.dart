@@ -3156,6 +3156,24 @@ class AppLocalizationsEn extends AppLocalizations {
   String get chatInputBarVoiceTranscribing => 'Recognizing…';
 
   @override
+  String get chatInputBarVoiceAttachAudioTooltip => 'Stop and attach as audio';
+
+  @override
+  String get chatInputBarVoiceSendAudioTooltip => 'Send recording';
+
+  @override
+  String get chatInputBarVoiceSavingAudio => 'Saving audio…';
+
+  @override
+  String get audioClipPlayTooltip => 'Play audio';
+
+  @override
+  String get audioClipPauseTooltip => 'Pause';
+
+  @override
+  String get audioClipPlaybackFailed => 'Couldn\'t play this audio';
+
+  @override
   String get chatInputBarImageProcessing => 'Processing image';
 
   @override

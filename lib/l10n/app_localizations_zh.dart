@@ -3040,6 +3040,24 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatInputBarVoiceTranscribing => '正在识别…';
 
   @override
+  String get chatInputBarVoiceAttachAudioTooltip => '停止并存为音频';
+
+  @override
+  String get chatInputBarVoiceSendAudioTooltip => '直接发送录音';
+
+  @override
+  String get chatInputBarVoiceSavingAudio => '正在保存录音…';
+
+  @override
+  String get audioClipPlayTooltip => '播放音频';
+
+  @override
+  String get audioClipPauseTooltip => '暂停';
+
+  @override
+  String get audioClipPlaybackFailed => '无法播放此音频';
+
+  @override
   String get chatInputBarImageProcessing => '正在处理图片';
 
   @override
@@ -15220,6 +15238,24 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get chatInputBarVoiceTranscribing => '正在识别…';
 
   @override
+  String get chatInputBarVoiceAttachAudioTooltip => '停止并存为音频';
+
+  @override
+  String get chatInputBarVoiceSendAudioTooltip => '直接发送录音';
+
+  @override
+  String get chatInputBarVoiceSavingAudio => '正在保存录音…';
+
+  @override
+  String get audioClipPlayTooltip => '播放音频';
+
+  @override
+  String get audioClipPauseTooltip => '暂停';
+
+  @override
+  String get audioClipPlaybackFailed => '无法播放此音频';
+
+  @override
   String get chatInputBarImageProcessing => '正在处理图片';
 
   @override
@@ -27324,6 +27360,24 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get chatInputBarVoiceTranscribing => '正在辨識…';
+
+  @override
+  String get chatInputBarVoiceAttachAudioTooltip => '停止並存為音訊';
+
+  @override
+  String get chatInputBarVoiceSendAudioTooltip => '直接發送錄音';
+
+  @override
+  String get chatInputBarVoiceSavingAudio => '正在儲存錄音…';
+
+  @override
+  String get audioClipPlayTooltip => '播放音訊';
+
+  @override
+  String get audioClipPauseTooltip => '暫停';
+
+  @override
+  String get audioClipPlaybackFailed => '無法播放此音訊';
 
   @override
   String get chatInputBarImageProcessing => '正在處理圖片';

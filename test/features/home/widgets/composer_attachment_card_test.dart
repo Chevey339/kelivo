@@ -52,6 +52,21 @@ void main() {
     },
   );
 
+  testWidgets('only audio attachments get a play control', (tester) async {
+    Widget card(String name, String mime) => ComposerAttachmentCard(
+      file: DocumentAttachment(path: '/tmp/$name', fileName: name, mime: mime),
+      onRemove: () {},
+    );
+
+    await tester.pumpWidget(app(card('voice_1.wav', 'audio/wav')));
+    expect(find.byTooltip('Play audio'), findsOneWidget);
+    expect(find.text('voice_1.wav'), findsOneWidget);
+
+    await tester.pumpWidget(app(card('notes.txt', 'text/plain')));
+    expect(find.byTooltip('Play audio'), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets(
     'import progress shows byte fraction and a working cancel action',
     (tester) async {

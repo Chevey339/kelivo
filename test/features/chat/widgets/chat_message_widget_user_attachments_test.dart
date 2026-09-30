@@ -1,5 +1,7 @@
 import "../../../support/business_test_harness.dart";
 import 'package:Kelivo/core/models/chat_message.dart';
+// ignore: depend_on_referenced_packages
+import 'package:audioplayers_platform_interface/audioplayers_platform_interface.dart';
 import 'package:Kelivo/core/models/message_part.dart';
 import 'package:Kelivo/core/providers/settings_provider.dart';
 import 'package:Kelivo/core/providers/user_provider.dart';
@@ -12,6 +14,8 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+
+import '../../../support/fake_audioplayers_platform.dart';
 
 Widget _harness(Widget child) {
   return MultiProvider(
@@ -42,6 +46,88 @@ void main() {
 
   tearDown(() {
     AppSnackBarManager().dismissAll();
+  });
+
+  testWidgets('local audio attachments render as playable clips', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      _harness(
+        ChatMessageWidget(
+          showUserAvatar: false,
+          message: ChatMessage(
+            id: 'user-with-audio',
+            role: 'user',
+            conversationId: 'conversation-user-audio',
+            parts: const [
+              FilePart(
+                uri: '/tmp/voice_20260929_120000.wav',
+                name: 'voice_20260929_120000.wav',
+                mime: 'audio/wav',
+              ),
+              FilePart(
+                uri: 'https://example.com/remote.mp3',
+                name: 'remote.mp3',
+                mime: 'audio/mpeg',
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+
+    expect(find.byTooltip('Play audio'), findsOneWidget);
+    expect(find.text('voice_20260929_120000.wav'), findsOneWidget);
+    expect(find.text('remote.mp3'), findsOneWidget);
+  });
+
+  testWidgets('a playing audio clip fits a narrow message column', (
+    tester,
+  ) async {
+    final previous = AudioplayersPlatformInterface.instance;
+    final previousGlobal = GlobalAudioplayersPlatformInterface.instance;
+    AudioplayersPlatformInterface.instance = FakeAudioplayersPlatform();
+    GlobalAudioplayersPlatformInterface.instance =
+        FakeGlobalAudioplayersPlatform();
+    addTearDown(() {
+      AudioplayersPlatformInterface.instance = previous;
+      GlobalAudioplayersPlatformInterface.instance = previousGlobal;
+    });
+    const name = 'voice_20260929_120000_with_a_rather_long_name.wav';
+
+    await tester.pumpWidget(
+      _harness(
+        Center(
+          child: SizedBox(
+            width: 320,
+            child: ChatMessageWidget(
+              showUserAvatar: false,
+              message: ChatMessage(
+                id: 'user-with-long-audio',
+                role: 'user',
+                conversationId: 'conversation-user-audio',
+                parts: const [
+                  FilePart(uri: '/tmp/$name', name: name, mime: 'audio/wav'),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.tap(find.byTooltip('Play audio'));
+    final time = find.text('0:00 / 0:12');
+    // The fake player resolves over several microtask hops.
+    for (var i = 0; i < 50 && time.evaluate().isEmpty; i++) {
+      await tester.pump(const Duration(milliseconds: 10));
+    }
+
+    expect(time, findsOneWidget);
+    expect(tester.takeException(), isNull);
+
+    await tester.tap(find.byTooltip('Pause'));
+    await tester.pumpWidget(const SizedBox());
+    await tester.pump(const Duration(seconds: 1));
   });
 
   testWidgets('用户消息附件显示在文本气泡上方且不在气泡内部', (tester) async {
