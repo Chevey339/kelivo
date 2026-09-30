@@ -224,10 +224,13 @@ class WorkspaceToolsService {
           },
           'timeout_seconds': {
             'type': 'integer',
-            'description': 'Timeout in seconds (default 120, max 600).',
-            'default': 120,
+            'description':
+                'Command timeout in seconds (default 900, range 1-3600). '
+                'Choose a longer timeout for package installs, downloads, builds, '
+                'or other long-running commands. Values outside this range are clamped.',
+            'default': 900,
             'minimum': 1,
-            'maximum': 600,
+            'maximum': 3600,
           },
         },
         ['command'],
@@ -708,9 +711,9 @@ class WorkspaceToolsService {
     );
     if (denied != null) return denied;
 
-    final timeoutSeconds = (_intArg(args, 'timeout_seconds') ?? 120).clamp(
+    final timeoutSeconds = (_intArg(args, 'timeout_seconds') ?? 900).clamp(
       1,
-      600,
+      3600,
     );
     final cwd = ctx.paths.normalizeCwd(
       _stringArg(args, 'cwd', fallback: ctx.cwd),
