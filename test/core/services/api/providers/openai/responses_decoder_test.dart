@@ -222,6 +222,73 @@ void main() {
     );
   });
 
+  for (final started in [false, true]) {
+    test(
+      'terminal citations stay on the completed search card, started=$started',
+      () {
+        final decoder = ResponsesStreamDecoder();
+        final handler = StreamChunkHandler();
+        if (started) {
+          for (final chunk
+              in decoder
+                  .accept(
+                    _event({
+                      'type': 'response.output_item.added',
+                      'item': {
+                        'type': 'web_search_call',
+                        'id': 'search-1',
+                        'status': 'in_progress',
+                      },
+                    }),
+                  )
+                  .chunks) {
+            handler.handle(chunk);
+          }
+        }
+        final done = decoder.accept(
+          _event({
+            'type': 'response.completed',
+            'response': {
+              'output': [
+                {
+                  'type': 'web_search_call',
+                  'id': 'search-1',
+                  'status': 'completed',
+                },
+                {
+                  'type': 'message',
+                  'content': [
+                    {
+                      'type': 'output_text',
+                      'text': 'answer',
+                      'annotations': [
+                        {
+                          'type': 'url_citation',
+                          'url': 'https://example.com',
+                          'title': 'Source',
+                        },
+                      ],
+                    },
+                  ],
+                },
+              ],
+            },
+          }),
+        );
+        for (final chunk in done.chunks) {
+          handler.handle(chunk);
+        }
+        final card = jsonDecode(
+          handler.parts.whereType<ToolCallPart>().single.payloadJson,
+        );
+        expect(card['id'], 'search-1');
+        expect(card['content']['items'], [
+          {'url': 'https://example.com', 'title': 'Source'},
+        ]);
+      },
+    );
+  }
+
   test('keeps message items separate so a hosted search stays inline', () {
     final decoder = ResponsesStreamDecoder();
     final handler = StreamChunkHandler();

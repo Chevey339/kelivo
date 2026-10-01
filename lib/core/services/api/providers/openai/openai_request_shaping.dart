@@ -8,13 +8,16 @@ import '../../../model_spec/vendor_defaults.dart';
 import '../../builtin_tools.dart';
 import '../../reasoning/reasoning_dialects.dart';
 
-void applyChatCompletionsBuiltInTools(
+/// Returns the resolved search query so client-tool rounds can reuse it.
+Object? applyChatCompletionsBuiltInTools(
   Map<String, dynamic> body, {
   required ProviderConfig config,
   required String modelId,
   required String upstreamModelId,
   Iterable<String>? configuredTools,
+  Object? searchQuery,
 }) {
+  Object? resolvedSearchQuery;
   final payload = BuiltInToolsHelper.buildChatCompletionsTools(
     cfg: config,
     modelId: modelId,
@@ -26,6 +29,36 @@ void applyChatCompletionsBuiltInTools(
   }
   for (final tool in payload.tools) {
     _appendChatTool(body, tool);
+  }
+  if (BuiltInToolsHelper.isVercelProvider(config) &&
+      payload.tools.any((tool) => tool['type'] == 'vercel:perplexity_search')) {
+    // Image-tool results add synthetic user messages to follow-up requests.
+    final query = searchQuery ?? _lastUserText(body['messages']);
+    final tools = body['tools'] as List;
+    for (var index = 0; index < tools.length; index++) {
+      final rawTool = tools[index];
+      if (rawTool is! Map || rawTool['type'] != 'vercel:perplexity_search') {
+        continue;
+      }
+      final tool = Map<String, dynamic>.from(rawTool);
+      final rawConfig = tool['config'];
+      final searchConfig = rawConfig is Map
+          ? Map<String, dynamic>.from(rawConfig)
+          : <String, dynamic>{};
+      final configuredQuery = searchConfig['query'];
+      if (configuredQuery == null ||
+          (configuredQuery is String && configuredQuery.trim().isEmpty)) {
+        if (query is String && query.trim().isEmpty) {
+          throw UnsupportedError(
+            'Vercel Gateway web search requires user text or an explicit config.query.',
+          );
+        }
+        searchConfig['query'] = query;
+      }
+      resolvedSearchQuery = searchConfig['query'];
+      tool['config'] = searchConfig;
+      tools[index] = tool;
+    }
   }
   // OpenRouter server-side web search replaces the legacy `web` plugin;
   // keeping both would double-charge for grounding.
@@ -43,6 +76,25 @@ void applyChatCompletionsBuiltInTools(
       body['plugins'] = plugins;
     }
   }
+  return resolvedSearchQuery;
+}
+
+String _lastUserText(Object? messages) {
+  if (messages is! List) return '';
+  for (final message in messages.reversed) {
+    if (message is! Map || message['role'] != 'user') continue;
+    final content = message['content'];
+    if (content is String) return content.trim();
+    if (content is List) {
+      return [
+        for (final part in content.whereType<Map>())
+          if (part['type'] == 'text' && part['text'] is String)
+            part['text'] as String,
+      ].join('\n').trim();
+    }
+    return '';
+  }
+  return '';
 }
 
 void _appendChatTool(Map<String, dynamic> body, Map<String, dynamic> tool) {

@@ -2,8 +2,10 @@ import 'dart:async';
 
 // ignore: depend_on_referenced_packages
 import 'package:audioplayers_platform_interface/audioplayers_platform_interface.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:Kelivo/l10n/app_localizations.dart';
 import 'package:Kelivo/shared/widgets/audio_clip_player.dart';
 
 import '../../support/fake_audioplayers_platform.dart';
@@ -25,6 +27,64 @@ void main() {
   });
 
   Future<void> settle() => Future<void>.delayed(Duration.zero);
+
+  Widget clips(String? firstPath) => MaterialApp(
+    locale: const Locale('en'),
+    localizationsDelegates: AppLocalizations.localizationsDelegates,
+    supportedLocales: AppLocalizations.supportedLocales,
+    home: Scaffold(
+      body: Column(
+        children: [
+          if (firstPath != null)
+            AudioClipPlayer(
+              key: const ValueKey('first'),
+              path: firstPath,
+              builder: (_, button, time) =>
+                  Row(children: [button, if (time != null) Text(time)]),
+            ),
+          AudioClipPlayer(
+            key: const ValueKey('second'),
+            path: '/tmp/widget-b.wav',
+            builder: (_, button, time) =>
+                Row(children: [button, if (time != null) Text(time)]),
+          ),
+        ],
+      ),
+    ),
+  );
+
+  for (final replacement in <String?>[null, '/tmp/widget-new.wav']) {
+    testWidgets(
+      '${replacement == null ? 'removing' : 'replacing'} the playing card does not notify a sibling during tree updates',
+      (tester) async {
+        await tester.pumpWidget(clips('/tmp/widget-a.wav'));
+        expect(find.byType(AudioClipPlayer), findsNWidgets(2));
+        await tester.runAsync(() async {
+          await tester.tap(
+            find.descendant(
+              of: find.byKey(const ValueKey('first')),
+              matching: find.byTooltip('Play audio'),
+            ),
+          );
+          await settle();
+        });
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 50));
+        expect(playback.status.value?.path, '/tmp/widget-a.wav');
+        expect(playback.status.value?.playing, isTrue);
+        expect(platform.resumed, ['/tmp/widget-a.wav']);
+        expect(find.byTooltip('Pause'), findsOneWidget);
+
+        await tester.pumpWidget(clips(replacement));
+        expect(tester.takeException(), isNull);
+        await tester.runAsync(settle);
+        await tester.pumpAndSettle();
+        expect(playback.status.value, isNull);
+        expect(find.byTooltip('Pause'), findsNothing);
+        expect(platform.calls, contains('stop:/tmp/widget-a.wav'));
+      },
+    );
+  }
 
   test('a clip removed while its source prepares never starts', () async {
     final owner = Object();
@@ -53,6 +113,19 @@ void main() {
 
     expect(platform.resumed, ['/tmp/b.wav']);
     expect(playback.status.value?.path, '/tmp/b.wav');
+    await playback.stopFor(second);
+  });
+
+  test('a deferred owner stop never clears a newly started clip', () async {
+    final first = Object();
+    final second = Object();
+    await playback.toggle(owner: first, path: '/tmp/a.wav');
+    final stopped = playback.stopFor(first);
+    final started = playback.toggle(owner: second, path: '/tmp/b.wav');
+    await Future.wait([stopped, started]);
+    expect(playback.status.value?.owner, same(second));
+    expect(playback.status.value?.path, '/tmp/b.wav');
+    expect(playback.status.value?.playing, isTrue);
     await playback.stopFor(second);
   });
 

@@ -97,6 +97,26 @@ class ResponsesStreamDecoder implements StreamChunkDecoder {
       _openImageIds.isNotEmpty || _endedImageIds.isNotEmpty;
   bool get emittedCitationEvents => _emittedCitationEvents;
 
+  /// Reuses the native search parser for a complete JSON response.
+  List<StreamChunk> decodeSearchResults(Map response) {
+    final output = response['output'];
+    if (output is! List) return const [];
+    final chunks = <StreamChunk>[];
+    for (final item in output.whereType<Map>()) {
+      if (item['type'] == 'web_search_call') {
+        chunks.addAll(
+          _endServerTool(
+            item.cast<String, dynamic>(),
+            fallbackStatus: ServerToolStatus.completed,
+          ),
+        );
+      }
+    }
+    _collectCitations(output);
+    _emitCollectedCitations(chunks);
+    return chunks;
+  }
+
   bool get hasFunctionCalls =>
       toolCallsByIndex.isNotEmpty || toolCallsByKey.isNotEmpty;
 
@@ -411,7 +431,6 @@ class ResponsesStreamDecoder implements StreamChunkDecoder {
           _collectCompletedImages(output);
         } catch (_) {}
         _emitCollectedImages(chunks);
-        _emitCollectedCitations(chunks);
         for (final item in outputItems) {
           if (_isResponsesServerTool(item['type']) &&
               !_endedServerToolIds.contains((item['id'] ?? '').toString())) {
@@ -425,6 +444,7 @@ class ResponsesStreamDecoder implements StreamChunkDecoder {
             );
           }
         }
+        _emitCollectedCitations(chunks);
       }
     }
     final status = failed
@@ -444,7 +464,8 @@ class ResponsesStreamDecoder implements StreamChunkDecoder {
       if (content is! List) continue;
       for (final block in content) {
         if (block is! Map) continue;
-        final anns = block['annotations'] as List? ?? const <dynamic>[];
+        final anns = block['annotations'];
+        if (anns is! List) continue;
         for (final an in anns) {
           if (an is! Map) continue;
           if ((an['type'] ?? '') != 'url_citation') continue;

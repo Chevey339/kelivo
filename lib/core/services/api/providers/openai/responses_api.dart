@@ -319,6 +319,14 @@ Stream<StreamChunk> runOpenAIResponsesToolFollowUps({
         final raw = await decodeUtf8Stream(resp2.stream);
         throwIfInBandStreamError(raw);
         final obj = jsonDecode(raw) as Map;
+        for (final chunk
+            in ResponsesStreamDecoder(
+              sourceId: 'round-$round',
+            ).decodeSearchResults(
+              obj['response'] is Map ? obj['response'] as Map : obj,
+            )) {
+          yield chunk;
+        }
         final output = obj['output'] ?? obj['response']?['output'];
         outputItemsForAppend = [
           if (output is List)

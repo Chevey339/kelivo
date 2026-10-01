@@ -155,23 +155,23 @@ void main() {
         final deepSeek = ProviderConfig.defaultsFor('DeepSeek');
         final moonshot = ProviderConfig.defaultsFor('Moonshot');
 
-        expect(aihubmix.balanceEnabled, isTrue);
+        expect(aihubmix.balanceEnabled, isFalse);
         expect(aihubmix.balanceApiPath, '/user/balance');
         expect(aihubmix.balanceResultPath, 'balance_infos[0].total_balance');
-        expect(openRouter.balanceEnabled, isTrue);
+        expect(openRouter.balanceEnabled, isFalse);
         expect(openRouter.balanceApiPath, '/credits');
         expect(
           openRouter.balanceResultPath,
           'data.total_credits - data.total_usage',
         );
         expect(siliconFlow.balanceEnabled, isFalse);
-        expect(vercel.balanceEnabled, isTrue);
+        expect(vercel.balanceEnabled, isFalse);
         expect(vercel.balanceApiPath, '/credits');
         expect(vercel.balanceResultPath, 'balance');
-        expect(deepSeek.balanceEnabled, isTrue);
+        expect(deepSeek.balanceEnabled, isFalse);
         expect(deepSeek.balanceApiPath, '/user/balance');
         expect(deepSeek.balanceResultPath, 'balance_infos[0].total_balance');
-        expect(moonshot.balanceEnabled, isTrue);
+        expect(moonshot.balanceEnabled, isFalse);
         expect(moonshot.balanceApiPath, '/users/me/balance');
         expect(moonshot.balanceResultPath, 'data.available_balance');
       },

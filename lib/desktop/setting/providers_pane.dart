@@ -307,6 +307,7 @@ class _DesktopProvidersBodyState extends State<_DesktopProvidersBody> {
       (name: l10n.providersPageSiliconFlowName, key: 'SiliconFlow'),
       (name: 'Gemini', key: 'Gemini'),
       (name: 'OpenRouter', key: 'OpenRouter'),
+      (name: 'Vercel AI Gateway', key: 'Vercel'),
       (name: 'KelivoIN', key: 'KelivoIN'),
       (name: 'Tensdaq', key: 'Tensdaq'),
       (name: 'DeepSeek', key: 'DeepSeek'),

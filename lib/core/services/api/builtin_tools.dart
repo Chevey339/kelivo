@@ -186,6 +186,11 @@ abstract class BuiltInToolsHelper {
     return host.contains('openrouter.ai') || providerId.contains('openrouter');
   }
 
+  static bool isVercelProvider(ProviderConfig? cfg) {
+    return Uri.tryParse(cfg?.baseUrl ?? '')?.host.toLowerCase() ==
+        'ai-gateway.vercel.sh';
+  }
+
   static Map<String, dynamic>? _openRouterServerTool(String toolName) {
     switch (BuiltInToolNames.normalize(toolName)) {
       case BuiltInToolNames.search:
@@ -288,8 +293,23 @@ abstract class BuiltInToolsHelper {
       case ProviderKind.google:
         return true;
       case ProviderKind.claude:
+        if (isVercelProvider(cfg)) {
+          return BuiltInToolNames.effectiveModelId(
+            cfg: cfg,
+            modelId: modelId,
+          ).toLowerCase().startsWith('anthropic/');
+        }
         return true;
       case ProviderKind.openai:
+        if (isVercelProvider(cfg)) {
+          // Chat Completions uses Gateway search across providers. Responses
+          // uses the model provider's native tool, documented for OpenAI.
+          return cfg.useResponseApi != true ||
+              BuiltInToolNames.effectiveModelId(
+                cfg: cfg,
+                modelId: modelId,
+              ).toLowerCase().startsWith('openai/');
+        }
         if (isOpenRouterProvider(cfg)) return true;
         // Native Grok search is only available as Responses tools.
         if (isGrokProvider(cfg)) return cfg.useResponseApi == true;
@@ -424,6 +444,15 @@ abstract class BuiltInToolsHelper {
     }
     if (!configured.contains(BuiltInToolNames.search)) {
       return const BuiltInToolsRequestPayload();
+    }
+    if (isVercelProvider(cfg)) {
+      // Request shaping fills config.query from the final user message after
+      // merging custom tools, whose explicit query and options take priority.
+      return const BuiltInToolsRequestPayload(
+        tools: <Map<String, dynamic>>[
+          <String, dynamic>{'type': 'vercel:perplexity_search'},
+        ],
+      );
     }
     if (isDashScopeProvider(cfg)) {
       final options = dashScopeSearchOptionsFromOverride(

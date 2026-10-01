@@ -63,9 +63,9 @@ Stream<StreamChunk> sendClaudeStream(
   final skipRedactedThinkingBlocks = BuiltInToolsHelper.isOpenRouterProvider(
     config,
   );
-  final replayServerToolBlocks = BuiltInToolsHelper.isOfficialAnthropicEndpoint(
-    config,
-  );
+  final replayServerToolBlocks =
+      BuiltInToolsHelper.isOfficialAnthropicEndpoint(config) ||
+      BuiltInToolsHelper.isVercelProvider(config);
 
   // Extract system prompt (Anthropic uses top-level `system`)
   String systemPrompt = '';
@@ -165,6 +165,15 @@ Stream<StreamChunk> sendClaudeStream(
         ).where((name) => name == BuiltInToolNames.search).toSet()
       : builtInTools(config, modelId);
   if (builtIns.contains(BuiltInToolNames.search)) {
+    if (BuiltInToolsHelper.isVercelProvider(config) &&
+        !BuiltInToolsHelper.supportsBuiltInSearchForModel(
+          cfg: config,
+          modelId: modelId,
+        )) {
+      throw UnsupportedError(
+        'Vercel Messages native web search requires an Anthropic model.',
+      );
+    }
     Map<String, dynamic> ws = const <String, dynamic>{};
     try {
       final ov = config.modelOverrides[modelId];

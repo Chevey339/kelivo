@@ -35,6 +35,7 @@ class ChatCompletionsStreamDecoder implements StreamChunkDecoder {
       <int, Map<String, dynamic>>{};
 
   final List<dynamic> _details = <dynamic>[];
+  final Map<String, Map<String, dynamic>> _citationItems = {};
   final Map<int, String> _toolIdsByIndex = <int, String>{};
   final Set<String> _openToolIds = <String>{};
   final Set<String> _endedToolIds = <String>{};
@@ -198,22 +199,7 @@ class ChatCompletionsStreamDecoder implements StreamChunkDecoder {
       _round = _mergeUsage(_round, obj['usage']);
     }
 
-    final citations = obj['citations'];
-    if (citations is List && citations.isNotEmpty) {
-      final items = <Map<String, dynamic>>[
-        for (var k = 0; k < citations.length; k++)
-          <String, dynamic>{
-            'index': k + 1,
-            'url': citations[k].toString(),
-            'title': citations[k].toString(),
-          },
-      ];
-      final searchId = _ids.searchSticky();
-      chunks.add(ServerToolStart(id: searchId, toolName: 'search_web'));
-      chunks.add(
-        ServerToolEnd(id: searchId, output: <String, dynamic>{'items': items}),
-      );
-    }
+    chunks.addAll(decodeCitations(obj));
 
     if (reasoning != null && reasoning.isNotEmpty) {
       chunks.add(ReasoningDelta(id: _ids.reasoning(), text: reasoning));
@@ -228,6 +214,55 @@ class ChatCompletionsStreamDecoder implements StreamChunkDecoder {
     if (finishReason == 'tool_calls') {
       chunks.addAll(_endOpenTools());
     }
+  }
+
+  /// Source annotations are also returned by non-streaming completions.
+  List<StreamChunk> decodeCitations(Map<String, dynamic> obj) {
+    final raw = <dynamic>[
+      if (obj['citations'] is List) ...obj['citations'] as List,
+    ];
+    final choices = obj['choices'];
+    if (choices is List && choices.isNotEmpty && choices.first is Map) {
+      final choice = choices.first as Map;
+      for (final message in [choice['message'], choice['delta']]) {
+        if (message is Map && message['annotations'] is List) {
+          raw.addAll(
+            (message['annotations'] as List).where((annotation) {
+              return annotation is Map && annotation['type'] == 'url_citation';
+            }),
+          );
+        }
+      }
+    }
+    var changed = false;
+    for (final citation in raw) {
+      final details = citation is Map
+          ? (citation['url_citation'] is Map
+                ? citation['url_citation'] as Map
+                : citation)
+          : null;
+      final url = (details?['url'] ?? (citation is String ? citation : ''))
+          .toString();
+      if (url.isEmpty) continue;
+      final previous = _citationItems[url];
+      final rawTitle = (details?['title'] ?? '').toString();
+      final title = rawTitle.isEmpty
+          ? (previous?['title'] ?? url).toString()
+          : rawTitle;
+      if (previous != null && previous['title'] == title) continue;
+      _citationItems[url] = {
+        'index': previous?['index'] ?? _citationItems.length + 1,
+        'url': url,
+        'title': title,
+      };
+      changed = true;
+    }
+    if (!changed) return const [];
+    final id = _ids.searchSticky();
+    return [
+      ServerToolStart(id: id, toolName: 'search_web'),
+      ServerToolEnd(id: id, output: {'items': _citationItems.values.toList()}),
+    ];
   }
 
   void _accumulateToolCalls(dynamic raw, List<StreamChunk> chunks) {

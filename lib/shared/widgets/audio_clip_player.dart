@@ -89,13 +89,18 @@ class AudioClipPlayback {
   }
 
   Future<void> stopFor(Object owner) async {
-    if (identical(_current?.owner, owner)) _stopCurrent();
+    if (!identical(_current?.owner, owner)) return;
+    _stopCurrent(notify: false);
+    // Called during widget updates and disposal: cancel immediately, then
+    // notify listeners once Flutter has unlocked the tree. A newer clip wins.
+    await Future<void>.value();
+    if (_current == null) status.value = null;
   }
 
-  void _stopCurrent() {
+  void _stopCurrent({bool notify = true}) {
     final request = _current;
     _current = null;
-    status.value = null;
+    if (notify) status.value = null;
     if (request != null) unawaited(request.dispose());
   }
 

@@ -105,7 +105,12 @@ void main() {
         'Grok',
         'ByteDance',
       ];
-      const migratedOrder = <String>[...legacyOrder, '随想AI中转站', 'MaruCode'];
+      const migratedOrder = <String>[
+        ...legacyOrder,
+        'Vercel',
+        '随想AI中转站',
+        'MaruCode',
+      ];
       await repository.replaceSnapshot(
         BusinessSettingsRouter.normalizeAndRoute({
           'providers_order_v1': legacyOrder,
@@ -115,6 +120,15 @@ void main() {
       final settings = SettingsProvider(BusinessPreferences(repository));
       await settings.loaded;
       expect(settings.providersOrder, migratedOrder);
+
+      final vercel = settings.getProviderConfig('Vercel');
+      expect(vercel.name, 'Vercel AI Gateway');
+      expect(vercel.enabled, isFalse);
+      expect(vercel.providerType, ProviderKind.openai);
+      expect(vercel.baseUrl, 'https://ai-gateway.vercel.sh/v1');
+      expect(vercel.balanceEnabled, isFalse);
+      expect(vercel.balanceApiPath, '/credits');
+      expect(vercel.balanceResultPath, 'balance');
 
       final suixiang = settings.getProviderConfig('随想AI中转站');
       expect(suixiang.enabled, isFalse);

@@ -157,6 +157,18 @@ Stream<StreamChunk> sendOpenAIStream(
     config,
     modelId,
   ).contains(BuiltInToolNames.search);
+  if (BuiltInToolsHelper.isVercelProvider(config) &&
+      config.useResponseApi == true &&
+      builtInSearchEnabled &&
+      !BuiltInToolsHelper.supportsBuiltInSearchForModel(
+        cfg: config,
+        modelId: modelId,
+      )) {
+    throw UnsupportedError(
+      'Kelivo supports Vercel Responses native web search with OpenAI models. '
+      'Use Chat Completions for Vercel Gateway search with other models.',
+    );
+  }
   if (config.useResponseApi != true &&
       BuiltInToolsHelper.isMoonshotProvider(config) &&
       builtInSearchEnabled) {
@@ -632,8 +644,9 @@ Stream<StreamChunk> sendOpenAIStream(
   CustomRequestMerger.applyBody(body, extraBodyCfg);
   // Built-in tools run after the custom body and merge by type so custom
   // function tools and provider server tools coexist.
+  Object? builtInSearchQuery;
   if (config.useResponseApi != true) {
-    applyChatCompletionsBuiltInTools(
+    builtInSearchQuery = applyChatCompletionsBuiltInTools(
       body,
       config: config,
       modelId: modelId,
@@ -656,6 +669,12 @@ Stream<StreamChunk> sendOpenAIStream(
       final obj = jsonDecode(txt);
       // Responses API non-stream
       if (config.useResponseApi == true) {
+        for (final chunk
+            in ResponsesStreamDecoder(sourceId: 'finish').decodeSearchResults(
+              obj['response'] is Map ? obj['response'] as Map : obj as Map,
+            )) {
+          yield chunk;
+        }
         String outText = '';
         final rawOutput = obj['output'] ?? obj['response']?['output'];
         final reasoningText = responsesReasoningText(rawOutput);
@@ -826,6 +845,11 @@ Stream<StreamChunk> sendOpenAIStream(
       );
       final firstMessage = openaiFirstChoiceMessage(lastObj);
       final ids = StreamChunkIds('finish');
+      for (final chunk in ChatCompletionsStreamDecoder(
+        sourceId: 'finish',
+      ).decodeCitations(lastObj)) {
+        yield chunk;
+      }
       yield* emitImages(visible.images, ids: ids);
       yield* emitDone(
         ids: ids,
@@ -1080,6 +1104,7 @@ Stream<StreamChunk> sendOpenAIStream(
       temperature: temperature,
       topP: topP,
       tools: tools,
+      builtInSearchQuery: builtInSearchQuery,
       extraBodyCfg: extraBodyCfg,
       extraHeaders: extraHeaders,
       wantsImageOutput: wantsImageOutput,

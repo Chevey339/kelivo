@@ -83,6 +83,7 @@ class SettingsProvider extends ChangeNotifier {
     'SiliconFlow',
     'Gemini',
     'OpenRouter',
+    'Vercel',
     'KelivoIN',
     'Tensdaq',
     'DeepSeek',
@@ -6416,6 +6417,7 @@ class ProviderConfig {
     if (k.contains('tensdaq')) return 'https://tensdaq-api.x-aio.com/v1';
     if (k.contains('kelivoin')) return 'https://text.pollinations.ai/openai';
     if (k.contains('openrouter')) return 'https://openrouter.ai/api/v1';
+    if (k.contains('vercel')) return 'https://ai-gateway.vercel.sh/v1';
     if (k.contains('aihubmix')) return 'https://aihubmix.com/v1';
     if (k.contains('随想')) return 'https://sui-xiang.com/v1';
     if (k.contains('marucode') || k.contains('muteki')) {
@@ -6561,7 +6563,7 @@ class ProviderConfig {
             apiKeys: const [],
             keyManagement: const KeyManagementConfig(),
             aihubmixAppCodeEnabled: false,
-            balanceEnabled: _defaultBalanceEnabled(key),
+            balanceEnabled: false,
             balanceApiPath: _defaultBalanceApiPath(key),
             balanceResultPath: _defaultBalanceResultPath(key),
             claudePromptCachingEnabled: false,
@@ -6602,7 +6604,7 @@ class ProviderConfig {
             apiKeys: const [],
             keyManagement: const KeyManagementConfig(),
             aihubmixAppCodeEnabled: false,
-            balanceEnabled: _defaultBalanceEnabled(key),
+            balanceEnabled: false,
             balanceApiPath: _defaultBalanceApiPath(key),
             balanceResultPath: _defaultBalanceResultPath(key),
             claudePromptCachingEnabled: false,
@@ -6611,7 +6613,8 @@ class ProviderConfig {
         return ProviderConfig(
           id: key,
           enabled: defaultEnabled(key),
-          name: displayName ?? key,
+          name:
+              displayName ?? (lowerKey == 'vercel' ? 'Vercel AI Gateway' : key),
           apiKey: '',
           baseUrl: _defaultBase(key),
           providerType: ProviderKind.openai,
@@ -6628,7 +6631,7 @@ class ProviderConfig {
           apiKeys: const [],
           keyManagement: const KeyManagementConfig(),
           aihubmixAppCodeEnabled: lowerKey.contains('aihubmix'),
-          balanceEnabled: _defaultBalanceEnabled(key),
+          balanceEnabled: false,
           balanceApiPath: _defaultBalanceApiPath(key),
           balanceResultPath: _defaultBalanceResultPath(key),
           claudePromptCachingEnabled: false,
@@ -6660,14 +6663,5 @@ class ProviderConfig {
       return 'data.available_balance';
     }
     return 'data.total_usage';
-  }
-
-  static bool _defaultBalanceEnabled(String key) {
-    final k = key.toLowerCase();
-    return k.contains('aihubmix') ||
-        k.contains('deepseek') ||
-        k.contains('openrouter') ||
-        k.contains('vercel') ||
-        RegExp(r'kimi|moonshot|月之暗面').hasMatch(k);
   }
 }

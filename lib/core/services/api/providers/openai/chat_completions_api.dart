@@ -821,6 +821,7 @@ Stream<StreamChunk> runOpenAIChatCompletionsToolFollowUps({
   required double? temperature,
   required double? topP,
   required List<Map<String, dynamic>>? tools,
+  required Object? builtInSearchQuery,
   required Map<String, dynamic> extraBodyCfg,
   required Map<String, String>? extraHeaders,
   required bool wantsImageOutput,
@@ -905,6 +906,7 @@ Stream<StreamChunk> runOpenAIChatCompletionsToolFollowUps({
         config: config,
         modelId: modelId,
         upstreamModelId: upstreamModelId,
+        searchQuery: builtInSearchQuery,
       );
       final req2 = http.Request('POST', url);
       req2.headers.addAll(
@@ -1001,6 +1003,10 @@ Stream<StreamChunk> runOpenAIChatCompletionsNonStreamToolFollowUps({
 }) async* {
   var usage = initialUsage;
   var lastObj = firstObj;
+  final citationsDecoder = ChatCompletionsStreamDecoder(sourceId: 'finish');
+  for (final chunk in citationsDecoder.decodeCitations(lastObj)) {
+    yield chunk;
+  }
   var currentMessages = [
     for (final message in messages) copyChatCompletionMessage(message),
   ];
@@ -1068,6 +1074,9 @@ Stream<StreamChunk> runOpenAIChatCompletionsNonStreamToolFollowUps({
           jsonDecode(await decodeUtf8Stream(resp2.stream))
               as Map<String, dynamic>;
       final roundUsage = openaiUsageFromObj(lastObj);
+      for (final chunk in citationsDecoder.decodeCitations(lastObj)) {
+        yield chunk;
+      }
       if (roundUsage != null) {
         usage = roundUsage;
       }

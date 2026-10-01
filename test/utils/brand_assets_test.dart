@@ -3,6 +3,13 @@ import 'package:flutter_test/flutter_test.dart';
 
 void main() {
   group('BrandAssets', () {
+    test('Vercel Gateway icon is selectable and adapts to dark mode', () {
+      const asset = 'assets/icons/vercel.svg';
+      expect(BrandAssets.assetForName('Vercel AI Gateway'), asset);
+      expect(BrandAssets.selectableAssetOrNull(asset), asset);
+      expect(BrandAssets.assetNeedsDarkInvert(asset), isTrue);
+    });
+
     test('mapped Metaso icon is selectable as a built-in provider avatar', () {
       final asset = BrandAssets.assetForName('metaso');
 
