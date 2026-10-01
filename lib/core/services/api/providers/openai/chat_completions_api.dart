@@ -823,6 +823,7 @@ Stream<StreamChunk> runOpenAIChatCompletionsToolFollowUps({
   required List<Map<String, dynamic>>? tools,
   required Object? builtInSearchQuery,
   required Map<String, dynamic> extraBodyCfg,
+  required String? promptCacheKey,
   required Map<String, String>? extraHeaders,
   required bool wantsImageOutput,
   required bool needsReasoningEcho,
@@ -900,6 +901,9 @@ Stream<StreamChunk> runOpenAIChatCompletionsToolFollowUps({
         transport: ReasoningTransport.chatCompletions,
       );
       CustomRequestMerger.applyBody(body2, extraBodyCfg);
+      if (promptCacheKey != null) {
+        body2.putIfAbsent('prompt_cache_key', () => promptCacheKey);
+      }
       // Built-in tools run after the custom body and merge by type.
       applyChatCompletionsBuiltInTools(
         body2,

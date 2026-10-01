@@ -6049,6 +6049,7 @@ class ProviderConfig {
   providerType; // Explicit provider type to avoid misclassification
   final String? chatPath; // openai only
   final bool? useResponseApi; // openai only
+  final bool promptCacheKeyEnabled; // openai only
   final bool? vertexAI; // google only
   final String? location; // google vertex ai only
   final String? projectId; // google vertex ai only
@@ -6140,6 +6141,7 @@ class ProviderConfig {
     this.providerType,
     this.chatPath,
     this.useResponseApi,
+    this.promptCacheKeyEnabled = false,
     this.vertexAI,
     this.location,
     this.projectId,
@@ -6182,6 +6184,7 @@ class ProviderConfig {
     ProviderKind? providerType,
     String? chatPath,
     bool? useResponseApi,
+    bool? promptCacheKeyEnabled,
     bool? vertexAI,
     String? location,
     String? projectId,
@@ -6221,6 +6224,7 @@ class ProviderConfig {
     providerType: providerType ?? this.providerType,
     chatPath: chatPath ?? this.chatPath,
     useResponseApi: useResponseApi ?? this.useResponseApi,
+    promptCacheKeyEnabled: promptCacheKeyEnabled ?? this.promptCacheKeyEnabled,
     vertexAI: vertexAI ?? this.vertexAI,
     location: location ?? this.location,
     projectId: projectId ?? this.projectId,
@@ -6269,6 +6273,7 @@ class ProviderConfig {
     'providerType': providerType?.name,
     'chatPath': chatPath,
     'useResponseApi': useResponseApi,
+    'promptCacheKeyEnabled': promptCacheKeyEnabled,
     'vertexAI': vertexAI,
     'location': location,
     'projectId': projectId,
@@ -6323,6 +6328,7 @@ class ProviderConfig {
         : null,
     chatPath: json['chatPath'] as String?,
     useResponseApi: json['useResponseApi'] as bool?,
+    promptCacheKeyEnabled: json['promptCacheKeyEnabled'] as bool? ?? false,
     vertexAI: json['vertexAI'] as bool?,
     location: json['location'] as String?,
     projectId: json['projectId'] as String?,

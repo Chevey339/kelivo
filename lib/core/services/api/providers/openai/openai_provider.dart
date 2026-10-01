@@ -109,6 +109,7 @@ Stream<StreamChunk> sendOpenAIStream(
   ProviderConfig config,
   String modelId,
   List<Map<String, dynamic>> messages, {
+  String? conversationId,
   List<String>? userImagePaths,
   ReasoningRequest reasoning = ReasoningRequest.auto,
   double? temperature,
@@ -124,6 +125,11 @@ Stream<StreamChunk> sendOpenAIStream(
   StreamRoundRunner? retryRound,
 }) async* {
   final upstreamModelId = apiModelId(config, modelId);
+  final cacheKey = conversationId?.trim() ?? '';
+  final promptCacheKey =
+      config.promptCacheKeyEnabled && !config.isOAuth && cacheKey.isNotEmpty
+      ? cacheKey
+      : null;
   // Utility calls (title / summary generation) only want search injected.
   final Iterable<String>? configuredBuiltInTools = builtInSearchOnly
       ? builtInTools(
@@ -642,6 +648,9 @@ Stream<StreamChunk> sendOpenAIStream(
   // Custom body keys go last so they win over the reasoning dialect.
   final extraBodyCfg = customBody(config, modelId, assistantBody: extraBody);
   CustomRequestMerger.applyBody(body, extraBodyCfg);
+  if (promptCacheKey != null) {
+    body.putIfAbsent('prompt_cache_key', () => promptCacheKey);
+  }
   // Built-in tools run after the custom body and merge by type so custom
   // function tools and provider server tools coexist.
   Object? builtInSearchQuery;
@@ -772,6 +781,7 @@ Stream<StreamChunk> sendOpenAIStream(
             onToolCall: effectiveOnToolCall,
             extraHeaders: extraHeaders,
             extraBody: extraBody,
+            promptCacheKey: promptCacheKey,
             temperature: temperature,
             topP: topP,
             maxTokens: maxTokens,
@@ -1019,6 +1029,7 @@ Stream<StreamChunk> sendOpenAIStream(
             onToolCall: effectiveOnToolCall,
             extraHeaders: extraHeaders,
             extraBody: extraBody,
+            promptCacheKey: promptCacheKey,
             temperature: temperature,
             topP: topP,
             maxTokens: maxTokens,
@@ -1106,6 +1117,7 @@ Stream<StreamChunk> sendOpenAIStream(
       tools: tools,
       builtInSearchQuery: builtInSearchQuery,
       extraBodyCfg: extraBodyCfg,
+      promptCacheKey: promptCacheKey,
       extraHeaders: extraHeaders,
       wantsImageOutput: wantsImageOutput,
       needsReasoningEcho: needsReasoningEcho,

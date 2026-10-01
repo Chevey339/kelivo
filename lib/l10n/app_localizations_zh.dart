@@ -4022,6 +4022,13 @@ class AppLocalizationsZh extends AppLocalizations {
   String get providerDetailPageResponseApiTitle => 'Response API (/responses)';
 
   @override
+  String get providerDetailPagePromptCacheKeyTitle => '发送会话缓存键';
+
+  @override
+  String get providerDetailPagePromptCacheKeyHelp =>
+      '为 OpenAI 兼容请求附加稳定的会话级 prompt_cache_key。仅在供应商支持时开启，自定义 Body 优先，不保证缓存命中。';
+
+  @override
   String get providerDetailPageAihubmixAppCodeLabel => '应用 Code（享 10% 优惠）';
 
   @override
@@ -16220,6 +16227,13 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get providerDetailPageResponseApiTitle => 'Response API (/responses)';
 
   @override
+  String get providerDetailPagePromptCacheKeyTitle => '发送会话缓存键';
+
+  @override
+  String get providerDetailPagePromptCacheKeyHelp =>
+      '为 OpenAI 兼容请求附加稳定的会话级 prompt_cache_key。仅在供应商支持时开启，自定义 Body 优先，不保证缓存命中。';
+
+  @override
   String get providerDetailPageAihubmixAppCodeLabel => '应用 Code（享 10% 优惠）';
 
   @override
@@ -28342,6 +28356,13 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get providerDetailPageResponseApiTitle => 'Response API (/responses)';
+
+  @override
+  String get providerDetailPagePromptCacheKeyTitle => '傳送對話快取鍵';
+
+  @override
+  String get providerDetailPagePromptCacheKeyHelp =>
+      '為 OpenAI 相容請求附加穩定的對話級 prompt_cache_key。僅在供應商支援時開啟，自訂 Body 優先，不保證快取命中。';
 
   @override
   String get providerDetailPageAihubmixAppCodeLabel => '應用 Code（享 10% 優惠）';

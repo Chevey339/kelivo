@@ -3121,6 +3121,45 @@ class _DesktopProviderDetailPaneState extends State<DesktopProviderDetailPane> {
                               const SizedBox(height: 4),
                               if (kindNow == ProviderKind.openai) ...[
                                 row(
+                                  l10n.providerDetailPagePromptCacheKeyTitle,
+                                  Row(
+                                    mainAxisAlignment: MainAxisAlignment.end,
+                                    children: [
+                                      Tooltip(
+                                        message: l10n
+                                            .providerDetailPagePromptCacheKeyHelp,
+                                        child: Icon(
+                                          LucideIcons.circleHelp,
+                                          size: 16,
+                                          color: cs.onSurface.withValues(
+                                            alpha: 0.6,
+                                          ),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 8),
+                                      IosSwitch(
+                                        value: cfgNow.promptCacheKeyEnabled,
+                                        semanticLabel: l10n
+                                            .providerDetailPagePromptCacheKeyTitle,
+                                        onChanged: (value) async {
+                                          final current = spWatch
+                                              .getProviderConfig(
+                                                widget.providerKey,
+                                                defaultName: widget.displayName,
+                                              );
+                                          await spWatch.setProviderConfig(
+                                            widget.providerKey,
+                                            current.copyWith(
+                                              promptCacheKeyEnabled: value,
+                                            ),
+                                          );
+                                        },
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                row(
                                   l10n.providerDetailPageBalanceInfo,
                                   Align(
                                     alignment: Alignment.centerRight,

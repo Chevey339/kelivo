@@ -68,6 +68,7 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
   final _saJsonCtrl = TextEditingController();
   bool _enabled = true;
   bool _useResp = false; // openai
+  bool _promptCacheKeyEnabled = false; // openai
   bool _vertexAI = false; // google
   bool _showApiKey = false; // toggle visibility
   bool _multiKeyEnabled = false; // single/multi key mode
@@ -103,6 +104,7 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
     _baseCtrl.text = _cfg.baseUrl;
     _pathCtrl.text = _cfg.chatPath ?? '/chat/completions';
     _useResp = _cfg.useResponseApi ?? false;
+    _promptCacheKeyEnabled = _cfg.promptCacheKeyEnabled;
     _vertexAI = _cfg.vertexAI ?? false;
     _locationCtrl.text = _cfg.location ?? '';
     _projectCtrl.text = _cfg.projectId ?? '';
@@ -1183,6 +1185,20 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
                   },
                 ),
               ),
+            if (_kind == ProviderKind.openai && !_cfg.isOAuth)
+              _iosRowWithHelp(
+                context,
+                label: l10n.providerDetailPagePromptCacheKeyTitle,
+                helpText: l10n.providerDetailPagePromptCacheKeyHelp,
+                trailing: IosSwitch(
+                  value: _promptCacheKeyEnabled,
+                  semanticLabel: l10n.providerDetailPagePromptCacheKeyTitle,
+                  onChanged: (value) {
+                    setState(() => _promptCacheKeyEnabled = value);
+                    _save();
+                  },
+                ),
+              ),
             if (_kind == ProviderKind.openai) _buildBalanceEntry(context),
             if (_kind == ProviderKind.google)
               _iosRow(
@@ -2242,6 +2258,9 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
       useResponseApi: _kind == ProviderKind.openai
           ? _useResp
           : old.useResponseApi,
+      promptCacheKeyEnabled: _kind == ProviderKind.openai
+          ? _promptCacheKeyEnabled
+          : old.promptCacheKeyEnabled,
       vertexAI: _kind == ProviderKind.google ? _vertexAI : old.vertexAI,
       location: _kind == ProviderKind.google
           ? _locationCtrl.text.trim()

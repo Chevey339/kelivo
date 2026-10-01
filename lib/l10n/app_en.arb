@@ -1835,6 +1835,8 @@
   "providerDetailPageShowTooltip": "Show",
   "providerDetailPageApiPathLabel": "API Path",
   "providerDetailPageResponseApiTitle": "Response API (/responses)",
+  "providerDetailPagePromptCacheKeyTitle": "Send Conversation Cache Key",
+  "providerDetailPagePromptCacheKeyHelp": "Adds a stable prompt_cache_key for each conversation to OpenAI-compatible requests. Enable only if your provider supports it. Custom Body values take precedence; cache hits are not guaranteed.",
   "providerDetailPageAihubmixAppCodeLabel": "APP-Code (10% off)",
   "providerDetailPageAihubmixAppCodeHelp": "Adds header APP-Code requests to get a 10% discount. Only affects AIhubmix.",
   "providerDetailPageClaudePromptCachingTitle": "Claude Prompt Caching",

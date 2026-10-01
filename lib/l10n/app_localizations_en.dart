@@ -4169,6 +4169,14 @@ class AppLocalizationsEn extends AppLocalizations {
   String get providerDetailPageResponseApiTitle => 'Response API (/responses)';
 
   @override
+  String get providerDetailPagePromptCacheKeyTitle =>
+      'Send Conversation Cache Key';
+
+  @override
+  String get providerDetailPagePromptCacheKeyHelp =>
+      'Adds a stable prompt_cache_key for each conversation to OpenAI-compatible requests. Enable only if your provider supports it. Custom Body values take precedence; cache hits are not guaranteed.';
+
+  @override
   String get providerDetailPageAihubmixAppCodeLabel => 'APP-Code (10% off)';
 
   @override

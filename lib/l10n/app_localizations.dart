@@ -7669,6 +7669,18 @@ abstract class AppLocalizations {
   /// **'Response API (/responses)'**
   String get providerDetailPageResponseApiTitle;
 
+  /// No description provided for @providerDetailPagePromptCacheKeyTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Send Conversation Cache Key'**
+  String get providerDetailPagePromptCacheKeyTitle;
+
+  /// No description provided for @providerDetailPagePromptCacheKeyHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'Adds a stable prompt_cache_key for each conversation to OpenAI-compatible requests. Enable only if your provider supports it. Custom Body values take precedence; cache hits are not guaranteed.'**
+  String get providerDetailPagePromptCacheKeyHelp;
+
   /// No description provided for @providerDetailPageAihubmixAppCodeLabel.
   ///
   /// In en, this message translates to:

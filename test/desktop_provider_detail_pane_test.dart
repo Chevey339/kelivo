@@ -6,6 +6,7 @@ import 'package:Kelivo/desktop/desktop_settings_page.dart';
 import 'package:Kelivo/features/provider/widgets/provider_custom_request_editor.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
 import 'package:Kelivo/shared/widgets/ios_checkbox.dart';
+import 'package:Kelivo/shared/widgets/ios_switch.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
@@ -84,6 +85,54 @@ Future<void> _pumpProviderSettings(
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+
+  testWidgets('desktop conversation cache key switch saves and restores', (
+    tester,
+  ) async {
+    final settings = await _buildSettings(tester);
+    addTearDown(settings.dispose);
+    await _pumpProviderSettings(tester, settings);
+    final settingsButton = find.byKey(
+      const ValueKey('desktop-provider-settings-ProviderA'),
+    );
+    await tester.tap(settingsButton);
+    await tester.pumpAndSettle();
+    final cacheSwitch = find.byWidgetPredicate(
+      (widget) =>
+          widget is IosSwitch &&
+          widget.semanticLabel == 'Send Conversation Cache Key',
+    );
+    expect(cacheSwitch, findsOneWidget);
+    expect(tester.widget<IosSwitch>(cacheSwitch).value, isFalse);
+    await tester.ensureVisible(cacheSwitch);
+    await tester.tap(cacheSwitch);
+    await tester.pumpAndSettle();
+    expect(
+      settings.getProviderConfig('ProviderA').promptCacheKeyEnabled,
+      isTrue,
+    );
+    Navigator.of(tester.element(cacheSwitch)).pop();
+    await tester.pumpAndSettle();
+    await tester.tap(settingsButton);
+    await tester.pumpAndSettle();
+    expect(tester.widget<IosSwitch>(cacheSwitch).value, isTrue);
+    await tester.ensureVisible(cacheSwitch);
+    await tester.tap(cacheSwitch);
+    await tester.pumpAndSettle();
+    expect(
+      settings.getProviderConfig('ProviderA').promptCacheKeyEnabled,
+      isFalse,
+    );
+    await settings.setProviderConfig(
+      'ProviderA',
+      settings
+          .getProviderConfig('ProviderA')
+          .copyWith(providerType: ProviderKind.claude),
+    );
+    await tester.pumpAndSettle();
+    expect(cacheSwitch, findsNothing);
+    expect(tester.takeException(), isNull);
+  });
 
   testWidgets(
     'desktop model selection state is cleared when provider changes',
@@ -182,6 +231,8 @@ void main() {
     final portField = find.byKey(
       const ValueKey('desktop-provider-proxy-port-field'),
     );
+    await tester.ensureVisible(portField);
+    await tester.pumpAndSettle();
     await tester.tap(portField);
     await tester.pump();
     await tester.enterText(portField, '1');

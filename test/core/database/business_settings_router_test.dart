@@ -727,6 +727,24 @@ void main() {
       );
     });
 
+    test('preserves optional boolean provider prompt cache key settings', () {
+      for (final fields in <Map<String, Object?>>[
+        {},
+        {'promptCacheKeyEnabled': null},
+        {'promptCacheKeyEnabled': false},
+        {'promptCacheKeyEnabled': true},
+      ]) {
+        final provider = {'id': 'provider-1', ...fields};
+        final snapshot = BusinessSettingsRouter.normalizeAndRoute({
+          'provider_configs_v1': jsonEncode({'provider-1': provider}),
+        });
+        final exported = BusinessSettingsRouter.exportSnapshot(snapshot);
+        final providers =
+            jsonDecode(exported['provider_configs_v1']! as String) as Map;
+        expect(providers['provider-1'], provider);
+      }
+    });
+
     test('rejects entity fields that runtime models cannot decode', () {
       final invalidBySourceKey = <String, Object>{
         'assistants_v1': [

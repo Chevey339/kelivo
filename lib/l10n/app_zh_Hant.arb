@@ -1407,6 +1407,8 @@
   "providerDetailPageShowTooltip": "顯示",
   "providerDetailPageApiPathLabel": "API 路徑",
   "providerDetailPageResponseApiTitle": "Response API (/responses)",
+  "providerDetailPagePromptCacheKeyTitle": "傳送對話快取鍵",
+  "providerDetailPagePromptCacheKeyHelp": "為 OpenAI 相容請求附加穩定的對話級 prompt_cache_key。僅在供應商支援時開啟，自訂 Body 優先，不保證快取命中。",
   "providerDetailPageAihubmixAppCodeLabel": "應用 Code（享 10% 優惠）",
   "providerDetailPageAihubmixAppCodeHelp": "為請求附加 APP-Code，可享 10% 優惠，僅對 AIhubmix 生效。",
   "providerDetailPageClaudePromptCachingTitle": "Claude Prompt Caching",

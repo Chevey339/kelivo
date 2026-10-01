@@ -211,6 +211,7 @@ Stream<StreamChunk> runOpenAIResponsesToolFollowUps({
   required ToolCallHandler onToolCall,
   required Map<String, String>? extraHeaders,
   required Map<String, dynamic>? extraBody,
+  required String? promptCacheKey,
   required double? temperature,
   required double? topP,
   required int? maxTokens,
@@ -277,6 +278,9 @@ Stream<StreamChunk> runOpenAIResponsesToolFollowUps({
       );
       final extraCfg = customBody(config, modelId, assistantBody: extraBody);
       CustomRequestMerger.applyBody(body2, extraCfg);
+      if (promptCacheKey != null) {
+        body2.putIfAbsent('prompt_cache_key', () => promptCacheKey);
+      }
       try {
         if (body2['tools'] is List) {
           final raw = (body2['tools'] as List).cast<dynamic>();

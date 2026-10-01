@@ -344,6 +344,7 @@ class ChatApiService {
                 ),
           extraHeaders: sessionHeaders,
           extraBody: textOnly ? null : extraBody,
+          conversationId: conversationId,
           stream: stream,
           builtInSearchOnly: builtInSearchOnly,
           skipImageParsing:
@@ -400,6 +401,7 @@ class ChatApiService {
 
   static Stream<StreamChunk> _sendOnce({
     required ProviderConfig config,
+    String? conversationId,
     required String modelId,
     required List<Map<String, dynamic>> messages,
     List<String>? userImagePaths,
@@ -456,6 +458,7 @@ class ChatApiService {
             config,
             modelId,
             messages,
+            conversationId: conversationId,
             userImagePaths: userImagePaths,
             reasoning: reasoning,
             temperature: temperature,
@@ -476,6 +479,7 @@ class ChatApiService {
             config,
             modelId,
             messages,
+            conversationId: conversationId,
             userImagePaths: userImagePaths,
             reasoning: reasoning,
             temperature: temperature,

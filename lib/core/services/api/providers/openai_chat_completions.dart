@@ -15,6 +15,7 @@ Stream<StreamChunk> sendOpenAIChatCompletionsStream(
   ProviderConfig config,
   String modelId,
   List<Map<String, dynamic>> messages, {
+  String? conversationId,
   List<String>? userImagePaths,
   ReasoningRequest reasoning = ReasoningRequest.auto,
   double? temperature,
@@ -35,6 +36,7 @@ Stream<StreamChunk> sendOpenAIChatCompletionsStream(
     cfg,
     modelId,
     messages,
+    conversationId: conversationId,
     userImagePaths: userImagePaths,
     reasoning: reasoning,
     temperature: temperature,
