@@ -2253,6 +2253,8 @@
   "displaySettingsShowReasoningLevelBadgeSubtitle": "Show the current level next to the reasoning icon in the input bar",
   "displaySettingsPageAutoCollapseThinkingTitle": "Auto-collapse Thinking",
   "displaySettingsPageAutoCollapseThinkingSubtitle": "Collapse reasoning after finish",
+  "displaySettingsPageShowCollapsedReasoningPreviewTitle": "Show Current Thought When Collapsed",
+  "displaySettingsPageShowCollapsedReasoningPreviewSubtitle": "Show the latest thought with animation while a thinking card is collapsed",
   "displaySettingsPageCollapseThinkingStepsTitle": "Collapse Thinking Steps",
   "displaySettingsPageCollapseThinkingStepsSubtitle": "Show only the latest steps until expanded",
   "displaySettingsPageShowToolResultSummaryTitle": "Show Tool Result Summary",
