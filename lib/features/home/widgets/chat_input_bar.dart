@@ -781,6 +781,9 @@ class _ChatInputBarState extends State<ChatInputBar>
 
   void _setExpanded(bool expanded) {
     if (expanded == _isExpanded) return;
+    // The field keeps focus across the toggle, so a context menu would stay
+    // open while the text under it jumps.
+    ContextMenuController.removeAny();
     final composer = _composerKey.currentContext?.findRenderObject();
     final textArea = _textAreaKey.currentContext?.findRenderObject();
     final editable = _findRenderEditable();
@@ -3295,9 +3298,11 @@ class _ChatInputBarState extends State<ChatInputBar>
                                           top: 2,
                                           end: 6,
                                           // Inside the field's tap region, so
-                                          // a mouse or trackpad click here is
-                                          // not a "tap outside" that drops
-                                          // focus and bounces the keyboard.
+                                          // a non-touch pointer (mouse,
+                                          // trackpad, stylus) or any desktop
+                                          // click here is not a "tap outside"
+                                          // that drops focus and bounces the
+                                          // keyboard.
                                           child: TextFieldTapRegion(
                                             child: IosIconButton(
                                               icon: _isExpanded
