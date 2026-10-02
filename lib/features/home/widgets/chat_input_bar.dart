@@ -3294,22 +3294,28 @@ class _ChatInputBarState extends State<ChatInputBar>
                                         PositionedDirectional(
                                           top: 2,
                                           end: 6,
-                                          child: IosIconButton(
-                                            icon: _isExpanded
-                                                ? Lucide.Minimize2
-                                                : Lucide.Maximize2,
-                                            size: 16,
-                                            color: theme.colorScheme.onSurface
-                                                .withValues(alpha: 0.45),
-                                            tooltip: _isExpanded
-                                                ? AppLocalizations.of(
-                                                    context,
-                                                  )!.chatInputBarCollapse
-                                                : AppLocalizations.of(
-                                                    context,
-                                                  )!.chatInputBarExpand,
-                                            onTap: () =>
-                                                _setExpanded(!_isExpanded),
+                                          // Inside the field's tap region, so
+                                          // a mouse or trackpad click here is
+                                          // not a "tap outside" that drops
+                                          // focus and bounces the keyboard.
+                                          child: TextFieldTapRegion(
+                                            child: IosIconButton(
+                                              icon: _isExpanded
+                                                  ? Lucide.Minimize2
+                                                  : Lucide.Maximize2,
+                                              size: 16,
+                                              color: theme.colorScheme.onSurface
+                                                  .withValues(alpha: 0.45),
+                                              tooltip: _isExpanded
+                                                  ? AppLocalizations.of(
+                                                      context,
+                                                    )!.chatInputBarCollapse
+                                                  : AppLocalizations.of(
+                                                      context,
+                                                    )!.chatInputBarExpand,
+                                              onTap: () =>
+                                                  _setExpanded(!_isExpanded),
+                                            ),
                                           ),
                                         ),
                                     ],

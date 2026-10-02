@@ -1,5 +1,6 @@
 import '../../../support/business_test_harness.dart';
 
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
@@ -68,6 +69,34 @@ void main() {
 
   double barHeight(WidgetTester tester) =>
       tester.getSize(find.byKey(barKey)).height;
+
+  for (final kind in [PointerDeviceKind.touch, PointerDeviceKind.mouse]) {
+    testWidgets('toggling keeps focus and the input connection ($kind)', (
+      tester,
+    ) async {
+      final controller = TextEditingController(text: 'line\n' * 6);
+      addTearDown(controller.dispose);
+      await pumpBar(tester, controller);
+      await tester.tap(find.byType(TextField));
+      await tester.pumpAndSettle();
+      final focus = tester
+          .widget<EditableText>(find.byType(EditableText))
+          .focusNode;
+      expect(focus.hasFocus, isTrue);
+
+      for (final tooltip in ['Expand', 'Collapse']) {
+        tester.testTextInput.log.clear();
+        await tester.tap(find.byTooltip(tooltip), kind: kind);
+        await tester.pump();
+        expect(focus.hasFocus, isTrue, reason: tooltip);
+        await tester.pumpAndSettle();
+        expect(focus.hasFocus, isTrue, reason: tooltip);
+        final methods = tester.testTextInput.log.map((c) => c.method);
+        expect(methods, isNot(contains('TextInput.clearClient')));
+        expect(methods, isNot(contains('TextInput.hide')));
+      }
+    });
+  }
 
   testWidgets('offers expansion only once the text wraps past two lines', (
     tester,
