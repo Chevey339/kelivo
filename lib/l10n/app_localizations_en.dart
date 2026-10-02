@@ -12787,4 +12787,54 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get phoneControlEnableAssistant =>
       'Allow this assistant to use phone control';
+
+  @override
+  String get providerPluginTitle => 'Provider plugins';
+
+  @override
+  String get providerPluginImport => 'Import provider plugin';
+
+  @override
+  String get providerPluginInstall => 'Install';
+
+  @override
+  String get providerPluginRemove => 'Remove plugin and account';
+
+  @override
+  String get providerPluginCopy => 'Copy plugin JSON';
+
+  @override
+  String get providerPluginModels => 'Fetch models';
+
+  @override
+  String get providerPluginLogout => 'Sign out locally';
+
+  @override
+  String get providerPluginSignedOut => 'Sign-in required';
+
+  @override
+  String get providerPluginSignedIn => 'Signed in';
+
+  @override
+  String get providerPluginSave => 'Save';
+
+  @override
+  String get providerPluginCancel => 'Cancel';
+
+  @override
+  String get providerPluginInvalid => 'Invalid provider plugin';
+
+  @override
+  String get providerPluginOperationFailed =>
+      'Provider plugin operation failed';
+
+  @override
+  String get providerPluginVersion => 'Version';
+
+  @override
+  String get providerPluginProtocol => 'Protocol';
+
+  @override
+  String get providerPluginTrust =>
+      'This is an unverified third-party provider. Its API will receive the conversations you send to it. Review the actual API and authorization URLs and requested scopes before installing. OAuth credentials use Kelivo\'s existing local and portable-backup storage; copying plugin JSON never includes credentials.';
 }

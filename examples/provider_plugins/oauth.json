@@ -1,0 +1,21 @@
+{
+  "schemaVersion": 1,
+  "id": "test.example.provider",
+  "name": "Example OAuth Provider",
+  "version": "1.0.0",
+  "protocol": "openai",
+  "baseUrl": "https://api.example.test/v1",
+  "models": [
+    "example-model"
+  ],
+  "oauth": {
+    "authorizationEndpoint": "https://auth.example.test/oauth/authorize",
+    "tokenEndpoint": "https://auth.example.test/oauth/token",
+    "clientId": "REGISTERED_PUBLIC_CLIENT_ID",
+    "scopes": [
+      "inference",
+      "offline_access"
+    ],
+    "loopbackRedirect": "http://127.0.0.1:0/oauth/callback"
+  }
+}

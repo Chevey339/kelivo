@@ -1,0 +1,11 @@
+{
+  "schemaVersion": 1,
+  "id": "test.example.provider",
+  "name": "Example API-key Provider",
+  "version": "1.0.0",
+  "protocol": "openai",
+  "baseUrl": "https://api.example.test/v1",
+  "models": [
+    "example-model"
+  ]
+}

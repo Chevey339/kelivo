@@ -12207,6 +12207,55 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get phoneControlEnableAssistant => '允许此助手使用手机控制';
+
+  @override
+  String get providerPluginTitle => '供应商插件';
+
+  @override
+  String get providerPluginImport => '导入供应商插件';
+
+  @override
+  String get providerPluginInstall => '安装';
+
+  @override
+  String get providerPluginRemove => '移除插件及账号';
+
+  @override
+  String get providerPluginCopy => '复制插件 JSON';
+
+  @override
+  String get providerPluginModels => '获取模型';
+
+  @override
+  String get providerPluginLogout => '退出本地登录';
+
+  @override
+  String get providerPluginSignedOut => '需要登录';
+
+  @override
+  String get providerPluginSignedIn => '已登录';
+
+  @override
+  String get providerPluginSave => '保存';
+
+  @override
+  String get providerPluginCancel => '取消';
+
+  @override
+  String get providerPluginInvalid => '供应商插件无效';
+
+  @override
+  String get providerPluginOperationFailed => '供应商插件操作失败';
+
+  @override
+  String get providerPluginVersion => '版本';
+
+  @override
+  String get providerPluginProtocol => '协议';
+
+  @override
+  String get providerPluginTrust =>
+      '这是未经验证的第三方供应商。你发给它的对话将发送到其 API。安装前请核对下方实际的 API、授权地址和请求权限。OAuth 凭据沿用 Kelivo 的本地及可迁移备份存储方式；复制插件 JSON 不会包含凭据。';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hans`).
@@ -24338,6 +24387,55 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get phoneControlEnableAssistant => '允许此助手使用手机控制';
+
+  @override
+  String get providerPluginTitle => '供应商插件';
+
+  @override
+  String get providerPluginImport => '导入供应商插件';
+
+  @override
+  String get providerPluginInstall => '安装';
+
+  @override
+  String get providerPluginRemove => '移除插件及账号';
+
+  @override
+  String get providerPluginCopy => '复制插件 JSON';
+
+  @override
+  String get providerPluginModels => '获取模型';
+
+  @override
+  String get providerPluginLogout => '退出本地登录';
+
+  @override
+  String get providerPluginSignedOut => '需要登录';
+
+  @override
+  String get providerPluginSignedIn => '已登录';
+
+  @override
+  String get providerPluginSave => '保存';
+
+  @override
+  String get providerPluginCancel => '取消';
+
+  @override
+  String get providerPluginInvalid => '供应商插件无效';
+
+  @override
+  String get providerPluginOperationFailed => '供应商插件操作失败';
+
+  @override
+  String get providerPluginVersion => '版本';
+
+  @override
+  String get providerPluginProtocol => '协议';
+
+  @override
+  String get providerPluginTrust =>
+      '这是未经验证的第三方供应商。你发给它的对话将发送到其 API。安装前请核对下方实际的 API、授权地址和请求权限。OAuth 凭据沿用 Kelivo 的本地及可迁移备份存储方式；复制插件 JSON 不会包含凭据。';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hant`).
@@ -36548,4 +36646,53 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get phoneControlEnableAssistant => '允許此助手使用手機控制';
+
+  @override
+  String get providerPluginTitle => '供应商插件';
+
+  @override
+  String get providerPluginImport => '导入供应商插件';
+
+  @override
+  String get providerPluginInstall => '安装';
+
+  @override
+  String get providerPluginRemove => '移除插件及账号';
+
+  @override
+  String get providerPluginCopy => '复制插件 JSON';
+
+  @override
+  String get providerPluginModels => '获取模型';
+
+  @override
+  String get providerPluginLogout => '退出本地登录';
+
+  @override
+  String get providerPluginSignedOut => '需要登录';
+
+  @override
+  String get providerPluginSignedIn => '已登录';
+
+  @override
+  String get providerPluginSave => '保存';
+
+  @override
+  String get providerPluginCancel => '取消';
+
+  @override
+  String get providerPluginInvalid => '供应商插件无效';
+
+  @override
+  String get providerPluginOperationFailed => '供应商插件操作失败';
+
+  @override
+  String get providerPluginVersion => '版本';
+
+  @override
+  String get providerPluginProtocol => '协议';
+
+  @override
+  String get providerPluginTrust =>
+      '这是未经验证的第三方供应商。你发给它的对话将发送到其 API。安装前请核对下方实际的 API、授权地址和请求权限。OAuth 凭据沿用 Kelivo 的本地及可迁移备份存储方式；复制插件 JSON 不会包含凭据。';
 }

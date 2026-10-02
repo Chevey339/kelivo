@@ -3,10 +3,22 @@ import 'package:http/http.dart' as http;
 
 import '../../providers/settings_provider.dart';
 import 'dio_http_client.dart';
+import '../provider_plugins/plugin_http_client.dart';
+import '../provider_plugins/provider_plugin_service.dart';
 
 /// HTTP client for requests to [config]'s endpoint, routed through the
 /// provider's proxy when one is configured.
 http.Client providerHttpClient(
+  ProviderConfig config, {
+  CancelToken? cancelToken,
+}) {
+  final client = _providerTransport(config, cancelToken: cancelToken);
+  return config.providerPlugin == null
+      ? client
+      : PluginHttpClient(client, config, ProviderPluginService.instance);
+}
+
+http.Client _providerTransport(
   ProviderConfig config, {
   CancelToken? cancelToken,
 }) {

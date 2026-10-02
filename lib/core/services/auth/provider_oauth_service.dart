@@ -7,6 +7,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:uuid/uuid.dart';
 
 import '../../models/model_spec.dart';
+import '../provider_plugins/provider_plugin_service.dart';
 import '../../models/provider_oauth.dart';
 import '../../providers/model_provider.dart';
 import '../../providers/settings_provider.dart';
@@ -33,9 +34,14 @@ class ProviderOAuthService extends ChangeNotifier {
   final _usageRequests = <String, Future<ProviderUsageSnapshot>>{};
   OAuthCancellation? _login;
 
-  void bind(SettingsProvider settings) => _settings = settings;
+  void bind(SettingsProvider settings) {
+    _settings = settings;
+    ProviderPluginService.instance.bind(settings);
+  }
+
   void unbind(SettingsProvider settings) {
     if (identical(settings, _settings)) {
+      ProviderPluginService.instance.unbind(settings);
       _login?.cancel();
       _settings = null;
       _usage.clear();
