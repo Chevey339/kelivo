@@ -100,6 +100,7 @@ class MarkdownWithCodeHighlight extends StatefulWidget {
     this.citationIndexResolver,
     this.baseStyle,
     this.streaming = false,
+    this.useBlockRendering = false,
     this.conversationId,
   });
 
@@ -113,6 +114,10 @@ class MarkdownWithCodeHighlight extends StatefulWidget {
   final String? Function(String id)? citationIndexResolver;
   final TextStyle? baseStyle; // optional override for base markdown text style
   final bool streaming;
+
+  /// Render static documents in source blocks while retaining full code
+  /// highlighting, tables and interactive state.
+  final bool useBlockRendering;
 
   static const int _streamingTableMaxRows = 30;
   static const int _streamingHighlightMaxLines = 300;
@@ -151,6 +156,7 @@ class _MarkdownWithCodeHighlightState extends State<MarkdownWithCodeHighlight> {
   String? _metadataSource;
   final _sourceScan = MarkdownSourceScan();
   bool? _metadataAppended;
+  bool _previousBlockSourceUnchanged = false;
   String _sanitizedText = '';
   List<String> _imageUrls = const [];
   List<String> _documentCitationIds = const [];
@@ -264,14 +270,31 @@ class _MarkdownWithCodeHighlightState extends State<MarkdownWithCodeHighlight> {
 
     // Keep the same block tree from the first streaming frame through
     // completion, so growing replies do not dispose interactive children.
+    // Static previews reuse it without enabling streaming rendering limits.
     final useIncrementalBlocks =
-        widget.streaming || _incrementalDocument.blocks.isNotEmpty;
+        widget.useBlockRendering ||
+        widget.streaming ||
+        _incrementalDocument.blocks.isNotEmpty;
+    // Whole-source rewrites can create safe boundaries, e.g. an inline-started
+    // display formula containing blank lines. Static blocks must split after
+    // those rewrites and must not apply them again to individual fragments.
+    final preprocessedBlocks = widget.useBlockRendering && !widget.streaming;
+    final blockSource = preprocessedBlocks
+        ? normalize(sanitizedText, streaming: false)
+        : sanitizedText;
+    final blockSourceUnchanged = identical(blockSource, sanitizedText);
     final sourceBlocks = useIncrementalBlocks
         ? _incrementalDocument.update(
-            sanitizedText,
-            appendOnly: _metadataAppended,
+            blockSource,
+            // Raw-source append proofs apply only when neither input changed
+            // during preprocessing, including after a math setting toggle.
+            appendOnly: _previousBlockSourceUnchanged && blockSourceUnchanged
+                ? _metadataAppended
+                : null,
           )
         : const <IncrementalMarkdownBlock>[];
+    _previousBlockSourceUnchanged =
+        useIncrementalBlocks && blockSourceUnchanged;
     final sourceAppended = _incrementalDocument.lastUpdateAppended;
     final wholeFence = useIncrementalBlocks
         ? null
@@ -734,7 +757,12 @@ class _MarkdownWithCodeHighlightState extends State<MarkdownWithCodeHighlight> {
         return cached.$3;
       }
       final result = _swallowsTrailingBlankLine(
-        normalize(block.text, streaming: widget.streaming && !block.stable),
+        preprocessedBlocks
+            ? block.text
+            : normalize(
+                block.text,
+                streaming: widget.streaming && !block.stable,
+              ),
         mathEnabled: settings.enableMathRendering,
       );
       _separatorCache[block] = (
@@ -763,7 +791,7 @@ class _MarkdownWithCodeHighlightState extends State<MarkdownWithCodeHighlight> {
                   false,
                 );
               }
-              final content = fence != null
+              final content = fence != null || preprocessedBlocks
                   ? block.text
                   : normalize(
                       block.text,

@@ -13,6 +13,8 @@ import 'package:Kelivo/shared/widgets/markdown_with_highlight.dart';
 import 'package:Kelivo/theme/palettes.dart';
 import 'package:Kelivo/theme/theme_factory.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_math_fork/flutter_math.dart';
+import 'package:flutter_math_fork/tex.dart' show TexEncoderExt;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 
@@ -253,6 +255,138 @@ void main() {
       await tester.pumpWidget(const SizedBox.shrink());
     }, _SkillFileOverrides([file]));
   });
+
+  for (final desktop in [false, true]) {
+    testWidgets('long preview retains full tables and state: desktop=$desktop', (
+      tester,
+    ) async {
+      file.replace(
+        [
+          '# Long skill',
+          for (var i = 0; i < 200; i++)
+            'Step $i: Read the source, preserve **formatting** and inspect `code`.',
+          '| Step | Result |\n| --- | --- |\n'
+              '${List.generate(55, (i) => '| row-${i + 1} | value |').join('\n')}',
+          '# End of the skill',
+        ].join('\n\n'),
+      );
+      await IOOverrides.runWithIOOverrides(() async {
+        Finder row(String label) => find.text(label, findRichText: true);
+        await pumpDetail(tester, desktop: desktop);
+        await tester.pumpAndSettle();
+        expect(find.text('End of the skill'), findsOneWidget);
+        expect(row('row-35'), findsOneWidget);
+        expect(row('row-55'), findsNothing);
+
+        final showMore = find.byKey(const ValueKey('markdown-table-show-more'));
+        await tester.ensureVisible(showMore);
+        await tester.pumpAndSettle();
+        await tester.tap(showMore);
+        await tester.pumpAndSettle();
+        expect(row('row-55'), findsOneWidget);
+
+        final scroll = tester.state<ScrollableState>(
+          find
+              .descendant(
+                of: find.byType(ListView),
+                matching: find.byType(Scrollable),
+              )
+              .first,
+        );
+        final extent = scroll.position.maxScrollExtent;
+        await service.setEnabled(skill.record.id, false);
+        await service.rescan();
+        await tester.pumpAndSettle();
+        expect(row('row-55'), findsOneWidget);
+        expect(scroll.position.maxScrollExtent, extent);
+        expect(file.reads, 1);
+        expect(tester.takeException(), isNull);
+        await tester.pumpWidget(const SizedBox.shrink());
+      }, _SkillFileOverrides([file]));
+    });
+  }
+
+  for (final desktop in [false, true]) {
+    testWidgets(
+      'edited skill survives a math setting toggle: desktop=$desktop',
+      (tester) async {
+        const original = r'Original $x$';
+        file.replace(original);
+        await IOOverrides.runWithIOOverrides(() async {
+          await pumpDetail(tester, desktop: desktop);
+          await tester.pumpAndSettle();
+          final state = tester.state(find.byType(MarkdownWithCodeHighlight));
+          expect(find.byType(Math), findsOneWidget);
+
+          file.replace('$original appended');
+          await service.updateBody(skill.record.id, utf8.decode(file.bytes));
+          await tester.pumpAndSettle();
+          expect(find.byType(Math), findsOneWidget);
+          expect(
+            tester.state(find.byType(MarkdownWithCodeHighlight)),
+            same(state),
+          );
+          await tester.runAsync(() => settings.setEnableDollarLatex(false));
+          await tester.pumpAndSettle();
+          expect(tester.takeException(), isNull);
+          expect(find.byType(Math), findsNothing);
+          expect(
+            tester.state(find.byType(MarkdownWithCodeHighlight)),
+            same(state),
+          );
+          expect(
+            tester
+                .widgetList<RichText>(find.byType(RichText))
+                .map((text) => text.text.toPlainText()),
+            contains('$original appended'),
+          );
+          await tester.runAsync(() => settings.setEnableDollarLatex(true));
+          await tester.pumpAndSettle();
+          expect(tester.takeException(), isNull);
+          expect(find.byType(Math), findsOneWidget);
+          expect(
+            tester.state(find.byType(MarkdownWithCodeHighlight)),
+            same(state),
+          );
+          expect(file.reads, 2);
+          await tester.pumpWidget(const SizedBox.shrink());
+        }, _SkillFileOverrides([file]));
+      },
+    );
+
+    testWidgets('skill preview keeps cross-paragraph math: desktop=$desktop', (
+      tester,
+    ) async {
+      file.replace(
+        r'说明文字 $$'
+        '\na + b\n\nc + d\n'
+        r'$$',
+      );
+      await IOOverrides.runWithIOOverrides(() async {
+        await pumpDetail(tester, desktop: desktop);
+        await tester.pumpAndSettle();
+        expect(find.byType(Math), findsOneWidget);
+
+        file.replace(
+          r'修改后的说明 $$'
+          '\nx + y\n\ny + z\n'
+          r'$$',
+        );
+        await service.updateBody(skill.record.id, utf8.decode(file.bytes));
+        await tester.pumpAndSettle();
+        expect(find.byType(Math), findsOneWidget);
+        final formula = tester
+            .widget<Math>(find.byType(Math))
+            .ast!
+            .greenRoot
+            .encodeTeX();
+        expect(formula, allOf(contains('x'), contains('z')));
+        expect(file.reads, 2);
+        expect(tester.takeException(), isNull);
+        await tester.pumpWidget(const SizedBox.shrink());
+      }, _SkillFileOverrides([file]));
+    });
+  }
 
   testWidgets('editing and rescanning refresh the cached body and size gate', (
     tester,

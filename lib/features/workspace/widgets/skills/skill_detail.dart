@@ -498,6 +498,7 @@ class _SkillDetailBodyState extends State<_SkillDetailBody> {
             padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
             child: MarkdownWithCodeHighlight(
               text: body,
+              useBlockRendering: true,
               baseStyle: const TextStyle(fontSize: 15, height: 1.5),
             ),
           ),
