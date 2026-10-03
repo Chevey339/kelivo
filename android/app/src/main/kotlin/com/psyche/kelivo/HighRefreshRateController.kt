@@ -13,7 +13,7 @@ import android.view.Window
 
 /**
  * Window-owned requests also work when a headless Flutter engine gains a new Activity.
- * On API 30+, Surface rate votes leave mode selection to Android for adaptive refresh.
+ * On API 31+, Surface rate votes leave mode selection to Android for adaptive refresh.
  */
 internal class HighRefreshRateController(private val window: Window) : SurfaceHolder.Callback {
     private val displayManager = window.context.getSystemService(DisplayManager::class.java)
@@ -84,7 +84,10 @@ internal class HighRefreshRateController(private val window: Window) : SurfaceHo
 
             if (Build.VERSION.SDK_INT >= 30) {
                 val surface = view?.holder?.surface?.takeIf { it.isValid } ?: return
-                setWindowMode(0)
+                // Android 11 vendors can accept a Surface vote while continuing
+                // to deliver 60 Hz app vsync. Also select the same-resolution
+                // window mode on API 30; newer versions use adaptive votes.
+                setWindowMode(if (Build.VERSION.SDK_INT == 30) highestMode.modeId else 0)
                 if (!force && requestedSurface === surface && requestedRate == rate) return
                 val compatibility = if (Build.VERSION.SDK_INT >= 36) {
                     Surface.FRAME_RATE_COMPATIBILITY_AT_LEAST

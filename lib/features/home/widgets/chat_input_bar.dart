@@ -44,6 +44,7 @@ import '../../../utils/app_directories.dart';
 import 'package:super_clipboard/super_clipboard.dart';
 import '../../../desktop/desktop_context_menu.dart';
 import '../../../shared/widgets/context_usage_ring.dart';
+import '../../../shared/widgets/long_message_editor.dart';
 import '../services/context_usage_service.dart';
 import 'package:Kelivo/theme/app_font_weights.dart';
 
@@ -273,6 +274,7 @@ class _ChatInputBarState extends State<ChatInputBar>
   InteractiveDrawerController? _hostDrawer;
   final GlobalKey _composerKey = GlobalKey();
   final GlobalKey _textAreaKey = GlobalKey();
+  final _longEditorKey = GlobalKey<LongMessageEditorState>();
   late final AnimationController _expandController = AnimationController(
     vsync: this,
     duration: const Duration(milliseconds: 320),
@@ -762,6 +764,10 @@ class _ChatInputBarState extends State<ChatInputBar>
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _expandCheckScheduled = false;
       if (!mounted || _expandedLayout) return;
+      if (_longEditorKey.currentState?.usesLineEditor ?? false) {
+        if (!_canExpand) setState(() => _canExpand = true);
+        return;
+      }
       final editable = _findRenderEditable();
       if (editable == null || !editable.hasSize) return;
       // Judge the text at the width it has while the button is shown. The
@@ -772,9 +778,13 @@ class _ChatInputBarState extends State<ChatInputBar>
           ? editable.size.width
           : editable.size.width -
                 (_expandButtonExtent + AppSpacing.xs - AppSpacing.md);
-      final canExpand =
-          editable.getMaxIntrinsicHeight(buttonWidth) >
-          editable.preferredLineHeight * 2.5;
+      // With the button already present, the field has exactly buttonWidth.
+      // Reuse its completed layout instead of shaping the whole draft again.
+      // Only the initial probe needs to measure the hypothetical narrower field.
+      final height = _canExpand
+          ? editable.size.height + editable.maxScrollExtent
+          : editable.getMaxIntrinsicHeight(buttonWidth);
+      final canExpand = height > editable.preferredLineHeight * 2.5;
       if (canExpand != _canExpand) setState(() => _canExpand = canExpand);
     });
   }
@@ -805,6 +815,23 @@ class _ChatInputBarState extends State<ChatInputBar>
       } else if (_expandController.isDismissed) {
         _expandFromHeight = composer.size.height;
         _textAreaChrome = textArea.size.height - editable.size.height;
+      }
+    } else if (composer is RenderBox &&
+        composer.hasSize &&
+        textArea is RenderBox &&
+        textArea.hasSize &&
+        (_longEditorKey.currentState?.usesLineEditor ?? false)) {
+      final collapsedText =
+          _longEditorKey.currentState!.preferredLineHeight * _collapsedMaxLines;
+      if (!expanded) {
+        _expandFromHeight =
+            composer.size.height -
+            textArea.size.height +
+            _textAreaChrome +
+            collapsedText;
+      } else if (_expandController.isDismissed) {
+        _expandFromHeight = composer.size.height;
+        _textAreaChrome = textArea.size.height - collapsedText;
       }
     }
     if (expanded && _expandController.isDismissed) {
@@ -1451,6 +1478,12 @@ class _ChatInputBarState extends State<ChatInputBar>
 
   // Keep the caret visible after programmatic edits (e.g., Shift+Enter insert)
   void _ensureCaretVisible() {
+    if (_longEditorKey.currentState?.usesLineEditor ?? false) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _longEditorKey.currentState?.ensureCaretVisible();
+      });
+      return;
+    }
     try {
       final selection = _controller.selection;
       if (!selection.isValid) return;
@@ -1471,7 +1504,12 @@ class _ChatInputBarState extends State<ChatInputBar>
 
   // Instance method for contextMenuBuilder to avoid flickering caused by recreating
   // the callback on every build. See: https://github.com/flutter/flutter/issues/150551
-  Widget _buildContextMenu(BuildContext context, EditableTextState state) {
+  Widget _buildMessageContextMenu(
+    BuildContext context,
+    TextSelectionToolbarAnchors anchors,
+    List<ContextMenuButtonItem> defaultItems,
+    VoidCallback hideToolbar,
+  ) {
     // Suppress context menu during app lifecycle transitions to avoid flickering
     if (_suppressContextMenu) {
       return const SizedBox.shrink();
@@ -1502,7 +1540,7 @@ class _ChatInputBarState extends State<ChatInputBar>
                     selection: TextSelection.collapsed(offset: start),
                   );
                 } catch (_) {}
-                state.hideToolbar();
+                hideToolbar();
               },
               label: materialL10n.cutButtonLabel,
             ),
@@ -1520,7 +1558,7 @@ class _ChatInputBarState extends State<ChatInputBar>
                   final text = value.text.substring(start, end);
                   await Clipboard.setData(ClipboardData(text: text));
                 } catch (_) {}
-                state.hideToolbar();
+                hideToolbar();
               },
               label: materialL10n.copyButtonLabel,
             ),
@@ -1532,7 +1570,7 @@ class _ChatInputBarState extends State<ChatInputBar>
           ContextMenuButtonItem(
             onPressed: () {
               _handlePasteFromClipboard();
-              state.hideToolbar();
+              hideToolbar();
             },
             label: materialL10n.pasteButtonLabel,
           ),
@@ -1543,7 +1581,7 @@ class _ChatInputBarState extends State<ChatInputBar>
           ContextMenuButtonItem(
             onPressed: () {
               _insertNewlineAtCursor();
-              state.hideToolbar();
+              hideToolbar();
             },
             label: appL10n.chatInputBarInsertNewline,
           ),
@@ -1560,7 +1598,7 @@ class _ChatInputBarState extends State<ChatInputBar>
                     extentOffset: value.text.length,
                   );
                 } catch (_) {}
-                state.hideToolbar();
+                hideToolbar();
               },
               label: materialL10n.selectAllButtonLabel,
             ),
@@ -1568,24 +1606,24 @@ class _ChatInputBarState extends State<ChatInputBar>
         }
       } catch (_) {}
       return AdaptiveTextSelectionToolbar.buttonItems(
-        anchors: state.contextMenuAnchors,
+        anchors: anchors,
         buttonItems: items,
       );
     }
 
-    final items = state.contextMenuButtonItems
+    final items = defaultItems
         .map((item) {
           if (item.type != ContextMenuButtonType.paste) return item;
           return item.copyWith(
             onPressed: () {
               unawaited(_handlePasteFromClipboard());
-              state.hideToolbar();
+              hideToolbar();
             },
           );
         })
         .toList(growable: false);
     return AdaptiveTextSelectionToolbar.buttonItems(
-      anchors: state.contextMenuAnchors,
+      anchors: anchors,
       buttonItems: items,
     );
   }
@@ -3210,7 +3248,8 @@ class _ChatInputBarState extends State<ChatInputBar>
                                                 // onSecondaryTapDown: (details) {
                                                 //   // _showDesktopContextMenu(details.globalPosition);
                                                 // },
-                                                child: TextField(
+                                                child: LongMessageEditor(
+                                                  key: _longEditorKey,
                                                   controller: _controller,
                                                   focusNode: widget.focusNode,
                                                   onChanged: _onTextChanged,
@@ -3239,8 +3278,6 @@ class _ChatInputBarState extends State<ChatInputBar>
                                                   expands: expandedLayout,
                                                   // On mobile, optionally show "Send" on the return key and submit on tap.
                                                   // Still keep multiline so pasted text preserves line breaks.
-                                                  keyboardType:
-                                                      TextInputType.multiline,
                                                   textInputAction: enterToSend
                                                       ? TextInputAction.send
                                                       : TextInputAction.newline,
@@ -3253,7 +3290,8 @@ class _ChatInputBarState extends State<ChatInputBar>
                                                   // caused by recreating the callback on every build.
                                                   // See: https://github.com/flutter/flutter/issues/150551
                                                   contextMenuBuilder:
-                                                      _buildContextMenu,
+                                                      _buildMessageContextMenu,
+                                                  onKeyEvent: _handleKeyEvent,
                                                   autofocus: false,
                                                   decoration: InputDecoration(
                                                     hintText: _hint(context),
@@ -3524,7 +3562,7 @@ class _ChatInputBarState extends State<ChatInputBar>
                 : null,
             child: child,
           ),
-          child: composer,
+          child: RepaintBoundary(child: composer),
         );
       },
     );

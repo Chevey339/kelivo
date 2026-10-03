@@ -97,7 +97,11 @@ class ChatBackdropSpec {
   static ChatBackdropSpec resolve(BuildContext context) {
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
-    final mq = MediaQuery.of(context);
+    // Keyboard insets do not change the artwork. Subscribing to all metrics
+    // also rebuilds HomePage, which resolves this spec while building its list.
+    final size = MediaQuery.sizeOf(context);
+    final dpr = MediaQuery.devicePixelRatioOf(context);
+    final disableAnimations = MediaQuery.disableAnimationsOf(context);
     final backgroundRaw = context.select<AssistantProvider, String>(
       (p) => (p.currentAssistant?.background ?? '').trim(),
     );
@@ -119,7 +123,7 @@ class ChatBackdropSpec {
     return ChatBackdropSpec(
       backgroundRaw: useGradientBackground ? '' : backgroundRaw,
       useGradientBackground: useGradientBackground,
-      gradientBackgroundAnimated: gradientOptions.$1 && !mq.disableAnimations,
+      gradientBackgroundAnimated: gradientOptions.$1 && !disableAnimations,
       gradientBackgroundPhase: gradientOptions.$4,
       gradientBackgroundOffset: Offset(gradientOptions.$2, gradientOptions.$3),
       active: useGradientBackground || isBackgroundActive(backgroundRaw),
@@ -127,8 +131,8 @@ class ChatBackdropSpec {
       surface: useGradientBackground ? Colors.transparent : cs.surface,
       shadow: useGradientBackground ? Colors.transparent : cs.shadow,
       brightness: theme.brightness,
-      logicalSize: mq.size,
-      dpr: mq.devicePixelRatio,
+      logicalSize: size,
+      dpr: dpr,
     );
   }
 

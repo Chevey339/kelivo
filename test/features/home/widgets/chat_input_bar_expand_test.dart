@@ -2,6 +2,8 @@ import '../../../support/business_test_harness.dart';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:flutter/services.dart';
+import 'package:re_editor/re_editor.dart';
 import 'package:provider/provider.dart';
 
 import 'package:Kelivo/core/models/chat_input_data.dart';
@@ -20,6 +22,7 @@ void main() {
     TextEditingController controller, {
     ChatInputSubmissionResult sendResult = ChatInputSubmissionResult.rejected,
     bool showBar = true,
+    List<ChatInputData>? submissions,
   }) async {
     final settings = SettingsProvider(createBusinessTestPreferences());
     await settings.loaded;
@@ -51,7 +54,10 @@ void main() {
                           controller: controller,
                           focusNode: FocusNode(),
                           onExpandedChanged: expandedEvents.add,
-                          onSend: (_) async => sendResult,
+                          onSend: (data) async {
+                            submissions?.add(data);
+                            return sendResult;
+                          },
                         )
                       : const SizedBox.shrink(),
                 ),
@@ -131,6 +137,42 @@ void main() {
     await tester.pumpAndSettle();
     expect(barHeight(tester), collapsedHeight);
     expect(events, [true, false]);
+  });
+
+  testWidgets('long drafts keep expansion and app send shortcuts', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(1200, 600);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    final source = '中文 mixed content **Markdown** 1234567890\n' * 1200;
+    final controller = TextEditingController(text: source);
+    addTearDown(controller.dispose);
+    final submissions = <ChatInputData>[];
+    final events = await pumpBar(tester, controller, submissions: submissions);
+    expect(find.byType(CodeEditor), findsOneWidget);
+    expect(find.byTooltip('Expand'), findsOneWidget);
+    final collapsed = barHeight(tester);
+    final editor = tester.widget<CodeEditor>(find.byType(CodeEditor));
+    editor.focusNode!.requestFocus();
+    await tester.pump();
+    // At the tablet-sized MediaQuery, Enter belongs to the app's send policy.
+    // A rejected send must not also insert a newline in the line editor.
+    await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+    await tester.pump();
+    expect(controller.text, source);
+    expect(submissions, hasLength(1));
+    expect(submissions.single.text, source.trim());
+    await tester.tap(find.byTooltip('Expand'));
+    await tester.pumpAndSettle();
+    expect(barHeight(tester), greaterThan(bodyHeight * .9));
+    expect(events, [true]);
+    await tester.tap(find.byTooltip('Collapse'));
+    await tester.pumpAndSettle();
+    expect(barHeight(tester), closeTo(collapsed, 1));
+    expect(events, [true, false]);
+    expect(controller.text, source);
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets('collapse lands on the height of text edited while expanded', (

@@ -1,0 +1,20 @@
+name: re_editor
+description: Re-Editor is a powerful lightweight text and code editor widget.
+version: 0.10.0
+homepage: https://reqable.com
+repository: https://github.com/reqable/re-editor
+
+environment:
+  sdk: ">=2.17.3 <4.0.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  re_highlight: ^0.0.3
+  isolate_manager: ^4.1.5+1
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^2.0.1
+  path: ^1.8.2

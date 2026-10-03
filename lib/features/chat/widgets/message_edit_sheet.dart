@@ -5,6 +5,7 @@ import '../../../l10n/app_localizations.dart';
 import '../../../shared/widgets/ios_tactile.dart';
 import '../../../core/services/haptics.dart';
 import '../../../theme/app_font_weights.dart';
+import '../../../shared/widgets/long_message_editor.dart';
 import 'package:Kelivo/theme/app_semantic_colors.dart';
 
 Future<MessageEditResult?> showMessageEditSheet(
@@ -107,13 +108,15 @@ class _MessageEditSheetState extends State<_MessageEditSheet> {
                       ),
                     ),
                     Center(
-                      child: Text(
-                        l10n.messageEditPageTitle,
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: AppFontWeights.semibold,
+                      child: IgnorePointer(
+                        child: Text(
+                          l10n.messageEditPageTitle,
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: AppFontWeights.semibold,
+                          ),
+                          textAlign: TextAlign.center,
                         ),
-                        textAlign: TextAlign.center,
                       ),
                     ),
                     Align(
@@ -150,14 +153,12 @@ class _MessageEditSheetState extends State<_MessageEditSheet> {
               ),
               const SizedBox(height: 12),
               Expanded(
-                child: SingleChildScrollView(
-                  controller: sc,
-                  child: TextField(
+                child: Align(
+                  alignment: Alignment.topCenter,
+                  child: LongMessageEditor(
+                    scrollController: sc,
                     controller: _controller,
                     autofocus: false,
-                    keyboardType: TextInputType.multiline,
-                    minLines: 8,
-                    maxLines: null,
                     decoration: InputDecoration(
                       hintText: l10n.messageEditPageHint,
                       filled: true,
