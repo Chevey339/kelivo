@@ -8,6 +8,57 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  testWidgets('completed medium paragraphs keep native text geometry', (
+    tester,
+  ) async {
+    final text = Text.rich(
+      TextSpan(
+        children: [
+          TextSpan(text: '中文 English paragraph ' * 25),
+          TextSpan(
+            text: 'bold 中文 ' * 40,
+            style: const TextStyle(fontWeight: FontWeight.bold),
+          ),
+          TextSpan(text: '尾部 text ' * 40),
+        ],
+      ),
+      style: const TextStyle(fontSize: 16, height: 1.5),
+    );
+    Future<(Size, List<Rect>)> measure(bool optimized) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: SingleChildScrollView(
+              child: SizedBox(
+                width: 300,
+                child: optimized
+                    ? StreamingRichText(text: text, streaming: false)
+                    : text,
+              ),
+            ),
+          ),
+        ),
+      );
+      final paragraph = tester.renderObject<RenderParagraph>(
+        find.byType(RichText).first,
+      );
+      return (
+        paragraph.size,
+        paragraph
+            .getBoxesForSelection(
+              const TextSelection(baseOffset: 20, extentOffset: 1200),
+            )
+            .map((box) => box.toRect())
+            .toList(),
+      );
+    }
+
+    final before = await measure(false);
+    final after = await measure(true);
+    expect(after.$1, before.$1);
+    expect(after.$2, before.$2);
+  });
+
   testWidgets('ancestor repaint reuses the unchanged paragraph drawing', (
     tester,
   ) async {

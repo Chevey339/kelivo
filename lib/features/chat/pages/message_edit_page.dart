@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../../core/models/chat_message.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../theme/app_font_weights.dart';
+import '../../../shared/widgets/long_message_editor.dart';
 import 'package:Kelivo/theme/app_semantic_colors.dart';
 
 class MessageEditPage extends StatefulWidget {
@@ -53,12 +54,9 @@ class _MessageEditPageState extends State<MessageEditPage> {
       body: SafeArea(
         child: Padding(
           padding: const EdgeInsets.all(16),
-          child: TextField(
+          child: LongMessageEditor(
             controller: _controller,
             autofocus: true,
-            keyboardType: TextInputType.multiline,
-            minLines: 8,
-            maxLines: null,
             decoration: InputDecoration(
               hintText: l10n.messageEditPageHint,
               filled: true,

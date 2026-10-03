@@ -3,6 +3,8 @@ import '../../../support/business_test_harness.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:flutter/services.dart';
+import 'package:re_editor/re_editor.dart';
 import 'package:provider/provider.dart';
 
 import 'package:Kelivo/core/models/chat_input_data.dart';
@@ -21,6 +23,7 @@ void main() {
     TextEditingController controller, {
     ChatInputSubmissionResult sendResult = ChatInputSubmissionResult.rejected,
     bool showBar = true,
+    List<ChatInputData>? submissions,
   }) async {
     final settings = SettingsProvider(createBusinessTestPreferences());
     await settings.loaded;
@@ -54,7 +57,10 @@ void main() {
                           controller: controller,
                           focusNode: focusNode,
                           onExpandedChanged: expandedEvents.add,
-                          onSend: (_) async => sendResult,
+                          onSend: (data) async {
+                            submissions?.add(data);
+                            return sendResult;
+                          },
                         )
                       : const SizedBox.shrink(),
                 ),
@@ -105,6 +111,76 @@ void main() {
       variant: TargetPlatformVariant.all(),
     );
   }
+
+  for (final kind in [
+    PointerDeviceKind.touch,
+    PointerDeviceKind.mouse,
+    PointerDeviceKind.stylus,
+  ]) {
+    testWidgets(
+      'toggling long drafts keeps focus and the input connection ($kind)',
+      (tester) async {
+        final source = 'line\n' * 500;
+        final controller = TextEditingController(text: source);
+        addTearDown(controller.dispose);
+        await pumpBar(tester, controller);
+        final focus = tester
+            .widget<CodeEditor>(find.byType(CodeEditor))
+            .focusNode!;
+        focus.requestFocus();
+        await tester.pumpAndSettle();
+
+        for (final tooltip in ['Expand', 'Collapse']) {
+          tester.testTextInput.log.clear();
+          await tester.tap(find.byTooltip(tooltip), kind: kind);
+          await tester.pump();
+          expect(focus.hasFocus, isTrue, reason: tooltip);
+          await tester.pumpAndSettle();
+          expect(focus.hasFocus, isTrue, reason: tooltip);
+          expect(controller.text, source);
+          final methods = tester.testTextInput.log.map((c) => c.method);
+          expect(methods, isNot(contains('TextInput.clearClient')));
+          expect(methods, isNot(contains('TextInput.hide')));
+        }
+      },
+      variant: TargetPlatformVariant.all(),
+    );
+  }
+
+  testWidgets(
+    'expanding long drafts closes the mobile selection toolbar',
+    (tester) async {
+      final source = 'line\n' * 500;
+      final controller = TextEditingController(text: source);
+      addTearDown(controller.dispose);
+      await pumpBar(tester, controller);
+      final editor = tester.widget<CodeEditor>(find.byType(CodeEditor));
+      editor.focusNode!.requestFocus();
+      editor.controller!.selection = const CodeLineSelection.collapsed(
+        index: 0,
+        offset: 0,
+      );
+      editor.scrollController!.verticalScroller.jumpTo(0);
+      await tester.pumpAndSettle();
+      for (final tooltip in ['Expand', 'Collapse']) {
+        await tester.longPressAt(
+          tester.getTopLeft(find.byType(CodeEditor)) + const Offset(20, 12),
+        );
+        await tester.pumpAndSettle();
+        expect(find.text('Copy'), findsOneWidget);
+
+        await tester.tap(find.byTooltip(tooltip));
+        await tester.pumpAndSettle();
+        expect(editor.focusNode!.hasFocus, isTrue);
+        expect(find.text('Copy'), findsNothing);
+        expect(controller.text, source);
+      }
+    },
+    variant: TargetPlatformVariant({
+      TargetPlatform.android,
+      TargetPlatform.iOS,
+    }),
+  );
 
   testWidgets('offers expansion only once the text wraps past two lines', (
     tester,
@@ -168,6 +244,42 @@ void main() {
     await tester.pumpAndSettle();
     expect(barHeight(tester), collapsedHeight);
     expect(events, [true, false]);
+  });
+
+  testWidgets('long drafts keep expansion and app send shortcuts', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(1200, 600);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    final source = '中文 mixed content **Markdown** 1234567890\n' * 1200;
+    final controller = TextEditingController(text: source);
+    addTearDown(controller.dispose);
+    final submissions = <ChatInputData>[];
+    final events = await pumpBar(tester, controller, submissions: submissions);
+    expect(find.byType(CodeEditor), findsOneWidget);
+    expect(find.byTooltip('Expand'), findsOneWidget);
+    final collapsed = barHeight(tester);
+    final editor = tester.widget<CodeEditor>(find.byType(CodeEditor));
+    editor.focusNode!.requestFocus();
+    await tester.pump();
+    // At the tablet-sized MediaQuery, Enter belongs to the app's send policy.
+    // A rejected send must not also insert a newline in the line editor.
+    await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+    await tester.pump();
+    expect(controller.text, source);
+    expect(submissions, hasLength(1));
+    expect(submissions.single.text, source.trim());
+    await tester.tap(find.byTooltip('Expand'));
+    await tester.pumpAndSettle();
+    expect(barHeight(tester), greaterThan(bodyHeight * .9));
+    expect(events, [true]);
+    await tester.tap(find.byTooltip('Collapse'));
+    await tester.pumpAndSettle();
+    expect(barHeight(tester), closeTo(collapsed, 1));
+    expect(events, [true, false]);
+    expect(controller.text, source);
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets('collapse lands on the height of text edited while expanded', (

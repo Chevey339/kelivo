@@ -39,6 +39,9 @@ void main() {
   const frosted = bool.fromEnvironment('PERF_FROSTED', defaultValue: true);
   const uniqueGlyphs = bool.fromEnvironment('PERF_UNIQUE_GLYPHS');
   const capture = bool.fromEnvironment('PERF_CAPTURE');
+  const backdropScope = bool.fromEnvironment('PERF_BACKDROP_SCOPE');
+  const forceLive = bool.fromEnvironment('PERF_FORCE_LIVE', defaultValue: true);
+  const semantics = bool.fromEnvironment('PERF_SEMANTICS', defaultValue: true);
   for (final font in onlyFont.split(',')) {
     testWidgets(
       'scrolls real chat messages with $font',
@@ -47,6 +50,23 @@ void main() {
         void collect(List<FrameTiming> batch) => frames.addAll(batch);
         final settings = SettingsProvider(createBusinessTestPreferences());
         await settings.loaded;
+        final assistants = AssistantProvider(
+          preferences: createBusinessTestPreferences(),
+        );
+        await assistants.loaded;
+        if (backdropScope && !forceLive) {
+          final id = await assistants.addAssistant(
+            name: 'Static backdrop profile',
+          );
+          await assistants.setCurrentAssistant(id);
+          // The harness paints the gradient below. This identity marks it as
+          // static artwork and exercises the production pre-blur capture path.
+          await assistants.updateAssistant(
+            assistants.currentAssistant!.copyWith(
+              background: 'https://perf.invalid/static-backdrop',
+            ),
+          );
+        }
         String? family;
         if (font == 'serif') family = 'serif';
         if (font.startsWith('local-')) {
@@ -118,17 +138,13 @@ void main() {
           fontFamily: family,
           fontFamilyFallback: getPlatformFontFallback(),
         );
-        debugFrostedForceLiveBackdropFilter = frosted;
+        debugFrostedForceLiveBackdropFilter = frosted && forceLive;
         final captureKey = GlobalKey();
         await tester.pumpWidget(
           MultiProvider(
             providers: [
               ChangeNotifierProvider.value(value: settings),
-              ChangeNotifierProvider(
-                create: (_) => AssistantProvider(
-                  preferences: createBusinessTestPreferences(),
-                ),
-              ),
+              ChangeNotifierProvider.value(value: assistants),
               ChangeNotifierProvider(
                 create: (_) =>
                     UserProvider(preferences: createBusinessTestPreferences()),
@@ -165,21 +181,24 @@ void main() {
                           ),
                         ),
                       ),
-                      MessageListView(
-                        scrollController: scroll,
-                        listController: list,
-                        messages: messages,
-                        byGroup: const {},
-                        versionSelections: const {},
-                        reasoning: const {},
-                        reasoningSegments: const {},
-                        contentSplits: const {},
-                        toolParts: const {},
-                        translations: const {},
-                        selecting: false,
-                        selectedItems: const {},
-                        dividerPadding: EdgeInsets.zero,
-                        processingFilesMessageId: processing,
+                      _ProfileBackdrop(
+                        enabled: backdropScope,
+                        child: MessageListView(
+                          scrollController: scroll,
+                          listController: list,
+                          messages: messages,
+                          byGroup: const {},
+                          versionSelections: const {},
+                          reasoning: const {},
+                          reasoningSegments: const {},
+                          contentSplits: const {},
+                          toolParts: const {},
+                          translations: const {},
+                          selecting: false,
+                          selectedItems: const {},
+                          dividerPadding: EdgeInsets.zero,
+                          processingFilesMessageId: processing,
+                        ),
                       ),
                     ],
                   ),
@@ -190,7 +209,20 @@ void main() {
         );
         await tester.pump(const Duration(seconds: 2));
         expect(find.byType(ChatMessageWidget), findsWidgets);
-        if (frosted) expect(find.byType(BackdropFilter), findsWidgets);
+        if (frosted && forceLive) {
+          expect(find.byType(BackdropFilter), findsWidgets);
+        }
+        if (frosted && backdropScope && !forceLive) {
+          final controller = tester
+              .widget<ChatFrostedBackdropScope>(
+                find.byType(ChatFrostedBackdropScope),
+              )
+              .controller;
+          expect(controller.mode, FrostedRenderMode.cached);
+          expect(controller.debugCaptureCount, greaterThan(0));
+        }
+        // ignore: avoid_print
+        print('FONT_SCROLL_READY $font');
         SchedulerBinding.instance.addTimingsCallback(collect);
         final rssBefore = ProcessInfo.currentRss;
         final watch = Stopwatch()..start();
@@ -211,13 +243,29 @@ void main() {
         }
 
         expect(frames, isNotEmpty);
+        final starts =
+            frames
+                .map(
+                  (frame) =>
+                      frame.timestampInMicroseconds(FramePhase.vsyncStart),
+                )
+                .toList()
+              ..sort();
+        final intervals = [
+          for (var index = 1; index < starts.length; index++)
+            starts[index] - starts[index - 1],
+        ];
         final result = <String, Object>{
           'font': font,
           'frosted': frosted,
+          'backdropScope': backdropScope,
+          'forceLive': forceLive,
           'uniqueGlyphs': uniqueGlyphs,
           'refreshRateHz':
               PlatformDispatcher.instance.views.first.display.refreshRate,
           'frames': frames.length,
+          'vsyncIntervalP50Us': percentile(intervals, .5),
+          'vsyncIntervalP95Us': percentile(intervals, .95),
           'elapsedMs': watch.elapsedMilliseconds,
           'buildP50Us': percentile(
             frames.map((f) => f.buildDuration.inMicroseconds),
@@ -253,6 +301,7 @@ void main() {
                     f.rasterDuration.inMicroseconds > 8333,
               )
               .length,
+          'semanticsEnabled': semantics,
           'rssBeforeBytes': rssBefore,
           'rssAfterBytes': ProcessInfo.currentRss,
         };
@@ -281,9 +330,37 @@ void main() {
         processing.dispose();
         await settings.clearAppFont();
         settings.dispose();
+        assistants.dispose();
         debugFrostedForceLiveBackdropFilter = false;
       },
+      semanticsEnabled: semantics,
       timeout: const Timeout(Duration(minutes: 5)),
     );
   }
+}
+
+class _ProfileBackdrop extends StatelessWidget {
+  const _ProfileBackdrop({required this.enabled, required this.child});
+  final bool enabled;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) => enabled
+      ? ChatFrostedBackdrop(
+          backdrop: const DecoratedBox(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [
+                  Color(0xff30243f),
+                  Color(0xff123d32),
+                  Color(0xff493425),
+                ],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+            ),
+          ),
+          child: child,
+        )
+      : child;
 }
