@@ -7,10 +7,12 @@ import 'package:Kelivo/core/providers/settings_provider.dart';
 import 'package:Kelivo/core/providers/update_provider.dart';
 import 'package:Kelivo/core/providers/backup_reminder_provider.dart';
 import 'package:Kelivo/core/providers/tag_provider.dart';
+import 'package:Kelivo/core/providers/user_provider.dart';
 import 'package:Kelivo/core/services/chat/chat_service.dart';
 import 'package:Kelivo/core/models/conversation.dart';
 import 'package:Kelivo/features/home/widgets/side_drawer.dart';
 import 'package:Kelivo/features/home/widgets/sidebar_selection_bars.dart';
+import 'package:Kelivo/features/stats/pages/stats_page.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
 import 'package:Kelivo/shared/widgets/snackbar.dart';
 import 'package:flutter/foundation.dart';
@@ -167,10 +169,11 @@ void main() {
     bool showChatListDate = false,
     bool embedded = true,
     bool showBottomBar = false,
+    Size physicalSize = const Size(1200, 900),
     FutureOr<void> Function(String id, {bool closeDrawer})?
     onSelectConversation,
   }) async {
-    tester.view.physicalSize = const Size(1200, 900);
+    tester.view.physicalSize = physicalSize;
     tester.view.devicePixelRatio = 1.0;
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
@@ -178,6 +181,7 @@ void main() {
     final assistantPrefs = createBusinessTestPreferences();
     final backupPrefs = createBusinessTestPreferences();
     final tagPrefs = createBusinessTestPreferences();
+    final userPrefs = createBusinessTestPreferences();
     final settings = SettingsProvider(settingsPrefs);
     Widget materialFor(Locale currentLocale) {
       return MaterialApp(
@@ -214,6 +218,9 @@ void main() {
           ChangeNotifierProvider(
             create: (_) => TagProvider(preferences: tagPrefs),
           ),
+          ChangeNotifierProvider(
+            create: (_) => UserProvider(preferences: userPrefs),
+          ),
           ChangeNotifierProvider(create: (_) => UpdateProvider()),
         ],
         child: localeListenable == null
@@ -237,6 +244,32 @@ void main() {
     }
     await tester.pump(const Duration(milliseconds: 400));
   }
+
+  testWidgets('mobile bottom bar opens the statistics page', (tester) async {
+    final service = createService();
+    await tester.runAsync(service.init);
+
+    await pumpDrawer(
+      tester,
+      service,
+      desktopTopicsOnly: false,
+      embedded: false,
+      showBottomBar: true,
+      physicalSize: const Size(390, 844),
+    );
+
+    final statsButton = find.byKey(
+      const ValueKey<String>('sidebar-stats-button'),
+    );
+    expect(statsButton, findsOneWidget);
+
+    await tester.tap(statsButton);
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 500));
+
+    expect(find.byType(StatsPage), findsOneWidget);
+    expect(find.text('Statistics'), findsOneWidget);
+  });
 
   testWidgets(
     'entering selection does not recompute sidebar rows or bump revision',
