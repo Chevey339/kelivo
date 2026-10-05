@@ -1,3 +1,5 @@
+import 'package:Kelivo/core/models/chat_input_data.dart';
+import 'package:Kelivo/core/models/composer_draft.dart';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:isolate';
@@ -1175,6 +1177,157 @@ void main() {
         await chat.close();
       }
     });
+
+    for (final includeChats in [true, false]) {
+      test(
+        'backup excludes private draft bytes (includeChats=$includeChats)',
+        () async {
+          SandboxPathResolver.debugSetDirs(
+            docsDir: root.path,
+            supportDir: root.path,
+          );
+          addTearDown(
+            () => SandboxPathResolver.debugSetDirs(
+              docsDir: null,
+              supportDir: null,
+            ),
+          );
+          final chat = ChatService();
+          await chat.init();
+          try {
+            final conversation = await chat.createDraftConversation();
+            final drafts = chat.composerDrafts!;
+            await drafts.load(conversation.id);
+            final source = await File(
+              '${root.path}/selected.txt',
+            ).writeAsString('published attachment');
+            final input = ComposerDraftInput(
+              text: 'published',
+              documents: [
+                DocumentAttachment(
+                  path: source.path,
+                  fileName: 'selected.txt',
+                  mime: 'text/plain',
+                ),
+              ],
+            );
+            final first = await drafts.beginSubmission(conversation.id, input);
+            final sent = await drafts.prepareSubmissionInput(
+              input.toInput(submission: first),
+            );
+            await chat.beginSendGeneration(
+              conversationId: conversation.id,
+              userParts: [
+                TextPart('published'),
+                FilePart(
+                  uri: SandboxPathResolver.canonicalize(
+                    sent.documents.single.path,
+                  ),
+                  name: 'selected.txt',
+                  mime: 'text/plain',
+                ),
+              ],
+              modelId: 'model',
+              providerId: 'provider',
+              draftSubmission: first,
+            );
+            await drafts.finishSubmission(first);
+            final secretFile = await File(
+              '${root.path}/unsent.txt',
+            ).writeAsString('draft-file-secret-2718');
+            final privateInput = ComposerDraftInput(
+              text: 'draft-text-secret-3141',
+              documents: [
+                DocumentAttachment(
+                  path: secretFile.path,
+                  fileName: 'unsent.txt',
+                  mime: 'text/plain',
+                ),
+              ],
+            );
+            final second = await drafts.beginSubmission(
+              conversation.id,
+              privateInput,
+            );
+            final interrupted = await drafts.prepareSubmissionInput(
+              privateInput.toInput(submission: second),
+            );
+            final tempFolder = Directory('${root.path}/drafts/temporary-chat');
+            await tempFolder.create(recursive: true);
+            await File(
+              '${tempFolder.path}/private.txt',
+            ).writeAsString('temporary-secret');
+            expect(await File(sent.documents.single.path).exists(), isTrue);
+            expect(
+              await drafts.publishedFiles(),
+              contains(
+                'kelivo-file:///upload/${p.basename(sent.documents.single.path)}',
+              ),
+            );
+            final sync = DataSync(
+              businessRepository: businessRepository,
+              chatService: chat,
+            );
+            final backup = await sync.prepareBackupFile(
+              WebDavConfig(includeChats: includeChats, includeFiles: true),
+            );
+            final stream = InputFileStream(backup.path);
+            final archive = ZipDecoder().decodeStream(stream);
+            try {
+              expect(
+                archive.findFile(
+                  'upload/${p.basename(sent.documents.single.path)}',
+                ),
+                isNotNull,
+              );
+              expect(
+                archive.findFile(
+                  'upload/${p.basename(interrupted.documents.single.path)}',
+                ),
+                isNull,
+              );
+              expect(
+                archive.files.where(
+                  (entry) => entry.name.startsWith('drafts/'),
+                ),
+                isEmpty,
+              );
+              for (final entry in archive.files.where(
+                (entry) => entry.isFile,
+              )) {
+                final bytes = entry.readBytes()!;
+                expect(
+                  _containsContiguousBytes(
+                    bytes,
+                    utf8.encode('draft-file-secret-2718'),
+                  ),
+                  isFalse,
+                  reason: entry.name,
+                );
+                expect(
+                  _containsContiguousBytes(
+                    bytes,
+                    utf8.encode('draft-text-secret-3141'),
+                  ),
+                  isFalse,
+                  reason: entry.name,
+                );
+              }
+            } finally {
+              archive.clear();
+              await stream.close();
+              await backup.delete();
+            }
+            expect(
+              (await drafts.load(conversation.id)).pending?.text,
+              'draft-text-secret-3141',
+            );
+          } finally {
+            await chat.close();
+          }
+        },
+      );
+    }
 
     test(
       'packs files as deflated zip entries and removes staging files',

@@ -10,10 +10,14 @@ import 'package:path_provider_platform_interface/path_provider_platform_interfac
 import 'package:provider/provider.dart';
 
 import '../../../support/business_test_harness.dart';
+import '../../../support/gated_xfile.dart';
 import 'package:Kelivo/core/database/chat_database_repository.dart';
 import 'package:Kelivo/core/models/chat_input_data.dart';
 import 'package:Kelivo/core/models/chat_message.dart';
+import 'package:Kelivo/core/models/composer_draft.dart';
 import 'package:Kelivo/core/models/conversation.dart';
+import 'package:Kelivo/core/models/message_part.dart';
+import 'package:Kelivo/core/models/preset_message.dart';
 import 'package:Kelivo/core/providers/assistant_provider.dart';
 import 'package:Kelivo/core/providers/mcp_provider.dart';
 import 'package:Kelivo/core/providers/settings_provider.dart';
@@ -27,6 +31,104 @@ import 'package:Kelivo/features/home/controllers/scroll_controller.dart';
 import 'package:Kelivo/features/home/services/ask_user_interaction_service.dart';
 import 'package:Kelivo/features/home/widgets/chat_input_bar.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
+import 'package:Kelivo/icons/lucide_adapter.dart';
+
+class _GatedChatService extends ChatService {
+  _GatedChatService({required super.existingRepository});
+  Completer<void>? versionSaveHold;
+  bool versionSaveEntered = false;
+  bool holdAfterVersionSave = false;
+  Completer<void>? regenerationHold;
+  bool regenerationEntered = false;
+  bool failAfterVersionSave = false;
+  Completer<void>? presetHold;
+  String? presetConversationId;
+
+  @override
+  Future<ChatMessage> addMessage({
+    required String conversationId,
+    required String role,
+    String content = '',
+    List<MessagePart>? parts,
+    String? modelId,
+    String? providerId,
+    int? totalTokens,
+    bool isStreaming = false,
+    String? reasoningText,
+    DateTime? reasoningStartAt,
+    DateTime? reasoningFinishedAt,
+    String? groupId,
+    int? version,
+    bool selectVersion = false,
+    String? temporaryAfterGroupId,
+  }) async {
+    if (content == 'preset question' && presetHold != null) {
+      presetConversationId = conversationId;
+      await presetHold!.future;
+    }
+    return super.addMessage(
+      conversationId: conversationId,
+      role: role,
+      content: content,
+      parts: parts,
+      modelId: modelId,
+      providerId: providerId,
+      totalTokens: totalTokens,
+      isStreaming: isStreaming,
+      reasoningText: reasoningText,
+      reasoningStartAt: reasoningStartAt,
+      reasoningFinishedAt: reasoningFinishedAt,
+      groupId: groupId,
+      version: version,
+      selectVersion: selectVersion,
+      temporaryAfterGroupId: temporaryAfterGroupId,
+    );
+  }
+
+  @override
+  Future<GenerationBeginResult> beginAssistantGeneration({
+    required String conversationId,
+    required String modelId,
+    required String providerId,
+    required String anchorGroupId,
+    required bool truncateFuture,
+  }) async {
+    regenerationEntered = true;
+    await regenerationHold?.future;
+    return super.beginAssistantGeneration(
+      conversationId: conversationId,
+      modelId: modelId,
+      providerId: providerId,
+      anchorGroupId: anchorGroupId,
+      truncateFuture: truncateFuture,
+    );
+  }
+
+  @override
+  Future<ChatMessage?> appendMessageVersion({
+    required String messageId,
+    String content = '',
+    List<MessagePart>? parts,
+    DraftSubmission? draftSubmission,
+  }) async {
+    if (!holdAfterVersionSave) {
+      versionSaveEntered = true;
+      await versionSaveHold?.future;
+    }
+    final message = await super.appendMessageVersion(
+      messageId: messageId,
+      content: content,
+      parts: parts,
+      draftSubmission: draftSubmission,
+    );
+    if (holdAfterVersionSave) {
+      versionSaveEntered = true;
+      await versionSaveHold?.future;
+    }
+    if (failAfterVersionSave) throw StateError('post-commit callback failed');
+    return message;
+  }
+}
 
 class _FakePathProviderPlatform extends PathProviderPlatform {
   _FakePathProviderPlatform(this.path);
@@ -53,7 +155,7 @@ void main() {
   late Directory directory;
   late PathProviderPlatform previousPathProvider;
   late ChatDatabaseRepository repository;
-  late ChatService service;
+  late _GatedChatService service;
   late HttpServer server;
   late SettingsProvider settings;
   late AssistantProvider assistantProvider;
@@ -172,7 +274,7 @@ void main() {
       file: File('${directory.path}/kelivo.db'),
     );
     await repository.ensureReady();
-    service = ChatService(existingRepository: repository);
+    service = _GatedChatService(existingRepository: repository);
     await service.init();
     streamRequestCount = 0;
     streamRequests.clear();
@@ -203,13 +305,16 @@ void main() {
   Future<HomePageController> pumpHarness(
     WidgetTester tester, {
     bool withSuggestions = false,
+    bool withComposer = false,
   }) async {
     HomePageController? controller;
+    late Zone sendZone;
     final baseUrl = 'http://${server.address.address}:${server.port}/v1';
     // Futures only complete for awaits on the zone that created them, and the
     // send path runs inside runAsync: build and fully configure every provider
     // there so its loaded/write futures belong to the real-async zone.
     await tester.runAsync(() async {
+      sendZone = Zone.current;
       final settingsPrefs = createBusinessTestPreferences();
       await settingsPrefs.load();
       settings = SettingsProvider(settingsPrefs);
@@ -261,7 +366,12 @@ void main() {
         child: MaterialApp(
           localizationsDelegates: AppLocalizations.localizationsDelegates,
           supportedLocales: AppLocalizations.supportedLocales,
-          home: _ControllerHarness(onCreated: (value) => controller = value),
+          home: _ControllerHarness(
+            onCreated: (value) => controller = value,
+            withComposer: withComposer,
+            onSend: (input) =>
+                sendZone.run(() => controller!.sendMessage(input)),
+          ),
         ),
       ),
     );
@@ -281,6 +391,36 @@ void main() {
       await Future<void>.delayed(const Duration(milliseconds: 50));
     }
     fail('timed out waiting for $description');
+  }
+
+  Future<void> waitForWidget(
+    WidgetTester tester,
+    bool Function() condition,
+    String description,
+  ) async {
+    for (var i = 0; i < 300 && !condition(); i++) {
+      await tester.pump(const Duration(milliseconds: 10));
+      await tester.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 10)),
+      );
+    }
+    expect(condition(), isTrue, reason: 'timed out waiting for $description');
+  }
+
+  Future<void> finishWidget(WidgetTester tester, Future<void> future) async {
+    var done = false;
+    Object? failure;
+    future.then<void>(
+      (_) {
+        done = true;
+      },
+      onError: (Object error) {
+        failure = error;
+        done = true;
+      },
+    );
+    await waitForWidget(tester, () => done, 'asynchronous operation');
+    if (failure != null) throw failure!;
   }
 
   testWidgets('concurrent sends persist a single user/assistant pair', (
@@ -501,6 +641,500 @@ void main() {
       expect(newReplies.single.version, 0);
       expect(newReplies.single.isStreaming, isFalse);
     });
+    expect(tester.takeException(), isNull);
+  });
+
+  for (final (laterInput, afterCommit) in [
+    ('text', false),
+    ('attachment', false),
+    ('none', false),
+    ('text', true),
+    ('cleared', false),
+  ]) {
+    testWidgets(
+      'edit submission preserves later $laterInput input${afterCommit ? ' after database commit' : ''}',
+      (tester) async {
+        final controller = await pumpHarness(tester, withComposer: true);
+        final state = tester.state<_ControllerHarnessState>(
+          find.byType(_ControllerHarness),
+        );
+        late Conversation conversation;
+        late ChatMessage original;
+        await tester.runAsync(() async {
+          conversation = await service.createConversation(title: 'Edit draft');
+          await controller.debugViewModel.switchConversation(conversation.id);
+          await waitFor(
+            () => state._mediaController.draftOwnerId == conversation.id,
+            'composer binding',
+          );
+          original = await service.addMessage(
+            conversationId: conversation.id,
+            role: 'user',
+            content: 'original',
+          );
+          await controller.chatController.setCurrentConversationAndLoad(
+            conversation,
+          );
+          state._inputController.text = 'ordinary draft';
+          await controller.startUserMessageEdit(original);
+        });
+        await tester.pumpAndSettle();
+        await tester.enterText(find.byType(EditableText), 'submitted edit');
+        service.versionSaveHold = Completer<void>();
+        service.holdAfterVersionSave = afterCommit;
+        if (laterInput == 'cleared') {
+          service.regenerationHold = Completer<void>();
+        }
+        await tester.tap(find.byIcon(Lucide.ArrowUp));
+        await tester.pump();
+        await waitForWidget(
+          tester,
+          () => service.versionSaveEntered,
+          'version persistence',
+        );
+        expect(state._inputController.text, isEmpty);
+        if (afterCommit) {
+          // A cleared interim edit can autosave after the version commits,
+          // while the UI is still waiting for the save callback.
+          await tester.enterText(find.byType(EditableText), 'interim input');
+          await tester.enterText(find.byType(EditableText), '');
+          await finishWidget(tester, service.composerDrafts!.flush());
+        }
+        if (laterInput == 'text' || laterInput == 'cleared') {
+          await tester.enterText(
+            find.byType(EditableText),
+            'typed after submit',
+          );
+        } else if (laterInput == 'attachment') {
+          state._mediaController.addFiles([
+            const DocumentAttachment(
+              path: '/later.txt',
+              fileName: 'later.txt',
+              mime: 'text/plain',
+            ),
+          ]);
+        }
+        service.versionSaveHold!.complete();
+        if (laterInput == 'cleared') {
+          await waitForWidget(
+            tester,
+            () => service.regenerationEntered,
+            'regeneration preparation',
+          );
+          await tester.enterText(find.byType(EditableText), '');
+          service.regenerationHold!.complete();
+        }
+        await waitForWidget(
+          tester,
+          () =>
+              streamRequestCount == 1 &&
+              !service.composerDrafts!.submitting.contains(conversation.id) &&
+              !controller.chatController.isConversationLoading(conversation.id),
+          'edit submission and regeneration',
+        );
+        await tester.runAsync(() async {
+          await service.composerDrafts!.flush();
+          final versions = await service.loadMessages(conversation.id);
+          expect(
+            versions
+                .where((m) => m.role == 'user' && m.version == 1)
+                .single
+                .content,
+            'submitted edit',
+          );
+        });
+        await tester.pumpAndSettle();
+        final draft = service.composerDrafts!.peek(conversation.id)!;
+        expect(draft.compose.text, 'ordinary draft');
+        expect(draft.pending, isNull);
+        if (laterInput == 'none' || laterInput == 'cleared') {
+          expect(controller.isUserMessageEditActive, isFalse);
+          expect(state._inputController.text, 'ordinary draft');
+        } else {
+          expect(controller.userMessageEditState?.messageId, original.id);
+          if (laterInput == 'text') {
+            expect(state._inputController.text, 'typed after submit');
+            expect(draft.edit!.text, 'typed after submit');
+          } else {
+            expect(
+              state._mediaController
+                  .snapshotDraft(state._inputController.text)
+                  .documents
+                  .single
+                  .fileName,
+              'later.txt',
+            );
+            expect(draft.edit!.documents.single.fileName, 'later.txt');
+          }
+          controller.cancelUserMessageEdit();
+          expect(state._inputController.text, 'ordinary draft');
+        }
+        await tester.pumpWidget(const SizedBox());
+        await finishWidget(tester, service.composerDrafts!.flush());
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
+
+  for (final saveOnly in [false, true]) {
+    testWidgets(
+      'ordinary file import survives edit submission (save only: $saveOnly)',
+      (tester) async {
+        final controller = await pumpHarness(tester, withComposer: true);
+        final state = tester.state<_ControllerHarnessState>(
+          find.byType(_ControllerHarness),
+        );
+        late Conversation conversation;
+        late ChatMessage original;
+        late GatedXFile file;
+        await tester.runAsync(() async {
+          conversation = await service.createConversation(
+            title: 'Ordinary import',
+          );
+          original = await service.addMessage(
+            conversationId: conversation.id,
+            role: 'user',
+            content: 'original',
+          );
+          await controller.debugViewModel.switchConversation(conversation.id);
+          await waitFor(
+            () => state._mediaController.draftOwnerId == conversation.id,
+            'composer',
+          );
+          state._inputController.text = 'ordinary draft';
+          final source = await File(
+            '${directory.path}/ordinary.txt',
+          ).writeAsString('ordinary attachment');
+          file = GatedXFile(source.path);
+        });
+        final importing = controller.onFilesDroppedDesktop([file]);
+        await finishWidget(tester, file.started.future);
+        await controller.startUserMessageEdit(original);
+        await tester.pumpAndSettle();
+        await tester.enterText(find.byType(EditableText), 'saved edit');
+        if (saveOnly) {
+          await finishWidget(tester, controller.saveUserMessageEditOnly());
+        } else {
+          await tester.tap(find.byIcon(Lucide.ArrowUp));
+          await waitForWidget(
+            tester,
+            () =>
+                service.versionSaveEntered &&
+                !service.composerDrafts!.submitting.contains(conversation.id) &&
+                !controller.chatController.isConversationLoading(
+                  conversation.id,
+                ),
+            'edit completion',
+          );
+        }
+        expect(controller.isUserMessageEditActive, isFalse);
+        expect(state._inputController.text, 'ordinary draft');
+        file.release.complete();
+        await finishWidget(tester, importing);
+        await finishWidget(tester, service.composerDrafts!.flush());
+        final docs = state._mediaController
+            .snapshotDraft(state._inputController.text)
+            .documents;
+        expect(docs, hasLength(1));
+        expect(docs.single.fileName, 'ordinary.txt');
+        expect(
+          service.composerDrafts!
+              .peek(conversation.id)!
+              .compose
+              .documents
+              .single
+              .fileName,
+          'ordinary.txt',
+        );
+        await tester.runAsync(() async {
+          expect(
+            await File(docs.single.path).readAsString(),
+            'ordinary attachment',
+          );
+          final edited = (await service.loadMessages(conversation.id))
+              .where(
+                (message) => message.role == 'user' && message.version == 1,
+              )
+              .single;
+          expect(edited.content, 'saved edit');
+          expect(edited.parts.whereType<FilePart>(), isEmpty);
+        });
+        await tester.pumpWidget(const SizedBox());
+        await finishWidget(tester, service.composerDrafts!.flush());
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
+
+  for (final (laterInput, callbackFails, navigate) in [
+    ('text', false, true),
+    ('attachment', false, true),
+    ('none', false, true),
+    ('text', true, true),
+    ('none', false, false),
+  ]) {
+    testWidgets(
+      'save-only preserves $laterInput ${navigate ? 'after A-B-A navigation' : 'while staying in A'} (callback fails: $callbackFails)',
+      (tester) async {
+        final controller = await pumpHarness(tester, withComposer: true);
+        final state = tester.state<_ControllerHarnessState>(
+          find.byType(_ControllerHarness),
+        );
+        late Conversation a;
+        late Conversation b;
+        late ChatMessage original;
+        await tester.runAsync(() async {
+          a = await service.createConversation(title: 'A');
+          b = await service.createConversation(title: 'B');
+          original = await service.addMessage(
+            conversationId: a.id,
+            role: 'user',
+            content: 'original',
+          );
+          await controller.debugViewModel.switchConversation(a.id);
+          await waitFor(
+            () => state._mediaController.draftOwnerId == a.id,
+            'A draft',
+          );
+          state._inputController.text = 'ordinary draft';
+          await controller.startUserMessageEdit(original);
+        });
+        await tester.pumpAndSettle();
+        await tester.enterText(find.byType(EditableText), 'saved edit');
+        service.versionSaveHold = Completer<void>();
+        service.failAfterVersionSave = callbackFails;
+        final saving = controller.saveUserMessageEditOnly();
+        await waitForWidget(
+          tester,
+          () => service.versionSaveEntered,
+          'save-only persistence',
+        );
+        expect(state._mediaController.restoringDraft, isTrue);
+        for (final id in navigate ? [b.id, a.id] : <String>[]) {
+          await finishWidget(tester, controller.switchConversationAnimated(id));
+          await waitForWidget(
+            tester,
+            () =>
+                state._mediaController.draftOwnerId == id &&
+                !state._mediaController.restoringDraft,
+            'restored composer',
+          );
+        }
+        if (laterInput == 'text') {
+          await tester.enterText(
+            find.byType(EditableText),
+            'new edit after returning',
+          );
+        } else if (laterInput == 'attachment') {
+          state._mediaController.addFiles([
+            const DocumentAttachment(
+              path: '/later.txt',
+              fileName: 'later.txt',
+              mime: 'text/plain',
+            ),
+          ]);
+        }
+        service.versionSaveHold!.complete();
+        await finishWidget(tester, saving);
+        await finishWidget(tester, service.composerDrafts!.flush());
+        expect(streamRequestCount, 0);
+        final draft = service.composerDrafts!.peek(a.id)!;
+        expect(draft.compose.text, 'ordinary draft');
+        expect(draft.pending, isNull);
+        expect(state._mediaController.restoringDraft, isFalse);
+        if (laterInput == 'none') {
+          expect(controller.isUserMessageEditActive, isFalse);
+          expect(state._inputController.text, 'ordinary draft');
+        } else {
+          expect(controller.userMessageEditState?.messageId, original.id);
+          if (laterInput == 'text') {
+            expect(state._inputController.text, 'new edit after returning');
+            expect(draft.edit!.text, 'new edit after returning');
+          } else {
+            expect(
+              state._mediaController
+                  .snapshotDraft(state._inputController.text)
+                  .documents
+                  .single
+                  .fileName,
+              'later.txt',
+            );
+            expect(draft.edit!.documents.single.fileName, 'later.txt');
+          }
+          controller.cancelUserMessageEdit();
+          expect(state._inputController.text, 'ordinary draft');
+        }
+        await tester.runAsync(() async {
+          final messages = await service.loadMessages(a.id);
+          expect(
+            messages.where((message) => message.version == 1).single.content,
+            'saved edit',
+          );
+        });
+        await tester.pumpWidget(const SizedBox());
+        await finishWidget(tester, service.composerDrafts!.flush());
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
+
+  for (final targetText in ['', 'existing target draft']) {
+    testWidgets(
+      'share keeps its target through preset loading and animated navigation (target: $targetText)',
+      (tester) async {
+        final controller = await pumpHarness(tester, withComposer: true);
+        final state = tester.state<_ControllerHarnessState>(
+          find.byType(_ControllerHarness),
+        );
+        late Conversation b;
+        await tester.runAsync(() async {
+          b = await service.createConversation(title: 'B');
+          await controller.debugViewModel.switchConversation(b.id);
+          await waitFor(
+            () => state._mediaController.draftOwnerId == b.id,
+            'B draft',
+          );
+          await assistantProvider.updateAssistant(
+            assistantProvider.currentAssistant!.copyWith(
+              presetMessages: [
+                PresetMessage(role: 'user', content: 'preset question'),
+              ],
+            ),
+          );
+        });
+        service.presetHold = Completer<void>();
+        bool? accepted;
+        Object? failure;
+        final delivery = controller
+            .openIncomingShareDraft(
+              const ChatInputData(text: 'shared input'),
+              shareIds: ['share-owner-test'],
+            )
+            .then<void>(
+              (value) {
+                accepted = value;
+              },
+              onError: (Object error) {
+                failure = error;
+              },
+            );
+        await waitForWidget(
+          tester,
+          () => service.presetConversationId != null,
+          'preset insertion',
+        );
+        final target = service.presetConversationId!;
+        expect(target, isNot(b.id));
+        await waitForWidget(
+          tester,
+          () => state._mediaController.draftOwnerId == target,
+          'share target binding',
+        );
+        state._inputController.text = targetText;
+        await finishWidget(tester, controller.switchConversationAnimated(b.id));
+        await waitForWidget(
+          tester,
+          () => state._mediaController.draftOwnerId == b.id,
+          'B binding',
+        );
+        expect(state._inputController.text, isEmpty);
+        service.presetHold!.complete();
+        await finishWidget(tester, delivery);
+        expect(controller.currentConversation!.id, b.id);
+        expect(state._inputController.text, isEmpty);
+        expect(service.composerDrafts!.peek(b.id)!.active.isEmpty, isTrue);
+        expect(find.byType(AlertDialog), findsNothing);
+        if (targetText.isEmpty) {
+          expect(failure, isNull);
+          expect(accepted, isTrue);
+          expect(
+            service.composerDrafts!.peek(target)!.active.text,
+            'shared input',
+          );
+          await tester.runAsync(() async {
+            expect(
+              await service.composerDrafts!.hasShareReceipt('share-owner-test'),
+              isTrue,
+            );
+            expect(
+              (await service.loadMessages(target)).single.content,
+              'preset question',
+            );
+          });
+          await finishWidget(
+            tester,
+            controller.switchConversationAnimated(target),
+          );
+          await waitForWidget(
+            tester,
+            () => state._mediaController.draftOwnerId == target,
+            'shared draft restore',
+          );
+          expect(state._inputController.text, 'shared input');
+        } else {
+          expect(failure, isStateError);
+          expect(accepted, isNull);
+          expect(service.composerDrafts!.peek(target)!.active.text, targetText);
+          await tester.runAsync(() async {
+            expect(
+              await service.composerDrafts!.hasShareReceipt('share-owner-test'),
+              isFalse,
+            );
+          });
+        }
+        await tester.pumpWidget(const SizedBox());
+        await finishWidget(tester, service.composerDrafts!.flush());
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
+
+  testWidgets('new entry reopens preset messages without reinjecting them', (
+    tester,
+  ) async {
+    final controller = await pumpHarness(tester, withComposer: true);
+    final state = tester.state<_ControllerHarnessState>(
+      find.byType(_ControllerHarness),
+    );
+    await tester.runAsync(() async {
+      await assistantProvider.updateAssistant(
+        assistantProvider.currentAssistant!.copyWith(
+          presetMessages: [
+            PresetMessage(role: 'user', content: 'preset question'),
+            PresetMessage(role: 'assistant', content: 'preset answer'),
+          ],
+        ),
+      );
+      await controller.debugViewModel.createNewConversation();
+      final entry = controller.currentConversation!;
+      await waitFor(
+        () => state._mediaController.draftOwnerId == entry.id,
+        'new entry binding',
+      );
+      state._inputController.text = 'unsent question';
+      await service.composerDrafts!.flush();
+      expect(service.getMessageCount(entry.id), 2);
+      final other = await service.createConversation(title: 'other');
+      await controller.debugViewModel.switchConversation(other.id);
+      await waitFor(
+        () => state._mediaController.draftOwnerId == other.id,
+        'other conversation binding',
+      );
+      await controller.debugViewModel.createNewConversation();
+      await waitFor(
+        () => state._mediaController.draftOwnerId == entry.id,
+        'restored entry binding',
+      );
+      expect(controller.currentConversation!.id, entry.id);
+      expect(controller.messages.map((m) => m.content), [
+        'preset question',
+        'preset answer',
+      ]);
+      expect(service.getMessageCount(entry.id), 2);
+      expect(state._inputController.text, 'unsent question');
+    });
+    await tester.pumpWidget(const SizedBox());
+    await finishWidget(tester, service.composerDrafts!.flush());
     expect(tester.takeException(), isNull);
   });
 
@@ -1112,9 +1746,15 @@ void main() {
 }
 
 class _ControllerHarness extends StatefulWidget {
-  const _ControllerHarness({required this.onCreated});
+  const _ControllerHarness({
+    required this.onCreated,
+    this.withComposer = false,
+    this.onSend,
+  });
 
   final ValueChanged<HomePageController> onCreated;
+  final bool withComposer;
+  final Future<ChatInputSubmissionResult> Function(ChatInputData)? onSend;
 
   @override
   State<_ControllerHarness> createState() => _ControllerHarnessState();
@@ -1156,5 +1796,23 @@ class _ControllerHarnessState extends State<_ControllerHarness>
   }
 
   @override
-  Widget build(BuildContext context) => Scaffold(key: _scaffoldKey);
+  Widget build(BuildContext context) => AnimatedBuilder(
+    animation: _controller,
+    builder: (context, _) => Scaffold(
+      key: _scaffoldKey,
+      body: widget.withComposer
+          ? Align(
+              alignment: Alignment.bottomCenter,
+              child: ChatInputBar(
+                key: _inputBarKey,
+                controller: _inputController,
+                mediaController: _mediaController,
+                focusNode: _inputFocus,
+                conversationId: _controller.currentConversation?.id,
+                onSend: widget.onSend ?? _controller.sendMessage,
+              ),
+            )
+          : null,
+    ),
+  );
 }

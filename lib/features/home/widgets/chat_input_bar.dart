@@ -48,22 +48,130 @@ import '../../../shared/widgets/context_usage_ring.dart';
 import '../../../shared/widgets/long_message_editor.dart';
 import '../services/context_usage_service.dart';
 import 'package:Kelivo/theme/app_font_weights.dart';
+import '../../../core/models/composer_draft.dart';
+import '../../../core/database/composer_draft_store.dart';
 
 class ChatInputBarController {
+  ChatInputBarController();
+  ChatInputBarController._captured(
+    this._origin,
+    this._owner,
+    this._edit,
+    this._inputEpoch,
+  );
+  ChatInputBarController? _origin;
+  String? _owner;
+  String? _edit;
+  int? _inputEpoch;
+  ChatInputBarController get _root => _origin ?? this;
+  bool get isValid =>
+      _origin == null ||
+      _root.draftStore == null ||
+      _root.draftStore!.isInputCurrent(
+        _owner!,
+        _inputEpoch!,
+        editMessageId: _edit,
+      );
+  bool get _currentTarget =>
+      (_origin == null && !_root.restoringDraft) ||
+      (!_root.restoringDraft &&
+          _root.isAttached &&
+          _root.draftOwnerId == _owner &&
+          _root.draftStore?.peek(_owner ?? '')?.editMessageId == _edit &&
+          (_root.draftStore == null ||
+              _root.draftStore!.isInputCurrent(
+                _owner!,
+                _inputEpoch!,
+                editMessageId: _edit,
+              )));
+  ChatInputBarController capture() {
+    final owner = _root.draftOwnerId;
+    if (owner == null) return this;
+    final edit = _root.draftStore?.peek(owner)?.editMessageId;
+    return ChatInputBarController._captured(
+      _root,
+      owner,
+      edit,
+      _root.draftStore?.inputEpoch(owner, editMessageId: edit) ?? 0,
+    );
+  }
+
+  void _mutate(ComposerDraftInput Function(ComposerDraftInput) change) {
+    final owner = _owner ?? draftOwnerId;
+    if (owner != null) {
+      final edit = _origin == null
+          ? _root.draftStore?.peek(owner)?.editMessageId
+          : _edit;
+      _root.draftStore?.mutateCaptured(
+        owner,
+        _inputEpoch ?? _root.draftStore!.inputEpoch(owner, editMessageId: edit),
+        edit,
+        change,
+      );
+    }
+  }
+
+  ComposerDraftStore? draftStore;
+  String? draftOwnerId;
+  bool _restoringDraft = false;
+  // An overwrite pauses editing independently of an in-progress/failed load.
+  // Releasing that pause must not change the draft restoration state.
+  bool get restoringDraft => _restoringDraft || draftStore?.suspended == true;
+  set restoringDraft(bool value) => _restoringDraft = value;
+  VoidCallback? onDraftChanged;
+  VoidCallback? onRecoverDraft;
+  VoidCallback? onDiscardRecoveredDraft;
+  VoidCallback? onClearSavedDraft;
+  VoidCallback? onRetrySave;
+  Future<DraftSubmission?> Function(ComposerDraftInput)? onBeginSubmission;
+  ComposerDraftInput snapshotDraft(String text) =>
+      _state?._snapshotDraft(text) ??
+      _pendingDraft?.copyWith(text: text) ??
+      ComposerDraftInput(text: text);
+  ComposerDraftInput? _pendingDraft;
+  void restoreDraft(ComposerDraftInput input, {bool resetHistory = true}) {
+    if (_state == null) {
+      _pendingDraft = input;
+    } else {
+      _state!._restoreDraft(input, resetHistory: resetHistory);
+    }
+  }
+
+  Future<Directory> uploadDirectory() =>
+      _root.draftStore != null && (_owner ?? _root.draftOwnerId) != null
+      ? _root.draftStore!.directoryFor((_owner ?? _root.draftOwnerId)!)
+      : AppDirectories.getUploadDirectory();
   final shareImport = ValueNotifier<ShareImportProgress?>(null);
   final sharedDraftAction = ValueNotifier<VoidCallback?>(null);
   VoidCallback? cancelShareImport;
 
   _ChatInputBarState? _state;
-  void _bind(_ChatInputBarState s) => _state = s;
-  void _unbind(_ChatInputBarState s) {
-    if (identical(_state, s)) _state = null;
+  void _bind(_ChatInputBarState s) {
+    _state = s;
+    final pending = _pendingDraft;
+    _pendingDraft = null;
+    if (pending != null) s._restoreDraft(pending);
   }
 
-  bool get allowImagesApiRouting => _state?._allowImagesApiRouting ?? true;
+  void _unbind(_ChatInputBarState s) {
+    if (!identical(_state, s)) return;
+    _pendingDraft = s._snapshotDraft(s._controller.text);
+    _state = null;
+  }
+
+  bool get allowImagesApiRouting =>
+      _state?._allowImagesApiRouting ??
+      _pendingDraft?.allowImagesApiRouting ??
+      true;
   bool get isAttached => _state != null;
-  bool get hasDraftMedia => _state?._hasDraftMedia ?? false;
-  bool get hasUnreadyImages => _state?._hasUnreadyImages ?? false;
+  bool get hasDraftMedia =>
+      _state?._hasDraftMedia ??
+      ((_pendingDraft?.images.isNotEmpty ?? false) ||
+          (_pendingDraft?.documents.isNotEmpty ?? false));
+  bool get hasUnreadyImages =>
+      _state?._hasUnreadyImages ??
+      (_pendingDraft?.images.any((image) => image.processing || image.failed) ??
+          false);
 
   /// Snapshot for comparing media across an asynchronous draft handoff.
   /// Unlike snapshotInput, this includes unready images and pending pastes.
@@ -80,23 +188,145 @@ class ChatInputBarController {
     ];
   }
 
-  void addImages(List<String> paths) => _state?._addImages(paths);
+  void addImages(List<String> paths) {
+    if (_currentTarget) {
+      _root._state?._addImages(paths);
+    } else {
+      _mutate(
+        (input) => input.copyWith(
+          images: [
+            ...input.images,
+            for (final path in paths) DraftImage(path: path),
+          ],
+        ),
+      );
+    }
+  }
+
   void enqueueImages(
     List<String> paths,
     ImageCompressConfig config, {
     bool deleteSourcesAfterProcessing = false,
-  }) => _state?._enqueueImages(
-    paths,
-    config,
-    deleteSourcesAfterProcessing: deleteSourcesAfterProcessing,
-  );
+  }) {
+    if (_currentTarget) {
+      _root._state?._enqueueImages(
+        paths,
+        config,
+        deleteSourcesAfterProcessing: deleteSourcesAfterProcessing,
+      );
+    } else {
+      _mutate(
+        (input) => input.copyWith(
+          images: [
+            ...input.images,
+            for (final path in paths) DraftImage(path: path, processing: true),
+          ],
+        ),
+      );
+      unawaited(
+        _processCapturedImages(paths, config, deleteSourcesAfterProcessing),
+      );
+    }
+  }
+
+  Future<void> _processCapturedImages(
+    List<String> paths,
+    ImageCompressConfig config,
+    bool deleteSources,
+  ) async {
+    for (final path in paths) {
+      UploadWrite? saved;
+      try {
+        saved = await ImageCompressor.compressToUploadDir(
+          path,
+          await uploadDirectory(),
+          config,
+        );
+      } catch (_) {}
+      replaceProcessedImage(path, saved?.path);
+      // Private source copies are reclaimed after a later durable snapshot.
+      if (deleteSources &&
+          _root.draftStore == null &&
+          saved?.path != path &&
+          saved != null) {
+        await UploadDedupe.deleteIfUnshared(path);
+      }
+    }
+  }
+
+  void replaceProcessedImage(String source, String? result) {
+    _mutate(
+      (input) => input.copyWith(
+        images: [
+          for (final image in input.images)
+            if ((image.path == source ||
+                    (_owner != null &&
+                        (_root.draftStore?.sameOwnedFile(
+                              _owner!,
+                              image.path,
+                              source,
+                            ) ??
+                            false))) &&
+                image.processing)
+              DraftImage(path: result ?? source, failed: result == null)
+            else
+              image,
+        ],
+      ),
+    );
+  }
+
   void clearImages() => _state?._clearImages();
-  void addFiles(List<DocumentAttachment> docs) => _state?._addFiles(docs);
+  void addFiles(List<DocumentAttachment> docs) {
+    if (_currentTarget) {
+      _root._state?._addFiles(docs);
+    } else {
+      _mutate(
+        (input) => input.copyWith(documents: [...input.documents, ...docs]),
+      );
+    }
+  }
+
+  void insertText(String text) {
+    if (_currentTarget) {
+      _root._state?._insertPastedText(text);
+    } else {
+      _mutate(
+        (input) => input.copyWith(
+          text: input.text + text,
+          selectionBase: input.text.length + text.length,
+          selectionExtent: input.text.length + text.length,
+        ),
+      );
+    }
+  }
+
   void clearFiles() => _state?._clearFiles();
   void restoreInput(ChatInputData input) => _state?._restoreInput(input);
-  ChatInputData snapshotInput(String text) =>
-      _state?._snapshotInput(text) ?? ChatInputData(text: text.trim());
-  void clearDraft() => _state?._clearDraft();
+  ChatInputData snapshotInput(String text) {
+    if (_state != null) return _state!._snapshotInput(text);
+    final draft = snapshotDraft(text);
+    return ChatInputData(
+      text: text.trim(),
+      imagePaths: [
+        for (final image in draft.images)
+          if (!image.processing && !image.failed) image.path,
+      ],
+      documents: draft.documents,
+      allowImagesApiRouting: draft.allowImagesApiRouting,
+    );
+  }
+
+  void clearDraft() {
+    final owner = draftOwnerId;
+    if (owner != null) {
+      draftStore?.invalidateInputOperations(
+        owner,
+        editMessageId: draftStore?.peek(owner)?.editMessageId,
+      );
+    }
+    _state?._clearDraft();
+  }
 }
 
 class _DraftImage {
@@ -112,11 +342,13 @@ class _ImageProcessingTask {
     required this.sourcePath,
     required this.config,
     required this.deleteSourceAfterProcessing,
+    this.target,
   });
 
   final int id;
   final String sourcePath;
   final ImageCompressConfig config;
+  final ChatInputBarController? target;
 
   /// Only ever true for app-owned temp sources (clipboard paste temps);
   /// user-picked files must never be flagged for deletion.
@@ -259,6 +491,12 @@ class ChatInputBar extends StatefulWidget {
 
 class _ChatInputBarState extends State<ChatInputBar>
     with WidgetsBindingObserver, SingleTickerProviderStateMixin {
+  @override
+  void setState(VoidCallback fn) {
+    super.setState(fn);
+    widget.mediaController?.onDraftChanged?.call();
+  }
+
   late TextEditingController _controller;
 
   // Expanding grows the whole composer to fill the height its host allows,
@@ -275,7 +513,7 @@ class _ChatInputBarState extends State<ChatInputBar>
   InteractiveDrawerController? _hostDrawer;
   final GlobalKey _composerKey = GlobalKey();
   final GlobalKey _textAreaKey = GlobalKey();
-  final _longEditorKey = GlobalKey<LongMessageEditorState>();
+  var _longEditorKey = GlobalKey<LongMessageEditorState>();
   late final AnimationController _expandController = AnimationController(
     vsync: this,
     duration: const Duration(milliseconds: 320),
@@ -337,8 +575,12 @@ class _ChatInputBarState extends State<ChatInputBar>
   String? _imageModeModelKey;
   String? _lastImageModeModelKey;
   String? _dismissedImageModeModelKey;
+  bool? _restoredRoutingChoice;
+  final Set<String> _missingDocumentPaths = {};
 
-  bool get _composerLocked => widget.hasQueuedInput;
+  bool get _composerLocked =>
+      widget.hasQueuedInput ||
+      (widget.mediaController?.restoringDraft ?? false);
 
   Color _inputFillColor({
     required ThemeData theme,
@@ -388,6 +630,10 @@ class _ChatInputBarState extends State<ChatInputBar>
       _lastImageModeModelKey = nextKey;
     }
     _imageModeModelKey = nextKey;
+    if (_restoredRoutingChoice != null) {
+      _dismissedImageModeModelKey = _restoredRoutingChoice! ? null : nextKey;
+      _restoredRoutingChoice = null;
+    }
     return supported;
   }
 
@@ -397,6 +643,7 @@ class _ChatInputBarState extends State<ChatInputBar>
   }
 
   bool get _allowImagesApiRouting {
+    if (_restoredRoutingChoice != null) return _restoredRoutingChoice!;
     final key = _imageModeModelKey;
     return key == null || key != _dismissedImageModeModelKey;
   }
@@ -451,6 +698,7 @@ class _ChatInputBarState extends State<ChatInputBar>
             sourcePath: path,
             config: config,
             deleteSourceAfterProcessing: deleteSourcesAfterProcessing,
+            target: widget.mediaController?.capture(),
           ),
         );
       }
@@ -472,7 +720,9 @@ class _ChatInputBarState extends State<ChatInputBar>
   Future<void> _processImage(_ImageProcessingTask task) async {
     UploadWrite? saved;
     try {
-      final dir = await AppDirectories.getUploadDirectory();
+      final dir =
+          await (task.target?.uploadDirectory() ??
+              AppDirectories.getUploadDirectory());
       saved = await ImageCompressor.compressToUploadDir(
         task.sourcePath,
         dir,
@@ -482,6 +732,7 @@ class _ChatInputBarState extends State<ChatInputBar>
       saved = null;
     } finally {
       if (task.deleteSourceAfterProcessing &&
+          widget.mediaController?.draftStore == null &&
           (saved == null ||
               !p.equals(
                 p.normalize(p.absolute(task.sourcePath)),
@@ -493,12 +744,23 @@ class _ChatInputBarState extends State<ChatInputBar>
     }
     final savedPath = saved?.path;
 
+    if (task.target != null && !task.target!._currentTarget) {
+      task.target!.replaceProcessedImage(task.sourcePath, savedPath);
+      if (mounted) _pumpImageProcessingQueue();
+      return;
+    }
+
     final index = mounted
         ? _images.indexWhere((image) => image.id == task.id)
         : -1;
     final taskIsActive = index >= 0 && _processingImageIds.contains(task.id);
     // Only a copy this task created, that no other import has resolved to in
     // the meantime, may be cleaned up.
+    if (!taskIsActive && task.target?._root.draftStore != null) {
+      task.target!.replaceProcessedImage(task.sourcePath, savedPath);
+      if (mounted) _pumpImageProcessingQueue();
+      return;
+    }
     if (!taskIsActive &&
         savedPath != null &&
         !saved!.reused &&
@@ -539,7 +801,8 @@ class _ChatInputBarState extends State<ChatInputBar>
     _failedImageIds.removeAll(discarded);
     _imageProcessingQueue.removeWhere((task) => discarded.contains(task.id));
     for (final task in discardedQueuedTasks) {
-      if (task.deleteSourceAfterProcessing) {
+      if (task.deleteSourceAfterProcessing &&
+          widget.mediaController?.draftStore == null) {
         unawaited(_deleteTemporaryImageSource(task.sourcePath));
       }
     }
@@ -604,6 +867,83 @@ class _ChatInputBarState extends State<ChatInputBar>
     );
   }
 
+  ComposerDraftInput _snapshotDraft(String text) => ComposerDraftInput(
+    text: text,
+    selectionBase: _controller.selection.baseOffset,
+    selectionExtent: _controller.selection.extentOffset,
+    images: [
+      for (final image in _images)
+        DraftImage(
+          path: image.path,
+          processing: _processingImageIds.contains(image.id),
+          failed: _failedImageIds.contains(image.id),
+        ),
+    ],
+    documents: List.of(_docs),
+    allowImagesApiRouting: _allowImagesApiRouting,
+  );
+
+  void _restoreDraft(ComposerDraftInput input, {bool resetHistory = true}) {
+    if (resetHistory) _longEditorKey = GlobalKey<LongMessageEditorState>();
+    final config = context
+        .read<SettingsProvider>()
+        .resolveImageCompressConfig();
+    _missingDocumentPaths
+      ..clear()
+      ..addAll(
+        input.documents
+            .where(
+              (doc) =>
+                  !isRemoteOrDataUri(doc.path) &&
+                  !File(SandboxPathResolver.fix(doc.path)).existsSync(),
+            )
+            .map((doc) => SandboxPathResolver.fix(doc.path)),
+      );
+    setState(() {
+      _draftReplacementRevision++;
+      if (resetHistory) {
+        _abandonVoiceSession();
+        _pendingImagePasteIds.clear();
+        _pendingTextPasteIds.clear();
+      }
+      _discardImageState(_images.map((image) => image.id));
+      _images.clear();
+      for (final saved in input.images) {
+        final path = SandboxPathResolver.fix(saved.path);
+        final image = _DraftImage(id: _nextImageId++, path: path);
+        _images.add(image);
+        if (saved.failed ||
+            (!isRemoteOrDataUri(path) && !File(path).existsSync())) {
+          _failedImageIds.add(image.id);
+        } else if (saved.processing) {
+          _processingImageIds.add(image.id);
+          _imageProcessingQueue.add(
+            _ImageProcessingTask(
+              id: image.id,
+              sourcePath: path,
+              config: config,
+              deleteSourceAfterProcessing: false,
+              target: widget.mediaController?.capture(),
+            ),
+          );
+        }
+      }
+      _docs
+        ..clear()
+        ..addAll(
+          input.documents.map(
+            (doc) => DocumentAttachment(
+              path: SandboxPathResolver.fix(doc.path),
+              fileName: doc.fileName,
+              mime: doc.mime,
+            ),
+          ),
+        );
+      _restoredRoutingChoice = input.allowImagesApiRouting;
+    });
+    _pumpImageProcessingQueue();
+  }
+
   void _clearDraft() {
     widget.mediaController?.sharedDraftAction.value = null;
     setState(() {
@@ -659,12 +999,15 @@ class _ChatInputBarState extends State<ChatInputBar>
       // When going to background, hide any open toolbar
       _suppressContextMenu = true;
       widget.focusNode?.unfocus();
-      if (_ownsVoiceSession) unawaited(_cancelVoiceInput());
+      if (_ownsVoiceSession) _abandonVoiceSession();
     }
   }
 
   @override
   void dispose() {
+    // Multi-selection temporarily removes the widget. Retain its complete
+    // draft before clearing processing/failure state for disposed image tasks.
+    widget.mediaController?._unbind(this);
     _controller.removeListener(_syncUsageDraft);
     WidgetsBinding.instance.removeObserver(this);
     _stopVoiceLevelSampling();
@@ -683,7 +1026,6 @@ class _ChatInputBarState extends State<ChatInputBar>
     _imageProcessingQueue.clear();
     _processingImageIds.clear();
     _failedImageIds.clear();
-    widget.mediaController?._unbind(this);
     // A host told the composer is expanded must hear it ended, or it keeps
     // ignoring the input bar's height after this one is replaced.
     if (!_expandController.isDismissed) widget.onExpandedChanged?.call(false);
@@ -1153,7 +1495,9 @@ class _ChatInputBarState extends State<ChatInputBar>
   }
 
   Future<DocumentAttachment> _saveVoiceRecording(Uint8List wav) async {
-    final dir = await AppDirectories.getUploadDirectory();
+    final dir =
+        await (widget.mediaController?.capture().uploadDirectory() ??
+            AppDirectories.getUploadDirectory());
     await dir.create(recursive: true);
     final now = DateTime.now();
     String two(int value) => value.toString().padLeft(2, '0');
@@ -1326,10 +1670,24 @@ class _ChatInputBarState extends State<ChatInputBar>
   }
 
   Future<void> _handleSend() async {
-    if (_isSubmitting ||
+    if (_composerLocked ||
+        _isSubmitting ||
         _hasUnreadyImages ||
         _ownsVoiceSession ||
         _finishingVoice) {
+      return;
+    }
+    if (widget.mediaController?.draftStore != null &&
+        _docs.any(
+          (doc) =>
+              !isRemoteOrDataUri(doc.path) &&
+              !File(SandboxPathResolver.fix(doc.path)).existsSync(),
+        )) {
+      showAppSnackBar(
+        context,
+        message: AppLocalizations.of(context)!.composerDraftMissingFile,
+        type: NotificationType.warning,
+      );
       return;
     }
     final submittedValue = _controller.value;
@@ -1339,13 +1697,29 @@ class _ChatInputBarState extends State<ChatInputBar>
     final submittedImages = List<_DraftImage>.of(_images);
     final submittedImageIds = submittedImages.map((image) => image.id).toSet();
     final submittedDocuments = List<DocumentAttachment>.of(_docs);
+    final submittedDraft = _snapshotDraft(submittedText);
     final submittedDraftRevision = _draftReplacementRevision;
     final submitSerial = ++_submitSerial;
     _isSubmitting = true;
+    final beginSubmission = widget.mediaController?.onBeginSubmission;
+    Future<DraftSubmission?>? pendingSubmission;
+    var persistentSubmission = false;
+    try {
+      pendingSubmission = beginSubmission?.call(submittedDraft);
+      persistentSubmission =
+          widget.mediaController?.draftStore
+              ?.peek(widget.mediaController?.draftOwnerId ?? '')
+              ?.pending !=
+          null;
+    } catch (_) {
+      _isSubmitting = false;
+      return;
+    }
     // Attachments leave the composer with the text, not when the send future
     // completes: that future now resolves at send time, but the draft must not
     // depend on it at all. A rejected send puts everything back below.
     setState(() {
+      _longEditorKey = GlobalKey<LongMessageEditorState>();
       _controller.clear();
       _images.removeWhere((image) => submittedImageIds.contains(image.id));
       for (final document in submittedDocuments) {
@@ -1353,13 +1727,15 @@ class _ChatInputBarState extends State<ChatInputBar>
       }
     });
     try {
+      final draftSubmission = await pendingSubmission;
       final result =
           await widget.onSend?.call(
             ChatInputData(
               text: text,
               imagePaths: submittedImages.map((image) => image.path).toList(),
               documents: List<DocumentAttachment>.of(submittedDocuments),
-              allowImagesApiRouting: _allowImagesApiRouting,
+              allowImagesApiRouting: submittedDraft.allowImagesApiRouting,
+              draftSubmission: draftSubmission,
             ),
           ) ??
           ChatInputSubmissionResult.rejected;
@@ -1384,7 +1760,8 @@ class _ChatInputBarState extends State<ChatInputBar>
             widget.focusNode?.requestFocus();
           }
         } catch (_) {}
-      } else if (_draftReplacementRevision == submittedDraftRevision) {
+      } else if (!persistentSubmission &&
+          _draftReplacementRevision == submittedDraftRevision) {
         setState(
           () => _restoreSubmittedDraft(
             submittedValue,
@@ -1394,7 +1771,8 @@ class _ChatInputBarState extends State<ChatInputBar>
         );
       }
     } catch (_) {
-      if (mounted &&
+      if (!persistentSubmission &&
+          mounted &&
           submitSerial == _submitSerial &&
           _draftReplacementRevision == submittedDraftRevision) {
         setState(
@@ -1405,7 +1783,8 @@ class _ChatInputBarState extends State<ChatInputBar>
           ),
         );
       }
-      rethrow;
+      // Persistent submissions report storage errors next to the editor.
+      if (!persistentSubmission) rethrow;
     } finally {
       if (submitSerial == _submitSerial) {
         _isSubmitting = false;
@@ -1767,10 +2146,16 @@ class _ChatInputBarState extends State<ChatInputBar>
     return KeyEventResult.handled;
   }
 
-  Future<String?> _savePastedImageBytes(String format, Uint8List bytes) async {
+  Future<String?> _savePastedImageBytes(
+    String format,
+    Uint8List bytes, {
+    ChatInputBarController? target,
+  }) async {
     File? reserved;
     try {
-      final dir = await AppDirectories.getSystemCacheDirectory();
+      final dir = await (target?._root.draftStore != null
+          ? target!.uploadDirectory()
+          : AppDirectories.getSystemCacheDirectory());
       if (!await dir.exists()) {
         await dir.create(recursive: true);
       }
@@ -1809,6 +2194,7 @@ class _ChatInputBarState extends State<ChatInputBar>
   }
 
   void _handleInsertedContent(KeyboardInsertedContent content) {
+    if (widget.mediaController?.restoringDraft ?? false) return;
     final format = switch (content.mimeType.toLowerCase()) {
       'image/png' => 'png',
       'image/jpeg' || 'image/jpg' => 'jpeg',
@@ -1820,30 +2206,42 @@ class _ChatInputBarState extends State<ChatInputBar>
     if (!mounted || format == null || bytes == null || bytes.isEmpty) return;
     final pasteId = _nextImagePasteId++;
     setState(() => _pendingImagePasteIds.add(pasteId));
-    unawaited(_enqueueInsertedImage(pasteId, format, bytes));
+    unawaited(
+      _enqueueInsertedImage(
+        pasteId,
+        format,
+        bytes,
+        widget.mediaController?.capture(),
+        context.read<SettingsProvider>().resolveImageCompressConfig(),
+      ),
+    );
   }
 
   Future<void> _enqueueInsertedImage(
     int pasteId,
     String format,
     Uint8List bytes,
+    ChatInputBarController? target,
+    ImageCompressConfig compressConfig,
   ) async {
-    final savedPath = await _savePastedImageBytes(format, bytes);
+    final savedPath = await _savePastedImageBytes(
+      format,
+      bytes,
+      target: target,
+    );
     if (savedPath == null) {
       if (mounted && _pendingImagePasteIds.contains(pasteId)) {
         setState(() => _pendingImagePasteIds.remove(pasteId));
       }
       return;
     }
-    if (!mounted || !_pendingImagePasteIds.contains(pasteId)) {
+    final retained = target?._root.draftStore != null && target!.isValid;
+    if (!retained && (!mounted || !_pendingImagePasteIds.contains(pasteId))) {
       await _deleteTemporaryImageSource(savedPath);
       return;
     }
-    final compressConfig = context
-        .read<SettingsProvider>()
-        .resolveImageCompressConfig();
     _pendingImagePasteIds.remove(pasteId);
-    _enqueueImages(
+    (target?.enqueueImages ?? _enqueueImages)(
       [savedPath],
       compressConfig,
       deleteSourcesAfterProcessing: true,
@@ -1851,6 +2249,8 @@ class _ChatInputBarState extends State<ChatInputBar>
   }
 
   Future<void> _handlePasteFromClipboard() async {
+    if (widget.mediaController?.restoringDraft ?? false) return;
+    final target = widget.mediaController?.capture();
     final compressConfig = context
         .read<SettingsProvider>()
         .resolveImageCompressConfig();
@@ -1935,7 +2335,11 @@ class _ChatInputBarState extends State<ChatInputBar>
         }
 
         if (bytes != null && bytes.isNotEmpty && fmt != null) {
-          final savedPath = await _savePastedImageBytes(fmt, bytes);
+          final savedPath = await _savePastedImageBytes(
+            fmt,
+            bytes,
+            target: target,
+          );
           if (!mounted) {
             if (savedPath != null) {
               await _deleteTemporaryImageSource(savedPath);
@@ -1943,7 +2347,7 @@ class _ChatInputBarState extends State<ChatInputBar>
             return;
           }
           if (savedPath != null) {
-            _enqueueImages(
+            (target?.enqueueImages ?? _enqueueImages)(
               [savedPath],
               compressConfig,
               deleteSourcesAfterProcessing: true,
@@ -1957,7 +2361,7 @@ class _ChatInputBarState extends State<ChatInputBar>
           try {
             final String? text = await reader.readValue(Formats.plainText);
             if (text != null && text.isNotEmpty) {
-              await _handlePastedText(text);
+              await _handlePastedText(text, target: target);
               return;
             }
           } catch (_) {}
@@ -1968,7 +2372,15 @@ class _ChatInputBarState extends State<ChatInputBar>
     // 2) Fallback: legacy platform channel image handling
     final imageTempPaths = await ClipboardImages.getImagePaths();
     if (imageTempPaths.isNotEmpty) {
-      await _enqueueClipboardImages(imageTempPaths);
+      if (target != null) {
+        target.enqueueImages(
+          imageTempPaths,
+          compressConfig,
+          deleteSourcesAfterProcessing: true,
+        );
+      } else {
+        await _enqueueClipboardImages(imageTempPaths);
+      }
       return;
     }
 
@@ -1988,21 +2400,27 @@ class _ChatInputBarState extends State<ChatInputBar>
               otherPaths.add(src);
             }
           }
-          _enqueueImages(
+          (target?.enqueueImages ?? _enqueueImages)(
             imagePaths,
             compressConfig,
             deleteSourcesAfterProcessing: false,
           );
 
-          final saved = await _copyFilesToUpload(otherPaths);
+          final saved = await _copyFilesToUpload(otherPaths, target: target);
           if (saved.images.isNotEmpty) {
-            _enqueueImages(
+            (target?.enqueueImages ?? _enqueueImages)(
               saved.images,
               compressConfig,
               deleteSourcesAfterProcessing: false,
             );
           }
-          if (saved.docs.isNotEmpty) _addFiles(saved.docs);
+          if (saved.docs.isNotEmpty) {
+            if (target != null) {
+              target.addFiles(saved.docs);
+            } else {
+              _addFiles(saved.docs);
+            }
+          }
           handledFiles =
               imagePaths.isNotEmpty ||
               saved.images.isNotEmpty ||
@@ -2017,11 +2435,15 @@ class _ChatInputBarState extends State<ChatInputBar>
       final data = await Clipboard.getData(Clipboard.kTextPlain);
       final text = data?.text ?? '';
       if (text.isEmpty) return;
-      await _handlePastedText(text);
+      await _handlePastedText(text, target: target);
     } catch (_) {}
   }
 
-  Future<void> _handlePastedText(String text) async {
+  Future<void> _handlePastedText(
+    String text, {
+    ChatInputBarController? target,
+  }) async {
+    target ??= widget.mediaController?.capture();
     if (!mounted) return;
     final settings = context.read<SettingsProvider>();
     final threshold = settings.longPasteAsFileThreshold;
@@ -2029,7 +2451,11 @@ class _ChatInputBarState extends State<ChatInputBar>
         settings.longPasteAsFile &&
         text.characters.take(threshold + 1).length > threshold;
     if (!isLongPaste) {
-      _insertPastedText(text);
+      if (target != null) {
+        target.insertText(text);
+      } else {
+        _insertPastedText(text);
+      }
       return;
     }
 
@@ -2042,12 +2468,17 @@ class _ChatInputBarState extends State<ChatInputBar>
 
     try {
       await previousWrite;
-      if (!mounted || !_pendingTextPasteIds.contains(pasteId)) return;
+      final retained = target?._root.draftStore != null && target!.isValid;
+      if (!retained && (!mounted || !_pendingTextPasteIds.contains(pasteId))) {
+        return;
+      }
 
       File? file;
       DocumentAttachment? attachment;
       try {
-        final dir = await AppDirectories.getUploadDirectory();
+        final dir =
+            await (target?.uploadDirectory() ??
+                AppDirectories.getUploadDirectory());
         await dir.create(recursive: true);
         file = await _reservePastedTextFile(dir);
         await file.writeAsString(text, flush: true);
@@ -2059,16 +2490,23 @@ class _ChatInputBarState extends State<ChatInputBar>
       } catch (_) {}
 
       if (attachment != null &&
-          mounted &&
-          _pendingTextPasteIds.contains(pasteId)) {
-        setState(() {
-          _pendingTextPasteIds.remove(pasteId);
-          _docs.add(attachment!);
-        });
+          ((retained && target.isValid) ||
+              (mounted && _pendingTextPasteIds.contains(pasteId)))) {
+        if (mounted) setState(() => _pendingTextPasteIds.remove(pasteId));
+        if (target != null) {
+          target.addFiles([attachment]);
+        } else {
+          setState(() => _docs.add(attachment!));
+        }
         return;
       }
 
       await _deleteUnclaimedPastedText(file);
+      if (retained && target.isValid) {
+        if (mounted) setState(() => _pendingTextPasteIds.remove(pasteId));
+        target.insertText(text);
+        return;
+      }
       if (!mounted || !_pendingTextPasteIds.contains(pasteId)) return;
       setState(() => _pendingTextPasteIds.remove(pasteId));
       _insertPastedText(text);
@@ -2128,11 +2566,17 @@ class _ChatInputBarState extends State<ChatInputBar>
   // Copy arbitrary files to upload directory (without deleting the source),
   // split into images and document attachments.
   Future<({List<String> images, List<DocumentAttachment> docs})>
-  _copyFilesToUpload(List<String> srcPaths) async {
+  _copyFilesToUpload(
+    List<String> srcPaths, {
+    ChatInputBarController? target,
+  }) async {
     final images = <String>[];
     final docs = <DocumentAttachment>[];
     try {
-      final dir = await AppDirectories.getUploadDirectory();
+      final dir =
+          await (target?.uploadDirectory() ??
+              widget.mediaController?.uploadDirectory() ??
+              AppDirectories.getUploadDirectory());
       for (final raw in srcPaths) {
         if (!mounted) {
           return (images: images, docs: docs);
@@ -3005,6 +3449,70 @@ class _ChatInputBarState extends State<ChatInputBar>
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
+              if (_docs.any((doc) => _missingDocumentPaths.contains(doc.path)))
+                Padding(
+                  padding: const EdgeInsets.all(4),
+                  child: Text(
+                    AppLocalizations.of(context)!.composerDraftMissingFile,
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Theme.of(context).colorScheme.error,
+                    ),
+                  ),
+                ),
+              if (widget.mediaController?.draftStore?.errors.containsKey(
+                    widget.conversationId,
+                  ) ??
+                  false)
+                _QueuedInputBanner(
+                  label: AppLocalizations.of(context)!.composerDraftSaveFailed,
+                  cancelLabel: AppLocalizations.of(context)!.composerDraftRetry,
+                  onCancel: widget.mediaController?.onRetrySave,
+                ),
+              if (!widget.hasQueuedInput &&
+                  !(widget.mediaController?.draftStore?.submitting.contains(
+                        widget.mediaController?.draftOwnerId,
+                      ) ??
+                      false) &&
+                  (widget.mediaController?.draftStore
+                          ?.peek(widget.mediaController?.draftOwnerId ?? '')
+                          ?.pending !=
+                      null))
+                Row(
+                  children: [
+                    Expanded(
+                      child: _QueuedInputBanner(
+                        label: AppLocalizations.of(
+                          context,
+                        )!.composerDraftRecovered,
+                        cancelLabel: AppLocalizations.of(
+                          context,
+                        )!.composerDraftRestore,
+                        onCancel: widget.mediaController?.onRecoverDraft,
+                      ),
+                    ),
+                    IosIconButton(
+                      icon: Lucide.Trash2,
+                      tooltip: AppLocalizations.of(
+                        context,
+                      )!.composerDraftDiscard,
+                      onTap: widget.mediaController?.onDiscardRecoveredDraft,
+                    ),
+                  ],
+                ),
+              if (widget.mediaController?.onClearSavedDraft != null &&
+                  (hasText || hasImages || hasDocs))
+                Align(
+                  alignment: AlignmentDirectional.centerEnd,
+                  child: IosIconButton(
+                    icon: Lucide.Eraser,
+                    size: 16,
+                    tooltip: AppLocalizations.of(context)!.composerDraftClear,
+                    onTap: _composerLocked
+                        ? null
+                        : widget.mediaController?.onClearSavedDraft,
+                  ),
+                ),
               if (widget.hasQueuedInput) ...[
                 _QueuedInputBanner(
                   label: AppLocalizations.of(

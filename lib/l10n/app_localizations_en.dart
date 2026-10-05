@@ -1903,7 +1903,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get backupPageOverwriteModeDescription =>
-      'Replace the selected components; keep unselected components and unrelated local settings';
+      'Replace the selected components; keep unselected components and unrelated local settings. Replacing chats also clears local unsent drafts.';
 
   @override
   String get backupPageMergeMode => 'Merge';
@@ -9323,7 +9323,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String localSnapshotRestoreMessage(String when) {
-    return 'Your current chats and settings will be replaced by this copy from $when. A copy of what you have now is saved first, so this can be undone.';
+    return 'Your current chats and settings will be replaced by this copy from $when. A copy of the current chats and settings is saved first. Unsent drafts are excluded from copies and will be cleared.';
   }
 
   @override
@@ -12787,4 +12787,56 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get phoneControlEnableAssistant =>
       'Allow this assistant to use phone control';
+
+  @override
+  String get composerDraftLabel => 'Draft';
+
+  @override
+  String get composerDraftRecovered => 'An unsent message was recovered.';
+
+  @override
+  String get composerDraftRestore => 'Continue editing';
+
+  @override
+  String get composerDraftDiscard => 'Discard';
+
+  @override
+  String get composerDraftClear => 'Clear draft';
+
+  @override
+  String get composerDraftClearConfirm =>
+      'Discard the unsent text and attachments in this editor?';
+
+  @override
+  String get composerDraftSaveFailed =>
+      'Your latest draft could not be saved. It is still in this window.';
+
+  @override
+  String get composerDraftRetry => 'Retry saving';
+
+  @override
+  String get composerDraftConflictTitle =>
+      'This conversation already has a draft';
+
+  @override
+  String get composerDraftConflictBody =>
+      'Append keeps both texts and attachments. Replace discards the existing draft. Nothing is sent automatically.';
+
+  @override
+  String get composerDraftAppend => 'Append';
+
+  @override
+  String get composerDraftReplace => 'Replace draft';
+
+  @override
+  String get composerDraftMissingFile =>
+      'An attachment is unavailable. Remove it or choose the file again.';
+
+  @override
+  String get composerDraftMessageMissing =>
+      'The message being edited no longer exists. Copy the text to a new message or discard this edit.';
+
+  @override
+  String get composerDraftDeleteNotice =>
+      'Unsent drafts in these conversations will also be deleted.';
 }

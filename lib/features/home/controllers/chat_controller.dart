@@ -269,6 +269,7 @@ class ChatController extends ChangeNotifier {
     final conversation = await _chatService.createDraftConversation(
       title: title,
       assistantId: assistantId,
+      reuseNewEntry: true,
     );
     _currentConversation = conversation;
     _messages = [];

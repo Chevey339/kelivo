@@ -1,3 +1,4 @@
+import '../widgets/new_conversation_draft_badge.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/foundation.dart'
@@ -655,32 +656,37 @@ class HomeDesktopScaffold extends StatelessWidget {
           onTap: onToggleRightSidebar,
         ),
       const SizedBox(width: 2),
-      IosIconButton(
-        size: 20,
-        padding: const EdgeInsets.all(8),
-        minSize: 40,
-        semanticLabel: canToggleTemporaryConversation
-            ? AppLocalizations.of(context)!.temporaryChatToggleTooltip
-            : AppLocalizations.of(context)!.titleForLocale,
-        icon: canToggleTemporaryConversation && !temporaryConversationEnabled
-            ? Lucide.MessageCircleDashed
-            : Lucide.MessageCirclePlus,
-        builder: canToggleTemporaryConversation && temporaryConversationEnabled
-            ? (color) => SvgPicture.asset(
-                'assets/icons/temporary_chat_checked.svg',
-                width: 20,
-                height: 20,
-                colorFilter: ColorFilter.mode(color, BlendMode.srcIn),
-              )
-            : null,
-        onTap: () async {
-          if (canToggleTemporaryConversation) {
-            await onToggleTemporaryConversation();
-          } else {
-            await onCreateNewConversation();
-          }
-        },
+      NewConversationDraftBadge(
+        enabled: !temporaryConversationEnabled,
+        child: IosIconButton(
+          size: 20,
+          padding: const EdgeInsets.all(8),
+          minSize: 40,
+          semanticLabel: canToggleTemporaryConversation
+              ? AppLocalizations.of(context)!.temporaryChatToggleTooltip
+              : AppLocalizations.of(context)!.titleForLocale,
+          icon: canToggleTemporaryConversation && !temporaryConversationEnabled
+              ? Lucide.MessageCircleDashed
+              : Lucide.MessageCirclePlus,
+          builder:
+              canToggleTemporaryConversation && temporaryConversationEnabled
+              ? (color) => SvgPicture.asset(
+                  'assets/icons/temporary_chat_checked.svg',
+                  width: 20,
+                  height: 20,
+                  colorFilter: ColorFilter.mode(color, BlendMode.srcIn),
+                )
+              : null,
+          onTap: () async {
+            if (canToggleTemporaryConversation) {
+              await onToggleTemporaryConversation();
+            } else {
+              await onCreateNewConversation();
+            }
+          },
+        ),
       ),
+
       const SizedBox(width: 6),
     ];
   }

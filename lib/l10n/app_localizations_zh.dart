@@ -1830,7 +1830,8 @@ class AppLocalizationsZh extends AppLocalizations {
   String get backupPageOverwriteMode => '完全覆盖';
 
   @override
-  String get backupPageOverwriteModeDescription => '仅替换已选组件；保留未选组件及无关本地设置';
+  String get backupPageOverwriteModeDescription =>
+      '替换所选内容，保留未选内容及其他本机设置。替换聊天时，也会清除本机未发送的草稿。';
 
   @override
   String get backupPageMergeMode => '合并';
@@ -8932,7 +8933,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String localSnapshotRestoreMessage(String when) {
-    return '当前的对话和设置会被 $when 的这份副本替换。系统会先把现在的数据存一份，所以这一步可以撤销。';
+    return '当前聊天和设置将替换为 $when 的副本。替换前会保存当前聊天和设置的副本。未发送的草稿不包含在副本中，此次恢复会清除这些草稿。';
   }
 
   @override
@@ -12207,6 +12208,51 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get phoneControlEnableAssistant => '允许此助手使用手机控制';
+
+  @override
+  String get composerDraftLabel => '草稿';
+
+  @override
+  String get composerDraftRecovered => '已恢复一条尚未发送的内容。';
+
+  @override
+  String get composerDraftRestore => '继续编辑';
+
+  @override
+  String get composerDraftDiscard => '丢弃';
+
+  @override
+  String get composerDraftClear => '清空草稿';
+
+  @override
+  String get composerDraftClearConfirm => '丢弃当前输入框里尚未发送的文字和附件？';
+
+  @override
+  String get composerDraftSaveFailed => '最新草稿保存失败，内容仍保留在当前窗口。';
+
+  @override
+  String get composerDraftRetry => '重试保存';
+
+  @override
+  String get composerDraftConflictTitle => '这个对话已有草稿';
+
+  @override
+  String get composerDraftConflictBody => '追加会保留两边的文字和附件；替换会丢弃原来的草稿。内容不会自动发送。';
+
+  @override
+  String get composerDraftAppend => '追加';
+
+  @override
+  String get composerDraftReplace => '替换草稿';
+
+  @override
+  String get composerDraftMissingFile => '有附件无法读取，请移除或重新选择该文件。';
+
+  @override
+  String get composerDraftMessageMissing => '正在编辑的原消息已不存在。请复制内容到新消息，或取消本次编辑。';
+
+  @override
+  String get composerDraftDeleteNotice => '这些对话中未发送的草稿也会一起删除。';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hans`).
@@ -14035,7 +14081,8 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get backupPageOverwriteMode => '完全覆盖';
 
   @override
-  String get backupPageOverwriteModeDescription => '仅替换已选组件；保留未选组件及无关本地设置';
+  String get backupPageOverwriteModeDescription =>
+      '替换所选内容，保留未选内容及其他本机设置。替换聊天时，也会清除本机未发送的草稿。';
 
   @override
   String get backupPageMergeMode => '合并';
@@ -21063,7 +21110,7 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String localSnapshotRestoreMessage(String when) {
-    return '当前的对话和设置会被 $when 的这份副本替换。系统会先把现在的数据存一份，所以这一步可以撤销。';
+    return '当前聊天和设置将替换为 $when 的副本。替换前会保存当前聊天和设置的副本。未发送的草稿不包含在副本中，此次恢复会清除这些草稿。';
   }
 
   @override
@@ -24338,6 +24385,51 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get phoneControlEnableAssistant => '允许此助手使用手机控制';
+
+  @override
+  String get composerDraftLabel => '草稿';
+
+  @override
+  String get composerDraftRecovered => '已恢复一条尚未发送的内容。';
+
+  @override
+  String get composerDraftRestore => '继续编辑';
+
+  @override
+  String get composerDraftDiscard => '丢弃';
+
+  @override
+  String get composerDraftClear => '清空草稿';
+
+  @override
+  String get composerDraftClearConfirm => '丢弃当前输入框里尚未发送的文字和附件？';
+
+  @override
+  String get composerDraftSaveFailed => '最新草稿保存失败，内容仍保留在当前窗口。';
+
+  @override
+  String get composerDraftRetry => '重试保存';
+
+  @override
+  String get composerDraftConflictTitle => '这个对话已有草稿';
+
+  @override
+  String get composerDraftConflictBody => '追加会保留两边的文字和附件；替换会丢弃原来的草稿。内容不会自动发送。';
+
+  @override
+  String get composerDraftAppend => '追加';
+
+  @override
+  String get composerDraftReplace => '替换草稿';
+
+  @override
+  String get composerDraftMissingFile => '有附件无法读取，请移除或重新选择该文件。';
+
+  @override
+  String get composerDraftMessageMissing => '正在编辑的原消息已不存在。请复制内容到新消息，或取消本次编辑。';
+
+  @override
+  String get composerDraftDeleteNotice => '这些对话中未发送的草稿也会一起删除。';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hant`).
@@ -26167,7 +26259,8 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get backupPageOverwriteMode => '完全覆蓋';
 
   @override
-  String get backupPageOverwriteModeDescription => '僅替換已選元件；保留未選元件及無關的本機設定';
+  String get backupPageOverwriteModeDescription =>
+      '取代所選內容，保留未選內容及其他本機設定。取代聊天時，也會清除本機未傳送的草稿。';
 
   @override
   String get backupPageMergeMode => '合併';
@@ -33269,7 +33362,7 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String localSnapshotRestoreMessage(String when) {
-    return '目前的對話和設定會被 $when 的這份副本替換。系統會先把現在的資料存一份，所以這一步可以復原。';
+    return '目前聊天和設定將取代為 $when 的副本。取代前會儲存目前聊天和設定的副本。未傳送的草稿不包含在副本中，此次還原會清除這些草稿。';
   }
 
   @override
@@ -36548,4 +36641,49 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get phoneControlEnableAssistant => '允許此助手使用手機控制';
+
+  @override
+  String get composerDraftLabel => '草稿';
+
+  @override
+  String get composerDraftRecovered => '已還原一則尚未傳送的內容。';
+
+  @override
+  String get composerDraftRestore => '繼續編輯';
+
+  @override
+  String get composerDraftDiscard => '捨棄';
+
+  @override
+  String get composerDraftClear => '清空草稿';
+
+  @override
+  String get composerDraftClearConfirm => '捨棄目前輸入框裡尚未傳送的文字和附件？';
+
+  @override
+  String get composerDraftSaveFailed => '最新草稿儲存失敗，內容仍保留在目前視窗。';
+
+  @override
+  String get composerDraftRetry => '重試儲存';
+
+  @override
+  String get composerDraftConflictTitle => '這個對話已有草稿';
+
+  @override
+  String get composerDraftConflictBody => '附加會保留兩邊的文字和附件；取代會捨棄原來的草稿。內容不會自動傳送。';
+
+  @override
+  String get composerDraftAppend => '附加';
+
+  @override
+  String get composerDraftReplace => '取代草稿';
+
+  @override
+  String get composerDraftMissingFile => '有附件無法讀取，請移除或重新選擇該檔案。';
+
+  @override
+  String get composerDraftMessageMissing => '正在編輯的原訊息已不存在。請複製內容到新訊息，或取消本次編輯。';
+
+  @override
+  String get composerDraftDeleteNotice => '這些對話中未傳送的草稿也會一起刪除。';
 }

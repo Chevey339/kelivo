@@ -803,7 +803,7 @@
   "backupPageSelectImportMode": "Select Import Mode",
   "backupPageSelectImportModeDescription": "Choose a restore mode. The chat and file switches determine which components are included.",
   "backupPageOverwriteMode": "Complete Overwrite",
-  "backupPageOverwriteModeDescription": "Replace the selected components; keep unselected components and unrelated local settings",
+  "backupPageOverwriteModeDescription": "Replace the selected components; keep unselected components and unrelated local settings. Replacing chats also clears local unsent drafts.",
   "backupPageMergeMode": "Merge",
   "backupPageMergeModeDescription": "Keep local data and add backup data. Identical conversations are skipped and conflicting conversations receive new IDs.",
   "backupPageRestore": "Restore",
@@ -4035,7 +4035,7 @@
   "localSnapshotActionPin": "Keep this copy",
   "localSnapshotActionUnpin": "Stop keeping",
   "localSnapshotRestoreTitle": "Restore this copy?",
-  "localSnapshotRestoreMessage": "Your current chats and settings will be replaced by this copy from {when}. A copy of what you have now is saved first, so this can be undone.",
+  "localSnapshotRestoreMessage": "Your current chats and settings will be replaced by this copy from {when}. A copy of the current chats and settings is saved first. Unsent drafts are excluded from copies and will be cleared.",
   "@localSnapshotRestoreMessage": {
     "placeholders": {
       "when": {
@@ -5619,5 +5619,20 @@
   "phoneControlAssistantHint": "Both permissions are required: enable Kelivo phone control in system Accessibility settings, then enable Phone Control under your assistant’s Local Tools (also available in the chat tools menu). Each assistant is configured separately. Keep the phone unlocked while running a task.",
   "phoneControlRestrictedTitle": "Accessibility switch unavailable?",
   "phoneControlRestrictedHint": "For some downloaded APKs, Android requires “Allow restricted settings” in the app info menu first. Tap to open Kelivo’s app info, then return to Accessibility settings.",
-  "phoneControlEnableAssistant": "Allow this assistant to use phone control"
+  "phoneControlEnableAssistant": "Allow this assistant to use phone control",
+  "composerDraftLabel": "Draft",
+  "composerDraftRecovered": "An unsent message was recovered.",
+  "composerDraftRestore": "Continue editing",
+  "composerDraftDiscard": "Discard",
+  "composerDraftClear": "Clear draft",
+  "composerDraftClearConfirm": "Discard the unsent text and attachments in this editor?",
+  "composerDraftSaveFailed": "Your latest draft could not be saved. It is still in this window.",
+  "composerDraftRetry": "Retry saving",
+  "composerDraftConflictTitle": "This conversation already has a draft",
+  "composerDraftConflictBody": "Append keeps both texts and attachments. Replace discards the existing draft. Nothing is sent automatically.",
+  "composerDraftAppend": "Append",
+  "composerDraftReplace": "Replace draft",
+  "composerDraftMissingFile": "An attachment is unavailable. Remove it or choose the file again.",
+  "composerDraftMessageMissing": "The message being edited no longer exists. Copy the text to a new message or discard this edit.",
+  "composerDraftDeleteNotice": "Unsent drafts in these conversations will also be deleted."
 }

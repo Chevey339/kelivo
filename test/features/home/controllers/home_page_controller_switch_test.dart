@@ -112,6 +112,7 @@ class _ControlledChatService extends ChatService {
     String? title,
     String? assistantId,
     bool temporary = false,
+    bool reuseNewEntry = false,
   }) async {
     final conversation = Conversation(
       title: title ?? 'Draft',

@@ -87,7 +87,7 @@ class SandboxPathResolver {
 
     // Determine root and tail to map. Prefer the same structured sandbox
     // markers as KelivoFileUri.tryEncodeLegacyAbsolutePath, then generic.
-    const subdirs = ['avatars', 'fonts', 'images', 'upload'];
+    const subdirs = ['avatars', 'fonts', 'images', 'upload', 'drafts'];
     String? tail; // starts with '/'
     String rootType = 'unknown';
 
@@ -181,7 +181,13 @@ class SandboxPathResolver {
     final String base = _basename(tail);
     for (final root in <String?>[docs, support]) {
       if (root == null || root.isEmpty) continue;
-      for (final sub in const ['avatars', 'fonts', 'images', 'upload']) {
+      for (final sub in const [
+        'avatars',
+        'fonts',
+        'images',
+        'upload',
+        'drafts',
+      ]) {
         final probe = '$root/$sub/$base';
         try {
           if (File(probe).existsSync()) {

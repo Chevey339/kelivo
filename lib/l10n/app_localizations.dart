@@ -3565,7 +3565,7 @@ abstract class AppLocalizations {
   /// No description provided for @backupPageOverwriteModeDescription.
   ///
   /// In en, this message translates to:
-  /// **'Replace the selected components; keep unselected components and unrelated local settings'**
+  /// **'Replace the selected components; keep unselected components and unrelated local settings. Replacing chats also clears local unsent drafts.'**
   String get backupPageOverwriteModeDescription;
 
   /// No description provided for @backupPageMergeMode.
@@ -16786,7 +16786,7 @@ abstract class AppLocalizations {
   /// No description provided for @localSnapshotRestoreMessage.
   ///
   /// In en, this message translates to:
-  /// **'Your current chats and settings will be replaced by this copy from {when}. A copy of what you have now is saved first, so this can be undone.'**
+  /// **'Your current chats and settings will be replaced by this copy from {when}. A copy of the current chats and settings is saved first. Unsent drafts are excluded from copies and will be cleared.'**
   String localSnapshotRestoreMessage(String when);
 
   /// No description provided for @localSnapshotRestorePreparing.
@@ -22841,6 +22841,96 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Allow this assistant to use phone control'**
   String get phoneControlEnableAssistant;
+
+  /// No description provided for @composerDraftLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Draft'**
+  String get composerDraftLabel;
+
+  /// No description provided for @composerDraftRecovered.
+  ///
+  /// In en, this message translates to:
+  /// **'An unsent message was recovered.'**
+  String get composerDraftRecovered;
+
+  /// No description provided for @composerDraftRestore.
+  ///
+  /// In en, this message translates to:
+  /// **'Continue editing'**
+  String get composerDraftRestore;
+
+  /// No description provided for @composerDraftDiscard.
+  ///
+  /// In en, this message translates to:
+  /// **'Discard'**
+  String get composerDraftDiscard;
+
+  /// No description provided for @composerDraftClear.
+  ///
+  /// In en, this message translates to:
+  /// **'Clear draft'**
+  String get composerDraftClear;
+
+  /// No description provided for @composerDraftClearConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Discard the unsent text and attachments in this editor?'**
+  String get composerDraftClearConfirm;
+
+  /// No description provided for @composerDraftSaveFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Your latest draft could not be saved. It is still in this window.'**
+  String get composerDraftSaveFailed;
+
+  /// No description provided for @composerDraftRetry.
+  ///
+  /// In en, this message translates to:
+  /// **'Retry saving'**
+  String get composerDraftRetry;
+
+  /// No description provided for @composerDraftConflictTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'This conversation already has a draft'**
+  String get composerDraftConflictTitle;
+
+  /// No description provided for @composerDraftConflictBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Append keeps both texts and attachments. Replace discards the existing draft. Nothing is sent automatically.'**
+  String get composerDraftConflictBody;
+
+  /// No description provided for @composerDraftAppend.
+  ///
+  /// In en, this message translates to:
+  /// **'Append'**
+  String get composerDraftAppend;
+
+  /// No description provided for @composerDraftReplace.
+  ///
+  /// In en, this message translates to:
+  /// **'Replace draft'**
+  String get composerDraftReplace;
+
+  /// No description provided for @composerDraftMissingFile.
+  ///
+  /// In en, this message translates to:
+  /// **'An attachment is unavailable. Remove it or choose the file again.'**
+  String get composerDraftMissingFile;
+
+  /// No description provided for @composerDraftMessageMissing.
+  ///
+  /// In en, this message translates to:
+  /// **'The message being edited no longer exists. Copy the text to a new message or discard this edit.'**
+  String get composerDraftMessageMissing;
+
+  /// No description provided for @composerDraftDeleteNotice.
+  ///
+  /// In en, this message translates to:
+  /// **'Unsent drafts in these conversations will also be deleted.'**
+  String get composerDraftDeleteNotice;
 }
 
 class _AppLocalizationsDelegate

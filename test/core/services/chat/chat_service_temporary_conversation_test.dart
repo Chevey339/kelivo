@@ -1,3 +1,5 @@
+import 'package:Kelivo/core/models/composer_draft.dart';
+import 'package:Kelivo/core/models/chat_input_data.dart';
 import 'package:Kelivo/core/models/message_part.dart';
 import 'package:Kelivo/core/models/chat_message.dart';
 import 'package:Kelivo/core/models/conversation.dart';
@@ -12,6 +14,8 @@ import 'package:path_provider_platform_interface/path_provider_platform_interfac
 import 'package:sqlite3/sqlite3.dart' as sqlite;
 
 import 'package:Kelivo/core/database/app_database.dart';
+import 'package:Kelivo/core/database/composer_draft_store.dart';
+import 'package:drift/native.dart';
 import 'package:Kelivo/core/database/generation_run.dart';
 import 'package:Kelivo/core/services/chat/chat_service.dart';
 import 'package:Kelivo/utils/sandbox_path_resolver.dart';
@@ -1726,4 +1730,261 @@ void main() {
     );
     expect(page!.slots.single.message.id, original.id);
   });
+  for (final editing in [false, true]) {
+    test(
+      'cancelling a later edit keeps the pending attachment submission (editing: $editing)',
+      () async {
+        final database = AppDatabase(NativeDatabase.memory());
+        final entered = Completer<void>();
+        final release = Completer<void>();
+        var holdCopy = false;
+        final drafts = ComposerDraftStore(
+          database,
+          directory: () async {
+            if (holdCopy && !entered.isCompleted) {
+              entered.complete();
+              await release.future;
+            }
+            return Directory('${tempDir.path}/scoped-drafts');
+          },
+        );
+        try {
+          await drafts.load('a');
+          final source = await File(
+            '${tempDir.path}/pending.txt',
+          ).writeAsString('pending attachment');
+          final input = ComposerDraftInput(
+            text: 'submitted',
+            documents: [
+              DocumentAttachment(
+                path: source.path,
+                fileName: 'pending.txt',
+                mime: 'text/plain',
+              ),
+            ],
+          );
+          if (editing) {
+            drafts.beginEdit('a', 'old', input);
+          } else {
+            drafts.setInput('a', input);
+          }
+          final submission = await drafts.beginSubmission('a', input);
+          holdCopy = true;
+          final preparing = drafts.prepareSubmissionInput(
+            input.toInput(submission: submission),
+          );
+          // Attach an error handler before exercising the interleaving.
+          Object? preparationError;
+          final completed = preparing.catchError((Object error) {
+            preparationError = error;
+            return const ChatInputData(text: '');
+          });
+          await entered.future;
+          drafts.beginEdit(
+            'a',
+            'another',
+            const ComposerDraftInput(text: 'another edit'),
+          );
+          drafts.endEdit('a');
+          release.complete();
+          final prepared = await completed;
+          expect(preparationError, isNull);
+          expect(prepared.draftSubmission!.id, submission.id);
+          expect(
+            await File(prepared.documents.single.path).readAsString(),
+            'pending attachment',
+          );
+          expect(drafts.peek('a')!.submissionId, submission.id);
+          await drafts.flush();
+        } finally {
+          if (!release.isCompleted) release.complete();
+          drafts.dispose();
+          await database.close();
+        }
+      },
+    );
+  }
+
+  test(
+    'composer submission consumes only its snapshot in the message transaction',
+    () async {
+      final first = createService();
+      await first.init();
+      final conversation = await first.createDraftConversation(
+        assistantId: 'assistant',
+        reuseNewEntry: true,
+      );
+      final drafts = first.composerDrafts!;
+      await drafts.load(conversation.id);
+      final ref = await drafts.beginSubmission(
+        conversation.id,
+        const ComposerDraftInput(text: 'first'),
+      );
+      drafts.setInput(
+        conversation.id,
+        const ComposerDraftInput(text: 'second'),
+      );
+      final sent = await first.beginSendGeneration(
+        conversationId: conversation.id,
+        userParts: [TextPart('first')],
+        modelId: 'model',
+        providerId: 'provider',
+        draftSubmission: ref,
+      );
+      expect(sent.userMessage!.id, ref.id);
+      // Deliberately skip finishSubmission: simulate the lost UI completion.
+      await drafts.flush();
+      await first.close();
+      services.remove(first);
+      final restarted = createService();
+      await restarted.init();
+      final saved = await restarted.composerDrafts!.load(conversation.id);
+      expect(saved.pending, isNull);
+      expect(saved.compose.text, 'second');
+      expect(restarted.composerDrafts!.newEntry('assistant'), isNull);
+      expect(
+        (await restarted.loadMessages(
+          conversation.id,
+        )).where((message) => message.role == 'user'),
+        hasLength(1),
+      );
+    },
+  );
+
+  test(
+    'draft attachment is private until the same message transaction publishes it',
+    () async {
+      final service = createService();
+      await service.init();
+      final conversation = await service.createDraftConversation();
+      final drafts = service.composerDrafts!;
+      await drafts.load(conversation.id);
+      final file = await File(
+        '${tempDir.path}/picked.txt',
+      ).writeAsString('private content');
+      final input = ComposerDraftInput(
+        text: 'send file',
+        documents: [
+          DocumentAttachment(
+            path: file.path,
+            fileName: 'picked.txt',
+            mime: 'text/plain',
+          ),
+        ],
+      );
+      final ref = await drafts.beginSubmission(conversation.id, input);
+      final prepared = await drafts.prepareSubmissionInput(
+        input.toInput(submission: ref),
+      );
+      final uri = SandboxPathResolver.canonicalize(
+        prepared.documents.single.path,
+      );
+      expect(await drafts.publishedFiles(), isNot(contains(uri)));
+      await service.beginSendGeneration(
+        conversationId: conversation.id,
+        userParts: [
+          TextPart('send file'),
+          FilePart(uri: uri, name: 'picked.txt', mime: 'text/plain'),
+        ],
+        modelId: 'model',
+        providerId: 'provider',
+        draftSubmission: ref,
+      );
+      expect(await drafts.publishedFiles(), contains(uri));
+      await drafts.finishSubmission(ref);
+      expect(
+        await File(prepared.documents.single.path).readAsString(),
+        'private content',
+      );
+    },
+  );
+
+  test(
+    'deleting an owner prevents a prepared submission from recreating it',
+    () async {
+      final service = createService();
+      await service.init();
+      final conversation = await service.createDraftConversation();
+      final drafts = service.composerDrafts!;
+      await drafts.load(conversation.id);
+      final ref = await drafts.beginSubmission(
+        conversation.id,
+        const ComposerDraftInput(text: 'late'),
+      );
+      await service.deleteConversation(conversation.id);
+      await expectLater(
+        service.beginSendGeneration(
+          conversationId: conversation.id,
+          userParts: [TextPart('late')],
+          modelId: 'model',
+          providerId: 'provider',
+          draftSubmission: ref,
+        ),
+        throwsStateError,
+      );
+      expect(service.getConversation(conversation.id), isNull);
+      expect(drafts.hasDraft(conversation.id), isFalse);
+    },
+  );
+  test('only the composer entry reuses its draft identity', () async {
+    final chat = createService();
+    await chat.init();
+    final first = await chat.createDraftConversation(
+      assistantId: 'a',
+      reuseNewEntry: true,
+    );
+    final again = await chat.createDraftConversation(
+      assistantId: 'a',
+      reuseNewEntry: true,
+    );
+    expect(again.id, first.id);
+    final independent = await chat.createDraftConversation(assistantId: 'a');
+    expect(independent.id, isNot(first.id));
+    expect(chat.composerDrafts!.newEntry('a')?.id, first.id);
+    final otherAssistant = await chat.createDraftConversation(
+      assistantId: 'b',
+      reuseNewEntry: true,
+    );
+    expect(otherAssistant.id, isNot(first.id));
+  });
+  test(
+    'restart removes an interrupted public copy but keeps its recoverable source',
+    () async {
+      final first = createService();
+      await first.init();
+      final conversation = await first.createDraftConversation(
+        reuseNewEntry: true,
+      );
+      final store = first.composerDrafts!;
+      await store.load(conversation.id);
+      final file = await File(
+        '${tempDir.path}/original.txt',
+      ).writeAsString('private source');
+      final input = ComposerDraftInput(
+        text: 'not committed',
+        documents: [
+          DocumentAttachment(
+            path: file.path,
+            fileName: 'original.txt',
+            mime: 'text/plain',
+          ),
+        ],
+      );
+      final ref = await store.beginSubmission(conversation.id, input);
+      final prepared = await store.prepareSubmissionInput(
+        input.toInput(submission: ref),
+      );
+      await first.close();
+      services.remove(first);
+      final second = createService();
+      await second.init();
+      final recovered = await second.composerDrafts!.load(conversation.id);
+      expect(recovered.pending?.text, 'not committed');
+      expect(
+        await File(recovered.pending!.documents.single.path).readAsString(),
+        'private source',
+      );
+      expect(await File(prepared.documents.single.path).exists(), isFalse);
+    },
+  );
 }

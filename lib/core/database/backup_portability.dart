@@ -91,7 +91,7 @@ final class BackupPortability {
     await database.transaction(() async {
       await BusinessRepository(database).transformSnapshot(portable);
       await database.customStatement(
-        "DELETE FROM extension_entity_rows WHERE kind = 'externalMounts';",
+        "DELETE FROM extension_entity_rows WHERE kind IN ('externalMounts', 'composerDraft', 'composerNewEntry', 'composerShareReceipt', 'composerPrivateFile');",
       );
       // Chat history remains readable, but imported chats cannot inherit a
       // directory grant or silently authorize shell execution on this device.

@@ -1,3 +1,4 @@
+import 'package:sqlite3/sqlite3.dart' as composer_sqlite;
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
@@ -654,6 +655,7 @@ class DataSync {
       settingsTmp = settingsFile;
 
       ChatDatabaseSnapshotInfo? snapshotInfo;
+      var publishedDraftFiles = <String>{};
       if (includeChats) {
         final databaseFile = File(p.join(workDir.path, '_bk_kelivo.db'));
         databaseTmp = databaseFile;
@@ -665,9 +667,23 @@ class DataSync {
           ),
         );
         snapshotInfo = await snapshotDatabase(databaseFile);
+        publishedDraftFiles = _publishedDraftFilesFrom(databaseFile);
         await _sanitizeBackupDatabase(databaseFile);
       }
 
+      if (!includeChats && includeFiles) {
+        final store = chatService.composerDrafts;
+        publishedDraftFiles = store != null
+            ? await store.publishedFiles()
+            : _publishedDraftFilesFrom(
+                File(
+                  p.join(
+                    (await AppDirectories.getAppDataDirectory()).path,
+                    'kelivo.db',
+                  ),
+                ),
+              );
+      }
       final packageInfo = await PackageInfo.fromPlatform();
       final appVersion = packageInfo.buildNumber.trim().isEmpty
           ? packageInfo.version
@@ -700,6 +716,7 @@ class DataSync {
           appVersion: appVersion,
           businessEntityRowIds: businessExport.entityRowIds,
           assetRootPaths: assetRootPaths,
+          publishedDraftFiles: publishedDraftFiles,
         ),
         cancelToken: cancelToken,
         onProgress: onProgress,
@@ -728,6 +745,24 @@ class DataSync {
         await _deleteFileQuietly(databaseTmp);
         await _deleteFileQuietly(manifestTmp);
       }
+    }
+  }
+
+  static Set<String> _publishedDraftFilesFrom(File file) {
+    if (!file.existsSync()) return {};
+    final database = composer_sqlite.sqlite3.open(
+      file.path,
+      mode: composer_sqlite.OpenMode.readOnly,
+    );
+    try {
+      return {
+        for (final row in database.select(
+          "SELECT id FROM extension_entity_rows WHERE kind = 'composerPublishedFile'",
+        ))
+          row['id'] as String,
+      };
+    } finally {
+      database.close();
     }
   }
 
@@ -989,6 +1024,7 @@ class DataSync {
       appVersion: args.appVersion,
       businessEntityRowIds: args.businessEntityRowIds,
       assetRootPaths: args.assetRootPaths,
+      publishedDraftFiles: args.publishedDraftFiles,
       ctx: ctx,
     );
     _verifyPackedBackupSync(
@@ -1024,6 +1060,7 @@ class DataSync {
     required String appVersion,
     required Map<String, List<String>> businessEntityRowIds,
     required Map<String, String> assetRootPaths,
+    Set<String> publishedDraftFiles = const {},
     BackupIsolateContext? ctx,
   }) {
     if (includeChats != (databasePath != null && snapshotInfo != null)) {
@@ -1037,7 +1074,20 @@ class DataSync {
     final assetFiles = includeFiles
         ? {
             for (final name in _assetRootNames)
-              name: _listFilesSync(assetRootPaths[name]!),
+              name: _listFilesSync(assetRootPaths[name]!).where((file) {
+                if (!RegExp(
+                  r'^draft-[0-9a-f-]{36}-[0-9]+',
+                ).hasMatch(p.basename(file.path))) {
+                  return true;
+                }
+                final relative = p.relative(
+                  file.path,
+                  from: p.dirname(assetRootPaths[name]!),
+                );
+                final uri =
+                    'kelivo-file:///${p.split(relative).map(Uri.encodeComponent).join('/')}';
+                return publishedDraftFiles.contains(uri);
+              }).toList(),
           }
         : const <String, List<File>>{};
     var totalBytes = _fileSizeSync(settingsPath) + _fileSizeSync(databasePath);
@@ -3509,6 +3559,7 @@ class _BackupPackArgs {
     required this.appVersion,
     required this.businessEntityRowIds,
     required this.assetRootPaths,
+    this.publishedDraftFiles = const {},
   });
 
   final String outPath;
@@ -3521,6 +3572,7 @@ class _BackupPackArgs {
   final String appVersion;
   final Map<String, List<String>> businessEntityRowIds;
   final Map<String, String> assetRootPaths;
+  final Set<String> publishedDraftFiles;
 }
 
 class _BackupByteMeter {

@@ -1,3 +1,5 @@
+import '../models/composer_draft.dart';
+import 'composer_draft_store.dart';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:isolate';
@@ -153,6 +155,7 @@ class ChatDatabaseRepository {
        _observer = observer ?? ChatDatabaseObserver.instance;
 
   final AppDatabase _db;
+  late final ComposerDraftStore composerDrafts = ComposerDraftStore(_db);
   final File? _databaseFile;
   final ChatDatabaseObserver _observer;
   bool _messageSearchFtsReady = false;
@@ -1408,6 +1411,8 @@ class ChatDatabaseRepository {
   }
 
   Future<void> close() async {
+    await composerDrafts.flush();
+    composerDrafts.dispose();
     await _db.close();
   }
 
@@ -4624,7 +4629,14 @@ class ChatDatabaseRepository {
     required ChatMessage userMessage,
     required ChatMessage assistantMessage,
     required String runId,
+    DraftSubmission? draftSubmission,
   }) {
+    if (draftSubmission != null &&
+        (draftSubmission.conversationId != conversation.id ||
+            draftSubmission.id != userMessage.id ||
+            draftSubmission.editMessageId != null)) {
+      throw StateError('composer_submission_mismatch');
+    }
     _validateGenerationBeginMessages(
       conversation: conversation,
       userMessage: userMessage,
@@ -4651,6 +4663,9 @@ class ChatDatabaseRepository {
           targetRevisionId: assistantMessage.id,
           createdAt: assistantMessage.timestamp,
         );
+        if (draftSubmission != null) {
+          await composerDrafts.consumeInTransaction(draftSubmission);
+        }
         return (
           conversation: persisted,
           userMessage: userMessage,
@@ -4935,6 +4950,7 @@ class ChatDatabaseRepository {
     required String messageId,
     String content = '',
     List<MessagePart>? parts,
+    DraftSubmission? draftSubmission,
   }) {
     return _observer.measure(
       ChatDatabaseOperation.commandAppendVersion,
@@ -4942,6 +4958,7 @@ class ChatDatabaseRepository {
         messageId: messageId,
         content: content,
         parts: parts,
+        draftSubmission: draftSubmission,
       ),
     );
   }
@@ -4950,12 +4967,18 @@ class ChatDatabaseRepository {
     required String messageId,
     required String content,
     List<MessagePart>? parts,
+    DraftSubmission? draftSubmission,
   }) async {
     return _db.transaction(() async {
       final originalRow = await (_db.select(
         _db.messageRows,
       )..where((row) => row.id.equals(messageId))).getSingleOrNull();
       if (originalRow == null) return null;
+      if (draftSubmission != null &&
+          (draftSubmission.conversationId != originalRow.conversationId ||
+              draftSubmission.editMessageId != messageId)) {
+        throw StateError('composer_submission_mismatch');
+      }
       final conversationRow =
           await (_db.select(_db.conversationRows)
                 ..where((row) => row.id.equals(originalRow.conversationId)))
@@ -4989,6 +5012,7 @@ class ChatDatabaseRepository {
           parts ??
           ChatMessage.partsWithRedistributedText(original.parts, content);
       final message = ChatMessage(
+        id: draftSubmission?.id,
         role: original.role,
         parts: resolvedParts,
         conversationId: original.conversationId,
@@ -5026,6 +5050,9 @@ class ChatDatabaseRepository {
       await (_db.update(_db.conversationRows)
             ..where((row) => row.id.equals(conversation.id)))
           .write(_conversationCompanion(conversation));
+      if (draftSubmission != null) {
+        await composerDrafts.consumeInTransaction(draftSubmission);
+      }
       return (conversation: conversation, message: message);
     });
   }
@@ -5228,7 +5255,7 @@ class ChatDatabaseRepository {
           "INSERT OR IGNORE INTO extension_entity_rows "
           "(kind, id, sort_order, owner_id, payload, updated_at) "
           "SELECT kind, id, sort_order, owner_id, payload, updated_at "
-          "FROM merge_source.extension_entity_rows WHERE kind IN ('workspace', 'skill');",
+          "FROM merge_source.extension_entity_rows WHERE kind IN ('workspace', 'skill', 'composerPublishedFile');",
         );
         final sourceRows = await _db
             .customSelect(
@@ -6179,28 +6206,31 @@ class ChatDatabaseRepository {
   /// Draft conversations never reach this method (they are not persisted), so
   /// no tombstone is written for them.
   Future<void> deleteConversation(String id) async {
-    await _db.transaction(() async {
-      final deleted = await (_db.delete(
-        _db.conversationRows,
-      )..where((t) => t.id.equals(id))).go();
-      if (deleted == 0) return;
-      final now = DateTime.now().toUtc();
-      await _db
-          .into(_db.tombstoneRows)
-          .insertOnConflictUpdate(
-            TombstoneRowsCompanion.insert(
-              scope: tombstoneScopeConversation,
-              entityId: id,
-              deletedAt: now,
-            ),
-          );
-      await (_db.delete(_db.tombstoneRows)..where(
-            (t) => t.deletedAt.isSmallerThanValue(
-              now.subtract(tombstoneRetention).microsecondsSinceEpoch,
-            ),
-          ))
-          .go();
-    });
+    await composerDrafts.delete(
+      id,
+      deleteConversation: () async {
+        final deleted = await (_db.delete(
+          _db.conversationRows,
+        )..where((t) => t.id.equals(id))).go();
+        if (deleted == 0) return;
+        final now = DateTime.now().toUtc();
+        await _db
+            .into(_db.tombstoneRows)
+            .insertOnConflictUpdate(
+              TombstoneRowsCompanion.insert(
+                scope: tombstoneScopeConversation,
+                entityId: id,
+                deletedAt: now,
+              ),
+            );
+        await (_db.delete(_db.tombstoneRows)..where(
+              (t) => t.deletedAt.isSmallerThanValue(
+                now.subtract(tombstoneRetention).microsecondsSinceEpoch,
+              ),
+            ))
+            .go();
+      },
+    );
   }
 
   /// Reads deletion tombstones, newest first, optionally filtered by [scope].
@@ -6407,6 +6437,9 @@ class ChatDatabaseRepository {
   }
 
   Future<void> _clearChatRows() async {
+    await _db.customStatement(
+      "DELETE FROM extension_entity_rows WHERE kind IN ('composerDraft','composerNewEntry','composerPrivateFile','composerPublishedFile')",
+    );
     await _db.delete(_db.conversationMcpServerRows).go();
     await _db.delete(_db.messageRows).go();
     await _db.delete(_db.conversationRows).go();

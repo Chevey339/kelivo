@@ -1,3 +1,4 @@
+import '../../../core/services/chat/chat_service.dart';
 import 'dart:async';
 import 'dart:io' show Platform;
 import 'package:flutter/material.dart';
@@ -813,9 +814,9 @@ class _HomePageState extends State<HomePage>
     _incomingShares?.dispose();
     _controller.removeListener(_onControllerChanged);
     _drawerController.removeListener(_onDrawerValueChanged);
+    _controller.dispose();
     _inputFocus.dispose();
     _inputController.dispose();
-    _controller.dispose();
     _scrollController.dispose();
     routeObserver.unsubscribe(this);
     super.dispose();
@@ -888,9 +889,20 @@ class _HomePageState extends State<HomePage>
     _readingIncomingShares = true;
     try {
       await _chatReady;
+      if (!mounted) return;
+      final drafts = context.read<ChatService>().composerDrafts;
       while (mounted && _incomingShareChanged) {
         _incomingShareChanged = false;
-        final shares = await service.pending();
+        final pendingShares = await service.pending();
+        final shares = <IncomingShare>[];
+        for (final share in pendingShares) {
+          if (await drafts?.hasShareReceipt(share.id) == true) {
+            await service.acknowledge([share]);
+            await drafts?.acknowledgeShares([share.id]);
+          } else {
+            shares.add(share);
+          }
+        }
         if (!mounted || shares.isEmpty) continue;
         final hasContent = shares.any(
           (share) => share.text.trim().isNotEmpty || share.files.isNotEmpty,
@@ -905,25 +917,39 @@ class _HomePageState extends State<HomePage>
           if (!mounted) return;
           final ChatInputData input;
           try {
-            input = await service.prepare(shares);
+            input = await service.prepare(
+              shares,
+              uploadDirectory: await drafts?.directoryFor('share-import'),
+            );
           } on ShareImportCancelled {
             await service.acknowledge(shares);
             continue;
           }
           var accepted = false;
+          var completed = false;
           try {
             if (!mounted) return;
             // Check the current draft at delivery time: preparing a large
             // attachment may take long enough for the user to keep typing.
-            accepted = await _controller.acceptIncomingShareDraft(input);
+            accepted = await _controller.acceptIncomingShareDraft(
+              input,
+              shareIds: shares.map((share) => share.id),
+            );
+            completed = true;
           } finally {
-            if (!accepted) await service.discardPrepared(input);
+            // The durable store owns a separate copy; native delivery remains
+            // unacknowledged if persistence failed.
+            if ((completed && drafts != null) ||
+                (drafts == null && !accepted)) {
+              await service.discardPrepared(input);
+            }
           }
         }
         if (shares.any((share) => share.failedFiles > 0)) {
           _showIncomingShareFailure();
         }
         await service.acknowledge(shares);
+        await drafts?.acknowledgeShares(shares.map((share) => share.id));
       }
     } on MissingPluginException {
       // The desktop/test host does not have a mobile incoming-share inbox.
