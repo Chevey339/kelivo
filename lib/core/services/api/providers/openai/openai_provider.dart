@@ -611,7 +611,7 @@ Stream<StreamChunk> sendOpenAIStream(
       if (temperature != null) 'temperature': temperature,
       if (topP != null) 'top_p': topP,
       if (tools != null && tools.isNotEmpty)
-        'tools': cleanToolsForCompatibility(tools),
+        'tools': copyChatCompletionTools(tools),
       if (tools != null && tools.isNotEmpty) 'tool_choice': 'auto',
     };
     setMaxTokens(body);

@@ -103,26 +103,19 @@ Map<String, dynamic> copyChatCompletionMessage(Map<String, dynamic> m) {
   return out;
 }
 
-List<Map<String, dynamic>> cleanToolsForCompatibility(
+List<Map<String, dynamic>> copyChatCompletionTools(
   List<Map<String, dynamic>> tools,
 ) {
-  final cleaned = tools.map((tool) {
+  // These parameters are JSON Schema. Google's native Schema repairs can add
+  // constraints (e.g. string items/required properties) that change its meaning.
+  return tools.map((tool) {
     final result = Map<String, dynamic>.from(tool);
     final fn = result['function'];
     if (fn is Map) {
-      final fnMap = Map<String, dynamic>.from(fn);
-      final params = fnMap['parameters'];
-      if (params is Map) {
-        fnMap['parameters'] = cleanSchemaForGemini(
-          Map<String, dynamic>.from(params),
-        );
-      }
-      result['function'] = fnMap;
+      result['function'] = Map<String, dynamic>.from(fn);
     }
     return result;
   }).toList();
-  // print('[ChatApi/Tools] Cleaned ${cleaned.length} tools: ${jsonEncode(cleaned)}');
-  return cleaned;
 }
 
 bool _isRemoteImageContentPart(dynamic part) {
@@ -889,7 +882,7 @@ Stream<StreamChunk> runOpenAIChatCompletionsToolFollowUps({
         if (temperature != null) 'temperature': temperature,
         if (topP != null) 'top_p': topP,
         if (tools != null && tools.isNotEmpty)
-          'tools': cleanToolsForCompatibility(tools),
+          'tools': copyChatCompletionTools(tools),
         if (tools != null && tools.isNotEmpty) 'tool_choice': 'auto',
       };
       applyMaxTokens(body2);

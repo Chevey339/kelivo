@@ -51,8 +51,9 @@ void main() {
         expect(
           (properties['config'] as Map)['additionalProperties'],
           <String, dynamic>{
+            r'$schema': 'https://json-schema.org/draft/2020-12/schema',
             'type': 'string',
-            'enum': ['enabled'],
+            'const': 'enabled',
           },
         );
         expect(
@@ -115,7 +116,7 @@ void main() {
       });
     });
 
-    test('passes an unresolvable \$ref through without inventing a type', () {
+    test('preserves unresolved refs without inventing a type', () {
       final output = ToolHandlerService.sanitizeToolParametersForProvider({
         'type': 'object',
         'properties': {
@@ -129,12 +130,15 @@ void main() {
       }, ProviderKind.openai);
 
       final props = output['properties'] as Map<String, dynamic>;
-      expect(props['remote'], {'description': 'kept'});
-      expect(props['dangling'], isEmpty);
-      expect(props['anchor'], isEmpty);
+      expect(props['remote'], {
+        r'$ref': 'https://example.com/s.json',
+        'description': 'kept',
+      });
+      expect(props['dangling'], {r'$ref': r'#/$defs/Missing'});
+      expect(props['anchor'], {r'$ref': '#Payload'});
     });
 
-    test('cuts a recursive \$ref without inventing a type', () {
+    test('preserves recursive refs and their definitions', () {
       final output = ToolHandlerService.sanitizeToolParametersForProvider({
         'type': 'object',
         r'$defs': {
@@ -150,17 +154,10 @@ void main() {
         },
       }, ProviderKind.openai);
 
-      var node = output['properties']['root'] as Map<String, dynamic>;
-      expect(node['type'], 'object');
-      var depth = 0;
-      while (node['properties'] is Map &&
-          (node['properties'] as Map)['child'] is Map &&
-          ((node['properties'] as Map)['child'] as Map).isNotEmpty) {
-        node = (node['properties'] as Map)['child'] as Map<String, dynamic>;
-        depth++;
-        if (depth > 40) break;
-      }
-      expect(depth, lessThan(40));
+      expect(output['properties']['root'], {r'$ref': r'#/$defs/Node'});
+      expect(output[r'$defs']['Node']['properties']['child'], {
+        r'$ref': r'#/$defs/Node',
+      });
     });
 
     test('keeps a parameter that is named like a schema keyword', () {
@@ -188,9 +185,9 @@ void main() {
     });
 
     test(
-      'does not advertise a boolean property from a \$ref to true or false',
+      'Google does not advertise a boolean property from a ref to true or false',
       () {
-        for (final kind in const [ProviderKind.google, ProviderKind.openai]) {
+        for (final kind in const [ProviderKind.google]) {
           final output = ToolHandlerService.sanitizeToolParametersForProvider({
             'type': 'object',
             r'$defs': {'Denied': false, 'Anything': true},
@@ -212,7 +209,7 @@ void main() {
       },
     );
 
-    test('tuple-form items fan-out still advertises a later payload', () {
+    test('Google skips refs in discarded tuple items', () {
       Map<String, dynamic> fanout(String next) => {
         'type': 'object',
         'properties': {
@@ -248,7 +245,7 @@ void main() {
         },
       };
 
-      for (final kind in ProviderKind.values) {
+      for (final kind in const [ProviderKind.google]) {
         final output = ToolHandlerService.sanitizeToolParametersForProvider(
           schema,
           kind,
@@ -315,9 +312,11 @@ void main() {
             schema,
             kind,
           );
-          final extra = output['additionalProperties'] as Map;
-          expect(extra['type'], 'object', reason: '$kind');
-          expect(extra.containsKey(r'$ref'), isFalse, reason: '$kind');
+          expect(
+            output,
+            schema,
+            reason: '$kind retains refs at the budget limit',
+          );
         }
       },
     );

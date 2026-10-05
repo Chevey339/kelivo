@@ -87,20 +87,18 @@ class ToolHandlerService {
     ProviderKind kind,
   ) {
     Map<String, dynamic> clone = _deepCloneMap(schema);
-    // Inline local $ref targets first: the allow-list below drops $ref/$defs,
-    // so an unresolved reference would reach the model as an empty schema and
-    // the whole nested object would silently vanish from the tool call.
+    // Inline local references before translating provider-specific schema fields.
     clone = resolveJsonSchemaRefs(
       clone,
-      expandAdditionalProperties: kind != ProviderKind.google,
+      preserveJsonSchema: kind != ProviderKind.google,
     );
-    clone = _sanitizeNode(clone, kind) as Map<String, dynamic>;
-    return clone;
+    if (kind != ProviderKind.google) return clone;
+    return _sanitizeGoogleNode(clone) as Map<String, dynamic>;
   }
 
-  static dynamic _sanitizeNode(dynamic node, ProviderKind kind) {
+  static dynamic _sanitizeGoogleNode(dynamic node) {
     if (node is List) {
-      return node.map((e) => _sanitizeNode(e, kind)).toList();
+      return node.map(_sanitizeGoogleNode).toList();
     }
     if (node is! Map) return node;
 
@@ -108,7 +106,7 @@ class ToolHandlerService {
     // Remove $schema as it's not needed for tool definitions
     m.remove(r'$schema');
 
-    // Convert 'const' to 'enum' for compatibility
+    // Google's native Schema does not have const.
     if (m.containsKey('const')) {
       final v = m['const'];
       if (v is String || v is num || v is bool) {
@@ -130,7 +128,7 @@ class ToolHandlerService {
       m.remove('const');
     }
 
-    // Flatten anyOf/oneOf/allOf to first variant for simplicity
+    // Keep Google's existing conversion to the native Schema subset.
     for (final key in [
       'anyOf',
       'oneOf',
@@ -139,9 +137,11 @@ class ToolHandlerService {
       'one_of',
       'all_of',
     ]) {
-      if (m[key] is List && (m[key] as List).isNotEmpty) {
-        final first = (m[key] as List).first;
-        final flattened = _sanitizeNode(first, kind);
+      final variants = m[key];
+      if (variants is! List) continue;
+      if (variants.isNotEmpty) {
+        final first = variants.first;
+        final flattened = _sanitizeGoogleNode(first);
         m.remove(key);
         if (flattened is Map<String, dynamic>) {
           m
@@ -153,59 +153,38 @@ class ToolHandlerService {
       }
     }
 
-    // Normalize type array to single type
+    // Google's native Schema needs a single type.
     final t = m['type'];
-    if (t is List && t.isNotEmpty) m['type'] = t.first.toString();
+    if (t is List && t.isNotEmpty) {
+      m['type'] = t.first.toString();
+    }
 
-    // Normalize items array to single item
+    // Keep Google's existing conversion of tuple-form items.
     final items = m['items'];
-    if (items is List && items.isNotEmpty) m['items'] = items.first;
-    if (m['items'] is Map) m['items'] = _sanitizeNode(m['items'], kind);
+    if (items is List && items.isNotEmpty) {
+      m['items'] = items.first;
+    }
+    if (m['items'] is Map || m['items'] is List) {
+      m['items'] = _sanitizeGoogleNode(m['items']);
+    }
 
-    // Recursively sanitize properties
     if (m['properties'] is Map) {
       final props = Map<String, dynamic>.from(m['properties']);
       final norm = <String, dynamic>{};
       props.forEach((k, v) {
-        norm[k] = _sanitizeNode(v, kind);
+        norm[k] = _sanitizeGoogleNode(v);
       });
       m['properties'] = norm;
     }
 
-    // additionalProperties can itself be a schema.
-    if (m['additionalProperties'] is Map) {
-      m['additionalProperties'] = _sanitizeNode(
-        m['additionalProperties'],
-        kind,
-      );
-    }
-
-    // Keep only allowed keys based on provider
-    Set<String> allowed;
-    switch (kind) {
-      case ProviderKind.google:
-        allowed = {
-          'type',
-          'description',
-          'properties',
-          'required',
-          'items',
-          'enum',
-        };
-        break;
-      case ProviderKind.openai:
-      case ProviderKind.claude:
-        allowed = {
-          'type',
-          'description',
-          'properties',
-          'required',
-          'items',
-          'enum',
-          'additionalProperties',
-        };
-        break;
-    }
+    const allowed = {
+      'type',
+      'description',
+      'properties',
+      'required',
+      'items',
+      'enum',
+    };
     m.removeWhere((k, v) => !allowed.contains(k));
     return m;
   }
