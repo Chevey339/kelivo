@@ -4461,8 +4461,6 @@
   "composerDraftRecovered": "已還原一則尚未傳送的內容。",
   "composerDraftRestore": "繼續編輯",
   "composerDraftDiscard": "捨棄",
-  "composerDraftClear": "清空草稿",
-  "composerDraftClearConfirm": "捨棄目前輸入框裡尚未傳送的文字和附件？",
   "composerDraftSaveFailed": "最新草稿儲存失敗，內容仍保留在目前視窗。",
   "composerDraftRetry": "重試儲存",
   "composerDraftConflictTitle": "這個對話已有草稿",

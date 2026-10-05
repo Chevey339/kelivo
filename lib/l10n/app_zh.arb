@@ -4461,8 +4461,6 @@
   "composerDraftRecovered": "已恢复一条尚未发送的内容。",
   "composerDraftRestore": "继续编辑",
   "composerDraftDiscard": "丢弃",
-  "composerDraftClear": "清空草稿",
-  "composerDraftClearConfirm": "丢弃当前输入框里尚未发送的文字和附件？",
   "composerDraftSaveFailed": "最新草稿保存失败，内容仍保留在当前窗口。",
   "composerDraftRetry": "重试保存",
   "composerDraftConflictTitle": "这个对话已有草稿",

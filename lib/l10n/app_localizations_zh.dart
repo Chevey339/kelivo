@@ -12222,12 +12222,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get composerDraftDiscard => '丢弃';
 
   @override
-  String get composerDraftClear => '清空草稿';
-
-  @override
-  String get composerDraftClearConfirm => '丢弃当前输入框里尚未发送的文字和附件？';
-
-  @override
   String get composerDraftSaveFailed => '最新草稿保存失败，内容仍保留在当前窗口。';
 
   @override
@@ -24397,12 +24391,6 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get composerDraftDiscard => '丢弃';
-
-  @override
-  String get composerDraftClear => '清空草稿';
-
-  @override
-  String get composerDraftClearConfirm => '丢弃当前输入框里尚未发送的文字和附件？';
 
   @override
   String get composerDraftSaveFailed => '最新草稿保存失败，内容仍保留在当前窗口。';
@@ -36653,12 +36641,6 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get composerDraftDiscard => '捨棄';
-
-  @override
-  String get composerDraftClear => '清空草稿';
-
-  @override
-  String get composerDraftClearConfirm => '捨棄目前輸入框裡尚未傳送的文字和附件？';
 
   @override
   String get composerDraftSaveFailed => '最新草稿儲存失敗，內容仍保留在目前視窗。';

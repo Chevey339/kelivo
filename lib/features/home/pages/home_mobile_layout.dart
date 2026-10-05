@@ -1,4 +1,3 @@
-import '../widgets/new_conversation_draft_badge.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/foundation.dart'
@@ -268,35 +267,31 @@ class HomeMobileScaffold extends StatelessWidget {
           semanticLabel: AppLocalizations.of(context)!.miniMapTooltip,
           icon: Lucide.Map,
         ),
-        NewConversationDraftBadge(
-          enabled: !temporaryConversationEnabled,
-          child: IosIconButton(
-            size: 22,
-            minSize: 44,
-            onTap: () async {
-              if (canToggleTemporaryConversation) {
-                await onToggleTemporaryConversation();
-              } else {
-                await onCreateNewConversation();
-              }
-            },
-            semanticLabel: canToggleTemporaryConversation
-                ? AppLocalizations.of(context)!.temporaryChatToggleTooltip
-                : AppLocalizations.of(context)!.titleForLocale,
-            icon:
-                canToggleTemporaryConversation && !temporaryConversationEnabled
-                ? Lucide.MessageCircleDashed
-                : Lucide.MessageCirclePlus,
-            builder:
-                canToggleTemporaryConversation && temporaryConversationEnabled
-                ? (color) => SvgPicture.asset(
-                    'assets/icons/temporary_chat_checked.svg',
-                    width: 22,
-                    height: 22,
-                    colorFilter: ColorFilter.mode(color, BlendMode.srcIn),
-                  )
-                : null,
-          ),
+        IosIconButton(
+          size: 22,
+          minSize: 44,
+          onTap: () async {
+            if (canToggleTemporaryConversation) {
+              await onToggleTemporaryConversation();
+            } else {
+              await onCreateNewConversation();
+            }
+          },
+          semanticLabel: canToggleTemporaryConversation
+              ? AppLocalizations.of(context)!.temporaryChatToggleTooltip
+              : AppLocalizations.of(context)!.titleForLocale,
+          icon: canToggleTemporaryConversation && !temporaryConversationEnabled
+              ? Lucide.MessageCircleDashed
+              : Lucide.MessageCirclePlus,
+          builder:
+              canToggleTemporaryConversation && temporaryConversationEnabled
+              ? (color) => SvgPicture.asset(
+                  'assets/icons/temporary_chat_checked.svg',
+                  width: 22,
+                  height: 22,
+                  colorFilter: ColorFilter.mode(color, BlendMode.srcIn),
+                )
+              : null,
         ),
 
         const SizedBox(width: 4),

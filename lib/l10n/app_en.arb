@@ -5624,8 +5624,6 @@
   "composerDraftRecovered": "An unsent message was recovered.",
   "composerDraftRestore": "Continue editing",
   "composerDraftDiscard": "Discard",
-  "composerDraftClear": "Clear draft",
-  "composerDraftClearConfirm": "Discard the unsent text and attachments in this editor?",
   "composerDraftSaveFailed": "Your latest draft could not be saved. It is still in this window.",
   "composerDraftRetry": "Retry saving",
   "composerDraftConflictTitle": "This conversation already has a draft",

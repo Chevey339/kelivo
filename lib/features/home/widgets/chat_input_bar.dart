@@ -121,7 +121,6 @@ class ChatInputBarController {
   VoidCallback? onDraftChanged;
   VoidCallback? onRecoverDraft;
   VoidCallback? onDiscardRecoveredDraft;
-  VoidCallback? onClearSavedDraft;
   VoidCallback? onRetrySave;
   Future<DraftSubmission?> Function(ComposerDraftInput)? onBeginSubmission;
   ComposerDraftInput snapshotDraft(String text) =>
@@ -3500,19 +3499,6 @@ class _ChatInputBarState extends State<ChatInputBar>
                     ),
                   ],
                 ),
-              if (widget.mediaController?.onClearSavedDraft != null &&
-                  (hasText || hasImages || hasDocs))
-                Align(
-                  alignment: AlignmentDirectional.centerEnd,
-                  child: IosIconButton(
-                    icon: Lucide.Eraser,
-                    size: 16,
-                    tooltip: AppLocalizations.of(context)!.composerDraftClear,
-                    onTap: _composerLocked
-                        ? null
-                        : widget.mediaController?.onClearSavedDraft,
-                  ),
-                ),
               if (widget.hasQueuedInput) ...[
                 _QueuedInputBanner(
                   label: AppLocalizations.of(
@@ -3808,6 +3794,8 @@ class _ChatInputBarState extends State<ChatInputBar>
                                                   autofocus: false,
                                                   decoration: InputDecoration(
                                                     hintText: _hint(context),
+                                                    hintFadeDuration:
+                                                        Duration.zero,
                                                     hintStyle: TextStyle(
                                                       color: theme
                                                           .colorScheme

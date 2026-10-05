@@ -12801,13 +12801,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get composerDraftDiscard => 'Discard';
 
   @override
-  String get composerDraftClear => 'Clear draft';
-
-  @override
-  String get composerDraftClearConfirm =>
-      'Discard the unsent text and attachments in this editor?';
-
-  @override
   String get composerDraftSaveFailed =>
       'Your latest draft could not be saved. It is still in this window.';
 

@@ -292,8 +292,6 @@ class HomePageController extends ChangeNotifier {
         unawaited(drafts.flush().catchError((Object _) {}));
       }
     };
-    _mediaController.onClearSavedDraft = () =>
-        unawaited(_clearSavedComposerDraft());
     _mediaController.onBeginSubmission = (input) {
       final owner = _composerOwner;
       if (owner == null || _chatService.isTemporaryConversation(owner)) {
@@ -398,39 +396,6 @@ class HomePageController extends ChangeNotifier {
             previewText: draft.active.text,
           );
     notifyListeners();
-  }
-
-  Future<void> _clearSavedComposerDraft() async {
-    final owner = _composerOwner;
-    final before = _mediaController.snapshotDraft(_inputController.text);
-    final l10n = AppLocalizations.of(_context)!;
-    final confirmed = await showDialog<bool>(
-      context: _context,
-      builder: (context) => AlertDialog(
-        title: Text(l10n.composerDraftClear),
-        content: Text(l10n.composerDraftClearConfirm),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: Text(l10n.homePageCancel),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: Text(l10n.composerDraftDiscard),
-          ),
-        ],
-      ),
-    );
-    if (confirmed != true ||
-        owner != _composerOwner ||
-        !before.sameValue(
-          _mediaController.snapshotDraft(_inputController.text),
-        )) {
-      return;
-    }
-    _mediaController.clearDraft();
-    _saveComposerDraft();
-    await _composerDrafts?.flush();
   }
 
   void _saveComposerDraft() {

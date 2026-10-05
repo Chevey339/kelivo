@@ -22866,18 +22866,6 @@ abstract class AppLocalizations {
   /// **'Discard'**
   String get composerDraftDiscard;
 
-  /// No description provided for @composerDraftClear.
-  ///
-  /// In en, this message translates to:
-  /// **'Clear draft'**
-  String get composerDraftClear;
-
-  /// No description provided for @composerDraftClearConfirm.
-  ///
-  /// In en, this message translates to:
-  /// **'Discard the unsent text and attachments in this editor?'**
-  String get composerDraftClearConfirm;
-
   /// No description provided for @composerDraftSaveFailed.
   ///
   /// In en, this message translates to:
