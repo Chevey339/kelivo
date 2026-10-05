@@ -217,7 +217,7 @@ class _DesktopSearchServicesPaneState extends State<DesktopSearchServicesPane> {
                                   ),
                                 )
                           : null,
-                      onPlus: common.timeout < 30000
+                      onPlus: common.timeout < 300000
                           ? () => context
                                 .read<SettingsProvider>()
                                 .setSearchCommonOptions(
