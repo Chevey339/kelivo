@@ -77,7 +77,7 @@ dependencies:
   xml: ^6.5.0
   open_filex: ^4.5.0
   easy_image_viewer: ^1.4.6
-  share_plus: ^11.1.0
+  share_plus: ^12.0.2
   pretty_qr_code: ^3.5.0
   mobile_scanner: ^7.0.1
   mcp_client: # ^1.0.2
