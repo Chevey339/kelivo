@@ -7,6 +7,7 @@ import '../../core/providers/mcp_provider.dart';
 import '../../shared/widgets/snackbar.dart';
 import 'mcp_edit_dialog.dart' show showDesktopMcpEditDialog;
 import '../../features/mcp/widgets/mcp_json_import.dart';
+import '../../features/mcp/widgets/mcp_oauth_progress.dart';
 import 'mcp_json_edit_dialog.dart' show showDesktopMcpJsonEditDialog;
 import 'mcp_timeout_dialog.dart' show showDesktopMcpTimeoutDialog;
 import '../../theme/app_font_weights.dart';
@@ -113,6 +114,7 @@ class DesktopMcpPane extends StatelessWidget {
                         child: ReorderableDragStartListener(
                           index: index,
                           child: _ServerCard(
+                            serverId: s.id,
                             name: s.name,
                             enabled: s.enabled,
                             transport: s.transport,
@@ -187,11 +189,13 @@ class _ServerCard extends StatefulWidget {
     required this.status,
     required this.onTap,
     required this.onReconnect,
+    required this.serverId,
     required this.onAuthorize,
     required this.onDelete,
     required this.onDetails,
     required this.showError,
   });
+  final String serverId;
   final String name;
   final bool enabled;
   final McpTransportType transport;
@@ -418,6 +422,7 @@ class _ServerCardState extends State<_ServerCard> {
                         ],
                       ),
                     ],
+                    McpOAuthProgress(serverId: widget.serverId),
                     if (widget.status == McpStatus.needsAuthorization) ...[
                       const SizedBox(height: 8),
                       Row(

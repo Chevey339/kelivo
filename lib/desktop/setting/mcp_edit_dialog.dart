@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 import '../../core/services/mcp/stdio_arguments.dart';
 import '../../features/mcp/widgets/mcp_environment_picker.dart';
+import '../../features/mcp/widgets/mcp_oauth_settings.dart';
 
 import 'package:flutter/material.dart';
 import '../../features/mcp/widgets/mcp_workspace_binding_field.dart';
@@ -49,6 +50,7 @@ class _DesktopMcpEditDialogState extends State<_DesktopMcpEditDialog>
       ? TabController(length: 2, vsync: this)
       : null;
 
+  late final McpOAuthFormController _oauth;
   bool _enabled = true;
   final _nameCtrl = TextEditingController();
   McpTransportType _transport = McpTransportType.http;
@@ -64,6 +66,11 @@ class _DesktopMcpEditDialogState extends State<_DesktopMcpEditDialog>
   @override
   void initState() {
     super.initState();
+    _oauth = McpOAuthFormController(
+      widget.serverId == null
+          ? null
+          : context.read<McpProvider>().getById(widget.serverId!),
+    );
     if (isEdit) {
       final server = context.read<McpProvider>().getById(widget.serverId!)!;
       _enabled = server.enabled;
@@ -97,6 +104,7 @@ class _DesktopMcpEditDialogState extends State<_DesktopMcpEditDialog>
 
   @override
   void dispose() {
+    _oauth.dispose();
     _tab?.dispose();
     _nameCtrl.dispose();
     _urlCtrl.dispose();
@@ -197,6 +205,19 @@ class _DesktopMcpEditDialogState extends State<_DesktopMcpEditDialog>
         );
       }
     } else {
+      final oauthError = _oauth.validate(l10n);
+      if (oauthError != null) {
+        showAppSnackBar(
+          context,
+          message: oauthError,
+          type: NotificationType.warning,
+        );
+        return;
+      }
+      final latest = widget.serverId == null
+          ? null
+          : mcp.getById(widget.serverId!);
+      final oauthClient = _oauth.registrationFor(latest);
       final url = _urlCtrl.text.trim();
       if (url.isEmpty) {
         showAppSnackBar(
@@ -215,8 +236,13 @@ class _DesktopMcpEditDialogState extends State<_DesktopMcpEditDialog>
             transport: _transport,
             url: url,
             headers: headers,
+            oauthClient: oauthClient,
+            clearOAuthClient: oauthClient == null,
+            oauthRedirectUri: _oauth.redirectUri,
+            clearOAuthRedirectUri: _oauth.redirectUri == null,
             clearWorkspace: true,
           ),
+          replaceOAuthSettings: true,
         );
       } else {
         await mcp.addServer(
@@ -225,6 +251,8 @@ class _DesktopMcpEditDialogState extends State<_DesktopMcpEditDialog>
           transport: _transport,
           url: url,
           headers: headers,
+          oauthClient: oauthClient,
+          oauthRedirectUri: _oauth.redirectUri,
         );
       }
     }
@@ -383,6 +411,8 @@ class _DesktopMcpEditDialogState extends State<_DesktopMcpEditDialog>
                 : 'http://localhost:3000',
             bold: true,
           ),
+        if (!isBuiltin && _transport != McpTransportType.stdio)
+          McpOAuthSettings(controller: _oauth),
         if (!isBuiltin && _transport == McpTransportType.stdio) ...[
           McpWorkspaceBindingField(
             workspaceId: _workspaceId,

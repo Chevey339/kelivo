@@ -5632,5 +5632,21 @@
   "composerDraftReplace": "Replace draft",
   "composerDraftMissingFile": "An attachment is unavailable. Remove it or choose the file again.",
   "composerDraftMessageMissing": "The message being edited no longer exists. Copy the text to a new message or discard this edit.",
-  "composerDraftDeleteNotice": "Unsent drafts in these conversations will also be deleted."
+  "composerDraftDeleteNotice": "Unsent drafts in these conversations will also be deleted.",
+  "mcpOAuthSettings": "OAuth settings",
+  "mcpOAuthAutomatic": "Automatic",
+  "mcpOAuthMetadataUrl": "Client metadata document URL",
+  "mcpOAuthClientAuthentication": "Client authentication",
+  "mcpOAuthPublicClient": "Public client",
+  "mcpOAuthRedirectUri": "Local callback URL (optional)",
+  "mcpOAuthFillRedirectExample": "Fill example",
+  "mcpOAuthRedirectHint": "Leave empty to use the platform default. Use an HTTP loopback URL if the service only allows localhost callbacks. Port 0 selects an available port; a pre-registered client may require a fixed port.",
+  "mcpOAuthClientIdRequired": "Enter a client ID or choose automatic registration.",
+  "mcpOAuthMetadataUrlInvalid": "Enter an HTTPS metadata document URL with a path.",
+  "mcpOAuthSecretRequired": "This client authentication method requires a client secret.",
+  "mcpOAuthRedirectInvalid": "Use an HTTP callback on localhost, 127.0.0.1 or [::1], without credentials, query parameters or a fragment.",
+  "mcpOAuthDiscovering": "Discovering authorization server…",
+  "mcpOAuthRegistering": "Preparing authorization…",
+  "mcpOAuthWaitingBrowser": "Waiting for browser authorization…",
+  "mcpOAuthExchangingToken": "Completing sign-in…"
 }

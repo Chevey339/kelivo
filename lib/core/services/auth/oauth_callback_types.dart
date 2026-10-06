@@ -25,4 +25,8 @@ abstract interface class OAuthCallback {
 }
 
 typedef OAuthCallbackFactory =
-    Future<OAuthCallback> Function(Uri authorizationServer);
+    Future<OAuthCallback> Function(
+      Uri authorizationServer, {
+      String? expectedState,
+      Uri? loopbackRedirect,
+    });

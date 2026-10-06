@@ -21,6 +21,108 @@ import '../../../support/business_test_harness.dart';
 import '../../../support/fake_workspace_runtime.dart';
 
 void main() {
+  for (final desktop in [false, true]) {
+    testWidgets(
+      'OAuth settings preserve login on rename and clear it on client change (${desktop ? 'desktop' : 'mobile'})',
+      (tester) async {
+        final provider = await _openEditor(
+          tester,
+          [],
+          desktop: desktop,
+          size: desktop ? const Size(960, 720) : const Size(320, 740),
+          remoteConfig: _remoteOAuthConfig,
+        );
+        await tester.enterText(_fieldWithText('Imported server'), 'Renamed');
+        await tester.tap(find.text('Save'));
+        await tester.pumpAndSettle();
+        expect(provider.getById('guest')!.oauth!.accessToken, 'existing-token');
+        expect(
+          provider.getById('guest')!.oauthClient!.redirectUri,
+          'http://127.0.0.1:45678/callback',
+        );
+
+        await tester.tap(find.text('Open'));
+        await tester.pumpAndSettle();
+        final client = find.byKey(const ValueKey('mcp-oauth-client-id'));
+        await tester.ensureVisible(client);
+        await tester.enterText(client, 'new-client');
+        await tester.tap(find.text('Save'));
+        await tester.pumpAndSettle();
+        expect(provider.getById('guest')!.oauth, isNull);
+        expect(provider.getById('guest')!.oauthClient!.clientId, 'new-client');
+        expect(
+          provider.getById('guest')!.oauthClient!.authorizationServer,
+          isNull,
+        );
+        expect(tester.takeException(), isNull);
+
+        await tester.tap(find.text('Open'));
+        await tester.pumpAndSettle();
+        await tester.ensureVisible(find.text('Automatic'));
+        await tester.tap(find.text('Automatic'));
+        await tester.pumpAndSettle();
+        final fillExample = find.byKey(
+          const ValueKey('mcp-oauth-fill-redirect-example'),
+        );
+        await tester.ensureVisible(fillExample);
+        await tester.tap(fillExample);
+        await tester.tap(find.text('Save'));
+        await tester.pumpAndSettle();
+        expect(provider.getById('guest')!.oauthClient, isNull);
+        expect(
+          provider.getById('guest')!.oauthRedirectUri,
+          'http://127.0.0.1:0/callback',
+        );
+        await tester.pumpWidget(const SizedBox.shrink());
+      },
+      variant: TargetPlatformVariant.only(
+        desktop ? TargetPlatform.macOS : TargetPlatform.android,
+      ),
+    );
+  }
+
+  testWidgets('OAuth form validates CIMD and local redirects before saving', (
+    tester,
+  ) async {
+    final provider = await _openEditor(
+      tester,
+      [],
+      remoteConfig: _remoteOAuthConfig,
+    );
+    await tester.ensureVisible(find.text('CIMD'));
+    await tester.tap(find.text('CIMD'));
+    await tester.pumpAndSettle();
+    final client = find.byKey(const ValueKey('mcp-oauth-client-id'));
+    await tester.ensureVisible(client);
+    await tester.enterText(client, 'http://client.example.com/metadata.json');
+    await tester.tap(find.text('Save'));
+    await tester.pumpAndSettle();
+    expect(provider.getById('guest')!.oauthClient!.clientId, 'existing-client');
+    await tester.enterText(client, 'https://client.example.com/metadata.json');
+    final redirect = find.byKey(const ValueKey('mcp-oauth-redirect'));
+    await tester.ensureVisible(redirect);
+    await tester.enterText(redirect, 'http://0.0.0.0:8000/callback');
+    await tester.tap(find.text('Save'));
+    await tester.pumpAndSettle();
+    expect(provider.getById('guest')!.oauthRedirectUri, isNull);
+    await tester.enterText(redirect, 'http://127.0.0.1:8000/callback');
+    await tester.tap(find.text('Save'));
+    await tester.pumpAndSettle();
+    expect(
+      provider.getById('guest')!.oauthClient!.clientId,
+      'https://client.example.com/metadata.json',
+    );
+    expect(
+      provider.getById('guest')!.oauthRedirectUri,
+      'http://127.0.0.1:8000/callback',
+    );
+    expect(provider.getById('guest')!.oauth, isNull);
+    expect(tester.takeException(), isNull);
+    await tester.pump(const Duration(seconds: 4));
+    await tester.pumpAndSettle();
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
   for (final brightness in Brightness.values) {
     testWidgets(
       'select, save, reopen and unbind a workspace (${brightness.name})',
@@ -264,6 +366,7 @@ Future<McpProvider> _openEditor(
   bool desktop = false,
   Brightness brightness = Brightness.light,
   Size size = const Size(600, 1600),
+  Map<String, Object?>? remoteConfig,
 }) async {
   tester.view.physicalSize = size;
   tester.view.devicePixelRatio = 1;
@@ -308,9 +411,12 @@ Future<McpProvider> _openEditor(
       'mcpServers': {
         'guest': {
           'name': 'Imported server',
-          'command': 'sh',
-          'args': arguments,
-          'env': environment,
+          if (remoteConfig == null) ...{
+            'command': 'sh',
+            'args': arguments,
+            'env': environment,
+          } else
+            ...remoteConfig,
           if (workingDirectory != null) 'workingDirectory': workingDirectory,
           if (workspaceId != null) 'workspaceId': workspaceId,
           'isActive': false,
@@ -348,6 +454,27 @@ Future<McpProvider> _openEditor(
   await tester.pumpAndSettle();
   return provider;
 }
+
+const _remoteOAuthConfig = <String, Object?>{
+  'type': 'http',
+  'baseUrl': 'https://mcp.example.com/mcp',
+  'oauthClient': {
+    'clientId': 'existing-client',
+    'authorizationServer': 'https://auth.example.com',
+    'registrationSource': 'preRegistered',
+    'redirectUri': 'http://127.0.0.1:45678/callback',
+  },
+  'oauth': {
+    'clientId': 'existing-client',
+    'authorizationServer': 'https://auth.example.com',
+    'authorizationEndpoint': 'https://auth.example.com/authorize',
+    'tokenEndpoint': 'https://auth.example.com/token',
+    'resource': 'https://mcp.example.com/mcp',
+    'accessToken': 'existing-token',
+    'registrationSource': 'preRegistered',
+    'redirectUri': 'http://127.0.0.1:45678/callback',
+  },
+};
 
 class _StdioRuntime extends FakeWorkspaceRuntime
     implements WorkspaceStdioRuntime {

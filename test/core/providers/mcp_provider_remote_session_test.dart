@@ -437,7 +437,8 @@ void main() {
           }
           return http.Response('not found', HttpStatus.notFound);
         }),
-        callbackFactory: (_) async => callback,
+        callbackFactory: (_, {expectedState, loopbackRedirect}) async =>
+            callback,
         launchAuthorizationUrl: (uri) async {
           scheduleMicrotask(
             () => callback.complete(
@@ -617,11 +618,12 @@ void main() {
           }
           return http.Response('not found', 404);
         }),
-        callbackFactory: (authorizationServer) async {
-          final callback = _FakeOAuthCallback();
-          callbacks.add(callback);
-          return callback;
-        },
+        callbackFactory:
+            (authorizationServer, {expectedState, loopbackRedirect}) async {
+              final callback = _FakeOAuthCallback();
+              callbacks.add(callback);
+              return callback;
+            },
         launchAuthorizationUrl: (uri) async {
           launched.add(uri);
           return true;
@@ -756,8 +758,9 @@ void main() {
           }
           return http.Response('not found', 404);
         }),
-        callbackFactory: (authorizationServer) async =>
-            activeCallback = _FakeOAuthCallback(),
+        callbackFactory:
+            (authorizationServer, {expectedState, loopbackRedirect}) async =>
+                activeCallback = _FakeOAuthCallback(),
         launchAuthorizationUrl: (uri) async {
           final callback = activeCallback!;
           scheduleMicrotask(
@@ -1257,6 +1260,158 @@ void main() {
     timeout: const Timeout(Duration(seconds: 8)),
   );
 
+  test(
+    'cancelled login and initialization retain credentials across restart',
+    () async {
+      const issuer = 'https://auth.example.test';
+      const metadata = 'https://metadata.example.test/resource';
+      final initializeGate = Completer<void>();
+      final server = await _MockMcpServer.start(
+        expectedAuthorization: 'Bearer new-token',
+        firstInitializeGate: initializeGate,
+      );
+      final harness = await BusinessTestHarness.create();
+      final callbacks = <_FakeOAuthCallback>[];
+      final launches = <Uri>[];
+      var registrations = 0;
+      McpOAuthService service() => McpOAuthService(
+        httpClient: MockClient((request) async {
+          if (request.url.toString() == server.url) {
+            return http.Response(
+              '',
+              401,
+              headers: {
+                'www-authenticate': 'Bearer resource_metadata="$metadata"',
+              },
+            );
+          }
+          if (request.url.toString() == metadata) {
+            return http.Response(
+              jsonEncode({
+                'resource': server.url,
+                'authorization_servers': [issuer],
+              }),
+              200,
+            );
+          }
+          if (request.url.path == '/.well-known/oauth-authorization-server') {
+            return http.Response(
+              jsonEncode({
+                'issuer': issuer,
+                'authorization_endpoint': '$issuer/authorize',
+                'token_endpoint': '$issuer/token',
+                'registration_endpoint': '$issuer/register',
+                'code_challenge_methods_supported': ['S256'],
+              }),
+              200,
+            );
+          }
+          if (request.url.path == '/register') {
+            registrations++;
+            return http.Response(
+              jsonEncode({'client_id': 'persistent-client'}),
+              201,
+            );
+          }
+          if (request.url.path == '/token') {
+            return http.Response(
+              jsonEncode({'access_token': 'new-token', 'token_type': 'Bearer'}),
+              200,
+            );
+          }
+          return http.Response('', 404);
+        }),
+        callbackFactory: (_, {expectedState, loopbackRedirect}) async {
+          final callback = _FakeOAuthCallback();
+          callbacks.add(callback);
+          return callback;
+        },
+        launchAuthorizationUrl: (uri) async {
+          launches.add(uri);
+          return true;
+        },
+      );
+      var oauthService = service();
+      var provider = McpProvider(
+        preferences: harness.preferences,
+        oauthService: oauthService,
+      );
+      try {
+        await _waitUntil(() => provider.servers.isNotEmpty, label: 'load');
+        final id = await provider.addServer(
+          enabled: true,
+          name: 'Persistent registration',
+          transport: McpTransportType.http,
+          url: server.url,
+        );
+        await _waitUntil(
+          () => provider.statusFor(id) == McpStatus.needsAuthorization,
+          label: 'challenge',
+        );
+        final first = provider.authorize(id);
+        await _waitUntil(() => launches.length == 1, label: 'first browser');
+        expect(provider.oauthStageFor(id), McpOAuthStage.browser);
+        expect(
+          provider.getById(id)!.oauthClient!.clientId,
+          'persistent-client',
+        );
+        await provider
+            .cancelAuthorization(id)
+            .timeout(const Duration(seconds: 1));
+        expect(await first, isFalse);
+        expect(provider.statusFor(id), McpStatus.needsAuthorization);
+        expect(provider.oauthStageFor(id), isNull);
+        expect(provider.errorFor(id), isNull);
+        expect(callbacks.first.closes, 1);
+        expect(provider.getById(id)!.oauth, isNull);
+
+        provider.dispose();
+        oauthService.dispose();
+        oauthService = service();
+        provider = McpProvider(
+          preferences: harness.preferences,
+          oauthService: oauthService,
+        );
+        await _waitUntil(
+          () => provider.statusFor(id) == McpStatus.needsAuthorization,
+          label: 'restored challenge',
+        );
+        expect(provider.getById(id)!.oauthClient!.authorizationServer, issuer);
+        final retry = provider.authorize(id);
+        await _waitUntil(() => launches.length == 2, label: 'second browser');
+        expect(registrations, 1);
+        callbacks.last.complete(
+          callbacks.last.redirectUri.replace(
+            queryParameters: {
+              'code': 'new-code',
+              'state': launches.last.queryParameters['state']!,
+            },
+          ),
+        );
+        await _waitUntil(
+          () => server.count('initialize') == 1,
+          label: 'pending initialize',
+        );
+        expect(provider.oauthStageFor(id), McpOAuthStage.reconnect);
+        await provider
+            .cancelAuthorization(id)
+            .timeout(const Duration(seconds: 1));
+        expect(await retry, isFalse);
+        expect(provider.getById(id)!.oauth!.accessToken, 'new-token');
+        expect(provider.oauthStageFor(id), isNull);
+        initializeGate.complete();
+        await provider.connect(id);
+        expect(provider.statusFor(id), McpStatus.connected);
+      } finally {
+        if (!initializeGate.isCompleted) initializeGate.complete();
+        provider.dispose();
+        oauthService.dispose();
+        await harness.close();
+        await server.close();
+      }
+    },
+  );
+
   test('JSON editor hides OAuth secrets and preserves them on save', () async {
     final harness = await BusinessTestHarness.create();
     final provider = McpProvider(preferences: harness.preferences);
@@ -1311,6 +1466,7 @@ void main() {
           'https://other-auth.example.test';
       await provider.replaceAllFromJson(jsonEncode(decoded));
       expect(provider.getById(id)?.oauthClient?.clientSecret, isNull);
+      expect(provider.getById(id)?.oauth, isNull);
     } finally {
       provider.dispose();
       await harness.close();
@@ -1386,6 +1542,7 @@ final class _FakeOAuthCallback implements OAuthCallback {
   final Uri redirectUri = Uri.parse('http://127.0.0.1:54321/oauth/callback');
 
   bool get isCompleted => _callback.isCompleted;
+  int closes = 0;
 
   void complete(Uri uri) => _callback.complete(uri);
 
@@ -1405,7 +1562,9 @@ final class _FakeOAuthCallback implements OAuthCallback {
   Future<Uri> waitForCallback(Duration timeout) => _callback.future;
 
   @override
-  Future<void> close() async {}
+  Future<void> close() async {
+    closes++;
+  }
 }
 
 class _MockMcpServer {

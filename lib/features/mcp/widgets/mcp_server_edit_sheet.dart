@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../../core/services/mcp/stdio_arguments.dart';
 import '../../../shared/widgets/ios_form_text_field.dart';
 import 'mcp_environment_picker.dart';
+import 'mcp_oauth_settings.dart';
 import 'mcp_workspace_binding_field.dart';
 import 'package:provider/provider.dart';
 import '../../../core/providers/settings_provider.dart';
@@ -56,6 +57,7 @@ class _McpServerEditSheetState extends State<_McpServerEditSheet>
   late final bool isEdit = widget.serverId != null;
   TabController? _tab;
 
+  late final McpOAuthFormController _oauth;
   bool _enabled = true;
   final _nameCtrl = TextEditingController();
   McpTransportType _transport = McpTransportType.http;
@@ -71,6 +73,11 @@ class _McpServerEditSheetState extends State<_McpServerEditSheet>
   @override
   void initState() {
     super.initState();
+    _oauth = McpOAuthFormController(
+      widget.serverId == null
+          ? null
+          : context.read<McpProvider>().getById(widget.serverId!),
+    );
     if (isEdit) {
       _tab = TabController(length: 2, vsync: this);
       _tab!.addListener(_onTabChanged);
@@ -108,6 +115,7 @@ class _McpServerEditSheetState extends State<_McpServerEditSheet>
 
   @override
   void dispose() {
+    _oauth.dispose();
     _tab?.removeListener(_onTabChanged);
     _tab?.dispose();
     _nameCtrl.dispose();
@@ -290,6 +298,7 @@ class _McpServerEditSheetState extends State<_McpServerEditSheet>
                   ? 'http://localhost:3000/sse'
                   : 'http://localhost:3000',
             ),
+            McpOAuthSettings(controller: _oauth),
             const SizedBox(height: 16),
             Text(
               l10n.mcpServerEditSheetCustomHeadersTitle,
@@ -508,6 +517,19 @@ class _McpServerEditSheetState extends State<_McpServerEditSheet>
       if (mounted) Navigator.of(context).pop();
       return;
     }
+    final oauthError = _oauth.validate(AppLocalizations.of(context)!);
+    if (oauthError != null) {
+      showAppSnackBar(
+        context,
+        message: oauthError,
+        type: NotificationType.warning,
+      );
+      return;
+    }
+    final latest = widget.serverId == null
+        ? null
+        : mcp.getById(widget.serverId!);
+    final oauthClient = _oauth.registrationFor(latest);
     final url = _urlCtrl.text.trim();
     if (url.isEmpty) {
       final l10n = AppLocalizations.of(context)!;
@@ -532,8 +554,13 @@ class _McpServerEditSheetState extends State<_McpServerEditSheet>
           transport: _transport,
           url: url,
           headers: headers,
+          oauthClient: oauthClient,
+          clearOAuthClient: oauthClient == null,
+          oauthRedirectUri: _oauth.redirectUri,
+          clearOAuthRedirectUri: _oauth.redirectUri == null,
           clearWorkspace: true,
         ),
+        replaceOAuthSettings: true,
       );
     } else {
       await mcp.addServer(
@@ -542,6 +569,8 @@ class _McpServerEditSheetState extends State<_McpServerEditSheet>
         transport: _transport,
         url: url,
         headers: headers,
+        oauthClient: oauthClient,
+        oauthRedirectUri: _oauth.redirectUri,
       );
     }
     if (mounted) Navigator.of(context).pop();

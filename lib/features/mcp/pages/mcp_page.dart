@@ -5,6 +5,7 @@ import 'package:flutter_slidable/flutter_slidable.dart';
 import '../../../icons/lucide_adapter.dart';
 import '../../../core/providers/mcp_provider.dart';
 import '../widgets/mcp_server_edit_sheet.dart';
+import '../widgets/mcp_oauth_progress.dart';
 import '../widgets/mcp_json_edit_sheet.dart';
 import '../widgets/mcp_json_import.dart';
 import '../widgets/mcp_timeout_sheet.dart';
@@ -357,6 +358,7 @@ class McpPage extends StatelessWidget {
                                           ],
                                         ),
                                       ],
+                                      McpOAuthProgress(serverId: s.id),
                                       if (st ==
                                           McpStatus.needsAuthorization) ...[
                                         const SizedBox(height: 8),

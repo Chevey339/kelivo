@@ -12832,4 +12832,57 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get composerDraftDeleteNotice =>
       'Unsent drafts in these conversations will also be deleted.';
+
+  @override
+  String get mcpOAuthSettings => 'OAuth settings';
+
+  @override
+  String get mcpOAuthAutomatic => 'Automatic';
+
+  @override
+  String get mcpOAuthMetadataUrl => 'Client metadata document URL';
+
+  @override
+  String get mcpOAuthClientAuthentication => 'Client authentication';
+
+  @override
+  String get mcpOAuthPublicClient => 'Public client';
+
+  @override
+  String get mcpOAuthRedirectUri => 'Local callback URL (optional)';
+
+  @override
+  String get mcpOAuthFillRedirectExample => 'Fill example';
+
+  @override
+  String get mcpOAuthRedirectHint =>
+      'Leave empty to use the platform default. Use an HTTP loopback URL if the service only allows localhost callbacks. Port 0 selects an available port; a pre-registered client may require a fixed port.';
+
+  @override
+  String get mcpOAuthClientIdRequired =>
+      'Enter a client ID or choose automatic registration.';
+
+  @override
+  String get mcpOAuthMetadataUrlInvalid =>
+      'Enter an HTTPS metadata document URL with a path.';
+
+  @override
+  String get mcpOAuthSecretRequired =>
+      'This client authentication method requires a client secret.';
+
+  @override
+  String get mcpOAuthRedirectInvalid =>
+      'Use an HTTP callback on localhost, 127.0.0.1 or [::1], without credentials, query parameters or a fragment.';
+
+  @override
+  String get mcpOAuthDiscovering => 'Discovering authorization server…';
+
+  @override
+  String get mcpOAuthRegistering => 'Preparing authorization…';
+
+  @override
+  String get mcpOAuthWaitingBrowser => 'Waiting for browser authorization…';
+
+  @override
+  String get mcpOAuthExchangingToken => 'Completing sign-in…';
 }

@@ -4445,5 +4445,21 @@
   "composerDraftReplace": "替换草稿",
   "composerDraftMissingFile": "有附件无法读取，请移除或重新选择该文件。",
   "composerDraftMessageMissing": "正在编辑的原消息已不存在。请复制内容到新消息，或取消本次编辑。",
-  "composerDraftDeleteNotice": "这些对话中未发送的草稿也会一起删除。"
+  "composerDraftDeleteNotice": "这些对话中未发送的草稿也会一起删除。",
+  "mcpOAuthSettings": "OAuth 设置",
+  "mcpOAuthAutomatic": "自动",
+  "mcpOAuthMetadataUrl": "客户端元数据文档 URL",
+  "mcpOAuthClientAuthentication": "客户端认证方式",
+  "mcpOAuthPublicClient": "公共客户端",
+  "mcpOAuthRedirectUri": "本地回调 URL（可选）",
+  "mcpOAuthFillRedirectExample": "填入示例",
+  "mcpOAuthRedirectHint": "留空使用平台默认回调。若服务仅允许 localhost 回调，可填写 HTTP 回环地址。端口 0 自动选择可用端口；预注册客户端可能要求固定端口。",
+  "mcpOAuthClientIdRequired": "请输入客户端 ID，或选择自动注册。",
+  "mcpOAuthMetadataUrlInvalid": "请输入包含路径的 HTTPS 元数据文档 URL。",
+  "mcpOAuthSecretRequired": "此客户端认证方式需要 Client secret。",
+  "mcpOAuthRedirectInvalid": "请使用 localhost、127.0.0.1 或 [::1] 的 HTTP 回调地址，不要包含凭据、查询参数或片段。",
+  "mcpOAuthDiscovering": "正在发现授权服务器…",
+  "mcpOAuthRegistering": "正在准备授权…",
+  "mcpOAuthWaitingBrowser": "等待浏览器授权…",
+  "mcpOAuthExchangingToken": "正在完成登录…"
 }

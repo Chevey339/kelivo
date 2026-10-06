@@ -4469,5 +4469,21 @@
   "composerDraftReplace": "取代草稿",
   "composerDraftMissingFile": "有附件無法讀取，請移除或重新選擇該檔案。",
   "composerDraftMessageMissing": "正在編輯的原訊息已不存在。請複製內容到新訊息，或取消本次編輯。",
-  "composerDraftDeleteNotice": "這些對話中未傳送的草稿也會一起刪除。"
+  "composerDraftDeleteNotice": "這些對話中未傳送的草稿也會一起刪除。",
+  "mcpOAuthSettings": "OAuth 設定",
+  "mcpOAuthAutomatic": "自動",
+  "mcpOAuthMetadataUrl": "用戶端中繼資料文件 URL",
+  "mcpOAuthClientAuthentication": "用戶端驗證方式",
+  "mcpOAuthPublicClient": "公用用戶端",
+  "mcpOAuthRedirectUri": "本機回呼 URL（選填）",
+  "mcpOAuthFillRedirectExample": "填入範例",
+  "mcpOAuthRedirectHint": "留空使用平台預設回呼。若服務僅允許 localhost 回呼，可填寫 HTTP 回環位址。連接埠 0 自動選擇可用連接埠；預先註冊的用戶端可能要求固定連接埠。",
+  "mcpOAuthClientIdRequired": "請輸入用戶端 ID，或選擇自動註冊。",
+  "mcpOAuthMetadataUrlInvalid": "請輸入包含路徑的 HTTPS 中繼資料文件 URL。",
+  "mcpOAuthSecretRequired": "此用戶端驗證方式需要 Client secret。",
+  "mcpOAuthRedirectInvalid": "請使用 localhost、127.0.0.1 或 [::1] 的 HTTP 回呼位址，不要包含憑證、查詢參數或片段。",
+  "mcpOAuthDiscovering": "正在探索授權伺服器…",
+  "mcpOAuthRegistering": "正在準備授權…",
+  "mcpOAuthWaitingBrowser": "等待瀏覽器授權…",
+  "mcpOAuthExchangingToken": "正在完成登入…"
 }

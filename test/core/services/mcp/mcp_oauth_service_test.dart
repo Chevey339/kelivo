@@ -16,6 +16,7 @@ void main() {
   test('loopback callback listens before waitForCallback is called', () async {
     final callback = await openOAuthCallback(
       Uri.parse('https://auth.example.com'),
+      expectedState: 'state',
     );
     final redirectUri = callback.redirectUri;
     final client = HttpClient();
@@ -135,10 +136,11 @@ void main() {
     });
     final service = McpOAuthService(
       httpClient: client,
-      callbackFactory: (authorizationServer) async {
-        expect(authorizationServer.toString(), issuer);
-        return callback;
-      },
+      callbackFactory:
+          (authorizationServer, {expectedState, loopbackRedirect}) async {
+            expect(authorizationServer.toString(), issuer);
+            return callback;
+          },
       launchAuthorizationUrl: (uri) async {
         launchedUrl = uri;
         scheduleMicrotask(
@@ -237,7 +239,7 @@ void main() {
           }
           return http.Response('not found', HttpStatus.notFound);
         }),
-        callbackFactory: (_) async {
+        callbackFactory: (_, {expectedState, loopbackRedirect}) async {
           final callback = _FakeCallback();
           callbacks.add(callback);
           return callback;
@@ -525,7 +527,9 @@ void main() {
         }
         return http.Response('not found', 404);
       }),
-      callbackFactory: (authorizationServer) async => callback,
+      callbackFactory:
+          (authorizationServer, {expectedState, loopbackRedirect}) async =>
+              callback,
       launchAuthorizationUrl: (uri) async {
         scheduleMicrotask(
           () => callback.complete(
@@ -602,8 +606,9 @@ void main() {
         }
         return http.Response('not found', 404);
       }),
-      callbackFactory: (authorizationServer) async =>
-          callback = _FakeCallback(),
+      callbackFactory:
+          (authorizationServer, {expectedState, loopbackRedirect}) async =>
+              callback = _FakeCallback(),
       launchAuthorizationUrl: (uri) async {
         scheduleMicrotask(
           () => callback.complete(
@@ -730,7 +735,9 @@ void main() {
           }
           return http.Response('not found', 404);
         }),
-        callbackFactory: (authorizationServer) async => callback,
+        callbackFactory:
+            (authorizationServer, {expectedState, loopbackRedirect}) async =>
+                callback,
         launchAuthorizationUrl: (uri) async {
           scheduleMicrotask(
             () => callback.complete(
@@ -836,7 +843,9 @@ void main() {
           }
           return http.Response('not found', 404);
         }),
-        callbackFactory: (authorizationServer) async => callback,
+        callbackFactory:
+            (authorizationServer, {expectedState, loopbackRedirect}) async =>
+                callback,
         launchAuthorizationUrl: (uri) async {
           scheduleMicrotask(() {
             callback.complete(

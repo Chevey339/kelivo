@@ -1,8 +1,6 @@
 import 'dart:async';
-import 'dart:convert';
 import 'dart:io';
 
-import 'package:crypto/crypto.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 
@@ -17,12 +15,18 @@ Future<OAuthCallback> openOAuthCallback(
   String? expectedState,
 }) async {
   if (loopbackRedirect != null) {
-    if (loopbackRedirect.scheme != "http" ||
-        !{"localhost", "127.0.0.1"}.contains(loopbackRedirect.host)) {
+    if (loopbackRedirect.scheme != 'http' ||
+        !{'localhost', '127.0.0.1', '::1'}.contains(loopbackRedirect.host) ||
+        loopbackRedirect.userInfo.isNotEmpty ||
+        loopbackRedirect.hasQuery ||
+        loopbackRedirect.hasFragment ||
+        loopbackRedirect.port > 65535) {
       throw ArgumentError.value(loopbackRedirect, "loopbackRedirect");
     }
     final server = await HttpServer.bind(
-      InternetAddress.loopbackIPv4,
+      loopbackRedirect.host == '::1'
+          ? InternetAddress.loopbackIPv6
+          : InternetAddress.loopbackIPv4,
       loopbackRedirect.port,
     );
     return _IoOAuthCallback(
@@ -30,7 +34,7 @@ Future<OAuthCallback> openOAuthCallback(
       redirectUri: loopbackRedirect.replace(port: server.port),
       expectedState: expectedState,
       mobileCallback: Platform.isAndroid
-          ? _AndroidOAuthCallback(authorizationServer)
+          ? _AndroidOAuthCallback(authorizationServer, completionOnly: true)
           : Platform.isIOS
           ? _IosOAuthCallback(authorizationServer)
           : null,
@@ -58,22 +62,19 @@ Future<OAuthCallback> createMobileLoopbackOAuthCallbackForTesting(
   mobileCallback: mobileCallback,
 );
 
-String _authorizationServerHash(Uri authorizationServer) => base64UrlEncode(
-  sha256.convert(utf8.encode(authorizationServer.toString())).bytes,
-).replaceAll('=', '');
-
 final class _AndroidOAuthCallback implements OAuthCallback {
-  _AndroidOAuthCallback(Uri authorizationServer)
+  _AndroidOAuthCallback(Uri authorizationServer, {this.completionOnly = false})
     : redirectUri = Uri(
         scheme: 'psyche.kelivo',
-        // This URI is registered with authorization servers; sharing the
-        // callback implementation must not rename the registered redirect.
+        // A stable route can be listed in a Client ID Metadata Document.
+        // Each attempt is bound to its own random OAuth state and session ID.
         host: 'mcp-oauth-callback',
-        path: '/${_authorizationServerHash(authorizationServer)}',
+        path: '/authorize',
       );
 
   @override
   final Uri redirectUri;
+  final bool completionOnly;
   final String _sessionId = oauthRandomString(24);
 
   @override
@@ -87,6 +88,7 @@ final class _AndroidOAuthCallback implements OAuthCallback {
           .invokeMethod<String>('authenticate', {
             'url': authorizationUrl.toString(),
             'redirectUri': redirectUri.toString(),
+            'completionOnly': completionOnly,
             'sessionId': _sessionId,
           })
           .timeout(timeout);
@@ -122,8 +124,7 @@ final class _IosOAuthCallback implements OAuthCallback {
   _IosOAuthCallback(Uri authorizationServer)
     : redirectUri = Uri(
         scheme: 'psyche.kelivo',
-        path:
-            '/oauth/callback/${_authorizationServerHash(authorizationServer)}',
+        path: '/oauth/callback/authorize',
       );
 
   @override
@@ -186,7 +187,7 @@ final class _IoOAuthCallback implements OAuthCallback {
              scheme: 'http',
              host: InternetAddress.loopbackIPv4.address,
              port: server.port,
-             path: '/oauth/callback',
+             path: '/callback',
            ) {
     _callback.future.ignore();
     _subscription = _server.listen(_handleRequest);
@@ -209,12 +210,17 @@ final class _IoOAuthCallback implements OAuthCallback {
     Duration timeout,
     OAuthUrlLauncher launchAuthorizationUrl,
   ) async {
+    final states = authorizationUrl.queryParametersAll['state'];
+    if (states == null ||
+        states.length != 1 ||
+        states.single.isEmpty ||
+        (_state != null && _state != states.single)) {
+      throw const OAuthCallbackException(
+        'authorization state is required or mismatched',
+      );
+    }
+    _state = states.single;
     if (mobileCallback case final mobile?) {
-      final states = authorizationUrl.queryParametersAll['state'];
-      if (states == null || states.length != 1 || states.single.isEmpty) {
-        throw const OAuthCallbackException('authorization state is required');
-      }
-      _state = states.single;
       // The provider returns to its registered loopback URL. That local page
       // redirects to the native callback to dismiss the browser and resume us.
       final results = await Future.wait([
@@ -247,7 +253,8 @@ final class _IoOAuthCallback implements OAuthCallback {
       _callback.future.timeout(timeout);
 
   Future<void> _handleRequest(HttpRequest request) async {
-    if (request.uri.path != redirectUri.path) {
+    final callbackPath = redirectUri.path.isEmpty ? '/' : redirectUri.path;
+    if (request.uri.path != callbackPath) {
       request.response
         ..statusCode = HttpStatus.notFound
         ..write('Not Found');
@@ -257,8 +264,15 @@ final class _IoOAuthCallback implements OAuthCallback {
 
     // A fixed port may still receive redirects from a cancelled login. Check
     // the nonce before completing the listener, including before authorize().
-    if (mobileCallback != null || _state != null) {
-      final params = request.uri.queryParametersAll;
+    {
+      final Map<String, List<String>> params;
+      try {
+        params = request.uri.queryParametersAll;
+      } on FormatException {
+        request.response.statusCode = HttpStatus.badRequest;
+        await request.response.close();
+        return;
+      }
       final codes = params['code'];
       final errors = params['error'];
       final validResult =
@@ -273,6 +287,7 @@ final class _IoOAuthCallback implements OAuthCallback {
           _state == null ||
           params['state']?.length != 1 ||
           params['state']?.single != _state ||
+          (params['iss'] != null && params['iss']!.length != 1) ||
           !validResult) {
         request.response.statusCode = HttpStatus.badRequest;
         await request.response.close();
