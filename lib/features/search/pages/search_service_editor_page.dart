@@ -3,9 +3,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter/widget_previews.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:intl/intl.dart';
+import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:uuid/uuid.dart';
 
+import '../../../core/providers/settings_provider.dart';
 import '../../../core/services/search/search_service.dart';
 import '../../../core/services/search/search_service_usage_service.dart';
 import '../../../icons/lucide_adapter.dart';
@@ -1001,7 +1003,12 @@ class _SearchServiceEditorPageState extends State<SearchServiceEditorPage> {
     try {
       final result = widget.searchFetcher != null
           ? await widget.searchFetcher!(query, options)
-          : await SearchService.getService(options).search(
+          : await SearchService.getService(
+              options,
+              locale:
+                  context.read<SettingsProvider?>()?.effectiveLocale ??
+                  Localizations.localeOf(context),
+            ).search(
               query: query,
               commonOptions: widget.commonOptions,
               serviceOptions: options,
@@ -1277,12 +1284,7 @@ class _SearchServiceEditorPageState extends State<SearchServiceEditorPage> {
     final initial = widget.initialService;
     switch (_selectedType) {
       case 'bing_local':
-        return BingLocalOptions(
-          id: _serviceId,
-          acceptLanguage: initial is BingLocalOptions
-              ? initial.acceptLanguage
-              : 'en-US,en;q=0.9',
-        );
+        return BingLocalOptions(id: _serviceId);
       case 'duckduckgo':
         return DuckDuckGoOptions(
           id: _serviceId,

@@ -664,7 +664,7 @@ void main() {
           },
         ]),
         'search_services_v1': jsonEncode([
-          {'id': 'search-1', 'type': 'bing_local', 'acceptLanguage': 'en-US'},
+          {'id': 'search-1', 'type': 'bing_local'},
         ]),
         'tts_services_v1': jsonEncode([
           {

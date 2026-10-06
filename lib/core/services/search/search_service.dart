@@ -62,10 +62,13 @@ abstract class SearchService<T extends SearchServiceOptions> {
   }
 
   // Factory method to get service instance based on options type
-  static SearchService getService(SearchServiceOptions options) {
+  static SearchService getService(
+    SearchServiceOptions options, {
+    Locale? locale,
+  }) {
     switch (options) {
       case BingLocalOptions _:
-        return BingSearchService() as SearchService;
+        return BingSearchService(locale: locale) as SearchService;
       case TavilyOptions _:
         return TavilySearchService() as SearchService;
       case ExaOptions _:
@@ -117,7 +120,7 @@ abstract class SearchService<T extends SearchServiceOptions> {
       case YouSearchOptions _:
         return YouSearchService() as SearchService;
       default:
-        return BingSearchService() as SearchService;
+        return BingSearchService(locale: locale) as SearchService;
     }
   }
 }
@@ -290,22 +293,13 @@ abstract class SearchServiceOptions {
 
 // Service-specific option classes
 class BingLocalOptions extends SearchServiceOptions {
-  final String acceptLanguage;
-
-  BingLocalOptions({required super.id, this.acceptLanguage = 'en-US,en;q=0.9'});
+  const BingLocalOptions({required super.id});
 
   @override
-  Map<String, dynamic> toJson() => {
-    'type': 'bing_local',
-    'id': id,
-    'acceptLanguage': acceptLanguage,
-  };
+  Map<String, dynamic> toJson() => {'type': 'bing_local', 'id': id};
 
   factory BingLocalOptions.fromJson(Map<String, dynamic> json) =>
-      BingLocalOptions(
-        id: json['id'],
-        acceptLanguage: json['acceptLanguage'] ?? 'en-US,en;q=0.9',
-      );
+      BingLocalOptions(id: json['id']);
 }
 
 class TavilyOptions extends SearchServiceOptions {
