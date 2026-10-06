@@ -23,6 +23,7 @@ import '../../stream/stream_chunk_ids.dart';
 import 'openai_tool_transcript.dart';
 import 'openai_request_shaping.dart';
 import 'responses_decoder.dart';
+import 'responses_history.dart';
 
 List<Map<String, dynamic>> toResponsesToolsFormat(
   List<Map<String, dynamic>> tools,
@@ -196,6 +197,7 @@ List<EmitToolCall> responsesCallsFromOutput(List<Map<String, dynamic>> output) {
 }
 
 Stream<StreamChunk> runOpenAIResponsesToolFollowUps({
+  required ResponsesTurnRecorder recorder,
   required http.Client client,
   required ProviderConfig config,
   required String modelId,
@@ -396,6 +398,10 @@ Stream<StreamChunk> runOpenAIResponsesToolFollowUps({
         });
         lastCalls = responsesCallsFromIndexMap(respCalls2);
       }
+      yield recorder.record(
+        withResponsesFunctionCallItems(outputItemsForAppend, lastCalls),
+        lastCalls,
+      );
       if (lastCalls.isEmpty) return;
       final currentSig = [
         for (final call in lastCalls)

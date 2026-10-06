@@ -18,6 +18,7 @@ import 'package:Kelivo/core/database/composer_draft_store.dart';
 import 'package:drift/native.dart';
 import 'package:Kelivo/core/database/generation_run.dart';
 import 'package:Kelivo/core/services/chat/chat_service.dart';
+import 'package:Kelivo/core/services/api/providers/openai/responses_history.dart';
 import 'package:Kelivo/utils/sandbox_path_resolver.dart';
 
 class _FakePathProviderPlatform extends PathProviderPlatform {
@@ -72,6 +73,61 @@ void main() {
     services.add(service);
     return service;
   }
+
+  test(
+    'Responses artifacts reload into cache and follow conversation forks',
+    () async {
+      final service = createService();
+      await service.init();
+      final conversation = await service.createConversation(title: 'Responses');
+      final assistant = await service.addMessage(
+        conversationId: conversation.id,
+        role: 'assistant',
+        content: 'Answer',
+      );
+      const payload =
+          '{"providerId":"p","modelId":"m","baseUrl":"https://example.com","rounds":[]}';
+      await service.setProviderArtifact(
+        assistant.id,
+        responsesTurnArtifactKind,
+        payload,
+      );
+      await service.close();
+      services.remove(service);
+
+      final restarted = createService();
+      await restarted.init();
+      final messages = await restarted.loadMessages(conversation.id);
+      expect(
+        restarted.getProviderArtifact(assistant.id, responsesTurnArtifactKind),
+        payload,
+      );
+      final fork = await restarted.forkConversationAtRevision(
+        sourceConversationId: conversation.id,
+        sourceRevisionId: assistant.id,
+        title: 'Fork',
+      );
+      expect(
+        restarted.getProviderArtifact(
+          restarted.getMessages(fork.id).single.id,
+          responsesTurnArtifactKind,
+        ),
+        payload,
+      );
+      final copied = await restarted.forkConversationFromMessages(
+        title: 'Copy',
+        assistantId: null,
+        sourceMessages: messages,
+      );
+      expect(
+        restarted.getProviderArtifact(
+          restarted.getMessages(copied.id).single.id,
+          responsesTurnArtifactKind,
+        ),
+        payload,
+      );
+    },
+  );
 
   test('cold init clears every stale streaming flag', () async {
     final first = createService();

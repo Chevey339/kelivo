@@ -71,7 +71,11 @@ class ResponsesStreamDecoder implements StreamChunkDecoder {
   bool completed = false;
   int approxCompletionChars = 0;
 
-  List<Map<String, dynamic>> outputItems = const <Map<String, dynamic>>[];
+  final _outputItems = <int, Map<String, dynamic>>{};
+  List<Map<String, dynamic>> get outputItems => [
+    for (final index in _outputItems.keys.toList()..sort())
+      _outputItems[index]!,
+  ];
   final List<Map<String, dynamic>> citations = <Map<String, dynamic>>[];
   final Map<int, ResponsesFunctionCall> toolCallsByIndex =
       <int, ResponsesFunctionCall>{};
@@ -297,6 +301,7 @@ class ResponsesStreamDecoder implements StreamChunkDecoder {
     if (type == 'response.output_item.done') {
       final item = obj['item'];
       final idx = (obj['output_index'] ?? 0) as int;
+      if (item is Map) _outputItems[idx] = item.cast<String, dynamic>();
       if (item is Map && (item['type'] ?? '') == 'function_call') {
         final args = (item['arguments'] ?? '').toString();
         final entry = toolCallsByIndex.putIfAbsent(
@@ -420,12 +425,15 @@ class ResponsesStreamDecoder implements StreamChunkDecoder {
         if (usage != null) chunks.add(Usage(usage!));
       }
       final output = response['output'];
-      outputItems = const <Map<String, dynamic>>[];
       if (output is List) {
-        outputItems = [
-          for (final it in output)
-            if (it is Map) it.cast<String, dynamic>(),
-        ];
+        for (var index = 0; index < output.length; index++) {
+          final item = output[index];
+          if (item is Map) {
+            // output_item.done owns the completed reasoning state. Some
+            // terminal envelopes omit it or contain only a reduced snapshot.
+            _outputItems.putIfAbsent(index, () => item.cast<String, dynamic>());
+          }
+        }
         try {
           _collectCitations(output);
           _collectCompletedImages(output);

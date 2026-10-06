@@ -46,6 +46,7 @@ import '../../../utils/assistant_regex.dart';
 import '../../../utils/markdown_media_sanitizer.dart';
 import 'ocr_service.dart';
 import 'assistant_tool_history.dart';
+import '../../../core/services/api/providers/openai/responses_history.dart';
 
 /// Result of §7.6 memory-prefix resolution.
 ///
@@ -313,14 +314,15 @@ class MessageBuilderService {
   /// Build API messages list from current conversation state.
   ///
   /// Applies truncation and version collapsing. Attachments come from parts.
-  /// [preserveToolTurns] selects Chat Completions' ordered response projection.
-  /// Native Claude / Gemini and Responses adapters own their protocol replay.
+  /// [preserveToolTurns] keeps OpenAI-compatible tool rounds ordered.
+  /// [responsesScope] selects native Responses replay for matching artifacts.
   List<Map<String, dynamic>> buildApiMessages({
     required List<ChatMessage> messages,
     required Map<String, int> versionSelections,
     required Conversation? currentConversation,
     bool includeToolMessages = false,
     bool preserveToolTurns = false,
+    ResponsesReplayScope? responsesScope,
   }) {
     final tIndex = currentConversation?.truncateIndex ?? -1;
     final List<ChatMessage> sourceAll =
@@ -335,6 +337,31 @@ class MessageBuilderService {
     final out = <Map<String, dynamic>>[];
 
     for (final m in source) {
+      if (m.role == 'assistant' &&
+          includeToolMessages &&
+          responsesScope != null) {
+        final history = buildResponsesHistory(
+          payload: providerArtifactLookup?.call(m, responsesTurnArtifactKind),
+          scope: responsesScope,
+          toolEvents: chatService.getToolEvents(m.id),
+          content: m.content,
+        );
+        if (history != null) {
+          for (final message in history) {
+            ContextSegmentTags.replaceWithSingle(
+              message,
+              source: message['role'] == 'tool'
+                  ? ContextSource.toolResult
+                  : message['tool_calls'] is List
+                  ? ContextSource.toolCall
+                  : ContextSource.chatHistory,
+              length: (message['content'] ?? '').toString().length,
+            );
+          }
+          out.addAll(history);
+          continue;
+        }
+      }
       var content = m.content;
       String? assistantReasoningContent;
       dynamic reasoningDetails;

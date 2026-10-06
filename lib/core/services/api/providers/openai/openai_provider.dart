@@ -30,6 +30,7 @@ import 'chat_completions_decoder.dart';
 import 'openai_request_shaping.dart';
 import 'responses_api.dart';
 import 'responses_decoder.dart';
+import 'responses_history.dart';
 
 Uri _openAICompatibleUrl(ProviderConfig config) {
   final rawBase = config.baseUrl.endsWith('/')
@@ -219,6 +220,9 @@ Stream<StreamChunk> sendOpenAIStream(
       const <Map<String, dynamic>>[];
   String responsesInstructions = '';
   List<dynamic>? responsesIncludeParam;
+  final responsesRecorder = ResponsesTurnRecorder(
+    responsesReplayScope(config, modelId),
+  );
   if (config.useResponseApi == true) {
     final input = <Map<String, dynamic>>[];
     // Extract system messages into `instructions` (Responses API best practice)
@@ -264,6 +268,12 @@ Stream<StreamChunk> sendOpenAIStream(
           ? textFromContentParts(originalContent)
           : (originalContent ?? '').toString();
       final roleRaw = (m['role'] ?? 'user').toString();
+
+      if (roleRaw == 'assistant' &&
+          m[multimodalInternalResponsesItemKey] is Map) {
+        input.add(responsesInputItem(m));
+        continue;
+      }
 
       // Responses API supports a top-level `instructions` field that has higher priority
       if (roleRaw == 'system') {
@@ -560,6 +570,12 @@ Stream<StreamChunk> sendOpenAIStream(
         }
       } catch (_) {}
     }
+    if (Uri.tryParse(config.baseUrl)?.host == 'api.openai.com') {
+      body['include'] = [
+        ...?body['include'] as List?,
+        'reasoning.encrypted_content',
+      ];
+    }
     // Save initial Responses context
     try {
       responsesInitialInput = List<Map<String, dynamic>>.from(
@@ -758,6 +774,7 @@ Stream<StreamChunk> sendOpenAIStream(
               item.cast<String, dynamic>(),
         ];
         final calls = responsesCallsFromOutput(outputItems);
+        yield responsesRecorder.record(outputItems, calls);
         if (calls.isNotEmpty && effectiveOnToolCall != null) {
           yield* emitDelta(
             ids: ids,
@@ -766,6 +783,7 @@ Stream<StreamChunk> sendOpenAIStream(
             usage: usage,
           );
           yield* runOpenAIResponsesToolFollowUps(
+            recorder: responsesRecorder,
             client: client,
             config: config,
             modelId: modelId,
@@ -954,6 +972,14 @@ Stream<StreamChunk> sendOpenAIStream(
             for (final call in decoder.takeFunctionCalls())
               call.index: call.toIndexFields(),
           });
+        final recordedCalls = responsesCallsFromIndexMap(respToolCallsByIndex);
+        yield responsesRecorder.record(
+          withResponsesFunctionCallItems(
+            lastResponseOutputItems,
+            recordedCalls,
+          ),
+          recordedCalls,
+        );
         if (!decoder.emittedImageEvents) {
           var fallbackCount = 0;
           for (final image in decoder.takeImages()) {
@@ -1014,6 +1040,7 @@ Stream<StreamChunk> sendOpenAIStream(
                     ),
                 ];
           yield* runOpenAIResponsesToolFollowUps(
+            recorder: responsesRecorder,
             client: client,
             config: config,
             modelId: modelId,

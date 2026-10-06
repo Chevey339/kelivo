@@ -25,6 +25,7 @@ import '../../models/chat_message.dart';
 import '../api/providers/claude/claude_container.dart';
 import '../api/providers/claude/claude_history.dart';
 import '../api/providers/google_gemini.dart';
+import '../api/providers/openai/responses_history.dart';
 import '../../models/message_part.dart';
 import '../../models/conversation.dart';
 import '../../models/workspace_binding.dart';
@@ -128,6 +129,7 @@ class ChatService extends ChangeNotifier {
     claudeContainerArtifactKind,
     claudeTurnArtifactKind,
     geminiThoughtSignatureArtifactKind,
+    responsesTurnArtifactKind,
   };
   final Map<String, Map<String, String>> _providerArtifactsCache = {};
 

@@ -333,6 +333,7 @@ Future<List<Map<String, dynamic>>> buildOpenAIChatCompletionMessages(
     outMsg.remove(multimodalInternalRevisionIdKey);
     outMsg.remove(multimodalInternalClaudeContainerKey);
     outMsg.remove(multimodalInternalClaudeTurnKey);
+    outMsg.remove(multimodalInternalResponsesItemKey);
     outMsg.remove(multimodalInternalGeminiThoughtSignatureKey);
     outMsg.remove('metadata');
     outMsg['role'] = role;

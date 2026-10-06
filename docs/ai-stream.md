@@ -18,7 +18,9 @@
 
 `runClientToolFollowUps` 在执行每批客户端工具之前发出 `AssistantRoundEnd`。它记录刚结束的模型响应边界及该轮 `reasoning_details`，handler 将其保存为不可见的 `AssistantRoundEndPart`。边界不表示工具已经执行；执行状态仍由对应 `ToolCallPart.content` 是否存在决定。
 
-Chat Completions 历史从有序 parts 重建，每个边界之前的正文、思考和工具调用属于同一响应，调用后紧跟该批结果。连续无正文的工具响应也各自保留；未完成批次不伪造结果，不影响此前已完成批次。普通最终回答只携带最后一轮思考。Claude、Gemini 和 Responses 继续由各自适配器处理原生回放。
+Chat Completions 历史从有序 parts 重建，每个边界之前的正文、思考和工具调用属于同一响应，调用后紧跟该批结果。连续无正文的工具响应也各自保留；未完成批次不伪造结果，不影响此前已完成批次。普通最终回答只携带最后一轮思考。Claude、Gemini 由各自适配器处理原生回放。
+
+Responses 在每轮返回后发出 `responses_turn` provider artifact，保存原生 output items、响应边界和供应商 call_id 与工具卡片 ID 的对应关系。流式以 `response.output_item.done` 的完整数据为准，保存明文 reasoning 或 `encrypted_content`；终止事件中的精简 output 不覆盖已完成 item。下一次请求按原顺序回放 items，在每轮调用后插入对应的工具结果，正文只发送一次。artifact 限定提供商、Base URL 和上游模型，随消息重载和会话分叉保留；未完成的工具批次及关联原生 reasoning 不回放。改写正文的回复使用当前文本，发送阶段的正则处理只改正文，不重写 reasoning。OpenAI 官方端点请求 `reasoning.encrypted_content`；不向其他兼容端点新增该参数。
 
 DeepSeek 默认使用 `all` 回传思考，包括没有实际调用工具的历史回答；用户显式配置的回放策略仍优先。上下文消息数限制为软上限，裁剪点回退到保留轮次的用户消息，避免把工具链从中间拆开。已有记录只能按其实际保存的 parts 回放，不能补回过去没有记录的响应边界。
 
