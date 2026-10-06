@@ -6,6 +6,7 @@ import 'package:Kelivo/core/database/chat_database_repository.dart';
 import 'package:Kelivo/core/models/chat_message.dart';
 import 'package:Kelivo/core/models/conversation.dart';
 import 'package:Kelivo/core/services/api/providers/claude/claude_history.dart';
+import 'package:Kelivo/core/services/api/providers/claude/claude_thinking_recovery.dart';
 import 'package:Kelivo/core/services/api/stream/stream_chunk.dart';
 import 'package:Kelivo/core/services/api/stream/stream_chunk_handler.dart';
 import 'package:Kelivo/core/services/chat/chat_service.dart';
@@ -233,6 +234,210 @@ void main() {
       );
     }
   });
+
+  test(
+    'prefix recovery survives SQLite reload without dropping fresh thinking',
+    () async {
+      final config = claudeConfig();
+      const modelId = 'claude-fable-5-1';
+      final oldTurn = encodeClaudeTurn([
+        [
+          {..._thinking, 'signature': 'stale-state'},
+          _text,
+        ],
+      ]);
+      final exchange = await captureClaudeExchange(
+        config: config,
+        modelId: modelId,
+        messages: [
+          {'role': 'user', 'content': 'Edited question'},
+          {
+            'role': 'assistant',
+            'content': 'Answer.',
+            multimodalInternalClaudeTurnKey: oldTurn,
+          },
+          {'role': 'user', 'content': 'Continue'},
+        ],
+        statusCodes: const [400, 200],
+        replies: const [
+          {
+            'type': 'error',
+            'error': {
+              'type': 'invalid_request_error',
+              'message':
+                  'messages.1.content.0: Invalid `signature` in `thinking` block. '
+                  'The block is bound to a different conversation. Remove the block.',
+            },
+          },
+          {
+            'content': [_thinking, _text],
+            'stop_reason': 'end_turn',
+          },
+        ],
+      );
+      expect(exchange.bodies, hasLength(2));
+      final root = await Directory.systemTemp.createTemp('claude_recovery_');
+      final file = File('${root.path}/chat.sqlite');
+      var repository = ChatDatabaseRepository.open(file: file);
+      addTearDown(() async {
+        await repository.close();
+        await root.delete(recursive: true);
+      });
+      await repository.ensureReady();
+      final conversation = Conversation(id: 'c', title: 'Edited history');
+      await repository.putConversation(conversation);
+      for (final id in ['old', 'fresh']) {
+        await repository.putMessage(
+          ChatMessage(
+            id: id,
+            role: 'assistant',
+            conversationId: 'c',
+            providerId: config.id,
+            modelId: modelId,
+            content: 'Answer.',
+          ),
+        );
+      }
+      await repository.setProviderArtifact(
+        'old',
+        claudeTurnArtifactKind,
+        oldTurn,
+      );
+      for (final artifact in exchange.chunks.whereType<ProviderArtifact>()) {
+        await repository.setProviderArtifact(
+          'fresh',
+          artifact.kind,
+          artifact.payload,
+        );
+      }
+      await repository.close();
+      repository = ChatDatabaseRepository.open(file: file);
+      await repository.ensureReady();
+      final artifacts = <String, Map<String, String>>{};
+      for (final kind in [
+        claudeTurnArtifactKind,
+        claudeThinkingRecoveryArtifactKind,
+      ]) {
+        artifacts[kind] = await repository.getProviderArtifactsForMessages([
+          'old',
+          'fresh',
+        ], kind);
+      }
+      final builder = MessageBuilderService(
+        chatService: _Chat(),
+        contextProvider: _Context(),
+        providerArtifactLookup: (message, kind) => artifacts[kind]?[message.id],
+      );
+      final history = builder.buildApiMessages(
+        messages: [
+          ChatMessage(
+            role: 'user',
+            content: 'Edited question',
+            conversationId: 'c',
+          ),
+          (await repository.getMessage('old'))!,
+          ChatMessage(role: 'user', content: 'Continue', conversationId: 'c'),
+          (await repository.getMessage('fresh'))!,
+          ChatMessage(role: 'user', content: 'Next', conversationId: 'c'),
+        ],
+        versionSelections: const {},
+        currentConversation: conversation,
+        includeToolMessages: true,
+        claudeSource: (providerId: config.id, modelId: modelId),
+      );
+      final resumed = await captureClaudeExchange(
+        config: config,
+        modelId: modelId,
+        messages: history,
+      );
+      expect(resumed.bodies, hasLength(1));
+      final messages = resumed.bodies.single['messages'] as List;
+      expect(messages[1]['content'], [_text]);
+      expect(messages[3]['content'], [_thinking, _text]);
+      expect(
+        resumed.chunks
+            .whereType<ProviderArtifact>()
+            .lastWhere(
+              (artifact) => artifact.kind == claudeThinkingRecoveryArtifactKind,
+            )
+            .payload,
+        artifacts[claudeThinkingRecoveryArtifactKind]!['fresh'],
+      );
+      expect(
+        await repository.getProviderArtifactsForMessages([
+          'old',
+        ], claudeTurnArtifactKind),
+        {'old': oldTurn},
+      );
+    },
+  );
+
+  for (final edited in ['Edited answer', '']) {
+    test('editing a tool reply preserves its tool pair: "$edited"', () async {
+      final config = claudeConfig();
+      const modelId = 'claude-sonnet-4-6';
+      final assistant = ChatMessage(
+        role: 'assistant',
+        conversationId: 'c',
+        providerId: config.id,
+        modelId: modelId,
+        content: edited,
+      );
+      final builder = MessageBuilderService(
+        chatService: _Chat([
+          {
+            'id': 'call1',
+            'name': 'create_memory',
+            'arguments': {'content': 'remember'},
+            'content': 'saved',
+          },
+        ]),
+        contextProvider: _Context(),
+        providerArtifactLookup: (_, kind) => kind == claudeTurnArtifactKind
+            ? encodeClaudeTurn([
+                [_thinking, _text, clientCall('call1', 'remember')],
+                [
+                  {'type': 'text', 'text': 'Final answer'},
+                ],
+              ])
+            : null,
+      );
+      final history = builder.buildApiMessages(
+        messages: [
+          ChatMessage(role: 'user', content: 'Question', conversationId: 'c'),
+          assistant,
+          ChatMessage(role: 'user', content: 'Next', conversationId: 'c'),
+        ],
+        versionSelections: const {},
+        currentConversation: null,
+        includeToolMessages: true,
+        claudeSource: (providerId: config.id, modelId: modelId),
+      );
+      final body = await captureClaudeRequestBody(
+        config: config,
+        modelId: modelId,
+        messages: history,
+      );
+      expect(body['messages'], [
+        {'role': 'user', 'content': 'Question'},
+        {
+          'role': 'assistant',
+          'content': [
+            _thinking,
+            if (edited.isNotEmpty) {'type': 'text', 'text': edited},
+            clientCall('call1', 'remember'),
+          ],
+        },
+        {
+          'role': 'user',
+          'content': [
+            {'type': 'tool_result', 'tool_use_id': 'call1', 'content': 'saved'},
+          ],
+        },
+        {'role': 'user', 'content': 'Next'},
+      ]);
+    });
+  }
 
   test('unfinished tools do not leak through the ordinary artifact path', () {
     final builder = MessageBuilderService(

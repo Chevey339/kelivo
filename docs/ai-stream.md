@@ -28,6 +28,8 @@ Claude 经 OpenAI 兼容接口回放时仍使用携带签名的 `reasoning_detai
 
 Claude/Messages 每个响应都保存 `claude_turn`，普通轮次也保留完整 thinking、signature 和 redacted_thinking。没有工具卡片时，artifact 随原提供商和模型的普通助手消息进入历史；编辑正文后不恢复旧块。发送时按回放策略过滤历史 thinking，正文和工具结果保留；当前工具循环仍完整回传所需的原生块。存储不受回放选项影响，切换选项不会丢掉已经保存的块。
 
+修改历史、系统提示或工具定义后，若 Claude 返回明确的 conversation-prefix 签名错误，客户端按实际请求中的错误位置，去掉该块及其后的 thinking/redacted_thinking，仅重试一次。`claude_thinking_recovery` 保存失效块的指纹，并累计写入后续回复，重载和分叉后也不重新带回；原始 artifact 不修改，新生成的思考继续正常回放。普通请求不新增 beta 参数，其他签名错误照常报告。带工具的历史回复编辑后以当前正文替换原正文，工具调用和结果保持原位。
+
 上下文消息数限制为软上限，裁剪点回退到保留轮次的用户消息，避免把工具链从中间拆开。已有记录只能按其实际保存的 parts 和 artifact 回放，不能补回过去没有记录的响应边界或 thinking 签名。
 
 `StreamChunkHandler` 每条响应流一个实例，按 id 折成 `List<MessagePart>`。非流式走同一条合并：`generateMessage` → `sendMessageStream(stream: false)` → `handler.handle` → `TextGenerationResult`。`handleResult` 原样收下 parts，不改写图片 URI。

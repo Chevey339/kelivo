@@ -27,6 +27,7 @@ import 'claude/claude_container.dart';
 import 'claude/claude_decoder.dart';
 import 'claude/claude_files.dart';
 import 'claude/claude_history.dart';
+import 'claude/claude_thinking_recovery.dart';
 
 export 'claude/claude_history.dart'
     show
@@ -105,6 +106,8 @@ Stream<StreamChunk> sendClaudeStream(
     userImagePaths: userImagePaths,
   );
   final initialMessages = await history.build(nonSystemMessages);
+  final thinkingRecovery = ClaudeThinkingRecovery()..readMessages(messages);
+  var recoveredThinking = false;
 
   // Map OpenAI-style tools to Anthropic custom tools (client tools)
   List<Map<String, dynamic>>? anthropicTools;
@@ -270,6 +273,13 @@ Stream<StreamChunk> sendClaudeStream(
       kind: claudeTurnArtifactKind,
       payload: encodeClaudeTurn(turnResponses),
     );
+    final recoveryArtifact = thinkingRecovery.artifact;
+    if (recoveryArtifact != null) {
+      yield ProviderArtifact(
+        kind: claudeThinkingRecoveryArtifactKind,
+        payload: recoveryArtifact,
+      );
+    }
     // Stored against this turn's message so the next turn can resume in the
     // same container — now rather than at the end, which a cancelled turn
     // never reaches.
@@ -338,66 +348,86 @@ Stream<StreamChunk> sendClaudeStream(
     sendRound: () async* {
       totalUsage = null;
       final spec = ModelSpecResolver.instance.spec(config, modelId);
-      final body = <String, dynamic>{
-        'model': upstreamModelId,
-        'max_tokens': maxTokens ?? spec.maxOutput ?? 64000,
-        if (config.claudePromptCachingEnabled == true)
-          'cache_control': ProviderConfig.claudePromptCacheControl(
-            config.claudePromptCachingTtl,
-          ),
-        if (systemPrompt.isNotEmpty) 'system': systemPrompt,
-        'messages': convo,
-        'stream': stream,
-        if (temperature != null) 'temperature': temperature,
-        if (topP != null) 'top_p': topP,
-        if (allTools.isNotEmpty) 'tools': allTools,
-        if (allTools.isNotEmpty) 'tool_choice': {'type': 'auto'},
-        if (hasCodeExecution && container != null) 'container': container!.id,
-      };
-      applyReasoning(
-        body,
-        spec,
-        reasoning,
-        transport: ReasoningTransport.anthropicMessages,
-      );
-      final resolution = resolveReasoning(spec, reasoning);
-      applySamplingPolicy(
-        body,
-        spec,
-        resolution,
-        transport: ReasoningTransport.anthropicMessages,
-      );
-      // Custom body keys win over the reasoning dialect.
-      final extraClaude = customBody(config, modelId, assistantBody: extraBody);
-      CustomRequestMerger.applyBody(body, extraClaude);
-      applyAnthropicMessagesProtocolConstraints(body);
+      var retriedContainer = false;
+      Map<String, dynamic> buildBody() {
+        final body = <String, dynamic>{
+          'model': upstreamModelId,
+          'max_tokens': maxTokens ?? spec.maxOutput ?? 64000,
+          if (config.claudePromptCachingEnabled == true)
+            'cache_control': ProviderConfig.claudePromptCacheControl(
+              config.claudePromptCachingTtl,
+            ),
+          if (systemPrompt.isNotEmpty) 'system': systemPrompt,
+          'messages': convo,
+          'stream': stream,
+          if (temperature != null) 'temperature': temperature,
+          if (topP != null) 'top_p': topP,
+          if (allTools.isNotEmpty) 'tools': allTools,
+          if (allTools.isNotEmpty) 'tool_choice': {'type': 'auto'},
+          if (hasCodeExecution && container != null) 'container': container!.id,
+        };
+        applyReasoning(
+          body,
+          spec,
+          reasoning,
+          transport: ReasoningTransport.anthropicMessages,
+        );
+        final resolution = resolveReasoning(spec, reasoning);
+        applySamplingPolicy(
+          body,
+          spec,
+          resolution,
+          transport: ReasoningTransport.anthropicMessages,
+        );
+        // Custom body keys win over the reasoning dialect.
+        final extraClaude = customBody(
+          config,
+          modelId,
+          assistantBody: extraBody,
+        );
+        CustomRequestMerger.applyBody(body, extraClaude);
+        applyAnthropicMessagesProtocolConstraints(body);
+        if (retriedContainer) body.remove('container');
+        thinkingRecovery.filterRequest(body);
+        return body;
+      }
 
-      http.Request buildRequest() {
+      http.Request buildRequest(Map<String, dynamic> body) {
         final request = http.Request('POST', url);
         request.headers.addAll(baseHeaders);
         request.body = jsonEncode(body);
         return request;
       }
 
-      var response = await client.send(buildRequest());
-      if (response.statusCode < 200 || response.statusCode >= 300) {
+      late http.StreamedResponse response;
+      while (true) {
+        final body = buildBody();
+        response = await client.send(buildRequest(body));
+        if (response.statusCode >= 200 && response.statusCode < 300) break;
         final errorBody = await response.stream.bytesToString();
+        if (!recoveredThinking &&
+            thinkingRecovery.recover(body, response.statusCode, errorBody)) {
+          recoveredThinking = true;
+          // Save before retrying: even a cancelled or failed retry must not
+          // put the rejected blocks back into a subsequent request.
+          yield ProviderArtifact(
+            kind: claudeThinkingRecoveryArtifactKind,
+            payload: thinkingRecovery.artifact!,
+          );
+          continue;
+        }
         // A stored container can have expired since the last turn; forget
         // it and let this round start a fresh one.
         final staleContainer =
+            !retriedContainer &&
             body.containsKey('container') &&
             isClaudeStaleContainerError(response.statusCode, errorBody);
         if (!staleContainer) {
           throw HttpException('HTTP ${response.statusCode}: $errorBody');
         }
+        retriedContainer = true;
         container = null;
-        body.remove('container');
         await uploadDataFiles();
-        response = await client.send(buildRequest());
-        if (response.statusCode < 200 || response.statusCode >= 300) {
-          final retryBody = await response.stream.bytesToString();
-          throw HttpException('HTTP ${response.statusCode}: $retryBody');
-        }
       }
 
       pendingCalls = [];

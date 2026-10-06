@@ -210,16 +210,31 @@ class ClaudeHistory {
     /// The persisted assistant message after a replayed turn aggregates the
     /// text of every response of it, which the replayed blocks already carry.
     /// Only what they stop short of — a snapshot cut mid-stream, or a last
-    /// response that had no card to record it — is still to be sent; on any
-    /// other disagreement the blocks win, being what the API produced.
+    /// response that had no card to record it — is still to be sent. An edit
+    /// replaces the recorded text in its first slot, like the message editor,
+    /// while leaving tool calls and their results in their original positions.
     void foldTurnText(_ReplayedTurn turn, Map<String, dynamic> m) {
-      final said = turn.text.trim();
-      final text = (m['content'] ?? '').toString().trim();
-      final rest = said.isEmpty
-          ? text
-          : text.startsWith(said)
-          ? text.substring(said.length).trim()
-          : '';
+      final said = turn.text;
+      final text = (m['content'] ?? '').toString();
+      if (said.isNotEmpty && !text.startsWith(said)) {
+        var replaced = false;
+        for (final message in turn.messages) {
+          final blocks = <Map<String, dynamic>>[];
+          for (final block
+              in (message['content'] as List).cast<Map<String, dynamic>>()) {
+            if (block['type'] != 'text') {
+              blocks.add(block);
+            } else if (!replaced) {
+              if (text.isNotEmpty) blocks.add({'type': 'text', 'text': text});
+              replaced = true;
+            }
+          }
+          message['content'] = blocks;
+          if (blocks.isEmpty) out.remove(message);
+        }
+        return;
+      }
+      final rest = said.isEmpty ? text : text.substring(said.length);
       // Nothing left to say. The results may now sit next to the user message
       // after them, which the API combines into the one turn they already were.
       if (rest.isEmpty) return;

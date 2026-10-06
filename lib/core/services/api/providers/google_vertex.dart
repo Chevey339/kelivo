@@ -194,6 +194,7 @@ Stream<StreamChunk> sendGoogleVertexClaudeStream({
         ..remove(multimodalInternalRevisionIdKey)
         ..remove(multimodalInternalClaudeContainerKey)
         ..remove(multimodalInternalClaudeTurnKey)
+        ..remove(multimodalInternalClaudeThinkingRecoveryKey)
         ..remove(multimodalInternalGeminiThoughtSignatureKey)
         ..['role'] = role.isEmpty ? 'user' : role,
     );

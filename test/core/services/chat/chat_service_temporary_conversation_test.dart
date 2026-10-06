@@ -20,6 +20,7 @@ import 'package:Kelivo/core/database/generation_run.dart';
 import 'package:Kelivo/core/services/chat/chat_service.dart';
 import 'package:Kelivo/core/services/api/providers/openai/responses_history.dart';
 import 'package:Kelivo/core/services/api/providers/claude/claude_history.dart';
+import 'package:Kelivo/core/services/api/providers/claude/claude_thinking_recovery.dart';
 import 'package:Kelivo/utils/sandbox_path_resolver.dart';
 
 class _FakePathProviderPlatform extends PathProviderPlatform {
@@ -104,6 +105,12 @@ void main() {
         claudeTurnArtifactKind,
         claudePayload,
       );
+      const recoveryPayload = '["removed-thinking-fingerprint"]';
+      await service.setProviderArtifact(
+        assistant.id,
+        claudeThinkingRecoveryArtifactKind,
+        recoveryPayload,
+      );
       await service.close();
       services.remove(service);
 
@@ -146,6 +153,10 @@ void main() {
         expect(
           restarted.getProviderArtifact(id, claudeTurnArtifactKind),
           claudePayload,
+        );
+        expect(
+          restarted.getProviderArtifact(id, claudeThinkingRecoveryArtifactKind),
+          recoveryPayload,
         );
       }
     },

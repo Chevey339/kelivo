@@ -24,6 +24,7 @@ import '../../database/generation_run.dart';
 import '../../models/chat_message.dart';
 import '../api/providers/claude/claude_container.dart';
 import '../api/providers/claude/claude_history.dart';
+import '../api/providers/claude/claude_thinking_recovery.dart';
 import '../api/providers/google_gemini.dart';
 import '../api/providers/openai/responses_history.dart';
 import '../../models/message_part.dart';
@@ -128,6 +129,7 @@ class ChatService extends ChangeNotifier {
   static const Set<String> _providerArtifactKinds = {
     claudeContainerArtifactKind,
     claudeTurnArtifactKind,
+    claudeThinkingRecoveryArtifactKind,
     geminiThoughtSignatureArtifactKind,
     responsesTurnArtifactKind,
   };

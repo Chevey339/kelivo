@@ -334,6 +334,7 @@ Future<List<Map<String, dynamic>>> buildOpenAIChatCompletionMessages(
     outMsg.remove(multimodalInternalRevisionIdKey);
     outMsg.remove(multimodalInternalClaudeContainerKey);
     outMsg.remove(multimodalInternalClaudeTurnKey);
+    outMsg.remove(multimodalInternalClaudeThinkingRecoveryKey);
     outMsg.remove(multimodalInternalResponsesItemKey);
     outMsg.remove(multimodalInternalGeminiThoughtSignatureKey);
     outMsg.remove('metadata');

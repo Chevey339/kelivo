@@ -39,6 +39,7 @@ import '../../../core/providers/world_book_provider.dart';
 import '../../../core/services/api/builtin_tools.dart';
 import '../../../core/services/api/providers/claude/claude_container.dart';
 import '../../../core/services/api/providers/claude/claude_history.dart';
+import '../../../core/services/api/providers/claude/claude_thinking_recovery.dart';
 import '../../../core/services/api/providers/google/gemini_thought_signature.dart';
 import '../../../core/models/assistant_regex.dart';
 import '../../../core/utils/multimodal_input_utils.dart';
@@ -338,7 +339,13 @@ class MessageBuilderService {
 
     final out = <Map<String, dynamic>>[];
 
+    final thinkingRecovery = ClaudeThinkingRecovery();
     for (final m in source) {
+      if (includeToolMessages && !preserveToolTurns && m.role == 'assistant') {
+        thinkingRecovery.readArtifact(
+          providerArtifactLookup?.call(m, claudeThinkingRecoveryArtifactKind),
+        );
+      }
       if (m.role == 'assistant' &&
           includeToolMessages &&
           responsesScope != null) {
@@ -365,6 +372,7 @@ class MessageBuilderService {
         }
       }
       var content = m.content;
+      var hasClaudeToolTurn = false;
       // Signed native blocks belong to the provider/model that produced them.
       // Tool turns carry their artifact on the tool-call message below.
       final plainClaudeTurn =
@@ -465,6 +473,7 @@ class MessageBuilderService {
               );
               if (turn != null && turn.isNotEmpty) {
                 assistantToolMessage[multimodalInternalClaudeTurnKey] = turn;
+                hasClaudeToolTurn = claudeSource != null;
               }
               // Also here: a turn that ran code and then said nothing has no
               // final message below to carry the container.
@@ -515,6 +524,7 @@ class MessageBuilderService {
           (assistantReasoningContent?.isEmpty ?? true) &&
           reasoningDetails == null &&
           (plainClaudeTurn?.isEmpty ?? true) &&
+          !hasClaudeToolTurn &&
           mediaRefs.isEmpty &&
           !_hasUsableAttachmentPart(m)) {
         continue;
@@ -565,6 +575,12 @@ class MessageBuilderService {
       out.add(message);
     }
 
+    // Carry the cumulative state on the last message so subsequent context
+    // trimming and textless assistant replies cannot lose the recovery.
+    final recoveryArtifact = thinkingRecovery.artifact;
+    if (out.isNotEmpty && recoveryArtifact != null) {
+      out.last[multimodalInternalClaudeThinkingRecoveryKey] = recoveryArtifact;
+    }
     return out;
   }
 
