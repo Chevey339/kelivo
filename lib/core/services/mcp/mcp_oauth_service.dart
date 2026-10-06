@@ -7,6 +7,9 @@ import 'package:url_launcher/url_launcher.dart' as url_launcher;
 import '../auth/oauth_callback.dart';
 import '../auth/oauth_pkce.dart';
 import 'mcp_oauth_http_client.dart';
+import 'mcp_oauth_session.dart';
+
+export 'mcp_oauth_session.dart';
 
 enum McpOAuthFailureKind { authorizationRequired, transient, invalidResponse }
 
@@ -18,19 +21,22 @@ final class McpOAuthException implements Exception {
     this.kind = McpOAuthFailureKind.invalidResponse,
     this.statusCode,
     this.oauthError,
+    this.stage,
   });
 
   final String message;
   final McpOAuthFailureKind kind;
   final int? statusCode;
   final String? oauthError;
+  final McpOAuthStage? stage;
 
   bool get requiresAuthorization =>
       kind == McpOAuthFailureKind.authorizationRequired;
   bool get isTransient => kind == McpOAuthFailureKind.transient;
 
   @override
-  String toString() => 'MCP OAuth: $message';
+  String toString() =>
+      'MCP OAuth${stage == null ? '' : ' (${stage!.name})'}: $message';
 }
 
 final class McpOAuthClientRegistration {
@@ -329,7 +335,6 @@ final class McpOAuthService {
       );
     }
     final challengedScope = discoveryChallenge?.parameter('scope');
-    final targetResource = server;
     final candidates = hasExplicitMetadata
         ? <_ProtectedResourceMetadataCandidate>[
             _ProtectedResourceMetadataCandidate(
@@ -337,7 +342,9 @@ final class McpOAuthService {
                 server.resolve(challengedMetadataUrl!),
                 localServer: _isLoopbackHost(server.host),
               ),
-              expectedResource: targetResource,
+              // A challenge supplies the document location, not a URL
+              // constructed from the resource. Validate against server below.
+              expectedResource: null,
             ),
           ]
         : _protectedResourceMetadataCandidates(server);
@@ -345,7 +352,7 @@ final class McpOAuthService {
     Map<String, dynamic>? protectedResource;
     Uri? protectedResourceUri;
     McpOAuthException? transientFailure;
-    var resourceMismatch = false;
+    McpOAuthException? resourceMismatch;
     for (final candidate in _distinctMetadataCandidates(candidates)) {
       try {
         final response = await _get(
@@ -362,15 +369,28 @@ final class McpOAuthService {
         final decoded = jsonDecode(response.body);
         if (decoded is! Map) continue;
         final value = decoded.cast<String, dynamic>();
-        if (value['resource'] != candidate.expectedResource.toString()) {
-          resourceMismatch = true;
+        final rawResource = value['resource'];
+        final resource = rawResource is String
+            ? Uri.tryParse(rawResource)
+            : null;
+        if (resource == null ||
+            !_resourceCoversServer(resource, server) ||
+            (candidate.expectedResource != null &&
+                rawResource != candidate.expectedResource.toString())) {
+          resourceMismatch ??= McpOAuthException(
+            'protected resource metadata resource does not match the requested resource '
+            '(endpoint: ${_diagnosticUri(server)}, '
+            'metadata: ${_diagnosticUri(candidate.metadataUri)}, '
+            'resource: ${resource == null ? 'missing or invalid' : _diagnosticUri(resource)}'
+            '${candidate.expectedResource == null ? '' : ', expected: ${_diagnosticUri(candidate.expectedResource!)}'})',
+          );
           continue;
         }
         final authorizationServers = value['authorization_servers'];
         if (authorizationServers is List &&
             authorizationServers.any((item) => item is String)) {
           protectedResource = value;
-          protectedResourceUri = candidate.expectedResource;
+          protectedResourceUri = resource;
           break;
         }
       } on McpOAuthException catch (error) {
@@ -380,11 +400,7 @@ final class McpOAuthService {
       }
     }
     if (protectedResource == null || protectedResourceUri == null) {
-      if (resourceMismatch) {
-        throw const McpOAuthException(
-          'protected resource metadata resource does not match the requested resource',
-        );
-      }
+      if (resourceMismatch != null) throw resourceMismatch;
       if (transientFailure != null) throw transientFailure;
       throw const McpOAuthException(
         'protected resource metadata could not be discovered',
@@ -520,7 +536,12 @@ final class McpOAuthService {
     List<String> wwwAuthenticate = const [],
     List<String> additionalScopes = const [],
     McpOAuthClientRegistration? clientRegistration,
+    Uri? loopbackRedirect,
+    McpOAuthSession? session,
+    Future<void> Function(McpOAuthClientRegistration registration)?
+    onClientRegistered,
   }) async {
+    final attempt = session ?? McpOAuthSession();
     OAuthCallback? callback;
     final discoveryKey = _discoveryCacheKey(
       serverUrl,
@@ -528,12 +549,35 @@ final class McpOAuthService {
       wwwAuthenticate,
     );
     try {
-      final discovery = await _cachedDiscovery(
-        serverUrl,
-        headers: headers,
-        wwwAuthenticate: wwwAuthenticate,
+      attempt.moveTo(McpOAuthStage.discovery);
+      final discovery = await attempt.wait(
+        _cachedDiscovery(
+          serverUrl,
+          headers: headers,
+          wwwAuthenticate: wwwAuthenticate,
+        ),
       );
-      callback = await _callbackFactory(discovery.authorizationServer);
+      final verifier = oauthRandomString(32);
+      final challenge = oauthPkceChallenge(verifier);
+      final state = oauthRandomString(16);
+      final configuredRedirect =
+          clientRegistration?.registrationSource !=
+              McpOAuthClientRegistrationSource.dcr
+          ? Uri.tryParse(clientRegistration?.redirectUri ?? '')
+          : null;
+      callback = await _callbackFactory(
+        discovery.authorizationServer,
+        expectedState: state,
+        loopbackRedirect:
+            loopbackRedirect ??
+            (configuredRedirect?.scheme == 'http'
+                ? (_isLoopbackRedirect(configuredRedirect!)
+                      ? configuredRedirect.replace(port: 0)
+                      : configuredRedirect)
+                : null),
+      );
+      await attempt.bindCallback(callback);
+      attempt.moveTo(McpOAuthStage.registration);
       final scopes = _unionScopes(discovery.scopes, additionalScopes);
       var registration = clientRegistration;
       if (registration?.registrationSource ==
@@ -546,11 +590,20 @@ final class McpOAuthService {
               ))) {
         registration = null;
       }
-      registration ??= await _cachedDynamicRegistration(
-        discovery,
-        redirectUri: callback.redirectUri,
-        clientName: serverName.trim().isEmpty ? 'Kelivo' : serverName.trim(),
-        scopes: scopes,
+      if (registration?.registrationSource ==
+              McpOAuthClientRegistrationSource.cimd &&
+          !discovery.clientIdMetadataDocumentSupported) {
+        throw const McpOAuthException(
+          'authorization server does not support Client ID Metadata Documents',
+        );
+      }
+      registration ??= await attempt.wait<McpOAuthClientRegistration>(
+        _cachedDynamicRegistration(
+          discovery,
+          redirectUri: callback.redirectUri,
+          clientName: serverName.trim().isEmpty ? 'Kelivo' : serverName.trim(),
+          scopes: scopes,
+        ),
       );
       _validateClientRegistration(registration);
       if (registration.registrationSource !=
@@ -563,9 +616,26 @@ final class McpOAuthService {
         );
       }
 
-      final verifier = oauthRandomString(32);
-      final challenge = oauthPkceChallenge(verifier);
-      final state = oauthRandomString(16);
+      if (registration.redirectUri != null &&
+          !_registrationRedirectUriMatches(
+            registration.redirectUri,
+            callback.redirectUri,
+          )) {
+        throw const McpOAuthException(
+          'configured redirect URI does not match the callback listener',
+        );
+      }
+      registration = McpOAuthClientRegistration(
+        clientId: registration.clientId,
+        clientSecret: registration.clientSecret,
+        tokenEndpointAuthMethod: registration.tokenEndpointAuthMethod,
+        authorizationServer: discovery.authorizationServer.toString(),
+        redirectUri: callback.redirectUri.toString(),
+        registrationSource: registration.registrationSource,
+      );
+      if (onClientRegistered != null) {
+        await attempt.wait(onClientRegistered(registration));
+      }
       final authorizationUrl = discovery.authorizationEndpoint.replace(
         queryParameters: {
           ...discovery.authorizationEndpoint.queryParameters,
@@ -580,11 +650,23 @@ final class McpOAuthService {
         },
       );
 
-      final callbackUri = await callback.authorize(
-        authorizationUrl,
-        _callbackTimeout,
-        _launchAuthorizationUrl,
+      attempt.moveTo(McpOAuthStage.browser);
+      final callbackUri = await attempt.wait(
+        callback.authorize(
+          authorizationUrl,
+          _callbackTimeout,
+          _launchAuthorizationUrl,
+        ),
       );
+      final params = callbackUri.queryParametersAll;
+      if (params['state']?.length != 1 ||
+          (params['iss'] != null && params['iss']!.length != 1) ||
+          !((params['code']?.length == 1 && params['error'] == null) ||
+              (params['error']?.length == 1 && params['code'] == null))) {
+        throw const McpOAuthException(
+          'authorization callback parameters are invalid',
+        );
+      }
       if (!_sameRedirectTarget(callbackUri, callback.redirectUri)) {
         throw const McpOAuthException(
           'authorization callback redirect URI mismatch',
@@ -621,15 +703,23 @@ final class McpOAuthService {
         );
       }
 
+      attempt.moveTo(McpOAuthStage.token);
       Map<String, dynamic> token;
       try {
-        token = await _requestToken(discovery.tokenEndpoint, {
-          'grant_type': 'authorization_code',
-          'code': code,
-          'redirect_uri': callback.redirectUri.toString(),
-          'code_verifier': verifier,
-          'resource': discovery.resource.toString(),
-        }, registration: registration);
+        token = await attempt.wait(
+          _requestToken(
+            discovery.tokenEndpoint,
+            {
+              'grant_type': 'authorization_code',
+              'code': code,
+              'redirect_uri': callback.redirectUri.toString(),
+              'code_verifier': verifier,
+              'resource': discovery.resource.toString(),
+            },
+            registration: registration,
+            session: attempt,
+          ),
+        );
       } on McpOAuthException catch (error) {
         if (error.oauthError == 'invalid_client' &&
             registration.registrationSource ==
@@ -662,19 +752,28 @@ final class McpOAuthService {
       }
       return result;
     } on TimeoutException {
-      throw const McpOAuthException(
+      throw McpOAuthException(
         'timed out waiting for authorization',
         kind: McpOAuthFailureKind.transient,
+        stage: attempt.stage,
       );
     } on OAuthCallbackException catch (error) {
+      if (error.cancelled) throw const McpOAuthCancelled();
       throw McpOAuthException(
         error.message,
-        kind: error.cancelled
-            ? McpOAuthFailureKind.authorizationRequired
-            : McpOAuthFailureKind.transient,
+        stage: attempt.stage,
+        kind: McpOAuthFailureKind.transient,
+      );
+    } on McpOAuthException catch (error) {
+      throw McpOAuthException(
+        error.message,
+        kind: error.kind,
+        statusCode: error.statusCode,
+        oauthError: error.oauthError,
+        stage: error.stage ?? attempt.stage,
       );
     } finally {
-      await callback?.close();
+      await attempt.close();
     }
   }
 
@@ -807,6 +906,8 @@ final class McpOAuthService {
     final existing = _dynamicRegistrationCache[key];
     if (existing != null) return existing;
 
+    // Like discovery, this request may have several waiting attempts. One
+    // cancellation must not abort another server's shared registration.
     final future = _dynamicallyRegisterClient(
       discovery,
       redirectUri: redirectUri,
@@ -857,7 +958,9 @@ final class McpOAuthService {
     Uri endpoint,
     Map<String, String> form, {
     required McpOAuthClientRegistration registration,
+    McpOAuthSession? session,
   }) async {
+    session?.check();
     final body = Map<String, String>.of(form);
     final headers = <String, String>{'Accept': 'application/json'};
     switch (registration.tokenEndpointAuthMethod) {
@@ -879,6 +982,7 @@ final class McpOAuthService {
       body,
       headers: headers,
       operation: 'token request',
+      session: session,
     );
     final token = _decodeSuccessfulJson(response, operation: 'token request');
     if (token['access_token'] is! String ||
@@ -918,6 +1022,13 @@ final class McpOAuthService {
   );
 
   void _validateClientRegistration(McpOAuthClientRegistration registration) {
+    if (registration.registrationSource ==
+            McpOAuthClientRegistrationSource.cimd &&
+        !_looksLikeClientMetadataDocumentId(registration.clientId)) {
+      throw const McpOAuthException(
+        'Client ID Metadata Document must be an HTTPS URL with a path',
+      );
+    }
     if (registration.clientId.isEmpty) {
       throw const McpOAuthException('OAuth client ID is empty');
     }
@@ -1017,6 +1128,7 @@ final class McpOAuthService {
     Map<String, String> body, {
     required Map<String, String> headers,
     required String operation,
+    McpOAuthSession? session,
   }) => _send(
     'POST',
     uri,
@@ -1031,6 +1143,7 @@ final class McpOAuthService {
     operation: operation,
     discoveredTarget: true,
     freshConnection: true,
+    session: session,
   );
 
   Future<http.Response> _send(
@@ -1042,7 +1155,9 @@ final class McpOAuthService {
     DateTime? deadline,
     bool discoveredTarget = false,
     bool freshConnection = false,
+    McpOAuthSession? session,
   }) async {
+    session?.check();
     if (discoveredTarget && _validateDiscoveredHosts) {
       try {
         await _validatePublicTarget(uri);
@@ -1060,9 +1175,16 @@ final class McpOAuthService {
         kind: McpOAuthFailureKind.transient,
       );
     }
+    session?.check();
     final abort = Completer<void>();
     final request =
-        http.AbortableRequest(method, uri, abortTrigger: abort.future)
+        http.AbortableRequest(
+            method,
+            uri,
+            abortTrigger: session == null
+                ? abort.future
+                : Future.any([abort.future, session.whenCancelled]),
+          )
           ..followRedirects = false
           ..maxRedirects = 0
           ..headers.addAll(headers);
@@ -1316,6 +1438,24 @@ final class McpOAuthService {
     return false;
   }
 
+  static bool _resourceCoversServer(Uri resource, Uri server) {
+    if (!resource.hasScheme ||
+        resource.host.isEmpty ||
+        resource.userInfo.isNotEmpty ||
+        resource.hasFragment ||
+        !_sameOrigin(resource, server) ||
+        (resource.hasQuery && resource.query != server.query)) {
+      return false;
+    }
+    if (resource.path.isEmpty || resource.path == '/') return true;
+    if (server.path.length < resource.path.length) return false;
+    final prefix = resource.path.endsWith('/')
+        ? resource.path
+        : '${resource.path}/';
+    final path = server.path.endsWith('/') ? server.path : '${server.path}/';
+    return path.startsWith(prefix);
+  }
+
   static List<_ProtectedResourceMetadataCandidate>
   _protectedResourceMetadataCandidates(Uri server) {
     final targetResource = server;
@@ -1371,6 +1511,10 @@ final class McpOAuthService {
     path: path,
     query: query,
   );
+
+  // Diagnostics must not expose credentials or query parameters from a server
+  // URL or resource_metadata challenge.
+  static String _diagnosticUri(Uri uri) => _originUri(uri, uri.path).toString();
 
   static Iterable<_ProtectedResourceMetadataCandidate>
   _distinctMetadataCandidates(
@@ -1477,7 +1621,7 @@ final class _ProtectedResourceMetadataCandidate {
   });
 
   final Uri metadataUri;
-  final Uri expectedResource;
+  final Uri? expectedResource;
 }
 
 final class _BearerChallenge {
@@ -1655,6 +1799,8 @@ bool _looksLikeClientMetadataDocumentId(String clientId) {
   return uri != null &&
       uri.scheme == 'https' &&
       uri.host.isNotEmpty &&
+      uri.userInfo.isEmpty &&
+      !uri.hasFragment &&
       uri.path.isNotEmpty &&
       uri.path != '/';
 }

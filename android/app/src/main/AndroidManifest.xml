@@ -88,6 +88,11 @@
             </intent-filter>
         </activity>
         <activity
+            android:name=".OAuthAuthorizationActivity"
+            android:exported="false"
+            android:excludeFromRecents="true"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar" />
+        <activity
             android:name=".OAuthCallbackActivity"
             android:excludeFromRecents="true"
             android:exported="true"

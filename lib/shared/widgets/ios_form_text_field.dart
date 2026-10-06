@@ -16,6 +16,7 @@ class IosFormTextField extends StatelessWidget {
     this.keyboardType,
     this.textAlign,
     this.autofocus = false,
+    this.obscureText = false,
     this.enabled = true,
     this.onChanged,
     this.onSubmitted,
@@ -39,6 +40,7 @@ class IosFormTextField extends StatelessWidget {
   final TextInputType? keyboardType;
   final TextAlign? textAlign;
   final bool autofocus;
+  final bool obscureText;
   final bool enabled;
   final ValueChanged<String>? onChanged;
   final ValueChanged<String>? onSubmitted;
@@ -90,6 +92,7 @@ class IosFormTextField extends StatelessWidget {
       maxLines: maxLines,
       minLines: minLines,
       autofocus: autofocus,
+      obscureText: obscureText,
       enabled: enabled,
       keyboardType: keyboardType,
       textAlign: textAlign ?? _defaultTextAlign(),

@@ -22919,6 +22919,102 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Unsent drafts in these conversations will also be deleted.'**
   String get composerDraftDeleteNotice;
+
+  /// No description provided for @mcpOAuthSettings.
+  ///
+  /// In en, this message translates to:
+  /// **'OAuth settings'**
+  String get mcpOAuthSettings;
+
+  /// No description provided for @mcpOAuthAutomatic.
+  ///
+  /// In en, this message translates to:
+  /// **'Automatic'**
+  String get mcpOAuthAutomatic;
+
+  /// No description provided for @mcpOAuthMetadataUrl.
+  ///
+  /// In en, this message translates to:
+  /// **'Client metadata document URL'**
+  String get mcpOAuthMetadataUrl;
+
+  /// No description provided for @mcpOAuthClientAuthentication.
+  ///
+  /// In en, this message translates to:
+  /// **'Client authentication'**
+  String get mcpOAuthClientAuthentication;
+
+  /// No description provided for @mcpOAuthPublicClient.
+  ///
+  /// In en, this message translates to:
+  /// **'Public client'**
+  String get mcpOAuthPublicClient;
+
+  /// No description provided for @mcpOAuthRedirectUri.
+  ///
+  /// In en, this message translates to:
+  /// **'Local callback URL (optional)'**
+  String get mcpOAuthRedirectUri;
+
+  /// No description provided for @mcpOAuthFillRedirectExample.
+  ///
+  /// In en, this message translates to:
+  /// **'Fill example'**
+  String get mcpOAuthFillRedirectExample;
+
+  /// No description provided for @mcpOAuthRedirectHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Leave empty to use the platform default. Use an HTTP loopback URL if the service only allows localhost callbacks. Port 0 selects an available port; a pre-registered client may require a fixed port.'**
+  String get mcpOAuthRedirectHint;
+
+  /// No description provided for @mcpOAuthClientIdRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter a client ID or choose automatic registration.'**
+  String get mcpOAuthClientIdRequired;
+
+  /// No description provided for @mcpOAuthMetadataUrlInvalid.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter an HTTPS metadata document URL with a path.'**
+  String get mcpOAuthMetadataUrlInvalid;
+
+  /// No description provided for @mcpOAuthSecretRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'This client authentication method requires a client secret.'**
+  String get mcpOAuthSecretRequired;
+
+  /// No description provided for @mcpOAuthRedirectInvalid.
+  ///
+  /// In en, this message translates to:
+  /// **'Use an HTTP callback on localhost, 127.0.0.1 or [::1], without credentials, query parameters or a fragment.'**
+  String get mcpOAuthRedirectInvalid;
+
+  /// No description provided for @mcpOAuthDiscovering.
+  ///
+  /// In en, this message translates to:
+  /// **'Discovering authorization server…'**
+  String get mcpOAuthDiscovering;
+
+  /// No description provided for @mcpOAuthRegistering.
+  ///
+  /// In en, this message translates to:
+  /// **'Preparing authorization…'**
+  String get mcpOAuthRegistering;
+
+  /// No description provided for @mcpOAuthWaitingBrowser.
+  ///
+  /// In en, this message translates to:
+  /// **'Waiting for browser authorization…'**
+  String get mcpOAuthWaitingBrowser;
+
+  /// No description provided for @mcpOAuthExchangingToken.
+  ///
+  /// In en, this message translates to:
+  /// **'Completing sign-in…'**
+  String get mcpOAuthExchangingToken;
 }
 
 class _AppLocalizationsDelegate

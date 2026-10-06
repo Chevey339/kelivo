@@ -397,6 +397,7 @@ class _FakeChatService extends ChatService {
     String? title,
     String? assistantId,
     bool temporary = false,
+    bool reuseNewEntry = false,
   }) async {
     conversation = Conversation(
       title: title ?? 'New Chat',

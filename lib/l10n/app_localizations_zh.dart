@@ -12247,6 +12247,56 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get composerDraftDeleteNotice => '这些对话中未发送的草稿也会一起删除。';
+
+  @override
+  String get mcpOAuthSettings => 'OAuth 设置';
+
+  @override
+  String get mcpOAuthAutomatic => '自动';
+
+  @override
+  String get mcpOAuthMetadataUrl => '客户端元数据文档 URL';
+
+  @override
+  String get mcpOAuthClientAuthentication => '客户端认证方式';
+
+  @override
+  String get mcpOAuthPublicClient => '公共客户端';
+
+  @override
+  String get mcpOAuthRedirectUri => '本地回调 URL（可选）';
+
+  @override
+  String get mcpOAuthFillRedirectExample => '填入示例';
+
+  @override
+  String get mcpOAuthRedirectHint =>
+      '留空使用平台默认回调。若服务仅允许 localhost 回调，可填写 HTTP 回环地址。端口 0 自动选择可用端口；预注册客户端可能要求固定端口。';
+
+  @override
+  String get mcpOAuthClientIdRequired => '请输入客户端 ID，或选择自动注册。';
+
+  @override
+  String get mcpOAuthMetadataUrlInvalid => '请输入包含路径的 HTTPS 元数据文档 URL。';
+
+  @override
+  String get mcpOAuthSecretRequired => '此客户端认证方式需要 Client secret。';
+
+  @override
+  String get mcpOAuthRedirectInvalid =>
+      '请使用 localhost、127.0.0.1 或 [::1] 的 HTTP 回调地址，不要包含凭据、查询参数或片段。';
+
+  @override
+  String get mcpOAuthDiscovering => '正在发现授权服务器…';
+
+  @override
+  String get mcpOAuthRegistering => '正在准备授权…';
+
+  @override
+  String get mcpOAuthWaitingBrowser => '等待浏览器授权…';
+
+  @override
+  String get mcpOAuthExchangingToken => '正在完成登录…';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hans`).
@@ -24418,6 +24468,56 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get composerDraftDeleteNotice => '这些对话中未发送的草稿也会一起删除。';
+
+  @override
+  String get mcpOAuthSettings => 'OAuth 设置';
+
+  @override
+  String get mcpOAuthAutomatic => '自动';
+
+  @override
+  String get mcpOAuthMetadataUrl => '客户端元数据文档 URL';
+
+  @override
+  String get mcpOAuthClientAuthentication => '客户端认证方式';
+
+  @override
+  String get mcpOAuthPublicClient => '公共客户端';
+
+  @override
+  String get mcpOAuthRedirectUri => '本地回调 URL（可选）';
+
+  @override
+  String get mcpOAuthFillRedirectExample => '填入示例';
+
+  @override
+  String get mcpOAuthRedirectHint =>
+      '留空使用平台默认回调。若服务仅允许 localhost 回调，可填写 HTTP 回环地址。端口 0 自动选择可用端口；预注册客户端可能要求固定端口。';
+
+  @override
+  String get mcpOAuthClientIdRequired => '请输入客户端 ID，或选择自动注册。';
+
+  @override
+  String get mcpOAuthMetadataUrlInvalid => '请输入包含路径的 HTTPS 元数据文档 URL。';
+
+  @override
+  String get mcpOAuthSecretRequired => '此客户端认证方式需要 Client secret。';
+
+  @override
+  String get mcpOAuthRedirectInvalid =>
+      '请使用 localhost、127.0.0.1 或 [::1] 的 HTTP 回调地址，不要包含凭据、查询参数或片段。';
+
+  @override
+  String get mcpOAuthDiscovering => '正在发现授权服务器…';
+
+  @override
+  String get mcpOAuthRegistering => '正在准备授权…';
+
+  @override
+  String get mcpOAuthWaitingBrowser => '等待浏览器授权…';
+
+  @override
+  String get mcpOAuthExchangingToken => '正在完成登录…';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hant`).
@@ -36668,4 +36768,54 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get composerDraftDeleteNotice => '這些對話中未傳送的草稿也會一起刪除。';
+
+  @override
+  String get mcpOAuthSettings => 'OAuth 設定';
+
+  @override
+  String get mcpOAuthAutomatic => '自動';
+
+  @override
+  String get mcpOAuthMetadataUrl => '用戶端中繼資料文件 URL';
+
+  @override
+  String get mcpOAuthClientAuthentication => '用戶端驗證方式';
+
+  @override
+  String get mcpOAuthPublicClient => '公用用戶端';
+
+  @override
+  String get mcpOAuthRedirectUri => '本機回呼 URL（選填）';
+
+  @override
+  String get mcpOAuthFillRedirectExample => '填入範例';
+
+  @override
+  String get mcpOAuthRedirectHint =>
+      '留空使用平台預設回呼。若服務僅允許 localhost 回呼，可填寫 HTTP 回環位址。連接埠 0 自動選擇可用連接埠；預先註冊的用戶端可能要求固定連接埠。';
+
+  @override
+  String get mcpOAuthClientIdRequired => '請輸入用戶端 ID，或選擇自動註冊。';
+
+  @override
+  String get mcpOAuthMetadataUrlInvalid => '請輸入包含路徑的 HTTPS 中繼資料文件 URL。';
+
+  @override
+  String get mcpOAuthSecretRequired => '此用戶端驗證方式需要 Client secret。';
+
+  @override
+  String get mcpOAuthRedirectInvalid =>
+      '請使用 localhost、127.0.0.1 或 [::1] 的 HTTP 回呼位址，不要包含憑證、查詢參數或片段。';
+
+  @override
+  String get mcpOAuthDiscovering => '正在探索授權伺服器…';
+
+  @override
+  String get mcpOAuthRegistering => '正在準備授權…';
+
+  @override
+  String get mcpOAuthWaitingBrowser => '等待瀏覽器授權…';
+
+  @override
+  String get mcpOAuthExchangingToken => '正在完成登入…';
 }
