@@ -22,6 +22,11 @@ ProviderConfig _openAIConfig(String baseUrl) {
     apiKey: 'test-key',
     baseUrl: baseUrl,
     providerType: ProviderKind.openai,
+    modelOverrides: {
+      'claude-sonnet-4-6': {
+        'reasoning': {'replay': 'all'},
+      },
+    },
   );
 }
 
@@ -69,7 +74,7 @@ void main() {
     });
 
     test(
-      'unsigned reasoning_content is stripped from Claude history replay',
+      'all history replay still strips unsigned Claude reasoning_content',
       () async {
         late Map<String, dynamic> requestBody;
         final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);

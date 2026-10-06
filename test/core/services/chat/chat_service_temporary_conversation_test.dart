@@ -19,6 +19,7 @@ import 'package:drift/native.dart';
 import 'package:Kelivo/core/database/generation_run.dart';
 import 'package:Kelivo/core/services/chat/chat_service.dart';
 import 'package:Kelivo/core/services/api/providers/openai/responses_history.dart';
+import 'package:Kelivo/core/services/api/providers/claude/claude_history.dart';
 import 'package:Kelivo/utils/sandbox_path_resolver.dart';
 
 class _FakePathProviderPlatform extends PathProviderPlatform {
@@ -75,7 +76,7 @@ void main() {
   }
 
   test(
-    'Responses artifacts reload into cache and follow conversation forks',
+    'native response artifacts reload into cache and follow conversation forks',
     () async {
       final service = createService();
       await service.init();
@@ -91,6 +92,17 @@ void main() {
         assistant.id,
         responsesTurnArtifactKind,
         payload,
+      );
+      final claudePayload = encodeClaudeTurn([
+        [
+          {'type': 'thinking', 'thinking': '', 'signature': 'opaque-state'},
+          {'type': 'text', 'text': 'Answer'},
+        ],
+      ]);
+      await service.setProviderArtifact(
+        assistant.id,
+        claudeTurnArtifactKind,
+        claudePayload,
       );
       await service.close();
       services.remove(service);
@@ -126,6 +138,16 @@ void main() {
         ),
         payload,
       );
+      for (final id in [
+        assistant.id,
+        restarted.getMessages(fork.id).single.id,
+        restarted.getMessages(copied.id).single.id,
+      ]) {
+        expect(
+          restarted.getProviderArtifact(id, claudeTurnArtifactKind),
+          claudePayload,
+        );
+      }
     },
   );
 

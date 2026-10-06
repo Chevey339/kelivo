@@ -618,6 +618,9 @@ Stream<StreamChunk> sendOpenAIStream(
       allowRemoteImages: allowRemoteImages,
       reasoningReplay: spec.reasoning.replay,
       replayField: spec.reasoning.replayField,
+      requiresSignedReasoning:
+          upstreamModelId.toLowerCase().contains('claude') ||
+          upstreamModelId.toLowerCase().startsWith('anthropic/'),
       skipImageParsing: skipImageParsing,
     );
     body = {

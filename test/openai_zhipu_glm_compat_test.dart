@@ -31,7 +31,7 @@ ProviderConfig _zhipuConfig(String baseUrl, {String modelId = 'glm-5.2'}) {
 
 void main() {
   group('Zhipu GLM compatibility', () {
-    test('glm-5.2 maps reasoning budget to thinking type', () async {
+    test('glm-5.2 maps budget and replays ordinary reasoning', () async {
       final requests = <Map<String, dynamic>>[];
       final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
       addTearDown(() async {
@@ -75,6 +75,12 @@ void main() {
         modelId: 'glm-5.2',
         messages: const [
           {'role': 'user', 'content': 'hello'},
+          {
+            'role': 'assistant',
+            'content': 'First answer',
+            'reasoning_content': ' original reasoning\n',
+          },
+          {'role': 'user', 'content': 'Continue'},
         ],
         reasoning: legacyBudget(1024),
       ).toList();
@@ -91,6 +97,10 @@ void main() {
       expect(requests, hasLength(2));
       expect(requests[0]['thinking'], {'type': 'enabled'});
       expect(requests[0]['reasoning_effort'], 'low');
+      expect(
+        (requests[0]['messages'] as List)[1]['reasoning_content'],
+        ' original reasoning\n',
+      );
       expect(requests[1]['thinking'], {'type': 'disabled'});
       expect(requests[1].containsKey('reasoning_effort'), isFalse);
     });

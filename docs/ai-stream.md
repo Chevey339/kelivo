@@ -22,7 +22,13 @@ Chat Completions 历史从有序 parts 重建，每个边界之前的正文、�
 
 Responses 在每轮返回后发出 `responses_turn` provider artifact，保存原生 output items、响应边界和供应商 call_id 与工具卡片 ID 的对应关系。流式以 `response.output_item.done` 的完整数据为准，保存明文 reasoning 或 `encrypted_content`；终止事件中的精简 output 不覆盖已完成 item。下一次请求按原顺序回放 items，在每轮调用后插入对应的工具结果，正文只发送一次。artifact 限定提供商、Base URL 和上游模型，随消息重载和会话分叉保留；未完成的工具批次及关联原生 reasoning 不回放。改写正文的回复使用当前文本，发送阶段的正则处理只改正文，不重写 reasoning。OpenAI 官方端点请求 `reasoning.encrypted_content`；不向其他兼容端点新增该参数。
 
-DeepSeek 默认使用 `all` 回传思考，包括没有实际调用工具的历史回答；用户显式配置的回放策略仍优先。上下文消息数限制为软上限，裁剪点回退到保留轮次的用户消息，避免把工具链从中间拆开。已有记录只能按其实际保存的 parts 回放，不能补回过去没有记录的响应边界。
+支持推理回放的模型和目录回放字段默认使用 `all`，包括没有实际调用工具的历史回答；`toolTurns` 保留为用户可选项，显式配置仍优先。不支持该回放字段的模型继续使用 `none`。这控制客户端回传范围，不会自动修改供应商的 `thinking.keep` 或 `clear_thinking` 等服务端参数。
+
+Claude 经 OpenAI 兼容接口回放时仍使用携带签名的 `reasoning_details`，不会因选择 `all` 而把旧的无签名思考文本当成原生 thinking 回传。
+
+Claude/Messages 每个响应都保存 `claude_turn`，普通轮次也保留完整 thinking、signature 和 redacted_thinking。没有工具卡片时，artifact 随原提供商和模型的普通助手消息进入历史；编辑正文后不恢复旧块。发送时按回放策略过滤历史 thinking，正文和工具结果保留；当前工具循环仍完整回传所需的原生块。存储不受回放选项影响，切换选项不会丢掉已经保存的块。
+
+上下文消息数限制为软上限，裁剪点回退到保留轮次的用户消息，避免把工具链从中间拆开。已有记录只能按其实际保存的 parts 和 artifact 回放，不能补回过去没有记录的响应边界或 thinking 签名。
 
 `StreamChunkHandler` 每条响应流一个实例，按 id 折成 `List<MessagePart>`。非流式走同一条合并：`generateMessage` → `sendMessageStream(stream: false)` → `handler.handle` → `TextGenerationResult`。`handleResult` 原样收下 parts，不改写图片 URI。
 

@@ -89,18 +89,17 @@ Stream<StreamChunk> sendClaudeStream(
     );
   }
 
-  final canImageInput = ModelSpecResolver.instance
-      .spec(config, modelId)
-      .input
-      .contains(Modality.image);
+  final spec = ModelSpecResolver.instance.spec(config, modelId);
+  final canImageInput = spec.input.contains(Modality.image);
   final history = ClaudeHistory(
     replayServerToolBlocks: replayServerToolBlocks,
     skipRedactedThinkingBlocks: skipRedactedThinkingBlocks,
+    reasoningReplay: spec.reasoning.replay,
     skipImageParsing: skipImageParsing,
     canImageInput: canImageInput,
     nativeInputs: NativeInputAttachments(
       config: config,
-      spec: ModelSpecResolver.instance.spec(config, modelId),
+      spec: spec,
       protocol: NativeInputProtocol.claude,
     ),
     userImagePaths: userImagePaths,
@@ -262,17 +261,15 @@ Stream<StreamChunk> sendClaudeStream(
   // pause — and stored after each so the next turn resumes in it too.
   ClaudeContainerRef? container = history.storedContainer;
   // Every response of this turn so far, stored against the message after each
-  // so the turn replays as the responses it was. A turn without a tool call
-  // replays from its text alone and stores nothing.
+  // so the turn replays as the responses it was, including thinking and its
+  // signature when no tool was called. Replay policy never discards storage.
   final turnResponses = <List<Map<String, dynamic>>>[];
   Stream<StreamChunk> recordTurn(List<Map<String, dynamic>> response) async* {
     turnResponses.add(response);
-    if (toolUseIdsInBlocks(turnResponses.expand((b) => b)).isNotEmpty) {
-      yield ProviderArtifact(
-        kind: claudeTurnArtifactKind,
-        payload: encodeClaudeTurn(turnResponses),
-      );
-    }
+    yield ProviderArtifact(
+      kind: claudeTurnArtifactKind,
+      payload: encodeClaudeTurn(turnResponses),
+    );
     // Stored against this turn's message so the next turn can resume in the
     // same container — now rather than at the end, which a cancelled turn
     // never reaches.

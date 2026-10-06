@@ -613,14 +613,14 @@ class ModelSpecResolver {
     if (interleaved == 'reasoning_content') {
       sources[ModelSpecField.reasoningReplay] = SpecSource.catalog;
       return (
-        policy: ReasoningReplayPolicy.toolTurns,
+        policy: ReasoningReplayPolicy.all,
         field: ReasoningReplayField.reasoningContent,
       );
     }
     if (interleaved == 'reasoning_details') {
       sources[ModelSpecField.reasoningReplay] = SpecSource.catalog;
       return (
-        policy: ReasoningReplayPolicy.toolTurns,
+        policy: ReasoningReplayPolicy.all,
         field: ReasoningReplayField.reasoningDetails,
       );
     }

@@ -59,6 +59,7 @@ void main() {
       );
       expect(claude.protocolDefault, ReasoningDialect.anthropicBudget);
       expect(claude.dialect, isNull);
+      expect(claude.replay, ReasoningReplayPolicy.all);
 
       final google = VendorDefaults.forProvider(
         _cfg(
@@ -175,6 +176,7 @@ void main() {
         ReasoningLevel.high,
       ]);
       expect(byHost.canDisable, isTrue);
+      expect(byHost.replay, ReasoningReplayPolicy.all);
 
       final byOauth = VendorDefaults.forProvider(
         _cfg(
@@ -258,13 +260,13 @@ void main() {
         VendorDefaults.forProvider(
           _cfg(id: 'Zhipu', baseUrl: 'https://open.bigmodel.cn/api/paas/v4'),
         ).replay,
-        ReasoningReplayPolicy.toolTurns,
+        ReasoningReplayPolicy.all,
       );
       expect(
         VendorDefaults.forProvider(
           _cfg(id: 'MiMo', baseUrl: 'https://api.xiaomimimo.com/v1'),
         ).replay,
-        ReasoningReplayPolicy.toolTurns,
+        ReasoningReplayPolicy.all,
       );
     });
   });

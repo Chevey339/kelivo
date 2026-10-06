@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import '../../../../models/model_spec.dart';
 import '../../../../utils/multimodal_input_utils.dart';
 import '../../../../../utils/sandbox_path_resolver.dart';
 import '../../chat_api_helpers.dart';
@@ -15,11 +16,10 @@ import 'claude_container.dart';
 /// message with the client results between them — so the boundary is
 /// recorded here rather than inferred from the blocks later.
 ///
-/// Written after every response once the turn has called a tool, so a turn
-/// cut short still replays up to the last response that completed. A turn
-/// without one replays from its text alone and stores nothing. It travels
-/// into the next request under [multimodalInternalClaudeTurnKey], on the
-/// assistant message that holds the turn's tool calls.
+/// Written after every response, so a turn cut short still replays up to the
+/// last response that completed. It travels into the next request under
+/// [multimodalInternalClaudeTurnKey], on the assistant message that holds the
+/// turn's tool calls, or on the ordinary assistant message without tools.
 const String claudeTurnArtifactKind = 'claude_turn';
 
 String encodeClaudeTurn(List<List<Map<String, dynamic>>> responses) =>
@@ -93,6 +93,7 @@ class ClaudeHistory {
   ClaudeHistory({
     required this.replayServerToolBlocks,
     required this.skipRedactedThinkingBlocks,
+    required this.reasoningReplay,
     required this.nativeInputs,
     this.skipImageParsing = false,
     this.canImageInput = true,
@@ -104,6 +105,7 @@ class ClaudeHistory {
   /// synthesised client pair, exactly as it did before these tools existed.
   final bool replayServerToolBlocks;
   final bool skipRedactedThinkingBlocks;
+  final ReasoningReplayPolicy reasoningReplay;
   final bool skipImageParsing;
   final bool canImageInput;
   final NativeInputAttachments nativeInputs;
@@ -127,12 +129,19 @@ class ClaudeHistory {
   final unseenDataFiles = <InternalDocumentRef>[];
   final turnDataFiles = <InternalDocumentRef>[];
 
-  /// The blocks of one response as this endpoint may be sent them.
-  List<Map<String, dynamic>> sanitize(Iterable<Map> blocks) {
+  /// The blocks of one response as this endpoint may be sent them. Current
+  /// tool continuations keep thinking; the replay setting filters history.
+  List<Map<String, dynamic>> sanitize(
+    Iterable<Map> blocks, {
+    bool replayThinking = true,
+  }) {
     return [
       for (final block in blocks)
         if (_keepBlock((block['type'] ?? '').toString()))
-          block.map((key, value) => MapEntry(key.toString(), value)),
+          if (replayThinking ||
+              (block['type'] != 'thinking' &&
+                  block['type'] != 'redacted_thinking'))
+            block.map((key, value) => MapEntry(key.toString(), value)),
     ];
   }
 
@@ -309,6 +318,17 @@ class ClaudeHistory {
         continue;
       }
 
+      if (role == 'assistant') {
+        final plainTurn = _readTurn(m, const []);
+        if (plainTurn != null) {
+          while (plainTurn.emitted < plainTurn.responses.length) {
+            emitResponse(plainTurn);
+          }
+          foldTurnText(plainTurn, m);
+          continue;
+        }
+      }
+
       out.add(
         await _plainMessage(
           m,
@@ -340,7 +360,7 @@ class ClaudeHistory {
     return out;
   }
 
-  /// The turn a persisted tool message records: the stored turn artifact, or
+  /// The turn a persisted assistant message records: the stored turn artifact, or
   /// for a message written before there was one, the fullest of its cards —
   /// each held the responses up to the one that last wrote it, so the last
   /// one written holds them all. Null when nothing recorded any.
@@ -356,6 +376,22 @@ class ClaudeHistory {
     }
     if (recorded == null) return null;
 
+    final recordedBlocks = recorded.expand((blocks) => blocks);
+    final recordedText = joinedTextOfBlocks(recordedBlocks);
+    if (m['tool_calls'] is! List &&
+        (toolUseIdsInBlocks(recordedBlocks, clientOnly: true).isNotEmpty ||
+            !(m['content'] ?? '').toString().startsWith(recordedText))) {
+      // An ordinary message cannot answer a recorded client tool call. An
+      // edited reply also owns its text, rather than reviving the old response.
+      return null;
+    }
+    final replayThinking = switch (reasoningReplay) {
+      ReasoningReplayPolicy.all => true,
+      ReasoningReplayPolicy.toolTurns =>
+        toolCalls.isNotEmpty || toolUseIdsInBlocks(recordedBlocks).isNotEmpty,
+      ReasoningReplayPolicy.none => false,
+    };
+
     final cards = <String, Map>{
       for (final tc in toolCalls.whereType<Map>())
         if ((tc['id'] ?? '').toString() case final id when id.isNotEmpty)
@@ -367,7 +403,7 @@ class ClaudeHistory {
     for (final raw in recorded) {
       // A `server_tool_use` whose result never arrived — the stream stopped
       // between the two — would replay as a call with no output.
-      final blocks = sanitize(raw)
+      final blocks = sanitize(raw, replayThinking: replayThinking)
         ..removeWhere(
           (block) =>
               block['type'] == 'server_tool_use' &&
@@ -395,7 +431,7 @@ class ClaudeHistory {
     responses.removeWhere((blocks) => blocks.isEmpty);
     return _ReplayedTurn(
       responses: responses,
-      text: joinedTextOfBlocks(recorded.expand((blocks) => blocks)),
+      text: recordedText,
       serverToolIds: replayServerToolBlocks
           ? {
               for (final block in recorded.expand((blocks) => blocks))
@@ -603,7 +639,7 @@ bool isClaudeSupportedImageMime(String mime) {
   }
 }
 
-/// A persisted tool turn being replayed: its responses in the order the API
+/// A persisted turn being replayed: its responses in the order the API
 /// produced them, sanitised for this endpoint, and how far the replay got.
 class _ReplayedTurn {
   _ReplayedTurn({

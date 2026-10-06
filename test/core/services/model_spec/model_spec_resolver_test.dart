@@ -243,7 +243,7 @@ void main() {
 
     test('replay comes from catalog interleavedField', () {
       final resolved = resolver.resolve(_anthropic(), 'claude-sonnet-4.6');
-      expect(resolved.spec.reasoning.replay, ReasoningReplayPolicy.toolTurns);
+      expect(resolved.spec.reasoning.replay, ReasoningReplayPolicy.all);
       expect(
         resolved.spec.reasoning.replayField,
         ReasoningReplayField.reasoningContent,
@@ -272,26 +272,38 @@ void main() {
       );
     });
 
-    test('DeepSeek explicit replay overrides still take precedence', () {
-      for (final policy in [
-        ReasoningReplayPolicy.none,
-        ReasoningReplayPolicy.toolTurns,
+    test('supported replay defaults to all and explicit overrides win', () {
+      for (final target in [
+        (config: _deepseek(), model: 'deepseek-v4-pro'),
+        (config: _openai(), model: 'kimi-k2.6'),
+        (config: _openai(), model: 'glm-5.2'),
+        (config: _anthropic(), model: 'claude-sonnet-4.6'),
       ]) {
-        final config = _deepseek().copyWith(
-          modelOverrides: {
-            'deepseek-v4-pro': {
-              'reasoning': {'replay': policy.name},
+        for (final policy in [
+          ReasoningReplayPolicy.none,
+          ReasoningReplayPolicy.toolTurns,
+        ]) {
+          final config = target.config.copyWith(
+            modelOverrides: {
+              target.model: {
+                'reasoning': {'replay': policy.name},
+              },
             },
-          },
-        );
-        final resolved = resolver.resolve(config, 'deepseek-v4-pro');
-        expect(resolved.spec.reasoning.replay, policy);
-        expect(resolved.base.reasoning.replay, ReasoningReplayPolicy.all);
-        expect(
-          resolved.sources[ModelSpecField.reasoningReplay],
-          SpecSource.override,
-        );
+          );
+          final resolved = resolver.resolve(config, target.model);
+          expect(resolved.spec.reasoning.replay, policy);
+          expect(resolved.base.reasoning.replay, ReasoningReplayPolicy.all);
+          expect(
+            resolved.sources[ModelSpecField.reasoningReplay],
+            SpecSource.override,
+          );
+        }
       }
+      // Chat Completions GPT does not accept the third-party reasoning field.
+      expect(
+        resolver.spec(_openai(), 'gpt-5.1').reasoning.replay,
+        ReasoningReplayPolicy.none,
+      );
     });
 
     test('sparse reasoning override leaves catalog levels intact', () {
@@ -319,7 +331,7 @@ void main() {
         resolved.sources[ModelSpecField.reasoningLevels],
         SpecSource.catalog,
       );
-      expect(resolved.base.reasoning.replay, ReasoningReplayPolicy.toolTurns);
+      expect(resolved.base.reasoning.replay, ReasoningReplayPolicy.all);
     });
 
     test('base has no override while spec does', () {

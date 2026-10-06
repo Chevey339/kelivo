@@ -80,6 +80,7 @@ class VendorDefaults {
         protocolDefault: protocolDefault,
         maxTokensKey: maxTokensKey,
         sendStreamOptions: sendStreamOptions,
+        replay: ReasoningReplayPolicy.all,
       );
     }
 
@@ -90,6 +91,7 @@ class VendorDefaults {
         protocolDefault: protocolDefault,
         maxTokensKey: maxTokensKey,
         sendStreamOptions: sendStreamOptions,
+        replay: ReasoningReplayPolicy.all,
       );
     }
 
@@ -107,7 +109,7 @@ class VendorDefaults {
         host.contains('bigmodel') ||
         host == 'api.z.ai') {
       dialect = ReasoningDialect.thinkingType;
-      replay = ReasoningReplayPolicy.toolTurns;
+      replay = ReasoningReplayPolicy.all;
       replayField = ReasoningReplayField.reasoningContent;
     } else if (host.contains('ark.cn-beijing.volces.com') ||
         host.contains('volc') ||
@@ -127,7 +129,7 @@ class VendorDefaults {
       replayField = ReasoningReplayField.reasoningContent;
     } else if (isMimoHost) {
       dialect = ReasoningDialect.thinkingType;
-      replay = ReasoningReplayPolicy.toolTurns;
+      replay = ReasoningReplayPolicy.all;
       replayField = ReasoningReplayField.reasoningContent;
     } else if (host == 'api.kimi.com' ||
         host == 'api.moonshot.ai' ||

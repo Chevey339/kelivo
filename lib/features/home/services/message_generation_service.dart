@@ -192,6 +192,7 @@ class MessageGenerationService {
       currentConversation: currentConversation,
       includeToolMessages: includeToolMessages,
       preserveToolTurns: kind == ProviderKind.openai,
+      claudeSource: (providerId: providerKey, modelId: modelId),
       responsesScope: kind == ProviderKind.openai && cfg.useResponseApi == true
           ? responsesReplayScope(cfg, modelId)
           : null,

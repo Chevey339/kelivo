@@ -255,6 +255,7 @@ Future<List<Map<String, dynamic>>> buildOpenAIChatCompletionMessages(
   required bool allowRemoteImages,
   required ReasoningReplayPolicy reasoningReplay,
   ReasoningReplayField replayField = ReasoningReplayField.reasoningContent,
+  bool requiresSignedReasoning = false,
   bool skipImageParsing = false,
 }) async {
   final out = <Map<String, dynamic>>[];
@@ -347,7 +348,11 @@ Future<List<Map<String, dynamic>>> buildOpenAIChatCompletionMessages(
         ];
       }
       final rawDetails = outMsg['reasoning_details'];
-      final signedDetails = reasoningDetailsNeedSignedReplay(rawDetails);
+      // The all-history policy must not turn legacy unsigned Claude text into
+      // a thinking block. Only its native details can carry the signature.
+      final signedDetails =
+          requiresSignedReasoning ||
+          reasoningDetailsNeedSignedReplay(rawDetails);
       final keepReasoningContent =
           !signedDetails &&
           (reasoningReplay == ReasoningReplayPolicy.all ||

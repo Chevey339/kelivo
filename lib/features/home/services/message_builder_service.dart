@@ -316,6 +316,7 @@ class MessageBuilderService {
   /// Applies truncation and version collapsing. Attachments come from parts.
   /// [preserveToolTurns] keeps OpenAI-compatible tool rounds ordered.
   /// [responsesScope] selects native Responses replay for matching artifacts.
+  /// [claudeSource] keeps ordinary Claude blocks on their original model.
   List<Map<String, dynamic>> buildApiMessages({
     required List<ChatMessage> messages,
     required Map<String, int> versionSelections,
@@ -323,6 +324,7 @@ class MessageBuilderService {
     bool includeToolMessages = false,
     bool preserveToolTurns = false,
     ResponsesReplayScope? responsesScope,
+    ({String providerId, String modelId})? claudeSource,
   }) {
     final tIndex = currentConversation?.truncateIndex ?? -1;
     final List<ChatMessage> sourceAll =
@@ -363,6 +365,18 @@ class MessageBuilderService {
         }
       }
       var content = m.content;
+      // Signed native blocks belong to the provider/model that produced them.
+      // Tool turns carry their artifact on the tool-call message below.
+      final plainClaudeTurn =
+          includeToolMessages &&
+              !preserveToolTurns &&
+              m.role == 'assistant' &&
+              claudeSource != null &&
+              m.providerId == claudeSource.providerId &&
+              m.modelId == claudeSource.modelId &&
+              chatService.getToolEvents(m.id).isEmpty
+          ? providerArtifactLookup?.call(m, claudeTurnArtifactKind)
+          : null;
       String? assistantReasoningContent;
       dynamic reasoningDetails;
       if (m.role == 'assistant') {
@@ -500,6 +514,7 @@ class MessageBuilderService {
       if (content.isEmpty &&
           (assistantReasoningContent?.isEmpty ?? true) &&
           reasoningDetails == null &&
+          (plainClaudeTurn?.isEmpty ?? true) &&
           mediaRefs.isEmpty &&
           !_hasUsableAttachmentPart(m)) {
         continue;
@@ -509,6 +524,9 @@ class MessageBuilderService {
       if (role == 'user') {
         message[internalRevisionIdKey] = m.id;
       } else {
+        if (plainClaudeTurn?.isNotEmpty == true) {
+          message[multimodalInternalClaudeTurnKey] = plainClaudeTurn;
+        }
         final container = providerArtifactLookup?.call(
           m,
           claudeContainerArtifactKind,
