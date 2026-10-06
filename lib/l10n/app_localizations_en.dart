@@ -1949,6 +1949,20 @@ class AppLocalizationsEn extends AppLocalizations {
   String get backupProgressCancelled => 'Cancelled';
 
   @override
+  String get backupProgressFailed => 'Operation failed';
+
+  @override
+  String backupProgressFailedAt(String phase) {
+    return 'Failed during: $phase';
+  }
+
+  @override
+  String get backupProgressCopyError => 'Copy error';
+
+  @override
+  String get backupProgressErrorCopied => 'Error copied';
+
+  @override
   String get backupProgressPreparing => 'Preparing';
 
   @override

@@ -3646,6 +3646,30 @@ abstract class AppLocalizations {
   /// **'Cancelled'**
   String get backupProgressCancelled;
 
+  /// No description provided for @backupProgressFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Operation failed'**
+  String get backupProgressFailed;
+
+  /// No description provided for @backupProgressFailedAt.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed during: {phase}'**
+  String backupProgressFailedAt(String phase);
+
+  /// No description provided for @backupProgressCopyError.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy error'**
+  String get backupProgressCopyError;
+
+  /// No description provided for @backupProgressErrorCopied.
+  ///
+  /// In en, this message translates to:
+  /// **'Error copied'**
+  String get backupProgressErrorCopied;
+
   /// No description provided for @backupProgressPreparing.
   ///
   /// In en, this message translates to:

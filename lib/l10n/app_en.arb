@@ -823,6 +823,17 @@
   "backupPageExporting": "Exporting...",
   "backupProgressCancel": "Cancel",
   "backupProgressCancelled": "Cancelled",
+  "backupProgressFailed": "Operation failed",
+  "backupProgressFailedAt": "Failed during: {phase}",
+  "@backupProgressFailedAt": {
+    "placeholders": {
+      "phase": {
+        "type": "String"
+      }
+    }
+  },
+  "backupProgressCopyError": "Copy error",
+  "backupProgressErrorCopied": "Error copied",
   "backupProgressPreparing": "Preparing",
   "backupProgressSnapshotting": "Creating database snapshot",
   "backupProgressPacking": "Packing",

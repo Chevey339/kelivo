@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 
 import '../../../core/services/backup/backup_activity.dart';
@@ -11,6 +12,7 @@ import '../../../l10n/app_localizations.dart';
 import '../../../shared/utils/format_bytes.dart';
 import '../../../shared/widgets/task_progress_dialog.dart';
 import '../../settings/widgets/custom_theme_widgets.dart';
+import '../backup_restore_error_message.dart';
 
 final class BackupTaskHandle {
   BackupTaskHandle({required this.cancelToken, required this._progress});
@@ -63,6 +65,7 @@ Future<BackupTaskResult<T>> showBackupProgressDialog<T>(
   required Future<T> Function(BackupTaskHandle handle) task,
   bool cancellable = true,
   String? backgroundLabel,
+  String Function(Object error)? errorMessage,
 }) async {
   final token = BackupCancelToken();
   final progress = ValueNotifier(
@@ -89,6 +92,7 @@ Future<BackupTaskResult<T>> showBackupProgressDialog<T>(
         task: task,
         initiallyCancellable: cancellable,
         backgroundLabel: backgroundLabel,
+        errorMessage: errorMessage,
         onStarted: (future) => running = future,
       ),
     );
@@ -120,6 +124,7 @@ class _BackupProgressDialogHost<T> extends StatefulWidget {
     required this.initiallyCancellable,
     required this.onStarted,
     this.backgroundLabel,
+    this.errorMessage,
   });
 
   final String title;
@@ -127,6 +132,7 @@ class _BackupProgressDialogHost<T> extends StatefulWidget {
   final Future<T> Function(BackupTaskHandle handle) task;
   final bool initiallyCancellable;
   final String? backgroundLabel;
+  final String Function(Object error)? errorMessage;
   final void Function(Future<T> running) onStarted;
 
   @override
@@ -139,6 +145,8 @@ class _BackupProgressDialogHostState<T>
   var _outcome = TaskProgressOutcome.running;
   var _started = false;
   Object? _error;
+  String? _errorMessage;
+  var _errorCopied = false;
 
   @override
   void didChangeDependencies() {
@@ -164,6 +172,9 @@ class _BackupProgressDialogHostState<T>
     } catch (error) {
       if (!mounted) return;
       _error = error;
+      _errorMessage =
+          widget.errorMessage?.call(error) ??
+          backupRestoreErrorMessage(AppLocalizations.of(context)!, error);
       setState(() => _outcome = TaskProgressOutcome.failure);
       widget.handle.report(
         BackupProgress(
@@ -192,6 +203,14 @@ class _BackupProgressDialogHostState<T>
     );
   }
 
+  Future<void> _copyError(String phaseLabel) async {
+    await Clipboard.setData(
+      ClipboardData(text: '${widget.title}\n$phaseLabel\n\n$_errorMessage'),
+    );
+    if (!mounted) return;
+    setState(() => _errorCopied = true);
+  }
+
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
@@ -199,21 +218,28 @@ class _BackupProgressDialogHostState<T>
       valueListenable: widget.handle._progress,
       builder: (context, progress, _) {
         final failure = _outcome == TaskProgressOutcome.failure;
+        final phaseLabel = backupPhaseLabel(l10n, progress.phase);
+        final failedAt = l10n.backupProgressFailedAt(phaseLabel);
         return TaskProgressDialogCard(
           title: widget.title,
-          phaseLabel: backupPhaseLabel(l10n, progress.phase),
+          phaseLabel: failure ? l10n.backupProgressFailed : phaseLabel,
           fraction: _outcome == TaskProgressOutcome.success
               ? 1
               : progress.fraction,
-          subtitle: backupProgressSubtitle(l10n, progress),
+          subtitle: failure ? failedAt : backupProgressSubtitle(l10n, progress),
           phaseIcon: backupPhaseIcon(progress.phase),
           cancellable: progress.cancellable && widget.initiallyCancellable,
           onCancel: _cancel,
           onAcknowledge: failure ? _acknowledgeFailure : null,
           cancelLabel: l10n.backupProgressCancel,
-          acknowledgeLabel: l10n.backupPageOK,
+          acknowledgeLabel: l10n.commonClose,
           onBackground: widget.backgroundLabel == null ? null : _background,
           backgroundLabel: widget.backgroundLabel,
+          errorMessage: _errorMessage,
+          onCopyError: failure ? () => unawaited(_copyError(failedAt)) : null,
+          copyErrorLabel: _errorCopied
+              ? l10n.backupProgressErrorCopied
+              : l10n.backupProgressCopyError,
           outcome: _outcome,
         );
       },

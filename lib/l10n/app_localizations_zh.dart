@@ -1877,6 +1877,20 @@ class AppLocalizationsZh extends AppLocalizations {
   String get backupProgressCancelled => '已取消';
 
   @override
+  String get backupProgressFailed => '操作失败';
+
+  @override
+  String backupProgressFailedAt(String phase) {
+    return '失败阶段：$phase';
+  }
+
+  @override
+  String get backupProgressCopyError => '复制错误';
+
+  @override
+  String get backupProgressErrorCopied => '错误已复制';
+
+  @override
   String get backupProgressPreparing => '准备中';
 
   @override
@@ -14172,6 +14186,20 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get backupProgressCancelled => '已取消';
 
   @override
+  String get backupProgressFailed => '操作失败';
+
+  @override
+  String backupProgressFailedAt(String phase) {
+    return '失败阶段：$phase';
+  }
+
+  @override
+  String get backupProgressCopyError => '复制错误';
+
+  @override
+  String get backupProgressErrorCopied => '错误已复制';
+
+  @override
   String get backupProgressPreparing => '准备中';
 
   @override
@@ -26392,6 +26420,20 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get backupProgressCancelled => '已取消';
+
+  @override
+  String get backupProgressFailed => '操作失敗';
+
+  @override
+  String backupProgressFailedAt(String phase) {
+    return '失敗階段：$phase';
+  }
+
+  @override
+  String get backupProgressCopyError => '複製錯誤';
+
+  @override
+  String get backupProgressErrorCopied => '錯誤已複製';
 
   @override
   String get backupProgressPreparing => '準備中';
