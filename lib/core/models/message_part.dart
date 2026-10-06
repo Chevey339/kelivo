@@ -5,6 +5,7 @@ import 'dart:convert';
 /// Payload contract:
 /// - `text` / `reasoning`: raw string
 /// - `tool_call`: JSON string preserved as-is
+/// - `assistant_round_end`: JSON reasoning-details array or `null`
 /// - `image`: `{"uri","mime"?,"assetId"?,"unavailable"?}`
 /// - `file`: `{"uri","name","mime"?,"assetId"?,"unavailable"?}`
 /// - unknown kinds: stored in [UnknownPart] and written back unchanged
@@ -21,6 +22,8 @@ sealed class MessagePart {
         return ReasoningPart(payload);
       case 'tool_call':
         return ToolCallPart(payload);
+      case 'assistant_round_end':
+        return AssistantRoundEndPart.fromPayload(payload);
       case 'image':
         return ImagePart.fromPayload(payload);
       case 'file':
@@ -116,6 +119,37 @@ final class ToolCallPart extends MessagePart {
 
   @override
   int get hashCode => payloadJson.hashCode;
+}
+
+/// End of one model response before its client tools execute. This is durable
+/// transcript structure, not visible text or a tool execution result.
+final class AssistantRoundEndPart extends MessagePart {
+  const AssistantRoundEndPart({this.reasoningDetails});
+
+  factory AssistantRoundEndPart.fromPayload(String payload) {
+    final decoded = jsonDecode(payload);
+    if (decoded != null && decoded is! List) {
+      throw const _MessagePartFormatException('invalid_round_details');
+    }
+    return AssistantRoundEndPart(reasoningDetails: decoded as List<dynamic>?);
+  }
+
+  final List<dynamic>? reasoningDetails;
+
+  @override
+  String get kind => 'assistant_round_end';
+
+  @override
+  String encodePayload() => jsonEncode(reasoningDetails);
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is AssistantRoundEndPart &&
+          encodePayload() == other.encodePayload();
+
+  @override
+  int get hashCode => encodePayload().hashCode;
 }
 
 final class ImagePart extends MessagePart {

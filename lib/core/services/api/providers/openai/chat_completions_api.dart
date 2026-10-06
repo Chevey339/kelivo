@@ -841,9 +841,10 @@ Stream<StreamChunk> runOpenAIChatCompletionsToolFollowUps({
       lastRound?.assistantContent ?? firstAssistantContent;
   String reasoningEcho() => lastRound?.reasoningEcho ?? firstReasoning;
   dynamic reasoningDetails() =>
-      lastRound?.reasoningDetails ?? firstReasoningDetails;
+      lastRound == null ? firstReasoningDetails : lastRound!.reasoningDetails;
 
   yield* runClientToolFollowUps(
+    reasoningDetailsOf: reasoningDetails,
     initialCalls: clientToolCallsFromChatAcc(firstToolAcc),
     onToolCall: onToolCall,
     append: (executed) {
@@ -966,7 +967,7 @@ Stream<StreamChunk> runOpenAIChatCompletionsToolFollowUps({
       return emitDone(
         ids: StreamChunkIds('finish'),
         reasoningDetails: includeReasoningDetailsOnDone
-            ? lastRound?.reasoningDetails ?? firstReasoningDetails
+            ? reasoningDetails()
             : null,
         usage: usage,
         totalTokens: usage?.totalTokens ?? approxTotal,
@@ -1007,8 +1008,25 @@ Stream<StreamChunk> runOpenAIChatCompletionsNonStreamToolFollowUps({
   var currentMessages = [
     for (final message in messages) copyChatCompletionMessage(message),
   ];
+  var round = 0;
+  Stream<StreamChunk> emitToolRoundOutput() async* {
+    final message = openaiFirstChoiceMessage(lastObj);
+    final visible = openaiVisibleOutputFromMessage(message);
+    final ids = StreamChunkIds('round-${round++}');
+    yield* emitDelta(
+      ids: ids,
+      content: visible.content,
+      reasoning: openaiReasoningText(message),
+      reasoningDetails: message?['reasoning_details'],
+    );
+    yield* emitImages(visible.images, ids: ids);
+  }
+
+  yield* emitToolRoundOutput();
 
   yield* runClientToolFollowUps(
+    reasoningDetailsOf: () =>
+        openaiFirstChoiceMessage(lastObj)?['reasoning_details'],
     initialCalls: initialCalls,
     onToolCall: onToolCall,
     emitCalls: true,
@@ -1070,6 +1088,11 @@ Stream<StreamChunk> runOpenAIChatCompletionsNonStreamToolFollowUps({
       lastObj =
           jsonDecode(await decodeUtf8Stream(resp2.stream))
               as Map<String, dynamic>;
+      if (openaiCallsFromCompletionMessage(
+        openaiFirstChoiceMessage(lastObj),
+      ).isNotEmpty) {
+        yield* emitToolRoundOutput();
+      }
       final roundUsage = openaiUsageFromObj(lastObj);
       for (final chunk in citationsDecoder.decodeCitations(lastObj)) {
         yield chunk;

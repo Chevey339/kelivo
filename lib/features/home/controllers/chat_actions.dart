@@ -2348,6 +2348,9 @@ class ChatActions {
       case ToolCallEnd():
         await _handleToolCallsChunk(chunk, state);
         _scheduleStreamingCheckpoint(state);
+      case AssistantRoundEnd():
+        streamController.reasoningDetails.remove(state.messageId);
+        _scheduleStreamingCheckpoint(state);
       case ServerToolStart(:final id, :final toolName):
         if (toolName.isNotEmpty) state.pendingToolNames[id] = toolName;
         await _handleToolCallsChunk(chunk, state);

@@ -190,6 +190,8 @@ class MessageGenerationService {
       versionSelections: versionSelections,
       currentConversation: currentConversation,
       includeToolMessages: includeToolMessages,
+      preserveToolTurns:
+          kind == ProviderKind.openai && cfg.useResponseApi != true,
     );
 
     if (assistant != null && assistant.regexRules.isNotEmpty) {

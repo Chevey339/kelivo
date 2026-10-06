@@ -99,6 +99,7 @@ Stream<StreamChunk> runClientToolFollowUps({
   required Stream<StreamChunk> Function() sendFollowUp,
   required List<EmitToolCall> Function() takeCallsAfterRound,
   required Stream<StreamChunk> Function() finish,
+  dynamic Function()? reasoningDetailsOf,
   StreamRoundRunner? retryRound,
   bool emitCalls = false,
   TokenUsage? Function()? usageOf,
@@ -114,6 +115,10 @@ Stream<StreamChunk> runClientToolFollowUps({
     if (emitCalls) {
       yield* emitToolCalls(calls, usage: usage, totalTokens: totalTokens);
     }
+    final details = reasoningDetailsOf?.call();
+    yield AssistantRoundEnd(
+      reasoningDetails: details is List ? List<dynamic>.of(details) : null,
+    );
     for (final call in calls) {
       executed.add(await _executeClientTool(call, onToolCall));
     }

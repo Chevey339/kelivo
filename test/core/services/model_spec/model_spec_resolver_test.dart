@@ -261,7 +261,7 @@ void main() {
         resolved.sources[ModelSpecField.reasoningDialect],
         SpecSource.vendor,
       );
-      expect(resolved.spec.reasoning.replay, ReasoningReplayPolicy.toolTurns);
+      expect(resolved.spec.reasoning.replay, ReasoningReplayPolicy.all);
       expect(
         resolved.spec.reasoning.replayField,
         ReasoningReplayField.reasoningContent,
@@ -270,6 +270,28 @@ void main() {
         resolved.sources[ModelSpecField.reasoningReplay],
         SpecSource.guess,
       );
+    });
+
+    test('DeepSeek explicit replay overrides still take precedence', () {
+      for (final policy in [
+        ReasoningReplayPolicy.none,
+        ReasoningReplayPolicy.toolTurns,
+      ]) {
+        final config = _deepseek().copyWith(
+          modelOverrides: {
+            'deepseek-v4-pro': {
+              'reasoning': {'replay': policy.name},
+            },
+          },
+        );
+        final resolved = resolver.resolve(config, 'deepseek-v4-pro');
+        expect(resolved.spec.reasoning.replay, policy);
+        expect(resolved.base.reasoning.replay, ReasoningReplayPolicy.all);
+        expect(
+          resolved.sources[ModelSpecField.reasoningReplay],
+          SpecSource.override,
+        );
+      }
     });
 
     test('sparse reasoning override leaves catalog levels intact', () {

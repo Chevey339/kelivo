@@ -637,7 +637,7 @@ void main() {
           ReasoningLevel.max,
         ],
         canDisable: true,
-        replay: ReasoningReplayPolicy.toolTurns,
+        replay: ReasoningReplayPolicy.all,
         replayField: ReasoningReplayField.reasoningContent,
       );
       expectHit(

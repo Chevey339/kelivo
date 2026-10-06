@@ -11,6 +11,31 @@ import 'package:flutter_test/flutter_test.dart';
 
 void main() {
   test(
+    'response boundaries close text ids and retain only that round metadata',
+    () {
+      const details = [
+        {'type': 'reasoning.text', 'text': 'first', 'signature': 'sig'},
+      ];
+      final handler = StreamChunkHandler();
+      handler.handle(
+        const ReasoningDelta(id: 'r', text: 'first', details: details),
+      );
+      handler.handle(const TextDelta(id: 't', text: 'before'));
+      handler.handle(const AssistantRoundEnd(reasoningDetails: details));
+      handler.handle(const ReasoningDelta(id: 'r', text: 'second'));
+      handler.handle(const TextDelta(id: 't', text: 'after'));
+      handler.handle(const Finish());
+      expect(handler.parts, const [
+        ReasoningPart('first'),
+        TextPart('before'),
+        AssistantRoundEndPart(reasoningDetails: details),
+        ReasoningPart('second'),
+        TextPart('after'),
+      ]);
+      expect(handler.reasoningDetails, isNull);
+    },
+  );
+  test(
     'sum requests once while merging partial and repeated usage updates',
     () {
       final handler = StreamChunkHandler();

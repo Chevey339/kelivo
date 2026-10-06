@@ -205,7 +205,7 @@ void main() {
       ]);
       expect(defaults.canDisable, isFalse);
       expect(defaults.protocolDefault, ReasoningDialect.anthropicBudget);
-      expect(defaults.replay, ReasoningReplayPolicy.toolTurns);
+      expect(defaults.replay, ReasoningReplayPolicy.all);
     });
 
     test('max tokens key and stream options', () {
@@ -252,7 +252,7 @@ void main() {
         VendorDefaults.forProvider(
           _cfg(id: 'DeepSeek', baseUrl: 'https://api.deepseek.com/v1'),
         ).replay,
-        ReasoningReplayPolicy.toolTurns,
+        ReasoningReplayPolicy.all,
       );
       expect(
         VendorDefaults.forProvider(

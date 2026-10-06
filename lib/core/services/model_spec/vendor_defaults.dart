@@ -63,7 +63,7 @@ class VendorDefaults {
         protocolDefault: protocolDefault,
         maxTokensKey: maxTokensKey,
         sendStreamOptions: sendStreamOptions,
-        replay: ReasoningReplayPolicy.toolTurns,
+        replay: ReasoningReplayPolicy.all,
         replayField: ReasoningReplayField.reasoningContent,
       );
     }
@@ -115,7 +115,7 @@ class VendorDefaults {
       dialect = ReasoningDialect.thinkingType;
     } else if (host.contains('deepseek')) {
       dialect = ReasoningDialect.thinkingType;
-      replay = ReasoningReplayPolicy.toolTurns;
+      replay = ReasoningReplayPolicy.all;
       replayField = ReasoningReplayField.reasoningContent;
     } else if (host.contains('intern-ai') ||
         host.contains('intern') ||

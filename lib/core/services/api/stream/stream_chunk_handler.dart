@@ -255,6 +255,14 @@ class StreamChunkHandler {
         }
         _imageIndex.remove(id);
         _imageMime.remove(id);
+      case AssistantRoundEnd(:final reasoningDetails):
+        for (final index in _textBuffers.keys.toList()) {
+          _endText(index);
+        }
+        _textIndex.clear();
+        _reasoningIndex.clear();
+        _parts.add(AssistantRoundEndPart(reasoningDetails: reasoningDetails));
+        this.reasoningDetails = null;
       case ProviderArtifact():
         // Provider state, not message content; the chat stores it separately.
         break;

@@ -788,7 +788,7 @@ _ReasoningHit _deepSeek(String id) {
     efforts: const ['low', 'high', 'max'],
     dialect: ReasoningDialect.thinkingType,
     canDisable: true,
-    replay: ReasoningReplayPolicy.toolTurns,
+    replay: ReasoningReplayPolicy.all,
     replayField: ReasoningReplayField.reasoningContent,
   );
 }
