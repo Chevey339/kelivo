@@ -170,6 +170,15 @@ class MessageBuilderService {
   final String? Function(ChatMessage message, String kind)?
   providerArtifactLookup;
 
+  String? _providerArtifact(ChatMessage message, String kind) {
+    // Native replay data follows the frozen message, including an explicitly
+    // empty snapshot. A later LRU eviction or stream update must not change it.
+    if (message.hasProviderArtifactSnapshot) {
+      return message.providerArtifactSnapshot[kind];
+    }
+    return providerArtifactLookup?.call(message, kind);
+  }
+
   /// Cache for document text extraction to avoid re-reading files on every message
   /// Keyed by path, validated with (modified + size) to avoid stale reuse.
   final Map<String, _DocTextCacheEntry> _docTextCache =
@@ -343,16 +352,16 @@ class MessageBuilderService {
     for (final m in source) {
       if (includeToolMessages && !preserveToolTurns && m.role == 'assistant') {
         thinkingRecovery.readArtifact(
-          providerArtifactLookup?.call(m, claudeThinkingRecoveryArtifactKind),
+          _providerArtifact(m, claudeThinkingRecoveryArtifactKind),
         );
       }
       if (m.role == 'assistant' &&
           includeToolMessages &&
           responsesScope != null) {
         final history = buildResponsesHistory(
-          payload: providerArtifactLookup?.call(m, responsesTurnArtifactKind),
+          payload: _providerArtifact(m, responsesTurnArtifactKind),
           scope: responsesScope,
-          toolEvents: chatService.getToolEvents(m.id),
+          toolEvents: chatService.getToolEventsForMessage(m),
           content: m.content,
         );
         if (history != null) {
@@ -382,8 +391,8 @@ class MessageBuilderService {
               claudeSource != null &&
               m.providerId == claudeSource.providerId &&
               m.modelId == claudeSource.modelId &&
-              chatService.getToolEvents(m.id).isEmpty
-          ? providerArtifactLookup?.call(m, claudeTurnArtifactKind)
+              chatService.getToolEventsForMessage(m).isEmpty
+          ? _providerArtifact(m, claudeTurnArtifactKind)
           : null;
       String? assistantReasoningContent;
       dynamic reasoningDetails;
@@ -415,7 +424,7 @@ class MessageBuilderService {
           reasoningDetails = null;
         }
       } else if (includeToolMessages && m.role == 'assistant') {
-        final events = chatService.getToolEvents(m.id);
+        final events = chatService.getToolEventsForMessage(m);
         if (events.isNotEmpty) {
           // Tool-call history is only valid once every call has a result.
           final hasPendingToolEvent = events.any((e) => e['content'] == null);
@@ -467,17 +476,14 @@ class MessageBuilderService {
                 'content': '\n\n',
                 'tool_calls': calls,
               };
-              final turn = providerArtifactLookup?.call(
-                m,
-                claudeTurnArtifactKind,
-              );
+              final turn = _providerArtifact(m, claudeTurnArtifactKind);
               if (turn != null && turn.isNotEmpty) {
                 assistantToolMessage[multimodalInternalClaudeTurnKey] = turn;
                 hasClaudeToolTurn = claudeSource != null;
               }
               // Also here: a turn that ran code and then said nothing has no
               // final message below to carry the container.
-              final container = providerArtifactLookup?.call(
+              final container = _providerArtifact(
                 m,
                 claudeContainerArtifactKind,
               );
@@ -537,14 +543,11 @@ class MessageBuilderService {
         if (plainClaudeTurn?.isNotEmpty == true) {
           message[multimodalInternalClaudeTurnKey] = plainClaudeTurn;
         }
-        final container = providerArtifactLookup?.call(
-          m,
-          claudeContainerArtifactKind,
-        );
+        final container = _providerArtifact(m, claudeContainerArtifactKind);
         if (container != null && container.isNotEmpty) {
           message[multimodalInternalClaudeContainerKey] = container;
         }
-        final signature = providerArtifactLookup?.call(
+        final signature = _providerArtifact(
           m,
           geminiThoughtSignatureArtifactKind,
         );

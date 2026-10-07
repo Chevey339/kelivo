@@ -17,6 +17,7 @@ import '../../database/business_preferences.dart';
 import '../../database/business_restore_service.dart';
 import '../../database/business_settings_router.dart';
 import '../../database/app_database.dart';
+import '../../database/message_timeline_index.dart';
 import '../../database/chat_database_repository.dart';
 import '../../database/schema_migrations.dart';
 import '../../models/backup.dart';
@@ -38,6 +39,7 @@ import 'temporary_restore_file.dart';
 import 'backup_cancel_token.dart';
 import 'backup_isolate_runner.dart';
 import 'backup_task_progress.dart';
+import 'streaming_zip_entry.dart';
 
 typedef _ParsedChatBackup = ({
   List<Conversation> conversations,
@@ -1202,7 +1204,11 @@ class DataSync {
             onBytes: (bytes) => meter.add(bytes, detail: canonical),
           );
           try {
-            entry.writeContent(digest);
+            writeZipEntryStreaming(
+              entry,
+              digest,
+              checkCancelled: ctx?.throwIfCancelled,
+            );
             final actualSha256 = digest.closeAndDigest();
             final expected = expectedEntries[canonical];
             if (expected == null) {
@@ -1372,7 +1378,11 @@ class DataSync {
             budget: _ExtractionBudget(maxTotalBytes: _maxManifestBytes),
           );
           try {
-            manifestEntry.writeContent(manifestOutput);
+            writeZipEntryStreaming(
+              manifestEntry,
+              manifestOutput,
+              checkCancelled: ctx?.throwIfCancelled,
+            );
             manifestOutput.verifyComplete();
           } finally {
             manifestOutput.closeSync();
@@ -1434,7 +1444,11 @@ class DataSync {
               meter: meter,
             );
             try {
-              entry.writeContent(output);
+              writeZipEntryStreaming(
+                entry,
+                output,
+                checkCancelled: ctx?.throwIfCancelled,
+              );
               output.verifyComplete();
             } finally {
               output.closeSync();
@@ -2997,6 +3011,9 @@ class DataSync {
     final database = AppDatabase.open(file: file);
     try {
       await BackupPortability.sanitizeDatabase(database);
+      for (final sql in MessageTimelineIndex.discardStatements) {
+        await database.customStatement(sql);
+      }
     } finally {
       await database.close();
     }

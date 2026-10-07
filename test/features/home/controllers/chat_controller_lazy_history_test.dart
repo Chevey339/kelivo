@@ -47,6 +47,12 @@ class _FakeLazyChatService extends ChatService {
   }
 
   @override
+  Future<List<ChatMessage>> loadMessagesByIds(List<String> ids) async => [
+    for (final message in _messages)
+      if (ids.contains(message.id)) message,
+  ];
+
+  @override
   Future<List<ChatMessage>> loadActiveTimelineMessages(
     String conversationId,
   ) async {
@@ -261,6 +267,15 @@ class _FakeLazyChatService extends ChatService {
         })
         .toList(growable: false);
   }
+
+  @override
+  Future<List<ChatMessage>> loadMessageVersionHeaders(
+    String conversationId,
+    Iterable<String> groupIds,
+  ) async => [
+    for (final message in await loadMessagesForGroups(conversationId, groupIds))
+      message.copyWith(content: ''),
+  ];
 
   @override
   Future<List<ChatMessage>> loadMessagesForGroups(
@@ -786,7 +801,6 @@ void main() {
         );
         chatService = _FakeLazyChatService(messages)
           ..versionSelections = const {'answer': 1}
-          ..timelineSelectedVersionOverride = 0
           ..requireGroupLoad = true;
         controller.dispose();
         controller = ChatController(chatService: chatService);

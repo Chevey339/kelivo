@@ -423,7 +423,7 @@ List<ToolUIPart> _exportToolPartsForMessage(
 ) {
   try {
     final chatService = context.read<ChatService>();
-    final events = chatService.getToolEvents(message.id);
+    final events = chatService.getToolEventsForMessage(message);
     if (events.isEmpty) return const <ToolUIPart>[];
     return events
         .map(

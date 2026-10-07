@@ -121,6 +121,8 @@ class StreamController {
   /// repeat restores (e.g. paging re-walks the whole window) skip them until
   /// their state is cleared.
   final Set<String> _restoredUiMessageIds = <String>{};
+  final Map<String, ({bool? reasoning, List<bool> segments})>
+  _offWindowExpansion = {};
 
   int _reasoningPayloadDecodeCount = 0;
 
@@ -252,6 +254,7 @@ class StreamController {
 
   /// Clear all state for a message (reasoning, segments, tools).
   void clearMessageState(String messageId) {
+    _offWindowExpansion.remove(messageId);
     _reasoning.remove(messageId);
     _reasoningSegments.remove(messageId);
     _contentSplits.remove(messageId);
@@ -265,6 +268,7 @@ class StreamController {
   /// Clear cached UI state while preserving any runs still owned by ChatActions.
   void clearAllState({Set<String> keepMessageIds = const {}}) {
     bool discard(String id) => !keepMessageIds.contains(id);
+    _offWindowExpansion.removeWhere((id, _) => discard(id));
     _reasoning.removeWhere((id, _) => discard(id));
     _reasoningSegments.removeWhere((id, _) => discard(id));
     _contentSplits.removeWhere((id, _) => discard(id));
@@ -274,6 +278,34 @@ class StreamController {
     _restoredUiMessageIds.removeWhere(discard);
     _cancelAllTimers(keepMessageIds: keepMessageIds);
     streamingContentNotifier.clear(keepMessageIds: keepMessageIds);
+  }
+
+  /// Release decoded history payloads while remembering the user's small
+  /// expand/collapse choices. Background generation remains owned by its run.
+  void pruneOffWindowState(Set<String> visibleMessageIds) {
+    final retained = {...visibleMessageIds, ..._activeStreamingIds};
+    final ids = {
+      ..._reasoning.keys,
+      ..._reasoningSegments.keys,
+      ..._contentSplits.keys,
+      ..._toolParts.keys,
+      ..._reasoningDetails.keys,
+      ..._decodedReasoningPayloads.keys,
+      ..._restoredUiMessageIds,
+    };
+    for (final id in ids) {
+      if (retained.contains(id)) continue;
+      final reasoning = _reasoning[id]?.expanded;
+      final segments = [
+        for (final segment
+            in _reasoningSegments[id] ?? const <ReasoningSegmentData>[])
+          segment.expanded,
+      ];
+      clearMessageState(id);
+      if (reasoning != null || segments.isNotEmpty) {
+        _offWindowExpansion[id] = (reasoning: reasoning, segments: segments);
+      }
+    }
   }
 
   /// Re-apply in-bubble retry UI after [clearAllState] / conversation switch.
@@ -1529,6 +1561,21 @@ class StreamController {
     final details = payload.reasoningDetails;
     if (details != null) {
       _reasoningDetails[messageId] = details;
+    }
+    final expanded = _offWindowExpansion.remove(messageId);
+    if (expanded != null) {
+      if (expanded.reasoning != null && _reasoning[messageId] != null) {
+        _reasoning[messageId]!.expanded = expanded.reasoning!;
+      }
+      final segments =
+          _reasoningSegments[messageId] ?? const <ReasoningSegmentData>[];
+      for (
+        var i = 0;
+        i < segments.length && i < expanded.segments.length;
+        i++
+      ) {
+        segments[i].expanded = expanded.segments[i];
+      }
     }
   }
 

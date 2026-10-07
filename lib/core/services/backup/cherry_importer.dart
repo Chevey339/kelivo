@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:archive/archive_io.dart';
+import 'streaming_zip_entry.dart';
 import 'package:flutter/foundation.dart' show visibleForTesting;
 import 'package:path/path.dart' as p;
 import '../../database/business_repository.dart';
@@ -1219,7 +1220,7 @@ class CherryImporter {
     );
     var written = false;
     try {
-      entry.writeContent(output);
+      writeZipEntryStreaming(entry, output);
       output.verifyComplete();
       written = true;
     } catch (_) {

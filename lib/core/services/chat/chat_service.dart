@@ -9,7 +9,6 @@ import 'dart:isolate';
 
 import 'package:crypto/crypto.dart';
 import 'package:flutter/foundation.dart';
-import 'package:flutter/scheduler.dart';
 import 'package:path/path.dart' as p;
 import 'package:uuid/uuid.dart';
 import '../../database/app_database.dart';
@@ -32,7 +31,6 @@ import '../../models/conversation.dart';
 import '../../models/workspace_binding.dart';
 import '../../../utils/sandbox_path_resolver.dart';
 import '../../../utils/app_directories.dart';
-import '../../utils/scheduler_idle.dart';
 
 final class LoadedTimelineSlot {
   const LoadedTimelineSlot({required this.identity, required this.message});
@@ -104,13 +102,6 @@ class ChatService extends ChangeNotifier {
   ChatDatabaseLease? _databaseLease;
   Future<void>? _assetReferenceMaintenanceFuture;
   Future<void>? _postStartupAssetMaintenanceFuture;
-  // Per-conversation full message-ID skeleton backfill kicked off by
-  // loadTimelinePage so first paint is not blocked on getMessageIds.
-  // Futures cover idle wait + query and are awaitable before idle fires.
-  final Map<String, Future<void>> _messageOrderBackfillFutures = {};
-  // Completing these aborts the idle wait (close) without resurrecting order.
-  final Map<String, Completer<void>> _messageOrderBackfillAbort = {};
-
   String? _currentConversationId;
   final Map<String, List<ChatMessage>> _messagesCache = {};
   final Map<String, Conversation> _conversationsCache = {};
@@ -159,14 +150,6 @@ class ChatService extends ChangeNotifier {
 
   @visibleForTesting
   int get debugTimelineFastPathHitCount => _timelineFastPathHitCount;
-
-  /// In-flight full order backfill for [conversationId], if any.
-  ///
-  /// [loadTimelinePage] schedules this after caching the first-page window so
-  /// callers (and tests) can await completeness without blocking first paint.
-  @visibleForTesting
-  Future<void>? debugMessageOrderBackfillFuture(String conversationId) =>
-      _messageOrderBackfillFutures[conversationId];
 
   /// Whether `_messageOrderIds` currently holds a complete skeleton entry.
   @visibleForTesting
@@ -408,20 +391,6 @@ class ChatService extends ChangeNotifier {
         await assetMaintenance;
       } catch (_) {}
     }
-    // Abort idle waits so close never waits for an animation to finish.
-    for (final abort in _messageOrderBackfillAbort.values) {
-      if (!abort.isCompleted) abort.complete();
-    }
-    _messageOrderBackfillAbort.clear();
-    final orderBackfills = List<Future<void>>.of(
-      _messageOrderBackfillFutures.values,
-    );
-    _messageOrderBackfillFutures.clear();
-    for (final backfill in orderBackfills) {
-      try {
-        await backfill;
-      } catch (_) {}
-    }
     await _repo.composerDrafts.flush();
     _repo.composerDrafts.removeListener(notifyListeners);
     _initialized = false;
@@ -488,9 +457,12 @@ class ChatService extends ChangeNotifier {
     }
     final cached = getMessageCount(conversationId);
     if (cached >= 0) return cached;
+    final revision = _contextRevisions[conversationId] ?? 0;
     final count = await _repo.getMessageCount(conversationId);
-    _messageCounts[conversationId] = count;
-    return count;
+    if ((_contextRevisions[conversationId] ?? 0) != revision) {
+      return resolveMessageCount(conversationId);
+    }
+    return _messageCounts.putIfAbsent(conversationId, () => count);
   }
 
   Future<int> _resolveMessageCount(String conversationId) =>
@@ -499,9 +471,13 @@ class ChatService extends ChangeNotifier {
   Future<List<String>> _loadMessageOrder(String conversationId) async {
     final cached = _messageOrderIds[conversationId];
     if (cached != null) return cached;
+    final revision = _contextRevisions[conversationId] ?? 0;
     final ids = (await _repo.getMessageIds(
       conversationId,
     )).toList(growable: true);
+    if ((_contextRevisions[conversationId] ?? 0) != revision) {
+      return _loadMessageOrder(conversationId);
+    }
     // Presence means complete & authoritative. A concurrent writer may have
     // installed a full skeleton (and appended newer ids) while getMessageIds
     // was in flight — never clobber that with a potentially stale snapshot.
@@ -510,120 +486,6 @@ class ChatService extends ChangeNotifier {
     _messageOrderIds[conversationId] = ids;
     _messageCounts[conversationId] = ids.length;
     return ids;
-  }
-
-  /// Idle-deferred full order backfill. Keeps `_messageOrderIds` absent until a
-  /// complete list is ready. Failure only logs — it never removes a concurrent
-  /// foreground-installed skeleton. Cancel/close leave an absent key absent.
-  ///
-  /// Does not start [getMessageIds] immediately — waits past the next frame,
-  /// then for an idle slot (same pattern as chat/home idle warm-ups).
-  /// Post-frame matters: an idle task alone can
-  /// still start during first-paint sibling awaits (e.g. visible-group preload)
-  /// and contend for SQLite. The registered future covers frame + idle wait +
-  /// query so tests and [close] can await it deterministically.
-  void _scheduleMessageOrderBackfill(String conversationId) {
-    if (_messageOrderIds.containsKey(conversationId)) return;
-    if (_messageOrderBackfillFutures.containsKey(conversationId)) return;
-
-    final abort = Completer<void>();
-    _messageOrderBackfillAbort[conversationId] = abort;
-
-    late final Future<void> backfill;
-    backfill = _runMessageOrderBackfill(conversationId, abort).whenComplete(() {
-      if (identical(_messageOrderBackfillFutures[conversationId], backfill)) {
-        _messageOrderBackfillFutures.remove(conversationId);
-      }
-      if (identical(_messageOrderBackfillAbort[conversationId], abort)) {
-        _messageOrderBackfillAbort.remove(conversationId);
-      }
-    });
-    _messageOrderBackfillFutures[conversationId] = backfill;
-    unawaited(backfill);
-  }
-
-  void _abortMessageOrderBackfill(String conversationId) {
-    final abort = _messageOrderBackfillAbort.remove(conversationId);
-    if (abort != null && !abort.isCompleted) {
-      abort.complete();
-    }
-  }
-
-  /// Returns `false` when [abort] wins before the idle slot is granted.
-  Future<bool> _awaitMessageOrderBackfillSlot(Completer<void> abort) async {
-    try {
-      final binding = SchedulerBinding.instance;
-      // 1) Past the next frame so first paint / visible-group preload DB work
-      // is not contended by a full-ID scan during their awaits.
-      final frame = Completer<void>();
-      binding.addPostFrameCallback((_) {
-        if (!frame.isCompleted) frame.complete();
-      });
-      binding.ensureVisualUpdate();
-      await Future.any<void>([frame.future, abort.future]);
-      if (abort.isCompleted) return false;
-
-      // 2) Wait alongside frames instead of spinning the event loop while
-      // a spinner, route transition or scroll animation keeps idle work paused.
-      return await waitForSchedulerIdle(cancelled: abort.future);
-    } catch (_) {
-      // No scheduler binding (rare bare isolates): proceed immediately.
-      return !abort.isCompleted;
-    }
-  }
-
-  Future<void> _runMessageOrderBackfill(
-    String conversationId,
-    Completer<void> abort,
-  ) async {
-    try {
-      if (!await _awaitMessageOrderBackfillSlot(abort)) return;
-      if (_messageOrderIds.containsKey(conversationId)) return;
-
-      // Race the query against abort so [close] never hangs on a gated /
-      // slow getMessageIds. Orphaned queries swallow late errors.
-      final query = Completer<List<String>>();
-      unawaited(() async {
-        try {
-          final ids = (await _repo.getMessageIds(
-            conversationId,
-          )).toList(growable: true);
-          if (!query.isCompleted) query.complete(ids);
-        } catch (error, stack) {
-          if (!query.isCompleted) query.completeError(error, stack);
-        }
-      }());
-      await Future.any<void>([query.future.then((_) {}), abort.future]);
-      if (abort.isCompleted) {
-        unawaited(query.future.catchError((Object _) => <String>[]));
-        return;
-      }
-      final ids = await query.future;
-
-      // Cancel / delete while in flight: do not resurrect a removed skeleton.
-      if (abort.isCompleted) return;
-      final raced = _messageOrderIds[conversationId];
-      if (raced != null) return;
-      if (!_conversationsCache.containsKey(conversationId) &&
-          !_draftConversations.containsKey(conversationId)) {
-        return;
-      }
-      // Existence == complete: install atomically with matching count.
-      _messageOrderIds[conversationId] = ids;
-      _messageCounts[conversationId] = ids.length;
-      // Re-project any already-cached messages through the complete order so
-      // getMessages matches the pre-Issue-7 awaited-skeleton ordering.
-      final cached = _messagesCache[conversationId];
-      if (cached != null) {
-        _cacheLoadedMessages(conversationId, cached);
-      }
-    } catch (error) {
-      // Do not remove caches on failure: this task never installs a partial
-      // skeleton (existence == complete), and a concurrent foreground
-      // `_loadMessageOrder` may have already written a full authoritative
-      // entry while our getMessageIds was in flight.
-      debugPrint('Message order backfill failed for $conversationId: $error');
-    }
   }
 
   Future<List<ChatMessage>> loadActiveTimelineMessages(
@@ -676,6 +538,10 @@ class ChatService extends ChangeNotifier {
         limit: limit,
       );
     }
+    // A cold prefetch must also know whether its bounded cache is complete.
+    // The maintained index resolves this once without scanning message rows.
+    final revision = _contextRevisions[conversationId] ?? 0;
+    await _resolveMessageCount(conversationId);
     if (timelineCacheFastPathEnabled &&
         !fromStart &&
         beforeRevisionId == null &&
@@ -700,6 +566,16 @@ class ChatService extends ChangeNotifier {
         .map((slot) => slot.revisionId)
         .toList(growable: false);
     final messages = await _repo.getMessagesByIds(revisionIds);
+    if ((_contextRevisions[conversationId] ?? 0) != revision) {
+      return loadTimelinePage(
+        conversationId,
+        beforeRevisionId: beforeRevisionId,
+        afterRevisionId: afterRevisionId,
+        aroundRevisionId: aroundRevisionId,
+        fromStart: fromStart,
+        limit: limit,
+      );
+    }
     final byId = {for (final message in messages) message.id: message};
     String? parentRevisionId;
     final loadedSlots = <LoadedTimelineSlot>[];
@@ -727,18 +603,23 @@ class ChatService extends ChangeNotifier {
     if (loadedSlots.length != page.slots.length) {
       throw StateError('timeline_selected_revision_shadow_missing');
     }
-    // First-page paint must not await the full message-ID skeleton. Cache the
-    // window, return, then backfill order in the background. Invariant:
-    // `_messageOrderIds` stays absent until backfill installs a complete list.
-    //
-    // Scroll audit (home_page_controller.scrollToMessageId / post-initChat):
-    // jump uses collapsed-index + loadUntilMessageVisible, not getMessageIndex
-    // on the order skeleton, so an absent order during first paint is safe.
-    // `_tryAppendPersistedTail` already treats missing order (index -1 / count
-    // unknown) as a contiguity miss and falls back to a full reload.
+    // Browse only the requested page. Full order and full bodies are loaded
+    // only by operations that explicitly need them.
     _cacheLoadedMessages(conversationId, messages);
     await _cacheMessageArtifacts(messages);
-    _scheduleMessageOrderBackfill(conversationId);
+    // A selection or structural mutation may finish during body/artifact reads.
+    // Return a page from the current selection, so a delayed navigation cannot
+    // replace an already refreshed version with an older selected body.
+    if ((_contextRevisions[conversationId] ?? 0) != revision) {
+      return loadTimelinePage(
+        conversationId,
+        beforeRevisionId: beforeRevisionId,
+        afterRevisionId: afterRevisionId,
+        aroundRevisionId: aroundRevisionId,
+        fromStart: fromStart,
+        limit: limit,
+      );
+    }
     return LoadedTimelinePage(
       conversationId: conversationId,
       stateRevision:
@@ -773,13 +654,21 @@ class ChatService extends ChangeNotifier {
     final conversation = _draftConversations[conversationId];
     if (conversation == null) return null;
     final allMessages = _messagesCache[conversationId] ?? const <ChatMessage>[];
+    final cursorId = aroundRevisionId ?? beforeRevisionId ?? afterRevisionId;
+    String? cursorGroupId;
     final groups = <String, List<ChatMessage>>{};
     for (final message in allMessages) {
-      groups.putIfAbsent(message.groupId ?? message.id, () => []).add(message);
+      final groupId = message.groupId ?? message.id;
+      groups.putIfAbsent(groupId, () => []).add(message);
+      if (message.id == cursorId) cursorGroupId = groupId;
     }
     final activeMessages = <ChatMessage>[];
     final versionCounts = <String, int>{};
+    var cursorIndex = -1;
     for (final entry in groups.entries) {
+      // Like persisted windows, any revision can identify the logical slot,
+      // including the revision that was selected before a version switch.
+      if (entry.key == cursorGroupId) cursorIndex = activeMessages.length;
       final revisions = entry.value;
       versionCounts[entry.key] = revisions.length;
       final selection = conversation.versionSelections[entry.key];
@@ -800,25 +689,17 @@ class ChatService extends ChangeNotifier {
     if (fromStart) {
       end = limit.clamp(0, activeMessages.length).toInt();
     } else if (aroundRevisionId != null) {
-      final targetIndex = activeMessages.indexWhere(
-        (message) => message.id == aroundRevisionId,
-      );
-      if (targetIndex < 0) return null;
-      start = (targetIndex - (limit ~/ 2))
+      if (cursorIndex < 0) return null;
+      start = (cursorIndex - (limit ~/ 2))
           .clamp(0, activeMessages.length)
           .toInt();
       end = (start + limit).clamp(start, activeMessages.length).toInt();
       start = (end - limit).clamp(0, end).toInt();
     } else if (beforeRevisionId != null) {
-      end = activeMessages.indexWhere(
-        (message) => message.id == beforeRevisionId,
-      );
+      end = cursorIndex;
       if (end < 0) return null;
       start = (end - limit).clamp(0, end).toInt();
     } else if (afterRevisionId != null) {
-      final cursorIndex = activeMessages.indexWhere(
-        (message) => message.id == afterRevisionId,
-      );
       if (cursorIndex < 0) return null;
       start = cursorIndex + 1;
       end = (start + limit).clamp(start, activeMessages.length).toInt();
@@ -1041,7 +922,8 @@ class ChatService extends ChangeNotifier {
       ),
     ).wait;
     for (final id in ids) {
-      _evictMessageCaches(id);
+      _toolEventsCache.remove(id);
+      _providerArtifactsCache.remove(id);
     }
     _toolEventsCache.addAll(toolEvents);
     for (var i = 0; i < artifactKinds.length; i++) {
@@ -1052,6 +934,12 @@ class ChatService extends ChangeNotifier {
         )[artifactKinds[i]] = entry.value;
       }
     }
+    for (final message in messages) {
+      message.hydrateProviderArtifacts(
+        _providerArtifactsCache[message.id] ?? const {},
+      );
+    }
+    _enforceMessageCacheLimits();
   }
 
   void _cacheLoadedMessages(
@@ -1073,6 +961,10 @@ class ChatService extends ChangeNotifier {
             for (final id in order)
               if (byId[id] != null) byId[id]!,
           ];
+    final cached = _messagesCache[conversationId]!;
+    if (order == null && cached.every((m) => m.storageOrder != null)) {
+      cached.sort((a, b) => a.storageOrder!.compareTo(b.storageOrder!));
+    }
     _touchMessageCache(conversationId);
     _enforceMessageCacheLimits();
   }
@@ -1083,89 +975,70 @@ class ChatService extends ChangeNotifier {
   }
 
   int _estimateCachedMessageBytes(ChatMessage message) {
+    // Charge raw parts and decoded tool structures without re-encoding their
+    // JSON on every insertion. This intentionally overestimates shared strings.
     var bytes =
-        message.content.length * 2 +
+        256 +
         (message.reasoningText?.length ?? 0) * 2 +
         (message.translation?.length ?? 0) * 2 +
         (message.reasoningSegmentsJson?.length ?? 0) * 2;
-    final toolEvents = _toolEventsCache[message.id];
-    if (toolEvents != null) {
-      for (final event in toolEvents) {
-        bytes += jsonEncode(event).length * 2;
-      }
+    for (final part in message.parts) {
+      bytes += part.encodePayload().length * (part is ToolCallPart ? 4 : 2);
+    }
+    final artifacts =
+        _providerArtifactsCache[message.id] ?? message.providerArtifactSnapshot;
+    for (final payload in artifacts.values) {
+      bytes += payload.length * 2;
     }
     return bytes;
   }
 
+  @visibleForTesting
+  int get debugCachedMessageBytes => _messagesCache.entries
+      .where((entry) => !_temporaryConversationIds.contains(entry.key))
+      .expand((entry) => entry.value)
+      .fold(0, (sum, message) => sum + _estimateCachedMessageBytes(message));
+
   void _enforceMessageCacheLimits() {
-    bool isExempt(String conversationId) =>
-        conversationId == _currentConversationId ||
-        _temporaryConversationIds.contains(conversationId);
-
-    // The current conversation is exempt from eviction: its cache upper bound
-    // is the full conversation or the idle-backfill count threshold.
-    //
-    // A conversation that alone exceeds the budget is tail-trimmed (keeps its
-    // most recent messages) instead of cascading an eviction of every other
-    // cached conversation.
-    for (final conversationId in _messagesCache.keys.toList()) {
-      if (isExempt(conversationId)) continue;
-      final messages = _messagesCache[conversationId]!;
-      var entries = messages.length;
-      var bytes = 0;
-      for (final message in messages) {
-        bytes += _estimateCachedMessageBytes(message);
-      }
-      if (entries <= _messageCacheMaxEntries &&
-          bytes <= _messageCacheMaxBytes) {
-        continue;
-      }
-      var drop = 0;
-      while (drop < messages.length &&
-          (entries > _messageCacheMaxEntries ||
-              bytes > _messageCacheMaxBytes)) {
-        entries--;
-        bytes -= _estimateCachedMessageBytes(messages[drop]);
-        drop++;
-      }
-      for (final message in messages.sublist(0, drop)) {
-        _evictMessageCaches(message.id);
-      }
-      if (drop >= messages.length) {
-        _messagesCache.remove(conversationId);
-      } else {
-        _messagesCache[conversationId] = messages.sublist(drop);
-      }
-    }
-
     var entries = 0;
     var bytes = 0;
+    final sizes = <String, int>{};
     for (final entry in _messagesCache.entries) {
-      if (isExempt(entry.key)) continue;
-      entries += entry.value.length;
-      bytes += entry.value.fold<int>(
-        0,
-        (sum, message) => sum + _estimateCachedMessageBytes(message),
-      );
-    }
-    while ((entries > _messageCacheMaxEntries ||
-            bytes > _messageCacheMaxBytes) &&
-        _messagesCache.isNotEmpty) {
-      final candidate = _messagesCache.entries.firstWhere(
-        (entry) => !isExempt(entry.key),
-        orElse: () => const MapEntry('', <ChatMessage>[]),
-      );
-      if (candidate.key.isEmpty) break;
-      _messagesCache.remove(candidate.key);
-      entries -= candidate.value.length;
-      bytes -= candidate.value.fold<int>(
-        0,
-        (sum, message) => sum + _estimateCachedMessageBytes(message),
-      );
-      for (final message in candidate.value) {
-        _evictMessageCaches(message.id);
+      if (_temporaryConversationIds.contains(entry.key)) continue;
+      for (final message in entry.value) {
+        if (message.isStreaming) continue;
+        final size = _estimateCachedMessageBytes(message);
+        sizes[message.id] = size;
+        entries++;
+        bytes += size;
       }
     }
+    for (final conversation in _messagesCache.entries.toList()) {
+      if (_temporaryConversationIds.contains(conversation.key)) continue;
+      if (entries <= _messageCacheMaxEntries &&
+          bytes <= _messageCacheMaxBytes) {
+        break;
+      }
+      final retained = <ChatMessage>[];
+      for (final message in conversation.value) {
+        if (!message.isStreaming &&
+            (entries > _messageCacheMaxEntries ||
+                bytes > _messageCacheMaxBytes)) {
+          entries--;
+          bytes -= sizes[message.id] ?? 0;
+          _evictMessageCaches(message.id);
+        } else {
+          retained.add(message);
+        }
+      }
+      _messagesCache[conversation.key] = retained;
+    }
+    final retainedIds = {
+      for (final messages in _messagesCache.values)
+        for (final message in messages) message.id,
+    };
+    _toolEventsCache.removeWhere((id, _) => !retainedIds.contains(id));
+    _providerArtifactsCache.removeWhere((id, _) => !retainedIds.contains(id));
   }
 
   List<Conversation> getAllConversations() {
@@ -1303,6 +1176,18 @@ class ChatService extends ChangeNotifier {
         .toList(growable: false);
   }
 
+  Future<List<ChatMessage>> loadMessageVersionHeaders(
+    String conversationId,
+    Iterable<String> groupIds,
+  ) {
+    if (!_initialized ||
+        _temporaryConversationIds.contains(conversationId) ||
+        _draftConversations.containsKey(conversationId)) {
+      return Future.value(getMessagesForGroups(conversationId, groupIds));
+    }
+    return _repo.getMessageVersionHeaders(conversationId, groupIds);
+  }
+
   Future<List<ChatMessage>> loadMessagesForGroups(
     String conversationId,
     Iterable<String> groupIds,
@@ -1382,6 +1267,13 @@ class ChatService extends ChangeNotifier {
     if (!_initialized) return false;
     final cached = _messagesCache[conversationId];
     if (cached == null) return false;
+    if (_temporaryConversationIds.contains(conversationId)) return true;
+    // Complete pages are sorted using their stored row order. An unknown
+    // order cannot become a full-history hit merely by collecting enough ids.
+    if (!_messageOrderIds.containsKey(conversationId) &&
+        cached.any((m) => m.storageOrder == null)) {
+      return false;
+    }
     final known =
         _messageCounts[conversationId] ??
         _messageOrderIds[conversationId]?.length;
@@ -1524,13 +1416,24 @@ class ChatService extends ChangeNotifier {
     if (!_initialized) return const [];
     // Require a known count: unknown (-1) must not short-circuit as a cache hit.
     if (isConversationFullyCached(conversationId)) {
-      return _messagesCache[conversationId]!;
+      final messages = List<ChatMessage>.of(_messagesCache[conversationId]!);
+      if (!_temporaryConversationIds.contains(conversationId)) {
+        // This explicit full read already owns every body, so its identity
+        // list needs no additional database query.
+        _messageOrderIds.putIfAbsent(
+          conversationId,
+          () => messages.map((m) => m.id).toList(growable: true),
+        );
+        await _cacheMessageArtifacts(messages);
+      }
+      return messages;
     }
     final conversation =
         _conversationsCache[conversationId] ??
         _draftConversations[conversationId];
     if (conversation == null) return [];
 
+    final revision = _contextRevisions[conversationId] ?? 0;
     final List<ChatMessage> messages;
     if (_temporaryConversationIds.contains(conversationId)) {
       messages = _messagesCache[conversationId] ?? const <ChatMessage>[];
@@ -1545,6 +1448,9 @@ class ChatService extends ChangeNotifier {
 
     if (!_temporaryConversationIds.contains(conversationId)) {
       await _cacheMessageArtifacts(messages);
+      if ((_contextRevisions[conversationId] ?? 0) != revision) {
+        return loadMessages(conversationId);
+      }
       // A full read sorted by message_order is the authoritative order; backfill
       // the skeleton so later windowed loads don't intersect against stale data.
       // Merge instead of replacing outright: a concurrent addMessage may have
@@ -2090,7 +1996,6 @@ class ChatService extends ChangeNotifier {
     _conversationsCache.remove(id);
     // Stop any deferred/in-flight order backfill before clearing caches so a
     // late getMessageIds cannot resurrect order/count for a deleted id.
-    _abortMessageOrderBackfill(id);
     final removedMessages = _messagesCache.remove(id);
     final removedOrder = _messageOrderIds.remove(id);
     _messageCounts.remove(id);
@@ -3062,9 +2967,6 @@ class ChatService extends ChangeNotifier {
       if (temporaryAfterGroupId != null) {
         throw StateError('anchored_message_requires_temporary_conversation');
       }
-      if (_conversationsCache.containsKey(conversationId)) {
-        await _loadMessageOrder(conversationId);
-      }
       final persisted = await _repo.appendLinearMessageToConversation(
         conversation: conversation,
         message: message,
@@ -3076,27 +2978,25 @@ class ChatService extends ChangeNotifier {
       _draftConversations.remove(conversationId);
       _conversationsCache[conversationId] = persisted;
       conversation = persisted;
-      final order = _messageOrderIds.putIfAbsent(
+      _messageCounts[conversationId] = await _repo.getMessageCount(
         conversationId,
-        () => <String>[],
       );
-      if (!order.contains(message.id)) order.add(message.id);
-      _messageCounts[conversationId] = order.length;
+      final order = _messageOrderIds[conversationId];
+      if (order != null && !order.contains(message.id)) order.add(message.id);
       // Persisted append touches updatedAt (list order) and may promote a
       // draft into the persisted list.
       _bumpConversationListRevision();
     }
 
     // Update cache
-    if (_messagesCache.containsKey(conversationId)) {
-      final messages = _messagesCache[conversationId]!;
-      if (temporaryInsertIndex == null) {
-        messages.add(message);
-      } else {
-        messages.insert(temporaryInsertIndex, message);
-      }
+    final messages = _messagesCache.putIfAbsent(conversationId, () => []);
+    if (temporaryInsertIndex == null) {
+      messages.add(message);
+    } else {
+      messages.insert(temporaryInsertIndex, message);
     }
     _touchMessageCache(conversationId);
+    _enforceMessageCacheLimits();
     _bumpContextRevision(conversationId);
 
     notifyListeners();
@@ -3121,9 +3021,6 @@ class ChatService extends ChangeNotifier {
         _conversationsCache[conversationId] ??
         _draftConversations[conversationId] ??
         Conversation(id: conversationId, title: _defaultConversationTitle);
-    if (_conversationsCache.containsKey(conversationId)) {
-      await _loadMessageOrder(conversationId);
-    }
     final userMessage = ChatMessage(
       id: draftSubmission?.id,
       role: 'user',
@@ -3163,7 +3060,6 @@ class ChatService extends ChangeNotifier {
     }
     final conversation = _conversationsCache[conversationId];
     if (conversation == null) throw StateError('conversation_missing');
-    await _loadMessageOrder(conversationId);
     final assistantMessage = ChatMessage(
       role: 'assistant',
       content: '',
@@ -3184,7 +3080,6 @@ class ChatService extends ChangeNotifier {
       _messagesCache.remove(conversationId);
       _messageOrderIds.remove(conversationId);
       _firstGroupIndicesCache.remove(conversationId);
-      await _loadMessageOrder(conversationId);
     }
     await _publishGenerationBegin(result);
     return result;
@@ -3203,7 +3098,6 @@ class ChatService extends ChangeNotifier {
     }
     final conversation = _conversationsCache[conversationId];
     if (conversation == null) throw StateError('conversation_missing');
-    await _loadMessageOrder(conversationId);
     final assistantMessage = ChatMessage(
       role: 'assistant',
       content: '',
@@ -3222,7 +3116,6 @@ class ChatService extends ChangeNotifier {
     _messagesCache.remove(conversationId);
     _messageOrderIds.remove(conversationId);
     _firstGroupIndicesCache.remove(conversationId);
-    await _loadMessageOrder(conversationId);
     await _publishGenerationBegin(result);
     return result;
   }
@@ -3239,17 +3132,14 @@ class ChatService extends ChangeNotifier {
         when _messageCanOwnAssets(userMessage)) {
       await _synchronizeMessageAssetsBestEffort(userMessage);
     }
-    final order = _messageOrderIds.putIfAbsent(
+    _messageCounts[conversationId] = await _repo.getMessageCount(
       conversationId,
-      () => <String>[],
     );
+    final order = _messageOrderIds[conversationId];
     for (final message in messages) {
-      if (!order.contains(message.id)) order.add(message.id);
+      if (order != null && !order.contains(message.id)) order.add(message.id);
     }
-    _messageCounts[conversationId] = order.length;
-    if (_messagesCache.containsKey(conversationId)) {
-      _messagesCache[conversationId]!.addAll(messages);
-    }
+    _messagesCache.putIfAbsent(conversationId, () => []).addAll(messages);
     _touchMessageCache(conversationId);
     _bumpConversationListRevision();
     _bumpContextRevision(conversationId);
@@ -3275,6 +3165,15 @@ class ChatService extends ChangeNotifier {
     if (messages == null) return;
     final index = messages.indexWhere((m) => m.id == updatedMessage.id);
     if (index >= 0) {
+      if (updatedMessage.storageOrder == null) {
+        updatedMessage.hydrateStorageOrder(messages[index].storageOrder);
+      }
+      if (!updatedMessage.hasProviderArtifactSnapshot &&
+          messages[index].hasProviderArtifactSnapshot) {
+        updatedMessage.hydrateProviderArtifacts(
+          messages[index].providerArtifactSnapshot,
+        );
+      }
       messages[index] = updatedMessage;
     }
     _touchMessageCache(updatedMessage.conversationId);
@@ -3547,10 +3446,57 @@ class ChatService extends ChangeNotifier {
     if (!_initialized) return const <Map<String, dynamic>>[];
     final temporary = _temporaryToolEvents[assistantMessageId];
     if (temporary != null) return List<Map<String, dynamic>>.of(temporary);
+    final events = _toolEventsCache[assistantMessageId];
+    if (events != null) return List<Map<String, dynamic>>.of(events);
+    final message = _cachedMessage(assistantMessageId);
+    if (message == null) return const [];
     return List<Map<String, dynamic>>.of(
-      _toolEventsCache[assistantMessageId] ?? const [],
+      _messageToolEvents[message] ??= [
+        for (final part in message.parts.whereType<ToolCallPart>())
+          ..._decodeMessageToolPart(part),
+      ],
     );
   }
+
+  ChatMessage? _cachedMessage(String id) {
+    for (final messages in _messagesCache.values) {
+      for (final message in messages) {
+        if (message.id == id) return message;
+      }
+    }
+    return null;
+  }
+
+  final _messageToolEvents = Expando<List<Map<String, dynamic>>>(
+    'message tool events',
+  );
+
+  List<Map<String, dynamic>> getToolEventsForMessage(ChatMessage message) {
+    final cached = getToolEvents(message.id);
+    if (cached.isNotEmpty ||
+        _temporaryToolEvents.containsKey(message.id) ||
+        _toolEventsCache.containsKey(message.id)) {
+      return cached;
+    }
+    return _messageToolEvents[message] ??= [
+      for (final part in message.parts.whereType<ToolCallPart>())
+        ..._decodeMessageToolPart(part),
+    ];
+  }
+
+  static List<Map<String, dynamic>> _decodeMessageToolPart(ToolCallPart part) {
+    try {
+      final value = jsonDecode(part.payloadJson);
+      return value is Map ? [Map<String, dynamic>.from(value)] : const [];
+    } catch (_) {
+      return const [];
+    }
+  }
+
+  String? getProviderArtifactForMessage(ChatMessage message, String kind) =>
+      message.hasProviderArtifactSnapshot
+      ? message.providerArtifactSnapshot[kind]
+      : getProviderArtifact(message.id, kind);
 
   Future<void> setToolEvents(
     String assistantMessageId,
@@ -3669,7 +3615,8 @@ class ChatService extends ChangeNotifier {
   String? getProviderArtifact(String assistantMessageId, String kind) {
     if (!_initialized) return null;
     return _temporaryProviderArtifacts[assistantMessageId]?[kind] ??
-        _providerArtifactsCache[assistantMessageId]?[kind];
+        _providerArtifactsCache[assistantMessageId]?[kind] ??
+        _cachedMessage(assistantMessageId)?.providerArtifactSnapshot[kind];
   }
 
   Future<void> setProviderArtifact(
@@ -3695,6 +3642,9 @@ class ChatService extends ChangeNotifier {
     );
     final previous = artifacts[kind];
     artifacts[kind] = payload;
+    final message = _cachedMessage(assistantMessageId);
+    final previousSnapshot = message?.providerArtifactSnapshot;
+    message?.hydrateProviderArtifacts({...?previousSnapshot, kind: payload});
     try {
       await _repo.setProviderArtifact(assistantMessageId, kind, payload);
     } catch (_) {
@@ -3702,6 +3652,9 @@ class ChatService extends ChangeNotifier {
         artifacts.remove(kind);
       } else {
         artifacts[kind] = previous;
+      }
+      if (previousSnapshot != null) {
+        message?.hydrateProviderArtifacts(previousSnapshot);
       }
       rethrow;
     }
@@ -3977,8 +3930,6 @@ class ChatService extends ChangeNotifier {
       return newMsg;
     }
 
-    final original = await _repo.getMessage(messageId);
-    if (original != null) await _loadMessageOrder(original.conversationId);
     final result = await _repo.appendMessageVersion(
       messageId: messageId,
       content: content,
@@ -3999,13 +3950,11 @@ class ChatService extends ChangeNotifier {
     }
     final cid = newMsg.conversationId;
     _conversationsCache[cid] = result.conversation;
-    final order = _messageOrderIds.putIfAbsent(cid, () => <String>[]);
-    if (!order.contains(newMsg.id)) order.add(newMsg.id);
-    _messageCounts[cid] = order.length;
+    _messageCounts[cid] = await _repo.getMessageCount(cid);
+    final order = _messageOrderIds[cid];
+    if (order != null && !order.contains(newMsg.id)) order.add(newMsg.id);
     // Update caches
-    final arr = _messagesCache[cid];
-    if (arr != null) arr.add(newMsg);
-    _touchMessageCache(cid);
+    _cacheLoadedMessages(cid, [newMsg]);
     _bumpConversationListRevision();
     _bumpContextRevision(cid);
     notifyListeners();
@@ -4162,17 +4111,9 @@ class ChatService extends ChangeNotifier {
       notifyListeners();
       return;
     }
-    final candidates = await _repo.getMessagesForGroups(conversationId, [
-      groupId,
-    ]);
-    ChatMessage? target;
-    for (final candidate in candidates) {
-      if (candidate.version == version) {
-        target = candidate;
-        break;
-      }
+    if (!await _repo.messageVersionExists(conversationId, groupId, version)) {
+      throw StateError('message_version_missing');
     }
-    if (target == null) throw StateError('message_version_missing');
     final conversation = await _repo.setSelectedVersion(
       conversationId: conversationId,
       groupId: groupId,

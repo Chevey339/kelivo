@@ -22,6 +22,27 @@ class ChatMessage extends HiveObject {
   /// [content] is derived from [TextPart]s.
   final List<MessagePart> parts;
 
+  // SQLite order metadata for sorting a bounded cache without loading every
+  // message id. Not serialized: message_rows remains the ordering authority.
+  int? _storageOrder;
+  int? get storageOrder => _storageOrder;
+  void hydrateStorageOrder(int? order) => _storageOrder = order;
+
+  // Hydrated request metadata belongs to this message snapshot. It is not a
+  // second persisted representation: provider_artifact_rows owns storage.
+  // Keeping it with the snapshot makes cache eviction safe while a request,
+  // export, or content rewrite still owns the loaded message.
+  Map<String, String>? _providerArtifactSnapshot;
+  Map<String, String> get providerArtifactSnapshot =>
+      _providerArtifactSnapshot ?? const {};
+  bool get hasProviderArtifactSnapshot => _providerArtifactSnapshot != null;
+
+  void hydrateProviderArtifacts(Map<String, String>? artifacts) {
+    _providerArtifactSnapshot = artifacts == null
+        ? null
+        : Map<String, String>.unmodifiable(artifacts);
+  }
+
   /// Derived text body: concatenation of every [TextPart] in [parts] order.
   late final String _content = parts
       .whereType<TextPart>()
@@ -300,32 +321,36 @@ class ChatMessage extends HiveObject {
       nextParts = this.parts;
     }
     return ChatMessage(
-      id: id ?? this.id,
-      role: role ?? this.role,
-      parts: nextParts,
-      timestamp: timestamp ?? this.timestamp,
-      modelId: modelId ?? this.modelId,
-      providerId: providerId ?? this.providerId,
-      totalTokens: totalTokens ?? this.totalTokens,
-      conversationId: conversationId ?? this.conversationId,
-      isStreaming: isStreaming ?? this.isStreaming,
-      reasoningText: reasoningText ?? this.reasoningText,
-      reasoningStartAt: reasoningStartAt ?? this.reasoningStartAt,
-      reasoningFinishedAt: reasoningFinishedAt ?? this.reasoningFinishedAt,
-      translation: translation ?? this.translation,
-      reasoningSegmentsJson:
-          reasoningSegmentsJson ?? this.reasoningSegmentsJson,
-      groupId: groupId ?? this.groupId,
-      version: version ?? this.version,
-      promptTokens: promptTokens ?? this.promptTokens,
-      completionTokens: completionTokens ?? this.completionTokens,
-      cachedTokens: cachedTokens ?? this.cachedTokens,
-      durationMs: durationMs ?? this.durationMs,
-      firstTokenMs: firstTokenMs ?? this.firstTokenMs,
-      reasoningTokens: reasoningTokens ?? this.reasoningTokens,
-      cacheWriteTokens: cacheWriteTokens ?? this.cacheWriteTokens,
-      finishUsage: finishUsage ?? this.finishUsage,
-    );
+        id: id ?? this.id,
+        role: role ?? this.role,
+        parts: nextParts,
+        timestamp: timestamp ?? this.timestamp,
+        modelId: modelId ?? this.modelId,
+        providerId: providerId ?? this.providerId,
+        totalTokens: totalTokens ?? this.totalTokens,
+        conversationId: conversationId ?? this.conversationId,
+        isStreaming: isStreaming ?? this.isStreaming,
+        reasoningText: reasoningText ?? this.reasoningText,
+        reasoningStartAt: reasoningStartAt ?? this.reasoningStartAt,
+        reasoningFinishedAt: reasoningFinishedAt ?? this.reasoningFinishedAt,
+        translation: translation ?? this.translation,
+        reasoningSegmentsJson:
+            reasoningSegmentsJson ?? this.reasoningSegmentsJson,
+        groupId: groupId ?? this.groupId,
+        version: version ?? this.version,
+        promptTokens: promptTokens ?? this.promptTokens,
+        completionTokens: completionTokens ?? this.completionTokens,
+        cachedTokens: cachedTokens ?? this.cachedTokens,
+        durationMs: durationMs ?? this.durationMs,
+        firstTokenMs: firstTokenMs ?? this.firstTokenMs,
+        reasoningTokens: reasoningTokens ?? this.reasoningTokens,
+        cacheWriteTokens: cacheWriteTokens ?? this.cacheWriteTokens,
+        finishUsage: finishUsage ?? this.finishUsage,
+      )
+      .._storageOrder = (id == null || id == this.id) ? _storageOrder : null
+      .._providerArtifactSnapshot = (id == null || id == this.id)
+          ? _providerArtifactSnapshot
+          : null;
   }
 
   Map<String, dynamic> toJson() {

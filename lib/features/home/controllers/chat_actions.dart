@@ -1879,7 +1879,7 @@ class ChatActions {
     final resumedParts = StreamChunkHandler(
       seed: completeMessages[contextIndex].parts,
     );
-    for (final event in chatService.getToolEvents(message.id)) {
+    for (final event in chatService.getToolEventsForMessage(message)) {
       final id = (event['id'] ?? '').toString();
       if (id.isEmpty || event['content'] == null) continue;
       resumedParts.handle(
@@ -2142,15 +2142,15 @@ class ChatActions {
   Future<void> _executeGeneration(stream_ctrl.GenerationContext ctx) async {
     final state = stream_ctrl.StreamingState(
       ctx,
-      responsesTurnPrefix: chatService.getProviderArtifact(
-        ctx.assistantMessage.id,
+      responsesTurnPrefix: chatService.getProviderArtifactForMessage(
+        ctx.assistantMessage,
         responsesTurnArtifactKind,
       ),
       claudeTurnPrefix:
           ctx.providerKey == ctx.assistantMessage.providerId &&
               ctx.modelId == ctx.assistantMessage.modelId
-          ? chatService.getProviderArtifact(
-              ctx.assistantMessage.id,
+          ? chatService.getProviderArtifactForMessage(
+              ctx.assistantMessage,
               claudeTurnArtifactKind,
             )
           : null,
@@ -2168,7 +2168,7 @@ class ChatActions {
     streamController.markStreamingStarted(state.messageId);
     _activeAssistantMessages.put(state.ctx.assistantMessage);
     _streamingToolEvents[state.messageId] = chatService
-        .getToolEvents(state.messageId)
+        .getToolEventsForMessage(ctx.assistantMessage)
         .map((event) => Map<String, dynamic>.from(event))
         .toList();
     _checkpointWriters[state.messageId] =

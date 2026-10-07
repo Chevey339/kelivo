@@ -251,6 +251,29 @@ class TimelineVisibleBlock {
 }
 
 /// Parse a persisted tool_call payload the same way the renderer does.
+final _toolPayloadMemo = Expando<TimelineToolRef>('timeline tool payload');
+
+/// Parts are immutable and stable across text-only streaming snapshots. Weak
+/// keys let an off-window part and its decoded result be collected together.
+TimelineToolRef? parseTimelineToolPart(
+  ToolCallPart part, {
+  int fallbackOrdinal = 0,
+}) {
+  var parsed = _toolPayloadMemo[part];
+  if (parsed == null) {
+    parsed = parseTimelineToolPayload(part.payloadJson);
+    if (parsed == null) return null;
+    parsed = parsed.copyWith(memoToken: identityHashCode(part));
+    _toolPayloadMemo[part] = parsed;
+  }
+  return fallbackOrdinal == 0
+      ? parsed
+      : parsed.copyWith(
+          fallbackOrdinal: fallbackOrdinal,
+          memoToken: Object.hash(parsed.memoToken, fallbackOrdinal),
+        );
+}
+
 TimelineToolRef? parseTimelineToolPayload(
   String payloadJson, {
   int fallbackOrdinal = 0,
@@ -661,11 +684,8 @@ List<TimelineProjectedBlock> _projectFromParts({
             reasoningOverlayIndex: provided == null ? null : overlayIndex,
           ),
         );
-      case ToolCallPart(:final payloadJson):
-        final parsed = parseTimelineToolPayload(
-          payloadJson,
-          fallbackOrdinal: toolCount,
-        );
+      case final ToolCallPart part:
+        final parsed = parseTimelineToolPart(part, fallbackOrdinal: toolCount);
         if (parsed == null || parsed.toolName == kBuiltinSearchToolName) {
           continue;
         }

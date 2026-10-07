@@ -379,7 +379,7 @@ void main() {
     tester,
   ) async {
     await asDesktop(() async {
-      final service = createService();
+      var service = createService();
       late final String alphaId;
       await tester.runAsync(() async {
         await service.init();
@@ -395,6 +395,9 @@ void main() {
         // The most recently created conversation becomes the current one, so
         // Alpha is a non-current hover target.
         await service.createConversation(title: 'Beta');
+        await service.close();
+        service = createService();
+        await service.init();
       });
       await pumpDrawer(tester, service);
       expect(service.isConversationFullyCached(alphaId), isFalse);
@@ -408,17 +411,23 @@ void main() {
       expect(service.timelineCalls, contains(alphaId));
       expect(service.notifyCount, notifyBefore);
 
-      // The prefetch chains several sequential database hops; each hop needs
+      // The cold index install and prefetch chain sequential database hops; each needs
       // a real-async window (isolate round trip) followed by a pump (fake-zone
       // continuation microtasks).
-      for (var i = 0; i < 20; i++) {
+      for (var i = 0; i < 80; i++) {
         if (service.isConversationFullyCached(alphaId)) break;
         await tester.runAsync(
           () => Future<void>.delayed(const Duration(milliseconds: 100)),
         );
         await tester.pump();
       }
-      expect(service.isConversationFullyCached(alphaId), isTrue);
+      expect(
+        service.isConversationFullyCached(alphaId),
+        isTrue,
+        reason:
+            'count=${service.getMessageCount(alphaId)}, '
+            'cached=${service.getMessages(alphaId).length}',
+      );
       expect(service.notifyCount, notifyBefore);
 
       await gesture.removePointer();
