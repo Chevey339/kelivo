@@ -6635,7 +6635,7 @@ class ProviderConfig {
           baseUrl: _defaultBase(key),
           providerType: ProviderKind.openai,
           chatPath: '/chat/completions',
-          useResponseApi: false,
+          useResponseApi: lowerKey == 'marucode',
           models: const [],
           modelOverrides: const {},
           proxyEnabled: false,
@@ -6647,7 +6647,7 @@ class ProviderConfig {
           apiKeys: const [],
           keyManagement: const KeyManagementConfig(),
           aihubmixAppCodeEnabled: lowerKey.contains('aihubmix'),
-          balanceEnabled: false,
+          balanceEnabled: lowerKey == 'marucode',
           balanceApiPath: _defaultBalanceApiPath(key),
           balanceResultPath: _defaultBalanceResultPath(key),
           claudePromptCachingEnabled: false,
@@ -6657,6 +6657,7 @@ class ProviderConfig {
 
   static String _defaultBalanceApiPath(String key) {
     final k = key.toLowerCase();
+    if (k == 'marucode') return '/usage';
     if (k.contains('aihubmix')) return '/user/balance';
     if (k.contains('deepseek')) return '/user/balance';
     if (k.contains('openrouter')) return '/credits';
@@ -6669,6 +6670,7 @@ class ProviderConfig {
 
   static String _defaultBalanceResultPath(String key) {
     final k = key.toLowerCase();
+    if (k == 'marucode') return 'remaining';
     if (k.contains('aihubmix')) return 'balance_infos[0].total_balance';
     if (k.contains('deepseek')) return 'balance_infos[0].total_balance';
     if (k.contains('openrouter')) {

@@ -67,6 +67,35 @@ void main() {
   });
 
   group('ProviderBalanceService', () {
+    test(
+      'MaruCode defaults support manual balance queries while disabled',
+      () async {
+        final requests = <HttpRequest>[];
+        final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+        addTearDown(() => server.close(force: true));
+        server.listen((request) async {
+          requests.add(request);
+          request.response.headers.contentType = ContentType.json;
+          request.response.write(jsonEncode({'remaining': 606.26}));
+          await request.response.close();
+        });
+
+        final config = ProviderConfig.defaultsFor('MaruCode').copyWith(
+          baseUrl: 'http://${server.address.address}:${server.port}/v1',
+          apiKey: 'balance-key',
+        );
+        expect(config.enabled, isFalse);
+        expect(config.balanceEnabled, isTrue);
+        expect(await ProviderBalanceService.fetchBalance(config), '606.26');
+        expect(requests, hasLength(1));
+        expect(requests.single.uri.path, '/v1/usage');
+        expect(
+          requests.single.headers.value(HttpHeaders.authorizationHeader),
+          'Bearer balance-key',
+        );
+      },
+    );
+
     test('requests configured balance path with bearer auth', () async {
       final requests = <HttpRequest>[];
       final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
