@@ -28,6 +28,7 @@ import 'package:Kelivo/core/services/chat/chat_service.dart';
 import 'package:Kelivo/core/services/world_book_activation.dart';
 import 'package:Kelivo/features/home/services/message_builder_service.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
+import 'package:Kelivo/features/world_book/utils/world_book_import.dart';
 
 import '../../../support/business_test_harness.dart';
 
@@ -801,6 +802,98 @@ void main() {
         // Regenerating before the trigger must not count later conversation messages.
         expect(await inject([history.first]), hasLength(1));
         expect(chat.getConversation('one')!.extras['keep'], isTrue);
+      });
+    },
+  );
+
+  testWidgets(
+    'imported ST entries preserve prompt order, supported roles and depth zero',
+    (tester) async {
+      await mount(tester);
+      await tester.runAsync(() async {
+        final imported = parseWorldBookImport({
+          'entries': {
+            '0': {
+              'key': [],
+              'content': 'LATER',
+              'constant': true,
+              'position': 0,
+              'order': 250,
+            },
+            '1': {
+              'key': [],
+              'content': 'EARLIER',
+              'constant': true,
+              'position': 0,
+              'order': 100,
+            },
+            '2': {
+              'key': ['dragon'],
+              'content': 'DEPTH ONE',
+              'position': 4,
+              'depth': 1,
+              'role': 1,
+            },
+            '3': {
+              'key': ['dragon'],
+              'content': 'DEPTH ZERO',
+              'position': 4,
+              'depth': 0,
+              'role': 1,
+            },
+            '5': {
+              'key': ['dragon'],
+              'content': 'INLINE SYSTEM MUST NOT INJECT',
+              'position': 4,
+              'depth': 0,
+              'role': 0,
+            },
+            '6': {
+              'key': [],
+              'constant': true,
+              'content': '{{getvar::current_location}}',
+            },
+            '7': {
+              'key': ['dragon'],
+              'content': 'DEEP',
+              'position': 4,
+              'depth': 100,
+              'role': 2,
+            },
+            '8': {
+              'key': ['dragon'],
+              'content': 'LESS DEEP',
+              'position': 4,
+              'depth': 99,
+              'role': 2,
+            },
+            '4': {
+              'key': ['dragon'],
+              'keysecondary': ['missing'],
+              'content': 'MUST NOT INJECT',
+            },
+          },
+        }, fileName: 'World.json')!;
+        final book = normalizeImportedWorldBook(
+          imported.book,
+          existingBookIds: {},
+        );
+        await books.addBook(book);
+        await books.setActiveBookIds([book.id], assistantId: 'assistant');
+        final messages = <Map<String, dynamic>>[
+          {'role': 'system', 'content': 'BASE'},
+          {'role': 'user', 'content': 'dragon'},
+        ];
+        await builder.injectWorldBookPrompts(messages, 'assistant');
+        builder.stripInternalRevisionIds(messages);
+        expect(messages, [
+          {'role': 'system', 'content': 'EARLIER\nLATER\nBASE'},
+          {'role': 'assistant', 'content': 'DEEP'},
+          {'role': 'assistant', 'content': 'LESS DEEP'},
+          {'role': 'user', 'content': '<system>\nDEPTH ONE\n</system>'},
+          {'role': 'user', 'content': 'dragon'},
+          {'role': 'user', 'content': '<system>\nDEPTH ZERO\n</system>'},
+        ]);
       });
     },
   );

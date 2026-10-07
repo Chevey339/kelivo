@@ -8031,6 +8031,11 @@ class AppLocalizationsZh extends AppLocalizations {
   String get worldBookInjectionPositionAtDepth => '指定深度';
 
   @override
+  String worldBookImportUnsupportedEntries(int count) {
+    return '导入完成。$count 个条目使用了暂不支持的酒馆功能（如宏、正则、时效、筛选或插入规则），已保留内容并停用，请检查后再启用。';
+  }
+
+  @override
   String get worldBookInjectionRoleUser => '用户';
 
   @override
@@ -20264,6 +20269,11 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get worldBookInjectionPositionAtDepth => '指定深度';
+
+  @override
+  String worldBookImportUnsupportedEntries(int count) {
+    return '导入完成。$count 个条目使用了暂不支持的酒馆功能（如宏、正则、时效、筛选或插入规则），已保留内容并停用，请检查后再启用。';
+  }
 
   @override
   String get worldBookInjectionRoleUser => '用户';
@@ -32574,6 +32584,11 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get worldBookInjectionPositionAtDepth => '指定深度';
+
+  @override
+  String worldBookImportUnsupportedEntries(int count) {
+    return '匯入完成。$count 個條目使用了暫不支援的酒館功能（如巨集、正則、時效、篩選或插入規則），已保留內容並停用，請檢查後再啟用。';
+  }
 
   @override
   String get worldBookInjectionRoleUser => '使用者';

@@ -15211,6 +15211,12 @@ abstract class AppLocalizations {
   /// **'At depth'**
   String get worldBookInjectionPositionAtDepth;
 
+  /// No description provided for @worldBookImportUnsupportedEntries.
+  ///
+  /// In en, this message translates to:
+  /// **'Imported. {count} entries use unsupported SillyTavern features (such as macros, regex, timing, filters, or insertion rules). Their content was kept and they were disabled. Review them before enabling.'**
+  String worldBookImportUnsupportedEntries(int count);
+
   /// No description provided for @worldBookInjectionRoleUser.
   ///
   /// In en, this message translates to:

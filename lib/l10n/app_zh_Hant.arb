@@ -2991,6 +2991,7 @@
   "worldBookInjectionPositionTopOfChat": "對話頂部",
   "worldBookInjectionPositionBottomOfChat": "對話底部",
   "worldBookInjectionPositionAtDepth": "指定深度",
+  "worldBookImportUnsupportedEntries": "匯入完成。{count} 個條目使用了暫不支援的酒館功能（如巨集、正則、時效、篩選或插入規則），已保留內容並停用，請檢查後再啟用。",
   "worldBookInjectionRoleUser": "使用者",
   "worldBookInjectionRoleAssistant": "助手",
   "mcpToolNeedsApproval": "需要審批",

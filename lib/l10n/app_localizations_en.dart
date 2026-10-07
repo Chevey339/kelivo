@@ -8378,6 +8378,11 @@ class AppLocalizationsEn extends AppLocalizations {
   String get worldBookInjectionPositionAtDepth => 'At depth';
 
   @override
+  String worldBookImportUnsupportedEntries(int count) {
+    return 'Imported. $count entries use unsupported SillyTavern features (such as macros, regex, timing, filters, or insertion rules). Their content was kept and they were disabled. Review them before enabling.';
+  }
+
+  @override
   String get worldBookInjectionRoleUser => 'User';
 
   @override

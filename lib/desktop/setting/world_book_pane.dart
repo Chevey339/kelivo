@@ -10,6 +10,7 @@ import 'package:uuid/uuid.dart';
 
 import '../../core/models/world_book.dart';
 import '../../core/providers/world_book_provider.dart';
+import '../../features/world_book/utils/world_book_import.dart';
 import '../../icons/lucide_adapter.dart' as lucide;
 import '../../l10n/app_localizations.dart';
 import '../../shared/widgets/ios_switch.dart';
@@ -71,44 +72,6 @@ class _DesktopWorldBookPaneState extends State<DesktopWorldBookPane> {
     }
   }
 
-  WorldBook? _parseWorldBookImport(dynamic decoded) {
-    try {
-      if (decoded is Map) {
-        final map = decoded.cast<String, dynamic>();
-        final data = map['data'];
-        if (data is Map) {
-          return WorldBook.fromJson(data.cast<String, dynamic>());
-        }
-        if (map.containsKey('entries')) {
-          return WorldBook.fromJson(map);
-        }
-      }
-    } catch (_) {}
-    return null;
-  }
-
-  WorldBook _normalizeImportedBook(
-    WorldBook book, {
-    required Set<String> existingBookIds,
-  }) {
-    var bookId = book.id.trim();
-    if (bookId.isEmpty || existingBookIds.contains(bookId)) {
-      bookId = const Uuid().v4();
-    }
-
-    final seenEntryIds = <String>{};
-    final nextEntries = <WorldBookEntry>[];
-    for (final entry in book.entries) {
-      var entryId = entry.id.trim();
-      if (entryId.isEmpty || !seenEntryIds.add(entryId)) {
-        entryId = const Uuid().v4();
-      }
-      nextEntries.add(entry.copyWith(id: entryId));
-    }
-
-    return book.copyWith(id: bookId, entries: nextEntries);
-  }
-
   Map<String, dynamic> _toRikkaHubExportJson(WorldBook book) {
     final data = book.toJson();
     return <String, dynamic>{'version': 1, 'type': 'lorebook', 'data': data};
@@ -157,7 +120,7 @@ class _DesktopWorldBookPaneState extends State<DesktopWorldBookPane> {
       return;
     }
 
-    final imported = _parseWorldBookImport(decoded);
+    final imported = parseWorldBookImport(decoded, fileName: file.name);
     if (imported == null) {
       showAppSnackBar(
         context,
@@ -167,11 +130,22 @@ class _DesktopWorldBookPaneState extends State<DesktopWorldBookPane> {
       return;
     }
 
-    final normalized = _normalizeImportedBook(
-      imported,
+    final normalized = normalizeImportedWorldBook(
+      imported.book,
       existingBookIds: provider.books.map((e) => e.id).toSet(),
     );
     await provider.addBook(normalized);
+    if (!mounted) return;
+    if (imported.unsupportedEntryCount > 0) {
+      showAppSnackBar(
+        context,
+        message: l10n.worldBookImportUnsupportedEntries(
+          imported.unsupportedEntryCount,
+        ),
+        type: NotificationType.warning,
+        duration: const Duration(seconds: 10),
+      );
+    }
   }
 
   Future<void> _exportBook(WorldBook book) async {
@@ -1207,6 +1181,7 @@ class _WorldBookEntryEditDialogState extends State<_WorldBookEntryEditDialog> {
     required String label,
     required TextEditingController controller,
     double width = 104,
+    bool signed = false,
   }) {
     return _labeledField(
       cs: cs,
@@ -1215,8 +1190,18 @@ class _WorldBookEntryEditDialogState extends State<_WorldBookEntryEditDialog> {
         width: width,
         child: TextField(
           controller: controller,
-          keyboardType: TextInputType.number,
-          inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+          keyboardType: TextInputType.numberWithOptions(signed: signed),
+          inputFormatters: [
+            if (signed)
+              TextInputFormatter.withFunction(
+                (oldValue, newValue) =>
+                    RegExp(r'^-?\d*$').hasMatch(newValue.text)
+                    ? newValue
+                    : oldValue,
+              )
+            else
+              FilteringTextInputFormatter.digitsOnly,
+          ],
           textAlign: TextAlign.center,
           decoration: _deskInputDecoration(context),
         ),
@@ -1500,6 +1485,7 @@ class _WorldBookEntryEditDialogState extends State<_WorldBookEntryEditDialog> {
                                     cs: cs,
                                     label: l10n.worldBookEntryPriorityLabel,
                                     controller: _priorityController,
+                                    signed: true,
                                   ),
                                 ),
                               ],
@@ -1577,7 +1563,7 @@ class _WorldBookEntryEditDialogState extends State<_WorldBookEntryEditDialog> {
                       priority: priority,
                       position: _position,
                       content: _contentController.text,
-                      injectDepth: injectDepth.clamp(1, 200).toInt(),
+                      injectDepth: injectDepth.clamp(0, 200).toInt(),
                       role: _role,
                       keywords: List<String>.from(_keywords),
                       useRegex: _useRegex,

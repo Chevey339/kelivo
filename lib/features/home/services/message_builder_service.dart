@@ -2440,34 +2440,37 @@ class MessageBuilderService {
         );
       }
 
-      // AT_DEPTH: insert at depth from end (depth=1 means before last message).
+      // AT_DEPTH: depth=0 appends; depth=1 inserts before the last message.
       final atDepthInjections = byPosition[WorldBookInjectionPosition.atDepth];
       if (atDepthInjections != null && atDepthInjections.isNotEmpty) {
         final byDepth = <int, List<WorldBookEntry>>{};
         for (final e in atDepthInjections) {
-          final depth = (e.injectDepth <= 0 ? 1 : e.injectDepth)
-              .clamp(1, 200)
-              .toInt();
+          final depth = e.injectDepth.clamp(0, 200);
           byDepth.putIfAbsent(depth, () => <WorldBookEntry>[]).add(e);
         }
 
         final depths = byDepth.keys.toList(growable: false)
           ..sort((a, b) => b.compareTo(a));
+        final originalLength = apiMessages.length;
+        final historyStart = apiMessages
+            .takeWhile((message) => message['role'] == 'system')
+            .length;
+        var insertedCount = 0;
 
         for (final depth in depths) {
           final injections = byDepth[depth] ?? const <WorldBookEntry>[];
-          var insertIndex = (apiMessages.length - depth).clamp(
-            0,
-            apiMessages.length,
-          );
+          // Anchor to the original history so multiple oversized depths keep
+          // their order after clamping to the start of the chat.
+          var insertIndex =
+              (originalLength - depth).clamp(historyStart, originalLength) +
+              insertedCount;
           insertIndex = findSafeInsertIndex(apiMessages, insertIndex);
-          apiMessages.insertAll(
-            insertIndex,
-            createMergedInjectionMessages(
-              injections,
-              position: WorldBookInjectionPosition.atDepth,
-            ),
+          final messages = createMergedInjectionMessages(
+            injections,
+            position: WorldBookInjectionPosition.atDepth,
           );
+          apiMessages.insertAll(insertIndex, messages);
+          insertedCount += messages.length;
         }
       }
     } catch (_) {}

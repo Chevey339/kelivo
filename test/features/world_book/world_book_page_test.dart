@@ -1,7 +1,9 @@
 import 'package:Kelivo/core/providers/settings_provider.dart';
+import 'dart:convert';
 import 'dart:io';
 import 'dart:ui' as ui;
 
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/rendering.dart';
@@ -17,9 +19,43 @@ import 'package:Kelivo/features/world_book/widgets/world_book_entry_widgets.dart
 import 'package:Kelivo/l10n/app_localizations.dart';
 import 'package:Kelivo/shared/widgets/ios_form_text_field.dart';
 import 'package:Kelivo/shared/widgets/ios_switch.dart';
+import 'package:Kelivo/shared/widgets/snackbar.dart';
 import 'package:Kelivo/theme/theme_factory.dart';
 
 import '../../support/business_test_harness.dart';
+
+class _WorldBookFilePicker extends FilePicker {
+  _WorldBookFilePicker(this.json);
+
+  final Map<String, dynamic> json;
+
+  @override
+  Future<FilePickerResult?> pickFiles({
+    String? dialogTitle,
+    String? initialDirectory,
+    FileType type = FileType.any,
+    List<String>? allowedExtensions,
+    Function(FilePickerStatus)? onFileLoading,
+    bool allowCompression = false,
+    int compressionQuality = 0,
+    bool allowMultiple = false,
+    bool withData = false,
+    bool withReadStream = false,
+    bool lockParentWindow = false,
+    bool readSequential = false,
+  }) async {
+    expect(allowedExtensions, ['json']);
+    expect(withData, isTrue);
+    final bytes = Uint8List.fromList(utf8.encode(jsonEncode(json)));
+    return FilePickerResult([
+      PlatformFile(
+        name: 'Imported world.json',
+        size: bytes.length,
+        bytes: bytes,
+      ),
+    ]);
+  }
+}
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -126,7 +162,7 @@ void main() {
               data: MediaQuery.of(
                 context,
               ).copyWith(textScaler: TextScaler.linear(textScale)),
-              child: child!,
+              child: AppSnackBarOverlay(child: child!),
             ),
             home: desktop
                 ? const Scaffold(body: DesktopWorldBookPane())
@@ -157,6 +193,94 @@ void main() {
 
   for (final desktop in [false, true]) {
     final platform = desktop ? 'desktop' : 'mobile';
+    for (final unsupported in [false, true]) {
+      testWidgets(
+        '$platform imports SillyTavern JSON and reports unsupported rules: $unsupported',
+        (tester) async {
+          final provider = await mount(tester, desktop: desktop);
+          FilePicker? previousPicker;
+          try {
+            previousPicker = FilePicker.platform;
+          } catch (_) {}
+          FilePicker.platform = _WorldBookFilePicker({
+            'entries': {
+              '0': {
+                'uid': 0,
+                'key': ['dragon'],
+                'comment': 'Imported entry',
+                'content': 'Imported lore',
+                'position': 4,
+                'depth': 0,
+                'role': unsupported ? 0 : 1,
+                if (unsupported) 'keysecondary': ['mountain'],
+              },
+            },
+          });
+          addTearDown(() {
+            if (previousPicker != null) FilePicker.platform = previousPicker;
+          });
+          final l10n = AppLocalizations.of(
+            tester.element(find.text('Story world')),
+          )!;
+          await tester.tap(find.byTooltip(l10n.providersPageImportTooltip));
+          await tester.pump();
+          for (var i = 0; i < 100 && provider.books.length < 2; i++) {
+            await tester.runAsync(() async {
+              await Future<void>.delayed(const Duration(milliseconds: 10));
+            });
+            await tester.pump();
+          }
+          expect(provider.books, hasLength(2));
+          await tester.pumpAndSettle();
+          expect(find.text('Imported world'), findsOneWidget);
+          expect(find.text('Imported entry'), findsOneWidget);
+          final book = provider.books.last;
+          expect(book.entries.single.content, 'Imported lore');
+          expect(book.entries.single.enabled, !unsupported);
+          expect(book.entries.single.role, WorldBookInjectionRole.user);
+          expect(book.entries.single.injectDepth, 0);
+          expect(
+            find.text(l10n.worldBookImportUnsupportedEntries(1)),
+            unsupported ? findsOneWidget : findsNothing,
+          );
+          await tester.runAsync(provider.loadAll);
+          expect(provider.books.last.toJson(), book.toJson());
+          if (unsupported) {
+            await tester.pump(const Duration(seconds: 11));
+            await tester.pumpAndSettle();
+          } else {
+            await tester.tap(find.text('Imported entry'));
+            await tester.pumpAndSettle();
+            final priority = find.byWidgetPredicate(
+              (widget) =>
+                  widget is TextField && widget.controller?.text == '-100',
+            );
+            await tester.ensureVisible(priority);
+            await tester.enterText(priority, '-250');
+            FocusManager.instance.primaryFocus?.unfocus();
+            await tester.pumpAndSettle();
+            await tester.tap(find.text(l10n.worldBookSave));
+            await tester.pump();
+            for (
+              var i = 0;
+              i < 100 && provider.books.last.entries.single.priority != -250;
+              i++
+            ) {
+              await tester.runAsync(() async {
+                await Future<void>.delayed(const Duration(milliseconds: 10));
+              });
+              await tester.pump();
+            }
+            await tester.pumpAndSettle();
+            final saved = provider.books.last.entries.single;
+            expect(saved.priority, -250);
+            expect(saved.injectDepth, 0);
+            expect(saved.role, WorldBookInjectionRole.user);
+          }
+          expect(tester.takeException(), isNull);
+        },
+      );
+    }
     for (final locale in [const Locale('en'), const Locale('zh')]) {
       testWidgets(
         '$platform ${locale.languageCode} keeps labels and counts aligned at narrow widths',

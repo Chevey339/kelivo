@@ -11,6 +11,7 @@ import 'package:uuid/uuid.dart';
 import '../../../core/models/world_book.dart';
 import '../../../core/providers/world_book_provider.dart';
 import '../../../core/services/haptics.dart';
+import '../utils/world_book_import.dart';
 import '../../../icons/lucide_adapter.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../shared/widgets/ios_form_text_field.dart';
@@ -94,44 +95,6 @@ class _WorldBookPageState extends State<WorldBookPage> {
     }
   }
 
-  WorldBook? _parseWorldBookImport(dynamic decoded) {
-    try {
-      if (decoded is Map) {
-        final map = decoded.cast<String, dynamic>();
-        final data = map['data'];
-        if (data is Map) {
-          return WorldBook.fromJson(data.cast<String, dynamic>());
-        }
-        if (map.containsKey('entries')) {
-          return WorldBook.fromJson(map);
-        }
-      }
-    } catch (_) {}
-    return null;
-  }
-
-  WorldBook _normalizeImportedBook(
-    WorldBook book, {
-    required Set<String> existingBookIds,
-  }) {
-    var bookId = book.id.trim();
-    if (bookId.isEmpty || existingBookIds.contains(bookId)) {
-      bookId = const Uuid().v4();
-    }
-
-    final seenEntryIds = <String>{};
-    final nextEntries = <WorldBookEntry>[];
-    for (final entry in book.entries) {
-      var entryId = entry.id.trim();
-      if (entryId.isEmpty || !seenEntryIds.add(entryId)) {
-        entryId = const Uuid().v4();
-      }
-      nextEntries.add(entry.copyWith(id: entryId));
-    }
-
-    return book.copyWith(id: bookId, entries: nextEntries);
-  }
-
   Future<void> _importBookFromFile() async {
     final l10n = AppLocalizations.of(context)!;
     final provider = context.read<WorldBookProvider>();
@@ -175,7 +138,7 @@ class _WorldBookPageState extends State<WorldBookPage> {
       return;
     }
 
-    final imported = _parseWorldBookImport(decoded);
+    final imported = parseWorldBookImport(decoded, fileName: file.name);
     if (imported == null) {
       showAppSnackBar(
         context,
@@ -185,11 +148,22 @@ class _WorldBookPageState extends State<WorldBookPage> {
       return;
     }
 
-    final normalized = _normalizeImportedBook(
-      imported,
+    final normalized = normalizeImportedWorldBook(
+      imported.book,
       existingBookIds: provider.books.map((e) => e.id).toSet(),
     );
     await provider.addBook(normalized);
+    if (!mounted) return;
+    if (imported.unsupportedEntryCount > 0) {
+      showAppSnackBar(
+        context,
+        message: l10n.worldBookImportUnsupportedEntries(
+          imported.unsupportedEntryCount,
+        ),
+        type: NotificationType.warning,
+        duration: const Duration(seconds: 10),
+      );
+    }
   }
 
   String _baseName(String path) {
@@ -1959,7 +1933,10 @@ class _WorldBookEntryEditSheetState extends State<_WorldBookEntryEditSheet> {
                         IosFormTextField(
                           label: l10n.worldBookEntryPriorityLabel,
                           controller: _priorityController,
-                          keyboardType: TextInputType.number,
+                          keyboardType: const TextInputType.numberWithOptions(
+                            signed: true,
+                          ),
+                          textAlign: TextAlign.end,
                           fieldWidth: 64,
                         ),
                       ],
@@ -2002,7 +1979,7 @@ class _WorldBookEntryEditSheetState extends State<_WorldBookEntryEditSheet> {
                         priority: priority,
                         position: _position,
                         content: _contentController.text,
-                        injectDepth: injectDepth.clamp(1, 200).toInt(),
+                        injectDepth: injectDepth.clamp(0, 200).toInt(),
                         role: _role,
                         keywords: keywords,
                         useRegex: _useRegex,

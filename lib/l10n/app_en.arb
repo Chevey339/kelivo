@@ -3548,6 +3548,14 @@
   "worldBookInjectionPositionTopOfChat": "Top of chat",
   "worldBookInjectionPositionBottomOfChat": "Bottom of chat",
   "worldBookInjectionPositionAtDepth": "At depth",
+  "worldBookImportUnsupportedEntries": "Imported. {count} entries use unsupported SillyTavern features (such as macros, regex, timing, filters, or insertion rules). Their content was kept and they were disabled. Review them before enabling.",
+  "@worldBookImportUnsupportedEntries": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "worldBookInjectionRoleUser": "User",
   "worldBookInjectionRoleAssistant": "Assistant",
   "mcpToolNeedsApproval": "Require approval",
