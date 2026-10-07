@@ -169,7 +169,9 @@ class MessageGenerationService {
     bool persistWorldBookActivation = true,
     void Function(int before, int after)? onWorldBookActivationPersisted,
   }) async {
-    final cfg = settings.getProviderConfig(providerKey);
+    final cfg = settings
+        .getProviderConfig(providerKey)
+        .forModelProtocol(modelId);
     final kind = ProviderConfig.classify(
       providerKey,
       explicitType: cfg.providerType,

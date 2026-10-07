@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import '../../../../models/model_spec.dart';
 import '../../../../providers/settings_provider.dart';
 import '../../../../utils/multimodal_input_utils.dart';
 import '../../../../../utils/mcp_structured_image.dart';
@@ -9,6 +10,26 @@ import '../../stream/stream_chunk_emit.dart';
 import 'openai_tool_transcript.dart';
 
 const responsesTurnArtifactKind = 'responses_turn';
+
+/// Each request records its own cumulative rounds. A resumed message owns
+/// earlier rounds too, so prepend its snapshot from before this request, not
+/// the last upsert (which would duplicate rounds on every tool follow-up).
+String appendResponsesTurn(String? prefix, String current) {
+  if (prefix == null) return current;
+  try {
+    final previous = jsonDecode(prefix) as Map;
+    final next = jsonDecode(current) as Map;
+    for (final key in ['providerId', 'baseUrl', 'modelId']) {
+      if (previous[key] != next[key]) return current;
+    }
+    return jsonEncode({
+      ...next,
+      'rounds': [...previous['rounds'] as List, ...next['rounds'] as List],
+    });
+  } catch (_) {
+    return current;
+  }
+}
 
 typedef ResponsesReplayScope = ({
   String providerId,
@@ -75,6 +96,49 @@ String _contentText(Map item) {
       )
       .map((part) => (part['text'] ?? '').toString())
       .join();
+}
+
+/// Filter only history supplied to a new request. Native outputs produced
+/// during its live tool loop are appended separately and remain intact.
+/// Assistant items between user/tool messages belong to one response; hosted
+/// calls count as tool rounds as well as client function calls.
+List<Map<String, dynamic>> filterResponsesReasoningHistory(
+  List<Map<String, dynamic>> messages,
+  ReasoningReplayPolicy replay,
+) {
+  if (replay == ReasoningReplayPolicy.all) return messages;
+  final out = <Map<String, dynamic>>[];
+  final response = <Map<String, dynamic>>[];
+  void flush() {
+    final keepThinking =
+        replay == ReasoningReplayPolicy.toolTurns &&
+        response.any((message) {
+          final calls = message['tool_calls'];
+          final item = message[multimodalInternalResponsesItemKey];
+          final type = item is Map ? (item['type'] ?? '').toString() : '';
+          return (calls is List && calls.isNotEmpty) ||
+              type.endsWith('_call') ||
+              type == 'openrouter:image_generation';
+        });
+    for (final message in response) {
+      final item = message[multimodalInternalResponsesItemKey];
+      if (keepThinking || item is! Map || item['type'] != 'reasoning') {
+        out.add(message);
+      }
+    }
+    response.clear();
+  }
+
+  for (final message in messages) {
+    if (message['role'] == 'assistant') {
+      response.add(message);
+    } else {
+      flush();
+      out.add(message);
+    }
+  }
+  flush();
+  return out;
 }
 
 /// Projects native items into the app's history envelope. Tool results still

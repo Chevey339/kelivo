@@ -293,7 +293,6 @@ Stream<StreamChunk> sendClaudeStream(
 
   final downloadedFileIds = <String>{};
   var lastStreamResults = <Map<String, dynamic>>[];
-  final nonStreamText = StringBuffer();
   var pauseTurn = false;
 
   // A container the conversation goes on using gets the files it has not
@@ -454,13 +453,17 @@ Stream<StreamChunk> sendClaudeStream(
             <Map<String, dynamic>>[];
         final Map<String, Map<String, dynamic>> toolUses =
             <String, Map<String, dynamic>>{}; // id -> {name,args}
-        for (final it in content) {
+        final roundId = 'round-${streamRound++}';
+        for (var index = 0; index < content.length; index++) {
+          final it = content[index];
           if (it is! Map) continue;
+          final ids = StreamChunkIds('$roundId-block-$index');
           final type = (it['type'] ?? '').toString();
           if (type == 'text') {
             final t = (it['text'] ?? '').toString();
             if (t.isNotEmpty) {
               assistantBlocks.add({'type': 'text', 'text': t});
+              yield* emitDelta(ids: ids, content: t);
             }
           } else if (type == 'thinking' ||
               (type == 'redacted_thinking' && !skipRedactedThinkingBlocks)) {
@@ -472,6 +475,12 @@ Stream<StreamChunk> sendClaudeStream(
                 Map<String, dynamic>.from(it.cast<String, dynamic>()),
               );
             } catch (_) {}
+            if (type == 'thinking') {
+              yield* emitDelta(
+                ids: ids,
+                reasoning: (it['thinking'] ?? '').toString(),
+              );
+            }
           } else if (type == 'tool_use') {
             final id = (it['id'] ?? '').toString();
             final rawName = (it['name'] ?? '').toString();
@@ -514,11 +523,10 @@ Stream<StreamChunk> sendClaudeStream(
         // The continuation round sends these, so they go through the same
         // sanitising as replayed history; the stored copy stays whole.
         lastAssistantBlocks = history.sanitize(assistantBlocks);
-        nonStreamText.write(joinedTextOfBlocks(assistantBlocks));
         final decoder = ClaudeStreamDecoder(
           skipRedactedThinkingBlocks: skipRedactedThinkingBlocks,
           serverToolNames: declaredServerToolNames,
-          sourceId: 'round-${streamRound++}',
+          sourceId: roundId,
         );
         for (final chunk in decoder.decodeCompleteServerTools(
           assistantBlocks,
@@ -720,7 +728,6 @@ Stream<StreamChunk> sendClaudeStream(
     finish: () async* {
       yield* emitDone(
         ids: StreamChunkIds('finish'),
-        content: nonStreamText.toString(),
         usage: totalUsage,
         totalTokens: totalUsage?.totalTokens ?? 0,
       );

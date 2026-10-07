@@ -1615,7 +1615,7 @@ class GenerationContext {
 
 /// State object for streaming message generation.
 class StreamingState {
-  StreamingState(this.ctx)
+  StreamingState(this.ctx, {this.responsesTurnPrefix, this.claudeTurnPrefix})
     : _content = StreamTextBuffer(ctx.assistantMessage.content),
       totalTokens = ctx.assistantMessage.totalTokens ?? 0,
       firstTokenMs = ctx.assistantMessage.firstTokenMs,
@@ -1623,6 +1623,10 @@ class StreamingState {
       partsHandler = StreamChunkHandler(seed: ctx.assistantMessage.parts);
 
   final GenerationContext ctx;
+
+  /// Immutable native history already owned by this message before resuming.
+  final String? responsesTurnPrefix;
+  final String? claudeTurnPrefix;
   final StreamTextBuffer _content;
   String get fullContentRaw => _content.value;
   set fullContentRaw(String text) => _content.value = text;

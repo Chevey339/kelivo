@@ -117,6 +117,7 @@ class ModelSpecResolver {
     String modelKey, {
     String? displayName,
   }) {
+    cfg = cfg.forModelProtocol(modelKey);
     final rawOverride = _rawOverride(cfg, modelKey);
     final catalogVersion = _catalog.version;
     final fingerprint = _fingerprint(cfg, displayName);

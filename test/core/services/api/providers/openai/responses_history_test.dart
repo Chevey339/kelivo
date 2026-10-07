@@ -3,10 +3,12 @@ import 'dart:convert';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
+import 'package:Kelivo/core/models/model_spec.dart';
 import 'package:Kelivo/core/providers/settings_provider.dart';
 import 'package:Kelivo/core/services/api/providers/openai/openai_provider.dart';
 import 'package:Kelivo/core/services/api/providers/openai/responses_history.dart';
 import 'package:Kelivo/core/services/api/stream/stream_chunk_emit.dart';
+import 'package:Kelivo/core/services/api/stream/stream_chunk.dart';
 import 'package:Kelivo/core/utils/multimodal_input_utils.dart';
 import 'package:Kelivo/features/home/services/context_assembly.dart';
 
@@ -38,6 +40,365 @@ Map<String, dynamic> _call(String id) => {
 };
 
 void main() {
+  for (final terminal in [false, true]) {
+    test(
+      'Responses retains completed items at EOF: terminal=$terminal',
+      () async {
+        final config = ProviderConfig(
+          id: 'OpenAI',
+          enabled: true,
+          name: 'OpenAI',
+          apiKey: 'fixture',
+          baseUrl: 'https://api.openai.com/v1',
+          providerType: ProviderKind.openai,
+          useResponseApi: true,
+        );
+        final message = _text('Answer');
+        final events = [
+          {
+            'type': 'response.output_item.done',
+            'output_index': 0,
+            'item': _reasoning,
+          },
+          {
+            'type': 'response.output_text.delta',
+            'output_index': 1,
+            'delta': 'Answer',
+          },
+          {
+            'type': 'response.output_item.done',
+            'output_index': 1,
+            'item': message,
+          },
+          if (terminal)
+            {
+              'type': 'response.completed',
+              'response': {
+                'output': [_reasoning, message],
+              },
+            },
+        ];
+        final bodies = <Map<String, dynamic>>[];
+        final client = MockClient((request) async {
+          bodies.add(jsonDecode(request.body));
+          return http.Response(
+            events.map((e) => 'data: ${jsonEncode(e)}\n\n').join(),
+            200,
+          );
+        });
+        addTearDown(client.close);
+        final chunks = await sendOpenAIStream(client, config, 'gpt-5.4', [
+          {'role': 'user', 'content': 'Hello'},
+        ]).toList();
+        final artifact = chunks.whereType<ProviderArtifact>().single;
+        expect(
+          chunks.whereType<TextDelta>().map((c) => c.text).join(),
+          'Answer',
+        );
+        final rounds = jsonDecode(artifact.payload)['rounds'] as List;
+        expect(rounds, hasLength(1));
+        expect(rounds.single['output'], [_reasoning, message]);
+        final history = buildResponsesHistory(
+          payload: artifact.payload,
+          scope: responsesReplayScope(config, 'gpt-5.4'),
+          content: 'Answer',
+          toolEvents: const [],
+        );
+        expect(history, isNotNull);
+        await sendOpenAIStream(client, config, 'gpt-5.4', [
+          {'role': 'user', 'content': 'Hello'},
+          ...history!,
+          {'role': 'user', 'content': 'Next'},
+        ]).toList();
+        expect(
+          (bodies.last['input'] as List).where(
+            (item) => item['type'] == 'reasoning',
+          ),
+          [_reasoning],
+        );
+      },
+    );
+  }
+
+  test(
+    'Responses EOF records no unfinished function call and runs no tool',
+    () async {
+      final config = ProviderConfig(
+        id: 'OpenAI',
+        enabled: true,
+        name: 'OpenAI',
+        apiKey: 'fixture',
+        baseUrl: 'https://api.openai.com/v1',
+        providerType: ProviderKind.openai,
+        useResponseApi: true,
+      );
+      final events = [
+        {
+          'type': 'response.output_item.done',
+          'output_index': 0,
+          'item': _reasoning,
+        },
+        {
+          'type': 'response.output_item.added',
+          'output_index': 1,
+          'item': {
+            'type': 'function_call',
+            'id': 'fc_unfinished',
+            'call_id': 'unfinished',
+            'name': 'lookup',
+            'arguments': '',
+          },
+        },
+        {
+          'type': 'response.function_call_arguments.delta',
+          'output_index': 1,
+          'delta': '{"q":',
+        },
+      ];
+      final client = MockClient(
+        (request) async => http.Response(
+          events.map((e) => 'data: ${jsonEncode(e)}\n\n').join(),
+          200,
+        ),
+      );
+      addTearDown(client.close);
+      var toolCalls = 0;
+      final chunks = await sendOpenAIStream(
+        client,
+        config,
+        'gpt-5.4',
+        [
+          {'role': 'user', 'content': 'Hello'},
+        ],
+        onToolCall: (name, args, {toolCallId}) async {
+          toolCalls++;
+          return 'unexpected';
+        },
+      ).toList();
+      final artifact = chunks.whereType<ProviderArtifact>().single;
+      expect(jsonDecode(artifact.payload)['rounds'].single['output'], [
+        _reasoning,
+      ]);
+      expect(toolCalls, 0);
+    },
+  );
+
+  test(
+    'resumed native artifacts never merge another provider, endpoint or model',
+    () {
+      final prefix = ResponsesTurnRecorder(
+        _scope,
+      ).record([_reasoning], []).payload;
+      for (final scope in [
+        (providerId: 'other', baseUrl: _scope.baseUrl, modelId: _scope.modelId),
+        (
+          providerId: _scope.providerId,
+          baseUrl: 'https://other.example',
+          modelId: _scope.modelId,
+        ),
+        (
+          providerId: _scope.providerId,
+          baseUrl: _scope.baseUrl,
+          modelId: 'other',
+        ),
+      ]) {
+        final current = ResponsesTurnRecorder(
+          scope,
+        ).record([_text('Fresh')], []).payload;
+        expect(appendResponsesTurn(prefix, current), current);
+        expect(appendResponsesTurn('broken', current), current);
+        expect(appendResponsesTurn(null, current), current);
+      }
+    },
+  );
+
+  for (final policy in [null, ...ReasoningReplayPolicy.values]) {
+    for (final tool in ['none', 'function', 'hosted']) {
+      test('Responses history replay=$policy, tool=$tool', () async {
+        final config = ProviderConfig(
+          id: 'OpenAI',
+          enabled: true,
+          name: 'OpenAI',
+          apiKey: 'test',
+          baseUrl: 'https://api.openai.com/v1',
+          providerType: ProviderKind.openai,
+          useResponseApi: true,
+          modelOverrides: {
+            if (policy != null)
+              'gpt-5.4': {
+                'reasoning': {'replay': policy.name},
+              },
+          },
+        );
+        final scope = responsesReplayScope(config, 'gpt-5.4');
+        final output = [
+          _reasoning,
+          _text('Answer'),
+          if (tool == 'function') _call('c1'),
+          if (tool == 'hosted')
+            {'type': 'web_search_call', 'id': 'ws1', 'status': 'completed'},
+        ];
+        final artifact = ResponsesTurnRecorder(scope).record(output, [
+          if (tool == 'function')
+            emitToolCall(id: 'c1', name: 'lookup', arguments: {}),
+        ]);
+        final history = buildResponsesHistory(
+          payload: artifact.payload,
+          scope: scope,
+          content: 'Answer',
+          toolEvents: [
+            if (tool == 'function') {'id': 'c1', 'content': 'found'},
+          ],
+        )!;
+        late Map<String, dynamic> body;
+        final client = MockClient((request) async {
+          body = jsonDecode(request.body);
+          return http.Response('{"output":[]}', 200);
+        });
+        addTearDown(client.close);
+        await sendOpenAIStream(client, config, 'gpt-5.4', [
+          {'role': 'user', 'content': 'Question'},
+          ...history,
+          {'role': 'user', 'content': 'Next'},
+        ], stream: false).toList();
+        final keepReasoning =
+            policy == null ||
+            policy == ReasoningReplayPolicy.all ||
+            (policy == ReasoningReplayPolicy.toolTurns && tool != 'none');
+        expect(body['input'], [
+          {'role': 'user', 'content': 'Question'},
+          for (final item in output)
+            if (item['type'] != 'reasoning' || keepReasoning) item,
+          if (tool == 'function')
+            {
+              'type': 'function_call_output',
+              'call_id': 'c1',
+              'output': 'found',
+            },
+          {'role': 'user', 'content': 'Next'},
+        ]);
+      });
+    }
+  }
+
+  for (final stream in [false, true]) {
+    test(
+      'Responses replay none preserves live tool reasoning: stream=$stream',
+      () async {
+        final config = ProviderConfig(
+          id: 'OpenAI',
+          enabled: true,
+          name: 'OpenAI',
+          apiKey: 'test',
+          baseUrl: 'https://api.openai.com/v1',
+          providerType: ProviderKind.openai,
+          useResponseApi: true,
+          modelOverrides: {
+            'gpt-5.4': {
+              'reasoning': {'replay': 'none'},
+            },
+          },
+        );
+        final bodies = <Map<String, dynamic>>[];
+        final output = [_reasoning, _call('live-call')];
+        final client = MockClient((request) async {
+          bodies.add(jsonDecode(request.body));
+          final response = {
+            'output': bodies.length == 1 ? output : [_text('Done')],
+          };
+          final events = [
+            for (final (index, item)
+                in (response['output'] as List).indexed) ...[
+              {
+                'type': 'response.output_item.added',
+                'output_index': index,
+                'item': item,
+              },
+              {
+                'type': 'response.output_item.done',
+                'output_index': index,
+                'item': item,
+              },
+            ],
+            {'type': 'response.completed', 'response': response},
+          ];
+          return http.Response(
+            stream
+                ? '${events.map((event) => 'data: ${jsonEncode(event)}\n\n').join()}data: [DONE]\n\n'
+                : jsonEncode(response),
+            200,
+            headers: {
+              'content-type': stream ? 'text/event-stream' : 'application/json',
+            },
+          );
+        });
+        addTearDown(client.close);
+        await sendOpenAIStream(
+          client,
+          config,
+          'gpt-5.4',
+          [
+            {'role': 'user', 'content': 'Look it up'},
+          ],
+          stream: stream,
+          tools: [
+            {
+              'type': 'function',
+              'function': {
+                'name': 'lookup',
+                'parameters': {'type': 'object'},
+              },
+            },
+          ],
+          onToolCall: (name, args, {toolCallId}) async => 'found',
+        ).toList();
+        expect(bodies, hasLength(2));
+        expect((bodies.last['input'] as List).skip(1), [
+          ...output,
+          {
+            'type': 'function_call_output',
+            'call_id': 'live-call',
+            'output': 'found',
+          },
+        ]);
+      },
+    );
+  }
+
+  test(
+    'toolTurns filters final response reasoning independently of tool rounds',
+    () {
+      final recorder = ResponsesTurnRecorder(_scope);
+      recorder.record(
+        [_reasoning, _call('c1')],
+        [emitToolCall(id: 'c1', name: 'lookup', arguments: {})],
+      );
+      final artifact = recorder.record([
+        {..._reasoning, 'id': 'final-reasoning'},
+        _text('Done'),
+      ], []);
+      final history = buildResponsesHistory(
+        payload: artifact.payload,
+        scope: _scope,
+        content: 'Done',
+        toolEvents: [
+          {'id': 'c1', 'content': 'found'},
+        ],
+      )!;
+      final filtered = filterResponsesReasoningHistory(
+        history,
+        ReasoningReplayPolicy.toolTurns,
+      );
+      expect(
+        filtered
+            .map((m) => m[multimodalInternalResponsesItemKey])
+            .whereType<Map>(),
+        [_reasoning, _call('c1'), _text('Done')],
+      );
+      expect(history, hasLength(5));
+    },
+  );
+
   for (final official in [true, false]) {
     test(
       'ordinary Responses request retains its options, official=$official',

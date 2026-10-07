@@ -3,6 +3,7 @@ import 'dart:convert';
 import '../../../../models/model_spec.dart';
 import '../../../../utils/multimodal_input_utils.dart';
 import '../../../../../utils/sandbox_path_resolver.dart';
+import '../../../../../utils/utf16_safe_cut.dart';
 import '../../chat_api_helpers.dart';
 import '../../native_input_attachments.dart';
 import '../../tool_result_content.dart';
@@ -25,6 +26,16 @@ const String claudeTurnArtifactKind = 'claude_turn';
 String encodeClaudeTurn(List<List<Map<String, dynamic>>> responses) =>
     jsonEncode(responses);
 
+/// Append this request's cumulative responses to the message's pre-request
+/// snapshot. Repeated artifact writes must not append to the previous upsert.
+String appendClaudeTurn(String? prefix, String current) {
+  if (prefix == null) return current;
+  final previous = decodeClaudeTurn(prefix);
+  final next = decodeClaudeTurn(current);
+  if (previous == null || next == null) return current;
+  return encodeClaudeTurn([...previous, ...next]);
+}
+
 List<List<Map<String, dynamic>>>? decodeClaudeTurn(Object? payload) {
   if (payload is! String || payload.isEmpty) return null;
   try {
@@ -32,6 +43,53 @@ List<List<Map<String, dynamic>>>? decodeClaudeTurn(Object? payload) {
   } catch (_) {
     return null;
   }
+}
+
+/// A body edit retains native tool boundaries and opaque thinking. Redistribute
+/// text over its existing slots, as ChatMessage does for rendered parts. Later
+/// thinking whose prefix changed is handled by the normal signature recovery.
+String? editClaudeTurnText(
+  String payload,
+  String content, {
+  required String originalContent,
+}) {
+  final responses = decodeClaudeTurn(payload);
+  if (responses == null) return null;
+  final recordedText = joinedTextOfBlocks(responses.expand((blocks) => blocks));
+  if (originalContent.startsWith(recordedText) &&
+      originalContent.length > recordedText.length) {
+    // Cancellation can leave a later response's visible text outside the
+    // artifact. Give that tail its own slot after the recorded tool results,
+    // rather than moving it into the last completed response during editing.
+    responses.add([
+      {'type': 'text', 'text': originalContent.substring(recordedText.length)},
+    ]);
+  }
+  final textBlocks = responses
+      .expand((blocks) => blocks)
+      .where((block) => block['type'] == 'text')
+      .toList();
+  final texts = redistributeTextUtf16Safe(content, [
+    for (final block in textBlocks) (block['text'] ?? '').toString().length,
+  ]);
+  for (var i = 0; i < textBlocks.length; i++) {
+    final block = textBlocks[i];
+    final oldText = (block['text'] ?? '').toString();
+    final text = texts[i];
+    if (text != oldText) {
+      block['text'] = text;
+      // Citation offsets refer to the original text.
+      block.remove('citations');
+    }
+  }
+  // Empty slots still locate text relative to tools on the next edit. Keep
+  // them in the stored artifact; sanitize removes them from API requests.
+  if (textBlocks.isEmpty && content.isNotEmpty) {
+    responses.add([
+      {'type': 'text', 'text': content},
+    ]);
+  }
+  return encodeClaudeTurn(responses);
 }
 
 /// Block lists read off persisted JSON, empty ones dropped.
@@ -137,7 +195,8 @@ class ClaudeHistory {
   }) {
     return [
       for (final block in blocks)
-        if (_keepBlock((block['type'] ?? '').toString()))
+        if (_keepBlock((block['type'] ?? '').toString()) &&
+            !(block['type'] == 'text' && block['text'] == ''))
           if (replayThinking ||
               (block['type'] != 'thinking' &&
                   block['type'] != 'redacted_thinking'))

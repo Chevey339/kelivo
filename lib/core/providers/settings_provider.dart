@@ -6172,6 +6172,16 @@ class ProviderConfig {
   // Sentinel for copyWith nullability control (allow explicit null set)
   static const Object _sentinel = Object();
 
+  /// Resolve a model's wire protocol before assembling history or sending it.
+  ProviderConfig forModelProtocol(String modelId) {
+    if (oauthProvider == OAuthProvider.kimi &&
+        (modelOverrides[modelId] as Map?)?['oauthProtocol'] == 'anthropic' &&
+        providerType != ProviderKind.claude) {
+      return copyWith(providerType: ProviderKind.claude);
+    }
+    return this;
+  }
+
   ProviderConfig copyWith({
     String? id,
     bool? enabled,

@@ -78,7 +78,14 @@ AssistantToolHistory buildAssistantToolHistory(List<MessagePart> parts) {
       if (part.text.isEmpty) continue;
       reasoning.write(part.text);
     } else if (part is ToolCallPart) {
-      final raw = jsonDecode(part.payloadJson);
+      final Object? raw;
+      try {
+        raw = jsonDecode(part.payloadJson);
+      } on FormatException {
+        // Stored/imported tool payloads are losslessly hydrated. One damaged
+        // card must not prevent replaying the rest of the conversation.
+        continue;
+      }
       if (raw is! Map) continue;
       final tool = Map<String, dynamic>.from(raw);
       if ((tool['id'] ?? '').toString().isEmpty ||

@@ -224,6 +224,7 @@ Stream<StreamChunk> sendOpenAIStream(
     responsesReplayScope(config, modelId),
   );
   if (config.useResponseApi == true) {
+    messages = filterResponsesReasoningHistory(messages, spec.reasoning.replay);
     final input = <Map<String, dynamic>>[];
     // Extract system messages into `instructions` (Responses API best practice)
     String instructions = '';
@@ -618,9 +619,6 @@ Stream<StreamChunk> sendOpenAIStream(
       allowRemoteImages: allowRemoteImages,
       reasoningReplay: spec.reasoning.replay,
       replayField: spec.reasoning.replayField,
-      requiresSignedReasoning:
-          upstreamModelId.toLowerCase().contains('claude') ||
-          upstreamModelId.toLowerCase().startsWith('anthropic/'),
       skipImageParsing: skipImageParsing,
     );
     body = {
@@ -1119,6 +1117,23 @@ Stream<StreamChunk> sendOpenAIStream(
   }
   for (final chunk in responsesDecoder?.onClosed() ?? const <StreamChunk>[]) {
     yield chunk;
+  }
+  if (responsesDecoder != null) {
+    usage = responsesDecoder.usage ?? usage;
+    approxCompletionChars = responsesDecoder.approxCompletionChars;
+    final output = responsesDecoder.outputItems;
+    if (output.isNotEmpty) {
+      // EOF can follow complete output_item.done events without a terminal
+      // response event. Retain those native items, but do not synthesize or
+      // execute function calls whose response never completed.
+      yield responsesRecorder.record(
+        output,
+        responsesCallsFromIndexMap({
+          for (final call in responsesDecoder.takeFunctionCalls())
+            call.index: call.toIndexFields(),
+        }),
+      );
+    }
   }
   if (chatDecoder != null &&
       effectiveOnToolCall != null &&

@@ -3944,6 +3944,30 @@ class ChatService extends ChangeNotifier {
         version: nextVersion,
       );
 
+      final preserveArtifacts =
+          parts == null && content == temporaryOriginal.content;
+      final artifacts = _temporaryProviderArtifacts[messageId];
+      if (artifacts != null) {
+        final inherited = <String, String>{};
+        for (final entry in artifacts.entries) {
+          final payload =
+              preserveArtifacts ||
+                  entry.key == claudeThinkingRecoveryArtifactKind
+              ? entry.value
+              : parts == null && entry.key == claudeTurnArtifactKind
+              ? editClaudeTurnText(
+                  entry.value,
+                  content,
+                  originalContent: temporaryOriginal.content,
+                )
+              : null;
+          if (payload != null) inherited[entry.key] = payload;
+        }
+        _temporaryProviderArtifacts[newMsg.id] = inherited;
+      }
+      if (preserveReasoning) {
+        _temporaryToolEvents[newMsg.id] = getToolEvents(messageId);
+      }
       messages.add(newMsg);
       conversation.messageIds.add(newMsg.id);
       conversation.versionSelections[groupId] = nextVersion;
@@ -3963,6 +3987,7 @@ class ChatService extends ChangeNotifier {
     );
     if (result == null) return null;
     final newMsg = result.message;
+    await _cacheMessageArtifacts([newMsg]);
     if (_messageCanOwnAssets(newMsg)) {
       await _synchronizeMessageAssetsBestEffort(newMsg);
     }

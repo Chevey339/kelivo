@@ -252,11 +252,7 @@ class ChatApiService {
       if (sessionToken.isCancelled) return;
       if (textOnly) config = _textOnlyConfig(config, modelId);
       if (config.oauthProvider == OAuthProvider.chatgpt) stream = true;
-      if (config.oauthProvider == OAuthProvider.kimi &&
-          (config.modelOverrides[modelId] as Map?)?['oauthProtocol'] ==
-              'anthropic') {
-        config = config.copyWith(providerType: ProviderKind.claude);
-      }
+      config = config.forModelProtocol(modelId);
       final options = retryOverride ?? AutoRetryConfig.current;
       final sessionHeaders = providerSessionHeaders(
         config,

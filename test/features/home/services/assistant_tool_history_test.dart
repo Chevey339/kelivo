@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:Kelivo/core/database/chat_database_repository.dart';
 import 'package:Kelivo/core/models/chat_message.dart';
 import 'package:Kelivo/core/models/conversation.dart';
 import 'package:Kelivo/core/models/message_part.dart';
@@ -33,6 +34,78 @@ Map<String, dynamic> _call(String id) => {
 };
 
 void main() {
+  test(
+    'malformed stored tools do not block healthy Chat Completions history',
+    () async {
+      final root = await Directory.systemTemp.createTemp(
+        'tool_history_corrupt_',
+      );
+      final file = File('${root.path}/chat.sqlite');
+      var repository = ChatDatabaseRepository.open(file: file);
+      addTearDown(() async {
+        await repository.close();
+        await root.delete(recursive: true);
+      });
+      await repository.ensureReady();
+      await repository.putConversation(
+        Conversation(id: 'c', title: 'Imported'),
+      );
+      const parts = [
+        ReasoningPart('Plan'),
+        TextPart('Before.'),
+        ToolCallPart(
+          '{"id":"good","name":"lookup","arguments":{},"content":"found"}',
+        ),
+        AssistantRoundEndPart(),
+        ToolCallPart('{broken'),
+        ToolCallPart('[]'),
+        TextPart('After.'),
+      ];
+      await repository.putMessage(
+        ChatMessage(
+          id: 'a',
+          role: 'assistant',
+          conversationId: 'c',
+          parts: parts,
+        ),
+      );
+      await repository.close();
+      repository = ChatDatabaseRepository.open(file: file);
+      await repository.ensureReady();
+      final restored = (await repository.getMessage('a'))!;
+      final builder = MessageBuilderService(
+        chatService: _Chat(),
+        contextProvider: _Context(),
+      );
+      final history = builder.buildApiMessages(
+        messages: [
+          ChatMessage(role: 'user', content: 'Question', conversationId: 'c'),
+          restored,
+          ChatMessage(role: 'user', content: 'Next', conversationId: 'c'),
+        ],
+        versionSelections: {},
+        currentConversation: null,
+        includeToolMessages: true,
+        preserveToolTurns: true,
+      );
+      expect(history.map((message) => message['role']), [
+        'user',
+        'assistant',
+        'tool',
+        'assistant',
+        'user',
+      ]);
+      expect(history[1]['reasoning_content'], 'Plan');
+      expect(history[1]['content'], 'Before.');
+      expect((history[1]['tool_calls'] as List).single['id'], 'good');
+      expect(history[2]['content'], 'found');
+      expect(history[3]['content'], 'After.');
+      expect(history[4]['content'], 'Next');
+      expect(restored.parts, parts);
+      expect((await repository.getMessage('a'))!.parts, parts);
+    },
+  );
+
   for (final stream in [true, false]) {
     for (final signed in [false, true]) {
       test(

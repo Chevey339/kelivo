@@ -22,6 +22,9 @@ import 'package:Kelivo/core/providers/assistant_provider.dart';
 import 'package:Kelivo/core/providers/mcp_provider.dart';
 import 'package:Kelivo/core/providers/settings_provider.dart';
 import 'package:Kelivo/core/services/chat/chat_service.dart';
+import 'package:Kelivo/core/services/api/providers/openai/responses_history.dart';
+import 'package:Kelivo/core/services/api/providers/claude/claude_history.dart';
+import 'package:Kelivo/core/services/api/stream/stream_chunk_emit.dart';
 import 'package:Kelivo/core/services/mcp/mcp_tool_service.dart';
 import 'package:Kelivo/features/chat/widgets/chat_message_widget.dart'
     show ToolUIPart;
@@ -43,6 +46,32 @@ class _GatedChatService extends ChatService {
   bool failAfterVersionSave = false;
   Completer<void>? presetHold;
   String? presetConversationId;
+  Completer<void>? checkpointHold;
+  final checkpointEntered = Completer<void>();
+
+  @override
+  Future<void> updateStreamingCheckpointSilent(
+    ChatMessage message,
+    List<Map<String, dynamic>> toolEvents, {
+    String? generationRunId,
+    int? checkpointSeq,
+  }) async {
+    if (checkpointHold != null &&
+        toolEvents.any(
+          (event) =>
+              event['arguments'] is Map &&
+              (event['arguments'] as Map).isNotEmpty,
+        )) {
+      if (!checkpointEntered.isCompleted) checkpointEntered.complete();
+      await checkpointHold!.future;
+    }
+    await super.updateStreamingCheckpointSilent(
+      message,
+      toolEvents,
+      generationRunId: generationRunId,
+      checkpointSeq: checkpointSeq,
+    );
+  }
 
   @override
   Future<ChatMessage> addMessage({
@@ -168,11 +197,13 @@ void main() {
       '{"suggestions":["suggestion one","suggestion two"]}';
   var suggestionResponsesSent = 0;
   late AskUserInteractionService questions;
+  Future<void> Function(HttpRequest, Map<String, dynamic>)? apiOverride;
 
   Future<void> handleApiRequest(HttpRequest request) async {
     final body =
         jsonDecode(await utf8.decoder.bind(request).join())
             as Map<String, dynamic>;
+    if (apiOverride != null) return apiOverride!(request, body);
     if (body['model'] == 'gpt-4o' &&
         body['stream'] != true &&
         !(body['messages'] as List).any((m) => m['role'] == 'tool')) {
@@ -277,6 +308,7 @@ void main() {
     service = _GatedChatService(existingRepository: repository);
     await service.init();
     streamRequestCount = 0;
+    apiOverride = null;
     streamRequests.clear();
     streamHold = null;
     suggestionHold = null;
@@ -421,6 +453,713 @@ void main() {
     );
     await waitForWidget(tester, () => done, 'asynchronous operation');
     if (failure != null) throw failure!;
+  }
+
+  Future<ProviderConfig> configureNative({
+    required bool claude,
+    required bool stream,
+  }) async {
+    final config = settings
+        .getProviderConfig('SiliconFlow')
+        .copyWith(
+          providerType: claude ? ProviderKind.claude : ProviderKind.openai,
+          useResponseApi: !claude,
+        );
+    await settings.setProviderConfig(config.id, config);
+    await settings.setCurrentModel(
+      config.id,
+      claude ? 'claude-sonnet-4-6' : 'gpt-5.4',
+    );
+    await settings.disableTitleGeneration();
+    await settings.disableSuggestionGeneration();
+    await assistantProvider.updateAssistant(
+      assistantProvider.currentAssistant!.copyWith(
+        streamOutput: stream,
+        localToolIds: [AskUserToolNames.askUser],
+      ),
+    );
+    return config;
+  }
+
+  for (final claude in [false, true]) {
+    testWidgets(
+      'nonstream cancel during checkpoint never starts the pending tool: claude=$claude',
+      (tester) async {
+        final controller = await pumpHarness(tester);
+        await tester.runAsync(() async {
+          await configureNative(claude: claude, stream: false);
+          final hold = Completer<void>();
+          service.checkpointHold = hold;
+          const arguments = {
+            'questions': [
+              {'id': 'q1', 'question': 'Continue?'},
+            ],
+          };
+          apiOverride = (request, body) async {
+            if (claude) {
+              request.response.headers.contentType = ContentType.json;
+              request.response.write(
+                jsonEncode({
+                  'content': [
+                    {'type': 'text', 'text': 'Before tool.'},
+                    {
+                      'type': 'tool_use',
+                      'id': 'cancel-probe',
+                      'name': AskUserToolNames.askUser,
+                      'input': arguments,
+                    },
+                  ],
+                  'stop_reason': 'tool_use',
+                }),
+              );
+              await request.response.close();
+            } else {
+              await _writeResponses(request, body, [
+                _nativeText('Before tool.'),
+                {
+                  'type': 'function_call',
+                  'call_id': 'cancel-probe',
+                  'name': AskUserToolNames.askUser,
+                  'arguments': jsonEncode(arguments),
+                },
+              ]);
+            }
+          };
+          final conversation = await openConversation(controller);
+          final sending = controller.sendMessage(ChatInputData(text: 'Ask me'));
+          try {
+            await service.checkpointEntered.future.timeout(
+              const Duration(seconds: 10),
+            );
+            expect(questions.pendingRequests, isEmpty);
+            final cancelling = controller.cancelStreaming();
+            await waitFor(
+              () => !controller.chatController.messages.last.isStreaming,
+              'cancellation published before checkpoint release',
+            );
+            hold.complete();
+            await cancelling;
+            // Let the tool closure finish too. A regression creates a new
+            // prompt after cancellation and leaves this generation waiting.
+            var completed = false;
+            final completion = sending.then((_) => completed = true);
+            await waitFor(
+              () => completed || questions.pendingRequests.isNotEmpty,
+              'cancelled generation to settle',
+            );
+            final pendingAfterCancel = List<String>.of(
+              questions.pendingRequests.keys,
+            );
+            questions.cancelForConversation(conversation.id);
+            await completion;
+            expect(pendingAfterCancel, isEmpty);
+          } finally {
+            if (!hold.isCompleted) hold.complete();
+            questions.cancelForConversation(conversation.id);
+            await ChatActions.cancelActiveGenerationFor(conversation.id);
+            await sending.timeout(const Duration(seconds: 10));
+          }
+        });
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'nonstream completed exchange is durable before next tool starts claude=$claude',
+      (tester) async {
+        final controller = await pumpHarness(tester);
+        await tester.runAsync(() async {
+          await configureNative(claude: claude, stream: false);
+          final requests = <Map<String, dynamic>>[];
+          const args = {
+            'questions': [
+              {'id': 'q1', 'question': 'Continue?'},
+            ],
+          };
+          apiOverride = (request, body) async {
+            requests.add(body);
+            final first = requests.length <= 2;
+            final callId = requests.length == 1 ? 'probe-first' : 'probe-ask';
+            request.response.headers.contentType = ContentType.json;
+            request.response.write(
+              jsonEncode(
+                claude
+                    ? {
+                        'content': [
+                          {
+                            'type': 'thinking',
+                            'thinking': 'Plan',
+                            'signature': 'signed-plan',
+                          },
+                          {
+                            'type': 'text',
+                            'text': first ? 'Before asking. ' : 'Done',
+                          },
+                          if (first)
+                            {
+                              'type': 'tool_use',
+                              'id': callId,
+                              'name': AskUserToolNames.askUser,
+                              'input': args,
+                            },
+                        ],
+                        'stop_reason': first ? 'tool_use' : 'end_turn',
+                      }
+                    : {
+                        'output': [
+                          _nativeReasoning('probe-plan'),
+                          _nativeText(first ? 'Before asking. ' : 'Done'),
+                          if (first)
+                            {
+                              'type': 'function_call',
+                              'call_id': callId,
+                              'name': AskUserToolNames.askUser,
+                              'arguments': jsonEncode(args),
+                            },
+                        ],
+                      },
+              ),
+            );
+            await request.response.close();
+          };
+          final conversation = await openConversation(controller);
+          final sending = controller.sendMessage(
+            ChatInputData(text: 'Ask before continuing'),
+          );
+          await waitFor(
+            () => questions.pendingRequests.containsKey('probe-first'),
+            'first probe tool pending',
+          );
+          questions.answer('probe-first', {
+            'q1': const AskUserAnswerValue.single(
+              value: 'First completed answer',
+              custom: true,
+            ),
+          });
+          await waitFor(
+            () => questions.pendingRequests.containsKey('probe-ask'),
+            'second probe tool pending',
+          );
+          final reloadedRepository = ChatDatabaseRepository.open(
+            file: File('${directory.path}/kelivo.db'),
+          );
+          await reloadedRepository.ensureReady();
+          final messages = await reloadedRepository.getMessagesRange(
+            conversation.id,
+            start: 0,
+            limit: 20,
+          );
+          final waiting = messages.last;
+          final artifact = await reloadedRepository
+              .getProviderArtifactsForMessages([
+                waiting.id,
+              ], claude ? claudeTurnArtifactKind : responsesTurnArtifactKind);
+          await reloadedRepository.close();
+          questions.answer('probe-ask', {
+            'q1': const AskUserAnswerValue.single(value: 'Yes', custom: true),
+          });
+          await sending;
+          await waitFor(
+            () => !controller.chatController.isConversationLoading(
+              conversation.id,
+            ),
+            'probe generation finish',
+          );
+          expect(
+            artifact[waiting.id],
+            contains(claude ? 'signed-plan' : 'opaque-probe-plan'),
+          );
+          final pending = waiting.parts
+              .whereType<ToolCallPart>()
+              .map((p) => jsonDecode(p.payloadJson) as Map)
+              .singleWhere((event) => event['id'] == 'probe-ask');
+          expect(pending['content'], isNull);
+          final completed = waiting.parts
+              .whereType<ToolCallPart>()
+              .map((p) => jsonDecode(p.payloadJson) as Map)
+              .where((event) => event['id'] == 'probe-first');
+          expect(
+            completed,
+            hasLength(1),
+            reason:
+                'The previous call and its answered result must survive a new database connection',
+          );
+          expect(
+            completed.single['content'],
+            contains('First completed answer'),
+          );
+          expect(waiting.content, 'Before asking. Before asking. ');
+          final finished = (await service.loadMessages(conversation.id)).last;
+          expect(finished.content, 'Before asking. Before asking. Done');
+          expect(finished.parts.whereType<ToolCallPart>(), hasLength(2));
+          expect(finished.firstTokenMs, isNull);
+          if (claude) expect(finished.reasoningText, 'PlanPlanPlan');
+        });
+      },
+    );
+  }
+
+  for (final claude in [false, true]) {
+    testWidgets(
+      'nonstream native state is persisted and sent on next question: claude=$claude',
+      (tester) async {
+        final controller = await pumpHarness(tester);
+        await tester.runAsync(() async {
+          await configureNative(claude: claude, stream: false);
+          final requests = <Map<String, dynamic>>[];
+          const thinking = {
+            'type': 'thinking',
+            'thinking': '',
+            'signature': 'opaque-claude',
+          };
+          apiOverride = (request, body) async {
+            requests.add(body);
+            expect(body['stream'], isFalse);
+            request.response.headers.contentType = ContentType.json;
+            request.response.write(
+              jsonEncode(
+                claude
+                    ? {
+                        'content': [
+                          thinking,
+                          {'type': 'text', 'text': 'Answer'},
+                        ],
+                        'stop_reason': 'end_turn',
+                      }
+                    : {
+                        'output': [
+                          _nativeReasoning('first'),
+                          _nativeText('Answer'),
+                        ],
+                      },
+              ),
+            );
+            await request.response.close();
+          };
+          final convo = await openConversation(controller);
+          await controller.sendMessage(ChatInputData(text: 'Question'));
+          await waitFor(
+            () => !controller.chatController.isConversationLoading(convo.id),
+            'nonstream finish',
+          );
+          final reply = (await service.loadMessages(convo.id)).last;
+          final kind = claude
+              ? claudeTurnArtifactKind
+              : responsesTurnArtifactKind;
+          final persisted = await repository.getProviderArtifactsForMessages([
+            reply.id,
+          ], kind);
+          expect(
+            persisted[reply.id],
+            contains(claude ? 'opaque-claude' : 'opaque-first'),
+          );
+          expect(
+            service.getProviderArtifact(reply.id, kind),
+            persisted[reply.id],
+          );
+          await controller.sendMessage(ChatInputData(text: 'Next'));
+          await waitFor(
+            () => !controller.chatController.isConversationLoading(convo.id),
+            'next finish',
+          );
+          expect(requests, hasLength(2));
+          final history = requests.last[claude ? 'messages' : 'input'] as List;
+          if (claude) {
+            final assistant = history.singleWhere(
+              (m) => m['role'] == 'assistant',
+            );
+            expect(assistant['content'], [
+              thinking,
+              {'type': 'text', 'text': 'Answer'},
+            ]);
+          } else {
+            expect(history.where((m) => m['type'] == 'reasoning'), [
+              _nativeReasoning('first'),
+            ]);
+          }
+        });
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
+
+  testWidgets('Claude recovered native history retains both signed responses', (
+    tester,
+  ) async {
+    final controller = await pumpHarness(tester);
+    await tester.runAsync(() async {
+      final config = await configureNative(claude: true, stream: false);
+      final convo = await openConversation(controller);
+      const arguments = {
+        'questions': [
+          {'id': 'q1', 'question': 'Which option?'},
+        ],
+      };
+      const oldBlocks = [
+        {'type': 'thinking', 'thinking': '', 'signature': 'opaque-old'},
+        {'type': 'text', 'text': 'Before asking. '},
+        {
+          'type': 'tool_use',
+          'id': 'old-ask',
+          'name': AskUserToolNames.askUser,
+          'input': arguments,
+        },
+      ];
+      const freshBlocks = [
+        {'type': 'thinking', 'thinking': '', 'signature': 'opaque-fresh'},
+        {'type': 'text', 'text': 'Answer'},
+      ];
+      await service.addMessage(
+        conversationId: convo.id,
+        role: 'user',
+        content: 'Ask me',
+      );
+      final reply = await service.addMessage(
+        conversationId: convo.id,
+        role: 'assistant',
+        providerId: config.id,
+        modelId: 'claude-sonnet-4-6',
+        parts: [
+          const TextPart('Before asking. '),
+          ToolCallPart(
+            jsonEncode({
+              'id': 'old-ask',
+              'name': AskUserToolNames.askUser,
+              'arguments': arguments,
+              'content': null,
+            }),
+          ),
+        ],
+      );
+      await service.setProviderArtifact(
+        reply.id,
+        claudeTurnArtifactKind,
+        encodeClaudeTurn([oldBlocks]),
+      );
+      final requests = <Map<String, dynamic>>[];
+      apiOverride = (request, body) async {
+        requests.add(body);
+        request.response.headers.contentType = ContentType.json;
+        request.response.write(
+          jsonEncode({'content': freshBlocks, 'stop_reason': 'end_turn'}),
+        );
+        await request.response.close();
+      };
+      await controller.chatController.setCurrentConversationAndLoad(convo);
+      await controller.submitRecoveredAskUserAnswer(
+        reply,
+        const ToolUIPart(
+          id: 'old-ask',
+          toolName: AskUserToolNames.askUser,
+          arguments: arguments,
+          loading: true,
+        ),
+        const AskUserResult.answer({
+          'q1': AskUserAnswerValue.single(value: 'approved', custom: true),
+        }),
+      );
+      await waitFor(
+        () => !controller.chatController.isConversationLoading(convo.id),
+        'Claude recovery finish',
+      );
+      expect(
+        decodeClaudeTurn(
+          service.getProviderArtifact(reply.id, claudeTurnArtifactKind),
+        ),
+        [oldBlocks, freshBlocks],
+      );
+      await controller.sendMessage(ChatInputData(text: 'Next'));
+      await waitFor(
+        () => !controller.chatController.isConversationLoading(convo.id),
+        'Claude next finish',
+      );
+      expect(requests, hasLength(2));
+      final messages = requests.last['messages'] as List;
+      final assistants = messages
+          .where((m) => m['role'] == 'assistant')
+          .toList();
+      expect(assistants.map((m) => m['content']), [oldBlocks, freshBlocks]);
+      final results = messages.where(
+        (m) => m['role'] == 'user' && m['content'] is List,
+      );
+      expect(jsonEncode(results.toList()), contains('approved'));
+    });
+    expect(tester.takeException(), isNull);
+  });
+
+  for (final stream in [false, true]) {
+    for (final temporary in [false, true]) {
+      for (final preamble in ['', 'Before asking. ']) {
+        testWidgets(
+          'native Responses recovery keeps all rounds: stream=$stream, temporary=$temporary, preamble="$preamble"',
+          (tester) async {
+            final controller = await pumpHarness(tester);
+            await tester.runAsync(() async {
+              final config = await configureNative(
+                claude: false,
+                stream: stream,
+              );
+              final convo = temporary
+                  ? await service.createDraftConversation(
+                      title: 'Recovery',
+                      temporary: true,
+                    )
+                  : await service.createConversation(title: 'Recovery');
+              const arguments = {
+                'questions': [
+                  {'id': 'q1', 'question': 'Which option?'},
+                ],
+              };
+              Map<String, dynamic> call(String id) => {
+                'type': 'function_call',
+                'id': 'fc-$id',
+                'call_id': id,
+                'name': AskUserToolNames.askUser,
+                'arguments': jsonEncode(arguments),
+              };
+              final oldOutput = [
+                _nativeReasoning('old'),
+                if (preamble.isNotEmpty) _nativeText(preamble),
+                call('old-ask'),
+              ];
+              await service.addMessage(
+                conversationId: convo.id,
+                role: 'user',
+                content: 'Ask me',
+              );
+              final reply = await service.addMessage(
+                conversationId: convo.id,
+                role: 'assistant',
+                providerId: config.id,
+                modelId: 'gpt-5.4',
+                parts: [
+                  if (preamble.isNotEmpty) TextPart(preamble),
+                  ToolCallPart(
+                    jsonEncode({
+                      'id': 'old-ask',
+                      'name': AskUserToolNames.askUser,
+                      'arguments': arguments,
+                      'content': null,
+                    }),
+                  ),
+                  const AssistantRoundEndPart(),
+                ],
+              );
+              await service.setProviderArtifact(
+                reply.id,
+                responsesTurnArtifactKind,
+                ResponsesTurnRecorder(
+                  responsesReplayScope(config, 'gpt-5.4'),
+                ).record(oldOutput, [
+                  emitToolCall(
+                    id: 'old-ask',
+                    name: AskUserToolNames.askUser,
+                    arguments: arguments,
+                  ),
+                ]).payload,
+              );
+              final requests = <Map<String, dynamic>>[];
+              final middle = [
+                _nativeReasoning('middle'),
+                _nativeText('During recovery. '),
+                call('live-ask'),
+              ];
+              final finalOutput = [
+                _nativeReasoning('final'),
+                _nativeText('Answer'),
+              ];
+              apiOverride = (request, body) async {
+                requests.add(body);
+                await _writeResponses(
+                  request,
+                  body,
+                  requests.length == 1 ? middle : finalOutput,
+                );
+              };
+              await controller.chatController.setCurrentConversationAndLoad(
+                convo,
+              );
+              final resumed = controller.submitRecoveredAskUserAnswer(
+                reply,
+                const ToolUIPart(
+                  id: 'old-ask',
+                  toolName: AskUserToolNames.askUser,
+                  arguments: arguments,
+                  loading: true,
+                ),
+                const AskUserResult.answer({
+                  'q1': AskUserAnswerValue.single(
+                    value: 'original answer',
+                    custom: true,
+                  ),
+                }),
+              );
+              await waitFor(
+                () => questions.pendingRequests.containsKey('live-ask'),
+                'second ask',
+              );
+              questions.answer('live-ask', {
+                'q1': const AskUserAnswerValue.single(
+                  value: 'follow-up answer',
+                  custom: true,
+                ),
+              });
+              await resumed;
+              await waitFor(
+                () =>
+                    !controller.chatController.isConversationLoading(convo.id),
+                'recovery finish',
+              );
+              expect(requests, hasLength(2));
+              final firstInput = requests.first['input'] as List;
+              expect(
+                firstInput.where(
+                  (m) =>
+                      m['type'] != null && m['type'] != 'function_call_output',
+                ),
+                oldOutput,
+              );
+              final artifact = service.getProviderArtifact(
+                reply.id,
+                responsesTurnArtifactKind,
+              )!;
+              final rounds = (jsonDecode(artifact) as Map)['rounds'] as List;
+              expect(rounds.map((round) => round['output']), [
+                oldOutput,
+                middle,
+                finalOutput,
+              ]);
+              if (!temporary) {
+                expect(
+                  (await repository.getProviderArtifactsForMessages([
+                    reply.id,
+                  ], responsesTurnArtifactKind))[reply.id],
+                  artifact,
+                );
+              }
+              await controller.sendMessage(ChatInputData(text: 'Next'));
+              await waitFor(
+                () =>
+                    !controller.chatController.isConversationLoading(convo.id),
+                'next finish',
+              );
+              expect(requests, hasLength(3));
+              final next = requests.last['input'] as List;
+              expect(
+                next
+                    .where((m) => m['type'] == 'reasoning')
+                    .map((m) => m['encrypted_content']),
+                ['opaque-old', 'opaque-middle', 'opaque-final'],
+              );
+              expect(
+                next
+                    .where((m) => m['type'] == 'function_call')
+                    .map((m) => m['call_id']),
+                ['old-ask', 'live-ask'],
+              );
+              final answers = next
+                  .where((m) => m['type'] == 'function_call_output')
+                  .toList();
+              expect(answers.map((m) => m['call_id']), ['old-ask', 'live-ask']);
+              expect(answers.first['output'], contains('original answer'));
+              expect(answers.last['output'], contains('follow-up answer'));
+              final latest = (await service.loadMessages(convo.id)).last;
+              expect(
+                (jsonDecode(
+                      service.getProviderArtifact(
+                        latest.id,
+                        responsesTurnArtifactKind,
+                      )!,
+                    )
+                    as Map)['rounds'],
+                hasLength(1),
+              );
+            });
+            expect(tester.takeException(), isNull);
+          },
+        );
+      }
+    }
+  }
+
+  for (final temporary in [false, true]) {
+    testWidgets('recovered ask answer reaches request: temporary=$temporary', (
+      tester,
+    ) async {
+      final controller = await pumpHarness(tester);
+      await tester.runAsync(() async {
+        final convo = temporary
+            ? await service.createDraftConversation(
+                title: 'Recovered ask',
+                temporary: true,
+              )
+            : await service.createConversation(title: 'Recovered ask');
+        await service.addMessage(
+          conversationId: convo.id,
+          role: 'user',
+          content: 'Ask me what to do',
+        );
+        final arguments = <String, dynamic>{
+          'questions': [
+            {'id': 'q1', 'question': 'Which option?'},
+          ],
+        };
+        final reply = await service.addMessage(
+          conversationId: convo.id,
+          role: 'assistant',
+          providerId: 'SiliconFlow',
+          modelId: 'test-model',
+          parts: [
+            const ReasoningPart('Need user choice'),
+            ToolCallPart(
+              jsonEncode({
+                'id': 'recovered-ask',
+                'name': AskUserToolNames.askUser,
+                'arguments': arguments,
+                'content': null,
+              }),
+            ),
+            const AssistantRoundEndPart(),
+          ],
+        );
+        await controller.chatController.setCurrentConversationAndLoad(convo);
+        await controller.submitRecoveredAskUserAnswer(
+          reply,
+          ToolUIPart(
+            id: 'recovered-ask',
+            toolName: AskUserToolNames.askUser,
+            arguments: arguments,
+            loading: true,
+          ),
+          const AskUserResult.answer({
+            'q1': AskUserAnswerValue.single(
+              value: 'Only review; do not modify files',
+              custom: true,
+            ),
+          }),
+        );
+        await waitFor(() => streamRequestCount == 1, 'recovered request');
+        await waitFor(
+          () => !controller.chatController.isConversationLoading(convo.id),
+          'recovered streaming to finish',
+        );
+        final requestMessages = (streamRequests.single['messages'] as List)
+            .cast<Map>();
+        final result = requestMessages.singleWhere((m) => m['role'] == 'tool');
+        expect(result['tool_call_id'], 'recovered-ask');
+        final answer = jsonDecode(result['content'] as String) as Map;
+        expect(answer['type'], 'ask_user_answer');
+        expect(
+          answer['answers']['q1']['value'],
+          'Only review; do not modify files',
+        );
+        final assistant = requestMessages.singleWhere(
+          (m) => m['role'] == 'assistant',
+        );
+        expect(assistant['tool_calls'].single['id'], 'recovered-ask');
+      });
+      expect(tester.takeException(), isNull);
+    });
   }
 
   testWidgets('concurrent sends persist a single user/assistant pair', (
@@ -1743,6 +2482,61 @@ void main() {
       expect(tester.takeException(), isNull);
     },
   );
+}
+
+Map<String, dynamic> _nativeReasoning(String id) => {
+  'type': 'reasoning',
+  'id': id,
+  'summary': [],
+  'encrypted_content': 'opaque-$id',
+};
+
+Map<String, dynamic> _nativeText(String text) => {
+  'type': 'message',
+  'id': 'message-$text',
+  'role': 'assistant',
+  'content': [
+    {'type': 'output_text', 'text': text, 'annotations': []},
+  ],
+};
+
+Future<void> _writeResponses(
+  HttpRequest request,
+  Map<String, dynamic> body,
+  List<Map<String, dynamic>> output,
+) async {
+  if (body['stream'] == true) {
+    request.response.headers.contentType = ContentType('text', 'event-stream');
+    void emit(Map<String, dynamic> event) =>
+        request.response.write('data: ${jsonEncode(event)}\n\n');
+    for (final (index, item) in output.indexed) {
+      emit({
+        'type': 'response.output_item.added',
+        'output_index': index,
+        'item': item,
+      });
+      if (item['type'] == 'message') {
+        emit({
+          'type': 'response.output_text.delta',
+          'output_index': index,
+          'delta': (item['content'] as List).first['text'],
+        });
+      }
+      emit({
+        'type': 'response.output_item.done',
+        'output_index': index,
+        'item': item,
+      });
+    }
+    emit({
+      'type': 'response.completed',
+      'response': {'output': output},
+    });
+  } else {
+    request.response.headers.contentType = ContentType.json;
+    request.response.write(jsonEncode({'output': output}));
+  }
+  await request.response.close();
 }
 
 class _ControllerHarness extends StatefulWidget {

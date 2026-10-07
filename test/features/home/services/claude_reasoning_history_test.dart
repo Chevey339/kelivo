@@ -5,6 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:Kelivo/core/database/chat_database_repository.dart';
 import 'package:Kelivo/core/models/chat_message.dart';
 import 'package:Kelivo/core/models/conversation.dart';
+import 'package:Kelivo/core/models/message_part.dart';
 import 'package:Kelivo/core/services/api/providers/claude/claude_history.dart';
 import 'package:Kelivo/core/services/api/providers/claude/claude_thinking_recovery.dart';
 import 'package:Kelivo/core/services/api/stream/stream_chunk.dart';
@@ -369,6 +370,56 @@ void main() {
         ], claudeTurnArtifactKind),
         {'old': oldTurn},
       );
+      final fresh = (await repository.getMessage('fresh'))!;
+      for (final edit in ['unchanged', 'text', 'remove-parts']) {
+        final text = edit == 'text' ? 'Edited answer' : fresh.content;
+        final version = (await repository.appendMessageVersion(
+          messageId: fresh.id,
+          content: text,
+          parts: edit == 'remove-parts' ? [TextPart(text)] : null,
+        ))!.message;
+        for (final kind in artifacts.keys) {
+          artifacts[kind]!.addAll(
+            await repository.getProviderArtifactsForMessages([
+              version.id,
+            ], kind),
+          );
+        }
+        final editedHistory = builder.buildApiMessages(
+          messages: [
+            ChatMessage(
+              role: 'user',
+              content: 'Edited question',
+              conversationId: 'c',
+            ),
+            (await repository.getMessage('old'))!,
+            ChatMessage(role: 'user', content: 'Continue', conversationId: 'c'),
+            version,
+            ChatMessage(role: 'user', content: 'Next', conversationId: 'c'),
+          ],
+          versionSelections: const {},
+          currentConversation: conversation,
+          includeToolMessages: true,
+          claudeSource: (providerId: config.id, modelId: modelId),
+        );
+        final body = await captureClaudeRequestBody(
+          config: config,
+          modelId: modelId,
+          messages: editedHistory,
+        );
+        final sent = body['messages'] as List;
+        expect(sent[1]['content'], [_text], reason: edit);
+        expect(
+          sent[3]['content'],
+          edit == 'remove-parts'
+              ? text
+              : [
+                  _thinking,
+                  {'type': 'text', 'text': text},
+                ],
+          reason: edit,
+        );
+      }
     },
   );
 

@@ -6,6 +6,7 @@ import 'package:http/testing.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:Kelivo/core/models/model_spec.dart';
+import 'package:Kelivo/core/models/provider_oauth.dart';
 import 'package:Kelivo/core/providers/settings_provider.dart';
 import 'package:Kelivo/core/services/api/reasoning/reasoning_dialects.dart';
 import 'package:Kelivo/core/services/model_catalog/catalog_entry.dart';
@@ -278,6 +279,11 @@ void main() {
         (config: _openai(), model: 'kimi-k2.6'),
         (config: _openai(), model: 'glm-5.2'),
         (config: _anthropic(), model: 'claude-sonnet-4.6'),
+        (config: _openai().copyWith(useResponseApi: true), model: 'gpt-5.1'),
+        (
+          config: _openai().copyWith(oauthProvider: OAuthProvider.chatgpt),
+          model: 'gpt-5.1',
+        ),
       ]) {
         for (final policy in [
           ReasoningReplayPolicy.none,
@@ -305,6 +311,30 @@ void main() {
         ReasoningReplayPolicy.none,
       );
     });
+
+    test(
+      'Kimi OAuth protocol is resolved per model without changing saved config',
+      () {
+        final config = _openai().copyWith(
+          oauthProvider: OAuthProvider.kimi,
+          modelOverrides: {
+            'kimi-for-coding': {'oauthProtocol': 'anthropic'},
+            'kimi-k2.5': {'oauthProtocol': 'openai'},
+          },
+        );
+        expect(
+          resolver.spec(config, 'kimi-for-coding').reasoning.dialect,
+          ReasoningDialect.anthropicBudget,
+        );
+        expect(config.providerType, ProviderKind.openai);
+        expect(config.forModelProtocol('kimi-k2.5'), same(config));
+        expect(config.forModelProtocol('unknown'), same(config));
+        final ordinary = _openai().copyWith(
+          modelOverrides: config.modelOverrides,
+        );
+        expect(ordinary.forModelProtocol('kimi-for-coding'), same(ordinary));
+      },
+    );
 
     test('sparse reasoning override leaves catalog levels intact', () {
       final ov = <String, dynamic>{

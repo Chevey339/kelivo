@@ -41,7 +41,14 @@ class VendorDefaults {
     ReasoningDialect? dialect;
     List<ReasoningLevel>? levels;
     bool? canDisable;
-    ReasoningReplayPolicy? replay;
+    // Native Responses items can be replayed even when the corresponding
+    // Chat Completions model has no supported raw reasoning field.
+    ReasoningReplayPolicy? replay =
+        kind == ProviderKind.openai &&
+            (cfg.useResponseApi == true ||
+                cfg.oauthProvider == OAuthProvider.chatgpt)
+        ? ReasoningReplayPolicy.all
+        : null;
     ReasoningReplayField? replayField;
     var maxTokensKey = 'max_tokens';
 
