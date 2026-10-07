@@ -147,7 +147,11 @@ class _MarkdownRenderedView extends StatelessWidget {
     final markdown = SelectionArea(
       child: DefaultTextStyle.merge(
         style: baseStyle,
-        child: MarkdownWithCodeHighlight(text: source, baseStyle: baseStyle),
+        child: MarkdownWithCodeHighlight(
+          text: source,
+          useBlockRendering: true,
+          baseStyle: baseStyle,
+        ),
       ),
     );
 

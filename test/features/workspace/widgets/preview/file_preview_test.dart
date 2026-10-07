@@ -21,6 +21,7 @@ import 'package:Kelivo/shared/widgets/markdown_with_highlight.dart';
 import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:gpt_markdown/gpt_markdown.dart';
 import 'package:image/image.dart' as image_lib;
 import 'package:path/path.dart' as p;
 import 'package:provider/provider.dart';
@@ -326,6 +327,73 @@ void main() {
 
     expect(find.byType(MarkdownWithCodeHighlight), findsOneWidget);
   });
+
+  for (final desktop in [false, true]) {
+    testWidgets(
+      'markdown preview splits long documents through source toggles: desktop=$desktop',
+      (tester) async {
+        tester.view.physicalSize = desktop
+            ? const Size(1400, 900)
+            : const Size(400, 900);
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.reset);
+        final source = [
+          '# Preview document',
+          for (var i = 0; i < 80; i++)
+            'Section $i: Keep **formatting** and `code` in this paragraph.',
+          [
+            '| Input | Output |',
+            '| --- | --- |',
+            for (var i = 0; i < 40; i++) '| row $i | result $i |',
+          ].join('\n'),
+          'Final paragraph.',
+        ].join('\n\n');
+        final markdown = File(p.join(tempDir.path, 'document.md'))
+          ..writeAsStringSync(source);
+
+        await _openPreview(tester, markdown, kind: FilePreviewKind.markdown);
+        await _loadMarkdownPreview(tester);
+        await tester.pumpAndSettle();
+
+        for (var round = 0; round < 2; round++) {
+          final parsedChunks = tester.widgetList<GptMarkdown>(
+            find.byType(GptMarkdown),
+          );
+          expect(parsedChunks, isNotEmpty);
+          // Guard against handing the full document to one parser again.
+          expect(
+            parsedChunks.map((chunk) => chunk.data.length),
+            everyElement(lessThan(source.length ~/ 2)),
+          );
+          // Static previews must retain rows beyond the streaming row limit.
+          final showMore = find.byKey(
+            const ValueKey('markdown-table-show-more'),
+          );
+          await tester.ensureVisible(showMore);
+          await tester.tap(showMore);
+          await tester.pumpAndSettle();
+          expect(find.text('row 39', findRichText: true), findsOneWidget);
+          await tester.ensureVisible(
+            find.text('Final paragraph.', findRichText: true),
+          );
+          await tester.pumpAndSettle();
+          expect(tester.takeException(), isNull);
+          if (round == 1) break;
+
+          await tester.tap(find.text('Source'));
+          await tester.pumpAndSettle();
+          expect(find.byType(MarkdownWithCodeHighlight), findsNothing);
+          final sourceText = tester.widget<SelectableText>(
+            find.byKey(CodeFilePreview.codeKey),
+          );
+          expect(sourceText.textSpan!.toPlainText(), source);
+
+          await tester.tap(find.text('Rendered'));
+          await tester.pumpAndSettle();
+        }
+      },
+    );
+  }
 
   testWidgets('large markdown bypasses parsing and uses lazy plain text', (
     tester,
