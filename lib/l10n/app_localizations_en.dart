@@ -2630,6 +2630,11 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String chatMessageWidgetWebFetch(String target) {
+    return 'Read page: $target';
+  }
+
+  @override
   String get chatMessageWidgetBuiltinSearch => 'Built-in Search';
 
   @override
@@ -4643,6 +4648,50 @@ class AppLocalizationsEn extends AppLocalizations {
       'Auto-test connections on launch';
 
   @override
+  String get searchServicesPageWebFetchSection => 'Web page reading';
+
+  @override
+  String get searchServicesPageWebFetchModeTitle => 'Read pages with';
+
+  @override
+  String get searchServicesPageWebFetchFollow => 'Follow search service';
+
+  @override
+  String searchServicesPageWebFetchFollowValue(String name) {
+    return 'Follow search · $name';
+  }
+
+  @override
+  String searchServicesPageWebFetchFollowSubtitle(String name) {
+    return 'Currently $name';
+  }
+
+  @override
+  String get searchServicesPageWebFetchLocal => 'Local';
+
+  @override
+  String get searchServicesPageWebFetchLocalSubtitle =>
+      'Free. This device requests the page directly.';
+
+  @override
+  String get searchServicesPageWebFetchProviderSubtitle =>
+      'Uses this service\'s API key and quota';
+
+  @override
+  String get searchServicesPageWebFetchOff => 'Off';
+
+  @override
+  String get searchServicesPageWebFetchOffSubtitle =>
+      'Search only, without reading pages';
+
+  @override
+  String get searchServicesPageWebFetchFooter =>
+      'With web search on, the model can also read full pages. When the search service can\'t read pages, local reading is used, which can\'t handle pages that need JavaScript or block bots.';
+
+  @override
+  String get searchServicesPageWebFetchSupported => 'Can read web pages';
+
+  @override
   String get searchServicesPageMaxResults => 'Max Results';
 
   @override
@@ -4887,6 +4936,31 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String searchServiceEditorTestFailed(String message) {
     return 'Search failed: $message';
+  }
+
+  @override
+  String get searchServiceEditorTestModeSearch => 'Search';
+
+  @override
+  String get searchServiceEditorTestModeFetch => 'Read page';
+
+  @override
+  String get searchServiceEditorTestUrlHint => 'Enter a URL';
+
+  @override
+  String get searchServiceEditorTestFetchRun => 'Run test fetch';
+
+  @override
+  String get searchServiceEditorTestFetchRunning => 'Reading…';
+
+  @override
+  String searchServiceEditorTestFetchFailed(String message) {
+    return 'Fetch failed: $message';
+  }
+
+  @override
+  String searchServiceEditorTestFetchStats(String characters, String seconds) {
+    return '$characters characters · ${seconds}s';
   }
 
   @override

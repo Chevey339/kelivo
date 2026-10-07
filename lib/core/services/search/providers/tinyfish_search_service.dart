@@ -4,9 +4,13 @@ import 'package:flutter/material.dart';
 
 import '../../../../l10n/app_localizations.dart';
 import '../search_service.dart';
+import '../web_fetch.dart';
 
-/// TinyFish Search API. Requires `X-API-Key`. Fetch/Scrape is not implemented.
-class TinyFishSearchService extends SearchService<TinyFishOptions> {
+/// TinyFish Search and Fetch APIs. Requires `X-API-Key`.
+class TinyFishSearchService extends SearchService<TinyFishOptions>
+    implements WebFetchCapable<TinyFishOptions> {
+  static const String fetchEndpoint = 'https://api.fetch.tinyfish.ai';
+
   TinyFishSearchService({super.client});
 
   @override
@@ -77,6 +81,54 @@ class TinyFishSearchService extends SearchService<TinyFishOptions> {
       return SearchResult(items: items);
     } catch (e) {
       throw Exception('TinyFish search failed: $e');
+    }
+  }
+
+  @override
+  Future<WebFetchPage> fetch({
+    required String url,
+    required SearchCommonOptions commonOptions,
+    required TinyFishOptions serviceOptions,
+  }) async {
+    try {
+      final searchUri = Uri.parse(serviceOptions.resolvedUrl);
+      final endpoint =
+          searchUri.host == Uri.parse(TinyFishOptions.defaultUrl).host
+          ? searchUri.replace(host: Uri.parse(fetchEndpoint).host).toString()
+          : siblingFetchEndpoint(
+              serviceOptions.resolvedUrl,
+              searchPath: '/search',
+              fetchPath: '/fetch',
+            );
+      final data = await postFetchJson(
+        Uri.parse(endpoint),
+        headers: {
+          'X-API-Key': serviceOptions.effectiveApiKey(serviceOptions.apiKey),
+        },
+        body: {
+          'urls': [url],
+          'format': 'markdown',
+        },
+        commonOptions: commonOptions,
+      );
+      final results = (data['results'] as List?) ?? const [];
+      if (results.isEmpty) {
+        final errors = (data['errors'] as List?) ?? const [];
+        throw Exception(
+          errors.isEmpty
+              ? 'no content returned'
+              : (errors.first as Map)['error'],
+        );
+      }
+      final page = (results.first as Map).cast<String, dynamic>();
+      final text = page['text'];
+      return WebFetchPage(
+        url: (page['final_url'] ?? page['url'] ?? url).toString(),
+        title: (page['title'] ?? '').toString(),
+        content: text is String ? text : (text == null ? '' : jsonEncode(text)),
+      );
+    } catch (e) {
+      throw Exception('TinyFish fetch failed: $e');
     }
   }
 }

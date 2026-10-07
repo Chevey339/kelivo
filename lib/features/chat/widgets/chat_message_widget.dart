@@ -450,6 +450,8 @@ IconData _toolIconFor(String name, [Map<String, dynamic> args = const {}]) {
       return Lucide.Search;
     case 'search_web':
       return Lucide.Earth;
+    case 'fetch_url':
+      return Lucide.Link;
     case 'builtin_search':
       return Lucide.Search;
     // Provider built-in server tools. These are the names the decoders emit,
@@ -648,6 +650,10 @@ String _toolTitleFor(
       return l10n.chatMessageWidgetWebSearch(q);
     case 'builtin_search':
       return l10n.chatMessageWidgetBuiltinSearch;
+    case 'fetch_url':
+      final url = (args['url'] ?? '').toString().trim();
+      final host = Uri.tryParse(url)?.host ?? '';
+      return l10n.chatMessageWidgetWebFetch(host.isEmpty ? url : host);
     default:
       return isResult
           ? l10n.chatMessageWidgetToolResult(name)

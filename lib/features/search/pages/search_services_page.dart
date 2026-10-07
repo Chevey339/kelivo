@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../../../core/providers/settings_provider.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import '../../../core/services/search/search_service.dart';
+import '../../../core/services/search/web_fetch_service.dart';
 import '../../../icons/lucide_adapter.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../shared/widgets/snackbar.dart';
@@ -12,7 +13,9 @@ import '../../../shared/widgets/ios_switch.dart';
 import '../../../theme/app_font_weights.dart';
 import 'search_service_editor_page.dart';
 import 'package:Kelivo/theme/app_semantic_colors.dart';
+import 'package:Kelivo/shared/widgets/option_sheet.dart';
 import 'package:Kelivo/shared/widgets/section_card.dart';
+import '../widgets/web_fetch_mode.dart';
 
 class SearchServicesPage extends StatefulWidget {
   const SearchServicesPage({super.key});
@@ -188,6 +191,20 @@ class _SearchServicesPageState extends State<SearchServicesPage> {
             ],
           ),
           const SizedBox(height: 16),
+          _sectionHeader(l10n.searchServicesPageWebFetchSection, cs),
+          _buildWebFetchSection(context),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
+            child: Text(
+              l10n.searchServicesPageWebFetchFooter,
+              style: TextStyle(
+                fontSize: 12,
+                height: 1.4,
+                color: cs.onSurface.withValues(alpha: 0.55),
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
           _sectionHeader(l10n.searchServicesPageGeneralOptions, cs),
           _buildCommonOptionsSection(context),
         ],
@@ -207,6 +224,85 @@ class _SearchServicesPageState extends State<SearchServicesPage> {
           ),
         ),
       );
+
+  Widget _buildWebFetchSection(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final l10n = AppLocalizations.of(context)!;
+    final settings = context.watch<SettingsProvider>();
+    return SectionCard(
+      children: [
+        _TactileRow(
+          onTap: () => _pickWebFetchMode(context),
+          pressedScale: 0.995,
+          builder: (pressed) {
+            final baseColor = cs.onSurface.withValues(alpha: 0.9);
+            return _AnimatedPressColor(
+              pressed: pressed,
+              base: baseColor,
+              builder: (c) {
+                return Padding(
+                  key: const ValueKey('web-fetch-mode-row'),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 11,
+                  ),
+                  child: Row(
+                    children: [
+                      SizedBox(
+                        width: 36,
+                        child: Icon(Lucide.FileText, size: 18, color: c),
+                      ),
+                      const SizedBox(width: 12),
+                      Text(
+                        l10n.searchServicesPageWebFetchModeTitle,
+                        style: TextStyle(fontSize: 15, color: c),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          webFetchModeValueLabel(l10n, settings),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          textAlign: TextAlign.right,
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: cs.onSurface.withValues(alpha: 0.6),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Icon(Lucide.ChevronRight, size: 16, color: c),
+                    ],
+                  ),
+                );
+              },
+            );
+          },
+        ),
+      ],
+    );
+  }
+
+  Future<void> _pickWebFetchMode(BuildContext context) async {
+    final l10n = AppLocalizations.of(context)!;
+    final settings = context.read<SettingsProvider>();
+    final picked = await showOptionSheet<String>(
+      context,
+      title: l10n.searchServicesPageWebFetchModeTitle,
+      selected: effectiveWebFetchMode(settings),
+      items: [
+        for (final choice in webFetchModeChoices(l10n, settings))
+          OptionSheetItem(
+            key: ValueKey('web-fetch-mode-${choice.value}'),
+            value: choice.value,
+            icon: choice.icon,
+            label: choice.label,
+            subtitle: choice.subtitle,
+          ),
+      ],
+    );
+    if (picked != null) await settings.setWebFetchMode(picked);
+  }
 
   Widget _buildCommonOptionsSection(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
@@ -478,15 +574,31 @@ class _SearchServicesPageState extends State<SearchServicesPage> {
                     ),
                     const SizedBox(width: 12),
                     Expanded(
-                      child: Text(
-                        name,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          fontSize: 15,
-                          color: c,
-                          fontWeight: AppFontWeights.semibold,
-                        ),
+                      child: Row(
+                        children: [
+                          Flexible(
+                            child: Text(
+                              name,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontSize: 15,
+                                color: c,
+                                fontWeight: AppFontWeights.semibold,
+                              ),
+                            ),
+                          ),
+                          if (WebFetchService.supports(s)) ...[
+                            const SizedBox(width: 6),
+                            Icon(
+                              Lucide.FileText,
+                              size: 14,
+                              color: cs.onSurface.withValues(alpha: 0.45),
+                              semanticLabel:
+                                  l10n.searchServicesPageWebFetchSupported,
+                            ),
+                          ],
+                        ],
                       ),
                     ),
                     if (s is! BingLocalOptions &&

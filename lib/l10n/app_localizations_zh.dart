@@ -2538,6 +2538,11 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
+  String chatMessageWidgetWebFetch(String target) {
+    return '读取网页: $target';
+  }
+
+  @override
   String get chatMessageWidgetBuiltinSearch => '模型内置搜索';
 
   @override
@@ -4488,6 +4493,48 @@ class AppLocalizationsZh extends AppLocalizations {
   String get searchServicesPageAutoTestTitle => '启动时自动测试连接';
 
   @override
+  String get searchServicesPageWebFetchSection => '网页抓取';
+
+  @override
+  String get searchServicesPageWebFetchModeTitle => '抓取方式';
+
+  @override
+  String get searchServicesPageWebFetchFollow => '跟随搜索服务';
+
+  @override
+  String searchServicesPageWebFetchFollowValue(String name) {
+    return '跟随搜索 · $name';
+  }
+
+  @override
+  String searchServicesPageWebFetchFollowSubtitle(String name) {
+    return '当前：$name';
+  }
+
+  @override
+  String get searchServicesPageWebFetchLocal => '本地抓取';
+
+  @override
+  String get searchServicesPageWebFetchLocalSubtitle => '免费，由本机直接请求网页';
+
+  @override
+  String get searchServicesPageWebFetchProviderSubtitle =>
+      '使用该服务商的 API Key 和额度';
+
+  @override
+  String get searchServicesPageWebFetchOff => '关闭';
+
+  @override
+  String get searchServicesPageWebFetchOffSubtitle => '联网时只搜索，不读取网页';
+
+  @override
+  String get searchServicesPageWebFetchFooter =>
+      '开启联网搜索后，模型还可以读取网页全文。搜索服务不支持抓取时会改用本地抓取，本地抓取无法处理需要 JavaScript 渲染或有反爬限制的页面。';
+
+  @override
+  String get searchServicesPageWebFetchSupported => '支持网页抓取';
+
+  @override
   String get searchServicesPageMaxResults => '最大结果数';
 
   @override
@@ -4724,6 +4771,31 @@ class AppLocalizationsZh extends AppLocalizations {
   @override
   String searchServiceEditorTestFailed(String message) {
     return '搜索失败：$message';
+  }
+
+  @override
+  String get searchServiceEditorTestModeSearch => '搜索';
+
+  @override
+  String get searchServiceEditorTestModeFetch => '抓取';
+
+  @override
+  String get searchServiceEditorTestUrlHint => '输入测试网址';
+
+  @override
+  String get searchServiceEditorTestFetchRun => '运行抓取测试';
+
+  @override
+  String get searchServiceEditorTestFetchRunning => '抓取中…';
+
+  @override
+  String searchServiceEditorTestFetchFailed(String message) {
+    return '抓取失败：$message';
+  }
+
+  @override
+  String searchServiceEditorTestFetchStats(String characters, String seconds) {
+    return '$characters 字符 · $seconds 秒';
   }
 
   @override
@@ -14862,6 +14934,11 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   }
 
   @override
+  String chatMessageWidgetWebFetch(String target) {
+    return '读取网页: $target';
+  }
+
+  @override
   String get chatMessageWidgetBuiltinSearch => '模型内置搜索';
 
   @override
@@ -16812,6 +16889,48 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get searchServicesPageAutoTestTitle => '启动时自动测试连接';
 
   @override
+  String get searchServicesPageWebFetchSection => '网页抓取';
+
+  @override
+  String get searchServicesPageWebFetchModeTitle => '抓取方式';
+
+  @override
+  String get searchServicesPageWebFetchFollow => '跟随搜索服务';
+
+  @override
+  String searchServicesPageWebFetchFollowValue(String name) {
+    return '跟随搜索 · $name';
+  }
+
+  @override
+  String searchServicesPageWebFetchFollowSubtitle(String name) {
+    return '当前：$name';
+  }
+
+  @override
+  String get searchServicesPageWebFetchLocal => '本地抓取';
+
+  @override
+  String get searchServicesPageWebFetchLocalSubtitle => '免费，由本机直接请求网页';
+
+  @override
+  String get searchServicesPageWebFetchProviderSubtitle =>
+      '使用该服务商的 API Key 和额度';
+
+  @override
+  String get searchServicesPageWebFetchOff => '关闭';
+
+  @override
+  String get searchServicesPageWebFetchOffSubtitle => '联网时只搜索，不读取网页';
+
+  @override
+  String get searchServicesPageWebFetchFooter =>
+      '开启联网搜索后，模型还可以读取网页全文。搜索服务不支持抓取时会改用本地抓取，本地抓取无法处理需要 JavaScript 渲染或有反爬限制的页面。';
+
+  @override
+  String get searchServicesPageWebFetchSupported => '支持网页抓取';
+
+  @override
   String get searchServicesPageMaxResults => '最大结果数';
 
   @override
@@ -17048,6 +17167,31 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   @override
   String searchServiceEditorTestFailed(String message) {
     return '搜索失败：$message';
+  }
+
+  @override
+  String get searchServiceEditorTestModeSearch => '搜索';
+
+  @override
+  String get searchServiceEditorTestModeFetch => '抓取';
+
+  @override
+  String get searchServiceEditorTestUrlHint => '输入测试网址';
+
+  @override
+  String get searchServiceEditorTestFetchRun => '运行抓取测试';
+
+  @override
+  String get searchServiceEditorTestFetchRunning => '抓取中…';
+
+  @override
+  String searchServiceEditorTestFetchFailed(String message) {
+    return '抓取失败：$message';
+  }
+
+  @override
+  String searchServiceEditorTestFetchStats(String characters, String seconds) {
+    return '$characters 字符 · $seconds 秒';
   }
 
   @override
@@ -27112,6 +27256,11 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   }
 
   @override
+  String chatMessageWidgetWebFetch(String target) {
+    return '讀取網頁: $target';
+  }
+
+  @override
   String get chatMessageWidgetBuiltinSearch => '模型內建搜尋';
 
   @override
@@ -29061,6 +29210,48 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get searchServicesPageAutoTestTitle => '啟動時自動測試連線';
 
   @override
+  String get searchServicesPageWebFetchSection => '網頁抓取';
+
+  @override
+  String get searchServicesPageWebFetchModeTitle => '抓取方式';
+
+  @override
+  String get searchServicesPageWebFetchFollow => '跟隨搜尋服務';
+
+  @override
+  String searchServicesPageWebFetchFollowValue(String name) {
+    return '跟隨搜尋 · $name';
+  }
+
+  @override
+  String searchServicesPageWebFetchFollowSubtitle(String name) {
+    return '目前：$name';
+  }
+
+  @override
+  String get searchServicesPageWebFetchLocal => '本機抓取';
+
+  @override
+  String get searchServicesPageWebFetchLocalSubtitle => '免費，由本機直接請求網頁';
+
+  @override
+  String get searchServicesPageWebFetchProviderSubtitle =>
+      '使用該服務商的 API Key 與額度';
+
+  @override
+  String get searchServicesPageWebFetchOff => '關閉';
+
+  @override
+  String get searchServicesPageWebFetchOffSubtitle => '連網時只搜尋，不讀取網頁';
+
+  @override
+  String get searchServicesPageWebFetchFooter =>
+      '開啟連網搜尋後，模型還可以讀取網頁全文。搜尋服務不支援抓取時會改用本機抓取，本機抓取無法處理需要 JavaScript 渲染或有反爬限制的頁面。';
+
+  @override
+  String get searchServicesPageWebFetchSupported => '支援網頁抓取';
+
+  @override
   String get searchServicesPageMaxResults => '最大結果數';
 
   @override
@@ -29297,6 +29488,31 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   @override
   String searchServiceEditorTestFailed(String message) {
     return '搜尋失敗：$message';
+  }
+
+  @override
+  String get searchServiceEditorTestModeSearch => '搜尋';
+
+  @override
+  String get searchServiceEditorTestModeFetch => '抓取';
+
+  @override
+  String get searchServiceEditorTestUrlHint => '輸入測試網址';
+
+  @override
+  String get searchServiceEditorTestFetchRun => '執行抓取測試';
+
+  @override
+  String get searchServiceEditorTestFetchRunning => '抓取中…';
+
+  @override
+  String searchServiceEditorTestFetchFailed(String message) {
+    return '抓取失敗：$message';
+  }
+
+  @override
+  String searchServiceEditorTestFetchStats(String characters, String seconds) {
+    return '$characters 字元 · $seconds 秒';
   }
 
   @override

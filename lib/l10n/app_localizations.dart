@@ -4900,6 +4900,12 @@ abstract class AppLocalizations {
   /// **'Web Search: {query}'**
   String chatMessageWidgetWebSearch(String query);
 
+  /// No description provided for @chatMessageWidgetWebFetch.
+  ///
+  /// In en, this message translates to:
+  /// **'Read page: {target}'**
+  String chatMessageWidgetWebFetch(String target);
+
   /// No description provided for @chatMessageWidgetBuiltinSearch.
   ///
   /// In en, this message translates to:
@@ -8545,6 +8551,78 @@ abstract class AppLocalizations {
   /// **'Auto-test connections on launch'**
   String get searchServicesPageAutoTestTitle;
 
+  /// No description provided for @searchServicesPageWebFetchSection.
+  ///
+  /// In en, this message translates to:
+  /// **'Web page reading'**
+  String get searchServicesPageWebFetchSection;
+
+  /// No description provided for @searchServicesPageWebFetchModeTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Read pages with'**
+  String get searchServicesPageWebFetchModeTitle;
+
+  /// No description provided for @searchServicesPageWebFetchFollow.
+  ///
+  /// In en, this message translates to:
+  /// **'Follow search service'**
+  String get searchServicesPageWebFetchFollow;
+
+  /// No description provided for @searchServicesPageWebFetchFollowValue.
+  ///
+  /// In en, this message translates to:
+  /// **'Follow search · {name}'**
+  String searchServicesPageWebFetchFollowValue(String name);
+
+  /// No description provided for @searchServicesPageWebFetchFollowSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Currently {name}'**
+  String searchServicesPageWebFetchFollowSubtitle(String name);
+
+  /// No description provided for @searchServicesPageWebFetchLocal.
+  ///
+  /// In en, this message translates to:
+  /// **'Local'**
+  String get searchServicesPageWebFetchLocal;
+
+  /// No description provided for @searchServicesPageWebFetchLocalSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Free. This device requests the page directly.'**
+  String get searchServicesPageWebFetchLocalSubtitle;
+
+  /// No description provided for @searchServicesPageWebFetchProviderSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Uses this service\'s API key and quota'**
+  String get searchServicesPageWebFetchProviderSubtitle;
+
+  /// No description provided for @searchServicesPageWebFetchOff.
+  ///
+  /// In en, this message translates to:
+  /// **'Off'**
+  String get searchServicesPageWebFetchOff;
+
+  /// No description provided for @searchServicesPageWebFetchOffSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Search only, without reading pages'**
+  String get searchServicesPageWebFetchOffSubtitle;
+
+  /// No description provided for @searchServicesPageWebFetchFooter.
+  ///
+  /// In en, this message translates to:
+  /// **'With web search on, the model can also read full pages. When the search service can\'t read pages, local reading is used, which can\'t handle pages that need JavaScript or block bots.'**
+  String get searchServicesPageWebFetchFooter;
+
+  /// No description provided for @searchServicesPageWebFetchSupported.
+  ///
+  /// In en, this message translates to:
+  /// **'Can read web pages'**
+  String get searchServicesPageWebFetchSupported;
+
   /// No description provided for @searchServicesPageMaxResults.
   ///
   /// In en, this message translates to:
@@ -8988,6 +9066,48 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Search failed: {message}'**
   String searchServiceEditorTestFailed(String message);
+
+  /// No description provided for @searchServiceEditorTestModeSearch.
+  ///
+  /// In en, this message translates to:
+  /// **'Search'**
+  String get searchServiceEditorTestModeSearch;
+
+  /// No description provided for @searchServiceEditorTestModeFetch.
+  ///
+  /// In en, this message translates to:
+  /// **'Read page'**
+  String get searchServiceEditorTestModeFetch;
+
+  /// No description provided for @searchServiceEditorTestUrlHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter a URL'**
+  String get searchServiceEditorTestUrlHint;
+
+  /// No description provided for @searchServiceEditorTestFetchRun.
+  ///
+  /// In en, this message translates to:
+  /// **'Run test fetch'**
+  String get searchServiceEditorTestFetchRun;
+
+  /// No description provided for @searchServiceEditorTestFetchRunning.
+  ///
+  /// In en, this message translates to:
+  /// **'Reading…'**
+  String get searchServiceEditorTestFetchRunning;
+
+  /// No description provided for @searchServiceEditorTestFetchFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Fetch failed: {message}'**
+  String searchServiceEditorTestFetchFailed(String message);
+
+  /// No description provided for @searchServiceEditorTestFetchStats.
+  ///
+  /// In en, this message translates to:
+  /// **'{characters} characters · {seconds}s'**
+  String searchServiceEditorTestFetchStats(String characters, String seconds);
 
   /// No description provided for @searchServiceEditorResultOpenTooltip.
   ///

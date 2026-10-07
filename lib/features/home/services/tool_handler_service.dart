@@ -14,6 +14,7 @@ import '../../../core/providers/memory_provider_v2.dart';
 import '../../../core/providers/settings_provider.dart';
 import '../../../core/providers/tts_provider.dart';
 import '../../../core/services/api/chat_api_service.dart';
+import '../../../core/services/api/builtin_tools.dart' as native_tools;
 import '../../../core/services/api/json_schema_utils.dart';
 import '../../../core/services/model_spec/model_spec_resolver.dart';
 import '../../../core/services/chat/chat_service.dart';
@@ -21,6 +22,8 @@ import '../../../core/services/mcp/mcp_tool_service.dart';
 import '../../../core/services/memory/memory_pipeline.dart';
 import '../../../core/services/memory/memory_tools.dart';
 import '../../../core/services/search/search_tool_service.dart';
+import '../../../core/services/search/web_fetch_service.dart';
+import '../../../core/services/search/web_fetch_tool_service.dart';
 import '../../../core/services/tools/tool_schema_overrides.dart';
 import '../../../core/services/skills/skills_service.dart';
 import '../../../core/services/workspace/tool_run_registry.dart';
@@ -260,6 +263,13 @@ class ToolHandlerService {
         !hasBuiltInSearch &&
         supportsTools) {
       toolDefs.add(SearchToolService.getToolDefinition());
+      if (settings.webFetchMode != WebFetchMode.off &&
+          !native_tools.BuiltInToolsHelper.isBuiltInFetchEnabled(
+            cfg: settings.getProviderConfig(providerKey),
+            modelId: modelId,
+          )) {
+        toolDefs.add(WebFetchToolService.getToolDefinition());
+      }
     }
 
     // Memory tools (§10.1)
@@ -486,6 +496,10 @@ class ToolHandlerService {
             assistant?.searchEnabled == true) {
           final q = (args['query'] ?? '').toString();
           return await SearchToolService.executeSearch(q, settings);
+        }
+        if (name == WebFetchToolService.toolName &&
+            assistant?.searchEnabled == true) {
+          return await WebFetchToolService.executeFetch(args, settings);
         }
 
         // Memory tools

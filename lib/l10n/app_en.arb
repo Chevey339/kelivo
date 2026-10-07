@@ -1141,6 +1141,12 @@
       }
     }
   },
+  "chatMessageWidgetWebFetch": "Read page: {target}",
+  "@chatMessageWidgetWebFetch": {
+    "placeholders": {
+      "target": { "type": "String" }
+    }
+  },
   "chatMessageWidgetBuiltinSearch": "Built-in Search",
   "chatMessageWidgetReadClipboard": "Read Clipboard",
   "chatMessageWidgetWriteClipboard": "Write Clipboard",
@@ -2051,6 +2057,28 @@
   "searchServicesPageSearchProviders": "Search Providers",
   "searchServicesPageGeneralOptions": "General Options",
   "searchServicesPageAutoTestTitle": "Auto-test connections on launch",
+  "searchServicesPageWebFetchSection": "Web page reading",
+  "searchServicesPageWebFetchModeTitle": "Read pages with",
+  "searchServicesPageWebFetchFollow": "Follow search service",
+  "searchServicesPageWebFetchFollowValue": "Follow search · {name}",
+  "@searchServicesPageWebFetchFollowValue": {
+    "placeholders": {
+      "name": { "type": "String" }
+    }
+  },
+  "searchServicesPageWebFetchFollowSubtitle": "Currently {name}",
+  "@searchServicesPageWebFetchFollowSubtitle": {
+    "placeholders": {
+      "name": { "type": "String" }
+    }
+  },
+  "searchServicesPageWebFetchLocal": "Local",
+  "searchServicesPageWebFetchLocalSubtitle": "Free. This device requests the page directly.",
+  "searchServicesPageWebFetchProviderSubtitle": "Uses this service's API key and quota",
+  "searchServicesPageWebFetchOff": "Off",
+  "searchServicesPageWebFetchOffSubtitle": "Search only, without reading pages",
+  "searchServicesPageWebFetchFooter": "With web search on, the model can also read full pages. When the search service can't read pages, local reading is used, which can't handle pages that need JavaScript or block bots.",
+  "searchServicesPageWebFetchSupported": "Can read web pages",
   "searchServicesPageMaxResults": "Max Results",
   "searchServicesPageTimeoutSeconds": "Timeout (seconds)",
   "searchServicesPageAtLeastOneServiceRequired": "At least one search service is required",
@@ -2169,6 +2197,24 @@
   "@searchServiceEditorTestFailed": {
     "placeholders": {
       "message": { "type": "String" }
+    }
+  },
+  "searchServiceEditorTestModeSearch": "Search",
+  "searchServiceEditorTestModeFetch": "Read page",
+  "searchServiceEditorTestUrlHint": "Enter a URL",
+  "searchServiceEditorTestFetchRun": "Run test fetch",
+  "searchServiceEditorTestFetchRunning": "Reading…",
+  "searchServiceEditorTestFetchFailed": "Fetch failed: {message}",
+  "@searchServiceEditorTestFetchFailed": {
+    "placeholders": {
+      "message": { "type": "String" }
+    }
+  },
+  "searchServiceEditorTestFetchStats": "{characters} characters · {seconds}s",
+  "@searchServiceEditorTestFetchStats": {
+    "placeholders": {
+      "characters": { "type": "String" },
+      "seconds": { "type": "String" }
     }
   },
   "searchServiceEditorResultOpenTooltip": "Open result",

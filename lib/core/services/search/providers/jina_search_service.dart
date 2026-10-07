@@ -2,8 +2,14 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import '../../../../l10n/app_localizations.dart';
 import '../search_service.dart';
+import '../web_fetch.dart';
 
-class JinaSearchService extends SearchService<JinaOptions> {
+class JinaSearchService extends SearchService<JinaOptions>
+    implements WebFetchCapable<JinaOptions> {
+  JinaSearchService({super.client});
+
+  static const String readerUrl = 'https://r.jina.ai/';
+
   @override
   String get name => 'Jina';
 
@@ -71,6 +77,38 @@ class JinaSearchService extends SearchService<JinaOptions> {
       return SearchResult(items: results);
     } catch (e) {
       throw Exception('Jina search failed: $e');
+    }
+  }
+
+  @override
+  Future<WebFetchPage> fetch({
+    required String url,
+    required SearchCommonOptions commonOptions,
+    required JinaOptions serviceOptions,
+  }) async {
+    try {
+      final apiKey = serviceOptions
+          .effectiveApiKey(serviceOptions.apiKey)
+          .trim();
+      final data = await postFetchJson(
+        Uri.parse(readerUrl),
+        headers: {
+          if (apiKey.isNotEmpty) 'Authorization': 'Bearer $apiKey',
+          // Image links only cost tokens; the model reads the text.
+          'X-Retain-Images': 'none',
+        },
+        body: {'url': url},
+        commonOptions: commonOptions,
+      );
+      final page = (data['data'] as Map?)?.cast<String, dynamic>();
+      if (page == null) throw Exception(fetchErrorDetail(jsonEncode(data)));
+      return WebFetchPage(
+        url: (page['url'] ?? url).toString(),
+        title: (page['title'] ?? '').toString(),
+        content: (page['content'] ?? '').toString(),
+      );
+    } catch (e) {
+      throw Exception('Jina fetch failed: $e');
     }
   }
 }

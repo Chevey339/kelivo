@@ -8,8 +8,10 @@ import 'package:mcp_client/mcp_client.dart' as mcp;
 import '../../../../l10n/app_localizations.dart';
 import '../../network/dio_http_client.dart';
 import '../search_service.dart';
+import '../web_fetch.dart';
 
-class ExaMcpSearchService extends SearchService<ExaMcpOptions> {
+class ExaMcpSearchService extends SearchService<ExaMcpOptions>
+    implements WebFetchCapable<ExaMcpOptions> {
   ExaMcpSearchService({super.client});
 
   @override
@@ -27,8 +29,52 @@ class ExaMcpSearchService extends SearchService<ExaMcpOptions> {
     required SearchCommonOptions commonOptions,
     required ExaMcpOptions serviceOptions,
   }) async {
-    final timeout = Duration(milliseconds: commonOptions.timeout);
     final limit = commonOptions.resultSize < 1 ? 1 : commonOptions.resultSize;
+    try {
+      final text = await _callTool(
+        'web_search_exa',
+        {'query': query, 'numResults': limit},
+        commonOptions: commonOptions,
+        serviceOptions: serviceOptions,
+      );
+      return SearchResult(items: _parseResults(text).take(limit).toList());
+    } catch (error) {
+      final detail = error is StateError ? error.message : error.toString();
+      throw Exception('Exa MCP search failed: $detail');
+    }
+  }
+
+  @override
+  Future<WebFetchPage> fetch({
+    required String url,
+    required SearchCommonOptions commonOptions,
+    required ExaMcpOptions serviceOptions,
+  }) async {
+    try {
+      final text = await _callTool(
+        'web_fetch_exa',
+        {
+          'urls': [url],
+          'maxCharacters': webFetchMaxContentLength,
+        },
+        commonOptions: commonOptions,
+        serviceOptions: serviceOptions,
+      );
+      return _parsePage(text);
+    } catch (error) {
+      final detail = error is StateError ? error.message : error.toString();
+      throw Exception('Exa MCP fetch failed: $detail');
+    }
+  }
+
+  /// Calls one hosted Exa tool and returns its joined text content.
+  Future<String> _callTool(
+    String tool,
+    Map<String, dynamic> arguments, {
+    required SearchCommonOptions commonOptions,
+    required ExaMcpOptions serviceOptions,
+  }) async {
+    final timeout = Duration(milliseconds: commonOptions.timeout);
     final apiKey = serviceOptions.effectiveApiKey(serviceOptions.apiKey).trim();
     final cancellation = CancelToken();
     final ownsHttpClient = client == null;
@@ -52,13 +98,10 @@ class ExaMcpSearchService extends SearchService<ExaMcpOptions> {
         await client.connect(transport);
         final remaining = timeout - elapsed.elapsed;
         if (remaining <= Duration.zero) {
-          throw TimeoutException('Exa MCP search timed out', timeout);
+          throw TimeoutException('Exa MCP $tool timed out', timeout);
         }
         client.setRequestTimeout(remaining);
-        final result = await client.callTool('web_search_exa', {
-          'query': query,
-          'numResults': limit,
-        });
+        final result = await client.callTool(tool, arguments);
         final text = result.content
             .whereType<mcp.TextContent>()
             .map((content) => content.text)
@@ -69,20 +112,34 @@ class ExaMcpSearchService extends SearchService<ExaMcpOptions> {
             text.trim().isEmpty ? 'Exa MCP tool failed' : text.trim(),
           );
         }
-        return SearchResult(items: _parseResults(text).take(limit).toList());
+        return text;
       } finally {
         client.dispose();
         transport.close();
       }
-    } catch (error) {
-      final detail = error is StateError ? error.message : error.toString();
-      throw Exception('Exa MCP search failed: $detail');
     } finally {
       // DioHttpClient.close preserves in-flight requests. This token belongs
-      // only to this search, so cancellation also releases stalled requests.
-      cancellation.cancel('Exa MCP search finished');
+      // only to this call, so cancellation also releases stalled requests.
+      cancellation.cancel('Exa MCP $tool finished');
       if (ownsHttpClient) httpClient.close();
     }
+  }
+
+  /// Parses `web_fetch_exa` output: `# Title`, a `URL:` line, then the page.
+  WebFetchPage _parsePage(String text) {
+    final normalized = text.replaceAll('\r\n', '\n').trim();
+    final header = RegExp(
+      r'^#[ \t]*(.*)\nURL:[ \t]*(\S+)[ \t]*(?:\n|$)',
+    ).firstMatch(normalized);
+    if (header == null) {
+      // Quota and crawl errors come back as plain text without isError.
+      throw StateError(normalized.isEmpty ? 'no content returned' : normalized);
+    }
+    return WebFetchPage(
+      url: header.group(2)!,
+      title: header.group(1)!.trim(),
+      content: normalized.substring(header.end).trim(),
+    );
   }
 
   List<SearchResultItem> _parseResults(String text) {

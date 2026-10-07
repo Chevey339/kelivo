@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:Kelivo/core/services/search/search_service.dart';
+import 'package:Kelivo/core/services/search/web_fetch.dart';
 import 'package:Kelivo/core/services/search/search_service_usage_service.dart';
 import 'package:Kelivo/features/search/pages/search_api_keys_page.dart';
 import 'package:Kelivo/features/search/pages/search_service_editor_page.dart';
@@ -12,6 +13,94 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  testWidgets(
+    'fetch test uses the current provider and ignores an obsolete URL',
+    (tester) async {
+      final first = Completer<WebFetchPage>();
+      final second = Completer<WebFetchPage>();
+      final urls = <String>[];
+      await _pumpEditor(
+        tester,
+        initialService: TavilyOptions(id: 'fetch-test', apiKey: 'key'),
+        pageFetcher: (url, options) {
+          expect((options as TavilyOptions).apiKey, 'key');
+          urls.add(url);
+          return urls.length == 1 ? first.future : second.future;
+        },
+        onResult: (_) {},
+      );
+      await tester.dragUntilVisible(
+        find.text('Read page'),
+        find.byType(ListView),
+        const Offset(0, -240),
+      );
+      await tester.tap(find.text('Read page'));
+      await tester.pumpAndSettle();
+      final urlField = find.byKey(const ValueKey('search-service-test-url'));
+      await tester.enterText(urlField, 'https://example.com/old');
+      await tester.pump();
+      await tester.tap(find.byIcon(Lucide.Play));
+      await tester.pump();
+      await tester.enterText(urlField, 'https://example.com/new');
+      await tester.pump();
+      await tester.tap(find.byIcon(Lucide.Play));
+      await tester.pump();
+      second.complete(
+        const WebFetchPage(
+          url: 'https://example.com/new',
+          title: 'New page',
+          content: 'New body',
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('New page'), findsOneWidget);
+      expect(find.text('New body'), findsOneWidget);
+      first.complete(
+        const WebFetchPage(
+          url: 'https://example.com/old',
+          title: 'Old page',
+          content: 'Old body',
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('New page'), findsOneWidget);
+      expect(find.text('Old page'), findsNothing);
+      expect(urls, ['https://example.com/old', 'https://example.com/new']);
+    },
+  );
+
+  testWidgets('switching to search ignores a pending fetch failure', (
+    tester,
+  ) async {
+    final fetch = Completer<WebFetchPage>();
+    await _pumpEditor(
+      tester,
+      initialService: TavilyOptions(id: 'fetch-mode', apiKey: 'key'),
+      pageFetcher: (_, _) => fetch.future,
+      onResult: (_) {},
+    );
+    await tester.dragUntilVisible(
+      find.text('Read page'),
+      find.byType(ListView),
+      const Offset(0, -240),
+    );
+    await tester.tap(find.text('Read page'));
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byKey(const ValueKey('search-service-test-url')),
+      'https://example.com',
+    );
+    await tester.pump();
+    await tester.tap(find.byIcon(Lucide.Play));
+    await tester.pump();
+    await tester.tap(find.text('Search'));
+    await tester.pumpAndSettle();
+    fetch.completeError(Exception('stale fetch error'));
+    await tester.pumpAndSettle();
+    expect(_testQueryField(), findsOneWidget);
+    expect(find.textContaining('stale fetch error'), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
   testWidgets('adds Exa MCP without an API key or custom URL', (tester) async {
     SearchServiceEditorResult? result;
     await _pumpEditor(tester, onResult: (value) => result = value);
@@ -981,6 +1070,7 @@ Future<void> _pumpEditor(
   bool autoQueryUsage = false,
   SearchServiceUsageFetcher? usageFetcher,
   SearchServiceTestFetcher? searchFetcher,
+  SearchServicePageFetcher? pageFetcher,
   bool settle = true,
 }) async {
   await tester.pumpWidget(
@@ -1004,6 +1094,7 @@ Future<void> _pumpEditor(
                           autoQueryUsage: autoQueryUsage,
                           usageFetcher: usageFetcher,
                           searchFetcher: searchFetcher,
+                          pageFetcher: pageFetcher,
                         ),
                       ),
                     );

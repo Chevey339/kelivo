@@ -503,6 +503,34 @@ abstract class BuiltInToolsHelper {
     return supportsBuiltInSearchForModel(cfg: cfg, modelId: modelId);
   }
 
+  /// Whether this model request already carries a provider-native page reader.
+  static bool isBuiltInFetchEnabled({
+    required ProviderConfig? cfg,
+    required String? modelId,
+  }) {
+    if (cfg == null || modelId == null || !_isChatModel(cfg, modelId)) {
+      return false;
+    }
+    final enabled = _enabledTools(cfg, modelId);
+    final kind = ProviderConfig.classify(
+      cfg.id,
+      explicitType: cfg.providerType,
+    );
+    if (kind == ProviderKind.google) {
+      return enabled.contains(BuiltInToolNames.urlContext);
+    }
+    if (kind == ProviderKind.claude) {
+      return claudeServerToolEntries(
+        cfg: cfg,
+        modelId: modelId,
+        enabled: enabled,
+      ).any((tool) => tool['name'] == BuiltInToolNames.webFetch);
+    }
+    return kind == ProviderKind.openai &&
+        isOpenRouterProvider(cfg) &&
+        enabled.contains(BuiltInToolNames.webFetch);
+  }
+
   /// Upstream model id when [cfg] talks to the official Claude API, or null
   /// for anything else — Vertex and Claude-compatible vendors reject the
   /// Anthropic-hosted server tools.

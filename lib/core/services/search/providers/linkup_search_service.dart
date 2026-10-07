@@ -2,8 +2,14 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import '../../../../l10n/app_localizations.dart';
 import '../search_service.dart';
+import '../web_fetch.dart';
 
-class LinkUpSearchService extends SearchService<LinkUpOptions> {
+class LinkUpSearchService extends SearchService<LinkUpOptions>
+    implements WebFetchCapable<LinkUpOptions> {
+  LinkUpSearchService({super.client});
+
+  static const String fetchUrl = 'https://api.linkup.so/v1/fetch';
+
   @override
   String get name => 'LinkUp';
 
@@ -61,6 +67,33 @@ class LinkUpSearchService extends SearchService<LinkUpOptions> {
       return SearchResult(answer: data['answer'], items: results);
     } catch (e) {
       throw Exception('LinkUp search failed: $e');
+    }
+  }
+
+  @override
+  Future<WebFetchPage> fetch({
+    required String url,
+    required SearchCommonOptions commonOptions,
+    required LinkUpOptions serviceOptions,
+  }) async {
+    try {
+      final data = await postFetchJson(
+        Uri.parse(fetchUrl),
+        headers: {
+          'Authorization':
+              'Bearer ${serviceOptions.effectiveApiKey(serviceOptions.apiKey)}',
+        },
+        body: {'url': url},
+        commonOptions: commonOptions,
+      );
+      final content = (data['markdown'] ?? '').toString();
+      return WebFetchPage(
+        url: url,
+        title: firstMarkdownHeading(content),
+        content: content,
+      );
+    } catch (e) {
+      throw Exception('LinkUp fetch failed: $e');
     }
   }
 }

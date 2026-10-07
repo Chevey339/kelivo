@@ -6,6 +6,27 @@ import 'package:Kelivo/core/services/backup/backup_settings_validator.dart';
 
 void main() {
   group('BackupSettingsValidator', () {
+    test('requires a string for the page reading setting', () {
+      for (final value in ['follow', 'local', 'off', 'configured-service-id']) {
+        expect(
+          () =>
+              BackupSettingsValidator.validate({'search_web_fetch_v1': value}),
+          returnsNormally,
+        );
+      }
+      for (final value in [
+        true,
+        3,
+        1.5,
+        ['follow'],
+      ]) {
+        expect(
+          () =>
+              BackupSettingsValidator.validate({'search_web_fetch_v1': value}),
+          throwsFormatException,
+        );
+      }
+    });
     test('normalizes legacy string lists before validating', () {
       final settings = <String, dynamic>{
         'pinned_models_v1': jsonEncode(['provider/model']),

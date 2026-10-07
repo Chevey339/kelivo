@@ -5,6 +5,7 @@ import 'dart:io';
 import 'package:Kelivo/core/database/business_settings_router.dart';
 import 'package:Kelivo/core/services/search/providers/exa_mcp_search_service.dart';
 import 'package:Kelivo/core/services/search/search_service.dart';
+import 'package:Kelivo/core/services/search/web_fetch.dart';
 import 'package:Kelivo/utils/brand_assets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
@@ -148,6 +149,52 @@ void main() {
       },
     );
   }
+
+  test('reads a page with web_fetch_exa', () async {
+    final client = _McpHttpClient((request, message) async {
+      expect(message['params'], {
+        'name': 'web_fetch_exa',
+        'arguments': {
+          'urls': ['https://example.com/post'],
+          'maxCharacters': webFetchMaxContentLength,
+        },
+      });
+      return _toolResponse(
+        message,
+        text: '# Example Post\nURL: https://example.com/post\n\nBody line.',
+      );
+    });
+    final page = await ExaMcpSearchService(client: client).fetch(
+      url: 'https://example.com/post',
+      commonOptions: const SearchCommonOptions(),
+      serviceOptions: ExaMcpOptions(id: 'anonymous'),
+    );
+    expect(page.title, 'Example Post');
+    expect(page.url, 'https://example.com/post');
+    expect(page.content, 'Body line.');
+    client.close();
+  });
+
+  test('reports a plain-text web_fetch_exa reply as a fetch error', () async {
+    final client = _McpHttpClient((request, message) async {
+      return _toolResponse(message, text: 'Rate limit exceeded.');
+    });
+    await expectLater(
+      ExaMcpSearchService(client: client).fetch(
+        url: 'https://example.com/post',
+        commonOptions: const SearchCommonOptions(),
+        serviceOptions: ExaMcpOptions(id: 'anonymous'),
+      ),
+      throwsA(
+        predicate(
+          (error) =>
+              error.toString() ==
+              'Exception: Exa MCP fetch failed: Rate limit exceeded.',
+        ),
+      ),
+    );
+    client.close();
+  });
 
   test('uses the custom endpoint and rotates keys once per search', () async {
     final keys = <String?>[];

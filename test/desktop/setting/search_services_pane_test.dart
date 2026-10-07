@@ -1,4 +1,7 @@
 import 'package:Kelivo/core/services/search/search_service.dart';
+import 'package:Kelivo/core/providers/settings_provider.dart';
+import 'package:provider/provider.dart';
+import '../../support/business_test_harness.dart';
 import 'package:Kelivo/desktop/setting/search_services_pane.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
@@ -6,6 +9,41 @@ import 'package:flutter_test/flutter_test.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+
+  testWidgets(
+    'desktop changes page reader through a dropdown',
+    (tester) async {
+      final settings = SettingsProvider(createBusinessTestPreferences());
+      addTearDown(settings.dispose);
+      await settings.loaded;
+      await settings.setSearchServices([
+        const BingLocalOptions(id: 'bing'),
+        TavilyOptions(id: 'tavily', apiKey: 'key'),
+      ]);
+      await tester.pumpWidget(
+        ChangeNotifierProvider.value(
+          value: settings,
+          child: const MaterialApp(
+            locale: Locale('en'),
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
+            home: Scaffold(body: DesktopSearchServicesPane()),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      final dropdown = find.byKey(const ValueKey('desktop-web-fetch-mode'));
+      await tester.ensureVisible(dropdown);
+      await tester.tap(dropdown);
+      await tester.pumpAndSettle();
+      expect(find.byType(BottomSheet), findsNothing);
+      await tester.tap(find.text('Tavily').last);
+      await tester.pumpAndSettle();
+      expect(settings.webFetchMode, 'tavily');
+      expect(tester.takeException(), isNull);
+    },
+    variant: TargetPlatformVariant({TargetPlatform.macOS}),
+  );
 
   testWidgets('desktop adds keyless Exa MCP with its default endpoint', (
     tester,

@@ -10,6 +10,8 @@ import 'package:uuid/uuid.dart';
 import '../../../core/providers/settings_provider.dart';
 import '../../../core/services/search/search_service.dart';
 import '../../../core/services/search/search_service_usage_service.dart';
+import '../../../core/services/search/web_fetch.dart';
+import '../../../core/services/search/web_fetch_service.dart';
 import '../../../icons/lucide_adapter.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../theme/app_font_weights.dart';
@@ -19,6 +21,7 @@ import 'search_api_keys_page.dart';
 import 'package:Kelivo/theme/app_semantic_colors.dart';
 import 'package:Kelivo/shared/widgets/ios_tactile.dart';
 import 'package:Kelivo/shared/widgets/section_card.dart';
+import 'package:Kelivo/shared/widgets/segmented_tabs.dart';
 
 class SearchServiceEditorResult {
   const SearchServiceEditorResult.saved(this.service) : deleted = false;
@@ -33,6 +36,8 @@ typedef SearchServiceUsageFetcher =
     Future<SearchServiceUsageInfo> Function(SearchServiceOptions options);
 typedef SearchServiceTestFetcher =
     Future<SearchResult> Function(String query, SearchServiceOptions options);
+typedef SearchServicePageFetcher =
+    Future<WebFetchPage> Function(String url, SearchServiceOptions options);
 
 typedef _SearchUsageCacheKey = ({
   String id,
@@ -50,6 +55,7 @@ class SearchServiceEditorPage extends StatefulWidget {
     this.autoQueryUsage = true,
     this.usageFetcher,
     this.searchFetcher,
+    this.pageFetcher,
   });
 
   final SearchServiceOptions? initialService;
@@ -58,6 +64,7 @@ class SearchServiceEditorPage extends StatefulWidget {
   final bool autoQueryUsage;
   final SearchServiceUsageFetcher? usageFetcher;
   final SearchServiceTestFetcher? searchFetcher;
+  final SearchServicePageFetcher? pageFetcher;
 
   @override
   State<SearchServiceEditorPage> createState() =>
@@ -71,6 +78,7 @@ class _SearchServiceEditorPageState extends State<SearchServiceEditorPage> {
   final _formKey = GlobalKey<FormState>();
   final _controllers = <String, TextEditingController>{};
   final _queryController = TextEditingController();
+  final _urlController = TextEditingController();
   List<String> _extraApiKeys = [];
 
   late final String _serviceId;
@@ -82,6 +90,9 @@ class _SearchServiceEditorPageState extends State<SearchServiceEditorPage> {
   int _usageRequestGeneration = 0;
   SearchResult? _testResult;
   String? _testError;
+  bool _fetchTestMode = false;
+  WebFetchPage? _fetchResult;
+  Duration? _fetchElapsed;
   SearchServiceUsageInfo? _usage;
   String? _usageError;
 
@@ -111,6 +122,7 @@ class _SearchServiceEditorPageState extends State<SearchServiceEditorPage> {
       controller.dispose();
     }
     _queryController.dispose();
+    _urlController.dispose();
     super.dispose();
   }
 
@@ -193,6 +205,9 @@ class _SearchServiceEditorPageState extends State<SearchServiceEditorPage> {
                                 _ProviderTypeChip(
                                   label: _serviceTypeName(context, spec.type),
                                   brand: spec.brand,
+                                  canFetch: WebFetchService.supportsType(
+                                    spec.type,
+                                  ),
                                   selected: spec.type == _selectedType,
                                   onTap: () => _changeType(spec.type),
                                 ),
@@ -841,23 +856,57 @@ class _SearchServiceEditorPageState extends State<SearchServiceEditorPage> {
   Widget _buildTestCard(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
     final cs = Theme.of(context).colorScheme;
-    final canRun = !_testing && _queryController.text.trim().isNotEmpty;
+    final canFetch = WebFetchService.supports(_currentService());
+    final fetchMode = canFetch && _fetchTestMode;
+    final controller = fetchMode ? _urlController : _queryController;
+    final canRun = !_testing && controller.text.trim().isNotEmpty;
+    final run = fetchMode ? _runTestFetch : _runTestSearch;
+    final runLabel = fetchMode
+        ? l10n.searchServiceEditorTestFetchRun
+        : l10n.searchServiceEditorTestRun;
     return SectionCard(
       child: Padding(
         padding: const EdgeInsets.fromLTRB(12, 12, 12, 14),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            if (canFetch) ...[
+              SegmentedTabs(
+                key: const ValueKey('search-service-test-mode'),
+                height: 36,
+                index: fetchMode ? 1 : 0,
+                tabs: [
+                  SegmentedTab(
+                    icon: Lucide.Search,
+                    label: l10n.searchServiceEditorTestModeSearch,
+                  ),
+                  SegmentedTab(
+                    icon: Lucide.FileText,
+                    label: l10n.searchServiceEditorTestModeFetch,
+                  ),
+                ],
+                onChanged: (index) => _onTestModeChanged(index == 1),
+              ),
+              const SizedBox(height: 12),
+            ],
             Row(
               children: [
                 Expanded(
                   child: TextField(
-                    controller: _queryController,
-                    textInputAction: TextInputAction.search,
-                    key: const ValueKey('search-service-test-query'),
+                    controller: controller,
+                    textInputAction: fetchMode
+                        ? TextInputAction.go
+                        : TextInputAction.search,
+                    keyboardType: fetchMode ? TextInputType.url : null,
+                    autocorrect: !fetchMode,
+                    key: ValueKey(
+                      fetchMode
+                          ? 'search-service-test-url'
+                          : 'search-service-test-query',
+                    ),
                     onChanged: _onTestQueryChanged,
                     onSubmitted: (_) {
-                      if (canRun) _runTestSearch();
+                      if (canRun) run();
                     },
                     style: TextStyle(
                       fontSize: 15,
@@ -866,17 +915,19 @@ class _SearchServiceEditorPageState extends State<SearchServiceEditorPage> {
                     ),
                     decoration: _inputDecoration(
                       context,
-                      hint: l10n.searchServiceEditorTestQueryHint,
+                      hint: fetchMode
+                          ? l10n.searchServiceEditorTestUrlHint
+                          : l10n.searchServiceEditorTestQueryHint,
                     ),
                   ),
                 ),
                 const SizedBox(width: 10),
                 Tooltip(
-                  message: l10n.searchServiceEditorTestRun,
+                  message: runLabel,
                   child: _SquareActionButton(
                     enabled: canRun,
-                    semanticLabel: l10n.searchServiceEditorTestRun,
-                    onTap: _runTestSearch,
+                    semanticLabel: runLabel,
+                    onTap: run,
                     child: _testing
                         ? SizedBox.square(
                             dimension: 19,
@@ -893,12 +944,151 @@ class _SearchServiceEditorPageState extends State<SearchServiceEditorPage> {
             AnimatedSize(
               duration: const Duration(milliseconds: 180),
               curve: Curves.easeOutCubic,
-              child: _buildTestResult(context),
+              child: fetchMode
+                  ? _buildFetchResult(context)
+                  : _buildTestResult(context),
             ),
           ],
         ),
       ),
     );
+  }
+
+  Widget _buildFetchResult(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    final cs = Theme.of(context).colorScheme;
+    if (_testing) {
+      return Padding(
+        padding: const EdgeInsets.only(top: 14),
+        child: Text(
+          l10n.searchServiceEditorTestFetchRunning,
+          style: TextStyle(
+            fontSize: 13,
+            color: cs.onSurface.withValues(alpha: 0.68),
+          ),
+        ),
+      );
+    }
+    if (_testError != null) {
+      return Padding(
+        padding: const EdgeInsets.only(top: 14),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(Lucide.TriangleAlert, size: 18, color: cs.error),
+            const SizedBox(width: 8),
+            Expanded(
+              child: SelectableText(
+                l10n.searchServiceEditorTestFetchFailed(_testError!),
+                style: TextStyle(fontSize: 13, height: 1.4, color: cs.error),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+    final page = _fetchResult;
+    if (page == null) return const SizedBox.shrink();
+    final host = Uri.tryParse(page.url)?.host ?? '';
+    final seconds = ((_fetchElapsed?.inMilliseconds ?? 0) / 1000)
+        .toStringAsFixed(1);
+    final characters = NumberFormat.decimalPattern(
+      Localizations.localeOf(context).toLanguageTag(),
+    ).format(page.content.length);
+    return Padding(
+      key: const ValueKey('search-service-fetch-result'),
+      padding: const EdgeInsets.only(top: 14),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            page.title.isEmpty ? (host.isEmpty ? page.url : host) : page.title,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              fontSize: 14,
+              height: 1.3,
+              fontWeight: AppFontWeights.semibold,
+              color: cs.onSurface,
+            ),
+          ),
+          const SizedBox(height: 3),
+          Text(
+            [
+              if (host.isNotEmpty) host,
+              l10n.searchServiceEditorTestFetchStats(characters, seconds),
+            ].join(' · '),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              fontSize: 12,
+              color: cs.onSurface.withValues(alpha: 0.58),
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            page.content.length > 600
+                ? '${page.content.substring(0, 600)}…'
+                : page.content,
+            maxLines: 8,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              fontSize: 12.5,
+              height: 1.45,
+              color: cs.onSurface.withValues(alpha: 0.72),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _onTestModeChanged(bool fetchMode) {
+    FocusScope.of(context).unfocus();
+    setState(() {
+      _fetchTestMode = fetchMode;
+      _testRequestGeneration++;
+      _testing = false;
+      _testResult = null;
+      _fetchResult = null;
+      _testError = null;
+    });
+  }
+
+  Future<void> _runTestFetch() async {
+    final url = _urlController.text.trim();
+    if (_testing || url.isEmpty) return;
+    if (!(_formKey.currentState?.validate() ?? false)) return;
+    FocusScope.of(context).unfocus();
+    final options = _currentService();
+    final requestGeneration = ++_testRequestGeneration;
+    final stopwatch = Stopwatch()..start();
+    setState(() {
+      _testing = true;
+      _fetchResult = null;
+      _testError = null;
+    });
+    try {
+      final page = widget.pageFetcher != null
+          ? await widget.pageFetcher!(url, options)
+          : await WebFetchService.fetch(
+              ProviderWebFetchSource(options),
+              url,
+              commonOptions: widget.commonOptions,
+            );
+      if (!mounted || requestGeneration != _testRequestGeneration) return;
+      setState(() {
+        _fetchResult = page;
+        _fetchElapsed = stopwatch.elapsed;
+      });
+    } catch (error) {
+      if (!mounted || requestGeneration != _testRequestGeneration) return;
+      setState(() => _testError = _cleanError(error));
+    } finally {
+      if (mounted && requestGeneration == _testRequestGeneration) {
+        setState(() => _testing = false);
+      }
+    }
   }
 
   Widget _buildTestResult(BuildContext context) {
@@ -1014,6 +1204,7 @@ class _SearchServiceEditorPageState extends State<SearchServiceEditorPage> {
     setState(() {
       _testing = true;
       _testResult = null;
+      _fetchResult = null;
       _testError = null;
     });
     try {
@@ -1046,6 +1237,7 @@ class _SearchServiceEditorPageState extends State<SearchServiceEditorPage> {
       _testRequestGeneration++;
       _testing = false;
       _testResult = null;
+      _fetchResult = null;
       _testError = null;
     });
   }
@@ -1108,6 +1300,7 @@ class _SearchServiceEditorPageState extends State<SearchServiceEditorPage> {
       _testing = false;
       _usageLoading = false;
       _testResult = null;
+      _fetchResult = null;
       _testError = null;
       _usage = _cachedUsage(next);
       _usageError = null;
@@ -1121,6 +1314,7 @@ class _SearchServiceEditorPageState extends State<SearchServiceEditorPage> {
       _testing = false;
       _usageLoading = false;
       _testResult = null;
+      _fetchResult = null;
       _testError = null;
       _usage = _cachedUsage(_currentService());
       _usageError = null;
@@ -2036,12 +2230,14 @@ class _ProviderTypeChip extends StatefulWidget {
   const _ProviderTypeChip({
     required this.label,
     required this.brand,
+    required this.canFetch,
     required this.selected,
     required this.onTap,
   });
 
   final String label;
   final String brand;
+  final bool canFetch;
   final bool selected;
   final VoidCallback onTap;
 
@@ -2104,6 +2300,18 @@ class _ProviderTypeChipState extends State<_ProviderTypeChip> {
                     color: widget.selected ? cs.primary : cs.onSurface,
                   ),
                 ),
+                if (widget.canFetch) ...[
+                  const SizedBox(width: 5),
+                  Icon(
+                    Lucide.FileText,
+                    size: 13,
+                    color: (widget.selected ? cs.primary : cs.onSurface)
+                        .withValues(alpha: 0.5),
+                    semanticLabel: AppLocalizations.of(
+                      context,
+                    )!.searchServicesPageWebFetchSupported,
+                  ),
+                ],
               ],
             ),
           ),

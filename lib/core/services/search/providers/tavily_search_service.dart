@@ -2,8 +2,12 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import '../../../../l10n/app_localizations.dart';
 import '../search_service.dart';
+import '../web_fetch.dart';
 
-class TavilySearchService extends SearchService<TavilyOptions> {
+class TavilySearchService extends SearchService<TavilyOptions>
+    implements WebFetchCapable<TavilyOptions> {
+  TavilySearchService({super.client});
+
   @override
   String get name => 'Tavily';
 
@@ -58,6 +62,45 @@ class TavilySearchService extends SearchService<TavilyOptions> {
       return SearchResult(answer: data['answer'], items: results);
     } catch (e) {
       throw Exception('Tavily search failed: $e');
+    }
+  }
+
+  @override
+  Future<WebFetchPage> fetch({
+    required String url,
+    required SearchCommonOptions commonOptions,
+    required TavilyOptions serviceOptions,
+  }) async {
+    try {
+      final endpoint = siblingFetchEndpoint(
+        serviceOptions.resolvedUrl,
+        searchPath: '/search',
+        fetchPath: '/extract',
+      );
+      final data = await postFetchJson(
+        Uri.parse(endpoint),
+        headers: {
+          'Authorization':
+              'Bearer ${serviceOptions.effectiveApiKey(serviceOptions.apiKey)}',
+        },
+        body: {'urls': url, 'format': 'markdown'},
+        commonOptions: commonOptions,
+      );
+      final results = (data['results'] as List?) ?? const [];
+      if (results.isEmpty) {
+        final failed = (data['failed_results'] as List?) ?? const [];
+        final error = failed.isEmpty ? null : (failed.first as Map)['error'];
+        throw Exception(error ?? 'no content returned');
+      }
+      final page = (results.first as Map).cast<String, dynamic>();
+      final content = (page['raw_content'] ?? '').toString();
+      return WebFetchPage(
+        url: (page['url'] ?? url).toString(),
+        title: firstMarkdownHeading(content),
+        content: content,
+      );
+    } catch (e) {
+      throw Exception('Tavily fetch failed: $e');
     }
   }
 }

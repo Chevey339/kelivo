@@ -12,6 +12,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'package:path/path.dart' as p;
 import '../services/search/search_service.dart';
+import '../services/search/web_fetch_service.dart';
 import '../services/tts/network_tts.dart';
 import '../services/tts/tts_text_selection.dart';
 import '../services/asr/asr_service_options.dart';
@@ -385,6 +386,7 @@ class SettingsProvider extends ChangeNotifier {
   static const String _searchEnabledKey = 'search_enabled_v1';
   static const String _searchAutoTestOnLaunchKey =
       'search_auto_test_on_launch_v1';
+  static const String _webFetchModeKey = 'search_web_fetch_v1';
   static const String _webDavConfigKey = 'webdav_config_v1';
   static const String _s3ConfigKey = 's3_config_v1';
   // Global network proxy
@@ -614,6 +616,9 @@ class SettingsProvider extends ChangeNotifier {
   bool get searchEnabled => _searchEnabled;
   bool _searchAutoTestOnLaunch = false;
   bool get searchAutoTestOnLaunch => _searchAutoTestOnLaunch;
+  // follow | local | off | a search service id (see WebFetchMode)
+  String _webFetchMode = WebFetchMode.follow;
+  String get webFetchMode => _webFetchMode;
   // Ephemeral connection test results: serviceId -> connected (true), failed (false), or null (not tested)
   final Map<String, bool?> _searchConnection = <String, bool?>{};
   Map<String, bool?> get searchConnection =>
@@ -1316,6 +1321,7 @@ class SettingsProvider extends ChangeNotifier {
     _searchEnabled = prefs.getBool(_searchEnabledKey) ?? false;
     _searchAutoTestOnLaunch =
         prefs.getBool(_searchAutoTestOnLaunchKey) ?? false;
+    _webFetchMode = prefs.getString(_webFetchModeKey) ?? WebFetchMode.follow;
 
     // load global proxy
     _globalProxyEnabled = prefs.getBool(_globalProxyEnabledKey) ?? false;
@@ -5565,6 +5571,12 @@ Requirements:
 
   Future<void> setSearchServices(List<SearchServiceOptions> services) async {
     _searchServices = List.from(services);
+    final nextFetchMode = WebFetchService.effectiveMode(
+      _webFetchMode,
+      _searchServices,
+    );
+    final resetFetchMode = _webFetchMode != nextFetchMode;
+    _webFetchMode = nextFetchMode;
     if (_searchServiceSelected >= _searchServices.length) {
       _searchServiceSelected = _searchServices.isNotEmpty
           ? _searchServices.length - 1
@@ -5577,6 +5589,7 @@ Requirements:
       jsonEncode(_searchServices.map((e) => e.toJson()).toList()),
     );
     await prefs.setInt(_searchSelectedKey, _searchServiceSelected);
+    if (resetFetchMode) await prefs.setString(_webFetchModeKey, _webFetchMode);
   }
 
   Future<void> setSearchCommonOptions(SearchCommonOptions options) async {
@@ -5610,6 +5623,13 @@ Requirements:
     await prefs.setBool(_searchAutoTestOnLaunchKey, enabled);
   }
 
+  Future<void> setWebFetchMode(String mode) async {
+    _webFetchMode = WebFetchService.effectiveMode(mode, _searchServices);
+    notifyListeners();
+    final prefs = _preferences;
+    await prefs.setString(_webFetchModeKey, _webFetchMode);
+  }
+
   // Combined update for settings
   Future<void> updateSettings(SettingsProvider newSettings) async {
     if (!listEquals(_searchServices, newSettings._searchServices)) {
@@ -5627,6 +5647,9 @@ Requirements:
     if (_searchAutoTestOnLaunch != newSettings._searchAutoTestOnLaunch) {
       await setSearchAutoTestOnLaunch(newSettings._searchAutoTestOnLaunch);
     }
+    if (_webFetchMode != newSettings._webFetchMode) {
+      await setWebFetchMode(newSettings._webFetchMode);
+    }
   }
 
   SettingsProvider copyWith({
@@ -5635,6 +5658,7 @@ Requirements:
     int? searchServiceSelected,
     bool? searchEnabled,
     bool? searchAutoTestOnLaunch,
+    String? webFetchMode,
   }) {
     final copy = SettingsProvider._withoutLoad(_preferences);
     copy._searchServices = searchServices ?? _searchServices;
@@ -5644,6 +5668,7 @@ Requirements:
     copy._searchEnabled = searchEnabled ?? _searchEnabled;
     copy._searchAutoTestOnLaunch =
         searchAutoTestOnLaunch ?? _searchAutoTestOnLaunch;
+    copy._webFetchMode = webFetchMode ?? _webFetchMode;
     copy._ttsServices = _ttsServices;
     copy._selectedTtsServiceId = _selectedTtsServiceId;
     copy._ttsAutoPlayAssistantReplies = _ttsAutoPlayAssistantReplies;

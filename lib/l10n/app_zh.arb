@@ -908,6 +908,12 @@
   "chatMessageWidgetBuiltinSearchHideNote": "隐藏内置搜索工具卡片",
   "chatMessageWidgetDeepThinking": "深度思考",
   "chatMessageWidgetWebSearch": "联网检索: {query}",
+  "chatMessageWidgetWebFetch": "读取网页: {target}",
+  "@chatMessageWidgetWebFetch": {
+    "placeholders": {
+      "target": { "type": "String" }
+    }
+  },
   "chatMessageWidgetBuiltinSearch": "模型内置搜索",
   "chatMessageWidgetReadClipboard": "读取剪切板",
   "chatMessageWidgetWriteClipboard": "写入剪切板",
@@ -1572,6 +1578,28 @@
   "searchServicesPageSearchProviders": "搜索提供商",
   "searchServicesPageGeneralOptions": "通用选项",
   "searchServicesPageAutoTestTitle": "启动时自动测试连接",
+  "searchServicesPageWebFetchSection": "网页抓取",
+  "searchServicesPageWebFetchModeTitle": "抓取方式",
+  "searchServicesPageWebFetchFollow": "跟随搜索服务",
+  "searchServicesPageWebFetchFollowValue": "跟随搜索 · {name}",
+  "@searchServicesPageWebFetchFollowValue": {
+    "placeholders": {
+      "name": { "type": "String" }
+    }
+  },
+  "searchServicesPageWebFetchFollowSubtitle": "当前：{name}",
+  "@searchServicesPageWebFetchFollowSubtitle": {
+    "placeholders": {
+      "name": { "type": "String" }
+    }
+  },
+  "searchServicesPageWebFetchLocal": "本地抓取",
+  "searchServicesPageWebFetchLocalSubtitle": "免费，由本机直接请求网页",
+  "searchServicesPageWebFetchProviderSubtitle": "使用该服务商的 API Key 和额度",
+  "searchServicesPageWebFetchOff": "关闭",
+  "searchServicesPageWebFetchOffSubtitle": "联网时只搜索，不读取网页",
+  "searchServicesPageWebFetchFooter": "开启联网搜索后，模型还可以读取网页全文。搜索服务不支持抓取时会改用本地抓取，本地抓取无法处理需要 JavaScript 渲染或有反爬限制的页面。",
+  "searchServicesPageWebFetchSupported": "支持网页抓取",
   "searchServicesPageMaxResults": "最大结果数",
   "searchServicesPageTimeoutSeconds": "超时时间（秒）",
   "searchServicesPageAtLeastOneServiceRequired": "至少需要一个搜索服务",
@@ -1672,6 +1700,24 @@
   "@searchServiceEditorTestFailed": {
     "placeholders": {
       "message": { "type": "String" }
+    }
+  },
+  "searchServiceEditorTestModeSearch": "搜索",
+  "searchServiceEditorTestModeFetch": "抓取",
+  "searchServiceEditorTestUrlHint": "输入测试网址",
+  "searchServiceEditorTestFetchRun": "运行抓取测试",
+  "searchServiceEditorTestFetchRunning": "抓取中…",
+  "searchServiceEditorTestFetchFailed": "抓取失败：{message}",
+  "@searchServiceEditorTestFetchFailed": {
+    "placeholders": {
+      "message": { "type": "String" }
+    }
+  },
+  "searchServiceEditorTestFetchStats": "{characters} 字符 · {seconds} 秒",
+  "@searchServiceEditorTestFetchStats": {
+    "placeholders": {
+      "characters": { "type": "String" },
+      "seconds": { "type": "String" }
     }
   },
   "searchServiceEditorResultOpenTooltip": "打开结果",

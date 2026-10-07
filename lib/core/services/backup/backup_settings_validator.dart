@@ -120,6 +120,9 @@ final class BackupSettingsValidator {
         value is String ||
         (value is List && value.every((item) => item is String));
     if (!supported) throw FormatException(key);
+    if (key == 'search_web_fetch_v1' && value is! String) {
+      throw FormatException(key);
+    }
 
     if (_jsonListKeys.contains(key)) {
       _validateJsonShape(key, value, expectList: true);

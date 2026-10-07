@@ -1,6 +1,7 @@
 import '../../services/memory/memory_prompts.dart';
 import '../../services/memory/memory_tools.dart';
 import '../../services/search/search_tool_service.dart';
+import '../../services/search/web_fetch_tool_service.dart';
 import '../../../features/home/services/local_tools_service.dart';
 import '../workspace/workspace_tools_service.dart';
 
@@ -39,6 +40,11 @@ abstract final class BuiltInToolCatalog {
       BuiltInToolCatalogEntry(
         name: SearchToolService.toolName,
         defaultDefinition: SearchToolService.getToolDefinition(),
+        group: BuiltInToolGroup.search,
+      ),
+      BuiltInToolCatalogEntry(
+        name: WebFetchToolService.toolName,
+        defaultDefinition: WebFetchToolService.getToolDefinition(),
         group: BuiltInToolGroup.search,
       ),
     ];
