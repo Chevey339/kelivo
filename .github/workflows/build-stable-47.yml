@@ -1,7 +1,7 @@
-name: Flutter Multi-Platform Build Stable 3.41
+name: Flutter Multi-Platform Build Stable 3.47
 
 env:
-  FLUTTER_VERSION: '3.41.2'  # 更新flutter版本为3.41.2
+  FLUTTER_VERSION: '3.47.6'  # Flutter 3.47.6 / Dart 3.13.x
 
 on:
   # 手动触发
@@ -173,6 +173,9 @@ jobs:
           channel: stable
           cache: true
 
+      - name: 🔧 关闭 Swift Package Manager
+        run: flutter config --no-enable-swift-package-manager
+
       - name: 📝 Inject fallback
         shell: bash
         run: |
@@ -190,6 +193,20 @@ jobs:
           fi
           echo "VERSION=$VERSION" >> $GITHUB_ENV
           echo "版本号: $VERSION"
+      - name: 🧰 缓存 iSH 沙箱产物
+        uses: actions/cache@v4
+        with:
+          path: |
+            ios/sandbox/build
+            ios/sandbox/resources/alpine-rootfs.zip
+            ios/sandbox/resources/libvdso.so.elf
+          key: ${{ runner.os }}-${{ runner.arch }}-ish-sandbox-${{ hashFiles('ios/sandbox/build_ish.sh', 'ios/sandbox/ensure_artifacts.sh', 'ios/sandbox/patches/*.patch', 'ios/sandbox/prepare_alpine_rootfs.sh', 'ios/sandbox/resources/VERSION') }}
+
+      - name: 🧰 准备 iSH 沙箱产物
+        run: |
+          brew install meson ninja llvm lld libarchive
+          ios/sandbox/ensure_artifacts.sh
+
       - name: 🏗️ 构建 iOS (无签名)
         run: |
           flutter build ios --release --no-codesign
@@ -231,6 +248,9 @@ jobs:
           flutter-version: ${{ env.FLUTTER_VERSION }}
           channel: stable
           cache: true
+
+      - name: 🔧 关闭 Swift Package Manager
+        run: flutter config --no-enable-swift-package-manager
 
       - name: 📝 Inject fallback
         shell: bash
@@ -413,10 +433,10 @@ jobs:
           [Run]
           Filename: "{app}\{#MyAppExeName}"; Description: "启动 {#MyAppName}"; Flags: nowait postinstall skipifsilent
           "@
-          
+
           # 使用 UTF-8 BOM 以确保中文字符在 Inno Setup 中正确解析
           $issContent | Out-File -FilePath "installer.iss" -Encoding utf8BOM
-          
+
           # 编译安装程序
           & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" "installer.iss"
       - name: 🚀 发布到 Release
@@ -459,7 +479,7 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y \
             clang cmake ninja-build pkg-config libgtk-3-dev \
-            libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev \
+            libgstreamer1.0-dev libunwind-dev libgstreamer-plugins-base1.0-dev \
             gstreamer1.0-plugins-base gstreamer1.0-tools \
             gstreamer1.0-plugins-good gstreamer1.0-plugins-bad \
             rpm patchelf libfuse2 file \
@@ -508,14 +528,14 @@ jobs:
           mkdir -p deb/opt/kelivo
           mkdir -p deb/usr/share/applications
           mkdir -p deb/usr/share/icons/hicolor/256x256/apps
-          
+
           # 复制文件
           cp -r build/linux/x64/release/bundle/* deb/opt/kelivo/
-          
+
           # 创建 /usr/bin 软链接
           mkdir -p deb/usr/bin
           ln -s /opt/kelivo/kelivo deb/usr/bin/kelivo
-          
+
           # 创建 control 文件
           cat > deb/DEBIAN/control << EOF
           Package: kelivo
@@ -528,7 +548,7 @@ jobs:
           Description: Kelivo Application
            A Flutter application for Linux
           EOF
-          
+
           # 创建 desktop 文件
           cat > deb/usr/share/applications/kelivo.desktop << EOF
           [Desktop Entry]
@@ -548,7 +568,7 @@ jobs:
             exit 1
           fi
           install -Dm644 "$ICON_SOURCE" deb/usr/share/icons/hicolor/256x256/apps/kelivo.png
-          
+
           # 创建启动脚本
           cat > deb/opt/kelivo/kelivo.sh << 'EOF'
           #!/bin/bash
@@ -556,14 +576,14 @@ jobs:
           ./kelivo "$@"
           EOF
           chmod +x deb/opt/kelivo/kelivo.sh
-          
+
           # 构建 DEB 包
           dpkg-deb --build deb Kelivo_linux_${VERSION}_amd64.deb
       - name: 📦 创建 RPM 包
         run: |
           # 创建 RPM 构建目录
           mkdir -p ~/rpmbuild/{BUILD,RPMS,SOURCES,SPECS,SRPMS}
-          
+
           # 创建源码目录
           mkdir -p kelivo-${VERSION_NUMBER}
           cp -r build/linux/x64/release/bundle/* kelivo-${VERSION_NUMBER}/
@@ -577,7 +597,7 @@ jobs:
           fi
           cp "$ICON_SOURCE" kelivo-${VERSION_NUMBER}/kelivo.png
           tar -czf ~/rpmbuild/SOURCES/kelivo-${VERSION_NUMBER}.tar.gz kelivo-${VERSION_NUMBER}
-          
+
           # 创建 spec 文件
           cat > ~/rpmbuild/SPECS/kelivo.spec << EOF
           Name:           kelivo
@@ -587,21 +607,22 @@ jobs:
           License:        MIT
           Source0:        %{name}-%{version}.tar.gz
           BuildArch:      x86_64
+          Provides:       libonnxruntime.so(VERS_1.17.1)(64bit)
           Requires:       gtk3, libstdc++ >= 6, mesa-libGLU, gstreamer1, gstreamer1-plugins-base, glib2, glibc
-          
+
           %description
           A Flutter application for Linux
-          
+
           %prep
           %setup -q
-          
+
           %install
           mkdir -p %{buildroot}/opt/kelivo
           cp -r * %{buildroot}/opt/kelivo/
-          
+
           mkdir -p %{buildroot}/usr/bin
           ln -s /opt/kelivo/kelivo %{buildroot}/usr/bin/kelivo
-          
+
           mkdir -p %{buildroot}/usr/share/applications
           cat > %{buildroot}/usr/share/applications/kelivo.desktop << 'DESKTOPEOF'
           [Desktop Entry]
@@ -614,18 +635,18 @@ jobs:
 
           mkdir -p %{buildroot}/usr/share/icons/hicolor/256x256/apps
           cp kelivo.png %{buildroot}/usr/share/icons/hicolor/256x256/apps/kelivo.png
-          
+
           %files
           /opt/kelivo/*
           /usr/bin/kelivo
           /usr/share/applications/kelivo.desktop
           /usr/share/icons/hicolor/256x256/apps/kelivo.png
-          
+
           %changelog
           * $(date "+%a %b %d %Y") Psyche <your@email.com> - ${VERSION_NUMBER}-1
           - Initial RPM release
           EOF
-          
+
           # 构建 RPM
           rpmbuild -bb ~/rpmbuild/SPECS/kelivo.spec
           cp ~/rpmbuild/RPMS/x86_64/kelivo-${VERSION_NUMBER}-1.*.rpm Kelivo_linux_${VERSION}.rpm
