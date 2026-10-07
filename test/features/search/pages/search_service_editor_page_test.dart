@@ -12,6 +12,49 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  testWidgets('adds Exa MCP without an API key or custom URL', (tester) async {
+    SearchServiceEditorResult? result;
+    await _pumpEditor(tester, onResult: (value) => result = value);
+    await tester.tap(find.text('Exa MCP'));
+    await tester.pumpAndSettle();
+    expect(find.text('API Key (optional)'), findsOneWidget);
+    expect(find.text(ExaMcpOptions.defaultUrl), findsOneWidget);
+    await tester.tap(find.byIcon(Lucide.Check));
+    await tester.pumpAndSettle();
+    final saved = result!.service! as ExaMcpOptions;
+    expect(saved.apiKey, isEmpty);
+    expect(saved.resolvedUrl, ExaMcpOptions.defaultUrl);
+  });
+
+  testWidgets('edits Exa MCP endpoint and preserves credentials', (
+    tester,
+  ) async {
+    SearchServiceEditorResult? result;
+    await _pumpEditor(
+      tester,
+      initialService: ExaMcpOptions(
+        id: 'exa-mcp',
+        apiKey: 'key',
+        extraApiKeys: const ['extra'],
+      ),
+      onResult: (value) => result = value,
+    );
+    await tester.enterText(
+      find.descendant(
+        of: find.byKey(const ValueKey('search-service-field-url')),
+        matching: find.byType(TextFormField),
+      ),
+      ' https://example.com/mcp ',
+    );
+    await tester.tap(find.byIcon(Lucide.Check));
+    await tester.pumpAndSettle();
+    final saved = result!.service! as ExaMcpOptions;
+    expect(saved.id, 'exa-mcp');
+    expect(saved.apiKey, 'key');
+    expect(saved.extraApiKeys, ['extra']);
+    expect(saved.url, 'https://example.com/mcp');
+  });
+
   testWidgets('does not show the provider description', (tester) async {
     await _pumpEditor(
       tester,

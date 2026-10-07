@@ -4568,6 +4568,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get searchServicesDialogApiKey => 'API Key';
 
   @override
+  String get searchServicesDialogApiKeyOptional => 'API Key（可选）';
+
+  @override
   String get searchServicesDialogModel => '模型';
 
   @override
@@ -5879,6 +5882,10 @@ class AppLocalizationsZh extends AppLocalizations {
   String get searchProviderExaDescription => '具备语义理解的神经搜索引擎。适合研究与查找特定内容。';
 
   @override
+  String get searchProviderExaMcpDescription =>
+      '通过 MCP 使用 Exa 搜索。不填 API Key 可在免费限额内使用。';
+
+  @override
   String get searchProviderLinkUpDescription =>
       '提供来源可追溯答案的搜索 API，同时提供搜索结果与 AI 摘要。';
 
@@ -5914,6 +5921,9 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get searchServiceNameExa => 'Exa';
+
+  @override
+  String get searchServiceNameExaMcp => 'Exa MCP';
 
   @override
   String get searchServiceNameZhipu => '智谱';
@@ -16882,6 +16892,9 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get searchServicesDialogApiKey => 'API Key';
 
   @override
+  String get searchServicesDialogApiKeyOptional => 'API Key（可选）';
+
+  @override
   String get searchServicesDialogModel => '模型';
 
   @override
@@ -18119,6 +18132,10 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get searchProviderExaDescription => '具备语义理解的神经搜索引擎。适合研究与查找特定内容。';
 
   @override
+  String get searchProviderExaMcpDescription =>
+      '通过 MCP 使用 Exa 搜索。不填 API Key 可在免费限额内使用。';
+
+  @override
   String get searchProviderLinkUpDescription =>
       '提供来源可追溯答案的搜索 API，同时提供搜索结果与 AI 摘要。';
 
@@ -18154,6 +18171,9 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get searchServiceNameExa => 'Exa';
+
+  @override
+  String get searchServiceNameExaMcp => 'Exa MCP';
 
   @override
   String get searchServiceNameZhipu => '智谱';
@@ -29121,6 +29141,9 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get searchServicesDialogApiKey => 'API Key';
 
   @override
+  String get searchServicesDialogApiKeyOptional => 'API Key（選填）';
+
+  @override
   String get searchServicesDialogModel => '模型';
 
   @override
@@ -30432,6 +30455,10 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get searchProviderExaDescription => '具備語義理解的神經搜尋引擎。適合研究與查找特定內容。';
 
   @override
+  String get searchProviderExaMcpDescription =>
+      '透過 MCP 使用 Exa 搜尋。不填 API Key 可在免費限額內使用。';
+
+  @override
   String get searchProviderLinkUpDescription =>
       '提供來源可追溯答案的搜尋 API，同時提供搜尋結果與 AI 摘要。';
 
@@ -30468,6 +30495,9 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get searchServiceNameExa => 'Exa';
+
+  @override
+  String get searchServiceNameExaMcp => 'Exa MCP';
 
   @override
   String get searchServiceNameZhipu => 'Zhipu（智譜）';

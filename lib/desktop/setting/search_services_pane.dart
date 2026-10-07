@@ -594,6 +594,7 @@ class _BrandBadge extends StatelessWidget {
     if (s is DuckDuckGoOptions) return 'duckduckgo';
     if (s is TavilyOptions) return 'tavily';
     if (s is ExaOptions) return 'exa';
+    if (s is ExaMcpOptions) return 'exa';
     if (s is ZhipuOptions) return 'zhipu';
     if (s is SearXNGOptions) return 'searxng';
     if (s is LinkUpOptions) return 'linkup';
@@ -770,6 +771,7 @@ class _AddServiceDialogState extends State<_AddServiceDialog> {
     'url': TextEditingController(),
     'tavilyUrl': TextEditingController(),
     'exaUrl': TextEditingController(),
+    'exaMcpUrl': TextEditingController(),
     'engines': TextEditingController(),
     'language': TextEditingController(),
     'username': TextEditingController(),
@@ -932,6 +934,21 @@ class _AddServiceDialogState extends State<_AddServiceDialog> {
             decoration: _deskInputDecoration(context).copyWith(
               labelText: l10n.searchServicesFieldCustomUrlOptional,
               hintText: ExaOptions.defaultUrl,
+            ),
+          ),
+        ];
+      case 'exa_mcp':
+        return [
+          TextField(
+            controller: _controllers['apiKey'],
+            decoration: deco(l10n.searchServicesDialogApiKeyOptional),
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _controllers['exaMcpUrl'],
+            decoration: _deskInputDecoration(context).copyWith(
+              labelText: l10n.searchServicesFieldCustomUrlOptional,
+              hintText: ExaMcpOptions.defaultUrl,
             ),
           ),
         ];
@@ -1327,6 +1344,12 @@ class _AddServiceDialogState extends State<_AddServiceDialog> {
           apiKey: _controllers['apiKey']!.text,
           url: _controllers['exaUrl']!.text.trim(),
         );
+      case 'exa_mcp':
+        return ExaMcpOptions(
+          id: id,
+          apiKey: _controllers['apiKey']!.text,
+          url: _controllers['exaMcpUrl']!.text.trim(),
+        );
       case 'zhipu':
         return ZhipuOptions(id: id, apiKey: _controllers['apiKey']!.text);
       case 'searxng':
@@ -1482,6 +1505,9 @@ class _EditServiceDialogState extends State<_EditServiceDialog> {
     } else if (s is DuckDuckGoOptions) {
       _controllers['region'] = TextEditingController(text: s.region);
     } else if (s is ExaOptions) {
+      _controllers['apiKey'] = TextEditingController(text: s.apiKey);
+      _controllers['url'] = TextEditingController(text: s.url);
+    } else if (s is ExaMcpOptions) {
       _controllers['apiKey'] = TextEditingController(text: s.apiKey);
       _controllers['url'] = TextEditingController(text: s.url);
     } else if (s is ZhipuOptions) {
@@ -1683,6 +1709,23 @@ class _EditServiceDialogState extends State<_EditServiceDialog> {
           decoration: _deskInputDecoration(context).copyWith(
             labelText: l10n.searchServicesFieldCustomUrlOptional,
             hintText: ExaOptions.defaultUrl,
+          ),
+        ),
+      ];
+    } else if (s is ExaMcpOptions) {
+      return [
+        TextField(
+          controller: _controllers['apiKey'],
+          decoration: deco(l10n.searchServicesDialogApiKeyOptional),
+        ),
+        const SizedBox(height: 12),
+        _multiKeyTile(),
+        const SizedBox(height: 12),
+        TextField(
+          controller: _controllers['url'],
+          decoration: _deskInputDecoration(context).copyWith(
+            labelText: l10n.searchServicesFieldCustomUrlOptional,
+            hintText: ExaMcpOptions.defaultUrl,
           ),
         ),
       ];
@@ -2175,6 +2218,14 @@ class _EditServiceDialogState extends State<_EditServiceDialog> {
         extraApiKeys: _extraApiKeys,
       );
     }
+    if (s is ExaMcpOptions) {
+      return ExaMcpOptions(
+        id: s.id,
+        apiKey: _controllers['apiKey']!.text,
+        url: _controllers['url']!.text.trim(),
+        extraApiKeys: _extraApiKeys,
+      );
+    }
     if (s is ZhipuOptions) {
       return ZhipuOptions(
         id: s.id,
@@ -2624,6 +2675,7 @@ class _ServiceTypeChipsState extends State<_ServiceTypeChips> {
     (type: 'duckduckgo', brand: 'duckduckgo'),
     (type: 'tavily', brand: 'tavily'),
     (type: 'exa', brand: 'exa'),
+    (type: 'exa_mcp', brand: 'exa'),
     (type: 'zhipu', brand: 'zhipu'),
     (type: 'searxng', brand: 'searxng'),
     (type: 'linkup', brand: 'linkup'),
@@ -2705,6 +2757,8 @@ String _serviceTypeName(BuildContext context, String type) {
       return l10n.searchServiceNameTavily;
     case 'exa':
       return l10n.searchServiceNameExa;
+    case 'exa_mcp':
+      return l10n.searchServiceNameExaMcp;
     case 'zhipu':
       return l10n.searchServiceNameZhipu;
     case 'searxng':

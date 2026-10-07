@@ -4724,6 +4724,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get searchServicesDialogApiKey => 'API Key';
 
   @override
+  String get searchServicesDialogApiKeyOptional => 'API Key (optional)';
+
+  @override
   String get searchServicesDialogModel => 'Model';
 
   @override
@@ -6121,6 +6124,10 @@ class AppLocalizationsEn extends AppLocalizations {
       'Neural search with semantic understanding. Great for research and finding specific content.';
 
   @override
+  String get searchProviderExaMcpDescription =>
+      'Exa search via MCP. An API key is optional for limited free usage.';
+
+  @override
   String get searchProviderLinkUpDescription =>
       'Search API with sourced answers. Provides both results and AI-generated summaries.';
 
@@ -6159,6 +6166,9 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get searchServiceNameExa => 'Exa';
+
+  @override
+  String get searchServiceNameExaMcp => 'Exa MCP';
 
   @override
   String get searchServiceNameZhipu => 'Zhipu AI';

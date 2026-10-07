@@ -8701,6 +8701,12 @@ abstract class AppLocalizations {
   /// **'API Key'**
   String get searchServicesDialogApiKey;
 
+  /// No description provided for @searchServicesDialogApiKeyOptional.
+  ///
+  /// In en, this message translates to:
+  /// **'API Key (optional)'**
+  String get searchServicesDialogApiKeyOptional;
+
   /// No description provided for @searchServicesDialogModel.
   ///
   /// In en, this message translates to:
@@ -11179,6 +11185,12 @@ abstract class AppLocalizations {
   /// **'Neural search with semantic understanding. Great for research and finding specific content.'**
   String get searchProviderExaDescription;
 
+  /// No description provided for @searchProviderExaMcpDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Exa search via MCP. An API key is optional for limited free usage.'**
+  String get searchProviderExaMcpDescription;
+
   /// No description provided for @searchProviderLinkUpDescription.
   ///
   /// In en, this message translates to:
@@ -11244,6 +11256,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Exa'**
   String get searchServiceNameExa;
+
+  /// No description provided for @searchServiceNameExaMcp.
+  ///
+  /// In en, this message translates to:
+  /// **'Exa MCP'**
+  String get searchServiceNameExaMcp;
 
   /// No description provided for @searchServiceNameZhipu.
   ///

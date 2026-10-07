@@ -436,13 +436,15 @@ class _ResponseStreamState {
   Future<void> cancel(Object error) async {
     if (finished || controller.isClosed) return;
     finished = true;
-    controller.addError(error);
-    unawaited(controller.close());
     // A caller can cancel between receiving headers and listening to the body.
     // Cancel that unopened body too, rather than leaving its socket alive.
     final active =
         subscription ?? source.listen((_) {}, onError: (Object _) {});
+    // addError can synchronously invoke onCancel. Detach the subscription
+    // first so that reentrant cancellation cannot make us listen again.
     subscription = null;
+    controller.addError(error);
+    unawaited(controller.close());
     await active.cancel();
   }
 }

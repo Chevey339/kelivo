@@ -999,6 +999,13 @@ final class BusinessSettingsRouter {
           strings: const {'url'},
           stringLists: const {'apiKeys'},
         );
+      case 'exa_mcp':
+        _validateKnownFields(
+          kind,
+          payload,
+          strings: const {'apiKey', 'url'},
+          stringLists: const {'apiKeys'},
+        );
       case 'zhipu':
       case 'linkup':
       case 'metaso':

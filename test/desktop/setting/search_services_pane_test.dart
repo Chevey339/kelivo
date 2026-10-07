@@ -7,6 +7,64 @@ import 'package:flutter_test/flutter_test.dart';
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
+  testWidgets('desktop adds keyless Exa MCP with its default endpoint', (
+    tester,
+  ) async {
+    SearchServiceOptions? created;
+    await _pumpDialogHost(
+      tester,
+      onOpen: (context) async {
+        created = await showDesktopAddSearchServiceDialog(context);
+      },
+    );
+    await tester.tap(find.text('Open'));
+    await tester.pumpAndSettle();
+    await _selectServiceType(tester, 'Exa MCP');
+    expect(find.text('API Key (optional)'), findsOneWidget);
+    expect(find.text(ExaMcpOptions.defaultUrl), findsOneWidget);
+    await tester.tap(find.text('Add'));
+    await tester.pumpAndSettle();
+    final saved = created! as ExaMcpOptions;
+    expect(saved.apiKey, isEmpty);
+    expect(saved.resolvedUrl, ExaMcpOptions.defaultUrl);
+  });
+
+  testWidgets(
+    'desktop edits Exa MCP without losing extra keys',
+    (tester) async {
+      SearchServiceOptions? updated;
+      await _pumpDialogHost(
+        tester,
+        onOpen: (context) async {
+          updated = await showDesktopEditSearchServiceDialog(
+            context,
+            ExaMcpOptions(
+              id: 'mcp',
+              apiKey: 'key',
+              extraApiKeys: const ['extra'],
+            ),
+          );
+        },
+      );
+      await tester.tap(find.text('Open'));
+      await tester.pumpAndSettle();
+      final urlField = find.byWidgetPredicate(
+        (widget) =>
+            widget is TextField &&
+            widget.decoration?.hintText == ExaMcpOptions.defaultUrl,
+      );
+      await tester.enterText(urlField, ' https://example.com/mcp ');
+      await tester.tap(find.text('Save'));
+      await tester.pumpAndSettle();
+      final saved = updated! as ExaMcpOptions;
+      expect(saved.id, 'mcp');
+      expect(saved.apiKey, 'key');
+      expect(saved.extraApiKeys, ['extra']);
+      expect(saved.url, 'https://example.com/mcp');
+    },
+    variant: TargetPlatformVariant({TargetPlatform.macOS}),
+  );
+
   testWidgets('desktop add dialog rejects invalid Brave maximum tokens', (
     tester,
   ) async {

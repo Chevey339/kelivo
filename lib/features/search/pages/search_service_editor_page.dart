@@ -376,6 +376,22 @@ class _SearchServiceEditorPageState extends State<SearchServiceEditorPage> {
         ),
       ];
     }
+    if (service is ExaMcpOptions) {
+      return [
+        field(
+          key: 'apiKey',
+          label: l10n.searchServicesDialogApiKeyOptional,
+          obscure: true,
+        ),
+        _buildMultiKeyEntry(context),
+        field(
+          key: 'url',
+          label: l10n.searchServicesFieldCustomUrlOptional,
+          hint: ExaMcpOptions.defaultUrl,
+          keyboardType: TextInputType.url,
+        ),
+      ];
+    }
     if (service is SearXNGOptions) {
       return [
         field(
@@ -1190,6 +1206,9 @@ class _SearchServiceEditorPageState extends State<SearchServiceEditorPage> {
     } else if (service is ExaOptions) {
       _putController('apiKey', service.apiKey);
       _putController('url', service.url);
+    } else if (service is ExaMcpOptions) {
+      _putController('apiKey', service.apiKey);
+      _putController('url', service.url);
     } else if (service is ZhipuOptions) {
       _putController('apiKey', service.apiKey);
     } else if (service is SearXNGOptions) {
@@ -1299,6 +1318,13 @@ class _SearchServiceEditorPageState extends State<SearchServiceEditorPage> {
         );
       case 'exa':
         return ExaOptions(
+          id: _serviceId,
+          apiKey: _text('apiKey'),
+          url: _text('url'),
+          extraApiKeys: _extraApiKeys,
+        );
+      case 'exa_mcp':
+        return ExaMcpOptions(
           id: _serviceId,
           apiKey: _text('apiKey'),
           url: _text('url'),
@@ -2485,6 +2511,7 @@ String _typeForService(SearchServiceOptions service) {
   if (service is DuckDuckGoOptions) return 'duckduckgo';
   if (service is TavilyOptions) return 'tavily';
   if (service is ExaOptions) return 'exa';
+  if (service is ExaMcpOptions) return 'exa_mcp';
   if (service is ZhipuOptions) return 'zhipu';
   if (service is SearXNGOptions) return 'searxng';
   if (service is LinkUpOptions) return 'linkup';
@@ -2525,6 +2552,8 @@ SearchServiceOptions _defaultService(String type, String id) {
       return TavilyOptions(id: id, apiKey: '');
     case 'exa':
       return ExaOptions(id: id, apiKey: '');
+    case 'exa_mcp':
+      return ExaMcpOptions(id: id);
     case 'zhipu':
       return ZhipuOptions(id: id, apiKey: '');
     case 'searxng':
@@ -2585,6 +2614,8 @@ String _serviceTypeName(BuildContext context, String type) {
       return l10n.searchServiceNameTavily;
     case 'exa':
       return l10n.searchServiceNameExa;
+    case 'exa_mcp':
+      return l10n.searchServiceNameExaMcp;
     case 'zhipu':
       return l10n.searchServiceNameZhipu;
     case 'searxng':
@@ -2639,6 +2670,7 @@ const _providerTypes = <({String type, String brand})>[
   (type: 'duckduckgo', brand: 'duckduckgo'),
   (type: 'tavily', brand: 'tavily'),
   (type: 'exa', brand: 'exa'),
+  (type: 'exa_mcp', brand: 'exa'),
   (type: 'zhipu', brand: 'zhipu'),
   (type: 'searxng', brand: 'searxng'),
   (type: 'linkup', brand: 'linkup'),

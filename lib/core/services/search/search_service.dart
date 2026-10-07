@@ -7,6 +7,7 @@ import 'search_api_key_rotator.dart';
 import 'providers/bing_search_service.dart';
 import 'providers/tavily_search_service.dart';
 import 'providers/exa_search_service.dart';
+import 'providers/exa_mcp_search_service.dart';
 import 'providers/zhipu_search_service.dart';
 import 'providers/searxng_search_service.dart';
 import 'providers/linkup_search_service.dart';
@@ -73,6 +74,8 @@ abstract class SearchService<T extends SearchServiceOptions> {
         return TavilySearchService() as SearchService;
       case ExaOptions _:
         return ExaSearchService() as SearchService;
+      case ExaMcpOptions _:
+        return ExaMcpSearchService() as SearchService;
       case ZhipuOptions _:
         return ZhipuSearchService() as SearchService;
       case SearXNGOptions _:
@@ -234,6 +237,8 @@ abstract class SearchServiceOptions {
         return TavilyOptions.fromJson(json);
       case 'exa':
         return ExaOptions.fromJson(json);
+      case 'exa_mcp':
+        return ExaMcpOptions.fromJson(json);
       case 'zhipu':
         return ZhipuOptions.fromJson(json);
       case 'searxng':
@@ -367,6 +372,38 @@ class ExaOptions extends SearchServiceOptions {
   factory ExaOptions.fromJson(Map<String, dynamic> json) => ExaOptions(
     id: json['id'],
     apiKey: json['apiKey'],
+    url: json['url'] ?? '',
+    extraApiKeys: SearchServiceOptions.parseExtraApiKeys(json),
+  );
+}
+
+class ExaMcpOptions extends SearchServiceOptions {
+  static const String defaultUrl = 'https://mcp.exa.ai/mcp';
+
+  final String apiKey;
+  final String url;
+
+  ExaMcpOptions({
+    required super.id,
+    this.apiKey = '',
+    this.url = '',
+    super.extraApiKeys,
+  });
+
+  String get resolvedUrl => url.trim().isEmpty ? defaultUrl : url.trim();
+
+  @override
+  Map<String, dynamic> toJson() => {
+    'type': 'exa_mcp',
+    'id': id,
+    'apiKey': apiKey,
+    'url': url.trim(),
+    if (extraApiKeys.isNotEmpty) 'apiKeys': extraApiKeys,
+  };
+
+  factory ExaMcpOptions.fromJson(Map<String, dynamic> json) => ExaMcpOptions(
+    id: json['id'],
+    apiKey: json['apiKey'] ?? '',
     url: json['url'] ?? '',
     extraApiKeys: SearchServiceOptions.parseExtraApiKeys(json),
   );

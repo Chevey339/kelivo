@@ -101,6 +101,37 @@ void main() {
   });
 
   test(
+    'cancelling an active body does not subscribe to its source twice',
+    () async {
+      final source = StreamController<Uint8List>(sync: true);
+      var cancellations = 0;
+      source.onCancel = () => cancellations++;
+      final token = CancelToken();
+      final client = DioHttpClient(
+        adapter: _Adapter(() => source.stream),
+        cancelToken: token,
+        logRequests: false,
+      );
+      addTearDown(client.close);
+      final response = await client.send(
+        http.Request('GET', Uri.parse('https://test.invalid')),
+      );
+      // bytesToString cancels its subscription synchronously on an error.
+      final failure = expectLater(
+        response.stream.bytesToString(),
+        throwsA(isA<DioException>()),
+      );
+      source.add(Uint8List.fromList([123, 34]));
+      token.cancel('stop during the response body');
+      await failure;
+      await Future<void>.delayed(Duration.zero);
+      expect(cancellations, 1);
+      expect(source.hasListener, isFalse);
+      await source.close();
+    },
+  );
+
+  test(
     'response demand propagates to the transport without an eager buffer',
     () async {
       final source = StreamController<Uint8List>(sync: true);
