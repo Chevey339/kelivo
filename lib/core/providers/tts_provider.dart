@@ -913,11 +913,9 @@ class TtsProvider extends ChangeNotifier {
     await _claimSpeechAudio();
     if (io.Platform.isIOS) {
       await _tts.autoStopSharedSession(false);
-      await _tts.setIosAudioCategory(
-        IosTextToSpeechAudioCategory.playback,
-        [IosTextToSpeechAudioCategoryOptions.mixWithOthers],
-        IosTextToSpeechAudioMode.spokenAudio,
-      );
+      await _tts.setIosAudioCategory(IosTextToSpeechAudioCategory.playback, [
+        IosTextToSpeechAudioCategoryOptions.mixWithOthers,
+      ], IosTextToSpeechAudioMode.spokenAudio);
       await _tts.setSharedInstance(true);
     }
     await _ensureBound();

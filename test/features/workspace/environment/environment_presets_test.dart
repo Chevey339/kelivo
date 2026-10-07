@@ -183,99 +183,93 @@ void main() {
     return logs;
   }
 
-  testWidgets(
-    'installation log stays bounded and follows new output',
-    (tester) async {
-      final logs = await pumpLog(tester);
-      final height = tester.getSize(logPanel).height;
-      final scroll = logController(tester);
-      final previousMax = scroll.position.maxScrollExtent;
-      final page = tester.state<ScrollableState>(
-        find
-            .descendant(
-              of: find.byType(ListView),
-              matching: find.byType(Scrollable),
-            )
-            .first,
-      );
-      final pageMax = page.position.maxScrollExtent;
-      expect(height, 240);
-      expect(previousMax, greaterThan(0));
-      expect(scroll.position.extentAfter, closeTo(0, 0.1));
+  testWidgets('installation log stays bounded and follows new output', (
+    tester,
+  ) async {
+    final logs = await pumpLog(tester);
+    final height = tester.getSize(logPanel).height;
+    final scroll = logController(tester);
+    final previousMax = scroll.position.maxScrollExtent;
+    final page = tester.state<ScrollableState>(
+      find
+          .descendant(
+            of: find.byType(ListView),
+            matching: find.byType(Scrollable),
+          )
+          .first,
+    );
+    final pageMax = page.position.maxScrollExtent;
+    expect(height, 240);
+    expect(previousMax, greaterThan(0));
+    expect(scroll.position.extentAfter, closeTo(0, 0.1));
 
-      logs.showLog(logLines(100));
-      await tester.pumpAndSettle();
-      expect(tester.getSize(logPanel).height, height);
-      expect(page.position.maxScrollExtent, pageMax);
-      expect(scroll.position.maxScrollExtent, greaterThan(previousMax));
-      expect(scroll.position.extentAfter, closeTo(0, 0.1));
-      expect(tester.takeException(), isNull);
-    },
-    variant: TargetPlatformVariant.mobile(),
-  );
+    logs.showLog(logLines(100));
+    await tester.pumpAndSettle();
+    expect(tester.getSize(logPanel).height, height);
+    expect(page.position.maxScrollExtent, pageMax);
+    expect(scroll.position.maxScrollExtent, greaterThan(previousMax));
+    expect(scroll.position.extentAfter, closeTo(0, 0.1));
+    expect(tester.takeException(), isNull);
+  }, variant: TargetPlatformVariant.mobile());
 
-  testWidgets(
-    'scrolling up pauses log following until back at the bottom',
-    (tester) async {
-      final logs = await pumpLog(tester);
-      final scroll = logController(tester);
-      await tester.drag(logPanel, const Offset(0, 150));
-      await tester.pumpAndSettle();
-      final readingOffset = scroll.offset;
-      expect(scroll.position.extentAfter, greaterThan(24));
+  testWidgets('scrolling up pauses log following until back at the bottom', (
+    tester,
+  ) async {
+    final logs = await pumpLog(tester);
+    final scroll = logController(tester);
+    await tester.drag(logPanel, const Offset(0, 150));
+    await tester.pumpAndSettle();
+    final readingOffset = scroll.offset;
+    expect(scroll.position.extentAfter, greaterThan(24));
 
-      logs.showLog(logLines(90));
-      await tester.pumpAndSettle();
-      expect(scroll.offset, closeTo(readingOffset, 0.1));
+    logs.showLog(logLines(90));
+    await tester.pumpAndSettle();
+    expect(scroll.offset, closeTo(readingOffset, 0.1));
 
-      await tester.drag(logPanel, const Offset(0, -1500));
-      await tester.pumpAndSettle();
-      expect(scroll.position.extentAfter, closeTo(0, 0.1));
-      logs.showLog(logLines(100));
-      await tester.pumpAndSettle();
-      expect(scroll.position.extentAfter, closeTo(0, 0.1));
+    await tester.drag(logPanel, const Offset(0, -1500));
+    await tester.pumpAndSettle();
+    expect(scroll.position.extentAfter, closeTo(0, 0.1));
+    logs.showLog(logLines(100));
+    await tester.pumpAndSettle();
+    expect(scroll.position.extentAfter, closeTo(0, 0.1));
 
-      logs.showLog('');
-      await tester.pumpAndSettle();
-      expect(logPanel, findsNothing);
-      logs.showLog(logLines(80));
-      await tester.pumpAndSettle();
-      expect(logController(tester).position.extentAfter, closeTo(0, 0.1));
-      expect(tester.takeException(), isNull);
-    },
-    variant: TargetPlatformVariant.mobile(),
-  );
+    logs.showLog('');
+    await tester.pumpAndSettle();
+    expect(logPanel, findsNothing);
+    logs.showLog(logLines(80));
+    await tester.pumpAndSettle();
+    expect(logController(tester).position.extentAfter, closeTo(0, 0.1));
+    expect(tester.takeException(), isNull);
+  }, variant: TargetPlatformVariant.mobile());
 
-  testWidgets(
-    'Android install opens source selection before any download',
-    (tester) async {
-      await setup(tester, ready: false);
-      await pump(tester, const Scaffold(body: EnvironmentPane()));
-      await tester.pumpAndSettle();
-      await tester.tap(find.byKey(EnvironmentPane.installKey));
-      await tester.pumpAndSettle();
-      expect(find.byType(EnvironmentDownloadPage), findsOneWidget);
-      expect(installer.calls, 0);
-      await tester.tap(find.byKey(const ValueKey('download-source-tuna')));
-      expect(installer.calls, 0);
-      final save = find.byKey(const ValueKey('download-source-save'));
-      await tester.ensureVisible(save);
-      await tester.tap(save);
-      await tester.runAsync(
-        () async => Future<void>.delayed(const Duration(milliseconds: 30)),
-      );
-      await tester.pumpAndSettle();
-      await tester.runAsync(
-        () async => Future<void>.delayed(const Duration(milliseconds: 30)),
-      );
-      await tester.pumpAndSettle();
-      expect(installer.calls, 1);
-      expect(installer.usedSource, RootfsDownloadSource.tuna);
-      expect(mirrors.autoDetectCalls, 0);
-      expect(tester.takeException(), isNull);
-    },
-    variant: TargetPlatformVariant.only(TargetPlatform.android),
-  );
+  testWidgets('Android install opens source selection before any download', (
+    tester,
+  ) async {
+    await setup(tester, ready: false);
+    await pump(tester, const Scaffold(body: EnvironmentPane()));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(EnvironmentPane.installKey));
+    await tester.pumpAndSettle();
+    expect(find.byType(EnvironmentDownloadPage), findsOneWidget);
+    expect(installer.calls, 0);
+    await tester.tap(find.byKey(const ValueKey('download-source-tuna')));
+    expect(installer.calls, 0);
+    final save = find.byKey(const ValueKey('download-source-save'));
+    await tester.ensureVisible(save);
+    await tester.tap(save);
+    await tester.runAsync(
+      () async => Future<void>.delayed(const Duration(milliseconds: 30)),
+    );
+    await tester.pumpAndSettle();
+    await tester.runAsync(
+      () async => Future<void>.delayed(const Duration(milliseconds: 30)),
+    );
+    await tester.pumpAndSettle();
+    expect(installer.calls, 1);
+    expect(installer.usedSource, RootfsDownloadSource.tuna);
+    expect(mirrors.autoDetectCalls, 0);
+    expect(tester.takeException(), isNull);
+  }, variant: TargetPlatformVariant.only(TargetPlatform.android));
 
   testWidgets(
     'architecture mismatch retains replacement confirmation before reinstall',
@@ -325,55 +319,50 @@ void main() {
     variant: TargetPlatformVariant.only(TargetPlatform.android),
   );
 
-  testWidgets(
-    'custom source validates URL and saves the exact archive link',
-    (tester) async {
-      await setup(tester);
-      await pump(
-        tester,
-        Builder(
-          builder: (context) => Scaffold(
-            body: TextButton(
-              onPressed: () => Navigator.of(context).push(
-                MaterialPageRoute<void>(
-                  builder: (_) => EnvironmentDownloadPage(installer: installer),
-                ),
+  testWidgets('custom source validates URL and saves the exact archive link', (
+    tester,
+  ) async {
+    await setup(tester);
+    await pump(
+      tester,
+      Builder(
+        builder: (context) => Scaffold(
+          body: TextButton(
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute<void>(
+                builder: (_) => EnvironmentDownloadPage(installer: installer),
               ),
-              child: const Text('open'),
             ),
+            child: const Text('open'),
           ),
         ),
-      );
-      await tester.tap(find.text('open'));
-      await tester.pumpAndSettle();
-      await tester.tap(find.byKey(const ValueKey('download-source-custom')));
-      await tester.pumpAndSettle();
-      await tester.enterText(
-        find.byType(TextField),
-        'file:///tmp/rootfs.tar.gz',
-      );
-      final save = find.byKey(const ValueKey('download-source-save'));
-      await tester.ensureVisible(save);
-      await tester.tap(save);
-      await tester.pumpAndSettle();
-      expect(env.downloadSource, RootfsDownloadSource.automatic);
-      expect(find.text('请输入有效的 HTTP 或 HTTPS 链接。'), findsOneWidget);
-      await tester.enterText(
-        find.byType(TextField),
-        'https://mirror.test/image.tar.gz?token=x%2Fy',
-      );
-      await tester.ensureVisible(save);
-      await tester.tap(save);
-      await tester.runAsync(
-        () async => Future<void>.delayed(const Duration(milliseconds: 30)),
-      );
-      await tester.pumpAndSettle();
-      expect(env.downloadUrl, 'https://mirror.test/image.tar.gz?token=x%2Fy');
-      expect(find.byType(EnvironmentDownloadPage), findsNothing);
-      expect(tester.takeException(), isNull);
-    },
-    variant: TargetPlatformVariant.only(TargetPlatform.android),
-  );
+      ),
+    );
+    await tester.tap(find.text('open'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('download-source-custom')));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextField), 'file:///tmp/rootfs.tar.gz');
+    final save = find.byKey(const ValueKey('download-source-save'));
+    await tester.ensureVisible(save);
+    await tester.tap(save);
+    await tester.pumpAndSettle();
+    expect(env.downloadSource, RootfsDownloadSource.automatic);
+    expect(find.text('请输入有效的 HTTP 或 HTTPS 链接。'), findsOneWidget);
+    await tester.enterText(
+      find.byType(TextField),
+      'https://mirror.test/image.tar.gz?token=x%2Fy',
+    );
+    await tester.ensureVisible(save);
+    await tester.tap(save);
+    await tester.runAsync(
+      () async => Future<void>.delayed(const Duration(milliseconds: 30)),
+    );
+    await tester.pumpAndSettle();
+    expect(env.downloadUrl, 'https://mirror.test/image.tar.gz?token=x%2Fy');
+    expect(find.byType(EnvironmentDownloadPage), findsNothing);
+    expect(tester.takeException(), isNull);
+  }, variant: TargetPlatformVariant.only(TargetPlatform.android));
 
   for (final platform in [TargetPlatform.android, TargetPlatform.iOS]) {
     testWidgets(

@@ -93,60 +93,56 @@ void main() {
     variant: TargetPlatformVariant.all(),
   );
 
-  testWidgets(
-    'disabled assistants never reach the native control API',
-    (tester) async {
-      messenger.setMockMethodCallHandler(
-        _channel,
-        (call) async => fail('Unexpected ${call.method}'),
-      );
-      expect(
-        await LocalToolsService.tryHandleToolCall(LocalToolNames.phoneControl, {
-          'action': 'home',
-        }, const Assistant(id: 'off', name: 'Off')),
-        isNull,
-      );
-    },
-    variant: TargetPlatformVariant.only(TargetPlatform.android),
-  );
+  testWidgets('disabled assistants never reach the native control API', (
+    tester,
+  ) async {
+    messenger.setMockMethodCallHandler(
+      _channel,
+      (call) async => fail('Unexpected ${call.method}'),
+    );
+    expect(
+      await LocalToolsService.tryHandleToolCall(LocalToolNames.phoneControl, {
+        'action': 'home',
+      }, const Assistant(id: 'off', name: 'Off')),
+      isNull,
+    );
+  }, variant: TargetPlatformVariant.only(TargetPlatform.android));
 
-  testWidgets(
-    'tool preserves structured errors and exact Unicode input',
-    (tester) async {
-      final arguments = {
-        'action': 'set_text',
-        'snapshot_id': 'snapshot',
-        'node_id': 'n2',
-        'text': '你好 👋\nline 2',
-      };
-      messenger.setMockMethodCallHandler(_channel, (call) async {
-        expect(call.method, 'phoneControl');
-        expect(jsonDecode(call.arguments as String), arguments);
-        return '{"error":"STALE_SCREEN","message":"read again"}';
-      });
-      final result = await LocalToolsService.tryHandleToolCall(
-        LocalToolNames.phoneControl,
-        arguments,
-        _enabled,
-      );
-      expect(jsonDecode(result!)['error'], 'STALE_SCREEN');
-      messenger.setMockMethodCallHandler(
-        _channel,
-        (call) async => throw PlatformException(code: 'SERVICE_UNAVAILABLE'),
-      );
-      expect(
-        jsonDecode(
-          (await LocalToolsService.tryHandleToolCall(
-            LocalToolNames.phoneControl,
-            arguments,
-            _enabled,
-          ))!,
-        )['error'],
-        'SERVICE_UNAVAILABLE',
-      );
-    },
-    variant: TargetPlatformVariant.only(TargetPlatform.android),
-  );
+  testWidgets('tool preserves structured errors and exact Unicode input', (
+    tester,
+  ) async {
+    final arguments = {
+      'action': 'set_text',
+      'snapshot_id': 'snapshot',
+      'node_id': 'n2',
+      'text': '你好 👋\nline 2',
+    };
+    messenger.setMockMethodCallHandler(_channel, (call) async {
+      expect(call.method, 'phoneControl');
+      expect(jsonDecode(call.arguments as String), arguments);
+      return '{"error":"STALE_SCREEN","message":"read again"}';
+    });
+    final result = await LocalToolsService.tryHandleToolCall(
+      LocalToolNames.phoneControl,
+      arguments,
+      _enabled,
+    );
+    expect(jsonDecode(result!)['error'], 'STALE_SCREEN');
+    messenger.setMockMethodCallHandler(
+      _channel,
+      (call) async => throw PlatformException(code: 'SERVICE_UNAVAILABLE'),
+    );
+    expect(
+      jsonDecode(
+        (await LocalToolsService.tryHandleToolCall(
+          LocalToolNames.phoneControl,
+          arguments,
+          _enabled,
+        ))!,
+      )['error'],
+      'SERVICE_UNAVAILABLE',
+    );
+  }, variant: TargetPlatformVariant.only(TargetPlatform.android));
 
   testWidgets(
     'settings refresh after resume and distinguish disconnected service',
@@ -180,25 +176,23 @@ void main() {
     variant: TargetPlatformVariant.only(TargetPlatform.android),
   );
 
-  testWidgets(
-    'a stale status query cannot overwrite a newer refresh',
-    (tester) async {
-      final first = Completer<Map<String, bool>>();
-      var count = 0;
-      messenger.setMockMethodCallHandler(_channel, (_) async {
-        if (count++ == 0) return first.future;
-        return {'enabled': true, 'connected': true};
-      });
-      await tester.pumpWidget(_app(const PhoneControlSettingsPage()));
-      await tester.pump();
-      await tester.tap(find.byTooltip('Refresh status'));
-      await tester.pumpAndSettle();
-      first.complete({'enabled': false, 'connected': false});
-      await tester.pumpAndSettle();
-      expect(find.text('Enabled and connected'), findsOneWidget);
-    },
-    variant: TargetPlatformVariant.only(TargetPlatform.android),
-  );
+  testWidgets('a stale status query cannot overwrite a newer refresh', (
+    tester,
+  ) async {
+    final first = Completer<Map<String, bool>>();
+    var count = 0;
+    messenger.setMockMethodCallHandler(_channel, (_) async {
+      if (count++ == 0) return first.future;
+      return {'enabled': true, 'connected': true};
+    });
+    await tester.pumpWidget(_app(const PhoneControlSettingsPage()));
+    await tester.pump();
+    await tester.tap(find.byTooltip('Refresh status'));
+    await tester.pumpAndSettle();
+    first.complete({'enabled': false, 'connected': false});
+    await tester.pumpAndSettle();
+    expect(find.text('Enabled and connected'), findsOneWidget);
+  }, variant: TargetPlatformVariant.only(TargetPlatform.android));
 
   testWidgets(
     'status failure stays unknown instead of claiming permission is disabled',
@@ -280,59 +274,57 @@ void main() {
     variant: TargetPlatformVariant.only(TargetPlatform.android),
   );
 
-  testWidgets(
-    'disabling permission revokes an already-built tool handler',
-    (tester) async {
-      final assistants = AssistantProvider(
-        preferences: createBusinessTestPreferences(),
-      );
-      final mcp = McpProvider(preferences: createBusinessTestPreferences());
-      final tools = McpToolService();
-      final settings = SettingsProvider(createBusinessTestPreferences());
-      addTearDown(assistants.dispose);
-      addTearDown(mcp.dispose);
-      addTearDown(tools.dispose);
-      addTearDown(settings.dispose);
-      await assistants.loaded;
-      await settings.loaded;
-      final id = await assistants.addAssistant(name: 'Phone');
-      await assistants.updateAssistant(
-        assistants
-            .getById(id)!
-            .copyWith(localToolIds: [LocalToolNames.phoneControl]),
-      );
-      await tester.pumpWidget(
-        MultiProvider(
-          providers: [
-            ChangeNotifierProvider.value(value: assistants),
-            ChangeNotifierProvider.value(value: mcp),
-            ChangeNotifierProvider.value(value: tools),
-            ChangeNotifierProvider.value(value: settings),
-          ],
-          child: const SizedBox.shrink(),
-        ),
-      );
-      final handler = ToolHandlerService(
-        contextProvider: tester.element(find.byType(SizedBox)),
-      ).buildToolCallHandler(settings, assistants.getById(id))!;
-      await assistants.updateAssistant(
-        assistants.getById(id)!.copyWith(localToolIds: []),
-      );
-      messenger.setMockMethodCallHandler(
-        _channel,
-        (call) async => fail('Revoked tool reached native code'),
-      );
-      final result = await handler(LocalToolNames.phoneControl, {
-        'action': 'home',
-      });
-      expect(
-        jsonDecode(result as String)['error'],
-        'permission_denied',
-        reason: result,
-      );
-    },
-    variant: TargetPlatformVariant.only(TargetPlatform.android),
-  );
+  testWidgets('disabling permission revokes an already-built tool handler', (
+    tester,
+  ) async {
+    final assistants = AssistantProvider(
+      preferences: createBusinessTestPreferences(),
+    );
+    final mcp = McpProvider(preferences: createBusinessTestPreferences());
+    final tools = McpToolService();
+    final settings = SettingsProvider(createBusinessTestPreferences());
+    addTearDown(assistants.dispose);
+    addTearDown(mcp.dispose);
+    addTearDown(tools.dispose);
+    addTearDown(settings.dispose);
+    await assistants.loaded;
+    await settings.loaded;
+    final id = await assistants.addAssistant(name: 'Phone');
+    await assistants.updateAssistant(
+      assistants
+          .getById(id)!
+          .copyWith(localToolIds: [LocalToolNames.phoneControl]),
+    );
+    await tester.pumpWidget(
+      MultiProvider(
+        providers: [
+          ChangeNotifierProvider.value(value: assistants),
+          ChangeNotifierProvider.value(value: mcp),
+          ChangeNotifierProvider.value(value: tools),
+          ChangeNotifierProvider.value(value: settings),
+        ],
+        child: const SizedBox.shrink(),
+      ),
+    );
+    final handler = ToolHandlerService(
+      contextProvider: tester.element(find.byType(SizedBox)),
+    ).buildToolCallHandler(settings, assistants.getById(id))!;
+    await assistants.updateAssistant(
+      assistants.getById(id)!.copyWith(localToolIds: []),
+    );
+    messenger.setMockMethodCallHandler(
+      _channel,
+      (call) async => fail('Revoked tool reached native code'),
+    );
+    final result = await handler(LocalToolNames.phoneControl, {
+      'action': 'home',
+    });
+    expect(
+      jsonDecode(result as String)['error'],
+      'permission_denied',
+      reason: result,
+    );
+  }, variant: TargetPlatformVariant.only(TargetPlatform.android));
 
   testWidgets('settings layout accommodates narrow screens and large text', (
     tester,

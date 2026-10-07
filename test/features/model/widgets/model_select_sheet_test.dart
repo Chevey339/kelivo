@@ -613,87 +613,83 @@ void main() {
     );
   }
 
-  testWidgets(
-    'desktop model selector pins hearts to a shared right edge',
-    (tester) async {
-      debugDefaultTargetPlatformOverride = TargetPlatform.macOS;
-      tester.view.physicalSize = const Size(1200, 900);
-      tester.view.devicePixelRatio = 1;
-      try {
-        SharedPreferences.setMockInitialValues({});
-        final settings = SettingsProvider(createBusinessTestPreferences());
-        await tester.pump(const Duration(milliseconds: 300));
-        await tester.pump();
-        await settings.setProviderConfig(
-          'capsule',
-          ProviderConfig(
-            id: 'capsule',
-            enabled: true,
-            name: 'Capsule',
-            apiKey: '',
-            baseUrl: '',
-            providerType: ProviderKind.openai,
-            models: const ['wide-ctx', 'narrow-ctx'],
-            modelOverrides: const {
-              'wide-ctx': {
-                'name': 'Wide Context',
-                'type': 'chat',
-                'input': ['text', 'image'],
-                'abilities': ['tool'],
-                'contextWindow': 1000000,
-              },
-              'narrow-ctx': {
-                'name': 'Narrow Context',
-                'type': 'chat',
-                'input': ['text', 'image'],
-                'abilities': ['tool'],
-                'contextWindow': 262144,
-              },
+  testWidgets('desktop model selector pins hearts to a shared right edge', (
+    tester,
+  ) async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.macOS;
+    tester.view.physicalSize = const Size(1200, 900);
+    tester.view.devicePixelRatio = 1;
+    try {
+      SharedPreferences.setMockInitialValues({});
+      final settings = SettingsProvider(createBusinessTestPreferences());
+      await tester.pump(const Duration(milliseconds: 300));
+      await tester.pump();
+      await settings.setProviderConfig(
+        'capsule',
+        ProviderConfig(
+          id: 'capsule',
+          enabled: true,
+          name: 'Capsule',
+          apiKey: '',
+          baseUrl: '',
+          providerType: ProviderKind.openai,
+          models: const ['wide-ctx', 'narrow-ctx'],
+          modelOverrides: const {
+            'wide-ctx': {
+              'name': 'Wide Context',
+              'type': 'chat',
+              'input': ['text', 'image'],
+              'abilities': ['tool'],
+              'contextWindow': 1000000,
             },
-          ),
-        );
-        await settings.setProvidersOrder(const ['capsule']);
-        await settings.setCurrentModel('capsule', 'wide-ctx');
+            'narrow-ctx': {
+              'name': 'Narrow Context',
+              'type': 'chat',
+              'input': ['text', 'image'],
+              'abilities': ['tool'],
+              'contextWindow': 262144,
+            },
+          },
+        ),
+      );
+      await settings.setProvidersOrder(const ['capsule']);
+      await settings.setCurrentModel('capsule', 'wide-ctx');
 
-        await _pumpModelSelector(
-          tester,
-          settings: settings,
-          limitProviderKey: 'capsule',
-        );
-        await tester.pumpAndSettle(const Duration(milliseconds: 100));
+      await _pumpModelSelector(
+        tester,
+        settings: settings,
+        limitProviderKey: 'capsule',
+      );
+      await tester.pumpAndSettle(const Duration(milliseconds: 100));
 
-        expect(find.text('1M'), findsOneWidget);
-        expect(find.text('262.1k'), findsOneWidget);
+      expect(find.text('1M'), findsOneWidget);
+      expect(find.text('262.1k'), findsOneWidget);
 
-        final wideHeart = tester.getRect(
-          find.byKey(
-            const ValueKey('desktop-model-favorite-capsule::wide-ctx'),
-          ),
+      final wideHeart = tester.getRect(
+        find.byKey(const ValueKey('desktop-model-favorite-capsule::wide-ctx')),
+      );
+      final narrowHeart = tester.getRect(
+        find.byKey(
+          const ValueKey('desktop-model-favorite-capsule::narrow-ctx'),
+        ),
+      );
+      expect(wideHeart.right, closeTo(narrowHeart.right, 0.5));
+      expect(wideHeart.width, closeTo(narrowHeart.width, 0.5));
+    } finally {
+      final dialog = find.byType(Dialog);
+      final general = find.byType(Material);
+      if (dialog.evaluate().isNotEmpty) {
+        Navigator.of(tester.element(dialog)).pop();
+      } else if (general.evaluate().isNotEmpty) {
+        final nav = Navigator.maybeOf(
+          tester.element(find.byKey(const ValueKey('open-model-selector'))),
         );
-        final narrowHeart = tester.getRect(
-          find.byKey(
-            const ValueKey('desktop-model-favorite-capsule::narrow-ctx'),
-          ),
-        );
-        expect(wideHeart.right, closeTo(narrowHeart.right, 0.5));
-        expect(wideHeart.width, closeTo(narrowHeart.width, 0.5));
-      } finally {
-        final dialog = find.byType(Dialog);
-        final general = find.byType(Material);
-        if (dialog.evaluate().isNotEmpty) {
-          Navigator.of(tester.element(dialog)).pop();
-        } else if (general.evaluate().isNotEmpty) {
-          final nav = Navigator.maybeOf(
-            tester.element(find.byKey(const ValueKey('open-model-selector'))),
-          );
-          nav?.pop();
-        }
-        await tester.pumpAndSettle(const Duration(milliseconds: 100));
-        debugDefaultTargetPlatformOverride = null;
-        tester.view.resetPhysicalSize();
-        tester.view.resetDevicePixelRatio();
+        nav?.pop();
       }
-    },
-    timeout: const Timeout(Duration(seconds: 20)),
-  );
+      await tester.pumpAndSettle(const Duration(milliseconds: 100));
+      debugDefaultTargetPlatformOverride = null;
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+    }
+  }, timeout: const Timeout(Duration(seconds: 20)));
 }

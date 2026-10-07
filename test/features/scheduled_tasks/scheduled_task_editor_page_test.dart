@@ -1044,35 +1044,33 @@ void main() {
     }
   }
 
-  testWidgets(
-    'narrow desktop uses a calendar dialog without a bottom sheet',
-    (tester) async {
-      tester.view.physicalSize = const Size(600, 700);
-      tester.view.devicePixelRatio = 1;
-      addTearDown(tester.view.resetPhysicalSize);
-      addTearDown(tester.view.resetDevicePixelRatio);
-      await tester.pumpWidget(app(editor()));
-      await tester.pumpAndSettle();
-      final row = find.ancestor(
-        of: find.text('Start date'),
-        matching: find.byType(DesktopScheduledTaskRow),
-      );
-      final picker = find.descendant(
-        of: row,
-        matching: find.byType(DesktopScheduledTaskPicker),
-      );
-      await tester.ensureVisible(picker);
-      await tester.pumpAndSettle();
-      await tester.tap(picker);
-      await tester.pumpAndSettle();
-      expect(find.byType(BottomSheet), findsNothing);
-      expect(find.byType(Dialog), findsOneWidget);
-      expect(
-        find.byKey(const ValueKey('ios-date-picker-calendar')),
-        findsOneWidget,
-      );
-      expect(tester.takeException(), isNull);
-    },
-    variant: TargetPlatformVariant({TargetPlatform.macOS}),
-  );
+  testWidgets('narrow desktop uses a calendar dialog without a bottom sheet', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(600, 700);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    await tester.pumpWidget(app(editor()));
+    await tester.pumpAndSettle();
+    final row = find.ancestor(
+      of: find.text('Start date'),
+      matching: find.byType(DesktopScheduledTaskRow),
+    );
+    final picker = find.descendant(
+      of: row,
+      matching: find.byType(DesktopScheduledTaskPicker),
+    );
+    await tester.ensureVisible(picker);
+    await tester.pumpAndSettle();
+    await tester.tap(picker);
+    await tester.pumpAndSettle();
+    expect(find.byType(BottomSheet), findsNothing);
+    expect(find.byType(Dialog), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('ios-date-picker-calendar')),
+      findsOneWidget,
+    );
+    expect(tester.takeException(), isNull);
+  }, variant: TargetPlatformVariant({TargetPlatform.macOS}));
 }

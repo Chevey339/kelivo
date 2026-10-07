@@ -78,7 +78,7 @@ If Kelivo is useful to you, you can also [support the project on WeChat](docx/sp
 | --- | --- | --- | --- |
 | iOS / iPadOS | [App Store](https://apps.apple.com/us/app/kelivo/id6752122930) · [TestFlight](https://testflight.apple.com/join/erbGGykR) (beta) | App Store, or unsigned IPA in [Releases](https://github.com/Chevey339/kelivo/releases/latest) | iOS 15.0 or later |
 | Android | [GitHub Releases](https://github.com/Chevey339/kelivo/releases/latest) | APK (`arm64-v8a`, `armeabi-v7a`, `x86_64`) | Android 7.0 or later |
-| macOS | [GitHub Releases](https://github.com/Chevey339/kelivo/releases/latest) | DMG | macOS 11.0 or later, Apple silicon or Intel |
+| macOS | [GitHub Releases](https://github.com/Chevey339/kelivo/releases/latest) | DMG | macOS 12.0 or later, Apple silicon or Intel |
 | Windows | [GitHub Releases](https://github.com/Chevey339/kelivo/releases/latest) | Installer (`setup.exe`) or portable ZIP | Windows 10 or 11 |
 | Linux | [GitHub Releases](https://github.com/Chevey339/kelivo/releases/latest) | AppImage, DEB, RPM, tar.gz | x86_64 |
 | HarmonyOS | [kelivo-ohos](https://github.com/Chevey339/kelivo-ohos) | Maintained in a separate repository | — |
@@ -185,7 +185,7 @@ On desktop, workspace commands run with your user account's permissions and are 
 
 **Requirements**
 
-- Flutter 3.44.9 or later (Dart 3.12)
+- Flutter 3.47.6 (Dart 3.13, matching CI)
 - The toolchain for your target platform: Android SDK, Xcode, or Visual Studio with the "Desktop development with C++" workload
 - Linux only (Debian/Ubuntu package names): `clang cmake ninja-build pkg-config libgtk-3-dev libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev libkeybinder-3.0-dev libayatana-appindicator3-dev`
 - iOS only: `brew install meson ninja llvm lld`. The Xcode build compiles the iSH sandbox and prepares the Alpine Linux image automatically.

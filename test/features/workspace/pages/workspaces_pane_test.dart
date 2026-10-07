@@ -142,82 +142,76 @@ void main() {
     TargetPlatform.iOS,
     TargetPlatform.macOS,
   ]) {
-    testWidgets(
-      'workspace tools persist independently on $platform',
-      (tester) async {
-        const haptics = MethodChannel('haptic_feedback');
-        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
-            .setMockMethodCallHandler(haptics, (_) async => true);
-        addTearDown(
-          () => TestDefaultBinaryMessengerBinding
-              .instance
-              .defaultBinaryMessenger
-              .setMockMethodCallHandler(haptics, null),
-        );
-        final desktop = platform == TargetPlatform.macOS;
-        tester.view.devicePixelRatio = 1;
-        tester.view.physicalSize = desktop
-            ? const Size(1100, 800)
-            : const Size(390, 844);
-        addTearDown(tester.view.resetPhysicalSize);
-        addTearDown(tester.view.resetDevicePixelRatio);
-        late Workspace first;
-        late Workspace second;
-        await tester.runAsync(() async {
-          first = await workspaces.create(name: 'First');
-          second = await workspaces.create(name: 'Second');
-          final root = await workspaces.hostRootFor(first);
-          await File(p.join(root, 'README.txt')).writeAsString('hello');
-        });
-        await tester.pumpWidget(harness());
-        await _pumpUi(tester);
-        await tester.tap(find.byKey(WorkspacesPane.itemKey(first.id)));
-        await _awaitIo(
-          tester,
-          () => find.text('README.txt').evaluate().isNotEmpty,
-        );
-        final tabs = find.byKey(const ValueKey('workspace-detail-tabs'));
-        final l10n = AppLocalizations.of(tester.element(tabs))!;
-        Future<void> selectTab(String title) async {
-          await tester.tap(
-            find.descendant(of: tabs, matching: find.text(title)),
-          );
-          await tester.pumpAndSettle();
-        }
+    testWidgets('workspace tools persist independently on $platform', (
+      tester,
+    ) async {
+      const haptics = MethodChannel('haptic_feedback');
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(haptics, (_) async => true);
+      addTearDown(
+        () => TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+            .setMockMethodCallHandler(haptics, null),
+      );
+      final desktop = platform == TargetPlatform.macOS;
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = desktop
+          ? const Size(1100, 800)
+          : const Size(390, 844);
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      late Workspace first;
+      late Workspace second;
+      await tester.runAsync(() async {
+        first = await workspaces.create(name: 'First');
+        second = await workspaces.create(name: 'Second');
+        final root = await workspaces.hostRootFor(first);
+        await File(p.join(root, 'README.txt')).writeAsString('hello');
+      });
+      await tester.pumpWidget(harness());
+      await _pumpUi(tester);
+      await tester.tap(find.byKey(WorkspacesPane.itemKey(first.id)));
+      await _awaitIo(
+        tester,
+        () => find.text('README.txt').evaluate().isNotEmpty,
+      );
+      final tabs = find.byKey(const ValueKey('workspace-detail-tabs'));
+      final l10n = AppLocalizations.of(tester.element(tabs))!;
+      Future<void> selectTab(String title) async {
+        await tester.tap(find.descendant(of: tabs, matching: find.text(title)));
+        await tester.pumpAndSettle();
+      }
 
-        await selectTab(l10n.workspaceToolsTitle);
-        final toggle = find.byKey(WorkspaceToolsPane.toggleKey('read_file'));
-        expect(tester.widget<IosSwitch>(toggle).value, isTrue);
-        await tester.tap(toggle);
-        await _awaitIo(
-          tester,
-          () => !workspaces.byId(first.id)!.isToolEnabled('read_file'),
+      await selectTab(l10n.workspaceToolsTitle);
+      final toggle = find.byKey(WorkspaceToolsPane.toggleKey('read_file'));
+      expect(tester.widget<IosSwitch>(toggle).value, isTrue);
+      await tester.tap(toggle);
+      await _awaitIo(
+        tester,
+        () => !workspaces.byId(first.id)!.isToolEnabled('read_file'),
+      );
+      expect(tester.widget<IosSwitch>(toggle).value, isFalse);
+      expect(workspaces.byId(second.id)!.isToolEnabled('read_file'), isTrue);
+      await tester.runAsync(() async {
+        final reloaded = WorkspaceProvider(
+          store: ExtensionEntityStore(database),
         );
-        expect(tester.widget<IosSwitch>(toggle).value, isFalse);
-        expect(workspaces.byId(second.id)!.isToolEnabled('read_file'), isTrue);
-        await tester.runAsync(() async {
-          final reloaded = WorkspaceProvider(
-            store: ExtensionEntityStore(database),
-          );
-          await reloaded.loaded;
-          expect(reloaded.byId(first.id)!.isToolEnabled('read_file'), isFalse);
-          expect(reloaded.byId(second.id)!.isToolEnabled('read_file'), isTrue);
-          reloaded.dispose();
-        });
-        await selectTab(l10n.workspaceEntryFiles);
-        expect(find.text('README.txt'), findsOneWidget);
-        await selectTab(l10n.workspaceToolsTitle);
-        expect(tester.widget<IosSwitch>(toggle).value, isFalse);
-        await tester.tap(toggle);
-        await _awaitIo(
-          tester,
-          () => workspaces.byId(first.id)!.isToolEnabled('read_file'),
-        );
-        expect(tester.widget<IosSwitch>(toggle).value, isTrue);
-        expect(tester.takeException(), isNull);
-      },
-      variant: TargetPlatformVariant.only(platform),
-    );
+        await reloaded.loaded;
+        expect(reloaded.byId(first.id)!.isToolEnabled('read_file'), isFalse);
+        expect(reloaded.byId(second.id)!.isToolEnabled('read_file'), isTrue);
+        reloaded.dispose();
+      });
+      await selectTab(l10n.workspaceEntryFiles);
+      expect(find.text('README.txt'), findsOneWidget);
+      await selectTab(l10n.workspaceToolsTitle);
+      expect(tester.widget<IosSwitch>(toggle).value, isFalse);
+      await tester.tap(toggle);
+      await _awaitIo(
+        tester,
+        () => workspaces.byId(first.id)!.isToolEnabled('read_file'),
+      );
+      expect(tester.widget<IosSwitch>(toggle).value, isTrue);
+      expect(tester.takeException(), isNull);
+    }, variant: TargetPlatformVariant.only(platform));
   }
 
   testWidgets(

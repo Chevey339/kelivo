@@ -171,11 +171,12 @@ void main() {
                   ((rect.top.clamp(2, 598) + rect.bottom.clamp(2, 598)) / 2)
                       .floor();
               final offset = (y * image.width + 10) * 4;
-              expect(
-                bytes!.buffer.asUint8List(offset, 4),
-                [0, 0, 255, 255],
-                reason: 'Frame $frame must paint visible block $rect',
-              );
+              expect(bytes!.buffer.asUint8List(offset, 4), [
+                0,
+                0,
+                255,
+                255,
+              ], reason: 'Frame $frame must paint visible block $rect');
             }
           } finally {
             image.dispose();

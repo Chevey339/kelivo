@@ -83,33 +83,31 @@ void main() {
     PointerDeviceKind.mouse,
     PointerDeviceKind.stylus,
   ]) {
-    testWidgets(
-      'toggling keeps focus and the input connection ($kind)',
-      (tester) async {
-        final controller = TextEditingController(text: 'line\n' * 6);
-        addTearDown(controller.dispose);
-        await pumpBar(tester, controller);
-        await tester.tap(find.byType(TextField));
-        await tester.pumpAndSettle();
-        final focus = tester
-            .widget<EditableText>(find.byType(EditableText))
-            .focusNode;
-        expect(focus.hasFocus, isTrue);
+    testWidgets('toggling keeps focus and the input connection ($kind)', (
+      tester,
+    ) async {
+      final controller = TextEditingController(text: 'line\n' * 6);
+      addTearDown(controller.dispose);
+      await pumpBar(tester, controller);
+      await tester.tap(find.byType(TextField));
+      await tester.pumpAndSettle();
+      final focus = tester
+          .widget<EditableText>(find.byType(EditableText))
+          .focusNode;
+      expect(focus.hasFocus, isTrue);
 
-        for (final tooltip in ['Expand', 'Collapse']) {
-          tester.testTextInput.log.clear();
-          await tester.tap(find.byTooltip(tooltip), kind: kind);
-          await tester.pump();
-          expect(focus.hasFocus, isTrue, reason: tooltip);
-          await tester.pumpAndSettle();
-          expect(focus.hasFocus, isTrue, reason: tooltip);
-          final methods = tester.testTextInput.log.map((c) => c.method);
-          expect(methods, isNot(contains('TextInput.clearClient')));
-          expect(methods, isNot(contains('TextInput.hide')));
-        }
-      },
-      variant: TargetPlatformVariant.all(),
-    );
+      for (final tooltip in ['Expand', 'Collapse']) {
+        tester.testTextInput.log.clear();
+        await tester.tap(find.byTooltip(tooltip), kind: kind);
+        await tester.pump();
+        expect(focus.hasFocus, isTrue, reason: tooltip);
+        await tester.pumpAndSettle();
+        expect(focus.hasFocus, isTrue, reason: tooltip);
+        final methods = tester.testTextInput.log.map((c) => c.method);
+        expect(methods, isNot(contains('TextInput.clearClient')));
+        expect(methods, isNot(contains('TextInput.hide')));
+      }
+    }, variant: TargetPlatformVariant.all());
   }
 
   for (final kind in [

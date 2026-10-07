@@ -32,3 +32,10 @@ analyzer:
   exclude:
     - dependencies/flutter_math_fork/**
     - dependencies/flutter_tts/**
+    - build/**
+    - android/**
+    - ios/**
+    - web/**
+    - windows/**
+    - macos/**
+    - linux/**

@@ -220,14 +220,10 @@ void main() {
       expect(builtInSearchTools, isEmpty);
       expect(unsupportedTools, isEmpty);
       for (final entry in nativeCases) {
-        expect(
-          nativeTools[entry.id]!.map((tool) => tool['function']['name']),
-          [
-            SearchToolService.toolName,
-            if (!entry.native) WebFetchToolService.toolName,
-          ],
-          reason: entry.id,
-        );
+        expect(nativeTools[entry.id]!.map((tool) => tool['function']['name']), [
+          SearchToolService.toolName,
+          if (!entry.native) WebFetchToolService.toolName,
+        ], reason: entry.id);
       }
     });
   });

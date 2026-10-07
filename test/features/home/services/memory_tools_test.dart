@@ -1011,29 +1011,23 @@ void main() {
     );
 
     test('empty query returns invalid_query', () async {
-      final raw = await call(
-        MemoryTools.chatSearch,
-        {'query': ''},
-        a: assistant(enableMemory: false, allowPastConversationRecall: true),
-      );
+      final raw = await call(MemoryTools.chatSearch, {
+        'query': '',
+      }, a: assistant(enableMemory: false, allowPastConversationRecall: true));
       expect(decode(raw!)['error'], 'invalid_query');
     });
 
     test('unavailable without ChatService', () async {
-      final raw = await call(
-        MemoryTools.chatSearch,
-        {'query': 'hello'},
-        a: assistant(enableMemory: false, allowPastConversationRecall: true),
-      );
+      final raw = await call(MemoryTools.chatSearch, {
+        'query': 'hello',
+      }, a: assistant(enableMemory: false, allowPastConversationRecall: true));
       expect(decode(raw!)['error'], 'chat_search_unavailable');
     });
 
     test('gated off when allowPastConversationRecall is false', () async {
-      final raw = await call(
-        MemoryTools.chatSearch,
-        {'query': 'hello'},
-        a: assistant(enableMemory: true, allowPastConversationRecall: false),
-      );
+      final raw = await call(MemoryTools.chatSearch, {
+        'query': 'hello',
+      }, a: assistant(enableMemory: true, allowPastConversationRecall: false));
       expect(raw, isNull);
     });
 

@@ -208,53 +208,49 @@ void main() {
     timeout: const Timeout(Duration(seconds: 8)),
   );
 
-  test(
-    'OAuth bearer token is attached to MCP HTTP requests',
-    () async {
-      const authorization = 'Bearer access-token';
-      final server = await _MockMcpServer.start(
-        expectedAuthorization: authorization,
+  test('OAuth bearer token is attached to MCP HTTP requests', () async {
+    const authorization = 'Bearer access-token';
+    final server = await _MockMcpServer.start(
+      expectedAuthorization: authorization,
+    );
+    final harness = await BusinessTestHarness.create();
+    final provider = McpProvider(preferences: harness.preferences);
+
+    try {
+      await _waitUntil(
+        () => provider.servers.isNotEmpty,
+        label: 'provider load',
       );
-      final harness = await BusinessTestHarness.create();
-      final provider = McpProvider(preferences: harness.preferences);
+      final id = await provider.addServer(
+        enabled: true,
+        name: 'OAuth Remote',
+        transport: McpTransportType.http,
+        url: server.url,
+        oauth: McpOAuthState(
+          clientId: 'client-id',
+          authorizationServer: 'https://auth.example.test',
+          authorizationEndpoint: 'https://auth.example.test/authorize',
+          tokenEndpoint: 'https://auth.example.test/token',
+          resource: server.url,
+          accessToken: 'access-token',
+          tokenType: 'bearer',
+        ),
+      );
+      await _waitUntil(
+        () => provider.getById(id)?.tools.length == 1,
+        label: 'OAuth tools',
+      );
 
-      try {
-        await _waitUntil(
-          () => provider.servers.isNotEmpty,
-          label: 'provider load',
-        );
-        final id = await provider.addServer(
-          enabled: true,
-          name: 'OAuth Remote',
-          transport: McpTransportType.http,
-          url: server.url,
-          oauth: McpOAuthState(
-            clientId: 'client-id',
-            authorizationServer: 'https://auth.example.test',
-            authorizationEndpoint: 'https://auth.example.test/authorize',
-            tokenEndpoint: 'https://auth.example.test/token',
-            resource: server.url,
-            accessToken: 'access-token',
-            tokenType: 'bearer',
-          ),
-        );
-        await _waitUntil(
-          () => provider.getById(id)?.tools.length == 1,
-          label: 'OAuth tools',
-        );
+      final result = await provider.callTool(id, 'echo', const {});
 
-        final result = await provider.callTool(id, 'echo', const {});
-
-        expect(result?.isError, isFalse);
-        expect(server.rejectedAuthorizationCount, 0);
-      } finally {
-        provider.dispose();
-        await harness.close();
-        await server.close();
-      }
-    },
-    timeout: const Timeout(Duration(seconds: 8)),
-  );
+      expect(result?.isError, isFalse);
+      expect(server.rejectedAuthorizationCount, 0);
+    } finally {
+      provider.dispose();
+      await harness.close();
+      await server.close();
+    }
+  }, timeout: const Timeout(Duration(seconds: 8)));
 
   test(
     '401 refreshes once while rejection and transient failures stay distinct',
@@ -492,73 +488,69 @@ void main() {
     },
   );
 
-  test(
-    'safe refresh retries once and merges notification bursts',
-    () async {
-      final server = await _MockMcpServer.start(
-        failFirstToolsList: true,
-        sendToolsChangedBurst: true,
+  test('safe refresh retries once and merges notification bursts', () async {
+    final server = await _MockMcpServer.start(
+      failFirstToolsList: true,
+      sendToolsChangedBurst: true,
+    );
+    final harness = await BusinessTestHarness.create();
+    final provider = McpProvider(preferences: harness.preferences);
+
+    try {
+      await _waitUntil(
+        () => provider.servers.isNotEmpty,
+        label: 'provider load',
       );
-      final harness = await BusinessTestHarness.create();
-      final provider = McpProvider(preferences: harness.preferences);
+      final id = await provider.addServer(
+        enabled: true,
+        name: 'Remote',
+        transport: McpTransportType.http,
+        url: server.url,
+      );
+      await _waitUntil(
+        () => provider.getById(id)?.tools.length == 1,
+        label: 'initial tools: ${server._counts}',
+      );
+      await _waitUntil(() => server.burstSent, label: 'notification burst');
+      await _waitUntil(
+        () => server.count('tools/list') >= 3,
+        label: 'coalesced refresh: ${server._counts}',
+      );
+      await Future<void>.delayed(const Duration(milliseconds: 100));
 
-      try {
-        await _waitUntil(
-          () => provider.servers.isNotEmpty,
-          label: 'provider load',
-        );
-        final id = await provider.addServer(
-          enabled: true,
-          name: 'Remote',
-          transport: McpTransportType.http,
-          url: server.url,
-        );
-        await _waitUntil(
-          () => provider.getById(id)?.tools.length == 1,
-          label: 'initial tools: ${server._counts}',
-        );
-        await _waitUntil(() => server.burstSent, label: 'notification burst');
-        await _waitUntil(
-          () => server.count('tools/list') >= 3,
-          label: 'coalesced refresh: ${server._counts}',
-        );
-        await Future<void>.delayed(const Duration(milliseconds: 100));
+      expect(server.count('initialize'), 1);
+      expect(server.count('tools/list'), 3);
+      expect(server.maxConcurrentToolsList, 1);
+      expect(
+        server.toolsListRequestTimes[1].difference(
+          server.toolsListRequestTimes[0],
+        ),
+        greaterThanOrEqualTo(const Duration(milliseconds: 1900)),
+      );
 
-        expect(server.count('initialize'), 1);
-        expect(server.count('tools/list'), 3);
-        expect(server.maxConcurrentToolsList, 1);
-        expect(
-          server.toolsListRequestTimes[1].difference(
-            server.toolsListRequestTimes[0],
-          ),
-          greaterThanOrEqualTo(const Duration(milliseconds: 1900)),
-        );
+      server.coordinateCooldown = true;
+      final olderSuccess = provider.callTool(id, 'slow-success', const {});
+      await _waitUntil(
+        () => server.count('tools/call') == 1,
+        label: 'older tool call',
+      );
+      final limited = await provider.callTool(id, 'limited', const {});
+      final callsAfterLimit = server.count('tools/call');
+      expect((await olderSuccess)?.isError, isFalse);
+      expect(provider.isInCooldown(id), isTrue);
+      final blocked = await provider.callTool(id, 'echo', const {});
 
-        server.coordinateCooldown = true;
-        final olderSuccess = provider.callTool(id, 'slow-success', const {});
-        await _waitUntil(
-          () => server.count('tools/call') == 1,
-          label: 'older tool call',
-        );
-        final limited = await provider.callTool(id, 'limited', const {});
-        final callsAfterLimit = server.count('tools/call');
-        expect((await olderSuccess)?.isError, isFalse);
-        expect(provider.isInCooldown(id), isTrue);
-        final blocked = await provider.callTool(id, 'echo', const {});
-
-        expect(limited?.isError, isTrue);
-        expect(blocked?.isError, isTrue);
-        expect(provider.isInCooldown(id), isTrue);
-        expect(server.count('tools/call'), callsAfterLimit);
-        expect(server.count('initialize'), 1);
-      } finally {
-        provider.dispose();
-        await harness.close();
-        await server.close();
-      }
-    },
-    timeout: const Timeout(Duration(seconds: 12)),
-  );
+      expect(limited?.isError, isTrue);
+      expect(blocked?.isError, isTrue);
+      expect(provider.isInCooldown(id), isTrue);
+      expect(server.count('tools/call'), callsAfterLimit);
+      expect(server.count('initialize'), 1);
+    } finally {
+      provider.dispose();
+      await harness.close();
+      await server.close();
+    }
+  }, timeout: const Timeout(Duration(seconds: 12)));
 
   test(
     'authorization stays generation-scoped and desktop retries the first connect',
@@ -845,183 +837,167 @@ void main() {
     timeout: const Timeout(Duration(seconds: 10)),
   );
 
-  test(
-    'unknown tool result is never replayed after a socket drop',
-    () async {
-      final server = await _MockMcpServer.start(dropFirstToolResponse: true);
-      final harness = await BusinessTestHarness.create();
-      final provider = McpProvider(preferences: harness.preferences);
+  test('unknown tool result is never replayed after a socket drop', () async {
+    final server = await _MockMcpServer.start(dropFirstToolResponse: true);
+    final harness = await BusinessTestHarness.create();
+    final provider = McpProvider(preferences: harness.preferences);
 
-      try {
-        await _waitUntil(
-          () => provider.servers.isNotEmpty,
-          label: 'provider load',
-        );
-        final id = await provider.addServer(
-          enabled: true,
-          name: 'Remote',
-          transport: McpTransportType.http,
-          url: server.url,
-        );
-        await _waitUntil(
-          () => provider.getById(id)?.tools.length == 1,
-          label: 'initial tools: ${server._counts}',
-        );
-
-        final result = await provider.callTool(id, 'side-effect', const {});
-
-        expect(result?.isError, isTrue);
-        expect(
-          (result!.content.single as mcp.TextContent).text,
-          contains('result is unknown'),
-        );
-        expect(server.count('tools/call'), 1);
-        expect(server.count('initialize'), 1);
-      } finally {
-        provider.dispose();
-        await harness.close();
-        await server.close();
-      }
-    },
-    timeout: const Timeout(Duration(seconds: 8)),
-  );
-
-  test(
-    'connect and manual reconnect are single-flight',
-    () async {
-      final firstInitializeGate = Completer<void>();
-      final server = await _MockMcpServer.start(
-        firstInitializeGate: firstInitializeGate,
+    try {
+      await _waitUntil(
+        () => provider.servers.isNotEmpty,
+        label: 'provider load',
       );
-      final harness = await BusinessTestHarness.create();
-      final provider = McpProvider(preferences: harness.preferences);
+      final id = await provider.addServer(
+        enabled: true,
+        name: 'Remote',
+        transport: McpTransportType.http,
+        url: server.url,
+      );
+      await _waitUntil(
+        () => provider.getById(id)?.tools.length == 1,
+        label: 'initial tools: ${server._counts}',
+      );
 
-      try {
-        await _waitUntil(
-          () => provider.servers.isNotEmpty,
-          label: 'provider load',
-        );
-        final id = await provider.addServer(
-          enabled: true,
-          name: 'Remote',
-          transport: McpTransportType.http,
-          url: server.url,
-        );
-        await _waitUntil(
-          () => server.count('initialize') == 1,
-          label: 'first initialize: ${server._counts}',
-        );
+      final result = await provider.callTool(id, 'side-effect', const {});
 
-        final reconnect = provider.reconnect(id);
-        await Future<void>.delayed(const Duration(milliseconds: 30));
-        expect(server.count('initialize'), 1);
-        firstInitializeGate.complete();
+      expect(result?.isError, isTrue);
+      expect(
+        (result!.content.single as mcp.TextContent).text,
+        contains('result is unknown'),
+      );
+      expect(server.count('tools/call'), 1);
+      expect(server.count('initialize'), 1);
+    } finally {
+      provider.dispose();
+      await harness.close();
+      await server.close();
+    }
+  }, timeout: const Timeout(Duration(seconds: 8)));
 
-        expect(
-          await reconnect.timeout(
-            const Duration(seconds: 3),
-            onTimeout: () => throw StateError(
-              'reconnect stuck: initialize=${server.count('initialize')} '
-              'delete=${server.deleteCount} status=${provider.statusFor(id)}',
-            ),
+  test('connect and manual reconnect are single-flight', () async {
+    final firstInitializeGate = Completer<void>();
+    final server = await _MockMcpServer.start(
+      firstInitializeGate: firstInitializeGate,
+    );
+    final harness = await BusinessTestHarness.create();
+    final provider = McpProvider(preferences: harness.preferences);
+
+    try {
+      await _waitUntil(
+        () => provider.servers.isNotEmpty,
+        label: 'provider load',
+      );
+      final id = await provider.addServer(
+        enabled: true,
+        name: 'Remote',
+        transport: McpTransportType.http,
+        url: server.url,
+      );
+      await _waitUntil(
+        () => server.count('initialize') == 1,
+        label: 'first initialize: ${server._counts}',
+      );
+
+      final reconnect = provider.reconnect(id);
+      await Future<void>.delayed(const Duration(milliseconds: 30));
+      expect(server.count('initialize'), 1);
+      firstInitializeGate.complete();
+
+      expect(
+        await reconnect.timeout(
+          const Duration(seconds: 3),
+          onTimeout: () => throw StateError(
+            'reconnect stuck: initialize=${server.count('initialize')} '
+            'delete=${server.deleteCount} status=${provider.statusFor(id)}',
           ),
-          isTrue,
-        );
-        await _waitUntil(
-          () => provider.getById(id)?.tools.length == 1,
-          label: 'reconnected tools: ${server._counts}',
-        );
-        expect(server.count('initialize'), 2);
-        expect(server.maxConcurrentInitialize, 1);
-        expect(server.deleteCount, 1);
-      } finally {
-        if (!firstInitializeGate.isCompleted) firstInitializeGate.complete();
-        provider.dispose();
-        await harness.close();
-        await server.close();
-      }
-    },
-    timeout: const Timeout(Duration(seconds: 8)),
-  );
+        ),
+        isTrue,
+      );
+      await _waitUntil(
+        () => provider.getById(id)?.tools.length == 1,
+        label: 'reconnected tools: ${server._counts}',
+      );
+      expect(server.count('initialize'), 2);
+      expect(server.maxConcurrentInitialize, 1);
+      expect(server.deleteCount, 1);
+    } finally {
+      if (!firstInitializeGate.isCompleted) firstInitializeGate.complete();
+      provider.dispose();
+      await harness.close();
+      await server.close();
+    }
+  }, timeout: const Timeout(Duration(seconds: 8)));
 
-  test(
-    'repeated GET 404 recovers the session once then stops',
-    () async {
-      final server = await _MockMcpServer.start(expireAllGets: true);
-      final harness = await BusinessTestHarness.create();
-      final provider = McpProvider(preferences: harness.preferences);
+  test('repeated GET 404 recovers the session once then stops', () async {
+    final server = await _MockMcpServer.start(expireAllGets: true);
+    final harness = await BusinessTestHarness.create();
+    final provider = McpProvider(preferences: harness.preferences);
 
-      try {
-        await _waitUntil(
-          () => provider.servers.isNotEmpty,
-          label: 'provider load',
-        );
-        final id = await provider.addServer(
-          enabled: true,
-          name: 'Remote',
-          transport: McpTransportType.http,
-          url: server.url,
-        );
-        await _waitUntil(
-          () => provider.statusFor(id) == McpStatus.error,
-          label: 'circuit open after repeated GET 404',
-        );
+    try {
+      await _waitUntil(
+        () => provider.servers.isNotEmpty,
+        label: 'provider load',
+      );
+      final id = await provider.addServer(
+        enabled: true,
+        name: 'Remote',
+        transport: McpTransportType.http,
+        url: server.url,
+      );
+      await _waitUntil(
+        () => provider.statusFor(id) == McpStatus.error,
+        label: 'circuit open after repeated GET 404',
+      );
 
-        expect(server.count('initialize'), 2);
-        expect(provider.errorFor(id), contains('Reconnect manually'));
-        await Future<void>.delayed(const Duration(milliseconds: 400));
-        expect(server.count('initialize'), 2);
+      expect(server.count('initialize'), 2);
+      expect(provider.errorFor(id), contains('Reconnect manually'));
+      await Future<void>.delayed(const Duration(milliseconds: 400));
+      expect(server.count('initialize'), 2);
 
-        expect(await provider.reconnect(id), isFalse);
-        expect(provider.isConnected(id), isFalse);
-        expect(provider.statusFor(id), McpStatus.error);
-        expect(server.count('initialize'), 4);
-      } finally {
-        provider.dispose();
-        await harness.close();
-        await server.close();
-      }
-    },
-    timeout: const Timeout(Duration(seconds: 8)),
-  );
+      expect(await provider.reconnect(id), isFalse);
+      expect(provider.isConnected(id), isFalse);
+      expect(provider.statusFor(id), McpStatus.error);
+      expect(server.count('initialize'), 4);
+    } finally {
+      provider.dispose();
+      await harness.close();
+      await server.close();
+    }
+  }, timeout: const Timeout(Duration(seconds: 8)));
 
-  test(
-    'GET 404 replaces the expired session once',
-    () async {
-      final server = await _MockMcpServer.start(expireFirstGet: true);
-      final harness = await BusinessTestHarness.create();
-      final provider = McpProvider(preferences: harness.preferences);
+  test('GET 404 replaces the expired session once', () async {
+    final server = await _MockMcpServer.start(expireFirstGet: true);
+    final harness = await BusinessTestHarness.create();
+    final provider = McpProvider(preferences: harness.preferences);
 
-      try {
-        await _waitUntil(
-          () => provider.servers.isNotEmpty,
-          label: 'provider load',
-        );
-        final id = await provider.addServer(
-          enabled: true,
-          name: 'Remote',
-          transport: McpTransportType.http,
-          url: server.url,
-        );
-        await _waitUntil(
-          () => server.count('initialize') == 2,
-          label: 'replacement initialize',
-        );
-        await _waitUntil(
-          () => provider.getById(id)?.tools.length == 1,
-          label: 'replacement tools',
-        );
+    try {
+      await _waitUntil(
+        () => provider.servers.isNotEmpty,
+        label: 'provider load',
+      );
+      final id = await provider.addServer(
+        enabled: true,
+        name: 'Remote',
+        transport: McpTransportType.http,
+        url: server.url,
+      );
+      await _waitUntil(
+        () => server.count('initialize') == 2,
+        label: 'replacement initialize',
+      );
+      await _waitUntil(
+        () => provider.getById(id)?.tools.length == 1,
+        label: 'replacement tools',
+      );
 
-        expect(server.count('initialize'), 2);
-        expect(server.deleteCount, 0);
-      } finally {
-        provider.dispose();
-        await harness.close();
-        await server.close();
-      }
-    },
-    timeout: const Timeout(Duration(seconds: 8)),
-  );
+      expect(server.count('initialize'), 2);
+      expect(server.deleteCount, 0);
+    } finally {
+      provider.dispose();
+      await harness.close();
+      await server.close();
+    }
+  }, timeout: const Timeout(Duration(seconds: 8)));
 
   test(
     'concurrent session 404 responses share one replacement connection',

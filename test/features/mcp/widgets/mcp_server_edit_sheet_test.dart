@@ -176,52 +176,48 @@ void main() {
     );
   }
 
-  testWidgets(
-    'a deleted binding remains visible and can be cleared',
-    (tester) async {
-      final provider = await _openEditor(
-        tester,
-        [],
-        withWorkspaces: true,
-        workspaceId: 'scripts',
-      );
-      await provider.workspaces!.delete('scripts', deleteFiles: false);
-      await tester.pumpAndSettle();
-      expect(find.text('Workspace not found'), findsOneWidget);
-      await tester.tap(find.byKey(const ValueKey('mcp-workspace-unbind')));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('Save'));
-      await tester.pumpAndSettle();
-      expect(provider.getById('guest')!.workspaceId, isNull);
-      await tester.pumpWidget(const SizedBox.shrink());
-    },
-    variant: TargetPlatformVariant.only(TargetPlatform.android),
-  );
+  testWidgets('a deleted binding remains visible and can be cleared', (
+    tester,
+  ) async {
+    final provider = await _openEditor(
+      tester,
+      [],
+      withWorkspaces: true,
+      workspaceId: 'scripts',
+    );
+    await provider.workspaces!.delete('scripts', deleteFiles: false);
+    await tester.pumpAndSettle();
+    expect(find.text('Workspace not found'), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('mcp-workspace-unbind')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Save'));
+    await tester.pumpAndSettle();
+    expect(provider.getById('guest')!.workspaceId, isNull);
+    await tester.pumpWidget(const SizedBox.shrink());
+  }, variant: TargetPlatformVariant.only(TargetPlatform.android));
 
-  testWidgets(
-    'desktop can clear a mobile binding without selecting a new one',
-    (tester) async {
-      final provider = await _openEditor(
-        tester,
-        [],
-        workspaceId: 'scripts',
-        desktop: true,
-      );
-      expect(
-        find.text(
-          'Workspace binding is available in the mobile Linux environment. Unbind it to run this server on desktop.',
-        ),
-        findsOneWidget,
-      );
-      await tester.tap(find.byKey(const ValueKey('mcp-workspace-unbind')));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('Save'));
-      await tester.pumpAndSettle();
-      expect(provider.getById('guest')!.workspaceId, isNull);
-      await tester.pumpWidget(const SizedBox.shrink());
-    },
-    variant: TargetPlatformVariant.only(TargetPlatform.macOS),
-  );
+  testWidgets('desktop can clear a mobile binding without selecting a new one', (
+    tester,
+  ) async {
+    final provider = await _openEditor(
+      tester,
+      [],
+      workspaceId: 'scripts',
+      desktop: true,
+    );
+    expect(
+      find.text(
+        'Workspace binding is available in the mobile Linux environment. Unbind it to run this server on desktop.',
+      ),
+      findsOneWidget,
+    );
+    await tester.tap(find.byKey(const ValueKey('mcp-workspace-unbind')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Save'));
+    await tester.pumpAndSettle();
+    expect(provider.getById('guest')!.workspaceId, isNull);
+    await tester.pumpWidget(const SizedBox.shrink());
+  }, variant: TargetPlatformVariant.only(TargetPlatform.macOS));
 
   testWidgets(
     'iOS stdio fields send literal input configuration to the keyboard',
@@ -264,33 +260,31 @@ void main() {
     variant: TargetPlatformVariant.only(TargetPlatform.iOS),
   );
 
-  testWidgets(
-    'renaming imported stdio preserves every argument exactly',
-    (tester) async {
-      const arguments = [
-        '-c',
-        'printf "hello"\nprintf "world"\n',
-        '',
-        '  spaced  ',
-        '\r\n',
-        '',
-      ];
-      final provider = await _openEditor(tester, arguments);
-      await tester.enterText(_fieldWithText('Imported server'), 'Renamed');
-      await tester.tap(find.text('Save'));
-      await tester.pumpAndSettle();
-      expect(provider.getById('guest')!.name, 'Renamed');
-      expect(provider.getById('guest')!.args, arguments);
-      expect(
-        jsonDecode(
-          provider.exportServersAsUiJson(),
-        )['mcpServers']['guest']['args'],
-        arguments,
-      );
-      await tester.pumpWidget(const SizedBox.shrink());
-    },
-    variant: TargetPlatformVariant.only(TargetPlatform.macOS),
-  );
+  testWidgets('renaming imported stdio preserves every argument exactly', (
+    tester,
+  ) async {
+    const arguments = [
+      '-c',
+      'printf "hello"\nprintf "world"\n',
+      '',
+      '  spaced  ',
+      '\r\n',
+      '',
+    ];
+    final provider = await _openEditor(tester, arguments);
+    await tester.enterText(_fieldWithText('Imported server'), 'Renamed');
+    await tester.tap(find.text('Save'));
+    await tester.pumpAndSettle();
+    expect(provider.getById('guest')!.name, 'Renamed');
+    expect(provider.getById('guest')!.args, arguments);
+    expect(
+      jsonDecode(
+        provider.exportServersAsUiJson(),
+      )['mcpServers']['guest']['args'],
+      arguments,
+    );
+    await tester.pumpWidget(const SizedBox.shrink());
+  }, variant: TargetPlatformVariant.only(TargetPlatform.macOS));
 
   testWidgets(
     'space separated arguments preserve quotes, empty strings and scripts',
@@ -315,41 +309,33 @@ void main() {
     variant: TargetPlatformVariant.only(TargetPlatform.macOS),
   );
 
-  testWidgets(
-    'unclosed argument quotes prevent saving',
-    (tester) async {
-      final provider = await _openEditor(tester, ['--yes']);
-      await tester.enterText(_fieldWithText('--yes'), '"unterminated');
-      await tester.tap(find.text('Save'));
-      await tester.pumpAndSettle();
-      expect(provider.getById('guest')!.args, ['--yes']);
-      expect(
-        find.text(
-          'Check for an unclosed quote or trailing escape in arguments.',
-        ),
-        findsOneWidget,
-      );
-      await tester.pumpWidget(const SizedBox.shrink());
-    },
-    variant: TargetPlatformVariant.only(TargetPlatform.macOS),
-  );
+  testWidgets('unclosed argument quotes prevent saving', (tester) async {
+    final provider = await _openEditor(tester, ['--yes']);
+    await tester.enterText(_fieldWithText('--yes'), '"unterminated');
+    await tester.tap(find.text('Save'));
+    await tester.pumpAndSettle();
+    expect(provider.getById('guest')!.args, ['--yes']);
+    expect(
+      find.text('Check for an unclosed quote or trailing escape in arguments.'),
+      findsOneWidget,
+    );
+    await tester.pumpWidget(const SizedBox.shrink());
+  }, variant: TargetPlatformVariant.only(TargetPlatform.macOS));
 
-  testWidgets(
-    'imports an environment variable into the server override',
-    (tester) async {
-      final provider = await _openEditor(tester, []);
-      await tester.ensureVisible(find.text('Import from Environment'));
-      await tester.tap(find.text('Import from Environment'));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('API_TOKEN'));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('Save'));
-      await tester.pumpAndSettle();
-      expect(provider.getById('guest')!.env, {'API_TOKEN': 'test-token'});
-      await tester.pumpWidget(const SizedBox.shrink());
-    },
-    variant: TargetPlatformVariant.only(TargetPlatform.macOS),
-  );
+  testWidgets('imports an environment variable into the server override', (
+    tester,
+  ) async {
+    final provider = await _openEditor(tester, []);
+    await tester.ensureVisible(find.text('Import from Environment'));
+    await tester.tap(find.text('Import from Environment'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('API_TOKEN'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Save'));
+    await tester.pumpAndSettle();
+    expect(provider.getById('guest')!.env, {'API_TOKEN': 'test-token'});
+    await tester.pumpWidget(const SizedBox.shrink());
+  }, variant: TargetPlatformVariant.only(TargetPlatform.macOS));
 }
 
 Finder _fieldWithText(String text) => find.byWidgetPredicate(

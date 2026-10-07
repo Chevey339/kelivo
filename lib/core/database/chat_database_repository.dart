@@ -1976,17 +1976,13 @@ class ChatDatabaseRepository {
   });
 
   Future<Conversation?> getConversation(String id) async {
-    return _observer.measure(
-      ChatDatabaseOperation.queryConversation,
-      () async {
-        final row = await (_db.select(
-          _db.conversationRows,
-        )..where((t) => t.id.equals(id))).getSingleOrNull();
-        if (row == null) return null;
-        return _conversationFromRow(row);
-      },
-      resultCount: (conversation) => conversation == null ? 0 : 1,
-    );
+    return _observer.measure(ChatDatabaseOperation.queryConversation, () async {
+      final row = await (_db.select(
+        _db.conversationRows,
+      )..where((t) => t.id.equals(id))).getSingleOrNull();
+      if (row == null) return null;
+      return _conversationFromRow(row);
+    }, resultCount: (conversation) => conversation == null ? 0 : 1);
   }
 
   Future<int> getMessageCount(String conversationId) async {

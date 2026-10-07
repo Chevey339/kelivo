@@ -23,124 +23,117 @@ import 'package:Kelivo/core/services/backup/restore_startup_gate.dart';
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
-  test(
-    'restore startup gate cold-start cost',
-    () async {
-      final assetMb =
-          int.tryParse(Platform.environment['KELIVO_BENCH_ASSET_MB'] ?? '') ??
-          150;
-      final assetFiles =
-          int.tryParse(
-            Platform.environment['KELIVO_BENCH_ASSET_FILES'] ?? '',
-          ) ??
-          300;
-      final root = await Directory.systemTemp.createTemp(
-        'kelivo_restore_bench_',
-      );
-      final appData = Directory(p.join(root.path, 'app_data'));
-      await appData.create();
+  test('restore startup gate cold-start cost', () async {
+    final assetMb =
+        int.tryParse(Platform.environment['KELIVO_BENCH_ASSET_MB'] ?? '') ??
+        150;
+    final assetFiles =
+        int.tryParse(Platform.environment['KELIVO_BENCH_ASSET_FILES'] ?? '') ??
+        300;
+    final root = await Directory.systemTemp.createTemp('kelivo_restore_bench_');
+    final appData = Directory(p.join(root.path, 'app_data'));
+    await appData.create();
 
-      final fixtureWatch = Stopwatch()..start();
-      final liveDatabase = File(p.join(appData.path, 'kelivo.db'));
-      await _createDatabase(liveDatabase, conversationId: 'old');
-      final liveBytes = await _writeAssets(
-        Directory(p.join(appData.path, 'upload')),
-        totalMb: assetMb,
-        files: assetFiles,
-        seed: 1,
-      );
+    final fixtureWatch = Stopwatch()..start();
+    final liveDatabase = File(p.join(appData.path, 'kelivo.db'));
+    await _createDatabase(liveDatabase, conversationId: 'old');
+    final liveBytes = await _writeAssets(
+      Directory(p.join(appData.path, 'upload')),
+      totalMb: assetMb,
+      files: assetFiles,
+      seed: 1,
+    );
 
-      final extracted = Directory(p.join(root.path, 'extracted'));
-      await extracted.create();
-      final candidateDatabase = File(
-        p.join(extracted.path, 'database', 'kelivo.db'),
-      );
-      await candidateDatabase.parent.create(recursive: true);
-      await _createDatabase(candidateDatabase, conversationId: 'new');
-      final databaseInfo =
-          await ChatDatabaseRepository.prepareSnapshotForRestore(
-            candidateDatabase,
-          );
-      final candidateBytes = await _writeAssets(
-        Directory(p.join(extracted.path, 'upload')),
-        totalMb: assetMb,
-        files: assetFiles,
-        seed: 2,
-      );
-      final settings = File(p.join(extracted.path, 'settings.json'));
-      await settings.writeAsString('{"theme":"new"}', flush: true);
+    final extracted = Directory(p.join(root.path, 'extracted'));
+    await extracted.create();
+    final candidateDatabase = File(
+      p.join(extracted.path, 'database', 'kelivo.db'),
+    );
+    await candidateDatabase.parent.create(recursive: true);
+    await _createDatabase(candidateDatabase, conversationId: 'new');
+    final databaseInfo = await ChatDatabaseRepository.prepareSnapshotForRestore(
+      candidateDatabase,
+    );
+    final candidateBytes = await _writeAssets(
+      Directory(p.join(extracted.path, 'upload')),
+      totalMb: assetMb,
+      files: assetFiles,
+      seed: 2,
+    );
+    final settings = File(p.join(extracted.path, 'settings.json'));
+    await settings.writeAsString('{"theme":"new"}', flush: true);
 
-      final entries = <String, dynamic>{
-        'settings.json': await _descriptor(settings),
-        'database/kelivo.db': await _descriptor(candidateDatabase),
-      };
-      await for (final entity in Directory(
-        p.join(extracted.path, 'upload'),
-      ).list(recursive: true, followLinks: false)) {
-        if (entity is! File) continue;
-        final name = p
-            .relative(entity.path, from: extracted.path)
-            .replaceAll(r'\', '/');
-        entries[name] = await _descriptor(entity);
-      }
-      final manifest = File(p.join(extracted.path, 'manifest.json'));
-      await manifest.writeAsString(
-        jsonEncode({
-          'format': 'kelivo-backup',
-          'formatVersion': 2,
-          'payloadKind': 'sqlite',
-          'createdAtUtc': '2026-07-09T00:00:00.000Z',
-          'appVersion': 'bench',
-          'includeChats': true,
-          'includeFiles': true,
-          'secretsIncluded': true,
-          'database': {
-            'entry': 'database/kelivo.db',
-            'schemaVersion': databaseInfo.schemaVersion,
-            'conversationCount': databaseInfo.conversationCount,
-            'messageCount': databaseInfo.messageCount,
-          },
-          'entries': entries,
-        }),
-        flush: true,
-      );
-      fixtureWatch.stop();
+    final entries = <String, dynamic>{
+      'settings.json': await _descriptor(settings),
+      'database/kelivo.db': await _descriptor(candidateDatabase),
+    };
+    await for (final entity in Directory(
+      p.join(extracted.path, 'upload'),
+    ).list(recursive: true, followLinks: false)) {
+      if (entity is! File) continue;
+      final name = p
+          .relative(entity.path, from: extracted.path)
+          .replaceAll(r'\', '/');
+      entries[name] = await _descriptor(entity);
+    }
+    final manifest = File(p.join(extracted.path, 'manifest.json'));
+    await manifest.writeAsString(
+      jsonEncode({
+        'format': 'kelivo-backup',
+        'formatVersion': 2,
+        'payloadKind': 'sqlite',
+        'createdAtUtc': '2026-07-09T00:00:00.000Z',
+        'appVersion': 'bench',
+        'includeChats': true,
+        'includeFiles': true,
+        'secretsIncluded': true,
+        'database': {
+          'entry': 'database/kelivo.db',
+          'schemaVersion': databaseInfo.schemaVersion,
+          'conversationCount': databaseInfo.conversationCount,
+          'messageCount': databaseInfo.messageCount,
+        },
+        'entries': entries,
+      }),
+      flush: true,
+    );
+    fixtureWatch.stop();
 
-      final prepareWatch = Stopwatch()..start();
-      await RestoreBundlePreparation.prepare(
-        appDataDirectory: appData,
-        extractedDirectory: extracted,
-        sourceManifestSha256: (await sha256.bind(manifest.openRead()).first)
-            .toString(),
-        bundleIncludesChats: true,
-        bundleIncludesFiles: true,
-        restoreChats: true,
-        restoreFiles: true,
-        createdAtUtc: DateTime.utc(2026, 7, 9, 12),
-      );
-      prepareWatch.stop();
+    final prepareWatch = Stopwatch()..start();
+    await RestoreBundlePreparation.prepare(
+      appDataDirectory: appData,
+      extractedDirectory: extracted,
+      sourceManifestSha256: (await sha256.bind(manifest.openRead()).first)
+          .toString(),
+      bundleIncludesChats: true,
+      bundleIncludesFiles: true,
+      restoreChats: true,
+      restoreFiles: true,
+      createdAtUtc: DateTime.utc(2026, 7, 9, 12),
+    );
+    prepareWatch.stop();
 
-      final rollback = Platform.environment['KELIVO_BENCH_ROLLBACK'] == '1';
-      final durability = _CountingDurability(
-        rollback
-            ? _ThrowAfterCandidateDatabaseRename(
-                appDataDirectory: appData,
-                delegate: RestorePlatformDurability(),
-              )
-            : RestorePlatformDurability(),
-      );
-      final stages = <String>[];
-      final gateWatch = Stopwatch()..start();
-      final outcome = await RestoreStartupGate.recoverAndRequireBusinessReady(
-        appDataDirectory: appData,
-        durability: durability,
-        onStage: (stage) =>
-            stages.add('${gateWatch.elapsedMilliseconds}ms  ${stage.name}'),
-      );
-      gateWatch.stop();
+    final rollback = Platform.environment['KELIVO_BENCH_ROLLBACK'] == '1';
+    final durability = _CountingDurability(
+      rollback
+          ? _ThrowAfterCandidateDatabaseRename(
+              appDataDirectory: appData,
+              delegate: RestorePlatformDurability(),
+            )
+          : RestorePlatformDurability(),
+    );
+    final stages = <String>[];
+    final gateWatch = Stopwatch()..start();
+    final outcome = await RestoreStartupGate.recoverAndRequireBusinessReady(
+      appDataDirectory: appData,
+      durability: durability,
+      onStage: (stage) =>
+          stages.add('${gateWatch.elapsedMilliseconds}ms  ${stage.name}'),
+    );
+    gateWatch.stop();
 
-      // ignore: avoid_print
-      print('''
+    // ignore: avoid_print
+    print('''
 --- restore startup gate bench ---
 live assets       ${_mb(liveBytes)} MB in $assetFiles files
 candidate assets  ${_mb(candidateBytes)} MB in $assetFiles files
@@ -154,10 +147,8 @@ STARTUP GATE      ${gateWatch.elapsedMilliseconds} ms   -> ${outcome?.state}
   rename timeline ${durability.timeline.join('\n                  ')}
 ''');
 
-      await root.delete(recursive: true);
-    },
-    timeout: const Timeout(Duration(minutes: 30)),
-  );
+    await root.delete(recursive: true);
+  }, timeout: const Timeout(Duration(minutes: 30)));
 }
 
 String _mb(int bytes) => (bytes / (1024 * 1024)).toStringAsFixed(1);

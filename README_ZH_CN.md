@@ -78,7 +78,7 @@ Kelivo 不只是聊天。模型可以联网搜索、调用 MCP 服务器、按�
 | --- | --- | --- | --- |
 | iOS / iPadOS | [App Store](https://apps.apple.com/us/app/kelivo/id6752122930) · [TestFlight](https://testflight.apple.com/join/erbGGykR)（测试版） | App Store；[Releases](https://github.com/Chevey339/kelivo/releases/latest) 另提供未签名 IPA | iOS 15.0 及以上 |
 | Android | [GitHub Releases](https://github.com/Chevey339/kelivo/releases/latest) | APK（`arm64-v8a`、`armeabi-v7a`、`x86_64`） | Android 7.0 及以上 |
-| macOS | [GitHub Releases](https://github.com/Chevey339/kelivo/releases/latest) | DMG | macOS 11.0 及以上，支持 Apple 芯片与 Intel |
+| macOS | [GitHub Releases](https://github.com/Chevey339/kelivo/releases/latest) | DMG | macOS 12.0 及以上，支持 Apple 芯片与 Intel |
 | Windows | [GitHub Releases](https://github.com/Chevey339/kelivo/releases/latest) | 安装程序（`setup.exe`）或免安装 ZIP | Windows 10 / 11 |
 | Linux | [GitHub Releases](https://github.com/Chevey339/kelivo/releases/latest) | AppImage、DEB、RPM、tar.gz | x86_64 |
 | HarmonyOS | [kelivo-ohos](https://github.com/Chevey339/kelivo-ohos) | 在独立仓库中维护 | — |
@@ -185,7 +185,7 @@ Kelivo 不只是聊天。模型可以联网搜索、调用 MCP 服务器、按�
 
 **环境要求**
 
-- Flutter 3.44.9 及以上（Dart 3.12）
+- Flutter 3.47.6（Dart 3.13，与 CI 保持一致）
 - 目标平台的工具链：Android SDK、Xcode，或安装了“使用 C++ 的桌面开发”工作负载的 Visual Studio
 - 仅 Linux（Debian/Ubuntu 包名）：`clang cmake ninja-build pkg-config libgtk-3-dev libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev libkeybinder-3.0-dev libayatana-appindicator3-dev`
 - 仅 iOS：`brew install meson ninja llvm lld`。Xcode 构建时会自动编译 iSH 沙盒并准备 Alpine Linux 镜像。
