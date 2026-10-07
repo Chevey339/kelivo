@@ -443,6 +443,8 @@ class _LegacyMemoryTabBody extends StatelessWidget {
                       size: 18,
                       color: cs.error,
                       onTap: () async {
+                        if (!await confirmHardDeleteMemory(context)) return;
+                        if (!context.mounted) return;
                         await context.read<MemoryProvider>().delete(id: m.id);
                       },
                     ),
