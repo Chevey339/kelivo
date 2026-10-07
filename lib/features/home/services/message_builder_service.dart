@@ -39,12 +39,15 @@ import '../../../core/providers/world_book_provider.dart';
 import '../../../core/services/api/builtin_tools.dart';
 import '../../../core/services/api/providers/claude/claude_container.dart';
 import '../../../core/services/api/providers/claude/claude_history.dart';
+import '../../../core/services/api/providers/claude/claude_thinking_recovery.dart';
 import '../../../core/services/api/providers/google/gemini_thought_signature.dart';
 import '../../../core/models/assistant_regex.dart';
 import '../../../core/utils/multimodal_input_utils.dart';
 import '../../../utils/assistant_regex.dart';
 import '../../../utils/markdown_media_sanitizer.dart';
 import 'ocr_service.dart';
+import 'assistant_tool_history.dart';
+import '../../../core/services/api/providers/openai/responses_history.dart';
 
 /// Result of §7.6 memory-prefix resolution.
 ///
@@ -312,11 +315,17 @@ class MessageBuilderService {
   /// Build API messages list from current conversation state.
   ///
   /// Applies truncation and version collapsing. Attachments come from parts.
+  /// [preserveToolTurns] keeps OpenAI-compatible tool rounds ordered.
+  /// [responsesScope] selects native Responses replay for matching artifacts.
+  /// [claudeSource] keeps ordinary Claude blocks on their original model.
   List<Map<String, dynamic>> buildApiMessages({
     required List<ChatMessage> messages,
     required Map<String, int> versionSelections,
     required Conversation? currentConversation,
     bool includeToolMessages = false,
+    bool preserveToolTurns = false,
+    ResponsesReplayScope? responsesScope,
+    ({String providerId, String modelId})? claudeSource,
   }) {
     final tIndex = currentConversation?.truncateIndex ?? -1;
     final List<ChatMessage> sourceAll =
@@ -330,14 +339,82 @@ class MessageBuilderService {
 
     final out = <Map<String, dynamic>>[];
 
+    final thinkingRecovery = ClaudeThinkingRecovery();
     for (final m in source) {
+      if (includeToolMessages && !preserveToolTurns && m.role == 'assistant') {
+        thinkingRecovery.readArtifact(
+          providerArtifactLookup?.call(m, claudeThinkingRecoveryArtifactKind),
+        );
+      }
+      if (m.role == 'assistant' &&
+          includeToolMessages &&
+          responsesScope != null) {
+        final history = buildResponsesHistory(
+          payload: providerArtifactLookup?.call(m, responsesTurnArtifactKind),
+          scope: responsesScope,
+          toolEvents: chatService.getToolEvents(m.id),
+          content: m.content,
+        );
+        if (history != null) {
+          for (final message in history) {
+            ContextSegmentTags.replaceWithSingle(
+              message,
+              source: message['role'] == 'tool'
+                  ? ContextSource.toolResult
+                  : message['tool_calls'] is List
+                  ? ContextSource.toolCall
+                  : ContextSource.chatHistory,
+              length: (message['content'] ?? '').toString().length,
+            );
+          }
+          out.addAll(history);
+          continue;
+        }
+      }
+      var content = m.content;
+      var hasClaudeToolTurn = false;
+      // Signed native blocks belong to the provider/model that produced them.
+      // Tool turns carry their artifact on the tool-call message below.
+      final plainClaudeTurn =
+          includeToolMessages &&
+              !preserveToolTurns &&
+              m.role == 'assistant' &&
+              claudeSource != null &&
+              m.providerId == claudeSource.providerId &&
+              m.modelId == claudeSource.modelId &&
+              chatService.getToolEvents(m.id).isEmpty
+          ? providerArtifactLookup?.call(m, claudeTurnArtifactKind)
+          : null;
       String? assistantReasoningContent;
       dynamic reasoningDetails;
       if (m.role == 'assistant') {
         assistantReasoningContent = _reasoningContentForToolContinuation(m);
         reasoningDetails = _reasoningDetailsForApi(m);
       }
-      if (includeToolMessages && m.role == 'assistant') {
+      if (includeToolMessages && m.role == 'assistant' && preserveToolTurns) {
+        final history = buildAssistantToolHistory(m.parts);
+        for (final message in history.messages) {
+          ContextSegmentTags.replaceWithSingle(
+            message,
+            source: message['role'] == 'tool'
+                ? ContextSource.toolResult
+                : ContextSource.toolCall,
+            length: (message['content'] ?? '').toString().length,
+          );
+        }
+        out.addAll(history.messages);
+        content = history.content;
+        // Persisted parts own the position and exact bytes of each thinking
+        // block. The scalar spans all rounds and must not be repeated here.
+        if (m.parts.any(
+          (part) => part is ReasoningPart || part is ToolCallPart,
+        )) {
+          assistantReasoningContent = history.reasoning;
+        }
+        if (content.isEmpty && history.reasoning == null) {
+          reasoningDetails = null;
+        }
+      } else if (includeToolMessages && m.role == 'assistant') {
         final events = chatService.getToolEvents(m.id);
         if (events.isNotEmpty) {
           // Tool-call history is only valid once every call has a result.
@@ -396,6 +473,7 @@ class MessageBuilderService {
               );
               if (turn != null && turn.isNotEmpty) {
                 assistantToolMessage[multimodalInternalClaudeTurnKey] = turn;
+                hasClaudeToolTurn = claudeSource != null;
               }
               // Also here: a turn that ran code and then said nothing has no
               // final message below to carry the container.
@@ -437,13 +515,16 @@ class MessageBuilderService {
         }
       }
 
-      final content = m.content;
       final mediaRefs = mediaRefsFromParts(m);
       // Pure-attachment turns have empty text content but still must be sent.
       // Document FileParts are omitted from mediaRefs (they travel via
       // document extraction), so also keep messages that still have a usable
       // ImagePart/FilePart for processUserMessagesForApi to inject text.
       if (content.isEmpty &&
+          (assistantReasoningContent?.isEmpty ?? true) &&
+          reasoningDetails == null &&
+          (plainClaudeTurn?.isEmpty ?? true) &&
+          !hasClaudeToolTurn &&
           mediaRefs.isEmpty &&
           !_hasUsableAttachmentPart(m)) {
         continue;
@@ -453,6 +534,9 @@ class MessageBuilderService {
       if (role == 'user') {
         message[internalRevisionIdKey] = m.id;
       } else {
+        if (plainClaudeTurn?.isNotEmpty == true) {
+          message[multimodalInternalClaudeTurnKey] = plainClaudeTurn;
+        }
         final container = providerArtifactLookup?.call(
           m,
           claudeContainerArtifactKind,
@@ -491,6 +575,12 @@ class MessageBuilderService {
       out.add(message);
     }
 
+    // Carry the cumulative state on the last message so subsequent context
+    // trimming and textless assistant replies cannot lose the recovery.
+    final recoveryArtifact = thinkingRecovery.artifact;
+    if (out.isNotEmpty && recoveryArtifact != null) {
+      out.last[multimodalInternalClaudeThinkingRecoveryKey] = recoveryArtifact;
+    }
     return out;
   }
 
@@ -623,7 +713,7 @@ class MessageBuilderService {
 
   String _reasoningContentForToolContinuation(ChatMessage message) {
     String pick(ChatMessage candidate) {
-      final direct = (candidate.reasoningText ?? '').trim();
+      final direct = candidate.reasoningText ?? '';
       if (direct.isNotEmpty) return direct;
 
       final raw = (candidate.reasoningSegmentsJson ?? '').trim();
@@ -639,10 +729,10 @@ class MessageBuilderService {
         final parts = <String>[];
         for (final item in segmentsRaw) {
           if (item is! Map) continue;
-          final text = (item['text'] ?? '').toString().trim();
+          final text = (item['text'] ?? '').toString();
           if (text.isNotEmpty) parts.add(text);
         }
-        return parts.join('\n').trim();
+        return parts.join();
       } catch (_) {
         return '';
       }
@@ -2427,18 +2517,14 @@ class MessageBuilderService {
       if (apiMessages.isNotEmpty && apiMessages.first['role'] == 'system') {
         startIdx = 1;
       }
-      final tail = apiMessages.sublist(startIdx);
-      if (tail.length > keep) {
-        final trimmed = tail.sublist(tail.length - keep);
-        apiMessages
-          ..removeRange(startIdx, apiMessages.length)
-          ..addAll(trimmed);
+      var cut = apiMessages.length - keep;
+      if (cut <= startIdx) return;
+      // Message count is a soft bound: keep the user request and its entire
+      // assistant/tool exchange instead of starting midway through a turn.
+      while (cut > startIdx && apiMessages[cut]['role'] != 'user') {
+        cut--;
       }
-      // Context trimming can cut in the middle of a tool-call triplet; avoid sending dangling tool messages.
-      while (apiMessages.length > startIdx &&
-          (apiMessages[startIdx]['role'] ?? '').toString() == 'tool') {
-        apiMessages.removeAt(startIdx);
-      }
+      apiMessages.removeRange(startIdx, cut);
     }
   }
 

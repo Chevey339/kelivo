@@ -46,6 +46,11 @@ void main() {
           expect(raw, isA<Map>(), reason: 'missing fixture for $id');
           final expected = Map<String, dynamic>.from(raw as Map);
           final guess = ModelDefaultsGuesser.guess(id);
+          expect(
+            guess.replay,
+            isNot(ReasoningReplayPolicy.toolTurns),
+            reason: id,
+          );
           final expectedType = _isImagesApiId(id)
               ? ModelType.image
               : _byName(ModelType.values, expected['type'] as String);
@@ -510,7 +515,7 @@ void main() {
         canDisable: true,
         sampling: SamplingPolicy.never,
         maxOutput: 32000,
-        replay: ReasoningReplayPolicy.toolTurns,
+        replay: ReasoningReplayPolicy.all,
         replayField: ReasoningReplayField.reasoningContent,
       );
       expectHit(
@@ -519,7 +524,7 @@ void main() {
         levels: const [],
         canDisable: true,
         maxOutput: 32000,
-        replay: ReasoningReplayPolicy.toolTurns,
+        replay: ReasoningReplayPolicy.all,
         replayField: ReasoningReplayField.reasoningContent,
       );
       expectHit(
@@ -529,7 +534,7 @@ void main() {
         canDisable: false,
         sampling: SamplingPolicy.never,
         maxOutput: 32000,
-        replay: ReasoningReplayPolicy.toolTurns,
+        replay: ReasoningReplayPolicy.all,
         replayField: ReasoningReplayField.reasoningContent,
       );
       expectHit(
@@ -603,7 +608,7 @@ void main() {
           ReasoningLevel.max,
         ],
         canDisable: false,
-        replay: ReasoningReplayPolicy.toolTurns,
+        replay: ReasoningReplayPolicy.all,
         replayField: ReasoningReplayField.reasoningContent,
       );
       expectHit(
@@ -617,7 +622,7 @@ void main() {
           ReasoningLevel.max,
         ],
         canDisable: true,
-        replay: ReasoningReplayPolicy.toolTurns,
+        replay: ReasoningReplayPolicy.all,
         replayField: ReasoningReplayField.reasoningContent,
       );
       expectHit(
@@ -625,7 +630,7 @@ void main() {
         dialect: ReasoningDialect.thinkingType,
         levels: const [],
         canDisable: true,
-        replay: ReasoningReplayPolicy.toolTurns,
+        replay: ReasoningReplayPolicy.all,
         replayField: ReasoningReplayField.reasoningContent,
       );
       expectHit(
@@ -637,7 +642,7 @@ void main() {
           ReasoningLevel.max,
         ],
         canDisable: true,
-        replay: ReasoningReplayPolicy.toolTurns,
+        replay: ReasoningReplayPolicy.all,
         replayField: ReasoningReplayField.reasoningContent,
       );
       expectHit(
@@ -649,7 +654,7 @@ void main() {
           ReasoningLevel.high,
         ],
         canDisable: true,
-        replay: ReasoningReplayPolicy.toolTurns,
+        replay: ReasoningReplayPolicy.all,
         replayField: ReasoningReplayField.reasoningContent,
       );
       expectHit(

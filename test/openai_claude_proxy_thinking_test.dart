@@ -2,9 +2,14 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:http/http.dart' as http;
+import 'package:http/testing.dart';
 
 import 'package:Kelivo/core/providers/settings_provider.dart';
 import 'package:Kelivo/core/services/api/chat_api_service.dart';
+import 'package:Kelivo/core/services/api/providers/openai/openai_provider.dart';
+import 'package:Kelivo/core/services/api/stream/stream_chunk_handler.dart';
+import 'package:Kelivo/features/home/services/assistant_tool_history.dart';
 import 'support/collect_generation.dart';
 
 /// Regression tests for https://github.com/Chevey339/kelivo/issues/764
@@ -22,10 +27,211 @@ ProviderConfig _openAIConfig(String baseUrl) {
     apiKey: 'test-key',
     baseUrl: baseUrl,
     providerType: ProviderKind.openai,
+    modelOverrides: {
+      'claude-sonnet-4-6': {
+        'reasoning': {'replay': 'all'},
+      },
+    },
   );
 }
 
 void main() {
+  for (final stream in [false, true]) {
+    for (final replay in ['none', 'toolTurns', 'all']) {
+      test(
+        'signed tool state obeys history replay=$replay, stream=$stream',
+        () async {
+          const model = 'claude-sonnet-4-6';
+          final config = _openAIConfig('https://example.com/v1').copyWith(
+            modelOverrides: {
+              model: {
+                'reasoning': {'replay': replay},
+              },
+            },
+          );
+          final bodies = <Map<String, dynamic>>[];
+          const details = [
+            {
+              'type': 'reasoning.text',
+              'text': 'Plan',
+              'signature': 'signed-plan',
+              'format': 'anthropic-claude-v1',
+              'index': 0,
+            },
+          ];
+          final client = MockClient((request) async {
+            bodies.add(jsonDecode(request.body));
+            final first = bodies.length == 1;
+            final message = first
+                ? {
+                    'content': 'Checking.',
+                    'reasoning_details': details,
+                    'tool_calls': [
+                      {
+                        'index': 0,
+                        'id': 'call1',
+                        'type': 'function',
+                        'function': {'name': 'lookup', 'arguments': '{}'},
+                      },
+                    ],
+                  }
+                : {'content': 'Done'};
+            final body = jsonEncode({
+              'choices': [
+                {
+                  stream ? 'delta' : 'message': message,
+                  'finish_reason': first ? 'tool_calls' : 'stop',
+                },
+              ],
+            });
+            return http.Response(
+              stream ? 'data: $body\n\ndata: [DONE]\n\n' : body,
+              200,
+            );
+          });
+          addTearDown(client.close);
+          final chunks = await sendOpenAIStream(
+            client,
+            config,
+            model,
+            [
+              {'role': 'user', 'content': 'Look up'},
+            ],
+            stream: stream,
+            tools: [
+              {
+                'type': 'function',
+                'function': {
+                  'name': 'lookup',
+                  'parameters': {'type': 'object', 'properties': {}},
+                },
+              },
+            ],
+            onToolCall: (name, args, {toolCallId}) async => 'found',
+          ).toList();
+          // Disabling history replay must not break the current tool loop.
+          expect(
+            (bodies[1]['messages'] as List)[1]['reasoning_details'],
+            details,
+          );
+          final result = StreamChunkHandler.collect(chunks);
+          expect(result.reasoningDetails, isNull);
+          final history = buildAssistantToolHistory(result.parts);
+          expect(history.messages.first['reasoning_details'], details);
+          await sendOpenAIStream(client, config, model, [
+            {'role': 'user', 'content': 'Look up'},
+            ...history.messages,
+            {'role': 'assistant', 'content': history.content},
+            {'role': 'user', 'content': 'Next'},
+          ], stream: stream).toList();
+          final pastToolRound = (bodies.last['messages'] as List)[1] as Map;
+          expect(
+            pastToolRound['reasoning_details'],
+            replay == 'none' ? isNull : details,
+          );
+          expect(pastToolRound['tool_calls'], hasLength(1));
+        },
+      );
+    }
+  }
+
+  for (final stream in [false, true]) {
+    test(
+      'Claude alias keeps signature guard on tool followup: stream=$stream',
+      () async {
+        const model = 'friendly-alias';
+        final config = _openAIConfig('https://example.com/v1').copyWith(
+          modelOverrides: {
+            model: {
+              'apiModelId': 'claude-sonnet-4-6',
+              'reasoning': {'replay': 'all'},
+            },
+          },
+        );
+        final bodies = <Map<String, dynamic>>[];
+        final client = MockClient((request) async {
+          bodies.add(jsonDecode(request.body));
+          final first = bodies.length == 1;
+          final message = first
+              ? {
+                  'role': 'assistant',
+                  'content': null,
+                  'reasoning_content': 'Current reasoning',
+                  'reasoning_details': [
+                    {
+                      'type': 'reasoning.text',
+                      'text': 'Current reasoning',
+                      'signature': 'current-signed-state',
+                    },
+                  ],
+                  'tool_calls': [
+                    {
+                      'index': 0,
+                      'id': 'call1',
+                      'type': 'function',
+                      'function': {'name': 'lookup', 'arguments': '{}'},
+                    },
+                  ],
+                }
+              : {'role': 'assistant', 'content': 'Done'};
+          final response = jsonEncode({
+            'choices': [
+              {
+                stream ? 'delta' : 'message': message,
+                'finish_reason': first ? 'tool_calls' : 'stop',
+              },
+            ],
+          });
+          return http.Response(
+            stream ? 'data: $response\n\ndata: [DONE]\n\n' : response,
+            200,
+            headers: {
+              'content-type': stream ? 'text/event-stream' : 'application/json',
+            },
+          );
+        });
+        addTearDown(client.close);
+        await sendOpenAIStream(
+          client,
+          config,
+          model,
+          [
+            {'role': 'user', 'content': 'Old question'},
+            {
+              'role': 'assistant',
+              'content': 'Old answer',
+              'reasoning_content': 'Legacy unsigned thinking',
+            },
+            {'role': 'user', 'content': 'Use lookup'},
+          ],
+          stream: stream,
+          tools: [
+            {
+              'type': 'function',
+              'function': {
+                'name': 'lookup',
+                'parameters': {'type': 'object', 'properties': {}},
+              },
+            },
+          ],
+          onToolCall: (name, args, {toolCallId}) async => 'found',
+        ).toList();
+        expect(bodies, hasLength(2));
+        for (final body in bodies) {
+          final history = (body['messages'] as List)[1] as Map;
+          expect(history, {'role': 'assistant', 'content': 'Old answer'});
+        }
+        final toolRound = (bodies.last['messages'] as List)
+            .cast<Map>()
+            .singleWhere((message) => message['tool_calls'] != null);
+        expect(
+          toolRound['reasoning_details'].single['signature'],
+          'current-signed-state',
+        );
+      },
+    );
+  }
+
   group('Claude via OpenAI-compatible proxy thinking signature', () {
     test('stream emits captured reasoning_details for persistence', () async {
       final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
@@ -69,7 +275,7 @@ void main() {
     });
 
     test(
-      'unsigned reasoning_content is stripped from Claude history replay',
+      'all history replay still strips unsigned Claude reasoning_content',
       () async {
         late Map<String, dynamic> requestBody;
         final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);

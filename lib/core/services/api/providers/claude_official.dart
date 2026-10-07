@@ -27,6 +27,7 @@ import 'claude/claude_container.dart';
 import 'claude/claude_decoder.dart';
 import 'claude/claude_files.dart';
 import 'claude/claude_history.dart';
+import 'claude/claude_thinking_recovery.dart';
 
 export 'claude/claude_history.dart'
     show
@@ -89,23 +90,24 @@ Stream<StreamChunk> sendClaudeStream(
     );
   }
 
-  final canImageInput = ModelSpecResolver.instance
-      .spec(config, modelId)
-      .input
-      .contains(Modality.image);
+  final spec = ModelSpecResolver.instance.spec(config, modelId);
+  final canImageInput = spec.input.contains(Modality.image);
   final history = ClaudeHistory(
     replayServerToolBlocks: replayServerToolBlocks,
     skipRedactedThinkingBlocks: skipRedactedThinkingBlocks,
+    reasoningReplay: spec.reasoning.replay,
     skipImageParsing: skipImageParsing,
     canImageInput: canImageInput,
     nativeInputs: NativeInputAttachments(
       config: config,
-      spec: ModelSpecResolver.instance.spec(config, modelId),
+      spec: spec,
       protocol: NativeInputProtocol.claude,
     ),
     userImagePaths: userImagePaths,
   );
   final initialMessages = await history.build(nonSystemMessages);
+  final thinkingRecovery = ClaudeThinkingRecovery()..readMessages(messages);
+  var recoveredThinking = false;
 
   // Map OpenAI-style tools to Anthropic custom tools (client tools)
   List<Map<String, dynamic>>? anthropicTools;
@@ -262,15 +264,20 @@ Stream<StreamChunk> sendClaudeStream(
   // pause — and stored after each so the next turn resumes in it too.
   ClaudeContainerRef? container = history.storedContainer;
   // Every response of this turn so far, stored against the message after each
-  // so the turn replays as the responses it was. A turn without a tool call
-  // replays from its text alone and stores nothing.
+  // so the turn replays as the responses it was, including thinking and its
+  // signature when no tool was called. Replay policy never discards storage.
   final turnResponses = <List<Map<String, dynamic>>>[];
   Stream<StreamChunk> recordTurn(List<Map<String, dynamic>> response) async* {
     turnResponses.add(response);
-    if (toolUseIdsInBlocks(turnResponses.expand((b) => b)).isNotEmpty) {
+    yield ProviderArtifact(
+      kind: claudeTurnArtifactKind,
+      payload: encodeClaudeTurn(turnResponses),
+    );
+    final recoveryArtifact = thinkingRecovery.artifact;
+    if (recoveryArtifact != null) {
       yield ProviderArtifact(
-        kind: claudeTurnArtifactKind,
-        payload: encodeClaudeTurn(turnResponses),
+        kind: claudeThinkingRecoveryArtifactKind,
+        payload: recoveryArtifact,
       );
     }
     // Stored against this turn's message so the next turn can resume in the
@@ -286,7 +293,6 @@ Stream<StreamChunk> sendClaudeStream(
 
   final downloadedFileIds = <String>{};
   var lastStreamResults = <Map<String, dynamic>>[];
-  final nonStreamText = StringBuffer();
   var pauseTurn = false;
 
   // A container the conversation goes on using gets the files it has not
@@ -341,66 +347,86 @@ Stream<StreamChunk> sendClaudeStream(
     sendRound: () async* {
       totalUsage = null;
       final spec = ModelSpecResolver.instance.spec(config, modelId);
-      final body = <String, dynamic>{
-        'model': upstreamModelId,
-        'max_tokens': maxTokens ?? spec.maxOutput ?? 64000,
-        if (config.claudePromptCachingEnabled == true)
-          'cache_control': ProviderConfig.claudePromptCacheControl(
-            config.claudePromptCachingTtl,
-          ),
-        if (systemPrompt.isNotEmpty) 'system': systemPrompt,
-        'messages': convo,
-        'stream': stream,
-        if (temperature != null) 'temperature': temperature,
-        if (topP != null) 'top_p': topP,
-        if (allTools.isNotEmpty) 'tools': allTools,
-        if (allTools.isNotEmpty) 'tool_choice': {'type': 'auto'},
-        if (hasCodeExecution && container != null) 'container': container!.id,
-      };
-      applyReasoning(
-        body,
-        spec,
-        reasoning,
-        transport: ReasoningTransport.anthropicMessages,
-      );
-      final resolution = resolveReasoning(spec, reasoning);
-      applySamplingPolicy(
-        body,
-        spec,
-        resolution,
-        transport: ReasoningTransport.anthropicMessages,
-      );
-      // Custom body keys win over the reasoning dialect.
-      final extraClaude = customBody(config, modelId, assistantBody: extraBody);
-      CustomRequestMerger.applyBody(body, extraClaude);
-      applyAnthropicMessagesProtocolConstraints(body);
+      var retriedContainer = false;
+      Map<String, dynamic> buildBody() {
+        final body = <String, dynamic>{
+          'model': upstreamModelId,
+          'max_tokens': maxTokens ?? spec.maxOutput ?? 64000,
+          if (config.claudePromptCachingEnabled == true)
+            'cache_control': ProviderConfig.claudePromptCacheControl(
+              config.claudePromptCachingTtl,
+            ),
+          if (systemPrompt.isNotEmpty) 'system': systemPrompt,
+          'messages': convo,
+          'stream': stream,
+          if (temperature != null) 'temperature': temperature,
+          if (topP != null) 'top_p': topP,
+          if (allTools.isNotEmpty) 'tools': allTools,
+          if (allTools.isNotEmpty) 'tool_choice': {'type': 'auto'},
+          if (hasCodeExecution && container != null) 'container': container!.id,
+        };
+        applyReasoning(
+          body,
+          spec,
+          reasoning,
+          transport: ReasoningTransport.anthropicMessages,
+        );
+        final resolution = resolveReasoning(spec, reasoning);
+        applySamplingPolicy(
+          body,
+          spec,
+          resolution,
+          transport: ReasoningTransport.anthropicMessages,
+        );
+        // Custom body keys win over the reasoning dialect.
+        final extraClaude = customBody(
+          config,
+          modelId,
+          assistantBody: extraBody,
+        );
+        CustomRequestMerger.applyBody(body, extraClaude);
+        applyAnthropicMessagesProtocolConstraints(body);
+        if (retriedContainer) body.remove('container');
+        thinkingRecovery.filterRequest(body);
+        return body;
+      }
 
-      http.Request buildRequest() {
+      http.Request buildRequest(Map<String, dynamic> body) {
         final request = http.Request('POST', url);
         request.headers.addAll(baseHeaders);
         request.body = jsonEncode(body);
         return request;
       }
 
-      var response = await client.send(buildRequest());
-      if (response.statusCode < 200 || response.statusCode >= 300) {
+      late http.StreamedResponse response;
+      while (true) {
+        final body = buildBody();
+        response = await client.send(buildRequest(body));
+        if (response.statusCode >= 200 && response.statusCode < 300) break;
         final errorBody = await response.stream.bytesToString();
+        if (!recoveredThinking &&
+            thinkingRecovery.recover(body, response.statusCode, errorBody)) {
+          recoveredThinking = true;
+          // Save before retrying: even a cancelled or failed retry must not
+          // put the rejected blocks back into a subsequent request.
+          yield ProviderArtifact(
+            kind: claudeThinkingRecoveryArtifactKind,
+            payload: thinkingRecovery.artifact!,
+          );
+          continue;
+        }
         // A stored container can have expired since the last turn; forget
         // it and let this round start a fresh one.
         final staleContainer =
+            !retriedContainer &&
             body.containsKey('container') &&
             isClaudeStaleContainerError(response.statusCode, errorBody);
         if (!staleContainer) {
           throw HttpException('HTTP ${response.statusCode}: $errorBody');
         }
+        retriedContainer = true;
         container = null;
-        body.remove('container');
         await uploadDataFiles();
-        response = await client.send(buildRequest());
-        if (response.statusCode < 200 || response.statusCode >= 300) {
-          final retryBody = await response.stream.bytesToString();
-          throw HttpException('HTTP ${response.statusCode}: $retryBody');
-        }
       }
 
       pendingCalls = [];
@@ -427,13 +453,17 @@ Stream<StreamChunk> sendClaudeStream(
             <Map<String, dynamic>>[];
         final Map<String, Map<String, dynamic>> toolUses =
             <String, Map<String, dynamic>>{}; // id -> {name,args}
-        for (final it in content) {
+        final roundId = 'round-${streamRound++}';
+        for (var index = 0; index < content.length; index++) {
+          final it = content[index];
           if (it is! Map) continue;
+          final ids = StreamChunkIds('$roundId-block-$index');
           final type = (it['type'] ?? '').toString();
           if (type == 'text') {
             final t = (it['text'] ?? '').toString();
             if (t.isNotEmpty) {
               assistantBlocks.add({'type': 'text', 'text': t});
+              yield* emitDelta(ids: ids, content: t);
             }
           } else if (type == 'thinking' ||
               (type == 'redacted_thinking' && !skipRedactedThinkingBlocks)) {
@@ -445,6 +475,12 @@ Stream<StreamChunk> sendClaudeStream(
                 Map<String, dynamic>.from(it.cast<String, dynamic>()),
               );
             } catch (_) {}
+            if (type == 'thinking') {
+              yield* emitDelta(
+                ids: ids,
+                reasoning: (it['thinking'] ?? '').toString(),
+              );
+            }
           } else if (type == 'tool_use') {
             final id = (it['id'] ?? '').toString();
             final rawName = (it['name'] ?? '').toString();
@@ -487,11 +523,10 @@ Stream<StreamChunk> sendClaudeStream(
         // The continuation round sends these, so they go through the same
         // sanitising as replayed history; the stored copy stays whole.
         lastAssistantBlocks = history.sanitize(assistantBlocks);
-        nonStreamText.write(joinedTextOfBlocks(assistantBlocks));
         final decoder = ClaudeStreamDecoder(
           skipRedactedThinkingBlocks: skipRedactedThinkingBlocks,
           serverToolNames: declaredServerToolNames,
-          sourceId: 'round-${streamRound++}',
+          sourceId: roundId,
         );
         for (final chunk in decoder.decodeCompleteServerTools(
           assistantBlocks,
@@ -693,7 +728,6 @@ Stream<StreamChunk> sendClaudeStream(
     finish: () async* {
       yield* emitDone(
         ids: StreamChunkIds('finish'),
-        content: nonStreamText.toString(),
         usage: totalUsage,
         totalTokens: totalUsage?.totalTokens ?? 0,
       );

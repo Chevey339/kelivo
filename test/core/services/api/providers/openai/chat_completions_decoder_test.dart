@@ -27,6 +27,32 @@ Map<String, dynamic> _choice({
 }
 
 void main() {
+  test('a tool-only message with null content preserves its reasoning', () {
+    final decoder = ChatCompletionsStreamDecoder(needsReasoningEcho: true);
+    final result = decoder.accept(
+      _event({
+        'choices': [
+          {
+            'message': {
+              'content': null,
+              'reasoning_content': ' plan\n',
+              'tool_calls': [
+                {
+                  'id': 'a',
+                  'type': 'function',
+                  'function': {'name': 'lookup', 'arguments': '{}'},
+                },
+              ],
+            },
+            'finish_reason': 'tool_calls',
+          },
+        ],
+      }),
+    );
+    expect(decoder.reasoningEcho, ' plan\n');
+    expect(result.chunks.first, isA<ReasoningDelta>());
+    expect(result.chunks.whereType<ReasoningDelta>().single.text, ' plan\n');
+  });
   test('streams text and reasoning without emitting Finish', () {
     final decoder = ChatCompletionsStreamDecoder();
     final reasoning = decoder.accept(

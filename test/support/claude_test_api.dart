@@ -275,6 +275,7 @@ Future<ClaudeExchange> captureClaudeExchange({
     },
   ],
   List<String>? sseRounds,
+  List<int>? statusCodes,
 }) async {
   final bodies = <Map<String, dynamic>>[];
   final paths = <String>[];
@@ -290,8 +291,11 @@ Future<ClaudeExchange> captureClaudeExchange({
       (jsonDecode(await utf8.decoder.bind(request).join()) as Map)
           .cast<String, dynamic>(),
     );
-    request.response.statusCode = HttpStatus.ok;
-    if (sseRounds != null) {
+    final status = statusCodes == null
+        ? HttpStatus.ok
+        : statusCodes[round.clamp(0, statusCodes.length - 1)];
+    request.response.statusCode = status;
+    if (sseRounds != null && status == HttpStatus.ok) {
       request.response.headers.contentType = ContentType(
         'text',
         'event-stream',

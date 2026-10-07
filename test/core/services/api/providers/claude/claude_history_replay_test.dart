@@ -1592,23 +1592,41 @@ void main() {
           'AB',
         ),
         'turn said nothing around the tool': ([search, result], 'A', 'A'),
-        'the two disagree, blocks win': (
+        'appended text keeps its line breaks': (
+          [
+            search,
+            result,
+            {'type': 'text', 'text': 'A'},
+          ],
+          'A\n\nB\n',
+          'A\n\nB\n',
+        ),
+        'edited message replaces the original text': (
           [
             search,
             result,
             {'type': 'text', 'text': 'A'},
           ],
           'totally different',
-          'A',
+          'totally different',
         ),
-        'message is the empty placeholder': (
+        'whitespace edit replaces the original text': (
           [
             search,
             result,
             {'type': 'text', 'text': 'A'},
           ],
           '\n\n',
-          'A',
+          '\n\n',
+        ),
+        'cleared text leaves the tool pair intact': (
+          [
+            search,
+            result,
+            {'type': 'text', 'text': 'A'},
+          ],
+          '',
+          '',
         ),
       };
 

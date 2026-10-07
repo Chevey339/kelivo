@@ -15,9 +15,13 @@ import '../../../core/providers/assistant_provider.dart';
 import '../../../core/providers/settings_provider.dart';
 import '../../../core/models/reasoning_request.dart';
 import '../../../core/services/api/chat_api_service.dart';
+import '../../../core/services/api/providers/openai/responses_history.dart';
+import '../../../core/services/api/providers/claude/claude_history.dart';
 import '../../../core/services/api/reasoning/reasoning_selection.dart';
 import '../../../core/services/api/retry_policy.dart';
 import '../../../core/services/api/stream/stream_chunk.dart';
+import '../../../core/services/api/stream/stream_chunk_handler.dart';
+import '../../../core/services/api/tool_call_cancellation.dart';
 import '../../../core/services/chat/chat_service.dart';
 import '../../../core/services/mobile_background.dart';
 import '../../../core/services/logging/flutter_logger.dart';
@@ -1870,7 +1874,24 @@ class ChatActions {
     final providerKey = modelConfig.providerKey!;
     final modelId = modelConfig.modelId!;
 
-    final streamingMessage = _messages[visibleIndex].copyWith(
+    // The visible bubble predates the recovered answer. Use the refreshed
+    // context and merge cached results too (temporary chats have no DB rows).
+    final resumedParts = StreamChunkHandler(
+      seed: completeMessages[contextIndex].parts,
+    );
+    for (final event in chatService.getToolEvents(message.id)) {
+      final id = (event['id'] ?? '').toString();
+      if (id.isEmpty || event['content'] == null) continue;
+      resumedParts.handle(
+        ToolCallResult(
+          id: id,
+          output: event['content'],
+          metadata: (event['metadata'] as Map?)?.cast<String, dynamic>(),
+        ),
+      );
+    }
+    final streamingMessage = completeMessages[contextIndex].copyWith(
+      parts: resumedParts.parts,
       isStreaming: true,
     );
     _activeAssistantMessages.put(streamingMessage);
@@ -1894,7 +1915,7 @@ class ChatActions {
     _bindFileProcessingCallbacks();
     try {
       final apiContextMessages = List<ChatMessage>.of(completeMessages);
-      apiContextMessages[contextIndex] = streamingMessage.copyWith(content: '');
+      apiContextMessages[contextIndex] = streamingMessage;
       final prepared = await messageGenerationService
           .prepareApiMessagesWithInjections(
             messages: apiContextMessages,
@@ -2119,7 +2140,21 @@ class ChatActions {
 
   /// Execute generation with the given context.
   Future<void> _executeGeneration(stream_ctrl.GenerationContext ctx) async {
-    final state = stream_ctrl.StreamingState(ctx);
+    final state = stream_ctrl.StreamingState(
+      ctx,
+      responsesTurnPrefix: chatService.getProviderArtifact(
+        ctx.assistantMessage.id,
+        responsesTurnArtifactKind,
+      ),
+      claudeTurnPrefix:
+          ctx.providerKey == ctx.assistantMessage.providerId &&
+              ctx.modelId == ctx.assistantMessage.modelId
+          ? chatService.getProviderArtifact(
+              ctx.assistantMessage.id,
+              claudeTurnArtifactKind,
+            )
+          : null,
+    );
     _streamingStates[state.messageId] = state;
     final assistant = ctx.assistant;
     final conversationId = state.conversationId;
@@ -2161,6 +2196,10 @@ class ChatActions {
               toolName: name,
             );
             try {
+              if (!ctx.streamOutput) {
+                await _checkpointWriters[state.messageId]?.barrier();
+                ToolCallCancellation.current?.throwIfCancelled();
+              }
               return await toolHandler(name, args, toolCallId: toolCallId);
             } finally {
               _scheduleBackgroundGenerationUpdate(state);
@@ -2200,72 +2239,6 @@ class ChatActions {
       }
 
       state.requestStartedAt = DateTime.now();
-      if (!ctx.streamOutput) {
-        try {
-          final result = await ChatApiService.generateMessage(
-            config: ctx.config,
-            modelId: ctx.modelId,
-            messages: ctx.apiMessages,
-            userImagePaths: ctx.userImagePaths,
-            reasoning: selectReasoningRequest(
-              settings: ctx.settings,
-              config: ctx.config,
-              modelId: ctx.modelId,
-              assistant: assistant,
-            ),
-            temperature: assistant?.temperature,
-            topP: assistant?.topP,
-            maxTokens: assistant?.maxTokens,
-            tools: ctx.toolDefs.isEmpty ? null : ctx.toolDefs,
-            onToolCall: onToolCall,
-            extraHeaders: ctx.extraHeaders,
-            extraBody: ctx.extraBody,
-            requestId: conversationId,
-            conversationId: conversationId,
-            allowImagesApiRouting: ctx.allowImagesApiRouting,
-            ocrActive: ctx.ocrActive,
-            parseMarkdownImageLinks:
-                ctx.settings.sendMarkdownImageLinksAsImages,
-            onRetry: (pending) => _setRetryStatus(state, pending),
-            onUsage: (update) {
-              state.partsHandler.handle(update);
-              _applyUsage(state);
-              _scheduleStreamingCheckpoint(state);
-            },
-          );
-          state.finishRequestTiming();
-          _setRetryStatus(state, null);
-          await _markGenerationStreaming(state);
-          state.partsHandler.handleResult(result);
-          state.fullContentRaw = [
-            for (final part in state.partsHandler.parts)
-              if (part is TextPart) part.text,
-          ].join();
-          state.bufferedReasoning = [
-            for (final part in state.partsHandler.parts)
-              if (part is ReasoningPart && part.text.isNotEmpty) part.text,
-          ].join();
-          _applyUsage(state);
-          if (result.reasoningDetails != null) {
-            streamController.setReasoningDetails(
-              state.messageId,
-              result.reasoningDetails,
-            );
-          }
-          await _handleStreamFinish(state);
-        } catch (e) {
-          _setRetryStatus(state, null);
-          if (isCancelledGenerationError(
-            e,
-            requestCancelled: isStopping(conversationId),
-          )) {
-            return;
-          }
-          await _handleStreamError(e, state);
-        }
-        return;
-      }
-
       final stream = ChatApiService.sendMessageStream(
         config: ctx.config,
         modelId: ctx.modelId,
@@ -2284,12 +2257,23 @@ class ChatActions {
         onToolCall: onToolCall,
         extraHeaders: ctx.extraHeaders,
         extraBody: ctx.extraBody,
+        stream: ctx.streamOutput,
         requestId: conversationId,
         conversationId: conversationId,
         allowImagesApiRouting: ctx.allowImagesApiRouting,
         ocrActive: ctx.ocrActive,
         parseMarkdownImageLinks: ctx.settings.sendMarkdownImageLinksAsImages,
       );
+
+      if (!ctx.streamOutput) {
+        // HTTP JSON responses still emit tool rounds. Consume them as they
+        // arrive so a paused tool has a durable transcript before it resumes.
+        await for (final chunk in stream) {
+          await _handleStreamChunk(chunk, state);
+        }
+        await _handleStreamDone(state);
+        return;
+      }
 
       final sub = listenSequentiallyToStream<StreamChunk>(
         stream: stream,
@@ -2348,6 +2332,9 @@ class ChatActions {
       case ToolCallEnd():
         await _handleToolCallsChunk(chunk, state);
         _scheduleStreamingCheckpoint(state);
+      case AssistantRoundEnd():
+        streamController.reasoningDetails.remove(state.messageId);
+        _scheduleStreamingCheckpoint(state);
       case ServerToolStart(:final id, :final toolName):
         if (toolName.isNotEmpty) state.pendingToolNames[id] = toolName;
         await _handleToolCallsChunk(chunk, state);
@@ -2358,8 +2345,8 @@ class ChatActions {
       case Usage():
         _applyUsage(state);
         _scheduleStreamingCheckpoint(state);
-      case ProviderArtifact(:final kind, :final payload):
-        await chatService.setProviderArtifact(state.messageId, kind, payload);
+      case ProviderArtifact():
+        await _persistProviderArtifact(state, chunk);
       case Finish():
         await _handleStreamFinish(state);
       case ImageStart() ||
@@ -2378,6 +2365,25 @@ class ChatActions {
         break;
     }
   }
+
+  Future<void> _persistProviderArtifact(
+    stream_ctrl.StreamingState state,
+    ProviderArtifact artifact,
+  ) => chatService.setProviderArtifact(
+    state.messageId,
+    artifact.kind,
+    switch (artifact.kind) {
+      responsesTurnArtifactKind => appendResponsesTurn(
+        state.responsesTurnPrefix,
+        artifact.payload,
+      ),
+      claudeTurnArtifactKind => appendClaudeTurn(
+        state.claudeTurnPrefix,
+        artifact.payload,
+      ),
+      _ => artifact.payload,
+    },
+  );
 
   void _applyUsage(stream_ctrl.StreamingState state) {
     state.usage = state.partsHandler.usage;
@@ -2552,6 +2558,13 @@ class ChatActions {
   Future<void> _handleStreamFinish(stream_ctrl.StreamingState state) async {
     final messageId = state.messageId;
     final conversationId = state.conversationId;
+    if (!state.ctx.streamOutput) {
+      // A resumed reply also owns the reasoning from its earlier rounds.
+      state.bufferedReasoning = state.partsHandler.parts
+          .whereType<ReasoningPart>()
+          .map((part) => part.text)
+          .join();
+    }
     final autoCollapseThinking =
         (!state.ctx.streamOutput && state.bufferedReasoning.isNotEmpty)
         ? contextProvider.read<SettingsProvider>().autoCollapseThinking

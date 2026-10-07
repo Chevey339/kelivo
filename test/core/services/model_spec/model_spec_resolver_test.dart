@@ -6,6 +6,7 @@ import 'package:http/testing.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:Kelivo/core/models/model_spec.dart';
+import 'package:Kelivo/core/models/provider_oauth.dart';
 import 'package:Kelivo/core/providers/settings_provider.dart';
 import 'package:Kelivo/core/services/api/reasoning/reasoning_dialects.dart';
 import 'package:Kelivo/core/services/model_catalog/catalog_entry.dart';
@@ -243,7 +244,7 @@ void main() {
 
     test('replay comes from catalog interleavedField', () {
       final resolved = resolver.resolve(_anthropic(), 'claude-sonnet-4.6');
-      expect(resolved.spec.reasoning.replay, ReasoningReplayPolicy.toolTurns);
+      expect(resolved.spec.reasoning.replay, ReasoningReplayPolicy.all);
       expect(
         resolved.spec.reasoning.replayField,
         ReasoningReplayField.reasoningContent,
@@ -261,7 +262,7 @@ void main() {
         resolved.sources[ModelSpecField.reasoningDialect],
         SpecSource.vendor,
       );
-      expect(resolved.spec.reasoning.replay, ReasoningReplayPolicy.toolTurns);
+      expect(resolved.spec.reasoning.replay, ReasoningReplayPolicy.all);
       expect(
         resolved.spec.reasoning.replayField,
         ReasoningReplayField.reasoningContent,
@@ -271,6 +272,69 @@ void main() {
         SpecSource.guess,
       );
     });
+
+    test('supported replay defaults to all and explicit overrides win', () {
+      for (final target in [
+        (config: _deepseek(), model: 'deepseek-v4-pro'),
+        (config: _openai(), model: 'kimi-k2.6'),
+        (config: _openai(), model: 'glm-5.2'),
+        (config: _anthropic(), model: 'claude-sonnet-4.6'),
+        (config: _openai().copyWith(useResponseApi: true), model: 'gpt-5.1'),
+        (
+          config: _openai().copyWith(oauthProvider: OAuthProvider.chatgpt),
+          model: 'gpt-5.1',
+        ),
+      ]) {
+        for (final policy in [
+          ReasoningReplayPolicy.none,
+          ReasoningReplayPolicy.toolTurns,
+        ]) {
+          final config = target.config.copyWith(
+            modelOverrides: {
+              target.model: {
+                'reasoning': {'replay': policy.name},
+              },
+            },
+          );
+          final resolved = resolver.resolve(config, target.model);
+          expect(resolved.spec.reasoning.replay, policy);
+          expect(resolved.base.reasoning.replay, ReasoningReplayPolicy.all);
+          expect(
+            resolved.sources[ModelSpecField.reasoningReplay],
+            SpecSource.override,
+          );
+        }
+      }
+      // Chat Completions GPT does not accept the third-party reasoning field.
+      expect(
+        resolver.spec(_openai(), 'gpt-5.1').reasoning.replay,
+        ReasoningReplayPolicy.none,
+      );
+    });
+
+    test(
+      'Kimi OAuth protocol is resolved per model without changing saved config',
+      () {
+        final config = _openai().copyWith(
+          oauthProvider: OAuthProvider.kimi,
+          modelOverrides: {
+            'kimi-for-coding': {'oauthProtocol': 'anthropic'},
+            'kimi-k2.5': {'oauthProtocol': 'openai'},
+          },
+        );
+        expect(
+          resolver.spec(config, 'kimi-for-coding').reasoning.dialect,
+          ReasoningDialect.anthropicBudget,
+        );
+        expect(config.providerType, ProviderKind.openai);
+        expect(config.forModelProtocol('kimi-k2.5'), same(config));
+        expect(config.forModelProtocol('unknown'), same(config));
+        final ordinary = _openai().copyWith(
+          modelOverrides: config.modelOverrides,
+        );
+        expect(ordinary.forModelProtocol('kimi-for-coding'), same(ordinary));
+      },
+    );
 
     test('sparse reasoning override leaves catalog levels intact', () {
       final ov = <String, dynamic>{
@@ -297,7 +361,7 @@ void main() {
         resolved.sources[ModelSpecField.reasoningLevels],
         SpecSource.catalog,
       );
-      expect(resolved.base.reasoning.replay, ReasoningReplayPolicy.toolTurns);
+      expect(resolved.base.reasoning.replay, ReasoningReplayPolicy.all);
     });
 
     test('base has no override while spec does', () {

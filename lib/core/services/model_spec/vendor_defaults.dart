@@ -41,7 +41,14 @@ class VendorDefaults {
     ReasoningDialect? dialect;
     List<ReasoningLevel>? levels;
     bool? canDisable;
-    ReasoningReplayPolicy? replay;
+    // Native Responses items can be replayed even when the corresponding
+    // Chat Completions model has no supported raw reasoning field.
+    ReasoningReplayPolicy? replay =
+        kind == ProviderKind.openai &&
+            (cfg.useResponseApi == true ||
+                cfg.oauthProvider == OAuthProvider.chatgpt)
+        ? ReasoningReplayPolicy.all
+        : null;
     ReasoningReplayField? replayField;
     var maxTokensKey = 'max_tokens';
 
@@ -63,7 +70,7 @@ class VendorDefaults {
         protocolDefault: protocolDefault,
         maxTokensKey: maxTokensKey,
         sendStreamOptions: sendStreamOptions,
-        replay: ReasoningReplayPolicy.toolTurns,
+        replay: ReasoningReplayPolicy.all,
         replayField: ReasoningReplayField.reasoningContent,
       );
     }
@@ -80,6 +87,7 @@ class VendorDefaults {
         protocolDefault: protocolDefault,
         maxTokensKey: maxTokensKey,
         sendStreamOptions: sendStreamOptions,
+        replay: ReasoningReplayPolicy.all,
       );
     }
 
@@ -90,6 +98,7 @@ class VendorDefaults {
         protocolDefault: protocolDefault,
         maxTokensKey: maxTokensKey,
         sendStreamOptions: sendStreamOptions,
+        replay: ReasoningReplayPolicy.all,
       );
     }
 
@@ -107,7 +116,7 @@ class VendorDefaults {
         host.contains('bigmodel') ||
         host == 'api.z.ai') {
       dialect = ReasoningDialect.thinkingType;
-      replay = ReasoningReplayPolicy.toolTurns;
+      replay = ReasoningReplayPolicy.all;
       replayField = ReasoningReplayField.reasoningContent;
     } else if (host.contains('ark.cn-beijing.volces.com') ||
         host.contains('volc') ||
@@ -115,7 +124,7 @@ class VendorDefaults {
       dialect = ReasoningDialect.thinkingType;
     } else if (host.contains('deepseek')) {
       dialect = ReasoningDialect.thinkingType;
-      replay = ReasoningReplayPolicy.toolTurns;
+      replay = ReasoningReplayPolicy.all;
       replayField = ReasoningReplayField.reasoningContent;
     } else if (host.contains('intern-ai') ||
         host.contains('intern') ||
@@ -127,7 +136,7 @@ class VendorDefaults {
       replayField = ReasoningReplayField.reasoningContent;
     } else if (isMimoHost) {
       dialect = ReasoningDialect.thinkingType;
-      replay = ReasoningReplayPolicy.toolTurns;
+      replay = ReasoningReplayPolicy.all;
       replayField = ReasoningReplayField.reasoningContent;
     } else if (host == 'api.kimi.com' ||
         host == 'api.moonshot.ai' ||

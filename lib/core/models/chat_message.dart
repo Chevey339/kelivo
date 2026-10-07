@@ -1,6 +1,7 @@
 import 'package:hive/hive.dart';
 import 'package:uuid/uuid.dart';
 
+import '../../utils/utf16_safe_cut.dart';
 import 'message_part.dart';
 import 'token_usage.dart';
 
@@ -171,9 +172,9 @@ class ChatMessage extends HiveObject {
 
   /// Content-only rewrite that keeps each [TextPart] slot.
   ///
-  /// Earlier text parts keep their original lengths as split points; the last
-  /// [TextPart] receives the remainder so interleaved tool / image / reasoning
-  /// cards stay in place.
+  /// Original cumulative text lengths define the split points, adjusted to
+  /// keep surrogate pairs whole. The last [TextPart] receives the remainder
+  /// so interleaved tool / image / reasoning cards stay in place.
   static List<MessagePart> partsWithRedistributedText(
     List<MessagePart> original,
     String newContent,
@@ -185,27 +186,15 @@ class ChatMessage extends HiveObject {
     if (lengths.length <= 1) {
       return partsWithReplacedText(original, newContent);
     }
+    final texts = redistributeTextUtf16Safe(newContent, lengths);
     final next = <MessagePart>[];
-    var offset = 0;
     var textIndex = 0;
     for (final part in original) {
-      if (part is! TextPart) {
+      if (part is TextPart) {
+        next.add(TextPart(texts[textIndex++]));
+      } else {
         next.add(part);
-        continue;
       }
-      final remaining = newContent.length - offset;
-      final isLast = textIndex == lengths.length - 1;
-      final take = isLast
-          ? remaining
-          : (lengths[textIndex] < remaining ? lengths[textIndex] : remaining);
-      final end = offset + (take < 0 ? 0 : take);
-      next.add(
-        TextPart(
-          offset >= newContent.length ? '' : newContent.substring(offset, end),
-        ),
-      );
-      offset = end;
-      textIndex++;
     }
     return next;
   }

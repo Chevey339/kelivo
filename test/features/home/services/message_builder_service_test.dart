@@ -1280,7 +1280,7 @@ void main() {
       expect(apiMessages.last['content'], 'message-1506');
     });
 
-    test('上下文裁剪不会保留缺少 tool result 的 assistant tool call', () {
+    test('上下文裁剪回退到工具轮次的 user 起点', () {
       final service = MessageBuilderService(
         chatService: _FakeChatService({}),
         contextProvider: _FakeBuildContext(),
@@ -1320,13 +1320,16 @@ void main() {
 
       expect(
         apiMessages.where((message) => message['tool_calls'] is List),
-        isEmpty,
+        hasLength(1),
       );
       expect(
         apiMessages.where((message) => message['role'] == 'tool'),
-        isEmpty,
+        hasLength(1),
       );
       expect(apiMessages.map((message) => message['content']).toList(), [
+        'before',
+        '\n\n',
+        'ok',
         'done',
         'next',
       ]);
@@ -1379,6 +1382,7 @@ void main() {
         hasLength(1),
       );
       expect(apiMessages.map((message) => message['role']).toList(), [
+        'user',
         'assistant',
         'tool',
         'assistant',

@@ -220,8 +220,12 @@ void main() {
       'kimi-for-coding',
       'kimi-for-coding-highspeed',
       'moonshotai/kimi-k2.8-preview',
+      'kimi-k2-thinking',
+      'kimi-k2.5',
+      'kimi-k2.6',
+      'kimi-k2.7',
     ]) {
-      test('$modelId replays ordinary history on Kimi Code', () async {
+      test('$modelId replays ordinary history by default', () async {
         final body = await _captureMoonshotBody(
           modelId: modelId,
           providerId: 'Kimi Code',

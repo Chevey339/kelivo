@@ -13,6 +13,46 @@ import 'package:flutter_test/flutter_test.dart';
 SseEvent _event(Map<String, dynamic> data) => SseEvent(data: jsonEncode(data));
 
 void main() {
+  test('completed reasoning items outlive reduced terminal snapshots', () {
+    final decoder = ResponsesStreamDecoder();
+    decoder.accept(
+      _event({
+        'type': 'response.output_item.added',
+        'output_index': 0,
+        'item': {
+          'type': 'reasoning',
+          'id': 'rs_1',
+          'encrypted_content': 'partial',
+        },
+      }),
+    );
+    expect(decoder.outputItems, isEmpty);
+    const completed = {
+      'type': 'reasoning',
+      'id': 'rs_1',
+      'summary': <Object>[],
+      'encrypted_content': 'complete',
+    };
+    decoder.accept(
+      _event({
+        'type': 'response.output_item.done',
+        'output_index': 0,
+        'item': completed,
+      }),
+    );
+    decoder.accept(
+      _event({
+        'type': 'response.completed',
+        'response': {
+          'output': [
+            {'type': 'reasoning', 'id': 'rs_1'},
+          ],
+        },
+      }),
+    );
+    expect(decoder.outputItems, [completed]);
+  });
+
   test('streams text and reasoning and completes without Finish', () {
     final decoder = ResponsesStreamDecoder();
     final reasoning = decoder.accept(

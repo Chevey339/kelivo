@@ -28,6 +28,8 @@ import 'generation_run.dart';
 import 'generation_run_commands.dart';
 import 'schema_migrations.dart';
 import '../services/api/stream/stream_chunk_handler.dart';
+import '../services/api/providers/claude/claude_thinking_recovery.dart';
+import '../services/api/providers/claude/claude_history.dart';
 import '../services/backup/restore_durability.dart';
 import '../services/backup/restore_previous_plan.dart';
 
@@ -5047,6 +5049,30 @@ class ChatDatabaseRepository {
           .into(_db.messageRows)
           .insert(_messageCompanion(message, order), mode: InsertMode.insert);
       await _replaceMessageParts(message);
+      // Recovery belongs to the selected history, even after editing its text.
+      // Body edits retain Claude's native response boundaries. Explicit part
+      // replacements may intentionally remove thinking/tools and must not
+      // inherit an artifact that would restore them on the next request.
+      final preserveArtifacts = parts == null && content == original.content;
+      final artifacts = await (_db.select(
+        _db.providerArtifactRows,
+      )..where((row) => row.revisionId.equals(messageId))).get();
+      for (final artifact in artifacts) {
+        final payload =
+            preserveArtifacts ||
+                artifact.kind == claudeThinkingRecoveryArtifactKind
+            ? artifact.payload
+            : parts == null && artifact.kind == claudeTurnArtifactKind
+            ? editClaudeTurnText(
+                artifact.payload,
+                content,
+                originalContent: original.content,
+              )
+            : null;
+        if (payload != null) {
+          await _upsertProviderArtifact(message.id, artifact.kind, payload);
+        }
+      }
       await (_db.update(_db.conversationRows)
             ..where((row) => row.id.equals(conversation.id)))
           .write(_conversationCompanion(conversation));

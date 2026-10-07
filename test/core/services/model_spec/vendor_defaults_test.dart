@@ -59,6 +59,7 @@ void main() {
       );
       expect(claude.protocolDefault, ReasoningDialect.anthropicBudget);
       expect(claude.dialect, isNull);
+      expect(claude.replay, ReasoningReplayPolicy.all);
 
       final google = VendorDefaults.forProvider(
         _cfg(
@@ -175,6 +176,7 @@ void main() {
         ReasoningLevel.high,
       ]);
       expect(byHost.canDisable, isTrue);
+      expect(byHost.replay, ReasoningReplayPolicy.all);
 
       final byOauth = VendorDefaults.forProvider(
         _cfg(
@@ -205,7 +207,7 @@ void main() {
       ]);
       expect(defaults.canDisable, isFalse);
       expect(defaults.protocolDefault, ReasoningDialect.anthropicBudget);
-      expect(defaults.replay, ReasoningReplayPolicy.toolTurns);
+      expect(defaults.replay, ReasoningReplayPolicy.all);
     });
 
     test('max tokens key and stream options', () {
@@ -252,19 +254,19 @@ void main() {
         VendorDefaults.forProvider(
           _cfg(id: 'DeepSeek', baseUrl: 'https://api.deepseek.com/v1'),
         ).replay,
-        ReasoningReplayPolicy.toolTurns,
+        ReasoningReplayPolicy.all,
       );
       expect(
         VendorDefaults.forProvider(
           _cfg(id: 'Zhipu', baseUrl: 'https://open.bigmodel.cn/api/paas/v4'),
         ).replay,
-        ReasoningReplayPolicy.toolTurns,
+        ReasoningReplayPolicy.all,
       );
       expect(
         VendorDefaults.forProvider(
           _cfg(id: 'MiMo', baseUrl: 'https://api.xiaomimimo.com/v1'),
         ).replay,
-        ReasoningReplayPolicy.toolTurns,
+        ReasoningReplayPolicy.all,
       );
     });
   });
