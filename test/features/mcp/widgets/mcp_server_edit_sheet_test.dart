@@ -71,7 +71,7 @@ void main() {
         expect(provider.getById('guest')!.oauthClient, isNull);
         expect(
           provider.getById('guest')!.oauthRedirectUri,
-          'http://127.0.0.1:0/callback',
+          'http://localhost:0/callback',
         );
         await tester.pumpWidget(const SizedBox.shrink());
       },

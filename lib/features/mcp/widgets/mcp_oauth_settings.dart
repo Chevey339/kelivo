@@ -145,7 +145,7 @@ class McpOAuthSettings extends StatefulWidget {
 }
 
 class _McpOAuthSettingsState extends State<McpOAuthSettings> {
-  static const _redirectExample = 'http://127.0.0.1:0/callback';
+  static const _redirectExample = 'http://localhost:0/callback';
 
   late bool expanded =
       widget.controller.mode != McpOAuthRegistrationMode.automatic ||
