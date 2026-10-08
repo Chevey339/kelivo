@@ -13,6 +13,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:xml/xml.dart';
 
 import '../../database/business_repository.dart';
+import '../../database/backup_content_filter.dart';
 import '../../database/business_preferences.dart';
 import '../../database/business_restore_service.dart';
 import '../../database/business_settings_router.dart';
@@ -93,6 +94,7 @@ typedef _VersionedBackupInfo = ({
   bool includeChats,
   bool includeFiles,
   bool secretsIncluded,
+  BackupScope scope,
   Map<String, Object?>? businessEntityRowIds,
   String normalizedManifestSha256,
 });
@@ -253,7 +255,7 @@ typedef _BackupDatabaseSource =
 
 class DataSync {
   static const _backupFormat = 'kelivo-backup';
-  static const _backupFormatVersion = 2;
+  static const _backupFormatVersion = 3;
 
   /// Manifest key naming the oldest archive format that can still read a
   /// backup this build writes.
@@ -272,7 +274,7 @@ class DataSync {
   /// field, anything an older build would MISREAD rather than merely fail to
   /// recognise. Leaving it behind on a purely additive change is what lets
   /// tomorrow's backups still restore into today's build.
-  static const _minimumReadableFormatVersion = 2;
+  static const _minimumReadableFormatVersion = 3;
   static const _manifestEntryName = 'manifest.json';
   static const _databaseEntryName = 'database/kelivo.db';
 
@@ -328,6 +330,7 @@ class DataSync {
     required bool includeFiles,
     required bool restoreChats,
     required bool restoreFiles,
+    BackupScope scope = const BackupScope(),
     Map<String, dynamic>? validatedSettings,
     BackupProgressSink? onProgress,
     BackupCancelToken? cancelToken,
@@ -339,6 +342,7 @@ class DataSync {
     bundleIncludesFiles: includeFiles,
     restoreChats: restoreChats,
     restoreFiles: restoreFiles,
+    scope: scope,
     validatedSettings: validatedSettings,
     onProgress: onProgress,
     cancelToken: cancelToken,
@@ -573,9 +577,11 @@ class DataSync {
     BackupProgressSink? onProgress,
     BackupCancelToken? cancelToken,
   }) async => (await _prepareBackupArchive(
-    includeChats: cfg.includeChats,
-    includeFiles: cfg.includeFiles,
-    exportSettings: _exportBusinessSettings,
+    includeChats: cfg.scope.includes(BackupCategory.chats),
+    includeFiles: cfg.scope.assetRoots.isNotEmpty,
+    scope: cfg.scope,
+    exportSettings: () =>
+        exportBusinessSettingsFrom(businessRepository, scope: cfg.scope),
     snapshotDatabase: (destination) => chatService.createBackupDatabaseSnapshot(
       destination,
       onProgress: onProgress,
@@ -615,6 +621,7 @@ class DataSync {
   Future<PreparedBackupArchive> _prepareBackupArchive({
     required bool includeChats,
     required bool includeFiles,
+    BackupScope scope = const BackupScope(),
     required _BackupSettingsSource exportSettings,
     required _BackupDatabaseSource snapshotDatabase,
     BackupProgressSink? onProgress,
@@ -670,7 +677,7 @@ class DataSync {
         );
         snapshotInfo = await snapshotDatabase(databaseFile);
         publishedDraftFiles = _publishedDraftFilesFrom(databaseFile);
-        await _sanitizeBackupDatabase(databaseFile);
+        await _sanitizeBackupDatabase(databaseFile, scope: scope);
       }
 
       if (!includeChats && includeFiles) {
@@ -717,6 +724,7 @@ class DataSync {
           includeFiles: includeFiles,
           appVersion: appVersion,
           businessEntityRowIds: businessExport.entityRowIds,
+          scope: scope,
           assetRootPaths: assetRootPaths,
           publishedDraftFiles: publishedDraftFiles,
         ),
@@ -1025,6 +1033,7 @@ class DataSync {
       includeFiles: args.includeFiles,
       appVersion: args.appVersion,
       businessEntityRowIds: args.businessEntityRowIds,
+      scope: args.scope,
       assetRootPaths: args.assetRootPaths,
       publishedDraftFiles: args.publishedDraftFiles,
       ctx: ctx,
@@ -1061,6 +1070,7 @@ class DataSync {
     required bool includeFiles,
     required String appVersion,
     required Map<String, List<String>> businessEntityRowIds,
+    required BackupScope scope,
     required Map<String, String> assetRootPaths,
     Set<String> publishedDraftFiles = const {},
     BackupIsolateContext? ctx,
@@ -1075,7 +1085,7 @@ class DataSync {
     }
     final assetFiles = includeFiles
         ? {
-            for (final name in _assetRootNames)
+            for (final name in scope.assetRoots)
               name: _listFilesSync(assetRootPaths[name]!).where((file) {
                 if (!RegExp(
                   r'^draft-[0-9a-f-]{36}-[0-9]+',
@@ -1127,7 +1137,7 @@ class DataSync {
       }
 
       if (includeFiles) {
-        for (final name in _assetRootNames) {
+        for (final name in scope.assetRoots) {
           _addDirectoryToZip(
             writer,
             assetRootPaths[name]!,
@@ -1146,6 +1156,7 @@ class DataSync {
         includeFiles: includeFiles,
         appVersion: appVersion,
         businessEntityRowIds: businessEntityRowIds,
+        scope: scope,
       );
       final manifestFile = File(manifestPath)
         ..writeAsStringSync(manifestJson, flush: true);
@@ -1761,8 +1772,9 @@ class DataSync {
 
   /// Whether this build may read an archive of the manifest's format version.
   ///
-  /// An exact match, plus one relaxation: a NEWER archive that vouches for us
-  /// through [backupMinimumReadableFormatKey]. An undeclared newer archive is
+  /// Reads the original SQLite archive and the current scoped format, plus a
+  /// newer archive that vouches for us through [backupMinimumReadableFormatKey].
+  /// An undeclared newer archive is
   /// refused -- unlike the database axis there are no undeclared newer
   /// archives in the wild to serve, since every build that can write a newer
   /// format also writes the declaration, so refusing costs nothing and keeps
@@ -1770,8 +1782,10 @@ class DataSync {
   static bool _acceptsArchiveFormat(Map<String, dynamic> manifest) {
     final formatVersion = manifest['formatVersion'];
     if (formatVersion is! int) return false;
-    if (formatVersion == _backupFormatVersion) return true;
-    // Older archive formats were never supported and still are not.
+    if (formatVersion == 2 || formatVersion == _backupFormatVersion) {
+      return true;
+    }
+    // Formats predating the SQLite archive are unsupported.
     if (formatVersion < _backupFormatVersion) return false;
     final declared = manifest[backupMinimumReadableFormatKey];
     return declared is int && declared >= 1 && declared <= _backupFormatVersion;
@@ -1812,6 +1826,7 @@ class DataSync {
     'includeFiles',
     'secretsIncluded',
     'businessEntityRowIds',
+    'scope',
     'database',
     'entries',
   };
@@ -2098,6 +2113,7 @@ class DataSync {
     required bool includeFiles,
     required String appVersion,
     required Map<String, List<String>> businessEntityRowIds,
+    required BackupScope scope,
   }) {
     return jsonEncode({
       'format': _backupFormat,
@@ -2110,6 +2126,7 @@ class DataSync {
       'includeFiles': includeFiles,
       'secretsIncluded': true,
       'businessEntityRowIds': businessEntityRowIds,
+      'scope': scope.toJson(),
       if (snapshotInfo != null)
         'database': {
           'entry': _databaseEntryName,
@@ -2172,6 +2189,18 @@ class DataSync {
       throw const FormatException('manifest_fields');
     }
     final businessEntityRowIds = _parseBusinessEntityRowIds(manifest);
+    if (manifest['formatVersion'] == _backupFormatVersion) {
+      final declaredScope = manifest['scope'];
+      if (declaredScope is! Map ||
+          BackupCategory.values.any(
+            (category) => declaredScope[category.name] is! bool,
+          )) {
+        throw const FormatException('manifest_scope');
+      }
+    }
+    final scope = manifest.containsKey('scope')
+        ? BackupScope.fromJson(manifest['scope'])
+        : const BackupScope(excluded: {BackupCategory.environmentVariables});
 
     final rawEntries = manifest['entries'];
     if (rawEntries is! Map) {
@@ -2373,6 +2402,7 @@ class DataSync {
       includeChats: includeChats,
       includeFiles: includeFiles,
       secretsIncluded: true,
+      scope: scope,
       businessEntityRowIds: businessEntityRowIds,
       normalizedManifestSha256: normalizedManifestSha256,
     );
@@ -2472,17 +2502,21 @@ class DataSync {
     }
   }
 
-  /// Copies the backup's asset payload directories into the live directories
-  /// without deleting anything already present, so files referenced by an
-  /// untouched chat database survive.
-  Future<void> _restoreAssetDirectoriesAdditive(
+  /// Ordinary attachments merge additively so untouched chats keep their files.
+  /// Skill and workspace roots can instead be replaced with their selected data.
+  Future<void> _restoreAssetDirectories(
     Directory payloadDirectory, {
+    required Set<String> assetRoots,
+    Set<String> overwriteRoots = const {},
     Map<String, String> remappedConversationIds = const {},
   }) async {
-    for (final name in _assetRootNames) {
+    for (final name in assetRoots) {
       final src = Directory(p.join(payloadDirectory.path, name));
-      if (!await src.exists()) continue;
       final dst = await _liveAssetRoot(name);
+      if (overwriteRoots.contains(name) && await dst.exists()) {
+        await dst.delete(recursive: true);
+      }
+      if (!await src.exists()) continue;
       if (!await dst.exists()) {
         await dst.create(recursive: true);
       }
@@ -2994,23 +3028,29 @@ class DataSync {
 
   /// The settings half of a backup, read from whichever repository is given.
   static Future<({String settingsJson, Map<String, List<String>> entityRowIds})>
-  exportBusinessSettingsFrom(BusinessRepository repository) async {
+  exportBusinessSettingsFrom(
+    BusinessRepository repository, {
+    BackupScope scope = const BackupScope(),
+  }) async {
     final exported = BusinessSettingsRouter.exportSnapshotWithRowIds(
       BackupPortability.portable(await repository.readSnapshot()),
     );
-    final settings = Map<String, Object>.from(exported.settings);
+    final settings = BackupContentFilter.select(exported.settings, scope);
     settings.removeWhere((key, _) => BackupSettingsValidator.shouldIgnore(key));
     BackupSettingsValidator.retainCloudAsrForExport(settings);
     return (
       settingsJson: jsonEncode(settings),
-      entityRowIds: exported.entityRowIds,
+      entityRowIds: BackupContentFilter.select(exported.entityRowIds, scope),
     );
   }
 
-  static Future<void> _sanitizeBackupDatabase(File file) async {
+  static Future<void> _sanitizeBackupDatabase(
+    File file, {
+    BackupScope scope = const BackupScope(),
+  }) async {
     final database = AppDatabase.open(file: file);
     try {
-      await BackupPortability.sanitizeDatabase(database);
+      await BackupPortability.sanitizeDatabase(database, scope: scope);
       for (final sql in MessageTimelineIndex.discardStatements) {
         await database.customStatement(sql);
       }
@@ -3133,7 +3173,23 @@ class DataSync {
         cancelToken: cancelToken,
         onProgress: onProgress,
       );
+      final scope = cfg.scope.intersect(
+        versionedBackup?.scope ??
+            BackupScope(
+              excluded: {
+                if (!settings.containsKey('environment_variables_v1'))
+                  BackupCategory.environmentVariables,
+              },
+            ),
+      );
+      settings.removeWhere(
+        (key, _) => !scope.includes(BackupContentFilter.categoryForKey(key)),
+      );
       BackupSettingsValidator.normalizeAndValidate(settings);
+      final selectedAssetRoots = versionedBackup?.includeFiles == false
+          ? <String>{}
+          : scope.assetRoots;
+      final restoreAttachments = selectedAssetRoots.contains('upload');
       void beginNonCancellableCommit() {
         if (cancelToken?.isCancelled == true) {
           throw const BackupCancelledException();
@@ -3151,35 +3207,41 @@ class DataSync {
       final businessRestore = BusinessRestoreService(businessRepository);
       Future<void> Function()? pendingBusinessRestore;
       if (versionedBackup != null) {
-        final entityRowIds = versionedBackup.businessEntityRowIds;
+        final entityRowIds = versionedBackup.businessEntityRowIds == null
+            ? null
+            : BackupContentFilter.select(
+                versionedBackup.businessEntityRowIds!,
+                scope,
+              );
         final preserveExplicitEmptyInstructionList = entityRowIds == null;
         final includeChats = versionedBackup.includeChats;
         final includeFiles = versionedBackup.includeFiles;
-        final restoreChats = cfg.includeChats && includeChats;
-        final restoreFiles = cfg.includeFiles && includeFiles;
-        if (mode == RestoreMode.merge && restoreChats) {
-          // Chat merge commits independently, so reject a mismatched business
-          // payload before either live domain is changed.
-          BusinessSettingsRouter.normalizeAndRoute(
-            settings,
-            preserveExplicitEmptyInstructionList:
-                preserveExplicitEmptyInstructionList,
-            entityRowIds: entityRowIds,
-          );
-        }
+        final restoreChats =
+            scope.includes(BackupCategory.chats) && includeChats;
+        final restoreFiles = selectedAssetRoots.isNotEmpty;
+        // Validate selected business data before changing any live files or chats.
+        BusinessSettingsRouter.normalizeAndRoute(
+          settings,
+          preserveExplicitEmptyInstructionList:
+              preserveExplicitEmptyInstructionList,
+          entityRowIds: entityRowIds,
+        );
         if (mode == RestoreMode.overwrite) {
           if (!restoreChats) {
             beginNonCancellableCommit();
             if (restoreFiles) {
-              // File restore is independent from chat restore. The live
-              // database stays untouched here, so copy the payload
-              // additively (never deleting existing files it references)
-              // and persist business data last, matching the legacy path.
-              await _restoreAssetDirectoriesAdditive(extractDir);
+              // Preserve attachments used by untouched chats. Replace selected
+              // skill/workspace directories together with their business rows.
+              await _restoreAssetDirectories(
+                extractDir,
+                assetRoots: selectedAssetRoots,
+                overwriteRoots: const {'skills', 'workspaces'},
+              );
             }
             await _runLiveBusinessRestore(
               () => businessRestore.overwrite(
                 settings,
+                scope: scope,
                 preserveExplicitEmptyInstructionList:
                     preserveExplicitEmptyInstructionList,
                 entityRowIds: entityRowIds,
@@ -3193,23 +3255,29 @@ class DataSync {
           if (cancelToken?.isCancelled == true) {
             throw const BackupCancelledException();
           }
-          await _prepareRestoreBundle(
-            appDataPath: appDataPath,
-            extractedPath: extractedPath,
-            sourceManifestSha256: sourceManifestSha256,
-            includeChats: includeChats,
-            includeFiles: includeFiles,
-            restoreChats: restoreChats,
-            restoreFiles: restoreFiles,
-            validatedSettings: settings,
-            onProgress: onProgress,
-            cancelToken: cancelToken,
+          // Drain accepted business writes before preserving unselected data,
+          // then keep writers fenced until the required restart.
+          await _runLiveBusinessRestore(
+            () => _prepareRestoreBundle(
+              appDataPath: appDataPath,
+              extractedPath: extractedPath,
+              sourceManifestSha256: sourceManifestSha256,
+              includeChats: includeChats,
+              includeFiles: includeFiles,
+              restoreChats: restoreChats,
+              restoreFiles: restoreFiles,
+              validatedSettings: settings,
+              scope: scope,
+              onProgress: onProgress,
+              cancelToken: cancelToken,
+            ),
           );
           return;
         }
         if (restoreChats) {
           await _sanitizeBackupDatabase(
             File(p.join(extractDir.path, _databaseEntryName)),
+            scope: scope,
           );
           beginNonCancellableCommit();
           _lastMergeReport = await chatService.mergeDatabaseSnapshot(
@@ -3217,7 +3285,7 @@ class DataSync {
           );
           // Chats-only: never leave local attachments marked available when
           // files were not restored (path collision on target is insufficient).
-          if (!restoreFiles && _lastMergeReport != null) {
+          if (!restoreAttachments && _lastMergeReport != null) {
             await chatService.recomputeImportedAttachmentAvailability(
               conversationIds: _lastMergeReport!.importedConversationIds,
               filesRestored: false,
@@ -3226,6 +3294,7 @@ class DataSync {
         }
         pendingBusinessRestore = () => businessRestore.merge(
           settings,
+          scope: scope,
           preserveExplicitEmptyInstructionList:
               preserveExplicitEmptyInstructionList,
           entityRowIds: entityRowIds,
@@ -3233,7 +3302,10 @@ class DataSync {
         if (!restoreChats) {
           beginNonCancellableCommit();
           if (restoreFiles) {
-            await _restoreAssetDirectoriesAdditive(extractDir);
+            await _restoreAssetDirectories(
+              extractDir,
+              assetRoots: selectedAssetRoots,
+            );
           }
           await _runLiveBusinessRestore(pendingBusinessRestore);
           return;
@@ -3241,7 +3313,7 @@ class DataSync {
       }
       final restoreChats =
           versionedBackup == null &&
-          cfg.includeChats &&
+          scope.includes(BackupCategory.chats) &&
           await chatsFile.exists();
 
       var conversations = const <Conversation>[];
@@ -3287,21 +3359,23 @@ class DataSync {
         pendingBusinessRestore = mode == RestoreMode.overwrite
             ? () => businessRestore.overwrite(
                 settings,
+                scope: scope,
                 preserveExplicitEmptyInstructionList: true,
                 assumePreV3EmbeddingMigrationWhenVersionMissing: true,
               )
             : () => businessRestore.merge(
                 settings,
+                scope: scope,
                 preserveExplicitEmptyInstructionList: true,
                 assumePreV3EmbeddingMigrationWhenVersionMissing: true,
               );
       }
 
       // Restore files
-      if (cfg.includeFiles) {
+      if (selectedAssetRoots.isNotEmpty) {
         beginNonCancellableCommit();
         if (mode == RestoreMode.overwrite) {
-          for (final name in _assetRootNames) {
+          for (final name in selectedAssetRoots) {
             final src = Directory(p.join(restorePayloadDirectory.path, name));
             if (!await src.exists()) continue;
             final dst = await _liveAssetRoot(name);
@@ -3319,8 +3393,9 @@ class DataSync {
           }
         } else {
           // Merge mode: Only copy non-existing files
-          await _restoreAssetDirectoriesAdditive(
+          await _restoreAssetDirectories(
             restorePayloadDirectory,
+            assetRoots: selectedAssetRoots,
             remappedConversationIds:
                 _lastMergeReport?.remappedConversationIds ?? const {},
           );
@@ -3329,7 +3404,7 @@ class DataSync {
       // Legacy chats.json decodes before assets exist. After files land,
       // directed-remap old absolute roots onto restored managed relatives,
       // then refresh availability (no global generic canonicalize fallback).
-      if (restoreChats && cfg.includeFiles) {
+      if (restoreChats && restoreAttachments) {
         if (SandboxPathResolver.docsDir == null) {
           await SandboxPathResolver.init();
         }
@@ -3344,7 +3419,7 @@ class DataSync {
           );
         }
         messages = refreshed;
-      } else if (restoreChats && !cfg.includeFiles) {
+      } else if (restoreChats && !restoreAttachments) {
         // Chats-only legacy import: local attachments unavailable by default.
         final refreshed = <ChatMessage>[];
         for (final message in messages) {
@@ -3575,6 +3650,7 @@ class _BackupPackArgs {
     required this.includeFiles,
     required this.appVersion,
     required this.businessEntityRowIds,
+    required this.scope,
     required this.assetRootPaths,
     this.publishedDraftFiles = const {},
   });
@@ -3588,6 +3664,7 @@ class _BackupPackArgs {
   final bool includeFiles;
   final String appVersion;
   final Map<String, List<String>> businessEntityRowIds;
+  final BackupScope scope;
   final Map<String, String> assetRootPaths;
   final Set<String> publishedDraftFiles;
 }

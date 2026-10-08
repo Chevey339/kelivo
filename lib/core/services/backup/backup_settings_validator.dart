@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import '../../database/backup_portability.dart';
+import '../../models/environment_variable.dart';
 import '../../database/business_settings_router.dart';
 
 /// Pure validation shared by backup preflight and business-data restoration.
@@ -124,10 +125,36 @@ final class BackupSettingsValidator {
       throw FormatException(key);
     }
 
+    if (key == 'environment_variables_v1') {
+      _validateEnvironmentVariables(value);
+      return;
+    }
     if (_jsonListKeys.contains(key)) {
       _validateJsonShape(key, value, expectList: true);
     } else if (_jsonMapKeys.contains(key)) {
       _validateJsonShape(key, value, expectList: false);
+    }
+  }
+
+  static void _validateEnvironmentVariables(Object? value) {
+    const key = 'environment_variables_v1';
+    if (value is! String) throw const FormatException(key);
+    final decoded = jsonDecode(value);
+    if (decoded is! List) throw const FormatException(key);
+    final names = <String>{};
+    for (final entry in decoded) {
+      if (entry is! Map) throw const FormatException(key);
+      final name = entry['name'];
+      final content = entry['value'];
+      if (name is! String ||
+          !EnvironmentVariable.namePattern.hasMatch(name) ||
+          !names.add(name) ||
+          content is! String ||
+          content.isEmpty ||
+          content.contains('\u0000') ||
+          (entry['note'] != null && entry['note'] is! String)) {
+        throw const FormatException(key);
+      }
     }
   }
 

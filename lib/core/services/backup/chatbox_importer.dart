@@ -5,6 +5,7 @@ import 'package:path/path.dart' as p;
 import 'package:uuid/uuid.dart';
 
 import '../../database/business_data.dart';
+import '../../database/backup_content_filter.dart';
 import '../../database/business_repository.dart';
 import '../../database/business_settings_router.dart';
 import '../../database/chat_database_repository.dart'
@@ -57,6 +58,7 @@ class ChatboxImporter {
   static Future<ChatboxImportResult> importFromChatbox({
     required File file,
     required RestoreMode mode,
+    BackupScope scope = const BackupScope(),
     required BusinessRepository businessRepository,
     required ChatService chatService,
     BackupProgressSink? onProgress,
@@ -78,8 +80,8 @@ class ChatboxImporter {
       if (treatAsZip) {
         staging = await Directory.systemTemp.createTemp('kelivo_chatbox_res_');
         DataSync.registerLiveTempPath(staging.path);
-        final upload = await AppDirectories.getUploadDirectory();
-        resourceDestDir = p.join(upload.path, 'chatbox');
+        final appData = await AppDirectories.getAppDataDirectory();
+        resourceDestDir = p.join(appData.path, 'upload', 'chatbox');
       }
 
       final existingConvs = chatService.getAllCompleteConversations();
@@ -102,7 +104,9 @@ class ChatboxImporter {
               isZip: treatAsZip,
               stagingPath: staging?.path,
               resourceDestDir: resourceDestDir,
-              overwrite: mode == RestoreMode.overwrite,
+              overwrite:
+                  mode == RestoreMode.overwrite &&
+                  scope.includes(BackupCategory.chats),
               merge: mode == RestoreMode.merge,
               existingConvIds: existingConvIds,
               existingMsgIds: existingMsgIds,
@@ -124,30 +128,66 @@ class ChatboxImporter {
           cancellable: false,
         ),
       );
-      await chatService.commitParsedImport(
-        businessRepository: businessRepository,
-        overwrite: mode == RestoreMode.overwrite,
-        conversationBatches: assistantConvRes.conversationBatches,
-        messagesToAppend: assistantConvRes.messagesToAppend,
-        transformBusiness: (current) => _transformBusinessData(
-          current: current,
-          mode: mode,
-          providers: importedProviders,
-          assistants: assistantConvRes.assistantPayloads,
-          assistantIds: assistantConvRes.assistantIds,
-        ),
-      );
-      if (archive != null) {
-        // Only publish after the DB commit succeeds. Overwrite also wipes
-        // Documents/upload during commit, so this is the sole dest write.
+      BusinessSnapshot transformBusiness(BusinessSnapshot current) =>
+          BackupContentFilter.preserveUnselected(
+            _transformBusinessData(
+              current: current,
+              mode: mode,
+              providers: importedProviders,
+              assistants: assistantConvRes.assistantPayloads,
+              assistantIds: assistantConvRes.assistantIds,
+            ),
+            current,
+            scope,
+          );
+      final includeChats = scope.includes(BackupCategory.chats);
+      final includeFiles = scope.includes(BackupCategory.files);
+      ChatMessage selectedMessage(ChatMessage message) => includeFiles
+          ? message
+          : message.copyWith(
+              parts: recomputeAttachmentAvailability(
+                message.parts,
+                fileExists: (_) => false,
+              ),
+            );
+      if (includeChats) {
+        await chatService.commitParsedImport(
+          businessRepository: businessRepository,
+          overwrite: mode == RestoreMode.overwrite,
+          deleteUploads: includeFiles,
+          conversationBatches: [
+            for (final batch in assistantConvRes.conversationBatches)
+              (
+                conversation: batch.conversation,
+                messages: batch.messages.map(selectedMessage).toList(),
+              ),
+          ],
+          messagesToAppend: {
+            for (final entry in assistantConvRes.messagesToAppend.entries)
+              entry.key: entry.value.map(selectedMessage).toList(),
+          },
+          transformBusiness: transformBusiness,
+        );
+      } else {
+        await businessRepository.transformSnapshot(
+          transformBusiness,
+          writeReceipt: true,
+        );
+      }
+      if (archive != null && includeFiles) {
+        // Publish resources only after the selected database changes commit.
         await ChatboxBackupArchive.publishStagedResources(archive);
       }
 
       return ChatboxImportResult(
-        providers: importedProviders.length,
-        assistants: assistantConvRes.assistants,
-        conversations: assistantConvRes.conversations,
-        messages: assistantConvRes.messages,
+        providers: scope.includes(BackupCategory.providers)
+            ? importedProviders.length
+            : 0,
+        assistants: scope.includes(BackupCategory.assistants)
+            ? assistantConvRes.assistants
+            : 0,
+        conversations: includeChats ? assistantConvRes.conversations : 0,
+        messages: includeChats ? assistantConvRes.messages : 0,
       );
     } catch (error) {
       importError = error;

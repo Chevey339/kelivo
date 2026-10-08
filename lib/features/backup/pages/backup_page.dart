@@ -34,6 +34,7 @@ import '../backup_restore_error_message.dart';
 import '../forward_compat_consent_dialog.dart';
 import '../backup_restart_dialog.dart';
 import '../widgets/backup_reminder_helpers.dart';
+import '../widgets/backup_category_labels.dart';
 import 'package:Kelivo/theme/app_semantic_colors.dart';
 import 'package:Kelivo/shared/widgets/section_card.dart';
 import '../../../core/database/startup_failure_report.dart' show formatBytes;
@@ -305,37 +306,38 @@ class _BackupPageState extends State<BackupPage> {
                 header(l10n.backupPageBackupManagement, first: true),
                 SectionCard(
                   children: [
-                    _iosSwitchRow(
-                      context,
-                      icon: Lucide.MessageSquare,
-                      label: l10n.backupPageChatsLabel,
-                      value: cfg.includeChats,
-                      onChanged: (v) async {
-                        final newCfg = cfg.copyWith(includeChats: v);
-                        await settings.setWebDavConfig(newCfg);
-                        vm.updateConfig(newCfg);
-
-                        final newS3Cfg = s3Cfg.copyWith(includeChats: v);
-                        await settings.setS3Config(newS3Cfg);
-                        s3Vm.updateConfig(newS3Cfg);
-                      },
+                    Padding(
+                      padding: const EdgeInsets.all(14),
+                      child: Text(
+                        l10n.backupPageBackupManagementDescription,
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: cs.onSurfaceVariant,
+                        ),
+                      ),
                     ),
-                    _iosDivider(context),
-                    _iosSwitchRow(
-                      context,
-                      icon: Lucide.FileText,
-                      label: l10n.backupPageFilesLabel,
-                      value: cfg.includeFiles,
-                      onChanged: (v) async {
-                        final newCfg = cfg.copyWith(includeFiles: v);
-                        await settings.setWebDavConfig(newCfg);
-                        vm.updateConfig(newCfg);
-
-                        final newS3Cfg = s3Cfg.copyWith(includeFiles: v);
-                        await settings.setS3Config(newS3Cfg);
-                        s3Vm.updateConfig(newS3Cfg);
-                      },
-                    ),
+                    for (final category in BackupCategory.values) ...[
+                      _iosDivider(context),
+                      _iosSwitchRow(
+                        context,
+                        key: ValueKey('backup-scope-${category.name}'),
+                        icon: category.icon,
+                        label: category.label(l10n),
+                        value: cfg.scope.includes(category),
+                        onChanged: (v) async {
+                          final scope = vm.config.scope.withCategory(
+                            category,
+                            v,
+                          );
+                          final newCfg = vm.config.copyWith(scope: scope);
+                          final newS3Cfg = s3Vm.config.copyWith(scope: scope);
+                          vm.updateConfig(newCfg);
+                          s3Vm.updateConfig(newS3Cfg);
+                          await settings.setWebDavConfig(newCfg);
+                          await settings.setS3Config(newS3Cfg);
+                        },
+                      ),
+                    ],
                   ],
                 ),
 
@@ -1323,6 +1325,7 @@ class _BackupPageState extends State<BackupPage> {
         imported = await CherryImporter.importFromCherryStudio(
           file: File(path),
           mode: mode,
+          scope: context.read<SettingsProvider>().webDavConfig.scope,
           businessRepository: businessRepository,
           chatService: cs,
           onProgress: handle.report,
@@ -1368,6 +1371,7 @@ class _BackupPageState extends State<BackupPage> {
         imported = await ChatboxImporter.importFromChatbox(
           file: File(path),
           mode: mode,
+          scope: context.read<SettingsProvider>().webDavConfig.scope,
           businessRepository: businessRepository,
           chatService: cs,
           onProgress: handle.report,
@@ -2206,6 +2210,7 @@ class _IosFilledButtonState extends State<_IosFilledButton> {
 
 Widget _iosSwitchRow(
   BuildContext context, {
+  Key? key,
   IconData? icon,
   required String label,
   required bool value,
@@ -2232,7 +2237,7 @@ Widget _iosSwitchRow(
                 Expanded(
                   child: Text(label, style: TextStyle(fontSize: 15, color: c)),
                 ),
-                IosSwitch(value: value, onChanged: onChanged),
+                IosSwitch(key: key, value: value, onChanged: onChanged),
               ],
             ),
           );

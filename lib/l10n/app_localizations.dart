@@ -3058,6 +3058,90 @@ abstract class AppLocalizations {
   /// **'Files'**
   String get backupPageFilesLabel;
 
+  /// No description provided for @backupPageBackupManagementDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose what to back up and import. Applies to local, WebDAV and S3 backups. Unselected content stays unchanged on import. Skills and workspaces include their own files.'**
+  String get backupPageBackupManagementDescription;
+
+  /// No description provided for @backupPageAssistantsLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Assistants'**
+  String get backupPageAssistantsLabel;
+
+  /// No description provided for @backupPageProvidersLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Providers'**
+  String get backupPageProvidersLabel;
+
+  /// No description provided for @backupPageMcpLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'MCP servers'**
+  String get backupPageMcpLabel;
+
+  /// No description provided for @backupPageEnvironmentVariablesLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Environment variables'**
+  String get backupPageEnvironmentVariablesLabel;
+
+  /// No description provided for @backupPageSkillsLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Skills'**
+  String get backupPageSkillsLabel;
+
+  /// No description provided for @backupPageWorldBooksLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'World books'**
+  String get backupPageWorldBooksLabel;
+
+  /// No description provided for @backupPageMemoriesLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Memories'**
+  String get backupPageMemoriesLabel;
+
+  /// No description provided for @backupPageQuickPhrasesLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Quick phrases'**
+  String get backupPageQuickPhrasesLabel;
+
+  /// No description provided for @backupPageInstructionsLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Prompt injections'**
+  String get backupPageInstructionsLabel;
+
+  /// No description provided for @backupPageWorkspacesLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Workspaces'**
+  String get backupPageWorkspacesLabel;
+
+  /// No description provided for @backupPageSearchServicesLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Search services'**
+  String get backupPageSearchServicesLabel;
+
+  /// No description provided for @backupPageSpeechServicesLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Speech services'**
+  String get backupPageSpeechServicesLabel;
+
+  /// No description provided for @backupPageSettingsLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Other settings'**
+  String get backupPageSettingsLabel;
+
   /// No description provided for @backupPageTestDone.
   ///
   /// In en, this message translates to:
@@ -3553,7 +3637,7 @@ abstract class AppLocalizations {
   /// No description provided for @backupPageSelectImportModeDescription.
   ///
   /// In en, this message translates to:
-  /// **'Choose a restore mode. The chat and file switches determine which components are included.'**
+  /// **'Choose a restore mode. The switches in Backup Management apply to this import.'**
   String get backupPageSelectImportModeDescription;
 
   /// No description provided for @backupPageOverwriteMode.

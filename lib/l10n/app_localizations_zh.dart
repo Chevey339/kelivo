@@ -1547,6 +1547,49 @@ class AppLocalizationsZh extends AppLocalizations {
   String get backupPageFilesLabel => '文件';
 
   @override
+  String get backupPageBackupManagementDescription =>
+      '选择备份和导入的内容，适用于本地、WebDAV 和 S3。导入时保留未选中的内容。技能和工作区包含各自的文件。';
+
+  @override
+  String get backupPageAssistantsLabel => '助手';
+
+  @override
+  String get backupPageProvidersLabel => '供应商';
+
+  @override
+  String get backupPageMcpLabel => 'MCP 服务器';
+
+  @override
+  String get backupPageEnvironmentVariablesLabel => '环境变量';
+
+  @override
+  String get backupPageSkillsLabel => '技能';
+
+  @override
+  String get backupPageWorldBooksLabel => '世界书';
+
+  @override
+  String get backupPageMemoriesLabel => '记忆';
+
+  @override
+  String get backupPageQuickPhrasesLabel => '快捷短语';
+
+  @override
+  String get backupPageInstructionsLabel => '提示词注入';
+
+  @override
+  String get backupPageWorkspacesLabel => '工作区';
+
+  @override
+  String get backupPageSearchServicesLabel => '搜索服务';
+
+  @override
+  String get backupPageSpeechServicesLabel => '语音服务';
+
+  @override
+  String get backupPageSettingsLabel => '其他设置';
+
+  @override
   String get backupPageTestDone => '测试完成';
 
   @override
@@ -1824,7 +1867,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get backupPageSelectImportModeDescription =>
-      '请选择恢复方式。聊天和文件开关决定本次恢复的组件。';
+      '请选择恢复方式。备份管理中的分类开关同样适用于本次导入。';
 
   @override
   String get backupPageOverwriteMode => '完全覆盖';
@@ -13943,6 +13986,49 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get backupPageFilesLabel => '文件';
 
   @override
+  String get backupPageBackupManagementDescription =>
+      '选择备份和导入的内容，适用于本地、WebDAV 和 S3。导入时保留未选中的内容。技能和工作区包含各自的文件。';
+
+  @override
+  String get backupPageAssistantsLabel => '助手';
+
+  @override
+  String get backupPageProvidersLabel => '供应商';
+
+  @override
+  String get backupPageMcpLabel => 'MCP 服务器';
+
+  @override
+  String get backupPageEnvironmentVariablesLabel => '环境变量';
+
+  @override
+  String get backupPageSkillsLabel => '技能';
+
+  @override
+  String get backupPageWorldBooksLabel => '世界书';
+
+  @override
+  String get backupPageMemoriesLabel => '记忆';
+
+  @override
+  String get backupPageQuickPhrasesLabel => '快捷短语';
+
+  @override
+  String get backupPageInstructionsLabel => '提示词注入';
+
+  @override
+  String get backupPageWorkspacesLabel => '工作区';
+
+  @override
+  String get backupPageSearchServicesLabel => '搜索服务';
+
+  @override
+  String get backupPageSpeechServicesLabel => '语音服务';
+
+  @override
+  String get backupPageSettingsLabel => '其他设置';
+
+  @override
   String get backupPageTestDone => '测试完成';
 
   @override
@@ -14220,7 +14306,7 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get backupPageSelectImportModeDescription =>
-      '请选择恢复方式。聊天和文件开关决定本次恢复的组件。';
+      '请选择恢复方式。备份管理中的分类开关同样适用于本次导入。';
 
   @override
   String get backupPageOverwriteMode => '完全覆盖';
@@ -26265,6 +26351,49 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get backupPageFilesLabel => '檔案';
 
   @override
+  String get backupPageBackupManagementDescription =>
+      '選擇備份和匯入的內容，適用於本機、WebDAV 和 S3。匯入時保留未選取的內容。技能和工作區包含各自的檔案。';
+
+  @override
+  String get backupPageAssistantsLabel => '助手';
+
+  @override
+  String get backupPageProvidersLabel => '供應商';
+
+  @override
+  String get backupPageMcpLabel => 'MCP 伺服器';
+
+  @override
+  String get backupPageEnvironmentVariablesLabel => '環境變數';
+
+  @override
+  String get backupPageSkillsLabel => '技能';
+
+  @override
+  String get backupPageWorldBooksLabel => '世界書';
+
+  @override
+  String get backupPageMemoriesLabel => '記憶';
+
+  @override
+  String get backupPageQuickPhrasesLabel => '快捷短語';
+
+  @override
+  String get backupPageInstructionsLabel => '提示詞注入';
+
+  @override
+  String get backupPageWorkspacesLabel => '工作區';
+
+  @override
+  String get backupPageSearchServicesLabel => '搜尋服務';
+
+  @override
+  String get backupPageSpeechServicesLabel => '語音服務';
+
+  @override
+  String get backupPageSettingsLabel => '其他設定';
+
+  @override
   String get backupPageTestDone => '測試完成';
 
   @override
@@ -26543,7 +26672,7 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get backupPageSelectImportModeDescription =>
-      '請選擇還原方式。聊天與檔案開關決定本次還原的元件。';
+      '請選擇還原方式。備份管理中的分類開關同樣適用於本次匯入。';
 
   @override
   String get backupPageOverwriteMode => '完全覆蓋';

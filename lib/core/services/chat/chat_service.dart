@@ -2434,6 +2434,7 @@ class ChatService extends ChangeNotifier {
   Future<void> commitParsedImport({
     required BusinessRepository businessRepository,
     required bool overwrite,
+    bool deleteUploads = true,
     required List<ParsedChatImportBatch> conversationBatches,
     required Map<String, List<ChatMessage>> messagesToAppend,
     required BusinessSnapshot Function(BusinessSnapshot current)
@@ -2453,7 +2454,7 @@ class ChatService extends ChangeNotifier {
         await commit();
         await _resetAfterOverwriteRestore();
       });
-      await _deleteUploadDirectory();
+      if (deleteUploads) await _deleteUploadDirectory();
       return;
     }
     await commit();

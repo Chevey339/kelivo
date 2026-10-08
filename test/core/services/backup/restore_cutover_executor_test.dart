@@ -9,6 +9,7 @@ import 'package:sqlite3/sqlite3.dart' as sqlite;
 
 import 'package:Kelivo/core/database/chat_database_repository.dart';
 import 'package:Kelivo/core/models/conversation.dart';
+import 'package:Kelivo/core/models/backup_scope.dart';
 import 'package:Kelivo/core/services/backup/restore_bundle_preparation.dart';
 import 'package:Kelivo/core/services/backup/restore_cutover_executor.dart';
 import 'package:Kelivo/core/services/backup/restore_durability.dart';
@@ -86,6 +87,66 @@ void main() {
         isFalse,
       );
     });
+
+    test(
+      'partial startup cutover keeps the unselected workspace in place',
+      () async {
+        final liveDatabase = File(p.join(appData.path, 'kelivo.db'));
+        await _createDatabase(liveDatabase, conversationId: 'old');
+        final workspace = Directory(
+          p.join(appData.path, 'workspaces', 'local'),
+        );
+        final empty = Directory(p.join(workspace.path, 'empty'));
+        await empty.create(recursive: true);
+        final script = File(p.join(workspace.path, 'run.sh'));
+        await script.writeAsString('before staging');
+        if (!Platform.isWindows) {
+          expect(
+            (await Process.run('chmod', ['755', script.path])).exitCode,
+            0,
+          );
+          await Link(p.join(workspace.path, 'script-link')).create('run.sh');
+        }
+        final mode = (await script.stat()).mode;
+        final prepared = await _prepareBundle(
+          root: root,
+          appData: appData,
+          directoryName: 'partial_source',
+          includeFiles: true,
+          scope: const BackupScope(excluded: {BackupCategory.workspaces}),
+        );
+        await script.writeAsString('after staging');
+        final lock = RestoreWorkspaceLock(appDataDirectory: appData);
+        final executor = RestoreCutoverExecutor(
+          appDataDirectory: appData,
+          runId: prepared.runId,
+          workspaceLock: lock,
+        );
+        final terminal = await lock.synchronized(() async {
+          final result = await executor.executeWhileWorkspaceLocked(
+            observedMarkerFileName: RestoreWorkspaceLock.activeRunFileName,
+          );
+          return executor.revalidateTerminalWhileWorkspaceLocked(result);
+        });
+        expect(terminal.state, RestoreReceiptState.committed);
+        expect(await _conversationIds(liveDatabase), ['new']);
+        expect(await empty.exists(), isTrue);
+        expect(await script.readAsString(), 'after staging');
+        expect((await script.stat()).mode, mode);
+        expect(
+          await Directory(
+            p.join(prepared.candidateDirectory.path, 'workspaces'),
+          ).exists(),
+          isFalse,
+        );
+        expect(
+          await Directory(
+            p.join(prepared.workspace.path, 'previous', 'workspaces'),
+          ).exists(),
+          isFalse,
+        );
+      },
+    );
 
     test('commits when the previous database was absent', () async {
       final prepared = await _prepareBundle(
@@ -230,6 +291,7 @@ Future<PreparedRestoreBundle> _prepareBundle({
   required Directory appData,
   required String directoryName,
   required bool includeFiles,
+  BackupScope scope = const BackupScope(),
 }) async {
   final extracted = Directory(p.join(root.path, directoryName));
   await extracted.create();
@@ -281,6 +343,7 @@ Future<PreparedRestoreBundle> _prepareBundle({
     bundleIncludesFiles: includeFiles,
     restoreChats: true,
     restoreFiles: includeFiles,
+    scope: scope,
     createdAtUtc: DateTime.utc(2026, 7, 9, 12),
   );
 }

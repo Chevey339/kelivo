@@ -76,11 +76,8 @@ class S3BackupProvider extends ChangeNotifier {
   }
 
   WebDavConfig _scopeAsWebdavConfig() {
-    // DataSync currently uses WebDavConfig for include flags; other fields are ignored.
-    return WebDavConfig(
-      includeChats: _cfg.includeChats,
-      includeFiles: _cfg.includeFiles,
-    );
+    // DataSync uses the same selection for local, WebDAV and S3 backups.
+    return WebDavConfig(scope: _cfg.scope);
   }
 
   Future<void> test() async {

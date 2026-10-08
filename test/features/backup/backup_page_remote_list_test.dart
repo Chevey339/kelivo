@@ -181,6 +181,10 @@ Future<void> _expectNoSetStateAfterDispose(
   navKey.currentState!.push(backupRoute);
   await tester.pumpAndSettle();
 
+  await tester.scrollUntilVisible(
+    find.text(tapFirstRestore ? 'WebDAV Backup' : 'S3 Backup'),
+    300,
+  );
   final restoreFinder = find.text('Restore');
   final target = tapFirstRestore ? restoreFinder.first : restoreFinder.last;
   await tester.scrollUntilVisible(target, 300);

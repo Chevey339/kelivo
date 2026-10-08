@@ -1605,6 +1605,49 @@ class AppLocalizationsEn extends AppLocalizations {
   String get backupPageFilesLabel => 'Files';
 
   @override
+  String get backupPageBackupManagementDescription =>
+      'Choose what to back up and import. Applies to local, WebDAV and S3 backups. Unselected content stays unchanged on import. Skills and workspaces include their own files.';
+
+  @override
+  String get backupPageAssistantsLabel => 'Assistants';
+
+  @override
+  String get backupPageProvidersLabel => 'Providers';
+
+  @override
+  String get backupPageMcpLabel => 'MCP servers';
+
+  @override
+  String get backupPageEnvironmentVariablesLabel => 'Environment variables';
+
+  @override
+  String get backupPageSkillsLabel => 'Skills';
+
+  @override
+  String get backupPageWorldBooksLabel => 'World books';
+
+  @override
+  String get backupPageMemoriesLabel => 'Memories';
+
+  @override
+  String get backupPageQuickPhrasesLabel => 'Quick phrases';
+
+  @override
+  String get backupPageInstructionsLabel => 'Prompt injections';
+
+  @override
+  String get backupPageWorkspacesLabel => 'Workspaces';
+
+  @override
+  String get backupPageSearchServicesLabel => 'Search services';
+
+  @override
+  String get backupPageSpeechServicesLabel => 'Speech services';
+
+  @override
+  String get backupPageSettingsLabel => 'Other settings';
+
+  @override
   String get backupPageTestDone => 'Test done';
 
   @override
@@ -1896,7 +1939,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get backupPageSelectImportModeDescription =>
-      'Choose a restore mode. The chat and file switches determine which components are included.';
+      'Choose a restore mode. The switches in Backup Management apply to this import.';
 
   @override
   String get backupPageOverwriteMode => 'Complete Overwrite';

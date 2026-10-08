@@ -1,3 +1,5 @@
+import '../models/backup_scope.dart';
+import 'backup_content_filter.dart';
 import 'backup_portability.dart';
 import 'business_repository.dart';
 import 'business_settings_merger.dart';
@@ -15,28 +17,35 @@ final class BusinessRestoreService {
 
   Future<void> overwrite(
     Map<String, Object?> imported, {
+    BackupScope scope = const BackupScope(),
     bool preserveExplicitEmptyInstructionList = false,
     Map<String, Object?>? entityRowIds,
     bool assumePreV3EmbeddingMigrationWhenVersionMissing = false,
   }) async {
     final replacement = BackupPortability.portable(
       BusinessSettingsRouter.normalizeAndRoute(
-        _portablePreferences(imported),
+        BackupContentFilter.select(_portablePreferences(imported), scope),
         preserveExplicitEmptyInstructionList:
             preserveExplicitEmptyInstructionList,
-        entityRowIds: entityRowIds,
+        entityRowIds: entityRowIds == null
+            ? null
+            : BackupContentFilter.select(entityRowIds, scope),
         assumePreV3EmbeddingMigrationWhenVersionMissing:
             assumePreV3EmbeddingMigrationWhenVersionMissing,
       ),
     );
     await _repository.transformSnapshot(
-      (current) => BackupPortability.preserveDeviceState(replacement, current),
+      (current) => BackupPortability.preserveDeviceState(
+        BackupContentFilter.preserveUnselected(replacement, current, scope),
+        current,
+      ),
       writeReceipt: true,
     );
   }
 
   Future<void> merge(
     Map<String, Object?> imported, {
+    BackupScope scope = const BackupScope(),
     bool preserveExplicitEmptyInstructionList = false,
     Map<String, Object?>? entityRowIds,
     bool assumePreV3EmbeddingMigrationWhenVersionMissing = false,
@@ -46,10 +55,12 @@ final class BusinessRestoreService {
     // snapshot, preserving both sides' database identities.
     final incoming = BackupPortability.portable(
       BusinessSettingsRouter.normalizeAndRoute(
-        _portablePreferences(imported),
+        BackupContentFilter.select(_portablePreferences(imported), scope),
         preserveExplicitEmptyInstructionList:
             preserveExplicitEmptyInstructionList,
-        entityRowIds: entityRowIds,
+        entityRowIds: entityRowIds == null
+            ? null
+            : BackupContentFilter.select(entityRowIds, scope),
         assumePreV3EmbeddingMigrationWhenVersionMissing:
             assumePreV3EmbeddingMigrationWhenVersionMissing,
       ),
@@ -58,7 +69,7 @@ final class BusinessRestoreService {
       return BusinessSettingsMerger.mergeSnapshots(
         current,
         incoming,
-        incomingKeys: imported.keys.toSet(),
+        incomingKeys: BackupContentFilter.select(imported, scope).keys.toSet(),
       );
     }, writeReceipt: true);
   }

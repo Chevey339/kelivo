@@ -122,6 +122,141 @@ void main() {
       if (await root.exists()) await root.delete(recursive: true);
     });
 
+    for (final mode in RestoreMode.values) {
+      test(
+        'provider-only $mode import keeps chats, assistants and files',
+        () async {
+          await BusinessRestoreService(businessRepository).overwrite({
+            'assistants_v1': jsonEncode([
+              {'id': 'local', 'name': 'Local'},
+            ]),
+          });
+          await chatService.restoreConversation(
+            Conversation(id: 'local-chat', title: 'Keep'),
+            [],
+          );
+          final sentinel = await File(
+            '${root.path}/upload/keep.txt',
+          ).create(recursive: true);
+          await sentinel.writeAsString('keep');
+          // A settings-only Chatbox export is sufficient when chats are disabled.
+          await backup.writeAsString(
+            jsonEncode({'settings': _chatboxFixture()['settings']}),
+          );
+          final result = await ChatboxImporter.importFromChatbox(
+            file: backup,
+            mode: mode,
+            businessRepository: businessRepository,
+            chatService: chatService,
+            scope: BackupScope(
+              excluded: BackupCategory.values
+                  .where((c) => c != BackupCategory.providers)
+                  .toSet(),
+            ),
+          );
+          expect(result.providers, 1);
+          expect(result.assistants, 0);
+          expect(result.conversations, 0);
+          expect(chatService.getAllConversations().map((c) => c.id), [
+            'local-chat',
+          ]);
+          expect(await sentinel.readAsString(), 'keep');
+          final settings = await BusinessRestoreService(
+            businessRepository,
+          ).exportSettings();
+          expect(
+            jsonDecode(settings['assistants_v1'] as String).single['id'],
+            'local',
+          );
+          expect(settings['provider_configs_v1'], contains('chatbox-secret'));
+        },
+      );
+    }
+
+    for (final filesOnly in [false, true]) {
+      test(
+        filesOnly
+            ? 'file-only ZIP import preserves chats and settings'
+            : 'chat-only ZIP overwrite keeps local files and skips imported resources',
+        () async {
+          await chatService.restoreConversation(
+            Conversation(id: 'local-chat', title: 'Keep'),
+            [],
+          );
+          final sentinel = await File(
+            '${root.path}/upload/keep.txt',
+          ).create(recursive: true);
+          await sentinel.writeAsString('keep');
+          final zip = await File('${root.path}/selective.zip').writeAsBytes(
+            _encodeChatboxZipV2(
+              settings: _chatboxZipSettings(),
+              session: _chatboxZipSession(
+                id: 'assistant-1',
+                messageId: 'message-1',
+                imageStorageKey: 'picture:one',
+              ),
+              resources: [
+                _ChatboxZipResource(
+                  id: 'resource-000001',
+                  storageKey: 'picture:one',
+                  sessionId: 'assistant-1',
+                  path: 'sessions/assistant-1/resources/resource-000001.png',
+                  mimeType: 'image/png',
+                  kind: 'image',
+                  bytes: _chatboxPngBytes(),
+                ),
+              ],
+            ),
+          );
+          final before = await BusinessRestoreService(
+            businessRepository,
+          ).exportSettings();
+          final selected = filesOnly
+              ? BackupCategory.files
+              : BackupCategory.chats;
+          final result = await ChatboxImporter.importFromChatbox(
+            file: zip,
+            mode: RestoreMode.overwrite,
+            businessRepository: businessRepository,
+            chatService: chatService,
+            scope: BackupScope(
+              excluded: BackupCategory.values
+                  .where((c) => c != selected)
+                  .toSet(),
+            ),
+          );
+          expect(result.providers, 0);
+          expect(result.assistants, 0);
+          expect(await sentinel.readAsString(), 'keep');
+          expect(
+            await BusinessRestoreService(businessRepository).exportSettings(),
+            before,
+          );
+          final files = await Directory(
+            '${root.path}/upload',
+          ).list(recursive: true).where((f) => f is File).toList();
+          if (filesOnly) {
+            expect(result.conversations, 0);
+            expect(chatService.getAllConversations().map((c) => c.id), [
+              'local-chat',
+            ]);
+            expect(files, hasLength(2));
+          } else {
+            expect(result.conversations, 1);
+            expect(files, hasLength(1));
+            final conversation = chatService.getAllConversations().single;
+            final message = (await chatService.loadMessages(
+              conversation.id,
+            )).single;
+            expect(
+              message.parts.whereType<ImagePart>().single.unavailable,
+              isTrue,
+            );
+          }
+        },
+      );
+    }
+
     test(
       'writes providers, assistants, tags, and relationships to SQLite',
       () async {

@@ -433,6 +433,7 @@ final class RestoreCutoverExecutor {
       final bundle = await RestorePreviousBuilder.build(
         appDataDirectory: appDataDirectory,
         preparedReceipt: preparedReceipt,
+        assetRoots: candidate.assetRoots,
       );
       pending = await previousStore.persistPending(
         bundle: bundle,

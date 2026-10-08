@@ -6,6 +6,7 @@ import 'streaming_zip_entry.dart';
 import 'package:flutter/foundation.dart' show visibleForTesting;
 import 'package:path/path.dart' as p;
 import '../../database/business_repository.dart';
+import '../../database/backup_content_filter.dart';
 import '../../database/business_settings_router.dart';
 import '../../models/api_keys.dart';
 import '../../models/backup.dart';
@@ -49,6 +50,7 @@ class CherryImporter {
   static Future<CherryImportResult> importFromCherryStudio({
     required File file,
     required RestoreMode mode,
+    BackupScope scope = const BackupScope(),
     required BusinessRepository businessRepository,
     required ChatService chatService,
     BackupProgressSink? onProgress,
@@ -60,7 +62,9 @@ class CherryImporter {
     final existingConvs = chatService.getAllCompleteConversations();
     final existingConvIds = existingConvs.map((c) => c.id).toList();
     final existingMsgIds = <String>[];
-    if (mode == RestoreMode.merge) {
+    final mergeChats =
+        mode == RestoreMode.merge && scope.includes(BackupCategory.chats);
+    if (mergeChats) {
       for (final c in existingConvs) {
         existingMsgIds.addAll(await chatService.getMessageIds(c.id));
       }
@@ -72,7 +76,7 @@ class CherryImporter {
             body: _parseCherryBackupInIsolate,
             payload: _CherryParseIsolateArgs(
               path: file.path,
-              merge: mode == RestoreMode.merge,
+              merge: mergeChats,
               existingConvIds: existingConvIds,
               existingMsgIds: existingMsgIds,
               debugSpeculativeJsonProbeBytes: debugSpeculativeJsonProbeBytes,
@@ -102,34 +106,45 @@ class CherryImporter {
     await _importBusinessData(
       businessRepository: businessRepository,
       mode: mode,
+      scope: scope,
       providers: importedProviders,
       assistants: importedAssistants,
     );
 
     // If overwrite, clear chats/files BEFORE writing any uploads to avoid deletion later
-    if (mode == RestoreMode.overwrite) {
-      await chatService.clearAllData();
+    final includeChats = scope.includes(BackupCategory.chats);
+    final includeFiles = scope.includes(BackupCategory.files);
+    if (mode == RestoreMode.overwrite && includeChats) {
+      await chatService.clearAllData(deleteUploads: includeFiles);
     }
 
     // Materialize stays after the first DB write so overwrite cannot delete
     // the files we just unpacked. Cancel is already disabled at this point.
-    final pathsByFileId = await _materializeFiles(
-      parsed.filesById,
-      parsed.usedFileIds,
-      backupArchive: file,
-      onProgress: onProgress,
-      cancelToken: cancelToken,
-    );
+    final pathsByFileId = includeFiles
+        ? await _materializeFiles(
+            parsed.filesById,
+            parsed.usedFileIds,
+            backupArchive: file,
+            onProgress: onProgress,
+            cancelToken: cancelToken,
+          )
+        : <String, String>{};
 
     final convCountAndMsgCount = await _commitTypedCherryTopics(
       topics: parsed.topics,
       filePaths: pathsByFileId,
       chatService: chatService,
+      includeChats: includeChats,
+      includeFiles: includeFiles,
     );
 
     return CherryImportResult(
-      providers: importedProviders.length,
-      assistants: importedAssistants.length,
+      providers: scope.includes(BackupCategory.providers)
+          ? importedProviders.length
+          : 0,
+      assistants: scope.includes(BackupCategory.assistants)
+          ? importedAssistants.length
+          : 0,
       conversations: convCountAndMsgCount.$1,
       messages: convCountAndMsgCount.$2,
       files: pathsByFileId.length + convCountAndMsgCount.$3,
@@ -772,6 +787,7 @@ class CherryImporter {
   static Future<void> _importBusinessData({
     required BusinessRepository businessRepository,
     required RestoreMode mode,
+    required BackupScope scope,
     required Map<String, Map<String, dynamic>> providers,
     required List<Map<String, dynamic>> assistants,
   }) {
@@ -781,7 +797,11 @@ class CherryImporter {
         settings[_providersKey] = jsonEncode(providers);
         settings[_providersOrderKey] = providers.keys.toList();
         settings[_assistantsKey] = jsonEncode(assistants);
-        return BusinessSettingsRouter.normalizeAndRoute(settings);
+        return BackupContentFilter.preserveUnselected(
+          BusinessSettingsRouter.normalizeAndRoute(settings),
+          current,
+          scope,
+        );
       }
 
       final currentProviders = _jsonObjectMap(
@@ -839,7 +859,11 @@ class CherryImporter {
         }
       }
       settings[_assistantsKey] = jsonEncode(assistantsById.values.toList());
-      return BusinessSettingsRouter.normalizeAndRoute(settings);
+      return BackupContentFilter.preserveUnselected(
+        BusinessSettingsRouter.normalizeAndRoute(settings),
+        current,
+        scope,
+      );
     }, writeReceipt: true);
   }
 
@@ -1505,8 +1529,11 @@ class CherryImporter {
     required List<_CherryTypedTopic> topics,
     required Map<String, String> filePaths,
     required ChatService chatService,
+    required bool includeChats,
+    required bool includeFiles,
   }) async {
     if (!chatService.initialized) await chatService.init();
+    if (!includeChats && !includeFiles) return (0, 0, 0);
     var convCount = 0;
     var msgCount = 0;
     var extraSaved = 0;
@@ -1516,7 +1543,11 @@ class CherryImporter {
         final parts = <MessagePart>[...typed.message.parts];
         for (final ref in typed.pendingWrites) {
           debugPendingWriteAccessCount++;
-          final part = await _resolveCherryAttachment(ref, filePaths);
+          final part = await _resolveCherryAttachment(
+            ref,
+            filePaths,
+            includeFiles: includeFiles,
+          );
           if (ref.dataUrl != null) {
             final unavailable = part is ImagePart
                 ? part.unavailable
@@ -1528,6 +1559,7 @@ class CherryImporter {
         resolved.add(typed.message.copyWith(parts: parts));
       }
 
+      if (!includeChats) continue;
       if (topic.mergeIntoExisting) {
         for (final message in resolved) {
           await chatService.addMessageDirectly(topic.conversation.id, message);
@@ -1544,14 +1576,17 @@ class CherryImporter {
 
   static Future<MessagePart> _resolveCherryAttachment(
     _PendingAttachmentRef ref,
-    Map<String, String> filePaths,
-  ) async {
+    Map<String, String> filePaths, {
+    required bool includeFiles,
+  }) async {
     final fileName = ref.name ?? (ref.isImage ? 'image' : 'file');
     final fileMime =
         ref.mime ?? (ref.isImage ? 'image/png' : 'application/octet-stream');
 
     if (ref.dataUrl != null) {
-      final savedPath = await _saveDataUrlToUpload(ref.dataUrl!);
+      final savedPath = includeFiles
+          ? await _saveDataUrlToUpload(ref.dataUrl!)
+          : null;
       if (savedPath != null) {
         return _attachmentPart(
           isImage: ref.isImage,

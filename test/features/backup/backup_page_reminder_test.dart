@@ -89,6 +89,8 @@ void main() {
         ),
       );
       await tester.pump();
+      await tester.scrollUntilVisible(find.text('Backup Reminder'), 300);
+      await tester.pumpAndSettle();
 
       expect(find.text('Backup Reminder'), findsOneWidget);
       expect(find.text('Remind me to back up'), findsOneWidget);
@@ -115,6 +117,8 @@ void main() {
         ),
       );
       await tester.pump();
+      await tester.scrollUntilVisible(find.text('Backup Reminder'), 300);
+      await tester.pumpAndSettle();
 
       expect(find.text('Backup Reminder'), findsOneWidget);
       expect(find.text('Frequency'), findsOneWidget);

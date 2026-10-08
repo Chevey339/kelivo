@@ -40,6 +40,27 @@ import 'package:Kelivo/core/services/backup/restore_startup_gate.dart';
 import 'package:Kelivo/core/services/chat/chat_service.dart';
 import 'package:Kelivo/core/services/instruction_injection_store.dart';
 
+const _withoutAssets = WebDavConfig(
+  scope: BackupScope(
+    excluded: {
+      BackupCategory.files,
+      BackupCategory.skills,
+      BackupCategory.workspaces,
+    },
+  ),
+);
+
+const _withoutChatsOrAssets = WebDavConfig(
+  scope: BackupScope(
+    excluded: {
+      BackupCategory.chats,
+      BackupCategory.files,
+      BackupCategory.skills,
+      BackupCategory.workspaces,
+    },
+  ),
+);
+
 bool _containsContiguousBytes(List<int> source, List<int> pattern) {
   for (var start = 0; start <= source.length - pattern.length; start++) {
     var matches = true;
@@ -1152,7 +1173,7 @@ void main() {
         );
         await sync.restoreFromLocalFile(
           fixture,
-          const WebDavConfig(includeChats: true, includeFiles: true),
+          const WebDavConfig(),
           mode: RestoreMode.merge,
         );
         final newId = sync
@@ -1269,7 +1290,11 @@ void main() {
               chatService: chat,
             );
             final backup = await sync.prepareBackupFile(
-              WebDavConfig(includeChats: includeChats, includeFiles: true),
+              WebDavConfig(
+                scope: BackupScope(
+                  excluded: {if (!includeChats) BackupCategory.chats},
+                ),
+              ),
             );
             final stream = InputFileStream(backup.path);
             final archive = ZipDecoder().decodeStream(stream);
@@ -1369,7 +1394,9 @@ void main() {
           chatService: ChatService(),
         );
         final backupFile = await sync.prepareBackupFile(
-          const WebDavConfig(includeChats: false, includeFiles: true),
+          const WebDavConfig(
+            scope: BackupScope(excluded: {BackupCategory.chats}),
+          ),
         );
 
         expect(await staleWorkDir.exists(), isFalse);
@@ -1449,7 +1476,9 @@ void main() {
           chatService: ChatService(),
         );
         final backupFile = await sync.prepareBackupFile(
-          const WebDavConfig(includeChats: false, includeFiles: true),
+          const WebDavConfig(
+            scope: BackupScope(excluded: {BackupCategory.chats}),
+          ),
         );
         addTearDown(() => DataSync.cleanupTemporaryBackupFile(backupFile));
 
@@ -1460,7 +1489,34 @@ void main() {
         );
 
         final bytes = await backupFile.readAsBytes();
-        final flipAt = bytes.length ~/ 2;
+        // Locate the payload's local ZIP header: the archive midpoint can
+        // fall in central-directory metadata as the manifest grows.
+        final name = utf8.encode('upload/payload.bin');
+        var flipAt = -1;
+        for (
+          var offset = 0;
+          offset + 30 + name.length < bytes.length;
+          offset++
+        ) {
+          if (bytes[offset] != 0x50 ||
+              bytes[offset + 1] != 0x4b ||
+              bytes[offset + 2] != 0x03 ||
+              bytes[offset + 3] != 0x04) {
+            continue;
+          }
+          final nameLength = bytes[offset + 26] | (bytes[offset + 27] << 8);
+          final extraLength = bytes[offset + 28] | (bytes[offset + 29] << 8);
+          if (nameLength != name.length ||
+              !List.generate(
+                name.length,
+                (i) => bytes[offset + 30 + i],
+              ).asMap().entries.every((e) => e.value == name[e.key])) {
+            continue;
+          }
+          flipAt = offset + 30 + nameLength + extraLength;
+          break;
+        }
+        expect(flipAt, greaterThanOrEqualTo(0));
         bytes[flipAt] = bytes[flipAt] ^ 0xff;
         await backupFile.writeAsBytes(bytes, flush: true);
 
@@ -1488,7 +1544,9 @@ void main() {
           chatService: ChatService(),
         );
         final backupFile = await sync.prepareBackupFile(
-          const WebDavConfig(includeChats: false, includeFiles: true),
+          const WebDavConfig(
+            scope: BackupScope(excluded: {BackupCategory.chats}),
+          ),
         );
         addTearDown(() => DataSync.cleanupTemporaryBackupFile(backupFile));
 
@@ -1543,7 +1601,9 @@ void main() {
         chatService: ChatService(),
       );
       final backupFile = await sync.prepareBackupFile(
-        const WebDavConfig(includeChats: false, includeFiles: true),
+        const WebDavConfig(
+          scope: BackupScope(excluded: {BackupCategory.chats}),
+        ),
       );
       addTearDown(() => DataSync.cleanupTemporaryBackupFile(backupFile));
       await Future<void>.delayed(Duration.zero);
@@ -1567,9 +1627,7 @@ void main() {
           businessRepository: businessRepository,
           chatService: ChatService(),
         );
-        final backupFile = await sync.prepareBackupFile(
-          const WebDavConfig(includeChats: false, includeFiles: false),
-        );
+        final backupFile = await sync.prepareBackupFile(_withoutChatsOrAssets);
         addTearDown(() => DataSync.cleanupTemporaryBackupFile(backupFile));
         expect(await backupFile.exists(), isTrue);
         expect(
@@ -1586,10 +1644,7 @@ void main() {
         ).exportSettings();
 
         await expectLater(
-          sync.restoreFromLocalFile(
-            backupFile,
-            const WebDavConfig(includeChats: false, includeFiles: false),
-          ),
+          sync.restoreFromLocalFile(backupFile, _withoutChatsOrAssets),
           throwsA(
             isA<FormatException>().having(
               (error) => error.message,
@@ -1621,7 +1676,9 @@ void main() {
 
       await expectLater(
         sync.prepareBackupFile(
-          const WebDavConfig(includeChats: false, includeFiles: true),
+          const WebDavConfig(
+            scope: BackupScope(excluded: {BackupCategory.chats}),
+          ),
           onProgress: (progress) {
             if (progress.phase == BackupPhase.packing) {
               token.cancel();
@@ -1669,7 +1726,7 @@ void main() {
           businessRepository: businessRepository,
           chatService: ChatService(),
         ).prepareBackupFile(
-          const WebDavConfig(includeChats: false, includeFiles: false),
+          _withoutChatsOrAssets,
           cancelToken: liveToken,
           onProgress: (progress) {
             events.add(progress);
@@ -1720,11 +1777,7 @@ void main() {
         await DataSync(
           businessRepository: businessRepository,
           chatService: chatService,
-        ).restoreFromLocalFile(
-          zip,
-          const WebDavConfig(includeChats: true, includeFiles: false),
-          onProgress: events.add,
-        );
+        ).restoreFromLocalFile(zip, _withoutAssets, onProgress: events.add);
 
         final extracting = events
             .where((event) => event.phase == BackupPhase.extracting)
@@ -1752,11 +1805,7 @@ void main() {
         await DataSync(
           businessRepository: businessRepository,
           chatService: chatService,
-        ).restoreFromLocalFile(
-          zip,
-          const WebDavConfig(includeChats: true, includeFiles: false),
-          onProgress: events.add,
-        );
+        ).restoreFromLocalFile(zip, _withoutAssets, onProgress: events.add);
 
         final verifyDoneIndex = events.indexWhere(
           (event) =>
@@ -1831,7 +1880,9 @@ void main() {
       await expectLater(
         sync.restoreFromLocalFile(
           zipFile,
-          const WebDavConfig(includeChats: false, includeFiles: true),
+          const WebDavConfig(
+            scope: BackupScope(excluded: {BackupCategory.chats}),
+          ),
           onProgress: (progress) {
             if (progress.phase == BackupPhase.extracting) {
               token.cancel();
@@ -1898,7 +1949,7 @@ void main() {
             chatService: chatService,
           ).restoreFromLocalFile(
             zipFile,
-            const WebDavConfig(includeChats: true, includeFiles: false),
+            _withoutAssets,
             onProgress: (progress) {
               if (progress.phase == BackupPhase.readingSettings) {
                 token.cancel();
@@ -1963,7 +2014,7 @@ void main() {
           chatService: chatService,
         ).restoreFromLocalFile(
           zipFile,
-          const WebDavConfig(includeChats: true, includeFiles: false),
+          _withoutAssets,
           onProgress: (progress) {
             if (progress.phase == BackupPhase.stagingCandidate) {
               token.cancel();
@@ -1997,9 +2048,7 @@ void main() {
           chatService: ChatService(),
         );
 
-        final backupFile = await sync.prepareBackupFile(
-          const WebDavConfig(includeChats: false, includeFiles: false),
-        );
+        final backupFile = await sync.prepareBackupFile(_withoutChatsOrAssets);
 
         final input = InputFileStream(backupFile.path);
         Archive? archive;
@@ -2058,9 +2107,7 @@ void main() {
           businessRepository: businessRepository,
           chatService: ChatService(),
         );
-        final backupFile = await sync.prepareBackupFile(
-          const WebDavConfig(includeChats: false, includeFiles: false),
-        );
+        final backupFile = await sync.prepareBackupFile(_withoutChatsOrAssets);
         addTearDown(() => DataSync.cleanupTemporaryBackupFile(backupFile));
 
         await BusinessRestoreService(businessRepository).overwrite({
@@ -2103,10 +2150,7 @@ void main() {
           's3_config_v1': jsonEncode({'secretAccessKey': 'target-s3-secret'}),
         });
 
-        await sync.restoreFromLocalFile(
-          backupFile,
-          const WebDavConfig(includeChats: false, includeFiles: false),
-        );
+        await sync.restoreFromLocalFile(backupFile, _withoutChatsOrAssets);
 
         final restored = await BusinessRestoreService(
           businessRepository,
@@ -2157,10 +2201,7 @@ void main() {
           DataSync(
             businessRepository: businessRepository,
             chatService: ChatService(),
-          ).restoreFromLocalFile(
-            backupFile,
-            const WebDavConfig(includeChats: true, includeFiles: false),
-          ),
+          ).restoreFromLocalFile(backupFile, _withoutAssets),
           throwsA(
             isA<FormatException>().having(
               (error) => error.message,
@@ -2203,10 +2244,7 @@ void main() {
           DataSync(
             businessRepository: businessRepository,
             chatService: ChatService(),
-          ).restoreFromLocalFile(
-            backupFile,
-            const WebDavConfig(includeChats: false, includeFiles: false),
-          ),
+          ).restoreFromLocalFile(backupFile, _withoutChatsOrAssets),
           throwsA(
             isA<FormatException>().having(
               (error) => error.message,
@@ -2238,9 +2276,7 @@ void main() {
         businessRepository: businessRepository,
         chatService: ChatService(),
       );
-      final backupFile = await sync.prepareBackupFile(
-        const WebDavConfig(includeChats: false, includeFiles: false),
-      );
+      final backupFile = await sync.prepareBackupFile(_withoutChatsOrAssets);
       addTearDown(() => DataSync.cleanupTemporaryBackupFile(backupFile));
 
       final targetProviders = jsonEncode({
@@ -2257,7 +2293,7 @@ void main() {
 
       await sync.restoreFromLocalFile(
         backupFile,
-        const WebDavConfig(includeChats: false, includeFiles: false),
+        _withoutChatsOrAssets,
         mode: RestoreMode.merge,
       );
 
@@ -2283,9 +2319,7 @@ void main() {
           businessRepository: businessRepository,
           chatService: ChatService(),
         );
-        final backupFile = await sync.prepareBackupFile(
-          const WebDavConfig(includeChats: false, includeFiles: false),
-        );
+        final backupFile = await sync.prepareBackupFile(_withoutChatsOrAssets);
         addTearDown(() => DataSync.cleanupTemporaryBackupFile(backupFile));
 
         final targetSearchServices = jsonEncode([
@@ -2298,10 +2332,7 @@ void main() {
           'search_services_v1': targetSearchServices,
         });
 
-        await sync.restoreFromLocalFile(
-          backupFile,
-          const WebDavConfig(includeChats: false, includeFiles: false),
-        );
+        await sync.restoreFromLocalFile(backupFile, _withoutChatsOrAssets);
 
         final prefs = await SharedPreferences.getInstance();
         await prefs.reload();
@@ -2339,13 +2370,10 @@ void main() {
         ],
       );
 
-      final backupFile =
-          await DataSync(
-            businessRepository: businessRepository,
-            chatService: chatService,
-          ).prepareBackupFile(
-            const WebDavConfig(includeChats: true, includeFiles: false),
-          );
+      final backupFile = await DataSync(
+        businessRepository: businessRepository,
+        chatService: chatService,
+      ).prepareBackupFile(_withoutAssets);
       addTearDown(() => DataSync.cleanupTemporaryBackupFile(backupFile));
 
       final input = InputFileStream(backupFile.path);
@@ -2370,7 +2398,7 @@ void main() {
             jsonDecode(utf8.decode(manifestEntry!.readBytes()!))
                 as Map<String, dynamic>;
         expect(manifest['format'], 'kelivo-backup');
-        expect(manifest['formatVersion'], 2);
+        expect(manifest['formatVersion'], 3);
         expect(manifest['payloadKind'], 'sqlite');
         expect(manifest['includeChats'], isTrue);
         expect(manifest['appVersion'], '1.0.0-test+1');
@@ -2466,10 +2494,7 @@ void main() {
       await DataSync(
         businessRepository: businessRepository,
         chatService: chatService,
-      ).restoreFromLocalFile(
-        zipFile,
-        const WebDavConfig(includeChats: true, includeFiles: false),
-      );
+      ).restoreFromLocalFile(zipFile, _withoutAssets);
 
       expect(chatService.getConversation(existing.id), isNotNull);
       expect(chatService.getConversation('restored-conversation'), isNull);
@@ -2516,7 +2541,7 @@ void main() {
         chatService: chatService,
       ).restoreFromLocalFile(
         zipFile,
-        const WebDavConfig(includeChats: true, includeFiles: false),
+        _withoutAssets,
         allowUnverifiedForwardCompatible: true,
       );
 
@@ -2552,10 +2577,7 @@ void main() {
         DataSync(
           businessRepository: businessRepository,
           chatService: ChatService(),
-        ).restoreFromLocalFile(
-          zipFile,
-          const WebDavConfig(includeChats: true, includeFiles: false),
-        ),
+        ).restoreFromLocalFile(zipFile, _withoutAssets),
         throwsA(
           isA<FormatException>().having(
             (e) => e.message,
@@ -2587,7 +2609,7 @@ void main() {
         chatService: chatService,
       ).restoreFromLocalFile(
         zipFile,
-        const WebDavConfig(includeChats: true, includeFiles: false),
+        _withoutAssets,
         allowUnverifiedForwardCompatible: true,
       );
 
@@ -2618,10 +2640,7 @@ void main() {
         DataSync(
           businessRepository: businessRepository,
           chatService: ChatService(),
-        ).restoreFromLocalFile(
-          zipFile,
-          const WebDavConfig(includeChats: true, includeFiles: false),
-        ),
+        ).restoreFromLocalFile(zipFile, _withoutAssets),
         throwsA(
           isA<FormatException>().having(
             (e) => e.message,
@@ -2640,7 +2659,7 @@ void main() {
         root: root,
         prefix: 'forward_format_only',
         settings: const {},
-        formatVersionOverride: 3,
+        formatVersionOverride: 4,
         minimumReadableFormatOverride: 2,
         extraEntries: const {'stickers/future.bin': 'ignorable'},
         extraManifestFields: const {'futureTopLevel': 'ignored'},
@@ -2650,10 +2669,7 @@ void main() {
       await DataSync(
         businessRepository: businessRepository,
         chatService: chatService,
-      ).restoreFromLocalFile(
-        zipFile,
-        const WebDavConfig(includeChats: true, includeFiles: false),
-      );
+      ).restoreFromLocalFile(zipFile, _withoutAssets);
 
       final runDirectory = await _singleRestoreRunDirectory(root);
       final candidateManifest =
@@ -2665,7 +2681,7 @@ void main() {
               as Map<String, dynamic>;
       // Reduced to this build's format, so the staged candidate is an ordinary
       // one that the single-version validators accept unchanged.
-      expect(candidateManifest['formatVersion'], 2);
+      expect(candidateManifest['formatVersion'], 3);
       expect(candidateManifest.keys, isNot(contains('futureTopLevel')));
       expect(
         candidateManifest.keys,
@@ -2683,17 +2699,14 @@ void main() {
         root: root,
         prefix: 'forward_format_undeclared',
         settings: const {},
-        formatVersionOverride: 3,
+        formatVersionOverride: 4,
       );
 
       await expectLater(
         DataSync(
           businessRepository: businessRepository,
           chatService: ChatService(),
-        ).restoreFromLocalFile(
-          zipFile,
-          const WebDavConfig(includeChats: true, includeFiles: false),
-        ),
+        ).restoreFromLocalFile(zipFile, _withoutAssets),
         throwsA(
           isA<FormatException>().having(
             (e) => e.message,
@@ -2709,18 +2722,15 @@ void main() {
         root: root,
         prefix: 'forward_format_too_new',
         settings: const {},
-        formatVersionOverride: 3,
-        minimumReadableFormatOverride: 3,
+        formatVersionOverride: 4,
+        minimumReadableFormatOverride: 4,
       );
 
       await expectLater(
         DataSync(
           businessRepository: businessRepository,
           chatService: ChatService(),
-        ).restoreFromLocalFile(
-          zipFile,
-          const WebDavConfig(includeChats: true, includeFiles: false),
-        ),
+        ).restoreFromLocalFile(zipFile, _withoutAssets),
         throwsA(
           isA<FormatException>().having(
             (e) => e.message,
@@ -2734,13 +2744,10 @@ void main() {
     test('every backup this build writes declares its readers', () async {
       // Without this the whole mechanism is inert: a future build has nothing
       // to check against and must refuse today's archives.
-      final zipFile =
-          await DataSync(
-            businessRepository: businessRepository,
-            chatService: ChatService(),
-          ).exportToFile(
-            const WebDavConfig(includeChats: false, includeFiles: false),
-          );
+      final zipFile = await DataSync(
+        businessRepository: businessRepository,
+        chatService: ChatService(),
+      ).exportToFile(_withoutChatsOrAssets);
       final archive = ZipDecoder().decodeBytes(await zipFile.readAsBytes());
       final manifest =
           jsonDecode(
@@ -2750,8 +2757,8 @@ void main() {
               )
               as Map<String, dynamic>;
 
-      expect(manifest['formatVersion'], 2);
-      expect(manifest['minimumReadableFormatVersion'], 2);
+      expect(manifest['formatVersion'], 3);
+      expect(manifest['minimumReadableFormatVersion'], 3);
       expect(
         manifest['minimumReadableFormatVersion'],
         lessThanOrEqualTo(manifest['formatVersion'] as int),
@@ -2776,7 +2783,7 @@ void main() {
       await manifestFile.writeAsString(
         jsonEncode({
           'format': 'kelivo-backup',
-          'formatVersion': 3,
+          'formatVersion': 4,
           'minimumReadableFormatVersion': 2,
           'payloadKind': 'settings-only',
           'createdAtUtc': '2026-07-09T00:00:00.000Z',
@@ -2815,10 +2822,7 @@ void main() {
       await DataSync(
         businessRepository: businessRepository,
         chatService: chatService,
-      ).restoreFromLocalFile(
-        zipFile,
-        const WebDavConfig(includeChats: false, includeFiles: false),
-      );
+      ).restoreFromLocalFile(zipFile, _withoutChatsOrAssets);
 
       final restored = await BusinessRestoreService(
         businessRepository,
@@ -2838,10 +2842,7 @@ void main() {
       await DataSync(
         businessRepository: businessRepository,
         chatService: chatService,
-      ).restoreFromLocalFile(
-        zipFile,
-        const WebDavConfig(includeChats: true, includeFiles: false),
-      );
+      ).restoreFromLocalFile(zipFile, _withoutAssets);
 
       final workspace = Directory('${root.path}/.kelivo_restore');
       final runDirectory = await _singleRestoreRunDirectory(root);
@@ -2889,10 +2890,7 @@ void main() {
         await DataSync(
           businessRepository: businessRepository,
           chatService: ChatService(),
-        ).restoreFromLocalFile(
-          zipFile,
-          const WebDavConfig(includeChats: false, includeFiles: false),
-        );
+        ).restoreFromLocalFile(zipFile, _withoutChatsOrAssets);
 
         final restored = await BusinessRestoreService(
           businessRepository,
@@ -2918,10 +2916,7 @@ void main() {
         await DataSync(
           businessRepository: businessRepository,
           chatService: ChatService(),
-        ).restoreFromLocalFile(
-          zipFile,
-          const WebDavConfig(includeChats: false, includeFiles: false),
-        );
+        ).restoreFromLocalFile(zipFile, _withoutChatsOrAssets);
 
         expect(
           await InstructionInjectionStore(
@@ -2951,7 +2946,7 @@ void main() {
           chatService: ChatService(),
         ).restoreFromLocalFile(
           zipFile,
-          const WebDavConfig(includeChats: false, includeFiles: false),
+          _withoutChatsOrAssets,
           mode: RestoreMode.merge,
         );
 
@@ -2992,10 +2987,7 @@ void main() {
           DataSync(
             businessRepository: businessRepository,
             chatService: ChatService(),
-          ).restoreFromLocalFile(
-            zipFile,
-            const WebDavConfig(includeChats: true, includeFiles: false),
-          ),
+          ).restoreFromLocalFile(zipFile, _withoutAssets),
           throwsStateError,
         );
 
@@ -3025,10 +3017,7 @@ void main() {
       await DataSync(
         businessRepository: businessRepository,
         chatService: ChatService(),
-      ).restoreFromLocalFile(
-        zipFile,
-        const WebDavConfig(includeChats: true, includeFiles: true),
-      );
+      ).restoreFromLocalFile(zipFile, const WebDavConfig());
 
       for (final rootName in RestorePreviousAssetsPlan.rootNames) {
         expect(
@@ -3080,7 +3069,9 @@ void main() {
               businessRepository: businessRepository,
               chatService: ChatService(),
             ).prepareBackupFile(
-              const WebDavConfig(includeChats: false, includeFiles: true),
+              const WebDavConfig(
+                scope: BackupScope(excluded: {BackupCategory.chats}),
+              ),
               onProgress: events.add,
             );
         addTearDown(() => DataSync.cleanupTemporaryBackupFile(backupFile));
@@ -3144,10 +3135,7 @@ void main() {
         await DataSync(
           businessRepository: businessRepository,
           chatService: ChatService(),
-        ).restoreFromLocalFile(
-          zipFile,
-          const WebDavConfig(includeChats: true, includeFiles: true),
-        );
+        ).restoreFromLocalFile(zipFile, const WebDavConfig());
 
         for (final path in nested.keys) {
           expect(await File(p.join(root.path, path)).exists(), isFalse);
@@ -3183,10 +3171,7 @@ void main() {
       await DataSync(
         businessRepository: businessRepository,
         chatService: ChatService(),
-      ).restoreFromLocalFile(
-        zipFile,
-        const WebDavConfig(includeChats: true, includeFiles: true),
-      );
+      ).restoreFromLocalFile(zipFile, const WebDavConfig());
 
       final runDirectory = await _singleRestoreRunDirectory(root);
       final candidate = Directory(p.join(runDirectory.path, 'candidate'));
@@ -3246,10 +3231,7 @@ void main() {
         await DataSync(
           businessRepository: businessRepository,
           chatService: ChatService(),
-        ).restoreFromLocalFile(
-          zipFile,
-          const WebDavConfig(includeChats: true, includeFiles: false),
-        );
+        ).restoreFromLocalFile(zipFile, _withoutAssets);
 
         expect(
           await BusinessRestoreService(businessRepository).exportSettings(),
@@ -3291,10 +3273,7 @@ void main() {
         DataSync(
           businessRepository: businessRepository,
           chatService: ChatService(),
-        ).restoreFromLocalFile(
-          zipFile,
-          const WebDavConfig(includeChats: false, includeFiles: false),
-        ),
+        ).restoreFromLocalFile(zipFile, _withoutChatsOrAssets),
         throwsA(anything),
       );
 
@@ -3329,10 +3308,7 @@ void main() {
           DataSync(
             businessRepository: businessRepository,
             chatService: chatService,
-          ).restoreFromLocalFile(
-            fixture,
-            const WebDavConfig(includeChats: true, includeFiles: false),
-          ),
+          ).restoreFromLocalFile(fixture, _withoutAssets),
           throwsA(isA<FormatException>()),
         );
 
@@ -3377,7 +3353,7 @@ void main() {
             chatService: chatService,
           ).restoreFromLocalFile(
             fixture,
-            const WebDavConfig(includeChats: true, includeFiles: false),
+            _withoutAssets,
             mode: RestoreMode.merge,
           ),
           throwsA(isA<FormatException>()),
@@ -3413,7 +3389,7 @@ void main() {
         await manifestFile.writeAsString(
           jsonEncode({
             'format': 'kelivo-backup',
-            'formatVersion': 3,
+            'formatVersion': 4,
             'payloadKind': 'settings-only',
             'createdAtUtc': '2026-07-09T00:00:00.000Z',
             'appVersion': 'future',
@@ -3450,10 +3426,7 @@ void main() {
           DataSync(
             businessRepository: businessRepository,
             chatService: chatService,
-          ).restoreFromLocalFile(
-            zipFile,
-            const WebDavConfig(includeChats: true, includeFiles: false),
-          ),
+          ).restoreFromLocalFile(zipFile, _withoutAssets),
           throwsA(isA<FormatException>()),
         );
 
@@ -3491,10 +3464,7 @@ void main() {
         DataSync(
           businessRepository: businessRepository,
           chatService: ChatService(),
-        ).restoreFromLocalFile(
-          zipFile,
-          const WebDavConfig(includeChats: false, includeFiles: false),
-        ),
+        ).restoreFromLocalFile(zipFile, _withoutChatsOrAssets),
         throwsA(isA<FormatException>()),
       );
 
@@ -3529,10 +3499,7 @@ void main() {
           DataSync(
             businessRepository: businessRepository,
             chatService: ChatService(),
-          ).restoreFromLocalFile(
-            zipFile,
-            const WebDavConfig(includeChats: false, includeFiles: false),
-          ),
+          ).restoreFromLocalFile(zipFile, _withoutChatsOrAssets),
           throwsA(
             isA<FormatException>().having(
               (error) => error.message,
@@ -3573,10 +3540,7 @@ void main() {
           DataSync(
             businessRepository: businessRepository,
             chatService: ChatService(),
-          ).restoreFromLocalFile(
-            zipFile,
-            const WebDavConfig(includeChats: false, includeFiles: false),
-          ),
+          ).restoreFromLocalFile(zipFile, _withoutChatsOrAssets),
           throwsA(isA<FormatException>()),
         );
 
@@ -3619,10 +3583,7 @@ void main() {
         DataSync(
           businessRepository: businessRepository,
           chatService: ChatService(),
-        ).restoreFromLocalFile(
-          zipFile,
-          const WebDavConfig(includeChats: false, includeFiles: false),
-        ),
+        ).restoreFromLocalFile(zipFile, _withoutChatsOrAssets),
         throwsA(isA<FormatException>()),
       );
 
@@ -3656,10 +3617,7 @@ void main() {
         DataSync(
           businessRepository: businessRepository,
           chatService: ChatService(),
-        ).restoreFromLocalFile(
-          zipFile,
-          const WebDavConfig(includeChats: true, includeFiles: false),
-        ),
+        ).restoreFromLocalFile(zipFile, _withoutAssets),
         throwsA(isA<FormatException>()),
       );
 
@@ -3689,7 +3647,7 @@ void main() {
       );
       await sync.restoreFromLocalFile(
         fixture,
-        const WebDavConfig(includeChats: true, includeFiles: false),
+        _withoutAssets,
         mode: RestoreMode.merge,
       );
 
@@ -3735,7 +3693,7 @@ void main() {
             chatService: ChatService(),
           ).restoreFromLocalFile(
             zipFile,
-            const WebDavConfig(includeChats: false, includeFiles: false),
+            _withoutChatsOrAssets,
             mode: RestoreMode.merge,
           ),
           throwsA(anything),
@@ -3774,7 +3732,9 @@ void main() {
         );
         await sync.restoreFromLocalFile(
           zipFile,
-          const WebDavConfig(includeChats: false, includeFiles: true),
+          const WebDavConfig(
+            scope: BackupScope(excluded: {BackupCategory.chats}),
+          ),
           mode: RestoreMode.merge,
         );
 
@@ -3787,7 +3747,9 @@ void main() {
 
         await sync.restoreFromLocalFile(
           zipFile,
-          const WebDavConfig(includeChats: false, includeFiles: true),
+          const WebDavConfig(
+            scope: BackupScope(excluded: {BackupCategory.chats}),
+          ),
           mode: RestoreMode.overwrite,
         );
 
@@ -3869,7 +3831,7 @@ void main() {
         );
         await sync.restoreFromLocalFile(
           zipFile,
-          const WebDavConfig(includeChats: false, includeFiles: false),
+          _withoutChatsOrAssets,
           mode: RestoreMode.merge,
         );
 
@@ -3949,7 +3911,7 @@ void main() {
           chatService: ChatService(),
         ).restoreFromLocalFile(
           zipFile,
-          const WebDavConfig(includeChats: false, includeFiles: false),
+          _withoutChatsOrAssets,
           mode: RestoreMode.merge,
         );
 
@@ -3995,7 +3957,7 @@ void main() {
       await expectLater(
         sync.restoreFromLocalFile(
           zipFile,
-          const WebDavConfig(includeChats: false, includeFiles: false),
+          _withoutChatsOrAssets,
           mode: RestoreMode.merge,
         ),
         throwsA(isA<FormatException>()),
@@ -4036,10 +3998,7 @@ void main() {
         );
 
         await expectLater(
-          sync.restoreFromLocalFile(
-            zipFile,
-            const WebDavConfig(includeChats: false, includeFiles: false),
-          ),
+          sync.restoreFromLocalFile(zipFile, _withoutChatsOrAssets),
           throwsA(isA<FormatException>()),
         );
         expect(
@@ -4076,7 +4035,7 @@ void main() {
       await expectLater(
         sync.restoreFromLocalFile(
           zipFile,
-          const WebDavConfig(includeChats: false, includeFiles: false),
+          _withoutChatsOrAssets,
           mode: RestoreMode.merge,
         ),
         throwsA(isA<FormatException>()),
@@ -4111,10 +4070,7 @@ void main() {
         DataSync(
           businessRepository: businessRepository,
           chatService: ChatService(),
-        ).restoreFromLocalFile(
-          zipFile,
-          const WebDavConfig(includeChats: false, includeFiles: false),
-        ),
+        ).restoreFromLocalFile(zipFile, _withoutChatsOrAssets),
         throwsA(isA<FormatException>()),
       );
       expect(
@@ -4143,10 +4099,7 @@ void main() {
         DataSync(
           businessRepository: businessRepository,
           chatService: ChatService(),
-        ).restoreFromLocalFile(
-          zipFile,
-          const WebDavConfig(includeChats: false, includeFiles: false),
-        ),
+        ).restoreFromLocalFile(zipFile, _withoutChatsOrAssets),
         throwsA(isA<FormatException>()),
       );
       expect(
@@ -4183,10 +4136,7 @@ void main() {
         );
 
         await expectLater(
-          sync.restoreFromLocalFile(
-            zipFile,
-            const WebDavConfig(includeChats: true, includeFiles: false),
-          ),
+          sync.restoreFromLocalFile(zipFile, _withoutAssets),
           throwsA(
             isA<StateError>().having(
               (error) => error.message,
@@ -4217,10 +4167,7 @@ void main() {
         );
 
         await expectLater(
-          sync.restoreFromLocalFile(
-            zipFile,
-            const WebDavConfig(includeChats: false, includeFiles: false),
-          ),
+          sync.restoreFromLocalFile(zipFile, _withoutChatsOrAssets),
           throwsA(isA<FormatException>()),
         );
       },
@@ -4268,10 +4215,7 @@ void main() {
         );
 
         await expectLater(
-          sync.restoreFromLocalFile(
-            zipFile,
-            const WebDavConfig(includeChats: true, includeFiles: false),
-          ),
+          sync.restoreFromLocalFile(zipFile, _withoutAssets),
           throwsA(
             isA<StateError>().having(
               (error) => error.message,
@@ -4319,10 +4263,7 @@ void main() {
           chatService: _FailingRestoreChatService(),
           businessRepository: businessRepository,
           businessPreferences: businessPreferences,
-          initialConfig: const WebDavConfig(
-            includeChats: true,
-            includeFiles: false,
-          ),
+          initialConfig: _withoutAssets,
         );
         final item = BackupFileItem(
           href: Uri.parse(
@@ -4380,10 +4321,7 @@ void main() {
       );
 
       await expectLater(
-        sync.restoreFromLocalFile(
-          zipFile,
-          const WebDavConfig(includeChats: true, includeFiles: false),
-        ),
+        sync.restoreFromLocalFile(zipFile, _withoutAssets),
         throwsA(isA<FormatException>()),
       );
       expect(chatService.cleared, isFalse);
@@ -4414,10 +4352,7 @@ void main() {
         DataSync(
           businessRepository: businessRepository,
           chatService: chatService,
-        ).restoreFromLocalFile(
-          zipFile,
-          const WebDavConfig(includeChats: true, includeFiles: false),
-        ),
+        ).restoreFromLocalFile(zipFile, _withoutAssets),
         throwsA(isA<FormatException>()),
       );
       expect(chatService.cleared, isFalse);
@@ -4460,10 +4395,7 @@ void main() {
         DataSync(
           businessRepository: businessRepository,
           chatService: chatService,
-        ).restoreFromLocalFile(
-          zipFile,
-          const WebDavConfig(includeChats: true, includeFiles: false),
-        ),
+        ).restoreFromLocalFile(zipFile, _withoutAssets),
         throwsA(isA<FormatException>()),
       );
       expect(chatService.cleared, isFalse);
@@ -4498,10 +4430,7 @@ void main() {
         );
 
         await expectLater(
-          sync.restoreFromLocalFile(
-            zipFile,
-            const WebDavConfig(includeChats: true, includeFiles: false),
-          ),
+          sync.restoreFromLocalFile(zipFile, _withoutAssets),
           throwsA(isA<FormatException>()),
         );
         expect(
@@ -4555,10 +4484,7 @@ void main() {
           chatService: chatService,
         );
 
-        await sync.restoreFromLocalFile(
-          zipFile,
-          const WebDavConfig(includeChats: true, includeFiles: false),
-        );
+        await sync.restoreFromLocalFile(zipFile, _withoutAssets);
 
         expect(chatService.cleared, isFalse);
         final restored = await BusinessRestoreService(
@@ -4624,10 +4550,7 @@ void main() {
         chatService: chatService,
       );
 
-      await sync.restoreFromLocalFile(
-        zipFile,
-        const WebDavConfig(includeChats: true, includeFiles: false),
-      );
+      await sync.restoreFromLocalFile(zipFile, _withoutAssets);
 
       expect(await uploadFile.readAsString(), 'keep');
     });
@@ -4688,10 +4611,7 @@ void main() {
       await DataSync(
         businessRepository: businessRepository,
         chatService: chatService,
-      ).restoreFromLocalFile(
-        zipFile,
-        const WebDavConfig(includeChats: true, includeFiles: false),
-      );
+      ).restoreFromLocalFile(zipFile, _withoutAssets);
 
       expect(chatService.getConversation('cache-conversation')?.title, 'New');
       expect(
@@ -4735,10 +4655,7 @@ void main() {
         await DataSync(
           businessRepository: businessRepository,
           chatService: chatService,
-        ).restoreFromLocalFile(
-          zipFile,
-          const WebDavConfig(includeChats: true, includeFiles: false),
-        );
+        ).restoreFromLocalFile(zipFile, _withoutAssets);
 
         expect(chatService.replaced, isTrue);
       },
@@ -4789,10 +4706,7 @@ void main() {
       // 1.1.17 silently tolerated messages whose conversation is missing:
       // they were simply invisible. The sanitizer now prunes the orphan and
       // the overwrite restore proceeds with an empty chat payload.
-      await sync.restoreFromLocalFile(
-        zipFile,
-        const WebDavConfig(includeChats: true, includeFiles: false),
-      );
+      await sync.restoreFromLocalFile(zipFile, _withoutAssets);
 
       final after = await BusinessRestoreService(
         businessRepository,
@@ -4827,10 +4741,7 @@ void main() {
       await DataSync(
         businessRepository: businessRepository,
         chatService: chatService,
-      ).restoreFromLocalFile(
-        zipFile,
-        const WebDavConfig(includeChats: true, includeFiles: false),
-      );
+      ).restoreFromLocalFile(zipFile, _withoutAssets);
 
       expect(chatService.replaced, isTrue);
       final conversation = chatService.replacedConversations!.single;
@@ -4881,10 +4792,7 @@ void main() {
         await DataSync(
           businessRepository: businessRepository,
           chatService: chatService,
-        ).restoreFromLocalFile(
-          zipFile,
-          const WebDavConfig(includeChats: true, includeFiles: false),
-        );
+        ).restoreFromLocalFile(zipFile, _withoutAssets);
 
         expect(chatService.replaced, isTrue);
         expect(chatService.replacedConversations!.single.messageIds, [
@@ -5013,10 +4921,7 @@ void main() {
         await DataSync(
           businessRepository: businessRepository,
           chatService: chatService,
-        ).restoreFromLocalFile(
-          zipFile,
-          const WebDavConfig(includeChats: true, includeFiles: false),
-        );
+        ).restoreFromLocalFile(zipFile, _withoutAssets);
 
         final restored = chatService.getConversation('conversation')!;
         expect(restored.truncateIndex, 2);
@@ -5134,10 +5039,7 @@ void main() {
         await DataSync(
           businessRepository: businessRepository,
           chatService: chatService,
-        ).restoreFromLocalFile(
-          zipFile,
-          const WebDavConfig(includeChats: true, includeFiles: false),
-        );
+        ).restoreFromLocalFile(zipFile, _withoutAssets);
 
         final restored = chatService.getConversation('conversation')!;
         expect(restored.versionSelections, const {'answer': 2});
@@ -5227,10 +5129,7 @@ void main() {
       await DataSync(
         businessRepository: businessRepository,
         chatService: chatService,
-      ).restoreFromLocalFile(
-        zipFile,
-        const WebDavConfig(includeChats: true, includeFiles: false),
-      );
+      ).restoreFromLocalFile(zipFile, _withoutAssets);
 
       expect(chatService.replaced, isTrue);
       final messages = chatService.replacedMessages!;
@@ -5279,10 +5178,7 @@ void main() {
       await DataSync(
         businessRepository: businessRepository,
         chatService: chatService,
-      ).restoreFromLocalFile(
-        zipFile,
-        const WebDavConfig(includeChats: true, includeFiles: false),
-      );
+      ).restoreFromLocalFile(zipFile, _withoutAssets);
 
       expect(chatService.replaced, isTrue);
       expect(chatService.replacedConversations!.single.mcpServerIds, [
@@ -5344,7 +5240,9 @@ void main() {
 
           await expectLater(
             sync.restoreFromWebDav(
-              const WebDavConfig(includeChats: false, includeFiles: true),
+              const WebDavConfig(
+                scope: BackupScope(excluded: {BackupCategory.chats}),
+              ),
               item,
             ),
             throwsA(anything),

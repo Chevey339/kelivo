@@ -115,7 +115,15 @@ void main() {
     );
     await sync.restoreFromLocalFile(
       zip,
-      const WebDavConfig(includeChats: true, includeFiles: false),
+      const WebDavConfig(
+        scope: BackupScope(
+          excluded: {
+            BackupCategory.files,
+            BackupCategory.skills,
+            BackupCategory.workspaces,
+          },
+        ),
+      ),
       mode: RestoreMode.overwrite,
     );
 
@@ -167,7 +175,15 @@ void main() {
       );
       await sync.restoreFromLocalFile(
         zip,
-        const WebDavConfig(includeChats: true, includeFiles: false),
+        const WebDavConfig(
+          scope: BackupScope(
+            excluded: {
+              BackupCategory.files,
+              BackupCategory.skills,
+              BackupCategory.workspaces,
+            },
+          ),
+        ),
         mode: RestoreMode.overwrite,
       );
 
@@ -218,7 +234,15 @@ void main() {
       );
       await sync.restoreFromLocalFile(
         zip,
-        const WebDavConfig(includeChats: true, includeFiles: false),
+        const WebDavConfig(
+          scope: BackupScope(
+            excluded: {
+              BackupCategory.files,
+              BackupCategory.skills,
+              BackupCategory.workspaces,
+            },
+          ),
+        ),
         mode: RestoreMode.overwrite,
       );
 
@@ -267,7 +291,15 @@ void main() {
       );
       await sync.restoreFromLocalFile(
         zip,
-        const WebDavConfig(includeChats: true, includeFiles: false),
+        const WebDavConfig(
+          scope: BackupScope(
+            excluded: {
+              BackupCategory.files,
+              BackupCategory.skills,
+              BackupCategory.workspaces,
+            },
+          ),
+        ),
         mode: RestoreMode.overwrite,
       );
 
@@ -339,7 +371,7 @@ void main() {
       );
       await sync.restoreFromLocalFile(
         zip,
-        const WebDavConfig(includeChats: true, includeFiles: true),
+        const WebDavConfig(scope: BackupScope(excluded: {})),
         mode: RestoreMode.overwrite,
       );
 

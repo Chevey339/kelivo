@@ -96,8 +96,7 @@ final class RestorePreviousAssetsPlan {
          for (final name in (entries.keys.toList()..sort()))
            name: entries[name]!,
        }) {
-    if (rootStates.length != rootNames.length ||
-        !rootNames.every(rootStates.containsKey)) {
+    if (rootStates.isEmpty || !rootStates.keys.every(rootNames.contains)) {
       throw ArgumentError('restore_previous_asset_roots');
     }
     final foldedNames = <String>{};
@@ -116,7 +115,7 @@ final class RestorePreviousAssetsPlan {
   final Map<String, RestoreFileDescriptor> entries;
 
   Map<String, dynamic> toJson() => {
-    'roots': {for (final root in rootNames) root: rootStates[root]!.name},
+    'roots': {for (final root in rootStates.keys) root: rootStates[root]!.name},
     'entries': {
       for (final entry in entries.entries) entry.key: entry.value.toJson(),
     },
@@ -132,13 +131,14 @@ final class RestorePreviousAssetsPlan {
     if (rawRoots is! Map || rawEntries is! Map) {
       throw const FormatException('restore_previous_assets');
     }
-    if (rawRoots.keys.any((key) => key is! String) ||
-        rawRoots.length != rootNames.length ||
-        !rootNames.every(rawRoots.containsKey)) {
+    if (rawRoots.isEmpty ||
+        rawRoots.keys.any(
+          (key) => key is! String || !rootNames.contains(key),
+        )) {
       throw const FormatException('restore_previous_asset_roots');
     }
     final roots = <String, RestorePreviousAssetRootState>{};
-    for (final root in rootNames) {
+    for (final root in rawRoots.keys.cast<String>()) {
       final rawState = rawRoots[root];
       if (rawState is! String) {
         throw const FormatException('restore_previous_asset_roots');

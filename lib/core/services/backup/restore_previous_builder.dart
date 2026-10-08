@@ -35,6 +35,7 @@ final class RestorePreviousBuilder {
   static Future<RestorePreviousBundle> build({
     required Directory appDataDirectory,
     required RestoreReceipt preparedReceipt,
+    Iterable<String> assetRoots = assetRootNames,
   }) async {
     if (preparedReceipt.state != RestoreReceiptState.prepared ||
         preparedReceipt.sequence != 1) {
@@ -51,7 +52,7 @@ final class RestorePreviousBuilder {
     final database = await inspectDatabase(appDataDirectory);
     final assets =
         preparedReceipt.selectedComponents.contains(RestoreComponent.assets)
-        ? await inspectAssets(appDataDirectory)
+        ? await inspectAssets(appDataDirectory, rootNames: assetRoots)
         : null;
     final totalBytes =
         (database.descriptor?.bytes ?? 0) +
@@ -90,7 +91,10 @@ final class RestorePreviousBuilder {
       throw StateError('restore_previous_database_changed');
     }
     if (expected.assets != null) {
-      final actual = await inspectAssets(appDataDirectory);
+      final actual = await inspectAssets(
+        appDataDirectory,
+        rootNames: expected.assets!.rootStates.keys,
+      );
       if (!_sameAssets(actual, expected.assets!)) {
         throw StateError('restore_previous_assets_changed');
       }
@@ -140,7 +144,10 @@ final class RestorePreviousBuilder {
       throw StateError('restore_previous_stored_database_topology');
     }
     if (expected.assets != null) {
-      final actual = await inspectAssets(directory);
+      final actual = await inspectAssets(
+        directory,
+        rootNames: expected.assets!.rootStates.keys,
+      );
       if (!_sameAssets(actual, expected.assets!)) {
         throw StateError('restore_previous_stored_assets');
       }
@@ -173,7 +180,14 @@ final class RestorePreviousBuilder {
     return RestorePreviousDatabasePlan.file(descriptor);
   }
 
-  static Future<RestorePreviousAssetsPlan> inspectAssets(Directory root) async {
+  static Future<RestorePreviousAssetsPlan> inspectAssets(
+    Directory root, {
+    Iterable<String> rootNames = assetRootNames,
+  }) async {
+    if (rootNames.isEmpty ||
+        rootNames.any((name) => !assetRootNames.contains(name))) {
+      throw ArgumentError.value(rootNames, 'rootNames');
+    }
     final rootStates = <String, RestorePreviousAssetRootState>{};
     final entries = <String, RestoreFileDescriptor>{};
     final foldedNames = <String>{};
@@ -181,7 +195,7 @@ final class RestorePreviousBuilder {
     var totalPathBytes = 0;
     var totalBytes = 0;
 
-    for (final rootName in assetRootNames) {
+    for (final rootName in rootNames) {
       final assetRoot = Directory(p.join(root.path, rootName));
       final rootType = await FileSystemEntity.type(
         assetRoot.path,
@@ -314,7 +328,7 @@ final class RestorePreviousBuilder {
     }
     await durability.syncDirectory(root, fullBarrier: true);
 
-    final after = await inspectAssets(root);
+    final after = await inspectAssets(root, rootNames: rootNames);
     for (final rootName in rootNames) {
       if (!_sameAssetRoot(after, expected, rootName)) {
         throw StateError('restore_previous_asset_sync_changed:$rootName');
@@ -338,7 +352,7 @@ final class RestorePreviousBuilder {
         left.entries.length != right.entries.length) {
       return false;
     }
-    return assetRootNames.every(
+    return left.rootStates.keys.every(
       (rootName) => _sameAssetRoot(left, right, rootName),
     );
   }

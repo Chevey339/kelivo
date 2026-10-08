@@ -66,12 +66,13 @@ Future<String> _writeCandidateManifest(RestoreReceiptStore store) async {
   await manifest.writeAsString(
     jsonEncode({
       'format': 'kelivo-backup',
-      'formatVersion': 2,
+      'formatVersion': 3,
       'payloadKind': 'sqlite',
       'createdAtUtc': '2026-07-09T00:00:00.000Z',
       'appVersion': 'test',
       'includeChats': true,
       'includeFiles': false,
+      'assetRoots': <String>[],
       'database': {
         'entry': 'database/kelivo.db',
         'schemaVersion': databaseInfo.schemaVersion,
@@ -243,6 +244,7 @@ void main() {
       final decoded = (jsonDecode(await manifest.readAsString()) as Map)
           .cast<String, dynamic>();
       decoded['includeFiles'] = true;
+      decoded['assetRoots'] = RestorePreviousAssetsPlan.rootNames;
       (decoded['entries'] as Map)['upload/extra.txt'] = {
         'bytes': await asset.length(),
         'sha256': (await sha256.bind(asset.openRead()).first).toString(),

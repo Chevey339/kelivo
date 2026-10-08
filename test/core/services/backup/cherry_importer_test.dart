@@ -13,6 +13,7 @@ import 'package:Kelivo/core/database/business_repository.dart';
 import 'package:Kelivo/core/database/business_restore_service.dart';
 import 'package:Kelivo/core/database/chat_database_repository.dart';
 import 'package:Kelivo/core/models/backup.dart';
+import 'package:Kelivo/core/models/conversation.dart';
 import 'package:Kelivo/core/models/message_part.dart';
 import 'package:Kelivo/core/services/backup/backup_task_progress.dart';
 import 'package:Kelivo/core/services/backup/cherry_direct_backup_reader.dart';
@@ -73,6 +74,189 @@ void main() {
   });
 
   group('CherryImporter', () {
+    for (final mode in RestoreMode.values) {
+      test(
+        'provider-only $mode import preserves local chats, assistants and files',
+        () async {
+          await BusinessRestoreService(businessRepository).overwrite({
+            'assistants_v1': jsonEncode([
+              {'id': 'local', 'name': 'Local'},
+            ]),
+          });
+          await chatService.restoreConversation(
+            Conversation(id: 'local-chat', title: 'Keep'),
+            [],
+          );
+          final sentinel = await File(
+            '${tempDir.path}/upload/keep.txt',
+          ).create(recursive: true);
+          await sentinel.writeAsString('keep');
+          final backup = await _createZip(tempDir, {
+            'data.json': utf8.encode(
+              jsonEncode(
+                _legacyBackupRoot(
+                  topicId: 'new-chat',
+                  messageId: 'new-message',
+                  content: 'hello',
+                ),
+              ),
+            ),
+          });
+          final result = await CherryImporter.importFromCherryStudio(
+            file: backup,
+            mode: mode,
+            businessRepository: businessRepository,
+            chatService: chatService,
+            scope: BackupScope(
+              excluded: BackupCategory.values
+                  .where((c) => c != BackupCategory.providers)
+                  .toSet(),
+            ),
+          );
+          expect(result.providers, 1);
+          expect(result.assistants, 0);
+          expect(result.conversations, 0);
+          expect(result.files, 0);
+          expect(chatService.getAllConversations().map((c) => c.id), [
+            'local-chat',
+          ]);
+          expect(await sentinel.readAsString(), 'keep');
+          final settings = await BusinessRestoreService(
+            businessRepository,
+          ).exportSettings();
+          expect(
+            jsonDecode(settings['assistants_v1'] as String).single['id'],
+            'local',
+          );
+          expect(
+            jsonDecode(settings['provider_configs_v1'] as String),
+            contains('openai'),
+          );
+        },
+      );
+    }
+
+    for (final filesOnly in [false, true]) {
+      test(
+        filesOnly
+            ? 'file-only import materializes inline images without replacing chats'
+            : 'chat-only overwrite keeps local uploads and skips inline image writes',
+        () async {
+          await chatService.restoreConversation(
+            Conversation(id: 'local-chat', title: 'Keep'),
+            [],
+          );
+          final sentinel = await File(
+            '${tempDir.path}/upload/keep.txt',
+          ).create(recursive: true);
+          await sentinel.writeAsString('keep');
+          final root = _legacyBackupRoot(
+            topicId: 'new-chat',
+            messageId: 'new-message',
+            content: 'data:image/png;base64,aGVsbG8=',
+          );
+          ((root['indexedDB'] as Map)['topics'] as List)
+                  .single['messages'][0]['role'] =
+              'assistant';
+          final backup = await _createZip(tempDir, {
+            'data.json': utf8.encode(jsonEncode(root)),
+          });
+          final before = await BusinessRestoreService(
+            businessRepository,
+          ).exportSettings();
+          final selected = filesOnly
+              ? BackupCategory.files
+              : BackupCategory.chats;
+          final result = await CherryImporter.importFromCherryStudio(
+            file: backup,
+            mode: RestoreMode.overwrite,
+            businessRepository: businessRepository,
+            chatService: chatService,
+            scope: BackupScope(
+              excluded: BackupCategory.values
+                  .where((c) => c != selected)
+                  .toSet(),
+            ),
+          );
+          expect(result.providers, 0);
+          expect(result.assistants, 0);
+          expect(await sentinel.readAsString(), 'keep');
+          expect(
+            await BusinessRestoreService(businessRepository).exportSettings(),
+            before,
+          );
+          final files = await Directory(
+            '${tempDir.path}/upload',
+          ).list(recursive: true).where((f) => f is File).toList();
+          if (filesOnly) {
+            expect(result.conversations, 0);
+            expect(result.files, 1);
+            expect(files, hasLength(2));
+            expect(chatService.getAllConversations().map((c) => c.id), [
+              'local-chat',
+            ]);
+          } else {
+            expect(result.files, 0);
+            expect(files, hasLength(1));
+            final message = (await chatService.loadMessages('new-chat')).single;
+            expect(
+              message.parts.whereType<ImagePart>().single.unavailable,
+              isTrue,
+            );
+          }
+        },
+      );
+    }
+
+    test(
+      'file-only merge materializes inline images from existing messages',
+      () async {
+        final root = _legacyBackupRoot(
+          topicId: 'existing-topic',
+          messageId: 'existing-message',
+          content: 'data:image/png;base64,aGVsbG8=',
+        );
+        ((root['indexedDB'] as Map)['topics'] as List)
+                .single['messages'][0]['role'] =
+            'assistant';
+        final backup = await _createZip(tempDir, {
+          'data.json': utf8.encode(jsonEncode(root)),
+        });
+        // Import the chat first without the image file, then select files alone.
+        await CherryImporter.importFromCherryStudio(
+          file: backup,
+          mode: RestoreMode.merge,
+          businessRepository: businessRepository,
+          chatService: chatService,
+          scope: BackupScope(
+            excluded: BackupCategory.values
+                .where((c) => c != BackupCategory.chats)
+                .toSet(),
+          ),
+        );
+        final result = await CherryImporter.importFromCherryStudio(
+          file: backup,
+          mode: RestoreMode.merge,
+          businessRepository: businessRepository,
+          chatService: chatService,
+          scope: BackupScope(
+            excluded: BackupCategory.values
+                .where((c) => c != BackupCategory.files)
+                .toSet(),
+          ),
+        );
+        expect(result.files, 1);
+        expect(result.messages, 0);
+        expect(result.conversations, 0);
+        expect(await chatService.loadMessages('existing-topic'), hasLength(1));
+        final images = await Directory(
+          '${tempDir.path}/upload',
+        ).list(recursive: true).where((entry) => entry is File).toList();
+        expect(images, hasLength(1));
+        expect(await File(images.single.path).readAsString(), 'hello');
+      },
+    );
+
     test('imports Cherry Studio v6 direct backup zip', () async {
       final backup = await _createZip(tempDir, <String, List<int>>{
         'metadata.json': utf8.encode(

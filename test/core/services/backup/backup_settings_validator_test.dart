@@ -6,6 +6,49 @@ import 'package:Kelivo/core/services/backup/backup_settings_validator.dart';
 
 void main() {
   group('BackupSettingsValidator', () {
+    test(
+      'validates portable environment variable names, values and duplicates',
+      () {
+        void validate(Object value) => BackupSettingsValidator.validate({
+          'environment_variables_v1': value,
+        });
+        expect(
+          () => validate(
+            jsonEncode([
+              {'name': 'API_KEY', 'value': 'secret', 'note': ''},
+            ]),
+          ),
+          returnsNormally,
+        );
+        for (final value in <Object>[
+          true,
+          '{}',
+          '[1]',
+          jsonEncode([
+            {'name': '1INVALID', 'value': 'secret'},
+          ]),
+          jsonEncode([
+            {'name': 'VALID', 'value': 3},
+          ]),
+          jsonEncode([
+            {'name': 'VALID', 'value': ''},
+          ]),
+          jsonEncode([
+            {'name': 'VALID', 'value': 'bad\u0000value'},
+          ]),
+          jsonEncode([
+            {'name': 'VALID', 'value': 'ok', 'note': 3},
+          ]),
+          jsonEncode([
+            {'name': 'SAME', 'value': 'first'},
+            {'name': 'SAME', 'value': 'second'},
+          ]),
+        ]) {
+          expect(() => validate(value), throwsFormatException);
+        }
+      },
+    );
+
     test('requires a string for the page reading setting', () {
       for (final value in ['follow', 'local', 'off', 'configured-service-id']) {
         expect(

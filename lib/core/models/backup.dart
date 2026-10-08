@@ -1,7 +1,10 @@
 import 'dart:convert';
 
+import 'backup_scope.dart';
+export 'backup_scope.dart';
+
 enum RestoreMode {
-  overwrite, // 完全覆盖：清空本地后恢复
+  overwrite, // 覆盖所选内容，保留未选内容
   merge, // 增量合并：智能去重
 }
 
@@ -11,8 +14,7 @@ class WebDavConfig {
   final String password;
   final String path;
   final String userAgent;
-  final bool includeChats; // Hive boxes
-  final bool includeFiles; // uploads/
+  final BackupScope scope;
 
   const WebDavConfig({
     this.url = '',
@@ -20,8 +22,7 @@ class WebDavConfig {
     this.password = '',
     this.path = 'kelivo_backups',
     this.userAgent = '',
-    this.includeChats = true,
-    this.includeFiles = true,
+    this.scope = const BackupScope(),
   });
 
   WebDavConfig copyWith({
@@ -30,8 +31,7 @@ class WebDavConfig {
     String? password,
     String? path,
     String? userAgent,
-    bool? includeChats,
-    bool? includeFiles,
+    BackupScope? scope,
   }) {
     return WebDavConfig(
       url: url ?? this.url,
@@ -39,8 +39,7 @@ class WebDavConfig {
       password: password ?? this.password,
       path: path ?? this.path,
       userAgent: userAgent ?? this.userAgent,
-      includeChats: includeChats ?? this.includeChats,
-      includeFiles: includeFiles ?? this.includeFiles,
+      scope: scope ?? this.scope,
     );
   }
 
@@ -50,8 +49,7 @@ class WebDavConfig {
     'password': password,
     'path': path,
     'userAgent': userAgent,
-    'includeChats': includeChats,
-    'includeFiles': includeFiles,
+    'scope': scope.toJson(),
   };
 
   static WebDavConfig fromJson(Map<String, dynamic> json) {
@@ -63,8 +61,7 @@ class WebDavConfig {
           ? (json['path'] as String).trim()
           : 'kelivo_backups',
       userAgent: (json['userAgent'] as String?) ?? '',
-      includeChats: json['includeChats'] as bool? ?? true,
-      includeFiles: json['includeFiles'] as bool? ?? true,
+      scope: BackupScope.fromJson(json['scope']),
     );
   }
 
@@ -93,8 +90,7 @@ class S3Config {
   final bool
   pathStyle; // safer for custom endpoints (no bucket subdomain TLS mismatch)
   final String userAgent;
-  final bool includeChats;
-  final bool includeFiles;
+  final BackupScope scope;
 
   const S3Config({
     this.endpoint = '',
@@ -106,8 +102,7 @@ class S3Config {
     this.prefix = 'kelivo_backups',
     this.pathStyle = true,
     this.userAgent = '',
-    this.includeChats = true,
-    this.includeFiles = true,
+    this.scope = const BackupScope(),
   });
 
   S3Config copyWith({
@@ -120,8 +115,7 @@ class S3Config {
     String? prefix,
     bool? pathStyle,
     String? userAgent,
-    bool? includeChats,
-    bool? includeFiles,
+    BackupScope? scope,
   }) {
     return S3Config(
       endpoint: endpoint ?? this.endpoint,
@@ -133,8 +127,7 @@ class S3Config {
       prefix: prefix ?? this.prefix,
       pathStyle: pathStyle ?? this.pathStyle,
       userAgent: userAgent ?? this.userAgent,
-      includeChats: includeChats ?? this.includeChats,
-      includeFiles: includeFiles ?? this.includeFiles,
+      scope: scope ?? this.scope,
     );
   }
 
@@ -148,8 +141,7 @@ class S3Config {
     'prefix': prefix,
     'pathStyle': pathStyle,
     'userAgent': userAgent,
-    'includeChats': includeChats,
-    'includeFiles': includeFiles,
+    'scope': scope.toJson(),
   };
 
   static S3Config fromJson(Map<String, dynamic> json) {
@@ -167,8 +159,7 @@ class S3Config {
           : 'kelivo_backups',
       pathStyle: json['pathStyle'] as bool? ?? true,
       userAgent: (json['userAgent'] as String?) ?? '',
-      includeChats: json['includeChats'] as bool? ?? true,
-      includeFiles: json['includeFiles'] as bool? ?? true,
+      scope: BackupScope.fromJson(json['scope']),
     );
   }
 

@@ -125,11 +125,13 @@ final class RestoreBundleMover {
       final expected = _candidateAssetsPlan(candidate);
       final source = await RestorePreviousBuilder.inspectAssets(
         candidateDirectory,
+        rootNames: candidate.assetRoots,
       );
       final target = await RestorePreviousBuilder.inspectAssets(
         appDataDirectory,
+        rootNames: candidate.assetRoots,
       );
-      for (final root in RestorePreviousAssetsPlan.rootNames) {
+      for (final root in candidate.assetRoots) {
         if (_exactAssetRootPresence(source, expected, root) ||
             !_exactAssetRootPresence(target, expected, root)) {
           throw StateError('restore_mover_assets_not_installed:$root');
@@ -166,11 +168,13 @@ final class RestoreBundleMover {
       final expected = _candidateAssetsPlan(candidate);
       final candidateActual = await RestorePreviousBuilder.inspectAssets(
         candidateDirectory,
+        rootNames: candidate.assetRoots,
       );
       final liveActual = await RestorePreviousBuilder.inspectAssets(
         appDataDirectory,
+        rootNames: candidate.assetRoots,
       );
-      for (final root in RestorePreviousAssetsPlan.rootNames) {
+      for (final root in candidate.assetRoots) {
         _requireAssetSplit(
           candidateActual: candidateActual,
           liveActual: liveActual,
@@ -211,7 +215,7 @@ final class RestoreBundleMover {
         throw StateError('restore_mover_rollback_assets');
       }
       final newAssets = _candidateAssetsPlan(candidate);
-      for (final root in RestorePreviousAssetsPlan.rootNames) {
+      for (final root in candidate.assetRoots) {
         await _rollbackAssetRoot(
           root: root,
           newAssets: newAssets,
@@ -377,12 +381,15 @@ final class RestoreBundleMover {
   }) async {
     final candidateActual = await RestorePreviousBuilder.inspectAssets(
       candidateDirectory,
+      rootNames: newAssets.rootStates.keys,
     );
     final liveActual = await RestorePreviousBuilder.inspectAssets(
       appDataDirectory,
+      rootNames: newAssets.rootStates.keys,
     );
     final previousActual = await RestorePreviousBuilder.inspectAssets(
       previousStore.previousDirectory,
+      rootNames: oldAssets.rootStates.keys,
     );
     final oldState = oldAssets.rootStates[root]!;
     final previousPresent = _exactAssetRootPresence(
@@ -540,10 +547,16 @@ final class RestoreBundleMover {
     required RestorePreviousAssetsPlan expected,
     bool syncSourceBeforeMove = false,
   }) async {
-    final source = await RestorePreviousBuilder.inspectAssets(sourceContainer);
-    final target = await RestorePreviousBuilder.inspectAssets(targetContainer);
+    final source = await RestorePreviousBuilder.inspectAssets(
+      sourceContainer,
+      rootNames: expected.rootStates.keys,
+    );
+    final target = await RestorePreviousBuilder.inspectAssets(
+      targetContainer,
+      rootNames: expected.rootStates.keys,
+    );
     final rootsToMove = <String>{};
-    for (final root in RestorePreviousAssetsPlan.rootNames) {
+    for (final root in expected.rootStates.keys) {
       final expectedState = expected.rootStates[root]!;
       if (expectedState == RestorePreviousAssetRootState.missing) {
         if (source.rootStates[root] != RestorePreviousAssetRootState.missing ||
@@ -666,7 +679,7 @@ final class RestoreBundleMover {
     }
     return RestorePreviousAssetsPlan(
       rootStates: {
-        for (final root in RestorePreviousAssetsPlan.rootNames)
+        for (final root in candidate.assetRoots)
           root: RestorePreviousAssetRootState.directory,
       },
       entries: {

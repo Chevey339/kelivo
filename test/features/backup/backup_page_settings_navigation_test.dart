@@ -7,6 +7,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 
 import 'package:Kelivo/core/database/business_preferences.dart';
+import 'package:Kelivo/core/models/backup.dart';
+import 'package:Kelivo/shared/widgets/ios_switch.dart';
 import 'package:Kelivo/core/database/business_repository.dart';
 import 'package:Kelivo/core/providers/backup_provider.dart';
 import 'package:Kelivo/core/providers/backup_reminder_provider.dart';
@@ -171,6 +173,60 @@ void _expectAbove(WidgetTester tester, String upper, String lower) {
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
+  for (final desktop in [false, true]) {
+    testWidgets(
+      '${desktop ? 'desktop' : 'mobile'} saves category switches to both backup providers',
+      (tester) async {
+        await tester.binding.setSurfaceSize(const Size(900, 1800));
+        addTearDown(() => tester.binding.setSurfaceSize(null));
+        final business = await createBusinessTestHarness();
+        final settings = SettingsProvider(business.preferences);
+        await settings.loaded;
+        if (desktop) {
+          await _pumpDesktopBackupPane(
+            tester,
+            settings: settings,
+            business: business,
+          );
+        } else {
+          await _pumpBackupPage(tester, settings: settings, business: business);
+        }
+        final switches = find.byType(IosSwitch);
+        for (var i = 0; i < BackupCategory.values.length; i++) {
+          expect(tester.widget<IosSwitch>(switches.at(i)).value, isTrue);
+        }
+        for (final category in [
+          BackupCategory.providers,
+          BackupCategory.files,
+          BackupCategory.environmentVariables,
+        ]) {
+          final control = find.byKey(ValueKey('backup-scope-${category.name}'));
+          await tester.ensureVisible(control);
+          await tester.pumpAndSettle();
+          await tester.tap(control);
+          await tester.pumpAndSettle();
+          expect(settings.webDavConfig.scope.includes(category), isFalse);
+          expect(settings.s3Config.scope.includes(category), isFalse);
+        }
+        expect(
+          settings.webDavConfig.scope.includes(BackupCategory.skills),
+          isTrue,
+        );
+        await tester.pumpWidget(const SizedBox.shrink());
+        final reloaded = SettingsProvider(business.preferences);
+        await reloaded.loaded;
+        expect(
+          reloaded.webDavConfig.scope.excluded,
+          settings.webDavConfig.scope.excluded,
+        );
+        expect(
+          reloaded.s3Config.scope.excluded,
+          settings.webDavConfig.scope.excluded,
+        );
+      },
+    );
+  }
+
   group('BackupPage mobile backup settings navigation', () {
     testWidgets('opens WebDAV settings as a full page and saves config', (
       tester,
@@ -205,7 +261,7 @@ void main() {
     testWidgets('shows local backup before WebDAV and S3 backup sections', (
       tester,
     ) async {
-      await tester.binding.setSurfaceSize(const Size(900, 1200));
+      await tester.binding.setSurfaceSize(const Size(900, 2400));
       addTearDown(() => tester.binding.setSurfaceSize(null));
 
       final business = await createBusinessTestHarness();
@@ -253,7 +309,7 @@ void main() {
     testWidgets('desktop shows local backup before WebDAV and S3 sections', (
       tester,
     ) async {
-      await tester.binding.setSurfaceSize(const Size(1100, 1300));
+      await tester.binding.setSurfaceSize(const Size(1100, 2600));
       addTearDown(() => tester.binding.setSurfaceSize(null));
 
       final business = await createBusinessTestHarness();

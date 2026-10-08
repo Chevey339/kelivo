@@ -129,11 +129,12 @@ final class BusinessSettingsMerger {
           imported,
           key,
         );
-      } else if (key == _asrServicesKey) {
+      } else if (key == _asrServicesKey || key == 'environment_variables_v1') {
         preferences[key] = _mergeJsonObjectListsByIdPreferExisting(
           preferences[key] as String?,
           imported as String,
           key,
+          identityKey: key == 'environment_variables_v1' ? 'name' : 'id',
         );
       } else if (_relationshipMapKeys.contains(key)) {
         preferences[key] = _mergeJsonMapsPreferExisting(
@@ -290,8 +291,9 @@ final class BusinessSettingsMerger {
   static String _mergeJsonObjectListsByIdPreferExisting(
     String? existingRaw,
     String incomingRaw,
-    String key,
-  ) {
+    String key, {
+    String identityKey = 'id',
+  }) {
     List<Map<String, dynamic>> decode(String raw) {
       final decoded = jsonDecode(raw);
       if (decoded is! List || decoded.any((entry) => entry is! Map)) {
@@ -308,12 +310,13 @@ final class BusinessSettingsMerger {
     final incoming = decode(incomingRaw);
     final seenIds = <String>{
       for (final service in existing)
-        if (service['id'] case final String id) id,
+        if (service[identityKey] case final String id) id,
     };
     return jsonEncode([
       ...existing,
       for (final service in incoming)
-        if (service['id'] is! String || seenIds.add(service['id'] as String))
+        if (service[identityKey] is! String ||
+            seenIds.add(service[identityKey] as String))
           service,
     ]);
   }
