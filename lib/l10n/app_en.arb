@@ -646,6 +646,18 @@
   "backupPagePath": "Path",
   "backupPageChatsLabel": "Chats",
   "backupPageFilesLabel": "Files",
+  "backupPageScopeTitle": "Backup and import content",
+  "backupPageScopeSelectedCount": "{selected}/{total}",
+  "@backupPageScopeSelectedCount": {
+    "placeholders": {
+      "selected": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
   "backupPageBackupManagementDescription": "Choose what to back up and import. Applies to local, WebDAV and S3 backups. Unselected content stays unchanged on import. Skills and workspaces include their own files.",
   "backupPageAssistantsLabel": "Assistants",
   "backupPageProvidersLabel": "Providers",

@@ -1605,6 +1605,14 @@ class AppLocalizationsEn extends AppLocalizations {
   String get backupPageFilesLabel => 'Files';
 
   @override
+  String get backupPageScopeTitle => 'Backup and import content';
+
+  @override
+  String backupPageScopeSelectedCount(int selected, int total) {
+    return '$selected/$total';
+  }
+
+  @override
   String get backupPageBackupManagementDescription =>
       'Choose what to back up and import. Applies to local, WebDAV and S3 backups. Unselected content stays unchanged on import. Skills and workspaces include their own files.';
 

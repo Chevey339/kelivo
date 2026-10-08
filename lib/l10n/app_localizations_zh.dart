@@ -1547,6 +1547,14 @@ class AppLocalizationsZh extends AppLocalizations {
   String get backupPageFilesLabel => '文件';
 
   @override
+  String get backupPageScopeTitle => '备份与导入内容';
+
+  @override
+  String backupPageScopeSelectedCount(int selected, int total) {
+    return '$selected/$total';
+  }
+
+  @override
   String get backupPageBackupManagementDescription =>
       '选择备份和导入的内容，适用于本地、WebDAV 和 S3。导入时保留未选中的内容。技能和工作区包含各自的文件。';
 
@@ -13986,6 +13994,14 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get backupPageFilesLabel => '文件';
 
   @override
+  String get backupPageScopeTitle => '备份与导入内容';
+
+  @override
+  String backupPageScopeSelectedCount(int selected, int total) {
+    return '$selected/$total';
+  }
+
+  @override
   String get backupPageBackupManagementDescription =>
       '选择备份和导入的内容，适用于本地、WebDAV 和 S3。导入时保留未选中的内容。技能和工作区包含各自的文件。';
 
@@ -26349,6 +26365,14 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get backupPageFilesLabel => '檔案';
+
+  @override
+  String get backupPageScopeTitle => '備份與匯入內容';
+
+  @override
+  String backupPageScopeSelectedCount(int selected, int total) {
+    return '$selected/$total';
+  }
 
   @override
   String get backupPageBackupManagementDescription =>

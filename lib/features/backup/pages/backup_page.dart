@@ -34,7 +34,7 @@ import '../backup_restore_error_message.dart';
 import '../forward_compat_consent_dialog.dart';
 import '../backup_restart_dialog.dart';
 import '../widgets/backup_reminder_helpers.dart';
-import '../widgets/backup_category_labels.dart';
+import '../widgets/backup_scope_tile.dart';
 import 'package:Kelivo/theme/app_semantic_colors.dart';
 import 'package:Kelivo/shared/widgets/section_card.dart';
 import '../../../core/database/startup_failure_report.dart' show formatBytes;
@@ -305,50 +305,28 @@ class _BackupPageState extends State<BackupPage> {
                 // Section 1: 备份管理
                 header(l10n.backupPageBackupManagement, first: true),
                 SectionCard(
-                  children: [
-                    Padding(
-                      padding: const EdgeInsets.all(14),
-                      child: Text(
-                        l10n.backupPageBackupManagementDescription,
-                        style: TextStyle(
-                          fontSize: 13,
-                          color: cs.onSurfaceVariant,
-                        ),
-                      ),
-                    ),
-                    for (final category in BackupCategory.values) ...[
-                      _iosDivider(context),
-                      _iosSwitchRow(
-                        context,
-                        key: ValueKey('backup-scope-${category.name}'),
-                        icon: category.icon,
-                        label: category.label(l10n),
-                        value: cfg.scope.includes(category),
-                        onChanged: (v) async {
-                          final scope = vm.config.scope.withCategory(
-                            category,
-                            v,
-                          );
-                          final newCfg = vm.config.copyWith(scope: scope);
-                          final newS3Cfg = s3Vm.config.copyWith(scope: scope);
-                          vm.updateConfig(newCfg);
-                          s3Vm.updateConfig(newS3Cfg);
-                          await settings.setWebDavConfig(newCfg);
-                          await settings.setS3Config(newS3Cfg);
-                        },
-                      ),
-                    ],
-                  ],
+                  child: BackupScopeTile(
+                    scope: cfg.scope,
+                    onChanged: vm.busy || s3Vm.busy
+                        ? null
+                        : (scope) async {
+                            final newCfg = vm.config.copyWith(scope: scope);
+                            final newS3Cfg = s3Vm.config.copyWith(scope: scope);
+                            vm.updateConfig(newCfg);
+                            s3Vm.updateConfig(newS3Cfg);
+                            await settings.setWebDavConfig(newCfg);
+                            await settings.setS3Config(newS3Cfg);
+                          },
+                  ),
                 ),
+
+                ..._buildMobileLocalBackupSection(context, l10n, vm, header),
 
                 header(l10n.backupReminderSectionTitle),
                 const _BackupReminderMobileSection(),
 
                 header(l10n.localSnapshotSectionTitle),
                 const _LocalSnapshotMobileSection(),
-
-                // Section 2: 本地备份
-                ..._buildMobileLocalBackupSection(context, l10n, vm, header),
 
                 // Section 3: WebDAV备份
                 header(l10n.backupPageWebDavBackup),

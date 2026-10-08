@@ -27,7 +27,7 @@ import '../../features/backup/backup_task_runner.dart';
 import '../../features/backup/widgets/backup_progress_dialog.dart';
 import '../../features/backup/backup_restart_dialog.dart';
 import '../../features/backup/widgets/backup_reminder_helpers.dart';
-import '../../features/backup/widgets/backup_category_labels.dart';
+import '../../features/backup/widgets/backup_scope_tile.dart';
 import '../../features/backup/pages/local_snapshots_page.dart';
 import '../../core/database/startup_failure_report.dart' show formatBytes;
 import '../widgets/desktop_select_dropdown.dart';
@@ -322,54 +322,30 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
                         ],
                       ),
                     ),
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: 8),
-                      child: Text(
-                        l10n.backupPageBackupManagementDescription,
-                        style: TextStyle(
-                          fontSize: 13,
-                          color: cs.onSurfaceVariant,
-                        ),
-                      ),
+                    BackupScopeTile(
+                      desktop: true,
+                      scope: _scope,
+                      onChanged: busy
+                          ? null
+                          : (scope) async {
+                              setState(() => _scope = scope);
+                              await _applyPartial(scope: scope);
+                              if (!mounted) return;
+                              await _applyS3Partial(scope: scope);
+                            },
                     ),
-                    for (final category in BackupCategory.values) ...[
-                      if (category != BackupCategory.values.first)
-                        _rowDivider(context),
-                      _ItemRow(
-                        label: category.label(l10n),
-                        vpad: 2,
-                        trailing: IosSwitch(
-                          key: ValueKey('backup-scope-${category.name}'),
-                          value: _scope.includes(category),
-                          onChanged: busy
-                              ? null
-                              : (v) async {
-                                  setState(
-                                    () => _scope = _scope.withCategory(
-                                      category,
-                                      v,
-                                    ),
-                                  );
-                                  await _applyPartial(scope: _scope);
-                                  if (!mounted) return;
-                                  await _applyS3Partial(scope: _scope);
-                                },
-                        ),
-                      ),
-                    ],
                   ],
                 ),
               ),
 
               const SliverToBoxAdapter(child: SizedBox(height: 10)),
 
+              _buildLocalBackupSliver(context, l10n, cs),
+              const SliverToBoxAdapter(child: SizedBox(height: 10)),
+
               SliverToBoxAdapter(child: _BackupReminderDesktopSection()),
               const SliverToBoxAdapter(child: SizedBox(height: 12)),
               const SliverToBoxAdapter(child: _LocalSnapshotDesktopSection()),
-
-              const SliverToBoxAdapter(child: SizedBox(height: 10)),
-
-              _buildLocalBackupSliver(context, l10n, cs),
 
               const SliverToBoxAdapter(child: SizedBox(height: 10)),
 

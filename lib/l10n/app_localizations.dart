@@ -3058,6 +3058,18 @@ abstract class AppLocalizations {
   /// **'Files'**
   String get backupPageFilesLabel;
 
+  /// No description provided for @backupPageScopeTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Backup and import content'**
+  String get backupPageScopeTitle;
+
+  /// No description provided for @backupPageScopeSelectedCount.
+  ///
+  /// In en, this message translates to:
+  /// **'{selected}/{total}'**
+  String backupPageScopeSelectedCount(int selected, int total);
+
   /// No description provided for @backupPageBackupManagementDescription.
   ///
   /// In en, this message translates to:

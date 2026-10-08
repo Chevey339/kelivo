@@ -514,6 +514,18 @@
   "backupPagePath": "路徑",
   "backupPageChatsLabel": "聊天記錄",
   "backupPageFilesLabel": "檔案",
+  "backupPageScopeTitle": "備份與匯入內容",
+  "backupPageScopeSelectedCount": "{selected}/{total}",
+  "@backupPageScopeSelectedCount": {
+    "placeholders": {
+      "selected": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
   "backupPageBackupManagementDescription": "選擇備份和匯入的內容，適用於本機、WebDAV 和 S3。匯入時保留未選取的內容。技能和工作區包含各自的檔案。",
   "backupPageAssistantsLabel": "助手",
   "backupPageProvidersLabel": "供應商",
