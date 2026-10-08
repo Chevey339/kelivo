@@ -8359,6 +8359,12 @@ abstract class AppLocalizations {
   /// **'ByteDance'**
   String get providersPageByteDanceName;
 
+  /// No description provided for @providersPageSambaNovaName.
+  ///
+  /// In en, this message translates to:
+  /// **'SambaNova'**
+  String get providersPageSambaNovaName;
+
   /// No description provided for @providersPageEnabledStatus.
   ///
   /// In en, this message translates to:

@@ -96,6 +96,7 @@ class SettingsProvider extends ChangeNotifier {
     'Claude',
     'Grok',
     'ByteDance',
+    'SambaNova',
   ];
   static const Set<String> _builtInProviderKeys = {
     ..._builtInProviderKeysInOrder,
@@ -6497,6 +6498,7 @@ class ProviderConfig {
     if (k.contains('claude') || k.contains('anthropic')) {
       return 'https://api.anthropic.com/v1';
     }
+    if (k.contains('sambanova')) return 'https://api.sambanova.ai/v1';
     return 'https://api.openai.com/v1';
   }
 

@@ -1556,6 +1556,7 @@
   "providersPageAliyunName": "阿里云千问",
   "providersPageZhipuName": "智谱",
   "providersPageByteDanceName": "火山引擎",
+  "providersPageSambaNovaName": "SambaNova",
   "providersPageEnabledStatus": "启用",
   "providersPageDisabledStatus": "禁用",
   "providersPageModelsCountSuffix": " models",
