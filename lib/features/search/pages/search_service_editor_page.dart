@@ -623,12 +623,12 @@ class _SearchServiceEditorPageState extends State<SearchServiceEditorPage> {
       ];
     }
     if (service is ParallelOptions) {
+      final hasApiKey = _text('apiKey').isNotEmpty;
       return [
         field(
           key: 'apiKey',
-          label: l10n.searchServicesDialogApiKey,
+          label: l10n.searchServicesDialogApiKeyOptional,
           obscure: true,
-          validator: requiredApiKey,
         ),
         _buildMultiKeyEntry(context),
         _SearchEditorDropdown(
@@ -639,10 +639,13 @@ class _SearchServiceEditorPageState extends State<SearchServiceEditorPage> {
             for (final mode in ParallelOptions.modes)
               (value: mode, label: ParallelOptions.modeLabel(mode)),
           ],
-          onChanged: (value) {
-            _controller('mode').text = value;
-            _markDirty();
-          },
+          enabled: hasApiKey,
+          onChanged: hasApiKey
+              ? (value) {
+                  _controller('mode').text = value;
+                  _markDirty();
+                }
+              : null,
         ),
       ];
     }
@@ -1956,12 +1959,14 @@ class _SearchEditorDropdown extends StatelessWidget {
     required this.value,
     required this.items,
     required this.onChanged,
+    this.enabled = true,
   });
 
   final String label;
   final String value;
   final List<({String value, String label})> items;
-  final ValueChanged<String> onChanged;
+  final ValueChanged<String>? onChanged;
+  final bool enabled;
 
   String get _effectiveValue {
     return items.any((item) => item.value == value) ? value : items.first.value;
@@ -1975,13 +1980,14 @@ class _SearchEditorDropdown extends StatelessWidget {
   }
 
   Future<void> _openPicker(BuildContext context) async {
+    if (!enabled) return;
     final selected = await _showSearchEditorOptionSheet(
       context,
       title: label,
       value: _effectiveValue,
       items: items,
     );
-    if (selected != null) onChanged(selected);
+    if (selected != null) onChanged?.call(selected);
   }
 
   @override
@@ -1995,15 +2001,19 @@ class _SearchEditorDropdown extends StatelessWidget {
           style: TextStyle(
             fontSize: 13,
             fontWeight: AppFontWeights.semibold,
-            color: cs.onSurface.withValues(alpha: 0.72),
+            color: cs.onSurface.withValues(
+              alpha: enabled ? 0.72 : 0.35,
+            ),
           ),
         ),
         const SizedBox(height: 7),
-        SizedBox(
-          width: double.infinity,
-          child: IosCardPress(
-            haptics: false,
-            baseColor: context.appColors.surfaceCardFill,
+        Opacity(
+          opacity: enabled ? 1.0 : 0.4,
+          child: SizedBox(
+            width: double.infinity,
+            child: IosCardPress(
+              haptics: false,
+              baseColor: context.appColors.surfaceCardFill,
             borderRadius: BorderRadius.circular(12),
             onTap: () => _openPicker(context),
             child: Padding(
@@ -2031,6 +2041,7 @@ class _SearchEditorDropdown extends StatelessWidget {
               ),
             ),
           ),
+        ),
         ),
       ],
     );

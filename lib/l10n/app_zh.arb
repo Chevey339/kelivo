@@ -2211,7 +2211,7 @@
   "searchServiceNameKimi": "Kimi",
   "searchProviderKimiDescription": "Kimi 搜索 API。Pro 返回相关网页正文片段，Basic 返回标题、链接和摘要。",
   "searchServiceNameParallel": "Parallel",
-  "searchProviderParallelDescription": "Parallel 搜索 API。返回面向 LLM 优化的网页摘录，支持 turbo、fast、basic 和 advanced 模式。",
+  "searchProviderParallelDescription": "Parallel 搜索。无需 API Key 即可免费使用（通过 MCP）；添加 Key 可获得更高速率限制和模式控制。",
   "searchServicesDialogSearchMode": "搜索模式",
   "searchServiceNameYou": "You.com",
   "searchProviderYouDescription": "You.com 搜索 API。返回网页与新闻结果，支持 Highlights 或 Snippets。",
