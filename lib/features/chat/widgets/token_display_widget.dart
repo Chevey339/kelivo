@@ -104,7 +104,9 @@ class _TokenDisplayWidgetState extends State<TokenDisplayWidget>
 
   @override
   void didChangeMetrics() {
-    if (_isShowing) _removeOverlayImmediate();
+    // Refresh root-overlay bounds even if the message's position and its
+    // Scaffold-adjusted MediaQuery did not change. Metrics must not dismiss it.
+    if (_isShowing) setState(() {});
   }
 
   void _showPopup() {
@@ -118,8 +120,13 @@ class _TokenDisplayWidgetState extends State<TokenDisplayWidget>
 
   Widget _buildPopup(BuildContext context, OverlayChildLayoutInfo info) {
     final animation = _curvedAnim!;
+    // Match the root overlay's bounds, including keyboard insets that the
+    // message's Scaffold may already have removed from its own MediaQuery.
+    final overlayContext = Overlay.of(context, rootOverlay: true).context;
+    final mediaQuery = MediaQuery.of(overlayContext);
     // The portal supplies the current transform after the message is laid out,
     // even when only a preceding image resized and this widget did not rebuild.
+    // Window metrics changes use this layout too; they need not close the popup.
     final anchor = MatrixUtils.transformRect(
       info.childPaintTransform,
       Offset.zero & info.childSize,
@@ -138,8 +145,8 @@ class _TokenDisplayWidgetState extends State<TokenDisplayWidget>
             delegate: _TokenPopupLayout(
               anchor: anchor,
               padding:
-                  MediaQuery.paddingOf(context) +
-                  MediaQuery.viewInsetsOf(context) +
+                  mediaQuery.padding +
+                  mediaQuery.viewInsets +
                   const EdgeInsets.all(8),
               animation: animation,
             ),
