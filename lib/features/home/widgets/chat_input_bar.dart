@@ -3423,6 +3423,7 @@ class _ChatInputBarState extends State<ChatInputBar>
     final hasText = _controller.text.trim().isNotEmpty;
     final hasImages = _images.isNotEmpty;
     final hasDocs = _docs.isNotEmpty;
+    final hasInput = hasText || hasImages || hasDocs;
     _supportsImagesApiRouting(context);
     final bool isMobileLayout =
         MediaQuery.sizeOf(context).width < AppBreakpoints.tablet;
@@ -3989,12 +3990,13 @@ class _ChatInputBarState extends State<ChatInputBar>
                                                   ],
                                                   _CompactSendButton(
                                                     enabled:
-                                                        (hasText ||
-                                                            hasImages ||
-                                                            hasDocs) &&
-                                                        !_hasUnreadyImages &&
-                                                        !widget.loading,
-                                                    loading: widget.loading,
+                                                        hasInput &&
+                                                        !_composerLocked &&
+                                                        !_hasUnreadyImages,
+                                                    loading:
+                                                        widget.loading &&
+                                                        (!hasInput ||
+                                                            _composerLocked),
                                                     onSend: _handleSend,
                                                     onStop: widget.loading
                                                         ? widget.onStop

@@ -29,6 +29,7 @@ void main() {
     AssistantProvider? assistantProvider,
     ChatInputBarController? mediaController,
     bool loading = false,
+    VoidCallback? onStop,
     bool hasQueuedInput = false,
     String? queuedPreviewText,
     VoidCallback? onCancelQueuedInput,
@@ -75,6 +76,7 @@ void main() {
             mediaController: mediaController,
             onSend: onSend,
             loading: loading,
+            onStop: onStop,
             hasQueuedInput: hasQueuedInput,
             queuedPreviewText: queuedPreviewText,
             onCancelQueuedInput: onCancelQueuedInput,
@@ -135,6 +137,136 @@ void main() {
 
     controller.dispose();
     focusNode.dispose();
+  });
+
+  for (final width in [390.0, 1280.0]) {
+    testWidgets('输出中根据草稿切换停止和排队发送按钮 width=$width', (tester) async {
+      await tester.binding.setSurfaceSize(Size(width, 844));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      final controller = TextEditingController();
+      final focusNode = FocusNode();
+      addTearDown(controller.dispose);
+      addTearDown(focusNode.dispose);
+      final submitted = <ChatInputData>[];
+      var stopCount = 0;
+
+      await tester.pumpWidget(
+        buildHarness(
+          controller: controller,
+          focusNode: focusNode,
+          loading: true,
+          onStop: () => stopCount++,
+          onSend: (input) async {
+            submitted.add(input);
+            return ChatInputSubmissionResult.queued;
+          },
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const ValueKey('stop')), findsOneWidget);
+      expect(find.byIcon(Lucide.ArrowUp), findsNothing);
+
+      await tester.enterText(find.byType(TextField), 'draft');
+      await tester.pumpAndSettle();
+      expect(find.byIcon(Lucide.ArrowUp), findsOneWidget);
+      expect(find.byKey(const ValueKey('stop')), findsNothing);
+
+      await tester.enterText(find.byType(TextField), ' \n ');
+      await tester.pumpAndSettle();
+      expect(find.byKey(const ValueKey('stop')), findsOneWidget);
+      expect(find.byIcon(Lucide.ArrowUp), findsNothing);
+      await tester.tap(find.byKey(const ValueKey('stop')));
+      await tester.pumpAndSettle();
+      expect(stopCount, 1);
+      expect(submitted, isEmpty);
+
+      await tester.enterText(find.byType(TextField), 'queued message');
+      await tester.pumpAndSettle();
+      await tapSendButton(tester);
+
+      expect(submitted.single.text, 'queued message');
+      expect(controller.text, isEmpty);
+      expect(stopCount, 1);
+      expect(find.byKey(const ValueKey('stop')), findsOneWidget);
+      expect(find.byIcon(Lucide.ArrowUp), findsNothing);
+    });
+  }
+
+  testWidgets('输出中仅有附件时也可点击发送进入排队', (tester) async {
+    final controller = TextEditingController();
+    final focusNode = FocusNode();
+    final mediaController = ChatInputBarController();
+    addTearDown(controller.dispose);
+    addTearDown(focusNode.dispose);
+    ChatInputData? submitted;
+    var stopCount = 0;
+
+    await tester.pumpWidget(
+      buildHarness(
+        controller: controller,
+        focusNode: focusNode,
+        mediaController: mediaController,
+        loading: true,
+        onStop: () => stopCount++,
+        onSend: (input) async {
+          submitted = input;
+          return ChatInputSubmissionResult.queued;
+        },
+      ),
+    );
+    mediaController.addFiles(const [
+      DocumentAttachment(
+        path: '/tmp/queued.pdf',
+        fileName: 'queued.pdf',
+        mime: 'application/pdf',
+      ),
+    ]);
+    await tester.pumpAndSettle();
+
+    expect(find.byIcon(Lucide.ArrowUp), findsOneWidget);
+    expect(find.byKey(const ValueKey('stop')), findsNothing);
+    await tapSendButton(tester);
+
+    expect(submitted?.text, isEmpty);
+    expect(submitted?.documents.single.fileName, 'queued.pdf');
+    expect(mediaController.hasDraftMedia, isFalse);
+    expect(stopCount, 0);
+    expect(find.byKey(const ValueKey('stop')), findsOneWidget);
+  });
+
+  testWidgets('已有排队消息时非空的锁定输入框仍可停止输出', (tester) async {
+    final controller = TextEditingController(text: 'editing history');
+    final focusNode = FocusNode();
+    addTearDown(controller.dispose);
+    addTearDown(focusNode.dispose);
+    var sendCount = 0;
+    var stopCount = 0;
+
+    await tester.pumpWidget(
+      buildHarness(
+        controller: controller,
+        focusNode: focusNode,
+        loading: true,
+        hasQueuedInput: true,
+        onStop: () => stopCount++,
+        onSend: (_) async {
+          sendCount++;
+          return ChatInputSubmissionResult.rejected;
+        },
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(tester.widget<TextField>(find.byType(TextField)).readOnly, isTrue);
+    expect(find.byIcon(Lucide.ArrowUp), findsNothing);
+    expect(find.byKey(const ValueKey('stop')), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('stop')));
+    await tester.pumpAndSettle();
+
+    expect(stopCount, 1);
+    expect(sendCount, 0);
+    expect(controller.text, 'editing history');
   });
 
   testWidgets('发送按钮可显示编辑态保存并发送提示', (tester) async {
