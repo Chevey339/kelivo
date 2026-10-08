@@ -1324,6 +1324,7 @@ class _AddServiceDialogState extends State<_AddServiceDialog> {
           TextField(
             controller: _controllers['apiKey'],
             decoration: deco(l10n.searchServicesDialogApiKeyOptional),
+            onChanged: (_) => setState(() {}),
           ),
           const SizedBox(height: 12),
           _deskModeDropdown(
@@ -1334,6 +1335,7 @@ class _AddServiceDialogState extends State<_AddServiceDialog> {
               for (final mode in ParallelOptions.modes)
                 (value: mode, label: ParallelOptions.modeLabel(mode)),
             ],
+            enabled: _controllers['apiKey']!.text.trim().isNotEmpty,
             onChanged: (value) => setState(() {
               _controllers['mode']!.text = value;
             }),
@@ -2114,7 +2116,8 @@ class _EditServiceDialogState extends State<_EditServiceDialog> {
       return [
         TextField(
           controller: _controllers['apiKey'],
-          decoration: deco(l10n.searchServicesDialogApiKey),
+          decoration: deco(l10n.searchServicesDialogApiKeyOptional),
+          onChanged: (_) => setState(() {}),
         ),
         const SizedBox(height: 12),
         _multiKeyTile(),
@@ -2127,6 +2130,7 @@ class _EditServiceDialogState extends State<_EditServiceDialog> {
             for (final mode in ParallelOptions.modes)
               (value: mode, label: ParallelOptions.modeLabel(mode)),
           ],
+          enabled: _controllers['apiKey']!.text.trim().isNotEmpty,
           onChanged: (value) => setState(() {
             _controllers['mode']!.text = value;
           }),
@@ -3239,6 +3243,7 @@ Widget _deskModeDropdown({
   required String value,
   required List<({String value, String label})> items,
   required ValueChanged<String> onChanged,
+  bool enabled = true,
 }) {
   final effective = items.any((item) => item.value == value)
       ? value
@@ -3247,19 +3252,25 @@ Widget _deskModeDropdown({
     decoration: _deskInputDecoration(context).copyWith(labelText: label),
     child: SizedBox(
       width: double.infinity,
-      child: DesktopSelectDropdown<String>(
-        value: effective,
-        options: [
-          for (final item in items)
-            DesktopSelectOption(value: item.value, label: item.label),
-        ],
-        onSelected: onChanged,
-        embedded: true,
-        minWidth: 0,
-        minHeight: 24,
-        padding: EdgeInsets.zero,
-        borderRadius: 8,
-        maxLabelWidth: 360,
+      child: IgnorePointer(
+        ignoring: !enabled,
+        child: Opacity(
+          opacity: enabled ? 1.0 : 0.4,
+          child: DesktopSelectDropdown<String>(
+            value: effective,
+            options: [
+              for (final item in items)
+                DesktopSelectOption(value: item.value, label: item.label),
+            ],
+            onSelected: onChanged,
+            embedded: true,
+            minWidth: 0,
+            minHeight: 24,
+            padding: EdgeInsets.zero,
+            borderRadius: 8,
+            maxLabelWidth: 360,
+          ),
+        ),
       ),
     ),
   );

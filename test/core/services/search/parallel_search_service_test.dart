@@ -223,10 +223,15 @@ class _McpMockClient extends MockClient {
                   'content': [
                     {
                       'type': 'text',
-                      'text':
-                          '# Free Result\n'
-                          'URL: https://example.com/free\n\n'
-                          'Free tier excerpt',
+                      'text': jsonEncode({
+                        'results': [
+                          {
+                            'url': 'https://example.com/free',
+                            'title': 'Free Result',
+                            'excerpts': ['Free tier excerpt'],
+                          },
+                        ],
+                      }),
                     },
                   ],
                 },

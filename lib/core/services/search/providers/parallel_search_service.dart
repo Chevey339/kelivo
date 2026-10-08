@@ -263,22 +263,53 @@ class ParallelSearchService extends SearchService<ParallelOptions>
       return [];
     }
 
+    // The MCP server returns results as JSON embedded in a text content block.
+    final jsonResult = _tryParseJsonResults(normalized);
+    if (jsonResult != null) return jsonResult;
+
+    // Fall back to markdown-style parsing.
+    return _parseMarkdownResults(normalized);
+  }
+
+  List<SearchResultItem>? _tryParseJsonResults(String text) {
+    try {
+      final data = jsonDecode(text) as Map<String, dynamic>;
+      final results = data['results'] as List?;
+      if (results == null) return null;
+      return results.map((item) {
+        final result = (item as Map).cast<String, dynamic>();
+        final excerpts =
+            (result['excerpts'] as List?)
+                ?.map((e) => e.toString())
+                .where((e) => e.trim().isNotEmpty)
+                .join('\n\n') ??
+            '';
+        return SearchResultItem(
+          title: (result['title'] ?? '').toString(),
+          url: (result['url'] ?? '').toString(),
+          text: excerpts,
+        );
+      }).toList();
+    } catch (_) {
+      return null;
+    }
+  }
+
+  List<SearchResultItem> _parseMarkdownResults(String text) {
     final items = <SearchResultItem>[];
-    // Split only on horizontal rules to separate results.
-    final blocks = normalized.split('\n---\n');
+    final blocks = text.split('\n---\n');
     for (final block in blocks) {
       final trimmed = block.trim();
       if (trimmed.isEmpty) continue;
 
-      // Find URL line.
       final urlMatch = RegExp(r'URL:\s*(\S+)').firstMatch(trimmed);
       if (urlMatch == null) continue;
 
-      // Title is the first markdown heading or "Title:" line before the URL.
       final titleMatch = RegExp(
         r'#{1,3}\s+(.+?)(?:\n|$)|Title:\s*(.+?)(?:\n|$)',
       ).firstMatch(trimmed);
-      final title = (titleMatch?.group(1) ?? titleMatch?.group(2) ?? '').trim();
+      final title = (titleMatch?.group(1) ?? titleMatch?.group(2) ?? '')
+          .trim();
 
       final url = urlMatch.group(1)!.trim();
       final excerpt = trimmed.substring(urlMatch.end).trim();
@@ -290,6 +321,23 @@ class ParallelSearchService extends SearchService<ParallelOptions>
 
   WebFetchPage _parseMcpPage(String text, {required String fallbackUrl}) {
     final normalized = text.replaceAll('\r\n', '\n').trim();
+
+    // The MCP server returns results as JSON embedded in a text content block.
+    try {
+      final data = jsonDecode(normalized) as Map<String, dynamic>;
+      final results = data['results'] as List?;
+      if (results != null && results.isNotEmpty) {
+        final page = (results.first as Map).cast<String, dynamic>();
+        return WebFetchPage(
+          url: (page['url'] ?? fallbackUrl).toString(),
+          title: (page['title'] ?? '').toString(),
+          content: (page['full_content'] ?? page['excerpts']?.join('\n\n') ?? '')
+              .toString(),
+        );
+      }
+    } catch (_) {}
+
+    // Fall back to markdown-style parsing.
     final header = RegExp(
       r'^#{1,3}\s+(.*)\nURL:\s*(\S+)',
       multiLine: true,
