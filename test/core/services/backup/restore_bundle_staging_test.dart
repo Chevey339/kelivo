@@ -668,6 +668,92 @@ void main() {
       );
     });
 
+    for (final includeFiles in [false, true]) {
+      test('reopens a v2 staged candidate ($includeFiles)', () async {
+        final extracted = await _createExtractedBundle(
+          root,
+          includeFiles: includeFiles,
+        );
+        final staged = await RestoreBundleStaging.create(
+          appDataDirectory: root,
+          extractedDirectory: extracted,
+          includeChats: true,
+          includeFiles: includeFiles,
+          sourceManifestSha256: await _manifestSha256(extracted),
+        );
+        final file = File(
+          p.join(staged.payloadDirectory.path, 'manifest.json'),
+        );
+        final manifest = jsonDecode(await file.readAsString()) as Map;
+        manifest['formatVersion'] = 2;
+        manifest.remove('assetRoots');
+        final originalBytes = utf8.encode(jsonEncode(manifest));
+        await file.writeAsBytes(originalBytes, flush: true);
+        final hash = sha256.convert(originalBytes).toString();
+
+        final reopened = await RestoreBundleStaging.validateExistingCandidate(
+          candidateDirectory: staged.payloadDirectory,
+          expectedManifestSha256: hash,
+        );
+
+        expect(reopened.manifestSha256, hash);
+        expect(
+          reopened.assetRoots,
+          includeFiles
+              ? {
+                  'upload',
+                  'images',
+                  'avatars',
+                  'fonts',
+                  'skills',
+                  'workspaces',
+                  'sessions',
+                }
+              : <String>{},
+        );
+        expect(await file.readAsBytes(), originalBytes);
+      });
+    }
+
+    test(
+      'requires the exact staged schema for each supported version',
+      () async {
+        final extracted = await _createExtractedBundle(root);
+        final staged = await RestoreBundleStaging.create(
+          appDataDirectory: root,
+          extractedDirectory: extracted,
+          includeChats: true,
+          includeFiles: false,
+          sourceManifestSha256: await _manifestSha256(extracted),
+        );
+        final file = File(
+          p.join(staged.payloadDirectory.path, 'manifest.json'),
+        );
+        final current =
+            jsonDecode(await file.readAsString()) as Map<String, dynamic>;
+        final old = {...current, 'formatVersion': 2}..remove('assetRoots');
+        for (final invalid in [
+          {...current}..remove('assetRoots'),
+          {...old, 'assetRoots': <String>[]},
+          {...old, 'unknown': true},
+          for (final version in [1, 4, 2.0, '2'])
+            {...old, 'formatVersion': version},
+        ]) {
+          await file.writeAsString(jsonEncode(invalid), flush: true);
+          await expectLater(
+            RestoreBundleStaging.readCandidateManifest(
+              candidateDirectory: staged.payloadDirectory,
+              expectedManifestSha256: await _manifestSha256(
+                staged.payloadDirectory,
+              ),
+            ),
+            throwsFormatException,
+            reason: '$invalid',
+          );
+        }
+      },
+    );
+
     test('rejects unknown candidate manifest fields', () async {
       final extracted = await _createExtractedBundle(root);
       final manifestFile = File(p.join(extracted.path, 'manifest.json'));

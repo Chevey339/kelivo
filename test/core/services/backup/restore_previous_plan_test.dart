@@ -60,6 +60,92 @@ void main() {
       expect(restored.checksum, plan.checksum);
     });
 
+    for (final restoreFiles in [false, true]) {
+      test('reads v2 plans without changing their bytes ($restoreFiles)', () {
+        final receipt = _preparedReceipt(restoreFiles: restoreFiles);
+        // The persisted v1.3.0 schema, independent of the current writer.
+        final json = _withChecksum({
+          'format': 'kelivo.restore-previous-plan',
+          'formatVersion': 2,
+          'runId': receipt.runId,
+          'preparedReceiptChecksum': receipt.checksum,
+          'candidateManifestSha256': receipt.candidateManifestSha256,
+          'selectedComponents': ['database', if (restoreFiles) 'assets'],
+          'createdAtUtc': receipt.createdAtUtc.toIso8601String(),
+          'database': {
+            'state': 'file',
+            'path': 'database/kelivo.db',
+            'descriptor': {'bytes': 7, 'sha256': _hashA},
+          },
+          'assets': restoreFiles
+              ? {
+                  'roots': {
+                    'upload': 'directory',
+                    'images': 'missing',
+                    'avatars': 'missing',
+                    'fonts': 'missing',
+                    'skills': 'missing',
+                    'workspaces': 'missing',
+                    'sessions': 'missing',
+                  },
+                  'entries': {
+                    'upload/old.txt': {'bytes': 4, 'sha256': _hashC},
+                  },
+                }
+              : null,
+        });
+
+        final restored = RestorePreviousPlan.fromJson(
+          json,
+          preparedReceipt: receipt,
+        );
+
+        expect(jsonEncode(restored.toJson()), jsonEncode(json));
+        expect(restored.checksum, json['checksum']);
+        if (restoreFiles) {
+          final entry = restored.assets!.entries['upload/old.txt']!;
+          expect(entry.type, RestoreAssetEntryType.file);
+          expect(entry.file?.sha256, _hashC);
+        }
+        expect(
+          () => RestorePreviousPlan.fromJson({
+            ...json,
+            'checksum': _hashA,
+          }, preparedReceipt: receipt),
+          throwsFormatException,
+        );
+        for (final invalidVersion in [1, 4, 2.0, '2']) {
+          expect(
+            () => RestorePreviousPlan.fromJson(
+              _withChecksum({...json, 'formatVersion': invalidVersion}),
+              preparedReceipt: receipt,
+            ),
+            throwsFormatException,
+          );
+        }
+        if (restoreFiles) {
+          expect(
+            () => RestorePreviousPlan.fromJson(
+              _withChecksum({...json, 'formatVersion': 3}),
+              preparedReceipt: receipt,
+            ),
+            throwsFormatException,
+          );
+          ((json['assets'] as Map)['entries'] as Map)['upload/old.txt'] = {
+            'type': 'file',
+            'descriptor': {'bytes': 4, 'sha256': _hashC},
+          };
+          expect(
+            () => RestorePreviousPlan.fromJson(
+              _withChecksum(json),
+              preparedReceipt: receipt,
+            ),
+            throwsFormatException,
+          );
+        }
+      });
+    }
+
     test('preserves missing asset roots and a populated database', () {
       final plan = RestorePreviousPlan.forPreparedReceipt(
         receipt: _preparedReceipt(restoreFiles: true),

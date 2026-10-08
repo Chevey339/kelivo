@@ -467,8 +467,10 @@ final class RestoreBundleStaging {
     final includeChats = manifest['includeChats'];
     final includeFiles = manifest['includeFiles'];
     final payloadKind = manifest['payloadKind'];
+    final formatVersion = manifest['formatVersion'];
     if (manifest['format'] != _backupFormat ||
-        manifest['formatVersion'] != _backupFormatVersion ||
+        formatVersion is! int ||
+        (formatVersion != 2 && formatVersion != _backupFormatVersion) ||
         includeChats != true ||
         includeFiles is! bool ||
         payloadKind != 'sqlite' ||
@@ -484,7 +486,7 @@ final class RestoreBundleStaging {
       'appVersion',
       'includeChats',
       'includeFiles',
-      'assetRoots',
+      if (formatVersion == _backupFormatVersion) 'assetRoots',
       'database',
       'entries',
     };
@@ -496,7 +498,11 @@ final class RestoreBundleStaging {
       manifest,
       includeFiles: includeFiles,
     );
-    final rawAssetRoots = manifest['assetRoots'];
+    // v1.3.0 staged all asset roots together. Interpret that exact schema in
+    // memory without rewriting the manifest bound by the existing receipts.
+    final rawAssetRoots = formatVersion == 2
+        ? (includeFiles ? _assetRoots : const <String>[])
+        : manifest['assetRoots'];
     if (rawAssetRoots is! List ||
         rawAssetRoots.any(
           (root) => root is! String || !_assetRoots.contains(root),

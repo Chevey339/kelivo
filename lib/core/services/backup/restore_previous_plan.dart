@@ -194,14 +194,22 @@ final class RestorePreviousAssetsPlan {
   final Map<String, RestorePreviousAssetRootState> rootStates;
   final Map<String, RestoreAssetDescriptor> entries;
 
-  Map<String, dynamic> toJson() => {
+  Map<String, dynamic> toJson({
+    int formatVersion = RestorePreviousPlan.formatVersion,
+  }) => {
     'roots': {for (final root in rootStates.keys) root: rootStates[root]!.name},
     'entries': {
-      for (final entry in entries.entries) entry.key: entry.value.toJson(),
+      for (final entry in entries.entries)
+        entry.key: formatVersion == 2
+            ? entry.value.file!.toJson()
+            : entry.value.toJson(),
     },
   };
 
-  factory RestorePreviousAssetsPlan.fromJson(Object? source) {
+  factory RestorePreviousAssetsPlan.fromJson(
+    Object? source, {
+    int formatVersion = RestorePreviousPlan.formatVersion,
+  }) {
     final json = _requireMap(source, const {
       'roots',
       'entries',
@@ -234,10 +242,11 @@ final class RestorePreviousAssetsPlan {
     }
     final entries = <String, RestoreAssetDescriptor>{};
     for (final entry in rawEntries.entries) {
-      entries[entry.key as String] = RestoreAssetDescriptor.fromJson(
-        entry.value,
-        entry.key as String,
-      );
+      entries[entry.key as String] = formatVersion == 2
+          ? RestoreAssetDescriptor.file(
+              _parseDescriptor(entry.value, entry.key as String),
+            )
+          : RestoreAssetDescriptor.fromJson(entry.value, entry.key as String);
     }
     try {
       return RestorePreviousAssetsPlan(rootStates: roots, entries: entries);
@@ -258,6 +267,7 @@ final class RestorePreviousPlan {
     required this.createdAtUtc,
     required this.database,
     this.assets,
+    this._persistedFormatVersion = formatVersion,
   }) : selectedComponents = Set.unmodifiable(selectedComponents) {
     if (!_runIdPattern.hasMatch(runId)) {
       throw ArgumentError.value(runId, 'runId');
@@ -277,6 +287,9 @@ final class RestorePreviousPlan {
   static const format = 'kelivo.restore-previous-plan';
   static const formatVersion = 3;
 
+  // Keep an existing plan's wire format: its canonical bytes and checksum are
+  // evidence referenced by later receipts, including during rollback.
+  final int _persistedFormatVersion;
   final String runId;
   final String preparedReceiptChecksum;
   final String candidateManifestSha256;
@@ -324,7 +337,7 @@ final class RestorePreviousPlan {
 
   Map<String, dynamic> _payloadJson() => {
     'format': format,
-    'formatVersion': formatVersion,
+    'formatVersion': _persistedFormatVersion,
     'runId': runId,
     'preparedReceiptChecksum': preparedReceiptChecksum,
     'candidateManifestSha256': candidateManifestSha256,
@@ -334,7 +347,7 @@ final class RestorePreviousPlan {
     ],
     'createdAtUtc': createdAtUtc.toIso8601String(),
     'database': database.toJson(),
-    'assets': assets?.toJson(),
+    'assets': assets?.toJson(formatVersion: _persistedFormatVersion),
   };
 
   factory RestorePreviousPlan.fromJson(
@@ -355,7 +368,8 @@ final class RestorePreviousPlan {
     }, 'restore_previous_plan');
     if (json['format'] != format ||
         json['formatVersion'] is! int ||
-        json['formatVersion'] != formatVersion ||
+        (json['formatVersion'] != 2 &&
+            json['formatVersion'] != formatVersion) ||
         json['runId'] is! String ||
         json['preparedReceiptChecksum'] is! String ||
         json['candidateManifestSha256'] is! String ||
@@ -371,6 +385,7 @@ final class RestorePreviousPlan {
         throw const FormatException('restore_previous_created_at');
       }
       final plan = RestorePreviousPlan._(
+        persistedFormatVersion: json['formatVersion'] as int,
         runId: json['runId'] as String,
         preparedReceiptChecksum: json['preparedReceiptChecksum'] as String,
         candidateManifestSha256: json['candidateManifestSha256'] as String,
@@ -379,7 +394,10 @@ final class RestorePreviousPlan {
         database: RestorePreviousDatabasePlan.fromJson(json['database']),
         assets: json['assets'] == null
             ? null
-            : RestorePreviousAssetsPlan.fromJson(json['assets']),
+            : RestorePreviousAssetsPlan.fromJson(
+                json['assets'],
+                formatVersion: json['formatVersion'] as int,
+              ),
       );
       if (!_hashPattern.hasMatch(json['checksum'] as String) ||
           plan.checksum != json['checksum']) {
