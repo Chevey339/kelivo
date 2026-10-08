@@ -724,15 +724,11 @@ class _ProviderOAuthHttpClient extends http.BaseClient {
       final existingBeta = result.headers['anthropic-beta'];
       final existingContentType = result.headers['content-type'];
       for (final name in authHeaders.keys) {
-        result.headers.removeWhere(
-          (key, _) => key.toLowerCase() == name.toLowerCase(),
-        );
+        result.headers.remove(name);
       }
       result.headers.addAll(authHeaders);
       if (isClaude) {
-        result.headers.removeWhere(
-          (key, _) => key.toLowerCase() == 'x-api-key',
-        );
+        result.headers.remove('x-api-key');
         setClaudeOAuthHeader(
           result.headers,
           'anthropic-beta',

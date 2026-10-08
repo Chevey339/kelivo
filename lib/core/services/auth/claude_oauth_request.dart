@@ -143,7 +143,13 @@ void setClaudeOAuthHeader(
   String name,
   String value,
 ) {
-  headers.removeWhere((key, _) => key.toLowerCase() == name.toLowerCase());
+  final lowerName = name.toLowerCase();
+  final matchingKeys = headers.keys
+      .where((key) => key.toLowerCase() == lowerName)
+      .toList();
+  for (final key in matchingKeys) {
+    headers.remove(key);
+  }
   headers[name] = value;
 }
 
