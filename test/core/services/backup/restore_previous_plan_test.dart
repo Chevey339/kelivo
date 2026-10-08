@@ -77,7 +77,9 @@ void main() {
             'sessions': RestorePreviousAssetRootState.missing,
           },
           entries: const {
-            'upload/note.txt': RestoreFileDescriptor(bytes: 4, sha256: _hashC),
+            'upload/note.txt': RestoreAssetDescriptor.file(
+              RestoreFileDescriptor(bytes: 4, sha256: _hashC),
+            ),
           },
         ),
       );
@@ -94,6 +96,71 @@ void main() {
         RestorePreviousAssetRootState.missing,
       );
       expect(restored.assets?.entries.keys, ['upload/note.txt']);
+    });
+
+    test(
+      'round trips typed local entries and binds link targets to the checksum',
+      () {
+        final receipt = _preparedReceipt(restoreFiles: true);
+        final plan = RestorePreviousPlan.forPreparedReceipt(
+          receipt: receipt,
+          database: RestorePreviousDatabasePlan.missing(),
+          assets: RestorePreviousAssetsPlan(
+            rootStates: const {
+              'workspaces': RestorePreviousAssetRootState.directory,
+            },
+            entries: const {
+              'workspaces/file': RestoreAssetDescriptor.file(
+                RestoreFileDescriptor(bytes: 4, sha256: _hashC),
+              ),
+              'workspaces/link': RestoreAssetDescriptor.link('../external'),
+              'workspaces/pipe': RestoreAssetDescriptor.pipe(),
+              'workspaces/socket': RestoreAssetDescriptor.socket(),
+            },
+          ),
+        );
+        final restored = RestorePreviousPlan.fromJson(
+          plan.toJson(),
+          preparedReceipt: receipt,
+        );
+        expect(restored.toJson(), plan.toJson());
+        for (final entry in plan.assets!.entries.entries) {
+          expect(
+            entry.value.matches(restored.assets!.entries[entry.key]),
+            isTrue,
+          );
+        }
+        final json = plan.toJson();
+        (((json['assets'] as Map)['entries'] as Map)['workspaces/link']
+                as Map)['target'] =
+            '../changed';
+        expect(
+          () => RestorePreviousPlan.fromJson(json, preparedReceipt: receipt),
+          throwsFormatException,
+        );
+      },
+    );
+
+    test('rejects malformed or unrecognized local entry descriptors', () {
+      for (final descriptor in [
+        {'type': 'directory'},
+        {'type': 'link'},
+        {'type': 'link', 'target': null},
+        {'type': 'link', 'target': ''},
+        {'type': 'link', 'target': 'bad\u0000target'},
+        {'type': 'pipe', 'target': 'unexpected'},
+        {'type': 'socket', 'descriptor': <String, dynamic>{}},
+        {
+          'type': 'file',
+          'descriptor': {'bytes': -1, 'sha256': _hashA},
+        },
+      ]) {
+        expect(
+          () => RestoreAssetDescriptor.fromJson(descriptor, 'upload/entry'),
+          throwsFormatException,
+          reason: '$descriptor',
+        );
+      }
     });
 
     test('rejects checksum changes, unknown fields, and three-leg plans', () {
@@ -185,7 +252,9 @@ void main() {
             'sessions': RestorePreviousAssetRootState.directory,
           },
           entries: const {
-            'upload/../secret': RestoreFileDescriptor(bytes: 1, sha256: _hashA),
+            'upload/../secret': RestoreAssetDescriptor.file(
+              RestoreFileDescriptor(bytes: 1, sha256: _hashA),
+            ),
           },
         ),
         throwsArgumentError,

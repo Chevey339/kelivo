@@ -687,9 +687,11 @@ final class RestoreBundleMover {
           if (RestorePreviousAssetsPlan.rootNames.any(
             (root) => entry.key.startsWith('$root/'),
           ))
-            entry.key: RestoreFileDescriptor(
-              bytes: entry.value.bytes,
-              sha256: entry.value.sha256,
+            entry.key: RestoreAssetDescriptor.file(
+              RestoreFileDescriptor(
+                bytes: entry.value.bytes,
+                sha256: entry.value.sha256,
+              ),
             ),
       },
     );
@@ -711,7 +713,7 @@ final class RestoreBundleMover {
     };
     if (actualEntries.length != expectedEntries.length) return false;
     for (final entry in actualEntries.entries) {
-      if (!_sameDescriptor(entry.value, expectedEntries[entry.key])) {
+      if (!entry.value.matches(expectedEntries[entry.key])) {
         return false;
       }
     }

@@ -233,25 +233,107 @@ void main() {
       );
     });
 
-    test('rejects links without following them', () async {
+    test('preserves links without following their targets', () async {
       if (Platform.isWindows) return;
-      final outside = File(p.join(root.parent.path, 'outside_asset.txt'));
-      await outside.writeAsBytes([1, 2, 3]);
-      final upload = Directory(p.join(root.path, 'upload'));
-      await upload.create();
+      final outside = await Directory.systemTemp.createTemp('kelivo_external_');
+      addTearDown(() => outside.delete(recursive: true));
+      final target = File(p.join(outside.path, 'target'));
+      await target.writeAsString('outside');
+      final upload = Directory(p.join(root.path, 'upload', 'nested'));
+      await upload.create(recursive: true);
       final link = Link(p.join(upload.path, 'linked.txt'));
-      await link.create(outside.path);
-      try {
-        await expectLater(
-          RestorePreviousBuilder.build(
-            appDataDirectory: root,
-            preparedReceipt: _receipt(files: true),
-          ),
-          throwsA(isA<StateError>()),
+      await link.create(target.path);
+      await Link(p.join(upload.path, 'directory')).create(outside.path);
+      final bundle = await RestorePreviousBuilder.build(
+        appDataDirectory: root,
+        preparedReceipt: _receipt(files: true),
+      );
+      expect(bundle.plan.assets!.entries.keys, [
+        'upload/nested/directory',
+        'upload/nested/linked.txt',
+      ]);
+      expect(
+        bundle.plan.assets!.entries['upload/nested/linked.txt']!.linkTarget,
+        target.path,
+      );
+      await target.writeAsString('modified externally');
+      await RestorePreviousBuilder.validateLive(
+        appDataDirectory: root,
+        expected: bundle.plan,
+      );
+      final durability = _RecordingDurability(root);
+      await RestorePreviousBuilder.syncAssetRoots(
+        root: root,
+        expected: bundle.plan.assets!,
+        rootNames: const {'upload'},
+        durability: durability,
+      );
+      expect(durability.events, [
+        'directory:upload/nested:false',
+        'directory:upload:false',
+        'directory:.:true',
+      ]);
+      expect(await target.readAsString(), 'modified externally');
+    });
+
+    for (final change in ['target', 'type', 'missing']) {
+      test('detects link $change changes before moving data', () async {
+        if (Platform.isWindows) return;
+        final upload = Directory(p.join(root.path, 'upload'));
+        await upload.create();
+        final link = Link(p.join(upload.path, 'link'));
+        await link.create('old-target');
+        final bundle = await RestorePreviousBuilder.build(
+          appDataDirectory: root,
+          preparedReceipt: _receipt(files: true),
         );
-      } finally {
-        if (await outside.exists()) await outside.delete();
-      }
+        await link.delete();
+        if (change == 'target') await link.create('new-target');
+        if (change == 'type') await File(link.path).writeAsString('old-target');
+        await expectLater(
+          RestorePreviousBuilder.validateLive(
+            appDataDirectory: root,
+            expected: bundle.plan,
+          ),
+          throwsA(
+            isA<StateError>().having(
+              (error) => error.message,
+              'message',
+              'restore_previous_assets_changed',
+            ),
+          ),
+        );
+        await expectLater(
+          RestorePreviousBuilder.syncAssetRoots(
+            root: root,
+            expected: bundle.plan.assets!,
+            rootNames: const {'upload'},
+            durability: _RecordingDurability(root),
+          ),
+          throwsA(
+            isA<StateError>().having(
+              (error) => error.message,
+              'message',
+              'restore_previous_asset_sync_changed:upload',
+            ),
+          ),
+        );
+      });
+    }
+
+    test('rejects a linked root and identifies its path and type', () async {
+      if (Platform.isWindows) return;
+      await Link(p.join(root.path, 'upload')).create('images');
+      await expectLater(
+        RestorePreviousBuilder.inspectAssets(root),
+        throwsA(
+          isA<StateError>().having(
+            (error) => error.message,
+            'message',
+            'restore_previous_asset_root:upload:link',
+          ),
+        ),
+      );
     });
   });
 }

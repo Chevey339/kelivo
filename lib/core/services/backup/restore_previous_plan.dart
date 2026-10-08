@@ -22,6 +22,86 @@ final class RestoreFileDescriptor {
   Map<String, dynamic> toJson() => {'bytes': bytes, 'sha256': sha256};
 }
 
+enum RestoreAssetEntryType { file, link, pipe, socket }
+
+/// Describes a local entry preserved by renaming its containing asset root.
+/// Links are opaque: their targets are never opened or recreated from a backup.
+final class RestoreAssetDescriptor {
+  const RestoreAssetDescriptor.file(RestoreFileDescriptor descriptor)
+    : type = RestoreAssetEntryType.file,
+      file = descriptor,
+      linkTarget = null;
+
+  const RestoreAssetDescriptor.link(String target)
+    : type = RestoreAssetEntryType.link,
+      file = null,
+      linkTarget = target;
+
+  const RestoreAssetDescriptor.pipe()
+    : type = RestoreAssetEntryType.pipe,
+      file = null,
+      linkTarget = null;
+
+  const RestoreAssetDescriptor.socket()
+    : type = RestoreAssetEntryType.socket,
+      file = null,
+      linkTarget = null;
+
+  final RestoreAssetEntryType type;
+  final RestoreFileDescriptor? file;
+  final String? linkTarget;
+
+  int get bytes => file?.bytes ?? utf8.encode(linkTarget ?? '').length;
+
+  bool matches(RestoreAssetDescriptor? other) =>
+      other != null &&
+      type == other.type &&
+      file?.bytes == other.file?.bytes &&
+      file?.sha256 == other.file?.sha256 &&
+      linkTarget == other.linkTarget;
+
+  Map<String, dynamic> toJson() => {
+    'type': type.name,
+    if (file != null) 'descriptor': file!.toJson(),
+    if (linkTarget != null) 'target': linkTarget,
+  };
+
+  factory RestoreAssetDescriptor.fromJson(Object? source, String field) {
+    final type = source is Map ? source['type'] : null;
+    final json = _requireMap(source, switch (type) {
+      'file' => const {'type', 'descriptor'},
+      'link' => const {'type', 'target'},
+      'pipe' || 'socket' => const {'type'},
+      _ => throw FormatException('restore_previous_asset_descriptor:$field'),
+    }, 'restore_previous_asset_descriptor:$field');
+    final descriptor = switch (type) {
+      'file' => RestoreAssetDescriptor.file(
+        _parseDescriptor(json['descriptor'], field),
+      ),
+      'link' when json['target'] is String => RestoreAssetDescriptor.link(
+        json['target'] as String,
+      ),
+      'pipe' => const RestoreAssetDescriptor.pipe(),
+      'socket' => const RestoreAssetDescriptor.socket(),
+      _ => throw FormatException('restore_previous_asset_descriptor:$field'),
+    };
+    try {
+      descriptor._validate(field);
+    } catch (_) {
+      throw FormatException('restore_previous_asset_descriptor:$field');
+    }
+    return descriptor;
+  }
+
+  void _validate(String field) {
+    if (file != null) _validateDescriptor(file!, field);
+    if (linkTarget != null &&
+        (linkTarget!.isEmpty || linkTarget!.contains('\u0000'))) {
+      throw ArgumentError('restore_previous_asset_link:$field');
+    }
+  }
+}
+
 final class RestorePreviousDatabasePlan {
   const RestorePreviousDatabasePlan._({
     required this.state,
@@ -87,7 +167,7 @@ final class RestorePreviousAssetsPlan {
 
   RestorePreviousAssetsPlan({
     required Map<String, RestorePreviousAssetRootState> rootStates,
-    required Map<String, RestoreFileDescriptor> entries,
+    required Map<String, RestoreAssetDescriptor> entries,
   }) : rootStates = Map.unmodifiable({
          for (final root in rootNames)
            if (rootStates.containsKey(root)) root: rootStates[root]!,
@@ -107,12 +187,12 @@ final class RestorePreviousAssetsPlan {
           !foldedNames.add(entry.key.toLowerCase())) {
         throw ArgumentError('restore_previous_asset_entry:${entry.key}');
       }
-      _validateDescriptor(entry.value, entry.key);
+      entry.value._validate(entry.key);
     }
   }
 
   final Map<String, RestorePreviousAssetRootState> rootStates;
-  final Map<String, RestoreFileDescriptor> entries;
+  final Map<String, RestoreAssetDescriptor> entries;
 
   Map<String, dynamic> toJson() => {
     'roots': {for (final root in rootStates.keys) root: rootStates[root]!.name},
@@ -152,9 +232,9 @@ final class RestorePreviousAssetsPlan {
     if (rawEntries.keys.any((key) => key is! String)) {
       throw const FormatException('restore_previous_asset_entries');
     }
-    final entries = <String, RestoreFileDescriptor>{};
+    final entries = <String, RestoreAssetDescriptor>{};
     for (final entry in rawEntries.entries) {
-      entries[entry.key as String] = _parseDescriptor(
+      entries[entry.key as String] = RestoreAssetDescriptor.fromJson(
         entry.value,
         entry.key as String,
       );
@@ -195,7 +275,7 @@ final class RestorePreviousPlan {
   }
 
   static const format = 'kelivo.restore-previous-plan';
-  static const formatVersion = 2;
+  static const formatVersion = 3;
 
   final String runId;
   final String preparedReceiptChecksum;
