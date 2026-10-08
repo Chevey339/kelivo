@@ -7,7 +7,7 @@ import '../../../l10n/app_localizations.dart';
 import '../../../shared/widgets/ios_tactile.dart';
 import '../../../theme/app_semantic_colors.dart';
 
-/// Read the live origin again on dismissal, including after rotation.
+/// Read the entry's last completed layout, including after rotation.
 typedef SettingsSearchOrigin = Rect? Function();
 
 const settingsSearchFieldRadius = BorderRadius.all(Radius.circular(14));

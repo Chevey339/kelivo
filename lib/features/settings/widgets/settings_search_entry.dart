@@ -73,8 +73,17 @@ class _SettingsSearchListState extends State<SettingsSearchList> {
     if (!mounted) return null;
     final box = _entryKey.currentContext?.findRenderObject();
     final overlay = Navigator.of(context).overlay?.context.findRenderObject();
-    if (box is! RenderBox || !box.attached || !box.hasSize || overlay == null) {
+    if (box is! RenderBox || !box.attached || overlay == null) {
       return null;
+    }
+    // A route kept offstage can have a new transition ancestor that has not
+    // been laid out, even when the entry itself still has a size.
+    RenderObject? ancestor = box;
+    while (ancestor != overlay) {
+      if (ancestor == null || (ancestor is RenderBox && !ancestor.hasSize)) {
+        return null;
+      }
+      ancestor = ancestor.parent;
     }
     return box.localToGlobal(Offset.zero, ancestor: overlay) & box.size;
   }
@@ -82,9 +91,22 @@ class _SettingsSearchListState extends State<SettingsSearchList> {
   Future<void> _openSearch() async {
     if (_searching) return;
     _searching = true;
+    var trackOrigin = true;
     try {
-      await widget.onSearch(_entryRect);
+      var origin = _entryRect();
+      void refreshOrigin(Duration _) {
+        if (!mounted || !trackOrigin) return;
+        origin = _entryRect() ?? origin;
+        WidgetsBinding.instance.addPostFrameCallback(refreshOrigin);
+      }
+
+      // Capture before pushing the search route, then sample completed frames.
+      // Its builder must not measure a source route still waiting for layout.
+      // Post-frame callbacks follow existing frames without scheduling new ones.
+      WidgetsBinding.instance.addPostFrameCallback(refreshOrigin);
+      await widget.onSearch(() => mounted ? origin : null);
     } finally {
+      trackOrigin = false;
       _searching = false;
     }
   }
