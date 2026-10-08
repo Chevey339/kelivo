@@ -1,7 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:Kelivo/secrets/fallback.dart';
 import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:http/http.dart' as http;
 
@@ -49,29 +48,11 @@ String apiModelId(ProviderConfig cfg, String modelId) {
 }
 
 String apiKeyForRequest(ProviderConfig cfg, String modelId) {
-  final orig = effectiveApiKey(cfg).trim();
-  if (orig.isNotEmpty) return orig;
-  if ((cfg.id) == 'SiliconFlow') {
-    final host = Uri.tryParse(cfg.baseUrl)?.host.toLowerCase() ?? '';
-    if (!host.contains('siliconflow')) return orig;
-    final m = apiModelId(cfg, modelId).toLowerCase();
-    final allowed = m == 'thudm/glm-4-9b-0414' || m == 'qwen/qwen3-8b';
-    final fallback = siliconflowFallbackKey.trim();
-    if (allowed && fallback.isNotEmpty) {
-      return fallback;
-    }
-  }
-  return orig;
+  return effectiveApiKey(cfg).trim();
 }
 
 String effectiveApiKey(ProviderConfig cfg) {
-  try {
-    if (cfg.multiKeyEnabled == true && (cfg.apiKeys?.isNotEmpty == true)) {
-      final sel = ApiKeyManager().selectForProvider(cfg);
-      if (sel.key != null) return sel.key!.key;
-    }
-  } catch (_) {}
-  return cfg.apiKey;
+  return ApiKeyManager().effectiveKeyForProvider(cfg);
 }
 
 // Read built-in tools configured per model (e.g., ['search', 'url_context']).

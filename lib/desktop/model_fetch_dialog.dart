@@ -4,7 +4,6 @@ import 'package:flutter_svg/flutter_svg.dart';
 
 import '../core/providers/settings_provider.dart';
 import '../core/providers/model_provider.dart';
-import '../core/services/model_spec/model_spec_resolver.dart';
 import '../l10n/app_localizations.dart';
 import '../icons/lucide_adapter.dart' as lucide;
 import '../utils/brand_assets.dart';
@@ -79,40 +78,14 @@ class _ModelFetchDialogBodyState extends State<_ModelFetchDialogBody> {
       widget.providerKey,
       defaultName: widget.providerDisplayName,
     );
-    final bool isDefaultSilicon =
-        widget.providerKey.toLowerCase() == 'siliconflow';
-    final bool hasUserKey =
-        (cfg.multiKeyEnabled == true && (cfg.apiKeys?.isNotEmpty == true)) ||
-        cfg.apiKey.trim().isNotEmpty;
-    final bool restrictToFree = isDefaultSilicon && !hasUserKey;
     try {
-      if (restrictToFree) {
-        final list = <ModelSpec>[
-          ModelSpecResolver.instance
-              .resolve(
-                cfg,
-                'THUDM/GLM-4-9B-0414',
-                displayName: 'THUDM/GLM-4-9B-0414',
-              )
-              .spec,
-          ModelSpecResolver.instance
-              .resolve(cfg, 'Qwen/Qwen3-8B', displayName: 'Qwen/Qwen3-8B')
-              .spec,
-        ];
-        setState(() {
-          _items = list;
-          _loading = false;
-          _error = '';
-        });
-      } else {
-        final list = await ProviderManager.listModels(cfg);
-        if (!mounted) return;
-        setState(() {
-          _items = list;
-          _loading = false;
-          _error = '';
-        });
-      }
+      final list = await ProviderManager.listModels(cfg);
+      if (!mounted) return;
+      setState(() {
+        _items = list;
+        _loading = false;
+        _error = '';
+      });
     } catch (e) {
       if (!mounted) return;
       setState(() {

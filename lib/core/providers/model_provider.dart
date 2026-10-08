@@ -9,7 +9,6 @@ import '../services/api_key_manager.dart';
 import '../services/api/provider_request_headers.dart';
 import '../services/model_override_payload_parser.dart';
 import '../services/custom_request_merger.dart';
-import 'package:Kelivo/secrets/fallback.dart';
 import '../services/api/embedding/embedding_api_service.dart';
 import '../services/api/google_service_account_auth.dart';
 import '../models/model_spec.dart';
@@ -215,13 +214,7 @@ class GoogleProvider extends BaseProvider {
 
 class ProviderManager {
   static String _effectiveApiKey(ProviderConfig cfg) {
-    try {
-      if (cfg.multiKeyEnabled == true && (cfg.apiKeys?.isNotEmpty == true)) {
-        final sel = ApiKeyManager().selectForProvider(cfg);
-        if (sel.key != null) return sel.key!.key;
-      }
-    } catch (_) {}
-    return cfg.apiKey;
+    return ApiKeyManager().effectiveKeyForProvider(cfg);
   }
 
   // Per-model override helpers (duplicated logic from ChatApiService)
@@ -341,20 +334,7 @@ class ProviderManager {
         final extra = _customBody(cfg, modelId);
         CustomRequestMerger.applyBody(body, extra);
         // Merge custom headers overrides
-        // SiliconFlow fallback key for built-in free models when no API key provided
-        String apiKey = _effectiveApiKey(cfg);
-        try {
-          if ((cfg.id) == 'SiliconFlow') {
-            final host = Uri.tryParse(cfg.baseUrl)?.host.toLowerCase() ?? '';
-            if (host.contains('siliconflow') && apiKey.trim().isEmpty) {
-              final m = upstreamId.toLowerCase();
-              final allowed =
-                  m == 'thudm/glm-4-9b-0414' || m == 'qwen/qwen3-8b';
-              final fb = siliconflowFallbackKey.trim();
-              if (allowed && fb.isNotEmpty) apiKey = fb;
-            }
-          }
-        } catch (_) {}
+        final apiKey = _effectiveApiKey(cfg);
         final headers = <String, String>{
           'Authorization': 'Bearer $apiKey',
           'Content-Type': 'application/json',

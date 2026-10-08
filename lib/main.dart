@@ -681,15 +681,6 @@ class MyApp extends StatelessWidget {
           create: (_) => UserProvider(preferences: businessPreferences),
         ),
         ChangeNotifierProvider(
-          create: (_) {
-            final settings = SettingsProvider(businessPreferences);
-            unawaited(
-              settings.loaded.then((_) => settings.incrementAppLaunchCount()),
-            );
-            return settings;
-          },
-        ),
-        ChangeNotifierProvider(
           create: (_) =>
               ChatService(existingRepository: databaseLease.chatRepository),
         ),
@@ -701,6 +692,20 @@ class MyApp extends StatelessWidget {
             preferences: businessPreferences,
             chatService: ctx.read<ChatService>(),
           ),
+        ),
+        ChangeNotifierProvider(
+          create: (ctx) {
+            final assistants = ctx.read<AssistantProvider>();
+            final settings = SettingsProvider(
+              businessPreferences,
+              onProviderModelsRetired:
+                  assistants.clearModelSelectionsForProvider,
+            );
+            unawaited(
+              settings.loaded.then((_) => settings.incrementAppLaunchCount()),
+            );
+            return settings;
+          },
         ),
         ChangeNotifierProvider(
           create: (_) =>

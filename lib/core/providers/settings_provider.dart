@@ -647,16 +647,18 @@ class SettingsProvider extends ChangeNotifier {
   int _appLaunchCount = 0;
   int get appLaunchCount => _appLaunchCount;
 
-  SettingsProvider(this._preferences) {
+  SettingsProvider(this._preferences, {this.onProviderModelsRetired}) {
     ProviderOAuthService.instance.bind(this);
     _appLocaleTag = _readAppLocaleTag(_preferences);
     _loaded = _load();
   }
 
   SettingsProvider._withoutLoad(this._preferences)
-    : _loaded = Future<void>.value();
+    : onProviderModelsRetired = null,
+      _loaded = Future<void>.value();
 
   final BusinessPreferences _preferences;
+  final Future<void> Function(String providerKey)? onProviderModelsRetired;
   late final Future<void> _loaded;
   Future<void> get loaded => _loaded;
 
@@ -1464,6 +1466,23 @@ class SettingsProvider extends ChangeNotifier {
         (key, config) => MapEntry(key, config.toJson()),
       );
       await prefs.setString(_providerConfigsKey, jsonEncode(seededConfigs));
+    }
+
+    final kelivo = _providerConfigs['KelivoIN'];
+    final kelivoHost = Uri.tryParse(kelivo?.baseUrl ?? '')?.host.toLowerCase();
+    if (kelivo != null &&
+        (kelivoHost == 'pollinations.ai' ||
+            (kelivoHost?.endsWith('.pollinations.ai') ?? false))) {
+      // The retired service cannot be used anymore. Drop its saved credentials,
+      // models and selections before installing the current built-in provider.
+      await onProviderModelsRetired?.call('KelivoIN');
+      await removeProviderConfig('KelivoIN');
+      await setProviderConfig(
+        'KelivoIN',
+        ProviderConfig.defaultsFor(
+          'KelivoIN',
+        ).copyWith(enabled: kelivo.enabled),
+      );
     }
 
     // kick off a one-time connectivity test for services (exclude local Bing)
@@ -6059,8 +6078,6 @@ enum ProviderKind { openai, google, claude }
 enum ChatMessageBackgroundStyle { defaultStyle, frosted, solid }
 
 class ProviderConfig {
-  static const _kelivoInPublicApiKey = 'kelivo';
-
   final String id;
   final bool enabled;
   final String name;
@@ -6342,7 +6359,7 @@ class ProviderConfig {
     id: json['id'] as String? ?? (json['name'] as String? ?? ''),
     enabled: json['enabled'] as bool? ?? true,
     name: json['name'] as String? ?? '',
-    apiKey: _apiKeyFromJson(json),
+    apiKey: json['apiKey'] as String? ?? '',
     oauthProvider: json['oauthProvider'] == null
         ? null
         : OAuthProvider.values.byName(json['oauthProvider'] as String),
@@ -6413,13 +6430,6 @@ class ProviderConfig {
     ),
   );
 
-  static String _apiKeyFromJson(Map<String, dynamic> json) {
-    final stored = json['apiKey'] as String? ?? '';
-    if (stored.isNotEmpty) return stored;
-    final id = json['id'] as String? ?? json['name'] as String? ?? '';
-    return id.trim().toLowerCase() == 'kelivoin' ? _kelivoInPublicApiKey : '';
-  }
-
   static List<Map<String, String>> _customRequestRowsFromJson(
     Object? raw, {
     required String keyName,
@@ -6456,7 +6466,7 @@ class ProviderConfig {
   static String _defaultBase(String key) {
     final k = key.toLowerCase();
     if (k.contains('tensdaq')) return 'https://tensdaq-api.x-aio.com/v1';
-    if (k.contains('kelivoin')) return 'https://text.pollinations.ai/openai';
+    if (k.contains('kelivoin')) return 'https://api.psycheas.top/v1';
     if (k.contains('openrouter')) return 'https://openrouter.ai/api/v1';
     if (k.contains('vercel')) return 'https://ai-gateway.vercel.sh/v1';
     if (k.contains('aihubmix')) return 'https://aihubmix.com/v1';
@@ -6564,76 +6574,39 @@ class ProviderConfig {
             id: key,
             enabled: defaultEnabled(key),
             name: displayName ?? key,
-            apiKey: _kelivoInPublicApiKey,
-            baseUrl: _defaultBase(key),
-            providerType: ProviderKind.openai,
-            chatPath:
-                null, // keep empty in UI; code uses default '/chat/completions'
-            useResponseApi: false,
-            models: const [
-              // 'openai-fast',
-              'mistral',
-              'qwen-coder',
-            ],
-            modelOverrides: const {
-              // 'openai-fast': {
-              //   'type': 'chat',
-              //   'input': ['text'],
-              //   'output': ['text'],
-              //   'abilities': ['tool'],
-              // },
-              'mistral': {
-                'type': 'chat',
-                'input': ['text'],
-                'output': ['text'],
-                'abilities': ['tool'],
-              },
-              'qwen-coder': {
-                'type': 'chat',
-                'input': ['text'],
-                'output': ['text'],
-                'abilities': ['tool'],
-              },
-            },
-            proxyEnabled: false,
-            proxyHost: '',
-            proxyPort: '8080',
-            proxyUsername: '',
-            proxyPassword: '',
-            multiKeyEnabled: false,
-            apiKeys: const [],
-            keyManagement: const KeyManagementConfig(),
-            aihubmixAppCodeEnabled: false,
-            balanceEnabled: false,
-            balanceApiPath: _defaultBalanceApiPath(key),
-            balanceResultPath: _defaultBalanceResultPath(key),
-            claudePromptCachingEnabled: false,
-          );
-        }
-        // Special-case SiliconFlow: prefill two partnered models
-        if (lowerKey.contains('silicon')) {
-          return ProviderConfig(
-            id: key,
-            enabled: defaultEnabled(key),
-            name: displayName ?? key,
             apiKey: '',
             baseUrl: _defaultBase(key),
             providerType: ProviderKind.openai,
             chatPath: '/chat/completions',
             useResponseApi: false,
-            models: const ['THUDM/GLM-4-9B-0414', 'Qwen/Qwen3-8B'],
+            models: const [
+              'Qwen/Qwen3-8B',
+              'Qwen/Qwen3.5-4B',
+              'THUDM/GLM-4-9B-0414',
+              'auto',
+            ],
             modelOverrides: const {
+              'Qwen/Qwen3-8B': {
+                'type': 'chat',
+                'input': ['text'],
+                'output': ['text'],
+                'abilities': ['tool', 'reasoning'],
+              },
+              'Qwen/Qwen3.5-4B': {
+                'abilities': ['tool', 'reasoning'],
+              },
               'THUDM/GLM-4-9B-0414': {
                 'type': 'chat',
                 'input': ['text'],
                 'output': ['text'],
                 'abilities': ['tool'],
               },
-              'Qwen/Qwen3-8B': {
+              'auto': {
                 'type': 'chat',
                 'input': ['text'],
                 'output': ['text'],
                 'abilities': ['tool', 'reasoning'],
+                'reasoning': {'dialect': 'openaiReasoningEffort'},
               },
             },
             proxyEnabled: false,

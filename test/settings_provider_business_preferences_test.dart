@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -86,6 +88,103 @@ void main() {
 
     expect(reloaded.providersOrder.take(2), <String>['Gemini', 'OpenAI']);
   });
+
+  test(
+    'replaces retired KelivoIN settings and persists the new provider',
+    () async {
+      final retired = ProviderConfig.defaultsFor('KelivoIN').copyWith(
+        baseUrl: 'https://text.pollinations.ai/openai',
+        apiKey: 'kelivo',
+        models: ['mistral', 'qwen-coder'],
+        modelOverrides: {
+          'mistral': {
+            'abilities': ['tool'],
+          },
+          'qwen-coder': {
+            'abilities': ['tool'],
+          },
+        },
+      );
+      final other = ProviderConfig.defaultsFor(
+        'OpenAI',
+      ).copyWith(apiKey: 'user-key', models: ['gpt-4o']);
+      await repository.replaceSnapshot(
+        BusinessSettingsRouter.normalizeAndRoute({
+          'provider_configs_v1': jsonEncode({
+            'KelivoIN': retired.toJson(),
+            'OpenAI': other.toJson(),
+          }),
+          'selected_model_v1': 'KelivoIN::mistral',
+          'title_model_v1': 'KelivoIN::qwen-coder',
+          'summary_model_v1': 'OpenAI::gpt-4o',
+          'pinned_models_v1': ['KelivoIN::mistral', 'OpenAI::gpt-4o'],
+          'reasoning_choice_by_model_v1': jsonEncode({
+            'KelivoIN::mistral': {'level': 'high'},
+            'OpenAI::gpt-4o': {'level': 'off'},
+          }),
+        }),
+      );
+
+      final settings = SettingsProvider(BusinessPreferences(repository));
+      await settings.loaded;
+      final expected = ProviderConfig.defaultsFor('KelivoIN');
+      expect(
+        settings.getProviderConfig('KelivoIN').toJson(),
+        expected.toJson(),
+      );
+      expect(settings.getProviderConfig('OpenAI').toJson(), other.toJson());
+      expect(settings.currentModelKey, isNull);
+      expect(settings.titleModelProvider, isNull);
+      expect(settings.summaryModelProvider, 'OpenAI');
+      expect(settings.pinnedModels, {'OpenAI::gpt-4o'});
+      expect(settings.reasoningChoiceFor('KelivoIN', 'mistral'), isNull);
+      expect(settings.reasoningChoiceFor('OpenAI', 'gpt-4o'), isNotNull);
+
+      final saved = BusinessPreferences(repository);
+      await saved.load();
+      final configs =
+          jsonDecode(saved.getString('provider_configs_v1')!) as Map;
+      expect(configs['KelivoIN'], expected.toJson());
+      expect(saved.getString('selected_model_v1'), isNull);
+      expect(saved.getString('title_model_v1'), isNull);
+
+      final reloaded = SettingsProvider(BusinessPreferences(repository));
+      await reloaded.loaded;
+      expect(
+        reloaded.getProviderConfig('KelivoIN').toJson(),
+        expected.toJson(),
+      );
+    },
+  );
+
+  test(
+    'keeps current KelivoIN customizations and other custom endpoints',
+    () async {
+      for (final baseUrl in [
+        'https://api.psycheas.top/v1',
+        'https://custom.test/v1',
+      ]) {
+        final customized = ProviderConfig.defaultsFor(
+          'KelivoIN',
+        ).copyWith(baseUrl: baseUrl, models: ['auto'], enabled: false);
+        await repository.replaceSnapshot(
+          BusinessSettingsRouter.normalizeAndRoute({
+            'provider_configs_v1': jsonEncode({
+              'KelivoIN': customized.toJson(),
+            }),
+            'selected_model_v1': 'KelivoIN::auto',
+          }),
+        );
+        final settings = SettingsProvider(BusinessPreferences(repository));
+        await settings.loaded;
+        expect(
+          settings.getProviderConfig('KelivoIN').toJson(),
+          customized.toJson(),
+        );
+        expect(settings.currentModelKey, 'KelivoIN::auto');
+      }
+    },
+  );
 
   test(
     'migrated order-only provider state survives startup seeding and reload',

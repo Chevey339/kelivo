@@ -3,10 +3,12 @@ import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hive_flutter/hive_flutter.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 // ignore: depend_on_referenced_packages
 import 'package:path_provider_platform_interface/path_provider_platform_interface.dart';
 
 import 'package:Kelivo/core/providers/assistant_provider.dart';
+import 'package:Kelivo/core/providers/settings_provider.dart';
 import 'package:Kelivo/core/services/chat/chat_service.dart';
 import 'package:Kelivo/features/search/services/global_session_search_service.dart';
 
@@ -90,6 +92,81 @@ void main() {
     services.add(service);
     return service;
   }
+
+  test(
+    'retiring KelivoIN clears assistant and conversation model overrides',
+    () async {
+      SharedPreferences.setMockInitialValues({'flutter_log_enabled_v1': false});
+      final chatService = createService();
+      await chatService.init();
+      final assistants = await _createLoadedAssistantProvider(
+        session: session,
+        chatService: chatService,
+        assistants: const [
+          {
+            'id': 'assistant-delete',
+            'name': 'Retired model',
+            'chatModelProvider': 'KelivoIN',
+            'chatModelId': 'mistral',
+          },
+          {
+            'id': 'assistant-keep',
+            'name': 'Keep model',
+            'chatModelProvider': 'OpenAI',
+            'chatModelId': 'gpt-4o',
+          },
+        ],
+      );
+      final retiredChat = await chatService.createConversation(
+        title: 'Retired',
+      );
+      await chatService.setConversationModel(
+        retiredChat.id,
+        providerKey: 'KelivoIN',
+        modelId: 'qwen-coder',
+      );
+      final keptChat = await chatService.createConversation(title: 'Keep');
+      await chatService.setConversationModel(
+        keptChat.id,
+        providerKey: 'OpenAI',
+        modelId: 'gpt-4o',
+      );
+      final retired = ProviderConfig.defaultsFor('KelivoIN').copyWith(
+        baseUrl: 'https://text.pollinations.ai/openai',
+        apiKey: 'kelivo',
+        models: ['mistral', 'qwen-coder'],
+      );
+      await session.preferences.setString(
+        'provider_configs_v1',
+        jsonEncode({'KelivoIN': retired.toJson()}),
+      );
+      final settings = SettingsProvider(
+        session.preferences,
+        onProviderModelsRetired: assistants.clearModelSelectionsForProvider,
+      );
+      await settings.loaded;
+
+      expect(assistants.assistants[0].chatModelProvider, isNull);
+      expect(assistants.assistants[0].chatModelId, isNull);
+      expect(assistants.assistants[1].chatModelId, 'gpt-4o');
+      expect(chatService.getConversation(retiredChat.id)!.chatModelId, isNull);
+      expect(chatService.getConversation(keptChat.id)!.chatModelId, 'gpt-4o');
+      expect(settings.getProviderConfig('KelivoIN').models, contains('auto'));
+
+      final reloadedSession = await harness.open();
+      final reloadedAssistants = AssistantProvider(
+        preferences: reloadedSession.preferences,
+      );
+      await reloadedAssistants.loaded;
+      expect(reloadedAssistants.assistants[0].chatModelProvider, isNull);
+      expect(reloadedAssistants.assistants[0].chatModelId, isNull);
+      expect(reloadedAssistants.assistants[1].chatModelId, 'gpt-4o');
+      final reloadedChat = createService();
+      await reloadedChat.init();
+      expect(reloadedChat.getConversation(retiredChat.id)!.chatModelId, isNull);
+      expect(reloadedChat.getConversation(keptChat.id)!.chatModelId, 'gpt-4o');
+    },
+  );
 
   group('AssistantProvider cascade delete', () {
     test(

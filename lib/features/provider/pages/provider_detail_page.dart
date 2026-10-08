@@ -826,47 +826,6 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
       children: [
-        if (widget.keyName.toLowerCase() == 'kelivoin') ...[
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-            decoration: BoxDecoration(
-              color: cs.primary.withValues(alpha: 0.08),
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: cs.primary.withValues(alpha: 0.35)),
-            ),
-            child: Text.rich(
-              TextSpan(
-                text: 'Powered by ',
-                style: TextStyle(color: cs.onSurface.withValues(alpha: 0.8)),
-                children: [
-                  TextSpan(
-                    text: 'Pollinations AI',
-                    style: TextStyle(
-                      color: cs.primary,
-                      fontWeight: AppFontWeights.emphasis,
-                    ),
-                    recognizer: TapGestureRecognizer()
-                      ..onTap = () async {
-                        final uri = Uri.parse('https://pollinations.ai');
-                        try {
-                          final ok = await launchUrl(
-                            uri,
-                            mode: LaunchMode.externalApplication,
-                          );
-                          if (!ok) {
-                            await launchUrl(uri);
-                          }
-                        } catch (_) {
-                          await launchUrl(uri);
-                        }
-                      },
-                  ),
-                ],
-              ),
-            ),
-          ),
-          const SizedBox(height: 12),
-        ],
         if (widget.keyName.toLowerCase() == 'tensdaq') ...[
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
@@ -933,11 +892,6 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  '已内置硅基流动的免费模型，无需 API Key。若需更强大的模型，请申请并在此配置你自己的 API Key。',
-                  style: TextStyle(color: cs.onSurface.withValues(alpha: 0.8)),
-                ),
-                const SizedBox(height: 6),
                 Text.rich(
                   TextSpan(
                     text: '官网：',
@@ -3366,11 +3320,6 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
       widget.keyName,
       defaultName: widget.displayName,
     );
-    final bool isDefaultSilicon = widget.keyName.toLowerCase() == 'siliconflow';
-    final bool hasUserKey =
-        (cfg.multiKeyEnabled == true && (cfg.apiKeys?.isNotEmpty == true)) ||
-        cfg.apiKey.trim().isNotEmpty;
-    final bool restrictToFree = isDefaultSilicon && !hasUserKey;
     final controller = TextEditingController();
     List<dynamic> items = const [];
     bool loading = true;
@@ -3391,34 +3340,11 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
             final l10n = AppLocalizations.of(ctx)!;
             Future<void> loadModels() async {
               try {
-                if (restrictToFree) {
-                  final list = <ModelSpec>[
-                    ModelSpecResolver.instance
-                        .resolve(
-                          cfg,
-                          'THUDM/GLM-4-9B-0414',
-                          displayName: 'THUDM/GLM-4-9B-0414',
-                        )
-                        .spec,
-                    ModelSpecResolver.instance
-                        .resolve(
-                          cfg,
-                          'Qwen/Qwen3-8B',
-                          displayName: 'Qwen/Qwen3-8B',
-                        )
-                        .spec,
-                  ];
-                  setLocal(() {
-                    items = list;
-                    loading = false;
-                  });
-                } else {
-                  final list = await ProviderManager.listModels(cfg);
-                  setLocal(() {
-                    items = list;
-                    loading = false;
-                  });
-                }
+                final list = await ProviderManager.listModels(cfg);
+                setLocal(() {
+                  items = list;
+                  loading = false;
+                });
               } catch (e) {
                 setLocal(() {
                   items = const [];

@@ -383,6 +383,18 @@ class AssistantProvider extends ChangeNotifier {
     return copy.id;
   }
 
+  Future<void> clearModelSelectionsForProvider(String providerKey) async {
+    await loaded;
+    for (final assistant in assistants) {
+      if (assistant.chatModelProvider == providerKey) {
+        await updateAssistant(assistant.copyWith(clearChatModel: true));
+      }
+    }
+    await chatService?.clearConversationModelOverrides(
+      providerKey: providerKey,
+    );
+  }
+
   Future<void> updateAssistant(Assistant updated) async {
     final idx = _assistants.indexWhere((a) => a.id == updated.id);
     if (idx == -1) return;

@@ -1306,13 +1306,6 @@ class _DesktopProviderDetailPaneState extends State<DesktopProviderDetailPane> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        '已内置硅基流动的免费模型，无需 API Key。若需更强大的模型，请申请并在此配置你自己的 API Key。',
-                        style: TextStyle(
-                          color: cs.onSurface.withValues(alpha: 0.8),
-                        ),
-                      ),
-                      const SizedBox(height: 6),
                       Text.rich(
                         TextSpan(
                           text: '官网：',
