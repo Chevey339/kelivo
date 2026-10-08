@@ -2746,7 +2746,7 @@
   "searchServiceNameKimi": "Kimi",
   "searchProviderKimiDescription": "Kimi Search API. Pro returns relevant web content excerpts; Basic returns titles, links, and snippets.",
   "searchServiceNameParallel": "Parallel",
-  "searchProviderParallelDescription": "Parallel Search API. Returns LLM-optimized web excerpts with turbo, fast, basic, and advanced modes.",
+  "searchProviderParallelDescription": "Parallel Search. Free to use without an API key (via MCP); add a key for higher rate limits and mode control.",
   "searchServicesDialogSearchMode": "Search mode",
   "searchServiceNameYou": "You.com",
   "searchProviderYouDescription": "You.com Search API. Returns web and news results with highlights or snippets.",

@@ -2201,7 +2201,7 @@
   "searchServiceNameKimi": "Kimi",
   "searchProviderKimiDescription": "Kimi 搜尋 API。Pro 傳回相關網頁正文片段，Basic 傳回標題、連結和摘要。",
   "searchServiceNameParallel": "Parallel",
-  "searchProviderParallelDescription": "Parallel 搜尋 API。返回面向 LLM 優化的網頁摘錄，支援 turbo、fast、basic 和 advanced 模式。",
+  "searchProviderParallelDescription": "Parallel 搜尋。無需 API Key 即可免費使用（透過 MCP）；添加 Key 可獲得更高速率限制和模式控制。",
   "searchServicesDialogSearchMode": "搜尋模式",
   "searchServiceNameYou": "You.com",
   "searchProviderYouDescription": "You.com 搜尋 API。返回網頁與新聞結果，支援 Highlights 或 Snippets。",

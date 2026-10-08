@@ -1323,7 +1323,7 @@ class _AddServiceDialogState extends State<_AddServiceDialog> {
         return [
           TextField(
             controller: _controllers['apiKey'],
-            decoration: deco(l10n.searchServicesDialogApiKey),
+            decoration: deco(l10n.searchServicesDialogApiKeyOptional),
           ),
           const SizedBox(height: 12),
           _deskModeDropdown(

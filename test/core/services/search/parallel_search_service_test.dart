@@ -83,7 +83,10 @@ void main() {
         ),
       );
 
-      expect(captured?.url.toString(), ParallelSearchService.endpoint);
+      expect(
+        captured?.url.toString(),
+        ParallelSearchService.restSearchEndpoint,
+      );
       expect(captured?.headers['x-api-key'], 'parallel-test');
       expect(captured?.headers['Content-Type'], contains('application/json'));
       expect(jsonDecode(captured!.body), {
@@ -167,5 +170,72 @@ void main() {
         ),
       );
     });
+
+    test('falls back to MCP when no API key is provided', () async {
+      final service = ParallelSearchService(client: _McpMockClient());
+
+      final result = await service.search(
+        query: 'kelivo',
+        commonOptions: const SearchCommonOptions(timeout: 5000),
+        serviceOptions: ParallelOptions(id: 'parallel-free'),
+      );
+
+      expect(result.items, hasLength(1));
+      expect(result.items.single.title, 'Free Result');
+      expect(result.items.single.url, 'https://example.com/free');
+      expect(result.items.single.text, 'Free tier excerpt');
+    });
   });
+}
+
+/// Minimal MCP mock that handles initialize, notifications/initialized,
+/// and tools/call with a canned search response.
+class _McpMockClient extends MockClient {
+  _McpMockClient()
+    : super((request) async {
+        if (request.method == 'GET') {
+          return http.Response('', 405);
+        }
+        final message = jsonDecode(request.body) as Map<String, dynamic>;
+        switch (message['method']) {
+          case 'initialize':
+            return http.Response(
+              jsonEncode({
+                'jsonrpc': '2.0',
+                'id': message['id'],
+                'result': {
+                  'protocolVersion': '2025-06-18',
+                  'serverInfo': {'name': 'Parallel', 'version': '1.0.0'},
+                  'capabilities': {'tools': {}},
+                },
+              }),
+              200,
+              headers: {'content-type': 'application/json; charset=utf-8'},
+            );
+          case 'notifications/initialized':
+            return http.Response('', 202);
+          case 'tools/call':
+            return http.Response(
+              jsonEncode({
+                'jsonrpc': '2.0',
+                'id': message['id'],
+                'result': {
+                  'content': [
+                    {
+                      'type': 'text',
+                      'text':
+                          '# Free Result\n'
+                          'URL: https://example.com/free\n\n'
+                          'Free tier excerpt',
+                    },
+                  ],
+                },
+              }),
+              200,
+              headers: {'content-type': 'application/json; charset=utf-8'},
+            );
+          default:
+            return http.Response('unknown method', 400);
+        }
+      });
 }
