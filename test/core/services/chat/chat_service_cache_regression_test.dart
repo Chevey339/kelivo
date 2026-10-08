@@ -1,4 +1,12 @@
 import 'dart:io';
+import 'dart:async';
+import 'package:Kelivo/core/database/app_database.dart';
+import 'package:Kelivo/core/database/chat_database_repository.dart';
+import 'package:Kelivo/core/models/chat_message.dart';
+import 'dart:convert';
+import 'package:Kelivo/core/services/api/providers/google/gemini_thought_signature.dart';
+
+import 'package:Kelivo/core/models/message_part.dart';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hive_flutter/hive_flutter.dart';
@@ -23,6 +31,45 @@ class _FakePathProviderPlatform extends PathProviderPlatform {
 
   @override
   Future<String?> getTemporaryPath() async => '$path/tmp';
+}
+
+class _DelayedSnapshotRepository extends ChatDatabaseRepository {
+  _DelayedSnapshotRepository(super.database);
+  Completer<void>? rangeGate;
+  Completer<void>? captured;
+  Completer<void>? pageGate;
+  Completer<void>? pageCaptured;
+  @override
+  Future<List<ChatMessage>> getMessagesByIds(List<String> ids) async {
+    final snapshot = await super.getMessagesByIds(ids);
+    final gate = pageGate;
+    if (gate != null) {
+      pageGate = null;
+      pageCaptured!.complete();
+      await gate.future;
+    }
+    return snapshot;
+  }
+
+  @override
+  Future<List<ChatMessage>> getMessagesRange(
+    String conversationId, {
+    required int start,
+    required int limit,
+  }) async {
+    final snapshot = await super.getMessagesRange(
+      conversationId,
+      start: start,
+      limit: limit,
+    );
+    final gate = rangeGate;
+    if (gate != null) {
+      rangeGate = null;
+      captured!.complete();
+      await gate.future;
+    }
+    return snapshot;
+  }
 }
 
 Future<void> _flushIdleTasks() async {
@@ -97,8 +144,8 @@ void main() {
 
       // The regression wrote an empty list here: without the order skeleton the
       // intersection in _cacheLoadedMessages dropped every loaded message.
-      // Bodies are cached on the first-page return path; the full order
-      // skeleton (and ordered projection) arrives via Issue 7 backfill.
+      // Bodies are cached on the first-page return path without loading the
+      // complete identity list during idle time.
       expect(
         service
             .getMessages(conversationId)
@@ -107,9 +154,8 @@ void main() {
         ids.toSet(),
       );
       await _flushIdleTasks();
-      await service.debugMessageOrderBackfillFuture(conversationId);
-      expect(service.debugHasMessageOrderSkeleton(conversationId), isTrue);
-      expect(service.getMessageCount(conversationId), ids.length);
+      expect(service.debugHasMessageOrderSkeleton(conversationId), isFalse);
+      expect(await service.resolveMessageCount(conversationId), ids.length);
       expect(
         service.getMessages(conversationId).map((message) => message.id),
         orderedEquals(ids),
@@ -218,5 +264,194 @@ void main() {
           .map((message) => message.id),
       orderedEquals(remaining),
     );
+  });
+  test(
+    'current conversation and retained request snapshots obey cache ownership',
+    () async {
+      final service = createService();
+      await service.init();
+      final conversation = await service.createConversation(
+        title: 'Large current',
+      );
+      final tool = {
+        'id': 'lookup',
+        'name': 'search',
+        'arguments': {'q': 'kept'},
+        'content': 'complete result',
+      };
+      final source = await service.addMessage(
+        conversationId: conversation.id,
+        role: 'assistant',
+        parts: [const TextPart('original'), ToolCallPart(jsonEncode(tool))],
+      );
+      const kind = geminiThoughtSignatureArtifactKind;
+      await service.setProviderArtifact(
+        source.id,
+        kind,
+        'opaque-original-signature',
+      );
+      final snapshot = (await service.loadSelectedContextMessages(
+        conversation.id,
+        truncateIndex: -1,
+        limit: 1,
+      )).single;
+      await service.updateMessage(source.id, translation: 'translated');
+      final updatedSnapshot = service.getMessages(conversation.id).single;
+      for (var i = 0; i < 12; i++) {
+        await service.addMessage(
+          conversationId: conversation.id,
+          role: 'user',
+          content: '$i${'x' * (512 * 1024)}',
+        );
+      }
+      expect(service.currentConversationId, conversation.id);
+      expect(
+        service.debugCachedMessageBytes,
+        lessThanOrEqualTo(8 * 1024 * 1024),
+      );
+      expect(
+        service.getMessages(conversation.id).any((m) => m.id == source.id),
+        isFalse,
+      );
+      expect(service.getToolEventsForMessage(snapshot).single, tool);
+      expect(
+        service.getProviderArtifactForMessage(snapshot, kind),
+        'opaque-original-signature',
+      );
+      expect(
+        service.getProviderArtifactForMessage(updatedSnapshot, kind),
+        'opaque-original-signature',
+      );
+      expect(
+        service.getProviderArtifactForMessage(
+          snapshot.copyWith(content: 'edited'),
+          kind,
+        ),
+        'opaque-original-signature',
+      );
+      expect(snapshot.copyWith(id: 'new-id').providerArtifactSnapshot, isEmpty);
+      expect(
+        (await service.loadMessagesByIds([source.id])).single.content,
+        'original',
+      );
+    },
+  );
+
+  test(
+    'cache eviction keeps an in-flight generation and its replay metadata',
+    () async {
+      final service = createService();
+      await service.init();
+      final first = await service.createConversation(title: 'Generating');
+      final active = await service.addMessage(
+        conversationId: first.id,
+        role: 'assistant',
+        content: 'partial',
+        isStreaming: true,
+      );
+      const kind = geminiThoughtSignatureArtifactKind;
+      await service.setProviderArtifact(active.id, kind, 'active-signature');
+      final second = await service.createConversation(title: 'Browsing');
+      for (var i = 0; i < 12; i++) {
+        await service.addMessage(
+          conversationId: second.id,
+          role: 'user',
+          content: '$i${'y' * (512 * 1024)}',
+        );
+      }
+      expect(service.getMessages(first.id).single.id, active.id);
+      expect(service.getProviderArtifact(active.id, kind), 'active-signature');
+    },
+  );
+  test('a delayed full snapshot cannot erase a concurrent append', () async {
+    final repository = _DelayedSnapshotRepository(
+      AppDatabase.open(file: File('${tempDir.path}/kelivo.db')),
+    );
+    final service = ChatService(existingRepository: repository);
+    await service.init();
+    try {
+      final conversation = await service.createConversation(
+        title: 'Concurrent',
+      );
+      final initial = await service.addMessage(
+        conversationId: conversation.id,
+        role: 'user',
+        content: 'initial',
+      );
+      service.debugPrimeMessageCountState(
+        conversation.id,
+        cachedMessages: const [],
+        messageCount: 1,
+      );
+      repository.rangeGate = Completer<void>();
+      repository.captured = Completer<void>();
+      final gate = repository.rangeGate!;
+      final loading = service.loadMessages(conversation.id);
+      await repository.captured!.future;
+      final added = await service.addMessage(
+        conversationId: conversation.id,
+        role: 'user',
+        content: 'concurrent',
+      );
+      gate.complete();
+      expect((await loading).map((m) => m.id), [initial.id, added.id]);
+      expect(
+        service
+            .getMessagesRange(conversation.id, start: 0, limit: 10)
+            .map((m) => m.id),
+        [initial.id, added.id],
+      );
+      expect(service.getMessageCount(conversation.id), 2);
+    } finally {
+      await service.close();
+      await repository.close();
+    }
+  });
+
+  test(
+    'collecting every page backwards does not reorder model history',
+    () async {
+      final (service, id, ids) = await seedRestartedService(messageCount: 4);
+      await service.resolveMessageCount(id);
+      final tail = (await service.loadTimelinePage(id, limit: 2))!;
+      await service.loadTimelinePage(
+        id,
+        beforeRevisionId: tail.slots.first.message.id,
+        limit: 2,
+      );
+      expect(service.isConversationFullyCached(id), isTrue);
+      expect((await service.loadMessages(id)).map((m) => m.id), ids);
+    },
+  );
+
+  test('a delayed page cannot undo a completed version choice', () async {
+    final repository = _DelayedSnapshotRepository(
+      AppDatabase.open(file: File('${tempDir.path}/kelivo.db')),
+    );
+    final service = ChatService(existingRepository: repository);
+    await service.init();
+    try {
+      final conversation = await service.createConversation(title: 'Selection');
+      final original = await service.addMessage(
+        conversationId: conversation.id,
+        role: 'assistant',
+        content: 'original',
+      );
+      await service.appendMessageVersion(
+        messageId: original.id,
+        content: 'edited',
+      );
+      repository.pageGate = Completer<void>();
+      repository.pageCaptured = Completer<void>();
+      final gate = repository.pageGate!;
+      final page = service.loadTimelinePage(conversation.id);
+      await repository.pageCaptured!.future;
+      await service.setSelectedVersion(conversation.id, original.id, 0);
+      gate.complete();
+      expect((await page)!.slots.single.message.id, original.id);
+    } finally {
+      await service.close();
+      await repository.close();
+    }
   });
 }

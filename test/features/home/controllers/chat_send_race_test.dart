@@ -783,301 +783,329 @@ void main() {
     );
   }
 
-  testWidgets('Claude recovered native history retains both signed responses', (
-    tester,
-  ) async {
-    final controller = await pumpHarness(tester);
-    await tester.runAsync(() async {
-      final config = await configureNative(claude: true, stream: false);
-      final convo = await openConversation(controller);
-      const arguments = {
-        'questions': [
-          {'id': 'q1', 'question': 'Which option?'},
-        ],
-      };
-      const oldBlocks = [
-        {'type': 'thinking', 'thinking': '', 'signature': 'opaque-old'},
-        {'type': 'text', 'text': 'Before asking. '},
-        {
-          'type': 'tool_use',
-          'id': 'old-ask',
-          'name': AskUserToolNames.askUser,
-          'input': arguments,
-        },
-      ];
-      const freshBlocks = [
-        {'type': 'thinking', 'thinking': '', 'signature': 'opaque-fresh'},
-        {'type': 'text', 'text': 'Answer'},
-      ];
+  Future<void> evictConversationMessages(String conversationId) async {
+    final pressure = await service.createConversation(
+      title: 'Cache pressure',
+      activate: false,
+    );
+    for (var i = 0; i < 12; i++) {
       await service.addMessage(
-        conversationId: convo.id,
+        conversationId: pressure.id,
         role: 'user',
-        content: 'Ask me',
+        content: '$i${'x' * (512 * 1024)}',
       );
-      final reply = await service.addMessage(
-        conversationId: convo.id,
-        role: 'assistant',
-        providerId: config.id,
-        modelId: 'claude-sonnet-4-6',
-        parts: [
-          const TextPart('Before asking. '),
-          ToolCallPart(
-            jsonEncode({
+    }
+    expect(service.getMessages(conversationId), isEmpty);
+  }
+
+  for (final evicted in [false, true]) {
+    testWidgets(
+      'Claude recovered native history retains both signed responses: evicted=$evicted',
+      (tester) async {
+        final controller = await pumpHarness(tester);
+        await tester.runAsync(() async {
+          final config = await configureNative(claude: true, stream: false);
+          final convo = await openConversation(controller);
+          const arguments = {
+            'questions': [
+              {'id': 'q1', 'question': 'Which option?'},
+            ],
+          };
+          const oldBlocks = [
+            {'type': 'thinking', 'thinking': '', 'signature': 'opaque-old'},
+            {'type': 'text', 'text': 'Before asking. '},
+            {
+              'type': 'tool_use',
               'id': 'old-ask',
               'name': AskUserToolNames.askUser,
-              'arguments': arguments,
-              'content': null,
+              'input': arguments,
+            },
+          ];
+          const freshBlocks = [
+            {'type': 'thinking', 'thinking': '', 'signature': 'opaque-fresh'},
+            {'type': 'text', 'text': 'Answer'},
+          ];
+          await service.addMessage(
+            conversationId: convo.id,
+            role: 'user',
+            content: 'Ask me',
+          );
+          final reply = await service.addMessage(
+            conversationId: convo.id,
+            role: 'assistant',
+            providerId: config.id,
+            modelId: 'claude-sonnet-4-6',
+            parts: [
+              const TextPart('Before asking. '),
+              ToolCallPart(
+                jsonEncode({
+                  'id': 'old-ask',
+                  'name': AskUserToolNames.askUser,
+                  'arguments': arguments,
+                  'content': null,
+                }),
+              ),
+            ],
+          );
+          await service.setProviderArtifact(
+            reply.id,
+            claudeTurnArtifactKind,
+            encodeClaudeTurn([oldBlocks]),
+          );
+          final requests = <Map<String, dynamic>>[];
+          apiOverride = (request, body) async {
+            requests.add(body);
+            request.response.headers.contentType = ContentType.json;
+            request.response.write(
+              jsonEncode({'content': freshBlocks, 'stop_reason': 'end_turn'}),
+            );
+            await request.response.close();
+          };
+          await controller.chatController.setCurrentConversationAndLoad(convo);
+          if (evicted) await evictConversationMessages(convo.id);
+          await controller.submitRecoveredAskUserAnswer(
+            reply,
+            const ToolUIPart(
+              id: 'old-ask',
+              toolName: AskUserToolNames.askUser,
+              arguments: arguments,
+              loading: true,
+            ),
+            const AskUserResult.answer({
+              'q1': AskUserAnswerValue.single(value: 'approved', custom: true),
             }),
-          ),
-        ],
-      );
-      await service.setProviderArtifact(
-        reply.id,
-        claudeTurnArtifactKind,
-        encodeClaudeTurn([oldBlocks]),
-      );
-      final requests = <Map<String, dynamic>>[];
-      apiOverride = (request, body) async {
-        requests.add(body);
-        request.response.headers.contentType = ContentType.json;
-        request.response.write(
-          jsonEncode({'content': freshBlocks, 'stop_reason': 'end_turn'}),
-        );
-        await request.response.close();
-      };
-      await controller.chatController.setCurrentConversationAndLoad(convo);
-      await controller.submitRecoveredAskUserAnswer(
-        reply,
-        const ToolUIPart(
-          id: 'old-ask',
-          toolName: AskUserToolNames.askUser,
-          arguments: arguments,
-          loading: true,
-        ),
-        const AskUserResult.answer({
-          'q1': AskUserAnswerValue.single(value: 'approved', custom: true),
-        }),
-      );
-      await waitFor(
-        () => !controller.chatController.isConversationLoading(convo.id),
-        'Claude recovery finish',
-      );
-      expect(
-        decodeClaudeTurn(
-          service.getProviderArtifact(reply.id, claudeTurnArtifactKind),
-        ),
-        [oldBlocks, freshBlocks],
-      );
-      await controller.sendMessage(ChatInputData(text: 'Next'));
-      await waitFor(
-        () => !controller.chatController.isConversationLoading(convo.id),
-        'Claude next finish',
-      );
-      expect(requests, hasLength(2));
-      final messages = requests.last['messages'] as List;
-      final assistants = messages
-          .where((m) => m['role'] == 'assistant')
-          .toList();
-      expect(assistants.map((m) => m['content']), [oldBlocks, freshBlocks]);
-      final results = messages.where(
-        (m) => m['role'] == 'user' && m['content'] is List,
-      );
-      expect(jsonEncode(results.toList()), contains('approved'));
-    });
-    expect(tester.takeException(), isNull);
-  });
+          );
+          await waitFor(
+            () => !controller.chatController.isConversationLoading(convo.id),
+            'Claude recovery finish',
+          );
+          expect(
+            decodeClaudeTurn(
+              service.getProviderArtifact(reply.id, claudeTurnArtifactKind),
+            ),
+            [oldBlocks, freshBlocks],
+          );
+          await controller.sendMessage(ChatInputData(text: 'Next'));
+          await waitFor(
+            () => !controller.chatController.isConversationLoading(convo.id),
+            'Claude next finish',
+          );
+          expect(requests, hasLength(2));
+          final messages = requests.last['messages'] as List;
+          final assistants = messages
+              .where((m) => m['role'] == 'assistant')
+              .toList();
+          expect(assistants.map((m) => m['content']), [oldBlocks, freshBlocks]);
+          final results = messages.where(
+            (m) => m['role'] == 'user' && m['content'] is List,
+          );
+          expect(jsonEncode(results.toList()), contains('approved'));
+        });
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
 
   for (final stream in [false, true]) {
     for (final temporary in [false, true]) {
       for (final preamble in ['', 'Before asking. ']) {
-        testWidgets(
-          'native Responses recovery keeps all rounds: stream=$stream, temporary=$temporary, preamble="$preamble"',
-          (tester) async {
-            final controller = await pumpHarness(tester);
-            await tester.runAsync(() async {
-              final config = await configureNative(
-                claude: false,
-                stream: stream,
-              );
-              final convo = temporary
-                  ? await service.createDraftConversation(
-                      title: 'Recovery',
-                      temporary: true,
-                    )
-                  : await service.createConversation(title: 'Recovery');
-              const arguments = {
-                'questions': [
-                  {'id': 'q1', 'question': 'Which option?'},
-                ],
-              };
-              Map<String, dynamic> call(String id) => {
-                'type': 'function_call',
-                'id': 'fc-$id',
-                'call_id': id,
-                'name': AskUserToolNames.askUser,
-                'arguments': jsonEncode(arguments),
-              };
-              final oldOutput = [
-                _nativeReasoning('old'),
-                if (preamble.isNotEmpty) _nativeText(preamble),
-                call('old-ask'),
-              ];
-              await service.addMessage(
-                conversationId: convo.id,
-                role: 'user',
-                content: 'Ask me',
-              );
-              final reply = await service.addMessage(
-                conversationId: convo.id,
-                role: 'assistant',
-                providerId: config.id,
-                modelId: 'gpt-5.4',
-                parts: [
-                  if (preamble.isNotEmpty) TextPart(preamble),
-                  ToolCallPart(
-                    jsonEncode({
-                      'id': 'old-ask',
-                      'name': AskUserToolNames.askUser,
-                      'arguments': arguments,
-                      'content': null,
-                    }),
-                  ),
-                  const AssistantRoundEndPart(),
-                ],
-              );
-              await service.setProviderArtifact(
-                reply.id,
-                responsesTurnArtifactKind,
-                ResponsesTurnRecorder(
-                  responsesReplayScope(config, 'gpt-5.4'),
-                ).record(oldOutput, [
-                  emitToolCall(
-                    id: 'old-ask',
-                    name: AskUserToolNames.askUser,
-                    arguments: arguments,
-                  ),
-                ]).payload,
-              );
-              final requests = <Map<String, dynamic>>[];
-              final middle = [
-                _nativeReasoning('middle'),
-                _nativeText('During recovery. '),
-                call('live-ask'),
-              ];
-              final finalOutput = [
-                _nativeReasoning('final'),
-                _nativeText('Answer'),
-              ];
-              apiOverride = (request, body) async {
-                requests.add(body);
-                await _writeResponses(
-                  request,
-                  body,
-                  requests.length == 1 ? middle : finalOutput,
+        for (final evicted in [false, if (!temporary) true]) {
+          testWidgets(
+            'native Responses recovery keeps all rounds: stream=$stream, temporary=$temporary, evicted=$evicted, preamble="$preamble"',
+            (tester) async {
+              final controller = await pumpHarness(tester);
+              await tester.runAsync(() async {
+                final config = await configureNative(
+                  claude: false,
+                  stream: stream,
                 );
-              };
-              await controller.chatController.setCurrentConversationAndLoad(
-                convo,
-              );
-              final resumed = controller.submitRecoveredAskUserAnswer(
-                reply,
-                const ToolUIPart(
-                  id: 'old-ask',
-                  toolName: AskUserToolNames.askUser,
-                  arguments: arguments,
-                  loading: true,
-                ),
-                const AskUserResult.answer({
-                  'q1': AskUserAnswerValue.single(
-                    value: 'original answer',
+                final convo = temporary
+                    ? await service.createDraftConversation(
+                        title: 'Recovery',
+                        temporary: true,
+                      )
+                    : await service.createConversation(title: 'Recovery');
+                const arguments = {
+                  'questions': [
+                    {'id': 'q1', 'question': 'Which option?'},
+                  ],
+                };
+                Map<String, dynamic> call(String id) => {
+                  'type': 'function_call',
+                  'id': 'fc-$id',
+                  'call_id': id,
+                  'name': AskUserToolNames.askUser,
+                  'arguments': jsonEncode(arguments),
+                };
+                final oldOutput = [
+                  _nativeReasoning('old'),
+                  if (preamble.isNotEmpty) _nativeText(preamble),
+                  call('old-ask'),
+                ];
+                await service.addMessage(
+                  conversationId: convo.id,
+                  role: 'user',
+                  content: 'Ask me',
+                );
+                final reply = await service.addMessage(
+                  conversationId: convo.id,
+                  role: 'assistant',
+                  providerId: config.id,
+                  modelId: 'gpt-5.4',
+                  parts: [
+                    if (preamble.isNotEmpty) TextPart(preamble),
+                    ToolCallPart(
+                      jsonEncode({
+                        'id': 'old-ask',
+                        'name': AskUserToolNames.askUser,
+                        'arguments': arguments,
+                        'content': null,
+                      }),
+                    ),
+                    const AssistantRoundEndPart(),
+                  ],
+                );
+                await service.setProviderArtifact(
+                  reply.id,
+                  responsesTurnArtifactKind,
+                  ResponsesTurnRecorder(
+                    responsesReplayScope(config, 'gpt-5.4'),
+                  ).record(oldOutput, [
+                    emitToolCall(
+                      id: 'old-ask',
+                      name: AskUserToolNames.askUser,
+                      arguments: arguments,
+                    ),
+                  ]).payload,
+                );
+                final requests = <Map<String, dynamic>>[];
+                final middle = [
+                  _nativeReasoning('middle'),
+                  _nativeText('During recovery. '),
+                  call('live-ask'),
+                ];
+                final finalOutput = [
+                  _nativeReasoning('final'),
+                  _nativeText('Answer'),
+                ];
+                apiOverride = (request, body) async {
+                  requests.add(body);
+                  await _writeResponses(
+                    request,
+                    body,
+                    requests.length == 1 ? middle : finalOutput,
+                  );
+                };
+                await controller.chatController.setCurrentConversationAndLoad(
+                  convo,
+                );
+                if (evicted) await evictConversationMessages(convo.id);
+                final resumed = controller.submitRecoveredAskUserAnswer(
+                  reply,
+                  const ToolUIPart(
+                    id: 'old-ask',
+                    toolName: AskUserToolNames.askUser,
+                    arguments: arguments,
+                    loading: true,
+                  ),
+                  const AskUserResult.answer({
+                    'q1': AskUserAnswerValue.single(
+                      value: 'original answer',
+                      custom: true,
+                    ),
+                  }),
+                );
+                await waitFor(
+                  () => questions.pendingRequests.containsKey('live-ask'),
+                  'second ask',
+                );
+                questions.answer('live-ask', {
+                  'q1': const AskUserAnswerValue.single(
+                    value: 'follow-up answer',
                     custom: true,
                   ),
-                }),
-              );
-              await waitFor(
-                () => questions.pendingRequests.containsKey('live-ask'),
-                'second ask',
-              );
-              questions.answer('live-ask', {
-                'q1': const AskUserAnswerValue.single(
-                  value: 'follow-up answer',
-                  custom: true,
-                ),
-              });
-              await resumed;
-              await waitFor(
-                () =>
-                    !controller.chatController.isConversationLoading(convo.id),
-                'recovery finish',
-              );
-              expect(requests, hasLength(2));
-              final firstInput = requests.first['input'] as List;
-              expect(
-                firstInput.where(
-                  (m) =>
-                      m['type'] != null && m['type'] != 'function_call_output',
-                ),
-                oldOutput,
-              );
-              final artifact = service.getProviderArtifact(
-                reply.id,
-                responsesTurnArtifactKind,
-              )!;
-              final rounds = (jsonDecode(artifact) as Map)['rounds'] as List;
-              expect(rounds.map((round) => round['output']), [
-                oldOutput,
-                middle,
-                finalOutput,
-              ]);
-              if (!temporary) {
-                expect(
-                  (await repository.getProviderArtifactsForMessages([
-                    reply.id,
-                  ], responsesTurnArtifactKind))[reply.id],
-                  artifact,
+                });
+                await resumed;
+                await waitFor(
+                  () => !controller.chatController.isConversationLoading(
+                    convo.id,
+                  ),
+                  'recovery finish',
                 );
-              }
-              await controller.sendMessage(ChatInputData(text: 'Next'));
-              await waitFor(
-                () =>
-                    !controller.chatController.isConversationLoading(convo.id),
-                'next finish',
-              );
-              expect(requests, hasLength(3));
-              final next = requests.last['input'] as List;
-              expect(
-                next
-                    .where((m) => m['type'] == 'reasoning')
-                    .map((m) => m['encrypted_content']),
-                ['opaque-old', 'opaque-middle', 'opaque-final'],
-              );
-              expect(
-                next
-                    .where((m) => m['type'] == 'function_call')
-                    .map((m) => m['call_id']),
-                ['old-ask', 'live-ask'],
-              );
-              final answers = next
-                  .where((m) => m['type'] == 'function_call_output')
-                  .toList();
-              expect(answers.map((m) => m['call_id']), ['old-ask', 'live-ask']);
-              expect(answers.first['output'], contains('original answer'));
-              expect(answers.last['output'], contains('follow-up answer'));
-              final latest = (await service.loadMessages(convo.id)).last;
-              expect(
-                (jsonDecode(
-                      service.getProviderArtifact(
-                        latest.id,
-                        responsesTurnArtifactKind,
-                      )!,
-                    )
-                    as Map)['rounds'],
-                hasLength(1),
-              );
-            });
-            expect(tester.takeException(), isNull);
-          },
-        );
+                expect(requests, hasLength(2));
+                final firstInput = requests.first['input'] as List;
+                expect(
+                  firstInput.where(
+                    (m) =>
+                        m['type'] != null &&
+                        m['type'] != 'function_call_output',
+                  ),
+                  oldOutput,
+                );
+                final artifact = service.getProviderArtifact(
+                  reply.id,
+                  responsesTurnArtifactKind,
+                )!;
+                final rounds = (jsonDecode(artifact) as Map)['rounds'] as List;
+                expect(rounds.map((round) => round['output']), [
+                  oldOutput,
+                  middle,
+                  finalOutput,
+                ]);
+                if (!temporary) {
+                  expect(
+                    (await repository.getProviderArtifactsForMessages([
+                      reply.id,
+                    ], responsesTurnArtifactKind))[reply.id],
+                    artifact,
+                  );
+                }
+                await controller.sendMessage(ChatInputData(text: 'Next'));
+                await waitFor(
+                  () => !controller.chatController.isConversationLoading(
+                    convo.id,
+                  ),
+                  'next finish',
+                );
+                expect(requests, hasLength(3));
+                final next = requests.last['input'] as List;
+                expect(
+                  next
+                      .where((m) => m['type'] == 'reasoning')
+                      .map((m) => m['encrypted_content']),
+                  ['opaque-old', 'opaque-middle', 'opaque-final'],
+                );
+                expect(
+                  next
+                      .where((m) => m['type'] == 'function_call')
+                      .map((m) => m['call_id']),
+                  ['old-ask', 'live-ask'],
+                );
+                final answers = next
+                    .where((m) => m['type'] == 'function_call_output')
+                    .toList();
+                expect(answers.map((m) => m['call_id']), [
+                  'old-ask',
+                  'live-ask',
+                ]);
+                expect(answers.first['output'], contains('original answer'));
+                expect(answers.last['output'], contains('follow-up answer'));
+                final latest = (await service.loadMessages(convo.id)).last;
+                expect(
+                  (jsonDecode(
+                        service.getProviderArtifact(
+                          latest.id,
+                          responsesTurnArtifactKind,
+                        )!,
+                      )
+                      as Map)['rounds'],
+                  hasLength(1),
+                );
+              });
+              expect(tester.takeException(), isNull);
+            },
+          );
+        }
       }
     }
   }

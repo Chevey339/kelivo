@@ -464,7 +464,7 @@ class ContextUsageService extends ChangeNotifier {
       usage: usage,
       assistantMessage: assistantMessage,
       replay: spec.reasoning.replay,
-      toolEvents: _chatService.getToolEvents(assistantMessage.id),
+      toolEvents: _chatService.getToolEventsForMessage(assistantMessage),
     );
     final window = spec.contextWindow;
     final previous = _snapshots[conversationId];

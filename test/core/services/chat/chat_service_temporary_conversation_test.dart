@@ -286,7 +286,7 @@ void main() {
               chatService: service,
               contextProvider: _ReplayContext(),
               providerArtifactLookup: (message, kind) =>
-                  service.getProviderArtifact(message.id, kind),
+                  service.getProviderArtifactForMessage(message, kind),
             );
             for (final claude in [true, false]) {
               final history = builder.buildApiMessages(
@@ -494,7 +494,7 @@ void main() {
             chatService: service,
             contextProvider: _ReplayContext(),
             providerArtifactLookup: (message, kind) =>
-                service.getProviderArtifact(message.id, kind),
+                service.getProviderArtifactForMessage(message, kind),
           );
           for (final claude in [true, false]) {
             final config = ProviderConfig(
@@ -654,7 +654,7 @@ void main() {
             chatService: service,
             contextProvider: _ReplayContext(),
             providerArtifactLookup: (message, kind) =>
-                service.getProviderArtifact(message.id, kind),
+                service.getProviderArtifactForMessage(message, kind),
           );
           final history = builder.buildApiMessages(
             messages: [
@@ -949,7 +949,7 @@ void main() {
   });
 
   test('windowed timeline cache stays appendable for the next send', () async {
-    final service = createService();
+    var service = createService();
     await service.init();
     final conversation = await service.createConversation(title: 'Chat');
     final ids = <String>[];
@@ -961,6 +961,11 @@ void main() {
       );
       ids.add(message.id);
     }
+
+    await service.close();
+    services.remove(service);
+    service = createService();
+    await service.init();
 
     // Cache only a tail window so the append lands in a partial cache.
     await service.loadTimelinePage(conversation.id, limit: 1);

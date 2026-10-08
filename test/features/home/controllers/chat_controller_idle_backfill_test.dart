@@ -157,7 +157,7 @@ void main() {
       );
     }
 
-    test('opening a conversation backfills its full cache when idle', () async {
+    test('opening a conversation never warms unrequested history', () async {
       chatService._messagesByConversation['conv-a'] = _messages('conv-a', 5);
 
       await open('conv-a');
@@ -165,12 +165,12 @@ void main() {
 
       await _flushIdleTasks();
 
-      expect(chatService.loadCallsFor('conv-a'), 1);
+      expect(chatService.loadCallsFor('conv-a'), 0);
       expect(controller.messages, hasLength(5));
       expect(controller.totalMessageCount, 5);
     });
 
-    test('committing a fetched window also schedules the backfill', () async {
+    test('committing a window leaves unrequested history unloaded', () async {
       chatService._messagesByConversation['conv-a'] = _messages('conv-a', 3);
 
       final fetched = await controller.fetchConversationWindow(
@@ -179,30 +179,31 @@ void main() {
       controller.commitConversationWindow(fetched);
       await _flushIdleTasks();
 
-      expect(chatService.loadCallsFor('conv-a'), 1);
-    });
-
-    test('abandons the backfill after switching away', () async {
-      chatService._messagesByConversation['conv-a'] = _messages('conv-a', 5);
-      chatService._messagesByConversation['conv-b'] = _messages('conv-b', 3);
-      await open('conv-a');
-      await open('conv-b');
-
-      await controller.backfillCurrentConversationCache('conv-a');
-      await _flushIdleTasks();
-
       expect(chatService.loadCallsFor('conv-a'), 0);
-      expect(chatService.loadCallsFor('conv-b'), 1);
     });
 
-    test('skips conversations beyond the slot threshold', () async {
+    test(
+      'switching conversations does not load either complete history',
+      () async {
+        chatService._messagesByConversation['conv-a'] = _messages('conv-a', 5);
+        chatService._messagesByConversation['conv-b'] = _messages('conv-b', 3);
+        await open('conv-a');
+        await open('conv-b');
+
+        await _flushIdleTasks();
+
+        expect(chatService.loadCallsFor('conv-a'), 0);
+        expect(chatService.loadCallsFor('conv-b'), 0);
+      },
+    );
+
+    test('large conversations retain a bounded initial window', () async {
       chatService._messagesByConversation['conv-a'] = _messages(
         'conv-a',
-        ChatController.idleCacheBackfillSlotLimit + 1,
+        10000,
       );
       await open('conv-a');
 
-      await controller.backfillCurrentConversationCache('conv-a');
       await _flushIdleTasks();
 
       expect(chatService.loadCallsFor('conv-a'), 0);
@@ -212,26 +213,23 @@ void main() {
       );
     });
 
-    test('pauses while generating and resumes when generation ends', () async {
+    test('finishing generation does not trigger a full history load', () async {
       chatService._messagesByConversation['conv-a'] = _messages('conv-a', 5);
       await open('conv-a');
       controller.setConversationLoading('conv-a', true);
 
-      await controller.backfillCurrentConversationCache('conv-a');
       expect(chatService.loadCallsFor('conv-a'), 0);
 
       controller.setConversationLoading('conv-a', false);
       await _flushIdleTasks();
 
-      expect(chatService.loadCallsFor('conv-a'), 1);
+      expect(chatService.loadCallsFor('conv-a'), 0);
     });
 
     test('skips an already fully cached conversation', () async {
       chatService._messagesByConversation['conv-a'] = _messages('conv-a', 5);
       await open('conv-a');
       chatService.fullyCached = true;
-
-      await controller.backfillCurrentConversationCache('conv-a');
 
       expect(chatService.loadCallsFor('conv-a'), 0);
     });

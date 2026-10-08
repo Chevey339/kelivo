@@ -70,6 +70,40 @@ void main() {
     );
   }
 
+  test(
+    'paging releases payloads and restores expansion choices without clearing active runs',
+    () {
+      final controller = buildController();
+      final old = buildAssistantMessage(
+        controller,
+        reasoningText: 'large old reasoning',
+      );
+      final active = buildAssistantMessage(
+        controller,
+        id: 'active',
+        reasoningText: 'active reasoning',
+      );
+      restore(controller, old);
+      restore(controller, active);
+      controller.reasoning[old.id]!.expanded = true;
+      controller.reasoningSegments[old.id]!.single.expanded = false;
+      controller.markStreamingStarted(active.id);
+      controller.pruneOffWindowState({});
+      expect(controller.reasoning.containsKey(old.id), isFalse);
+      expect(controller.toolParts.containsKey(old.id), isFalse);
+      expect(controller.reasoningDetails.containsKey(old.id), isFalse);
+      expect(controller.reasoning.containsKey(active.id), isTrue);
+      restore(controller, old);
+      expect(controller.reasoning[old.id]!.expanded, isTrue);
+      expect(controller.reasoningSegments[old.id]!.single.expanded, isFalse);
+      expect(controller.toolParts[old.id]!.single.content, 'result body');
+      controller.clearAllState();
+      restore(controller, old);
+      expect(controller.reasoning[old.id]!.expanded, isFalse);
+      controller.dispose();
+    },
+  );
+
   test('restore decodes reasoningSegmentsJson once per message', () {
     final controller = buildController();
     final message = buildAssistantMessage(

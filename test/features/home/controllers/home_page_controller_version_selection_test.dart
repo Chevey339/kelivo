@@ -800,12 +800,17 @@ void main() {
             .allCollapsedMessagesForCurrentConversation();
         expect(collapsed.map((m) => m.id).last, v1.id);
 
-        // Directed group cache (visible-group preload) exposes both versions
-        // without the full order skeleton — same data
-        // selectedMessagesIncludeMultipleVersions reads via getMessagesForGroups.
-        final groupMessages = service.getMessagesForGroups(conversation.id, [
-          'answer',
-        ]);
+        // The picker gets revision headers; browsing does not load the
+        // unselected body or the full order skeleton.
+        final groupMessages = chatController.groupedMessages['answer']!;
+        expect(
+          service.getMessagesForGroups(conversation.id, ['answer']),
+          hasLength(1),
+        );
+        expect(
+          groupMessages.firstWhere((m) => m.version == 0).content,
+          isEmpty,
+        );
         expect(groupMessages.length, 2);
         expect(groupMessages.any((m) => m.id == v1.id), isTrue);
         expect(spy.rangeQueries.where((q) => q.limit < 0), isEmpty);

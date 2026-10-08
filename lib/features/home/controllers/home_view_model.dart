@@ -1519,12 +1519,16 @@ class HomeViewModel extends ChangeNotifier {
   }
 
   void _restoreMessageUiState() {
+    _streamController.pruneOffWindowState({
+      ..._chatActions.activeStreamingMessageIds,
+      for (final message in messages) message.id,
+    });
     for (int i = 0; i < messages.length; i++) {
       final m = messages[i];
       if (m.role == 'assistant') {
         _streamController.restoreMessageUiState(
           m,
-          getToolEventsFromDb: (id) => _chatService.getToolEvents(id),
+          getToolEventsFromDb: (id) => _chatService.getToolEventsForMessage(m),
         );
 
         final cleanedContent = _chatService.migrateLegacyGeminiThoughtSignature(

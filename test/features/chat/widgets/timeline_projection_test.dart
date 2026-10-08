@@ -28,6 +28,23 @@ List<TimelineToolRef> _toolsIn(TimelineProjection projected) {
 }
 
 void main() {
+  test('tool parsing is reused until its immutable payload changes', () {
+    const first = ToolCallPart(
+      '{"id":"t","name":"search","arguments":{},"content":"same","metadata":{"version":1}}',
+    );
+    const changed = ToolCallPart(
+      '{"id":"t","name":"search","arguments":{},"content":"same","metadata":{"version":2}}',
+    );
+    final parsed = parseTimelineToolPart(first)!;
+    expect(identical(parsed, parseTimelineToolPart(first)), isTrue);
+    expect(
+      parseTimelineToolPart(first, fallbackOrdinal: 3)!.fallbackOrdinal,
+      3,
+    );
+    expect(parseTimelineToolPart(changed)!.metadata!['version'], 2);
+    expect(parseTimelineToolPart(changed)!.memoToken, isNot(parsed.memoToken));
+  });
+
   test('missing reasoning metadata defaults to collapsed after tool calls', () {
     final projected = projectAssistantTimeline(
       parts: const [

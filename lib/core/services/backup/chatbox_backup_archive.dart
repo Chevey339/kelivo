@@ -3,6 +3,7 @@ import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:archive/archive_io.dart';
+import 'streaming_zip_entry.dart';
 import 'package:crypto/crypto.dart';
 import 'package:path/path.dart' as p;
 
@@ -542,7 +543,7 @@ class ChatboxBackupArchive {
   }) {
     final sink = _BoundedInflateSink(path: 'deflate', maxBytes: maxBytes);
     try {
-      _inflateRawDeflate(InputMemoryStream(compressed), sink);
+      inflateZipDeflateStreaming(InputMemoryStream(compressed), sink);
       return sink.finish().size;
     } catch (e) {
       sink.abort();
@@ -555,39 +556,14 @@ class ChatboxBackupArchive {
     if (raw != null &&
         (entry.compression == CompressionType.deflate ||
             (raw.isCompressed && entry.compression != CompressionType.bzip2))) {
-      _inflateRawDeflate(raw.getStream(decompress: false), sink);
+      inflateZipDeflateStreaming(raw.getStream(decompress: false), sink);
       return;
     }
     if (raw != null) {
       sink.writeStream(raw.getStream(decompress: false));
       return;
     }
-    entry.writeContent(sink);
-  }
-
-  static void _inflateRawDeflate(
-    InputStream input,
-    _BoundedInflateSink output,
-  ) {
-    final outSink = _ImmediateByteSink(output);
-    final inSink = ZLibCodec(raw: true).decoder.startChunkedConversion(outSink);
-    try {
-      const chunkSize = 64 * 1024;
-      while (!input.isEOS) {
-        final remaining = input.length;
-        final readSize = remaining < chunkSize ? remaining : chunkSize;
-        if (readSize <= 0) break;
-        final chunk = input.readBytes(readSize).toUint8List();
-        if (chunk.isEmpty) break;
-        inSink.add(chunk);
-      }
-      inSink.close();
-    } catch (e) {
-      try {
-        inSink.close();
-      } catch (_) {}
-      rethrow;
-    }
+    writeZipEntryStreaming(entry, sink);
   }
 
   static void _assertEntryBudget({
@@ -1394,21 +1370,5 @@ class _BoundedInflateSink extends OutputStream {
     if (propagate && thrown != null) {
       Error.throwWithStackTrace(thrown, thrownStack!);
     }
-  }
-}
-
-class _ImmediateByteSink extends ByteConversionSink {
-  _ImmediateByteSink(this._output);
-
-  final _BoundedInflateSink _output;
-
-  @override
-  void add(List<int> chunk) {
-    _output.writeBytes(chunk);
-  }
-
-  @override
-  void close() {
-    _output.flush();
   }
 }

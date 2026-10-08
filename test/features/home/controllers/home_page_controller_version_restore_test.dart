@@ -62,6 +62,7 @@ class _VersionedChatService extends ChatService {
     int limit = 40,
   }) async {
     final timestamp = DateTime(2026, 7, 29);
+    final selected = selectedVersion == 0 ? older : newer;
     return LoadedTimelinePage(
       conversationId: conversationId,
       stateRevision: 0,
@@ -70,7 +71,7 @@ class _VersionedChatService extends ChatService {
         LoadedTimelineSlot(
           identity: ActiveTimelineSlot(
             slotId: 'answer',
-            revisionId: newer.id,
+            revisionId: selected.id,
             parentRevisionId: null,
             role: 'assistant',
             createdAt: timestamp,
@@ -79,7 +80,7 @@ class _VersionedChatService extends ChatService {
             versionCount: 2,
             logicalIndex: 0,
           ),
-          message: newer,
+          message: selected,
         ),
       ],
       hasMoreBefore: false,
