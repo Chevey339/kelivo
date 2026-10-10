@@ -31,10 +31,11 @@ class IosRootfsManager implements EnvironmentManager {
   }) : _alpineRootfsDir = alpineRootfsDir ?? iosAlpineRootfsDir,
        _runInGuest =
            runInGuest ??
-           ((script) => runGuestScript(
+           ((script) async => runGuestScript(
              IosIshRuntime(channel: channel),
              script,
              timeout: const Duration(minutes: 10),
+             environment: (await env.loadExecutionConfig()).variables,
            ));
 
   final WorkspaceChannel channel;

@@ -775,7 +775,12 @@ class MyApp extends StatelessWidget {
           ),
         ),
         ChangeNotifierProvider(
-          create: (_) => EnvironmentProvider(preferences: businessPreferences),
+          create: (ctx) => EnvironmentProvider(
+            preferences: businessPreferences,
+            proxySettings: WorkspaceChannel.isSupportedPlatform
+                ? ctx.read<SettingsProvider>()
+                : null,
+          ),
         ),
         ChangeNotifierProvider(create: (_) => _WorkspaceStackHolder()),
         ChangeNotifierProvider(
