@@ -433,7 +433,7 @@ void applyAnthropicMessagesProtocolConstraints(Map<String, dynamic> body) {
   thinking['budget_tokens'] = next;
 }
 
-// Clean JSON Schema for Google Gemini API strict validation
+// Clean schemas for Google Gemini's native `parameters` field.
 // Google requires array types to have 'items' field, and only accepts `enum`
 // on string-typed schemas (values must be strings too).
 Map<String, dynamic> cleanSchemaForGemini(
@@ -485,7 +485,10 @@ String? _inferScalarType(List<dynamic> values) {
 
 dynamic _cleanSchemaNode(dynamic node, bool stringEnumOnly) {
   if (node is! Map) return node;
-  final result = Map<String, dynamic>.from(node);
+  // Native Schema rejects this JSON Schema keyword. Only remove it from
+  // schema nodes; a property name or a key inside default/example is data.
+  final result = Map<String, dynamic>.from(node)
+    ..remove('additionalProperties');
 
   final declaredType = (result['type'] ?? '').toString();
 
@@ -563,6 +566,13 @@ dynamic _cleanSchemaNode(dynamic node, bool stringEnumOnly) {
     result['items'] = _cleanSchemaNode(result['items'], stringEnumOnly);
   } else if (type == 'array' && !result.containsKey('items')) {
     result['items'] = {'type': 'string'}; // Default to string array
+  }
+
+  if (result['anyOf'] is List) {
+    result['anyOf'] = [
+      for (final variant in result['anyOf'] as List)
+        _cleanSchemaNode(variant, stringEnumOnly),
+    ];
   }
 
   return result;
