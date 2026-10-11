@@ -1,7 +1,9 @@
 import "../../../support/business_test_harness.dart";
 import 'package:flutter_test/flutter_test.dart';
 import 'package:Kelivo/core/models/chat_message.dart';
+import 'package:Kelivo/core/models/message_part.dart';
 import 'package:Kelivo/core/providers/settings_provider.dart';
+import 'package:Kelivo/core/services/api/stream/stream_chunk.dart';
 import 'package:Kelivo/features/home/controllers/stream_controller.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -156,6 +158,202 @@ void main() {
       controller.dispose();
     },
   );
+
+  test('interleaved reasoning and text preserve segment identity', () async {
+    final settings = SettingsProvider(createBusinessTestPreferences());
+    await settings.loaded;
+    final controller = buildController(
+      settings: settings,
+      currentConversationId: 'conversation-1',
+    );
+    addTearDown(controller.dispose);
+    final state = buildStreamingState(settings);
+
+    const first = ReasoningDelta(id: 'reasoning-1', text: 'initial reasoning');
+    state.partsHandler.handle(first);
+    await controller.handleReasoningChunk(first.text, state, segmentId: first.id);
+    final original = controller.getReasoningSegments(state.messageId)!.single;
+
+    state.partsHandler.handle(
+      const TextDelta(id: 'text-1', text: 'partial answer'),
+    );
+    controller.finishReasoningIfNeeded(state.messageId);
+    final finishedAt = original.finishedAt;
+    expect(finishedAt, isNotNull);
+    original.expanded = true;
+
+    const second = ReasoningDelta(id: 'reasoning-1', text: ' continued');
+    state.partsHandler.handle(second);
+    await controller.handleReasoningChunk(
+      second.text,
+      state,
+      segmentId: second.id,
+    );
+
+    final segments = controller.getReasoningSegments(state.messageId)!;
+    final parts = state.partsHandler.parts.whereType<ReasoningPart>().toList();
+    expect(segments, hasLength(1));
+    expect(parts, hasLength(1));
+    expect(segments.single, same(original));
+    expect(segments.single.text, 'initial reasoning continued');
+    expect(segments.single.text, parts.single.text);
+    expect(segments.single.finishedAt, finishedAt);
+    expect(segments.single.expanded, isTrue);
+  });
+
+  test('structured reasoning summaries keep item boundaries', () async {
+    final settings = SettingsProvider(createBusinessTestPreferences());
+    await settings.loaded;
+    await settings.setAutoCollapseThinking(true);
+    final controller = buildController(
+      settings: settings,
+      currentConversationId: 'conversation-1',
+    );
+    addTearDown(controller.dispose);
+    final state = buildStreamingState(settings);
+
+    await controller.handleReasoningChunk(
+      '**First**',
+      state,
+      segmentId: 'summary-1',
+      reasoningType: ReasoningType.summaryText,
+    );
+    controller.getReasoningSegments(state.messageId)!.single.expanded = true;
+    await controller.handleReasoningChunk(
+      ' explanation',
+      state,
+      segmentId: 'summary-1',
+      reasoningType: ReasoningType.summaryText,
+    );
+    await controller.handleReasoningChunk(
+      '**Second**',
+      state,
+      segmentId: 'summary-2',
+      reasoningType: ReasoningType.summaryText,
+    );
+
+    final segments = controller.getReasoningSegments(state.messageId)!;
+    expect(segments, hasLength(2));
+    expect(segments[0].id, 'summary-1');
+    expect(segments[0].text, '**First** explanation');
+    expect(segments[0].reasoningType, ReasoningType.summaryText);
+    expect(segments[0].finishedAt, isNotNull);
+    expect(segments[0].expanded, isFalse);
+    expect(segments[1].id, 'summary-2');
+    expect(segments[1].text, '**Second**');
+    expect(segments[1].finishedAt, isNull);
+  });
+
+  for (final autoCollapse in [true, false]) {
+    test('summary completion honors auto-collapse: $autoCollapse', () async {
+      final settings = SettingsProvider(createBusinessTestPreferences());
+      await settings.loaded;
+      await settings.setAutoCollapseThinking(autoCollapse);
+      final controller = buildController(
+        settings: settings,
+        currentConversationId: 'conversation-1',
+      );
+      addTearDown(controller.dispose);
+      final state = buildStreamingState(settings);
+      await controller.handleReasoningChunk(
+        'summary',
+        state,
+        segmentId: 'summary-1',
+        reasoningType: ReasoningType.summaryText,
+      );
+      final segment = controller.getReasoningSegments(state.messageId)!.single;
+      segment.expanded = true;
+
+      controller.finishReasoningSegment(state.messageId, 'summary-1');
+
+      final finishedAt = segment.finishedAt;
+      expect(finishedAt, isNotNull);
+      expect(segment.expanded, !autoCollapse);
+
+      segment.expanded = true;
+      controller.finishReasoningSegment(state.messageId, 'summary-1');
+      controller.finishReasoningIfNeeded(state.messageId);
+
+      expect(segment.finishedAt, finishedAt);
+      expect(segment.expanded, isTrue);
+      await controller.handleReasoningChunk('subsequent reasoning', state);
+      expect(segment.expanded, isTrue);
+    });
+  }
+
+  test('switching to reasoning closes and collapses a summary', () async {
+    final settings = SettingsProvider(createBusinessTestPreferences());
+    await settings.loaded;
+    await settings.setAutoCollapseThinking(true);
+    final controller = buildController(settings: settings);
+    addTearDown(controller.dispose);
+    final state = buildStreamingState(settings);
+    await controller.handleReasoningChunk(
+      'summary',
+      state,
+      segmentId: 'summary-1',
+      reasoningType: ReasoningType.summaryText,
+    );
+    final summary = controller.getReasoningSegments(state.messageId)!.single;
+    summary.expanded = true;
+
+    await controller.handleReasoningChunk('subsequent reasoning', state);
+
+    final segments = controller.getReasoningSegments(state.messageId)!;
+    expect(segments, hasLength(2));
+    expect(summary.finishedAt, isNotNull);
+    expect(summary.expanded, isFalse);
+    expect(segments.last.text, 'subsequent reasoning');
+    expect(segments.last.finishedAt, isNull);
+  });
+
+  test('deltas after summary completion create a new segment', () async {
+    final settings = SettingsProvider(createBusinessTestPreferences());
+    await settings.loaded;
+    final controller = buildController(
+      settings: settings,
+      currentConversationId: 'conversation-1',
+    );
+    addTearDown(controller.dispose);
+    final state = buildStreamingState(settings);
+
+    const first = ReasoningDelta(
+      id: 'summary-1',
+      text: 'item one',
+      reasoningType: ReasoningType.summaryText,
+    );
+    state.partsHandler.handle(first);
+    await controller.handleReasoningChunk(
+      first.text,
+      state,
+      segmentId: first.id,
+      reasoningType: first.reasoningType,
+    );
+    state.partsHandler.handle(const ReasoningEnd(id: 'summary-1'));
+    controller.finishReasoningSegment(state.messageId, 'summary-1');
+
+    const second = ReasoningDelta(
+      id: 'summary-1',
+      text: 'item two',
+      reasoningType: ReasoningType.summaryText,
+    );
+    state.partsHandler.handle(second);
+    await controller.handleReasoningChunk(
+      second.text,
+      state,
+      segmentId: second.id,
+      reasoningType: second.reasoningType,
+    );
+
+    final segments = controller.getReasoningSegments(state.messageId)!;
+    final parts = state.partsHandler.parts.whereType<ReasoningPart>().toList();
+    expect(segments, hasLength(2));
+    expect(parts, hasLength(2));
+    expect(segments.map((segment) => segment.text), ['item one', 'item two']);
+    expect(parts.map((part) => part.text), ['item one', 'item two']);
+    expect(segments.first.finishedAt, isNotNull);
+    expect(segments.last.finishedAt, isNull);
+  });
 
   testWidgets('clearing completed messages preserves pending reasoning ticks', (
     tester,
