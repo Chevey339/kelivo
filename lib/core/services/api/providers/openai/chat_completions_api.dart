@@ -65,6 +65,12 @@ Map<String, dynamic> copyChatCompletionMessage(Map<String, dynamic> m) {
 
   // Preserve tool linkage fields.
   if (role == 'tool') {
+    // Follow-up requests still need typed image metadata to rebuild history.
+    // The final request builder removes it after resolving the image payloads.
+    final metadata = m['metadata'];
+    if (metadata is Map) {
+      out['metadata'] = Map<String, dynamic>.from(metadata);
+    }
     final toolCallId = m['tool_call_id'];
     if (toolCallId != null && toolCallId.toString().isNotEmpty) {
       out['tool_call_id'] = toolCallId;

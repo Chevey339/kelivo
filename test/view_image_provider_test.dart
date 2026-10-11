@@ -259,6 +259,7 @@ Future<List<Map<String, dynamic>>> _replayMessages(
   String toolName,
   ToolCallResult tool, {
   required bool preserveToolTurns,
+  String toolCallId = 'call_image',
 }) async {
   final chat = ChatService();
   addTearDown(chat.dispose);
@@ -279,7 +280,7 @@ Future<List<Map<String, dynamic>>> _replayMessages(
         parts: [
           ToolCallPart(
             jsonEncode({
-              'id': 'call_image',
+              'id': toolCallId,
               'name': toolName,
               'arguments': {'path': 'plot.png'},
               'content': tool.output,
@@ -495,21 +496,39 @@ void main() {
               toolName,
               tool,
               preserveToolTurns: preserveToolTurns,
+              toolCallId: 'previous_image',
             );
             expect(
               replay.singleWhere((m) => m['role'] == 'tool')['content'],
               result.content,
             );
+            final replayStart = requests.length;
+            var replayCalls = 0;
+            requestTool = true;
             await ChatApiService.sendMessageStream(
               config: config,
               modelId: model,
               stream: stream,
               skipImageParsing: mcp,
               messages: replay,
+              tools: _imageTools(toolName),
+              onToolCall: (name, args, {toolCallId}) async {
+                replayCalls++;
+                return 'Checked again.';
+              },
             ).toList();
-            expect(_imagePayloads(requests.last), [base64Encode(png)]);
-            // Paths/Markdown are UI persistence, never the model's image payload.
-            expect(jsonEncode(requests.last), isNot(contains(file.path)));
+            expect(replayCalls, 1);
+            expect(requests.length, replayStart + 2);
+            // Historical images must survive both the initial replay and a
+            // subsequent tool round, without exposing persistence metadata.
+            for (final request in requests.skip(replayStart)) {
+              expect(_imagePayloads(request), [base64Encode(png)]);
+              expect(jsonEncode(request), isNot(contains(file.path)));
+              expect(
+                jsonEncode(request),
+                isNot(contains(kMcpResultMetadataKey)),
+              );
+            }
           }
           await ChatApiService.sendMessageStream(
             config: config.copyWith(
