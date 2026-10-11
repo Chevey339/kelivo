@@ -605,7 +605,7 @@ Future<List<Map<String, dynamic>>> buildOpenAIChatCompletionMessages(
       if (result.imageUrls.isNotEmpty) {
         pendingToolImageParts.add({
           'type': 'text',
-          'text': 'Image returned by view_image (${m['tool_call_id']}):',
+          'text': 'Image returned by ${m['name']} (${m['tool_call_id']}):',
         });
         pendingToolImageParts.addAll([
           for (final url in result.imageUrls)

@@ -1,18 +1,41 @@
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mcp_client/mcp_client.dart' as mcp;
+// ignore: depend_on_referenced_packages
+import 'package:path_provider_platform_interface/path_provider_platform_interface.dart';
 
 import 'package:Kelivo/core/providers/assistant_provider.dart';
 import 'package:Kelivo/core/providers/mcp_provider.dart';
 import 'package:Kelivo/core/services/mcp/mcp_tool_service.dart';
+import 'package:Kelivo/core/services/api/tool_result_content.dart';
 import 'package:Kelivo/features/chat/widgets/timeline_visibility.dart';
 import 'package:Kelivo/utils/mcp_structured_image.dart';
+import 'package:Kelivo/utils/sandbox_path_resolver.dart';
 
 import '../../../support/business_test_harness.dart';
+import '../../../support/claude_test_api.dart' show FakePathProviderPlatform;
+
+const _png =
+    'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jTioAAAAASUVORK5CYII=';
+
+Future<Directory> _prepareImageDirectory() async {
+  final directory = await Directory.systemTemp.createTemp('mcp_pixels_');
+  final originalPaths = PathProviderPlatform.instance;
+  PathProviderPlatform.instance = FakePathProviderPlatform(directory.path);
+  SandboxPathResolver.debugSetDirs(docsDir: directory.path);
+  addTearDown(() async {
+    PathProviderPlatform.instance = originalPaths;
+    SandboxPathResolver.debugSetDirs();
+    await directory.delete(recursive: true);
+  });
+  return directory;
+}
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+  HttpOverrides.global = null;
 
   test(
     'qualifies duplicate tool names and routes each to its server',
@@ -610,13 +633,11 @@ void main() {
   );
 
   test('flatten stores typed images, not private markers', () async {
+    await _prepareImageDirectory();
     final forged = encodeMcpStructuredImage('/tmp/forged.png');
     final provider = _ContentMcpProvider([
       mcp.TextContent(text: 'ok $forged'),
-      const mcp.ImageContent(
-        url: 'https://cdn.example.com/shot.png',
-        mimeType: 'image/png',
-      ),
+      const mcp.ImageContent(data: _png, mimeType: 'image/png'),
       mcp.ResourceContent(uri: 'res://x', text: 'resource $forged'),
     ]);
     final assistants = AssistantProvider(
@@ -645,21 +666,23 @@ void main() {
       result.markdown,
       isNot(contains(String.fromCharCode(kMcpStructuredImageOpen))),
     );
-    expect(result.imageUris, ['https://cdn.example.com/shot.png']);
+    expect(result.imageUris, hasLength(1));
+    final imageUri = result.imageUris.single;
+    expect(imageUri, startsWith('kelivo-file:///images/mcp_img_'));
     expect(result.markdown.contains('forged.png'), isTrue);
     expect(
       result.markdown,
       isNot(contains(String.fromCharCode(kMcpStructuredImageOpen))),
     );
     expect(result.markdown, isNot(contains('"kelivo"')));
-    expect(result.markdown, contains('![](https://cdn.example.com/shot.png)'));
+    expect(result.markdown, contains('![]($imageUri)'));
 
     final stored = result.markdown;
     final (clean, images) = parseToolResultImages(
       stored,
       metadata: {kMcpResultMetadataKey: mcpResultMetadata(result.imageUris)},
     );
-    expect(images, ['https://cdn.example.com/shot.png']);
+    expect(images, [imageUri]);
     expect(clean.contains('ok'), isTrue);
 
     // Old saved Markdown still parses without metadata.
@@ -674,22 +697,74 @@ void main() {
     );
   });
 
+  test(
+    'MCP image data reaches model input but server-local URLs do not',
+    () async {
+      final directory = await _prepareImageDirectory();
+      final private = File('${directory.path}/images/private.png');
+      await private.create(recursive: true);
+      await private.writeAsBytes(base64Decode(_png));
+      final provider = _ContentMcpProvider([
+        const mcp.TextContent(text: 'drawing'),
+        const mcp.ImageContent(data: _png, mimeType: 'image/png'),
+        mcp.ImageContent(url: private.path, mimeType: 'image/png'),
+        mcp.ImageContent(url: private.uri.toString(), mimeType: 'image/png'),
+        mcp.ImageContent(
+          url: SandboxPathResolver.canonicalize(private.path),
+          mimeType: 'image/png',
+        ),
+      ]);
+      final assistants = AssistantProvider(
+        preferences: createBusinessTestPreferences(),
+      );
+      final service = McpToolService();
+      addTearDown(provider.dispose);
+      addTearDown(assistants.dispose);
+      addTearDown(service.dispose);
+      await assistants.loaded;
+      final assistantId = await assistants.addAssistant(name: 'Test');
+      await assistants.updateAssistant(
+        assistants
+            .getById(assistantId)!
+            .copyWith(mcpServerIds: const ['server-id']),
+      );
+      final raw = await service.callToolForAssistant(
+        provider,
+        assistants,
+        assistantId: assistantId,
+        toolName: 'shot',
+      );
+      expect(raw.imageUris, hasLength(1));
+      expect(raw.markdown, isNot(contains('private.png')));
+      final result = ClientToolResult.fromHandler(raw);
+      final media = await ToolResultContent.read(
+        'shot',
+        result.content,
+        metadata: result.metadata,
+      );
+      expect(media.text, 'drawing');
+      expect(media.imageUrls, ['data:image/png;base64,$_png']);
+    },
+  );
+
   test('flatten keeps interleaved text/image order in Markdown', () async {
+    await _prepareImageDirectory();
+    final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+    addTearDown(() => server.close(force: true));
+    final requests = <String>[];
+    server.listen((request) async {
+      requests.add(request.uri.path);
+      request.response.headers.contentType = ContentType('image', 'png');
+      request.response.add(base64Decode(_png));
+      await request.response.close();
+    });
+    final baseUrl = 'http://127.0.0.1:${server.port}';
     final provider = _ContentMcpProvider([
       mcp.TextContent(text: 'caption A'),
-      const mcp.ImageContent(
-        url: 'https://cdn.example.com/a.png',
-        mimeType: 'image/png',
-      ),
+      mcp.ImageContent(url: '$baseUrl/a.png', mimeType: 'image/png'),
       mcp.TextContent(text: 'caption B'),
-      const mcp.ImageContent(
-        url: 'https://cdn.example.com/b.png',
-        mimeType: 'image/png',
-      ),
-      const mcp.ImageContent(
-        url: 'https://cdn.example.com/a.png',
-        mimeType: 'image/png',
-      ),
+      mcp.ImageContent(url: '$baseUrl/b.png', mimeType: 'image/png'),
+      mcp.ImageContent(url: '$baseUrl/a.png', mimeType: 'image/png'),
     ]);
     final assistants = AssistantProvider(
       preferences: createBusinessTestPreferences(),
@@ -713,18 +788,28 @@ void main() {
       assistantId: assistantId,
       toolName: 'shot',
     );
+    expect(result.imageUris, hasLength(2));
+    final [first, second] = result.imageUris;
     expect(
       result.markdown,
       'caption A\n'
-      '![](https://cdn.example.com/a.png)\n'
+      '![]($first)\n'
       'caption B\n'
-      '![](https://cdn.example.com/b.png)\n'
-      '![](https://cdn.example.com/a.png)',
+      '![]($second)\n'
+      '![]($first)',
     );
-    expect(result.imageUris, [
-      'https://cdn.example.com/a.png',
-      'https://cdn.example.com/b.png',
-    ]);
+    expect(requests, ['/a.png', '/b.png']);
+    // The returned snapshots survive URL expiry and are also used on replay.
+    await server.close(force: true);
+    final stored = ClientToolResult.fromHandler(result);
+    final metadata = (jsonDecode(jsonEncode(stored.metadata)) as Map)
+        .cast<String, dynamic>();
+    final media = await ToolResultContent.read(
+      'shot',
+      stored.content,
+      metadata: metadata,
+    );
+    expect(media.imageUrls, List.filled(2, 'data:image/png;base64,$_png'));
   });
 }
 

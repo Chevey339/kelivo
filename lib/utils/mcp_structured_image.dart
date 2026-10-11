@@ -30,7 +30,7 @@ class McpToolResult {
   /// Model / export / old-client view. Standard Markdown, no private JSON.
   final String markdown;
 
-  /// First-seen image URIs for UI metadata. May omit duplicates.
+  /// First-seen typed image URIs for display and model input.
   final List<String> imageUris;
 
   /// Original envelope `text` for old JSON rows. Null for new Markdown writes.

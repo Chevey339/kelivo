@@ -323,33 +323,35 @@ class ChatApiService {
       }
 
       yield* retryRound(
-        () => _sendOnce(
-          config: config,
-          modelId: modelId,
-          messages: safeMessages,
-          userImagePaths: safeUserImagePaths,
-          reasoning: reasoning,
-          temperature: temperature,
-          topP: topP,
-          maxTokens: maxTokens,
-          tools: textOnly ? null : tools,
-          onToolCall: toolHandler == null
-              ? null
-              : (name, args, {toolCallId}) => toolCancellation.run(
-                  () => toolHandler(name, args, toolCallId: toolCallId),
-                ),
-          extraHeaders: sessionHeaders,
-          extraBody: textOnly ? null : extraBody,
-          conversationId: conversationId,
-          stream: stream,
-          builtInSearchOnly: builtInSearchOnly,
-          skipImageParsing:
-              textOnly || skipImageParsing || !parseMarkdownImageLinks,
-          kind: kind,
-          useOpenAIImagesApi: useOpenAIImagesApi,
-          useZhipuLayoutParsing: useZhipuLayoutParsing,
-          sessionToken: sessionToken,
-          retryRound: retryRound,
+        () => toolCancellation.runStream(
+          () => _sendOnce(
+            config: config,
+            modelId: modelId,
+            messages: safeMessages,
+            userImagePaths: safeUserImagePaths,
+            reasoning: reasoning,
+            temperature: temperature,
+            topP: topP,
+            maxTokens: maxTokens,
+            tools: textOnly ? null : tools,
+            onToolCall: toolHandler == null
+                ? null
+                : (name, args, {toolCallId}) => toolCancellation.run(
+                    () => toolHandler(name, args, toolCallId: toolCallId),
+                  ),
+            extraHeaders: sessionHeaders,
+            extraBody: textOnly ? null : extraBody,
+            conversationId: conversationId,
+            stream: stream,
+            builtInSearchOnly: builtInSearchOnly,
+            skipImageParsing:
+                textOnly || skipImageParsing || !parseMarkdownImageLinks,
+            kind: kind,
+            useOpenAIImagesApi: useOpenAIImagesApi,
+            useZhipuLayoutParsing: useZhipuLayoutParsing,
+            sessionToken: sessionToken,
+            retryRound: retryRound,
+          ),
         ),
       );
     } finally {
