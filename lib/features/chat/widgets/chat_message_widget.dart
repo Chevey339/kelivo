@@ -8,6 +8,7 @@ import 'dart:math' as math;
 import 'package:flutter/services.dart';
 import '../../../core/services/haptics.dart';
 import '../../../shared/widgets/optional_shader_mask.dart';
+import '../../../utils/ui_scale.dart';
 import 'package:provider/provider.dart';
 import 'dart:io';
 import 'package:open_filex/open_filex.dart';
@@ -1445,8 +1446,12 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
     final safeTop = insets.top + 12;
     final safeBottom = insets.bottom + 12;
 
-    const double menuWidth = 220; // compact width
-    const double estMenuHeight = 140; // ~ 3 rows
+    final double menuWidth = MediaQuery.textScalerOf(
+      context,
+    ).scale(220); // compact width
+    final double estMenuHeight = MediaQuery.textScalerOf(
+      context,
+    ).scale(140); // ~ 3 rows
     const double gap = 10; // space between bubble and menu
 
     // Horizontal placement: align menu's right edge to bubble's right edge,
@@ -2308,7 +2313,9 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
                     // The name yields width so the button and time always fit.
                     Flexible(
                       child: ConstrainedBox(
-                        constraints: const BoxConstraints(maxWidth: 180),
+                        constraints: BoxConstraints(
+                          maxWidth: scaledDim(context, 180),
+                        ),
                         child: Text(
                           d.name,
                           maxLines: 1,
@@ -5160,7 +5167,7 @@ class _ChainOfThoughtReasoningStepState
     Widget? content;
     if (state == _ReasoningStepState.preview) {
       content = ConstrainedBox(
-        constraints: const BoxConstraints(maxHeight: 100),
+        constraints: BoxConstraints(maxHeight: scaledDim(context, 100)),
         child: OptionalShaderMask(
           enabled: _hasOverflow,
           shaderCallback: (rect) {

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:Kelivo/theme/app_semantic_colors.dart';
 
 import '../animations/widgets.dart';
+import '../../utils/ui_scale.dart';
 
 class LoadingDialogCard extends StatelessWidget {
   const LoadingDialogCard({super.key, this.label});
@@ -29,7 +30,10 @@ class LoadingDialogCard extends StatelessWidget {
         child: Material(
           color: Colors.transparent,
           child: ConstrainedBox(
-            constraints: const BoxConstraints(minWidth: 96, maxWidth: 240),
+            constraints: BoxConstraints(
+              minWidth: scaledDim(context, 96),
+              maxWidth: scaledDim(context, 240),
+            ),
             child: Container(
               decoration: BoxDecoration(
                 color: context.overlaySurface,

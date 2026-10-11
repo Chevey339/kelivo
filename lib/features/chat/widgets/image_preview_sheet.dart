@@ -19,6 +19,7 @@ import 'package:super_clipboard/super_clipboard.dart';
 import 'dart:ui' as ui;
 import '../../../theme/app_font_weights.dart';
 import 'package:Kelivo/theme/app_semantic_colors.dart';
+import '../../../utils/ui_scale.dart';
 
 const int _previewBlankTrimPreservePadding = 48;
 const int _previewBlankAlphaTolerance = 8;
@@ -284,10 +285,10 @@ class _ImagePreviewDesktopDialogState
       insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: ConstrainedBox(
-        constraints: const BoxConstraints(
-          maxWidth: 720,
-          minWidth: 520,
-          maxHeight: 720,
+        constraints: BoxConstraints(
+          maxWidth: scaledDim(context, 720),
+          minWidth: scaledDim(context, 520),
+          maxHeight: scaledDim(context, 720),
         ),
         child: ClipRRect(
           borderRadius: BorderRadius.circular(16),
@@ -1188,7 +1189,7 @@ class _ImagePreviewSheetState extends State<_ImagePreviewSheet> {
                       // Right main save button (no ripple)
                       Expanded(
                         child: SizedBox(
-                          height: 48,
+                          height: scaledDim(context, 48),
                           child: IosCardPress(
                             onTap: _saving ? null : _onSave,
                             borderRadius: BorderRadius.circular(12),

@@ -13,11 +13,11 @@ class _DesktopAssistantsBody extends StatelessWidget {
       child: Padding(
         padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
         child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 960),
+          constraints: BoxConstraints(maxWidth: scaledDim(context, 960)),
           child: Column(
             children: [
               SizedBox(
-                height: 36,
+                height: scaledDim(context, 36),
                 child: Row(
                   children: [
                     Expanded(
@@ -161,13 +161,13 @@ Future<String?> _showAddAssistantDesktopDialog(BuildContext context) async {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
         child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 440),
+          constraints: BoxConstraints(maxWidth: scaledDim(context, 440)),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               SizedBox(
-                height: 44,
+                height: scaledDim(context, 44),
                 child: Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 12),
                   child: Row(
@@ -343,7 +343,7 @@ Future<bool?> _confirmDeleteDesktop(BuildContext context) async {
         color: Colors.transparent,
         child: Center(
           child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 380),
+            constraints: BoxConstraints(maxWidth: scaledDim(context, 380)),
             child: DecoratedBox(
               decoration: ShapeDecoration(
                 color: ctx.overlaySurface,
@@ -361,7 +361,7 @@ Future<bool?> _confirmDeleteDesktop(BuildContext context) async {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   SizedBox(
-                    height: 44,
+                    height: scaledDim(context, 44),
                     child: Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 10),
                       child: Row(
@@ -674,6 +674,7 @@ class _AssistantAvatarDesktop extends StatelessWidget {
   final double size;
   @override
   Widget build(BuildContext context) {
+    final dim = scaledAvatarSize(context, size);
     final cs = Theme.of(context).colorScheme;
     final av = (item.avatar ?? '').trim();
     if (av.isNotEmpty) {
@@ -686,8 +687,8 @@ class _AssistantAvatarDesktop extends StatelessWidget {
               return ClipOval(
                 child: Image(
                   image: FileImage(File(p)),
-                  width: size,
-                  height: size,
+                  width: dim,
+                  height: dim,
                   fit: BoxFit.cover,
                 ),
               );
@@ -695,10 +696,10 @@ class _AssistantAvatarDesktop extends StatelessWidget {
             return ClipOval(
               child: Image.network(
                 av,
-                width: size,
-                height: size,
+                width: dim,
+                height: dim,
                 fit: BoxFit.cover,
-                errorBuilder: (c, e, s) => _initial(cs),
+                errorBuilder: (c, e, s) => _initial(context, cs, dim),
               ),
             );
           },
@@ -710,45 +711,48 @@ class _AssistantAvatarDesktop extends StatelessWidget {
           return ClipOval(
             child: Image(
               image: FileImage(f),
-              width: size,
-              height: size,
+              width: dim,
+              height: dim,
               fit: BoxFit.cover,
             ),
           );
         }
-        return _initial(cs);
+        return _initial(context, cs, dim);
       } else {
-        return _emoji(cs, av);
+        return _emoji(cs, av, dim);
       }
     }
-    return _initial(cs);
+    return _initial(context, cs, dim);
   }
 
-  Widget _initial(ColorScheme cs) {
+  Widget _initial(BuildContext context, ColorScheme cs, double dim) {
     final letter = item.name.isNotEmpty ? item.name.characters.first : '?';
     return Container(
-      width: size,
-      height: size,
+      width: dim,
+      height: dim,
       decoration: BoxDecoration(
         color: cs.primary.withValues(alpha: 0.15),
         shape: BoxShape.circle,
       ),
       alignment: Alignment.center,
-      child: Text(
-        letter,
-        style: TextStyle(
-          color: cs.primary,
-          fontWeight: AppFontWeights.emphasis,
-          fontSize: size * 0.42,
+      child: Transform.translate(
+        offset: Offset(0, avatarInitialNudgeY(context, size)),
+        child: Text(
+          letter,
+          style: TextStyle(
+            color: cs.primary,
+            fontWeight: AppFontWeights.emphasis,
+            fontSize: size * 0.42,
+          ),
         ),
       ),
     );
   }
 
-  Widget _emoji(ColorScheme cs, String emoji) {
+  Widget _emoji(ColorScheme cs, String emoji, double dim) {
     return Container(
-      width: size,
-      height: size,
+      width: dim,
+      height: dim,
       decoration: BoxDecoration(
         color: cs.primary.withValues(alpha: 0.15),
         shape: BoxShape.circle,

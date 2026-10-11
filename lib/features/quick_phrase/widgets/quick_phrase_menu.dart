@@ -27,7 +27,7 @@ class QuickPhraseMenu extends StatelessWidget {
     AppLocalizations.of(context); // keep localization wired; no new strings
 
     // Calculate menu position anchored to the input bar's global left and bottom inset
-    final double menuWidth = 250;
+    final double menuWidth = MediaQuery.textScalerOf(context).scale(250);
     final double maxMenuHeight = size.height * 0.5;
 
     // Use provided anchor; dx is global left of input bar, dy is input bar height

@@ -19,6 +19,7 @@ import 'package:Kelivo/shared/widgets/ios_tactile.dart';
 import 'package:Kelivo/shared/widgets/section_card.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../../../../utils/ui_scale.dart';
 
 Future<void> showConversationSkillsSheet(
   BuildContext context, {
@@ -109,7 +110,7 @@ class ConversationSkillsPanel extends StatelessWidget {
             onTap: () => onChanged(!value),
             onLongPress: onLongPress,
             child: SizedBox(
-              height: 40,
+              height: scaledDim(context, 40),
               child: Row(
                 children: [
                   SizedBox(

@@ -15,6 +15,7 @@ import '../../shared/widgets/ios_switch.dart';
 import '../../theme/app_font_weights.dart';
 import 'package:Kelivo/theme/app_semantic_colors.dart';
 import 'package:Kelivo/shared/widgets/section_card.dart';
+import '../../utils/ui_scale.dart';
 
 Future<void> showDesktopMcpEditDialog(
   BuildContext context, {
@@ -28,7 +29,10 @@ Future<void> showDesktopMcpEditDialog(
       insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 720, maxHeight: 640),
+        constraints: BoxConstraints(
+          maxWidth: scaledDim(context, 720),
+          maxHeight: scaledDim(context, 640),
+        ),
         child: _DesktopMcpEditDialog(serverId: serverId),
       ),
     ),
@@ -262,7 +266,7 @@ class _DesktopMcpEditDialogState extends State<_DesktopMcpEditDialog>
   Widget _headerBar() {
     final l10n = AppLocalizations.of(context)!;
     return SizedBox(
-      height: 52,
+      height: scaledDim(context, 52),
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 12),
         child: Row(

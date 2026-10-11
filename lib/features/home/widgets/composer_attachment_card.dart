@@ -11,6 +11,7 @@ import '../../../shared/utils/format_bytes.dart';
 import '../../../shared/widgets/audio_clip_player.dart';
 import '../../../shared/widgets/ios_tactile.dart';
 import '../../../theme/app_font_weights.dart';
+import '../../../utils/ui_scale.dart';
 
 /// Metadata only: never read an attachment's contents to draw its preview.
 class ComposerAttachmentCard extends StatefulWidget {
@@ -85,7 +86,7 @@ class _ComposerAttachmentCardState extends State<ComposerAttachmentCard> {
     return Tooltip(
       message: file.fileName,
       child: Container(
-        width: 96,
+        width: scaledDim(context, 96),
         height: ComposerAttachmentCard.heightFor(context),
         decoration: BoxDecoration(
           color: cs.onSurface.withValues(alpha: 0.035),

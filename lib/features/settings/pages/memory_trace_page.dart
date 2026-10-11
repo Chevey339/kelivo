@@ -18,6 +18,7 @@ import '../../../shared/widgets/ios_tile_button.dart';
 import '../../../shared/widgets/snackbar.dart';
 import '../../../utils/platform_utils.dart';
 import '../widgets/memory_ui.dart';
+import '../../../utils/ui_scale.dart';
 
 /// Debug viewer for the background memory pipeline (Gatekeeper → Extract →
 /// Smart Add → Distiller, plus summaries, recall and memory tool calls).
@@ -609,7 +610,7 @@ class _BeforeAfterLine extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         SizedBox(
-          width: 52,
+          width: scaledDim(context, 52),
           child: Text(
             label,
             style: TextStyle(
@@ -1143,7 +1144,7 @@ class _KvGrid extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               SizedBox(
-                width: 92,
+                width: scaledDim(context, 92),
                 child: Text(
                   it.k,
                   style: TextStyle(

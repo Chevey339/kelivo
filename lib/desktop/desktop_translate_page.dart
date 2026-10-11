@@ -16,6 +16,7 @@ import '../core/services/api/stream/stream_chunk.dart';
 import '../shared/widgets/snackbar.dart';
 import '../features/model/widgets/model_select_sheet.dart'
     show showModelSelector;
+import '../utils/ui_scale.dart';
 import '../features/settings/widgets/language_select_sheet.dart'
     show LanguageOption, supportedLanguages;
 
@@ -235,7 +236,7 @@ class _DesktopTranslatePageState extends State<DesktopTranslatePage> {
     final l10n = AppLocalizations.of(context)!;
 
     final topBar = SizedBox(
-      height: 36,
+      height: scaledDim(context, 36),
       child: Align(
         alignment: Alignment.centerLeft,
         child: Padding(
@@ -269,7 +270,9 @@ class _DesktopTranslatePageState extends State<DesktopTranslatePage> {
               child: Align(
                 alignment: Alignment.topCenter,
                 child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 1200),
+                  constraints: BoxConstraints(
+                    maxWidth: scaledDim(context, 1200),
+                  ),
                   child: Column(
                     children: [
                       SizedBox(
@@ -442,7 +445,11 @@ class _LanguageDropdownState extends State<_LanguageDropdown> {
     final rb = _triggerKey.currentContext?.findRenderObject() as RenderBox?;
     if (rb == null) return;
     final triggerSize = rb.size;
-    final triggerWidth = triggerSize.width;
+    // Menu rows carry a check icon the trigger lacks, and both scale with the
+    // ambient text scaler — widen the menu by the same scaled amount so long
+    // language names don't ellipsize at large UI font scales.
+    final menuWidth =
+        triggerSize.width + MediaQuery.textScalerOf(context).scale(24);
 
     _entry = OverlayEntry(
       builder: (ctx) {
@@ -462,7 +469,7 @@ class _LanguageDropdownState extends State<_LanguageDropdown> {
               showWhenUnlinked: false,
               offset: Offset(0, triggerSize.height + 6),
               child: _LangDropdownOverlay(
-                width: triggerWidth,
+                width: menuWidth,
                 backgroundColor: bgColor,
                 onClose: _close,
                 onSelected: (opt) {
@@ -505,7 +512,10 @@ class _LanguageDropdownState extends State<_LanguageDropdown> {
             duration: const Duration(milliseconds: 120),
             curve: Curves.easeOutCubic,
             padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 4),
-            constraints: const BoxConstraints(minWidth: 150, minHeight: 40),
+            constraints: BoxConstraints(
+              minWidth: scaledDim(context, 150),
+              minHeight: 40,
+            ),
             decoration: BoxDecoration(
               color: Theme.of(context).colorScheme.surfaceContainerHigh,
               borderRadius: BorderRadius.circular(10),
@@ -532,7 +542,9 @@ class _LanguageDropdownState extends State<_LanguageDropdown> {
                     ),
                     const SizedBox(width: 8),
                     ConstrainedBox(
-                      constraints: const BoxConstraints(maxWidth: 240),
+                      constraints: BoxConstraints(
+                        maxWidth: MediaQuery.textScalerOf(context).scale(240),
+                      ),
                       child: Text(
                         label,
                         overflow: TextOverflow.ellipsis,
@@ -679,7 +691,9 @@ class _LangDropdownOverlayState extends State<_LangDropdownOverlay>
               children: [
                 // Options
                 ConstrainedBox(
-                  constraints: const BoxConstraints(maxHeight: 350),
+                  constraints: BoxConstraints(
+                    maxHeight: MediaQuery.textScalerOf(context).scale(350),
+                  ),
                   child: Scrollbar(
                     thickness: 6,
                     radius: const Radius.circular(3),

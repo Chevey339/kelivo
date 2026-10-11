@@ -10,6 +10,7 @@ import '../../../desktop/menu_anchor.dart';
 import 'package:Kelivo/theme/app_font_weights.dart';
 import 'package:Kelivo/theme/app_semantic_colors.dart';
 import '../../../shared/widgets/section_card.dart';
+import '../../../utils/ui_scale.dart';
 
 class LanguageOption {
   final String code;
@@ -216,7 +217,7 @@ class _LanguageSelectSheetState extends State<_LanguageSelectSheet> {
                       const SizedBox(height: 8),
                       // Clear translation row (iOS style)
                       SizedBox(
-                        height: 48,
+                        height: scaledDim(context, 48),
                         child: IosCardPress(
                           borderRadius: BorderRadius.circular(14),
                           baseColor: sheetTileColor(context),
@@ -271,7 +272,7 @@ class _LanguageSelectSheetState extends State<_LanguageSelectSheet> {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: SizedBox(
-        height: 48,
+        height: scaledDim(context, 48),
         child: IosCardPress(
           borderRadius: BorderRadius.circular(14),
           baseColor: sheetTileColor(context),

@@ -1081,7 +1081,7 @@ class _PresetMessageCardState extends State<_PresetMessageCard> {
         border: Border.all(color: borderColor, width: 1.0),
       ),
       padding: const EdgeInsets.all(14),
-      constraints: const BoxConstraints(minHeight: 64),
+      constraints: BoxConstraints(minHeight: scaledDim(context, 64)),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
@@ -1344,7 +1344,10 @@ class _SystemPromptDesktopDialogState
       child: Material(
         type: MaterialType.transparency,
         child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 860, maxHeight: 660),
+          constraints: BoxConstraints(
+            maxWidth: scaledDim(context, 860),
+            maxHeight: scaledDim(context, 660),
+          ),
           child: DecoratedBox(
             decoration: BoxDecoration(
               color: context.overlaySurface,
@@ -1545,7 +1548,7 @@ Future<void> _showEditPresetDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
         child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 560),
+          constraints: BoxConstraints(maxWidth: scaledDim(context, 560)),
           child: Padding(
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
             child: Column(
