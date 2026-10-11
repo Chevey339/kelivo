@@ -4286,7 +4286,7 @@ class ReasoningSegment {
   final int toolStartIndex;
 
   const ReasoningSegment({
-    required String text,
+    required this._text,
     this.summaryText,
     required this.expanded,
     required this.loading,
@@ -4294,8 +4294,7 @@ class ReasoningSegment {
     this.finishedAt,
     this.onToggle,
     this.toolStartIndex = 0,
-  }) : _text = text,
-       _source = null;
+  }) : _source = null;
 
   final String _text;
   final TimelineReasoningRef? _source;

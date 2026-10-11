@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import "../../../support/business_test_harness.dart";
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:Kelivo/core/models/chat_message.dart';
 import 'package:Kelivo/core/providers/settings_provider.dart';
@@ -126,6 +127,7 @@ void main() {
     final segment = ReasoningSegmentData()
       ..id = 'summary-1'
       ..reasoningType = ReasoningType.summaryText
+      ..summaryEnded = true
       ..text = '**Title** body';
 
     final json = controller.serializeReasoningSegments([segment]);
@@ -133,6 +135,7 @@ void main() {
 
     expect(restored.id, 'summary-1');
     expect(restored.reasoningType, ReasoningType.summaryText);
+    expect(restored.summaryEnded, isTrue);
     expect(restored.text, '**Title** body');
   });
 

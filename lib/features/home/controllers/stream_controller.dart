@@ -1,7 +1,9 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
+
 import '../../../core/models/chat_message.dart';
 import '../../../core/models/message_part.dart';
 import '../../../core/models/token_usage.dart';
@@ -336,6 +338,7 @@ class StreamController {
             if (s.id.isNotEmpty) 'id': s.id,
             if (s.reasoningType != ReasoningType.reasoningText)
               'reasoningType': s.reasoningType.name,
+            if (s.summaryEnded) 'summaryEnded': true,
           },
         )
         .toList();
@@ -360,6 +363,7 @@ class StreamController {
             if (s.id.isNotEmpty) 'id': s.id,
             if (s.reasoningType != ReasoningType.reasoningText)
               'reasoningType': s.reasoningType.name,
+            if (s.summaryEnded) 'summaryEnded': true,
           },
         )
         .toList();
@@ -874,11 +878,15 @@ class StreamController {
         if (needsNewStructuredSegment &&
             lastSegment != null &&
             lastSegment.finishedAt == null) {
-          lastSegment.finishedAt = DateTime.now();
-          if (autoCollapse) lastSegment.expanded = false;
+          if (lastSegment.reasoningType == ReasoningType.summaryText) {
+            finishReasoningSegment(messageId, lastSegment.id);
+          } else {
+            lastSegment.finishedAt = DateTime.now();
+            if (autoCollapse) lastSegment.expanded = false;
+          }
         }
         final newSegment = ReasoningSegmentData();
-        newSegment.id = structuredSegment ? segmentId! : '';
+        newSegment.id = structuredSegment ? segmentId : '';
         newSegment.reasoningType = reasoningType;
         newSegment.text = reasoning;
         newSegment.startAt = DateTime.now();
@@ -893,8 +901,12 @@ class StreamController {
             (current.reasoningType == ReasoningType.summaryText ||
                 (hasToolsAfterLastSegment && current.finishedAt != null))) {
           if (current.finishedAt == null) {
-            current.finishedAt = DateTime.now();
-            if (autoCollapse) current.expanded = false;
+            if (current.reasoningType == ReasoningType.summaryText) {
+              finishReasoningSegment(messageId, current.id);
+            } else {
+              current.finishedAt = DateTime.now();
+              if (autoCollapse) current.expanded = false;
+            }
           }
           final newSegment = ReasoningSegmentData();
           newSegment.text = reasoning;
@@ -902,9 +914,10 @@ class StreamController {
           newSegment.expanded = initialExpanded;
           newSegment.toolStartIndex = (_toolParts[messageId]?.length ?? 0);
           segments.add(newSegment);
-        } else if (structuredSegment && current.finishedAt != null) {
+        } else if (structuredSegment &&
+            (current.summaryEnded || current.finishedAt != null)) {
           final newSegment = ReasoningSegmentData();
-          newSegment.id = structuredSegment ? segmentId! : '';
+          newSegment.id = structuredSegment ? segmentId : '';
           newSegment.reasoningType = reasoningType;
           newSegment.text = reasoning;
           newSegment.startAt = DateTime.now();
@@ -938,16 +951,17 @@ class StreamController {
     }
   }
 
-  /// Close a provider summary sequence to keep subsequent summary items separate.
+  /// 结束摘要条目，但保留思考阶段的计时。
   void finishReasoningSegment(String messageId, String segmentId) {
     if (segmentId.isEmpty) return;
     final segments = _reasoningSegments[messageId];
     if (segments == null || segments.isEmpty) return;
     for (final segment in segments.reversed) {
       if (segment.id != segmentId) continue;
-      if (segment.startAt != null && segment.finishedAt == null) {
-        segment.finishedAt = DateTime.now();
-        if (getSettingsProvider().autoCollapseThinking) {
+      if (!segment.summaryEnded) {
+        segment.summaryEnded = true;
+        if (segment.finishedAt == null &&
+            getSettingsProvider().autoCollapseThinking) {
           segment.expanded = false;
         }
         _reasoningSegments[messageId] = segments;
@@ -976,13 +990,19 @@ class StreamController {
     final messageId = state.messageId;
     final conversationId = state.conversationId;
 
-    // Finish any unfinished reasoning segment when tools start
+    // 工具开始时结束所有未完成的思考段，保留已结束段的时间和展开状态。
     final segments = _reasoningSegments[messageId] ?? <ReasoningSegmentData>[];
-    if (segments.isNotEmpty && segments.last.finishedAt == null) {
-      segments.last.finishedAt = DateTime.now();
+    final unfinishedSegments = segments
+        .where((segment) => segment.finishedAt == null)
+        .toList();
+    if (unfinishedSegments.isNotEmpty) {
+      final finishedAt = DateTime.now();
       final autoCollapse = getSettingsProvider().autoCollapseThinking;
+      for (final segment in unfinishedSegments) {
+        segment.finishedAt = finishedAt;
+        if (autoCollapse && !segment.summaryEnded) segment.expanded = false;
+      }
       if (autoCollapse) {
-        segments.last.expanded = false;
         final rd = _reasoning[messageId];
         if (rd != null) rd.expanded = false;
       }
@@ -1383,7 +1403,7 @@ class StreamController {
       final autoCollapse = getSettingsProvider().autoCollapseThinking;
       for (final segment in unfinishedSegments) {
         segment.finishedAt = finishedAt;
-        if (autoCollapse) segment.expanded = false;
+        if (autoCollapse && !segment.summaryEnded) segment.expanded = false;
       }
       _reasoningSegments[messageId] = segments;
       _safeNotifyStateChanged();
@@ -1430,7 +1450,7 @@ class StreamController {
         final finishedAt = DateTime.now();
         for (final segment in unfinishedSegments) {
           segment.finishedAt = finishedAt;
-          if (autoCollapse) segment.expanded = false;
+          if (autoCollapse && !segment.summaryEnded) segment.expanded = false;
         }
         _reasoningSegments[messageId] = segments;
         _safeNotifyStateChanged();
@@ -1484,7 +1504,7 @@ class StreamController {
     // This allows users to expand reasoning during content streaming without it
     // being immediately collapsed again.
 
-    // Summary items can have separate IDs, so finish every unfinished segment.
+    // 摘要结束不代表思考结束，在阶段边界统一记录各段的结束时间。
     final segments = _reasoningSegments[messageId];
     if (segments != null && segments.isNotEmpty) {
       final unfinishedSegments = segments
@@ -1494,7 +1514,7 @@ class StreamController {
         final finishedAt = DateTime.now();
         for (final segment in unfinishedSegments) {
           segment.finishedAt = finishedAt;
-          if (autoCollapse) segment.expanded = false;
+          if (autoCollapse && !segment.summaryEnded) segment.expanded = false;
         }
         _reasoningSegments[messageId] = segments;
         changed = true;
@@ -1847,6 +1867,8 @@ class ReasoningSegmentData {
   int toolStartIndex = 0;
   String id = '';
   ReasoningType reasoningType = ReasoningType.reasoningText;
+  // 摘要条目的结束状态独立于思考阶段的结束时间。
+  bool summaryEnded = false;
 }
 
 class ContentSplitData {
@@ -1949,6 +1971,7 @@ class _DecodedReasoningPayload {
       s.reasoningType = item['reasoningType'] == ReasoningType.summaryText.name
           ? ReasoningType.summaryText
           : ReasoningType.reasoningText;
+      s.summaryEnded = item['summaryEnded'] == true;
       return s;
     }).toList();
   }

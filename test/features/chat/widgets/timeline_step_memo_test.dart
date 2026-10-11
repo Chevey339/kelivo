@@ -564,6 +564,15 @@ void main() {
       var isStreaming = false;
       DateTime? reasoningFinishedAt;
       late StateSetter rebuild;
+      Finder fullReasoningFinder() => find.byWidgetPredicate(
+        (widget) =>
+            widget is MarkdownWithCodeHighlight &&
+            widget.text ==
+                parts
+                    .whereType<ReasoningPart>()
+                    .map((part) => part.text)
+                    .join('\n\n'),
+      );
       await tester.pumpWidget(
         MultiProvider(
           providers: [
@@ -630,9 +639,7 @@ void main() {
       expect(find.text('latest summary'), findsNothing);
       await tester.tap(find.text('Deep Thinking'));
       await tester.pumpAndSettle();
-      expect(find.text('imported plan'), findsOneWidget);
-      expect(find.text('second plan'), findsOneWidget);
-      expect(find.text('latest summary'), findsOneWidget);
+      expect(fullReasoningFinder(), findsOneWidget);
       await tester.tap(find.text('Deep Thinking'));
       await tester.pumpAndSettle();
       expect(find.text('imported plan'), findsNothing);
@@ -647,10 +654,7 @@ void main() {
       expect(find.text('updated summary'), findsNothing);
       await tester.tap(find.text('Deep Thinking'));
       await tester.pumpAndSettle();
-      expect(find.text('imported plan'), findsOneWidget);
-      expect(find.text('second plan'), findsOneWidget);
-      expect(find.text('latest summary'), findsOneWidget);
-      expect(find.text('updated summary'), findsOneWidget);
+      expect(fullReasoningFinder(), findsOneWidget);
       await tester.tap(find.text('Deep Thinking'));
       await tester.pumpAndSettle();
       final start = DateTime.now().subtract(const Duration(seconds: 10));
@@ -690,7 +694,7 @@ void main() {
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 350));
       final timerFinder = find.ancestor(
-        of: find.textMatching(RegExp(r'^\(\d+\.\ds\)$')),
+        of: find.textContaining(RegExp(r'^\(\d+\.\ds\)$')),
         matching: find.byType(ValueListenableBuilder<int>),
       );
       final timer = tester.widget<ValueListenableBuilder<int>>(timerFinder);
@@ -715,22 +719,7 @@ void main() {
       expect(timer.valueListenable.value, stoppedTick);
       await tester.tap(find.text('Deep Thinking'));
       await tester.pumpAndSettle();
-      expect(find.text('imported plan'), findsOneWidget);
-      expect(find.text('second plan'), findsOneWidget);
-      expect(find.text('latest summary'), findsOneWidget);
-      expect(find.text('updated summary'), findsOneWidget);
-      final fullReasoning = parts
-          .whereType<ReasoningPart>()
-          .map((part) => part.text)
-          .join('\n\n');
-      expect(
-        find.byWidgetPredicate(
-          (widget) =>
-              widget is MarkdownWithCodeHighlight &&
-              widget.text == fullReasoning,
-        ),
-        findsOneWidget,
-      );
+      expect(fullReasoningFinder(), findsOneWidget);
       await tester.tap(find.text('Deep Thinking'));
       await tester.pumpAndSettle();
       expect(find.byType(MarkdownWithCodeHighlight), findsNothing);

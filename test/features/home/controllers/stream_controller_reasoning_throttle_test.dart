@@ -1,9 +1,11 @@
 import "../../../support/business_test_harness.dart";
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:Kelivo/core/models/chat_message.dart';
 import 'package:Kelivo/core/models/message_part.dart';
 import 'package:Kelivo/core/providers/settings_provider.dart';
 import 'package:Kelivo/core/services/api/stream/stream_chunk.dart';
+import 'package:Kelivo/features/chat/widgets/timeline_projection.dart';
 import 'package:Kelivo/features/home/controllers/stream_controller.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -171,7 +173,11 @@ void main() {
 
     const first = ReasoningDelta(id: 'reasoning-1', text: 'initial reasoning');
     state.partsHandler.handle(first);
-    await controller.handleReasoningChunk(first.text, state, segmentId: first.id);
+    await controller.handleReasoningChunk(
+      first.text,
+      state,
+      segmentId: first.id,
+    );
     final original = controller.getReasoningSegments(state.messageId)!.single;
 
     state.partsHandler.handle(
@@ -237,12 +243,211 @@ void main() {
     expect(segments[0].id, 'summary-1');
     expect(segments[0].text, '**First** explanation');
     expect(segments[0].reasoningType, ReasoningType.summaryText);
-    expect(segments[0].finishedAt, isNotNull);
+    expect(segments[0].summaryEnded, isTrue);
+    expect(segments[0].finishedAt, isNull);
     expect(segments[0].expanded, isFalse);
     expect(segments[1].id, 'summary-2');
     expect(segments[1].text, '**Second**');
     expect(segments[1].finishedAt, isNull);
   });
+
+  test('tool start finishes every unfinished reasoning segment', () async {
+    final settings = SettingsProvider(createBusinessTestPreferences());
+    await settings.loaded;
+    await settings.setAutoCollapseThinking(true);
+    final controller = buildController(settings: settings);
+    addTearDown(controller.dispose);
+    final state = buildStreamingState(settings);
+
+    await controller.handleReasoningChunk('first reasoning', state);
+    final segments = controller.getReasoningSegments(state.messageId)!;
+    final first = segments.single..expanded = true;
+    final second = ReasoningSegmentData()
+      ..text = 'second reasoning'
+      ..startAt = DateTime.now()
+      ..expanded = true;
+    segments.add(second);
+    final previousEnd = DateTime.now().subtract(const Duration(seconds: 20));
+    final completed = ReasoningSegmentData()
+      ..text = 'completed reasoning'
+      ..startAt = previousEnd.subtract(const Duration(seconds: 4))
+      ..finishedAt = previousEnd
+      ..expanded = true;
+    segments.insert(0, completed);
+    String? persisted;
+
+    await controller.handleToolCallsChunk(
+      const ToolCallStart(id: 'search-1', toolName: 'search'),
+      state,
+      updateReasoningSegmentsInDb: (_, json) async {
+        persisted = json;
+      },
+      setToolEventsInDb: (_, _) async {},
+      getToolEventsFromDb: (_) => [],
+    );
+
+    expect(first.finishedAt, isNotNull);
+    expect(second.finishedAt, first.finishedAt);
+    expect(first.expanded, isFalse);
+    expect(second.expanded, isFalse);
+    expect(completed.finishedAt, previousEnd);
+    expect(completed.expanded, isTrue);
+    final restored = controller.deserializeReasoningSegments(persisted!);
+    expect(restored.map((segment) => segment.finishedAt), [
+      previousEnd,
+      first.finishedAt,
+      first.finishedAt,
+    ]);
+  });
+
+  for (final boundary in ['text', 'tool', 'stream end']) {
+    test(
+      'post-tool summaries keep timing until $boundary and retain phase ends',
+      () async {
+        final settings = SettingsProvider(createBusinessTestPreferences());
+        await settings.loaded;
+        final controller = buildController(settings: settings);
+        addTearDown(controller.dispose);
+        final state = buildStreamingState(settings);
+
+        Future<void> summary(String id, String text) async {
+          final chunk = ReasoningDelta(
+            id: id,
+            text: text,
+            reasoningType: ReasoningType.summaryText,
+          );
+          state.partsHandler.handle(chunk);
+          await controller.handleReasoningChunk(
+            text,
+            state,
+            segmentId: id,
+            reasoningType: chunk.reasoningType,
+          );
+          state.partsHandler.handle(ReasoningEnd(id: id));
+          controller.finishReasoningSegment(state.messageId, id);
+        }
+
+        Future<void> tool(String id) async {
+          final chunk = ToolCallStart(id: id, toolName: 'search');
+          state.partsHandler.handle(chunk);
+          await controller.handleToolCallsChunk(
+            chunk,
+            state,
+            updateReasoningSegmentsInDb: (_, _) async {},
+            setToolEventsInDb: (_, _) async {},
+            getToolEventsFromDb: (_) => [],
+          );
+        }
+
+        await summary('first', 'first-round summary');
+        state.partsHandler.handle(
+          const TextDelta(id: 'first-text', text: 'first-round answer'),
+        );
+        controller.finishReasoningIfNeeded(state.messageId);
+        final first = controller.getReasoningSegments(state.messageId)!.single;
+        expect(first.finishedAt, isNotNull);
+        final firstEnd = DateTime.now().subtract(const Duration(seconds: 20));
+        first
+          ..startAt = firstEnd.subtract(const Duration(seconds: 4))
+          ..finishedAt = firstEnd;
+        controller.getReasoningData(state.messageId)!.finishedAt = firstEnd;
+        await tool('first-tool');
+
+        await summary('second', 'second-round summary one');
+        await summary('third', 'second-round summary two');
+        final segments = controller.getReasoningSegments(state.messageId)!;
+        final secondStart = DateTime.now().subtract(
+          const Duration(seconds: 10),
+        );
+        segments[1].startAt = secondStart;
+        segments[2].startAt = secondStart.add(const Duration(seconds: 2));
+        expect(segments[1].summaryEnded, isTrue);
+        expect(segments[2].summaryEnded, isTrue);
+        expect(segments[1].finishedAt, isNull);
+        expect(segments[2].finishedAt, isNull);
+        segments[1].expanded = true;
+        segments[2].expanded = true;
+
+        switch (boundary) {
+          case 'text':
+            state.partsHandler.handle(
+              const TextDelta(id: 'second-text', text: 'second-round answer'),
+            );
+            await controller.finishReasoningAndPersist(
+              state.messageId,
+              updateReasoningInDb:
+                  (
+                    _, {
+                    reasoningText,
+                    reasoningFinishedAt,
+                    reasoningSegmentsJson,
+                  }) async {},
+            );
+          case 'tool':
+            await tool('second-tool');
+          case 'stream end':
+            state.partsHandler.handle(const Finish());
+            await controller.finalizeReasoningState(
+              state.messageId,
+              updateReasoningInDb:
+                  (
+                    _, {
+                    reasoningText,
+                    reasoningFinishedAt,
+                    reasoningSegmentsJson,
+                  }) async {},
+            );
+        }
+        final secondEnd = segments[2].finishedAt;
+        expect(secondEnd, isNotNull);
+        expect(segments[1].finishedAt, secondEnd);
+        expect(segments[1].expanded, isTrue);
+        expect(segments[2].expanded, isTrue);
+        expect(first.finishedAt, firstEnd);
+
+        for (final restored in [false, true]) {
+          final overlay = restored
+              ? controller.deserializeReasoningSegments(
+                  controller.serializeReasoningSegmentsWithSplits(segments),
+                )
+              : segments;
+          final projected = projectAssistantTimeline(
+            parts: state.partsHandler.parts,
+            liveTools: const [],
+            reasoningSegments: [
+              for (final segment in overlay)
+                TimelineReasoningRef(
+                  text: segment.text,
+                  startAt: segment.startAt,
+                  finishedAt: segment.finishedAt,
+                  loading: timelineReasoningLoading(
+                    finishedAt: segment.finishedAt,
+                    isStreaming: !restored && boundary != 'stream end',
+                  ),
+                  toolStartIndex: segment.toolStartIndex,
+                ),
+            ],
+            visualContent: boundary == 'text'
+                ? 'first-round answersecond-round answer'
+                : 'first-round answer',
+            isStreaming: !restored && boundary != 'stream end',
+            partsArrivalOrdered: !restored,
+            reasoningFinishedAt: controller
+                .getReasoningData(state.messageId)!
+                .finishedAt,
+          );
+          final reasoning = projected.blocks
+              .expand((block) => block.steps)
+              .where((step) => step.isReasoning)
+              .last
+              .reasoning!;
+          expect(reasoning.startAt, secondStart);
+          expect(reasoning.finishedAt, secondEnd);
+          expect(reasoning.loading, isFalse);
+        }
+      },
+    );
+  }
 
   for (final autoCollapse in [true, false]) {
     test('summary completion honors auto-collapse: $autoCollapse', () async {
@@ -266,14 +471,17 @@ void main() {
 
       controller.finishReasoningSegment(state.messageId, 'summary-1');
 
-      final finishedAt = segment.finishedAt;
-      expect(finishedAt, isNotNull);
+      expect(segment.summaryEnded, isTrue);
+      expect(segment.finishedAt, isNull);
       expect(segment.expanded, !autoCollapse);
 
       segment.expanded = true;
       controller.finishReasoningSegment(state.messageId, 'summary-1');
       controller.finishReasoningIfNeeded(state.messageId);
 
+      final finishedAt = segment.finishedAt;
+      expect(finishedAt, isNotNull);
+      controller.finishReasoningIfNeeded(state.messageId);
       expect(segment.finishedAt, finishedAt);
       expect(segment.expanded, isTrue);
       await controller.handleReasoningChunk('subsequent reasoning', state);
@@ -301,7 +509,8 @@ void main() {
 
     final segments = controller.getReasoningSegments(state.messageId)!;
     expect(segments, hasLength(2));
-    expect(summary.finishedAt, isNotNull);
+    expect(summary.summaryEnded, isTrue);
+    expect(summary.finishedAt, isNull);
     expect(summary.expanded, isFalse);
     expect(segments.last.text, 'subsequent reasoning');
     expect(segments.last.finishedAt, isNull);
@@ -351,7 +560,8 @@ void main() {
     expect(parts, hasLength(2));
     expect(segments.map((segment) => segment.text), ['item one', 'item two']);
     expect(parts.map((part) => part.text), ['item one', 'item two']);
-    expect(segments.first.finishedAt, isNotNull);
+    expect(segments.first.summaryEnded, isTrue);
+    expect(segments.first.finishedAt, isNull);
     expect(segments.last.finishedAt, isNull);
   });
 

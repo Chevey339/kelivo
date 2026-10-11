@@ -32,9 +32,7 @@ void main() {
     test('completed summaries keep the reasoning timer running ($count)', () {
       final start = DateTime.utc(2026, 10, 11);
       final projected = projectAssistantTimeline(
-        parts: [
-          for (var i = 0; i < count; i++) ReasoningPart('summary $i'),
-        ],
+        parts: [for (var i = 0; i < count; i++) ReasoningPart('summary $i')],
         liveTools: const [],
         reasoningSegments: [
           for (var i = 0; i < count; i++)

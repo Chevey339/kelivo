@@ -1032,7 +1032,8 @@ class _MessageListViewState extends State<MessageListView> {
     final text = reasoning.text;
     final charWidth = fontSize * (0.5 + 0.55 * _wideCharRatio(text));
     final charsPerLine = math.max(1.0, textWidth / charWidth);
-    final bodyHeight = _wrappedLineCount(
+    final bodyHeight =
+        _wrappedLineCount(
           text,
           charsPerLine: charsPerLine,
           codeCharsPerLine: null,

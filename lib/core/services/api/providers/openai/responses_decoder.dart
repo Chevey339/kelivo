@@ -257,14 +257,11 @@ class ResponsesStreamDecoder implements StreamChunkDecoder {
             ? ReasoningType.summaryText
             : ReasoningType.reasoningText;
         if (isSummary) {
+          if (_endedReasoningIds.contains(id)) return;
           chunks.addAll(_startReasoning(id, reasoningType));
         }
         chunks.add(
-          ReasoningDelta(
-            id: id,
-            text: delta,
-            reasoningType: reasoningType,
-          ),
+          ReasoningDelta(id: id, text: delta, reasoningType: reasoningType),
         );
       }
       return;
@@ -747,9 +744,7 @@ class ResponsesStreamDecoder implements StreamChunkDecoder {
     if (_endedReasoningIds.contains(id) || !_openReasoningIds.add(id)) {
       return const <StreamChunk>[];
     }
-    return <StreamChunk>[
-      ReasoningStart(id: id, reasoningType: reasoningType),
-    ];
+    return <StreamChunk>[ReasoningStart(id: id, reasoningType: reasoningType)];
   }
 
   List<StreamChunk> _endReasoning(String id) {

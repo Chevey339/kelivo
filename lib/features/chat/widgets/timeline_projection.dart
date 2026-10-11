@@ -66,7 +66,7 @@ class TimelineToolRef {
 /// Reasoning overlay used when structured parts or legacy segments are present.
 class TimelineReasoningRef {
   const TimelineReasoningRef({
-    required String text,
+    required this._text,
     this.textParts,
     this.summaryText,
     this.expanded = true,
@@ -74,7 +74,7 @@ class TimelineReasoningRef {
     this.startAt,
     this.finishedAt,
     this.toolStartIndex = 0,
-  }) : _text = text;
+  });
 
   final String _text;
   final List<String>? textParts;
@@ -599,8 +599,7 @@ TimelineProjection mergeLiveToolsIntoProjection(
                     step,
               ],
               continueReasoning:
-                  isStreaming &&
-                  identical(block, projection.blocks.last),
+                  isStreaming && identical(block, projection.blocks.last),
               reasoningFinishedAt: identical(block, lastThinkingBlock)
                   ? reasoningFinishedAt
                   : null,
