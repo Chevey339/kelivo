@@ -7,6 +7,7 @@ import 'package:path/path.dart' as p;
 
 import 'package:Kelivo/core/models/environment_state.dart';
 import 'package:Kelivo/core/providers/environment_provider.dart';
+import 'package:Kelivo/core/services/logging/flutter_logger.dart';
 import 'package:Kelivo/core/services/sandbox/environment_manager.dart';
 import 'package:Kelivo/core/services/sandbox/mirror_speed_test.dart';
 import 'package:Kelivo/core/services/sandbox/rootfs_source.dart';
@@ -25,6 +26,10 @@ abstract final class EnvironmentError {
   static const patchFailed = 'patch_failed';
   static const cancelled = 'cancelled';
   static const invalidRootfs = 'invalid_rootfs';
+  static const cleanupFailed = 'cleanup_failed';
+  static const cleanupIncomplete = 'cleanup_incomplete';
+  static const resetFailed = 'reset_failed';
+  static const installFailed = 'install_failed';
 }
 
 /// Android grants the app network via GID 3003 (inet) and 9997 (everybody).
@@ -113,6 +118,9 @@ class EnvironmentInstaller implements EnvironmentManager {
 
   Directory get rootfsDir => Directory(p.join(_requireEnvDir().path, 'rootfs'));
 
+  Directory get deletingRootfsDir =>
+      Directory(p.join(_requireEnvDir().path, 'deleting-rootfs'));
+
   Directory get tmpDir => Directory(p.join(_requireEnvDir().path, 'tmp'));
 
   Directory get stagingRootfsDir =>
@@ -128,6 +136,7 @@ class EnvironmentInstaller implements EnvironmentManager {
     _cancelled = false;
     _abortDownload = Completer<void>();
     _onProgress = onProgress;
+    var processesStopped = false;
     try {
       await env.loaded;
       await _resolveEnvDir();
@@ -137,23 +146,34 @@ class EnvironmentInstaller implements EnvironmentManager {
           ? env.state
           : null;
       await channel.setEnvironmentBusy(true);
+      processesStopped = true;
       await channel.keepScreenOn(true);
       await _installBody();
     } on _InstallStopped {
       // State already persisted by [_fail] or [_throwIfCancelled].
-    } catch (_) {
-      await _fail(EnvironmentError.extractFailed);
+    } catch (error, stack) {
+      FlutterLogger.log('Install failed: $error\n$stack', tag: 'Environment');
+      await _fail(
+        error is _EnvironmentCleanupFailed
+            ? EnvironmentError.cleanupFailed
+            : EnvironmentError.installFailed,
+      );
     } finally {
       _onProgress = null;
       _downloadSub = null;
       if (_abortDownload?.isCompleted == false) _abortDownload!.complete();
       _abortDownload = null;
       _downloadDone = null;
-      if (_resolvedEnvDir != null) {
+      if (processesStopped && _resolvedEnvDir != null) {
         // Keep resumable downloads, but never retain a half-extracted image.
         try {
           await _deleteIfExists(stagingRootfsDir);
-        } catch (_) {}
+        } catch (error, stack) {
+          FlutterLogger.log(
+            'Staging cleanup failed: $error\n$stack',
+            tag: 'Environment',
+          );
+        }
       }
       _previousState = null;
       try {
@@ -180,6 +200,10 @@ class EnvironmentInstaller implements EnvironmentManager {
     await _resolveEnvDir();
     _cancelled = false;
     try {
+      if (!await File(p.join(rootfsDir.path, kKelivoVersionFile)).exists()) {
+        await _fail(EnvironmentError.invalidRootfs);
+        return;
+      }
       if (!await _validateInstalledArchitecture()) return;
       await _setPhase(
         env.state.copyWith(
@@ -211,23 +235,50 @@ class EnvironmentInstaller implements EnvironmentManager {
 
   @override
   Future<void> reset() async {
-    await _resolveEnvDir();
     if (_installing) return;
-    await channel.setEnvironmentBusy(true);
+    _installing = true;
+    var deletingCurrent = false;
     try {
+      await env.loaded;
+      await _resolveEnvDir();
+      await channel.setEnvironmentBusy(true);
       // Remove recovery data first so a later startup cannot resurrect it
       // after the current rootfs has been deleted.
       await _deleteIfExists(
         Directory(p.join(_requireEnvDir().path, 'previous-rootfs')),
       );
-      await _deleteIfExists(rootfsDir);
+      await _deleteIfExists(deletingRootfsDir);
+      // Retire the active path atomically before destructive traversal. Partial
+      // deletion (or process exit) must never leave an adoptable rootfs behind.
+      if (await FileSystemEntity.type(rootfsDir.path, followLinks: false) ==
+          FileSystemEntityType.directory) {
+        await rootfsDir.rename(deletingRootfsDir.path);
+      } else {
+        await _deleteIfExists(rootfsDir);
+      }
+      deletingCurrent = true;
+      await _deleteIfExists(deletingRootfsDir);
       await _deleteIfExists(
         Directory(p.join(_requireEnvDir().path, 'staging')),
       );
       await _deleteIfExists(downloadsDir);
       await _setPhase(const EnvironmentState());
+    } catch (_) {
+      // Preserve readiness only if the active directory has not been retired.
+      await _setPhase(
+        env.state.copyWith(
+          phase: deletingCurrent ? EnvironmentPhase.error : env.state.phase,
+          errorMessage: EnvironmentError.resetFailed,
+          clearProgress: true,
+        ),
+      );
+      rethrow;
     } finally {
-      await channel.setEnvironmentBusy(false);
+      try {
+        await channel.setEnvironmentBusy(false);
+      } finally {
+        _installing = false;
+      }
     }
   }
 
@@ -489,8 +540,27 @@ class EnvironmentInstaller implements EnvironmentManager {
     );
     _previousState = null;
     await env.clearCachedDiskUsage();
-    await _deleteIfExists(previous);
-    if (!local) await _deleteIfExists(downloadsDir);
+    var cleanupIncomplete = false;
+    for (final directory in [
+      previous,
+      deletingRootfsDir,
+      if (!local) downloadsDir,
+    ]) {
+      try {
+        await _deleteIfExists(directory);
+      } catch (error, stack) {
+        cleanupIncomplete = true;
+        FlutterLogger.log(
+          'Post-install cleanup failed: $error\n$stack',
+          tag: 'Environment',
+        );
+      }
+    }
+    if (cleanupIncomplete) {
+      await _setPhase(
+        env.state.copyWith(errorMessage: EnvironmentError.cleanupIncomplete),
+      );
+    }
   }
 
   Future<ProbeResult> _safeProbe() async {
@@ -665,10 +735,26 @@ class EnvironmentInstaller implements EnvironmentManager {
     );
   }
 
-  /// Recover a process exit between the two directory renames on replacement.
+  /// Reconcile replacement or reset interrupted before its state was persisted.
   Future<void> recoverInterruptedInstall() async {
     await env.loaded;
     await _resolveEnvDir();
+    if (!await rootfsDir.exists()) {
+      if (await deletingRootfsDir.exists()) {
+        await _setPhase(
+          env.state.copyWith(
+            phase: EnvironmentPhase.error,
+            errorMessage: EnvironmentError.resetFailed,
+            clearProgress: true,
+          ),
+        );
+        return;
+      }
+      if (env.state.phase == EnvironmentPhase.ready) {
+        await _setPhase(const EnvironmentState());
+        return;
+      }
+    }
     if ({
       EnvironmentPhase.downloading,
       EnvironmentPhase.verifying,
@@ -729,8 +815,23 @@ class EnvironmentInstaller implements EnvironmentManager {
   }
 
   Future<void> _deleteIfExists(FileSystemEntity entity) async {
-    if (await entity.exists()) {
+    try {
       await entity.delete(recursive: true);
+    } on PathNotFoundException {
+      // Also handles a missing parent. Unlike exists(), delete removes dangling links.
+    } on FileSystemException catch (error, stack) {
+      FlutterLogger.log(
+        'Retrying deletion with permission repair: $error\n$stack',
+        tag: 'Environment',
+      );
+      try {
+        await channel.deleteEnvironmentDirectory(entity.path);
+      } catch (error, stack) {
+        Error.throwWithStackTrace(
+          _EnvironmentCleanupFailed(entity.path, error),
+          stack,
+        );
+      }
     }
   }
 
@@ -743,4 +844,14 @@ class EnvironmentInstaller implements EnvironmentManager {
 
 class _InstallStopped implements Exception {
   const _InstallStopped();
+}
+
+class _EnvironmentCleanupFailed implements Exception {
+  const _EnvironmentCleanupFailed(this.path, this.cause);
+
+  final String path;
+  final Object cause;
+
+  @override
+  String toString() => 'Could not delete $path: $cause';
 }

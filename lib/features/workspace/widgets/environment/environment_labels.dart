@@ -177,6 +177,12 @@ String workspaceEnvErrorMessage(AppLocalizations l10n, String? code) {
       return l10n.workspaceEnvErrorChecksumMismatch;
     case 'extract_failed':
       return l10n.workspaceEnvErrorExtractFailed;
+    case 'cleanup_failed':
+      return l10n.workspaceEnvErrorCleanupFailed;
+    case 'cleanup_incomplete':
+      return l10n.workspaceEnvCleanupIncomplete;
+    case 'reset_failed':
+      return l10n.workspaceEnvErrorResetFailed;
     case 'patch_failed':
       return l10n.workspaceEnvErrorPatchFailed;
     case 'cancelled':

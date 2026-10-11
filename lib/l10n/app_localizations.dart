@@ -18325,6 +18325,24 @@ abstract class AppLocalizations {
   /// **'Could not extract the sandbox image.'**
   String get workspaceEnvErrorExtractFailed;
 
+  /// No description provided for @workspaceEnvErrorCleanupFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not remove old sandbox files. Please try again.'**
+  String get workspaceEnvErrorCleanupFailed;
+
+  /// No description provided for @workspaceEnvCleanupIncomplete.
+  ///
+  /// In en, this message translates to:
+  /// **'The sandbox is ready, but some old files could not be removed. They still take up storage space.'**
+  String get workspaceEnvCleanupIncomplete;
+
+  /// No description provided for @workspaceEnvErrorResetFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not finish resetting the sandbox. Please try again.'**
+  String get workspaceEnvErrorResetFailed;
+
   /// No description provided for @workspaceEnvErrorPatchFailed.
   ///
   /// In en, this message translates to:

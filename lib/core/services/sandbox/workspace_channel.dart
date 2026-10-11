@@ -165,6 +165,11 @@ class WorkspaceChannel {
         'inspectRootfs',
       );
 
+  /// Android retries deletion after repairing guest directory permissions.
+  Future<void> deleteEnvironmentDirectory(String path) async {
+    await _invoke('deleteEnvironmentDirectory', {'path': path});
+  }
+
   Future<void> setEnvironmentBusy(bool busy) async {
     await _invoke('setEnvironmentBusy', {'busy': busy});
   }

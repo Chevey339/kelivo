@@ -9790,6 +9790,15 @@ class AppLocalizationsZh extends AppLocalizations {
   String get workspaceEnvErrorExtractFailed => '无法解压沙箱镜像。';
 
   @override
+  String get workspaceEnvErrorCleanupFailed => '无法清理旧沙箱文件，请重试。';
+
+  @override
+  String get workspaceEnvCleanupIncomplete => '沙箱已就绪，但部分旧文件未能清理，仍占用存储空间。';
+
+  @override
+  String get workspaceEnvErrorResetFailed => '未能完成沙箱重置，请重试。';
+
+  @override
   String get workspaceEnvErrorPatchFailed => '无法完成沙箱配置。';
 
   @override
@@ -22161,6 +22170,15 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get workspaceEnvErrorExtractFailed => '无法解压沙箱镜像。';
+
+  @override
+  String get workspaceEnvErrorCleanupFailed => '无法清理旧沙箱文件，请重试。';
+
+  @override
+  String get workspaceEnvCleanupIncomplete => '沙箱已就绪，但部分旧文件未能清理，仍占用存储空间。';
+
+  @override
+  String get workspaceEnvErrorResetFailed => '未能完成沙箱重置，请重试。';
 
   @override
   String get workspaceEnvErrorPatchFailed => '无法完成沙箱配置。';
@@ -34609,6 +34627,15 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get workspaceEnvErrorExtractFailed => '無法解壓沙箱映像。';
+
+  @override
+  String get workspaceEnvErrorCleanupFailed => '無法清理舊沙箱檔案，請重試。';
+
+  @override
+  String get workspaceEnvCleanupIncomplete => '沙箱已就緒，但部分舊檔案未能清理，仍佔用儲存空間。';
+
+  @override
+  String get workspaceEnvErrorResetFailed => '未能完成沙箱重設，請重試。';
 
   @override
   String get workspaceEnvErrorPatchFailed => '無法完成沙箱設定。';

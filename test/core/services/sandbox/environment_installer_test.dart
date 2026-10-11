@@ -11,6 +11,7 @@ import 'package:path/path.dart' as p;
 
 import 'package:Kelivo/core/models/environment_state.dart';
 import 'package:Kelivo/core/providers/environment_provider.dart';
+import 'package:Kelivo/core/services/sandbox/android_proot_runtime.dart';
 import 'package:Kelivo/core/services/sandbox/environment_installer.dart';
 import 'package:Kelivo/core/services/sandbox/mirror_speed_test.dart';
 import 'package:Kelivo/core/services/sandbox/rootfs_source.dart';
@@ -593,6 +594,282 @@ void main() {
     );
   }
 
+  Future<Directory> lockDirectory(Directory root) async {
+    final locked = await Directory(
+      p.join(root.path, 'locked'),
+    ).create(recursive: true);
+    await File(p.join(locked.path, 'payload')).writeAsString('guest data');
+    expect((await Process.run('chmod', ['555', locked.path])).exitCode, 0);
+    return locked;
+  }
+
+  Future<void> unlockDirectory(Directory locked) async {
+    if (await locked.exists()) {
+      expect((await Process.run('chmod', ['700', locked.path])).exitCode, 0);
+    }
+  }
+
+  Future<void> repairDeletion(String path) async {
+    await unlockDirectory(Directory(p.join(path, 'locked')));
+    await Directory(path).delete(recursive: true);
+  }
+
+  test(
+    'reset retries protected trees through native deletion and cannot resurrect them',
+    () async {
+      final installer = buildInstaller(servingTarball());
+      await installer.install();
+      final directories = [
+        Directory(p.join(envDir.path, 'previous-rootfs')),
+        installer.rootfsDir,
+        Directory(p.join(envDir.path, 'staging')),
+        installer.downloadsDir,
+      ];
+      final locked = <Directory>[];
+      try {
+        for (final directory in directories) {
+          locked.add(await lockDirectory(directory));
+        }
+        workspace.deleteDirectory = repairDeletion;
+        await installer.reset();
+        expect(workspace.deletePaths, [
+          directories.first.path,
+          installer.deletingRootfsDir.path,
+          directories[2].path,
+          directories[3].path,
+        ]);
+        expect(env.state.phase, EnvironmentPhase.notInstalled);
+        expect(workspace.busyCalls.last, isFalse);
+        for (final directory in directories) {
+          expect(await directory.exists(), isFalse);
+        }
+        await buildInstaller(servingTarball()).recoverInterruptedInstall();
+        expect(await installer.rootfsDir.exists(), isFalse);
+        expect(env.state.phase, EnvironmentPhase.notInstalled);
+      } finally {
+        for (final directory in locked) {
+          await unlockDirectory(directory);
+        }
+        await unlockDirectory(
+          Directory(p.join(installer.deletingRootfsDir.path, 'locked')),
+        );
+      }
+    },
+    skip: Platform.isWindows,
+  );
+
+  test(
+    'failed backup cleanup preserves the active system and reports cleanup_failed',
+    () async {
+      final installer = buildInstaller(servingTarball());
+      await installer.install();
+      final original = await File(
+        p.join(installer.rootfsDir.path, 'keep.txt'),
+      ).writeAsString('old work');
+      final locked = await lockDirectory(
+        Directory(p.join(envDir.path, 'previous-rootfs')),
+      );
+      workspace.extractedBytes = null;
+      try {
+        await installer.install();
+        expect(workspace.extractedBytes, isNotNull);
+        expect(env.state.phase, EnvironmentPhase.ready);
+        expect(env.state.errorMessage, EnvironmentError.cleanupFailed);
+        expect(await original.readAsString(), 'old work');
+        expect(await installer.stagingRootfsDir.exists(), isFalse);
+        expect(workspace.busyCalls.last, isFalse);
+      } finally {
+        await unlockDirectory(locked);
+      }
+    },
+    skip: Platform.isWindows,
+  );
+
+  test(
+    'cleanup after replacement preserves the new ready system and continues other cleanup',
+    () async {
+      final installer = buildInstaller(servingTarball());
+      await installer.install();
+      final locked = await lockDirectory(installer.rootfsDir);
+      final previousLocked = Directory(
+        p.join(envDir.path, 'previous-rootfs', 'locked'),
+      );
+      workspace.rootfsInfo = {
+        'distro': 'alpine',
+        'version': '3.24.1',
+        'codename': 'v3.24',
+        'arch': 'arm64',
+      };
+      await env.setRootfsSelection(
+        imageId: 'alpine-3.24.1',
+        source: RootfsDownloadSource.official,
+      );
+      try {
+        await installer.install();
+        expect(env.state.phase, EnvironmentPhase.ready);
+        expect(env.state.errorMessage, EnvironmentError.cleanupIncomplete);
+        expect(env.state.distro, 'alpine');
+        final marker = File(
+          p.join(installer.rootfsDir.path, kKelivoVersionFile),
+        );
+        expect(await marker.readAsString(), startsWith('alpine '));
+        expect(await previousLocked.exists(), isTrue);
+        expect(await installer.downloadsDir.exists(), isFalse);
+        await buildInstaller(servingTarball()).recoverInterruptedInstall();
+        expect(await marker.readAsString(), startsWith('alpine '));
+        expect(env.state.phase, EnvironmentPhase.ready);
+      } finally {
+        await unlockDirectory(locked);
+        await unlockDirectory(previousLocked);
+      }
+    },
+    skip: Platform.isWindows,
+  );
+
+  for (final backupFailure in [true, false]) {
+    test(
+      'reset failure is retryable and tracks whether active data was touched, backup=$backupFailure',
+      () async {
+        final installer = buildInstaller(servingTarball());
+        await installer.install();
+        final directory = backupFailure
+            ? Directory(p.join(envDir.path, 'previous-rootfs'))
+            : installer.rootfsDir;
+        final locked = await lockDirectory(directory);
+        try {
+          await expectLater(installer.reset(), throwsException);
+          expect(env.state.errorMessage, EnvironmentError.resetFailed);
+          expect(
+            env.state.phase,
+            backupFailure ? EnvironmentPhase.ready : EnvironmentPhase.error,
+          );
+          expect(workspace.busyCalls.last, isFalse);
+          if (backupFailure) {
+            expect(
+              await File(
+                p.join(installer.rootfsDir.path, kKelivoVersionFile),
+              ).exists(),
+              isTrue,
+            );
+          } else {
+            expect(await installer.rootfsDir.exists(), isFalse);
+            // Even a surviving version marker is now outside the active path.
+            await File(
+              p.join(installer.deletingRootfsDir.path, kKelivoVersionFile),
+            ).writeAsString('ubuntu 24.04.3 arm64 noble\n');
+            final restarted = buildInstaller(servingTarball());
+            await restarted.recoverInterruptedInstall();
+            workspace.patchArgs = null;
+            await restarted.repair();
+            expect(workspace.patchArgs, isNull);
+            workspace.rejectExtract = true;
+            await restarted.ensureInstalled();
+            expect(env.state.errorMessage, EnvironmentError.extractFailed);
+            final runtime = AndroidProotRuntime(
+              channel: workspace.channel,
+              env: env,
+              rootfsDir: installer.rootfsDir,
+              tmpDir: installer.tmpDir,
+            );
+            expect((await runtime.status()).ready, isFalse);
+            expect(await installer.rootfsDir.exists(), isFalse);
+          }
+          workspace.deleteDirectory = repairDeletion;
+          await installer.reset();
+          expect(env.state.phase, EnvironmentPhase.notInstalled);
+          expect(env.state.errorMessage, isNull);
+          await buildInstaller(servingTarball()).recoverInterruptedInstall();
+          expect(await installer.rootfsDir.exists(), isFalse);
+        } finally {
+          await unlockDirectory(locked);
+          await unlockDirectory(
+            Directory(p.join(installer.deletingRootfsDir.path, 'locked')),
+          );
+        }
+      },
+      skip: Platform.isWindows,
+    );
+  }
+
+  test('install cleans up a rootfs retired by an interrupted reset', () async {
+    final installer = buildInstaller(servingTarball());
+    await installer.deletingRootfsDir.create();
+    final oldData = await File(
+      p.join(installer.deletingRootfsDir.path, 'old-work'),
+    ).writeAsString('retired data');
+    await File(
+      p.join(installer.deletingRootfsDir.path, kKelivoVersionFile),
+    ).writeAsString('debian 12 arm64 bookworm\n');
+    await env.setState(const EnvironmentState(phase: EnvironmentPhase.ready));
+    await installer.recoverInterruptedInstall();
+    expect(await installer.rootfsDir.exists(), isFalse);
+    expect(env.state.phase, EnvironmentPhase.error);
+    expect(env.state.errorMessage, EnvironmentError.resetFailed);
+    await installer.ensureInstalled();
+    expect(env.state.phase, EnvironmentPhase.ready);
+    expect(env.state.distro, 'ubuntu');
+    expect(await oldData.exists(), isFalse);
+    expect(await installer.deletingRootfsDir.exists(), isFalse);
+  });
+
+  test(
+    'startup clears ready after reset finished deleting before state save',
+    () async {
+      final installer = buildInstaller(servingTarball());
+      await env.setState(const EnvironmentState(phase: EnvironmentPhase.ready));
+      await installer.recoverInterruptedInstall();
+      expect(env.state.phase, EnvironmentPhase.notInstalled);
+      expect(env.state.errorMessage, isNull);
+    },
+  );
+
+  test('reset removes a dangling recovery link', () async {
+    final installer = buildInstaller(servingTarball());
+    await installer.install();
+    final previous = Link(p.join(envDir.path, 'previous-rootfs'));
+    await previous.create(p.join(envDir.path, 'missing'));
+    await installer.reset();
+    expect(await previous.exists(), isFalse);
+    expect(env.state.phase, EnvironmentPhase.notInstalled);
+  }, skip: Platform.isWindows);
+
+  test('unexpected setup errors are not labeled extract_failed', () async {
+    workspace.rejectKeepScreenOn = true;
+    await buildInstaller(servingTarball()).install();
+    expect(env.state.errorMessage, EnvironmentError.installFailed);
+    expect(workspace.busyCalls.last, isFalse);
+  });
+
+  for (final reset in [false, true]) {
+    test(
+      'failed process shutdown leaves files untouched, reset=$reset',
+      () async {
+        final installer = buildInstaller(servingTarball());
+        await installer.install();
+        final active = await File(
+          p.join(installer.rootfsDir.path, 'keep'),
+        ).writeAsString('active data');
+        await installer.stagingRootfsDir.create(recursive: true);
+        final staged = await File(
+          p.join(installer.stagingRootfsDir.path, 'keep'),
+        ).writeAsString('staged data');
+        workspace.rejectStop = true;
+        if (reset) {
+          await expectLater(installer.reset(), throwsException);
+        } else {
+          await installer.install();
+        }
+        expect(await active.readAsString(), 'active data');
+        expect(await staged.readAsString(), 'staged data');
+        expect(workspace.deletePaths, isEmpty);
+        expect(workspace.busyCalls.last, isFalse);
+        workspace.rejectStop = false;
+        await installer.reset();
+        expect(env.state.phase, EnvironmentPhase.notInstalled);
+      },
+    );
+  }
+
   test('local newer releases are not offered a downgrade', () async {
     final installer = buildInstaller(servingTarball());
     await installer.rootfsDir.create();
@@ -649,6 +926,10 @@ class _WorkspaceHarness {
   String Function(String path)? sha256Override;
   final List<bool> keepScreenOnCalls = <bool>[];
   Map<String, Object?>? patchArgs;
+  final deletePaths = <String>[];
+  Future<void> Function(String path)? deleteDirectory;
+  bool rejectKeepScreenOn = false;
+  bool rejectStop = false;
 
   void install() {
     final messenger =
@@ -686,6 +967,9 @@ class _WorkspaceHarness {
           return sha256.convert(await File(path).readAsBytes()).toString();
         case 'setEnvironmentBusy':
           busyCalls.add((call.arguments as Map)['busy'] == true);
+          if (busyCalls.last && rejectStop) {
+            throw PlatformException(code: 'workspace');
+          }
           return null;
         case 'extractRootfs':
           if (rejectExtract) throw PlatformException(code: 'extract_failed');
@@ -714,7 +998,20 @@ class _WorkspaceHarness {
         case 'patchRootfs':
           patchArgs = Map<String, Object?>.from(call.arguments as Map);
           return <String, Object?>{'ok': true};
+        case 'deleteEnvironmentDirectory':
+          final path = (call.arguments as Map)['path'] as String;
+          deletePaths.add(path);
+          final deletion = deleteDirectory;
+          if (deletion == null) {
+            throw PlatformException(
+              code: 'cleanup_failed',
+              message: 'Permission denied: $path',
+            );
+          }
+          await deletion(path);
+          return null;
         case 'keepScreenOn':
+          if (rejectKeepScreenOn) throw PlatformException(code: 'workspace');
           keepScreenOnCalls.add((call.arguments as Map)['enabled'] == true);
           return null;
         default:

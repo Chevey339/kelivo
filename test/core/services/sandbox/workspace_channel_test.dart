@@ -153,6 +153,32 @@ void main() {
     );
   });
 
+  test(
+    'directory cleanup forwards the path and preserves native failure details',
+    () async {
+      messenger.setMockMethodCallHandler(methodChannel, (call) async {
+        expect(call.method, 'deleteEnvironmentDirectory');
+        expect(call.arguments, {'path': '/env/previous-rootfs'});
+        throw PlatformException(
+          code: 'cleanup_failed',
+          message: 'Permission denied: /env/previous-rootfs',
+        );
+      });
+      await expectLater(
+        channel.deleteEnvironmentDirectory('/env/previous-rootfs'),
+        throwsA(
+          isA<WorkspaceChannelException>()
+              .having((error) => error.code, 'code', 'cleanup_failed')
+              .having(
+                (error) => error.message,
+                'message',
+                contains('/env/previous-rootfs'),
+              ),
+        ),
+      );
+    },
+  );
+
   test('freeSpace and sha256File parse native results', () async {
     messenger.setMockMethodCallHandler(methodChannel, (call) async {
       if (call.method == 'freeSpace') {

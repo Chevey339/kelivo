@@ -10220,6 +10220,18 @@ class AppLocalizationsEn extends AppLocalizations {
       'Could not extract the sandbox image.';
 
   @override
+  String get workspaceEnvErrorCleanupFailed =>
+      'Could not remove old sandbox files. Please try again.';
+
+  @override
+  String get workspaceEnvCleanupIncomplete =>
+      'The sandbox is ready, but some old files could not be removed. They still take up storage space.';
+
+  @override
+  String get workspaceEnvErrorResetFailed =>
+      'Could not finish resetting the sandbox. Please try again.';
+
+  @override
   String get workspaceEnvErrorPatchFailed =>
       'Could not finish setting up the sandbox.';
 
