@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:crypto/crypto.dart';
 
+import '../models/assistant.dart';
 import 'business_data.dart';
 
 enum BusinessKeyDisposition {
@@ -45,6 +46,7 @@ final class BusinessKeyRegistry {
     'desktop_scheduled_tasks_v1',
     'scheduled_task_results_v1',
     'current_assistant_id_v1',
+    'orphaned_conversations_assistant_id_v1',
     'selected_model_v1',
     'per_chat_model_enabled_v1',
     'pinned_models_v1',
@@ -346,6 +348,9 @@ final class BusinessSettingsRouter {
                   ? projectedMemoryIds[row.id]!
                   : row.id;
             }
+            if (kind == BusinessEntityKind.assistant) {
+              _validateRuntimeAssistant(payload);
+            }
             return payload;
           }(),
       ]);
@@ -460,6 +465,9 @@ final class BusinessSettingsRouter {
     final id = hasPayloadId
         ? rawId.toString()
         : rowId ?? _stableGeneratedId(kind.sourceKey, index, payload);
+    if (kind == BusinessEntityKind.assistant) {
+      _validateRuntimeAssistant({...payload, 'id': id});
+    }
     String? assistantId;
     if (kind == BusinessEntityKind.assistantMemory) {
       final rawAssistantId = payload['assistantId'];
@@ -474,6 +482,20 @@ final class BusinessSettingsRouter {
       payload: jsonEncode(payload),
       assistantId: assistantId,
     );
+  }
+
+  // Validate with the same decoder used by AssistantProvider, before migration
+  // cleanup or exposing a startup snapshot. Keep the original payload intact,
+  // including unknown fields and IDs projected only for runtime use.
+  static void _validateRuntimeAssistant(Map<String, Object?> payload) {
+    try {
+      Assistant.fromJson(payload);
+    } catch (error) {
+      throw FormatException(
+        BusinessEntityKind.assistant.sourceKey,
+        'assistant=${payload['id']}; $error',
+      );
+    }
   }
 
   // Mirror runtime decoder cast boundaries without canonicalizing payloads.

@@ -1194,7 +1194,11 @@ class ChatActions {
     } catch (e) {
       return ChatActionResult.error(e.toString());
     }
-    final assistant = assistantOverride ?? assistantProvider.currentAssistant;
+    final assistant =
+        assistantOverride ??
+        assistantProvider.resolveConversationAssistant(
+          conversation.assistantId,
+        );
     final assistantId = assistant?.id;
     final modelConfig =
         modelOverride ??
@@ -1572,7 +1576,11 @@ class ChatActions {
     } catch (e) {
       return ChatActionResult.error(e.toString());
     }
-    final assistant = assistantOverride ?? assistantProvider.currentAssistant;
+    final assistant =
+        assistantOverride ??
+        assistantProvider.resolveConversationAssistant(
+          conversation.assistantId,
+        );
 
     await cancelStreaming(conversation);
 
@@ -1843,7 +1851,9 @@ class ChatActions {
     } catch (e) {
       return ChatActionResult.error(e.toString());
     }
-    final assistant = assistantProvider.currentAssistant;
+    final assistant = assistantProvider.resolveConversationAssistant(
+      conversation.assistantId,
+    );
 
     final visibleIndex = _messages.indexWhere(
       (candidate) => candidate.id == message.id,

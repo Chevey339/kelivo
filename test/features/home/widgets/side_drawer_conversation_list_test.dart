@@ -167,6 +167,7 @@ void main() {
     Locale locale = const Locale('en'),
     ValueNotifier<Locale>? localeListenable,
     bool showChatListDate = false,
+    AssistantProvider? assistantProvider,
     FutureOr<void> Function(String id, {bool closeDrawer})?
     onSelectConversation,
   }) async {
@@ -205,9 +206,14 @@ void main() {
         providers: [
           ChangeNotifierProvider<ChatService>.value(value: service),
           ChangeNotifierProvider<SettingsProvider>.value(value: settings),
-          ChangeNotifierProvider(
-            create: (_) => AssistantProvider(preferences: assistantPrefs),
-          ),
+          if (assistantProvider != null)
+            ChangeNotifierProvider<AssistantProvider>.value(
+              value: assistantProvider,
+            )
+          else
+            ChangeNotifierProvider(
+              create: (_) => AssistantProvider(preferences: assistantPrefs),
+            ),
           ChangeNotifierProvider(
             create: (_) => BackupReminderProvider(preferences: backupPrefs),
           ),
@@ -272,6 +278,84 @@ void main() {
         )
         .first;
   }
+
+  testWidgets('orphaned topics remain visible after switching assistants', (
+    tester,
+  ) async {
+    await asDesktop(() async {
+      final service = createService();
+      late AssistantProvider assistants;
+      late String first;
+      late String second;
+      await tester.runAsync(() async {
+        await service.init();
+        await service.createConversation(
+          title: 'Orphaned topic',
+          assistantId: 'missing-assistant',
+        );
+        assistants = AssistantProvider(
+          preferences: createBusinessTestPreferences(),
+        );
+        await assistants.loaded;
+        first = await assistants.addAssistant(name: 'First');
+        second = await assistants.addAssistant(name: 'Second');
+        await assistants.setCurrentAssistant(first);
+        await service.createConversation(
+          title: 'First topic',
+          assistantId: first,
+        );
+        await service.createConversation(
+          title: 'Second topic',
+          assistantId: second,
+        );
+      });
+      await pumpDrawer(tester, service, assistantProvider: assistants);
+      await tester.pumpAndSettle();
+      expect(find.text('Orphaned topic'), findsOneWidget);
+      expect(find.text('First topic'), findsOneWidget);
+      expect(find.text('Second topic'), findsNothing);
+
+      await tester.runAsync(() => assistants.setCurrentAssistant(second));
+      await tester.pumpAndSettle();
+      expect(find.text('Orphaned topic'), findsNothing);
+      expect(find.text('First topic'), findsNothing);
+      expect(find.text('Second topic'), findsOneWidget);
+      await tester.runAsync(() => assistants.setCurrentAssistant(first));
+      await tester.pumpAndSettle();
+      expect(find.text('Orphaned topic'), findsOneWidget);
+      expect(
+        service
+            .getAllConversations()
+            .singleWhere((c) => c.title == 'Orphaned topic')
+            .assistantId,
+        'missing-assistant',
+      );
+      // Reordering must not move recovered history away from the selected
+      // assistant, including after reopening the persisted assistant snapshot.
+      await tester.runAsync(() => assistants.reorderAssistants(1, 0));
+      await tester.pumpAndSettle();
+      expect(assistants.currentAssistantId, first);
+      expect(find.text('Orphaned topic'), findsOneWidget);
+      expect(find.text('First topic'), findsOneWidget);
+      final originalAssistants = assistants;
+      await tester.runAsync(() async {
+        assistants = AssistantProvider(
+          preferences: originalAssistants.preferences,
+        );
+        await assistants.loaded;
+      });
+      await pumpDrawer(tester, service, assistantProvider: assistants);
+      await tester.pumpAndSettle();
+      expect(assistants.assistants.first.id, second);
+      expect(assistants.currentAssistantId, first);
+      expect(find.text('Orphaned topic'), findsOneWidget);
+      await tester.runAsync(() => assistants.deleteAssistant(first));
+      await tester.pumpAndSettle();
+      expect(assistants.currentAssistantId, second);
+      expect(find.text('Orphaned topic'), findsOneWidget);
+      expect(find.text('Second topic'), findsOneWidget);
+    });
+  });
 
   testWidgets('list does not rebuild on unrelated ChatService notify', (
     tester,

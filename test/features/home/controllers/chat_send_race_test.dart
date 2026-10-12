@@ -12,6 +12,7 @@ import 'package:provider/provider.dart';
 import '../../../support/business_test_harness.dart';
 import '../../../support/gated_xfile.dart';
 import 'package:Kelivo/core/database/chat_database_repository.dart';
+import 'package:Kelivo/core/database/business_preferences.dart';
 import 'package:Kelivo/core/models/chat_input_data.dart';
 import 'package:Kelivo/core/models/chat_message.dart';
 import 'package:Kelivo/core/models/composer_draft.dart';
@@ -32,7 +33,9 @@ import 'package:Kelivo/features/home/controllers/home_page_controller.dart';
 import 'package:Kelivo/features/home/controllers/chat_actions.dart';
 import 'package:Kelivo/features/home/controllers/scroll_controller.dart';
 import 'package:Kelivo/features/home/services/ask_user_interaction_service.dart';
+import 'package:Kelivo/features/home/utils/model_display_helper.dart';
 import 'package:Kelivo/features/home/widgets/chat_input_bar.dart';
+import 'package:Kelivo/features/search/services/global_session_search_service.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
 import 'package:Kelivo/icons/lucide_adapter.dart';
 
@@ -338,6 +341,8 @@ void main() {
     WidgetTester tester, {
     bool withSuggestions = false,
     bool withComposer = false,
+    List<dynamic>? storedAssistants,
+    BusinessPreferences? assistantPreferences,
   }) async {
     HomePageController? controller;
     late Zone sendZone;
@@ -367,14 +372,27 @@ void main() {
         await settings.resetSuggestionModel();
       }
 
-      final assistantPrefs = createBusinessTestPreferences();
+      final assistantPrefs =
+          assistantPreferences ?? createBusinessTestPreferences();
       await assistantPrefs.load();
+      if (storedAssistants != null) {
+        await assistantPrefs.setString(
+          'assistants_v1',
+          jsonEncode(storedAssistants),
+        );
+        await assistantPrefs.setString(
+          'current_assistant_id_v1',
+          (storedAssistants.first as Map)['id'] as String,
+        );
+      }
       assistantProvider = AssistantProvider(preferences: assistantPrefs);
       await assistantProvider.loaded;
-      final assistantId = await assistantProvider.addAssistant(
-        name: 'Test Assistant',
-      );
-      await assistantProvider.setCurrentAssistant(assistantId);
+      if (storedAssistants == null && assistantPreferences == null) {
+        final assistantId = await assistantProvider.addAssistant(
+          name: 'Test Assistant',
+        );
+        await assistantProvider.setCurrentAssistant(assistantId);
+      }
     });
     await tester.pumpWidget(
       MultiProvider(
@@ -1188,6 +1206,264 @@ void main() {
       });
       expect(tester.takeException(), isNull);
     });
+  }
+
+  testWidgets('orphaned assistant history still accepts a composer send', (
+    tester,
+  ) async {
+    // The assistant JSON is a real old writer's output. Only the topic's
+    // ownership is stale, as older deletion/import paths could leave it;
+    // this regression must not depend on malformed assistant fields.
+    final fixtures =
+        jsonDecode(
+              File(
+                'test/fixtures/assistants/historical_writers.json',
+              ).readAsStringSync(),
+            )
+            as List;
+    final fixture = fixtures.firstWhere(
+      (value) => ((value as Map)['writers'] as List).any(
+        (writer) => ((writer as Map)['refs'] as List).contains('v1.3.0'),
+      ),
+    );
+    final storedAssistants = (fixture as Map)['assistants'] as List;
+    final originalIds = storedAssistants
+        .map((value) => (value as Map)['id'] as String)
+        .toList();
+    final controller = await pumpHarness(
+      tester,
+      storedAssistants: storedAssistants,
+    );
+    await tester.runAsync(() async {
+      await settings.disableTitleGeneration();
+      await settings.setNewChatOnLaunch(false);
+      final displayedAssistant = assistantProvider.currentAssistant!;
+      await assistantProvider.updateAssistant(
+        displayedAssistant.copyWith(
+          chatModelProvider: 'SiliconFlow',
+          chatModelId: 'assistant-model',
+        ),
+      );
+      final conversation = await service.createConversation(
+        title: 'Existing topic',
+        assistantId: 'missing-assistant',
+      );
+      final original = await service.addMessage(
+        conversationId: conversation.id,
+        role: 'user',
+        content: 'preserved history',
+      );
+      expect(
+        await GlobalSessionSearchService.search(
+          chatService: service,
+          query: 'preserved history',
+        ),
+        hasLength(1),
+      );
+      await controller.initChat();
+      expect(controller.currentConversation!.id, conversation.id);
+      // Startup used to install the topic's missing owner as the selection,
+      // while currentAssistant silently displayed the first valid assistant.
+      // That leaked the invalid ID into every subsequent new conversation.
+      expect(assistantProvider.currentAssistantId, displayedAssistant.id);
+      final firstNewConversation = await controller.debugViewModel
+          .createNewConversation();
+      expect(firstNewConversation!.assistantId, displayedAssistant.id);
+      await controller.debugViewModel.switchConversation(conversation.id);
+      final drafts = service.composerDrafts!;
+      await drafts.load(conversation.id, assistantId: conversation.assistantId);
+      const input = ComposerDraftInput(text: 'continue this topic');
+      final submission = await drafts.beginSubmission(conversation.id, input);
+      final result = await controller.sendMessage(
+        input.toInput(submission: submission),
+      );
+      expect(result, ChatInputSubmissionResult.sent);
+      await waitFor(() => streamRequestCount == 1, 'orphaned topic request');
+      await waitFor(
+        () => !controller.chatController.isConversationLoading(conversation.id),
+        'orphaned topic reply',
+      );
+      expect(streamRequests.single['model'], 'assistant-model');
+      expect(assistantProvider.currentAssistantId, displayedAssistant.id);
+      expect(
+        assistantProvider.assistants.map((assistant) => assistant.id),
+        originalIds,
+      );
+      final messages = await service.loadMessages(conversation.id);
+      expect(messages.first.id, original.id);
+      expect(messages.first.content, 'preserved history');
+      expect(messages.last.content, 'ok');
+      expect(
+        (await repository.getMessage(original.id))!.content,
+        'preserved history',
+      );
+      expect(
+        service.getConversation(conversation.id)!.assistantId,
+        'missing-assistant',
+      );
+      expect(drafts.peek(conversation.id)!.pending, isNull);
+
+      expect(
+        await controller.debugViewModel.regenerateAtMessage(messages.last),
+        isTrue,
+      );
+      await waitFor(
+        () => streamRequestCount == 2,
+        'orphaned topic regeneration',
+      );
+      await waitFor(
+        () => !controller.chatController.isConversationLoading(conversation.id),
+        'regenerated reply',
+      );
+      expect(streamRequests.last['model'], 'assistant-model');
+
+      final otherId = await assistantProvider.addAssistant(name: 'Other');
+      await assistantProvider.setCurrentAssistant(otherId);
+      await controller.debugViewModel.createNewConversation();
+      await controller.debugViewModel.switchConversation(conversation.id);
+      expect(assistantProvider.currentAssistantId, displayedAssistant.id);
+      expect(controller.messages.first.id, original.id);
+      final newConversation = await controller.debugViewModel
+          .createNewConversation();
+      expect(newConversation!.assistantId, displayedAssistant.id);
+
+      await assistantProvider.setCurrentAssistant(otherId);
+      final prepared = await controller.debugViewModel
+          .prepareConversationSwitch(conversation.id);
+      expect(assistantProvider.currentAssistantId, otherId);
+      controller.debugViewModel.commitConversationSwitch(prepared!);
+      await waitFor(
+        () => assistantProvider.currentAssistantId == displayedAssistant.id,
+        'assistant selection after opening a search result',
+      );
+      expect(controller.messages.first.id, original.id);
+      expect(assistantProvider.assistants.map((assistant) => assistant.id), [
+        ...originalIds,
+        otherId,
+      ]);
+    });
+    await tester.pumpWidget(const SizedBox());
+    expect(tester.takeException(), isNull);
+  });
+
+  for (final newChatOnLaunch in [false, true]) {
+    testWidgets(
+      'recovered model survives reorder and restart: newChat=$newChatOnLaunch',
+      (tester) async {
+        final business = (await tester.runAsync(
+          () => createBusinessTestHarness(
+            initial: {
+              'assistants_v1': jsonEncode(const [
+                {
+                  'id': 'recovery-a',
+                  'name': 'A',
+                  'chatModelProvider': 'SiliconFlow',
+                  'chatModelId': 'model-a',
+                },
+                {
+                  'id': 'recovery-b',
+                  'name': 'B',
+                  'chatModelProvider': 'SiliconFlow',
+                  'chatModelId': 'model-b',
+                },
+              ]),
+              'current_assistant_id_v1': 'recovery-a',
+            },
+          ),
+        ))!;
+        var controller = await pumpHarness(
+          tester,
+          assistantPreferences: business.preferences,
+        );
+        late Conversation conversation;
+        await tester.runAsync(() async {
+          await settings.disableTitleGeneration();
+          conversation = await service.createConversation(
+            title: 'Recovered topic',
+            assistantId: 'missing-assistant',
+          );
+          await controller.debugViewModel.switchConversation(conversation.id);
+          await assistantProvider.reorderAssistants(1, 0);
+          expect(assistantProvider.currentAssistantId, 'recovery-a');
+          final display = getModelDisplayInfo(
+            settings,
+            conversation: controller.currentConversation,
+            assistant: assistantProvider.currentAssistant,
+          );
+          expect(display.modelDisplay, 'model-a');
+          expect(
+            await controller.sendMessage(ChatInputData(text: 'after reorder')),
+            ChatInputSubmissionResult.sent,
+          );
+          await waitFor(
+            () =>
+                streamRequestCount == 1 &&
+                !controller.chatController.isConversationLoading(
+                  conversation.id,
+                ),
+            'reply after reorder',
+          );
+          expect(streamRequests.single['model'], display.modelId);
+        });
+        await tester.pumpWidget(const SizedBox());
+        controller = await pumpHarness(
+          tester,
+          assistantPreferences: BusinessPreferences(business.repository),
+        );
+        await tester.runAsync(() async {
+          await settings.disableTitleGeneration();
+          await settings.setNewChatOnLaunch(newChatOnLaunch);
+          await controller.initChat();
+          expect(assistantProvider.assistants.first.id, 'recovery-b');
+          expect(assistantProvider.currentAssistantId, 'recovery-a');
+          if (newChatOnLaunch) {
+            expect(controller.currentConversation!.assistantId, 'recovery-a');
+            await controller.debugViewModel.switchConversation(conversation.id);
+          } else {
+            expect(controller.currentConversation!.id, conversation.id);
+          }
+          final display = getModelDisplayInfo(
+            settings,
+            conversation: controller.currentConversation,
+            assistant: assistantProvider.currentAssistant,
+          );
+          expect(display.modelDisplay, 'model-a');
+          expect(
+            await controller.sendMessage(ChatInputData(text: 'after restart')),
+            ChatInputSubmissionResult.sent,
+          );
+          await waitFor(
+            () =>
+                streamRequestCount == 2 &&
+                !controller.chatController.isConversationLoading(
+                  conversation.id,
+                ),
+            'reply after restart',
+          );
+          expect(streamRequests.last['model'], display.modelId);
+          final messages = await service.loadMessages(conversation.id);
+          expect(
+            await controller.debugViewModel.regenerateAtMessage(messages.last),
+            isTrue,
+          );
+          await waitFor(
+            () =>
+                streamRequestCount == 3 &&
+                !controller.chatController.isConversationLoading(
+                  conversation.id,
+                ),
+            'regeneration after restart',
+          );
+          expect(streamRequests.last['model'], display.modelId);
+          expect(
+            service.getConversation(conversation.id)!.assistantId,
+            'missing-assistant',
+          );
+        });
+        await tester.pumpWidget(const SizedBox());
+        expect(tester.takeException(), isNull);
+      },
+    );
   }
 
   testWidgets('concurrent sends persist a single user/assistant pair', (

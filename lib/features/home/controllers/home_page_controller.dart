@@ -1116,11 +1116,12 @@ class HomePageController extends ChangeNotifier {
           // Assistant restore and window load are independent; the message
           // list already tolerates a one-frame missing-assistant fallback.
           final restoreAssistant = Future<void>(() async {
-            if ((recent.assistantId ?? '').isNotEmpty) {
+            final assistant = assistantProvider.resolveConversationAssistant(
+              recent.assistantId,
+            );
+            if (assistant != null) {
               try {
-                await assistantProvider.setCurrentAssistant(
-                  recent.assistantId!,
-                );
+                await assistantProvider.setCurrentAssistant(assistant.id);
               } catch (_) {}
             }
           });
@@ -2196,8 +2197,9 @@ class HomePageController extends ChangeNotifier {
         : _chatService.getConversation(input.draftSubmission!.conversationId);
     if (conversation == null) return null;
     final assistants = _context.read<AssistantProvider>();
-    final assistant = assistants.getById(conversation.assistantId ?? '');
-    if (conversation.assistantId != null && assistant == null) return null;
+    final assistant = assistants.resolveConversationAssistant(
+      conversation.assistantId,
+    );
     final parts = await MessageGenerationService.buildPersistedUserMessageParts(
       input,
       assistant: assistant,

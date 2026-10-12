@@ -257,9 +257,7 @@ Future<ModelSelection?> showModelSelectorWithCurrentChatFallback(
       : chats.getConversation(conversationId);
   final assistants = context.read<AssistantProvider>();
   final assistantId = conversation?.assistantId;
-  final assistant = assistantId != null
-      ? assistants.getById(assistantId)
-      : assistants.currentAssistant;
+  final assistant = assistants.resolveConversationAssistant(assistantId);
   final current = resolveChatModel(
     settings,
     conversation: conversation,
@@ -297,9 +295,11 @@ Future<void> showModelSelectSheet(
 }) async {
   final settings = context.read<SettingsProvider>();
   final assistantProvider = context.read<AssistantProvider>();
-  final assistant = assistantProvider.currentAssistant;
   final perChat = settings.perChatModelEnabled;
   final conversation = controller.currentConversation;
+  final assistant = assistantProvider.resolveConversationAssistant(
+    conversation?.assistantId,
+  );
   final resolved = resolveChatModel(
     settings,
     conversation: conversation,

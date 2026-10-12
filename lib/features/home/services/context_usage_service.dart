@@ -844,9 +844,7 @@ class ContextUsageService extends ChangeNotifier {
     final conversation = _chatService.getConversation(conversationId);
     if (conversation == null) return null;
     final assistantId = conversation.assistantId;
-    final assistant = assistantId == null
-        ? _assistants.currentAssistant
-        : _assistants.getById(assistantId);
+    final assistant = _assistants.resolveConversationAssistant(assistantId);
     final model = resolveChatModel(
       _settings,
       conversation: conversation,

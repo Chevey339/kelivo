@@ -90,6 +90,40 @@ void main() {
     },
   );
 
+  test(
+    'invalid assistant writes cannot replace the last readable snapshot',
+    () async {
+      final preferences = BusinessPreferences(repository);
+      await preferences.load();
+      final source = jsonEncode([
+        {'id': 'original-id', 'name': 'Original'},
+      ]);
+      await preferences.setString('assistants_v1', source);
+
+      await expectLater(
+        preferences.setString(
+          'assistants_v1',
+          jsonEncode([
+            {
+              'id': 'replacement-id',
+              'name': 'Invalid',
+              'skillIds': 'not-a-list',
+            },
+          ]),
+        ),
+        throwsFormatException,
+      );
+      expect(preferences.getString('assistants_v1'), source);
+      final stored = await repository.readEntities(
+        BusinessEntityKind.assistant,
+      );
+      expect(stored.single.id, 'original-id');
+      final reloaded = BusinessPreferences(repository);
+      await reloaded.load();
+      expect(reloaded.getString('assistants_v1'), source);
+    },
+  );
+
   test('successful restore fence rejects late business writes', () async {
     final preferences = BusinessPreferences(repository);
     await preferences.load();
