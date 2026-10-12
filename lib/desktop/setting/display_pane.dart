@@ -51,6 +51,8 @@ class _DisplaySettingsBody extends StatelessWidget {
                   _AppLanguageRow(),
                   _RowDivider(),
                   _ChatFontSizeRow(),
+                  _RowDivider(),
+                  _ChatLineHeightRow(),
                 ],
               ),
               const SizedBox(height: 16),
@@ -1744,6 +1746,54 @@ class _ChatFontSizeRowState extends State<_ChatFontSizeRow> {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _ChatLineHeightRow extends StatefulWidget {
+  const _ChatLineHeightRow();
+  @override
+  State<_ChatLineHeightRow> createState() => _ChatLineHeightRowState();
+}
+
+class _ChatLineHeightRowState extends State<_ChatLineHeightRow> {
+  late final TextEditingController _controller;
+  @override
+  void initState() {
+    super.initState();
+    final height = context.read<SettingsProvider>().chatLineHeight;
+    _controller = TextEditingController(text: height.toStringAsFixed(2));
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _commit(String text) {
+    final n = double.tryParse(text.trim());
+    if (n == null) return;
+    final clamped = n.clamp(1.2, 2.0);
+    context.read<SettingsProvider>().setChatLineHeight(clamped);
+    _controller.text = clamped.toStringAsFixed(2);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    return _LabeledRow(
+      label: l10n.displaySettingsPageChatLineHeightTitle,
+      trailing: IntrinsicWidth(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(minWidth: 36, maxWidth: 72),
+          child: _BorderInput(
+            controller: _controller,
+            onSubmitted: _commit,
+            onFocusLost: _commit,
+          ),
+        ),
       ),
     );
   }

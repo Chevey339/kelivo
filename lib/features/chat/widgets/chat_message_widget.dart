@@ -2061,14 +2061,17 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
         defaultTargetPlatform == TargetPlatform.windows ||
         defaultTargetPlatform == TargetPlatform.linux;
     final double baseUser = isDesktop ? 14.0 : 15.5;
+    final lineHeight = context.select<SettingsProvider, double>(
+      (s) => s.chatLineHeight,
+    );
 
     Widget content;
     if (enableUserMarkdown) {
       content = DefaultTextStyle.merge(
-        style: TextStyle(fontSize: baseUser, height: 1.45),
+        style: TextStyle(fontSize: baseUser, height: lineHeight),
         child: MarkdownWithCodeHighlight(
           text: visualText,
-          baseStyle: TextStyle(fontSize: baseUser, height: 1.45),
+          baseStyle: TextStyle(fontSize: baseUser, height: lineHeight),
           conversationId: widget.message.conversationId,
         ),
       );
@@ -2077,7 +2080,7 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
         visualText,
         style: TextStyle(
           fontSize: baseUser,
-          height: 1.4,
+          height: lineHeight,
           color: chatSurfacePlainTextColor(context, isUser: true),
         ),
       );
@@ -2091,11 +2094,11 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
     }
 
     if (collapseChars > 0 && visualText.length > collapseChars) {
-      final lineHeight =
-          MediaQuery.textScalerOf(context).scale(baseUser) * 1.45;
+      final linePixels =
+          MediaQuery.textScalerOf(context).scale(baseUser) * lineHeight;
       content = CollapsibleUserText(
         key: ValueKey('user-collapse:${widget.message.id}'),
-        collapsedHeight: lineHeight * _collapsedUserTextLines,
+        collapsedHeight: linePixels * _collapsedUserTextLines,
         child: content,
       );
     }
@@ -2517,6 +2520,9 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
         defaultTargetPlatform == TargetPlatform.windows ||
         defaultTargetPlatform == TargetPlatform.linux;
     final double baseAssistant = isDesktop ? 14.0 : 15.7;
+    final lineHeight = context.select<SettingsProvider, double>(
+      (s) => s.chatLineHeight,
+    );
 
     Widget assistantContent;
     if (enableAssistantMarkdown) {
@@ -2525,7 +2531,7 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
         onCitationTap: (id) => _handleCitationTap(id),
         citationIndexResolver: (id) =>
             _resolveCitationIndex(id, citationIndexLookup),
-        baseStyle: TextStyle(fontSize: baseAssistant, height: 1.5),
+        baseStyle: TextStyle(fontSize: baseAssistant, height: lineHeight),
         streaming: widget.message.isStreaming,
         conversationId: widget.message.conversationId,
       );
@@ -2534,7 +2540,7 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
         visualContent,
         style: TextStyle(
           fontSize: baseAssistant,
-          height: 1.5,
+          height: lineHeight,
           color: chatSurfacePlainTextColor(context),
         ),
       );
@@ -2561,7 +2567,7 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
               : 'assistant_${widget.message.id}_$contentKey',
         ),
         child: DefaultTextStyle.merge(
-          style: TextStyle(fontSize: baseAssistant, height: 1.5),
+          style: TextStyle(fontSize: baseAssistant, height: lineHeight),
           child: assistantContent,
         ),
       ),
