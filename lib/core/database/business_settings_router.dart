@@ -571,6 +571,7 @@ final class BusinessSettingsRouter {
             'apiKey',
             'oauthProvider',
             'oauthModelsSyncedAt',
+            'oauthModelsClientVersion',
             'baseUrl',
             'chatPath',
             'location',

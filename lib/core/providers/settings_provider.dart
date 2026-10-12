@@ -6085,6 +6085,7 @@ class ProviderConfig {
   final OAuthProvider? oauthProvider;
   final ProviderOAuthCredentials? oauthCredentials;
   final DateTime? oauthModelsSyncedAt;
+  final String? oauthModelsClientVersion;
   bool get isOAuth => oauthProvider != null;
   final String baseUrl;
   final ProviderKind?
@@ -6179,6 +6180,7 @@ class ProviderConfig {
     this.oauthProvider,
     this.oauthCredentials,
     this.oauthModelsSyncedAt,
+    this.oauthModelsClientVersion,
     required this.baseUrl,
     this.providerType,
     this.chatPath,
@@ -6232,6 +6234,7 @@ class ProviderConfig {
     OAuthProvider? oauthProvider,
     Object? oauthCredentials = _sentinel,
     DateTime? oauthModelsSyncedAt,
+    Object? oauthModelsClientVersion = _sentinel,
     String? baseUrl,
     ProviderKind? providerType,
     String? chatPath,
@@ -6272,6 +6275,9 @@ class ProviderConfig {
         ? this.oauthCredentials
         : oauthCredentials as ProviderOAuthCredentials?,
     oauthModelsSyncedAt: oauthModelsSyncedAt ?? this.oauthModelsSyncedAt,
+    oauthModelsClientVersion: identical(oauthModelsClientVersion, _sentinel)
+        ? this.oauthModelsClientVersion
+        : oauthModelsClientVersion as String?,
     baseUrl: baseUrl ?? this.baseUrl,
     providerType: providerType ?? this.providerType,
     chatPath: chatPath ?? this.chatPath,
@@ -6321,6 +6327,8 @@ class ProviderConfig {
       'oauthCredentials': oauthCredentials!.toJson(),
     if (oauthModelsSyncedAt != null)
       'oauthModelsSyncedAt': oauthModelsSyncedAt!.toIso8601String(),
+    if (oauthModelsClientVersion != null)
+      'oauthModelsClientVersion': oauthModelsClientVersion,
     'baseUrl': baseUrl,
     'providerType': providerType?.name,
     'chatPath': chatPath,
@@ -6371,6 +6379,7 @@ class ProviderConfig {
     oauthModelsSyncedAt: DateTime.tryParse(
       json['oauthModelsSyncedAt'] as String? ?? '',
     ),
+    oauthModelsClientVersion: json['oauthModelsClientVersion'] as String?,
     baseUrl: json['baseUrl'] as String? ?? '',
     providerType: json['providerType'] != null
         ? ProviderKind.values.firstWhere(

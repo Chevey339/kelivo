@@ -745,6 +745,17 @@ void main() {
       }
     });
 
+    test('rejects a non-string OAuth model cache version', () {
+      expect(
+        () => BusinessSettingsRouter.normalizeAndRoute({
+          'provider_configs_v1': jsonEncode({
+            'account': {'oauthModelsClientVersion': 159},
+          }),
+        }),
+        throwsFormatException,
+      );
+    });
+
     test('rejects entity fields that runtime models cannot decode', () {
       final invalidBySourceKey = <String, Object>{
         'assistants_v1': [
