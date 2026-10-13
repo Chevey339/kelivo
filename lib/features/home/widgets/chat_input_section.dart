@@ -13,8 +13,8 @@ import '../../../core/services/model_spec/model_spec_resolver.dart';
 import '../../../core/models/workspace_binding.dart';
 import '../../../core/models/skills_binding.dart';
 import '../../../core/models/plan_mode_binding.dart';
+import '../../../icons/lucide_adapter.dart';
 import '../../../l10n/app_localizations.dart';
-import '../../../theme/icons.dart';
 import '../../../core/providers/asr_provider.dart';
 import '../../../core/providers/settings_provider.dart';
 import '../../../core/providers/assistant_provider.dart';
@@ -189,9 +189,10 @@ class ChatInputSection extends StatelessWidget {
       workspaceBound = _isWorkspaceBound(context);
     }
 
-    final planModeBinding = conversationId != null
+    final convId = conversationId;
+    final planModeBinding = convId != null
         ? PlanModeBinding.fromExtras(
-            context.watch<ChatService>().getConversation(conversationId)?.extras ??
+            context.watch<ChatService>().getConversation(convId)?.extras ??
                 const {},
           )
         : const PlanModeBinding();
@@ -210,15 +211,15 @@ class ChatInputSection extends StatelessWidget {
       showWorkspaceButton: showWorkspaceButton,
       workspaceActive: workspaceBound,
       planModeActive: planModeBinding.isPlanMode,
-      onTogglePlanMode: conversationId == null
+      onTogglePlanMode: convId == null
           ? null
           : () {
               final chatService = context.read<ChatService>();
               final current = PlanModeBinding.fromExtras(
-                chatService.getConversation(conversationId)?.extras ?? const {},
+                chatService.getConversation(convId)?.extras ?? const {},
               );
               chatService.updateConversationExtras(
-                conversationId,
+                convId,
                 (extras) => current
                     .copyWith(isPlanMode: !current.isPlanMode)
                     .applyTo(extras),
@@ -295,11 +296,11 @@ class ChatInputSection extends StatelessWidget {
       inputBackgroundOpacityDark: settings.chatInputBackgroundOpacityDark,
     );
 
-    final showPlanModeBanner = planModeBinding.isPlanMode && conversationId != null;
+    final showPlanModeBanner = planModeBinding.isPlanMode && convId != null;
 
     if (!showEnvChip && !showPlanModeBanner) return bar;
     final theme = Theme.of(context);
-    final l10n = AppLocalizations.of(context);
+    final l10n = AppLocalizations.of(context)!;
     return Column(
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -344,11 +345,11 @@ class ChatInputSection extends StatelessWidget {
                     onTap: () {
                       final chatService = context.read<ChatService>();
                       final current = PlanModeBinding.fromExtras(
-                        chatService.getConversation(conversationId)?.extras ??
+                        chatService.getConversation(convId)?.extras ??
                             const {},
                       );
                       chatService.updateConversationExtras(
-                        conversationId,
+                        convId,
                         (extras) => current
                             .copyWith(isPlanMode: false)
                             .applyTo(extras),
