@@ -5,6 +5,7 @@ import 'package:flutter/widgets.dart';
 import 'package:provider/provider.dart';
 import '../../../core/models/assistant.dart';
 import '../../../core/models/model_spec.dart';
+import '../../../core/models/plan_mode_binding.dart';
 import '../../../core/models/reasoning_request.dart';
 import '../../../core/providers/assistant_provider.dart';
 import '../../../core/providers/environment_provider.dart';
@@ -70,9 +71,23 @@ class ToolHandlerService {
             ?.loadExecutionConfig,
         isToolEnabled: (id, name) =>
             workspaces.byId(id)?.isToolEnabled(name) ?? false,
+        isPlanMode: _isPlanMode,
       );
     } catch (_) {
-      return WorkspaceToolsService();
+      return WorkspaceToolsService(isPlanMode: _isPlanMode);
+    }
+  }
+
+  bool _isPlanMode(String? conversationId) {
+    try {
+      final chatService = contextProvider.read<ChatService>();
+      final targetId = conversationId ?? chatService.currentConversationId;
+      if (targetId == null) return false;
+      final conversation = chatService.getConversation(targetId);
+      if (conversation == null) return false;
+      return PlanModeBinding.fromExtras(conversation.extras).isPlanMode;
+    } catch (_) {
+      return false;
     }
   }
 
@@ -309,6 +324,7 @@ class ToolHandlerService {
     );
     toolDefs.addAll(mcpTools);
 
+    final isPlan = _isPlanMode(conversationId);
     if (supportsTools && workspaceContext != null) {
       final canImageInput = ModelSpecResolver.instance
           .spec(settings.getProviderConfig(providerKey), modelId)
@@ -316,7 +332,7 @@ class ToolHandlerService {
           .contains(Modality.image);
       toolDefs.addAll(
         _workspaceTools()
-            .buildToolDefinitions(workspaceContext)
+            .buildToolDefinitions(workspaceContext, isPlanMode: isPlan)
             .where(
               (definition) =>
                   canImageInput ||

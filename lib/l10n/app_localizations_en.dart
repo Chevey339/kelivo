@@ -13051,4 +13051,34 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get mcpOAuthExchangingToken => 'Completing sign-in…';
+
+  @override
+  String get planModeTitle => 'Plan Mode';
+
+  @override
+  String get planModeTooltip => 'Plan Mode (Exploration & Planning only)';
+
+  @override
+  String get planModeActiveBanner => 'Plan Mode Active · Read-only exploration & planning';
+
+  @override
+  String get planModeExit => 'Exit Plan Mode';
+
+  @override
+  String get planModeImplementPlan => 'Implement Plan';
+
+  @override
+  String get planModeImplementPlanTooltip => 'Switch to execution mode and implement this plan';
+
+  @override
+  String get planModeImplementInNewChat => 'Clear Context & Implement';
+
+  @override
+  String get planModeImplementInNewChatTooltip => 'Start a fresh chat with this plan to keep context clean and focused';
+
+  @override
+  String get planModeRevisePlan => 'Revise Plan';
+
+  @override
+  String get planModeReadOnlyError => 'Write operations and shell execution are forbidden in Plan Mode. Please formulate your plan and request user approval.';
 }

@@ -12458,6 +12458,36 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get mcpOAuthExchangingToken => '正在完成登录…';
+
+  @override
+  String get planModeTitle => '计划模式';
+
+  @override
+  String get planModeTooltip => '计划模式（仅探索与方案规划）';
+
+  @override
+  String get planModeActiveBanner => '计划模式已激活 · 仅探索与方案规划';
+
+  @override
+  String get planModeExit => '退出计划模式';
+
+  @override
+  String get planModeImplementPlan => '批准并执行';
+
+  @override
+  String get planModeImplementPlanTooltip => '切换到执行模式并立即执行此计划';
+
+  @override
+  String get planModeImplementInNewChat => '新会话中执行';
+
+  @override
+  String get planModeImplementInNewChatTooltip => '在新会话中仅带入此计划，保持上下文纯净并高质实现';
+
+  @override
+  String get planModeRevisePlan => '调整计划';
+
+  @override
+  String get planModeReadOnlyError => '计划模式下禁止文件修改和命令执行。请继续完善方案并请求用户审批。';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hans`).
@@ -37301,4 +37331,34 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get mcpOAuthExchangingToken => '正在完成登入…';
+
+  @override
+  String get planModeTitle => '計劃模式';
+
+  @override
+  String get planModeTooltip => '計劃模式（僅探索與方案規劃）';
+
+  @override
+  String get planModeActiveBanner => '計劃模式已啟用 · 僅探索與方案規劃';
+
+  @override
+  String get planModeExit => '退出計劃模式';
+
+  @override
+  String get planModeImplementPlan => '批准並執行';
+
+  @override
+  String get planModeImplementPlanTooltip => '切換至執行模式並立即執行此計劃';
+
+  @override
+  String get planModeImplementInNewChat => '新對話中執行';
+
+  @override
+  String get planModeImplementInNewChatTooltip => '在新對話中僅帶入此計劃，保持上下文純淨並高質實作';
+
+  @override
+  String get planModeRevisePlan => '調整計劃';
+
+  @override
+  String get planModeReadOnlyError => '計劃模式下禁止檔案修改和命令執行。請繼續完善方案並請求使用者審批。';
 }

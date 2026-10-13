@@ -51,6 +51,7 @@ class WorkspaceToolsService {
     this.onShellCompleted,
     this.isToolEnabled,
     this.loadEnvironment,
+    this.isPlanMode,
   }) : registry = registry ?? ToolRunRegistry(),
        runtimeProvider = runtimeProvider ?? WorkspaceRuntimeProvider();
 
@@ -85,6 +86,7 @@ class WorkspaceToolsService {
   final Future<void> Function()? onShellCompleted;
   final bool Function(String workspaceId, String tool)? isToolEnabled;
   final Future<EnvironmentExecutionConfig> Function()? loadEnvironment;
+  final bool Function(String? conversationId)? isPlanMode;
 
   bool _enabled(WorkspaceToolContext ctx, String name) =>
       isToolEnabled?.call(ctx.workspace.id, name) ??
@@ -157,7 +159,10 @@ class WorkspaceToolsService {
     );
   }
 
-  List<Map<String, dynamic>> buildToolDefinitions(WorkspaceToolContext ctx) {
+  List<Map<String, dynamic>> buildToolDefinitions(
+    WorkspaceToolContext ctx, {
+    bool isPlanMode = false,
+  }) {
     if (ctx.skillsOnly) {
       return [
         _fn(
@@ -191,8 +196,14 @@ class WorkspaceToolsService {
               : '${ctx.paths.sessionHostDir}/outputs/<id>.txt',
         )
         .where(
-          (definition) =>
-              _enabled(ctx, (definition['function'] as Map)['name'] as String),
+          (definition) {
+            final name = (definition['function'] as Map)['name'] as String;
+            if (isPlanMode &&
+                const {'write_file', 'edit_file', 'shell'}.contains(name)) {
+              return false;
+            }
+            return _enabled(ctx, name);
+          },
         )
         .toList();
   }
@@ -504,6 +515,16 @@ class WorkspaceToolsService {
         tool: name,
         error: 'tool_disabled',
         message: 'This tool is disabled for the workspace',
+      );
+    }
+    if (isPlanMode?.call(conversationId) == true &&
+        const {'write_file', 'edit_file', 'shell'}.contains(name)) {
+      return _errorResult(
+        tool: name,
+        error: 'plan_mode_readonly',
+        message:
+            'Write operations and shell execution are forbidden in Plan Mode. '
+            'Please explore and formulate your plan, then ask for user approval.',
       );
     }
     try {

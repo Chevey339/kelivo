@@ -29,6 +29,7 @@ import '../../../core/services/memory/memory_block_builder.dart';
 import '../../../core/services/memory/memory_prompts.dart';
 import '../../../core/services/memory/memory_snapshot.dart';
 import '../../../core/models/skills_binding.dart';
+import '../../../core/models/plan_mode_binding.dart';
 import '../../../core/providers/workspace_provider.dart';
 import '../../../core/services/search/search_tool_service.dart';
 import '../../../core/services/skills/skills_service.dart';
@@ -2135,6 +2136,43 @@ class MessageBuilderService {
         source: ContextSource.skills,
       );
     } catch (_) {}
+  }
+
+  /// Inject the Plan Mode prompt when enabled for the current conversation.
+  void injectPlanModePrompt(
+    List<Map<String, dynamic>> apiMessages, {
+    String? conversationId,
+    bool? isPlanMode,
+  }) {
+    final bool active = isPlanMode ??
+        (conversationId != null &&
+            PlanModeBinding.fromExtras(
+              chatService.getConversation(conversationId)?.extras ?? const {},
+            ).isPlanMode);
+    if (!active) return;
+
+    const prompt = '''
+<plan_mode>
+You are currently operating in PLAN MODE.
+Your primary objective is to thoroughly investigate the user request, explore the codebase, and formulate a complete, rigorous, and actionable plan.
+
+CRITICAL RULES & CONSTRAINTS:
+1. STRICT READ-ONLY: You can only use read-only inspection tools (e.g. read_file, list_dir, glob, grep, search, fetch_web_content). You are strictly forbidden from writing, editing, creating, or deleting files, or executing mutating shell commands.
+2. EXPLORE FIRST: Read and inspect relevant code files, configuration, schemas, and directory layouts first to eliminate unknowns before proposing a plan or asking questions.
+3. DECISION COMPLETE: Formulate the implementation plan so it is "decision complete" — resolve all key architectural choices, data structures, and edge cases so the implementation phase requires no further design decisions.
+4. PROPOSED PLAN OUTPUT: When you have formulated the plan, enclose your complete specification within <proposed_plan> and </proposed_plan> tags. Include:
+   - Summary of changes
+   - Files to create, modify, or delete
+   - Step-by-step implementation details
+   - Verification and testing steps
+5. DO NOT PROCEED TO EXECUTION: Once the plan is presented, request user review and approval. Do not attempt to make code modifications until the user explicitly approves the plan.
+</plan_mode>''';
+
+    _appendToSystemMessage(
+      apiMessages,
+      prompt,
+      source: ContextSource.planMode,
+    );
   }
 
   /// Inject world book (lorebook) entries into apiMessages.

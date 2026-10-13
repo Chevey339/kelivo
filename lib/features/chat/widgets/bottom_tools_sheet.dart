@@ -6,6 +6,8 @@ import 'package:provider/provider.dart';
 
 import '../../../core/models/assistant.dart';
 import '../../../core/models/skills_binding.dart';
+import '../../../core/models/plan_mode_binding.dart';
+import '../../../shared/widgets/ios_switch.dart';
 import '../../../core/providers/assistant_provider.dart';
 import '../../../core/providers/instruction_injection_provider.dart';
 import '../../../core/services/chat/chat_service.dart';
@@ -344,6 +346,52 @@ class _LearningAndClearSectionState extends State<_LearningAndClearSection> {
             });
           },
           trailing: selectionTrailing(enabledSkillCount, skills.skills.length),
+        ),
+        const SizedBox(height: 8),
+        ToolsSheetRow(
+          icon: Lucide.ListTodo,
+          label: l10n.planModeTitle,
+          onTap: () {
+            Haptics.light();
+            final convId = widget.conversationId;
+            if (convId != null) {
+              final chatService = context.read<ChatService>();
+              final current = PlanModeBinding.fromExtras(
+                chatService.getConversation(convId)?.extras ?? const {},
+              );
+              chatService.updateConversationExtras(
+                convId,
+                (extras) => current
+                    .copyWith(isPlanMode: !current.isPlanMode)
+                    .applyTo(extras),
+              );
+              setState(() {});
+            }
+          },
+          trailing: IosSwitch(
+            value: widget.conversationId != null &&
+                PlanModeBinding.fromExtras(
+                  context
+                          .read<ChatService>()
+                          .getConversation(widget.conversationId!)
+                          ?.extras ??
+                      const {},
+                ).isPlanMode,
+            onChanged: (val) {
+              final convId = widget.conversationId;
+              if (convId != null) {
+                final chatService = context.read<ChatService>();
+                final current = PlanModeBinding.fromExtras(
+                  chatService.getConversation(convId)?.extras ?? const {},
+                );
+                chatService.updateConversationExtras(
+                  convId,
+                  (extras) => current.copyWith(isPlanMode: val).applyTo(extras),
+                );
+                setState(() {});
+              }
+            },
+          ),
         ),
         const SizedBox(height: 8),
         ToolsSheetRow(

@@ -4568,5 +4568,15 @@
   "mcpOAuthDiscovering": "正在探索授權伺服器…",
   "mcpOAuthRegistering": "正在準備授權…",
   "mcpOAuthWaitingBrowser": "等待瀏覽器授權…",
-  "mcpOAuthExchangingToken": "正在完成登入…"
+  "mcpOAuthExchangingToken": "正在完成登入…",
+  "planModeTitle": "計劃模式",
+  "planModeTooltip": "計劃模式（僅探索與方案規劃）",
+  "planModeActiveBanner": "計劃模式已啟用 · 僅探索與方案規劃",
+  "planModeExit": "退出計劃模式",
+  "planModeImplementPlan": "批准並執行",
+  "planModeImplementPlanTooltip": "切換至執行模式並立即執行此計劃",
+  "planModeImplementInNewChat": "新對話中執行",
+  "planModeImplementInNewChatTooltip": "在新對話中僅帶入此計劃，保持上下文純淨並高質實作",
+  "planModeRevisePlan": "調整計劃",
+  "planModeReadOnlyError": "計劃模式下禁止檔案修改和命令執行。請繼續完善方案並請求使用者審批。"
 }

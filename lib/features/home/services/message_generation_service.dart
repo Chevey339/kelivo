@@ -311,6 +311,10 @@ class MessageGenerationService {
       conversationId: currentConversation?.id,
       workspaceContext: workspaceContext,
     );
+    messageBuilderService.injectPlanModePrompt(
+      apiMessages,
+      conversationId: currentConversation?.id,
+    );
 
     messageBuilderService.applyContextLimit(apiMessages, assistant);
 

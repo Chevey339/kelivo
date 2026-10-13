@@ -1,4 +1,5 @@
 # Miscellaneous
+.zcode/
 *.class
 *.log
 *.pyc

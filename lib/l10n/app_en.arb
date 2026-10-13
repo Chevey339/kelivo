@@ -5745,5 +5745,15 @@
   "mcpOAuthDiscovering": "Discovering authorization server…",
   "mcpOAuthRegistering": "Preparing authorization…",
   "mcpOAuthWaitingBrowser": "Waiting for browser authorization…",
-  "mcpOAuthExchangingToken": "Completing sign-in…"
+  "mcpOAuthExchangingToken": "Completing sign-in…",
+  "planModeTitle": "Plan Mode",
+  "planModeTooltip": "Plan Mode (Exploration & Planning only)",
+  "planModeActiveBanner": "Plan Mode Active · Read-only exploration & planning",
+  "planModeExit": "Exit Plan Mode",
+  "planModeImplementPlan": "Implement Plan",
+  "planModeImplementPlanTooltip": "Switch to execution mode and implement this plan",
+  "planModeImplementInNewChat": "Clear Context & Implement",
+  "planModeImplementInNewChatTooltip": "Start a fresh chat with this plan to keep context clean and focused",
+  "planModeRevisePlan": "Revise Plan",
+  "planModeReadOnlyError": "Write operations and shell execution are forbidden in Plan Mode. Please formulate your plan and request user approval."
 }

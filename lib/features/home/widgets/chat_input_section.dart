@@ -12,6 +12,9 @@ import '../../../core/services/api/reasoning/reasoning_selection.dart';
 import '../../../core/services/model_spec/model_spec_resolver.dart';
 import '../../../core/models/workspace_binding.dart';
 import '../../../core/models/skills_binding.dart';
+import '../../../core/models/plan_mode_binding.dart';
+import '../../../l10n/app_localizations.dart';
+import '../../../theme/icons.dart';
 import '../../../core/providers/asr_provider.dart';
 import '../../../core/providers/settings_provider.dart';
 import '../../../core/providers/assistant_provider.dart';
@@ -186,6 +189,13 @@ class ChatInputSection extends StatelessWidget {
       workspaceBound = _isWorkspaceBound(context);
     }
 
+    final planModeBinding = conversationId != null
+        ? PlanModeBinding.fromExtras(
+            context.watch<ChatService>().getConversation(conversationId)?.extras ??
+                const {},
+          )
+        : const PlanModeBinding();
+
     final bar = ChatInputBar(
       key: inputBarKey,
       chatModelProviderKey: pk,
@@ -199,6 +209,21 @@ class ChatInputSection extends StatelessWidget {
       onOpenWorkspace: onOpenWorkspace,
       showWorkspaceButton: showWorkspaceButton,
       workspaceActive: workspaceBound,
+      planModeActive: planModeBinding.isPlanMode,
+      onTogglePlanMode: conversationId == null
+          ? null
+          : () {
+              final chatService = context.read<ChatService>();
+              final current = PlanModeBinding.fromExtras(
+                chatService.getConversation(conversationId)?.extras ?? const {},
+              );
+              chatService.updateConversationExtras(
+                conversationId,
+                (extras) => current
+                    .copyWith(isPlanMode: !current.isPlanMode)
+                    .applyTo(extras),
+              );
+            },
       onOpenSkills: isDesktop ? onOpenSkills : null,
       skillsActive:
           isDesktop && onOpenSkills != null && _isSkillsActive(context, a),
@@ -270,11 +295,84 @@ class ChatInputSection extends StatelessWidget {
       inputBackgroundOpacityDark: settings.chatInputBackgroundOpacityDark,
     );
 
-    if (!showEnvChip || !workspaceBound) return bar;
+    final showPlanModeBanner = planModeBinding.isPlanMode && conversationId != null;
+
+    if (!showEnvChip && !showPlanModeBanner) return bar;
+    final theme = Theme.of(context);
+    final l10n = AppLocalizations.of(context);
     return Column(
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        if (showPlanModeBanner)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(
+              AppSpacing.sm,
+              0,
+              AppSpacing.sm,
+              AppSpacing.xxs,
+            ),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              decoration: BoxDecoration(
+                color: theme.colorScheme.primaryContainer.withValues(alpha: 0.7),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(
+                  color: theme.colorScheme.primary.withValues(alpha: 0.3),
+                  width: 1,
+                ),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    Lucide.ListTodo,
+                    size: 14,
+                    color: theme.colorScheme.primary,
+                  ),
+                  const SizedBox(width: 6),
+                  Text(
+                    l10n.planModeActiveBanner,
+                    style: theme.textTheme.labelMedium?.copyWith(
+                      color: theme.colorScheme.onPrimaryContainer,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  InkWell(
+                    borderRadius: BorderRadius.circular(4),
+                    onTap: () {
+                      final chatService = context.read<ChatService>();
+                      final current = PlanModeBinding.fromExtras(
+                        chatService.getConversation(conversationId)?.extras ??
+                            const {},
+                      );
+                      chatService.updateConversationExtras(
+                        conversationId,
+                        (extras) => current
+                            .copyWith(isPlanMode: false)
+                            .applyTo(extras),
+                      );
+                    },
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 4,
+                        vertical: 2,
+                      ),
+                      child: Text(
+                        l10n.planModeExit,
+                        style: theme.textTheme.labelSmall?.copyWith(
+                          color: theme.colorScheme.primary,
+                          decoration: TextDecoration.underline,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
         if (showEnvChip && workspaceBound)
           Padding(
             padding: const EdgeInsets.fromLTRB(

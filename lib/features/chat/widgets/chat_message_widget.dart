@@ -15,6 +15,7 @@ import 'package:open_filex/open_filex.dart';
 import 'dart:convert';
 import '../../home/widgets/file_processing_indicator.dart';
 import '../pages/image_viewer_page.dart';
+import 'proposed_plan_card.dart';
 import '../../../core/models/chat_message.dart';
 import '../../../core/models/message_part.dart';
 import '../../../icons/lucide_adapter.dart';
@@ -3550,6 +3551,29 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
                       ),
                     ),
             ),
+            if (!widget.message.isStreaming) ...[
+              Builder(
+                builder: (context) {
+                  final planExtraction =
+                      ProposedPlanExtractor.extract(widget.message.content);
+                  if (planExtraction.hasPlan &&
+                      planExtraction.planContent != null &&
+                      planExtraction.planContent!.isNotEmpty) {
+                    return Padding(
+                      padding: const EdgeInsets.only(top: 8),
+                      child: ProposedPlanCard(
+                        planMarkdown: planExtraction.planContent!,
+                        conversationId: widget.message.conversationId,
+                        onImplementPlan: () {
+                          widget.onSuggestionTap?.call('Implement the plan.');
+                        },
+                      ),
+                    );
+                  }
+                  return const SizedBox.shrink();
+                },
+              ),
+            ],
             if (!widget.message.isStreaming &&
                 widget.suggestions.isNotEmpty &&
                 widget.onSuggestionTap != null) ...[
