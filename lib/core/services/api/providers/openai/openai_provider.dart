@@ -327,6 +327,9 @@ Stream<StreamChunk> sendOpenAIStream(
       }
 
       final isAssistant = roleRaw == 'assistant';
+      // Reconstructed assistant text precedes its calls. Insert it here so
+      // no message separates a tool-call batch from its matching results.
+      final assistantMessageIndex = input.length;
 
       // Handle assistant messages with tool_calls - convert to function_call format
       if (isAssistant && m['tool_calls'] is List) {
@@ -391,7 +394,7 @@ Stream<StreamChunk> sendOpenAIStream(
         );
         if (!canImageInput) {
           if (isAssistant) {
-            input.add({
+            input.insert(assistantMessageIndex, {
               'type': 'message',
               'role': 'assistant',
               'status': 'completed',
@@ -522,7 +525,7 @@ Stream<StreamChunk> sendOpenAIStream(
           if (assistantContent.isEmpty) {
             assistantContent.add({'type': 'output_text', 'text': parsed.text});
           }
-          input.add({
+          input.insert(assistantMessageIndex, {
             'type': 'message',
             'role': 'assistant',
             'status': 'completed',
@@ -535,7 +538,7 @@ Stream<StreamChunk> sendOpenAIStream(
         // No images
         if (isAssistant) {
           // Use proper message object format for assistant messages
-          input.add({
+          input.insert(assistantMessageIndex, {
             'type': 'message',
             'role': 'assistant',
             'status': 'completed',
