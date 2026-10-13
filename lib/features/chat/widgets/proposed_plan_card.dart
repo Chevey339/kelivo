@@ -195,8 +195,8 @@ class _ProposedPlanCardState extends State<ProposedPlanCard> {
             Padding(
               padding: const EdgeInsets.all(AppSpacing.md),
               child: MarkdownWithCodeHighlight(
-                data: widget.planMarkdown,
-                selectable: true,
+                text: widget.planMarkdown,
+                conversationId: widget.conversationId,
               ),
             ),
             const Divider(height: 1),
