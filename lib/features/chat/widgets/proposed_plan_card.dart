@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
-import '../../../core/models/chat_input_data.dart';
 import '../../../core/models/plan_mode_binding.dart';
 import '../../../core/services/chat/chat_service.dart';
 import '../../../icons/lucide_adapter.dart';
@@ -100,47 +99,37 @@ class _ProposedPlanCardState extends State<ProposedPlanCard> {
     widget.onImplementPlan?.call();
   }
 
-  void _handleImplementInNewChat(BuildContext context) {
+  Future<void> _handleImplementInNewChat(BuildContext context) async {
     if (widget.onImplementInNewChat != null) {
       widget.onImplementInNewChat!.call();
       return;
     }
-    // Fallback implementation: create conversation and send the plan
     final convId = widget.conversationId;
     final chatService = context.read<ChatService>();
-    final currentConv = convId != null ? chatService.getConversation(convId) : null;
-    final newConv = chatService.createConversation(
+    final currentConv =
+        convId != null ? chatService.getConversation(convId) : null;
+    await chatService.createConversation(
       title: 'Plan: ${currentConv?.title ?? "Implementation"}',
       assistantId: currentConv?.assistantId,
-      chatModelProvider: currentConv?.chatModelProvider,
-      chatModelId: currentConv?.chatModelId,
-      extras: {
-        // Inherit workspace and skills if present, but plan mode is off
-        if (currentConv?.extras['workspace.id'] != null)
-          'workspace.id': currentConv!.extras['workspace.id'],
-        if (currentConv?.extras['workspace.cwd'] != null)
-          'workspace.cwd': currentConv!.extras['workspace.cwd'],
-        if (currentConv?.extras['skills.ids'] != null)
-          'skills.ids': currentConv!.extras['skills.ids'],
-      },
+      activate: true,
     );
-    chatService.selectConversation(newConv.id);
-
-    // Send prompt with the plan into the fresh conversation
-    final instruction =
-        'A plan was prepared to accomplish the task. '
-        'Implement the plan directly in this fresh context. '
-        'Treat this plan as the specification:\n\n${widget.planMarkdown}';
-    chatService.sendMessage(
-      newConv.id,
-      ChatInputData(text: instruction),
-    );
+    if (chatService.currentConversationId != null) {
+      chatService.updateConversationExtras(
+        chatService.currentConversationId!,
+        (extras) => PlanModeBinding.fromExtras(extras)
+            .copyWith(
+              isPlanMode: false,
+              currentPlanMarkdown: widget.planMarkdown,
+            )
+            .applyTo(extras),
+      );
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final l10n = AppLocalizations.of(context);
+    final l10n = AppLocalizations.of(context)!;
     final isDark = theme.brightness == Brightness.dark;
 
     return Container(
@@ -205,7 +194,7 @@ class _ProposedPlanCardState extends State<ProposedPlanCard> {
           if (_expanded) ...[
             Padding(
               padding: const EdgeInsets.all(AppSpacing.md),
-              child: MarkdownWithHighlight(
+              child: MarkdownWithCodeHighlight(
                 data: widget.planMarkdown,
                 selectable: true,
               ),
@@ -222,7 +211,7 @@ class _ProposedPlanCardState extends State<ProposedPlanCard> {
                   // Revise Plan
                   if (widget.onRevisePlan != null)
                     TextButton.icon(
-                      icon: const Icon(Lucide.FileEdit, size: 14),
+                      icon: const Icon(Lucide.Pencil, size: 14),
                       label: Text(l10n.planModeRevisePlan),
                       onPressed: widget.onRevisePlan,
                     ),
