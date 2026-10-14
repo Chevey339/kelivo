@@ -2858,8 +2858,13 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
     final parsedInlineThinking = _legacyInlineThinkingFor(widget);
     final extractedThinking = parsedInlineThinking.thinkingTexts.join('\n\n');
     final contentWithoutThink = parsedInlineThinking.visibleContent;
+    final planExtraction = ProposedPlanExtractor.extract(contentWithoutThink);
+    final contentToDisplay =
+        (planExtraction.hasPlan && !widget.message.isStreaming)
+            ? planExtraction.cleanedText
+            : contentWithoutThink;
     final visualContent = _applyVisualAssistantRegexes(
-      contentWithoutThink,
+      contentToDisplay,
       assistant: assistant,
       scope: AssistantRegexScope.assistant,
     );

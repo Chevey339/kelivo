@@ -351,10 +351,10 @@ class _LearningAndClearSectionState extends State<_LearningAndClearSection> {
         ToolsSheetRow(
           icon: Lucide.ListTodo,
           label: l10n.planModeTitle,
-          onTap: () {
+          onTap: () async {
             Haptics.light();
-            final convId = widget.conversationId;
-            if (convId != null) {
+            final convId = await _promptScopeId();
+            if (convId != null && mounted) {
               final chatService = context.read<ChatService>();
               final current = PlanModeBinding.fromExtras(
                 chatService.getConversation(convId)?.extras ?? const {},
@@ -369,17 +369,19 @@ class _LearningAndClearSectionState extends State<_LearningAndClearSection> {
             }
           },
           trailing: IosSwitch(
-            value: widget.conversationId != null &&
+            value: (_promptConversationId ?? widget.conversationId) != null &&
                 PlanModeBinding.fromExtras(
                   context
                           .read<ChatService>()
-                          .getConversation(widget.conversationId!)
+                          .getConversation(
+                            _promptConversationId ?? widget.conversationId!,
+                          )
                           ?.extras ??
                       const {},
                 ).isPlanMode,
-            onChanged: (val) {
-              final convId = widget.conversationId;
-              if (convId != null) {
+            onChanged: (val) async {
+              final convId = await _promptScopeId();
+              if (convId != null && mounted) {
                 final chatService = context.read<ChatService>();
                 final current = PlanModeBinding.fromExtras(
                   chatService.getConversation(convId)?.extras ?? const {},

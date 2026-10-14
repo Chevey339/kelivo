@@ -5755,5 +5755,6 @@
   "planModeImplementInNewChat": "Clear Context & Implement",
   "planModeImplementInNewChatTooltip": "Start a fresh chat with this plan to keep context clean and focused",
   "planModeRevisePlan": "Revise Plan",
-  "planModeReadOnlyError": "Write operations and shell execution are forbidden in Plan Mode. Please formulate your plan and request user approval."
+  "planModeReadOnlyError": "Write operations and shell execution are forbidden in Plan Mode. Please formulate your plan and request user approval.",
+  "planModeInputHint": "Plan Mode: Describe the feature or task to plan…"
 }

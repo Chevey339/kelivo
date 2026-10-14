@@ -102,4 +102,16 @@ Analyzing now...
       expect(ContextSourceWire.fromWire('planMode'), equals(ContextSource.planMode));
     });
   });
+
+  group('PlanMode Tail Guard Contract', () {
+    test('tail guard string contains required directives and tags', () {
+      const directive =
+          '[Active Mode: <collaboration_mode>plan</collaboration_mode>. System directive: You are operating in PLAN MODE. You are strictly forbidden from performing direct implementation or writing out complete executable code solutions directly. You must explore, clarify, or provide a structured, decision-complete plan enclosed in <proposed_plan>...</proposed_plan> tags.]';
+
+      expect(directive, contains('<collaboration_mode>plan</collaboration_mode>'));
+      expect(directive, contains('PLAN MODE'));
+      expect(directive, contains('<proposed_plan>'));
+      expect(directive, contains('decision-complete'));
+    });
+  });
 }

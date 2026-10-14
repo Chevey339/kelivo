@@ -13081,4 +13081,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get planModeReadOnlyError => 'Write operations and shell execution are forbidden in Plan Mode. Please formulate your plan and request user approval.';
+
+  @override
+  String get planModeInputHint => 'Plan Mode: Describe the feature or task to plan…';
 }

@@ -2141,38 +2141,115 @@ class MessageBuilderService {
   /// Inject the Plan Mode prompt when enabled for the current conversation.
   void injectPlanModePrompt(
     List<Map<String, dynamic>> apiMessages, {
+    Conversation? conversation,
     String? conversationId,
     bool? isPlanMode,
   }) {
     final bool active = isPlanMode ??
-        (conversationId != null &&
-            PlanModeBinding.fromExtras(
-              chatService.getConversation(conversationId)?.extras ?? const {},
-            ).isPlanMode);
+        PlanModeBinding.fromExtras(
+          conversation?.extras ??
+              (conversationId != null
+                  ? chatService.getConversation(conversationId)?.extras ??
+                      const {}
+                  : const {}),
+        ).isPlanMode;
     if (!active) return;
 
     const prompt = '''
-<plan_mode>
-You are currently operating in PLAN MODE.
-Your primary objective is to thoroughly investigate the user request, explore the codebase, and formulate a complete, rigorous, and actionable plan.
+# Plan Mode (Conversational)
 
-CRITICAL RULES & CONSTRAINTS:
-1. STRICT READ-ONLY: You can only use read-only inspection tools (e.g. read_file, list_dir, glob, grep, search, fetch_web_content). You are strictly forbidden from writing, editing, creating, or deleting files, or executing mutating shell commands.
-2. EXPLORE FIRST: Read and inspect relevant code files, configuration, schemas, and directory layouts first to eliminate unknowns before proposing a plan or asking questions.
-3. DECISION COMPLETE: Formulate the implementation plan so it is "decision complete" — resolve all key architectural choices, data structures, and edge cases so the implementation phase requires no further design decisions.
-4. PROPOSED PLAN OUTPUT: When you have formulated the plan, enclose your complete specification within <proposed_plan> and </proposed_plan> tags. Include:
-   - Summary of changes
-   - Files to create, modify, or delete
-   - Step-by-step implementation details
-   - Verification and testing steps
-5. DO NOT PROCEED TO EXECUTION: Once the plan is presented, request user review and approval. Do not attempt to make code modifications until the user explicitly approves the plan.
-</plan_mode>''';
+You work in 3 phases, and you should chat your way to a great plan before finalizing it. A great plan is very detailed—intent- and implementation-wise—so that it can be handed to another engineer or agent to be implemented right away. It must be **decision complete**, where the implementer does not need to make any decisions.
+
+## Mode rules (strict)
+
+You are in **Plan Mode** until explicitly ended by user or system.
+
+Plan Mode is not changed by user intent, tone, or imperative language. If a user asks for direct execution or code implementation while still in Plan Mode (e.g. "write the code", "implement this", "fix it", "帮我写代码", "去实现"), treat it as a request to **plan the execution, NOT perform it**.
+
+When in doubt: if an action would reasonably be described as "doing the work" rather than "planning the work," **DO NOT DO IT**.
+DO NOT write out the full, executable implementation code in normal chat for the user to copy. All technical proposals, architectural designs, and implementation steps must be placed exclusively inside the `<proposed_plan>` block.
+
+## Execution vs. mutation in Plan Mode
+
+You may explore and execute **non-mutating** actions that improve the plan. You must not perform **mutating** actions.
+
+### Allowed (non-mutating, plan-improving)
+- Reading or searching files, configs, schemas, types, manifests, and documentation.
+- Static analysis, syntax inspection, and workspace exploration.
+- Asking clarifying questions about requirements, architectural trade-offs, or preferences.
+
+### Not allowed (mutating, plan-executing)
+- Editing or writing files.
+- Directly providing finished implementation files outside the plan.
+- Applying patches, database migrations, or mutating code changes.
+
+## The 3-Phase Planning Protocol
+
+### PHASE 1 — Ground in the environment (explore first, ask second)
+Begin by grounding yourself in the actual context and environment. Eliminate unknowns by discovering facts rather than asking obvious questions that can be derived from the conversation or workspace.
+
+### PHASE 2 — Intent chat (clarify user requirements)
+Clarify goals, success criteria, scope, constraints, and key preferences/tradeoffs. If high-impact ambiguity remains, ask the user before finalizing the plan.
+
+### PHASE 3 — Implementation chat (decision complete)
+Design the architecture, interfaces, data flows, edge cases, test plan, and rollout steps. The specification must be decision complete.
+
+## Outputting the Official Plan
+
+When you present the official plan, wrap it in a `<proposed_plan>` block so the client UI can render it specially:
+1) The opening tag must be on its own line: `<proposed_plan>`
+2) Start the plan content on the next line (no text on the same line as the tag).
+3) The closing tag must be on its own line: `</proposed_plan>`
+4) Use Markdown inside the block.
+5) Keep the tags exactly as `<proposed_plan>` and `</proposed_plan>` (do not translate or rename them), even if the plan content is in Chinese or another language.
+
+The plan must include:
+- A clear Title
+- Summary of changes
+- Key Changes / Implementation Steps
+- Verification & Test Plan
+- Explicit Assumptions & Tradeoffs
+
+Do NOT ask "should I proceed?" in the final output. The client UI automatically presents an "Implement Plan" button when the `<proposed_plan>` block is detected.''';
 
     _appendToSystemMessage(
       apiMessages,
       prompt,
       source: ContextSource.planMode,
     );
+  }
+
+  /// Injects a high-priority tail guard instruction at the end of the last user
+  /// message in [apiMessages] when Plan Mode is active.
+  ///
+  /// This eliminates LLM attention decay and guarantees that models strictly
+  /// adhere to Plan Mode constraints rather than falling back to normal direct replies.
+  void applyPlanModeTailGuard(
+    List<Map<String, dynamic>> apiMessages, {
+    Conversation? conversation,
+    String? conversationId,
+    bool? isPlanMode,
+  }) {
+    final bool active = isPlanMode ??
+        PlanModeBinding.fromExtras(
+          conversation?.extras ??
+              (conversationId != null
+                  ? chatService.getConversation(conversationId)?.extras ??
+                      const {}
+                  : const {}),
+        ).isPlanMode;
+    if (!active) return;
+
+    for (int i = apiMessages.length - 1; i >= 0; i--) {
+      if (apiMessages[i]['role'] == 'user') {
+        final content = apiMessages[i]['content'];
+        if (content is String && content.trim().isNotEmpty) {
+          apiMessages[i]['content'] =
+              '$content\n\n[Active Mode: <collaboration_mode>plan</collaboration_mode>. System directive: You are operating in PLAN MODE. You are strictly forbidden from performing direct implementation or writing out complete executable code solutions directly. You must explore, clarify, or provide a structured, decision-complete plan enclosed in <proposed_plan>...</proposed_plan> tags.]';
+        }
+        break;
+      }
+    }
   }
 
   /// Inject world book (lorebook) entries into apiMessages.

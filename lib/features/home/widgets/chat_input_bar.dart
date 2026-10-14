@@ -1077,6 +1077,9 @@ class _ChatInputBarState extends State<ChatInputBar>
 
   String _hint(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
+    if (widget.planModeActive) {
+      return l10n.planModeInputHint;
+    }
     return l10n.chatInputBarHint;
   }
 

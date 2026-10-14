@@ -23327,6 +23327,9 @@ abstract class AppLocalizations {
 
   /// No description provided for @planModeReadOnlyError.
   String get planModeReadOnlyError;
+
+  /// No description provided for @planModeInputHint.
+  String get planModeInputHint;
 }
 
 class _AppLocalizationsDelegate

@@ -12488,6 +12488,9 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get planModeReadOnlyError => '计划模式下禁止文件修改和命令执行。请继续完善方案并请求用户审批。';
+
+  @override
+  String get planModeInputHint => '计划模式：描述你想规划的需求或任务…';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hans`).
@@ -37361,4 +37364,7 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get planModeReadOnlyError => '計劃模式下禁止檔案修改和命令執行。請繼續完善方案並請求使用者審批。';
+
+  @override
+  String get planModeInputHint => '計劃模式：描述你想規劃的需求或任務…';
 }

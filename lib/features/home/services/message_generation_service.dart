@@ -313,6 +313,7 @@ class MessageGenerationService {
     );
     messageBuilderService.injectPlanModePrompt(
       apiMessages,
+      conversation: promptConversation,
       conversationId: currentConversation?.id,
     );
 
@@ -531,6 +532,12 @@ class MessageGenerationService {
         onFileProcessingFinished?.call(indicatorMessageId);
       }
     }
+
+    messageBuilderService.applyPlanModeTailGuard(
+      apiMessages,
+      conversation: currentConversation,
+      conversationId: currentConversation?.id,
+    );
 
     await messageBuilderService.inlineLocalImages(apiMessages);
     if (ContextLogger.enabled) {

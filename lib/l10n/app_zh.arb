@@ -4578,5 +4578,6 @@
   "planModeImplementInNewChat": "新会话中执行",
   "planModeImplementInNewChatTooltip": "在新会话中仅带入此计划，保持上下文纯净并高质实现",
   "planModeRevisePlan": "调整计划",
-  "planModeReadOnlyError": "计划模式下禁止文件修改和命令执行。请继续完善方案并请求用户审批。"
+  "planModeReadOnlyError": "计划模式下禁止文件修改和命令执行。请继续完善方案并请求用户审批。",
+  "planModeInputHint": "计划模式：描述你想规划的需求或任务…"
 }
