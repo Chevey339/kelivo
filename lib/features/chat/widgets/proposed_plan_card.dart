@@ -281,11 +281,11 @@ class _ProposedPlanCardState extends State<ProposedPlanCard> {
             children: [
               TextButton(
                 onPressed: () => setState(() => _showRevisionBox = false),
-                child: Text(l10n.cancel),
+                child: Text(l10n.homePageCancel),
               ),
               const SizedBox(width: 8),
               FilledButton.icon(
-                icon: const Icon(Lucide.Send, size: 14),
+                icon: const Icon(Lucide.circleArrowUp, size: 15),
                 label: Text(l10n.planModeSubmitRevision),
                 onPressed: () => _submitFeedback(_feedbackController.text),
               ),
