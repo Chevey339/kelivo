@@ -1354,7 +1354,7 @@ class ChatActions {
             messages: apiContextMessages,
             versionSelections: _versionSelections,
             currentConversation:
-                (_chatService.getConversation(conversation.id) ?? conversation)
+                (chatService.getConversation(conversation.id) ?? conversation)
                     .copyWith(truncateIndex: -1),
             settings: settings,
             assistant: assistant,
@@ -1933,7 +1933,7 @@ class ChatActions {
             messages: apiContextMessages,
             versionSelections: _versionSelections,
             currentConversation:
-                (_chatService.getConversation(conversation.id) ?? conversation)
+                (chatService.getConversation(conversation.id) ?? conversation)
                     .copyWith(truncateIndex: -1),
             settings: settings,
             assistant: assistant,
