@@ -2227,8 +2227,9 @@ You are now operating in **Default / Execution Mode** (<collaboration_mode>execu
 ## Directives:
 1. You are NO LONGER in Plan Mode. All restrictions against modifying files, writing code, or running workspace commands are completely lifted.
 2. Proactively carry out the implementation of the approved plan step-by-step using your workspace tools (e.g. `write_file`, `edit_file`, `shell`).
-3. Focus on creating the actual code files and making the required changes. Do not output repetitive plan proposals or ask for redundant confirmations.
-4. The approved plan being executed:
+3. You have access to the `update_task_progress` tool. As you work through the tasks, call `update_task_progress` to mark steps as `in_progress` or `completed` so the user can track progress in real time.
+4. Focus on creating the actual code files and making the required changes. Do not output repetitive plan proposals or ask for redundant confirmations.
+5. The approved plan being executed:
 <approved_plan>
 ${binding.currentPlanMarkdown}
 </approved_plan>''';

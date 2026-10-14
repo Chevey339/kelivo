@@ -174,9 +174,24 @@ class TaskPlanParser {
   }
 
   static String _cleanMarkdownFormatting(String text) {
-    var cleaned = text.replaceAll(RegExp(r'\*\*([^*]+)\*\*'), r'$1');
-    cleaned = cleaned.replaceAll(RegExp(r'\*([^*]+)\*'), r'$1');
-    cleaned = cleaned.replaceAll(RegExp(r'`([^`]+)`'), r'$1');
+    var cleaned = text.replaceAllMapped(
+      RegExp(r'\*\*([^*]+)\*\*'),
+      (m) => m.group(1) ?? '',
+    );
+    cleaned = cleaned.replaceAllMapped(
+      RegExp(r'\*([^*]+)\*'),
+      (m) => m.group(1) ?? '',
+    );
+    cleaned = cleaned.replaceAllMapped(
+      RegExp(r'`([^`]+)`'),
+      (m) => m.group(1) ?? '',
+    );
+    cleaned = cleaned.replaceAllMapped(
+      RegExp(r'__([^_]+)__'),
+      (m) => m.group(1) ?? '',
+    );
+    cleaned = cleaned.replaceAll(RegExp(r'^\s*[-*•:]\s*'), '');
+    cleaned = cleaned.replaceAll(RegExp(r'\s*[:：]\s*$'), '');
     return cleaned.trim();
   }
 }

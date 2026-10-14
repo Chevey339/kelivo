@@ -136,6 +136,26 @@ void main() {
       expect(plan.steps[1].status, equals(TaskStepStatus.pending));
       expect(plan.steps[2].status, equals(TaskStepStatus.pending));
     });
+
+    test('cleans bold and backtick markdown formatting without producing literal \$1', () {
+      const planMarkdown = '''
+# 落地实施计划
+
+## 落地实施步骤 (Key Changes)
+1. **新建并编写** `/workspace/pelican-bike.html` :
+2. **SVG 画布与图层层级** (从后至前)
+3. **核心动画与联动机制** (`CSS Keyframes`)
+''';
+
+      final plan = TaskPlanParser.parse(planMarkdown);
+      expect(plan.steps.length, equals(3));
+      expect(plan.steps[0].title, equals('新建并编写 /workspace/pelican-bike.html'));
+      expect(plan.steps[0].title, isNot(contains(r'$1')));
+      expect(plan.steps[1].title, equals('SVG 画布与图层层级 (从后至前)'));
+      expect(plan.steps[1].title, isNot(contains(r'$1')));
+      expect(plan.steps[2].title, equals('核心动画与联动机制 (CSS Keyframes)'));
+      expect(plan.steps[2].title, isNot(contains(r'$1')));
+    });
   });
 
   group('ProposedPlanExtractor', () {

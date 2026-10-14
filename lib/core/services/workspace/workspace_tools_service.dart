@@ -12,6 +12,7 @@ import '../../../utils/mcp_structured_image.dart';
 import '../../../utils/sandbox_path_resolver.dart';
 import '../api/tool_call_cancellation.dart';
 import '../../models/workspace_binding.dart';
+import '../../models/task_execution_binding.dart';
 import '../../models/external_mount.dart';
 import '../../models/environment_variable.dart';
 import '../../providers/external_mounts_provider.dart';
@@ -491,7 +492,68 @@ class WorkspaceToolsService {
       conversationId: conversationId,
       environment: environment.variables,
     );
+    if (const {'write_file', 'edit_file', 'shell'}.contains(name) &&
+        conversationId != null &&
+        updateConversationExtras != null) {
+      unawaited(_autoAdvanceTaskPlan(conversationId, name, args, result));
+    }
     return redactor.redact(ClientToolResult.fromHandler(result));
+  }
+
+  Future<void> _autoAdvanceTaskPlan(
+    String convId,
+    String toolName,
+    Map<String, dynamic> args,
+    Object? result,
+  ) async {
+    if (updateConversationExtras == null) return;
+    try {
+      final isError = result is Map && result['error'] != null;
+      if (isError) return;
+
+      final targetPath = (args['path'] ?? '').toString();
+      final targetFile =
+          targetPath.split('/').last.split('\\').last.toLowerCase();
+
+      await updateConversationExtras!(convId, (extras) {
+        final binding = TaskExecutionBinding.fromExtras(extras);
+        final plan = binding.plan;
+        if (plan == null || plan.isCompleted) return extras;
+
+        TaskStep? matchedStep;
+        if (targetFile.isNotEmpty) {
+          for (final s in plan.steps) {
+            if (s.status != TaskStepStatus.completed &&
+                s.title.toLowerCase().contains(targetFile)) {
+              matchedStep = s;
+              break;
+            }
+          }
+        }
+
+        matchedStep ??= plan.activeStep;
+        if (matchedStep == null) return extras;
+
+        var updatedPlan = plan.updateStepStatus(
+          matchedStep.id,
+          TaskStepStatus.completed,
+        );
+
+        final nextPending = updatedPlan.steps.firstWhere(
+          (s) => s.status == TaskStepStatus.pending,
+          orElse: () => matchedStep!,
+        );
+        if (nextPending.id != matchedStep.id &&
+            nextPending.status == TaskStepStatus.pending) {
+          updatedPlan = updatedPlan.updateStepStatus(
+            nextPending.id,
+            TaskStepStatus.inProgress,
+          );
+        }
+
+        return TaskExecutionBinding(plan: updatedPlan).applyTo(extras);
+      });
+    } catch (_) {}
   }
 
   Future<Object?> _handle(
