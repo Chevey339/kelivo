@@ -7,6 +7,8 @@ void main() {
       expect(AsrServiceKind.sherpaOnnx.id, 'sherpa_onnx');
       expect(AsrServiceKind.system.id, 'system');
       expect(AsrServiceKind.openAiRealtime.id, 'openai_realtime');
+      expect(AsrServiceKind.groq.id, 'groq');
+      expect(AsrServiceKind.mistral.id, 'mistral');
       expect(AsrServiceKind.dashScope.id, 'dashscope');
       expect(AsrServiceKind.volcengine.id, 'volcengine');
       expect(AsrServiceKind.mimo.id, 'mimo');
@@ -22,6 +24,55 @@ void main() {
   });
 
   group('AsrServiceOptions', () {
+    for (final kind in [AsrServiceKind.groq, AsrServiceKind.mistral]) {
+      test(
+        '${kind.name} restores defaults and custom transcription settings',
+        () {
+          final defaults =
+              AsrServiceOptions.fromJson({'kind': kind.id})
+                  as AudioTranscriptionAsrOptions;
+          expect(defaults.kind, kind);
+          expect(
+            defaults.name,
+            kind == AsrServiceKind.groq ? 'Groq' : 'Mistral',
+          );
+          expect(
+            defaults.baseUrl,
+            kind == AsrServiceKind.groq
+                ? 'https://api.groq.com/openai/v1'
+                : 'https://api.mistral.ai/v1',
+          );
+          expect(
+            defaults.model,
+            kind == AsrServiceKind.groq
+                ? 'whisper-large-v3'
+                : 'voxtral-mini-latest',
+          );
+          expect(defaults.sampleRate, 16000);
+          expect(defaults.segmentDurationSec, 30);
+          expect(defaults.language, isEmpty);
+          expect(defaults.isConfigured, isFalse);
+          final custom = defaults.copyWith(
+            id: '${kind.name}-id',
+            name: 'Custom transcription',
+            apiKey: 'key',
+            baseUrl: 'https://proxy.test/v1',
+            model: 'custom-model',
+            language: 'zh',
+            sampleRate: 8000,
+            segmentDurationSec: 10,
+          );
+          expect(custom.isConfigured, isTrue);
+          final restored = AsrServiceOptions.fromJson(custom.toJson());
+          expect(restored.toJson(), custom.toJson());
+          expect(restored.kind, kind);
+          expect(custom.copyWith(model: '').isConfigured, isFalse);
+          expect(custom.copyWith(baseUrl: '').isConfigured, isFalse);
+          expect(custom.copyWith(sampleRate: 0).isConfigured, isFalse);
+        },
+      );
+    }
+
     test('uses concise default display names', () {
       final options = <AsrServiceOptions>[
         SherpaOnnxAsrOptions(),

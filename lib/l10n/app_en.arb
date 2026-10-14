@@ -2477,6 +2477,8 @@
   "asrServicesLocalSubtitle": "Runs offline on this device after download",
   "asrServicesOpenAiTitle": "OpenAI Realtime",
   "asrServicesOpenAiSubtitle": "Low-latency streaming transcription",
+  "asrServicesGroqSubtitle": "Whisper segmented transcription",
+  "asrServicesMistralSubtitle": "Voxtral segmented transcription",
   "asrServicesDashScopeTitle": "DashScope",
   "asrServicesDashScopeSubtitle": "Qwen real-time transcription",
   "asrServicesVolcengineTitle": "Volcengine",

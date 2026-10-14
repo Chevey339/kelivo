@@ -10435,6 +10435,18 @@ abstract class AppLocalizations {
   /// **'Low-latency streaming transcription'**
   String get asrServicesOpenAiSubtitle;
 
+  /// No description provided for @asrServicesGroqSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Whisper segmented transcription'**
+  String get asrServicesGroqSubtitle;
+
+  /// No description provided for @asrServicesMistralSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Voxtral segmented transcription'**
+  String get asrServicesMistralSubtitle;
+
   /// No description provided for @asrServicesDashScopeTitle.
   ///
   /// In en, this message translates to:

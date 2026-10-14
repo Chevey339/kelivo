@@ -5721,6 +5721,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get asrServicesOpenAiSubtitle => 'Low-latency streaming transcription';
 
   @override
+  String get asrServicesGroqSubtitle => 'Whisper segmented transcription';
+
+  @override
+  String get asrServicesMistralSubtitle => 'Voxtral segmented transcription';
+
+  @override
   String get asrServicesDashScopeTitle => 'DashScope';
 
   @override

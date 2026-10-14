@@ -1976,6 +1976,8 @@
   "asrServicesLocalSubtitle": "下载后在设备上离线运行",
   "asrServicesOpenAiTitle": "OpenAI Realtime",
   "asrServicesOpenAiSubtitle": "低延迟流式转写",
+  "asrServicesGroqSubtitle": "Whisper 分段云端转写",
+  "asrServicesMistralSubtitle": "Voxtral 分段云端转写",
   "asrServicesDashScopeTitle": "DashScope",
   "asrServicesDashScopeSubtitle": "Qwen 实时转写",
   "asrServicesVolcengineTitle": "火山引擎",

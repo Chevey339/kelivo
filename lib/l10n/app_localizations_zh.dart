@@ -5496,6 +5496,12 @@ class AppLocalizationsZh extends AppLocalizations {
   String get asrServicesOpenAiSubtitle => '低延迟流式转写';
 
   @override
+  String get asrServicesGroqSubtitle => 'Whisper 分段云端转写';
+
+  @override
+  String get asrServicesMistralSubtitle => 'Voxtral 分段云端转写';
+
+  @override
   String get asrServicesDashScopeTitle => 'DashScope';
 
   @override
@@ -17952,6 +17958,12 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get asrServicesOpenAiSubtitle => '低延迟流式转写';
 
   @override
+  String get asrServicesGroqSubtitle => 'Whisper 分段云端转写';
+
+  @override
+  String get asrServicesMistralSubtitle => 'Voxtral 分段云端转写';
+
+  @override
   String get asrServicesDashScopeTitle => 'DashScope';
 
   @override
@@ -30331,6 +30343,12 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get asrServicesOpenAiSubtitle => '低延遲串流轉寫';
+
+  @override
+  String get asrServicesGroqSubtitle => 'Whisper 分段雲端轉寫';
+
+  @override
+  String get asrServicesMistralSubtitle => 'Voxtral 分段雲端轉寫';
 
   @override
   String get asrServicesDashScopeTitle => 'DashScope';

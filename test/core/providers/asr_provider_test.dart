@@ -1,7 +1,10 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:http/http.dart' as http;
+import 'package:http/testing.dart';
 
 import 'package:Kelivo/core/providers/asr_provider.dart';
 import 'package:Kelivo/core/services/asr/asr_audio_capture.dart';
@@ -82,6 +85,97 @@ void main() {
       expect(provider.state, AsrSessionState.idle);
     });
   }
+
+  for (final kind in [AsrServiceKind.groq, AsrServiceKind.mistral]) {
+    test(
+      '${kind.name} records, uploads and returns a final transcription',
+      () async {
+        final capture = _FakeAudioCapture();
+        var requestCount = 0;
+        final cloud = CloudAsrService(
+          httpClient: MockClient((request) async {
+            requestCount++;
+            expect(request.url.path, endsWith('/audio/transcriptions'));
+            return http.Response.bytes(utf8.encode('{"text":"语音输入"}'), 200);
+          }),
+        );
+        final provider = AsrProvider(
+          audioCaptureFactory: () => capture,
+          cloudSessionStarter: cloud.startSession,
+        );
+        addTearDown(provider.dispose);
+        final options = AudioTranscriptionAsrOptions(
+          kind: kind,
+          apiKey: 'key',
+          sampleRate: 8000,
+        );
+        expect(provider.canUse(options), isTrue);
+        await provider.start(options);
+        expect(provider.state, AsrSessionState.listening);
+        expect(capture.sampleRate, 8000);
+        capture.add(_pcm16(6000));
+        expect(await provider.finish(), '语音输入');
+        expect(requestCount, 1);
+        expect(capture.stopped, isTrue);
+        expect(provider.state, AsrSessionState.idle);
+      },
+    );
+  }
+
+  test('Groq finishes native resampled audio with a sub-10ms tail', () async {
+    final capture = _FakeAudioCapture();
+    final uploadedSamples = <int>[];
+    late Uint8List lastPcm;
+    final cloud = CloudAsrService(
+      httpClient: MockClient((request) async {
+        final start = latin1.decode(request.bodyBytes).indexOf('RIFF');
+        final bytes = ByteData.sublistView(
+          request.bodyBytes,
+          start,
+        ).getUint32(40, Endian.little);
+        uploadedSamples.add(bytes ~/ 2);
+        lastPcm = Uint8List.sublistView(
+          request.bodyBytes,
+          start + 44,
+          start + 44 + bytes,
+        );
+        if (bytes < 320) {
+          return http.Response(
+            '{"error":{"message":"audio file is too short"}}',
+            400,
+          );
+        }
+        return http.Response(
+          jsonEncode({'text': 'part-${uploadedSamples.length}'}),
+          200,
+        );
+      }),
+    );
+    final provider = AsrProvider(
+      audioCaptureFactory: () => capture,
+      cloudSessionStarter: cloud.startSession,
+    );
+    addTearDown(provider.dispose);
+    await provider.start(
+      AudioTranscriptionAsrOptions(
+        kind: AsrServiceKind.groq,
+        apiKey: 'test-key',
+      ),
+    );
+    // record_macos AVAudioConverter: 48kHz input, 4096-frame taps,
+    // 16kHz PCM16 output. After 1055 taps, 3 x 30s leaves a 64-sample tail.
+    capture.add(Uint8List(1354 * 2)..fillRange(0, 1354 * 2, 1));
+    for (var index = 1; index < 1055; index++) {
+      capture.add(Uint8List(1365 * 2)..fillRange(0, 1365 * 2, 1));
+    }
+
+    expect(await provider.finish(), 'part-1 part-2 part-3 part-4');
+    expect(uploadedSamples, [480000, 480000, 480000, 160]);
+    expect(lastPcm.take(128), everyElement(1));
+    expect(lastPcm.skip(128), everyElement(0));
+    expect(provider.state, AsrSessionState.idle);
+    expect(capture.stopped, isTrue);
+  });
 
   test('captures audio at each cloud provider sample rate', () async {
     final captures = <_FakeAudioCapture>[];
