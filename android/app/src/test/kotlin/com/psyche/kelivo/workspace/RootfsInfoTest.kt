@@ -73,13 +73,13 @@ class RootfsInfoTest {
         try {
             image(root)
             for (command in listOf("echo ok", null)) {
-                val base = ProotCommand.build(root, root, root, emptyList(), "/", command, emptyMap(), extraArgs = listOf("-k", "5.10.0"))
+                val base = ProotCommand.build(root, root, root, emptyList(), "/", command, emptyMap(), extraArgs = listOf("-k", "5.10.0"), kernelRelease = null)
                 assertTrue(base.argv.contains("/bin/sh"))
                 assertEquals(listOf("-k", "5.10.0"), base.argv.subList(4, 6))
                 File(root, "bin/bash").apply { writeText("shell fixture"); setExecutable(true) }
-                val bash = ProotCommand.build(root, root, root, emptyList(), "/", command, emptyMap())
+                val bash = ProotCommand.build(root, root, root, emptyList(), "/", command, emptyMap(), kernelRelease = null)
                 assertTrue(bash.argv.contains("/bin/bash"))
-                val custom = ProotCommand.build(root, root, root, emptyList(), "/", command, emptyMap(), shell = "/usr/bin/zsh")
+                val custom = ProotCommand.build(root, root, root, emptyList(), "/", command, emptyMap(), shell = "/usr/bin/zsh", kernelRelease = null)
                 assertTrue(custom.argv.contains("/usr/bin/zsh"))
                 File(root, "bin/bash").delete()
             }
