@@ -5760,5 +5760,12 @@
   "planModeApprovedAndImplementMessage": "Plan approved. Proceed with implementation.",
   "taskProgressTitle": "Task Execution",
   "taskProgressCompletedBadge": "All plan steps completed",
-  "taskProgressStepCount": "{completed} / {total} Steps"
+  "taskProgressStepCount": "{completed} / {total} Steps",
+  "planModeRevisionHint": "Enter feedback or revisions for this plan (e.g. change framework, add steps, tests)…",
+  "planModeSubmitRevision": "Submit Feedback",
+  "planModeQuickChipSimplify": "Simpler approach",
+  "planModeQuickChipDetail": "More step details",
+  "planModeQuickChipTests": "Add test plan",
+  "planModeRevisionPrefix": "I have the following feedback on the proposed plan:",
+  "planModeRevisionInstruction": "Please refine the plan in Plan Mode incorporating this feedback, and output the updated complete specification inside <proposed_plan> tags."
 }

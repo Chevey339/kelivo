@@ -5,6 +5,7 @@ import '../../../core/models/plan_mode_binding.dart';
 import '../../../core/models/task_execution_binding.dart';
 import '../utils/task_plan_parser.dart';
 import '../../../core/services/chat/chat_service.dart';
+import '../../../core/services/haptics.dart';
 import '../../../icons/lucide_adapter.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../shared/widgets/markdown_with_highlight.dart';
@@ -59,7 +60,8 @@ class ProposedPlanExtractor {
 }
 
 /// A dedicated UI card that displays the model's `<proposed_plan>`
-/// and offers immediate actions: Implement in current chat, Clear context & implement, or Revise.
+/// and offers immediate actions: Implement in current chat, Clear context & implement,
+/// or expand an interactive revision box to provide feedback.
 class ProposedPlanCard extends StatefulWidget {
   const ProposedPlanCard({
     super.key,
@@ -68,6 +70,7 @@ class ProposedPlanCard extends StatefulWidget {
     this.onImplementPlan,
     this.onImplementInNewChat,
     this.onRevisePlan,
+    this.onSendFeedback,
   });
 
   final String planMarkdown;
@@ -75,6 +78,7 @@ class ProposedPlanCard extends StatefulWidget {
   final VoidCallback? onImplementPlan;
   final VoidCallback? onImplementInNewChat;
   final VoidCallback? onRevisePlan;
+  final ValueChanged<String>? onSendFeedback;
 
   @override
   State<ProposedPlanCard> createState() => _ProposedPlanCardState();
@@ -82,6 +86,16 @@ class ProposedPlanCard extends StatefulWidget {
 
 class _ProposedPlanCardState extends State<ProposedPlanCard> {
   bool _expanded = true;
+  bool _showRevisionBox = false;
+  final TextEditingController _feedbackController = TextEditingController();
+  final FocusNode _feedbackFocusNode = FocusNode();
+
+  @override
+  void dispose() {
+    _feedbackController.dispose();
+    _feedbackFocusNode.dispose();
+    super.dispose();
+  }
 
   Future<void> _handleApproveAndImplement(BuildContext context) async {
     final convId = widget.conversationId;
@@ -145,6 +159,174 @@ class _ProposedPlanCardState extends State<ProposedPlanCard> {
       );
     }
     widget.onImplementPlan?.call();
+  }
+
+  Future<void> _submitFeedback(String text) async {
+    final trimmed = text.trim();
+    if (trimmed.isEmpty) return;
+
+    final convId = widget.conversationId;
+    if (convId != null) {
+      final chatService = context.read<ChatService>();
+      final current = PlanModeBinding.fromExtras(
+        chatService.getConversation(convId)?.extras ?? const {},
+      );
+      // Re-affirm that plan mode is strictly active for revision
+      await chatService.updateConversationExtras(
+        convId,
+        (extras) => current.copyWith(isPlanMode: true).applyTo(extras),
+      );
+    }
+
+    final l10n = AppLocalizations.of(context)!;
+    final prompt =
+        '${l10n.planModeRevisionPrefix}\n$trimmed\n\n${l10n.planModeRevisionInstruction}';
+    widget.onSendFeedback?.call(prompt);
+    _feedbackController.clear();
+    setState(() => _showRevisionBox = false);
+  }
+
+  Widget _buildRevisionPanel(BuildContext context) {
+    final theme = Theme.of(context);
+    final l10n = AppLocalizations.of(context)!;
+
+    return Container(
+      padding: const EdgeInsets.all(AppSpacing.sm),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.35),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Row(
+            children: [
+              Icon(Lucide.Pencil, size: 14, color: theme.colorScheme.primary),
+              const SizedBox(width: 6),
+              Text(
+                l10n.planModeRevisePlan,
+                style: theme.textTheme.labelMedium?.copyWith(
+                  fontWeight: FontWeight.w600,
+                  color: theme.colorScheme.onSurface,
+                ),
+              ),
+              const Spacer(),
+              InkWell(
+                borderRadius: BorderRadius.circular(12),
+                onTap: () => setState(() => _showRevisionBox = false),
+                child: Padding(
+                  padding: const EdgeInsets.all(2),
+                  child: Icon(
+                    Lucide.X,
+                    size: 16,
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          // Quick suggestion chips
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: [
+                _quickChip(l10n.planModeQuickChipSimplify),
+                const SizedBox(width: 6),
+                _quickChip(l10n.planModeQuickChipDetail),
+                const SizedBox(width: 6),
+                _quickChip(l10n.planModeQuickChipTests),
+              ],
+            ),
+          ),
+          const SizedBox(height: 8),
+          // Multiline TextField
+          TextField(
+            controller: _feedbackController,
+            focusNode: _feedbackFocusNode,
+            minLines: 1,
+            maxLines: 4,
+            style: theme.textTheme.bodyMedium,
+            decoration: InputDecoration(
+              hintText: l10n.planModeRevisionHint,
+              hintStyle: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.6),
+              ),
+              filled: true,
+              fillColor: theme.colorScheme.surface,
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 10,
+                vertical: 8,
+              ),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide: BorderSide(
+                  color: theme.colorScheme.outlineVariant,
+                ),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide: BorderSide(
+                  color: theme.colorScheme.primary,
+                  width: 1.5,
+                ),
+              ),
+            ),
+            onSubmitted: _submitFeedback,
+          ),
+          const SizedBox(height: 8),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.end,
+            children: [
+              TextButton(
+                onPressed: () => setState(() => _showRevisionBox = false),
+                child: Text(l10n.cancel),
+              ),
+              const SizedBox(width: 8),
+              FilledButton.icon(
+                icon: const Icon(Lucide.Send, size: 14),
+                label: Text(l10n.planModeSubmitRevision),
+                onPressed: () => _submitFeedback(_feedbackController.text),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _quickChip(String text) {
+    final theme = Theme.of(context);
+    return InkWell(
+      borderRadius: BorderRadius.circular(12),
+      onTap: () {
+        Haptics.light();
+        final current = _feedbackController.text.trim();
+        if (current.isEmpty) {
+          _feedbackController.text = text;
+        } else {
+          _feedbackController.text = '$current；$text';
+        }
+        _feedbackFocusNode.requestFocus();
+      },
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        decoration: BoxDecoration(
+          color: theme.colorScheme.surface,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: theme.colorScheme.outlineVariant.withValues(alpha: 0.6),
+          ),
+        ),
+        child: Text(
+          text,
+          style: theme.textTheme.labelSmall?.copyWith(
+            color: theme.colorScheme.onSurfaceVariant,
+          ),
+        ),
+      ),
+    );
   }
 
   @override
@@ -220,6 +402,13 @@ class _ProposedPlanCardState extends State<ProposedPlanCard> {
                 conversationId: widget.conversationId,
               ),
             ),
+            if (_showRevisionBox) ...[
+              const Divider(height: 1),
+              Padding(
+                padding: const EdgeInsets.all(AppSpacing.sm),
+                child: _buildRevisionPanel(context),
+              ),
+            ],
             const Divider(height: 1),
             // Actions
             Padding(
@@ -229,13 +418,23 @@ class _ProposedPlanCardState extends State<ProposedPlanCard> {
                 runSpacing: AppSpacing.xs,
                 alignment: WrapAlignment.end,
                 children: [
-                  // Revise Plan
-                  if (widget.onRevisePlan != null)
-                    TextButton.icon(
-                      icon: const Icon(Lucide.Pencil, size: 14),
-                      label: Text(l10n.planModeRevisePlan),
-                      onPressed: widget.onRevisePlan,
+                  // Revise Plan button
+                  OutlinedButton.icon(
+                    icon: Icon(
+                      _showRevisionBox ? Lucide.ChevronUp : Lucide.Pencil,
+                      size: 14,
                     ),
+                    label: Text(l10n.planModeRevisePlan),
+                    onPressed: () {
+                      Haptics.light();
+                      setState(() {
+                        _showRevisionBox = !_showRevisionBox;
+                        if (_showRevisionBox) {
+                          _feedbackFocusNode.requestFocus();
+                        }
+                      });
+                    },
+                  ),
                   // Clear context & implement
                   OutlinedButton.icon(
                     icon: const Icon(Lucide.Sparkles, size: 14),

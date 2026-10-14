@@ -4583,5 +4583,12 @@
   "planModeApprovedAndImplementMessage": "已批准計劃，請開始執行。",
   "taskProgressTitle": "任務執行進度",
   "taskProgressCompletedBadge": "所有計劃步驟已完成",
-  "taskProgressStepCount": "{completed} / {total} 步驟"
+  "taskProgressStepCount": "{completed} / {total} 步驟",
+  "planModeRevisionHint": "輸入對該方案的修改意見（例如：更換實現技術、增刪功能步驟、補充測試用例等）…",
+  "planModeSubmitRevision": "發送修改意見",
+  "planModeQuickChipSimplify": "更精簡方案",
+  "planModeQuickChipDetail": "細化實施步驟",
+  "planModeQuickChipTests": "補充測試方案",
+  "planModeRevisionPrefix": "我對剛才的方案有以下修改要求：",
+  "planModeRevisionInstruction": "請在計劃模式下結合上述要求重新調整，並輸出更新後的完整方案（用 <proposed_plan> 包裹）。"
 }

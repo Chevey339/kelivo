@@ -222,6 +222,15 @@ Analyzing now...
       expect(directive, contains('<proposed_plan>'));
       expect(directive, contains('decision-complete'));
     });
+
+    test('revision prompt formats feedback with plan mode instruction', () {
+      const feedbackText = '把颜色改为复古湖水绿，并增加停止按钮';
+      final prompt = '我对刚才的方案有以下修改要求：\n$feedbackText\n\n请在计划模式下结合上述要求重新调整，并输出更新后的完整方案（用 <proposed_plan> 包裹）。';
+
+      expect(prompt, contains(feedbackText));
+      expect(prompt, contains('计划模式'));
+      expect(prompt, contains('<proposed_plan>'));
+    });
   });
 }
 

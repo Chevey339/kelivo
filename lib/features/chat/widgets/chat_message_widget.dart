@@ -3579,6 +3579,9 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
                             l10n.planModeApprovedAndImplementMessage,
                           );
                         },
+                        onSendFeedback: (feedback) {
+                          widget.onSuggestionTap?.call(feedback);
+                        },
                       ),
                     );
                   }

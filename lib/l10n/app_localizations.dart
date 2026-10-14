@@ -23342,6 +23342,27 @@ abstract class AppLocalizations {
 
   /// No description provided for @taskProgressStepCount.
   String taskProgressStepCount(Object completed, Object total);
+
+  /// No description provided for @planModeRevisionHint.
+  String get planModeRevisionHint;
+
+  /// No description provided for @planModeSubmitRevision.
+  String get planModeSubmitRevision;
+
+  /// No description provided for @planModeQuickChipSimplify.
+  String get planModeQuickChipSimplify;
+
+  /// No description provided for @planModeQuickChipDetail.
+  String get planModeQuickChipDetail;
+
+  /// No description provided for @planModeQuickChipTests.
+  String get planModeQuickChipTests;
+
+  /// No description provided for @planModeRevisionPrefix.
+  String get planModeRevisionPrefix;
+
+  /// No description provided for @planModeRevisionInstruction.
+  String get planModeRevisionInstruction;
 }
 
 class _AppLocalizationsDelegate

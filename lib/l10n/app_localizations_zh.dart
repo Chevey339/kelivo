@@ -12503,6 +12503,27 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String taskProgressStepCount(Object completed, Object total) => '$completed / $total 步骤';
+
+  @override
+  String get planModeRevisionHint => '输入对该方案的修改意见（例如：更换实现技术、增删功能步骤、补充测试用例等）…';
+
+  @override
+  String get planModeSubmitRevision => '发送修改意见';
+
+  @override
+  String get planModeQuickChipSimplify => '更精简方案';
+
+  @override
+  String get planModeQuickChipDetail => '细化实施步骤';
+
+  @override
+  String get planModeQuickChipTests => '补充测试方案';
+
+  @override
+  String get planModeRevisionPrefix => '我对刚才的方案有以下修改要求：';
+
+  @override
+  String get planModeRevisionInstruction => '请在计划模式下结合上述要求重新调整，并输出更新后的完整方案（用 <proposed_plan> 包裹）。';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hans`).
@@ -37391,4 +37412,25 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String taskProgressStepCount(Object completed, Object total) => '$completed / $total 步驟';
+
+  @override
+  String get planModeRevisionHint => '輸入對該方案的修改意見（例如：更換實現技術、增刪功能步驟、補充測試用例等）…';
+
+  @override
+  String get planModeSubmitRevision => '發送修改意見';
+
+  @override
+  String get planModeQuickChipSimplify => '更精簡方案';
+
+  @override
+  String get planModeQuickChipDetail => '細化實施步驟';
+
+  @override
+  String get planModeQuickChipTests => '補充測試方案';
+
+  @override
+  String get planModeRevisionPrefix => '我對剛才的方案有以下修改要求：';
+
+  @override
+  String get planModeRevisionInstruction => '請在計劃模式下結合上述要求重新調整，並輸出更新後的完整方案（用 <proposed_plan> 包裹）。';
 }
