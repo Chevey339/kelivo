@@ -1353,7 +1353,9 @@ class ChatActions {
           .prepareApiMessagesWithInjections(
             messages: apiContextMessages,
             versionSelections: _versionSelections,
-            currentConversation: conversation.copyWith(truncateIndex: -1),
+            currentConversation:
+                (_chatService.getConversation(conversation.id) ?? conversation)
+                    .copyWith(truncateIndex: -1),
             settings: settings,
             assistant: assistant,
             assistantId: assistantId,
@@ -1930,7 +1932,9 @@ class ChatActions {
           .prepareApiMessagesWithInjections(
             messages: apiContextMessages,
             versionSelections: _versionSelections,
-            currentConversation: conversation.copyWith(truncateIndex: -1),
+            currentConversation:
+                (_chatService.getConversation(conversation.id) ?? conversation)
+                    .copyWith(truncateIndex: -1),
             settings: settings,
             assistant: assistant,
             assistantId: assistant?.id,

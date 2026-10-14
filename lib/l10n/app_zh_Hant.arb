@@ -4579,5 +4579,9 @@
   "planModeImplementInNewChatTooltip": "在新對話中僅帶入此計劃，保持上下文純淨並高質實作",
   "planModeRevisePlan": "調整計劃",
   "planModeReadOnlyError": "計劃模式下禁止檔案修改和命令執行。請繼續完善方案並請求使用者審批。",
-  "planModeInputHint": "計劃模式：描述你想規劃的需求或任務…"
+  "planModeInputHint": "計劃模式：描述你想規劃的需求或任務…",
+  "planModeApprovedAndImplementMessage": "已批准計劃，請開始執行。",
+  "taskProgressTitle": "任務執行進度",
+  "taskProgressCompletedBadge": "所有計劃步驟已完成",
+  "taskProgressStepCount": "{completed} / {total} 步驟"
 }

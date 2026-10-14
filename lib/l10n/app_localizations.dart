@@ -23330,6 +23330,18 @@ abstract class AppLocalizations {
 
   /// No description provided for @planModeInputHint.
   String get planModeInputHint;
+
+  /// No description provided for @planModeApprovedAndImplementMessage.
+  String get planModeApprovedAndImplementMessage;
+
+  /// No description provided for @taskProgressTitle.
+  String get taskProgressTitle;
+
+  /// No description provided for @taskProgressCompletedBadge.
+  String get taskProgressCompletedBadge;
+
+  /// No description provided for @taskProgressStepCount.
+  String taskProgressStepCount(Object completed, Object total);
 }
 
 class _AppLocalizationsDelegate

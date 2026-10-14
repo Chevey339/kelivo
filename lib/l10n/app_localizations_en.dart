@@ -13084,4 +13084,16 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get planModeInputHint => 'Plan Mode: Describe the feature or task to plan…';
+
+  @override
+  String get planModeApprovedAndImplementMessage => 'Plan approved. Proceed with implementation.';
+
+  @override
+  String get taskProgressTitle => 'Task Execution';
+
+  @override
+  String get taskProgressCompletedBadge => 'All plan steps completed';
+
+  @override
+  String taskProgressStepCount(Object completed, Object total) => '$completed / $total Steps';
 }

@@ -2138,24 +2138,23 @@ class MessageBuilderService {
     } catch (_) {}
   }
 
-  /// Inject the Plan Mode prompt when enabled for the current conversation.
+  /// Inject the Plan Mode prompt when enabled for the current conversation,
+  /// or inject the Execution Mode prompt when an approved plan is being implemented.
   void injectPlanModePrompt(
     List<Map<String, dynamic>> apiMessages, {
     Conversation? conversation,
     String? conversationId,
     bool? isPlanMode,
   }) {
-    final bool active = isPlanMode ??
-        PlanModeBinding.fromExtras(
-          conversation?.extras ??
-              (conversationId != null
-                  ? chatService.getConversation(conversationId)?.extras ??
-                      const {}
-                  : const {}),
-        ).isPlanMode;
-    if (!active) return;
+    final conv = conversation ??
+        (conversationId != null
+            ? chatService.getConversation(conversationId)
+            : null);
+    final binding = PlanModeBinding.fromExtras(conv?.extras ?? const {});
+    final bool active = isPlanMode ?? binding.isPlanMode;
 
-    const prompt = '''
+    if (active) {
+      const prompt = '''
 # Plan Mode (Conversational)
 
 You work in 3 phases, and you should chat your way to a great plan before finalizing it. A great plan is very detailed—intent- and implementation-wise—so that it can be handed to another engineer or agent to be implemented right away. It must be **decision complete**, where the implementer does not need to make any decisions.
@@ -2212,42 +2211,77 @@ The plan must include:
 
 Do NOT ask "should I proceed?" in the final output. The client UI automatically presents an "Implement Plan" button when the `<proposed_plan>` block is detected.''';
 
-    _appendToSystemMessage(
-      apiMessages,
-      prompt,
-      source: ContextSource.planMode,
-    );
+      _appendToSystemMessage(
+        apiMessages,
+        prompt,
+        source: ContextSource.planMode,
+      );
+    } else if (binding.currentPlanMarkdown != null &&
+        binding.currentPlanMarkdown!.trim().isNotEmpty) {
+      final prompt = '''
+# Execution Mode (Plan Approved)
+
+The user has reviewed and officially APPROVED the proposed plan.
+You are now operating in **Default / Execution Mode** (<collaboration_mode>execution</collaboration_mode>).
+
+## Directives:
+1. You are NO LONGER in Plan Mode. All restrictions against modifying files, writing code, or running workspace commands are completely lifted.
+2. Proactively carry out the implementation of the approved plan step-by-step using your workspace tools (e.g. `write_file`, `edit_file`, `shell`).
+3. Focus on creating the actual code files and making the required changes. Do not output repetitive plan proposals or ask for redundant confirmations.
+4. The approved plan being executed:
+<approved_plan>
+${binding.currentPlanMarkdown}
+</approved_plan>''';
+
+      _appendToSystemMessage(
+        apiMessages,
+        prompt,
+        source: ContextSource.planMode,
+      );
+    }
   }
 
   /// Injects a high-priority tail guard instruction at the end of the last user
-  /// message in [apiMessages] when Plan Mode is active.
+  /// message in [apiMessages] when Plan Mode is active, or execution directive
+  /// when an approved plan is being executed.
   ///
   /// This eliminates LLM attention decay and guarantees that models strictly
-  /// adhere to Plan Mode constraints rather than falling back to normal direct replies.
+  /// adhere to Plan Mode or Execution Mode constraints.
   void applyPlanModeTailGuard(
     List<Map<String, dynamic>> apiMessages, {
     Conversation? conversation,
     String? conversationId,
     bool? isPlanMode,
   }) {
-    final bool active = isPlanMode ??
-        PlanModeBinding.fromExtras(
-          conversation?.extras ??
-              (conversationId != null
-                  ? chatService.getConversation(conversationId)?.extras ??
-                      const {}
-                  : const {}),
-        ).isPlanMode;
-    if (!active) return;
+    final conv = conversation ??
+        (conversationId != null
+            ? chatService.getConversation(conversationId)
+            : null);
+    final binding = PlanModeBinding.fromExtras(conv?.extras ?? const {});
+    final bool active = isPlanMode ?? binding.isPlanMode;
 
-    for (int i = apiMessages.length - 1; i >= 0; i--) {
-      if (apiMessages[i]['role'] == 'user') {
-        final content = apiMessages[i]['content'];
-        if (content is String && content.trim().isNotEmpty) {
-          apiMessages[i]['content'] =
-              '$content\n\n[Active Mode: <collaboration_mode>plan</collaboration_mode>. System directive: You are operating in PLAN MODE. You are strictly forbidden from performing direct implementation or writing out complete executable code solutions directly. You must explore, clarify, or provide a structured, decision-complete plan enclosed in <proposed_plan>...</proposed_plan> tags.]';
+    if (active) {
+      for (int i = apiMessages.length - 1; i >= 0; i--) {
+        if (apiMessages[i]['role'] == 'user') {
+          final content = apiMessages[i]['content'];
+          if (content is String && content.trim().isNotEmpty) {
+            apiMessages[i]['content'] =
+                '$content\n\n[Active Mode: <collaboration_mode>plan</collaboration_mode>. System directive: You are operating in PLAN MODE. You are strictly forbidden from performing direct implementation or writing out complete executable code solutions directly. You must explore, clarify, or provide a structured, decision-complete plan enclosed in <proposed_plan>...</proposed_plan> tags.]';
+          }
+          break;
         }
-        break;
+      }
+    } else if (binding.currentPlanMarkdown != null &&
+        binding.currentPlanMarkdown!.trim().isNotEmpty) {
+      for (int i = apiMessages.length - 1; i >= 0; i--) {
+        if (apiMessages[i]['role'] == 'user') {
+          final content = apiMessages[i]['content'];
+          if (content is String && content.trim().isNotEmpty) {
+            apiMessages[i]['content'] =
+                '$content\n\n[Active Mode: <collaboration_mode>execution</collaboration_mode>. System directive: You are operating in EXECUTION MODE. The plan has been approved. Proceed directly with implementing the code and using workspace tools to create/modify files. Do NOT output another proposed_plan block.]';
+          }
+          break;
+        }
       }
     }
   }

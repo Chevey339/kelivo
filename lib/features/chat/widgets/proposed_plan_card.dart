@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../../core/models/plan_mode_binding.dart';
+import '../../../core/models/task_execution_binding.dart';
+import '../utils/task_plan_parser.dart';
 import '../../../core/services/chat/chat_service.dart';
 import '../../../icons/lucide_adapter.dart';
 import '../../../l10n/app_localizations.dart';
@@ -81,19 +83,30 @@ class ProposedPlanCard extends StatefulWidget {
 class _ProposedPlanCardState extends State<ProposedPlanCard> {
   bool _expanded = true;
 
-  void _handleApproveAndImplement(BuildContext context) {
+  Future<void> _handleApproveAndImplement(BuildContext context) async {
     final convId = widget.conversationId;
     if (convId != null) {
       final chatService = context.read<ChatService>();
       final current = PlanModeBinding.fromExtras(
         chatService.getConversation(convId)?.extras ?? const {},
       );
-      // Switch off plan mode and store the approved plan
-      chatService.updateConversationExtras(
+      // Parse markdown plan into structured task steps
+      final taskPlan = TaskPlanParser.parse(widget.planMarkdown);
+      final taskBinding = TaskExecutionBinding(plan: taskPlan);
+
+      // Switch off plan mode, record approved plan markdown, and store task plan
+      await chatService.updateConversationExtras(
         convId,
-        (extras) => current
-            .copyWith(isPlanMode: false, currentPlanMarkdown: widget.planMarkdown)
-            .applyTo(extras),
+        (extras) {
+          var updated = current
+              .copyWith(
+                isPlanMode: false,
+                currentPlanMarkdown: widget.planMarkdown,
+              )
+              .applyTo(extras);
+          updated = taskBinding.applyTo(updated);
+          return updated;
+        },
       );
     }
     widget.onImplementPlan?.call();
@@ -108,22 +121,30 @@ class _ProposedPlanCardState extends State<ProposedPlanCard> {
     final chatService = context.read<ChatService>();
     final currentConv =
         convId != null ? chatService.getConversation(convId) : null;
-    await chatService.createConversation(
+    final taskPlan = TaskPlanParser.parse(widget.planMarkdown);
+    final taskBinding = TaskExecutionBinding(plan: taskPlan);
+
+    final newConv = await chatService.createConversation(
       title: 'Plan: ${currentConv?.title ?? "Implementation"}',
       assistantId: currentConv?.assistantId,
       activate: true,
     );
     if (chatService.currentConversationId != null) {
-      chatService.updateConversationExtras(
+      await chatService.updateConversationExtras(
         chatService.currentConversationId!,
-        (extras) => PlanModeBinding.fromExtras(extras)
-            .copyWith(
-              isPlanMode: false,
-              currentPlanMarkdown: widget.planMarkdown,
-            )
-            .applyTo(extras),
+        (extras) {
+          var updated = PlanModeBinding.fromExtras(extras)
+              .copyWith(
+                isPlanMode: false,
+                currentPlanMarkdown: widget.planMarkdown,
+              )
+              .applyTo(extras);
+          updated = taskBinding.applyTo(updated);
+          return updated;
+        },
       );
     }
+    widget.onImplementPlan?.call();
   }
 
   @override

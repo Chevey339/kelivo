@@ -13,6 +13,7 @@ import '../../../core/services/model_spec/model_spec_resolver.dart';
 import '../../../core/models/workspace_binding.dart';
 import '../../../core/models/skills_binding.dart';
 import '../../../core/models/plan_mode_binding.dart';
+import '../../../core/models/task_execution_binding.dart';
 import '../../chat/utils/ensure_conversation.dart';
 import '../../../icons/lucide_adapter.dart';
 import '../../../l10n/app_localizations.dart';
@@ -30,6 +31,7 @@ import '../../../features/workspace/workspace_navigation.dart';
 import '../../../theme/design_tokens.dart';
 import 'chat_input_bar.dart';
 import 'model_icon.dart';
+import 'task_execution_banner.dart';
 
 /// Callback for checking if a model supports tool calling.
 typedef IsToolModelCallback = bool Function(String providerKey, String modelId);
@@ -202,6 +204,16 @@ class ChatInputSection extends StatelessWidget {
           )
         : const PlanModeBinding();
 
+    final taskExecutionBinding = effectiveConvId != null
+        ? TaskExecutionBinding.fromExtras(
+            context
+                    .watch<ChatService>()
+                    .getConversation(effectiveConvId)
+                    ?.extras ??
+                const {},
+          )
+        : const TaskExecutionBinding();
+
     final bar = ChatInputBar(
       key: inputBarKey,
       chatModelProviderKey: pk,
@@ -308,8 +320,13 @@ class ChatInputSection extends StatelessWidget {
 
     final showPlanModeBanner =
         planModeBinding.isPlanMode && effectiveConvId != null;
+    final showTaskExecutionBanner = !planModeBinding.isPlanMode &&
+        taskExecutionBinding.plan != null &&
+        effectiveConvId != null;
 
-    if (!showEnvChip && !showPlanModeBanner) return bar;
+    if (!showEnvChip && !showPlanModeBanner && !showTaskExecutionBanner) {
+      return bar;
+    }
     final theme = Theme.of(context);
     final l10n = AppLocalizations.of(context)!;
     return Column(
@@ -384,6 +401,11 @@ class ChatInputSection extends StatelessWidget {
                 ],
               ),
             ),
+          ),
+        if (showTaskExecutionBanner)
+          TaskExecutionBanner(
+            plan: taskExecutionBinding.plan!,
+            conversationId: effectiveConvId,
           ),
         if (showEnvChip && workspaceBound)
           Padding(

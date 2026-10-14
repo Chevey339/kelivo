@@ -1,7 +1,9 @@
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:Kelivo/core/models/plan_mode_binding.dart';
+import 'package:Kelivo/core/models/task_execution_binding.dart';
 import 'package:Kelivo/core/services/logging/context_log_models.dart';
+import 'package:Kelivo/features/chat/utils/task_plan_parser.dart';
 import 'package:Kelivo/features/chat/widgets/proposed_plan_card.dart';
 
 void main() {
@@ -46,6 +48,93 @@ void main() {
 
       expect(updatedExtras.containsKey(PlanModeBinding.keyEnabled), isFalse);
       expect(updatedExtras.containsKey(PlanModeBinding.keyCurrentPlan), isFalse);
+    });
+  });
+
+  group('TaskExecutionBinding & TaskExecutionPlan', () {
+    test('calculates step count, progress fraction and completion', () {
+      final plan = TaskExecutionPlan(
+        id: 'plan_1',
+        title: 'Test Plan',
+        steps: [
+          const TaskStep(id: 's1', title: 'Step 1', status: TaskStepStatus.completed),
+          const TaskStep(id: 's2', title: 'Step 2', status: TaskStepStatus.inProgress),
+          const TaskStep(id: 's3', title: 'Step 3', status: TaskStepStatus.pending),
+          const TaskStep(id: 's4', title: 'Step 4', status: TaskStepStatus.pending),
+        ],
+        createdAt: 1000,
+      );
+
+      expect(plan.totalCount, equals(4));
+      expect(plan.completedCount, equals(1));
+      expect(plan.progressFraction, equals(0.25));
+      expect(plan.isCompleted, isFalse);
+      expect(plan.activeStep?.id, equals('s2'));
+
+      final updated = plan.updateStepStatus('s2', TaskStepStatus.completed);
+      expect(updated.completedCount, equals(2));
+      expect(updated.progressFraction, equals(0.5));
+    });
+
+    test('serializes and deserializes to extras correctly', () {
+      final plan = TaskExecutionPlan(
+        id: 'plan_1',
+        title: 'Test Plan',
+        steps: [
+          const TaskStep(id: 's1', title: 'Step 1', status: TaskStepStatus.completed),
+        ],
+        createdAt: 1000,
+      );
+      final binding = TaskExecutionBinding(plan: plan);
+      final extras = binding.applyTo({});
+
+      final restored = TaskExecutionBinding.fromExtras(extras);
+      expect(restored.hasActivePlan, isFalse); // only 1 step and it's completed
+      expect(restored.plan?.title, equals('Test Plan'));
+      expect(restored.plan?.steps.first.title, equals('Step 1'));
+    });
+  });
+
+  group('TaskPlanParser', () {
+    test('parses markdown plan into structured task steps', () {
+      const planMarkdown = '''
+# 鹅鹕骑自行车 2D SVG 动画实现方案
+
+## 方案概述
+使用原生 SVG 绘制呆萌生动的鹅鹕与复古自行车。
+
+## 落地实施步骤 (Key Changes)
+1. 新建并编写 /workspace/pelican-bike.html
+2. SVG 画布与视口规格定义
+3. 核心动画与联动机制 (CSS Keyframes)
+4. 验证与测试方案
+
+## 假设与权衡
+- 纯原生 SVG 动画
+''';
+
+      final plan = TaskPlanParser.parse(planMarkdown);
+      expect(plan.title, contains('鹅鹕骑自行车'));
+      expect(plan.steps.length, equals(4));
+      expect(plan.steps[0].title, contains('新建并编写'));
+      expect(plan.steps[1].title, contains('SVG 画布'));
+      expect(plan.steps[2].title, contains('核心动画'));
+      expect(plan.steps[3].title, contains('验证与测试'));
+    });
+
+    test('parses checklist items with checkboxes', () {
+      const planMarkdown = '''
+# Todo Tasks
+- [x] Done step 1
+- [ ] Pending step 2
+- [ ] Pending step 3
+''';
+
+      final plan = TaskPlanParser.parse(planMarkdown);
+      expect(plan.steps.length, equals(3));
+      expect(plan.steps[0].status, equals(TaskStepStatus.completed));
+      expect(plan.steps[1].status, equals(TaskStepStatus.pending));
+      expect(plan.steps[2].status, equals(TaskStepStatus.pending));
     });
   });
 
@@ -115,3 +204,4 @@ Analyzing now...
     });
   });
 }
+

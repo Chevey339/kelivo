@@ -2715,11 +2715,15 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
       contentSplitOffsets: widget.contentSplitOffsets,
       reasoningCountAtSplit: widget.reasoningCountAtSplit,
       toolCountAtSplit: widget.toolCountAtSplit,
-      transformText: (text) => _applyVisualAssistantRegexes(
-        text,
-        assistant: assistant,
-        scope: AssistantRegexScope.assistant,
-      ),
+      transformText: (text) {
+        final planExt = ProposedPlanExtractor.extract(text);
+        final cleaned = planExt.hasPlan ? planExt.cleanedText : text;
+        return _applyVisualAssistantRegexes(
+          cleaned,
+          assistant: assistant,
+          scope: AssistantRegexScope.assistant,
+        );
+      },
       partsArrivalOrdered: widget.message.isStreaming,
       parseInlineThinking: _legacyInlineThinkingFor(widget).hasThinking,
     );
@@ -3564,13 +3568,16 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
                   if (planExtraction.hasPlan &&
                       planExtraction.planContent != null &&
                       planExtraction.planContent!.isNotEmpty) {
+                    final l10n = AppLocalizations.of(context)!;
                     return Padding(
                       padding: const EdgeInsets.only(top: 8),
                       child: ProposedPlanCard(
                         planMarkdown: planExtraction.planContent!,
                         conversationId: widget.message.conversationId,
                         onImplementPlan: () {
-                          widget.onSuggestionTap?.call('Implement the plan.');
+                          widget.onSuggestionTap?.call(
+                            l10n.planModeApprovedAndImplementMessage,
+                          );
                         },
                       ),
                     );

@@ -12491,6 +12491,18 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get planModeInputHint => '计划模式：描述你想规划的需求或任务…';
+
+  @override
+  String get planModeApprovedAndImplementMessage => '已批准计划，请开始执行。';
+
+  @override
+  String get taskProgressTitle => '任务执行进度';
+
+  @override
+  String get taskProgressCompletedBadge => '所有计划步骤已完成';
+
+  @override
+  String taskProgressStepCount(Object completed, Object total) => '$completed / $total 步骤';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hans`).
@@ -37367,4 +37379,16 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get planModeInputHint => '計劃模式：描述你想規劃的需求或任務…';
+
+  @override
+  String get planModeApprovedAndImplementMessage => '已批准計劃，請開始執行。';
+
+  @override
+  String get taskProgressTitle => '任務執行進度';
+
+  @override
+  String get taskProgressCompletedBadge => '所有計劃步驟已完成';
+
+  @override
+  String taskProgressStepCount(Object completed, Object total) => '$completed / $total 步驟';
 }
