@@ -15,8 +15,6 @@ class GoogleFunctionCall {
     required this.name,
     required this.args,
     this.result,
-    this.thoughtSigKey,
-    this.thoughtSigVal,
     required this.part,
   });
 
@@ -25,8 +23,6 @@ class GoogleFunctionCall {
   final String name;
   final Map<String, dynamic> args;
   ClientToolResult? result;
-  final String? thoughtSigKey;
-  final dynamic thoughtSigVal;
   final Map<String, dynamic> part;
 }
 
@@ -61,7 +57,6 @@ class GoogleRemoteImage {
 /// Stateful Gemini / Vertex Gemini SSE decoder. One instance per HTTP response.
 class GoogleStreamDecoder implements StreamChunkDecoder {
   GoogleStreamDecoder({
-    this.isGemini3 = false,
     this.persistThoughtSigs = false,
     this.expectImage = false,
     this.receivedImage = false,
@@ -71,7 +66,6 @@ class GoogleStreamDecoder implements StreamChunkDecoder {
   }) : builtinCitations = citations ?? <Map<String, dynamic>>[],
        _ids = StreamChunkIds(sourceId);
 
-  final bool isGemini3;
   final bool persistThoughtSigs;
   final bool expectImage;
   final TokenUsage? initialUsage;
@@ -347,7 +341,7 @@ class GoogleStreamDecoder implements StreamChunkDecoder {
     final fc = p['functionCall'];
     final rawPart = Map<String, dynamic>.from(p);
 
-    if (isGemini3 && !thought && rawPart.isNotEmpty) {
+    if (!thought && rawPart.isNotEmpty) {
       roundModelParts.add(rawPart);
     }
 
@@ -463,24 +457,8 @@ class GoogleStreamDecoder implements StreamChunkDecoder {
       final apiId = fc['id']?.toString();
       final id = _effectiveToolCallId(apiId, 'call', _syntheticPartIndex++);
 
-      String? thoughtSigKey;
-      dynamic thoughtSigVal;
-      if (p.containsKey('thoughtSignature')) {
-        thoughtSigKey = 'thoughtSignature';
-        thoughtSigVal = p['thoughtSignature'];
-      } else if (p.containsKey('thought_signature')) {
-        thoughtSigKey = 'thought_signature';
-        thoughtSigVal = p['thought_signature'];
-      }
-
       final metadata = <String, dynamic>{
-        'google': <String, dynamic>{
-          'part': rawPart,
-          if (thoughtSigKey != null && thoughtSigVal != null)
-            'thoughtSigKey': thoughtSigKey,
-          if (thoughtSigKey != null && thoughtSigVal != null)
-            'thoughtSigVal': thoughtSigVal,
-        },
+        'google': <String, dynamic>{'part': rawPart},
       };
       functionCalls.add(
         GoogleFunctionCall(
@@ -488,8 +466,6 @@ class GoogleStreamDecoder implements StreamChunkDecoder {
           apiId: apiId,
           name: name,
           args: args,
-          thoughtSigKey: thoughtSigKey,
-          thoughtSigVal: thoughtSigVal,
           part: rawPart,
         ),
       );
