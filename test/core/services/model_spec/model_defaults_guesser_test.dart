@@ -493,6 +493,34 @@ void main() {
         ).abilities.contains(ModelAbility.reasoning),
         isTrue,
       );
+      for (final id in const [
+        'gemini-4-argon',
+        'gemini-4-argon-cyber-permissive',
+      ]) {
+        expectHit(
+          id,
+          dialect: ReasoningDialect.geminiThinkingLevel,
+          levels: const [
+            ReasoningLevel.low,
+            ReasoningLevel.medium,
+            ReasoningLevel.high,
+          ],
+          canDisable: false,
+          sampling: SamplingPolicy.never,
+          maxOutput: 65536,
+          replay: ReasoningReplayPolicy.all,
+        );
+      }
+      expect(
+        ModelDefaultsGuesser.guess('gemini-4-argon').reasoning!.defaultLevel,
+        ReasoningLevel.medium,
+      );
+      expect(
+        ModelDefaultsGuesser.guess(
+          'gemini-4-argon-cyber-permissive',
+        ).reasoning!.defaultLevel,
+        ReasoningLevel.high,
+      );
       expectHit(
         'gemini-2.5-flash',
         dialect: ReasoningDialect.geminiThinkingBudget,

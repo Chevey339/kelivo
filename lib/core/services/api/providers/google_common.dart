@@ -31,9 +31,9 @@ import 'google/google_decoder.dart';
 import 'google_gemini.dart';
 import 'google_vertex.dart';
 
-/// Builds the Gemini tools array, handling Gemini 3 coexistence vs 2.x mutual exclusion.
+/// Builds the Gemini tools array, handling Gemini 3+ coexistence vs 2.x mutual exclusion.
 ///
-/// Gemini 3: built-in tools can coexist with function_declarations (MCP).
+/// Gemini 3+: built-in tools can coexist with function_declarations (MCP).
 /// Gemini 2.x and below: code_execution is exclusive; search/url_context exclude MCP.
 List<Map<String, dynamic>> _buildGeminiToolsArray({
   required Set<String> builtIns,
@@ -585,7 +585,7 @@ Stream<StreamChunk> sendGoogleStream(
     );
     final geminiToolConfig = buildGeminiToolConfig(
       tools: toolsArr,
-      isGemini3: mixedBuiltInAndFunctionTools && !isVertex,
+      allowServerSideToolInvocations: mixedBuiltInAndFunctionTools && !isVertex,
     );
 
     final generationConfig = <String, dynamic>{
@@ -1060,7 +1060,7 @@ Stream<StreamChunk> sendGoogleStream(
   );
   final geminiToolConfig = buildGeminiToolConfig(
     tools: toolsArr,
-    isGemini3: mixedBuiltInAndFunctionTools && !isVertex,
+    allowServerSideToolInvocations: mixedBuiltInAndFunctionTools && !isVertex,
   );
 
   // Maintain a rolling conversation for multi-round tool calls
