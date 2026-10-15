@@ -373,10 +373,17 @@ final class McpOAuthService {
         final resource = rawResource is String
             ? Uri.tryParse(rawResource)
             : null;
+        // Some servers publish endpoint metadata only at the root fallback.
+        // Accept that layout only when the resource is the exact endpoint.
+        final matchesEndpointAtRoot =
+            candidate.metadataUri ==
+                _originUri(server, '/.well-known/oauth-protected-resource') &&
+            rawResource == server.toString();
         if (resource == null ||
             !_resourceCoversServer(resource, server) ||
             (candidate.expectedResource != null &&
-                rawResource != candidate.expectedResource.toString())) {
+                rawResource != candidate.expectedResource.toString() &&
+                !matchesEndpointAtRoot)) {
           resourceMismatch ??= McpOAuthException(
             'protected resource metadata resource does not match the requested resource '
             '(endpoint: ${_diagnosticUri(server)}, '
