@@ -269,108 +269,121 @@ void main() {
       },
     );
 
-    test('preserves parallel function calls without inventing signatures', () async {
-      final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
-      addTearDown(() async {
-        await server.close(force: true);
-      });
+    // Replaying the batch as one model turn must not depend on the model id.
+    for (final modelId in const [
+      'gemini-3.1-pro-preview',
+      'gemini-2.5-flash',
+      'gemini-4-argon',
+    ]) {
+      test('$modelId replays parallel function calls as one signed turn', () async {
+        final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+        addTearDown(() async {
+          await server.close(force: true);
+        });
 
-      var requestCount = 0;
-      server.listen((request) async {
-        requestCount++;
-        final bodyText = await utf8.decoder.bind(request).join();
+        var requestCount = 0;
+        server.listen((request) async {
+          requestCount++;
+          final bodyText = await utf8.decoder.bind(request).join();
 
-        if (requestCount == 1) {
-          request.response.statusCode = HttpStatus.ok;
-          request.response.headers.contentType = ContentType(
-            'text',
-            'event-stream',
-          );
-          request.response.headers.set('Transfer-Encoding', 'chunked');
-          request.response.write(
-            'data: ${jsonEncode(_streamChunk([
-              _functionCallPart(name: 'search_docs', args: {'query': 'Kelivo fetch'}, thoughtSignature: 'sig-search-docs'),
-              _functionCallPart(name: 'fetch_markdown', args: {'url': 'https://example.com'}),
-            ], finishReason: 'STOP'))}\n\n',
-          );
-          request.response.write('data: [DONE]');
-          await request.response.close();
-          return;
-        }
+          if (requestCount == 1) {
+            request.response.statusCode = HttpStatus.ok;
+            request.response.headers.contentType = ContentType(
+              'text',
+              'event-stream',
+            );
+            request.response.headers.set('Transfer-Encoding', 'chunked');
+            request.response.write(
+              'data: ${jsonEncode(_streamChunk([
+                _functionCallPart(name: 'search_docs', args: {'query': 'Kelivo fetch'}, thoughtSignature: 'sig-search-docs'),
+                _functionCallPart(name: 'fetch_markdown', args: {'url': 'https://example.com'}),
+              ], finishReason: 'STOP'))}\n\n',
+            );
+            request.response.write('data: [DONE]');
+            await request.response.close();
+            return;
+          }
 
-        if (requestCount == 2) {
-          final body = jsonDecode(bodyText) as Map<String, dynamic>;
-          final contents = (body['contents'] as List).cast<Map>();
-          final modelParts = (contents[1]['parts'] as List).cast<Map>();
-          final functionCalls = modelParts
-              .where((p) => p.containsKey('functionCall'))
-              .toList();
+          if (requestCount == 2) {
+            final body = jsonDecode(bodyText) as Map<String, dynamic>;
+            final contents = (body['contents'] as List).cast<Map>();
+            final modelParts = (contents[1]['parts'] as List).cast<Map>();
+            final functionCalls = modelParts
+                .where((p) => p.containsKey('functionCall'))
+                .toList();
 
-          expect(functionCalls, hasLength(2));
-          expect(_thoughtSignatureOf(functionCalls[0]), 'sig-search-docs');
-          expect(_hasThoughtSignature(functionCalls[1]), isFalse);
+            expect(contents, hasLength(3));
+            expect(functionCalls, hasLength(2));
+            expect(_thoughtSignatureOf(functionCalls[0]), 'sig-search-docs');
+            expect(_hasThoughtSignature(functionCalls[1]), isFalse);
+            final responses = (contents[2]['parts'] as List)
+                .cast<Map>()
+                .map((p) => (p['functionResponse'] as Map)['name'])
+                .toList();
+            expect(responses, ['search_docs', 'fetch_markdown']);
 
-          request.response.statusCode = HttpStatus.ok;
-          request.response.headers.contentType = ContentType(
-            'text',
-            'event-stream',
-          );
-          request.response.headers.set('Transfer-Encoding', 'chunked');
-          request.response.write(
-            'data: ${jsonEncode(_streamChunk([_textPart(text: 'ok')], finishReason: 'STOP'))}\n\n',
-          );
-          request.response.write('data: [DONE]');
-          await request.response.close();
-          return;
-        }
+            request.response.statusCode = HttpStatus.ok;
+            request.response.headers.contentType = ContentType(
+              'text',
+              'event-stream',
+            );
+            request.response.headers.set('Transfer-Encoding', 'chunked');
+            request.response.write(
+              'data: ${jsonEncode(_streamChunk([_textPart(text: 'ok')], finishReason: 'STOP'))}\n\n',
+            );
+            request.response.write('data: [DONE]');
+            await request.response.close();
+            return;
+          }
 
-        fail('Unexpected request count: $requestCount');
-      });
+          fail('Unexpected request count: $requestCount');
+        });
 
-      final chunks = await ChatApiService.sendMessageStream(
-        config: _geminiConfig(
-          'http://${server.address.address}:${server.port}/v1beta',
-        ),
-        modelId: 'gemini-3.1-pro-preview',
-        messages: const [
-          {
-            'role': 'user',
-            'content': 'Look up the docs first, then fetch the page content.',
-          },
-        ],
-        tools: const [
-          {
-            'function_declarations': [
-              {
-                'name': 'search_docs',
-                'description': 'Search for matching docs',
-                'parameters': {
-                  'type': 'object',
-                  'properties': {
-                    'query': {'type': 'string'},
+        final chunks = await ChatApiService.sendMessageStream(
+          config: _geminiConfig(
+            'http://${server.address.address}:${server.port}/v1beta',
+          ),
+          modelId: modelId,
+          messages: const [
+            {
+              'role': 'user',
+              'content': 'Look up the docs first, then fetch the page content.',
+            },
+          ],
+          tools: const [
+            {
+              'function_declarations': [
+                {
+                  'name': 'search_docs',
+                  'description': 'Search for matching docs',
+                  'parameters': {
+                    'type': 'object',
+                    'properties': {
+                      'query': {'type': 'string'},
+                    },
+                    'required': ['query'],
                   },
-                  'required': ['query'],
                 },
-              },
-              {
-                'name': 'fetch_markdown',
-                'description': 'Fetch a page as markdown',
-                'parameters': {
-                  'type': 'object',
-                  'properties': {
-                    'url': {'type': 'string'},
+                {
+                  'name': 'fetch_markdown',
+                  'description': 'Fetch a page as markdown',
+                  'parameters': {
+                    'type': 'object',
+                    'properties': {
+                      'url': {'type': 'string'},
+                    },
+                    'required': ['url'],
                   },
-                  'required': ['url'],
                 },
-              },
-            ],
-          },
-        ],
-      ).toList();
+              ],
+            },
+          ],
+        ).toList();
 
-      expect(requestCount, 2);
-      expect(chunks.isGenerationDone, isTrue);
-    });
+        expect(requestCount, 2);
+        expect(chunks.isGenerationDone, isTrue);
+      });
+    }
 
     test('keeps a detached signature part instead of moving it', () async {
       final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
