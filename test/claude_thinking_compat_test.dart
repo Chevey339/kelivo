@@ -321,6 +321,20 @@ final _claudeCases = <_ClaudeCase>[
     },
   ),
   _ClaudeCase(
+    name: 'Haiku 5.5 uses adaptive thinking, not budget_tokens',
+    modelId: 'claude-haiku-5-5',
+    thinkingBudget: 16000,
+    temperature: 0.7,
+    topP: 0.8,
+    verify: (body) {
+      expect(body['thinking'], {'type': 'adaptive', 'display': 'summarized'});
+      expect(body['output_config'], {'effort': 'medium'});
+      expect(body['max_tokens'], 128000);
+      expect(body.containsKey('temperature'), isFalse);
+      expect(body.containsKey('top_p'), isFalse);
+    },
+  ),
+  _ClaudeCase(
     name: 'Sonnet 5 can disable thinking but still rejects sampling',
     modelId: 'claude-sonnet-5',
     thinkingBudget: 0,

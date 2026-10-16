@@ -971,7 +971,7 @@ _ReasoningHit _geminiBudget(String id) {
 }
 
 bool _isClaude5(String id) =>
-    _matches(id, r'claude-(?:opus|sonnet)-5(?:$|[._:@/-])');
+    _matches(id, r'claude-(?:opus|sonnet|haiku)-5(?:$|[._:@/-])');
 
 bool _isClaudeAlwaysOn(String id) =>
     id.contains('claude-fable') || id.contains('claude-mythos');
@@ -1040,7 +1040,7 @@ bool _claudeSupportsMax(String id) {
 int _claudeMaxOutput(String id) {
   if (_matches(
     id,
-    r'claude-(?:fable-5|mythos-5|opus-(?:5|4-[678])|sonnet-(?:5|4-6))(?:$|[._:/-])',
+    r'claude-(?:fable-5|mythos-5|opus-(?:5|4-[678])|sonnet-(?:5|4-6)|haiku-5)(?:$|[._:/-])',
   )) {
     return 128000;
   }
