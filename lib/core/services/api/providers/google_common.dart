@@ -1079,6 +1079,7 @@ Stream<StreamChunk> sendGoogleStream(
   var pendingCalls = <EmitToolCall>[];
   var lastRoundCalls = <Map<String, dynamic>>[];
   var lastRoundModelParts = <dynamic>[];
+  var sawFunctionCallThoughtSig = false;
   var retryMalformed = false;
 
   yield* runProviderToolRounds(
@@ -1405,6 +1406,11 @@ Stream<StreamChunk> sendGoogleStream(
         convo.add({'role': 'user', 'parts': responseParts});
         return;
       }
+      // Replay the whole round as one model turn and one user turn: Gemini
+      // signs only the first call of a parallel batch, so splitting the batch
+      // into one turn per call leaves the later turns unsigned.
+      final modelParts = <Map<String, dynamic>>[];
+      final responseParts = <Map<String, dynamic>>[];
       for (final c in lastRoundCalls) {
         final name = (c['name'] ?? '').toString();
         final args =
@@ -1425,28 +1431,27 @@ Stream<StreamChunk> sendGoogleStream(
         };
         if (thoughtSigKey != null && thoughtSigVal != null) {
           part[thoughtSigKey] = thoughtSigVal;
+          sawFunctionCallThoughtSig = true;
         }
-
-        convo.add({
-          'role': 'model',
-          'parts': [part],
-        });
+        modelParts.add(part);
         Map<String, dynamic> responseObj;
         try {
           responseObj = (jsonDecode(resText) as Map).cast<String, dynamic>();
         } catch (_) {
           responseObj = {'result': resText};
         }
-        convo.add({
-          'role': 'user',
-          'parts': [
-            {
-              'functionResponse': {'name': name, 'response': responseObj},
-            },
-            ...result.googleImageParts,
-          ],
+        responseParts.add({
+          'functionResponse': {'name': name, 'response': responseObj},
         });
+        responseParts.addAll(result.googleImageParts);
       }
+      // Once the model signs its calls, every later step must be signed too;
+      // a step that arrived without one gets the placeholder.
+      if (persistGeminiThoughtSigs || sawFunctionCallThoughtSig) {
+        _ensureGeminiFunctionCallThoughtSig(modelParts);
+      }
+      convo.add({'role': 'model', 'parts': modelParts});
+      convo.add({'role': 'user', 'parts': responseParts});
     },
     finish: () => emitDone(
       ids: StreamChunkIds('finish'),
