@@ -261,7 +261,7 @@ final _claudeCases = <_ClaudeCase>[
     },
   ),
   _ClaudeCase(
-    name: 'Opus 4.7 off disables thinking and keeps sampling',
+    name: 'Opus 4.7 off disables thinking and drops sampling',
     modelId: 'claude-opus-4-7',
     thinkingBudget: 0,
     temperature: 0.7,
@@ -269,8 +269,22 @@ final _claudeCases = <_ClaudeCase>[
     verify: (body) {
       expect(body['thinking'], {'type': 'disabled'});
       expect(body.containsKey('output_config'), isFalse);
-      expect(body['temperature'], 0.7);
-      expect(body['top_p'], 0.8);
+      // Claude 4.7 removed temperature/top_p/top_k outright.
+      expect(body.containsKey('temperature'), isFalse);
+      expect(body.containsKey('top_p'), isFalse);
+    },
+  ),
+  _ClaudeCase(
+    name: 'Opus 4.7 adaptive strips sampling',
+    modelId: 'claude-opus-4-7',
+    thinkingBudget: 16000,
+    temperature: 0.7,
+    topP: 0.8,
+    verify: (body) {
+      expect(body['thinking'], {'type': 'adaptive', 'display': 'summarized'});
+      expect(body['output_config'], {'effort': 'medium'});
+      expect(body.containsKey('temperature'), isFalse);
+      expect(body.containsKey('top_p'), isFalse);
     },
   ),
   _ClaudeCase(
@@ -318,6 +332,89 @@ final _claudeCases = <_ClaudeCase>[
       expect(body['max_tokens'], 128000);
       expect(body.containsKey('temperature'), isFalse);
       expect(body.containsKey('top_p'), isFalse);
+    },
+  ),
+  _ClaudeCase(
+    name: 'Haiku 5.5 uses adaptive thinking, not budget_tokens',
+    modelId: 'claude-haiku-5-5',
+    thinkingBudget: 16000,
+    temperature: 0.7,
+    topP: 0.8,
+    verify: (body) {
+      expect(body['thinking'], {'type': 'adaptive', 'display': 'summarized'});
+      expect(body['output_config'], {'effort': 'medium'});
+      expect(body['max_tokens'], 128000);
+      expect((body['thinking'] as Map).containsKey('budget_tokens'), isFalse);
+      expect(body.containsKey('temperature'), isFalse);
+      expect(body.containsKey('top_p'), isFalse);
+    },
+  ),
+  _ClaudeCase(
+    name: 'Bedrock-style Haiku 5.5 id uses adaptive thinking',
+    modelId: 'anthropic.claude-haiku-5-5',
+    thinkingBudget: 16000,
+    verify: (body) {
+      expect(body['thinking'], {'type': 'adaptive', 'display': 'summarized'});
+      expect(body['output_config'], {'effort': 'medium'});
+    },
+  ),
+  _ClaudeCase(
+    name: 'Haiku 5.5 off disables thinking and still drops sampling',
+    modelId: 'claude-haiku-5-5',
+    thinkingBudget: 0,
+    temperature: 0.7,
+    topP: 0.8,
+    verify: (body) {
+      expect(body['thinking'], {'type': 'disabled'});
+      expect(body.containsKey('output_config'), isFalse);
+      expect(body.containsKey('temperature'), isFalse);
+      expect(body.containsKey('top_p'), isFalse);
+    },
+  ),
+  _ClaudeCase(
+    name: 'Sonnet 5.5 off uses between_tools instead of disabled',
+    modelId: 'claude-sonnet-5-5',
+    thinkingBudget: 0,
+    verify: (body) {
+      expect(body['thinking'], {'type': 'between_tools'});
+      expect(body.containsKey('output_config'), isFalse);
+    },
+  ),
+  _ClaudeCase(
+    name: 'Sonnet 5.5 maps the effort ladder onto output_config',
+    modelId: 'claude-sonnet-5-5',
+    thinkingBudget: 64000,
+    verify: (body) {
+      expect(body['thinking'], {'type': 'adaptive', 'display': 'summarized'});
+      expect(body['output_config'], {'effort': 'xhigh'});
+    },
+  ),
+  _ClaudeCase(
+    name: 'Opus 5.5 cannot disable thinking',
+    modelId: 'claude-opus-5-5',
+    thinkingBudget: 0,
+    verify: (body) {
+      expect(body['thinking'], {'type': 'adaptive', 'display': 'summarized'});
+      expect(body['output_config'], {'effort': 'low'});
+      expect(body['max_tokens'], 128000);
+    },
+  ),
+  _ClaudeCase(
+    name: 'newer Claude generations default to adaptive thinking',
+    modelId: 'claude-opus-6',
+    thinkingBudget: 16000,
+    verify: (body) {
+      expect(body['thinking'], {'type': 'adaptive', 'display': 'summarized'});
+      expect(body['output_config'], {'effort': 'medium'});
+    },
+  ),
+  _ClaudeCase(
+    name: 'dated Claude 4 snapshots keep extended thinking',
+    modelId: 'claude-sonnet-4-20250514',
+    thinkingBudget: 2048,
+    verify: (body) {
+      expect(body['thinking'], {'type': 'enabled', 'budget_tokens': 2048});
+      expect(body.containsKey('output_config'), isFalse);
     },
   ),
   _ClaudeCase(

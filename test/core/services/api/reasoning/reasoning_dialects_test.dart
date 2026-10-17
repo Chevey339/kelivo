@@ -60,6 +60,7 @@ ReasoningTransport _nativeTransport(ReasoningDialect dialect) {
       return ReasoningTransport.responses;
     case ReasoningDialect.anthropicBudget:
     case ReasoningDialect.anthropicAdaptiveEffort:
+    case ReasoningDialect.anthropicBetweenTools:
     case ReasoningDialect.anthropicEffort:
       return ReasoningTransport.anthropicMessages;
     case ReasoningDialect.geminiThinkingBudget:
@@ -210,6 +211,17 @@ Map<String, dynamic> _expectedBody({
       if (effective == ReasoningLevel.off) {
         return {
           'thinking': {'type': 'disabled'},
+        };
+      }
+      return {
+        'thinking': {'type': 'adaptive', 'display': 'summarized'},
+        if (effective != ReasoningLevel.auto)
+          'output_config': {'effort': effective.name},
+      };
+    case ReasoningDialect.anthropicBetweenTools:
+      if (effective == ReasoningLevel.off) {
+        return {
+          'thinking': {'type': 'between_tools'},
         };
       }
       return {
@@ -1297,6 +1309,29 @@ void main() {
               'thinkingLevel': 'HIGH',
             },
           },
+        },
+      );
+      expect(
+        applyReasoning(
+          <String, dynamic>{},
+          _spec(dialect: ReasoningDialect.anthropicBetweenTools),
+          const ReasoningRequest(ReasoningLevel.off),
+          transport: ReasoningTransport.anthropicMessages,
+        ),
+        {
+          'thinking': {'type': 'between_tools'},
+        },
+      );
+      expect(
+        applyReasoning(
+          <String, dynamic>{},
+          _spec(dialect: ReasoningDialect.anthropicBetweenTools),
+          const ReasoningRequest(ReasoningLevel.high),
+          transport: ReasoningTransport.anthropicMessages,
+        ),
+        {
+          'thinking': {'type': 'adaptive', 'display': 'summarized'},
+          'output_config': {'effort': 'high'},
         },
       );
       expect(

@@ -263,6 +263,8 @@ String dialectLabel(AppLocalizations l10n, ReasoningDialect dialect) {
       l10n.modelSpecFormDialectAnthropicBudget,
     ReasoningDialect.anthropicAdaptiveEffort =>
       l10n.modelSpecFormDialectAnthropicAdaptiveEffort,
+    ReasoningDialect.anthropicBetweenTools =>
+      l10n.modelSpecFormDialectAnthropicBetweenTools,
     ReasoningDialect.anthropicEffort =>
       l10n.modelSpecFormDialectAnthropicEffort,
     ReasoningDialect.geminiThinkingBudget =>
@@ -296,6 +298,8 @@ String dialectSubtitle(AppLocalizations l10n, ReasoningDialect dialect) {
       l10n.modelSpecFormDialectAnthropicBudgetSubtitle,
     ReasoningDialect.anthropicAdaptiveEffort =>
       l10n.modelSpecFormDialectAnthropicAdaptiveEffortSubtitle,
+    ReasoningDialect.anthropicBetweenTools =>
+      l10n.modelSpecFormDialectAnthropicBetweenToolsSubtitle,
     ReasoningDialect.anthropicEffort =>
       l10n.modelSpecFormDialectAnthropicEffortSubtitle,
     ReasoningDialect.geminiThinkingBudget =>
