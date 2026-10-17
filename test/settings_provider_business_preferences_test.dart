@@ -22,6 +22,7 @@ void main() {
   setUp(() async {
     SharedPreferences.setMockInitialValues({
       'display_chat_font_scale_v1': 1.2,
+      'display_chat_line_height_v1': 1.6,
       'flutter_log_enabled_v1': false,
       // A business value in prefs must no longer win over SQLite.
       'theme_mode_v1': 'light',
@@ -57,6 +58,7 @@ void main() {
       expect(settings.learningModeEnabled, isTrue);
       expect(settings.learningModePrompt, 'Learn from the database');
       expect(settings.chatFontScale, 1.2);
+      expect(settings.chatLineHeight, 1.6);
     },
   );
 
@@ -257,6 +259,7 @@ void main() {
       await settings.setLearningModeEnabled(false);
       await settings.setLearningModePrompt('Updated prompt');
       await settings.setChatFontScale(1.35);
+      await settings.setChatLineHeight(1.75);
 
       final reloaded = SettingsProvider(BusinessPreferences(repository));
       await reloaded.loaded;
@@ -267,9 +270,11 @@ void main() {
       expect(reloaded.learningModeEnabled, isFalse);
       expect(reloaded.learningModePrompt, 'Updated prompt');
       expect(reloaded.chatFontScale, 1.35);
+      expect(reloaded.chatLineHeight, 1.75);
 
       final localPreferences = await SharedPreferences.getInstance();
       expect(localPreferences.getDouble('display_chat_font_scale_v1'), 1.35);
+      expect(localPreferences.getDouble('display_chat_line_height_v1'), 1.75);
       expect(localPreferences.getString('theme_mode_v1'), 'light');
     },
   );

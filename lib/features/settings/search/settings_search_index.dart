@@ -548,6 +548,12 @@ class SettingsSearchIndex {
       keywords: 'font size text scale 字号 字號 文字大小 字体大小',
     );
     add(
+      'displaySettingsPageChatLineHeightTitle',
+      SettingsSearchDestination.display,
+      (l) => l.displaySettingsPageChatLineHeightTitle,
+      keywords: 'line height line spacing 行高 行距 行间距 行間距',
+    );
+    add(
       'displaySettingsPageAutoScrollIdleTitle',
       SettingsSearchDestination.display,
       (l) => l.displaySettingsPageAutoScrollIdleTitle,
