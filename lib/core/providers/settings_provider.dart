@@ -32,6 +32,7 @@ import '../../utils/app_directories.dart';
 import '../../utils/sandbox_path_resolver.dart';
 import '../../utils/avatar_cache.dart';
 import '../models/assistant.dart';
+import '../models/memory_entry.dart';
 import '../models/model_spec.dart';
 import '../models/reasoning_request.dart';
 import '../services/model_spec/model_spec_resolver.dart';
@@ -182,6 +183,8 @@ class SettingsProvider extends ChangeNotifier {
   static const int maxMemoryMigrationBatchSize = 24;
   static const String _memoryInjectionMaxItemsKey =
       'memory_injection_max_items_v1';
+  static const String _memoryFullInjectionTypesKey =
+      'memory_full_injection_types_v1';
   static const int defaultMemoryInjectionMaxItems = 10;
   static const int minMemoryInjectionMaxItems = 1;
   static const int maxMemoryInjectionMaxItems = 100;
@@ -968,6 +971,13 @@ class SettingsProvider extends ChangeNotifier {
         (prefs.getInt(_memoryInjectionMaxItemsKey) ??
                 defaultMemoryInjectionMaxItems)
             .clamp(minMemoryInjectionMaxItems, maxMemoryInjectionMaxItems);
+    final fullInjectionTypes =
+        prefs.getStringList(_memoryFullInjectionTypesKey) ?? const <String>[];
+    _memoryFullInjectionTypes = Set<MemoryType>.unmodifiable(
+      MemoryType.values.where(
+        (type) => fullInjectionTypes.contains(MemoryEntry.typeToString(type)),
+      ),
+    );
 
     // display settings
     _showUserAvatar = prefs.getBool(_displayShowUserAvatarKey) ?? true;
@@ -4193,6 +4203,9 @@ Requirements:
   String _memoryMigratePromptEn = MemoryPrompts.migrateEn;
   int _memoryMigrationBatchSize = defaultMemoryMigrationBatchSize;
   int _memoryInjectionMaxItems = defaultMemoryInjectionMaxItems;
+  Set<MemoryType> _memoryFullInjectionTypes = const {};
+
+  Set<MemoryType> get memoryFullInjectionTypes => _memoryFullInjectionTypes;
 
   String get memoryRulesPromptZh => _memoryRulesPromptZh;
   String get memoryRulesPromptEn => _memoryRulesPromptEn;
@@ -4455,6 +4468,19 @@ Requirements:
     _memoryInjectionMaxItems = next;
     notifyListeners();
     await _preferences.setInt(_memoryInjectionMaxItemsKey, next);
+  }
+
+  Future<void> setMemoryFullInjectionTypes(Set<MemoryType> types) async {
+    final next = Set<MemoryType>.unmodifiable(
+      MemoryType.values.where(types.contains),
+    );
+    if (setEquals(_memoryFullInjectionTypes, next)) return;
+    _memoryFullInjectionTypes = next;
+    notifyListeners();
+    await _preferences.setStringList(
+      _memoryFullInjectionTypesKey,
+      next.map(MemoryEntry.typeToString).toList(),
+    );
   }
 
   Future<void> resetMemoryRulesPromptZh() async =>
@@ -5768,6 +5794,7 @@ Requirements:
     copy._memoryMigratePromptEn = _memoryMigratePromptEn;
     copy._memoryMigrationBatchSize = _memoryMigrationBatchSize;
     copy._memoryInjectionMaxItems = _memoryInjectionMaxItems;
+    copy._memoryFullInjectionTypes = _memoryFullInjectionTypes;
     copy._showUserAvatar = _showUserAvatar;
     copy._showModelIcon = _showModelIcon;
     copy._showModelNameTimestamp = _showModelNameTimestamp;

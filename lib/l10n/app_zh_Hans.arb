@@ -2641,7 +2641,9 @@
   "memorySettingsThinkingSubtitle": "在模型支持时允许记忆模型使用推理",
   "memorySettingsInjectionSection": "记忆注入",
   "memorySettingsInjectionMaxItemsTitle": "每类注入条数",
-  "memorySettingsInjectionMaxItemsSubtitle": "某一类型的记忆超过该条数时，只注入最近的若干条，其余由模型用 memory_search_profile 按需查询。调大更全面但更费 token。若你改过规则提示词，请一并更新或恢复默认。",
+  "memorySettingsInjectionMaxItemsSubtitle": "此限制仅适用于未选择全量注入的类型。某一类型的记忆超过该条数时，只注入最近的若干条，其余由模型用 memory_search_profile 按需查询。调大更全面但更费 token。若你改过规则提示词，请一并更新或恢复默认。",
+  "memorySettingsFullInjectionTypesTitle": "全量注入类型",
+  "memorySettingsFullInjectionTypesSubtitle": "可多选。选中类型会注入全局及当前助手的全部有效记忆，不受条数限制，会增加上下文和 token 消耗。",
   "memorySettingsInjectionMaxItemsOption": "{n}",
   "@memorySettingsInjectionMaxItemsOption": {
     "placeholders": {

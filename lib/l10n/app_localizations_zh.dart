@@ -7279,7 +7279,14 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get memorySettingsInjectionMaxItemsSubtitle =>
-      '某一类型的记忆超过该条数时，只注入最近的若干条，其余由模型用 memory_search_profile 按需查询。调大更全面但更费 token。若你改过规则提示词，请一并更新或恢复默认。';
+      '此限制仅适用于未选择全量注入的类型。某一类型的记忆超过该条数时，只注入最近的若干条，其余由模型用 memory_search_profile 按需查询。调大更全面但更费 token。若你改过规则提示词，请一并更新或恢复默认。';
+
+  @override
+  String get memorySettingsFullInjectionTypesTitle => '全量注入类型';
+
+  @override
+  String get memorySettingsFullInjectionTypesSubtitle =>
+      '可多选。选中类型会注入全局及当前助手的全部有效记忆，不受条数限制，会增加上下文和 token 消耗。';
 
   @override
   String memorySettingsInjectionMaxItemsOption(int n) {
@@ -19674,7 +19681,14 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get memorySettingsInjectionMaxItemsSubtitle =>
-      '某一类型的记忆超过该条数时，只注入最近的若干条，其余由模型用 memory_search_profile 按需查询。调大更全面但更费 token。若你改过规则提示词，请一并更新或恢复默认。';
+      '此限制仅适用于未选择全量注入的类型。某一类型的记忆超过该条数时，只注入最近的若干条，其余由模型用 memory_search_profile 按需查询。调大更全面但更费 token。若你改过规则提示词，请一并更新或恢复默认。';
+
+  @override
+  String get memorySettingsFullInjectionTypesTitle => '全量注入类型';
+
+  @override
+  String get memorySettingsFullInjectionTypesSubtitle =>
+      '可多选。选中类型会注入全局及当前助手的全部有效记忆，不受条数限制，会增加上下文和 token 消耗。';
 
   @override
   String memorySettingsInjectionMaxItemsOption(int n) {
@@ -32144,7 +32158,14 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get memorySettingsInjectionMaxItemsSubtitle =>
-      '某一類型的記憶超過該條數時，只注入最近的若干條，其餘由模型用 memory_search_profile 按需查詢。調大更全面但更費 token。若你改過規則提示詞，請一併更新或恢復預設。';
+      '此限制僅適用於未選擇全量注入的類型。某一類型的記憶超過該條數時，只注入最近的若干條，其餘由模型用 memory_search_profile 按需查詢。調大更全面但更費 token。若你改過規則提示詞，請一併更新或恢復預設。';
+
+  @override
+  String get memorySettingsFullInjectionTypesTitle => '全量注入類型';
+
+  @override
+  String get memorySettingsFullInjectionTypesSubtitle =>
+      '可多選。選中類型會注入全域及目前助手的全部有效記憶，不受條數限制，會增加上下文和 token 消耗。';
 
   @override
   String memorySettingsInjectionMaxItemsOption(int n) {

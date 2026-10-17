@@ -1758,6 +1758,8 @@ class MessageBuilderService {
       assistantId: assistant.id,
       lang: lang,
       maxItems: maxItems,
+      fullInjectionTypes:
+          resolvedSettings?.memoryFullInjectionTypes ?? const {},
     );
   }
 

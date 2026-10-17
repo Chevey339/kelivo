@@ -13792,8 +13792,20 @@ abstract class AppLocalizations {
   /// No description provided for @memorySettingsInjectionMaxItemsSubtitle.
   ///
   /// In en, this message translates to:
-  /// **'When a type exceeds this limit, only the newest items are injected. The rest can be fetched with memory_search_profile. A larger number is more complete but uses more tokens. If you customized the rules prompt, update it or restore the default.'**
+  /// **'This limit applies to types not selected for full injection. When a type exceeds this limit, only the newest items are injected. The rest can be fetched with memory_search_profile. A larger number is more complete but uses more tokens. If you customized the rules prompt, update it or restore the default.'**
   String get memorySettingsInjectionMaxItemsSubtitle;
+
+  /// No description provided for @memorySettingsFullInjectionTypesTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Always inject these types'**
+  String get memorySettingsFullInjectionTypesTitle;
+
+  /// No description provided for @memorySettingsFullInjectionTypesSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Select one or more types to inject all their active memories visible to the current assistant. These types ignore the item limit and use more context and tokens.'**
+  String get memorySettingsFullInjectionTypesSubtitle;
 
   /// No description provided for @memorySettingsInjectionMaxItemsOption.
   ///

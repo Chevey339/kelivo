@@ -438,10 +438,20 @@ void main() {
     'delete',
     'language',
     'limit',
+    'fullInjection',
+    'limitedInjection',
   ]) {
     testWidgets(
       '$change invalidates the prepared notification using actual injected memory',
       (tester) async {
+        if (change == 'fullInjection' || change == 'limitedInjection') {
+          await tester.runAsync(() async {
+            await settings.setMemoryInjectionMaxItems(1);
+            if (change == 'limitedInjection') {
+              await settings.setMemoryFullInjectionTypes({MemoryType.identity});
+            }
+          });
+        }
         await mount(tester);
         await tester.runAsync(() async {
           await scheduler.save(task);
@@ -450,7 +460,12 @@ void main() {
           final before = scheduler.tasks.single.runs.first;
           final body = notifications.bodies[before.id];
           expect(body, contains('Paris'));
-          expect(body, contains('Quiet mornings'));
+          expect(
+            body,
+            change == 'fullInjection'
+                ? isNot(contains('Quiet mornings'))
+                : contains('Quiet mornings'),
+          );
           final executor = service.preparation.executor;
           switch (change) {
             case 'profile':
@@ -474,6 +489,10 @@ void main() {
               await settings.setMemoryPromptLang('zh');
             case 'limit':
               await settings.setMemoryInjectionMaxItems(1);
+            case 'fullInjection':
+              await settings.setMemoryFullInjectionTypes({MemoryType.identity});
+            case 'limitedInjection':
+              await settings.setMemoryFullInjectionTypes({});
           }
           await waitFor('pending'); // Requires the real binding's listener.
           final revision = await executor.revision(task);

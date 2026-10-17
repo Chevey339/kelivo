@@ -7569,7 +7569,15 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get memorySettingsInjectionMaxItemsSubtitle =>
-      'When a type exceeds this limit, only the newest items are injected. The rest can be fetched with memory_search_profile. A larger number is more complete but uses more tokens. If you customized the rules prompt, update it or restore the default.';
+      'This limit applies to types not selected for full injection. When a type exceeds this limit, only the newest items are injected. The rest can be fetched with memory_search_profile. A larger number is more complete but uses more tokens. If you customized the rules prompt, update it or restore the default.';
+
+  @override
+  String get memorySettingsFullInjectionTypesTitle =>
+      'Always inject these types';
+
+  @override
+  String get memorySettingsFullInjectionTypesSubtitle =>
+      'Select one or more types to inject all their active memories visible to the current assistant. These types ignore the item limit and use more context and tokens.';
 
   @override
   String memorySettingsInjectionMaxItemsOption(int n) {
