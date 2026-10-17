@@ -163,6 +163,16 @@ void main() {
         '( ) ',
         '| a | b |',
         '| --- | --- |',
+        ':::note',
+        '::::',
+        '::image[caption]{src=x}',
+        '> [!TIP]',
+        '<div>',
+        '</div>',
+        '<script>',
+        '</script>',
+        '<!--',
+        '-->',
       ];
       for (var sample = 0; sample < 700; sample++) {
         final source = List.generate(

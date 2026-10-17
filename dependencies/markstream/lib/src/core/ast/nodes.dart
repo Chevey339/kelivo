@@ -336,3 +336,96 @@ final class DetailsSummaryNode extends BlockNode {
   @override
   T accept<T>(AstVisitor<T> visitor) => visitor.visitDetailsSummary(this);
 }
+
+enum NamedBlockSyntax { alert, containerDirective, leafDirective }
+
+final class NamedBlockNode extends BlockNode {
+  NamedBlockNode({
+    required SourceSpan span,
+    required this.name,
+    required this.syntax,
+    required List<BlockNode> children,
+    Map<String, String> attributes = const {},
+    this.closed = true,
+  }) : children = List.unmodifiable(children),
+       attributes = Map.unmodifiable(attributes),
+       super(span);
+  final String name;
+  final NamedBlockSyntax syntax;
+  final Map<String, String> attributes;
+  final bool closed;
+  @override
+  final List<BlockNode> children;
+  @override
+  String get type => 'named_block';
+  @override
+  Map<String, Object?> get fields => {
+    'name': name,
+    'syntax': syntax.name,
+    'attributes': attributes,
+    'closed': closed,
+  };
+  @override
+  T accept<T>(AstVisitor<T> visitor) => visitor.visitNamedBlock(this);
+}
+
+final class DirectiveLabelNode extends BlockNode {
+  DirectiveLabelNode({
+    required SourceSpan span,
+    required List<InlineNode> children,
+  }) : children = List.unmodifiable(children),
+       super(span);
+  @override
+  final List<InlineNode> children;
+  @override
+  String get type => 'directive_label';
+  @override
+  T accept<T>(AstVisitor<T> visitor) => visitor.visitDirectiveLabel(this);
+}
+
+final class HtmlBlockNode extends BlockNode {
+  HtmlBlockNode({
+    required SourceSpan span,
+    required List<InlineNode> children,
+    required this.raw,
+    this.fullDocument = false,
+    this.closed = true,
+  }) : children = List.unmodifiable(children),
+       super(span);
+  @override
+  final List<InlineNode> children;
+  final String raw;
+  final bool fullDocument;
+  final bool closed;
+  @override
+  String get type => 'html_block';
+  @override
+  Map<String, Object?> get fields => {
+    'raw': raw,
+    'fullDocument': fullDocument,
+    'closed': closed,
+  };
+  @override
+  T accept<T>(AstVisitor<T> visitor) => visitor.visitHtmlBlock(this);
+}
+
+final class HtmlElementNode extends InlineNode {
+  HtmlElementNode({
+    required SourceSpan span,
+    required this.tag,
+    required List<InlineNode> children,
+    Map<String, String> attributes = const {},
+  }) : children = List.unmodifiable(children),
+       attributes = Map.unmodifiable(attributes),
+       super(span);
+  final String tag;
+  final Map<String, String> attributes;
+  @override
+  final List<InlineNode> children;
+  @override
+  String get type => 'html_element';
+  @override
+  Map<String, Object?> get fields => {'tag': tag, 'attributes': attributes};
+  @override
+  T accept<T>(AstVisitor<T> visitor) => visitor.visitHtmlElement(this);
+}

@@ -1,6 +1,9 @@
 /// Block syntax defaults for LLM-authored Markdown.
 final class ParserOptions {
   const ParserOptions({
+    this.alerts = true,
+    this.directives = true,
+    this.htmlBlocks = true,
     this.tables = true,
     this.details = true,
     this.taskItems = true,
@@ -13,7 +16,10 @@ final class ParserOptions {
   });
 
   const ParserOptions.commonMark()
-    : tables = false,
+    : alerts = false,
+      directives = false,
+      htmlBlocks = true,
+      tables = false,
       details = false,
       taskItems = false,
       standaloneTaskLine = false,
@@ -23,6 +29,9 @@ final class ParserOptions {
       indentedCode = true,
       relaxedListIndentation = false;
 
+  final bool alerts;
+  final bool directives;
+  final bool htmlBlocks;
   final bool tables;
   final bool details;
   final bool taskItems;

@@ -6,6 +6,10 @@ import 'syntax/math_block.dart';
 import 'syntax/task_item.dart';
 import 'syntax/table.dart';
 import 'syntax/html_tag.dart';
+import 'syntax/directive.dart';
+import 'syntax/alert.dart';
+import 'syntax/html_block.dart';
+import '../html/html_fragment.dart';
 
 /// Builds block structure before inline interpretation, using original offsets.
 final class BlockParser {
@@ -30,6 +34,9 @@ enum _Kind {
   table,
   details,
   summary,
+  named,
+  label,
+  html,
 }
 
 final class _Block {
@@ -60,6 +67,10 @@ final class _Block {
   final rows = <TableRowNode>[];
   List<TableAlignment> alignments = const [];
   bool open = false;
+  String name = '';
+  Map<String, String> attributes = const {};
+  NamedBlockSyntax? syntax;
+  HtmlBlockTracker? html;
 }
 
 final class _ListMarker {
@@ -148,6 +159,19 @@ final class _BlockSession {
 
   bool _interrupts(LineCursor cursor) {
     if (cursor.indentation.width > 3) return false;
+    if (options.directives &&
+        readBlockDirective(source, cursor.indentation.end, cursor.line.end) !=
+            null)
+      return true;
+    if (options.directives && _directiveCloser(cursor) >= 0) return true;
+    if (options.htmlBlocks &&
+        matchHtmlBlock(
+              source,
+              cursor.indentation.end,
+              cursor.line.end,
+            )?.interrupts ==
+            true)
+      return true;
     if (options.details) {
       final tag = readHtmlTag(source, cursor.indentation.end, cursor.line.end);
       if (tag?.name == 'details') return true;
@@ -473,12 +497,57 @@ final class _BlockSession {
     _touch(cursor.line);
   }
 
+  int _directiveCloser(LineCursor cursor) {
+    if (cursor.indentation.width > 3) return -1;
+    final text = _trimmed(cursor);
+    final closer = RegExp(r'^(:{3,})[ \t]*$').firstMatch(text);
+    if (closer == null) return -1;
+    return stack.lastIndexWhere(
+      (block) =>
+          block.syntax == NamedBlockSyntax.containerDirective &&
+          closer[1]!.length >= block.fenceLength,
+    );
+  }
+
+  bool _closeDirective(LineCursor cursor) {
+    if (!options.directives) return false;
+    final index = _directiveCloser(cursor);
+    if (index < 0) return false;
+    for (var i = 1; i < stack.length; i++) {
+      stack[i].end = i < index ? cursor.line.next : cursor.line.start;
+    }
+    stack[index]
+      ..end = cursor.line.end
+      ..closed = true;
+    stack.removeRange(index, stack.length);
+    leaf = null;
+    return true;
+  }
+
+  void _htmlLine(LineCursor cursor) {
+    final block = leaf!;
+    block.text.addAll(cursor.textFragments());
+    if (cursor.line.next > cursor.line.end)
+      block.text.add(
+        TextNode(
+          span: SourceSpan(cursor.line.end, cursor.line.next),
+          text: '\n',
+        ),
+      );
+    block.end = cursor.line.next;
+    _touch(cursor.line);
+    if (block.html!.feed(source, cursor.offset, cursor.line.end)) {
+      block.closed = true;
+      leaf = null;
+    }
+  }
+
   void _line(SourceLine line) {
     final cursor = LineCursor(line);
     var matched = 0;
     for (var i = 1; i < stack.length; i++) {
       final block = stack[i];
-      if (block.kind == _Kind.quote) {
+      if (block.kind == _Kind.quote || block.syntax == NamedBlockSyntax.alert) {
         final indent = cursor.indentation;
         if (indent.width > 3 ||
             indent.end == line.end ||
@@ -529,6 +598,16 @@ final class _BlockSession {
 
   void _content(LineCursor cursor) {
     final line = cursor.line;
+    if (leaf?.kind == _Kind.html) {
+      if (leaf!.html!.start.rootTag == null &&
+          leaf!.html!.start.terminator == null &&
+          cursor.blank) {
+        leaf = null;
+      } else {
+        _htmlLine(cursor);
+        return;
+      }
+    }
     if (leaf?.kind == _Kind.math) {
       _math(cursor);
       return;
@@ -571,6 +650,7 @@ final class _BlockSession {
       return;
     }
     if (_detailsBoundary(cursor)) return;
+    if (_closeDirective(cursor)) return;
     if (leaf?.kind == _Kind.table) {
       if (!cursor.blank && !_interrupts(cursor)) {
         _tableRow(cursor);
@@ -619,6 +699,17 @@ final class _BlockSession {
         cursor.indent(indentation);
         cursor.advance(1);
         cursor.indent(1);
+        if (options.alerts) {
+          final name = alertName(cursor.rest);
+          if (name != null) {
+            quote
+              ..kind = _Kind.named
+              ..name = name
+              ..syntax = NamedBlockSyntax.alert;
+            _touch(line);
+            return;
+          }
+        }
         continue;
       }
       if (indentation <= 3 && _rule.hasMatch(text)) {
@@ -731,6 +822,44 @@ final class _BlockSession {
         return;
       }
       if (_detailsBoundary(cursor)) return;
+      if (indentation <= 3 && options.directives) {
+        final directive = readBlockDirective(
+          source,
+          cursor.indentation.end,
+          line.end,
+        );
+        if (directive != null) {
+          final block = _add(_Kind.named, directive.start)
+            ..end = line.end
+            ..name = directive.name
+            ..attributes = directive.attributes
+            ..syntax = directive.colons == 2
+                ? NamedBlockSyntax.leafDirective
+                : NamedBlockSyntax.containerDirective
+            ..fenceLength = directive.colons
+            ..closed = directive.colons == 2;
+          if (directive.label case final label?) {
+            final child = _Block(_Kind.label, label.start, parent: block)
+              ..end = label.end;
+            child.text.add(TextNode(span: label, text: label.slice(source)));
+            block.children.add(child);
+          }
+          if (directive.colons >= 3) stack.add(block);
+          _touch(line);
+          return;
+        }
+      }
+      if (indentation <= 3 && options.htmlBlocks) {
+        final html = matchHtmlBlock(source, cursor.indentation.end, line.end);
+        if (html != null) {
+          cursor.indent(indentation);
+          leaf = _add(_Kind.html, cursor.sourceOffset)
+            ..html = HtmlBlockTracker(html)
+            ..closed = false;
+          _htmlLine(cursor);
+          return;
+        }
+      }
       _paragraph(cursor);
       return;
     }
@@ -798,6 +927,24 @@ final class _BlockSession {
           closed: block.closed,
         ),
         _Kind.summary => DetailsSummaryNode(span: span, children: block.text),
+        _Kind.named => NamedBlockNode(
+          span: span,
+          name: block.name,
+          syntax: block.syntax!,
+          attributes: block.attributes,
+          children: children,
+          closed: block.closed,
+        ),
+        _Kind.label => DirectiveLabelNode(span: span, children: block.text),
+        _Kind.html => HtmlBlockNode(
+          span: span,
+          children: block.html!.start.fullDocument
+              ? const []
+              : parseHtmlFragment(block.text.cast<TextNode>(), block: true),
+          raw: block.text.cast<TextNode>().map((n) => n.text).join(),
+          fullDocument: block.html!.start.fullDocument,
+          closed: block.closed,
+        ),
         _Kind.math => MathBlockNode(
           span: span,
           children: block.text.cast<TextNode>(),

@@ -17,6 +17,10 @@ abstract class AstVisitor<T> {
   T visitTableCell(TableCellNode node) => visitNode(node);
   T visitDetails(DetailsNode node) => visitNode(node);
   T visitDetailsSummary(DetailsSummaryNode node) => visitNode(node);
+  T visitNamedBlock(NamedBlockNode node) => visitNode(node);
+  T visitDirectiveLabel(DirectiveLabelNode node) => visitNode(node);
+  T visitHtmlBlock(HtmlBlockNode node) => visitNode(node);
+  T visitHtmlElement(HtmlElementNode node) => visitNode(node);
   T visitListItem(ListItemNode node) => visitNode(node);
 }
 
