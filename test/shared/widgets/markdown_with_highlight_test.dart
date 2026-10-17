@@ -24,6 +24,13 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:gpt_markdown/gpt_markdown.dart' show GptMarkdown, HTag;
 import 'package:provider/provider.dart';
 
+Finder _codeTextFinder() => find.descendant(
+  of: find.byType(SelectableHighlightView),
+  matching: find.byWidgetPredicate(
+    (widget) => widget is Text && widget.textSpan != null,
+  ),
+);
+
 Finder _findMathWidget() {
   return find.byType(Math);
 }
@@ -812,15 +819,7 @@ Inline ***strong emphasis*** text.
           find.descendant(of: tableBlock, matching: find.byType(RichText)),
         )
         .map((widget) => widget.text.toPlainText());
-    final selectablePlainText = tester
-        .widgetList<SelectableText>(
-          find.descendant(
-            of: tableBlock,
-            matching: find.byType(SelectableText),
-          ),
-        )
-        .map((widget) => widget.textSpan?.toPlainText() ?? widget.data ?? '');
-    final plainText = [...richTextPlainText, ...selectablePlainText].join('\n');
+    final plainText = richTextPlainText.join('\n');
     expect(plainText, contains('Name'));
     expect(plainText, contains('42'));
   });
@@ -1965,21 +1964,18 @@ const greet = (name) => {
             .map((widget) => widget.text.toPlainText())
             .join('\n');
         final codeText = tester
-            .widgetList<SelectableText>(
+            .widgetList<Text>(
               find.descendant(
                 of: find.byType(SelectableHighlightView),
-                matching: find.byType(SelectableText),
+                matching: _codeTextFinder(),
               ),
             )
             .map((widget) => widget.textSpan?.toPlainText() ?? widget.data)
             .join('\n');
         final blockquote = find.byKey(const ValueKey('markdown-blockquote'));
         final blockquoteCodeText = tester
-            .widgetList<SelectableText>(
-              find.descendant(
-                of: blockquote,
-                matching: find.byType(SelectableText),
-              ),
+            .widgetList<Text>(
+              find.descendant(of: blockquote, matching: _codeTextFinder()),
             )
             .map((widget) => widget.textSpan?.toPlainText() ?? widget.data)
             .join('\n');
@@ -2021,10 +2017,10 @@ const greet = (name) => {
       await tester.pump();
 
       final codeText = tester
-          .widgetList<SelectableText>(
+          .widgetList<Text>(
             find.descendant(
               of: find.byType(SelectableHighlightView),
-              matching: find.byType(SelectableText),
+              matching: _codeTextFinder(),
             ),
           )
           .map((widget) => widget.textSpan?.toPlainText() ?? widget.data)
@@ -2050,10 +2046,10 @@ final value = "$foo$";
       await tester.pump();
 
       final codeText = tester
-          .widgetList<SelectableText>(
+          .widgetList<Text>(
             find.descendant(
               of: find.byType(SelectableHighlightView),
-              matching: find.byType(SelectableText),
+              matching: _codeTextFinder(),
             ),
           )
           .map((widget) => widget.textSpan?.toPlainText() ?? widget.data)
@@ -2573,18 +2569,7 @@ A-->B
             ),
           )
           .map((widget) => widget.text.toPlainText());
-      final selectablePlainText = tester
-          .widgetList<SelectableText>(
-            find.descendant(
-              of: find.byType(Table),
-              matching: find.byType(SelectableText),
-            ),
-          )
-          .map((widget) => widget.textSpan?.toPlainText() ?? widget.data ?? '');
-      final tableText = [
-        ...richTextPlainText,
-        ...selectablePlainText,
-      ].join('\n');
+      final tableText = richTextPlainText.join('\n');
 
       expect(tableText, contains('a | b'));
       expect(tableText, contains('c | d'));
@@ -2613,18 +2598,7 @@ A-->B
             find.descendant(of: tableBlock, matching: find.byType(RichText)),
           )
           .map((widget) => widget.text.toPlainText());
-      final selectablePlainText = tester
-          .widgetList<SelectableText>(
-            find.descendant(
-              of: tableBlock,
-              matching: find.byType(SelectableText),
-            ),
-          )
-          .map((widget) => widget.textSpan?.toPlainText() ?? widget.data ?? '');
-      final plainText = [
-        ...richTextPlainText,
-        ...selectablePlainText,
-      ].join('\n');
+      final plainText = richTextPlainText.join('\n');
 
       expect(plainText, contains(r'$...$'));
       expect(plainText, contains(r'$$...$$'));
@@ -3280,8 +3254,8 @@ final price = "$12";
       ),
     );
 
-    final richText = tester.widget<SelectableText>(find.byType(SelectableText));
-    final root = richText.textSpan!;
+    final richText = tester.widget<Text>(_codeTextFinder());
+    final root = richText.textSpan! as TextSpan;
     final children = root.children ?? const <InlineSpan>[];
 
     expect(children, isNotEmpty);
@@ -3308,195 +3282,17 @@ final price = "$12";
       ),
     );
 
-    final before = tester
-        .widget<SelectableText>(find.byType(SelectableText))
-        .textSpan!
-        .children;
+    final before =
+        (tester.widget<Text>(_codeTextFinder()).textSpan! as TextSpan).children;
 
     rebuild(() {});
     await tester.pump();
 
-    final after = tester
-        .widget<SelectableText>(find.byType(SelectableText))
-        .textSpan!
-        .children;
+    final after =
+        (tester.widget<Text>(_codeTextFinder()).textSpan! as TextSpan).children;
 
     expect(identical(before, after), isTrue);
   });
-
-  testWidgets(
-    'SelectableHighlightView adds iOS native translation for non-empty selection',
-    (tester) async {
-      debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
-      addTearDown(() => debugDefaultTargetPlatformOverride = null);
-      const channel = MethodChannel('app.ios_translation');
-      final calls = <MethodCall>[];
-      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
-          .setMockMethodCallHandler(channel, (call) async {
-            calls.add(call);
-            return call.method == 'isAvailable' ? true : null;
-          });
-      addTearDown(
-        () => TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
-            .setMockMethodCallHandler(channel, null),
-      );
-
-      await tester.pumpWidget(
-        const MaterialApp(
-          localizationsDelegates: AppLocalizations.localizationsDelegates,
-          supportedLocales: AppLocalizations.supportedLocales,
-          home: Scaffold(
-            body: SelectableHighlightView(
-              'final value = 1;',
-              language: 'dart',
-              theme: {},
-            ),
-          ),
-        ),
-      );
-      await tester.pump();
-
-      final editableTextState = tester.state<EditableTextState>(
-        find.byType(EditableText),
-      );
-      final contextMenuBuilder = tester
-          .widget<SelectableText>(find.byType(SelectableText))
-          .contextMenuBuilder!;
-      final editableContext = tester.element(find.byType(EditableText));
-
-      final collapsedMenu =
-          contextMenuBuilder(editableContext, editableTextState)
-              as AdaptiveTextSelectionToolbar;
-      expect(
-        collapsedMenu.buttonItems,
-        isNot(
-          contains(
-            predicate<ContextMenuButtonItem>((item) {
-              return item.label == 'Translate';
-            }),
-          ),
-        ),
-      );
-
-      editableTextState.userUpdateTextEditingValue(
-        editableTextState.textEditingValue.copyWith(
-          selection: const TextSelection(baseOffset: 0, extentOffset: 5),
-        ),
-        SelectionChangedCause.longPress,
-      );
-      await tester.pump();
-
-      final selectionMenu =
-          contextMenuBuilder(editableContext, editableTextState)
-              as AdaptiveTextSelectionToolbar;
-      final translateItem = selectionMenu.buttonItems!.singleWhere(
-        (item) => item.label == 'Translate',
-      );
-      translateItem.onPressed!();
-      await tester.pump();
-
-      final presentCall = calls.singleWhere((call) => call.method == 'present');
-      final arguments = presentCall.arguments as Map<Object?, Object?>;
-      expect(arguments['text'], 'final');
-      expect(arguments['anchorX'], isA<double>());
-      expect(arguments['anchorY'], isA<double>());
-      debugDefaultTargetPlatformOverride = null;
-    },
-  );
-
-  testWidgets(
-    'SelectableHighlightView keeps stock menu when iOS translation is unavailable',
-    (tester) async {
-      debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
-      addTearDown(() => debugDefaultTargetPlatformOverride = null);
-      const channel = MethodChannel('app.ios_translation');
-      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
-          .setMockMethodCallHandler(channel, (call) async => false);
-      addTearDown(
-        () => TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
-            .setMockMethodCallHandler(channel, null),
-      );
-
-      await tester.pumpWidget(
-        const MaterialApp(
-          home: Scaffold(
-            body: SelectableHighlightView(
-              'final value = 1;',
-              language: 'dart',
-              theme: {},
-            ),
-          ),
-        ),
-      );
-      await tester.pump();
-
-      final editableTextState = tester.state<EditableTextState>(
-        find.byType(EditableText),
-      );
-      editableTextState.userUpdateTextEditingValue(
-        editableTextState.textEditingValue.copyWith(
-          selection: const TextSelection(baseOffset: 0, extentOffset: 5),
-        ),
-        SelectionChangedCause.longPress,
-      );
-      await tester.pump();
-      final menu =
-          tester
-              .widget<SelectableText>(find.byType(SelectableText))
-              .contextMenuBuilder!(
-            tester.element(find.byType(EditableText)),
-            editableTextState,
-          );
-
-      expect(menu, isA<AdaptiveTextSelectionToolbar>());
-      expect(
-        (menu as AdaptiveTextSelectionToolbar).buttonItems,
-        isNot(
-          contains(
-            predicate<ContextMenuButtonItem>((item) {
-              return item.label == 'Translate';
-            }),
-          ),
-        ),
-      );
-      debugDefaultTargetPlatformOverride = null;
-    },
-  );
-
-  testWidgets(
-    'SelectableHighlightView does not query native translation off iOS',
-    (tester) async {
-      debugDefaultTargetPlatformOverride = TargetPlatform.android;
-      addTearDown(() => debugDefaultTargetPlatformOverride = null);
-      const channel = MethodChannel('app.ios_translation');
-      final calls = <MethodCall>[];
-      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
-          .setMockMethodCallHandler(channel, (call) async {
-            calls.add(call);
-            return true;
-          });
-      addTearDown(
-        () => TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
-            .setMockMethodCallHandler(channel, null),
-      );
-
-      await tester.pumpWidget(
-        const MaterialApp(
-          home: Scaffold(
-            body: SelectableHighlightView(
-              'final value = 1;',
-              language: 'dart',
-              theme: {},
-            ),
-          ),
-        ),
-      );
-      await tester.pump();
-
-      expect(calls, isEmpty);
-      debugDefaultTargetPlatformOverride = null;
-    },
-  );
 
   testWidgets(
     'SelectableHighlightView skips synchronous highlighting on demand',
@@ -3514,10 +3310,8 @@ final price = "$12";
         ),
       );
 
-      final richText = tester.widget<SelectableText>(
-        find.byType(SelectableText),
-      );
-      final root = richText.textSpan!;
+      final richText = tester.widget<Text>(_codeTextFinder());
+      final root = richText.textSpan! as TextSpan;
       final children = root.children ?? const <InlineSpan>[];
 
       expect(children, hasLength(1));
@@ -3536,13 +3330,13 @@ final value = 1;
       );
       await tester.pump();
 
-      final richText = tester.widget<SelectableText>(
+      final richText = tester.widget<Text>(
         find.descendant(
           of: find.byType(SelectableHighlightView),
-          matching: find.byType(SelectableText),
+          matching: _codeTextFinder(),
         ),
       );
-      final root = richText.textSpan!;
+      final root = richText.textSpan! as TextSpan;
       final children = root.children ?? const <InlineSpan>[];
 
       expect(children.length, greaterThan(1));
@@ -4790,10 +4584,10 @@ void main() {
       await tester.pump();
 
       Set<Color?> codeSpanColors() {
-        final richText = tester.widget<SelectableText>(
+        final richText = tester.widget<Text>(
           find.descendant(
             of: find.byType(SelectableHighlightView),
-            matching: find.byType(SelectableText),
+            matching: _codeTextFinder(),
           ),
         );
         final colors = <Color?>{};
@@ -4985,10 +4779,10 @@ Fenced code body
       _paragraphContaining('Theme table body').text.style?.color,
       themeInk.withValues(alpha: 0.90),
     );
-    final fencedCode = tester.widget<SelectableText>(
+    final fencedCode = tester.widget<Text>(
       find.descendant(
         of: find.byType(SelectableHighlightView),
-        matching: find.byType(SelectableText),
+        matching: _codeTextFinder(),
       ),
     );
     expect(fencedCode.textSpan?.style?.color, themeInk);

@@ -1,3 +1,4 @@
+import 'package:Kelivo/shared/widgets/app_selection_area.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
 import 'package:Kelivo/shared/widgets/markdown_with_highlight.dart';
 import 'package:flutter/foundation.dart';
@@ -38,15 +39,17 @@ void main() {
         localizationsDelegates: AppLocalizations.localizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
         home: Scaffold(
-          body: SingleChildScrollView(
+          body: AppSelectionArea(
             child: SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: ValueListenableBuilder<String>(
-                valueListenable: source,
-                builder: (_, value, _) => SelectableHighlightView(
-                  value,
-                  language: 'dart',
-                  textStyle: const TextStyle(fontSize: 13, height: 1.5),
+              child: SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: ValueListenableBuilder<String>(
+                  valueListenable: source,
+                  builder: (_, value, _) => SelectableHighlightView(
+                    value,
+                    language: 'dart',
+                    textStyle: const TextStyle(fontSize: 13, height: 1.5),
+                  ),
                 ),
               ),
             ),

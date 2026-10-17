@@ -47,6 +47,7 @@ import 'markdown_block_list.dart';
 import 'streaming_rich_text.dart';
 import 'markdown_selection/selectable_span_adapter.dart';
 import 'markdown_selection/table_selection.dart';
+import 'markdown_selection/code_selection.dart';
 import 'streaming_code_fence.dart';
 import 'markdown_line_lexer.dart';
 import 'markdown_source_scan.dart';
@@ -6378,27 +6379,22 @@ class SelectableHighlightView extends StatefulWidget {
 }
 
 class _SelectableHighlightViewState extends State<SelectableHighlightView> {
-  static const MethodChannel _iosTranslationChannel = MethodChannel(
-    'app.ios_translation',
-  );
-
   late List<TextSpan> _codeTextSpans;
-  bool _iosTranslationAvailable = false;
+  late final CodeSelectionDelegate _selection;
+  TextStyle? _inheritedStyle;
   Widget? _selectable;
-  String _selectedCode = '';
 
   @override
   void initState() {
     super.initState();
     _codeTextSpans = _highlightSource();
-    if (defaultTargetPlatform == TargetPlatform.iOS) {
-      unawaited(_loadIosTranslationAvailability());
-    }
+    _selection = CodeSelectionDelegate(widget.source);
   }
 
   @override
   void didUpdateWidget(covariant SelectableHighlightView oldWidget) {
     super.didUpdateWidget(oldWidget);
+    _selection.source = widget.source;
     if (oldWidget.source == widget.source &&
         oldWidget.language == widget.language &&
         oldWidget.textStyle == widget.textStyle &&
@@ -6428,75 +6424,6 @@ class _SelectableHighlightViewState extends State<SelectableHighlightView> {
     }
   }
 
-  Future<void> _loadIosTranslationAvailability() async {
-    try {
-      final available =
-          await _iosTranslationChannel.invokeMethod<bool>('isAvailable') ??
-          false;
-      if (mounted && available != _iosTranslationAvailable) {
-        setState(() => _iosTranslationAvailable = available);
-      }
-    } on MissingPluginException {
-      // Keep the stock selection menu when the native bridge is unavailable.
-    } on PlatformException {
-      // Keep the stock selection menu when the availability check fails.
-    }
-  }
-
-  Widget _buildSelectionContextMenu(
-    BuildContext context,
-    EditableTextState editableTextState,
-  ) {
-    final value = editableTextState.textEditingValue;
-    final selection = value.selection;
-    if (!_iosTranslationAvailable ||
-        !selection.isValid ||
-        selection.isCollapsed) {
-      return AdaptiveTextSelectionToolbar.editableText(
-        editableTextState: editableTextState,
-      );
-    }
-
-    final selectedText = selection.textInside(value.text);
-    if (selectedText.trim().isEmpty) {
-      return AdaptiveTextSelectionToolbar.editableText(
-        editableTextState: editableTextState,
-      );
-    }
-
-    final anchors = editableTextState.contextMenuAnchors;
-    final buttonItems = <ContextMenuButtonItem>[
-      ...editableTextState.contextMenuButtonItems,
-      ContextMenuButtonItem(
-        label: AppLocalizations.of(context)!.chatMessageWidgetTranslateTooltip,
-        onPressed: () {
-          editableTextState.hideToolbar();
-          unawaited(
-            _presentIosTranslation(selectedText, anchors.primaryAnchor),
-          );
-        },
-      ),
-    ];
-    return AdaptiveTextSelectionToolbar.buttonItems(
-      anchors: anchors,
-      buttonItems: buttonItems,
-    );
-  }
-
-  Future<void> _presentIosTranslation(String text, Offset anchor) async {
-    try {
-      await _iosTranslationChannel.invokeMethod<void>('present', {
-        'text': text,
-        'anchorX': anchor.dx,
-        'anchorY': anchor.dy,
-      });
-    } on MissingPluginException {
-      // The toolbar has already closed; there is no native UI to present.
-    } on PlatformException {
-      // Do not let a native presentation failure affect text selection.
-    }
-  }
-
   /// Converts a highlight Node tree to a TextSpan tree with appropriate styling
   List<TextSpan> _convertNodes(List<Node> nodes) {
     final List<TextSpan> spans = [];
@@ -6522,55 +6449,44 @@ class _SelectableHighlightViewState extends State<SelectableHighlightView> {
   }
 
   @override
+  void dispose() {
+    _selection.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final inheritedStyle = DefaultTextStyle.of(
+      context,
+    ).style.merge(widget.textStyle);
+    if (_inheritedStyle != inheritedStyle) {
+      _inheritedStyle = inheritedStyle;
+      _selectable = null;
+    }
     final span = TextSpan(
       style: widget.textStyle,
       children: _codeTextSpans.isEmpty
           ? [TextSpan(text: widget.source)]
           : _codeTextSpans,
     );
-    return _selectable ??= widget.source.length > 2048
-        ? SelectionArea(
-            onSelectionChanged: (selection) =>
-                _selectedCode = selection?.plainText ?? '',
-            contextMenuBuilder: _buildChunkSelectionContextMenu,
-            // SelectableText reserves its 2px cursor plus RenderEditable's 1px
-            // caret gap, even when read-only. Keep the same wrapping and width.
-            child: Padding(
-              padding: const EdgeInsets.only(right: 3),
-              child: StreamingRichText(text: Text.rich(span)),
-            ),
-          )
-        : SelectableText.rich(
-            span,
-            contextMenuBuilder: _buildSelectionContextMenu,
-          );
-  }
-
-  Widget _buildChunkSelectionContextMenu(
-    BuildContext context,
-    SelectableRegionState region,
-  ) {
-    final anchors = region.contextMenuAnchors;
-    final selectedText = _selectedCode;
-    return AdaptiveTextSelectionToolbar.buttonItems(
-      anchors: anchors,
-      buttonItems: [
-        ...region.contextMenuButtonItems,
-        if (_iosTranslationAvailable && selectedText.trim().isNotEmpty)
-          ContextMenuButtonItem(
-            label: AppLocalizations.of(
-              context,
-            )!.chatMessageWidgetTranslateTooltip,
-            onPressed: () {
-              region.hideToolbar();
-              unawaited(
-                _presentIosTranslation(selectedText, anchors.primaryAnchor),
-              );
-            },
-          ),
-      ],
+    final content = _selectable ??= Padding(
+      // Keep the existing caret space in the layout after removing EditableText.
+      padding: const EdgeInsets.only(right: 3),
+      child: StreamingRichText(
+        streaming: false,
+        text: Text.rich(
+          span,
+          // Short code used the EditableText strut. Long code already uses the
+          // chunked text path, which retains its original paragraph metrics.
+          strutStyle: widget.source.length <= 2048
+              ? StrutStyle.fromTextStyle(inheritedStyle)
+              : null,
+        ),
+      ),
     );
+    return SelectionContainer.maybeOf(context) == null
+        ? content
+        : SelectionContainer(delegate: _selection, child: content);
   }
 }
 

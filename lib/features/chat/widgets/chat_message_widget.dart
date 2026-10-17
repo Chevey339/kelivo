@@ -56,6 +56,7 @@ import '../../home/services/tool_approval_service.dart';
 import '../utils/assistant_paragraph_splitter.dart';
 import '../utils/thinking_tag_parser.dart';
 import 'timeline_projection.dart';
+import 'select_copy_sheet.dart';
 import 'timeline_visibility.dart';
 import 'citation_sources_sheet.dart';
 import 'chat_surface.dart';
@@ -1447,7 +1448,7 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
     final safeBottom = insets.bottom + 12;
 
     const double menuWidth = 220; // compact width
-    const double estMenuHeight = 140; // ~ 3 rows
+    final double estMenuHeight = widget.onEdit == null ? 140 : 184;
     const double gap = 10; // space between bubble and menu
 
     // Horizontal placement: align menu's right edge to bubble's right edge,
@@ -1555,6 +1556,24 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
                                       );
                                     }
                                   }
+                                },
+                              ),
+                              _MenuItem(
+                                icon: Lucide.TextSelect,
+                                label: l10n.messageMoreSheetSelectCopy,
+                                onTap: () {
+                                  Navigator.of(ctx).pop();
+                                  WidgetsBinding.instance.addPostFrameCallback((
+                                    _,
+                                  ) {
+                                    if (!mounted) return;
+                                    unawaited(
+                                      showSelectCopySheet(
+                                        context,
+                                        message: widget.message,
+                                      ),
+                                    );
+                                  });
                                 },
                               ),
                               if (widget.onEdit != null)
