@@ -1773,7 +1773,7 @@
   "modelSpecFormDialectAnthropicAdaptiveEffort": "Anthropic adaptive effort",
   "modelSpecFormDialectAnthropicAdaptiveEffortSubtitle": "thinking + output_config.effort",
   "modelSpecFormDialectAnthropicBetweenTools": "Anthropic between tools",
-  "modelSpecFormDialectAnthropicBetweenToolsSubtitle": "thinking.between_tools + output_config.effort",
+  "modelSpecFormDialectAnthropicBetweenToolsSubtitle": "thinking.type: between_tools; effort only when on",
   "modelSpecFormDialectAnthropicEffort": "Anthropic effort",
   "modelSpecFormDialectAnthropicEffortSubtitle": "thinking + output_config.effort",
   "modelSpecFormDialectGeminiThinkingBudget": "Gemini thinking budget",

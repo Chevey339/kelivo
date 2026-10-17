@@ -474,11 +474,15 @@ String _normalizeGuesserId(String modelId) {
 }
 
 /// Anthropic dynamic-filtering search / fetch tool versions (2026-03-18).
+/// Documented for Claude 4.6 and later; only the Opus and Sonnet lines (plus
+/// Fable and Mythos) are enabled here until Haiku is documented too.
 bool _isClaudeDynamicSearchGeneration(String id) {
   if (id.contains('mythos') || id.contains('fable')) return true;
-  return _isClaude5(id) ||
-      _matches(id, r'claude-opus-4[-.][678](?:$|[._:@/-])') ||
-      _matches(id, r'claude-sonnet-4[-.]6(?:$|[._:@/-])');
+  if (!id.contains('opus') && !id.contains('sonnet')) return false;
+  final generation = _claudeGeneration(id);
+  if (generation == null) return false;
+  if (generation.major == 5) return true;
+  return generation.major == 4 && (generation.minor ?? 0) >= 6;
 }
 
 /// K3 rejects remote image URLs (local and data URLs still work). K2.x on the
@@ -972,24 +976,22 @@ _ReasoningHit _geminiBudget(String id) {
 
 /// Claude generation read off a model id: `claude-opus-4-7` → 4.7,
 /// `claude-haiku-5-5` → 5.5, `claude-3-5-sonnet` → 3.5, `claude-4.5-opus` →
-/// 4.5. Only the first two short numbers count, so a snapshot date
-/// (`claude-sonnet-4-20250514`) never reads as a minor version.
+/// 4.5, `claude-opus-4-20250514` → 4.0. A minor version has to sit directly
+/// against the major (`-7` or `.7`), so trailing tokens
+/// (`claude-opus-4-thinking-8k`, `claude-sonnet-4-v1`) and snapshot dates are
+/// never read as one.
 ({int major, int? minor})? _claudeGeneration(String id) {
   final start = id.indexOf('claude');
   if (start < 0) return null;
-  final numbers = <int>[];
-  for (final match in RegExp(r'\d+').allMatches(id.substring(start))) {
-    final digits = match.group(0)!;
-    // A snapshot date (`20250514`) ends the generation, so a later `v1` tag
-    // is never read as a minor version.
-    if (digits.length > 2) break;
-    final value = int.parse(digits);
-    if (value > 20) continue;
-    numbers.add(value);
-    if (numbers.length == 2) break;
-  }
-  if (numbers.isEmpty) return null;
-  return (major: numbers.first, minor: numbers.length > 1 ? numbers[1] : null);
+  final match = RegExp(
+    r'(?<!\d)(\d{1,2})(?!\d)(?:[-.](\d{1,2})(?![\dA-Za-z]))?',
+  ).firstMatch(id.substring(start));
+  if (match == null) return null;
+  final minor = match.group(2);
+  return (
+    major: int.parse(match.group(1)!),
+    minor: minor == null ? null : int.parse(minor),
+  );
 }
 
 /// True when the id names a Claude [family] model of at least [major].[minor].
@@ -999,6 +1001,17 @@ bool _isClaudeFamilySince(String id, String family, int major, int minor) {
   if (generation == null) return false;
   if (generation.major != major) return generation.major > major;
   return (generation.minor ?? 0) >= minor;
+}
+
+/// True when the id names a Claude [family] model of exactly [major].[minor]
+/// or a later minor of that same generation. Later generations are left alone:
+/// their request surface is unknown until the API documents it.
+bool _isClaudeFamilyAt(String id, String family, int major, int minor) {
+  if (!id.contains(family)) return false;
+  final generation = _claudeGeneration(id);
+  return generation != null &&
+      generation.major == major &&
+      (generation.minor ?? 0) >= minor;
 }
 
 /// The Claude 5 generation: adaptive thinking with an effort ladder, no
@@ -1013,12 +1026,11 @@ bool _isClaudeAlwaysOn(String id) =>
     id.contains('claude-fable') ||
     id.contains('claude-mythos') ||
     // Claude Opus 5.5 keeps adaptive thinking on; `disabled` is a 400.
-    _isClaudeFamilySince(id, 'opus', 5, 5);
+    _isClaudeFamilyAt(id, 'opus', 5, 5);
 
 /// Claude Sonnet 5.5 turns up-front thinking off with `between_tools` and
 /// rejects `disabled`.
-bool _isClaudeBetweenTools(String id) =>
-    _isClaudeFamilySince(id, 'sonnet', 5, 5);
+bool _isClaudeBetweenTools(String id) => _isClaudeFamilyAt(id, 'sonnet', 5, 5);
 
 /// Adaptive thinking arrived with Claude 4.6 and replaced manual extended
 /// thinking from 4.7 on; Claude 4.5 and earlier only speak
@@ -1058,30 +1070,28 @@ bool _claudeSupportsMax(String id) {
 }
 
 int _claudeMaxOutput(String id) {
+  final generation = _claudeGeneration(id);
+  final opus = id.contains('opus');
   if (_isClaude5(id) || id.contains('fable-5') || id.contains('mythos-5')) {
     return 128000;
   }
-  if (_isClaudeFamilySince(id, 'opus', 4, 6) ||
-      _isClaudeFamilySince(id, 'sonnet', 4, 6)) {
-    return 128000;
+  if (generation != null && generation.major == 4) {
+    // Claude Opus 4 and 4.1 stop at 32K, snapshots included.
+    if (opus && (generation.minor ?? 0) <= 1) return 32000;
+    if ((generation.minor ?? 0) >= 6 && (opus || id.contains('sonnet'))) {
+      return 128000;
+    }
   }
   if (_matches(id, r'claude-3-haiku(?:$|[._:/])')) return 8000;
   if (id.contains('claude-3-5-sonnet') || id.contains('claude-3.5-sonnet')) {
     return 8192;
   }
-  if (_matches(id, r'claude-opus-4-1(?:$|[._:/])') ||
-      _matches(id, r'claude-opus-4(?:$|[._:/])')) {
-    return 32000;
-  }
   return 64000;
 }
 
 SamplingPolicy? _claudeSampling(String id) {
-  if (_isClaudeAlwaysOn(id) || _isClaude5(id)) {
-    return SamplingPolicy.never;
-  }
-  if (_isClaudeFamilySince(id, 'opus', 4, 8)) return SamplingPolicy.never;
-  if (_isClaudeAdaptiveOnly(id)) return SamplingPolicy.onlyWhenReasoningOff;
+  // Claude 4.7 dropped temperature/top_p/top_k, and 5.x inherits that.
+  if (_isClaudeAdaptiveOnly(id)) return SamplingPolicy.never;
   return null;
 }
 

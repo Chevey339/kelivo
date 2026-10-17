@@ -466,17 +466,37 @@ void main() {
           reason: id,
         );
       }
+      // A minor version has to sit against the major: a trailing token is not
+      // one, so these stay on extended thinking (as on master).
       for (final id in const [
         'claude-haiku-4-5',
         'claude-sonnet-4-20250514',
         'claude-opus-4-20250514',
         'claude-3-7-sonnet-20250219',
+        'claude-opus-4-thinking-8k',
+        'claude-sonnet-4-thinking-16k',
+        'claude-sonnet-4-v1',
+        'claude-opus-4-v2',
       ]) {
         expect(
           ModelDefaultsGuesser.guess(id).reasoning!.dialect,
           ReasoningDialect.anthropicBudget,
           reason: id,
         );
+      }
+    });
+
+    test('Claude output limits include dated Opus 4 snapshots', () {
+      for (final id in const [
+        'claude-opus-4',
+        'claude-opus-4-1',
+        'claude-opus-4-1-20250805',
+        'claude-opus-4-20250514',
+      ]) {
+        expect(ModelDefaultsGuesser.guess(id).maxOutput, 32000, reason: id);
+      }
+      for (final id in const ['claude-sonnet-4-20250514', 'claude-opus-4-5']) {
+        expect(ModelDefaultsGuesser.guess(id).maxOutput, 64000, reason: id);
       }
     });
 
@@ -820,6 +840,7 @@ void main() {
         'claude-opus-5',
         'claude-opus-5-5',
         'claude-sonnet-5',
+        'claude-sonnet-5-5',
       ]) {
         expect(
           ModelDefaultsGuesser.guess(id).dynamicWebSearch,
@@ -827,7 +848,13 @@ void main() {
           reason: id,
         );
       }
-      for (final id in const ['claude-sonnet-4-20250514', 'gpt-5.5']) {
+      // Haiku is not in the documented dynamic-filtering model list, so it
+      // keeps the plain search/fetch tool versions.
+      for (final id in const [
+        'claude-sonnet-4-20250514',
+        'claude-haiku-5-5',
+        'gpt-5.5',
+      ]) {
         expect(
           ModelDefaultsGuesser.guess(id).dynamicWebSearch,
           isFalse,

@@ -7252,7 +7252,7 @@ abstract class AppLocalizations {
   /// No description provided for @modelSpecFormDialectAnthropicBetweenToolsSubtitle.
   ///
   /// In en, this message translates to:
-  /// **'thinking.between_tools + output_config.effort'**
+  /// **'thinking.type: between_tools; effort only when on'**
   String get modelSpecFormDialectAnthropicBetweenToolsSubtitle;
 
   /// No description provided for @modelSpecFormDialectAnthropicEffort.

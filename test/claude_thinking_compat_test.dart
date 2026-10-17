@@ -261,7 +261,7 @@ final _claudeCases = <_ClaudeCase>[
     },
   ),
   _ClaudeCase(
-    name: 'Opus 4.7 off disables thinking and keeps sampling',
+    name: 'Opus 4.7 off disables thinking and drops sampling',
     modelId: 'claude-opus-4-7',
     thinkingBudget: 0,
     temperature: 0.7,
@@ -269,8 +269,22 @@ final _claudeCases = <_ClaudeCase>[
     verify: (body) {
       expect(body['thinking'], {'type': 'disabled'});
       expect(body.containsKey('output_config'), isFalse);
-      expect(body['temperature'], 0.7);
-      expect(body['top_p'], 0.8);
+      // Claude 4.7 removed temperature/top_p/top_k outright.
+      expect(body.containsKey('temperature'), isFalse);
+      expect(body.containsKey('top_p'), isFalse);
+    },
+  ),
+  _ClaudeCase(
+    name: 'Opus 4.7 adaptive strips sampling',
+    modelId: 'claude-opus-4-7',
+    thinkingBudget: 16000,
+    temperature: 0.7,
+    topP: 0.8,
+    verify: (body) {
+      expect(body['thinking'], {'type': 'adaptive', 'display': 'summarized'});
+      expect(body['output_config'], {'effort': 'medium'});
+      expect(body.containsKey('temperature'), isFalse);
+      expect(body.containsKey('top_p'), isFalse);
     },
   ),
   _ClaudeCase(
