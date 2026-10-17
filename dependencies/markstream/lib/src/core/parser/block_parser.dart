@@ -849,7 +849,7 @@ final class _BlockSession {
           cursor.advance(heading[1]!.length);
           cursor.indent(cursor.indentation.width);
           final content = cursor.rest
-              .replaceFirst(RegExp(r'[ \t]+#+[ \t]*$'), '')
+              .replaceFirst(RegExp(r'(?:^|[ \t]+)#+[ \t]*$'), '')
               .replaceFirst(RegExp(r'[ \t]+$'), '')
               .replaceAll('\u0000', '\uFFFD');
           if (content.isNotEmpty)

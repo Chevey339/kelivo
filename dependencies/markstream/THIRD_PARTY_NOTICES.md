@@ -34,3 +34,26 @@ INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
 CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
 ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 POSSIBILITY OF SUCH DAMAGE.
+
+
+## CommonMark and GFM specification examples
+
+`test/core/spec/fixtures/commonmark-0.31.2.json` contains the unmodified
+652 examples published by John MacFarlane and CommonMark contributors at
+<https://spec.commonmark.org/0.31.2/spec.json>.
+Source SHA-256: `d431b29d97b6f73e69d547109cf5081578fac931e72afe95639ebe766c1b2a20`.
+
+`test/core/spec/fixtures/gfm-0.29-extensions.json` contains 27 examples extracted
+from the tables, task lists, strikethrough and autolinks sections of GitHub's
+GFM 0.29 specification (2019-04-06), <https://github.github.com/gfm/>.
+GFM is based on the CommonMark specification by John MacFarlane.
+Source HTML SHA-256: `b153d814fdfc8624bb6da7449162c1cd707a637f7d1c1b636eb44b9cf63fa220`.
+The extraction changes the container format to JSON and turns visible tab
+markers back into tab characters. Example Markdown and expected HTML are
+otherwise preserved. Reproduce with `tool/extract_gfm_fixtures.py` and a saved
+copy of the official HTML page.
+
+Both specifications license these examples under
+[Creative Commons Attribution-ShareAlike 4.0 International](https://creativecommons.org/licenses/by-sa/4.0/).
+These fixture files retain that license. Source snapshots were retrieved on
+2026-10-17. The license does not imply endorsement of this implementation.

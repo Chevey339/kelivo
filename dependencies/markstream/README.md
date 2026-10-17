@@ -80,3 +80,14 @@ content, resolved citation labels and inserted soft-wrap characters can differ
 from the complete AST. Generated glyphs have empty source spans. Segment order
 must follow document selection order. Clipboard string lengths are not valid
 selection offsets.
+
+
+## Specification instrument
+
+`flutter test test/core/spec` compares the pinned CommonMark 0.31.2 examples
+and the four GFM 0.29 extension sections against `toHtml`. Exact output
+percentages, failing IDs, and complete differences are saved under
+`build/reports/`. The tests fail on crashes and invalid source spans, not on
+conformance percentages. `test/core/spec/known_deviations.txt` distinguishes
+native HTML policy from remaining parser and serializer gaps. Fixture sources,
+hashes and licenses are recorded in `THIRD_PARTY_NOTICES.md`.

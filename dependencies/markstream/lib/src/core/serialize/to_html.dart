@@ -2,13 +2,24 @@ import '../ast/nodes.dart';
 import '../html/html_fragment.dart';
 import 'common.dart';
 
-String escapeHtml(String value, {bool attribute = false}) {
-  final escaped = value
-      .replaceAll('&', '&amp;')
-      .replaceAll('<', '&lt;')
-      .replaceAll('>', '&gt;');
-  return attribute ? escaped.replaceAll('"', '&quot;') : escaped;
-}
+String escapeHtml(String value) => value
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;');
+
+// Preserve URI delimiters and existing percent escapes; encode Unicode and
+// characters that cannot appear literally in an HTML link destination.
+final _urlCharactersToEscape = RegExp(
+  r"[^a-zA-Z0-9:/?#\[\]@!$&'()*+,;=%.~_\-]+",
+  unicode: true,
+);
+String _htmlUrl(String value) => escapeHtml(
+  value.replaceAllMapped(
+    _urlCharactersToEscape,
+    (match) => Uri.encodeComponent(match[0]!),
+  ),
+);
 
 bool isSafeHtmlUrl(String value, {bool image = false}) {
   final normalized = value.replaceAll(RegExp(r'[\x00-\x20\x7F]'), '');
@@ -92,9 +103,7 @@ String _attributes(String tag, Map<String, String> attributes) {
         RegExp(r'^[a-z0-9#]+$', caseSensitive: false).hasMatch(value))
       safe[key] = value;
   }
-  return safe.entries
-      .map((e) => ' ${e.key}="${escapeHtml(e.value, attribute: true)}"')
-      .join();
+  return safe.entries.map((e) => ' ${e.key}="${escapeHtml(e.value)}"').join();
 }
 
 /// Portable HTML for export and clipboard use; active tags and URL schemes are excluded.
@@ -119,7 +128,7 @@ String toHtml(MarkdownNode root) => serializeNodes(root, (node, output) {
     final language = node is CodeBlockNode
         ? node.info.split(RegExp(r'\s+')).first
         : 'html';
-    return '<pre><code${language.isEmpty ? '' : ' class="language-${escapeHtml(language, attribute: true)}"'}>${escapeHtml(code)}</code></pre>\n';
+    return '<pre><code${language.isEmpty ? '' : ' class="language-${escapeHtml(language)}"'}>${escapeHtml(code)}</code></pre>\n';
   }
   if (node is MathInlineNode)
     return '<span class="math">${escapeHtml(mathSource(node.tex, node.delimiter, block: false, closed: node.closed))}</span>';
@@ -127,7 +136,7 @@ String toHtml(MarkdownNode root) => serializeNodes(root, (node, output) {
     return '<div class="math">${escapeHtml(mathSource(node.tex, node.delimiter, block: true, closed: node.closed))}</div>\n';
   if (node is ThematicBreakNode) return '<hr />\n';
   if (node is LinkNode)
-    return '<a${isSafeHtmlUrl(node.destination) ? ' href="${escapeHtml(node.destination, attribute: true)}"' : ''}${node.title == null ? '' : ' title="${escapeHtml(node.title!, attribute: true)}"'}>$body</a>';
+    return '<a${isSafeHtmlUrl(node.destination) ? ' href="${_htmlUrl(node.destination)}"' : ''}${node.title == null ? '' : ' title="${escapeHtml(node.title!)}"'}>$body</a>';
   if (node is ImageNode) {
     final text = StringBuffer();
     final pending = <MarkdownNode>[...node.children.reversed];
@@ -141,7 +150,7 @@ String toHtml(MarkdownNode root) => serializeNodes(root, (node, output) {
         pending.addAll(current.children.reversed);
       }
     }
-    return '<img${isSafeHtmlUrl(node.destination, image: true) ? ' src="${escapeHtml(node.destination, attribute: true)}"' : ''} alt="${escapeHtml(text.toString(), attribute: true)}"${node.title == null ? '' : ' title="${escapeHtml(node.title!, attribute: true)}"'} />';
+    return '<img${isSafeHtmlUrl(node.destination, image: true) ? ' src="${_htmlUrl(node.destination)}"' : ''} alt="${escapeHtml(text.toString())}"${node.title == null ? '' : ' title="${escapeHtml(node.title!)}"'} />';
   }
   if (node is BlockQuoteNode) return '<blockquote>\n$body</blockquote>\n';
   if (node is ListNode) {
@@ -165,7 +174,11 @@ String toHtml(MarkdownNode root) => serializeNodes(root, (node, output) {
           contents.write(output[child]);
         }
       }
-      rows.write('<li>${node.tight ? '' : '\n'}$contents</li>\n');
+      final startsWithBlock =
+          item.children.isNotEmpty && item.children.first is! ParagraphNode;
+      rows.write(
+        '<li>${!node.tight || startsWithBlock ? '\n' : ''}$contents</li>\n',
+      );
     }
     return '<$tag${node.ordered && node.start != 1 ? ' start="${node.start}"' : ''}>\n$rows</$tag>\n';
   }
@@ -188,9 +201,9 @@ String toHtml(MarkdownNode root) => serializeNodes(root, (node, output) {
   if (node is DetailsNode)
     return '<details${node.open ? ' open=""' : ''}>\n$body</details>\n';
   if (node is NamedBlockNode)
-    return '<aside data-${node.syntax == NamedBlockSyntax.alert ? 'alert' : 'directive'}="${escapeHtml(node.name, attribute: true)}"${_attributes('aside', node.attributes)}>\n$body</aside>\n';
+    return '<aside data-${node.syntax == NamedBlockSyntax.alert ? 'alert' : 'directive'}="${escapeHtml(node.name)}"${_attributes('aside', node.attributes)}>\n$body</aside>\n';
   if (node is NamedInlineNode)
-    return '<span data-${node.syntax == NamedInlineSyntax.directive ? 'directive' : 'extension'}="${escapeHtml(node.name, attribute: true)}"${_attributes('span', node.attributes)}>$body</span>';
+    return '<span data-${node.syntax == NamedInlineSyntax.directive ? 'directive' : 'extension'}="${escapeHtml(node.name)}"${_attributes('span', node.attributes)}>$body</span>';
   if (node is HtmlElementNode) {
     if (discardedHtmlTags.contains(node.tag)) return '';
     if (!htmlBlockTags.contains(node.tag) && !htmlInlineTags.contains(node.tag))

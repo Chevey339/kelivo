@@ -1,0 +1,52 @@
+CommonMark / GFM conformance observations
+========================================
+
+This file records the current instrument output, not a passing threshold.
+Run flutter test test/core/spec to regenerate build/reports/*.json.
+The report includes every source, expected HTML, actual HTML and example ID.
+Parse exceptions and invalid source spans fail the tests; HTML differences do not.
+
+CommonMark 0.31.2: 564/652 exact HTML matches (86.5%).
+GFM 0.29 extension examples: 19/27 (70.4%).
+
+Intentional policy differences
+-----------------------------
+- Raw HTML is parsed into a safe native subset instead of copied verbatim.
+  Unknown tag shells are removed; script/style/iframe bodies are discarded;
+  comments are removed; attributes are filtered; unclosed tags are balanced.
+  Complete HTML documents export as escaped code. This also affects examples
+  outside the HTML sections (links, emphasis, lists and line breaks).
+- The HTML serializer allows only http, https, mailto, tel and file schemes
+  plus selected base64 image data. Other schemes lose the destination.
+- Strikethrough requires double tildes; GFM example 491 accepts single tildes.
+- Task input attributes and XHTML closing syntax differ from GFM examples
+  279 and 280; checkbox state and list nesting agree.
+
+Known implementation gaps (not claimed as deliberate dialect choices)
+-------------------------------------------------------------------
+- Trailing whitespace at the end of paragraphs/setext headings is retained
+  (CommonMark 82, 89, 226, 645).
+- Reference definitions immediately before setext delimiters are not removed
+  before heading recognition (215, 216). Unicode reference-label matching
+  uses lowercase, not complete Unicode case folding (540).
+- Empty list items followed by blank lines can absorb a following paragraph
+  (280). Blank lines at nested-list boundaries do not always mark the parent
+  list loose (325, 326). Empty loose items have an extra HTML newline (315).
+- URL serialization retains square brackets, including outside IPv6 hosts;
+  the reference HTML percent-encodes those brackets (526, 538, 603).
+- GFM bare-link scanning does not yet trim a trailing entity-like ampersand
+  suffix (627), accept one-character email domain suffixes (632), or include
+  explicit mailto/xmpp prefixes and XMPP resources (633-635).
+
+Current failing example IDs
+---------------------------
+CommonMark:
+21, 31, 82, 89, 148, 149, 150, 151, 152, 153, 154, 155, 156, 157, 158, 160,
+161, 162, 163, 164, 165, 166, 167, 168, 169, 170, 171, 172, 173, 174, 175,
+176, 177, 178, 179, 180, 181, 182, 183, 184, 186, 187, 188, 190, 191, 201,
+215, 216, 226, 280, 308, 309, 315, 325, 326, 344, 475, 476, 477, 491, 494,
+500, 524, 526, 536, 538, 540, 596, 598, 599, 601, 603, 613, 614, 615, 616,
+617, 623, 625, 626, 627, 628, 629, 630, 631, 642, 643, 645
+
+GFM extensions:
+279, 280, 491, 627, 632, 633, 634, 635
