@@ -240,7 +240,7 @@ class EmbeddingApiService {
       final json = await _post(
         client,
         Uri.parse(
-          '${vertexOrigin(config, loc)}/v1/projects/$proj/locations/$loc/publishers/google/models/$upstream:embedContent',
+          '${vertexModelsUrl(config, location: loc, project: proj, publisher: 'google')}/$upstream:embedContent',
         ),
         config,
         modelId,
@@ -262,7 +262,7 @@ class EmbeddingApiService {
     final json = await _post(
       client,
       Uri.parse(
-        '${vertexOrigin(config, loc)}/v1/projects/$proj/locations/$loc/publishers/google/models/$upstream:predict',
+        '${vertexModelsUrl(config, location: loc, project: proj, publisher: 'google')}/$upstream:predict',
       ),
       config,
       modelId,

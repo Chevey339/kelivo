@@ -332,8 +332,10 @@ Stream<StreamChunk> sendGoogleStream(
     if (isVertex &&
         (config.projectId?.isNotEmpty == true) &&
         (config.location?.isNotEmpty == true)) {
+      final loc = config.location!.trim();
+      final proj = config.projectId!.trim();
       url =
-          'https://aiplatform.googleapis.com/v1/projects/${config.projectId}/locations/${config.location}/publishers/google/models/$upstreamModelId:generateContent';
+          '${vertexModelsUrl(config, location: loc, project: proj, publisher: 'google')}/$upstreamModelId:generateContent';
     } else {
       url = '$base/models/$upstreamModelId:generateContent';
     }
@@ -823,7 +825,7 @@ Stream<StreamChunk> sendGoogleStream(
     final loc = config.location!.trim();
     final proj = config.projectId!.trim();
     baseUrl =
-        'https://aiplatform.googleapis.com/v1/projects/$proj/locations/$loc/publishers/google/models/$upstreamModelId:streamGenerateContent';
+        '${vertexModelsUrl(config, location: loc, project: proj, publisher: 'google')}/$upstreamModelId:streamGenerateContent';
   } else {
     final base = config.baseUrl.endsWith('/')
         ? config.baseUrl.substring(0, config.baseUrl.length - 1)
