@@ -45,6 +45,7 @@ import '../cache/byte_lru_cache.dart';
 import 'incremental_markdown_document.dart';
 import 'markdown_block_list.dart';
 import 'streaming_rich_text.dart';
+import 'markdown_selection/selectable_span_adapter.dart';
 import 'streaming_code_fence.dart';
 import 'markdown_line_lexer.dart';
 import 'markdown_source_scan.dart';
@@ -1851,154 +1852,62 @@ TextStyle _inlineMathTextStyle(TextStyle? style) {
   return base.copyWith(fontSize: baseSize * 1.2);
 }
 
-WidgetSpan _inlineMathSpan(Widget math) {
+WidgetSpan _inlineMathSpan(Widget math, String source) {
   return WidgetSpan(
     alignment: PlaceholderAlignment.baseline,
     baseline: TextBaseline.alphabetic,
-    child: SelectionContainer.disabled(
-      child: _InlineMathScrollable(child: math),
+    child: SelectableSpanAdapter(
+      selectedText: source,
+      child: _InlineMathFittedBox(child: math),
     ),
   );
 }
 
-/// Horizontally scrollable inline math that preserves baseline alignment.
-///
-/// [SingleChildScrollView] breaks baseline forwarding because its internal
-/// [RenderViewport] does not implement [computeDistanceToActualBaseline].
-/// This widget uses a custom [RenderObject] that lays out the child
-/// unconstrained in width, reports correct baseline, and paints with a
-/// horizontal scroll offset driven by a [GestureDetector].
-class _InlineMathScrollable extends StatefulWidget {
-  const _InlineMathScrollable({required this.child});
-  final Widget child;
+class _InlineMathFittedBox extends FittedBox {
+  const _InlineMathFittedBox({required super.child})
+    : super(fit: BoxFit.scaleDown);
 
   @override
-  State<_InlineMathScrollable> createState() => _InlineMathScrollableState();
+  RenderFittedBox createRenderObject(BuildContext context) =>
+      _RenderInlineMathFittedBox();
 }
 
-class _InlineMathScrollableState extends State<_InlineMathScrollable> {
-  double _scrollOffset = 0.0;
-  double _maxScroll = 0.0;
+class _RenderInlineMathFittedBox extends RenderFittedBox {
+  _RenderInlineMathFittedBox() : super(fit: BoxFit.scaleDown);
 
-  void _onHorizontalDragUpdate(DragUpdateDetails d) {
-    setState(() {
-      _scrollOffset = (_scrollOffset - d.delta.dx).clamp(0.0, _maxScroll);
-    });
-  }
-
-  void _updateMaxScroll(double childWidth, double viewportWidth) {
-    _maxScroll = (childWidth - viewportWidth).clamp(0.0, double.infinity);
-    // Ensure current offset stays valid after relayout.
-    if (_scrollOffset > _maxScroll) {
-      _scrollOffset = _maxScroll;
-    }
+  // RenderFittedBox forwards the unscaled baseline. Inline placeholders need
+  // the painted baseline so a wide, scaled formula keeps the right line height.
+  double? _scaledBaseline(Size childSize, Size boxSize, double? baseline) {
+    if (baseline == null || childSize.isEmpty) return baseline;
+    final fitted = applyBoxFit(BoxFit.scaleDown, childSize, boxSize);
+    final scale = fitted.destination.height / childSize.height;
+    return (boxSize.height - fitted.destination.height) / 2 + baseline * scale;
   }
 
   @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      behavior: HitTestBehavior.translucent,
-      onHorizontalDragUpdate: _onHorizontalDragUpdate,
-      child: _InlineMathScrollableRenderWidget(
-        scrollOffset: _scrollOffset,
-        onMetrics: _updateMaxScroll,
-        child: widget.child,
-      ),
-    );
-  }
-}
-
-class _InlineMathScrollableRenderWidget extends SingleChildRenderObjectWidget {
-  const _InlineMathScrollableRenderWidget({
-    required this.scrollOffset,
-    required this.onMetrics,
-    required Widget child,
-  }) : super(child: child);
-
-  final double scrollOffset;
-  final void Function(double childWidth, double viewportWidth) onMetrics;
+  double? computeDistanceToActualBaseline(TextBaseline baseline) =>
+      child == null
+      ? null
+      : _scaledBaseline(
+          child!.size,
+          size,
+          child!.getDistanceToActualBaseline(baseline),
+        );
 
   @override
-  RenderObject createRenderObject(BuildContext context) =>
-      _RenderInlineMathScrollable(
-        initialScrollOffset: scrollOffset,
-        onMetrics: onMetrics,
-      );
-
-  @override
-  void updateRenderObject(
-    BuildContext context,
-    _RenderInlineMathScrollable renderObject,
+  double? computeDryBaseline(
+    BoxConstraints constraints,
+    TextBaseline baseline,
   ) {
-    renderObject
-      ..scrollOffset = scrollOffset
-      ..onMetrics = onMetrics;
-  }
-}
-
-class _RenderInlineMathScrollable extends RenderProxyBox {
-  _RenderInlineMathScrollable({
-    required double initialScrollOffset,
-    required this.onMetrics,
-  }) : _scrollOffset = initialScrollOffset;
-
-  double _scrollOffset;
-  set scrollOffset(double value) {
-    if (_scrollOffset == value) return;
-    _scrollOffset = value;
-    markNeedsPaint();
-  }
-
-  void Function(double childWidth, double viewportWidth) onMetrics;
-
-  @override
-  void performLayout() {
-    final child = this.child;
-    if (child == null) {
-      size = constraints.smallest;
-      return;
-    }
-    child.layout(
-      constraints.copyWith(maxWidth: double.infinity),
-      parentUsesSize: true,
+    final childBaseline = child?.getDryBaseline(
+      const BoxConstraints(),
+      baseline,
     );
-    size = constraints.constrain(child.size);
-    // Notify stateful widget of the scrollable extent.
-    if (child.size.width > size.width) {
-      onMetrics(child.size.width, size.width);
-    }
-  }
-
-  @override
-  double? computeDistanceToActualBaseline(TextBaseline baseline) {
-    return child?.getDistanceToActualBaseline(baseline);
-  }
-
-  @override
-  void paint(PaintingContext context, Offset offset) {
-    final child = this.child;
-    if (child == null) return;
-    if (child.size.width <= size.width) {
-      context.paintChild(child, offset);
-      return;
-    }
-    context.pushClipRect(needsCompositing, offset, Offset.zero & size, (
-      context,
-      clipOffset,
-    ) {
-      context.paintChild(child, clipOffset - Offset(_scrollOffset, 0));
-    });
-  }
-
-  @override
-  bool hitTestChildren(BoxHitTestResult result, {required Offset position}) {
-    final child = this.child;
-    if (child == null) return false;
-    return result.addWithPaintOffset(
-      offset: Offset(-_scrollOffset, 0),
-      position: position,
-      hitTest: (result, transformed) =>
-          child.hitTest(result, position: transformed),
+    if (childBaseline == null) return null;
+    return _scaledBaseline(
+      child!.getDryLayout(const BoxConstraints()),
+      getDryLayout(constraints),
+      childBaseline,
     );
   }
 }
@@ -5407,7 +5316,10 @@ class LatexBlockScrollableMd extends BlockMd {
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: LayoutBuilder(
         builder: (context, constraints) {
-          return SelectionContainer.disabled(
+          return SelectableSpanAdapter(
+            // The block matcher consumes its trailing separator. Preserve a
+            // paragraph boundary when copying into surrounding text.
+            selectedText: '\$\$\n$body\n\$\$\n\n',
             child: SingleChildScrollView(
               scrollDirection: Axis.horizontal,
               primary: false,
@@ -5442,7 +5354,7 @@ class InlineLatexScrollableMd extends InlineMd {
     final body = ((m.group(1) ?? m.group(2) ?? '')).trim();
     if (body.isEmpty) return TextSpan(text: text, style: config.style);
     final math = _renderMath(body, style: _inlineMathTextStyle(config.style));
-    return _inlineMathSpan(math);
+    return _inlineMathSpan(math, '\$$body\$');
   }
 }
 
@@ -5470,7 +5382,7 @@ class InlineLatexDollarScrollableMd extends InlineMd {
       style: config.style,
       children: [
         if (prefix.isNotEmpty) TextSpan(text: prefix, style: config.style),
-        _inlineMathSpan(math),
+        _inlineMathSpan(math, '\$$body\$'),
       ],
     );
   }
@@ -5492,7 +5404,7 @@ class InlineLatexParenScrollableMd extends InlineMd {
     final body = (m.group(1) ?? '').trim();
     if (body.isEmpty) return TextSpan(text: text, style: config.style);
     final math = _renderMath(body, style: _inlineMathTextStyle(config.style));
-    return _inlineMathSpan(math);
+    return _inlineMathSpan(math, '\$$body\$');
   }
 }
 
