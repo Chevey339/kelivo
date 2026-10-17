@@ -145,7 +145,7 @@ class ModelDefaultsGuesser {
 
   static final RegExp _reasoning = RegExp(
     (r'(gpt-oss|gpt-5(?!-chat)|gpt-6|o\d|'
-            r'gemini-(?:2\.5|3).*|gemini-(?:flash-latest|pro-latest)|'
+            r'gemini-(?:2\.5|3|4).*|gemini-(?:flash-latest|pro-latest)|'
             r'gemini-3-pro-image-preview|'
             r'gemma[-_]?4|'
             r'claude|'
@@ -200,6 +200,7 @@ class ModelDefaultsGuesser {
     _ReasoningRule(matches: _isGemini3Pro, apply: _gemini3Pro),
     _ReasoningRule(matches: _isGemini3Flash, apply: _gemini3Flash),
     _ReasoningRule(matches: _isGemini3ReplayOnly, apply: _gemini3ReplayOnly),
+    _ReasoningRule(matches: _isGemini4, apply: _gemini4),
     _ReasoningRule(matches: _isGeminiBudgetFamily, apply: _geminiBudget),
     _ReasoningRule(matches: _isQwen3Family, apply: _qwen3),
     _ReasoningRule(matches: _isLaguna, apply: _laguna),
@@ -614,6 +615,14 @@ bool _isGemini3ReplayOnly(String id) =>
 bool _isGemini25NonTextVariant(String id) =>
     _isGeminiNonTextVariant(id) && !id.contains('gemini-3');
 
+final _gemini4Id = RegExp(
+  r'(^|[/:_-])gemini-4(?:\.\d+)?-',
+  caseSensitive: false,
+);
+
+bool _isGemini4(String id) =>
+    _gemini4Id.hasMatch(id) && !_isGeminiNonTextVariant(id);
+
 bool _isGeminiBudgetFamily(String id) {
   return id.contains('gemini') &&
       !_isGemini3FlashImage(id) &&
@@ -957,6 +966,25 @@ _ReasoningHit _gemini3Flash(String id) {
     defaultLevel: defaultLevel,
     sampling: SamplingPolicy.never,
     maxOutput: minor >= 5 ? 65536 : null,
+    replay: ReasoningReplayPolicy.all,
+  );
+}
+
+// gemini-4 rejects thinking_budget and MINIMAL with HTTP 400.
+_ReasoningHit _gemini4(String id) {
+  return _fixed(
+    dialect: ReasoningDialect.geminiThinkingLevel,
+    levels: const [
+      ReasoningLevel.low,
+      ReasoningLevel.medium,
+      ReasoningLevel.high,
+    ],
+    canDisable: false,
+    defaultLevel: id.contains('cyber-permissive')
+        ? ReasoningLevel.high
+        : ReasoningLevel.medium,
+    sampling: SamplingPolicy.never,
+    maxOutput: 65536,
     replay: ReasoningReplayPolicy.all,
   );
 }
