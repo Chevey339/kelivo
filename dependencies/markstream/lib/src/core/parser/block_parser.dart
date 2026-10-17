@@ -2,6 +2,7 @@ import '../ast/nodes.dart';
 import '../ast/source_span.dart';
 import 'dialect.dart';
 import 'source_line.dart';
+import 'mapped_text.dart';
 import 'syntax/math_block.dart';
 import 'syntax/task_item.dart';
 import 'syntax/table.dart';
@@ -10,14 +11,19 @@ import 'syntax/directive.dart';
 import 'syntax/alert.dart';
 import 'syntax/html_block.dart';
 import '../html/html_fragment.dart';
+import '../html/entities.dart';
 
 /// Builds block structure before inline interpretation, using original offsets.
 final class BlockParser {
   const BlockParser({this.options = const ParserOptions()});
   final ParserOptions options;
 
-  DocumentNode parse(String source, {bool streaming = false}) =>
-      _BlockSession(source, options, streaming).parse();
+  /// [start] is an original-source line boundary for incremental reparsing.
+  DocumentNode parse(String source, {bool streaming = false, int start = 0}) {
+    if (start < 0 || start > source.length)
+      throw RangeError.range(start, 0, source.length, 'start');
+    return _BlockSession(source, options, streaming, start).parse();
+  }
 }
 
 enum _Kind {
@@ -67,6 +73,7 @@ final class _Block {
   final rows = <TableRowNode>[];
   List<TableAlignment> alignments = const [];
   bool open = false;
+  bool provisional = false;
   String name = '';
   Map<String, String> attributes = const {};
   NamedBlockSyntax? syntax;
@@ -94,13 +101,14 @@ final class _ListMarker {
 }
 
 final class _BlockSession {
-  _BlockSession(this.source, this.options, this.streaming) {
+  _BlockSession(this.source, this.options, this.streaming, this.start) {
     root = _Block(_Kind.root, 0)..end = source.length;
     stack.add(root);
   }
   final String source;
   final ParserOptions options;
   final bool streaming;
+  final int start;
   late final _Block root;
   final stack = <_Block>[];
   _Block? leaf;
@@ -115,10 +123,44 @@ final class _BlockSession {
   static final _setext = RegExp(r'^(=+|-+)[ \t]*$');
 
   DocumentNode parse() {
-    for (final line in SourceLine.scan(source)) {
+    for (final line in SourceLine.scan(source, start: start)) {
       _line(line);
     }
+    if (streaming) _provisionalTable();
     return DocumentNode(source: source, children: _freeze());
+  }
+
+  void _provisionalTable() {
+    final block = leaf;
+    if (!options.tables || block == null || block.kind != _Kind.paragraph)
+      return;
+    final mapped = MappedText(block.text.cast<TextNode>());
+    final firstBreak = mapped.text.indexOf('\n');
+    if (firstBreak >= 0) {
+      final rest = mapped.text.substring(firstBreak + 1);
+      if (!RegExp(r'^[|:\- \t]+$').hasMatch(rest)) return;
+    }
+    final firstEnd = firstBreak < 0 ? mapped.text.length : firstBreak;
+    if (!mapped.text.substring(0, firstEnd).trimLeft().startsWith('|')) return;
+    final span = mapped.span(0, firstEnd);
+    final header = splitTableLine(
+      source,
+      span.start,
+      span.end,
+      math: options.inlineMath,
+      maxMathLength: options.maxInlineMathLength,
+    );
+    if (header.cells.isEmpty ||
+        !options.tablePipesOptional && !header.outerPipes)
+      return;
+    block
+      ..kind = _Kind.table
+      ..provisional = true
+      ..alignments = List.filled(header.cells.length, TableAlignment.none);
+    block.rows.add(
+      TableRowNode(span: span, children: header.cells, header: true),
+    );
+    block.text.clear();
   }
 
   _ListMarker? _marker(LineCursor cursor) {
@@ -946,6 +988,7 @@ final class _BlockSession {
         ),
         _Kind.table => TableNode(
           span: span,
+          provisional: block.provisional,
           children: block.rows,
           alignments: block.alignments,
         ),
@@ -960,7 +1003,13 @@ final class _BlockSession {
           span: span,
           name: block.name,
           syntax: block.syntax!,
-          attributes: block.attributes,
+          attributes: {
+            for (final entry in block.attributes.entries)
+              entry.key: decodeMarkdownString(
+                entry.value,
+                entities: options.entities,
+              ),
+          },
           children: children,
           closed: block.closed,
         ),

@@ -5,6 +5,7 @@ MarkdownNode replaceChildren(MarkdownNode node, List<MarkdownNode> children) =>
     switch (node) {
       DocumentNode() => DocumentNode(
         source: node.source,
+        references: node.references,
         children: children.cast<BlockNode>(),
       ),
       ParagraphNode() => ParagraphNode(
@@ -45,6 +46,7 @@ MarkdownNode replaceChildren(MarkdownNode node, List<MarkdownNode> children) =>
       ),
       TableNode() => TableNode(
         span: node.span,
+        provisional: node.provisional,
         children: children.cast<TableRowNode>(),
         alignments: node.alignments,
       ),
@@ -103,6 +105,7 @@ MarkdownNode replaceChildren(MarkdownNode node, List<MarkdownNode> children) =>
       ),
       CodeSpanNode() => CodeSpanNode(
         span: node.span,
+        closed: node.closed,
         children: children.cast<TextNode>(),
         delimiterLength: node.delimiterLength,
       ),
@@ -114,6 +117,7 @@ MarkdownNode replaceChildren(MarkdownNode node, List<MarkdownNode> children) =>
       ),
       EmphasisNode() => EmphasisNode(
         span: node.span,
+        closed: node.closed,
         children: children.cast<InlineNode>(),
         strong: node.strong,
         marker: node.marker,
@@ -133,6 +137,7 @@ MarkdownNode replaceChildren(MarkdownNode node, List<MarkdownNode> children) =>
       ),
       StrikethroughNode() => StrikethroughNode(
         span: node.span,
+        closed: node.closed,
         children: children.cast<InlineNode>(),
       ),
       MathInlineNode() => MathInlineNode(

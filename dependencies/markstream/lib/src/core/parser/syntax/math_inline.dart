@@ -1,11 +1,18 @@
 import 'characters.dart';
 
 final class InlineMathMatch {
-  const InlineMathMatch(this.end, this.bodyStart, this.bodyEnd, this.delimiter);
+  const InlineMathMatch(
+    this.end,
+    this.bodyStart,
+    this.bodyEnd,
+    this.delimiter, {
+    this.closed = true,
+  });
   final int end;
   final int bodyStart;
   final int bodyEnd;
   final String delimiter;
+  final bool closed;
 }
 
 bool _boundary(int c) => isSpace(c) || isPunctuation(c) || isCjk(c);
@@ -41,6 +48,7 @@ InlineMathMatch? readInlineMath(
   int? end,
   bool adjacent = false,
   int maxLength = 512,
+  bool allowOpen = false,
 }) {
   final limit = end ?? text.length;
   final paren = text.startsWith(r'\(', start);
@@ -79,6 +87,16 @@ InlineMathMatch? readInlineMath(
           ? InlineMathMatch(i + 1, bodyStart, i, r'$')
           : null;
     }
+  }
+  if (allowOpen &&
+      limit - bodyStart <= maxLength &&
+      !text.substring(bodyStart, limit).contains(RegExp(r'[\r\n]'))) {
+    var a = bodyStart;
+    var b = limit;
+    while (a < b && isSpace(text.codeUnitAt(a))) a++;
+    while (b > a && isSpace(text.codeUnitAt(b - 1))) b--;
+    if (b - a >= 2)
+      return InlineMathMatch(limit, a, b, paren ? r'\(' : r'$', closed: false);
   }
   return null;
 }

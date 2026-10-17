@@ -28,17 +28,28 @@ abstract class InlineNode extends MarkdownNode {
 }
 
 final class DocumentNode extends MarkdownNode {
-  DocumentNode({required this.source, required List<BlockNode> children})
-    : children = List.unmodifiable(children),
-      super(SourceSpan(0, source.length));
+  DocumentNode({
+    required this.source,
+    required List<BlockNode> children,
+    Map<String, ReferenceDefinitionNode> references = const {},
+  }) : children = List.unmodifiable(children),
+       references = Map.unmodifiable(references),
+       super(SourceSpan(0, source.length));
 
   final String source;
+  final Map<String, ReferenceDefinitionNode> references;
   @override
   final List<BlockNode> children;
   @override
   String get type => 'document';
   @override
-  Map<String, Object?> get fields => {'source': source};
+  Map<String, Object?> get fields => {
+    'source': source,
+    if (references.isNotEmpty)
+      'references': {
+        for (final entry in references.entries) entry.key: entry.value.toJson(),
+      },
+  };
   @override
   T accept<T>(AstVisitor<T> visitor) => visitor.visitDocument(this);
 }
@@ -255,6 +266,7 @@ enum TableAlignment { none, left, center, right }
 final class TableNode extends BlockNode {
   TableNode({
     required SourceSpan span,
+    this.provisional = false,
     required List<TableRowNode> children,
     required List<TableAlignment> alignments,
   }) : children = List.unmodifiable(children),
@@ -263,10 +275,12 @@ final class TableNode extends BlockNode {
   @override
   final List<TableRowNode> children;
   final List<TableAlignment> alignments;
+  final bool provisional;
   @override
   String get type => 'table';
   @override
   Map<String, Object?> get fields => {
+    if (provisional) 'provisional': true,
     'alignments': alignments.map((a) => a.name).toList(),
   };
   @override
@@ -433,11 +447,13 @@ final class HtmlElementNode extends InlineNode {
 final class EmphasisNode extends InlineNode {
   EmphasisNode({
     required SourceSpan span,
+    this.closed = true,
     required List<InlineNode> children,
     this.strong = false,
     this.marker = '*',
   }) : children = List.unmodifiable(children),
        super(span);
+  final bool closed;
   @override
   final List<InlineNode> children;
   final bool strong;
@@ -445,7 +461,10 @@ final class EmphasisNode extends InlineNode {
   @override
   String get type => strong ? 'strong' : 'emphasis';
   @override
-  Map<String, Object?> get fields => {'marker': marker};
+  Map<String, Object?> get fields => {
+    'marker': marker,
+    if (!closed) 'closed': false,
+  };
   @override
   T accept<T>(AstVisitor<T> visitor) => visitor.visitEmphasis(this);
 }
@@ -453,11 +472,13 @@ final class EmphasisNode extends InlineNode {
 final class CodeSpanNode extends InlineNode {
   CodeSpanNode({
     required SourceSpan span,
+    this.closed = true,
     required List<TextNode> children,
     this.delimiterLength = 1,
   }) : children = List.unmodifiable(children),
        code = children.map((n) => n.text).join(),
        super(span);
+  final bool closed;
   @override
   final List<TextNode> children;
   final String code;
@@ -467,6 +488,7 @@ final class CodeSpanNode extends InlineNode {
   @override
   Map<String, Object?> get fields => {
     'code': code,
+    if (!closed) 'closed': false,
     'delimiterLength': delimiterLength,
   };
   @override
@@ -557,13 +579,17 @@ final class ReferenceDefinitionNode extends BlockNode {
 final class StrikethroughNode extends InlineNode {
   StrikethroughNode({
     required SourceSpan span,
+    this.closed = true,
     required List<InlineNode> children,
   }) : children = List.unmodifiable(children),
        super(span);
+  final bool closed;
   @override
   final List<InlineNode> children;
   @override
   String get type => 'strikethrough';
+  @override
+  Map<String, Object?> get fields => {if (!closed) 'closed': false};
   @override
   T accept<T>(AstVisitor<T> visitor) => visitor.visitStrikethrough(this);
 }

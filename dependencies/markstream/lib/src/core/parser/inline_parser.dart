@@ -28,6 +28,7 @@ final class InlineParser {
   List<InlineNode> parse(
     String source, {
     Map<String, ReferenceDefinitionNode> references = const {},
+    bool optimistic = false,
   }) {
     final fragments = <TextNode>[];
     for (final line in SourceLine.scan(source)) {
@@ -37,18 +38,24 @@ final class InlineParser {
           TextNode(span: SourceSpan(line.end, line.next), text: '\n'),
         );
     }
-    return parseFragments(fragments, references: references);
+    return parseFragments(
+      fragments,
+      references: references,
+      optimistic: optimistic,
+    );
   }
 
   List<InlineNode> parseFragments(
     List<TextNode> fragments, {
     Map<String, ReferenceDefinitionNode> references = const {},
+    bool optimistic = false,
   }) {
     final session = _InlineSession(
       MappedText(fragments),
       options,
       references,
       syntaxes,
+      optimistic: optimistic,
     );
     final nodes = session.parse();
     return _directiveLabels(nodes, references, session.pendingLabels);
@@ -141,8 +148,13 @@ final class _Bracket {
 }
 
 final class _InlineSession {
-  _InlineSession(this.input, this.options, this.references, this.syntaxes)
-    : text = input.text {
+  _InlineSession(
+    this.input,
+    this.options,
+    this.references,
+    this.syntaxes, {
+    this.optimistic = false,
+  }) : text = input.text {
     tail = head;
     // Pair equal-length backtick runs once. Failed openers then cost O(1).
     final runs = <int, int>{};
@@ -171,6 +183,7 @@ final class _InlineSession {
   final ParserOptions options;
   final Map<String, ReferenceDefinitionNode> references;
   final List<InlineSyntax> syntaxes;
+  final bool optimistic;
   final head = _Part(null, 0, 0);
   late _Part tail;
   _Delimiter? firstDelimiter;
@@ -263,6 +276,7 @@ final class _InlineSession {
           text,
           i,
           maxLength: options.maxInlineMathLength,
+          allowOpen: optimistic,
           adjacent: tail.node is MathInlineNode && tail.end == i,
         );
         if (math != null) {
@@ -271,6 +285,7 @@ final class _InlineSession {
               span: input.span(i, math.end),
               children: input.slice(math.bodyStart, math.bodyEnd),
               delimiter: math.delimiter,
+              closed: math.closed,
             ),
             i,
             math.end,
@@ -341,7 +356,9 @@ final class _InlineSession {
         final start = i;
         while (i < text.length && text.codeUnitAt(i) == 96) i++;
         final length = i - start;
-        final close = backticks[start];
+        final actualClose = backticks[start];
+        final close =
+            actualClose ?? (optimistic && i < text.length ? text.length : null);
         if (close != null) {
           var a = i;
           var b = close;
@@ -356,16 +373,18 @@ final class _InlineSession {
             for (final node in input.slice(a, b))
               TextNode(span: node.span, text: node.text.replaceAll('\n', ' ')),
           ];
+          final end = actualClose == null ? close : close + length;
           _add(
             CodeSpanNode(
-              span: input.span(start, close + length),
+              span: input.span(start, end),
+              closed: actualClose != null,
               children: body,
               delimiterLength: length,
             ),
             start,
-            close + length,
+            end,
           );
-          i = close + length;
+          i = end;
         } else {
           _literal(start, i);
         }
@@ -489,7 +508,7 @@ final class _InlineSession {
       run = i;
     }
     if (run < text.length) _text(run, text.length);
-    _emphasis(null);
+    _emphasis(null, closeOpen: optimistic);
     final nodes = _nodes(head.next, null);
     return List.unmodifiable(options.autolinks ? _linkify(nodes) : nodes);
   }
@@ -655,7 +674,7 @@ final class _InlineSession {
     return link.end;
   }
 
-  void _emphasis(_Delimiter? bottom) {
+  void _emphasis(_Delimiter? bottom, {bool closeOpen = false}) {
     final lowerBounds = <(int, bool, int), int>{};
     var closer = bottom == null ? firstDelimiter : bottom.next;
     while (closer != null) {
@@ -730,6 +749,44 @@ final class _InlineSession {
         _removePart(closer.part);
         _removeDelimiter(closer);
         closer = next;
+      }
+    }
+    if (closeOpen) {
+      var opener = lastDelimiter;
+      while (opener != null && opener != bottom) {
+        final previous = opener.previous;
+        if (opener.canOpen && opener.part.next != null) {
+          while (opener.length > 0) {
+            final used = opener.length >= 2 ? 2 : 1;
+            final children = _nodes(opener.part.next, null);
+            final start = opener.part.end - used;
+            final node = opener.character == 126
+                ? StrikethroughNode(
+                    span: input.span(start, text.length),
+                    children: children,
+                    closed: false,
+                  )
+                : EmphasisNode(
+                    span: input.span(start, text.length),
+                    children: children,
+                    strong: used == 2,
+                    marker: String.fromCharCode(opener.character),
+                    closed: false,
+                  );
+            opener.part.end -= used;
+            opener.length -= used;
+            opener.part.node = TextNode(
+              span: input.span(opener.part.start, opener.part.end),
+              text: text.substring(opener.part.start, opener.part.end),
+            );
+            tail = opener.part;
+            tail.next = null;
+            _add(node, start, text.length);
+          }
+          _removePart(opener.part);
+        }
+        _removeDelimiter(opener);
+        opener = previous;
       }
     }
     var leftover = bottom == null ? firstDelimiter : bottom.next;

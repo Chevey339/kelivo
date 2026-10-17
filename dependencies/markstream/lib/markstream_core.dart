@@ -10,3 +10,4 @@ export 'src/core/parser/dialect.dart';
 export 'src/core/parser/inline_parser.dart';
 export 'src/core/parser/markdown_parser.dart';
 export 'src/core/parser/syntax/inline_syntax.dart';
+export 'src/core/parser/incremental_document.dart';

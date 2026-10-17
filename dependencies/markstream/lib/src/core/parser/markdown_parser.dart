@@ -6,6 +6,7 @@ import 'block_parser.dart';
 import 'dialect.dart';
 import 'inline_parser.dart';
 import 'mapped_text.dart';
+import 'source_line.dart';
 import 'syntax/reference_definition.dart';
 import 'syntax/inline_syntax.dart';
 
@@ -18,10 +19,19 @@ final class MarkdownParser {
   final ParserOptions options;
   final List<InlineSyntax> inlineSyntaxes;
 
-  DocumentNode parse(String source, {bool streaming = false}) {
-    final blocks = BlockParser(options: options)
-        .parse(source, streaming: streaming);
-    final references = <String, ReferenceDefinitionNode>{};
+  DocumentNode parse(
+    String source, {
+    bool streaming = false,
+    int start = 0,
+    Map<String, ReferenceDefinitionNode> initialReferences = const {},
+    StreamingOptions streamingOptions = const StreamingOptions(),
+  }) {
+    final blocks = BlockParser(options: options).parse(
+      source,
+      streaming: streaming && streamingOptions.optimisticBlocks,
+      start: start,
+    );
+    final references = <String, ReferenceDefinitionNode>{...initialReferences};
     final withReferences = _transform(blocks, (node) {
       if (node is! ParagraphNode) return [node];
       final input = MappedText(node.children.cast<TextNode>());
@@ -52,7 +62,7 @@ final class MarkdownParser {
       return result;
     });
     final inline = InlineParser(options: options, syntaxes: inlineSyntaxes);
-    return _transform(withReferences, (node) {
+    final document = _transform(withReferences, (node) {
       if (node is ParagraphNode ||
           node is HeadingNode ||
           node is TableCellNode ||
@@ -65,6 +75,10 @@ final class MarkdownParser {
             inline.parseFragments(
               node.children.cast<TextNode>(),
               references: references,
+              optimistic:
+                  streaming &&
+                  streamingOptions.optimisticInlines &&
+                  _openInlineTail(node, source),
             ),
           ),
         ];
@@ -82,6 +96,74 @@ final class MarkdownParser {
         ];
       return [node];
     });
+    return DocumentNode(
+      source: source,
+      children: streaming && !streamingOptions.optimisticBlocks
+          ? _literalIncomplete(document).children
+          : document.children,
+      references: references,
+    );
+  }
+
+  bool _openInlineTail(MarkdownNode node, String source) =>
+      node.children.isNotEmpty &&
+      node.children.last.span.end == node.span.end &&
+      RegExp(r'^[ \t]*(?:\r\n|\r|\n)?[ \t]*$')
+          .hasMatch(source.substring(node.span.end));
+
+  DocumentNode _literalIncomplete(DocumentNode document) {
+    final converted = <MarkdownNode, MarkdownNode>{};
+    final pending = <(MarkdownNode, bool)>[(document, false)];
+    while (pending.isNotEmpty) {
+      final (node, visited) = pending.removeLast();
+      final incomplete = switch (node) {
+        CodeBlockNode() => !node.closed,
+        MathBlockNode() => !node.closed,
+        DetailsNode() => !node.closed,
+        NamedBlockNode() => !node.closed,
+        HtmlBlockNode() => !node.closed,
+        TableNode() => node.provisional,
+        _ => false,
+      };
+      if (incomplete) {
+        final raw = node.span.slice(document.source);
+        final fragments = <TextNode>[];
+        for (final line in SourceLine.scan(raw)) {
+          fragments.add(
+            TextNode(
+              span: SourceSpan(
+                node.span.start + line.start,
+                node.span.start + line.end,
+              ),
+              text: raw
+                  .substring(line.start, line.end)
+                  .replaceAll('\u0000', '\uFFFD'),
+            ),
+          );
+          if (line.next > line.end)
+            fragments.add(
+              TextNode(
+                span: SourceSpan(
+                  node.span.start + line.end,
+                  node.span.start + line.next,
+                ),
+                text: '\n',
+              ),
+            );
+        }
+        converted[node] = ParagraphNode(span: node.span, children: fragments);
+        continue;
+      }
+      if (!visited) {
+        pending.add((node, true));
+        for (final child in node.children.reversed) pending.add((child, false));
+      } else {
+        converted[node] = replaceChildren(node, [
+          for (final child in node.children) converted[child]!,
+        ]);
+      }
+    }
+    return converted[document]! as DocumentNode;
   }
 
   DocumentNode _transform(

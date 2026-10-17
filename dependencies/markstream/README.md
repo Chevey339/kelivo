@@ -37,3 +37,27 @@ to text and table cells. Disabling checkboxes does not disable radio items.
 
 `StreamingOptions` describes the closure policy for incomplete input: blocks
 are optimistic by default, while unfinished inline syntax remains literal.
+
+## Streaming documents
+
+```dart
+final stream = IncrementalDocument();
+stream.update('First paragraph.\n\n**in progress', streaming: true);
+final document = stream.update('First paragraph.\n\n**complete**');
+```
+
+Updates accept the cumulative source. Completed leading blocks retain their
+identity; changes to an open container reparse that container. Changing a
+reference definition invalidates earlier links. Replacing or truncating the
+source reparses it, and an identical update returns the existing document.
+
+The default policy projects an unfinished pipe-table header without inventing
+source characters. Optional optimistic inline closure covers emphasis, strike,
+code spans and mathematical expressions; links still need a destination. Only
+the active inline tail receives this closure. `closed` and `provisional` flags
+distinguish projected nodes, and every source span remains inside the input.
+
+`optimisticBlocks: false` displays the source of unfinished fenced code, math,
+details, directives and HTML blocks until they finish. Ending the stream uses
+ordinary Markdown parsing. Document reference metadata is immutable and uses
+the same original-source coordinates as the visible syntax tree.
