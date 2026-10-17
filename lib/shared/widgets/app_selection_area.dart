@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import 'markdown_selection/stable_selection_container.dart';
 import '../../l10n/app_localizations.dart';
 
 /// App-owned selection actions shared by messages and Markdown previews.
@@ -82,6 +83,6 @@ class _AppSelectionAreaState extends State<AppSelectionArea> {
   Widget build(BuildContext context) => SelectionArea(
     onSelectionChanged: (content) => _selectedText = content?.plainText ?? '',
     contextMenuBuilder: _buildMenu,
-    child: widget.child,
+    child: StableSelectionContainer(child: widget.child),
   );
 }

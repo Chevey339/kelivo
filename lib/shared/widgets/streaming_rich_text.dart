@@ -4,6 +4,7 @@ import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 
+import 'markdown_selection/selectable_rich_text.dart';
 import 'incremental_markdown_document.dart';
 import 'markdown_block_list.dart';
 
@@ -142,7 +143,7 @@ class _StreamingRichTextState extends State<StreamingRichText> {
       _chunks.clear();
       _runs = runs;
       _runsVersion++;
-      return RepaintBoundary(child: text);
+      return RepaintBoundary(child: buildSelectableText(text));
     }
     return LayoutBuilder(
       builder: (context, constraints) {

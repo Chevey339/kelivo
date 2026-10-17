@@ -255,4 +255,48 @@ void main() {
     await tester.pumpAndSettle();
     expect(selected, '\tText\t\n\t$prefix\$a+b\$$suffix\t');
   });
+
+  for (final blocks in [false, true]) {
+    testWidgets(
+      'nested math table supports cross-document drag, blocks=$blocks',
+      (tester) async {
+        String? selected;
+        await tester.pumpWidget(
+          _harness(
+            SizedBox(
+              width: 390,
+              child: MarkdownWithCodeHighlight(
+                text:
+                    'Before\n\n| A | B |\n| --- | --- |\n| alpha \$x\$ omega | other |\n\nAfter',
+                useBlockRendering: blocks,
+              ),
+            ),
+            (value) => selected = value?.plainText,
+          ),
+        );
+        await tester.pumpAndSettle();
+        final before = _paragraph('Before'), after = _paragraph('After');
+        final start = _edge(
+          before,
+          before.text.toPlainText().indexOf('Before'),
+          trailing: false,
+        );
+        final end = _edge(
+          after,
+          after.text.toPlainText().indexOf('After') + 4,
+          trailing: true,
+        );
+        for (final reverse in [false, true]) {
+          _region(tester).clearSelection();
+          await tester.pump();
+          await _drag(tester, reverse ? end : start, reverse ? start : end);
+          expect(
+            selected,
+            'Before\n\nA\tB\nalpha \$x\$ omega\tother\n\nAfter',
+            reason: 'reverse=$reverse',
+          );
+        }
+      },
+    );
+  }
 }

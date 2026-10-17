@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/rendering.dart';
 
+import 'markdown_selection/stable_selection_container.dart';
 import 'incremental_markdown_document.dart';
 import 'export_capture_scope.dart';
 
@@ -222,15 +223,7 @@ class _BlockSelectionGroup extends StatefulWidget {
 }
 
 class _BlockSelectionGroupState extends State<_BlockSelectionGroup> {
-  final _delegate = StaticSelectionContainerDelegate();
-
-  @override
-  void initState() {
-    super.initState();
-    // A nested registrar may publish from a microtask after the frame. Ensure
-    // its parent gets a frame to finish registration even in a static document.
-    _delegate.addListener(WidgetsBinding.instance.ensureVisualUpdate);
-  }
+  final _delegate = StableSelectionDelegate();
 
   @override
   void dispose() {

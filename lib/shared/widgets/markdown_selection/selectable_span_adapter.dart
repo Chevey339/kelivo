@@ -22,6 +22,7 @@ class SelectableSpanAdapter extends StatelessWidget {
       child: _SelectableSource(
         registrar: registrar,
         text: selectedText,
+        direction: Directionality.of(context),
         color:
             DefaultSelectionStyle.of(context).selectionColor ??
             const Color(0x663F51B5),
@@ -36,16 +37,18 @@ class _SelectableSource extends SingleChildRenderObjectWidget {
     required this.registrar,
     required this.text,
     required this.color,
+    required this.direction,
     required super.child,
   });
 
   final SelectionRegistrar registrar;
   final String text;
   final Color color;
+  final TextDirection direction;
 
   @override
   _RenderSelectableSource createRenderObject(BuildContext context) =>
-      _RenderSelectableSource(text, color, registrar);
+      _RenderSelectableSource(text, color, direction, registrar);
 
   @override
   void updateRenderObject(
@@ -54,6 +57,7 @@ class _SelectableSource extends SingleChildRenderObjectWidget {
   ) {
     object
       ..text = text
+      ..direction = direction
       ..color = color
       ..registrar = registrar;
   }
@@ -64,6 +68,7 @@ class _RenderSelectableSource extends RenderProxyBox
   _RenderSelectableSource(
     this._text,
     this._color,
+    this._direction,
     SelectionRegistrar registrar,
   ) {
     _geometry = SelectionGeometry(
@@ -77,6 +82,14 @@ class _RenderSelectableSource extends RenderProxyBox
   late SelectionGeometry _geometry;
   String _text;
   Color _color;
+  TextDirection _direction;
+
+  set direction(TextDirection value) {
+    if (_direction == value) return;
+    _direction = value;
+    _updateGeometry(force: true);
+  }
+
   int? _start;
   int? _end;
   LayerLink? _startHandle;
@@ -133,9 +146,12 @@ class _RenderSelectableSource extends RenderProxyBox
       );
     } else {
       SelectionPoint point(int offset, bool start) => SelectionPoint(
-        localPosition: Offset(offset == 0 ? 0 : size.width, size.height),
+        localPosition: Offset(
+          (offset == 0) != (_direction == TextDirection.rtl) ? 0 : size.width,
+          size.height,
+        ),
         lineHeight: size.height,
-        handleType: start
+        handleType: start != (_direction == TextDirection.rtl)
             ? TextSelectionHandleType.left
             : TextSelectionHandleType.right,
       );
@@ -208,10 +224,22 @@ class _RenderSelectableSource extends RenderProxyBox
           Offset.zero & size,
           position,
         );
+        if (_direction == TextDirection.rtl &&
+            position.dy >= 0 &&
+            position.dy <= size.height) {
+          result = switch (result) {
+            SelectionResult.previous => SelectionResult.next,
+            SelectionResult.next => SelectionResult.previous,
+            _ => result,
+          };
+        }
         final offset = switch (result) {
           SelectionResult.previous => 0,
           SelectionResult.next => _text.length,
-          _ => position.dx < size.width / 2 ? 0 : _text.length,
+          _ =>
+            (position.dx < size.width / 2) != (_direction == TextDirection.rtl)
+                ? 0
+                : _text.length,
         };
         if (event.type == SelectionEventType.startEdgeUpdate) {
           _start = offset;
@@ -241,7 +269,7 @@ class _RenderSelectableSource extends RenderProxyBox
     if (_startHandle == startHandle && _endHandle == endHandle) return;
     _startHandle = startHandle;
     _endHandle = endHandle;
-    markNeedsPaint();
+    if (attached) markNeedsPaint();
   }
 
   @override

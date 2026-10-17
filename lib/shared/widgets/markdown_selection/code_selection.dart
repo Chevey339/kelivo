@@ -1,14 +1,13 @@
 import 'dart:math' as math;
 
 import 'package:flutter/rendering.dart';
-import 'package:flutter/widgets.dart';
+
+import 'stable_selection_container.dart';
 
 /// Code text chunks have the same offsets as their source. Copying the selected
 /// source range preserves indentation and line breaks across visual line chunks.
-class CodeSelectionDelegate extends StaticSelectionContainerDelegate {
-  CodeSelectionDelegate(this.source) {
-    addListener(WidgetsBinding.instance.ensureVisualUpdate);
-  }
+class CodeSelectionDelegate extends StableSelectionDelegate {
+  CodeSelectionDelegate(this.source);
   String source;
 
   @override

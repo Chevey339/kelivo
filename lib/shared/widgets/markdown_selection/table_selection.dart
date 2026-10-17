@@ -3,13 +3,11 @@ import 'dart:math' as math;
 import 'package:flutter/rendering.dart';
 import 'package:flutter/widgets.dart';
 
+import 'stable_selection_container.dart';
+
 /// Keeps table copy in source row/column order, including empty cells, while
 /// the standard delegate owns gesture routing and selection geometry.
-class TableSelectionDelegate extends StaticSelectionContainerDelegate {
-  TableSelectionDelegate() {
-    addListener(WidgetsBinding.instance.ensureVisualUpdate);
-  }
-
+class TableSelectionDelegate extends StableSelectionDelegate {
   final _cells = <_TableCellSelectionState>{};
 
   List<_TableCellSelectionState> get _orderedCells =>
@@ -84,13 +82,12 @@ class TableCellSelection extends StatefulWidget {
 }
 
 class _TableCellSelectionState extends State<TableCellSelection> {
-  final delegate = StaticSelectionContainerDelegate();
+  final delegate = StableSelectionDelegate();
 
   @override
   void initState() {
     super.initState();
     widget.table._cells.add(this);
-    delegate.addListener(WidgetsBinding.instance.ensureVisualUpdate);
   }
 
   @override

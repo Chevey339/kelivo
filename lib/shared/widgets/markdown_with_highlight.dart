@@ -52,6 +52,8 @@ import 'streaming_code_fence.dart';
 import 'markdown_line_lexer.dart';
 import 'markdown_source_scan.dart';
 
+import 'markdown_selection/selectable_rich_text.dart';
+
 // Inline math is parsed on the UI thread. Bound the lookahead window so a long
 // line with many unmatched openers cannot trigger repeated whole-line scans.
 const int _maxInlineMathBodyLength = 512;
@@ -4088,24 +4090,26 @@ class _MarkdownTableCell extends StatelessWidget {
           // SelectableText reserved a caret and gap on desktop. Keep the
           // existing column wrapping while joining the parent selection.
           padding: EdgeInsets.only(right: compact ? 0 : 3),
-          child: Text.rich(
-            textSpan,
-            style: compact ? baseStyle.copyWith(inherit: false) : baseStyle,
-            textAlign: data.alignment,
-            textScaler: compact
-                ? TextScaler.noScaling
-                : MediaQuery.textScalerOf(context),
-            strutStyle: compact
-                ? null
-                : StrutStyle.fromTextStyle(inheritedStyle),
-            textHeightBehavior: compact
-                ? null
-                : DefaultTextStyle.of(context).textHeightBehavior ??
-                      DefaultTextHeightBehavior.maybeOf(context),
-            selectionColor: DefaultSelectionStyle.of(context).selectionColor,
-            softWrap: true,
-            overflow: TextOverflow.visible,
-            textWidthBasis: TextWidthBasis.parent,
+          child: buildSelectableText(
+            Text.rich(
+              textSpan,
+              style: compact ? baseStyle.copyWith(inherit: false) : baseStyle,
+              textAlign: data.alignment,
+              textScaler: compact
+                  ? TextScaler.noScaling
+                  : MediaQuery.textScalerOf(context),
+              strutStyle: compact
+                  ? null
+                  : StrutStyle.fromTextStyle(inheritedStyle),
+              textHeightBehavior: compact
+                  ? null
+                  : DefaultTextStyle.of(context).textHeightBehavior ??
+                        DefaultTextHeightBehavior.maybeOf(context),
+              selectionColor: DefaultSelectionStyle.of(context).selectionColor,
+              softWrap: true,
+              overflow: TextOverflow.visible,
+              textWidthBasis: TextWidthBasis.parent,
+            ),
           ),
         ),
       ),
