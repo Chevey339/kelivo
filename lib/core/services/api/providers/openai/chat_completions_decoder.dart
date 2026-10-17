@@ -111,6 +111,12 @@ class ChatCompletionsStreamDecoder implements StreamChunkDecoder {
             content += deltaContent;
             approxCompletionChars += deltaContent.length;
           }
+          // A refusal replaces the content, so it is shown as the reply.
+          final refusal = delta['refusal'];
+          if (refusal is String && refusal.isNotEmpty) {
+            content += refusal;
+            approxCompletionChars += refusal.length;
+          }
           final rc = delta['reasoning_content'] ?? delta['reasoning'];
           if (rc is String && rc.isNotEmpty) {
             reasoning = rc;
@@ -149,6 +155,11 @@ class ChatCompletionsStreamDecoder implements StreamChunkDecoder {
                     it,
               ]);
             }
+          }
+          final messageRefusal = message['refusal'];
+          if (messageRefusal is String && messageRefusal.isNotEmpty) {
+            content += messageRefusal;
+            approxCompletionChars += messageRefusal.length;
           }
           if (delta is! Map || delta['tool_calls'] == null) {
             _ingestCompleteToolCalls(message['tool_calls'], toolChunks);

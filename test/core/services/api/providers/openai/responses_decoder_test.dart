@@ -53,6 +53,22 @@ void main() {
     expect(decoder.outputItems, [completed]);
   });
 
+  test('streams a refusal as the reply text', () {
+    final decoder = ResponsesStreamDecoder();
+    final refusal = decoder.accept(
+      _event({
+        'type': 'response.refusal.delta',
+        'output_index': 0,
+        'delta': "I can't help with that.",
+      }),
+    );
+
+    expect(
+      refusal.chunks.whereType<TextDelta>().single.text,
+      "I can't help with that.",
+    );
+  });
+
   test('streams text and reasoning and completes without Finish', () {
     final decoder = ResponsesStreamDecoder();
     final reasoning = decoder.accept(
