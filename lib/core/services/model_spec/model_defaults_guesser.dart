@@ -970,78 +970,99 @@ _ReasoningHit _geminiBudget(String id) {
   );
 }
 
-bool _isClaude5(String id) =>
-    _matches(id, r'claude-(?:opus|sonnet)-5(?:$|[._:@/-])');
-
-bool _isClaudeAlwaysOn(String id) =>
-    id.contains('claude-fable') || id.contains('claude-mythos');
-
-bool _supportsClaudeAdaptive(String id) {
-  if (!id.contains('claude-')) return false;
-  if (id.contains('fable') || id.contains('mythos')) return true;
-  if (_isClaude5(id)) return true;
-  final m = RegExp(
-    r'claude-(opus|sonnet)-(\d+)[-.](\d+)',
-    caseSensitive: false,
-  ).firstMatch(id);
-  if (m != null) {
-    final major = int.tryParse(m.group(2) ?? '');
-    final minor = int.tryParse(m.group(3) ?? '');
-    if (major != null && minor != null) {
-      return major > 4 || (major == 4 && minor >= 6);
-    }
+/// Claude generation read off a model id: `claude-opus-4-7` → 4.7,
+/// `claude-haiku-5-5` → 5.5, `claude-3-5-sonnet` → 3.5, `claude-4.5-opus` →
+/// 4.5. Only the first two short numbers count, so a snapshot date
+/// (`claude-sonnet-4-20250514`) never reads as a minor version.
+({int major, int? minor})? _claudeGeneration(String id) {
+  final start = id.indexOf('claude');
+  if (start < 0) return null;
+  final numbers = <int>[];
+  for (final match in RegExp(r'\d+').allMatches(id.substring(start))) {
+    final digits = match.group(0)!;
+    // A snapshot date (`20250514`) ends the generation, so a later `v1` tag
+    // is never read as a minor version.
+    if (digits.length > 2) break;
+    final value = int.parse(digits);
+    if (value > 20) continue;
+    numbers.add(value);
+    if (numbers.length == 2) break;
   }
-  return id.contains('4-6') || id.contains('4.6');
+  if (numbers.isEmpty) return null;
+  return (major: numbers.first, minor: numbers.length > 1 ? numbers[1] : null);
 }
 
+/// True when the id names a Claude [family] model of at least [major].[minor].
+bool _isClaudeFamilySince(String id, String family, int major, int minor) {
+  if (!id.contains(family)) return false;
+  final generation = _claudeGeneration(id);
+  if (generation == null) return false;
+  if (generation.major != major) return generation.major > major;
+  return (generation.minor ?? 0) >= minor;
+}
+
+/// The Claude 5 generation: adaptive thinking with an effort ladder, no
+/// `budget_tokens`, and no non-default sampling parameters.
+bool _isClaude5(String id) {
+  final generation = _claudeGeneration(id);
+  return generation != null && generation.major >= 5;
+}
+
+/// Models that reject `thinking.type: "disabled"` at every effort level.
+bool _isClaudeAlwaysOn(String id) =>
+    id.contains('claude-fable') ||
+    id.contains('claude-mythos') ||
+    // Claude Opus 5.5 keeps adaptive thinking on; `disabled` is a 400.
+    _isClaudeFamilySince(id, 'opus', 5, 5);
+
+/// Claude Sonnet 5.5 turns up-front thinking off with `between_tools` and
+/// rejects `disabled`.
+bool _isClaudeBetweenTools(String id) =>
+    _isClaudeFamilySince(id, 'sonnet', 5, 5);
+
+/// Adaptive thinking arrived with Claude 4.6 and replaced manual extended
+/// thinking from 4.7 on; Claude 4.5 and earlier only speak
+/// `enabled` + `budget_tokens`.
+bool _supportsClaudeAdaptive(String id) {
+  if (!id.contains('claude-')) return false;
+  if (_isClaudeAlwaysOn(id)) return true;
+  final generation = _claudeGeneration(id);
+  if (generation == null) return false;
+  if (generation.major > 4) return true;
+  return generation.major == 4 && (generation.minor ?? 0) >= 6;
+}
+
+/// Claude 4.7 and later reject `thinking: {"type": "enabled"}` with a 400, so
+/// a request that keeps thinking on may only send the adaptive shape.
 bool _isClaudeAdaptiveOnly(String id) {
   if (!id.contains('claude-')) return false;
-  if (id.contains('fable') || id.contains('mythos')) return true;
-  if (_isClaude5(id)) return true;
-  final m = RegExp(
-    r'claude-(opus|sonnet)-(\d+)[-.](\d+)',
-    caseSensitive: false,
-  ).firstMatch(id);
-  if (m == null) {
-    return id.contains('4-7') ||
-        id.contains('4.7') ||
-        id.contains('4-8') ||
-        id.contains('4.8');
-  }
-  final family = (m.group(1) ?? '').toLowerCase();
-  final major = int.tryParse(m.group(2) ?? '');
-  final minor = int.tryParse(m.group(3) ?? '');
-  if (major == null || minor == null) return false;
-  if (major > 4) return true;
-  if (major < 4) return false;
-  if (family == 'opus' && minor >= 7) return true;
-  return false;
+  if (_isClaudeAlwaysOn(id)) return true;
+  final generation = _claudeGeneration(id);
+  if (generation == null) return false;
+  if (generation.major > 4) return true;
+  return generation.major == 4 && (generation.minor ?? 0) >= 7;
 }
 
 bool _claudeSupportsXhigh(String id) {
   return _isClaude5(id) ||
-      id.contains('claude-opus-4-7') ||
-      id.contains('claude-opus-4.7') ||
-      id.contains('claude-opus-4-8') ||
-      id.contains('claude-opus-4.8') ||
+      _isClaudeFamilySince(id, 'opus', 4, 7) ||
       id.contains('claude-fable') ||
       id.contains('claude-mythos');
 }
 
 bool _claudeSupportsMax(String id) {
   return _claudeSupportsXhigh(id) ||
-      id.contains('claude-opus-4-6') ||
-      id.contains('claude-opus-4.6') ||
-      id.contains('claude-sonnet-4-6') ||
-      id.contains('claude-sonnet-4.6') ||
+      _isClaudeFamilySince(id, 'opus', 4, 6) ||
+      _isClaudeFamilySince(id, 'sonnet', 4, 6) ||
       id.contains('mythos');
 }
 
 int _claudeMaxOutput(String id) {
-  if (_matches(
-    id,
-    r'claude-(?:fable-5|mythos-5|opus-(?:5|4-[678])|sonnet-(?:5|4-6))(?:$|[._:/-])',
-  )) {
+  if (_isClaude5(id) || id.contains('fable-5') || id.contains('mythos-5')) {
+    return 128000;
+  }
+  if (_isClaudeFamilySince(id, 'opus', 4, 6) ||
+      _isClaudeFamilySince(id, 'sonnet', 4, 6)) {
     return 128000;
   }
   if (_matches(id, r'claude-3-haiku(?:$|[._:/])')) return 8000;
@@ -1056,12 +1077,10 @@ int _claudeMaxOutput(String id) {
 }
 
 SamplingPolicy? _claudeSampling(String id) {
-  if (_isClaudeAlwaysOn(id)) return SamplingPolicy.never;
-  if (_isClaude5(id) ||
-      id.contains('claude-opus-4-8') ||
-      id.contains('claude-opus-4.8')) {
+  if (_isClaudeAlwaysOn(id) || _isClaude5(id)) {
     return SamplingPolicy.never;
   }
+  if (_isClaudeFamilySince(id, 'opus', 4, 8)) return SamplingPolicy.never;
   if (_isClaudeAdaptiveOnly(id)) return SamplingPolicy.onlyWhenReasoningOff;
   return null;
 }
@@ -1080,11 +1099,14 @@ List<ReasoningLevel> _claudeAdaptiveLevels(String id) {
 _ReasoningHit _claudeFamily(String id) {
   final maxOutput = _claudeMaxOutput(id);
   final sampling = _claudeSampling(id);
-  if (_isClaudeAlwaysOn(id) || _supportsClaudeAdaptive(id)) {
+  final alwaysOn = _isClaudeAlwaysOn(id);
+  if (alwaysOn || _supportsClaudeAdaptive(id)) {
     return _fixed(
-      dialect: ReasoningDialect.anthropicAdaptiveEffort,
+      dialect: _isClaudeBetweenTools(id)
+          ? ReasoningDialect.anthropicBetweenTools
+          : ReasoningDialect.anthropicAdaptiveEffort,
       levels: _claudeAdaptiveLevels(id),
-      canDisable: !_isClaudeAlwaysOn(id),
+      canDisable: !alwaysOn,
       sampling: sampling,
       maxOutput: maxOutput,
     );

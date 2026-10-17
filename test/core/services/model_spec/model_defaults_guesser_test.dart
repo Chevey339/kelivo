@@ -350,6 +350,48 @@ void main() {
         maxOutput: 128000,
       );
       expectHit(
+        'claude-haiku-5-5',
+        dialect: ReasoningDialect.anthropicAdaptiveEffort,
+        levels: const [
+          ReasoningLevel.low,
+          ReasoningLevel.medium,
+          ReasoningLevel.high,
+          ReasoningLevel.xhigh,
+          ReasoningLevel.max,
+        ],
+        canDisable: true,
+        sampling: SamplingPolicy.never,
+        maxOutput: 128000,
+      );
+      expectHit(
+        'claude-sonnet-5-5',
+        dialect: ReasoningDialect.anthropicBetweenTools,
+        levels: const [
+          ReasoningLevel.low,
+          ReasoningLevel.medium,
+          ReasoningLevel.high,
+          ReasoningLevel.xhigh,
+          ReasoningLevel.max,
+        ],
+        canDisable: true,
+        sampling: SamplingPolicy.never,
+        maxOutput: 128000,
+      );
+      expectHit(
+        'claude-opus-5-5',
+        dialect: ReasoningDialect.anthropicAdaptiveEffort,
+        levels: const [
+          ReasoningLevel.low,
+          ReasoningLevel.medium,
+          ReasoningLevel.high,
+          ReasoningLevel.xhigh,
+          ReasoningLevel.max,
+        ],
+        canDisable: false,
+        sampling: SamplingPolicy.never,
+        maxOutput: 128000,
+      );
+      expectHit(
         'claude-sonnet-4-6',
         dialect: ReasoningDialect.anthropicAdaptiveEffort,
         levels: const [
@@ -409,6 +451,33 @@ void main() {
         sampling: SamplingPolicy.never,
         maxOutput: 128000,
       );
+    });
+
+    test('Claude generation picks the thinking shape', () {
+      for (final id in const [
+        'claude-5-sonnet',
+        'anthropic.claude-haiku-5-5',
+        'claude-opus-6',
+        'claude-4-9-opus',
+      ]) {
+        expect(
+          ModelDefaultsGuesser.guess(id).reasoning!.dialect,
+          ReasoningDialect.anthropicAdaptiveEffort,
+          reason: id,
+        );
+      }
+      for (final id in const [
+        'claude-haiku-4-5',
+        'claude-sonnet-4-20250514',
+        'claude-opus-4-20250514',
+        'claude-3-7-sonnet-20250219',
+      ]) {
+        expect(
+          ModelDefaultsGuesser.guess(id).reasoning!.dialect,
+          ReasoningDialect.anthropicBudget,
+          reason: id,
+        );
+      }
     });
 
     test('Gemini families', () {
