@@ -97,7 +97,23 @@ class ProviderBalanceValueParser {
 class ProviderBalanceService {
   const ProviderBalanceService._();
 
-  static Future<String> fetchBalance(ProviderConfig config) async {
+  static Future<String> fetchBalance(ProviderConfig config) {
+    return _fetchBalance(config, _effectiveApiKey(config));
+  }
+
+  /// Fetch the balance for a specific API key, ignoring multi-key selection.
+  /// Used by the multi-key manager to query every key's balance at once.
+  static Future<String> fetchBalanceForKey(
+    ProviderConfig config,
+    String apiKey,
+  ) {
+    return _fetchBalance(config, apiKey);
+  }
+
+  static Future<String> _fetchBalance(
+    ProviderConfig config,
+    String apiKey,
+  ) async {
     final kind = ProviderConfig.classify(
       config.id,
       explicitType: config.providerType,
@@ -116,7 +132,6 @@ class ProviderBalanceService {
     final uri = _balanceUri(config.baseUrl, apiPath);
     final client = providerHttpClient(config);
     try {
-      final apiKey = _effectiveApiKey(config);
       final headers = <String, String>{
         if (apiKey.isNotEmpty) 'Authorization': 'Bearer $apiKey',
         ...providerDefaultHeaders(config),
