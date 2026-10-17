@@ -13,11 +13,12 @@ TaskMarker? matchTaskMarker(
   int start,
   int end, {
   bool radioItems = true,
+  bool checkboxItems = true,
 }) {
   final match = _taskMarker.firstMatch(source.substring(start, end));
   if (match == null) return null;
   final radio = match[3] != null;
-  if (radio && !radioItems) return null;
+  if (radio ? !radioItems : !checkboxItems) return null;
   return TaskMarker(
     start,
     start + match.end,

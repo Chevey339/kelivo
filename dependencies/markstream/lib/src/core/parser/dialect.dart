@@ -1,6 +1,10 @@
-/// Block syntax defaults for LLM-authored Markdown.
+/// Independently configurable Markdown syntax, defaulting to the LLM dialect.
 final class ParserOptions {
   const ParserOptions({
+    this.plusListMarker = true,
+    this.orderedParenthesis = true,
+    this.tablePipesOptional = true,
+    this.maxInlineMathLength = 512,
     this.inlineMath = true,
     this.strikethrough = true,
     this.inlineHtml = true,
@@ -21,10 +25,16 @@ final class ParserOptions {
     this.setextHeadings = false,
     this.indentedCode = false,
     this.relaxedListIndentation = true,
-  });
+  }) : assert(maxInlineMathLength > 0);
+
+  const ParserOptions.llm() : this();
 
   const ParserOptions.commonMark()
-    : inlineMath = false,
+    : plusListMarker = true,
+      orderedParenthesis = true,
+      tablePipesOptional = true,
+      maxInlineMathLength = 512,
+      inlineMath = false,
       strikethrough = false,
       inlineHtml = true,
       softBreakAsHardBreak = false,
@@ -45,6 +55,36 @@ final class ParserOptions {
       indentedCode = true,
       relaxedListIndentation = false;
 
+  const ParserOptions.gfm()
+    : plusListMarker = true,
+      orderedParenthesis = true,
+      tablePipesOptional = true,
+      maxInlineMathLength = 512,
+      inlineMath = false,
+      strikethrough = true,
+      inlineHtml = true,
+      softBreakAsHardBreak = false,
+      underscoreEmphasis = true,
+      autolinks = true,
+      entities = true,
+      cjkFlankingRelax = false,
+      alerts = false,
+      directives = false,
+      htmlBlocks = true,
+      tables = true,
+      details = false,
+      taskItems = true,
+      standaloneTaskLine = false,
+      radioItems = false,
+      mathBlocks = false,
+      setextHeadings = true,
+      indentedCode = true,
+      relaxedListIndentation = false;
+
+  final bool plusListMarker;
+  final bool orderedParenthesis;
+  final bool tablePipesOptional;
+  final int maxInlineMathLength;
   final bool inlineMath;
   final bool strikethrough;
   final bool inlineHtml;
@@ -65,4 +105,71 @@ final class ParserOptions {
   final bool setextHeadings;
   final bool indentedCode;
   final bool relaxedListIndentation;
+
+  ParserOptions copyWith({
+    bool? plusListMarker,
+    bool? orderedParenthesis,
+    bool? tablePipesOptional,
+    int? maxInlineMathLength,
+    bool? inlineMath,
+    bool? strikethrough,
+    bool? inlineHtml,
+    bool? softBreakAsHardBreak,
+    bool? underscoreEmphasis,
+    bool? autolinks,
+    bool? entities,
+    bool? cjkFlankingRelax,
+    bool? alerts,
+    bool? directives,
+    bool? htmlBlocks,
+    bool? tables,
+    bool? details,
+    bool? taskItems,
+    bool? standaloneTaskLine,
+    bool? radioItems,
+    bool? mathBlocks,
+    bool? setextHeadings,
+    bool? indentedCode,
+    bool? relaxedListIndentation,
+  }) => ParserOptions(
+    plusListMarker: plusListMarker ?? this.plusListMarker,
+    orderedParenthesis: orderedParenthesis ?? this.orderedParenthesis,
+    tablePipesOptional: tablePipesOptional ?? this.tablePipesOptional,
+    maxInlineMathLength: maxInlineMathLength ?? this.maxInlineMathLength,
+    inlineMath: inlineMath ?? this.inlineMath,
+    strikethrough: strikethrough ?? this.strikethrough,
+    inlineHtml: inlineHtml ?? this.inlineHtml,
+    softBreakAsHardBreak: softBreakAsHardBreak ?? this.softBreakAsHardBreak,
+    underscoreEmphasis: underscoreEmphasis ?? this.underscoreEmphasis,
+    autolinks: autolinks ?? this.autolinks,
+    entities: entities ?? this.entities,
+    cjkFlankingRelax: cjkFlankingRelax ?? this.cjkFlankingRelax,
+    alerts: alerts ?? this.alerts,
+    directives: directives ?? this.directives,
+    htmlBlocks: htmlBlocks ?? this.htmlBlocks,
+    tables: tables ?? this.tables,
+    details: details ?? this.details,
+    taskItems: taskItems ?? this.taskItems,
+    standaloneTaskLine: standaloneTaskLine ?? this.standaloneTaskLine,
+    radioItems: radioItems ?? this.radioItems,
+    mathBlocks: mathBlocks ?? this.mathBlocks,
+    setextHeadings: setextHeadings ?? this.setextHeadings,
+    indentedCode: indentedCode ?? this.indentedCode,
+    relaxedListIndentation:
+        relaxedListIndentation ?? this.relaxedListIndentation,
+  );
+}
+
+/// Closure policy for an incomplete document; complete input keeps its syntax.
+final class StreamingOptions {
+  const StreamingOptions({
+    this.optimisticBlocks = true,
+    this.optimisticInlines = false,
+  });
+
+  /// Render unfinished fenced code, math, tables and containers structurally.
+  final bool optimisticBlocks;
+
+  /// Allow the incremental parser to close unfinished inline syntax for display.
+  final bool optimisticInlines;
 }

@@ -3,9 +3,10 @@ import '../../ast/source_span.dart';
 import 'math_inline.dart';
 
 final class TableLine {
-  const TableLine(this.cells, this.hasPipe);
+  const TableLine(this.cells, this.hasPipe, this.outerPipes);
   final List<TableCellNode> cells;
   final bool hasPipe;
+  final bool outerPipes;
 }
 
 /// Pipes are separators even inside code spans; an escaped pipe is cell text.
@@ -14,6 +15,7 @@ TableLine splitTableLine(
   int start,
   int end, {
   bool math = false,
+  int maxMathLength = 512,
 }) {
   while (start < end && _space(source.codeUnitAt(start))) start++;
   while (end > start && _space(source.codeUnitAt(end - 1))) end--;
@@ -46,6 +48,7 @@ TableLine splitTableLine(
         source,
         i,
         end: end,
+        maxLength: maxMathLength,
         adjacent: formulas.isNotEmpty && formulas.last.end == i,
       );
       if (formula != null) {
@@ -95,7 +98,13 @@ TableLine splitTableLine(
       );
     cells.add(TableCellNode(span: SourceSpan(a, b), children: fragments));
   }
-  return TableLine(cells, separators.isNotEmpty);
+  return TableLine(
+    cells,
+    separators.isNotEmpty,
+    separators.isNotEmpty &&
+        separators.first == start &&
+        separators.last == end - 1,
+  );
 }
 
 bool _space(int c) => c == 32 || c == 9;

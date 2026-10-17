@@ -128,6 +128,9 @@ final class _BlockSession {
     final match = _listStart.firstMatch(rest);
     if (match == null) return null;
     final marker = match[1]!;
+    if (marker == '+' && !options.plusListMarker ||
+        marker.endsWith(')') && !options.orderedParenthesis)
+      return null;
     final number = marker.length > 1
         ? int.parse(marker.substring(0, marker.length - 1))
         : null;
@@ -185,13 +188,14 @@ final class _BlockSession {
       );
       if (math != null && math.start == cursor.indentation.end) return true;
     }
-    if (options.standaloneTaskLine &&
-        options.taskItems &&
+    if ((options.standaloneTaskLine && options.taskItems ||
+            options.radioItems) &&
         matchTaskMarker(
               source,
               cursor.indentation.end,
               cursor.line.end,
               radioItems: options.radioItems,
+              checkboxItems: options.taskItems && options.standaloneTaskLine,
             ) !=
             null)
       return true;
@@ -322,12 +326,13 @@ final class _BlockSession {
     if (leaf == null &&
         stack.last.kind == _Kind.item &&
         stack.last.children.isEmpty &&
-        options.taskItems) {
+        (options.taskItems || options.radioItems)) {
       final marker = matchTaskMarker(
         source,
         cursor.offset,
         cursor.line.end,
         radioItems: options.radioItems,
+        checkboxItems: options.taskItems,
       );
       if (marker != null) {
         stack.last
@@ -458,6 +463,7 @@ final class _BlockSession {
       cursor.offset,
       cursor.line.end,
       math: options.inlineMath,
+      maxMathLength: options.maxInlineMathLength,
     );
     final alignments = tableDelimiter(delimiter, source);
     if (alignments == null) return false;
@@ -466,7 +472,11 @@ final class _BlockSession {
       block.start,
       block.end,
       math: options.inlineMath,
+      maxMathLength: options.maxInlineMathLength,
     );
+    if (!options.tablePipesOptional &&
+        (!header.outerPipes || !delimiter.outerPipes))
+      return false;
     if (header.cells.length != alignments.length ||
         !(header.hasPipe || delimiter.hasPipe))
       return false;
@@ -486,14 +496,17 @@ final class _BlockSession {
     return true;
   }
 
-  void _tableRow(LineCursor cursor) {
+  bool _tableRow(LineCursor cursor) {
     final block = leaf!;
-    final cells = splitTableLine(
+    final row = splitTableLine(
       source,
       cursor.offset,
       cursor.line.end,
       math: options.inlineMath,
-    ).cells;
+      maxMathLength: options.maxInlineMathLength,
+    );
+    if (!options.tablePipesOptional && !row.outerPipes) return false;
+    final cells = row.cells;
     final count = block.alignments.length;
     block.rows.add(
       TableRowNode(
@@ -510,6 +523,7 @@ final class _BlockSession {
     );
     block.end = cursor.line.end;
     _touch(cursor.line);
+    return true;
   }
 
   int _directiveCloser(LineCursor cursor) {
@@ -668,8 +682,7 @@ final class _BlockSession {
     if (_closeDirective(cursor)) return;
     if (leaf?.kind == _Kind.table) {
       if (!cursor.blank && !_interrupts(cursor)) {
-        _tableRow(cursor);
-        return;
+        if (_tableRow(cursor)) return;
       }
       leaf = null;
     }
@@ -760,14 +773,15 @@ final class _BlockSession {
         continue;
       }
       if (indentation <= 3 &&
-          options.standaloneTaskLine &&
-          options.taskItems &&
+          (options.standaloneTaskLine && options.taskItems ||
+              options.radioItems) &&
           !(stack.last.kind == _Kind.item && stack.last.children.isEmpty)) {
         final task = matchTaskMarker(
           source,
           cursor.indentation.end,
           line.end,
           radioItems: options.radioItems,
+          checkboxItems: options.taskItems && options.standaloneTaskLine,
         );
         if (task != null) {
           final node = _add(_Kind.task, task.start)

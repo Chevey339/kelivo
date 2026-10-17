@@ -262,6 +262,7 @@ final class _InlineSession {
         final math = readInlineMath(
           text,
           i,
+          maxLength: options.maxInlineMathLength,
           adjacent: tail.node is MathInlineNode && tail.end == i,
         );
         if (math != null) {
