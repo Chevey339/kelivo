@@ -1034,6 +1034,7 @@ final class BusinessSettingsRouter {
       case 'linkup':
       case 'metaso':
       case 'ollama':
+      case 'deepseek':
       case 'jina':
       case 'doubao':
       case 'kagi':
