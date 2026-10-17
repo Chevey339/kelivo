@@ -109,7 +109,7 @@ jobs:
           echo "✅ 签名配置已写入"
 
       - name: 🏗️ 构建 APK
-        run: flutter build apk --release --split-per-abi
+        run: flutter build apk --release --split-per-abi --android-skip-build-dependency-validation
 
       - name: 📦 重命名 APK
         run: |

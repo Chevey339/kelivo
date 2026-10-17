@@ -121,8 +121,13 @@ class ChatController extends ChangeNotifier {
   void _syncCurrentConversationWithService() {
     final conversation = _currentConversation;
     if (conversation == null) return;
-    if (_chatService.getConversation(conversation.id) != null) return;
-    _clearCurrentConversationState();
+    final fresh = _chatService.getConversation(conversation.id);
+    if (fresh == null) {
+      _clearCurrentConversationState();
+      notifyListeners();
+      return;
+    }
+    _currentConversation = fresh;
     notifyListeners();
   }
 

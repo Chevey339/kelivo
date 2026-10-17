@@ -15,6 +15,7 @@ import 'package:open_filex/open_filex.dart';
 import 'dart:convert';
 import '../../home/widgets/file_processing_indicator.dart';
 import '../pages/image_viewer_page.dart';
+import 'proposed_plan_card.dart';
 import '../../../core/models/chat_message.dart';
 import '../../../core/models/message_part.dart';
 import '../../../icons/lucide_adapter.dart';
@@ -2714,11 +2715,15 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
       contentSplitOffsets: widget.contentSplitOffsets,
       reasoningCountAtSplit: widget.reasoningCountAtSplit,
       toolCountAtSplit: widget.toolCountAtSplit,
-      transformText: (text) => _applyVisualAssistantRegexes(
-        text,
-        assistant: assistant,
-        scope: AssistantRegexScope.assistant,
-      ),
+      transformText: (text) {
+        final planExt = ProposedPlanExtractor.extract(text);
+        final cleaned = planExt.hasPlan ? planExt.cleanedText : text;
+        return _applyVisualAssistantRegexes(
+          cleaned,
+          assistant: assistant,
+          scope: AssistantRegexScope.assistant,
+        );
+      },
       partsArrivalOrdered: widget.message.isStreaming,
       parseInlineThinking: _legacyInlineThinkingFor(widget).hasThinking,
     );
@@ -2857,8 +2862,13 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
     final parsedInlineThinking = _legacyInlineThinkingFor(widget);
     final extractedThinking = parsedInlineThinking.thinkingTexts.join('\n\n');
     final contentWithoutThink = parsedInlineThinking.visibleContent;
+    final planExtraction = ProposedPlanExtractor.extract(contentWithoutThink);
+    final contentToDisplay =
+        (planExtraction.hasPlan && !widget.message.isStreaming)
+            ? planExtraction.cleanedText
+            : contentWithoutThink;
     final visualContent = _applyVisualAssistantRegexes(
-      contentWithoutThink,
+      contentToDisplay,
       assistant: assistant,
       scope: AssistantRegexScope.assistant,
     );
@@ -3550,6 +3560,35 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
                       ),
                     ),
             ),
+            if (!widget.message.isStreaming) ...[
+              Builder(
+                builder: (context) {
+                  final planExtraction =
+                      ProposedPlanExtractor.extract(widget.message.content);
+                  if (planExtraction.hasPlan &&
+                      planExtraction.planContent != null &&
+                      planExtraction.planContent!.isNotEmpty) {
+                    final l10n = AppLocalizations.of(context)!;
+                    return Padding(
+                      padding: const EdgeInsets.only(top: 8),
+                      child: ProposedPlanCard(
+                        planMarkdown: planExtraction.planContent!,
+                        conversationId: widget.message.conversationId,
+                        onImplementPlan: () {
+                          widget.onSuggestionTap?.call(
+                            l10n.planModeApprovedAndImplementMessage,
+                          );
+                        },
+                        onSendFeedback: (feedback) {
+                          widget.onSuggestionTap?.call(feedback);
+                        },
+                      ),
+                    );
+                  }
+                  return const SizedBox.shrink();
+                },
+              ),
+            ],
             if (!widget.message.isStreaming &&
                 widget.suggestions.isNotEmpty &&
                 widget.onSuggestionTap != null) ...[

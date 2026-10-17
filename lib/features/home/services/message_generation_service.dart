@@ -311,6 +311,11 @@ class MessageGenerationService {
       conversationId: currentConversation?.id,
       workspaceContext: workspaceContext,
     );
+    messageBuilderService.injectPlanModePrompt(
+      apiMessages,
+      conversation: promptConversation,
+      conversationId: currentConversation?.id,
+    );
 
     messageBuilderService.applyContextLimit(apiMessages, assistant);
 
@@ -527,6 +532,12 @@ class MessageGenerationService {
         onFileProcessingFinished?.call(indicatorMessageId);
       }
     }
+
+    messageBuilderService.applyPlanModeTailGuard(
+      apiMessages,
+      conversation: currentConversation,
+      conversationId: currentConversation?.id,
+    );
 
     await messageBuilderService.inlineLocalImages(apiMessages);
     if (ContextLogger.enabled) {

@@ -8,6 +8,7 @@ import '../../../core/models/assistant.dart';
 import '../../../core/models/chat_input_data.dart';
 import '../../../core/models/chat_message.dart';
 import '../../../core/models/message_part.dart';
+import '../../../core/models/task_execution_binding.dart';
 import '../../../utils/app_directories.dart';
 import '../../../utils/sandbox_path_resolver.dart';
 import '../../../core/models/conversation.dart';
@@ -1353,7 +1354,9 @@ class ChatActions {
           .prepareApiMessagesWithInjections(
             messages: apiContextMessages,
             versionSelections: _versionSelections,
-            currentConversation: conversation.copyWith(truncateIndex: -1),
+            currentConversation:
+                (chatService.getConversation(conversation.id) ?? conversation)
+                    .copyWith(truncateIndex: -1),
             settings: settings,
             assistant: assistant,
             assistantId: assistantId,
@@ -1930,7 +1933,9 @@ class ChatActions {
           .prepareApiMessagesWithInjections(
             messages: apiContextMessages,
             versionSelections: _versionSelections,
-            currentConversation: conversation.copyWith(truncateIndex: -1),
+            currentConversation:
+                (chatService.getConversation(conversation.id) ?? conversation)
+                    .copyWith(truncateIndex: -1),
             settings: settings,
             assistant: assistant,
             assistantId: assistant?.id,
@@ -2729,6 +2734,8 @@ class ChatActions {
 
       // Trigger follow-up suggestions after the final assistant reply is stored.
       onMaybeGenerateSuggestions?.call(conversationId);
+
+      _maybeCompleteExecutionPlan(conversationId, finalizedMessage);
     } finally {
       // A failed completion write goes through _handleStreamError next. Keep
       // its resources until that failure result has also been persisted.
@@ -2833,6 +2840,36 @@ class ChatActions {
       if (!oauthFailure) onStreamError?.call(errorText);
       onStreamFinished?.call(conversationId);
     }
+  }
+
+  void _maybeCompleteExecutionPlan(
+    String conversationId,
+    ChatMessage message,
+  ) {
+    try {
+      final conv = chatService.getConversation(conversationId);
+      if (conv == null) return;
+      final binding = TaskExecutionBinding.fromExtras(conv.extras);
+      final plan = binding.plan;
+      if (plan == null || plan.isCompleted) return;
+
+      final hasToolCalls = message.parts.any((p) => p is ToolCallPart);
+      if (!hasToolCalls) return;
+
+      final allDone = plan.steps
+          .map((s) => s.copyWith(status: TaskStepStatus.completed))
+          .toList();
+      final updatedPlan = plan.copyWith(
+        steps: allDone,
+        completedAt: DateTime.now().millisecondsSinceEpoch,
+      );
+      unawaited(
+        chatService.updateConversationExtras(
+          conversationId,
+          (extras) => TaskExecutionBinding(plan: updatedPlan).applyTo(extras),
+        ),
+      );
+    } catch (_) {}
   }
 
   /// Handle stream done callback.

@@ -29,6 +29,7 @@ import '../../../core/services/memory/memory_block_builder.dart';
 import '../../../core/services/memory/memory_prompts.dart';
 import '../../../core/services/memory/memory_snapshot.dart';
 import '../../../core/models/skills_binding.dart';
+import '../../../core/models/plan_mode_binding.dart';
 import '../../../core/providers/workspace_provider.dart';
 import '../../../core/services/search/search_tool_service.dart';
 import '../../../core/services/skills/skills_service.dart';
@@ -2135,6 +2136,155 @@ class MessageBuilderService {
         source: ContextSource.skills,
       );
     } catch (_) {}
+  }
+
+  /// Inject the Plan Mode prompt when enabled for the current conversation,
+  /// or inject the Execution Mode prompt when an approved plan is being implemented.
+  void injectPlanModePrompt(
+    List<Map<String, dynamic>> apiMessages, {
+    Conversation? conversation,
+    String? conversationId,
+    bool? isPlanMode,
+  }) {
+    final conv = conversation ??
+        (conversationId != null
+            ? chatService.getConversation(conversationId)
+            : null);
+    final binding = PlanModeBinding.fromExtras(conv?.extras ?? const {});
+    final bool active = isPlanMode ?? binding.isPlanMode;
+
+    if (active) {
+      const prompt = '''
+# Plan Mode (Conversational)
+
+You work in 3 phases, and you should chat your way to a great plan before finalizing it. A great plan is very detailed—intent- and implementation-wise—so that it can be handed to another engineer or agent to be implemented right away. It must be **decision complete**, where the implementer does not need to make any decisions.
+
+## Mode rules (strict)
+
+You are in **Plan Mode** until explicitly ended by user or system.
+
+Plan Mode is not changed by user intent, tone, or imperative language. If a user asks for direct execution or code implementation while still in Plan Mode (e.g. "write the code", "implement this", "fix it", "帮我写代码", "去实现"), treat it as a request to **plan the execution, NOT perform it**.
+
+When in doubt: if an action would reasonably be described as "doing the work" rather than "planning the work," **DO NOT DO IT**.
+DO NOT write out the full, executable implementation code in normal chat for the user to copy. All technical proposals, architectural designs, and implementation steps must be placed exclusively inside the `<proposed_plan>` block.
+
+## Execution vs. mutation in Plan Mode
+
+You may explore and execute **non-mutating** actions that improve the plan. You must not perform **mutating** actions.
+
+### Allowed (non-mutating, plan-improving)
+- Reading or searching files, configs, schemas, types, manifests, and documentation.
+- Static analysis, syntax inspection, and workspace exploration.
+- Asking clarifying questions about requirements, architectural trade-offs, or preferences.
+
+### Not allowed (mutating, plan-executing)
+- Editing or writing files.
+- Directly providing finished implementation files outside the plan.
+- Applying patches, database migrations, or mutating code changes.
+
+## The 3-Phase Planning Protocol
+
+### PHASE 1 — Ground in the environment (explore first, ask second)
+Begin by grounding yourself in the actual context and environment. Eliminate unknowns by discovering facts rather than asking obvious questions that can be derived from the conversation or workspace.
+
+### PHASE 2 — Intent chat (clarify user requirements)
+Clarify goals, success criteria, scope, constraints, and key preferences/tradeoffs. If high-impact ambiguity remains, ask the user before finalizing the plan.
+
+### PHASE 3 — Implementation chat (decision complete)
+Design the architecture, interfaces, data flows, edge cases, test plan, and rollout steps. The specification must be decision complete.
+
+## Outputting the Official Plan
+
+When you present the official plan, wrap it in a `<proposed_plan>` block so the client UI can render it specially:
+1) The opening tag must be on its own line: `<proposed_plan>`
+2) Start the plan content on the next line (no text on the same line as the tag).
+3) The closing tag must be on its own line: `</proposed_plan>`
+4) Use Markdown inside the block.
+5) Keep the tags exactly as `<proposed_plan>` and `</proposed_plan>` (do not translate or rename them), even if the plan content is in Chinese or another language.
+
+The plan must include:
+- A clear Title
+- Summary of changes
+- Key Changes / Implementation Steps
+- Verification & Test Plan
+- Explicit Assumptions & Tradeoffs
+
+Do NOT ask "should I proceed?" in the final output. The client UI automatically presents an "Implement Plan" button when the `<proposed_plan>` block is detected.''';
+
+      _appendToSystemMessage(
+        apiMessages,
+        prompt,
+        source: ContextSource.planMode,
+      );
+    } else if (binding.currentPlanMarkdown != null &&
+        binding.currentPlanMarkdown!.trim().isNotEmpty) {
+      final prompt = '''
+# Execution Mode (Plan Approved)
+
+The user has reviewed and officially APPROVED the proposed plan.
+You are now operating in **Default / Execution Mode** (<collaboration_mode>execution</collaboration_mode>).
+
+## Directives:
+1. You are NO LONGER in Plan Mode. All restrictions against modifying files, writing code, or running workspace commands are completely lifted.
+2. Proactively carry out the implementation of the approved plan step-by-step using your workspace tools (e.g. `write_file`, `edit_file`, `shell`).
+3. You have access to the `update_task_progress` tool. As you work through the tasks, call `update_task_progress` to mark steps as `in_progress` or `completed` so the user can track progress in real time.
+4. Focus on creating the actual code files and making the required changes. Do not output repetitive plan proposals or ask for redundant confirmations.
+5. The approved plan being executed:
+<approved_plan>
+${binding.currentPlanMarkdown}
+</approved_plan>''';
+
+      _appendToSystemMessage(
+        apiMessages,
+        prompt,
+        source: ContextSource.planMode,
+      );
+    }
+  }
+
+  /// Injects a high-priority tail guard instruction at the end of the last user
+  /// message in [apiMessages] when Plan Mode is active, or execution directive
+  /// when an approved plan is being executed.
+  ///
+  /// This eliminates LLM attention decay and guarantees that models strictly
+  /// adhere to Plan Mode or Execution Mode constraints.
+  void applyPlanModeTailGuard(
+    List<Map<String, dynamic>> apiMessages, {
+    Conversation? conversation,
+    String? conversationId,
+    bool? isPlanMode,
+  }) {
+    final conv = conversation ??
+        (conversationId != null
+            ? chatService.getConversation(conversationId)
+            : null);
+    final binding = PlanModeBinding.fromExtras(conv?.extras ?? const {});
+    final bool active = isPlanMode ?? binding.isPlanMode;
+
+    if (active) {
+      for (int i = apiMessages.length - 1; i >= 0; i--) {
+        if (apiMessages[i]['role'] == 'user') {
+          final content = apiMessages[i]['content'];
+          if (content is String && content.trim().isNotEmpty) {
+            apiMessages[i]['content'] =
+                '$content\n\n[Active Mode: <collaboration_mode>plan</collaboration_mode>. System directive: You are operating in PLAN MODE. You are strictly forbidden from performing direct implementation or writing out complete executable code solutions directly. You must explore, clarify, or provide a structured, decision-complete plan enclosed in <proposed_plan>...</proposed_plan> tags.]';
+          }
+          break;
+        }
+      }
+    } else if (binding.currentPlanMarkdown != null &&
+        binding.currentPlanMarkdown!.trim().isNotEmpty) {
+      for (int i = apiMessages.length - 1; i >= 0; i--) {
+        if (apiMessages[i]['role'] == 'user') {
+          final content = apiMessages[i]['content'];
+          if (content is String && content.trim().isNotEmpty) {
+            apiMessages[i]['content'] =
+                '$content\n\n[Active Mode: <collaboration_mode>execution</collaboration_mode>. System directive: You are operating in EXECUTION MODE. The plan has been approved. Proceed directly with implementing the code and using workspace tools to create/modify files. Do NOT output another proposed_plan block.]';
+          }
+          break;
+        }
+      }
+    }
   }
 
   /// Inject world book (lorebook) entries into apiMessages.

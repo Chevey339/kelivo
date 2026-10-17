@@ -23321,6 +23321,72 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Completing sign-in…'**
   String get mcpOAuthExchangingToken;
+
+  /// No description provided for @planModeTitle.
+  String get planModeTitle;
+
+  /// No description provided for @planModeTooltip.
+  String get planModeTooltip;
+
+  /// No description provided for @planModeActiveBanner.
+  String get planModeActiveBanner;
+
+  /// No description provided for @planModeExit.
+  String get planModeExit;
+
+  /// No description provided for @planModeImplementPlan.
+  String get planModeImplementPlan;
+
+  /// No description provided for @planModeImplementPlanTooltip.
+  String get planModeImplementPlanTooltip;
+
+  /// No description provided for @planModeImplementInNewChat.
+  String get planModeImplementInNewChat;
+
+  /// No description provided for @planModeImplementInNewChatTooltip.
+  String get planModeImplementInNewChatTooltip;
+
+  /// No description provided for @planModeRevisePlan.
+  String get planModeRevisePlan;
+
+  /// No description provided for @planModeReadOnlyError.
+  String get planModeReadOnlyError;
+
+  /// No description provided for @planModeInputHint.
+  String get planModeInputHint;
+
+  /// No description provided for @planModeApprovedAndImplementMessage.
+  String get planModeApprovedAndImplementMessage;
+
+  /// No description provided for @taskProgressTitle.
+  String get taskProgressTitle;
+
+  /// No description provided for @taskProgressCompletedBadge.
+  String get taskProgressCompletedBadge;
+
+  /// No description provided for @taskProgressStepCount.
+  String taskProgressStepCount(Object completed, Object total);
+
+  /// No description provided for @planModeRevisionHint.
+  String get planModeRevisionHint;
+
+  /// No description provided for @planModeSubmitRevision.
+  String get planModeSubmitRevision;
+
+  /// No description provided for @planModeQuickChipSimplify.
+  String get planModeQuickChipSimplify;
+
+  /// No description provided for @planModeQuickChipDetail.
+  String get planModeQuickChipDetail;
+
+  /// No description provided for @planModeQuickChipTests.
+  String get planModeQuickChipTests;
+
+  /// No description provided for @planModeRevisionPrefix.
+  String get planModeRevisionPrefix;
+
+  /// No description provided for @planModeRevisionInstruction.
+  String get planModeRevisionInstruction;
 }
 
 class _AppLocalizationsDelegate

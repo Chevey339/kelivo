@@ -12,6 +12,7 @@ import '../../../utils/mcp_structured_image.dart';
 import '../../../utils/sandbox_path_resolver.dart';
 import '../api/tool_call_cancellation.dart';
 import '../../models/workspace_binding.dart';
+import '../../models/task_execution_binding.dart';
 import '../../models/external_mount.dart';
 import '../../models/environment_variable.dart';
 import '../../providers/external_mounts_provider.dart';
@@ -51,6 +52,7 @@ class WorkspaceToolsService {
     this.onShellCompleted,
     this.isToolEnabled,
     this.loadEnvironment,
+    this.isPlanMode,
   }) : registry = registry ?? ToolRunRegistry(),
        runtimeProvider = runtimeProvider ?? WorkspaceRuntimeProvider();
 
@@ -85,6 +87,7 @@ class WorkspaceToolsService {
   final Future<void> Function()? onShellCompleted;
   final bool Function(String workspaceId, String tool)? isToolEnabled;
   final Future<EnvironmentExecutionConfig> Function()? loadEnvironment;
+  final bool Function(String? conversationId)? isPlanMode;
 
   bool _enabled(WorkspaceToolContext ctx, String name) =>
       isToolEnabled?.call(ctx.workspace.id, name) ??
@@ -157,7 +160,10 @@ class WorkspaceToolsService {
     );
   }
 
-  List<Map<String, dynamic>> buildToolDefinitions(WorkspaceToolContext ctx) {
+  List<Map<String, dynamic>> buildToolDefinitions(
+    WorkspaceToolContext ctx, {
+    bool isPlanMode = false,
+  }) {
     if (ctx.skillsOnly) {
       return [
         _fn(
@@ -191,8 +197,14 @@ class WorkspaceToolsService {
               : '${ctx.paths.sessionHostDir}/outputs/<id>.txt',
         )
         .where(
-          (definition) =>
-              _enabled(ctx, (definition['function'] as Map)['name'] as String),
+          (definition) {
+            final name = (definition['function'] as Map)['name'] as String;
+            if (isPlanMode &&
+                const {'write_file', 'edit_file', 'shell'}.contains(name)) {
+              return false;
+            }
+            return _enabled(ctx, name);
+          },
         )
         .toList();
   }
@@ -480,7 +492,68 @@ class WorkspaceToolsService {
       conversationId: conversationId,
       environment: environment.variables,
     );
+    if (const {'write_file', 'edit_file', 'shell'}.contains(name) &&
+        conversationId != null &&
+        updateConversationExtras != null) {
+      unawaited(_autoAdvanceTaskPlan(conversationId, name, args, result));
+    }
     return redactor.redact(ClientToolResult.fromHandler(result));
+  }
+
+  Future<void> _autoAdvanceTaskPlan(
+    String convId,
+    String toolName,
+    Map<String, dynamic> args,
+    Object? result,
+  ) async {
+    if (updateConversationExtras == null) return;
+    try {
+      final isError = result is Map && result['error'] != null;
+      if (isError) return;
+
+      final targetPath = (args['path'] ?? '').toString();
+      final targetFile =
+          targetPath.split('/').last.split('\\').last.toLowerCase();
+
+      await updateConversationExtras!(convId, (extras) {
+        final binding = TaskExecutionBinding.fromExtras(extras);
+        final plan = binding.plan;
+        if (plan == null || plan.isCompleted) return extras;
+
+        TaskStep? matchedStep;
+        if (targetFile.isNotEmpty) {
+          for (final s in plan.steps) {
+            if (s.status != TaskStepStatus.completed &&
+                s.title.toLowerCase().contains(targetFile)) {
+              matchedStep = s;
+              break;
+            }
+          }
+        }
+
+        matchedStep ??= plan.activeStep;
+        if (matchedStep == null) return extras;
+
+        var updatedPlan = plan.updateStepStatus(
+          matchedStep.id,
+          TaskStepStatus.completed,
+        );
+
+        final nextPending = updatedPlan.steps.firstWhere(
+          (s) => s.status == TaskStepStatus.pending,
+          orElse: () => matchedStep!,
+        );
+        if (nextPending.id != matchedStep.id &&
+            nextPending.status == TaskStepStatus.pending) {
+          updatedPlan = updatedPlan.updateStepStatus(
+            nextPending.id,
+            TaskStepStatus.inProgress,
+          );
+        }
+
+        return TaskExecutionBinding(plan: updatedPlan).applyTo(extras);
+      });
+    } catch (_) {}
   }
 
   Future<Object?> _handle(
@@ -504,6 +577,16 @@ class WorkspaceToolsService {
         tool: name,
         error: 'tool_disabled',
         message: 'This tool is disabled for the workspace',
+      );
+    }
+    if (isPlanMode?.call(conversationId) == true &&
+        const {'write_file', 'edit_file', 'shell'}.contains(name)) {
+      return _errorResult(
+        tool: name,
+        error: 'plan_mode_readonly',
+        message:
+            'Write operations and shell execution are forbidden in Plan Mode. '
+            'Please explore and formulate your plan, then ask for user approval.',
       );
     }
     try {
