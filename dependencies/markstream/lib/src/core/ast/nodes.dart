@@ -553,3 +553,72 @@ final class ReferenceDefinitionNode extends BlockNode {
   @override
   T accept<T>(AstVisitor<T> visitor) => visitor.visitReferenceDefinition(this);
 }
+
+final class StrikethroughNode extends InlineNode {
+  StrikethroughNode({
+    required SourceSpan span,
+    required List<InlineNode> children,
+  }) : children = List.unmodifiable(children),
+       super(span);
+  @override
+  final List<InlineNode> children;
+  @override
+  String get type => 'strikethrough';
+  @override
+  T accept<T>(AstVisitor<T> visitor) => visitor.visitStrikethrough(this);
+}
+
+final class MathInlineNode extends InlineNode {
+  MathInlineNode({
+    required SourceSpan span,
+    required List<TextNode> children,
+    this.delimiter = r'$',
+    this.closed = true,
+  }) : children = List.unmodifiable(children),
+       tex = children.map((n) => n.text).join(),
+       super(span);
+  @override
+  final List<TextNode> children;
+  final String tex;
+  final String delimiter;
+  final bool closed;
+  @override
+  String get type => 'math_inline';
+  @override
+  Map<String, Object?> get fields => {
+    'tex': tex,
+    'delimiter': delimiter,
+    'closed': closed,
+  };
+  @override
+  T accept<T>(AstVisitor<T> visitor) => visitor.visitMathInline(this);
+}
+
+enum NamedInlineSyntax { directive, extension }
+
+final class NamedInlineNode extends InlineNode {
+  NamedInlineNode({
+    required SourceSpan span,
+    required this.name,
+    required List<InlineNode> children,
+    this.syntax = NamedInlineSyntax.extension,
+    Map<String, String> attributes = const {},
+  }) : children = List.unmodifiable(children),
+       attributes = Map.unmodifiable(attributes),
+       super(span);
+  final String name;
+  final NamedInlineSyntax syntax;
+  final Map<String, String> attributes;
+  @override
+  final List<InlineNode> children;
+  @override
+  String get type => 'named_inline';
+  @override
+  Map<String, Object?> get fields => {
+    'name': name,
+    'syntax': syntax.name,
+    'attributes': attributes,
+  };
+  @override
+  T accept<T>(AstVisitor<T> visitor) => visitor.visitNamedInline(this);
+}

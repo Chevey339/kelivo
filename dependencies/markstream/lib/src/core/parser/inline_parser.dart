@@ -8,14 +8,22 @@ import 'source_line.dart';
 import 'syntax/autolink.dart';
 import 'syntax/characters.dart';
 import 'syntax/link_destination.dart';
+import 'syntax/directive.dart';
+import 'syntax/inline_html.dart';
+import 'syntax/inline_syntax.dart';
+import 'syntax/math_inline.dart';
 
 String normalizeReferenceLabel(String label) =>
     label.trim().replaceAll(RegExp(r'\s+'), ' ').toUpperCase().toLowerCase();
 
 /// Parses inline syntax with delimiter and bracket stacks, without source edits.
 final class InlineParser {
-  const InlineParser({this.options = const ParserOptions()});
+  const InlineParser({
+    this.options = const ParserOptions(),
+    this.syntaxes = const [],
+  });
   final ParserOptions options;
+  final List<InlineSyntax> syntaxes;
 
   List<InlineNode> parse(
     String source, {
@@ -35,7 +43,64 @@ final class InlineParser {
   List<InlineNode> parseFragments(
     List<TextNode> fragments, {
     Map<String, ReferenceDefinitionNode> references = const {},
-  }) => _InlineSession(MappedText(fragments), options, references).parse();
+  }) {
+    final session = _InlineSession(
+      MappedText(fragments),
+      options,
+      references,
+      syntaxes,
+    );
+    final nodes = session.parse();
+    return _directiveLabels(nodes, references, session.pendingLabels);
+  }
+
+  List<InlineNode> _directiveLabels(
+    List<InlineNode> roots,
+    Map<String, ReferenceDefinitionNode> references,
+    Map<NamedInlineNode, List<TextNode>> pendingLabels,
+  ) {
+    final parsed = <InlineNode, List<InlineNode>>{};
+    final converted = <InlineNode, InlineNode>{};
+    final pending = <(InlineNode, bool)>[
+      for (final node in roots.reversed) (node, false),
+    ];
+    while (pending.isNotEmpty) {
+      final (node, visited) = pending.removeLast();
+      final container =
+          node is EmphasisNode ||
+          node is StrikethroughNode ||
+          node is LinkNode ||
+          node is ImageNode ||
+          node is NamedInlineNode;
+      if (!container) {
+        converted[node] = node;
+        continue;
+      }
+      if (!visited) {
+        final List<InlineNode> children;
+        if (node is NamedInlineNode && pendingLabels.containsKey(node)) {
+          final session = _InlineSession(
+            MappedText(pendingLabels[node]!),
+            options,
+            references,
+            syntaxes,
+          );
+          children = session.parse();
+          pendingLabels.addAll(session.pendingLabels);
+        } else {
+          children = node.children.cast<InlineNode>();
+        }
+        parsed[node] = children;
+        pending.add((node, true));
+        for (final child in children.reversed) pending.add((child, false));
+      } else {
+        converted[node] = replaceChildren(node, [
+          for (final child in parsed[node]!) converted[child]!,
+        ]) as InlineNode;
+      }
+    }
+    return List.unmodifiable([for (final root in roots) converted[root]!]);
+  }
 }
 
 final class _Part {
@@ -76,7 +141,7 @@ final class _Bracket {
 }
 
 final class _InlineSession {
-  _InlineSession(this.input, this.options, this.references)
+  _InlineSession(this.input, this.options, this.references, this.syntaxes)
     : text = input.text {
     tail = head;
     // Pair equal-length backtick runs once. Failed openers then cost O(1).
@@ -105,6 +170,7 @@ final class _InlineSession {
   final String text;
   final ParserOptions options;
   final Map<String, ReferenceDefinitionNode> references;
+  final List<InlineSyntax> syntaxes;
   final head = _Part(null, 0, 0);
   late _Part tail;
   _Delimiter? firstDelimiter;
@@ -112,6 +178,7 @@ final class _InlineSession {
   _Bracket? bracket;
   final backticks = <int, int>{};
   var delimiterIndex = 0;
+  final pendingLabels = <NamedInlineNode, List<TextNode>>{};
 
   _Part _add(InlineNode node, int start, int end) {
     final part = _Part(node, start, end)..previous = tail;
@@ -151,12 +218,106 @@ final class _InlineSession {
     var run = 0;
     while (i < text.length) {
       final c = text.codeUnitAt(i);
-      if (!const {92, 96, 42, 95, 91, 93, 33, 60, 38, 10}.contains(c)) {
+      if (!const {
+            92,
+            96,
+            42,
+            95,
+            91,
+            93,
+            33,
+            60,
+            38,
+            10,
+            36,
+            58,
+            126,
+          }.contains(c) &&
+          !syntaxes.any((syntax) => syntax.startCharacters.contains(c))) {
         i++;
         continue;
       }
       if (i > run) _text(run, i);
       var consumed = false;
+      for (final syntax in syntaxes) {
+        if (!syntax.startCharacters.contains(c)) continue;
+        final match = syntax.match(InlineSyntaxContext(input, options), i);
+        if (match == null) continue;
+        if (match.end <= i || match.end > text.length)
+          throw ArgumentError(
+            'InlineSyntax must consume a nonempty source interval',
+          );
+        final span = input.span(i, match.end);
+        if (match.node.span.start < span.start ||
+            match.node.span.end > span.end)
+          throw ArgumentError(
+            'InlineSyntax node must stay inside its consumed source interval',
+          );
+        _add(match.node, i, match.end);
+        i = match.end;
+        consumed = true;
+        break;
+      }
+      if (!consumed && options.inlineMath && (c == 36 || c == 92)) {
+        final math = readInlineMath(
+          text,
+          i,
+          adjacent: tail.node is MathInlineNode && tail.end == i,
+        );
+        if (math != null) {
+          _add(
+            MathInlineNode(
+              span: input.span(i, math.end),
+              children: input.slice(math.bodyStart, math.bodyEnd),
+              delimiter: math.delimiter,
+            ),
+            i,
+            math.end,
+          );
+          i = math.end;
+          consumed = true;
+        }
+      }
+      if (!consumed &&
+          options.directives &&
+          c == 58 &&
+          i + 1 < text.length &&
+          text.codeUnitAt(i + 1) == 58) {
+        final start = i;
+        while (i < text.length && text.codeUnitAt(i) == 58) i++;
+        _literal(start, i);
+        consumed = true;
+      }
+      if (!consumed && options.directives && c == 58) {
+        final directive = readDirective(text, i, text.length);
+        if (directive != null && directive.colons == 1) {
+          final label = directive.label;
+          final labelText = label == null
+              ? <TextNode>[]
+              : input.slice(label.start, label.end);
+          final node = NamedInlineNode(
+            span: input.span(i, directive.end),
+            name: directive.name,
+            syntax: NamedInlineSyntax.directive,
+            children: labelText,
+            attributes: {
+              for (final entry in directive.attributes.entries)
+                entry.key: decodeMarkdownString(
+                  entry.value,
+                  entities: options.entities,
+                ),
+            },
+          );
+          pendingLabels[node] = labelText;
+          _add(node, i, directive.end);
+          i = directive.end;
+          consumed = true;
+        }
+      }
+      if (consumed) {
+        run = i;
+        continue;
+      }
       if (c == 92 && i + 1 < text.length) {
         final next = text.codeUnitAt(i + 1);
         if (isAsciiPunctuation(next)) {
@@ -208,9 +369,16 @@ final class _InlineSession {
           _literal(start, i);
         }
         consumed = true;
-      } else if (c == 42 || c == 95 && options.underscoreEmphasis) {
+      } else if (c == 42 ||
+          c == 95 && options.underscoreEmphasis ||
+          c == 126 && options.strikethrough) {
         final start = i;
         while (i < text.length && text.codeUnitAt(i) == c) i++;
+        if (c == 126 && i - start != 2) {
+          _literal(start, i);
+          run = i;
+          continue;
+        }
         final before = runeBefore(text, start);
         final after = runeAt(text, i);
         final left =
@@ -286,6 +454,14 @@ final class _InlineSession {
           i = link.end;
           consumed = true;
         }
+        if (!consumed && options.inlineHtml) {
+          final html = readInlineHtml(input, i, entities: options.entities);
+          if (html != null) {
+            for (final node in html.nodes) _add(node, i, html.end);
+            i = html.end;
+            consumed = true;
+          }
+        }
       } else if (c == 10) {
         var spaces = 0;
         var start = i;
@@ -342,10 +518,10 @@ final class _InlineSession {
         }
         result.addAll(mapped.slice(cursor, node.text.length));
         converted[node] = result;
-      } else if (node is EmphasisNode) {
+      } else if (node is EmphasisNode || node is StrikethroughNode) {
         if (!visited) {
           pending.add((node, true));
-          for (final child in node.children.reversed)
+          for (final child in node.children.cast<InlineNode>().reversed)
             pending.add((child, false));
         } else {
           converted[node] = [
@@ -491,6 +667,7 @@ final class _InlineSession {
       var opener = closer.previous;
       while (opener != null && opener.index > minimum) {
         final odd =
+            closer.character != 126 &&
             (opener.canClose || closer.canOpen) &&
             (opener.length + closer.length) % 3 == 0 &&
             (opener.length % 3 != 0 || closer.length % 3 != 0);
@@ -510,12 +687,14 @@ final class _InlineSession {
       final b = closer.part.start + used;
       final children = _nodes(opener.part.next, closer.part);
       final wrapped = _Part(
-        EmphasisNode(
-          span: input.span(a, b),
-          children: children,
-          strong: used == 2,
-          marker: String.fromCharCode(closer.character),
-        ),
+        closer.character == 126
+            ? StrikethroughNode(span: input.span(a, b), children: children)
+            : EmphasisNode(
+                span: input.span(a, b),
+                children: children,
+                strong: used == 2,
+                marker: String.fromCharCode(closer.character),
+              ),
         a,
         b,
       );

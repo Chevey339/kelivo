@@ -7,11 +7,16 @@ import 'dialect.dart';
 import 'inline_parser.dart';
 import 'mapped_text.dart';
 import 'syntax/reference_definition.dart';
+import 'syntax/inline_syntax.dart';
 
 /// Two-phase block and inline parsing. References resolve across the document.
 final class MarkdownParser {
-  const MarkdownParser({this.options = const ParserOptions()});
+  const MarkdownParser({
+    this.options = const ParserOptions(),
+    this.inlineSyntaxes = const [],
+  });
   final ParserOptions options;
+  final List<InlineSyntax> inlineSyntaxes;
 
   DocumentNode parse(String source, {bool streaming = false}) {
     final blocks = BlockParser(options: options)
@@ -46,7 +51,7 @@ final class MarkdownParser {
         );
       return result;
     });
-    final inline = InlineParser(options: options);
+    final inline = InlineParser(options: options, syntaxes: inlineSyntaxes);
     return _transform(withReferences, (node) {
       if (node is ParagraphNode ||
           node is HeadingNode ||

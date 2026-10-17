@@ -1,6 +1,9 @@
 /// Block syntax defaults for LLM-authored Markdown.
 final class ParserOptions {
   const ParserOptions({
+    this.inlineMath = true,
+    this.strikethrough = true,
+    this.inlineHtml = true,
     this.softBreakAsHardBreak = true,
     this.underscoreEmphasis = true,
     this.autolinks = true,
@@ -21,7 +24,10 @@ final class ParserOptions {
   });
 
   const ParserOptions.commonMark()
-    : softBreakAsHardBreak = false,
+    : inlineMath = false,
+      strikethrough = false,
+      inlineHtml = true,
+      softBreakAsHardBreak = false,
       underscoreEmphasis = true,
       autolinks = false,
       entities = true,
@@ -39,6 +45,9 @@ final class ParserOptions {
       indentedCode = true,
       relaxedListIndentation = false;
 
+  final bool inlineMath;
+  final bool strikethrough;
+  final bool inlineHtml;
   final bool softBreakAsHardBreak;
   final bool underscoreEmphasis;
   final bool autolinks;

@@ -453,10 +453,20 @@ final class _BlockSession {
       return false;
     if (!source.substring(block.start, cursor.line.end).contains('|'))
       return false;
-    final delimiter = splitTableLine(source, cursor.offset, cursor.line.end);
+    final delimiter = splitTableLine(
+      source,
+      cursor.offset,
+      cursor.line.end,
+      math: options.inlineMath,
+    );
     final alignments = tableDelimiter(delimiter, source);
     if (alignments == null) return false;
-    final header = splitTableLine(source, block.start, block.end);
+    final header = splitTableLine(
+      source,
+      block.start,
+      block.end,
+      math: options.inlineMath,
+    );
     if (header.cells.length != alignments.length ||
         !(header.hasPipe || delimiter.hasPipe))
       return false;
@@ -478,7 +488,12 @@ final class _BlockSession {
 
   void _tableRow(LineCursor cursor) {
     final block = leaf!;
-    final cells = splitTableLine(source, cursor.offset, cursor.line.end).cells;
+    final cells = splitTableLine(
+      source,
+      cursor.offset,
+      cursor.line.end,
+      math: options.inlineMath,
+    ).cells;
     final count = block.alignments.length;
     block.rows.add(
       TableRowNode(

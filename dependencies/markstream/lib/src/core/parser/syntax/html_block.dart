@@ -44,11 +44,16 @@ final class HtmlBlockTracker {
   final _tags = <String>[];
   String? _opaque;
   bool _seenRoot = false;
+  int? closedOffset;
 
   bool feed(String source, int beginning, int end) {
     final text = source.substring(beginning, end);
-    if (start.terminator case final terminator?)
-      return text.contains(terminator);
+    closedOffset = null;
+    if (start.terminator case final terminator?) {
+      final index = text.indexOf(terminator);
+      if (index >= 0) closedOffset = beginning + index + terminator.length;
+      return index >= 0;
+    }
     if (start.rootTag == null) return false;
     final lower = text.toLowerCase();
     var i = 0;
@@ -86,7 +91,10 @@ final class HtmlBlockTracker {
       if (tag.closing) {
         final index = _tags.lastIndexOf(tag.name);
         if (index >= 0) _tags.removeRange(index, _tags.length);
-        if (tag.name == start.rootTag && _tags.isEmpty) return true;
+        if (tag.name == start.rootTag && _tags.isEmpty) {
+          closedOffset = beginning + tag.end;
+          return true;
+        }
       } else if (!tag.selfClosing &&
           !const {
             'hr',
@@ -104,9 +112,12 @@ final class HtmlBlockTracker {
         if (discardedHtmlTags.contains(tag.name) || tag.name == 'pre')
           _opaque = '</${tag.name}';
       } else if (!_seenRoot && tag.name == start.rootTag) {
+        closedOffset = beginning + tag.end;
         return true;
       }
     }
-    return _seenRoot && _tags.isEmpty;
+    final closed = _seenRoot && _tags.isEmpty;
+    if (closed) closedOffset = end;
+    return closed;
   }
 }

@@ -131,5 +131,22 @@ MarkdownNode replaceChildren(MarkdownNode node, List<MarkdownNode> children) =>
         destination: node.destination,
         title: node.title,
       ),
+      StrikethroughNode() => StrikethroughNode(
+        span: node.span,
+        children: children.cast<InlineNode>(),
+      ),
+      MathInlineNode() => MathInlineNode(
+        span: node.span,
+        children: children.cast<TextNode>(),
+        delimiter: node.delimiter,
+        closed: node.closed,
+      ),
+      NamedInlineNode() => NamedInlineNode(
+        span: node.span,
+        children: children.cast<InlineNode>(),
+        name: node.name,
+        syntax: node.syntax,
+        attributes: node.attributes,
+      ),
       _ => node,
     };

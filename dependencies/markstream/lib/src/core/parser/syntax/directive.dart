@@ -44,6 +44,24 @@ DirectiveStart? readDirective(String source, int start, int end) {
         i++;
         continue;
       }
+      if (c == 96) {
+        var run = i + 1;
+        while (run < end && source.codeUnitAt(run) == 96) run++;
+        final marker = source.substring(i, run);
+        var close = source.indexOf(marker, run);
+        while (close >= 0 && close + marker.length <= end) {
+          var after = close + marker.length;
+          while (after < end && source.codeUnitAt(after) == 96) after++;
+          if (after - close == marker.length) {
+            i = after - 1;
+            break;
+          }
+          close = source.indexOf(marker, after);
+        }
+        if (close >= 0 && close + marker.length <= end) continue;
+        i = run - 1;
+        continue;
+      }
       if (c == 91) depth++;
       if (c == 93) {
         depth--;

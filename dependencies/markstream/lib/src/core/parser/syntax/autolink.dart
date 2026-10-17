@@ -10,8 +10,13 @@ final _bare = RegExp(
 ({int end, String destination, int labelStart, int labelEnd})?
 readAngleAutolink(String text, int start) {
   if (text.codeUnitAt(start) != 60) return null;
-  final end = text.indexOf('>', start + 1);
-  if (end < 0) return null;
+  var end = start + 1;
+  while (end < text.length && text.codeUnitAt(end) != 62) {
+    final c = text.codeUnitAt(end);
+    if (c <= 32 || c == 60) return null;
+    end++;
+  }
+  if (end == text.length) return null;
   final label = text.substring(start + 1, end);
   final String destination;
   if (_scheme.hasMatch(label)) {

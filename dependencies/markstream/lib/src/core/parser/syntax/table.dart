@@ -1,5 +1,6 @@
 import '../../ast/nodes.dart';
 import '../../ast/source_span.dart';
+import 'math_inline.dart';
 
 final class TableLine {
   const TableLine(this.cells, this.hasPipe);
@@ -8,13 +9,52 @@ final class TableLine {
 }
 
 /// Pipes are separators even inside code spans; an escaped pipe is cell text.
-TableLine splitTableLine(String source, int start, int end) {
+TableLine splitTableLine(
+  String source,
+  int start,
+  int end, {
+  bool math = false,
+}) {
   while (start < end && _space(source.codeUnitAt(start))) start++;
   while (end > start && _space(source.codeUnitAt(end - 1))) end--;
   final separators = <int>[];
+  final formulas = <InlineMathMatch>[];
+  var codeEnd = -1;
   var slashes = 0;
   for (var i = start; i < end; i++) {
     final c = source.codeUnitAt(i);
+    if (c == 96 && i > codeEnd && slashes.isEven) {
+      var run = i + 1;
+      while (run < end && source.codeUnitAt(run) == 96) run++;
+      final marker = source.substring(i, run);
+      var candidate = source.indexOf(marker, run);
+      while (candidate >= 0 && candidate + marker.length <= end) {
+        var after = candidate + marker.length;
+        while (after < end && source.codeUnitAt(after) == 96) after++;
+        if (after - candidate == marker.length) {
+          codeEnd = after - 1;
+          break;
+        }
+        candidate = source.indexOf(marker, after);
+      }
+      i = run - 1;
+      slashes = 0;
+      continue;
+    }
+    if (math && i > codeEnd && slashes.isEven && (c == 36 || c == 92)) {
+      final formula = readInlineMath(
+        source,
+        i,
+        end: end,
+        adjacent: formulas.isNotEmpty && formulas.last.end == i,
+      );
+      if (formula != null) {
+        formulas.add(formula);
+        i = formula.end - 1;
+        slashes = 0;
+        continue;
+      }
+    }
     if (c == 124 && slashes.isEven) separators.add(i);
     slashes = c == 92 ? slashes + 1 : 0;
   }
@@ -33,6 +73,12 @@ TableLine splitTableLine(String source, int start, int end) {
     var run = a;
     for (var i = a; i < b; i++) {
       if (source.codeUnitAt(i) != 92) continue;
+      if (formulas.any(
+        (formula) => i >= formula.bodyStart && i < formula.bodyEnd,
+      )) {
+        i++;
+        continue;
+      }
       if (i + 1 < b && source.codeUnitAt(i + 1) == 124) {
         if (i > run)
           fragments.add(
