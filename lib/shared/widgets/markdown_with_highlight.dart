@@ -46,6 +46,7 @@ import 'incremental_markdown_document.dart';
 import 'markdown_block_list.dart';
 import 'streaming_rich_text.dart';
 import 'markdown_selection/selectable_span_adapter.dart';
+import 'markdown_selection/table_selection.dart';
 import 'streaming_code_fence.dart';
 import 'markdown_line_lexer.dart';
 import 'markdown_source_scan.dart';
@@ -3504,12 +3505,19 @@ class _MarkdownTableBlockState extends State<_MarkdownTableBlock> {
   static const int _rowPageSize = 100;
   final GlobalKey _tableBoundaryKey = GlobalKey();
   int _visibleRows = _initialRows;
+  final _selection = TableSelectionDelegate();
   bool _capturingTableImage = false;
 
   _MarkdownTableData get rows => widget.rows;
   TextStyle get style => widget.style;
   GptMarkdownConfig get config => widget.config;
   String? get appFontFamily => widget.appFontFamily;
+
+  @override
+  void dispose() {
+    _selection.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -3535,7 +3543,7 @@ class _MarkdownTableBlockState extends State<_MarkdownTableBlock> {
         ? bodyFill
         : bodyFill.withValues(alpha: kBlockFillAlphaTable);
 
-    return LayoutBuilder(
+    final content = LayoutBuilder(
       builder: (context, constraints) {
         final bool isDesktopPlatform = _markdownTableTargetPlatformIsDesktop();
         final bool isExporting = ExportCaptureScope.of(context);
@@ -3597,28 +3605,28 @@ class _MarkdownTableBlockState extends State<_MarkdownTableBlock> {
         }
 
         final l10n = AppLocalizations.of(context)!;
-        return SelectionContainer.disabled(
-          child: Container(
-            key: const ValueKey('markdown-table-block'),
-            width: double.infinity,
-            margin: const EdgeInsets.symmetric(vertical: 6),
-            decoration: BoxDecoration(
-              color: Color.alphaBlend(
-                cs.primary.withValues(alpha: isDark ? 0.045 : 0.018),
-                cs.surface,
-              ).withValues(alpha: kBlockFillAlphaTable),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            foregroundDecoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: borderColor, width: 0.8),
-            ),
-            clipBehavior: Clip.antiAlias,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                _MarkdownTableToolbar(
+        return Container(
+          key: const ValueKey('markdown-table-block'),
+          width: double.infinity,
+          margin: const EdgeInsets.symmetric(vertical: 6),
+          decoration: BoxDecoration(
+            color: Color.alphaBlend(
+              cs.primary.withValues(alpha: isDark ? 0.045 : 0.018),
+              cs.surface,
+            ).withValues(alpha: kBlockFillAlphaTable),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          foregroundDecoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: borderColor, width: 0.8),
+          ),
+          clipBehavior: Clip.antiAlias,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              SelectionContainer.disabled(
+                child: _MarkdownTableToolbar(
                   label: l10n.markdownTableLabel,
                   backgroundColor: headerBg,
                   copyLabel: l10n.shareProviderSheetCopyButton,
@@ -3634,21 +3642,24 @@ class _MarkdownTableBlockState extends State<_MarkdownTableBlock> {
                       ? _exportImage(context)
                       : _saveImageToGallery(context),
                 ),
-                GestureDetector(
-                  key: const ValueKey('markdown-table-body'),
-                  behavior: HitTestBehavior.opaque,
-                  child: _buildMobileTableViewport(
-                    scrollable: shouldScrollHorizontally,
-                    child: tableSurface,
-                  ),
+              ),
+              GestureDetector(
+                key: const ValueKey('markdown-table-body'),
+                behavior: HitTestBehavior.opaque,
+                child: _buildMobileTableViewport(
+                  scrollable: shouldScrollHorizontally,
+                  child: tableSurface,
                 ),
-                if (!isExporting) _buildRowPager(context),
-              ],
-            ),
+              ),
+              if (!isExporting) _buildRowPager(context),
+            ],
           ),
         );
       },
     );
+    return SelectionContainer.maybeOf(context) == null
+        ? content
+        : SelectionContainer(delegate: _selection, child: content);
   }
 
   Widget _buildTable(
@@ -3683,13 +3694,18 @@ class _MarkdownTableBlockState extends State<_MarkdownTableBlock> {
             decoration: r == 0 ? BoxDecoration(color: headerBg) : null,
             children: [
               for (int c = 0; c < rows.columnCount; c++)
-                _MarkdownTableCell(
-                  data: rows.rows[r].cells[c],
-                  header: r == 0,
-                  style: style,
-                  config: config,
-                  appFontFamily: appFontFamily,
-                  selectable: !compact,
+                TableCellSelection(
+                  table: _selection,
+                  row: r,
+                  column: c,
+                  child: _MarkdownTableCell(
+                    data: rows.rows[r].cells[c],
+                    header: r == 0,
+                    style: style,
+                    config: config,
+                    appFontFamily: appFontFamily,
+                    compact: compact,
+                  ),
                 ),
             ],
           ),
@@ -3701,27 +3717,29 @@ class _MarkdownTableBlockState extends State<_MarkdownTableBlock> {
     if (rows.rows.length <= _initialRows) return const SizedBox.shrink();
     final remaining = rows.rows.length - _visibleRows;
     final l10n = AppLocalizations.of(context)!;
-    return Row(
-      key: const ValueKey('markdown-table-row-pager'),
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        if (_visibleRows > _initialRows)
-          TextButton(
-            onPressed: () => setState(() => _visibleRows = _initialRows),
-            child: Text(l10n.largeContentCollapse),
-          ),
-        if (remaining > 0)
-          TextButton(
-            key: const ValueKey('markdown-table-show-more'),
-            onPressed: () => setState(
-              () => _visibleRows = math.min(
-                rows.rows.length,
-                _visibleRows + _rowPageSize,
-              ),
+    return SelectionContainer.disabled(
+      child: Row(
+        key: const ValueKey('markdown-table-row-pager'),
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          if (_visibleRows > _initialRows)
+            TextButton(
+              onPressed: () => setState(() => _visibleRows = _initialRows),
+              child: Text(l10n.largeContentCollapse),
             ),
-            child: Text(l10n.largeContentShowMore(remaining)),
-          ),
-      ],
+          if (remaining > 0)
+            TextButton(
+              key: const ValueKey('markdown-table-show-more'),
+              onPressed: () => setState(
+                () => _visibleRows = math.min(
+                  rows.rows.length,
+                  _visibleRows + _rowPageSize,
+                ),
+              ),
+              child: Text(l10n.largeContentShowMore(remaining)),
+            ),
+        ],
+      ),
     );
   }
 
@@ -4029,7 +4047,7 @@ class _MarkdownTableCell extends StatelessWidget {
     required this.style,
     required this.config,
     required this.appFontFamily,
-    required this.selectable,
+    required this.compact,
   });
 
   final _MarkdownTableCellData data;
@@ -4037,7 +4055,7 @@ class _MarkdownTableCell extends StatelessWidget {
   final TextStyle style;
   final GptMarkdownConfig config;
   final String? appFontFamily;
-  final bool selectable;
+  final bool compact;
 
   @override
   Widget build(BuildContext context) {
@@ -4059,20 +4077,36 @@ class _MarkdownTableCell extends StatelessWidget {
       true,
     );
     final textSpan = TextSpan(style: baseStyle, children: spans);
+    final inheritedStyle = DefaultTextStyle.of(context).style.merge(baseStyle);
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
       child: Align(
         alignment: _alignmentFor(data.alignment),
-        child: selectable
-            ? SelectableText.rich(textSpan, textAlign: data.alignment)
-            : RichText(
-                text: textSpan,
-                textAlign: data.alignment,
-                softWrap: true,
-                overflow: TextOverflow.visible,
-                textWidthBasis: TextWidthBasis.parent,
-              ),
+        child: Padding(
+          // SelectableText reserved a caret and gap on desktop. Keep the
+          // existing column wrapping while joining the parent selection.
+          padding: EdgeInsets.only(right: compact ? 0 : 3),
+          child: Text.rich(
+            textSpan,
+            style: compact ? baseStyle.copyWith(inherit: false) : baseStyle,
+            textAlign: data.alignment,
+            textScaler: compact
+                ? TextScaler.noScaling
+                : MediaQuery.textScalerOf(context),
+            strutStyle: compact
+                ? null
+                : StrutStyle.fromTextStyle(inheritedStyle),
+            textHeightBehavior: compact
+                ? null
+                : DefaultTextStyle.of(context).textHeightBehavior ??
+                      DefaultTextHeightBehavior.maybeOf(context),
+            selectionColor: DefaultSelectionStyle.of(context).selectionColor,
+            softWrap: true,
+            overflow: TextOverflow.visible,
+            textWidthBasis: TextWidthBasis.parent,
+          ),
+        ),
       ),
     );
   }

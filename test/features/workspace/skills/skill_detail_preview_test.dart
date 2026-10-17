@@ -13,6 +13,7 @@ import 'package:Kelivo/shared/widgets/markdown_with_highlight.dart';
 import 'package:Kelivo/theme/palettes.dart';
 import 'package:Kelivo/theme/theme_factory.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_math_fork/flutter_math.dart';
 import 'package:flutter_math_fork/tex.dart' show TexEncoderExt;
 import 'package:flutter_test/flutter_test.dart';
@@ -165,6 +166,44 @@ void main() {
 
   AppLocalizations localizations(WidgetTester tester) =>
       AppLocalizations.of(tester.element(find.byType(SkillDetailView)))!;
+
+  for (final desktop in [false, true]) {
+    testWidgets('skill preview owns a table selection area: desktop=$desktop', (
+      tester,
+    ) async {
+      file.replace(
+        '$_source\n\n| Name | Value |\n| --- | --- |\n| Alpha | 42 |',
+      );
+      String? copied;
+      final messenger =
+          TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+      messenger.setMockMethodCallHandler(SystemChannels.platform, (call) async {
+        if (call.method == 'Clipboard.setData') {
+          copied = (call.arguments as Map<Object?, Object?>)['text'] as String?;
+        }
+        return null;
+      });
+      addTearDown(
+        () => messenger.setMockMethodCallHandler(SystemChannels.platform, null),
+      );
+      await IOOverrides.runWithIOOverrides(() async {
+        await pumpDetail(tester, desktop: desktop);
+        await tester.pumpAndSettle();
+        final region = tester.state<SelectableRegionState>(
+          find.byType(SelectableRegion),
+        );
+        region.selectAll(SelectionChangedCause.keyboard);
+        await tester.pumpAndSettle();
+        region.contextMenuButtonItems
+            .singleWhere((item) => item.type == ContextMenuButtonType.copy)
+            .onPressed!();
+        await tester.pump();
+        expect(copied, contains('Name\tValue\nAlpha\t42'));
+        expect(copied, isNot(contains('Instructions')));
+        await tester.pumpWidget(const SizedBox.shrink());
+      }, _SkillFileOverrides([file]));
+    });
+  }
 
   for (final size in [_limit - 1, _limit, _limit + 1]) {
     testWidgets('preview limit uses file bytes: $size', (tester) async {

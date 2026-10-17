@@ -3133,7 +3133,9 @@ class _ExportedBubble extends StatelessWidget {
     final Widget contentWidget = (mdText.toString().trim().isNotEmpty)
         ? DefaultTextStyle.merge(
             style: TextStyle(fontSize: contentFontSize, height: 1.5),
-            child: MarkdownWithCodeHighlight(text: mdText.toString()),
+            child: SelectionArea(
+              child: MarkdownWithCodeHighlight(text: mdText.toString()),
+            ),
           )
         : Text('—', style: TextStyle(color: bubbleFg.withValues(alpha: 0.5)));
 
