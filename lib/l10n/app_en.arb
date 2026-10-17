@@ -2021,6 +2021,7 @@
   "providersPageAliyunName": "Aliyun",
   "providersPageZhipuName": "Zhipu AI",
   "providersPageByteDanceName": "ByteDance",
+  "providersPageSambaNovaName": "SambaNova",
   "providersPageEnabledStatus": "ON",
   "providersPageDisabledStatus": "OFF",
   "providersPageModelsCountSuffix": " models",
