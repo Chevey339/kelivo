@@ -21,6 +21,7 @@ import 'package:Kelivo/shared/widgets/action_sheet.dart';
 import 'package:Kelivo/shared/widgets/ios_switch.dart';
 import 'package:Kelivo/shared/widgets/ios_tactile.dart';
 import 'package:Kelivo/shared/widgets/markdown_with_highlight.dart';
+import 'package:Kelivo/shared/widgets/app_selection_area.dart';
 import 'package:Kelivo/shared/widgets/section_card.dart';
 import 'package:Kelivo/shared/widgets/snackbar.dart';
 import 'package:Kelivo/theme/app_font_weights.dart';
@@ -496,7 +497,7 @@ class _SkillDetailBodyState extends State<_SkillDetailBody> {
         else
           SectionCard(
             padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
-            child: SelectionArea(
+            child: AppSelectionArea(
               child: MarkdownWithCodeHighlight(
                 text: body,
                 useBlockRendering: true,

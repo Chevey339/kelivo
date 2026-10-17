@@ -29,6 +29,7 @@ import '../../../core/services/chat/chat_service.dart';
 import '../../../utils/mcp_structured_image.dart';
 import '../../../utils/sandbox_path_resolver.dart';
 import '../../../shared/widgets/markdown_with_highlight.dart';
+import 'package:Kelivo/shared/widgets/app_selection_area.dart';
 import '../../../shared/widgets/export_capture_scope.dart';
 import '../../../shared/widgets/diagram_exporter.dart';
 import '../../../shared/widgets/snackbar.dart';
@@ -3133,7 +3134,7 @@ class _ExportedBubble extends StatelessWidget {
     final Widget contentWidget = (mdText.toString().trim().isNotEmpty)
         ? DefaultTextStyle.merge(
             style: TextStyle(fontSize: contentFontSize, height: 1.5),
-            child: SelectionArea(
+            child: AppSelectionArea(
               child: MarkdownWithCodeHighlight(text: mdText.toString()),
             ),
           )

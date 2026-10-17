@@ -32,6 +32,7 @@ import '../../../utils/assistant_regex.dart';
 import '../../../core/models/assistant.dart';
 import '../../../core/providers/tts_provider.dart';
 import '../../../shared/widgets/markdown_with_highlight.dart';
+import 'package:Kelivo/shared/widgets/app_selection_area.dart';
 import '../../../shared/widgets/snackbar.dart';
 import '../../../shared/widgets/audio_clip_player.dart';
 import '../../../core/utils/multimodal_input_utils.dart';
@@ -950,7 +951,7 @@ class _ToolDetailBody extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    return SelectionArea(
+    return AppSelectionArea(
       child: CustomScrollView(
         controller: scrollController,
         slivers: [
@@ -2084,7 +2085,7 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
     }
 
     if (isDesktop) {
-      content = SelectionArea(
+      content = AppSelectionArea(
         key: ValueKey('user_${widget.message.id}'),
         child: content,
       );
@@ -2554,7 +2555,7 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
     );
 
     return RepaintBoundary(
-      child: SelectionArea(
+      child: AppSelectionArea(
         key: ValueKey(
           contentKey.isEmpty
               ? 'assistant_${widget.message.id}'
@@ -3230,7 +3231,7 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
                             Padding(
                               padding: const EdgeInsets.fromLTRB(8, 2, 8, 6),
                               child: RepaintBoundary(
-                                child: SelectionArea(
+                                child: AppSelectionArea(
                                   key: ValueKey(
                                     'translation_${widget.message.id}',
                                   ),
@@ -5187,12 +5188,12 @@ class _ChainOfThoughtReasoningStepState
             // Bouncing physics already declines drags when content fits.
             // Keeping it stable also retains ScrollPosition on overflow.
             physics: const BouncingScrollPhysics(),
-            child: SelectionArea(child: reasoningContent(display)),
+            child: AppSelectionArea(child: reasoningContent(display)),
           ),
         ),
       );
     } else if (state == _ReasoningStepState.expanded) {
-      content = SelectionArea(child: reasoningContent(display));
+      content = AppSelectionArea(child: reasoningContent(display));
     }
 
     return _TimelineStepShell(
@@ -7231,7 +7232,7 @@ class _ReasoningSectionState extends State<_ReasoningSection> {
     }
 
     // Enable long-press text selection in reasoning body
-    body = SelectionArea(child: body);
+    body = AppSelectionArea(child: body);
 
     return AnimatedSize(
       duration: const Duration(milliseconds: 300),
