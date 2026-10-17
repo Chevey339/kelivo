@@ -11,3 +11,7 @@ export 'src/core/parser/inline_parser.dart';
 export 'src/core/parser/markdown_parser.dart';
 export 'src/core/parser/syntax/inline_syntax.dart';
 export 'src/core/parser/incremental_document.dart';
+export 'src/core/serialize/to_plain_text.dart';
+export 'src/core/serialize/to_markdown.dart';
+export 'src/core/serialize/to_html.dart';
+export 'src/core/text_index/text_index.dart';

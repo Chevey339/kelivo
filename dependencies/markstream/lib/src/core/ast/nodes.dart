@@ -401,14 +401,17 @@ final class HtmlBlockNode extends BlockNode {
   HtmlBlockNode({
     required SourceSpan span,
     required List<InlineNode> children,
-    required this.raw,
+    required List<TextNode> rawFragments,
     this.fullDocument = false,
     this.closed = true,
   }) : children = List.unmodifiable(children),
+       rawFragments = List.unmodifiable(rawFragments),
+       raw = rawFragments.map((n) => n.text).join(),
        super(span);
   @override
   final List<InlineNode> children;
   final String raw;
+  final List<TextNode> rawFragments;
   final bool fullDocument;
   final bool closed;
   @override
@@ -416,6 +419,8 @@ final class HtmlBlockNode extends BlockNode {
   @override
   Map<String, Object?> get fields => {
     'raw': raw,
+    if (fullDocument)
+      'rawFragments': [for (final fragment in rawFragments) fragment.toJson()],
     'fullDocument': fullDocument,
     'closed': closed,
   };

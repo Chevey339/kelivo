@@ -1023,7 +1023,7 @@ final class _BlockSession {
                   block: true,
                   entities: options.entities,
                 ),
-          raw: block.text.cast<TextNode>().map((n) => n.text).join(),
+          rawFragments: block.text.cast<TextNode>(),
           fullDocument: block.html!.start.fullDocument,
           closed: block.closed,
         ),

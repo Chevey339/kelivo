@@ -32,8 +32,18 @@ final class MarkdownParser {
       start: start,
     );
     final references = <String, ReferenceDefinitionNode>{...initialReferences};
+    final taskLabels = <MarkdownNode>{};
+    final pendingBlocks = <BlockNode>[...blocks.children];
+    while (pendingBlocks.isNotEmpty) {
+      final block = pendingBlocks.removeLast();
+      if (block is ListItemNode &&
+          block.checked != null &&
+          block.children.isNotEmpty)
+        taskLabels.add(block.children.first);
+      pendingBlocks.addAll(block.children.whereType<BlockNode>());
+    }
     final withReferences = _transform(blocks, (node) {
-      if (node is! ParagraphNode) return [node];
+      if (node is! ParagraphNode || taskLabels.contains(node)) return [node];
       final input = MappedText(node.children.cast<TextNode>());
       var offset = 0;
       final result = <MarkdownNode>[];

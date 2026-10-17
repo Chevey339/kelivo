@@ -61,3 +61,22 @@ distinguish projected nodes, and every source span remains inside the input.
 details, directives and HTML blocks until they finish. Ending the stream uses
 ordinary Markdown parsing. Document reference metadata is immutable and uses
 the same original-source coordinates as the visible syntax tree.
+
+## Serialization and selection offsets
+
+`toPlainText(document)` produces structured clipboard text, including TSV for
+tables and markers for lists and tasks. `toMarkdown(document)` writes canonical
+Markdown; `toHtml(document)` emits portable HTML with active tags, unsafe URL
+schemes and unsupported style properties removed. Complete HTML documents are
+exported as escaped code. `tableToCsv(table)` uses CRLF rows and CSV quoting.
+
+`TextIndex.fromDocument(document)` indexes canonical selectable content. Its
+offsets deliberately exclude generated TSV separators, list markers and block
+spacing. Code display omits one structural final newline. Original entities,
+pipe escapes and normalized line endings keep their source ranges.
+
+Use `TextIndex.fromSegments(...)` for a rendered projection: hidden details
+content, resolved citation labels and inserted soft-wrap characters can differ
+from the complete AST. Generated glyphs have empty source spans. Segment order
+must follow document selection order. Clipboard string lengths are not valid
+selection offsets.

@@ -84,7 +84,7 @@ MarkdownNode replaceChildren(MarkdownNode node, List<MarkdownNode> children) =>
       HtmlBlockNode() => HtmlBlockNode(
         span: node.span,
         children: children.cast<InlineNode>(),
-        raw: node.raw,
+        rawFragments: node.rawFragments,
         fullDocument: node.fullDocument,
         closed: node.closed,
       ),
