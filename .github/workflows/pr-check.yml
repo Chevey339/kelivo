@@ -28,6 +28,10 @@ jobs:
       - name: Flutter pub get
         run: flutter pub get
 
+      - name: Flutter pub get (markstream)
+        working-directory: dependencies/markstream
+        run: flutter pub get
+
       - name: Dart format (changed files only)
         shell: bash
         run: |
@@ -40,7 +44,7 @@ jobs:
             HEAD_SHA="${{ github.sha }}"
           fi
 
-          files="$(git diff --diff-filter=ACMR --name-only "$BASE_SHA" "$HEAD_SHA" -- | grep -E '^(lib|test|integration_test)/.*\.dart$' || true)"
+          files="$(git diff --diff-filter=ACMR --name-only "$BASE_SHA" "$HEAD_SHA" -- | grep -E '^(lib|test|integration_test|dependencies/markstream/(lib|test))/.*\.dart$' || true)"
           if [ -z "$files" ]; then
             echo "No changed Dart files to format-check."
             exit 0
@@ -82,4 +86,12 @@ jobs:
         run: dart analyze --fatal-infos lib test integration_test
 
       - name: flutter test
+        run: flutter test
+
+      - name: dart analyze (markstream)
+        working-directory: dependencies/markstream
+        run: dart analyze --fatal-infos
+
+      - name: flutter test (markstream)
+        working-directory: dependencies/markstream
         run: flutter test
