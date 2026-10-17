@@ -3,10 +3,10 @@ import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
-import 'package:math_expressions/math_expressions.dart';
 
 import '../../../core/models/assistant.dart';
 import '../../../core/models/health_data_type.dart';
+import 'calculator_service.dart';
 
 typedef TextToSpeechStarter = Future<void> Function(String text);
 
@@ -769,7 +769,10 @@ class LocalToolsService {
     'function': {
       'name': LocalToolNames.calculate,
       'description':
-          'Evaluate a mathematical expression. Supports: + - * / ^ % !, sin() cos() tan() sqrt() ln() abs() floor() ceil() sgn(), log(base, value), constants pi e. Example: "5!", "sin(pi/4)", "log(2, 8)", "floor(3.7)"',
+          'Evaluate a mathematical expression. Decimal/integer arithmetic, division, integer powers, factorial, modulo and rounding use exact rational arithmetic. '
+          'Repeating decimal outputs and calculations using pi, e, roots, non-integer powers, or transcendental functions are marked approximate and rounded to 15 significant digits. '
+          'Supports: + - * / ^ % !, sin() cos() tan() (radians), sqrt() ln() abs() floor() ceil() sgn(), log(base, value), constants pi e. '
+          'Example: "5!", "sin(pi/4)", "log(2, 8)", "floor(3.7)"',
       'parameters': {
         'type': 'object',
         'properties': {
@@ -1258,19 +1261,12 @@ class LocalToolsService {
     }
 
     try {
-      final parsed = GrammarParser().parse(expression);
-      final result = parsed.evaluate(EvaluationType.REAL, ContextModel());
-      if (!result.isFinite) {
-        return jsonEncode({
-          'error': 'math_error',
-          'message':
-              'The result is not a finite number. Please check your expression (e.g. division by zero).',
-        });
-      }
       return jsonEncode({
         'expression': expression,
-        'result': result.toString(),
+        ...CalculatorService.evaluate(expression),
       });
+    } on CalculatorException catch (e) {
+      return jsonEncode({'error': 'math_error', 'message': e.message});
     } catch (e) {
       return jsonEncode({
         'error': 'parse_error',
