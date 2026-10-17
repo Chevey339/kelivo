@@ -7,6 +7,8 @@ captures. These tests live outside `test/` and are deliberately opt-in.
 flutter test test_goldens --dart-define=MARKSTREAM_GOLDEN_SET=baseline
 flutter test test_goldens --dart-define=MARKSTREAM_GOLDEN_SET=current
 dart analyze --fatal-infos test_goldens
+dart run test_goldens/tool/diff_report.dart \
+  test_goldens/out/baseline test_goldens/out/current test_goldens/out/report
 ```
 
 The matrix covers widths 720/390, light/dark themes and chat font scales 1/1.3.
@@ -34,3 +36,11 @@ awaiting `toByteData` in the fake async test zone can hang.
 
 All 48 fixtures in `fixtures/synthetic/` are synthetic. The separate `real/`
 directory is reserved for user-supplied, reviewed conversation exports.
+
+The report contains JSON measurements and a local HTML page with the baseline,
+current capture and red difference mask side by side. Pixel ratios compare
+exact RGBA values over the union of both image footprints, so size changes count
+as differences. The HTML can filter unchanged captures. Changes require visual
+review and do not fail the command; missing images do fail with exit code 2.
+When a capture manifest exists, it defines the current run's image set so stale
+PNG files from a previous run cannot silently stand in for missing captures.
