@@ -5,6 +5,12 @@ abstract class AstVisitor<T> {
   T visitDocument(DocumentNode node) => visitNode(node);
   T visitParagraph(ParagraphNode node) => visitNode(node);
   T visitText(TextNode node) => visitNode(node);
+  T visitHeading(HeadingNode node) => visitNode(node);
+  T visitThematicBreak(ThematicBreakNode node) => visitNode(node);
+  T visitCodeBlock(CodeBlockNode node) => visitNode(node);
+  T visitBlockQuote(BlockQuoteNode node) => visitNode(node);
+  T visitList(ListNode node) => visitNode(node);
+  T visitListItem(ListItemNode node) => visitNode(node);
 }
 
 /// Override specific visits and call super to keep walking their descendants.
