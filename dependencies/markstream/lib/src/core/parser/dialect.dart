@@ -1,6 +1,11 @@
 /// Block syntax defaults for LLM-authored Markdown.
 final class ParserOptions {
   const ParserOptions({
+    this.softBreakAsHardBreak = true,
+    this.underscoreEmphasis = true,
+    this.autolinks = true,
+    this.entities = true,
+    this.cjkFlankingRelax = true,
     this.alerts = true,
     this.directives = true,
     this.htmlBlocks = true,
@@ -16,7 +21,12 @@ final class ParserOptions {
   });
 
   const ParserOptions.commonMark()
-    : alerts = false,
+    : softBreakAsHardBreak = false,
+      underscoreEmphasis = true,
+      autolinks = false,
+      entities = true,
+      cjkFlankingRelax = false,
+      alerts = false,
       directives = false,
       htmlBlocks = true,
       tables = false,
@@ -29,6 +39,11 @@ final class ParserOptions {
       indentedCode = true,
       relaxedListIndentation = false;
 
+  final bool softBreakAsHardBreak;
+  final bool underscoreEmphasis;
+  final bool autolinks;
+  final bool entities;
+  final bool cjkFlankingRelax;
   final bool alerts;
   final bool directives;
   final bool htmlBlocks;

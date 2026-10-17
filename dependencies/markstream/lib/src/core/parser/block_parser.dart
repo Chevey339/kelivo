@@ -940,7 +940,11 @@ final class _BlockSession {
           span: span,
           children: block.html!.start.fullDocument
               ? const []
-              : parseHtmlFragment(block.text.cast<TextNode>(), block: true),
+              : parseHtmlFragment(
+                  block.text.cast<TextNode>(),
+                  block: true,
+                  entities: options.entities,
+                ),
           raw: block.text.cast<TextNode>().map((n) => n.text).join(),
           fullDocument: block.html!.start.fullDocument,
           closed: block.closed,

@@ -15,6 +15,7 @@ final class HtmlBlockStart {
 }
 
 HtmlBlockStart? matchHtmlBlock(String source, int start, int end) {
+  if (start >= end || source.codeUnitAt(start) != 60) return null;
   final text = source.substring(start, end);
   final lower = text.toLowerCase();
   if (lower.startsWith('<!doctype html'))

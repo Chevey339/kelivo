@@ -1,4 +1,5 @@
 import '../ast/nodes.dart';
+import 'entities.dart';
 import '../parser/mapped_text.dart';
 import '../parser/syntax/html_tag.dart';
 
@@ -78,6 +79,7 @@ final class _Element {
 List<InlineNode> parseHtmlFragment(
   List<TextNode> fragments, {
   bool block = false,
+  bool entities = true,
 }) {
   final input = MappedText(fragments);
   final text = input.text;
@@ -114,7 +116,10 @@ List<InlineNode> parseHtmlFragment(
       i++;
       continue;
     }
-    if (run < i) stack.last.children.addAll(input.slice(run, i));
+    if (run < i)
+      stack.last.children.addAll(
+        entities ? decodeHtmlText(input.slice(run, i)) : input.slice(run, i),
+      );
     if (comment || declaration) {
       final marker = comment ? '-->' : '>';
       final end = text.indexOf(marker, i + 2);
@@ -136,14 +141,18 @@ List<InlineNode> parseHtmlFragment(
       }
       i = end < 0 ? text.length : closing!.end;
     } else {
-      stack.add(_Element(tag.name, i, _attributes(tag)));
+      stack.add(_Element(tag.name, i, _attributes(tag, entities: entities)));
       i = tag.end;
       if (tag.selfClosing || _voidTags.contains(tag.name)) close(i);
     }
     run = i;
   }
   if (run < text.length)
-    stack.last.children.addAll(input.slice(run, text.length));
+    stack.last.children.addAll(
+      entities
+          ? decodeHtmlText(input.slice(run, text.length))
+          : input.slice(run, text.length),
+    );
   while (stack.length > 1) close(text.length);
   final result = stack.single.children;
   if (block) {
@@ -159,7 +168,7 @@ List<InlineNode> parseHtmlFragment(
   return List.unmodifiable(result);
 }
 
-Map<String, String> _attributes(HtmlTag tag) => {
+Map<String, String> _attributes(HtmlTag tag, {required bool entities}) => {
   for (final entry in tag.attributes.entries)
     if (const {
           'title',
@@ -176,5 +185,5 @@ Map<String, String> _attributes(HtmlTag tag) => {
             const {'src', 'alt', 'width', 'height'}.contains(entry.key) ||
         tag.name == 'span' && entry.key == 'style' ||
         tag.name == 'font' && entry.key == 'color')
-      entry.key: entry.value,
+      entry.key: entities ? decodeEntities(entry.value) : entry.value,
 };

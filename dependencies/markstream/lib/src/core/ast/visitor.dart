@@ -21,6 +21,12 @@ abstract class AstVisitor<T> {
   T visitDirectiveLabel(DirectiveLabelNode node) => visitNode(node);
   T visitHtmlBlock(HtmlBlockNode node) => visitNode(node);
   T visitHtmlElement(HtmlElementNode node) => visitNode(node);
+  T visitEmphasis(EmphasisNode node) => visitNode(node);
+  T visitCodeSpan(CodeSpanNode node) => visitNode(node);
+  T visitLink(LinkNode node) => visitNode(node);
+  T visitImage(ImageNode node) => visitNode(node);
+  T visitLineBreak(LineBreakNode node) => visitNode(node);
+  T visitReferenceDefinition(ReferenceDefinitionNode node) => visitNode(node);
   T visitListItem(ListItemNode node) => visitNode(node);
 }
 

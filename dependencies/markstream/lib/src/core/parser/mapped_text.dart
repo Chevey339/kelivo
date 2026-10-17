@@ -23,6 +23,15 @@ final class MappedText {
     if (fragments.isEmpty) return 0;
     if (offset <= 0) return fragments.first.span.start;
     if (offset >= text.length) return fragments.last.span.end;
+    final index = _index(offset, end);
+    final fragment = fragments[index];
+    final relative = offset - _starts[index];
+    if (fragment.text.isEmpty) return fragment.span.start;
+    final scaled = relative * fragment.span.length / fragment.text.length;
+    return fragment.span.start + (end ? scaled.ceil() : scaled.floor());
+  }
+
+  int _index(int offset, bool end) {
     var low = 0;
     var high = _starts.length;
     while (low < high) {
@@ -33,17 +42,13 @@ final class MappedText {
         high = mid;
       }
     }
-    final index = low - 1;
-    final fragment = fragments[index];
-    final relative = offset - _starts[index];
-    if (fragment.text.isEmpty) return fragment.span.start;
-    final scaled = relative * fragment.span.length / fragment.text.length;
-    return fragment.span.start + (end ? scaled.ceil() : scaled.floor());
+    return low == 0 ? 0 : low - 1;
   }
 
   List<TextNode> slice(int start, int end) {
     final result = <TextNode>[];
-    for (var i = 0; i < fragments.length; i++) {
+    if (start == end || fragments.isEmpty) return result;
+    for (var i = _index(start, false); i < fragments.length; i++) {
       final a = start > _starts[i] ? start : _starts[i];
       final boundary = _starts[i] + fragments[i].text.length;
       final b = end < boundary ? end : boundary;

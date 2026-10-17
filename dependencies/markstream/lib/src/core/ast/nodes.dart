@@ -429,3 +429,127 @@ final class HtmlElementNode extends InlineNode {
   @override
   T accept<T>(AstVisitor<T> visitor) => visitor.visitHtmlElement(this);
 }
+
+final class EmphasisNode extends InlineNode {
+  EmphasisNode({
+    required SourceSpan span,
+    required List<InlineNode> children,
+    this.strong = false,
+    this.marker = '*',
+  }) : children = List.unmodifiable(children),
+       super(span);
+  @override
+  final List<InlineNode> children;
+  final bool strong;
+  final String marker;
+  @override
+  String get type => strong ? 'strong' : 'emphasis';
+  @override
+  Map<String, Object?> get fields => {'marker': marker};
+  @override
+  T accept<T>(AstVisitor<T> visitor) => visitor.visitEmphasis(this);
+}
+
+final class CodeSpanNode extends InlineNode {
+  CodeSpanNode({
+    required SourceSpan span,
+    required List<TextNode> children,
+    this.delimiterLength = 1,
+  }) : children = List.unmodifiable(children),
+       code = children.map((n) => n.text).join(),
+       super(span);
+  @override
+  final List<TextNode> children;
+  final String code;
+  final int delimiterLength;
+  @override
+  String get type => 'code_span';
+  @override
+  Map<String, Object?> get fields => {
+    'code': code,
+    'delimiterLength': delimiterLength,
+  };
+  @override
+  T accept<T>(AstVisitor<T> visitor) => visitor.visitCodeSpan(this);
+}
+
+final class LinkNode extends InlineNode {
+  LinkNode({
+    required SourceSpan span,
+    required List<InlineNode> children,
+    required this.destination,
+    this.title,
+    this.autolink = false,
+  }) : children = List.unmodifiable(children),
+       super(span);
+  @override
+  final List<InlineNode> children;
+  final String destination;
+  final String? title;
+  final bool autolink;
+  @override
+  String get type => 'link';
+  @override
+  Map<String, Object?> get fields => {
+    'destination': destination,
+    if (title != null) 'title': title,
+    if (autolink) 'autolink': true,
+  };
+  @override
+  T accept<T>(AstVisitor<T> visitor) => visitor.visitLink(this);
+}
+
+final class ImageNode extends InlineNode {
+  ImageNode({
+    required SourceSpan span,
+    required List<InlineNode> children,
+    required this.destination,
+    this.title,
+  }) : children = List.unmodifiable(children),
+       super(span);
+  @override
+  final List<InlineNode> children;
+  final String destination;
+  final String? title;
+  @override
+  String get type => 'image';
+  @override
+  Map<String, Object?> get fields => {
+    'destination': destination,
+    if (title != null) 'title': title,
+  };
+  @override
+  T accept<T>(AstVisitor<T> visitor) => visitor.visitImage(this);
+}
+
+final class LineBreakNode extends InlineNode {
+  const LineBreakNode({required SourceSpan span, required this.hard})
+    : super(span);
+  final bool hard;
+  @override
+  String get type => hard ? 'hard_break' : 'soft_break';
+  @override
+  T accept<T>(AstVisitor<T> visitor) => visitor.visitLineBreak(this);
+}
+
+final class ReferenceDefinitionNode extends BlockNode {
+  const ReferenceDefinitionNode({
+    required SourceSpan span,
+    required this.label,
+    required this.destination,
+    this.title,
+  }) : super(span);
+  final String label;
+  final String destination;
+  final String? title;
+  @override
+  String get type => 'reference_definition';
+  @override
+  Map<String, Object?> get fields => {
+    'label': label,
+    'destination': destination,
+    if (title != null) 'title': title,
+  };
+  @override
+  T accept<T>(AstVisitor<T> visitor) => visitor.visitReferenceDefinition(this);
+}

@@ -7,3 +7,5 @@ export 'src/core/ast/visitor.dart';
 
 export 'src/core/parser/block_parser.dart';
 export 'src/core/parser/dialect.dart';
+export 'src/core/parser/inline_parser.dart';
+export 'src/core/parser/markdown_parser.dart';
