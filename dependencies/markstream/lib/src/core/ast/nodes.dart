@@ -174,13 +174,165 @@ final class ListNode extends BlockNode {
 }
 
 final class ListItemNode extends BlockNode {
-  ListItemNode({required SourceSpan span, required List<BlockNode> children})
-    : children = List.unmodifiable(children),
-      super(span);
+  ListItemNode({
+    required SourceSpan span,
+    required List<BlockNode> children,
+    this.checked,
+    this.radio = false,
+    this.markerSpan,
+  }) : children = List.unmodifiable(children),
+       super(span);
   @override
   final List<BlockNode> children;
+  final bool? checked;
+  final bool radio;
+  final SourceSpan? markerSpan;
+  @override
+  Map<String, Object?> get fields => {
+    if (checked != null) 'checked': checked,
+    if (radio) 'radio': true,
+    if (markerSpan != null) 'markerSpan': markerSpan!.toJson(),
+  };
   @override
   String get type => 'list_item';
   @override
   T accept<T>(AstVisitor<T> visitor) => visitor.visitListItem(this);
+}
+
+final class MathBlockNode extends BlockNode {
+  MathBlockNode({
+    required SourceSpan span,
+    required List<TextNode> children,
+    this.delimiter = r'$$',
+    this.closed = true,
+  }) : children = List.unmodifiable(children),
+       tex = children.map((node) => node.text).join().trim(),
+       super(span);
+  @override
+  final List<TextNode> children;
+  final String tex;
+  final String delimiter;
+  final bool closed;
+  @override
+  String get type => 'math_block';
+  @override
+  Map<String, Object?> get fields => {
+    'tex': tex,
+    'delimiter': delimiter,
+    'closed': closed,
+  };
+  @override
+  T accept<T>(AstVisitor<T> visitor) => visitor.visitMathBlock(this);
+}
+
+final class TaskItemNode extends BlockNode {
+  TaskItemNode({
+    required SourceSpan span,
+    required this.markerSpan,
+    required this.checked,
+    this.radio = false,
+    required List<InlineNode> children,
+  }) : children = List.unmodifiable(children),
+       super(span);
+  @override
+  final List<InlineNode> children;
+  final SourceSpan markerSpan;
+  final bool checked;
+  final bool radio;
+  @override
+  String get type => radio ? 'radio_item' : 'task_item';
+  @override
+  Map<String, Object?> get fields => {
+    'checked': checked,
+    'markerSpan': markerSpan.toJson(),
+  };
+  @override
+  T accept<T>(AstVisitor<T> visitor) => visitor.visitTaskItem(this);
+}
+
+enum TableAlignment { none, left, center, right }
+
+final class TableNode extends BlockNode {
+  TableNode({
+    required SourceSpan span,
+    required List<TableRowNode> children,
+    required List<TableAlignment> alignments,
+  }) : children = List.unmodifiable(children),
+       alignments = List.unmodifiable(alignments),
+       super(span);
+  @override
+  final List<TableRowNode> children;
+  final List<TableAlignment> alignments;
+  @override
+  String get type => 'table';
+  @override
+  Map<String, Object?> get fields => {
+    'alignments': alignments.map((a) => a.name).toList(),
+  };
+  @override
+  T accept<T>(AstVisitor<T> visitor) => visitor.visitTable(this);
+}
+
+final class TableRowNode extends MarkdownNode {
+  TableRowNode({
+    required SourceSpan span,
+    required List<TableCellNode> children,
+    this.header = false,
+  }) : children = List.unmodifiable(children),
+       super(span);
+  @override
+  final List<TableCellNode> children;
+  final bool header;
+  @override
+  String get type => 'table_row';
+  @override
+  Map<String, Object?> get fields => {'header': header};
+  @override
+  T accept<T>(AstVisitor<T> visitor) => visitor.visitTableRow(this);
+}
+
+final class TableCellNode extends MarkdownNode {
+  TableCellNode({required SourceSpan span, required List<InlineNode> children})
+    : children = List.unmodifiable(children),
+      super(span);
+  @override
+  final List<InlineNode> children;
+  @override
+  String get type => 'table_cell';
+  @override
+  T accept<T>(AstVisitor<T> visitor) => visitor.visitTableCell(this);
+}
+
+final class DetailsNode extends BlockNode {
+  DetailsNode({
+    required SourceSpan span,
+    required List<BlockNode> children,
+    this.open = false,
+    this.closed = true,
+  }) : children = List.unmodifiable(children),
+       super(span);
+  @override
+  final List<BlockNode> children;
+  final bool open;
+  final bool closed;
+  @override
+  String get type => 'details';
+  @override
+  Map<String, Object?> get fields => {'open': open, 'closed': closed};
+  @override
+  T accept<T>(AstVisitor<T> visitor) => visitor.visitDetails(this);
+}
+
+final class DetailsSummaryNode extends BlockNode {
+  DetailsSummaryNode({
+    required SourceSpan span,
+    required List<InlineNode> children,
+  }) : children = List.unmodifiable(children),
+       super(span);
+  @override
+  final List<InlineNode> children;
+  @override
+  String get type => 'details_summary';
+  @override
+  T accept<T>(AstVisitor<T> visitor) => visitor.visitDetailsSummary(this);
 }

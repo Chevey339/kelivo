@@ -154,6 +154,15 @@ void main() {
         '```',
         '~~~',
         '***',
+        '<details>',
+        '<summary>',
+        '</summary>',
+        '</details>',
+        r'$$',
+        '[x] ',
+        '( ) ',
+        '| a | b |',
+        '| --- | --- |',
       ];
       for (var sample = 0; sample < 700; sample++) {
         final source = List.generate(

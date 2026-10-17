@@ -2,16 +2,35 @@ import '../ast/nodes.dart';
 import '../ast/source_span.dart';
 import 'dialect.dart';
 import 'source_line.dart';
+import 'syntax/math_block.dart';
+import 'syntax/task_item.dart';
+import 'syntax/table.dart';
+import 'syntax/html_tag.dart';
 
 /// Builds block structure before inline interpretation, using original offsets.
 final class BlockParser {
   const BlockParser({this.options = const ParserOptions()});
   final ParserOptions options;
 
-  DocumentNode parse(String source) => _BlockSession(source, options).parse();
+  DocumentNode parse(String source, {bool streaming = false}) =>
+      _BlockSession(source, options, streaming).parse();
 }
 
-enum _Kind { root, quote, list, item, paragraph, heading, rule, code }
+enum _Kind {
+  root,
+  quote,
+  list,
+  item,
+  paragraph,
+  heading,
+  rule,
+  code,
+  math,
+  task,
+  table,
+  details,
+  summary,
+}
 
 final class _Block {
   _Block(this.kind, this.start, {this.parent}) : end = start;
@@ -35,6 +54,12 @@ final class _Block {
   bool closed = true;
   int fenceLength = 0;
   String info = '';
+  bool? checked;
+  bool radio = false;
+  SourceSpan? markerSpan;
+  final rows = <TableRowNode>[];
+  List<TableAlignment> alignments = const [];
+  bool open = false;
 }
 
 final class _ListMarker {
@@ -58,15 +83,17 @@ final class _ListMarker {
 }
 
 final class _BlockSession {
-  _BlockSession(this.source, this.options) {
+  _BlockSession(this.source, this.options, this.streaming) {
     root = _Block(_Kind.root, 0)..end = source.length;
     stack.add(root);
   }
   final String source;
   final ParserOptions options;
+  final bool streaming;
   late final _Block root;
   final stack = <_Block>[];
   _Block? leaf;
+  final _remaining = <LineCursor>[];
 
   static final _listStart = RegExp(r'^([-+*]|[0-9]{1,9}[.)])(?=\s|$)');
   static final _fenceStart = RegExp(r'^(`{3,}|~{3,})(.*)$');
@@ -121,6 +148,29 @@ final class _BlockSession {
 
   bool _interrupts(LineCursor cursor) {
     if (cursor.indentation.width > 3) return false;
+    if (options.details) {
+      final tag = readHtmlTag(source, cursor.indentation.end, cursor.line.end);
+      if (tag?.name == 'details') return true;
+    }
+    if (options.mathBlocks) {
+      final math = findMathBlockStart(
+        source,
+        cursor.offset,
+        cursor.line.end,
+        streaming: streaming,
+      );
+      if (math != null && math.start == cursor.indentation.end) return true;
+    }
+    if (options.standaloneTaskLine &&
+        options.taskItems &&
+        matchTaskMarker(
+              source,
+              cursor.indentation.end,
+              cursor.line.end,
+              radioItems: options.radioItems,
+            ) !=
+            null)
+      return true;
     final text = _trimmed(cursor);
     if (text.startsWith('>') || _heading.hasMatch(text) || _rule.hasMatch(text))
       return true;
@@ -154,7 +204,115 @@ final class _BlockSession {
   }
 
   void _paragraph(LineCursor cursor) {
+    if (stack.any((node) => node.kind == _Kind.details)) {
+      final close = findClosingHtmlTag(
+        source,
+        cursor.offset,
+        cursor.line.end,
+        'details',
+      );
+      if (close != null) {
+        _remaining.add(
+          LineCursor(
+            SourceLine(source, close.start, cursor.line.end, cursor.line.next),
+          ),
+        );
+        if (source.substring(cursor.offset, close.start).trim().isNotEmpty)
+          _paragraphContent(
+            LineCursor(
+              SourceLine(source, cursor.offset, close.start, close.start),
+            ),
+          );
+        return;
+      }
+    }
+    _paragraphContent(cursor);
+  }
+
+  void _paragraphContent(LineCursor cursor) {
+    final math = options.mathBlocks
+        ? findMathBlockStart(
+            source,
+            cursor.offset,
+            cursor.line.end,
+            streaming: streaming,
+          )
+        : null;
+    if (math != null) {
+      if (source.substring(cursor.offset, math.start).trim().isNotEmpty) {
+        _appendParagraph(
+          LineCursor(SourceLine(source, cursor.offset, math.start, math.start)),
+        );
+      }
+      leaf = _add(_Kind.math, math.start)
+        ..marker = math.closer
+        ..info = math.delimiter
+        ..closed = false
+        ..end = cursor.line.end;
+      _math(
+        LineCursor(
+          SourceLine(source, math.bodyStart, cursor.line.end, cursor.line.next),
+        ),
+      );
+      return;
+    }
+    _appendParagraph(cursor);
+  }
+
+  void _math(LineCursor cursor) {
+    final block = leaf!;
+    final close = findMathBlockClose(
+      source,
+      cursor.offset,
+      cursor.line.end,
+      block.marker,
+    );
+    if (close < 0) {
+      block.text.addAll(cursor.textFragments());
+      if (cursor.line.next > cursor.line.end) {
+        block.text.add(
+          TextNode(
+            span: SourceSpan(cursor.line.end, cursor.line.next),
+            text: '\n',
+          ),
+        );
+      }
+      block.end = cursor.line.next;
+      _touch(cursor.line);
+      return;
+    }
+    block.text.addAll(
+      LineCursor(SourceLine(source, cursor.offset, close, close))
+          .textFragments(),
+    );
+    block
+      ..closed = true
+      ..end = close + block.marker.length;
+    _touch(cursor.line);
+    leaf = null;
+    _queueSuffix(block.end, cursor.line);
+  }
+
+  void _appendParagraph(LineCursor cursor) {
     cursor.indent(cursor.indentation.width);
+    if (leaf == null &&
+        stack.last.kind == _Kind.item &&
+        stack.last.children.isEmpty &&
+        options.taskItems) {
+      final marker = matchTaskMarker(
+        source,
+        cursor.offset,
+        cursor.line.end,
+        radioItems: options.radioItems,
+      );
+      if (marker != null) {
+        stack.last
+          ..checked = marker.checked
+          ..radio = marker.radio
+          ..markerSpan = SourceSpan(marker.start, marker.end);
+        cursor.advance(marker.end - marker.start);
+      }
+    }
     final current = leaf ??= _add(_Kind.paragraph, cursor.sourceOffset);
     if (current.lastLine case final previous?) {
       current.text.add(
@@ -179,6 +337,140 @@ final class _BlockSession {
         ),
       ],
     ));
+  }
+
+  void _queueSuffix(int start, SourceLine line) {
+    if (source.substring(start, line.end).trim().isNotEmpty)
+      _remaining.add(
+        LineCursor(SourceLine(source, start, line.end, line.next)),
+      );
+  }
+
+  void _closeDetails(HtmlTag tag, SourceLine line) {
+    final index = stack.lastIndexWhere((node) => node.kind == _Kind.details);
+    if (index < 0) return;
+    for (var i = 1; i < stack.length; i++) {
+      stack[i].end = i < index ? line.next : tag.start;
+    }
+    stack[index]
+      ..end = tag.end
+      ..closed = true;
+    stack.removeRange(index, stack.length);
+    leaf = null;
+    _queueSuffix(tag.end, line);
+  }
+
+  bool _detailsBoundary(LineCursor cursor) {
+    if (!options.details || cursor.indentation.width > 3) return false;
+    final tag = readHtmlTag(source, cursor.indentation.end, cursor.line.end);
+    if (tag == null) return false;
+    if (tag.name == 'details') {
+      if (tag.closing) {
+        if (!stack.any((n) => n.kind == _Kind.details)) return false;
+        _closeDetails(tag, cursor.line);
+      } else {
+        leaf = null;
+        if (stack.last.kind == _Kind.list) stack.removeLast();
+        final block = _add(_Kind.details, tag.start)
+          ..end = cursor.line.end
+          ..open = tag.attributes.containsKey('open')
+          ..closed = tag.selfClosing;
+        if (!tag.selfClosing) stack.add(block);
+        _touch(cursor.line);
+        _queueSuffix(tag.end, cursor.line);
+      }
+      return true;
+    }
+    if (tag.name == 'summary' &&
+        !tag.closing &&
+        stack.last.kind == _Kind.details &&
+        stack.last.children.isEmpty) {
+      leaf = _add(_Kind.summary, tag.start)..end = tag.end;
+      _summary(
+        LineCursor(
+          SourceLine(source, tag.end, cursor.line.end, cursor.line.next),
+        ),
+      );
+      return true;
+    }
+    return false;
+  }
+
+  void _summary(LineCursor cursor) {
+    final block = leaf!;
+    final close = findClosingHtmlTag(
+      source,
+      cursor.offset,
+      cursor.line.end,
+      'summary',
+    );
+    final end = close?.start ?? cursor.line.end;
+    if (block.lastLine case final previous?)
+      block.text.add(
+        TextNode(span: SourceSpan(previous.end, previous.next), text: '\n'),
+      );
+    block.text.addAll(
+      LineCursor(SourceLine(source, cursor.offset, end, end)).textFragments(),
+    );
+    block.lastLine = cursor.line;
+    block.end = close?.end ?? cursor.line.end;
+    _touch(cursor.line);
+    if (close != null) {
+      leaf = null;
+      _queueSuffix(close.end, cursor.line);
+    }
+  }
+
+  bool _tableStart(LineCursor cursor) {
+    final block = leaf!;
+    if (!options.tables ||
+        block.lastLine == null ||
+        block.text.any((n) => n is TextNode && n.text.contains('\n')))
+      return false;
+    if (!source.substring(block.start, cursor.line.end).contains('|'))
+      return false;
+    final delimiter = splitTableLine(source, cursor.offset, cursor.line.end);
+    final alignments = tableDelimiter(delimiter, source);
+    if (alignments == null) return false;
+    final header = splitTableLine(source, block.start, block.end);
+    if (header.cells.length != alignments.length ||
+        !(header.hasPipe || delimiter.hasPipe))
+      return false;
+    block
+      ..kind = _Kind.table
+      ..alignments = alignments
+      ..end = cursor.line.end;
+    block.rows.add(
+      TableRowNode(
+        span: SourceSpan(block.start, block.lastLine!.end),
+        children: header.cells,
+        header: true,
+      ),
+    );
+    block.text.clear();
+    _touch(cursor.line);
+    return true;
+  }
+
+  void _tableRow(LineCursor cursor) {
+    final block = leaf!;
+    final cells = splitTableLine(source, cursor.offset, cursor.line.end).cells;
+    final count = block.alignments.length;
+    block.rows.add(
+      TableRowNode(
+        span: SourceSpan(cursor.sourceOffset, cursor.line.end),
+        children: [
+          ...cells.take(count),
+          for (var i = cells.length; i < count; i++)
+            TableCellNode(
+              span: SourceSpan(cursor.line.end, cursor.line.end),
+              children: const [],
+            ),
+        ],
+      ),
+    );
+    block.end = cursor.line.end;
+    _touch(cursor.line);
   }
 
   void _line(SourceLine line) {
@@ -220,12 +512,27 @@ final class _BlockSession {
           !cursor.blank &&
           !_interrupts(cursor)) {
         _paragraph(cursor);
+        _drain();
         return;
       }
       leaf = null;
       stack.removeRange(matched + 1, stack.length);
     }
 
+    _content(cursor);
+    _drain();
+  }
+
+  void _drain() {
+    while (_remaining.isNotEmpty) _content(_remaining.removeLast());
+  }
+
+  void _content(LineCursor cursor) {
+    final line = cursor.line;
+    if (leaf?.kind == _Kind.math) {
+      _math(cursor);
+      return;
+    }
     if (leaf?.kind == _Kind.code && leaf!.fenced) {
       final block = leaf!;
       final indentation = cursor.indentation.width;
@@ -259,6 +566,19 @@ final class _BlockSession {
       leaf = null;
     }
 
+    if (leaf?.kind == _Kind.summary) {
+      _summary(cursor);
+      return;
+    }
+    if (_detailsBoundary(cursor)) return;
+    if (leaf?.kind == _Kind.table) {
+      if (!cursor.blank && !_interrupts(cursor)) {
+        _tableRow(cursor);
+        return;
+      }
+      leaf = null;
+    }
+
     if (cursor.blank) {
       leaf = null;
       if (stack.last.kind == _Kind.item) stack.last.pendingBlank = true;
@@ -266,6 +586,7 @@ final class _BlockSession {
     }
 
     if (leaf?.kind == _Kind.paragraph) {
+      if (_tableStart(cursor)) return;
       if (options.setextHeadings &&
           cursor.indentation.width <= 3 &&
           _setext.hasMatch(_trimmed(cursor))) {
@@ -332,6 +653,30 @@ final class _BlockSession {
         }
         continue;
       }
+      if (indentation <= 3 &&
+          options.standaloneTaskLine &&
+          options.taskItems &&
+          !(stack.last.kind == _Kind.item && stack.last.children.isEmpty)) {
+        final task = matchTaskMarker(
+          source,
+          cursor.indentation.end,
+          line.end,
+          radioItems: options.radioItems,
+        );
+        if (task != null) {
+          final node = _add(_Kind.task, task.start)
+            ..checked = task.checked
+            ..radio = task.radio
+            ..markerSpan = SourceSpan(task.start, task.end)
+            ..end = line.end;
+          node.text.addAll(
+            LineCursor(SourceLine(source, task.end, line.end, line.next))
+                .textFragments(),
+          );
+          _touch(line);
+          return;
+        }
+      }
       if (indentation <= 3) {
         final heading = _heading.firstMatch(text);
         if (heading != null) {
@@ -385,6 +730,7 @@ final class _BlockSession {
         _touch(line);
         return;
       }
+      if (_detailsBoundary(cursor)) return;
       _paragraph(cursor);
       return;
     }
@@ -426,7 +772,38 @@ final class _BlockSession {
           delimiter: block.delimiter,
           tight: !block.loose,
         ),
-        _Kind.item => ListItemNode(span: span, children: children),
+        _Kind.item => ListItemNode(
+          span: span,
+          children: children,
+          checked: block.checked,
+          radio: block.radio,
+          markerSpan: block.markerSpan,
+        ),
+        _Kind.task => TaskItemNode(
+          span: span,
+          children: block.text,
+          markerSpan: block.markerSpan!,
+          checked: block.checked!,
+          radio: block.radio,
+        ),
+        _Kind.table => TableNode(
+          span: span,
+          children: block.rows,
+          alignments: block.alignments,
+        ),
+        _Kind.details => DetailsNode(
+          span: span,
+          children: children,
+          open: block.open,
+          closed: block.closed,
+        ),
+        _Kind.summary => DetailsSummaryNode(span: span, children: block.text),
+        _Kind.math => MathBlockNode(
+          span: span,
+          children: block.text.cast<TextNode>(),
+          delimiter: block.info,
+          closed: block.closed,
+        ),
         _Kind.code => CodeBlockNode(
           span: span,
           children: [for (final line in block.code) ...line.text],

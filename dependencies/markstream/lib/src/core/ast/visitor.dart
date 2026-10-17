@@ -7,9 +7,16 @@ abstract class AstVisitor<T> {
   T visitText(TextNode node) => visitNode(node);
   T visitHeading(HeadingNode node) => visitNode(node);
   T visitThematicBreak(ThematicBreakNode node) => visitNode(node);
+  T visitMathBlock(MathBlockNode node) => visitNode(node);
   T visitCodeBlock(CodeBlockNode node) => visitNode(node);
   T visitBlockQuote(BlockQuoteNode node) => visitNode(node);
   T visitList(ListNode node) => visitNode(node);
+  T visitTaskItem(TaskItemNode node) => visitNode(node);
+  T visitTable(TableNode node) => visitNode(node);
+  T visitTableRow(TableRowNode node) => visitNode(node);
+  T visitTableCell(TableCellNode node) => visitNode(node);
+  T visitDetails(DetailsNode node) => visitNode(node);
+  T visitDetailsSummary(DetailsSummaryNode node) => visitNode(node);
   T visitListItem(ListItemNode node) => visitNode(node);
 }
 
