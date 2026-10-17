@@ -418,6 +418,21 @@ class SandboxPathResolver {
     return path;
   }
 
+  /// Key for de-duplicating media sources that may spell one file differently
+  /// (e.g. `kelivo-file:` URI vs. absolute path). Windows drive paths compare
+  /// with `/` separators and case-insensitively; everything else is [fix].
+  static String dedupeKey(String src) {
+    if (src.startsWith('http') || src.startsWith('data:')) return src;
+    String path;
+    try {
+      path = fix(src);
+    } catch (_) {
+      path = src;
+    }
+    if (!_looksLikeWindowsDrivePath(path)) return path;
+    return path.replaceAll('\\', '/').toLowerCase();
+  }
+
   // Expose current dirs for diagnostic purposes
   static String? get docsDir => _docsDir;
   static String? get supportDir => _supportDir;

@@ -602,14 +602,7 @@ class ClaudeHistory {
     final text = <Map<String, dynamic>>[];
     final images = <Map<String, dynamic>>[];
     final seenSources = <String>{};
-    String normalizeSrc(String src) {
-      if (src.startsWith('http') || src.startsWith('data:')) return src;
-      try {
-        return SandboxPathResolver.fix(src);
-      } catch (_) {
-        return src;
-      }
-    }
+    String normalizeSrc(String src) => SandboxPathResolver.dedupeKey(src);
 
     Future<void> addClaudeImage(String source, {String? explicitMime}) async {
       final normalized = normalizeSrc(source);

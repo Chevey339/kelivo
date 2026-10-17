@@ -281,14 +281,7 @@ Stream<StreamChunk> sendGoogleVertexClaudeStream({
             nativeParts.isNotEmpty)) {
       final parts = <Map<String, dynamic>>[...nativeParts];
       final seenSources = <String>{};
-      String normalizeSrc(String src) {
-        if (src.startsWith('http') || src.startsWith('data:')) return src;
-        try {
-          return SandboxPathResolver.fix(src);
-        } catch (_) {
-          return src;
-        }
-      }
+      String normalizeSrc(String src) => SandboxPathResolver.dedupeKey(src);
 
       Future<void> addVertexClaudeImage(
         String source, {
