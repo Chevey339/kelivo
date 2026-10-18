@@ -300,9 +300,15 @@ class _MarkdownImageState extends State<_MarkdownImage> {
       ];
       while (pending.isNotEmpty) {
         final node = pending.removeLast();
-        if (node is ImageNode &&
-            KelivoLink.tryParse(node.destination) == null) {
-          urls.add(node.destination);
+        final destination = node is ImageNode
+            ? node.destination
+            : node is HtmlElementNode && node.tag == 'img'
+            ? node.attributes['src']
+            : null;
+        if (destination != null &&
+            (node is ImageNode || isSafeHtmlUrl(destination, image: true)) &&
+            KelivoLink.tryParse(destination) == null) {
+          urls.add(destination);
         }
         pending.addAll(node.children.reversed);
       }

@@ -5171,6 +5171,25 @@ Fenced code body
     expect(viewer.images.last, second);
   });
 
+  testWidgets('HTML images join Markdown images in the source-order gallery', (
+    tester,
+  ) async {
+    const second = 'https://example.com/b.png';
+    await tester.pumpWidget(
+      _markdownHarness(
+        '<img src="$_transparentPngDataUrl" alt="First" width="42" height="24">\n\n'
+        '![]($second)\n\n<img src="javascript:bad" alt="Unsafe">',
+        width: 360,
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byType(Image).first);
+    await tester.pumpAndSettle();
+    final viewer = tester.widget<ImageViewerPage>(find.byType(ImageViewerPage));
+    expect(viewer.images, [_transparentPngDataUrl, second]);
+    expect(viewer.initialIndex, 0);
+  });
+
   testWidgets(
     'sibling list fragments do not collide on a literal placeholder token',
     (tester) async {

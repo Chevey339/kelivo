@@ -294,3 +294,14 @@ are checked by widget assertions.
 ```text
 MARKSTREAM_RENDER {"run":1,"renderer":"markstream","appAdapters":true,"appendChars":30000,"coldChars":100000,"samples":56,"firstPumpMedianUs":433,"firstPumpP95Us":941,"contentPumpMedianUs":2384,"contentPumpP95Us":3560,"coldFirstFrameUs":534131}
 ```
+
+## C43 native HTML subset diagnostic
+
+One fixed-fixture diagnostic after the sub/sup baseline repair, before the
+final C43 full suite, with the same host, SDK and app adapters: scheduling
+median/p95 0.493/1.028ms, actual content 2.482/4.128ms, cold 584.193ms. This is
+not a five-round acceptance measurement; C41 performance targets remain open.
+
+```text
+MARKSTREAM_RENDER {"run":1,"renderer":"markstream","appAdapters":true,"appendChars":30000,"coldChars":100000,"samples":56,"firstPumpMedianUs":493,"firstPumpP95Us":1028,"contentPumpMedianUs":2482,"contentPumpP95Us":4128,"coldFirstFrameUs":584193}
+```

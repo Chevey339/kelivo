@@ -12,6 +12,10 @@ DocumentNode selectedDocument(
   required Set<MarkdownNode> visible,
   required Set<MarkdownNode> complete,
 }) {
+  final completeHtmlTables = complete
+      .whereType<HtmlElementNode>()
+      .where((node) => node.tag == 'table')
+      .toList();
   final parts = <MarkdownNode, List<TextSegment>>{};
   for (final part in selected) {
     if (part.node != null) (parts[part.node!] ??= []).add(part);
@@ -90,6 +94,40 @@ DocumentNode selectedDocument(
       );
       continue;
     }
+    if (node is HtmlElementNode &&
+        node.tag == 'tr' &&
+        (kept.isNotEmpty ||
+            node.children.any(visible.contains) &&
+                completeHtmlTables.any(
+                  (table) =>
+                      table.span.start <= node.span.start &&
+                      table.span.end >= node.span.end,
+                ))) {
+      converted[node] = replaceChildren(node, [
+        for (final child in node.children.whereType<HtmlElementNode>())
+          if (child.tag == 'td' || child.tag == 'th')
+            converted[child] ?? replaceChildren(child, []),
+      ]);
+      continue;
+    }
+    if (node is HtmlElementNode && node.tag == 'ol' && kept.isNotEmpty) {
+      final items = node.children
+          .whereType<HtmlElementNode>()
+          .where((n) => n.tag == 'li')
+          .toList();
+      final first = items.indexWhere((child) => converted[child] != null);
+      converted[node] = HtmlElementNode(
+        span: node.span,
+        tag: node.tag,
+        attributes: {
+          ...node.attributes,
+          'start':
+              '${(int.tryParse(node.attributes['start'] ?? '') ?? 1) + (first < 0 ? 0 : first)}',
+        },
+        children: kept.cast<InlineNode>(),
+      );
+      continue;
+    }
     if (kept.isEmpty && node is! DocumentNode) {
       final inside =
           envelope != null &&
@@ -100,7 +138,16 @@ DocumentNode selectedDocument(
               visible.contains(node) &&
               (node is ThematicBreakNode ||
                   node is CodeBlockNode && node.code.trim().isEmpty ||
-                  node is ImageNode)
+                  node is ImageNode ||
+                  node is HtmlElementNode &&
+                      const {
+                        'td',
+                        'th',
+                        'tr',
+                        'img',
+                        'hr',
+                        'br',
+                      }.contains(node.tag))
           ? node
           : null;
       continue;

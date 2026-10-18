@@ -182,3 +182,22 @@ final extensions = MarkstreamExtensions(directiveBuilders: {
 
 Keep this registration object stable across streaming updates. Reuse
 `rendering.buildBlock` so source selection and app adapters remain connected.
+
+### Native HTML subset
+
+HTML fragments use native text and the existing link, image, code, table and
+details adapters. Supported inline styling includes `b`/`strong`, `i`/`em`, `u`,
+`s`/`del`, `mark`, `font[color]`, `code`, `kbd`, `sub`, `sup`, `a`, `img` and `br`.
+`span[style]` accepts bounded color/background-color, font-weight, font-style,
+font-size (px/em/percent), and text-decoration declarations. Other CSS is ignored.
+Colors accept named colors, hex, and numeric rgb/rgba. Image dimensions accept
+positive finite values up to 4096; source resolution belongs to `ImageBuilder`.
+
+Block fragments support paragraphs, headings, quotes, lists (including ordered
+start numbers), rules, alignment, details, preformatted code and rectangular
+tables. Rowspan/colspan layout and arbitrary browser CSS are not implemented.
+Tables reuse pagination, CSV/Markdown actions and TSV selection. Source-aware
+selection retains the original HTML structure, including empty table cells,
+partial inline styles and adjusted ordered-list starts. Unknown wrappers retain
+their text; active elements are discarded and active URL schemes are rejected.
+Full HTML documents continue through the application's HTML preview extension.

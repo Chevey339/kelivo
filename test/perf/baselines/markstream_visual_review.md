@@ -88,3 +88,31 @@ long code/table capture and bottom pixels. These are distinct automated checks,
 not claims of manual mobile QA or physical Android performance.
 
 Final capture report: 384 compared, 376 changed, 8 equal; 332 size changes.
+
+## C42–C43 extension review
+
+C42 changes only fixture 44's eight card captures; all eight were inspected for
+light/dark, 390/720 widths and 1.0/1.3 scaling. The directive/alert card title
+and body remain separate; locale changes were verified in widget tests.
+
+C43 compared with C42: 372 equal, 12 changed. All 12 changed captures were
+inspected. Fixture 42 gains the requested inline styles, keyboard capsule and
+raised/lowered scripts; narrow wrapping changes follow those styled widths.
+The four desktop fixture 43 differences are the formerly plain `inside` text
+now honoring its `<strong>` wrapper. No other fixture changes.
+
+An additional eight captures exercise the complete native HTML subset at the
+same width/theme/scale matrix: headings, color spans, mark/kbd/code, sub/sup,
+center/quote, nested ordered/unordered lists, aligned table cells, preformatted
+code and rules. All were inspected. The first visual pass caught scripts that
+had reduced size but an unchanged baseline; a baseline-reporting render proxy
+and geometric assertions repaired that before the final captures and gates.
+Table copy actions, empty cells/rows, partial list/style selection, image-gallery
+ordering and cached HTML links have focused automated regression coverage.
+
+Final C43 gates: root 7,968 passed / one existing skip; package 265 passed;
+golden suite 389 passed (384 captures plus harness checks); analyzers clean.
+A preceding full run had a two-second attachment-backfill timeout while other
+preflight work ran. Its 72-test file and the subsequent serialized full suite
+both passed without changes to that unrelated path. Physical-device and native
+keyboard limits above remain open; this review does not extend their evidence.

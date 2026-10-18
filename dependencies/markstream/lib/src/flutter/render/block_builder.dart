@@ -17,6 +17,9 @@ import 'blocks/table_block.dart';
 import 'blocks/math_block.dart';
 import 'blocks/details_block.dart';
 import 'blocks/directive_card.dart';
+import '../../core/ast/source_span.dart';
+
+part 'html_block_builder.dart';
 
 /// One view owns this session. Cached prefix widgets do not retain historical
 /// whole-document snapshots; recursive callbacks read the current session.
@@ -130,88 +133,6 @@ class MarkstreamRenderer {
             segments: content.segments,
             child: child,
           );
-  }
-
-  /// HTML block shells share the same paragraph, fold and selection pipeline.
-  Widget htmlFlow(
-    BuildContext context,
-    List<InlineNode> nodes,
-    TextStyle style, {
-    required bool streaming,
-  }) {
-    final widgets = <Widget>[];
-    var run = <InlineNode>[];
-    void flush() {
-      while (run.isNotEmpty &&
-          run.first is TextNode &&
-          (run.first as TextNode).text.trim().isEmpty) {
-        run.removeAt(0);
-      }
-      while (run.isNotEmpty &&
-          run.last is TextNode &&
-          (run.last as TextNode).text.trim().isEmpty) {
-        run.removeLast();
-      }
-      if (run.isNotEmpty) {
-        widgets.add(
-          inlineText(context, run.first, run, style, streaming: streaming),
-        );
-      }
-      run = [];
-    }
-
-    for (final node in nodes) {
-      if (node is! HtmlElementNode || !htmlBlockTags.contains(node.tag)) {
-        run.add(node);
-        continue;
-      }
-      flush();
-      final Widget child;
-      if (node.tag == 'details') {
-        final summary = node.children
-            .whereType<HtmlElementNode>()
-            .where((child) => child.tag == 'summary')
-            .firstOrNull;
-        child = MarkstreamDetailsBlock(
-          node: node,
-          source: node.span.slice(document.source),
-          open: node.attributes.containsKey('open'),
-          theme: theme,
-          summary: summary == null
-              ? SelectionContainer.disabled(
-                  child: Text(labels.details, style: theme.details.summary),
-                )
-              : inlineText(
-                  context,
-                  summary,
-                  summary.children,
-                  theme.details.summary,
-                  streaming: streaming,
-                ),
-          body: (context) => htmlFlow(
-            context,
-            node.children.where((child) => !identical(child, summary)).toList(),
-            style,
-            streaming: streaming,
-          ),
-        );
-      } else {
-        child = htmlFlow(context, node.children, style, streaming: streaming);
-      }
-      widgets.add(DocumentSelectionGroup(node: node, child: child));
-    }
-    flush();
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        for (var i = 0; i < widgets.length; i++)
-          Padding(
-            padding: EdgeInsets.only(top: i == 0 ? 0 : theme.blockSpacing),
-            child: widgets[i],
-          ),
-      ],
-    );
   }
 
   Widget children(

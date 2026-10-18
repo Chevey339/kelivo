@@ -1,5 +1,6 @@
 import '../ast/nodes.dart';
 import 'common.dart';
+import '../html/html_fragment.dart' show htmlBlockTags;
 
 /// Structural clipboard text. Generated separators do not define selection offsets.
 String toPlainText(MarkdownNode root) => serializeNodes(root, (node, output) {
@@ -67,19 +68,34 @@ String toPlainText(MarkdownNode root) => serializeNodes(root, (node, output) {
     if (node.tag == 'hr') return '---';
     if (node.tag == 'tr')
       return node.children
+          .whereType<HtmlElementNode>()
+          .where((n) => n.tag == 'td' || n.tag == 'th')
           .map((n) => separatedCell(output[n]!, '\t'))
           .join('\t');
-    if (const {
-      'table',
-      'thead',
-      'tbody',
-      'tfoot',
-      'ul',
-      'ol',
-    }.contains(node.tag))
-      return joinChildren(node, output, '\n');
-    if (node.tag == 'li') return '- ${joinChildren(node, output)}';
+    if (const {'table', 'thead', 'tbody', 'tfoot'}.contains(node.tag))
+      return node.children
+          .whereType<HtmlElementNode>()
+          .map((child) => output[child]!)
+          .join('\n');
+    if (node.tag == 'ul' || node.tag == 'ol') {
+      final items = node.children
+          .whereType<HtmlElementNode>()
+          .where((n) => n.tag == 'li')
+          .toList();
+      final start = int.tryParse(node.attributes['start'] ?? '') ?? 1;
+      return [
+        for (var i = 0; i < items.length; i++)
+          indentLines(
+            output[items[i]]!,
+            node.tag == 'ol' ? '${start + i}. ' : '- ',
+            '  ',
+          ),
+      ].join('\n');
+    }
+    if (node.tag != 'pre' && htmlBlockTags.contains(node.tag))
+      return _htmlFlow(node.children, output);
   }
+  if (node is HtmlBlockNode) return _htmlFlow(node.children, output);
   if (node is DocumentNode ||
       node is BlockQuoteNode ||
       node is DetailsNode ||
@@ -95,3 +111,20 @@ String tableToCsv(TableNode table) => table.children
           .join(','),
     )
     .join('\r\n');
+
+String _htmlFlow(List<InlineNode> nodes, Map<MarkdownNode, String> output) {
+  final result = StringBuffer();
+  var previousBlock = false;
+  final hasBlocks = nodes.any(
+    (node) => node is HtmlElementNode && htmlBlockTags.contains(node.tag),
+  );
+  for (final node in nodes) {
+    final block = node is HtmlElementNode && htmlBlockTags.contains(node.tag);
+    final text = output[node]!;
+    if (text.trim().isEmpty && hasBlocks) continue;
+    if (result.isNotEmpty && (block || previousBlock)) result.write('\n\n');
+    result.write(text);
+    previousBlock = block;
+  }
+  return result.toString();
+}

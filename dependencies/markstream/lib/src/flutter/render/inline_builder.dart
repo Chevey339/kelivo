@@ -12,6 +12,9 @@ import '../selection/selectable_span_adapter.dart';
 import '../theme/markstream_theme.dart';
 import 'fitted_math.dart';
 import 'inline_code_capsule.dart';
+import 'html_style.dart';
+import 'shifted_baseline.dart';
+import '../../core/serialize/to_html.dart' show isSafeHtmlUrl;
 
 typedef LinkRecognizerBuilder = TapGestureRecognizer Function(
   LinkNode,
@@ -204,9 +207,107 @@ class InlineSpanBuilder {
         alt,
       );
     }
-    if (node is HtmlElementNode && node.tag == 'br') {
-      emit('\n', node);
-      return TextSpan(text: '\n', style: style);
+    if (node is HtmlElementNode) {
+      if (node.tag == 'br') {
+        emit('\n', node);
+        return TextSpan(text: '\n', style: style);
+      }
+      final htmlStyle = htmlTextStyle(node, style, theme);
+      if (node.tag == 'a') {
+        final href = node.attributes['href'];
+        return children(
+          node.children,
+          href != null && isSafeHtmlUrl(href)
+              ? htmlStyle.merge(theme.link)
+              : htmlStyle,
+          target: href != null && isSafeHtmlUrl(href)
+              ? LinkNode(
+                  span: node.span,
+                  destination: href,
+                  children: node.children,
+                  title: node.attributes['title'],
+                )
+              : link,
+        );
+      }
+      if (node.tag == 'img') {
+        final alt = node.attributes['alt'] ?? '';
+        final src = node.attributes['src'];
+        emit(alt, node);
+        if (src == null || !isSafeHtmlUrl(src, image: true))
+          return TextSpan(text: alt, style: htmlStyle);
+        final image = ImageNode(
+          span: node.span,
+          destination: src,
+          title: node.attributes['title'],
+          children: [TextNode(span: node.span, text: alt)],
+        );
+        double? dimension(String name) {
+          final value = double.tryParse(node.attributes[name] ?? '');
+          return value != null && value.isFinite && value > 0
+              ? value.clamp(1, 4096)
+              : null;
+        }
+
+        return atom(
+          ClipRRect(
+            borderRadius: BorderRadius.circular(theme.imageRadius),
+            child: SizedBox(
+              width: dimension('width'),
+              height: dimension('height'),
+              child:
+                  imageBuilder?.build(context, image, theme) ??
+                  Text(alt, style: htmlStyle),
+            ),
+          ),
+          alt,
+        );
+      }
+      if (node.tag == 'code' || node.tag == 'kbd') {
+        emit(toPlainText(node), node);
+        return atom(
+          DecoratedBox(
+            decoration: BoxDecoration(
+              color: theme.inlineCode.backgroundColor,
+              border: Border.all(color: theme.inlineCode.borderColor),
+              borderRadius: BorderRadius.circular(
+                node.tag == 'kbd' ? 3 : theme.inlineCode.radius,
+              ),
+            ),
+            child: Padding(
+              padding: theme.inlineCode.padding,
+              child: Text(toPlainText(node), style: theme.inlineCode.text),
+            ),
+          ),
+          toPlainText(node),
+        );
+      }
+      if (node.tag == 'sub' || node.tag == 'sup') {
+        emit(toPlainText(node), node);
+        final fontSize = htmlStyle.fontSize ?? theme.body.fontSize ?? 15.5;
+        return atom(
+          ShiftedBaseline(
+            shift: fontSize * (node.tag == 'sup' ? .35 : -.2),
+            child: Text.rich(
+              TextSpan(
+                children: [
+                  for (final child in node.children)
+                    build(
+                      context,
+                      child,
+                      htmlStyle.copyWith(fontSize: fontSize * .75),
+                      streaming: streaming,
+                      link: link,
+                    ),
+                ],
+              ),
+              style: htmlStyle.copyWith(fontSize: fontSize * .75),
+            ),
+          ),
+          toPlainText(node),
+        );
+      }
+      return children(node.children, htmlStyle);
     }
     return children(node.children.cast<InlineNode>(), style);
   }

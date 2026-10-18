@@ -142,6 +142,10 @@ class _MarkstreamViewState extends State<MarkstreamView> {
       final node = pending.removeLast();
       if (node is LinkNode)
         links.add((node.span.start, node.span.end, node.destination));
+      if (node is HtmlElementNode && node.tag == 'a') {
+        final href = node.attributes['href'];
+        if (href != null) links.add((node.span.start, node.span.end, href));
+      }
       pending.addAll(node.children);
     }
     for (final key in _recognizers.keys.toList()) {
