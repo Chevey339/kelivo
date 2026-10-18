@@ -14,6 +14,15 @@ import 'package:provider/provider.dart';
 import '../../support/business_test_harness.dart';
 
 void main() {
+  test('diagram extraction respects container indentation and info words', () {
+    expect(
+      extractDiagramCodes(
+        '> ~~~mermaid title\n> graph TD; A-->B\n> ~~~\n\n- ```svg caption\n  <svg/>\n  ```',
+      ),
+      [(code: 'graph TD; A-->B', isSvg: false), (code: '<svg/>', isSvg: true)],
+    );
+  });
+
   test('extracts Mermaid, SVG and XML SVG while respecting outer fences', () {
     const markdown = '''
 ```mermaid

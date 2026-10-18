@@ -152,3 +152,25 @@ RESULT sections=100 blocks=true chars=23718 loadMedianMs=105.14 scrollMedianMs=1
 RESULT sections=250 blocks=false chars=59463 loadMedianMs=242.84 scrollMedianMs=1.21 scrollP90Ms=2.00
 RESULT sections=250 blocks=true chars=59463 loadMedianMs=230.31 scrollMedianMs=1.14 scrollP90Ms=2.02
 ```
+
+## C36 shared structure and Unicode-line diagnostic
+
+The non-rendering consumers now use the block parser for fence/container
+boundaries. The LLM profile also recognizes LS/PS separators. Incremental
+line-start lookup stops at the nearest separator instead of searching the
+entire prefix separately for each possible delimiter.
+
+The existing pure-Dart parser harness ran five rounds in one process on the
+same SDK/host. The table reports the median of those rounds. These are parser
+timings, not application frames or the final five-process C41 acceptance run.
+An earlier C36 implementation used separate delimiter searches; that run also
+coincided with visible Spotlight indexing. Do not attribute all differences
+between that exploratory run and this final state to the code change.
+
+| Metric | C33 median / p95 (ms) | C36 median / p95 (ms) |
+| --- | ---: | ---: |
+| Full parse, 30k characters | 2.049 / 2.341 | 2.173 / 2.447 |
+| Full parse, 100k characters | 6.431 / 6.795 | 6.936 / 7.288 |
+| Incremental append | 0.182 / 0.194 | 0.029 / 0.036 |
+
+Command: `cd dependencies/markstream && dart run test/perf/parse_bench.dart`.

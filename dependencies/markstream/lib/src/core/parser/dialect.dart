@@ -2,6 +2,7 @@
 final class ParserOptions {
   const ParserOptions({
     this.plusListMarker = true,
+    this.unicodeLineBreaks = true,
     this.orderedParenthesis = true,
     this.tablePipesOptional = true,
     this.maxInlineMathLength = 512,
@@ -32,6 +33,7 @@ final class ParserOptions {
 
   const ParserOptions.commonMark()
     : plusListMarker = true,
+      unicodeLineBreaks = false,
       orderedParenthesis = true,
       tablePipesOptional = true,
       maxInlineMathLength = 512,
@@ -59,6 +61,7 @@ final class ParserOptions {
 
   const ParserOptions.gfm()
     : plusListMarker = true,
+      unicodeLineBreaks = false,
       orderedParenthesis = true,
       tablePipesOptional = true,
       maxInlineMathLength = 512,
@@ -84,6 +87,8 @@ final class ParserOptions {
       indentedCode = true,
       relaxedListIndentation = false;
 
+  /// Treat LS and PS as line boundaries in the LLM dialect.
+  final bool unicodeLineBreaks;
   final bool plusListMarker;
   final bool orderedParenthesis;
   final bool tablePipesOptional;
@@ -114,6 +119,7 @@ final class ParserOptions {
 
   ParserOptions copyWith({
     bool? plusListMarker,
+    bool? unicodeLineBreaks,
     bool? orderedParenthesis,
     bool? tablePipesOptional,
     int? maxInlineMathLength,
@@ -140,6 +146,7 @@ final class ParserOptions {
     bool? relaxedListIndentation,
   }) => ParserOptions(
     plusListMarker: plusListMarker ?? this.plusListMarker,
+    unicodeLineBreaks: unicodeLineBreaks ?? this.unicodeLineBreaks,
     orderedParenthesis: orderedParenthesis ?? this.orderedParenthesis,
     tablePipesOptional: tablePipesOptional ?? this.tablePipesOptional,
     maxInlineMathLength: maxInlineMathLength ?? this.maxInlineMathLength,

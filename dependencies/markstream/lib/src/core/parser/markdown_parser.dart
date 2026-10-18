@@ -159,8 +159,11 @@ final class MarkdownParser {
   bool _openInlineTail(MarkdownNode node, String source) =>
       node.children.isNotEmpty &&
       node.children.last.span.end == node.span.end &&
-      RegExp(r'^[ \t]*(?:\r\n|\r|\n)?[ \t]*$')
-          .hasMatch(source.substring(node.span.end));
+      RegExp(
+        options.unicodeLineBreaks
+            ? r'^[ \t]*(?:\r\n|[\r\n\u2028\u2029])?[ \t]*$'
+            : r'^[ \t]*(?:\r\n|\r|\n)?[ \t]*$',
+      ).hasMatch(source.substring(node.span.end));
 
   DocumentNode _literalIncomplete(DocumentNode document) {
     final converted = <MarkdownNode, MarkdownNode>{};
@@ -179,7 +182,10 @@ final class MarkdownParser {
       if (incomplete) {
         final raw = node.span.slice(document.source);
         final fragments = <TextNode>[];
-        for (final line in SourceLine.scan(raw)) {
+        for (final line in SourceLine.scan(
+          raw,
+          unicodeLineBreaks: options.unicodeLineBreaks,
+        )) {
           fragments.add(
             TextNode(
               span: SourceSpan(

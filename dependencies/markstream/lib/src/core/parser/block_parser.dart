@@ -131,7 +131,11 @@ final class _BlockSession {
   static final _setext = RegExp(r'^(=+|-+)[ \t]*$');
 
   DocumentNode parse() {
-    for (final line in SourceLine.scan(source, start: start)) {
+    for (final line in SourceLine.scan(
+      source,
+      start: start,
+      unicodeLineBreaks: options.unicodeLineBreaks,
+    )) {
       _line(line);
     }
     if (streaming) _provisionalTable();

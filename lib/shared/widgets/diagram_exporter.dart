@@ -1,47 +1,25 @@
 import 'dart:async';
-import 'dart:convert';
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'mermaid_bridge.dart';
 import 'mermaid_image_cache.dart';
-import 'markdown_line_lexer.dart';
+import 'package:markstream/markstream_core.dart';
 import '../../utils/svg_preview_html.dart';
 
 typedef DiagramCode = ({String code, bool isSvg});
 
 List<DiagramCode> extractDiagramCodes(String markdown) {
   final diagrams = <DiagramCode>[];
-  final lexer = MarkdownLineLexer();
-  final body = StringBuffer();
-  var language = '';
-
-  void addDiagram() {
-    final code = body.toString().trim();
-    if (code.isEmpty) return;
+  final infoWords = RegExp(r'\s+');
+  for (final node in MarkdownStructure(markdown).codeBlocks) {
+    final code = node.code.trim();
+    if (code.isEmpty) continue;
+    final language = node.info.trim().split(infoWords).first.toLowerCase();
     final isSvg = isSvgCodeBlock(language, code);
     if (language == 'mermaid' || isSvg) {
       diagrams.add((code: code, isSvg: isSvg));
     }
   }
-
-  for (final line in const LineSplitter().convert(markdown)) {
-    final wasFenced = lexer.fenced;
-    lexer.consumeFence(line);
-    if (!wasFenced && lexer.fenced) {
-      final opening = line.trimLeft();
-      var end = 0;
-      while (end < opening.length && opening[end] == opening[0]) {
-        end++;
-      }
-      language = opening.substring(end).trim().toLowerCase();
-      body.clear();
-    } else if (wasFenced && !lexer.fenced) {
-      addDiagram();
-    } else if (wasFenced) {
-      body.writeln(line);
-    }
-  }
-  if (lexer.fenced) addDiagram();
   return diagrams;
 }
 

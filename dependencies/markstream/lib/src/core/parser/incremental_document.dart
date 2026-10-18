@@ -111,7 +111,10 @@ final class IncrementalDocument {
       if (node is ParagraphNode) {
         final raw = node.span.slice(_document.source);
         if (!raw.contains(r'$$') && !raw.contains(r'\[')) continue;
-        for (final line in SourceLine.scan(raw)) {
+        for (final line in SourceLine.scan(
+          raw,
+          unicodeLineBreaks: parser.options.unicodeLineBreaks,
+        )) {
           if (findMathBlockStart(raw, line.start, line.end, streaming: true) !=
               null)
             return true;
@@ -124,10 +127,16 @@ final class IncrementalDocument {
   }
 
   int _lineStart(String source, int offset) {
-    if (offset == 0) return 0;
-    final lf = source.lastIndexOf('\n', offset - 1);
-    final cr = source.lastIndexOf('\r', offset - 1);
-    return (lf > cr ? lf : cr) + 1;
+    for (var i = offset - 1; i >= 0; i--) {
+      final unit = source.codeUnitAt(i);
+      if (unit == 10 ||
+          unit == 13 ||
+          (parser.options.unicodeLineBreaks &&
+              (unit == 0x2028 || unit == 0x2029))) {
+        return i + 1;
+      }
+    }
+    return 0;
   }
 
   bool _blankLineBefore(String source, int start) {

@@ -31,7 +31,10 @@ final class InlineParser {
     bool optimistic = false,
   }) {
     final fragments = <TextNode>[];
-    for (final line in SourceLine.scan(source)) {
+    for (final line in SourceLine.scan(
+      source,
+      unicodeLineBreaks: options.unicodeLineBreaks,
+    )) {
       fragments.addAll(LineCursor(line).textFragments());
       if (line.next > line.end)
         fragments.add(

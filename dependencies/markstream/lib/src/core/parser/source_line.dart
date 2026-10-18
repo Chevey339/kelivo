@@ -9,13 +9,22 @@ final class SourceLine {
   final int end;
   final int next;
 
-  static Iterable<SourceLine> scan(String source, {int start = 0}) sync* {
+  String get text => source.substring(start, end);
+
+  static Iterable<SourceLine> scan(
+    String source, {
+    int start = 0,
+    bool unicodeLineBreaks = false,
+  }) sync* {
     var offset = start;
     while (offset < source.length) {
       final beginning = offset;
-      while (offset < source.length &&
-          source.codeUnitAt(offset) != 10 &&
-          source.codeUnitAt(offset) != 13) {
+      while (offset < source.length) {
+        final unit = source.codeUnitAt(offset);
+        if (unit == 10 ||
+            unit == 13 ||
+            (unicodeLineBreaks && (unit == 0x2028 || unit == 0x2029)))
+          break;
         offset++;
       }
       final end = offset;

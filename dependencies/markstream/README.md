@@ -62,6 +62,23 @@ details, directives and HTML blocks until they finish. Ending the stream uses
 ordinary Markdown parsing. Document reference metadata is immutable and uses
 the same original-source coordinates as the visible syntax tree.
 
+## Non-rendering structure scans
+
+`MarkdownStructure(source)` uses the same block grammar as rendering, including
+unfinished streaming fences, math and containers. `codeBlocks` exposes code in
+source order; `protects(offset)` identifies blank lines inside protected blocks.
+`lines` retains each original line and its UTF-16 offsets, and identifies code
+opening, content and closing lines for attachment extraction.
+
+`removeCode(source)` removes fenced and closed inline code for speech while
+preserving surrounding source and line endings. Its inline-code scan is
+line-local: unmatched backticks cannot pair across separate speech lines.
+Unfinished fenced code suppresses its remaining body.
+
+The LLM profile recognizes Unicode LS/PS line separators through
+`unicodeLineBreaks`; CommonMark and GFM leave that option off. The parser,
+incremental document and structure scans share this policy.
+
 ## Serialization and selection offsets
 
 `toPlainText(document)` produces structured clipboard text, including TSV for

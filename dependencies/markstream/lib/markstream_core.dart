@@ -16,3 +16,6 @@ export 'src/core/serialize/to_markdown.dart';
 export 'src/core/serialize/to_html.dart';
 export 'src/core/text_index/text_index.dart';
 export 'src/core/parser/syntax/block_syntax.dart';
+
+export 'src/core/parser/markdown_structure.dart';
+export 'src/core/parser/source_line.dart' show SourceLine;
