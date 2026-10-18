@@ -23423,6 +23423,42 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Input {shown} / {total}'**
   String markdownPlaygroundProgress(int shown, int total);
+
+  /// No description provided for @markdownCopyMarkdownAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy Markdown'**
+  String get markdownCopyMarkdownAction;
+
+  /// No description provided for @markdownCopyCsvAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy CSV'**
+  String get markdownCopyCsvAction;
+
+  /// No description provided for @markdownCopyImageAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy image'**
+  String get markdownCopyImageAction;
+
+  /// No description provided for @markdownCodeLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Code'**
+  String get markdownCodeLabel;
+
+  /// No description provided for @markdownDetailsLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Details'**
+  String get markdownDetailsLabel;
+
+  /// No description provided for @markdownMoreRows.
+  ///
+  /// In en, this message translates to:
+  /// **'Show {count} more rows'**
+  String markdownMoreRows(int count);
 }
 
 class _AppLocalizationsDelegate

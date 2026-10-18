@@ -87,12 +87,19 @@ class InlineSpanBuilder {
     WidgetSpan atom(Widget child, String selectedText) {
       Widget selected = SelectableSpanAdapter(
         selectedText: selectedText,
-        child: child,
+        mouseCursor: onTap == null
+            ? SystemMouseCursors.text
+            : SystemMouseCursors.click,
+        child: onTap == null ? child : IgnorePointer(child: child),
       );
       if (onTap != null)
         selected = MouseRegion(
           cursor: SystemMouseCursors.click,
-          child: GestureDetector(onTap: onTap, child: selected),
+          child: GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: onTap,
+            child: selected,
+          ),
         );
       return WidgetSpan(
         alignment: PlaceholderAlignment.baseline,
@@ -143,6 +150,9 @@ class InlineSpanBuilder {
       for (final fragment in node.children) emit(fragment.text, fragment);
       Widget capsule = InlineCodeCapsule(
         text: node.code,
+        mouseCursor: onTap == null
+            ? SystemMouseCursors.text
+            : SystemMouseCursors.click,
         style: theme.inlineCode.text,
         backgroundColor: theme.inlineCode.backgroundColor,
         borderColor: theme.inlineCode.borderColor,

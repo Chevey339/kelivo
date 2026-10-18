@@ -6,6 +6,7 @@ final class ParserOptions {
     this.tablePipesOptional = true,
     this.maxInlineMathLength = 512,
     this.inlineMath = true,
+    this.dollarInlineMath = true,
     this.strikethrough = true,
     this.inlineHtml = true,
     this.softBreakAsHardBreak = true,
@@ -35,6 +36,7 @@ final class ParserOptions {
       tablePipesOptional = true,
       maxInlineMathLength = 512,
       inlineMath = false,
+      dollarInlineMath = false,
       strikethrough = false,
       inlineHtml = true,
       softBreakAsHardBreak = false,
@@ -61,6 +63,7 @@ final class ParserOptions {
       tablePipesOptional = true,
       maxInlineMathLength = 512,
       inlineMath = false,
+      dollarInlineMath = false,
       strikethrough = true,
       inlineHtml = true,
       softBreakAsHardBreak = false,
@@ -86,6 +89,9 @@ final class ParserOptions {
   final bool tablePipesOptional;
   final int maxInlineMathLength;
   final bool inlineMath;
+
+  /// Single-dollar inline math; parenthesized and display math stay independent.
+  final bool dollarInlineMath;
   final bool strikethrough;
   final bool inlineHtml;
   final bool softBreakAsHardBreak;
@@ -112,6 +118,7 @@ final class ParserOptions {
     bool? tablePipesOptional,
     int? maxInlineMathLength,
     bool? inlineMath,
+    bool? dollarInlineMath,
     bool? strikethrough,
     bool? inlineHtml,
     bool? softBreakAsHardBreak,
@@ -137,6 +144,7 @@ final class ParserOptions {
     tablePipesOptional: tablePipesOptional ?? this.tablePipesOptional,
     maxInlineMathLength: maxInlineMathLength ?? this.maxInlineMathLength,
     inlineMath: inlineMath ?? this.inlineMath,
+    dollarInlineMath: dollarInlineMath ?? this.dollarInlineMath,
     strikethrough: strikethrough ?? this.strikethrough,
     inlineHtml: inlineHtml ?? this.inlineHtml,
     softBreakAsHardBreak: softBreakAsHardBreak ?? this.softBreakAsHardBreak,

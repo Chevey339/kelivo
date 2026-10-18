@@ -25,3 +25,4 @@ export 'src/flutter/selection/selection_controller.dart'
         MarkstreamSelectionScope,
         MarkstreamSelectionFragment;
 export 'src/flutter/performance_limits.dart';
+export 'src/flutter/render/blocks/code_block.dart' show MarkstreamCodeBlock;

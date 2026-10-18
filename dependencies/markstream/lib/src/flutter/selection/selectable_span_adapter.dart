@@ -8,17 +8,19 @@ class SelectableSpanAdapter extends StatelessWidget {
     super.key,
     required this.selectedText,
     required this.child,
+    this.mouseCursor = SystemMouseCursors.text,
   });
 
   final String selectedText;
   final Widget child;
+  final MouseCursor mouseCursor;
 
   @override
   Widget build(BuildContext context) {
     final registrar = SelectionContainer.maybeOf(context);
     if (registrar == null) return child;
     return MouseRegion(
-      cursor: SystemMouseCursors.text,
+      cursor: mouseCursor,
       child: _SelectableSource(
         registrar: registrar,
         text: selectedText,

@@ -183,6 +183,39 @@ void main() {
       isFalse,
     );
   });
+  testWidgets(
+    'an early expansion follows a growing code anchor across remount',
+    (tester) async {
+      final store = CodeExpansionState();
+      final options = CodeBlockOptions(
+        autoCollapse: true,
+        collapsedLines: 1,
+        expansionState: store,
+      );
+      Widget view(String source, {bool streaming = true}) => host(
+        MarkstreamView(
+          source: source,
+          streaming: streaming,
+          codeOptions: options,
+        ),
+      );
+      await tester.pumpWidget(view('```text\na\nb'));
+      await tester.tap(find.text('Expand'));
+      await tester.pumpAndSettle();
+      const completed = '```text\na\nb\nthis completes the prefix\n```';
+      await tester.pumpWidget(view(completed, streaming: false));
+      await tester.pumpAndSettle();
+      await tester.pumpWidget(const SizedBox());
+      await tester.pumpWidget(view(completed, streaming: false));
+      await tester.pumpAndSettle();
+      expect(find.text('Collapse'), findsOneWidget);
+      expect(
+        paragraph('a').text.toPlainText(),
+        contains('this completes the prefix'),
+      );
+    },
+  );
+
   testWidgets('code chrome actions are injectable and copy complete raw code', (
     tester,
   ) async {
@@ -519,14 +552,20 @@ void main() {
     expect(selected, 'Summary strong');
     expect(find.byType(SelectableRegion), findsOneWidget);
   });
-  testWidgets('display math scrolls wide visuals and copies only LaTeX', (
+  testWidgets('display math scrolls wide visuals and copies delimited LaTeX', (
     tester,
   ) async {
     String? selected;
     final math = _DisplayMath();
+    final controller = MarkstreamSelectionController();
+    addTearDown(controller.dispose);
     await tester.pumpWidget(
       host(
-        MarkstreamView(source: '\$\$\nx^2 + y^2\n\$\$', mathRenderer: math),
+        MarkstreamView(
+          source: '\$\$\nx^2 + y^2\n\$\$',
+          mathRenderer: math,
+          selectionController: controller,
+        ),
         width: 180,
         selectable: true,
         onSelection: (value) => selected = value?.plainText,
@@ -536,7 +575,9 @@ void main() {
     selectAll(tester);
     await tester.pumpAndSettle();
     expect(math.display, isTrue);
-    expect(selected, 'x^2 + y^2');
+    expect(selected, '\$\$\nx^2 + y^2\n\$\$');
+    expect(controller.selectedPlainText, selected);
+    expect(controller.selectedMarkdown, '\$\$\nx^2 + y^2\n\$\$');
     expect(tester.takeException(), isNull);
   });
   testWidgets('full HTML documents dispatch through the html code extension', (

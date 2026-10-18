@@ -50,8 +50,17 @@ class _MarkstreamCodeBlockState extends State<MarkstreamCodeBlock> {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.node.span.start != widget.node.span.start ||
         !toPlainText(widget.node).startsWith(toPlainText(oldWidget.node)) ||
-        oldWidget.node.info != widget.node.info)
+        oldWidget.node.info != widget.node.info) {
       _restore();
+    } else if (_manual != null && oldWidget.node.code != widget.node.code) {
+      // A very short stream can be toggled before its 16-character anchor is
+      // complete. Carry that choice forward so a later remount can find it.
+      widget.options.expansionState?.remember(
+        _language,
+        widget.node.code,
+        _manual!,
+      );
+    }
   }
 
   @override

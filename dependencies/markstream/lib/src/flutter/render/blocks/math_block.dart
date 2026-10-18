@@ -2,6 +2,7 @@ import 'package:flutter/widgets.dart';
 
 import '../../../core/ast/nodes.dart';
 import '../../../core/text_index/text_index.dart';
+import '../../../core/serialize/to_plain_text.dart';
 import '../../interfaces/renderers.dart';
 import '../../selection/selectable_span_adapter.dart';
 import '../../selection/selection_controller.dart';
@@ -20,7 +21,9 @@ class MarkstreamMathBlock extends StatelessWidget {
   @override
   Widget build(BuildContext context) => MarkstreamSelectionFragment(
     node: node,
-    segments: [TextSegment(text: node.tex, sourceSpan: node.span, node: node)],
+    segments: [
+      TextSegment(text: toPlainText(node), sourceSpan: node.span, node: node),
+    ],
     child: Padding(
       padding: theme.mathPadding,
       child: LayoutBuilder(
@@ -33,7 +36,7 @@ class MarkstreamMathBlock extends StatelessWidget {
             ),
             child: Center(
               child: SelectableSpanAdapter(
-                selectedText: node.tex,
+                selectedText: toPlainText(node),
                 child: SelectionContainer.disabled(
                   child:
                       renderer?.build(

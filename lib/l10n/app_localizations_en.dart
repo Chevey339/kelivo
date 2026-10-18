@@ -13120,4 +13120,24 @@ class AppLocalizationsEn extends AppLocalizations {
   String markdownPlaygroundProgress(int shown, int total) {
     return 'Input $shown / $total';
   }
+
+  @override
+  String get markdownCopyMarkdownAction => 'Copy Markdown';
+
+  @override
+  String get markdownCopyCsvAction => 'Copy CSV';
+
+  @override
+  String get markdownCopyImageAction => 'Copy image';
+
+  @override
+  String get markdownCodeLabel => 'Code';
+
+  @override
+  String get markdownDetailsLabel => 'Details';
+
+  @override
+  String markdownMoreRows(int count) {
+    return 'Show $count more rows';
+  }
 }

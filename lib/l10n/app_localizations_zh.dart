@@ -12525,6 +12525,26 @@ class AppLocalizationsZh extends AppLocalizations {
   String markdownPlaygroundProgress(int shown, int total) {
     return '已输入 $shown / $total';
   }
+
+  @override
+  String get markdownCopyMarkdownAction => '复制为 Markdown';
+
+  @override
+  String get markdownCopyCsvAction => '复制 CSV';
+
+  @override
+  String get markdownCopyImageAction => '复制图片';
+
+  @override
+  String get markdownCodeLabel => '代码';
+
+  @override
+  String get markdownDetailsLabel => '详情';
+
+  @override
+  String markdownMoreRows(int count) {
+    return '再显示 $count 行';
+  }
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hans`).
@@ -24973,6 +24993,26 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   @override
   String markdownPlaygroundProgress(int shown, int total) {
     return '已输入 $shown / $total';
+  }
+
+  @override
+  String get markdownCopyMarkdownAction => '复制为 Markdown';
+
+  @override
+  String get markdownCopyCsvAction => '复制 CSV';
+
+  @override
+  String get markdownCopyImageAction => '复制图片';
+
+  @override
+  String get markdownCodeLabel => '代码';
+
+  @override
+  String get markdownDetailsLabel => '详情';
+
+  @override
+  String markdownMoreRows(int count) {
+    return '再显示 $count 行';
   }
 }
 
@@ -37501,5 +37541,25 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   @override
   String markdownPlaygroundProgress(int shown, int total) {
     return '已輸入 $shown / $total';
+  }
+
+  @override
+  String get markdownCopyMarkdownAction => '複製為 Markdown';
+
+  @override
+  String get markdownCopyCsvAction => '複製 CSV';
+
+  @override
+  String get markdownCopyImageAction => '複製圖片';
+
+  @override
+  String get markdownCodeLabel => '程式碼';
+
+  @override
+  String get markdownDetailsLabel => '詳情';
+
+  @override
+  String markdownMoreRows(int count) {
+    return '再顯示 $count 行';
   }
 }

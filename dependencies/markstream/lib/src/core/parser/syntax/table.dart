@@ -15,6 +15,7 @@ TableLine splitTableLine(
   int start,
   int end, {
   bool math = false,
+  bool dollarMath = true,
   int maxMathLength = 512,
 }) {
   while (start < end && _space(source.codeUnitAt(start))) start++;
@@ -43,7 +44,10 @@ TableLine splitTableLine(
       slashes = 0;
       continue;
     }
-    if (math && i > codeEnd && slashes.isEven && (c == 36 || c == 92)) {
+    if (math &&
+        i > codeEnd &&
+        slashes.isEven &&
+        ((c == 36 && dollarMath) || c == 92)) {
       final formula = readInlineMath(
         source,
         i,

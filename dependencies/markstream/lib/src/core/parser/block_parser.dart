@@ -148,6 +148,7 @@ final class _BlockSession {
       span.start,
       span.end,
       math: options.inlineMath,
+      dollarMath: options.dollarInlineMath,
       maxMathLength: options.maxInlineMathLength,
     );
     if (header.cells.isEmpty ||
@@ -505,6 +506,7 @@ final class _BlockSession {
       cursor.offset,
       cursor.line.end,
       math: options.inlineMath,
+      dollarMath: options.dollarInlineMath,
       maxMathLength: options.maxInlineMathLength,
     );
     final alignments = tableDelimiter(delimiter, source);
@@ -514,6 +516,7 @@ final class _BlockSession {
       block.start,
       block.end,
       math: options.inlineMath,
+      dollarMath: options.dollarInlineMath,
       maxMathLength: options.maxInlineMathLength,
     );
     if (!options.tablePipesOptional &&
@@ -545,6 +548,7 @@ final class _BlockSession {
       cursor.offset,
       cursor.line.end,
       math: options.inlineMath,
+      dollarMath: options.dollarInlineMath,
       maxMathLength: options.maxInlineMathLength,
     );
     if (!options.tablePipesOptional && !row.outerPipes) return false;

@@ -2,13 +2,29 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 import 'package:markstream/markstream_core.dart';
+import 'package:Kelivo/shared/markdown/kelivo_markdown_extensions.dart';
 
 /// Drives the developer preview without modifying the editor's complete source.
 class MarkdownPlaygroundModel extends ChangeNotifier {
   MarkdownPlaygroundModel(String source) {
     setSource(source);
   }
-  final _parser = IncrementalDocument();
+  ParserOptions _options = const ParserOptions();
+  IncrementalDocument _parser = _newParser(const ParserOptions());
+  static IncrementalDocument _newParser(ParserOptions options) =>
+      IncrementalDocument(
+        parser: MarkdownParser(
+          options: options,
+          inlineSyntaxes: kelivoMarkdownExtensions.inlineSyntaxes,
+        ),
+      );
+  void setParserOptions(ParserOptions options) {
+    if (identical(options, _options)) return;
+    _options = options;
+    _parser = _newParser(options);
+    _publish();
+  }
+
   Timer? _timer;
   String _source = '', _displayed = '';
   int _cursor = 0, _shown = 0, _total = 0;

@@ -1,5 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:markstream/markstream.dart';
+import 'package:provider/provider.dart';
+import 'package:Kelivo/core/providers/settings_provider.dart';
+import 'package:Kelivo/shared/markdown/markdown_with_code_highlight.dart';
+import 'package:Kelivo/shared/markdown/kelivo_markdown_extensions.dart';
 
 import 'package:Kelivo/icons/lucide_adapter.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
@@ -16,7 +20,7 @@ const _sample = r'''# Markdown Playground
 
 编辑源码，检查 AST，并尝试跨段落选择文本。
 
-**Bold**, _emphasis_, `inline code`, [link](https://example.com) and plain [1].
+**Bold**, _emphasis_, `inline code`, [link](https://example.com) plain [1] and citations [cite:demo,other].
 
 - [x] Native selection
 - [ ] Streaming input
@@ -62,6 +66,14 @@ class _MarkdownPlaygroundPageState extends State<MarkdownPlaygroundPage>
     super.initState();
     _source.addListener(_sourceChanged);
     _model.addListener(_changed);
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _model.setParserOptions(
+      markdownParserOptions(Provider.of<SettingsProvider>(context)),
+    );
   }
 
   void _sourceChanged() {
@@ -145,8 +157,9 @@ class _MarkdownPlaygroundPageState extends State<MarkdownPlaygroundPage>
                   child: MarkstreamSelectionScope(
                     controller: _selection,
                     child: AppSelectionArea(
-                      child: MarkstreamView(
-                        source: _model.displayed,
+                      child: MarkdownWithCodeHighlight(
+                        text: _model.displayed,
+                        citationIndexResolver: (id) => id == 'demo' ? '1' : '2',
                         streaming: _model.streaming,
                       ),
                     ),

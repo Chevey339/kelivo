@@ -271,7 +271,9 @@ final class _InlineSession {
         consumed = true;
         break;
       }
-      if (!consumed && options.inlineMath && (c == 36 || c == 92)) {
+      if (!consumed &&
+          options.inlineMath &&
+          ((c == 36 && options.dollarInlineMath) || c == 92)) {
         final math = readInlineMath(
           text,
           i,
@@ -304,7 +306,11 @@ final class _InlineSession {
         _literal(start, i);
         consumed = true;
       }
-      if (!consumed && options.directives && c == 58) {
+      if (!consumed &&
+          options.directives &&
+          c == 58 &&
+          (isSpace(runeBefore(text, i)) ||
+              isPunctuation(runeBefore(text, i)))) {
         final directive = readDirective(text, i, text.length);
         if (directive != null && directive.colons == 1) {
           final label = directive.label;

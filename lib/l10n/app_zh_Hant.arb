@@ -4589,5 +4589,11 @@
   "markdownPlaygroundMarkdown": "選取範圍 Markdown",
   "markdownPlaygroundSelectionHint": "在預覽中選取文字，檢視複製結果。",
   "markdownPlaygroundEmpty": "輸入 Markdown 開始預覽。",
-  "markdownPlaygroundProgress": "已輸入 {shown} / {total}"
+  "markdownPlaygroundProgress": "已輸入 {shown} / {total}",
+  "markdownCopyMarkdownAction": "複製為 Markdown",
+  "markdownCopyCsvAction": "複製 CSV",
+  "markdownCopyImageAction": "複製圖片",
+  "markdownCodeLabel": "程式碼",
+  "markdownDetailsLabel": "詳情",
+  "markdownMoreRows": "再顯示 {count} 行"
 }

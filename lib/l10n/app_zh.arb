@@ -4589,5 +4589,11 @@
   "markdownPlaygroundMarkdown": "选区 Markdown",
   "markdownPlaygroundSelectionHint": "在预览中选择文本，查看复制结果。",
   "markdownPlaygroundEmpty": "输入 Markdown 开始预览。",
-  "markdownPlaygroundProgress": "已输入 {shown} / {total}"
+  "markdownPlaygroundProgress": "已输入 {shown} / {total}",
+  "markdownCopyMarkdownAction": "复制为 Markdown",
+  "markdownCopyCsvAction": "复制 CSV",
+  "markdownCopyImageAction": "复制图片",
+  "markdownCodeLabel": "代码",
+  "markdownDetailsLabel": "详情",
+  "markdownMoreRows": "再显示 {count} 行"
 }

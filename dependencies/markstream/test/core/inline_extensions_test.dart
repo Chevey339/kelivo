@@ -238,6 +238,16 @@ void main() {
     final doc = const MarkdownParser().parse(':::bad trailing');
     expect(doc.children.single.children.whereType<NamedInlineNode>(), isEmpty);
   });
+  test('colons inside words and unfinished citation labels stay literal', () {
+    const source = r'key:value [cite:abc \[cite:def] foo:note[label]';
+    final parsed = parser.parse(source);
+    expect(parsed.whereType<NamedInlineNode>(), isEmpty);
+    expect(
+      parsed.map(textOf).join(),
+      r'key:value [cite:abc [cite:def] foo:note[label]',
+    );
+    expect(parser.parse(':note[label]').single, isA<NamedInlineNode>());
+  });
   test('long malformed angle brackets remain literal and terminate', () {
     final source = '${'<' * 20000}plain';
     expect(parser.parse(source).map(textOf).join(), source);

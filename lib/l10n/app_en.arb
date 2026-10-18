@@ -5776,5 +5776,18 @@
         "type": "int"
       }
     }
+  },
+  "markdownCopyMarkdownAction": "Copy Markdown",
+  "markdownCopyCsvAction": "Copy CSV",
+  "markdownCopyImageAction": "Copy image",
+  "markdownCodeLabel": "Code",
+  "markdownDetailsLabel": "Details",
+  "markdownMoreRows": "Show {count} more rows",
+  "@markdownMoreRows": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
   }
 }
