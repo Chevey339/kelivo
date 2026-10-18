@@ -9,15 +9,18 @@ import 'mapped_text.dart';
 import 'source_line.dart';
 import 'syntax/reference_definition.dart';
 import 'syntax/inline_syntax.dart';
+import 'syntax/block_syntax.dart';
 
 /// Two-phase block and inline parsing. References resolve across the document.
 final class MarkdownParser {
   const MarkdownParser({
     this.options = const ParserOptions(),
     this.inlineSyntaxes = const [],
+    this.blockSyntaxes = const [],
   });
   final ParserOptions options;
   final List<InlineSyntax> inlineSyntaxes;
+  final List<BlockSyntax> blockSyntaxes;
 
   DocumentNode parse(
     String source, {
@@ -106,11 +109,49 @@ final class MarkdownParser {
         ];
       return [node];
     });
+    final projected = streaming && !streamingOptions.optimisticBlocks
+        ? _literalIncomplete(document)
+        : document;
+    final extended = blockSyntaxes.isEmpty
+        ? projected
+        : _transform(projected, (node) {
+            if (node is! BlockNode || node is ReferenceDefinitionNode)
+              return [node];
+            final context = BlockSyntaxContext(
+              source: source,
+              block: node,
+              options: options,
+              streaming: streaming,
+            );
+            for (final syntax in blockSyntaxes) {
+              final replacement = syntax.parse(context);
+              if (replacement == null) continue;
+              if (replacement.span != node.span) {
+                throw ArgumentError(
+                  'BlockSyntax must preserve the scanned source boundary',
+                );
+              }
+              final pending = <MarkdownNode>[replacement];
+              while (pending.isNotEmpty) {
+                final parent = pending.removeLast();
+                for (final child in parent.children) {
+                  if (child.span.end < child.span.start ||
+                      child.span.start < parent.span.start ||
+                      child.span.end > parent.span.end) {
+                    throw ArgumentError(
+                      'BlockSyntax child source range is outside its parent',
+                    );
+                  }
+                  pending.add(child);
+                }
+              }
+              return [replacement];
+            }
+            return [node];
+          });
     return DocumentNode(
       source: source,
-      children: streaming && !streamingOptions.optimisticBlocks
-          ? _literalIncomplete(document).children
-          : document.children,
+      children: extended.children,
       references: references,
     );
   }

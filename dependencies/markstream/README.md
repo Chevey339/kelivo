@@ -116,3 +116,24 @@ heading styles, so reconstructing equivalent settings does not invalidate
 cached document prefixes. Heading lists are immutable snapshots. Fill alpha
 constants and the monochrome code-border adjustment follow the existing app
 palette; applications can override individual surfaces in the token groups.
+
+## Extension and renderer contracts
+
+`MarkstreamExtensions` takes immutable snapshots of syntax lists and builder
+maps. Code builders dispatch by the first, case-insensitive fence language;
+directive and named-inline builders dispatch by name. These specific builders
+take precedence over `NodeBuilderRegistry` entries keyed by node runtime type.
+An unregistered node remains available to the built-in renderer.
+
+`BlockSyntax` classifies an already-scanned leaf block after inline parsing.
+It must preserve that block's source boundary and keep child spans inside it.
+Structural multiline containers use the built-in directive or fence grammar.
+Syntax implementations should remain stable for a document session.
+`InlineSyntax` retains its mapped-text offsets and non-consuming-match guard.
+
+`CodeHighlighter` returns a synchronous or asynchronous `TextSpan` whose plain
+text exactly matches its input. `MathRenderer` builds the visual formula while
+the library owns LaTeX selection. `ImageBuilder` and `LinkHandler` leave source
+resolution, navigation and image viewing to the application. Table/code extra
+actions similarly leave saving and sharing to the application; a table action
+receives a PNG-capture callback. Extensions share the consumer's selection area.

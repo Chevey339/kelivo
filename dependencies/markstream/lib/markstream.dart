@@ -9,3 +9,5 @@ export 'src/flutter/render/inline_code_capsule.dart';
 export 'src/flutter/selection/code_selection.dart';
 export 'src/flutter/selection/table_selection.dart';
 export 'src/flutter/theme/markstream_theme.dart';
+export 'src/flutter/interfaces/renderers.dart';
+export 'src/flutter/extensions/registry.dart';

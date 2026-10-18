@@ -15,3 +15,4 @@ export 'src/core/serialize/to_plain_text.dart';
 export 'src/core/serialize/to_markdown.dart';
 export 'src/core/serialize/to_html.dart';
 export 'src/core/text_index/text_index.dart';
+export 'src/core/parser/syntax/block_syntax.dart';
