@@ -119,8 +119,61 @@ class GoogleProvider extends BaseProvider {
     return '$base/models';
   }
 
+  /// AIhubmix's Gemini-native gateway has no `GET /models`; its model list is
+  /// only served in OpenAI format at `/v1/models` on the same host.
+  static Uri? aihubmixModelListUri(ProviderConfig cfg) {
+    if (cfg.vertexAI == true) return null;
+    final uri = Uri.tryParse(cfg.baseUrl.trim());
+    final host = uri?.host.toLowerCase() ?? '';
+    if (host != 'aihubmix.com' && !host.endsWith('.aihubmix.com')) return null;
+    return uri!.replace(path: '/v1/models', query: null, fragment: null);
+  }
+
+  /// Model ids AIhubmix routes to its Gemini-native endpoint.
+  static bool isAihubmixGeminiModel(String id) {
+    final lower = id.toLowerCase();
+    return lower.startsWith('gemini') &&
+        !lower.endsWith('-nothink') &&
+        !lower.endsWith('-search');
+  }
+
+  Future<List<ModelSpec>> _listAihubmixModels(
+    ProviderConfig cfg,
+    Uri uri,
+  ) async {
+    final key = ProviderManager._effectiveApiKey(cfg);
+    final client = providerHttpClient(cfg);
+    try {
+      final headers = <String, String>{};
+      if (key.isNotEmpty) headers['Authorization'] = 'Bearer $key';
+      final res = await client.get(
+        uri,
+        headers: _Http.modelListHeaders(cfg, headers),
+      );
+      if (res.statusCode >= 200 && res.statusCode < 300) {
+        final data = (jsonDecode(res.body)['data'] as List?) ?? [];
+        return [
+          for (final e in data)
+            if (e is Map && e['id'] is String && isAihubmixGeminiModel(e['id']))
+              ModelSpecResolver.instance
+                  .resolve(
+                    cfg,
+                    e['id'] as String,
+                    displayName: e['id'] as String,
+                  )
+                  .spec,
+        ];
+      }
+      return [];
+    } finally {
+      client.close();
+    }
+  }
+
   @override
   Future<List<ModelSpec>> listModels(ProviderConfig cfg) async {
+    final aihubmixUri = aihubmixModelListUri(cfg);
+    if (aihubmixUri != null) return _listAihubmixModels(cfg, aihubmixUri);
     final client = providerHttpClient(cfg);
     try {
       final url = _buildUrl(cfg);
