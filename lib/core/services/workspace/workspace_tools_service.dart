@@ -11,6 +11,7 @@ import '../../../utils/app_directories.dart';
 import '../../../utils/mcp_structured_image.dart';
 import '../../../utils/sandbox_path_resolver.dart';
 import '../api/tool_call_cancellation.dart';
+import '../tool_image.dart';
 import '../../models/workspace_binding.dart';
 import '../../models/external_mount.dart';
 import '../../models/environment_variable.dart';
@@ -24,7 +25,6 @@ import 'host_file_tools.dart';
 import 'output_buffer.dart';
 import 'tool_run_registry.dart';
 import 'workspace_paths.dart';
-import 'workspace_image.dart';
 import 'workspace_runtime.dart';
 import 'workspace_session_sync.dart';
 import 'workspace_tool_context.dart';
@@ -929,7 +929,7 @@ class WorkspaceToolsService {
       if (ctx.paths.sandboxed && resolved.zone == WorkspaceZone.outside) {
         throw const PathResolutionException('Path is outside sandbox zones');
       }
-      final image = await WorkspaceImage.read(resolved.hostPath);
+      final image = await ToolImage.read(resolved.hostPath);
       ToolCallCancellation.current?.throwIfCancelled();
       final imagesDir = await AppDirectories.getImagesDirectory();
       await imagesDir.create(recursive: true);
@@ -956,7 +956,7 @@ class WorkspaceToolsService {
           kMcpResultMetadataKey: mcpResultMetadata([uri]),
         },
       );
-    } on HostFileException catch (e) {
+    } on ToolImageException catch (e) {
       return _errorResult(
         tool: tool,
         error: 'view_image_failed',
