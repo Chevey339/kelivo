@@ -61,12 +61,21 @@ class DeepSeekSearchService extends SearchService<DeepSeekOptions>
         items: results.map((item) {
           final result = item as Map<String, dynamic>;
           final summary = (result['summary'] ?? '').toString();
+          var text = summary.trim().isNotEmpty
+              ? summary
+              : (result['snippet'] ?? '').toString();
+          final rawDate = result['date'];
+          final publishedAt = rawDate is String
+              ? DateTime.tryParse(rawDate)
+              : null;
+          if (publishedAt != null && publishedAt.isUtc) {
+            final date = publishedAt.toIso8601String().split('T').first;
+            text = '[Published: $date] $text';
+          }
           return SearchResultItem(
             title: (result['title'] ?? '').toString(),
             url: (result['url'] ?? '').toString(),
-            text: summary.trim().isNotEmpty
-                ? summary
-                : (result['snippet'] ?? '').toString(),
+            text: text,
           );
         }).toList(),
       );
