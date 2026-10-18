@@ -4,7 +4,11 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-import 'package:markstream/markstream.dart' show StableSelectionContainer;
+import 'package:markstream/markstream.dart'
+    show
+        StableSelectionContainer,
+        MarkstreamSelectionController,
+        MarkstreamSelectionScope;
 import '../../l10n/app_localizations.dart';
 
 /// App-owned selection actions shared by messages and Markdown previews.
@@ -21,6 +25,8 @@ class _AppSelectionAreaState extends State<AppSelectionArea> {
   static const _translation = MethodChannel('app.ios_translation');
   bool _translationAvailable = false;
   String _selectedText = '';
+  final _ownedMarkdownSelection = MarkstreamSelectionController();
+  late MarkstreamSelectionController _markdownSelection;
 
   @override
   void initState() {
@@ -65,6 +71,17 @@ class _AppSelectionAreaState extends State<AppSelectionArea> {
       anchors: anchors,
       buttonItems: [
         ...region.contextMenuButtonItems,
+        if (_markdownSelection.hasSelection)
+          ContextMenuButtonItem(
+            label: AppLocalizations.of(context)!.markdownCopyMarkdownAction,
+            onPressed: () {
+              final markdown = _markdownSelection.selectedMarkdown;
+              region.hideToolbar();
+              if (markdown.isNotEmpty) {
+                unawaited(Clipboard.setData(ClipboardData(text: markdown)));
+              }
+            },
+          ),
         if (_translationAvailable && text.trim().isNotEmpty)
           ContextMenuButtonItem(
             label: AppLocalizations.of(
@@ -80,9 +97,23 @@ class _AppSelectionAreaState extends State<AppSelectionArea> {
   }
 
   @override
-  Widget build(BuildContext context) => SelectionArea(
-    onSelectionChanged: (content) => _selectedText = content?.plainText ?? '',
-    contextMenuBuilder: _buildMenu,
-    child: StableSelectionContainer(child: widget.child),
-  );
+  void dispose() {
+    _ownedMarkdownSelection.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    _markdownSelection =
+        MarkstreamSelectionScope.maybeOf(context) ?? _ownedMarkdownSelection;
+    return MarkstreamSelectionScope(
+      controller: _markdownSelection,
+      child: SelectionArea(
+        onSelectionChanged: (content) =>
+            _selectedText = content?.plainText ?? '',
+        contextMenuBuilder: _buildMenu,
+        child: StableSelectionContainer(child: widget.child),
+      ),
+    );
+  }
 }

@@ -305,3 +305,19 @@ not a five-round acceptance measurement; C41 performance targets remain open.
 ```text
 MARKSTREAM_RENDER {"run":1,"renderer":"markstream","appAdapters":true,"appendChars":30000,"coldChars":100000,"samples":56,"firstPumpMedianUs":493,"firstPumpP95Us":1028,"contentPumpMedianUs":2482,"contentPumpP95Us":4128,"coldFirstFrameUs":584193}
 ```
+
+## C44 message-selection controller diagnostic
+
+The fixed-fixture host now uses the application's `AppSelectionArea`, including
+its Markdown selection controller, matching the message-menu configuration.
+The previous C41–C43 diagnostic host used a raw `SelectionArea`. This difference
+is recorded in each new result as `selectionController: true`.
+
+One fresh process before the C44 full suite: scheduling median/p95
+0.252/0.548ms, actual content 1.589/2.234ms, cold 478.231ms. This remains a
+single diagnostic, not the final five-round acceptance result. Cold render and
+actual-content p95 exceed the plan's limits in this sample.
+
+```text
+MARKSTREAM_RENDER {"run":1,"renderer":"markstream","appAdapters":true,"selectionController":true,"appendChars":30000,"coldChars":100000,"samples":56,"firstPumpMedianUs":252,"firstPumpP95Us":548,"contentPumpMedianUs":1589,"contentPumpP95Us":2234,"coldFirstFrameUs":478231}
+```

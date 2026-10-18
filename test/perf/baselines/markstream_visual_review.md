@@ -116,3 +116,12 @@ A preceding full run had a two-second attachment-backfill timeout while other
 preflight work ran. Its 72-test file and the subsequent serialized full suite
 both passed without changes to that unrelated path. Physical-device and native
 keyboard limits above remain open; this review does not extend their evidence.
+
+## C44 message menu
+
+The 384 document captures are byte-identical to C43. Thirteen focused menu
+checks cover desktop platform variants, native plain copy, structural Markdown,
+partial emphasis/link ranges, multi-view ordering, borrowed-controller lifetime
+and iOS Translate coexistence. Platform variants are widget simulations, not
+physical device evidence. Final gates: root 7,975 passed / one existing skip,
+package 265 passed, golden suite 389 passed; analyzers clean.
