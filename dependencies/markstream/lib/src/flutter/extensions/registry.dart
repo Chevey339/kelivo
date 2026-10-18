@@ -6,6 +6,7 @@ import '../../core/ast/nodes.dart';
 import '../../core/parser/syntax/block_syntax.dart';
 import '../../core/parser/syntax/inline_syntax.dart';
 import '../theme/markstream_theme.dart';
+import '../render/chrome.dart';
 
 /// Rendering callbacks use the same document, style and selection owner as
 /// built-in nodes. Extensions must not create their own SelectionArea.
@@ -93,7 +94,8 @@ final class MarkstreamExtensions {
       directiveBuilders = const {},
       namedInlineBuilders = const {},
       tableExtraActions = null,
-      codeExtraActions = null;
+      codeExtraActions = null,
+      actionButtonBuilder = null;
 
   MarkstreamExtensions({
     List<BlockSyntax> blockSyntaxes = const [],
@@ -104,6 +106,7 @@ final class MarkstreamExtensions {
     Map<String, InlineNodeBuilder> namedInlineBuilders = const {},
     this.tableExtraActions,
     this.codeExtraActions,
+    this.actionButtonBuilder,
   }) : blockSyntaxes = List.unmodifiable(blockSyntaxes),
        inlineSyntaxes = List.unmodifiable(inlineSyntaxes),
        codeBlockBuilders = _normalized(codeBlockBuilders),
@@ -118,6 +121,7 @@ final class MarkstreamExtensions {
   final Map<String, InlineNodeBuilder> namedInlineBuilders;
   final TableExtraActions? tableExtraActions;
   final CodeExtraActions? codeExtraActions;
+  final MarkstreamActionButtonBuilder? actionButtonBuilder;
 
   static Map<String, T> _normalized<T>(Map<String, T> values) =>
       Map.unmodifiable({

@@ -14,3 +14,5 @@ export 'src/flutter/extensions/registry.dart';
 export 'src/flutter/render/block_list.dart';
 export 'src/flutter/render/streaming_text.dart';
 export 'src/flutter/markstream_view.dart';
+export 'src/flutter/render/chrome.dart';
+export 'src/flutter/render/blocks/code_content.dart' show MarkstreamCodeContent;

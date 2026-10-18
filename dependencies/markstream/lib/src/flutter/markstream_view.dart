@@ -9,6 +9,7 @@ import 'extensions/registry.dart';
 import 'interfaces/renderers.dart';
 import 'render/block_builder.dart';
 import 'render/block_list.dart';
+import 'render/chrome.dart';
 import 'theme/markstream_theme.dart';
 
 /// Renders source or a parsed snapshot inside the caller's SelectionArea.
@@ -27,6 +28,9 @@ class MarkstreamView extends StatefulWidget {
     this.imageBuilder,
     this.linkHandler,
     this.cullToViewport = true,
+    this.codeOptions = const CodeBlockOptions(),
+    this.labels = const MarkstreamLabels(),
+    this.exporting = false,
   }) : assert((source == null) != (document == null));
 
   final String? source;
@@ -41,6 +45,9 @@ class MarkstreamView extends StatefulWidget {
   final ImageBuilder? imageBuilder;
   final LinkHandler? linkHandler;
   final bool cullToViewport;
+  final CodeBlockOptions codeOptions;
+  final MarkstreamLabels labels;
+  final bool exporting;
 
   @override
   State<MarkstreamView> createState() => _MarkstreamViewState();
@@ -137,6 +144,9 @@ class _MarkstreamViewState extends State<MarkstreamView> {
       mathRenderer: widget.mathRenderer,
       imageBuilder: widget.imageBuilder,
       linkHandler: widget.linkHandler,
+      codeOptions: widget.codeOptions,
+      labels: widget.labels,
+      exporting: widget.exporting,
     );
     final nodes = _document.children
         .where((node) => node is! ReferenceDefinitionNode)
@@ -159,7 +169,7 @@ class _MarkstreamViewState extends State<MarkstreamView> {
     _entries = entries;
     return BlockList(
       blocks: entries,
-      cullToViewport: widget.cullToViewport,
+      cullToViewport: widget.cullToViewport && !widget.exporting,
       signature: (
         theme,
         widget.extensions,
@@ -167,6 +177,9 @@ class _MarkstreamViewState extends State<MarkstreamView> {
         widget.mathRenderer,
         widget.imageBuilder,
         widget.linkHandler,
+        widget.codeOptions,
+        widget.labels,
+        widget.exporting,
       ),
       itemBuilder: (context, index) => Padding(
         key: ValueKey(entries[index].node.span.start),

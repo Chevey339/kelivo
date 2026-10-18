@@ -7,6 +7,11 @@ import '../interfaces/renderers.dart';
 import '../theme/markstream_theme.dart';
 import 'inline_builder.dart';
 import 'streaming_text.dart';
+import 'chrome.dart';
+import 'blocks/code_block.dart';
+import 'blocks/table_block.dart';
+import 'blocks/math_block.dart';
+import 'blocks/details_block.dart';
 
 /// One view owns this session. Cached prefix widgets do not retain historical
 /// whole-document snapshots; recursive callbacks read the current session.
@@ -21,6 +26,9 @@ class MarkstreamRenderer {
   ImageBuilder? imageBuilder;
   LinkHandler? linkHandler;
   late InlineSpanBuilder _inline;
+  late CodeBlockOptions codeOptions;
+  late MarkstreamLabels labels;
+  bool exporting = false;
 
   void update({
     required DocumentNode document,
@@ -30,6 +38,9 @@ class MarkstreamRenderer {
     MathRenderer? mathRenderer,
     ImageBuilder? imageBuilder,
     LinkHandler? linkHandler,
+    required CodeBlockOptions codeOptions,
+    required MarkstreamLabels labels,
+    required bool exporting,
   }) {
     this.document = document;
     this.theme = theme;
@@ -38,6 +49,9 @@ class MarkstreamRenderer {
     this.mathRenderer = mathRenderer;
     this.imageBuilder = imageBuilder;
     this.linkHandler = linkHandler;
+    this.codeOptions = codeOptions;
+    this.labels = labels;
+    this.exporting = exporting;
     _inline = InlineSpanBuilder(
       theme: theme,
       extensions: extensions,
@@ -119,6 +133,73 @@ class MarkstreamRenderer {
     if (custom != null)
       return custom(context, node, contextFor(context, streaming));
     final body = style ?? theme.body;
+    if (node is CodeBlockNode)
+      return MarkstreamCodeBlock(
+        node: node,
+        theme: theme,
+        extensions: extensions,
+        options: codeOptions,
+        labels: labels,
+        highlighter: codeHighlighter,
+        streaming: streaming,
+      );
+    if (node is HtmlBlockNode && node.fullDocument)
+      return build(
+        context,
+        CodeBlockNode(
+          span: node.span,
+          children: node.rawFragments,
+          info: 'html',
+          closed: node.closed,
+        ),
+        streaming: streaming,
+      );
+    if (node is HtmlBlockNode)
+      return inlineText(context, node.children, body, streaming: streaming);
+    if (node is TableNode)
+      return MarkstreamTableBlock(
+        node: node,
+        theme: theme,
+        extensions: extensions,
+        labels: labels,
+        streaming: streaming,
+        exporting: exporting,
+        buildCell: (context, cell, style) =>
+            inlineText(context, cell.children, style, streaming: streaming),
+      );
+    if (node is MathBlockNode)
+      return MarkstreamMathBlock(
+        node: node,
+        theme: theme,
+        renderer: mathRenderer,
+      );
+    if (node is DetailsNode) {
+      final summary = node.children.whereType<DetailsSummaryNode>().firstOrNull;
+      return MarkstreamDetailsBlock(
+        node: node,
+        theme: theme,
+        summary: summary == null
+            ? Text(labels.details, style: theme.details.summary)
+            : inlineText(
+                context,
+                summary.children,
+                theme.details.summary,
+                streaming: streaming,
+              ),
+        body: (context) => children(
+          context,
+          node.children.where((child) => child is! DetailsSummaryNode).toList(),
+          streaming: streaming,
+        ),
+      );
+    }
+    if (node is DetailsSummaryNode)
+      return inlineText(
+        context,
+        node.children,
+        theme.details.summary,
+        streaming: streaming,
+      );
     if (node is ParagraphNode)
       return inlineText(context, node.children, body, streaming: streaming);
     if (node is HeadingNode)

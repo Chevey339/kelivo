@@ -40,3 +40,38 @@ The basic builders render paragraphs, headings, quotes, lists, tasks, radio
 items and rules. Unsupported block types remain readable through their plain
 text projection. Consumers supply the SelectionArea and menu. The package does
 not import app settings or launch URLs itself.
+
+## Rich blocks
+
+Code blocks use the injected highlighter, rejecting changed plain text and
+ignoring stale asynchronous results. Stream-time work is capped at 12,000
+characters / 300 lines. More than 1,000 lines uses a 420 px viewport of 200-line
+chunks. The code selection delegate reports logical source offsets, so select
+all and dragging across the complete scrolled block include unmounted lines
+and chunk-boundary newlines. Partial selection still follows native geometry.
+
+`CodeBlockOptions` controls wrapping, highlighting and initial folding. Explicit
+folding choices survive append and completion. An optional app-owned bounded
+`CodeExpansionState` retains them across remounts using the established
+language/16-character-prefix key. `MarkstreamCodeContent` is also available for
+diagram source panes. The copy button copies complete raw code; selection copies
+only the visible collapsed prefix or the selected logical range.
+
+Tables paginate at 40 rows, then 100 more; an active streaming table shows at
+most 30 rows. Selection uses TSV, while toolbar actions copy complete Markdown
+or CSV. `TableActionContext.capturePng` temporarily renders all rows with opaque
+fill and unclipped text, restores pagination on success/failure, and rejects
+invalid ratios or images beyond 64 million pixels / 32,767 px per edge. Image
+encoding resources are disposed. `exporting` renders every table row and hides
+its toolbar/pager; it also disables view-level viewport culling.
+
+Display math scrolls horizontally and exposes LaTeX through its source adapter.
+Details retain manual folding and unmount hidden bodies from selection. Full
+HTML documents enter the `html` code-builder path, allowing the app to add its
+preview action. Native inline HTML remains in the normal text builder.
+
+`MarkstreamLabels`, `actionButtonBuilder`, `codeExtraActions` and
+`tableExtraActions` let the app supply localization, icons, save/share dialogs
+and platform clipboard actions. Toolbar widgets are excluded from selection.
+The package still owns no SelectionArea, platform files, URL launcher or app
+settings.
