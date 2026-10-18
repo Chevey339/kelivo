@@ -13140,4 +13140,22 @@ class AppLocalizationsEn extends AppLocalizations {
   String markdownMoreRows(int count) {
     return 'Show $count more rows';
   }
+
+  @override
+  String get markdownNoteLabel => 'Note';
+
+  @override
+  String get markdownTipLabel => 'Tip';
+
+  @override
+  String get markdownImportantLabel => 'Important';
+
+  @override
+  String get markdownWarningLabel => 'Warning';
+
+  @override
+  String get markdownCautionLabel => 'Caution';
+
+  @override
+  String get markdownDangerLabel => 'Danger';
 }

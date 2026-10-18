@@ -23459,6 +23459,42 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Show {count} more rows'**
   String markdownMoreRows(int count);
+
+  /// No description provided for @markdownNoteLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Note'**
+  String get markdownNoteLabel;
+
+  /// No description provided for @markdownTipLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Tip'**
+  String get markdownTipLabel;
+
+  /// No description provided for @markdownImportantLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Important'**
+  String get markdownImportantLabel;
+
+  /// No description provided for @markdownWarningLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Warning'**
+  String get markdownWarningLabel;
+
+  /// No description provided for @markdownCautionLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Caution'**
+  String get markdownCautionLabel;
+
+  /// No description provided for @markdownDangerLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Danger'**
+  String get markdownDangerLabel;
 }
 
 class _AppLocalizationsDelegate

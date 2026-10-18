@@ -21,10 +21,11 @@ Widget host(
   SettingsProvider? settings,
   bool dark = false,
   double width = 390,
+  Locale locale = const Locale('en'),
 }) => ChangeNotifierProvider.value(
   value: settings ?? SettingsProvider(createBusinessTestPreferences()),
   child: MaterialApp(
-    locale: const Locale('en'),
+    locale: locale,
     localizationsDelegates: AppLocalizations.localizationsDelegates,
     supportedLocales: AppLocalizations.supportedLocales,
     theme: ThemeData(brightness: dark ? Brightness.dark : Brightness.light),
@@ -49,6 +50,26 @@ List<MarkdownNode> nodes(MarkdownNode root) {
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+  testWidgets('directive cards follow the app locale when it changes', (
+    tester,
+  ) async {
+    for (final pair in [
+      (const Locale('en'), 'Note'),
+      (const Locale('zh'), '备注'),
+      (const Locale.fromSubtags(languageCode: 'zh', scriptCode: 'Hans'), '备注'),
+      (const Locale.fromSubtags(languageCode: 'zh', scriptCode: 'Hant'), '備註'),
+    ]) {
+      await tester.pumpWidget(
+        host(
+          const MarkdownWithCodeHighlight(text: '> [!NOTE]\n> Body'),
+          locale: pair.$1,
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(find.byType(MarkstreamDirectiveCard), findsOneWidget);
+      expect(find.text(pair.$2), findsOneWidget);
+    }
+  });
   final parser = MarkdownParser(
     inlineSyntaxes: const [CitationSyntax(), LocalImagePathSyntax()],
   );

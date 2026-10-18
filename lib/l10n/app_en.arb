@@ -5789,5 +5789,11 @@
         "type": "int"
       }
     }
-  }
+  },
+  "markdownNoteLabel": "Note",
+  "markdownTipLabel": "Tip",
+  "markdownImportantLabel": "Important",
+  "markdownWarningLabel": "Warning",
+  "markdownCautionLabel": "Caution",
+  "markdownDangerLabel": "Danger"
 }

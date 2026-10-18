@@ -4595,5 +4595,11 @@
   "markdownCopyImageAction": "复制图片",
   "markdownCodeLabel": "代码",
   "markdownDetailsLabel": "详情",
-  "markdownMoreRows": "再显示 {count} 行"
+  "markdownMoreRows": "再显示 {count} 行",
+  "markdownNoteLabel": "备注",
+  "markdownTipLabel": "提示",
+  "markdownImportantLabel": "重要",
+  "markdownWarningLabel": "警告",
+  "markdownCautionLabel": "注意",
+  "markdownDangerLabel": "危险"
 }

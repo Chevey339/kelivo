@@ -81,6 +81,12 @@ MarkstreamLabels markdownLabels(BuildContext context) {
     collapse: l10n.codeBlockCollapseButton,
     unnamedCode: l10n.markdownCodeLabel,
     details: l10n.markdownDetailsLabel,
+    note: l10n.markdownNoteLabel,
+    tip: l10n.markdownTipLabel,
+    important: l10n.markdownImportantLabel,
+    warning: l10n.markdownWarningLabel,
+    caution: l10n.markdownCautionLabel,
+    danger: l10n.markdownDangerLabel,
     moreRows: l10n.markdownMoreRows,
   );
 }

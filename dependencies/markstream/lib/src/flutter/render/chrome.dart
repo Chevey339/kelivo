@@ -56,6 +56,12 @@ class MarkstreamLabels {
     this.collapse = 'Collapse',
     this.unnamedCode = 'Code',
     this.details = 'Details',
+    this.note = 'Note',
+    this.tip = 'Tip',
+    this.important = 'Important',
+    this.warning = 'Warning',
+    this.caution = 'Caution',
+    this.danger = 'Danger',
     this.moreRows = _moreRows,
   });
   final String copyCode,
@@ -64,7 +70,13 @@ class MarkstreamLabels {
       expand,
       collapse,
       unnamedCode,
-      details;
+      details,
+      note,
+      tip,
+      important,
+      warning,
+      caution,
+      danger;
   final String Function(int) moreRows;
   static String _moreRows(int count) => 'Show $count more rows';
   @override
@@ -77,6 +89,12 @@ class MarkstreamLabels {
       other.collapse == collapse &&
       other.unnamedCode == unnamedCode &&
       other.details == details &&
+      other.note == note &&
+      other.tip == tip &&
+      other.important == important &&
+      other.warning == warning &&
+      other.caution == caution &&
+      other.danger == danger &&
       other.moreRows == moreRows;
   @override
   int get hashCode => Object.hash(
@@ -87,6 +105,12 @@ class MarkstreamLabels {
     collapse,
     unnamedCode,
     details,
+    note,
+    tip,
+    important,
+    warning,
+    caution,
+    danger,
     moreRows,
   );
 }

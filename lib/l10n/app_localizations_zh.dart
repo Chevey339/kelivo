@@ -12545,6 +12545,24 @@ class AppLocalizationsZh extends AppLocalizations {
   String markdownMoreRows(int count) {
     return '再显示 $count 行';
   }
+
+  @override
+  String get markdownNoteLabel => '备注';
+
+  @override
+  String get markdownTipLabel => '提示';
+
+  @override
+  String get markdownImportantLabel => '重要';
+
+  @override
+  String get markdownWarningLabel => '警告';
+
+  @override
+  String get markdownCautionLabel => '注意';
+
+  @override
+  String get markdownDangerLabel => '危险';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hans`).
@@ -25014,6 +25032,24 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String markdownMoreRows(int count) {
     return '再显示 $count 行';
   }
+
+  @override
+  String get markdownNoteLabel => '备注';
+
+  @override
+  String get markdownTipLabel => '提示';
+
+  @override
+  String get markdownImportantLabel => '重要';
+
+  @override
+  String get markdownWarningLabel => '警告';
+
+  @override
+  String get markdownCautionLabel => '注意';
+
+  @override
+  String get markdownDangerLabel => '危险';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hant`).
@@ -37562,4 +37598,22 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String markdownMoreRows(int count) {
     return '再顯示 $count 行';
   }
+
+  @override
+  String get markdownNoteLabel => '備註';
+
+  @override
+  String get markdownTipLabel => '提示';
+
+  @override
+  String get markdownImportantLabel => '重要';
+
+  @override
+  String get markdownWarningLabel => '警告';
+
+  @override
+  String get markdownCautionLabel => '注意';
+
+  @override
+  String get markdownDangerLabel => '危險';
 }

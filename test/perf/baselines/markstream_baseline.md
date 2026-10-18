@@ -281,3 +281,16 @@ MARKSTREAM_RENDER {"run":5,"renderer":"markstream","appAdapters":true,"appendCha
 ```
 
 The complete visual/interaction review is in `markstream_visual_review.md`.
+
+
+## C42 directive-card diagnostic
+
+One app fixed-fixture batch on the same host/SDK after C41, before the C42 full
+test run: scheduling median/p95 0.433/0.941ms, actual content 2.384/3.560ms,
+cold 534.131ms. This is a diagnostic, not a five-round acceptance result; the
+C41 unmet targets remain open. Directive selection, scaling and live closure
+are checked by widget assertions.
+
+```text
+MARKSTREAM_RENDER {"run":1,"renderer":"markstream","appAdapters":true,"appendChars":30000,"coldChars":100000,"samples":56,"firstPumpMedianUs":433,"firstPumpP95Us":941,"contentPumpMedianUs":2384,"contentPumpP95Us":3560,"coldFirstFrameUs":534131}
+```

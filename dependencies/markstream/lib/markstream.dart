@@ -26,6 +26,8 @@ export 'src/flutter/selection/selection_controller.dart'
         MarkstreamSelectionFragment;
 export 'src/flutter/performance_limits.dart';
 export 'src/flutter/render/blocks/code_block.dart' show MarkstreamCodeBlock;
+export 'src/flutter/render/blocks/directive_card.dart'
+    show MarkstreamDirectiveCard;
 
 export 'src/flutter/render/blocks/table_block.dart' show MarkstreamTableBlock;
 export 'src/flutter/render/blocks/details_block.dart'

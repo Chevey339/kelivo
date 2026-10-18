@@ -154,3 +154,31 @@ the library owns LaTeX selection. `ImageBuilder` and `LinkHandler` leave source
 resolution, navigation and image viewing to the application. Table/code extra
 actions similarly leave saving and sharing to the application; a table action
 receives a PNG-capture callback. Extensions share the consumer's selection area.
+
+
+### Directives and alerts
+
+`:::note`, `:::tip`, `:::warning`, `:::danger` containers and leaf directives
+render as cards. GitHub `NOTE`, `TIP`, `IMPORTANT`, `WARNING` and `CAUTION`
+alerts use the same renderer. `MarkstreamLabels` localizes default titles;
+`title="..."` overrides the chrome title. An explicit `[label]` stays selectable.
+Unknown directive names retain their children without a card.
+
+Register a named builder to override a default or add an app-specific card:
+
+```dart
+final extensions = MarkstreamExtensions(directiveBuilders: {
+  'answer': (context, node, rendering) => MarkstreamDirectiveCard(
+    kind: 'note',
+    title: 'Answer',
+    theme: rendering.theme,
+    child: Column(children: [
+      for (final child in node.children)
+        rendering.buildBlock(child as BlockNode),
+    ]),
+  ),
+});
+```
+
+Keep this registration object stable across streaming updates. Reuse
+`rendering.buildBlock` so source selection and app adapters remain connected.

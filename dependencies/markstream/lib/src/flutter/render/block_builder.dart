@@ -16,6 +16,7 @@ import 'blocks/code_block.dart';
 import 'blocks/table_block.dart';
 import 'blocks/math_block.dart';
 import 'blocks/details_block.dart';
+import 'blocks/directive_card.dart';
 
 /// One view owns this session. Cached prefix widgets do not retain historical
 /// whole-document snapshots; recursive callbacks read the current session.
@@ -482,8 +483,27 @@ class MarkstreamRenderer {
     if (node is ListItemNode)
       return children(context, node.children, streaming: streaming);
     if (node is ReferenceDefinitionNode) return const SizedBox.shrink();
-    if (node is NamedBlockNode)
-      return children(context, node.children, streaming: streaming);
+    if (node is NamedBlockNode) {
+      final kind = node.name.toLowerCase();
+      final content = children(context, node.children, streaming: streaming);
+      if (!MarkstreamDirectiveCard.kinds.contains(kind)) return content;
+      final title =
+          node.attributes['title'] ??
+          switch (kind) {
+            'tip' => labels.tip,
+            'important' => labels.important,
+            'warning' => labels.warning,
+            'caution' => labels.caution,
+            'danger' => labels.danger,
+            _ => labels.note,
+          };
+      return MarkstreamDirectiveCard(
+        kind: kind,
+        title: title,
+        theme: theme,
+        child: content,
+      );
+    }
     if (node is DirectiveLabelNode)
       return inlineText(
         context,
