@@ -4795,6 +4795,16 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
+  String searchServiceEditorUsageDeepSeekRequests(String count) {
+    return '约可调用 $count 次搜索/抓取';
+  }
+
+  @override
+  String searchServiceEditorUsageDeepSeekBalance(String balance, String price) {
+    return '余额 $balance · 每千次 $price';
+  }
+
+  @override
   String searchServiceEditorUsageUsed(String used, String limit) {
     return '已使用 $used / $limit 额度';
   }
@@ -17271,6 +17281,16 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   }
 
   @override
+  String searchServiceEditorUsageDeepSeekRequests(String count) {
+    return '约可调用 $count 次搜索/抓取';
+  }
+
+  @override
+  String searchServiceEditorUsageDeepSeekBalance(String balance, String price) {
+    return '余额 $balance · 每千次 $price';
+  }
+
+  @override
   String searchServiceEditorUsageUsed(String used, String limit) {
     return '已使用 $used / $limit 额度';
   }
@@ -29669,6 +29689,16 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   @override
   String searchServiceEditorUsageBalance(String balance) {
     return '餘額 $balance';
+  }
+
+  @override
+  String searchServiceEditorUsageDeepSeekRequests(String count) {
+    return '約可呼叫 $count 次搜尋/擷取';
+  }
+
+  @override
+  String searchServiceEditorUsageDeepSeekBalance(String balance, String price) {
+    return '餘額 $balance · 每千次 $price';
   }
 
   @override

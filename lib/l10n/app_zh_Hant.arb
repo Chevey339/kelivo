@@ -1694,6 +1694,19 @@
       "balance": { "type": "String" }
     }
   },
+  "searchServiceEditorUsageDeepSeekRequests": "約可呼叫 {count} 次搜尋/擷取",
+  "@searchServiceEditorUsageDeepSeekRequests": {
+    "placeholders": {
+      "count": { "type": "String" }
+    }
+  },
+  "searchServiceEditorUsageDeepSeekBalance": "餘額 {balance} · 每千次 {price}",
+  "@searchServiceEditorUsageDeepSeekBalance": {
+    "placeholders": {
+      "balance": { "type": "String" },
+      "price": { "type": "String" }
+    }
+  },
   "searchServiceEditorUsageUsed": "已使用 {used} / {limit} 額度",
   "@searchServiceEditorUsageUsed": {
     "placeholders": {

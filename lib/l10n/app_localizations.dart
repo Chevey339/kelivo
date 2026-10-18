@@ -9115,6 +9115,18 @@ abstract class AppLocalizations {
   /// **'Balance: {balance}'**
   String searchServiceEditorUsageBalance(String balance);
 
+  /// No description provided for @searchServiceEditorUsageDeepSeekRequests.
+  ///
+  /// In en, this message translates to:
+  /// **'About {count} Search/Fetch requests left'**
+  String searchServiceEditorUsageDeepSeekRequests(String count);
+
+  /// No description provided for @searchServiceEditorUsageDeepSeekBalance.
+  ///
+  /// In en, this message translates to:
+  /// **'Balance {balance} · {price} per 1,000 requests'**
+  String searchServiceEditorUsageDeepSeekBalance(String balance, String price);
+
   /// No description provided for @searchServiceEditorUsageUsed.
   ///
   /// In en, this message translates to:

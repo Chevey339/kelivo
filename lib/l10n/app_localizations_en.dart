@@ -4959,6 +4959,16 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String searchServiceEditorUsageDeepSeekRequests(String count) {
+    return 'About $count Search/Fetch requests left';
+  }
+
+  @override
+  String searchServiceEditorUsageDeepSeekBalance(String balance, String price) {
+    return 'Balance $balance · $price per 1,000 requests';
+  }
+
+  @override
   String searchServiceEditorUsageUsed(String used, String limit) {
     return '$used of $limit credits used';
   }
