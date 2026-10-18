@@ -91,3 +91,14 @@ percentages, failing IDs, and complete differences are saved under
 conformance percentages. `test/core/spec/known_deviations.txt` distinguishes
 native HTML policy from remaining parser and serializer gaps. Fixture sources,
 hashes and licenses are recorded in `THIRD_PARTY_NOTICES.md`.
+
+
+## Inline widget selection
+
+Use `buildSelectableText(Text.rich(...))` for paragraphs containing inline
+widgets. `InlineCodeCapsule` renders a baseline-aligned `WidgetSpan` child and
+copies its code text as an atomic selection unit. `SelectableSpanAdapter`
+provides the same source-text bridge for formulas or application citation chips.
+Wrap changing groups in `StableSelectionContainer` and supply one outer
+`SelectionArea` in the application. The package does not create a selection
+menu or selection owner. See `doc/selection_spike.md` for validation boundaries.
