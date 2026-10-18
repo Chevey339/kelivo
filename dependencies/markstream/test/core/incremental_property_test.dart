@@ -10,6 +10,7 @@ void main() {
       '> - first\n> - second\n>   continuation\n\nOutside',
       '<details><summary>Title</summary>\n\n- one\n- two\n</details>After',
       'Before \$\$\nx+y\n\nq\n\$\$ after',
+      'Before \$\$x+y\n\nq\$\$ after',
       '| A | B |\n| --- | --- |\n| \$|x|\$ | `y` |',
       '[ref]\n\n[ref]: /url "title"\n\nnext',
       '::::note[label]\n:::tip\ninside\n:::\n::::',
@@ -72,6 +73,52 @@ void main() {
       second.toJson(),
       const MarkdownParser().parse(source, streaming: true).toJson(),
     );
+  });
+  test(
+    'late display-math closers revisit literal prefixes for each policy',
+    () {
+      const parser = MarkdownParser();
+      for (final streaming in [false, true]) {
+        for (final optimistic in [false, true]) {
+          final policy = StreamingOptions(optimisticBlocks: optimistic);
+          for (final source in [
+            'head\n\nBefore \$\$a + b\n\nc + d\$\$ after\n\ntail',
+            'head\n\nBefore \\[a + b\n\nc + d\\] after\n\ntail',
+            '> Before \$\$a\n>\n> b\$\$\n\nnext',
+          ]) {
+            final incremental = IncrementalDocument(streamingOptions: policy);
+            for (var end = 0; end <= source.length; end++) {
+              final prefix = source.substring(0, end);
+              expect(
+                incremental.update(prefix, streaming: streaming).toJson(),
+                parser
+                    .parse(
+                      prefix,
+                      streaming: streaming,
+                      streamingOptions: policy,
+                    )
+                    .toJson(),
+                reason: '$streaming/$optimistic: $prefix',
+              );
+            }
+          }
+        }
+      }
+    },
+  );
+  test('resuming an unfinished display body reopens its literal prefix', () {
+    const source = 'head\n\nBefore \$\$a\n\nb';
+    const parser = MarkdownParser();
+    final incremental = IncrementalDocument();
+    final initial = incremental.update(source);
+    for (final streaming in [true, false, true]) {
+      final current = incremental.update(source, streaming: streaming);
+      expect(
+        current.toJson(),
+        parser.parse(source, streaming: streaming).toJson(),
+      );
+      expect(current.children.first, same(initial.children.first));
+    }
   });
   test('random chunk boundaries and truncations match full parsing', () {
     final random = Random(1818);

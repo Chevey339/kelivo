@@ -1,6 +1,8 @@
 import '../ast/nodes.dart';
 import 'dialect.dart';
 import 'markdown_parser.dart';
+import 'source_line.dart';
+import 'syntax/math_block.dart';
 
 /// Reuses complete leading blocks and reparses the final open block chain.
 final class IncrementalDocument {
@@ -41,6 +43,29 @@ final class IncrementalDocument {
           _document.children[prefixLength].span.start,
         );
       }
+      // Static and pessimistic input can keep an unfinished display formula
+      // as prose across blank lines. A new closer or resuming optimistic input
+      // can reclassify an earlier block. Ongoing optimistic streams already
+      // retain that open math node.
+      final startsOptimisticMath =
+          streaming && !_streaming && streamingOptions.optimisticBlocks;
+      if (parser.options.mathBlocks &&
+          (startsOptimisticMath ||
+              (!(streaming &&
+                      _streaming &&
+                      streamingOptions.optimisticBlocks) &&
+                  _newMathCloser(source)))) {
+        for (var i = 0; i < prefixLength; i++) {
+          if (_hasOpenMathText(_document.children[i])) {
+            prefixLength = i;
+            start = _lineStart(
+              _document.source,
+              _document.children[i].span.start,
+            );
+            break;
+          }
+        }
+      }
     }
     final leadingReferences = {
       for (final entry in _document.references.entries)
@@ -68,6 +93,34 @@ final class IncrementalDocument {
       children: [..._document.children.take(prefixLength), ...tail.children],
       references: tail.references,
     );
+  }
+
+  static final _mathCloser = RegExp(r'\$\$|\\\]');
+  bool _newMathCloser(String source) =>
+      source.length > _document.source.length &&
+      _mathCloser.hasMatch(
+        source.substring(
+          _document.source.isEmpty ? 0 : _document.source.length - 1,
+        ),
+      );
+
+  bool _hasOpenMathText(BlockNode root) {
+    final pending = <BlockNode>[root];
+    while (pending.isNotEmpty) {
+      final node = pending.removeLast();
+      if (node is ParagraphNode) {
+        final raw = node.span.slice(_document.source);
+        if (!raw.contains(r'$$') && !raw.contains(r'\[')) continue;
+        for (final line in SourceLine.scan(raw)) {
+          if (findMathBlockStart(raw, line.start, line.end, streaming: true) !=
+              null)
+            return true;
+        }
+      } else {
+        pending.addAll(node.children.whereType<BlockNode>());
+      }
+    }
+    return false;
   }
 
   int _lineStart(String source, int offset) {

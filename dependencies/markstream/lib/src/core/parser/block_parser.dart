@@ -113,6 +113,14 @@ final class _BlockSession {
   final stack = <_Block>[];
   _Block? leaf;
   final _remaining = <LineCursor>[];
+  final _lastMathClose = <String, int>{};
+
+  // Lookahead is only needed for an opener with body text on its first line.
+  // Cache the last unescaped closer so malformed openers do not rescan the
+  // whole remaining document for every source line.
+  bool _hasLaterMathClose(int after, String closer) =>
+      (_lastMathClose[closer] ??= findLastMathBlockClose(source, closer)) >=
+      after;
 
   static final _listStart = RegExp(r'^([-+*]|[0-9]{1,9}[.)])(?=\s|$)');
   static final _fenceStart = RegExp(r'^(`{3,}|~{3,})(.*)$');
@@ -228,6 +236,7 @@ final class _BlockSession {
         cursor.offset,
         cursor.line.end,
         streaming: streaming,
+        hasLaterClose: _hasLaterMathClose,
       );
       if (math != null && math.start == cursor.indentation.end) return true;
     }
@@ -307,6 +316,7 @@ final class _BlockSession {
             cursor.offset,
             cursor.line.end,
             streaming: streaming,
+            hasLaterClose: _hasLaterMathClose,
           )
         : null;
     if (math != null) {

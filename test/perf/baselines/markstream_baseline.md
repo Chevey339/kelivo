@@ -126,3 +126,29 @@ MARKSTREAM_RENDER {"run":3,"appendChars":30000,"coldChars":100000,"samples":56,"
 MARKSTREAM_RENDER {"run":4,"appendChars":30000,"coldChars":100000,"samples":56,"firstPumpMedianUs":395,"firstPumpP95Us":822,"contentPumpMedianUs":2525,"contentPumpP95Us":3602,"coldFirstFrameUs":495843,"themePlatform":"android","hostOS":"macos","selectionController":true,"appAdapters":false}
 MARKSTREAM_RENDER {"run":5,"appendChars":30000,"coldChars":100000,"samples":56,"firstPumpMedianUs":374,"firstPumpP95Us":554,"contentPumpMedianUs":2478,"contentPumpP95Us":3747,"coldFirstFrameUs":484370,"themePlatform":"android","hostOS":"macos","selectionController":true,"appAdapters":false}
 ```
+
+## C33 static preview migration diagnostic
+
+Code state: C32 parent `ae757f3f` plus the C33 file/Skill preview migration and
+cross-paragraph display-math fix. This is one diagnostic batch on the same
+Flutter 3.47.6 host, fixture generator, font and benchmark setup as C04, with
+no other Flutter test process running during this batch. It is not the final
+five-process streaming/cold-render comparison. Both values of the retained
+`useBlockRendering` argument now use the same native block renderer; their
+within-batch difference is warm-up/cache noise, not two rendering modes.
+
+The static-preview (`blocks=true`) 100/250-section load medians changed from
+235.26/658.66 ms in C04 to 105.14/230.31 ms here. Scroll medians changed from
+1.68/2.12 ms to 1.06/1.14 ms. These measurements cover the existing synthetic
+preview workload, not a physical device or a 100k-character cold render.
+
+```sh
+flutter test --no-pub test/perf/skill_preview_bench.dart --reporter expanded
+```
+
+```text
+RESULT sections=100 blocks=false chars=23718 loadMedianMs=156.04 scrollMedianMs=1.52 scrollP90Ms=2.28
+RESULT sections=100 blocks=true chars=23718 loadMedianMs=105.14 scrollMedianMs=1.06 scrollP90Ms=1.75
+RESULT sections=250 blocks=false chars=59463 loadMedianMs=242.84 scrollMedianMs=1.21 scrollP90Ms=2.00
+RESULT sections=250 blocks=true chars=59463 loadMedianMs=230.31 scrollMedianMs=1.14 scrollP90Ms=2.02
+```

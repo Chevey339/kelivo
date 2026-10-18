@@ -24,11 +24,21 @@ int findMathBlockClose(String source, int start, int end, String closer) {
   return -1;
 }
 
+int findLastMathBlockClose(String source, String closer) {
+  var offset = source.lastIndexOf(closer);
+  while (offset >= 0 && _escaped(source, offset)) {
+    if (offset == 0) return -1;
+    offset = source.lastIndexOf(closer, offset - 1);
+  }
+  return offset;
+}
+
 MathBlockStart? findMathBlockStart(
   String source,
   int start,
   int end, {
   bool streaming = false,
+  bool Function(int after, String closer)? hasLaterClose,
 }) {
   for (var i = start; i < end; i++) {
     final char = source.codeUnitAt(i);
@@ -67,10 +77,10 @@ MathBlockStart? findMathBlockStart(
       continue;
     }
     final after = source.substring(i + opener.length, end);
-    final atLineStart = source.substring(start, i).trim().isEmpty;
     if (after.trim().isEmpty ||
         findMathBlockClose(source, i + opener.length, end, closer) >= 0 ||
-        (streaming && atLineStart)) {
+        streaming ||
+        (hasLaterClose?.call(end, closer) ?? false)) {
       return MathBlockStart(i, opener, closer);
     }
   }

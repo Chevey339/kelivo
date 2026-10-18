@@ -35,6 +35,34 @@ void main() {
       'x + y',
     );
   });
+  test('same-line display bodies can close after a blank line', () {
+    const source = 'Before \$\$a + b\n\nc + d\$\$ after';
+    final doc = parser.parse(source);
+    expect(doc.children.map((node) => node.type), [
+      'paragraph',
+      'math_block',
+      'paragraph',
+    ]);
+    final math = doc.children[1] as MathBlockNode;
+    expect(math.tex, 'a + b\n\nc + d');
+    expect(math.span.slice(source), '\$\$a + b\n\nc + d\$\$');
+    expect(math.closed, isTrue);
+    expect(
+      parser.parse('Before \$\$a + b', streaming: true).children.last,
+      isA<MathBlockNode>(),
+    );
+    expect(
+      parser.parse('Before \$\$a + b').children.single,
+      isA<ParagraphNode>(),
+    );
+    expect(
+      parser
+          .parse('Before \$\$a\n\nb\\\$\$')
+          .children
+          .whereType<MathBlockNode>(),
+      isEmpty,
+    );
+  });
   test('fences and inline code protect math markers', () {
     final doc = parser.parse('`\$\$x\$\$`\n\n```\n\$\$\nx\n\$\$\n```');
     expect(doc.children.map((n) => n.type), ['paragraph', 'code_block']);
