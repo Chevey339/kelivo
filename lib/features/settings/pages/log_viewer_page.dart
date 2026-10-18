@@ -2018,6 +2018,7 @@ Color _contextSourceColor(BuildContext context, ContextSource source) {
     case ContextSource.instructionInjection:
     case ContextSource.skills:
     case ContextSource.workspace:
+    case ContextSource.planMode:
       return colors.warning;
     case ContextSource.searchPrompt:
       return cs.secondary;
@@ -2043,6 +2044,8 @@ String _contextSourceLabel(AppLocalizations l10n, ContextSource source) {
       return l10n.contextUsageBucketSkills;
     case ContextSource.workspace:
       return l10n.contextUsageBucketWorkspace;
+    case ContextSource.planMode:
+      return l10n.planModeTitle;
     case ContextSource.worldBook:
       return l10n.contextLogSourceWorldBook;
     case ContextSource.memorySnapshot:

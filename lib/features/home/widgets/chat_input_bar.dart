@@ -563,6 +563,8 @@ class ChatInputBar extends StatefulWidget {
     this.onOpenWorkspace,
     this.showWorkspaceButton = false,
     this.workspaceActive = false,
+    this.onTogglePlanMode,
+    this.planModeActive = false,
     this.onOpenSkills,
     this.skillsActive = false,
     this.onOpenSearch,
@@ -623,6 +625,8 @@ class ChatInputBar extends StatefulWidget {
   final VoidCallback? onOpenWorkspace;
   final bool showWorkspaceButton;
   final bool workspaceActive;
+  final VoidCallback? onTogglePlanMode;
+  final bool planModeActive;
   final VoidCallback? onOpenSkills;
   final bool skillsActive;
   final VoidCallback? onOpenSearch;
@@ -1343,6 +1347,9 @@ class _ChatInputBarState extends State<ChatInputBar>
 
   String _hint(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
+    if (widget.planModeActive) {
+      return l10n.planModeInputHint;
+    }
     return l10n.chatInputBarHint;
   }
 
@@ -3125,6 +3132,25 @@ class _ChatInputBarState extends State<ChatInputBar>
                 icon: Lucide.WandSparkles,
                 label: l10n.workspaceEntrySessionSkills,
                 onTap: lockTap(widget.onOpenSkills),
+              ),
+            ),
+          );
+        }
+
+        if (widget.onTogglePlanMode != null) {
+          actions.add(
+            _OverflowAction(
+              width: normalButtonW,
+              builder: () => _CompactIconButton(
+                tooltip: l10n.planModeTooltip,
+                icon: Lucide.ListTodo,
+                active: widget.planModeActive,
+                onTap: lockTap(widget.onTogglePlanMode),
+              ),
+              menu: DesktopContextMenuItem(
+                icon: Lucide.ListTodo,
+                label: l10n.planModeTitle,
+                onTap: lockTap(widget.onTogglePlanMode),
               ),
             ),
           );

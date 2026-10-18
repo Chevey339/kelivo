@@ -5,6 +5,8 @@ import 'package:flutter/widgets.dart';
 import 'package:provider/provider.dart';
 import '../../../core/models/assistant.dart';
 import '../../../core/models/model_spec.dart';
+import '../../../core/models/plan_mode_binding.dart';
+import '../../../core/models/task_execution_binding.dart';
 import '../../../core/models/reasoning_request.dart';
 import '../../../core/providers/assistant_provider.dart';
 import '../../../core/providers/environment_provider.dart';
@@ -70,9 +72,23 @@ class ToolHandlerService {
             ?.loadExecutionConfig,
         isToolEnabled: (id, name) =>
             workspaces.byId(id)?.isToolEnabled(name) ?? false,
+        isPlanMode: _isPlanMode,
       );
     } catch (_) {
-      return WorkspaceToolsService();
+      return WorkspaceToolsService(isPlanMode: _isPlanMode);
+    }
+  }
+
+  bool _isPlanMode(String? conversationId) {
+    try {
+      final chatService = contextProvider.read<ChatService>();
+      final targetId = conversationId ?? chatService.currentConversationId;
+      if (targetId == null) return false;
+      final conversation = chatService.getConversation(targetId);
+      if (conversation == null) return false;
+      return PlanModeBinding.fromExtras(conversation.extras).isPlanMode;
+    } catch (_) {
+      return false;
     }
   }
 
@@ -309,6 +325,7 @@ class ToolHandlerService {
     );
     toolDefs.addAll(mcpTools);
 
+    final isPlan = _isPlanMode(conversationId);
     if (supportsTools && workspaceContext != null) {
       final canImageInput = ModelSpecResolver.instance
           .spec(settings.getProviderConfig(providerKey), modelId)
@@ -316,13 +333,17 @@ class ToolHandlerService {
           .contains(Modality.image);
       toolDefs.addAll(
         _workspaceTools()
-            .buildToolDefinitions(workspaceContext)
+            .buildToolDefinitions(workspaceContext, isPlanMode: isPlan)
             .where(
               (definition) =>
                   canImageInput ||
                   (definition['function'] as Map)['name'] != 'view_image',
             ),
       );
+    }
+
+    if (supportsTools) {
+      toolDefs.add(updateTaskProgressDefinition);
     }
 
     final overrides = settings.toolSchemaOverrides;
@@ -491,6 +512,13 @@ class ToolHandlerService {
           return await approveAndExecuteMcp(name, args, toolCallId: toolCallId);
         }
 
+        if (name == 'update_task_progress') {
+          return await _handleUpdateTaskProgress(
+            args,
+            conversationId: conversationId,
+          );
+        }
+
         // Search tool
         if (name == SearchToolService.toolName &&
             assistant?.searchEnabled == true) {
@@ -617,6 +645,105 @@ class ToolHandlerService {
               'The tool execution failed unexpectedly. You may try again with different parameters or inform the user about the issue.',
         );
       }
+    };
+  }
+
+  /// Definition for the update_task_progress tool during execution phase.
+  static Map<String, dynamic> get updateTaskProgressDefinition => {
+        'type': 'function',
+        'function': {
+          'name': 'update_task_progress',
+          'description':
+              'Update the execution status of a task step in the approved plan. '
+              'Call this tool as you begin working on a step (mark in_progress) and when a step is finished (mark completed).',
+          'parameters': {
+            'type': 'object',
+            'properties': {
+              'step_index': {
+                'type': 'integer',
+                'description':
+                    'The 1-based index of the step being updated (e.g. 1 for step 1, 2 for step 2).',
+              },
+              'step_id': {
+                'type': 'string',
+                'description': 'Optional step ID (e.g. "step_1", "step_2").',
+              },
+              'status': {
+                'type': 'string',
+                'enum': ['in_progress', 'completed', 'failed', 'pending'],
+                'description': 'The new execution status for this step.',
+              },
+              'note': {
+                'type': 'string',
+                'description':
+                    'Optional progress details or execution outcome for this step.',
+              },
+            },
+            'required': ['status'],
+          },
+        },
+      };
+
+  Future<Object?> _handleUpdateTaskProgress(
+    Map<String, dynamic> args, {
+    String? conversationId,
+  }) async {
+    final chatService = contextProvider.read<ChatService>();
+    final targetId = conversationId ?? chatService.currentConversationId;
+    if (targetId == null) {
+      return {'success': false, 'error': 'No conversation context'};
+    }
+    final conversation = chatService.getConversation(targetId);
+    if (conversation == null) {
+      return {'success': false, 'error': 'Conversation not found'};
+    }
+
+    final binding = TaskExecutionBinding.fromExtras(conversation.extras);
+    final plan = binding.plan;
+    if (plan == null) {
+      return {'success': false, 'error': 'No active task execution plan'};
+    }
+
+    final rawStatus = args['status']?.toString();
+    final status = TaskStepStatusWire.fromWire(rawStatus);
+    final note = args['note']?.toString();
+
+    String? targetStepId = args['step_id']?.toString();
+    final rawIndex = args['step_index'];
+    if (targetStepId == null || targetStepId.isEmpty) {
+      if (rawIndex is int && rawIndex >= 1 && rawIndex <= plan.steps.length) {
+        targetStepId = plan.steps[rawIndex - 1].id;
+      } else if (rawIndex is String) {
+        final parsed = int.tryParse(rawIndex);
+        if (parsed != null && parsed >= 1 && parsed <= plan.steps.length) {
+          targetStepId = plan.steps[parsed - 1].id;
+        }
+      }
+    }
+
+    targetStepId ??= plan.activeStep?.id ??
+        (plan.steps.isNotEmpty ? plan.steps.first.id : null);
+
+    if (targetStepId == null) {
+      return {'success': false, 'error': 'Step not found'};
+    }
+
+    final updatedPlan = plan.updateStepStatus(targetStepId, status, note: note);
+    final updatedBinding = TaskExecutionBinding(plan: updatedPlan);
+
+    await chatService.updateConversationExtras(
+      targetId,
+      (extras) => updatedBinding.applyTo(extras),
+    );
+
+    return {
+      'success': true,
+      'updated_step_id': targetStepId,
+      'status': status.wireName,
+      'completed_steps': updatedPlan.completedCount,
+      'total_steps': updatedPlan.totalCount,
+      'progress': '${(updatedPlan.progressFraction * 100).toInt()}%',
+      'all_completed': updatedPlan.isCompleted,
     };
   }
 

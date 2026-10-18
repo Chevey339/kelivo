@@ -17,5 +17,6 @@ abstract final class BuiltInToolNames {
     ...MemoryTools.legacyToolNames,
     ...LocalToolNames.all,
     ...WorkspaceToolsService.toolNames,
+    'update_task_progress',
   };
 }

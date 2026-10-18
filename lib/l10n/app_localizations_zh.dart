@@ -12478,6 +12478,72 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get mcpOAuthExchangingToken => '正在完成登录…';
+
+  @override
+  String get planModeTitle => '计划模式';
+
+  @override
+  String get planModeTooltip => '计划模式（仅探索与方案规划）';
+
+  @override
+  String get planModeActiveBanner => '计划模式已激活 · 仅探索与方案规划';
+
+  @override
+  String get planModeExit => '退出计划模式';
+
+  @override
+  String get planModeImplementPlan => '批准并执行';
+
+  @override
+  String get planModeImplementPlanTooltip => '切换到执行模式并立即执行此计划';
+
+  @override
+  String get planModeImplementInNewChat => '新会话中执行';
+
+  @override
+  String get planModeImplementInNewChatTooltip => '在新会话中仅带入此计划，保持上下文纯净并高质实现';
+
+  @override
+  String get planModeRevisePlan => '调整计划';
+
+  @override
+  String get planModeReadOnlyError => '计划模式下禁止文件修改和命令执行。请继续完善方案并请求用户审批。';
+
+  @override
+  String get planModeInputHint => '计划模式：描述你想规划的需求或任务…';
+
+  @override
+  String get planModeApprovedAndImplementMessage => '已批准计划，请开始执行。';
+
+  @override
+  String get taskProgressTitle => '任务执行进度';
+
+  @override
+  String get taskProgressCompletedBadge => '所有计划步骤已完成';
+
+  @override
+  String taskProgressStepCount(Object completed, Object total) => '$completed / $total 步骤';
+
+  @override
+  String get planModeRevisionHint => '输入对该方案的修改意见（例如：更换实现技术、增删功能步骤、补充测试用例等）…';
+
+  @override
+  String get planModeSubmitRevision => '发送修改意见';
+
+  @override
+  String get planModeQuickChipSimplify => '更精简方案';
+
+  @override
+  String get planModeQuickChipDetail => '细化实施步骤';
+
+  @override
+  String get planModeQuickChipTests => '补充测试方案';
+
+  @override
+  String get planModeRevisionPrefix => '我对刚才的方案有以下修改要求：';
+
+  @override
+  String get planModeRevisionInstruction => '请在计划模式下结合上述要求重新调整，并输出更新后的完整方案（用 <proposed_plan> 包裹）。';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hans`).
@@ -37361,4 +37427,70 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get mcpOAuthExchangingToken => '正在完成登入…';
+
+  @override
+  String get planModeTitle => '計劃模式';
+
+  @override
+  String get planModeTooltip => '計劃模式（僅探索與方案規劃）';
+
+  @override
+  String get planModeActiveBanner => '計劃模式已啟用 · 僅探索與方案規劃';
+
+  @override
+  String get planModeExit => '退出計劃模式';
+
+  @override
+  String get planModeImplementPlan => '批准並執行';
+
+  @override
+  String get planModeImplementPlanTooltip => '切換至執行模式並立即執行此計劃';
+
+  @override
+  String get planModeImplementInNewChat => '新對話中執行';
+
+  @override
+  String get planModeImplementInNewChatTooltip => '在新對話中僅帶入此計劃，保持上下文純淨並高質實作';
+
+  @override
+  String get planModeRevisePlan => '調整計劃';
+
+  @override
+  String get planModeReadOnlyError => '計劃模式下禁止檔案修改和命令執行。請繼續完善方案並請求使用者審批。';
+
+  @override
+  String get planModeInputHint => '計劃模式：描述你想規劃的需求或任務…';
+
+  @override
+  String get planModeApprovedAndImplementMessage => '已批准計劃，請開始執行。';
+
+  @override
+  String get taskProgressTitle => '任務執行進度';
+
+  @override
+  String get taskProgressCompletedBadge => '所有計劃步驟已完成';
+
+  @override
+  String taskProgressStepCount(Object completed, Object total) => '$completed / $total 步驟';
+
+  @override
+  String get planModeRevisionHint => '輸入對該方案的修改意見（例如：更換實現技術、增刪功能步驟、補充測試用例等）…';
+
+  @override
+  String get planModeSubmitRevision => '發送修改意見';
+
+  @override
+  String get planModeQuickChipSimplify => '更精簡方案';
+
+  @override
+  String get planModeQuickChipDetail => '細化實施步驟';
+
+  @override
+  String get planModeQuickChipTests => '補充測試方案';
+
+  @override
+  String get planModeRevisionPrefix => '我對剛才的方案有以下修改要求：';
+
+  @override
+  String get planModeRevisionInstruction => '請在計劃模式下結合上述要求重新調整，並輸出更新後的完整方案（用 <proposed_plan> 包裹）。';
 }

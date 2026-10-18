@@ -13072,4 +13072,70 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get mcpOAuthExchangingToken => 'Completing sign-in…';
+
+  @override
+  String get planModeTitle => 'Plan Mode';
+
+  @override
+  String get planModeTooltip => 'Plan Mode (Exploration & Planning only)';
+
+  @override
+  String get planModeActiveBanner => 'Plan Mode Active · Read-only exploration & planning';
+
+  @override
+  String get planModeExit => 'Exit Plan Mode';
+
+  @override
+  String get planModeImplementPlan => 'Implement Plan';
+
+  @override
+  String get planModeImplementPlanTooltip => 'Switch to execution mode and implement this plan';
+
+  @override
+  String get planModeImplementInNewChat => 'Clear Context & Implement';
+
+  @override
+  String get planModeImplementInNewChatTooltip => 'Start a fresh chat with this plan to keep context clean and focused';
+
+  @override
+  String get planModeRevisePlan => 'Revise Plan';
+
+  @override
+  String get planModeReadOnlyError => 'Write operations and shell execution are forbidden in Plan Mode. Please formulate your plan and request user approval.';
+
+  @override
+  String get planModeInputHint => 'Plan Mode: Describe the feature or task to plan…';
+
+  @override
+  String get planModeApprovedAndImplementMessage => 'Plan approved. Proceed with implementation.';
+
+  @override
+  String get taskProgressTitle => 'Task Execution';
+
+  @override
+  String get taskProgressCompletedBadge => 'All plan steps completed';
+
+  @override
+  String taskProgressStepCount(Object completed, Object total) => '$completed / $total Steps';
+
+  @override
+  String get planModeRevisionHint => 'Enter feedback or revisions for this plan (e.g. change framework, add steps, tests)…';
+
+  @override
+  String get planModeSubmitRevision => 'Submit Feedback';
+
+  @override
+  String get planModeQuickChipSimplify => 'Simpler approach';
+
+  @override
+  String get planModeQuickChipDetail => 'More step details';
+
+  @override
+  String get planModeQuickChipTests => 'Add test plan';
+
+  @override
+  String get planModeRevisionPrefix => 'I have the following feedback on the proposed plan:';
+
+  @override
+  String get planModeRevisionInstruction => 'Please refine the plan in Plan Mode incorporating this feedback, and output the updated complete specification inside <proposed_plan> tags.';
 }
