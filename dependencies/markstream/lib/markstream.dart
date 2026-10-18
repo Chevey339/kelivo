@@ -11,3 +11,5 @@ export 'src/flutter/selection/table_selection.dart';
 export 'src/flutter/theme/markstream_theme.dart';
 export 'src/flutter/interfaces/renderers.dart';
 export 'src/flutter/extensions/registry.dart';
+export 'src/flutter/render/block_list.dart';
+export 'src/flutter/render/streaming_text.dart';
