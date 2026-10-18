@@ -1,4 +1,5 @@
 import '../../../support/business_test_harness.dart';
+import '../../../support/markdown_render_helpers.dart';
 
 import 'package:Kelivo/core/models/chat_message.dart';
 import 'package:Kelivo/core/providers/assistant_provider.dart';
@@ -42,12 +43,10 @@ void main() {
         );
 
         await _pumpTimeline(tester, role: role);
-        final paragraph = tester.renderObject<RenderParagraph>(
-          find.byWidgetPredicate(
-            (widget) =>
-                widget is RichText && widget.text.toPlainText() == _messageText,
-          ),
-        );
+        final paragraph = renderParagraphs(find.byType(MessageListView))
+            .singleWhere(
+              (paragraph) => paragraph.text.toPlainText() == _messageText,
+            );
 
         await _selectWord(tester, paragraph, doubleClick: true);
         expect(paragraph.selections, contains(_wordSelection));

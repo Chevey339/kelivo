@@ -4,13 +4,17 @@ import 'package:markstream/markstream.dart';
 
 /// Native paragraph batches have render objects without individual elements.
 List<RenderParagraph> markdownParagraphs(WidgetTester tester) {
+  return renderParagraphs(find.byType(MarkstreamView));
+}
+
+List<RenderParagraph> renderParagraphs(Finder roots) {
   final paragraphs = <RenderParagraph>[];
   void visit(RenderObject object) {
     if (object is RenderParagraph) paragraphs.add(object);
     object.visitChildren(visit);
   }
 
-  for (final element in find.byType(MarkstreamView).evaluate()) {
+  for (final element in roots.evaluate()) {
     visit(element.findRenderObject()!);
   }
   return paragraphs;

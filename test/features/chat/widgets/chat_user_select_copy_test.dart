@@ -9,6 +9,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 
 import '../../../support/business_test_harness.dart';
+import '../../../support/markdown_render_helpers.dart';
 
 void main() {
   testWidgets(
@@ -59,9 +60,7 @@ void main() {
         ),
       );
       await tester.pumpAndSettle();
-      await tester.longPress(
-        find.textContaining('Before', findRichText: true).first,
-      );
+      await tester.longPressAt(markdownGlyphCenter(tester, 'Before'));
       await tester.pumpAndSettle();
       expect(find.text('Edit'), findsOneWidget);
       expect(find.text('Delete This Version'), findsOneWidget);

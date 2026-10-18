@@ -31,7 +31,8 @@ import '../../../utils/avatar_cache.dart';
 import '../../../utils/assistant_regex.dart';
 import '../../../core/models/assistant.dart';
 import '../../../core/providers/tts_provider.dart';
-import '../../../shared/widgets/markdown_with_highlight.dart';
+import '../../../shared/markdown/markdown_with_code_highlight.dart';
+import '../../../shared/widgets/markdown_with_highlight.dart' as legacy;
 import 'package:Kelivo/shared/widgets/app_selection_area.dart';
 import '../../../shared/widgets/snackbar.dart';
 import '../../../shared/widgets/audio_clip_player.dart';
@@ -2540,7 +2541,7 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
 
     Widget assistantContent;
     if (enableAssistantMarkdown) {
-      assistantContent = MarkdownWithCodeHighlight(
+      assistantContent = legacy.MarkdownWithCodeHighlight(
         text: visualContent,
         onCitationTap: (id) => _handleCitationTap(id),
         citationIndexResolver: (id) =>
@@ -5164,7 +5165,7 @@ class _ChainOfThoughtReasoningStepState
     Widget reasoningContent(String text) {
       if (enableReasoningMarkdown) {
         return RepaintBoundary(
-          child: MarkdownWithCodeHighlight(
+          child: legacy.MarkdownWithCodeHighlight(
             text: text.isNotEmpty ? text : '…',
             baseStyle: TextStyle(fontSize: 12.5, height: 1.32),
             streaming: widget.step.loading,
@@ -7186,7 +7187,7 @@ class _ReasoningSectionState extends State<_ReasoningSection> {
     Widget reasoningContent(String text) {
       if (enableReasoningMarkdown) {
         return RepaintBoundary(
-          child: MarkdownWithCodeHighlight(
+          child: legacy.MarkdownWithCodeHighlight(
             text: text.isNotEmpty ? text : '…',
             baseStyle: baseStyle,
             streaming: isLoading,

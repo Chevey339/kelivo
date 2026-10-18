@@ -1,4 +1,5 @@
 import "../../../support/business_test_harness.dart";
+import '../../../support/markdown_render_helpers.dart';
 import 'package:Kelivo/core/models/chat_message.dart';
 import 'package:Kelivo/core/providers/assistant_provider.dart';
 import 'package:Kelivo/core/providers/settings_provider.dart';
@@ -56,13 +57,13 @@ void main() {
         ),
       );
 
-      await tester.longPress(find.text('old question'));
+      await tester.longPressAt(markdownGlyphCenter(tester, 'old question'));
       await tester.pumpAndSettle();
       expect(find.text('Edit'), findsOneWidget);
       await tester.tap(find.text('Edit'));
       await tester.pumpAndSettle();
 
-      await tester.longPress(find.text('latest question'));
+      await tester.longPressAt(markdownGlyphCenter(tester, 'latest question'));
       await tester.pumpAndSettle();
       expect(find.text('Edit'), findsOneWidget);
 
