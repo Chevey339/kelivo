@@ -1,3 +1,4 @@
+import '../../../support/markdown_render_helpers.dart';
 import "../../../support/business_test_harness.dart";
 
 import 'dart:async';
@@ -1126,7 +1127,7 @@ void main() {
     expect(rendered.showToolCards, isFalse);
     expect(find.text('Deep Thinking'), findsNothing);
     expect(find.textContaining('legacy reasoning'), findsNothing);
-    expect(find.textContaining('Final answer'), findsOneWidget);
+    expect(renderedParagraphsWith('Final answer', exact: false), hasLength(1));
   });
 
   testWidgets('grown snapshot.content misses the streaming height cache', (

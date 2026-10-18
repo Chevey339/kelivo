@@ -26,18 +26,20 @@ class MarkstreamMathBlock extends StatelessWidget {
     ],
     child: Padding(
       padding: theme.mathPadding,
-      child: LayoutBuilder(
-        builder: (context, constraints) => SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          primary: false,
-          child: ConstrainedBox(
-            constraints: BoxConstraints(
-              minWidth: constraints.hasBoundedWidth ? constraints.maxWidth : 0,
-            ),
-            child: Center(
-              child: SelectableSpanAdapter(
-                selectedText: toPlainText(node),
-                child: SelectionContainer.disabled(
+      child: SelectableSpanAdapter(
+        selectedText: toPlainText(node),
+        child: SelectionContainer.disabled(
+          child: LayoutBuilder(
+            builder: (context, constraints) => SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              primary: false,
+              child: ConstrainedBox(
+                constraints: BoxConstraints(
+                  minWidth: constraints.hasBoundedWidth
+                      ? constraints.maxWidth
+                      : 0,
+                ),
+                child: Center(
                   child:
                       renderer?.build(
                         context,

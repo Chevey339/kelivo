@@ -1,3 +1,4 @@
+import '../../../support/markdown_render_helpers.dart';
 import '../../../support/business_test_harness.dart';
 import 'package:Kelivo/core/models/chat_message.dart';
 import 'package:Kelivo/core/models/message_part.dart';
@@ -88,7 +89,10 @@ void main() {
     );
     await tester.pump();
 
-    expect(find.textContaining('partial answer'), findsOneWidget);
+    expect(
+      renderedParagraphsWith('partial answer', exact: false),
+      hasLength(1),
+    );
     expect(find.textContaining('until retry (2/3)'), findsOneWidget);
   });
 
@@ -118,7 +122,10 @@ void main() {
     );
     await tester.pump();
 
-    expect(find.textContaining('partial answer'), findsOneWidget);
+    expect(
+      renderedParagraphsWith('partial answer', exact: false),
+      hasLength(1),
+    );
     expect(find.textContaining('until retry (2/3)'), findsOneWidget);
   });
 

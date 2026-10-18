@@ -1,3 +1,4 @@
+import '../../../support/markdown_render_helpers.dart';
 import "../../../support/business_test_harness.dart";
 import 'dart:convert';
 
@@ -1036,7 +1037,10 @@ void main() {
       );
       await tester.pump();
 
-      expect(find.textContaining('<think>literal answer'), findsOneWidget);
+      expect(
+        renderedParagraphsWith('literal answer', exact: false),
+        hasLength(1),
+      );
       expect(find.text('Deep Thinking'), findsNothing);
     });
 
@@ -1067,10 +1071,10 @@ void main() {
         await tester.pump(const Duration(milliseconds: 300));
 
         expect(find.text('Deep Thinking'), findsOneWidget);
-        expect(find.textContaining('结构化思考'), findsOneWidget);
+        expect(renderedParagraphsWith('结构化思考', exact: false), hasLength(1));
         expect(
-          find.textContaining('正文 <think>literal</think> 继续显示'),
-          findsOneWidget,
+          renderedParagraphsWith('正文 literal 继续显示', exact: false),
+          hasLength(1),
         );
       },
     );
@@ -1100,8 +1104,11 @@ void main() {
       await tester.pump(const Duration(milliseconds: 300));
 
       expect(find.text('Deep Thinking'), findsNothing);
-      expect(find.textContaining('legacy reasoning'), findsNothing);
-      expect(find.textContaining('Final answer'), findsOneWidget);
+      expect(renderedParagraphsWith('legacy reasoning', exact: false), isEmpty);
+      expect(
+        renderedParagraphsWith('Final answer', exact: false),
+        hasLength(1),
+      );
     });
 
     testWidgets('hiding tool cards keeps thinking and ask-user cards', (
@@ -1171,10 +1178,13 @@ void main() {
       await tester.pump(const Duration(milliseconds: 300));
 
       expect(find.text('Deep Thinking'), findsOneWidget);
-      expect(find.textContaining('需要本地信息'), findsOneWidget);
+      expect(renderedParagraphsWith('需要本地信息', exact: false), hasLength(1));
       expect(find.text('Time Info'), findsNothing);
       expect(find.text('Choose scope?'), findsOneWidget);
-      expect(find.textContaining('Answer after tools'), findsOneWidget);
+      expect(
+        renderedParagraphsWith('Answer after tools', exact: false),
+        hasLength(1),
+      );
     });
 
     testWidgets(
@@ -1779,13 +1789,22 @@ void main() {
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 300));
       expect(find.text('Deep Thinking'), findsOneWidget);
-      expect(find.textContaining('inline reasoning'), findsOneWidget);
-      expect(find.textContaining('<thinking>'), findsNothing);
-      expect(find.textContaining('Final answer'), findsOneWidget);
+      expect(
+        renderedParagraphsWith('inline reasoning', exact: false),
+        hasLength(1),
+      );
+      expect(renderedParagraphsWith('<thinking>', exact: false), isEmpty);
+      expect(
+        renderedParagraphsWith('Final answer', exact: false),
+        hasLength(1),
+      );
       await tester.tap(find.text('Deep Thinking'));
       await tester.pumpAndSettle();
-      expect(find.textContaining('inline reasoning'), findsNothing);
-      expect(find.textContaining('Final answer'), findsOneWidget);
+      expect(renderedParagraphsWith('inline reasoning', exact: false), isEmpty);
+      expect(
+        renderedParagraphsWith('Final answer', exact: false),
+        hasLength(1),
+      );
       expect(tester.takeException(), isNull);
     });
 
@@ -1813,10 +1832,13 @@ void main() {
       await tester.pump(const Duration(milliseconds: 300));
 
       expect(find.text('Deep Thinking'), findsOneWidget);
-      expect(find.textContaining('Final answer'), findsOneWidget);
       expect(
-        find.textContaining('<think>legacy reasoning</think>'),
-        findsNothing,
+        renderedParagraphsWith('Final answer', exact: false),
+        hasLength(1),
+      );
+      expect(
+        renderedParagraphsWith('<think>legacy reasoning</think>', exact: false),
+        isEmpty,
       );
     });
 

@@ -2,7 +2,7 @@ import 'dart:ui' as ui;
 
 import 'package:Kelivo/core/providers/settings_provider.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
-import 'package:Kelivo/shared/widgets/markdown_with_highlight.dart';
+import 'package:Kelivo/shared/markdown/markdown_with_code_highlight.dart';
 import 'package:markstream/markstream.dart' show SelectableSpanAdapter;
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
@@ -13,6 +13,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 
 import '../../support/business_test_harness.dart';
+import '../../support/markdown_render_helpers.dart';
 
 Widget _harness(Widget child, ValueChanged<SelectedContent?> onSelection) =>
     ChangeNotifierProvider(
@@ -33,12 +34,8 @@ Widget _harness(Widget child, ValueChanged<SelectedContent?> onSelection) =>
 SelectableRegionState _region(WidgetTester tester) =>
     tester.state<SelectableRegionState>(find.byType(SelectableRegion));
 
-RenderParagraph _paragraph(String text) => find
-    .byType(RichText)
-    .evaluate()
-    .map((e) => e.renderObject)
-    .whereType<RenderParagraph>()
-    .firstWhere((p) => p.text.toPlainText().contains(text));
+RenderParagraph _paragraph(WidgetTester tester, String text) =>
+    markdownParagraph(tester, text);
 
 Offset _edge(RenderParagraph paragraph, int offset, {required bool trailing}) {
   final box = paragraph
@@ -85,8 +82,8 @@ void main() {
       await tester.pumpAndSettle();
       _region(tester).selectAll(SelectionChangedCause.keyboard);
       await tester.pumpAndSettle();
-      expect(selected, r'Before $a+b$ After');
-      final paragraph = _paragraph('Before');
+      expect(selected, source);
+      final paragraph = _paragraph(tester, 'Before');
       final length = paragraph.text.toPlainText().length;
       final start = _edge(paragraph, 0, trailing: false);
       final end = _edge(paragraph, length - 1, trailing: true);
@@ -94,7 +91,7 @@ void main() {
         _region(tester).clearSelection();
         await tester.pump();
         await _drag(tester, reverse ? end : start, reverse ? start : end);
-        expect(selected, r'Before $a+b$ After', reason: 'reverse=$reverse');
+        expect(selected, source, reason: 'reverse=$reverse');
       }
       expect(tester.takeException(), isNull);
     }, variant: TargetPlatformVariant.desktop());
@@ -120,7 +117,7 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
-    final paragraph = _paragraph('Before');
+    final paragraph = _paragraph(tester, 'Before');
     await _drag(
       tester,
       _edge(paragraph, 0, trailing: false),
@@ -151,8 +148,8 @@ void main() {
     _region(tester).selectAll(SelectionChangedCause.keyboard);
     await tester.pumpAndSettle();
     expect(selected, source);
-    final start = _edge(_paragraph('Before'), 0, trailing: false);
-    final end = _edge(_paragraph('After'), 4, trailing: true);
+    final start = _edge(_paragraph(tester, 'Before'), 0, trailing: false);
+    final end = _edge(_paragraph(tester, 'After'), 4, trailing: true);
     for (final reverse in [false, true]) {
       _region(tester).clearSelection();
       await tester.pump();
@@ -172,7 +169,7 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
-    final paragraph = _paragraph('Before');
+    final paragraph = _paragraph(tester, 'Before');
     await _drag(
       tester,
       _edge(paragraph, 0, trailing: false),
@@ -254,7 +251,7 @@ void main() {
     expect(fitted.size.height, lessThan(math.size.height));
     // A baseline forwarded without scaling would enlarge this line to the
     // unscaled fraction's ascent, even though its painted box is tiny.
-    expect(_paragraph('\uFFFC').size.height, lessThan(30));
+    expect(_paragraph(tester, '\uFFFC').size.height, lessThan(30));
     expect(find.byType(SingleChildScrollView), findsNothing);
     expect(tester.takeException(), isNull);
   });

@@ -1,3 +1,4 @@
+import '../../../support/markdown_render_helpers.dart';
 import "../../../support/business_test_harness.dart";
 import 'dart:ui';
 
@@ -476,7 +477,13 @@ void main() {
     );
     await tester.pump();
 
-    expect(find.text('updated after nested reasoning scroll'), findsOneWidget);
+    expect(
+      renderedParagraphsWith(
+        'updated after nested reasoning scroll',
+        exact: true,
+      ),
+      hasLength(1),
+    );
 
     scrollController.dispose();
     listController.dispose();
@@ -567,17 +574,32 @@ void main() {
     );
     await tester.pump();
 
-    expect(find.text('initial stream content'), findsOneWidget);
-    expect(find.text('updated while dragging'), findsNothing);
+    expect(
+      renderedParagraphsWith('initial stream content', exact: true),
+      hasLength(1),
+    );
+    expect(
+      renderedParagraphsWith('updated while dragging', exact: true),
+      isEmpty,
+    );
 
     await tester.pump(const Duration(milliseconds: 220));
-    expect(find.text('initial stream content'), findsOneWidget);
-    expect(find.text('updated while dragging'), findsNothing);
+    expect(
+      renderedParagraphsWith('initial stream content', exact: true),
+      hasLength(1),
+    );
+    expect(
+      renderedParagraphsWith('updated while dragging', exact: true),
+      isEmpty,
+    );
 
     await gesture.up();
     await tester.pump(const Duration(milliseconds: 220));
 
-    expect(find.text('updated while dragging'), findsOneWidget);
+    expect(
+      renderedParagraphsWith('updated while dragging', exact: true),
+      hasLength(1),
+    );
 
     scrollController.dispose();
     listController.dispose();
@@ -678,12 +700,18 @@ void main() {
     );
     await tester.pump();
 
-    expect(find.text('updated while still near bottom'), findsNothing);
+    expect(
+      renderedParagraphsWith('updated while still near bottom', exact: true),
+      isEmpty,
+    );
 
     await gesture.up();
     await tester.pump(const Duration(milliseconds: 220));
     expect(userIntentCalls, 1);
-    expect(find.text('updated while still near bottom'), findsOneWidget);
+    expect(
+      renderedParagraphsWith('updated while still near bottom', exact: true),
+      hasLength(1),
+    );
 
     scrollController.dispose();
     listController.dispose();
@@ -775,12 +803,21 @@ void main() {
     );
     await tester.pump();
 
-    expect(find.text('initial wheel stream content'), findsOneWidget);
-    expect(find.text('updated while wheel scrolling'), findsNothing);
+    expect(
+      renderedParagraphsWith('initial wheel stream content', exact: true),
+      hasLength(1),
+    );
+    expect(
+      renderedParagraphsWith('updated while wheel scrolling', exact: true),
+      isEmpty,
+    );
 
     await tester.pump(const Duration(milliseconds: 220));
 
-    expect(find.text('updated while wheel scrolling'), findsOneWidget);
+    expect(
+      renderedParagraphsWith('updated while wheel scrolling', exact: true),
+      hasLength(1),
+    );
 
     scrollController.dispose();
     listController.dispose();

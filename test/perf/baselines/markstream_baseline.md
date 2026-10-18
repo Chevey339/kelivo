@@ -193,3 +193,46 @@ both the 2 ms content target and 100 ms cold target remain open. The parser
 harness, five rounds in one process, reports median-of-rounds median/p95:
 30k full parse 2.209/2.710 ms, 100k 6.942/7.726 ms, incremental append
 0.029/0.035 ms. These parse timings do not establish rendering performance.
+
+
+## C39 chat migration: native macOS diagnostic
+
+The assistant body and both reasoning views now use markstream. The existing
+long-stream harness completed all 12 shapes/sizes for direct rendering and
+all 12 for reasoning. Its combined three-pump timings are diagnostic, not the
+fixed 30k first-content-frame acceptance metric. One isolated fixed-fixture
+application batch reported:
+
+```text
+MARKSTREAM_RENDER {"run":1,"appAdapters":true,"appendChars":30000,"coldChars":100000,"samples":56,"firstPumpMedianUs":323,"firstPumpP95Us":475,"contentPumpMedianUs":1928,"contentPumpP95Us":3196,"coldFirstFrameUs":477168}
+```
+
+The native macOS 26.5.2 arm64 profile integration run used Flutter 3.47.6,
+in-memory business databases and mock preferences. It exercised MessageListView
+with semantics enabled, default backgrounds and 100 streaming updates per case.
+The device reported a 120 Hz display. `liveFrames=false` means the integration
+binding scheduled frames explicitly; these are native FrameTiming observations,
+not physical Android results or the fixed-fixture five-process C41 comparison.
+
+```sh
+flutter drive --profile -d macos --no-pub \
+  --driver=test_driver/integration_test.dart \
+  --target=integration_test/long_streaming_performance_test.dart \
+  --dart-define=STREAM_MAX_BLOCKS=300 --dart-define=STREAM_TIMELINE=true
+```
+
+| Case | Characters | Frames | Build p50 / p95 (ms) | Raster p95 (ms) | Frames over 16.7 ms |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| reply-20 | 2478 | 301 | 0.630 / 2.833 | 2.397 | 0 |
+| reply-200 | 18238 | 301 | 0.988 / 2.644 | 1.929 | 0 |
+| reply-300 | 27038 | 301 | 0.640 / 2.726 | 1.918 | 0 |
+| reasoning-20 | 2478 | 301 | 0.513 / 3.902 | 2.088 | 0 |
+| reasoning-200 | 18238 | 301 | 0.553 / 3.617 | 1.768 | 0 |
+| reasoning-300 | 27038 | 301 | 0.533 / 3.862 | 1.949 | 0 |
+
+All six cases passed their nonempty-frame and exception checks, and the driver
+returned success with all six records in `build/integration_response_data.json`.
+The binding emitted a missing native integration-test-plugin warning on macOS;
+the Dart driver response still contained the complete reported measurements.
+The largest case contains 27,038 characters, so it does not establish the exact
+30k target. Desktop content p95 and 100k cold-render targets remain open for C41.

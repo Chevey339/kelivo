@@ -1,3 +1,4 @@
+import 'package:flutter/material.dart' show MaterialApp;
 import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:markstream/markstream.dart';
@@ -35,3 +36,12 @@ Offset markdownGlyphCenter(WidgetTester tester, String label) {
       .toRect();
   return paragraph.localToGlobal(rect.center);
 }
+
+/// Matches rendered text even when a native batch has no per-paragraph Element.
+List<RenderParagraph> renderedParagraphsWith(
+  Pattern pattern, {
+  bool exact = false,
+}) => renderParagraphs(find.byType(MaterialApp)).where((paragraph) {
+  final text = paragraph.text.toPlainText();
+  return exact ? text == pattern : text.contains(pattern);
+}).toList();
