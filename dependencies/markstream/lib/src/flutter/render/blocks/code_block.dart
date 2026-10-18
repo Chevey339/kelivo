@@ -20,6 +20,7 @@ class MarkstreamCodeBlock extends StatefulWidget {
     required this.labels,
     this.highlighter,
     this.streaming = false,
+    this.exporting = false,
   });
   final CodeBlockNode node;
   final MarkstreamTheme theme;
@@ -27,7 +28,7 @@ class MarkstreamCodeBlock extends StatefulWidget {
   final CodeBlockOptions options;
   final MarkstreamLabels labels;
   final CodeHighlighter? highlighter;
-  final bool streaming;
+  final bool streaming, exporting;
   @override
   State<MarkstreamCodeBlock> createState() => _MarkstreamCodeBlockState();
 }
@@ -68,9 +69,10 @@ class _MarkstreamCodeBlockState extends State<MarkstreamCodeBlock> {
     final theme = widget.theme.code;
     final lines = codeLineCount(toPlainText(widget.node));
     final expanded =
-        _manual ??
-        (!widget.options.autoCollapse ||
-            lines <= widget.options.collapsedLines);
+        widget.exporting ||
+        (_manual ??
+            (!widget.options.autoCollapse ||
+                lines <= widget.options.collapsedLines));
     final mobile =
         defaultTargetPlatform == TargetPlatform.android ||
         defaultTargetPlatform == TargetPlatform.iOS;
@@ -91,7 +93,8 @@ class _MarkstreamCodeBlockState extends State<MarkstreamCodeBlock> {
             theme: widget.theme,
             highlighter: widget.highlighter,
             streaming: widget.streaming,
-            wrap: !mobile || widget.options.mobileWrap,
+            exporting: widget.exporting,
+            wrap: widget.exporting || !mobile || widget.options.mobileWrap,
             highlight: widget.options.highlight,
             maxLines: expanded ? null : widget.options.collapsedLines,
           ),
@@ -148,63 +151,67 @@ class _MarkstreamCodeBlockState extends State<MarkstreamCodeBlock> {
                         overflow: TextOverflow.ellipsis,
                       ),
                     ),
-                    Flexible(
-                      flex: 4,
-                      child: SingleChildScrollView(
-                        scrollDirection: Axis.horizontal,
-                        primary: false,
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            if (lines > widget.options.collapsedLines)
-                              action(
-                                expanded
-                                    ? MarkstreamActionKind.collapse
-                                    : MarkstreamActionKind.expand,
-                                expanded
-                                    ? widget.labels.collapse
-                                    : widget.labels.expand,
-                                () {
-                                  setState(() => _manual = !expanded);
-                                  widget.options.expansionState?.remember(
-                                    _language,
-                                    widget.node.code,
-                                    !expanded,
-                                  );
-                                },
-                              ),
-                            ...?widget.extensions.codeExtraActions?.call(
-                              context,
-                              CodeActionContext(
-                                code: widget.node,
-                                theme: widget.theme,
-                                streaming: widget.streaming,
-                              ),
-                            ),
-                            MarkstreamActionButton(
-                              action: MarkstreamAction(
-                                kind: MarkstreamActionKind.copyCode,
-                                label: widget.labels.copyCode,
-                                onInvoke: () => Clipboard.setData(
-                                  ClipboardData(text: widget.node.code),
+                    if (!widget.exporting)
+                      Flexible(
+                        flex: 4,
+                        child: SingleChildScrollView(
+                          scrollDirection: Axis.horizontal,
+                          primary: false,
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              if (lines > widget.options.collapsedLines)
+                                action(
+                                  expanded
+                                      ? MarkstreamActionKind.collapse
+                                      : MarkstreamActionKind.expand,
+                                  expanded
+                                      ? widget.labels.collapse
+                                      : widget.labels.expand,
+                                  () {
+                                    setState(() => _manual = !expanded);
+                                    widget.options.expansionState?.remember(
+                                      _language,
+                                      widget.node.code,
+                                      !expanded,
+                                    );
+                                  },
+                                ),
+                              ...?widget.extensions.codeExtraActions?.call(
+                                context,
+                                CodeActionContext(
+                                  code: widget.node,
+                                  theme: widget.theme,
+                                  streaming: widget.streaming,
                                 ),
                               ),
-                              builder: widget.extensions.actionButtonBuilder,
-                            ),
-                          ],
+                              MarkstreamActionButton(
+                                action: MarkstreamAction(
+                                  kind: MarkstreamActionKind.copyCode,
+                                  label: widget.labels.copyCode,
+                                  onInvoke: () => Clipboard.setData(
+                                    ClipboardData(text: widget.node.code),
+                                  ),
+                                ),
+                                builder: widget.extensions.actionButtonBuilder,
+                              ),
+                            ],
+                          ),
                         ),
                       ),
-                    ),
                   ],
                 ),
               ),
             ),
           ),
-          AnimatedSize(
-            duration: theme.collapseDuration,
-            alignment: Alignment.topCenter,
-            child: body,
-          ),
+          if (widget.exporting)
+            body
+          else
+            AnimatedSize(
+              duration: theme.collapseDuration,
+              alignment: Alignment.topCenter,
+              child: body,
+            ),
         ],
       ),
     );

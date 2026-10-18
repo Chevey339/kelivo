@@ -21,6 +21,7 @@ import 'package:Kelivo/core/services/workspace/workspace_tool_metadata.dart';
 import 'package:Kelivo/features/chat/widgets/workspace_tool_ui.dart';
 import 'package:Kelivo/features/workspace/widgets/files/file_browser.dart';
 import 'package:Kelivo/features/workspace/widgets/preview/file_preview.dart';
+import 'package:Kelivo/features/workspace/widgets/preview/code_file_preview.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
 import 'package:Kelivo/shared/widgets/markdown_with_highlight.dart';
 import 'package:Kelivo/shared/widgets/snackbar.dart';
@@ -94,6 +95,12 @@ void main() {
     if (find.byType(FileBrowser).evaluate().isNotEmpty) {
       await tester.runAsync(
         tester.state<FileBrowserState>(find.byType(FileBrowser)).refreshEntries,
+      );
+      await tester.pump();
+    }
+    if (find.byType(CodeFilePreview).evaluate().isNotEmpty) {
+      await tester.runAsync(
+        tester.state<CodeFilePreviewState>(find.byType(CodeFilePreview)).load,
       );
       await tester.pump();
     }

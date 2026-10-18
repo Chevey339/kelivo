@@ -39,6 +39,7 @@ class MarkstreamCodeContent extends StatefulWidget {
     required this.theme,
     this.highlighter,
     this.streaming = false,
+    this.exporting = false,
     this.wrap = true,
     this.highlight = true,
     this.maxLines,
@@ -46,7 +47,7 @@ class MarkstreamCodeContent extends StatefulWidget {
   final CodeBlockNode node;
   final MarkstreamTheme theme;
   final CodeHighlighter? highlighter;
-  final bool streaming, wrap, highlight;
+  final bool streaming, exporting, wrap, highlight;
   final int? maxLines;
   @override
   State<MarkstreamCodeContent> createState() => _MarkstreamCodeContentState();
@@ -114,6 +115,7 @@ class _MarkstreamCodeContentState extends State<MarkstreamCodeContent> {
     final highlight =
         widget.highlight &&
         !(widget.streaming &&
+            !widget.exporting &&
             (_source.length > PerformanceLimits.highlightCharacters ||
                 codeLineCount(_source) > PerformanceLimits.highlightLines));
     Widget fragment(String text, int offset) {
@@ -125,8 +127,9 @@ class _MarkstreamCodeContentState extends State<MarkstreamCodeContent> {
         language: language,
         theme: widget.theme,
         highlighter: highlight ? widget.highlighter : null,
+        cullToViewport: !widget.exporting,
       );
-      if (!widget.wrap)
+      if (!widget.wrap && !widget.exporting)
         child = SingleChildScrollView(
           scrollDirection: Axis.horizontal,
           primary: false,
@@ -136,7 +139,8 @@ class _MarkstreamCodeContentState extends State<MarkstreamCodeContent> {
     }
 
     final Widget content;
-    if (codeLineCount(_source) > PerformanceLimits.virtualCodeLines) {
+    if (!widget.exporting &&
+        codeLineCount(_source) > PerformanceLimits.virtualCodeLines) {
       content = SizedBox(
         key: const ValueKey('markstream-virtualized-code'),
         height: widget.theme.code.virtualizedHeight,
@@ -293,7 +297,9 @@ class _CodeTextFragment extends StatefulWidget {
     required this.language,
     required this.theme,
     this.highlighter,
+    this.cullToViewport = true,
   });
+  final bool cullToViewport;
   final String source, language;
   final int offset;
   final _CodeChunksSelectionDelegate owner;
@@ -389,6 +395,7 @@ class _CodeTextFragmentState extends State<_CodeTextFragment> {
       padding: const EdgeInsets.only(right: 3),
       child: StreamingText(
         streaming: false,
+        cullToViewport: widget.cullToViewport,
         text: Text.rich(
           _span,
           style: widget.theme.code.text,

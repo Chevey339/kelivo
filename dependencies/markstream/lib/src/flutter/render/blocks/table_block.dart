@@ -131,7 +131,11 @@ class _MarkstreamTableBlockState extends State<MarkstreamTableBlock> {
                 theme.columnMinWidth,
                 theme.columnMaxWidth,
               );
-        final scroll = compact && columns >= 4 && columnWidth * columns > width;
+        final scroll =
+            !widget.exporting &&
+            compact &&
+            columns >= 4 &&
+            columnWidth * columns > width;
         final radius = compact ? theme.compactRadius : theme.wideRadius;
         final header = _capturing
             ? theme.headerBackgroundColor.withValues(alpha: 1)

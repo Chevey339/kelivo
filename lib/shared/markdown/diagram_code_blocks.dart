@@ -144,6 +144,17 @@ class KelivoDiagramBlockState extends State<KelivoDiagramBlock> {
       );
     }
     final hasImage = displayBytes != null && displayBytes.isNotEmpty;
+    if (exporting && !hasImage) {
+      return MarkstreamCodeBlock(
+        node: widget.node,
+        theme: widget.theme,
+        extensions: const MarkstreamExtensions.empty(),
+        options: const CodeBlockOptions(),
+        labels: MarkstreamLabels(unnamedCode: l10n.markdownCodeLabel),
+        highlighter: const KelivoCodeHighlighter(),
+        exporting: true,
+      );
+    }
     final showLoading =
         !hasImage &&
         !_suppressBitmapLoading &&

@@ -189,6 +189,7 @@ class MarkstreamRenderer {
         labels: labels,
         highlighter: codeHighlighter,
         streaming: streaming,
+        exporting: exporting,
       );
     if (node is HtmlBlockNode && node.fullDocument)
       return build(
