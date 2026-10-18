@@ -91,3 +91,38 @@ Only an Android emulator was connected during M0. There is no physical-device
 `FrameTiming.buildDuration` median/p95 or raster p95 in this baseline, and no
 claim against the Android ≤4ms target. Real conversation exports are likewise
 deferred; the current corpus is synthetic.
+
+## M2 package checkpoint — C30
+
+- Measurement tree: C30 implementation following `41ab9b24`; same machine, SDK, fixed fixtures, font, viewport and sampling protocol as M0.
+- Five fresh Flutter test VM processes; package renderer with rich blocks and a selection controller. Application highlighter, math, image and link adapters are not installed in this package benchmark.
+- Host is macOS; the Flutter test theme platform is Android, matching the test framework default used by the original harness. Font weights use the same application mapping as the original harness.
+- Other Flutter suites had finished before these five runs. iOS Simulator services and WindowServer were active (observed load averages 6.52 / 6.93 / 6.23). Treat this as a local checkpoint with background load, not controlled evidence attributing a regression to one change.
+
+| Metric | Median of five rounds (ms) | Observed range (ms) |
+| --- | ---: | ---: |
+| 30k first pump: median | 0.383 | 0.368–0.395 |
+| 30k first pump: p95 | 0.613 | 0.496–0.822 |
+| 30k deferred content pump: median | 2.478 | 2.391–2.525 |
+| 30k deferred content pump: p95 | 3.729 | 3.449–3.830 |
+| 100k cold document: first frame | 484.370 | 481.829–495.843 |
+
+The scheduling frame improved, but the actual content median/p95 exceed the desktop 2 ms goal and the original content baseline. The cold frame is below the original baseline but remains above 100 ms. **The desktop performance acceptance criteria are not met.** Keep these gaps open through application integration and C41; do not substitute the cheap scheduling frame for the content frame. Physical Android measurements remain deferred.
+
+```sh
+cd dependencies/markstream
+for markstream_round in 1 2 3 4 5; do
+  MARKSTREAM_RUN=$markstream_round flutter test --no-pub \
+    test/perf/streaming_append_bench.dart --reporter expanded
+done
+```
+
+Raw output:
+
+```text
+MARKSTREAM_RENDER {"run":1,"appendChars":30000,"coldChars":100000,"samples":56,"firstPumpMedianUs":383,"firstPumpP95Us":496,"contentPumpMedianUs":2488,"contentPumpP95Us":3830,"coldFirstFrameUs":481907,"themePlatform":"android","hostOS":"macos","selectionController":true,"appAdapters":false}
+MARKSTREAM_RENDER {"run":2,"appendChars":30000,"coldChars":100000,"samples":56,"firstPumpMedianUs":368,"firstPumpP95Us":613,"contentPumpMedianUs":2391,"contentPumpP95Us":3449,"coldFirstFrameUs":492316,"themePlatform":"android","hostOS":"macos","selectionController":true,"appAdapters":false}
+MARKSTREAM_RENDER {"run":3,"appendChars":30000,"coldChars":100000,"samples":56,"firstPumpMedianUs":385,"firstPumpP95Us":645,"contentPumpMedianUs":2468,"contentPumpP95Us":3729,"coldFirstFrameUs":481829,"themePlatform":"android","hostOS":"macos","selectionController":true,"appAdapters":false}
+MARKSTREAM_RENDER {"run":4,"appendChars":30000,"coldChars":100000,"samples":56,"firstPumpMedianUs":395,"firstPumpP95Us":822,"contentPumpMedianUs":2525,"contentPumpP95Us":3602,"coldFirstFrameUs":495843,"themePlatform":"android","hostOS":"macos","selectionController":true,"appAdapters":false}
+MARKSTREAM_RENDER {"run":5,"appendChars":30000,"coldChars":100000,"samples":56,"firstPumpMedianUs":374,"firstPumpP95Us":554,"contentPumpMedianUs":2478,"contentPumpP95Us":3747,"coldFirstFrameUs":484370,"themePlatform":"android","hostOS":"macos","selectionController":true,"appAdapters":false}
+```

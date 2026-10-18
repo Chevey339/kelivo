@@ -108,3 +108,36 @@ object replacement character. Custom block widgets can use
 blocks / MarkstreamCodeContent, which already provide their projections. Do not
 nest overlapping fragments or add a SelectionArea. Unregistered extension labels
 copy their selected text rather than an unselected part of the original spelling.
+
+## Rendering budgets and retained paragraph runs
+
+`PerformanceLimits` centralizes table pagination, streaming highlighting, code
+virtualization, native-text thresholds and capture bounds. Streams of at least
+8,000 source characters coalesce prefix appends into a 50 ms window, matching
+the application's previous policy. Completion, non-prefix edits, parser changes,
+caller-supplied ASTs and exports flush immediately. Disposal cancels pending
+work. Unchanged parsed snapshots reuse the cached view during scheduling frames.
+
+Consecutive paragraphs share a bounded source projection. Completed paragraph
+widgets and spans retain identity. Short text-only paragraphs use native
+RenderParagraph children behind one element; embedded widgets keep their normal
+Flutter tree. Native children still own layout, hit testing, selection and
+semantics. Exact fractional paragraph spacing is retained. Contextual layout
+settings such as text scaling, RTL view direction or accessibility overrides
+use the individual paragraph path.
+
+Paragraph runs participate in the same before-paint viewport observer as the
+block forest, including when an ancestor moves behind a cached layer. Paint and
+semantic membership are tracked independently. Capture disables nested culling.
+Pixel tests compare English, CJK, RTL text, links and code capsules at both font
+scales; selection tests cover source edits during active dragging.
+
+Run `flutter test --no-pub test/perf/streaming_append_bench.dart --reporter expanded`
+from this package. It uses the fixed application 30k/100k fixtures and the exact
+baseline font, with rich blocks and a selection controller. It reports the
+request frame separately from the actual content frame after advancing the fake
+clock by 50 ms. That clock advance is not wall-clock sleep. Cold timing includes
+parsing, building, layout and paint for the whole initial document. The benchmark
+does not claim that the final application adapters or physical Android profile
+performance have been measured. Desktop target gaps remain visible in the
+application's performance report until final migration acceptance.

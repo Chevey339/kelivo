@@ -26,12 +26,17 @@ Widget host(
     ),
   ),
 );
-List<RenderParagraph> paragraphs() => find
-    .byType(RichText)
-    .evaluate()
-    .map((element) => element.renderObject)
-    .whereType<RenderParagraph>()
-    .toList();
+List<RenderParagraph> paragraphs() {
+  final result = <RenderParagraph>[];
+  void visit(RenderObject object) {
+    if (object is RenderParagraph) result.add(object);
+    object.visitChildren(visit);
+  }
+
+  for (final view in RendererBinding.instance.renderViews) visit(view);
+  return result;
+}
+
 RenderParagraph paragraph(String prefix) =>
     paragraphs().firstWhere((p) => p.text.toPlainText().startsWith(prefix));
 Offset edge(RenderParagraph p, int offset, {bool end = false}) {

@@ -14,6 +14,7 @@ import '../../selection/selection_controller.dart';
 import '../../selection/stable_selection_container.dart';
 import '../../theme/markstream_theme.dart';
 import '../streaming_text.dart';
+import '../../performance_limits.dart';
 
 String codePrefix(String source, int? lines) {
   if (lines == null) return source;
@@ -84,7 +85,7 @@ class _MarkstreamCodeContentState extends State<MarkstreamCodeContent> {
     while (true) {
       final newline = next.indexOf('\n', cursor);
       if (newline < 0) break;
-      if (++lines == 200) {
+      if (++lines == PerformanceLimits.codeChunkLines) {
         _chunks.add((start, next.substring(start, newline)));
         start = newline + 1;
         lines = 0;
@@ -113,7 +114,8 @@ class _MarkstreamCodeContentState extends State<MarkstreamCodeContent> {
     final highlight =
         widget.highlight &&
         !(widget.streaming &&
-            (_source.length > 12000 || codeLineCount(_source) > 300));
+            (_source.length > PerformanceLimits.highlightCharacters ||
+                codeLineCount(_source) > PerformanceLimits.highlightLines));
     Widget fragment(String text, int offset) {
       Widget child = _CodeTextFragment(
         key: ValueKey(offset),
@@ -134,7 +136,7 @@ class _MarkstreamCodeContentState extends State<MarkstreamCodeContent> {
     }
 
     final Widget content;
-    if (codeLineCount(_source) > 1000) {
+    if (codeLineCount(_source) > PerformanceLimits.virtualCodeLines) {
       content = SizedBox(
         key: const ValueKey('markstream-virtualized-code'),
         height: widget.theme.code.virtualizedHeight,
@@ -390,7 +392,8 @@ class _CodeTextFragmentState extends State<_CodeTextFragment> {
         text: Text.rich(
           _span,
           style: widget.theme.code.text,
-          strutStyle: widget.source.length <= 2048
+          strutStyle:
+              widget.source.length <= PerformanceLimits.staticNativeCharacters
               ? StrutStyle.fromTextStyle(inherited)
               : null,
         ),

@@ -14,6 +14,7 @@ import '../../selection/table_selection.dart';
 import '../../theme/markstream_theme.dart';
 import '../block_list.dart';
 import '../chrome.dart';
+import '../../performance_limits.dart';
 
 class MarkstreamTableBlock extends StatefulWidget {
   const MarkstreamTableBlock({
@@ -39,7 +40,7 @@ class MarkstreamTableBlock extends StatefulWidget {
 class _MarkstreamTableBlockState extends State<MarkstreamTableBlock> {
   final _selection = TableSelectionDelegate();
   final _boundary = GlobalKey();
-  int _visibleRows = 40;
+  int _visibleRows = PerformanceLimits.initialTableRows;
   bool _capturing = false;
   @override
   void dispose() {
@@ -67,9 +68,9 @@ class _MarkstreamTableBlockState extends State<MarkstreamTableBlock> {
       final height = (boundary.size.height * pixelRatio).ceil();
       if (width <= 0 ||
           height <= 0 ||
-          width > 32767 ||
-          height > 32767 ||
-          width * height > 64000000)
+          width > PerformanceLimits.tableImageDimension ||
+          height > PerformanceLimits.tableImageDimension ||
+          width * height > PerformanceLimits.tableImagePixels)
         throw StateError('Table image exceeds the capture size limit');
       final image = await boundary.toImage(pixelRatio: pixelRatio);
       try {
@@ -105,7 +106,12 @@ class _MarkstreamTableBlockState extends State<MarkstreamTableBlock> {
     final all = _capturing || widget.exporting;
     final count = all
         ? rows.length
-        : math.min(rows.length, widget.streaming ? 30 : _visibleRows);
+        : math.min(
+            rows.length,
+            widget.streaming
+                ? PerformanceLimits.streamingTableRows
+                : _visibleRows,
+          );
     final content = LayoutBuilder(
       builder: (context, constraints) {
         final width = constraints.hasBoundedWidth
@@ -250,17 +256,22 @@ class _MarkstreamTableBlockState extends State<MarkstreamTableBlock> {
                 )
               else
                 surface,
-              if (!all && !widget.streaming && rows.length > 40)
+              if (!all &&
+                  !widget.streaming &&
+                  rows.length > PerformanceLimits.initialTableRows)
                 SelectionContainer.disabled(
                   child: Wrap(
                     alignment: WrapAlignment.center,
                     children: [
-                      if (_visibleRows > 40)
+                      if (_visibleRows > PerformanceLimits.initialTableRows)
                         _action(
                           MarkstreamActionKind.collapse,
                           widget.labels.collapse,
                           () async {
-                            setState(() => _visibleRows = 40);
+                            setState(
+                              () => _visibleRows =
+                                  PerformanceLimits.initialTableRows,
+                            );
                           },
                         ),
                       if (count < rows.length)
@@ -271,7 +282,7 @@ class _MarkstreamTableBlockState extends State<MarkstreamTableBlock> {
                             setState(
                               () => _visibleRows = math.min(
                                 rows.length,
-                                _visibleRows + 100,
+                                _visibleRows + PerformanceLimits.tablePageRows,
                               ),
                             );
                           },

@@ -79,6 +79,31 @@ class MarkstreamRenderer {
             _inline.build(context, node, style, streaming: streaming),
       );
 
+  RenderedInline inlineContent(
+    BuildContext context,
+    List<InlineNode> nodes,
+    TextStyle style, {
+    required bool streaming,
+  }) {
+    final projection = trackSelection ? <TextSegment>[] : null;
+    return RenderedInline(
+      span: TextSpan(
+        style: style,
+        children: [
+          for (final node in nodes)
+            _inline.build(
+              context,
+              node,
+              style,
+              streaming: streaming,
+              projection: projection,
+            ),
+        ],
+      ),
+      segments: projection ?? const [],
+    );
+  }
+
   Widget inlineText(
     BuildContext context,
     MarkdownNode owner,
@@ -86,31 +111,16 @@ class MarkstreamRenderer {
     TextStyle style, {
     required bool streaming,
   }) {
-    final projection = trackSelection ? <TextSegment>[] : null;
+    final content = inlineContent(context, nodes, style, streaming: streaming);
     final child = StreamingText(
       streaming: streaming,
-      text: Text.rich(
-        TextSpan(
-          style: style,
-          children: [
-            for (final node in nodes)
-              _inline.build(
-                context,
-                node,
-                style,
-                streaming: streaming,
-                projection: projection,
-              ),
-          ],
-        ),
-        style: style,
-      ),
+      text: Text.rich(content.span, style: style),
     );
-    return projection == null
+    return !trackSelection
         ? child
         : MarkstreamSelectionFragment(
             node: owner,
-            segments: projection,
+            segments: content.segments,
             child: child,
           );
   }

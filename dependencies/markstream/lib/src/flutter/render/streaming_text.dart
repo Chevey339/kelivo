@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 
 import '../selection/selectable_rich_text.dart';
 import 'block_list.dart';
+import '../performance_limits.dart';
 
 /// Shapes long text in bounded windows, committing only complete visual lines.
 /// Markdown still supplies the styled spans; embedded widgets and bidi text
@@ -139,7 +140,11 @@ class _StreamingTextState extends State<StreamingText> {
     // Short paragraphs and contextual text use Flutter's paragraph directly.
     // They need no chunk forest, viewport observer or constraint builder. Keep
     // the paint boundary so moving ancestors can reuse their glyph display list.
-    if (!supported || length <= (widget.streaming ? 512 : 2048)) {
+    if (!supported ||
+        length <=
+            (widget.streaming
+                ? PerformanceLimits.streamingNativeCharacters
+                : PerformanceLimits.staticNativeCharacters)) {
       _layout = null;
       _chunks.clear();
       _runs = runs;

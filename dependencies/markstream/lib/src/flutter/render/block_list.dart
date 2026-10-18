@@ -11,7 +11,13 @@ import '../selection/document_selection.dart';
 /// All blocks remain mounted for selection, search and interactive state.
 /// Supply immutable snapshots with an unchanged identity prefix and a replaced
 /// suffix. Changing signature rebuilds every item when layout inputs change.
+abstract interface class ViewportClipParticipant {
+  void viewportChanged();
+}
+
 class BlockList extends StatefulWidget {
+  static bool cullingEnabled(BuildContext context) =>
+      _BlockCullScope.of(context);
   const BlockList({
     super.key,
     required this.blocks,
@@ -300,9 +306,9 @@ class _BlockColumn extends MultiChildRenderObjectWidget {
   }
 }
 
-typedef _ViewportClips = ({Rect? paint, Rect? semantics});
+typedef ViewportClips = ({Rect? paint, Rect? semantics});
 
-_ViewportClips _viewportClips(RenderBox target) {
+ViewportClips viewportClips(RenderBox target) {
   Rect? paint;
   Rect? semantics;
   // Intersect every viewport, including a code area's horizontal viewport
@@ -332,7 +338,7 @@ _ViewportClips _viewportClips(RenderBox target) {
   return (paint: paint, semantics: semantics);
 }
 
-class _RenderBlockColumn extends RenderFlex {
+class _RenderBlockColumn extends RenderFlex implements ViewportClipParticipant {
   _RenderBlockColumn(this._cullToViewport, TextDirection textDirection)
     : super(
         direction: Axis.vertical,
@@ -352,8 +358,8 @@ class _RenderBlockColumn extends RenderFlex {
     markNeedsSemanticsUpdate();
   }
 
-  _ViewportClips get _clips =>
-      _cullToViewport ? _viewportClips(this) : (paint: null, semantics: null);
+  ViewportClips get _clips =>
+      _cullToViewport ? viewportClips(this) : (paint: null, semantics: null);
 
   List<RenderBox> _childrenNearViewport(Rect? visible) {
     return [
@@ -407,8 +413,8 @@ class _RenderBlockColumn extends RenderFlex {
     }
     void visit(RenderObject node) {
       if (!node.attached) return;
-      if (node is _RenderBlockColumn) {
-        if (node.hasSize) node.viewportChanged();
+      if (node is RenderBox && node is ViewportClipParticipant) {
+        if (node.hasSize) (node as ViewportClipParticipant).viewportChanged();
       } else {
         node.visitChildren(visit);
       }
@@ -504,8 +510,8 @@ class _RenderViewportPaintObserver extends RenderProxyBox {
   void _refreshBlocks() {
     if (!attached || !hasSize) return;
     void visit(RenderObject node) {
-      if (node is _RenderBlockColumn) {
-        if (node.hasSize) node.viewportChanged();
+      if (node is RenderBox && node is ViewportClipParticipant) {
+        if (node.hasSize) (node as ViewportClipParticipant).viewportChanged();
       } else {
         node.visitChildren(visit);
       }

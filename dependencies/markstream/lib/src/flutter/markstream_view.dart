@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 
@@ -10,6 +12,8 @@ import 'interfaces/renderers.dart';
 import 'render/block_builder.dart';
 import 'render/block_list.dart';
 import 'render/chrome.dart';
+import 'performance_limits.dart';
+import 'render/paragraph_run.dart';
 import 'selection/document_selection.dart';
 import 'selection/selection_controller.dart';
 import 'theme/markstream_theme.dart';
@@ -65,6 +69,10 @@ class _MarkstreamViewState extends State<MarkstreamView> {
   final _recognizers = <(int, int, String), TapGestureRecognizer>{};
   List<_BlockEntry> _entries = const [];
   DocumentSelectionBinding? _binding;
+  Timer? _pendingUpdate;
+  Widget? _cachedView;
+  DocumentNode? _cachedDocument;
+  Object? _cachedSignature;
 
   @override
   void initState() {
@@ -87,16 +95,36 @@ class _MarkstreamViewState extends State<MarkstreamView> {
   @override
   void didUpdateWidget(MarkstreamView oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.options != widget.options ||
+    final parserChanged =
+        oldWidget.options != widget.options ||
         oldWidget.streamingOptions != widget.streamingOptions ||
-        oldWidget.extensions != widget.extensions)
-      _resetParser();
+        oldWidget.extensions != widget.extensions;
+    if (parserChanged) _resetParser();
     if (oldWidget.linkHandler != widget.linkHandler) {
       for (final recognizer in _recognizers.values) {
         recognizer.dispose();
       }
       _recognizers.clear();
     }
+    final source = widget.source;
+    final previous = oldWidget.source;
+    if (!parserChanged &&
+        !widget.exporting &&
+        widget.streaming &&
+        source != null &&
+        previous != null &&
+        source.length >= PerformanceLimits.coalescingCharacters &&
+        source.startsWith(previous) &&
+        oldWidget.streaming) {
+      if (source == _document.source && _pendingUpdate == null) return;
+      _pendingUpdate ??= Timer(PerformanceLimits.coalescingInterval, () {
+        _pendingUpdate = null;
+        if (mounted) setState(_syncDocument);
+      });
+      return;
+    }
+    _pendingUpdate?.cancel();
+    _pendingUpdate = null;
     _syncDocument();
   }
 
@@ -104,6 +132,7 @@ class _MarkstreamViewState extends State<MarkstreamView> {
     _document =
         widget.document ??
         _incremental.update(widget.source!, streaming: widget.streaming);
+    if (_recognizers.isEmpty) return;
     // Cached prefix spans keep their recognizers. Remove only links that no
     // longer exist, rather than disposing recognizers on every streaming frame.
     final links = <(int, int, String)>{};
@@ -126,6 +155,7 @@ class _MarkstreamViewState extends State<MarkstreamView> {
 
   @override
   void dispose() {
+    _pendingUpdate?.cancel();
     if (_binding case final binding?) binding.controller.detach(binding);
     for (final recognizer in _recognizers.values) {
       recognizer.dispose();
@@ -172,23 +202,84 @@ class _MarkstreamViewState extends State<MarkstreamView> {
     final nodes = _document.children
         .where((node) => node is! ReferenceDefinitionNode)
         .toList();
+    final defaults = DefaultTextStyle.of(context);
+    final batching =
+        MediaQuery.textScalerOf(context) == TextScaler.noScaling &&
+        Directionality.of(context) == TextDirection.ltr &&
+        !MediaQuery.boldTextOf(context) &&
+        MediaQuery.maybeLineHeightScaleFactorOverrideOf(context) == null &&
+        MediaQuery.maybeLetterSpacingOverrideOf(context) == null &&
+        MediaQuery.maybeWordSpacingOverrideOf(context) == null &&
+        defaults.textHeightBehavior == null &&
+        DefaultTextHeightBehavior.maybeOf(context) == null &&
+        defaults.maxLines == null &&
+        defaults.softWrap;
+    final visualSignature = (
+      theme,
+      widget.extensions,
+      widget.codeHighlighter,
+      widget.mathRenderer,
+      widget.imageBuilder,
+      widget.linkHandler,
+      widget.codeOptions,
+      widget.labels,
+      widget.exporting,
+      widget.cullToViewport,
+      _binding,
+      widget.streaming,
+      batching,
+    );
+    if (identical(_cachedDocument, _document) &&
+        _cachedSignature == visualSignature)
+      return _cachedView!;
+    _cachedDocument = _document;
+    _cachedSignature = visualSignature;
+    final groups = <List<BlockNode>>[];
+    for (var i = 0; i < nodes.length;) {
+      final node = nodes[i];
+      if (!batching ||
+          node is! ParagraphNode ||
+          widget.extensions.blockBuilderFor(node) != null) {
+        groups.add([node]);
+        i++;
+        continue;
+      }
+      final run = <BlockNode>[];
+      var characters = 0;
+      while (i < nodes.length &&
+          nodes[i] is ParagraphNode &&
+          widget.extensions.blockBuilderFor(nodes[i]) == null &&
+          (run.isEmpty ||
+              characters + nodes[i].span.length <=
+                  PerformanceLimits.paragraphRunCharacters)) {
+        run.add(nodes[i]);
+        characters += nodes[i].span.length;
+        i++;
+      }
+      groups.add(run);
+    }
     final entries = <_BlockEntry>[];
     var reuse = true;
-    for (var i = 0; i < nodes.length; i++) {
+    for (var i = 0; i < groups.length; i++) {
+      final group = groups[i];
       final active =
-          widget.streaming && identical(nodes[i], _document.children.last);
+          widget.streaming && identical(group.last, _document.children.last);
       if (reuse &&
           i < _entries.length &&
-          identical(nodes[i], _entries[i].node) &&
-          active == _entries[i].streaming) {
+          active == _entries[i].streaming &&
+          group.length == _entries[i].nodes.length &&
+          List.generate(
+            group.length,
+            (j) => identical(group[j], _entries[i].nodes[j]),
+          ).every((same) => same)) {
         entries.add(_entries[i]);
       } else {
         reuse = false;
-        entries.add(_BlockEntry(nodes[i], active));
+        entries.add(_BlockEntry(group, active));
       }
     }
     _entries = entries;
-    return DocumentSelectionScope(
+    return _cachedView = DocumentSelectionScope(
       binding: _binding,
       child: DocumentSelectionGroup(
         node: _document,
@@ -208,15 +299,26 @@ class _MarkstreamViewState extends State<MarkstreamView> {
             widget.labels,
             widget.exporting,
             _binding != null,
+            batching,
           ),
           itemBuilder: (context, index) => Padding(
             key: ValueKey(entries[index].node.span.start),
             padding: EdgeInsets.only(top: index == 0 ? 0 : theme.blockSpacing),
-            child: _renderer.build(
-              context,
-              entries[index].node,
-              streaming: entries[index].streaming,
-            ),
+            child:
+                batching &&
+                    entries[index].node is ParagraphNode &&
+                    widget.extensions.blockBuilderFor(entries[index].node) ==
+                        null
+                ? ParagraphRun(
+                    nodes: entries[index].nodes.cast<ParagraphNode>(),
+                    renderer: _renderer,
+                    streaming: entries[index].streaming,
+                  )
+                : _renderer.build(
+                    context,
+                    entries[index].node,
+                    streaming: entries[index].streaming,
+                  ),
           ),
         ),
       ),
@@ -225,7 +327,8 @@ class _MarkstreamViewState extends State<MarkstreamView> {
 }
 
 class _BlockEntry {
-  const _BlockEntry(this.node, this.streaming);
-  final BlockNode node;
+  const _BlockEntry(this.nodes, this.streaming);
+  final List<BlockNode> nodes;
+  BlockNode get node => nodes.first;
   final bool streaming;
 }
