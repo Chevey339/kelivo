@@ -22,6 +22,8 @@ class MarkdownWithCodeHighlight extends StatelessWidget {
     this.streaming = false,
     this.useBlockRendering = false,
     this.conversationId,
+    this.highlightRanges = const [],
+    this.highlightColor,
   });
   final String text;
   final void Function(String id)? onCitationTap;
@@ -33,6 +35,8 @@ class MarkdownWithCodeHighlight extends StatelessWidget {
   /// source blocks and keeps their identity through streaming completion.
   final bool useBlockRendering;
   final String? conversationId;
+  final List<SourceSpan> highlightRanges;
+  final Color? highlightColor;
   @override
   Widget build(BuildContext context) {
     final settings = context.watch<SettingsProvider>();
@@ -45,6 +49,8 @@ class MarkdownWithCodeHighlight extends StatelessWidget {
         resolve: citationIndexResolver,
         child: MarkstreamView(
           source: text,
+          highlightRanges: highlightRanges,
+          highlightColor: highlightColor,
           streaming: streaming,
           options: markdownParserOptions(settings),
           theme: mapMarkdownTheme(context, settings, baseStyle),

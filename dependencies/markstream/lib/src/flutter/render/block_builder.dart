@@ -10,6 +10,7 @@ import '../selection/selection_controller.dart';
 import '../interfaces/renderers.dart';
 import '../theme/markstream_theme.dart';
 import 'inline_builder.dart';
+import 'source_highlights.dart';
 import 'streaming_text.dart';
 import 'chrome.dart';
 import 'blocks/code_block.dart';
@@ -38,6 +39,7 @@ class MarkstreamRenderer {
   late MarkstreamLabels labels;
   bool exporting = false;
   bool trackSelection = false;
+  SourceHighlights highlights = SourceHighlights.empty;
 
   void update({
     required DocumentNode document,
@@ -51,6 +53,7 @@ class MarkstreamRenderer {
     required MarkstreamLabels labels,
     required bool exporting,
     required bool trackSelection,
+    SourceHighlights highlights = SourceHighlights.empty,
   }) {
     this.document = document;
     this.theme = theme;
@@ -63,6 +66,7 @@ class MarkstreamRenderer {
     this.labels = labels;
     this.exporting = exporting;
     this.trackSelection = trackSelection;
+    this.highlights = highlights;
     _inline = InlineSpanBuilder(
       theme: theme,
       extensions: extensions,
@@ -71,6 +75,7 @@ class MarkstreamRenderer {
       mathRenderer: mathRenderer,
       imageBuilder: imageBuilder,
       linkHandler: linkHandler,
+      highlights: highlights,
     );
   }
 
@@ -187,8 +192,11 @@ class MarkstreamRenderer {
     TextStyle? style,
   }) {
     final custom = extensions.blockBuilderFor(node);
-    if (custom != null)
-      return custom(context, node, contextFor(context, streaming));
+    if (custom != null) {
+      final child = custom(context, node, contextFor(context, streaming));
+      // Code extensions use MarkstreamCodeContent, which paints exact ranges.
+      return node is CodeBlockNode ? child : highlights.atom(node.span, child);
+    }
     final body = style ?? theme.body;
     if (node is CodeBlockNode)
       return MarkstreamCodeBlock(

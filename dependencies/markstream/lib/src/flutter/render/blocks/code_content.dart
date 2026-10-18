@@ -14,6 +14,7 @@ import '../../selection/selection_controller.dart';
 import '../../selection/stable_selection_container.dart';
 import '../../theme/markstream_theme.dart';
 import '../streaming_text.dart';
+import '../source_highlights.dart';
 import '../../performance_limits.dart';
 
 String codePrefix(String source, int? lines) {
@@ -118,6 +119,13 @@ class _MarkstreamCodeContentState extends State<MarkstreamCodeContent> {
             !widget.exporting &&
             (_source.length > PerformanceLimits.highlightCharacters ||
                 codeLineCount(_source) > PerformanceLimits.highlightLines));
+    final highlights = SourceHighlightScope.of(context);
+    final ranges = highlights.isEmpty
+        ? const <SourceSpan>[]
+        : highlights.textRanges([
+            for (final part in widget.node.children)
+              TextSegment(text: part.text, sourceSpan: part.span, node: part),
+          ]);
     Widget fragment(String text, int offset) {
       Widget child = _CodeTextFragment(
         key: ValueKey(offset),
@@ -128,6 +136,15 @@ class _MarkstreamCodeContentState extends State<MarkstreamCodeContent> {
         theme: widget.theme,
         highlighter: highlight ? widget.highlighter : null,
         cullToViewport: !widget.exporting,
+        highlightRanges: [
+          for (final range in ranges)
+            if (range.start < offset + text.length && range.end > offset)
+              SourceSpan(
+                (range.start - offset).clamp(0, text.length),
+                (range.end - offset).clamp(0, text.length),
+              ),
+        ],
+        highlightColor: highlights.color,
       );
       if (!widget.wrap && !widget.exporting)
         child = SingleChildScrollView(
@@ -298,8 +315,12 @@ class _CodeTextFragment extends StatefulWidget {
     required this.theme,
     this.highlighter,
     this.cullToViewport = true,
+    this.highlightRanges = const [],
+    this.highlightColor = const Color(0x00000000),
   });
   final bool cullToViewport;
+  final List<SourceSpan> highlightRanges;
+  final Color highlightColor;
   final String source, language;
   final int offset;
   final _CodeChunksSelectionDelegate owner;
@@ -397,7 +418,11 @@ class _CodeTextFragmentState extends State<_CodeTextFragment> {
         streaming: false,
         cullToViewport: widget.cullToViewport,
         text: Text.rich(
-          _span,
+          paintTextHighlights(
+            _span,
+            widget.highlightRanges,
+            widget.highlightColor,
+          ),
           style: widget.theme.code.text,
           strutStyle:
               widget.source.length <= PerformanceLimits.staticNativeCharacters

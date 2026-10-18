@@ -14,6 +14,7 @@ import 'fitted_math.dart';
 import 'inline_code_capsule.dart';
 import 'html_style.dart';
 import 'shifted_baseline.dart';
+import 'source_highlights.dart';
 import '../../core/serialize/to_html.dart' show isSafeHtmlUrl;
 
 typedef LinkRecognizerBuilder = TapGestureRecognizer Function(
@@ -30,6 +31,7 @@ class InlineSpanBuilder {
     this.mathRenderer,
     this.imageBuilder,
     this.linkHandler,
+    this.highlights = SourceHighlights.empty,
   });
   final MarkstreamTheme theme;
   final MarkstreamExtensions extensions;
@@ -38,6 +40,7 @@ class InlineSpanBuilder {
   final MathRenderer? mathRenderer;
   final ImageBuilder? imageBuilder;
   final LinkHandler? linkHandler;
+  final SourceHighlights highlights;
 
   InlineSpan build(
     BuildContext context,
@@ -55,7 +58,11 @@ class InlineSpanBuilder {
         renderingContext(context, streaming),
       );
       projection?.addAll(rendered.segments);
-      return rendered.span;
+      return highlights.customInline(
+        rendered.span,
+        node.span,
+        rendered.segments,
+      );
     }
     void emit(String text, MarkdownNode source) => projection?.add(
       TextSegment(text: text, sourceSpan: source.span, node: source),
@@ -93,6 +100,7 @@ class InlineSpanBuilder {
         ? child
         : MediaQuery.withNoTextScaling(child: child);
     WidgetSpan atom(Widget child, String selectedText) {
+      child = highlights.atom(node.span, child);
       Widget selected = SelectableSpanAdapter(
         selectedText: selectedText,
         mouseCursor: onTap == null
@@ -118,7 +126,7 @@ class InlineSpanBuilder {
 
     if (node is TextNode) {
       emit(node.text, node);
-      return TextSpan(
+      final span = TextSpan(
         text: node.text,
         style: style,
         recognizer: recognizer(),
@@ -126,6 +134,10 @@ class InlineSpanBuilder {
             ? MouseCursor.defer
             : SystemMouseCursors.click,
       );
+      if (highlights.isEmpty) return span;
+      return highlights.text(span, [
+        TextSegment(text: node.text, sourceSpan: node.span, node: node),
+      ]);
     }
     if (node is LineBreakNode) {
       emit(node.hard ? "\n" : " ", node);
@@ -175,7 +187,7 @@ class InlineSpanBuilder {
       return WidgetSpan(
         alignment: PlaceholderAlignment.baseline,
         baseline: TextBaseline.alphabetic,
-        child: unscaled(capsule),
+        child: unscaled(highlights.atom(node.span, capsule)),
       );
     }
     if (node is MathInlineNode) {

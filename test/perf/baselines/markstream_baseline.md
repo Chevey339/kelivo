@@ -321,3 +321,15 @@ actual-content p95 exceed the plan's limits in this sample.
 ```text
 MARKSTREAM_RENDER {"run":1,"renderer":"markstream","appAdapters":true,"selectionController":true,"appendChars":30000,"coldChars":100000,"samples":56,"firstPumpMedianUs":252,"firstPumpP95Us":548,"contentPumpMedianUs":1589,"contentPumpP95Us":2234,"coldFirstFrameUs":478231}
 ```
+
+## C45 source-highlight diagnostic
+
+One fresh process with app adapters and the C44 message-selection controller,
+with no active highlight ranges: scheduling median/p95 0.325/0.566ms, actual
+content 2.101/3.190ms, cold 497.743ms. Empty ranges bypass span splitting and
+projection allocation. This is a diagnostic; final acceptance still requires
+five independent rounds and the unmet limits are not waived.
+
+```text
+MARKSTREAM_RENDER {"run":1,"renderer":"markstream","appAdapters":true,"selectionController":true,"appendChars":30000,"coldChars":100000,"samples":56,"firstPumpMedianUs":325,"firstPumpP95Us":566,"contentPumpMedianUs":2101,"contentPumpP95Us":3190,"coldFirstFrameUs":497743}
+```

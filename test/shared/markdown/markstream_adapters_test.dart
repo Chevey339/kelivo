@@ -70,6 +70,22 @@ void main() {
       expect(find.text(pair.$2), findsOneWidget);
     }
   });
+  testWidgets('app wrapper forwards source ranges and highlight color', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      host(
+        const MarkdownWithCodeHighlight(
+          text: '**Search** result',
+          highlightRanges: [SourceSpan(2, 8)],
+          highlightColor: Colors.amber,
+        ),
+      ),
+    );
+    final view = tester.widget<MarkstreamView>(find.byType(MarkstreamView));
+    expect(view.highlightRanges, const [SourceSpan(2, 8)]);
+    expect(view.highlightColor, Colors.amber);
+  });
   final parser = MarkdownParser(
     inlineSyntaxes: const [CitationSyntax(), LocalImagePathSyntax()],
   );

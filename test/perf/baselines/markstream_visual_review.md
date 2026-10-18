@@ -125,3 +125,19 @@ partial emphasis/link ranges, multi-view ordering, borrowed-controller lifetime
 and iOS Translate coexistence. Platform variants are widget simulations, not
 physical device evidence. Final gates: root 7,975 passed / one existing skip,
 package 265 passed, golden suite 389 passed; analyzers clean.
+
+## C45 source ranges
+
+All 384 default captures remain byte-identical to C43/C44. Eight additional
+highlight captures were inspected at both widths, themes and text scales.
+They cover headings, plain/bold/link text, entities, escaped punctuation,
+emoji, HTML colors, code, table cells, inline/display math and app citations.
+Only source-matched characters or documented atoms gain paint; text and code
+syntax colors remain visible. Empty ranges retain the existing render path.
+
+Ten focused package cases verify source mapping, overlapping ranges, Unicode,
+accessible labels, mixed-widget extension atoms, cached-prefix updates without
+reparsing, persistent selection/layout, streaming truncation and virtual code
+offsets. Final gates: root 7,976 passed / one existing skip, package 275 passed,
+golden suite 389 passed, clean analyzers. Extra images are visual review evidence,
+not native-device proof.

@@ -201,3 +201,21 @@ selection retains the original HTML structure, including empty table cells,
 partial inline styles and adjusted ordered-list starts. Unknown wrappers retain
 their text; active elements are discarded and active URL schemes are rejected.
 Full HTML documents continue through the application's HTML preview extension.
+
+### Source range highlights
+
+`MarkstreamView.highlightRanges` and Kelivo's wrapper accept half-open UTF-16
+`SourceSpan` intervals in the original Markdown. `highlightColor` overrides the
+default translucent theme-primary paint. Pass a new list for a changed search or
+TTS range. Overlapping/adjacent intervals merge; empty and out-of-document ranges
+have no visible effect. Source changes keep the supplied absolute offsets, so
+callers must update them when their search/TTS result changes.
+
+Text is split only for paint. Entity/escape fragments retain their original
+source mapping, surrogate pairs stay intact, and formulas, images and inline
+code are marked as whole atoms. Fenced/indented code ranges map through original
+text fragments and retain syntax colors and virtualized chunk offsets. The
+same atomic rule applies to a custom inline node containing embedded widgets,
+whose selectable text can be longer than its rendered placeholder. The
+range-only path reuses the parsed document; cached prefix paint is invalidated.
+Selections, plain/Markdown/HTML serialization and link gestures stay unchanged.

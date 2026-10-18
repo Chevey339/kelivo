@@ -4,6 +4,8 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 
 import '../core/ast/nodes.dart';
+import '../core/ast/source_span.dart';
+import 'render/source_highlights.dart';
 import '../core/html/html_fragment.dart' show htmlBlockTags;
 import '../core/parser/dialect.dart';
 import '../core/parser/incremental_document.dart';
@@ -39,6 +41,8 @@ class MarkstreamView extends StatefulWidget {
     this.labels = const MarkstreamLabels(),
     this.exporting = false,
     this.selectionController,
+    this.highlightRanges = const [],
+    this.highlightColor,
   }) : assert((source == null) != (document == null));
 
   final String? source;
@@ -57,6 +61,12 @@ class MarkstreamView extends StatefulWidget {
   final MarkstreamLabels labels;
   final bool exporting;
   final MarkstreamSelectionController? selectionController;
+
+  /// Original UTF-16 source intervals for search/TTS paint. Inline atoms are
+  /// highlighted whole; decoded entities/escapes keep their source mapping.
+  /// Supply a new list when changing ranges. This does not reparse the source.
+  final List<SourceSpan> highlightRanges;
+  final Color? highlightColor;
 
   @override
   State<MarkstreamView> createState() => _MarkstreamViewState();
@@ -133,7 +143,7 @@ class _MarkstreamViewState extends State<MarkstreamView> {
     _document =
         widget.document ??
         _incremental.update(widget.source!, streaming: widget.streaming);
-    if (_recognizers.isEmpty) return;
+    if (identical(_cachedDocument, _document) || _recognizers.isEmpty) return;
     // Cached prefix spans keep their recognizers. Remove only links that no
     // longer exist, rather than disposing recognizers on every streaming frame.
     final links = <(int, int, String)>{};
@@ -191,6 +201,11 @@ class _MarkstreamViewState extends State<MarkstreamView> {
       if (_binding case final binding?) controller!.attach(binding);
     }
     _binding?.document = _document;
+    final highlights = SourceHighlights(
+      widget.highlightRanges,
+      widget.highlightColor ??
+          Theme.of(context).colorScheme.primary.withValues(alpha: .22),
+    );
     _renderer.update(
       document: _document,
       theme: theme,
@@ -203,6 +218,7 @@ class _MarkstreamViewState extends State<MarkstreamView> {
       labels: widget.labels,
       exporting: widget.exporting,
       trackSelection: _binding != null,
+      highlights: highlights,
     );
     final nodes = _document.children
         .where((node) => node is! ReferenceDefinitionNode)
@@ -233,6 +249,7 @@ class _MarkstreamViewState extends State<MarkstreamView> {
       _binding,
       widget.streaming,
       batching,
+      highlights,
     );
     if (identical(_cachedDocument, _document) &&
         _cachedSignature == visualSignature)
@@ -288,42 +305,48 @@ class _MarkstreamViewState extends State<MarkstreamView> {
       }
     }
     _entries = entries;
-    return _cachedView = DocumentSelectionScope(
-      binding: _binding,
-      child: DocumentSelectionGroup(
-        node: _document,
-        root: true,
-        child: BlockList(
-          blocks: entries,
-          selectionSeparator: '\n\n',
-          cullToViewport: widget.cullToViewport && !widget.exporting,
-          signature: (
-            theme,
-            widget.extensions,
-            widget.codeHighlighter,
-            widget.mathRenderer,
-            widget.imageBuilder,
-            widget.linkHandler,
-            widget.codeOptions,
-            widget.labels,
-            widget.exporting,
-            _binding != null,
-            batching,
-          ),
-          itemBuilder: (context, index) => Padding(
-            key: ValueKey(entries[index].node.span.start),
-            padding: EdgeInsets.only(top: index == 0 ? 0 : theme.blockSpacing),
-            child: batching && batchable(entries[index].node)
-                ? ParagraphRun(
-                    nodes: entries[index].nodes.cast<ParagraphNode>(),
-                    renderer: _renderer,
-                    streaming: entries[index].streaming,
-                  )
-                : _renderer.build(
-                    context,
-                    entries[index].node,
-                    streaming: entries[index].streaming,
-                  ),
+    return _cachedView = SourceHighlightScope(
+      highlights: highlights,
+      child: DocumentSelectionScope(
+        binding: _binding,
+        child: DocumentSelectionGroup(
+          node: _document,
+          root: true,
+          child: BlockList(
+            blocks: entries,
+            selectionSeparator: '\n\n',
+            cullToViewport: widget.cullToViewport && !widget.exporting,
+            signature: (
+              theme,
+              widget.extensions,
+              widget.codeHighlighter,
+              widget.mathRenderer,
+              widget.imageBuilder,
+              widget.linkHandler,
+              widget.codeOptions,
+              widget.labels,
+              widget.exporting,
+              _binding != null,
+              batching,
+              highlights,
+            ),
+            itemBuilder: (context, index) => Padding(
+              key: ValueKey(entries[index].node.span.start),
+              padding: EdgeInsets.only(
+                top: index == 0 ? 0 : theme.blockSpacing,
+              ),
+              child: batching && batchable(entries[index].node)
+                  ? ParagraphRun(
+                      nodes: entries[index].nodes.cast<ParagraphNode>(),
+                      renderer: _renderer,
+                      streaming: entries[index].streaming,
+                    )
+                  : _renderer.build(
+                      context,
+                      entries[index].node,
+                      streaming: entries[index].streaming,
+                    ),
+            ),
           ),
         ),
       ),

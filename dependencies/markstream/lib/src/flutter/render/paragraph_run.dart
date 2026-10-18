@@ -52,6 +52,7 @@ class _ParagraphRunState extends State<ParagraphRun> {
       renderer.imageBuilder,
       renderer.linkHandler,
       renderer.trackSelection,
+      renderer.highlights,
       base,
       locale,
       color,
