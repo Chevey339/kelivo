@@ -20,6 +20,9 @@ class _CodeLineEditingControllerImpl extends ValueNotifier<CodeLineEditingValue>
   CodeLineEditingValue? _preValue;
   bool _disposed = false;
   GlobalKey? _editorKey;
+  CodeLines? _documentLines;
+  String _documentText = '';
+  List<int> _documentStarts = const [0];
 
   _CodeLineEditingControllerImpl({
     required CodeLines codeLines,
@@ -52,8 +55,20 @@ class _CodeLineEditingControllerImpl extends ValueNotifier<CodeLineEditingValue>
     return controller;
   }
 
+  double? _verticalNavigationX;
+  TextSelection? _verticalNavigationTarget;
+  CodeLines? _verticalNavigationLines;
+
   @override
   set value(CodeLineEditingValue value) {
+    final TextSelection? target = _verticalNavigationTarget;
+    if (target != null && (!identical(value.codeLines, _verticalNavigationLines) ||
+        _documentStarts[value.selection.baseIndex] + value.selection.baseOffset != target.baseOffset ||
+        _documentStarts[value.selection.extentIndex] + value.selection.extentOffset != target.extentOffset ||
+        value.selection.extentAffinity != target.affinity)) {
+      _verticalNavigationX = null;
+      _verticalNavigationTarget = null;
+    }
     _preValue = super.value;
     super.value = value;
   }
@@ -111,7 +126,181 @@ class _CodeLineEditingControllerImpl extends ValueNotifier<CodeLineEditingValue>
   bool get isComposing => composing.end > composing.start;
 
   @override
-  String get text => codeLines.asString(lineBreak);
+  String get text {
+    if (!options.plainText) return codeLines.asString(lineBreak);
+    _ensureDocumentCache();
+    return _documentText;
+  }
+
+  void _ensureDocumentCache() {
+    if (identical(_documentLines, codeLines)) return;
+    _cacheDocument(codeLines, codeLines.asString(lineBreak, false));
+  }
+
+  void _cacheDocument(CodeLines lines, String text) {
+    _documentLines = lines;
+    _documentText = text;
+    final List<int> starts = [];
+    int offset = 0;
+    for (final CodeLineSegment segment in lines.segments) {
+      for (final CodeLine line in segment.codeLines) {
+        starts.add(offset);
+        offset += line.length + 1;
+      }
+    }
+    _documentStarts = starts;
+  }
+
+  CodeLinePosition _documentPosition(int offset) {
+    offset = offset.clamp(0, _documentText.length);
+    int low = 0;
+    int high = _documentStarts.length;
+    while (low + 1 < high) {
+      final int middle = (low + high) ~/ 2;
+      if (_documentStarts[middle] <= offset) {
+        low = middle;
+      } else {
+        high = middle;
+      }
+    }
+    return CodeLinePosition(index: low, offset: offset - _documentStarts[low]);
+  }
+
+  @override
+  CodeNavigationLayout? captureNavigationLayout() => _render?.captureNavigationLayout();
+
+  @override
+  TextSelection resolveVerticalNavigation(TextSelection selected, bool up, bool extend) {
+    _ensureDocumentCache();
+    if (!identical(_verticalNavigationLines, codeLines) || selected.baseOffset != _verticalNavigationTarget?.baseOffset || selected.extentOffset != _verticalNavigationTarget?.extentOffset) {
+      _verticalNavigationX = null;
+    }
+    if (!extend && !selected.isCollapsed) {
+      _verticalNavigationX = null;
+      _verticalNavigationTarget = null;
+      return TextSelection.collapsed(offset: up ? selected.start : selected.end);
+    }
+    final int anchor = extend || selected.isCollapsed
+      ? selected.extentOffset : up ? selected.start : selected.end;
+    final CodeLinePosition mapped = _documentPosition(anchor);
+    final CodeLinePosition current = CodeLinePosition(index: mapped.index, offset: mapped.offset,
+      affinity: _verticalNavigationX == null ? selected.affinity : _verticalNavigationTarget!.affinity);
+    _verticalNavigationX ??= _render?.navigationHorizontalOffset(current);
+    final CodeLinePosition? visual = up
+      ? _render?.getUpPosition(current, horizontal: _verticalNavigationX)
+      : _render?.getDownPosition(current, horizontal: _verticalNavigationX);
+    final CodeLinePosition target;
+    if (visual != null) {
+      target = visual;
+    } else if (up && current.index == 0) {
+      target = const CodeLinePosition(index: 0, offset: 0);
+    } else if (!up && current.index == codeLines.length - 1) {
+      target = CodeLinePosition(index: current.index, offset: codeLines.last.length);
+    } else {
+      final int index = current.index + (up ? -1 : 1);
+      target = CodeLinePosition(index: index, offset: min(current.offset, codeLines[index].length));
+    }
+    final int offset = _documentStarts[target.index] + target.offset;
+    _verticalNavigationLines = codeLines;
+    return _verticalNavigationTarget = TextSelection(baseOffset: extend ? selected.baseOffset : offset,
+      extentOffset: offset, affinity: target.affinity);
+  }
+
+  @override
+  TextEditingValue get documentEditingValue {
+    assert(options.plainText);
+    _ensureDocumentCache();
+    final int extentStart = _documentStarts[selection.extentIndex];
+    return TextEditingValue(
+      text: _documentText,
+      selection: TextSelection(
+        baseOffset: _documentStarts[selection.baseIndex] + selection.baseOffset,
+        extentOffset: extentStart + selection.extentOffset,
+        affinity: selection.extentAffinity,
+      ),
+      composing: composing.isValid ? TextRange(
+        start: extentStart + composing.start,
+        end: extentStart + composing.end,
+      ) : TextRange.empty,
+    );
+  }
+
+  @override
+  void editDocument(TextEditingValue newValue, {TextRange? replacedRange, bool revealCaret = true}) {
+    assert(options.plainText);
+    final String previous = text;
+    final bool textChanged = previous != newValue.text;
+    CodeLines next = codeLines;
+    if (textChanged) {
+      if (replacedRange == null) {
+        int start = 0;
+        final int limit = min(previous.length, newValue.text.length);
+        while (start < limit && previous.codeUnitAt(start) == newValue.text.codeUnitAt(start)) {
+          start++;
+        }
+        int end = previous.length;
+        int newEnd = newValue.text.length;
+        while (end > start && newEnd > start &&
+          previous.codeUnitAt(end - 1) == newValue.text.codeUnitAt(newEnd - 1)) {
+          end--;
+          newEnd--;
+        }
+        replacedRange = TextRange(start: start, end: end);
+      }
+      final CodeLinePosition start = _documentPosition(replacedRange.start);
+      final CodeLinePosition end = _documentPosition(replacedRange.end);
+      final int newEnd = replacedRange.end + newValue.text.length - previous.length;
+      // The complete single-line document is already materialized by the delta.
+      // Reuse it instead of concatenating another full prefix/insert/suffix.
+      final String replacement = codeLines.length == 1 ? newValue.text :
+        codeLines[start.index].substring(0, start.offset) +
+        newValue.text.substring(replacedRange.start, newEnd) +
+        codeLines[end.index].substring(end.offset);
+      if (start.index == end.index && !replacement.contains('\n')) {
+        next = CodeLines.from(codeLines);
+        next[start.index] = codeLines[start.index].copyWith(text: replacement);
+      } else {
+        next = codeLines.sublines(0, start.index);
+        next.addFrom(CodeLines.of(replacement.split('\n').map(CodeLine.new)), 0);
+        next.addFrom(codeLines, end.index + 1);
+      }
+      if (!selection.isSameLine || _preEditLineIndex != selection.extentIndex) {
+        _cache.markNewRecord(true);
+      }
+      _preEditLineIndex = selection.extentIndex;
+      _cacheDocument(next, newValue.text);
+    }
+    final CodeLinePosition base = _documentPosition(newValue.selection.baseOffset);
+    final CodeLinePosition extent = _documentPosition(newValue.selection.extentOffset);
+    final CodeLinePosition composingStart = _documentPosition(newValue.composing.start);
+    final CodeLinePosition composingEnd = _documentPosition(newValue.composing.end);
+    // Android carries global offsets, but no visual-wrap affinity. Retain the
+    // affinity just resolved by Flutter for this metadata-only navigation.
+    final TextSelection? navigation = _verticalNavigationTarget;
+    final TextAffinity affinity = !textChanged && navigation != null &&
+      navigation.baseOffset == newValue.selection.baseOffset &&
+      navigation.extentOffset == newValue.selection.extentOffset
+      ? navigation.affinity : newValue.selection.affinity;
+    final CodeLineSelection nextSelection = CodeLineSelection(
+      baseIndex: base.index,
+      baseOffset: base.offset,
+      extentIndex: extent.index,
+      extentOffset: extent.offset,
+      baseAffinity: affinity,
+      extentAffinity: affinity,
+    );
+    final bool selectionChanged = nextSelection != selection;
+    value = CodeLineEditingValue(
+      codeLines: next,
+      selection: nextSelection,
+      composing: newValue.composing.isValid &&
+        composingStart.index == extent.index && composingEnd.index == extent.index
+        ? TextRange(start: composingStart.offset, end: composingEnd.offset)
+        : TextRange.empty,
+    );
+    if (textChanged) _cache.markNewRecord(false);
+    if (revealCaret && (textChanged || selectionChanged)) makeCursorCenterIfInvisible();
+  }
 
   @override
   String get selectedText {
@@ -2324,6 +2513,21 @@ class _CodeLineEditingControllerDelegate implements CodeLineEditingController {
   @override
   void edit(TextEditingValue newValue) {
     _delegate.edit(newValue);
+  }
+
+  @override
+  TextEditingValue get documentEditingValue => _delegate.documentEditingValue;
+
+  @override
+  CodeNavigationLayout? captureNavigationLayout() => _delegate.captureNavigationLayout();
+
+  @override
+  TextSelection resolveVerticalNavigation(TextSelection selected, bool up, bool extend) =>
+    _delegate.resolveVerticalNavigation(selected, up, extend);
+
+  @override
+  void editDocument(TextEditingValue newValue, {TextRange? replacedRange, bool revealCaret = true}) {
+    _delegate.editDocument(newValue, replacedRange: replacedRange, revealCaret: revealCaret);
   }
 
   @override

@@ -72,7 +72,7 @@ class _CodeHighlighter extends ValueNotifier<List<_HighlightResult>> {
   void dispose() {
     _controller.removeListener(_onCodesChanged);
     _engine.dispose();
-    _provider.clearCache();
+    _provider.dispose();
     super.dispose();
   }
 

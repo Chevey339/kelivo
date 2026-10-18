@@ -1,6 +1,6 @@
 part of 're_editor.dart';
 
-class _CodeInputController extends ChangeNotifier implements DeltaTextInputClient {
+class _CodeInputController extends ChangeNotifier implements DeltaTextInputClient, CodeNavigationInputClient, CodeDocumentInputClient {
 
   CodeLineEditingController _controller;
   FocusNode _focusNode;
@@ -12,8 +12,11 @@ class _CodeInputController extends ChangeNotifier implements DeltaTextInputClien
   bool _updateCausedByFloatingCursor;
   late Offset _floatingCursorStartingOffset;
 
-  TextInputConnection? _textInputConnection;
+  CodeInputConnection? _textInputConnection;
   TextEditingValue? _remoteEditingValue;
+  bool _applyingDocumentUpdate = false;
+  bool get _fullDocument => _controller.options.plainText &&
+    _controller.options.inputConnectionFactory != null;
   Timer? _composingRectRetry;
 
   final _CodeFloatingCursorController _floatingCursorController;
@@ -132,6 +135,19 @@ class _CodeInputController extends ChangeNotifier implements DeltaTextInputClien
   TextEditingValue? get currentTextEditingValue => _buildTextEditingValue();
 
   @override
+  CodeNavigationLayout? captureNavigationLayout() => _controller.captureNavigationLayout();
+
+  @override
+  CodeDocumentCallbacks captureDocumentCallbacks() => CodeDocumentCallbacks(
+    onSubmitted: _onSubmitted,
+    onContentInserted: _contentInsertionConfiguration?.onContentInserted,
+  );
+
+  @override
+  TextSelection resolveVerticalNavigation(TextSelection selected, bool up, bool extend) =>
+    _controller.resolveVerticalNavigation(selected, up, extend);
+
+  @override
   void performAction(TextInputAction action) {
     if (_readOnly) return;
     if (action == TextInputAction.newline) {
@@ -172,6 +188,41 @@ class _CodeInputController extends ChangeNotifier implements DeltaTextInputClien
       // This is necessary because otherwise the content of the line where the floating cursor was started
       // will be pasted over to the line where the floating cursor was stopped.
       _updateCausedByFloatingCursor = false;
+      return;
+    }
+
+    if (_fullDocument) {
+      TextEditingValue next = _remoteEditingValue!;
+      int start = next.text.length;
+      int end = 0;
+      int lengthChange = 0;
+      bool changed = false;
+      bool contiguous = true;
+      for (final TextEditingDelta delta in textEditingDeltas) {
+        contiguous &= delta.oldText == next.text;
+        final TextEditingDelta effective = _autocompleteSymbols
+          ? _SmartTextEditingDelta(delta).apply(selection) : delta;
+        final TextRange? range;
+        if (effective is TextEditingDeltaInsertion) {
+          range = TextRange.collapsed(effective.insertionOffset);
+        } else if (effective is TextEditingDeltaDeletion) {
+          range = effective.deletedRange;
+        } else if (effective is TextEditingDeltaReplacement) {
+          range = effective.replacedRange;
+        } else {
+          range = null;
+        }
+        final TextEditingValue updated = effective.apply(next);
+        if (range != null) {
+          start = min(start, range.start);
+          end = max(end, range.end - lengthChange);
+          lengthChange += updated.text.length - next.text.length;
+          changed = true;
+        }
+        next = updated;
+      }
+      _applyDocumentEditingValue(next, replacedRange: changed && contiguous
+        ? TextRange(start: start, end: end) : null);
       return;
     }
 
@@ -231,6 +282,10 @@ class _CodeInputController extends ChangeNotifier implements DeltaTextInputClien
       _updateCausedByFloatingCursor = false;
       return;
     }
+    if (_fullDocument) {
+      _applyDocumentEditingValue(textEditingValue);
+      return;
+    }
     final TextEditingValue? previousValue = _remoteEditingValue;
     if (textEditingValue == previousValue) return;
     _remoteEditingValue = textEditingValue;
@@ -242,6 +297,20 @@ class _CodeInputController extends ChangeNotifier implements DeltaTextInputClien
     } else {
       _controller.edit(textEditingValue.removePrefixIfNecessary());
     }
+    notifyListeners();
+  }
+
+  void _applyDocumentEditingValue(TextEditingValue next, {TextRange? replacedRange}) {
+    if (next == _remoteEditingValue) return;
+    _remoteEditingValue = next;
+    _applyingDocumentUpdate = true;
+    try {
+      _controller.editDocument(next, replacedRange: replacedRange);
+    } finally {
+      _applyingDocumentUpdate = false;
+    }
+    _updateRemoteEditingValueIfNeeded();
+    _updateRemoteComposingIfNeeded();
     notifyListeners();
   }
 
@@ -440,6 +509,7 @@ class _CodeInputController extends ChangeNotifier implements DeltaTextInputClien
   bool get _hasInputConnection => _textInputConnection?.attached ?? false;
 
   void _onCodeEditingChanged() {
+    if (_applyingDocumentUpdate) return;
     _updateRemoteEditingValueIfNeeded();
     _updateRemoteComposingIfNeeded();
   }
@@ -532,7 +602,7 @@ class _CodeInputController extends ChangeNotifier implements DeltaTextInputClien
     if (!_hasInputConnection) {
       // Fix PlatformException issue on new flutter version.
       // See https://github.com/reqable/re-editor/issues/83
-      final TextInputConnection connection = TextInput.attach(this, _configuration(context));
+      final CodeInputConnection connection = (_controller.options.inputConnectionFactory ?? _FlutterCodeInputConnection.new)(this, _configuration(context));
       _remoteEditingValue = _buildTextEditingValue();
       connection.setEditingState(_remoteEditingValue!);
       connection.show();
@@ -567,6 +637,11 @@ class _CodeInputController extends ChangeNotifier implements DeltaTextInputClien
   }
 
   TextEditingValue _buildTextEditingValue() {
+    if (_fullDocument) {
+      // A native IME operates on document offsets and owns clipboard actions.
+      // Give it the complete document, without a synthetic editable prefix.
+      return _controller.documentEditingValue;
+    }
     if (_controller.options.plainText && !selection.isSameLine) {
       // A base-line-only projection makes replacing a multi-line selection
       // with the base line indistinguishable from a selection-only update.

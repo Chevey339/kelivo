@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:re_editor/re_editor.dart';
+import 'dart:async';
+import '../text_input/message_editing_controller.dart';
 
 typedef LongMessageContextMenuBuilder =
     Widget Function(
@@ -16,6 +18,8 @@ typedef LongMessageContextMenuBuilder =
 class LongMessageEditor extends StatefulWidget {
   const LongMessageEditor({
     super.key,
+    this.inputConnectionFactory,
+    this.onInputModeExit,
     required this.controller,
     required this.decoration,
     this.scrollController,
@@ -36,6 +40,10 @@ class LongMessageEditor extends StatefulWidget {
   });
 
   final TextEditingController controller;
+  final CodeInputConnectionFactory? inputConnectionFactory;
+
+  /// Finish accepted native work before another text input backend is attached.
+  final Future<void> Function()? onInputModeExit;
   final InputDecoration decoration;
   final ScrollController? scrollController;
   final bool autofocus;
@@ -79,6 +87,26 @@ class LongMessageEditorState extends State<LongMessageEditor>
   CodeLines? _lastLines;
   bool _long = false;
   bool? _renderingLines;
+  bool _drainingInput = false;
+  bool _inputModeExitReady = false;
+  bool _inputModeExitFailed = false;
+  bool _refocusAfterModeExit = false;
+  MessageEditingController? get _document =>
+      widget.controller is MessageEditingController
+      ? widget.controller as MessageEditingController
+      : null;
+  CodeInputConnectionFactory? get _inputFactory =>
+      widget.inputConnectionFactory ?? _document?.inputConnectionFactory;
+  Future<void> Function()? get _modeExit =>
+      widget.onInputModeExit ??
+      (_document?.nativeInputEnabled == true ? _document!.handoffInput : null);
+  int _inputGeneration = 0;
+  bool _documentWasDraining = false;
+  bool get _inputPaused =>
+      _drainingInput ||
+      _inputModeExitFailed ||
+      (_document?.isInputPaused ?? false);
+  bool get _lineInputActive => _renderingLines == true && !_inputPaused;
   final _undoController = UndoHistoryController();
   BuildContext? _undoContext;
   late final _toolbar = _MessageSelectionToolbarController(
@@ -89,19 +117,24 @@ class LongMessageEditorState extends State<LongMessageEditor>
   void initState() {
     super.initState();
     _text = widget.controller.text;
-    _long = _supportsLineEditing(_text);
     _focus = widget.focusNode ?? FocusNode();
+    _long = _supportsLineEditing(_text);
     _scroll = _makeScrollController();
     widget.controller.addListener(_copyFromTextController);
     _focus.addListener(_onFocusChanged);
     _undoController.addListener(_updatePlatformUndoState);
+    _document?.userEdits.addListener(_onDocumentUserEdit);
+    _inputGeneration = _document?.inputGeneration ?? 0;
   }
 
   CodeLineEditingController get _lines => _lineController ??= _createLines();
 
   CodeLineEditingController _createLines() {
     final lines = CodeLineEditingController(
-      options: const CodeLineOptions(plainText: true),
+      options: CodeLineOptions(
+        plainText: true,
+        inputConnectionFactory: _inputFactory,
+      ),
       codeLines: CodeLines.fromText(_text),
       spanBuilder:
           ({
@@ -160,12 +193,24 @@ class LongMessageEditorState extends State<LongMessageEditor>
     return lines;
   }
 
+  // Keep the native document attached through a cut/delete to short text.
+  // Retiring it mid-focus can discard the IME's immediately following input.
+  bool get _retainNativeEditor =>
+      _inputFactory != null && _long && _focus.hasFocus;
+
   bool _supportsLineEditing(String text) =>
-      text.length >= _threshold && !_requiresParagraph.hasMatch(text);
+      (text.length >= _threshold || _retainNativeEditor) &&
+      !_requiresParagraph.hasMatch(text);
 
   bool _supportsChangedLines(CodeLines previous, CodeLines next) {
     // Each untouched line is already known to be LTR/LF. The library uses
     // copy-on-write segments, so checking a keystroke need not scan the history.
+    // Inserting/removing paragraphs shifts later segment indices. Their line
+    // objects remain shared; avoid re-checking the unchanged document suffix.
+    final Set<CodeLine>? unchanged = previous.length == next.length
+        ? null
+        : (Set<CodeLine>.identity()
+            ..addAll(previous.segments.expand((segment) => segment.codeLines)));
     for (var index = 0; index < next.segments.length; index++) {
       final lines = next.segments[index].codeLines;
       final old = index < previous.segments.length
@@ -178,6 +223,7 @@ class LongMessageEditorState extends State<LongMessageEditor>
             identical(lines[line], old[line])) {
           continue;
         }
+        if (unchanged?.contains(lines[line]) == true) continue;
         if (_requiresParagraph.hasMatch(lines[line].text)) return false;
       }
     }
@@ -218,16 +264,36 @@ class LongMessageEditorState extends State<LongMessageEditor>
   void didUpdateWidget(LongMessageEditor oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.focusNode != widget.focusNode) {
+      _refocusAfterModeExit = false;
       _focus.removeListener(_onFocusChanged);
       if (oldWidget.focusNode == null) _focus.dispose();
       _focus = widget.focusNode ?? FocusNode();
       _focus.addListener(_onFocusChanged);
     }
     if (oldWidget.controller != widget.controller) {
+      if (oldWidget.controller case final MessageEditingController previous) {
+        previous.userEdits.removeListener(_onDocumentUserEdit);
+      }
+      _document?.userEdits.addListener(_onDocumentUserEdit);
+      _inputGeneration = _document?.inputGeneration ?? 0;
       _undoController.value = UndoHistoryValue.empty;
       oldWidget.controller.removeListener(_copyFromTextController);
       widget.controller.addListener(_copyFromTextController);
-      _copyFromTextController();
+    }
+    if (oldWidget.controller != widget.controller ||
+        oldWidget.inputConnectionFactory != widget.inputConnectionFactory) {
+      // The factory is captured in CodeLineOptions. A new document/transport
+      // needs its own renderer, while accepted old edits stay with their model.
+      _retireLineController();
+      _drainingInput = false;
+      _inputModeExitReady = false;
+      _inputModeExitFailed = false;
+      _refocusAfterModeExit = false;
+      _renderingLines = null;
+      _long = false;
+      _replaceText(widget.controller.text);
+      _long = _supportsLineEditing(_text);
+      _documentWasDraining = _document?.isInputPaused ?? false;
     }
     if (oldWidget.scrollController != widget.scrollController) {
       _scroll.dispose();
@@ -237,6 +303,7 @@ class LongMessageEditorState extends State<LongMessageEditor>
   }
 
   void _onFocusChanged() {
+    if (!_focus.hasFocus && _text.length < _threshold) _long = false;
     if (_focus.hasFocus && !widget.controller.selection.isValid) {
       // Match EditableText's initial focus behavior for an unset selection.
       widget.controller.selection = TextSelection.collapsed(
@@ -250,14 +317,26 @@ class LongMessageEditorState extends State<LongMessageEditor>
   // Both renderers share Flutter's undo coalescing and the same document
   // history. The history widget stays mounted across a size/bidi transition.
   @override
-  bool get canUndo => !widget.readOnly && _undoController.value.canUndo;
+  bool get canUndo =>
+      !widget.readOnly &&
+      !_inputPaused &&
+      (_document?.history?.canUndo ?? _undoController.value.canUndo);
 
   @override
-  bool get canRedo => !widget.readOnly && _undoController.value.canRedo;
+  bool get canRedo =>
+      !widget.readOnly &&
+      !_inputPaused &&
+      (_document?.history?.canRedo ?? _undoController.value.canRedo);
 
   @override
   void undo() {
-    if (!widget.readOnly && _undoContext != null) {
+    if (_document?.history != null) {
+      if (!widget.readOnly && !_inputPaused) {
+        unawaited(_document!.performCommand('undo'));
+      }
+      return;
+    }
+    if (!widget.readOnly && !_inputPaused && _undoContext != null) {
       Actions.invoke(
         _undoContext!,
         const UndoTextIntent(SelectionChangedCause.keyboard),
@@ -267,7 +346,13 @@ class LongMessageEditorState extends State<LongMessageEditor>
 
   @override
   void redo() {
-    if (!widget.readOnly && _undoContext != null) {
+    if (_document?.history != null) {
+      if (!widget.readOnly && !_inputPaused) {
+        unawaited(_document!.performCommand('redo'));
+      }
+      return;
+    }
+    if (!widget.readOnly && !_inputPaused && _undoContext != null) {
       Actions.invoke(
         _undoContext!,
         const RedoTextIntent(SelectionChangedCause.keyboard),
@@ -351,8 +436,22 @@ class LongMessageEditorState extends State<LongMessageEditor>
         : TextRange.empty;
   }
 
+  void _onDocumentUserEdit() {
+    widget.onChanged?.call(widget.controller.text);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) ensureCaretVisible();
+    });
+  }
+
   void _copyFromTextController() {
     if (_mirroring) return;
+    final generation = _document?.inputGeneration ?? 0;
+    final draining = _document?.isInputPaused ?? false;
+    if (_inputGeneration != generation || _documentWasDraining != draining) {
+      _inputGeneration = generation;
+      _documentWasDraining = draining;
+      if (mounted) setState(() {});
+    }
     final value = widget.controller.value;
     final textChanged = !identical(_text, value.text);
     _replaceText(value.text);
@@ -360,6 +459,13 @@ class LongMessageEditorState extends State<LongMessageEditor>
     final changedMode = _long != nextLong;
     _long = nextLong;
     if (_lineController == null) {
+      if (changedMode && mounted) setState(() {});
+      return;
+    }
+    if (textChanged && !nextLong && _inputFactory != null) {
+      // Keep the raw model intact while transferring to the paragraph editor.
+      // Its CRLF/bidi/accessibility path must not receive a normalized line
+      // controller echo before the old input client detaches.
       if (changedMode && mounted) setState(() {});
       return;
     }
@@ -371,22 +477,31 @@ class LongMessageEditorState extends State<LongMessageEditor>
       if (!value.selection.isValid && _focus.hasFocus) {
         widget.controller.selection = selection;
       }
-      final base = _linePosition(selection.baseOffset);
-      final extent = _linePosition(selection.extentOffset);
-      _lines.value = CodeLineEditingValue(
-        codeLines: textChanged
-            ? CodeLines.fromText(value.text)
-            : _lines.codeLines,
-        selection: CodeLineSelection(
-          baseIndex: base.index,
-          baseOffset: base.offset,
-          extentIndex: extent.index,
-          extentOffset: extent.offset,
-          baseAffinity: selection.affinity,
-          extentAffinity: selection.affinity,
-        ),
-        composing: _lineComposing(value),
-      );
+      if (textChanged && nextLong && _inputFactory != null) {
+        // Use the same incremental document update as native edits. Rebuilding
+        // every CodeLine loses shared unchanged lines and the document cache.
+        _lines.editDocument(
+          value.copyWith(selection: selection),
+          revealCaret: false,
+        );
+      } else {
+        final base = _linePosition(selection.baseOffset);
+        final extent = _linePosition(selection.extentOffset);
+        _lines.value = CodeLineEditingValue(
+          codeLines: textChanged
+              ? CodeLines.fromText(value.text)
+              : _lines.codeLines,
+          selection: CodeLineSelection(
+            baseIndex: base.index,
+            baseOffset: base.offset,
+            extentIndex: extent.index,
+            extentOffset: extent.offset,
+            baseAffinity: selection.affinity,
+            extentAffinity: selection.affinity,
+          ),
+          composing: _lineComposing(value),
+        );
+      }
       _lastLines = _lines.codeLines;
     } finally {
       _mirroring = false;
@@ -395,18 +510,18 @@ class LongMessageEditorState extends State<LongMessageEditor>
   }
 
   void _copyToTextController() {
-    if (_mirroring) return;
+    if (_mirroring || (_inputFactory != null && !_lineInputActive)) return;
     var textChanged = false;
     var nextLong = _long;
     _mirroring = true;
     try {
       if (!identical(_lastLines, _lines.codeLines)) {
         final previous = _lastLines;
-        final nextText = _lines.codeLines.asString(TextLineBreak.lf, false);
+        final nextText = _lines.text;
         textChanged = _text != nextText;
         _replaceText(nextText);
         nextLong =
-            _text.length >= _threshold &&
+            (_text.length >= _threshold || _retainNativeEditor) &&
             (_long && previous != null
                 ? _supportsChangedLines(previous, _lines.codeLines)
                 : !_requiresParagraph.hasMatch(_text));
@@ -460,6 +575,7 @@ class LongMessageEditorState extends State<LongMessageEditor>
     _toolbar.hide(context);
     if (UndoManager.client == this) UndoManager.client = null;
     _undoController.dispose();
+    _document?.userEdits.removeListener(_onDocumentUserEdit);
     widget.controller.removeListener(_copyFromTextController);
     _lineController?.removeListener(_copyToTextController);
     _lineController?.dispose();
@@ -473,6 +589,19 @@ class LongMessageEditorState extends State<LongMessageEditor>
 
   @override
   Widget build(BuildContext context) {
+    if (_document?.history != null) {
+      return Actions(
+        actions: {
+          UndoTextIntent: CallbackAction<UndoTextIntent>(
+            onInvoke: (_) => undo(),
+          ),
+          RedoTextIntent: CallbackAction<RedoTextIntent>(
+            onInvoke: (_) => redo(),
+          ),
+        },
+        child: _buildEditor(context),
+      );
+    }
     return UndoHistory<TextEditingValue>(
       key: ValueKey(widget.controller),
       value: widget.controller,
@@ -523,12 +652,16 @@ class LongMessageEditorState extends State<LongMessageEditor>
     required VoidCallback onDismiss,
     required VoidCallback onRefresh,
   }) {
+    final owner = _lineController;
+    bool active() =>
+        mounted && _lineInputActive && identical(owner, _lineController);
     final selected = !controller.selection.isCollapsed;
     final items = <ContextMenuButtonItem>[
       if (selected && !widget.readOnly)
         ContextMenuButtonItem(
           type: ContextMenuButtonType.cut,
           onPressed: () {
+            if (!active() || widget.readOnly) return;
             controller.cut();
             onDismiss();
           },
@@ -537,6 +670,7 @@ class LongMessageEditorState extends State<LongMessageEditor>
         ContextMenuButtonItem(
           type: ContextMenuButtonType.copy,
           onPressed: () {
+            if (!active()) return;
             controller.copy();
             onDismiss();
           },
@@ -545,13 +679,19 @@ class LongMessageEditorState extends State<LongMessageEditor>
         ContextMenuButtonItem(
           type: ContextMenuButtonType.paste,
           onPressed: () {
-            controller.paste();
+            if (!active() || widget.readOnly) return;
+            if (_document?.nativeInputEnabled == true) {
+              unawaited(_document!.performCommand('paste'));
+            } else {
+              controller.paste();
+            }
             onDismiss();
           },
         ),
       ContextMenuButtonItem(
         type: ContextMenuButtonType.selectAll,
         onPressed: () {
+          if (!active()) return;
           controller.selectAll();
           onRefresh();
         },
@@ -569,16 +709,83 @@ class LongMessageEditorState extends State<LongMessageEditor>
         );
   }
 
+  void _retireInputForModeChange() {
+    if (_drainingInput || _inputModeExitFailed) return;
+    _drainingInput = true;
+    final controller = widget.controller;
+    final exit = _modeExit!;
+    // This build first makes the old editor read-only and detaches its IME
+    // handle. Only after all accepted work is delivered can TextField open.
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (!mounted || !identical(controller, widget.controller)) return;
+      _toolbar.hide(context);
+      _updatePlatformUndoState();
+      // A new EditableText reusing an already focused node may never receive
+      // a focus notification and therefore never attach its native input.
+      // Release the old attachment's focus, then restore it after handoff if
+      // the user has not focused another control in the meantime.
+      _refocusAfterModeExit = _focus.hasFocus;
+      if (_refocusAfterModeExit) _focus.unfocus();
+      try {
+        await exit();
+      } catch (error, stack) {
+        if (mounted && identical(controller, widget.controller)) {
+          setState(() => _inputModeExitFailed = true);
+        }
+        FlutterError.reportError(
+          FlutterErrorDetails(
+            exception: error,
+            stack: stack,
+            context: ErrorDescription(
+              'while completing the native editor handoff',
+            ),
+          ),
+        );
+        return;
+      }
+      if (!mounted || !identical(controller, widget.controller)) return;
+      setState(() {
+        _drainingInput = false;
+        _inputModeExitReady = true;
+      });
+    });
+  }
+
+  void _retireLineController() {
+    final retired = _lineController;
+    retired?.removeListener(_copyToTextController);
+    _lineController = null;
+    _lastLines = null;
+    WidgetsBinding.instance.addPostFrameCallback((_) => retired?.dispose());
+  }
+
   Widget _buildEditor(BuildContext context) {
-    final renderingLines =
+    var renderingLines =
         _long &&
         !MediaQuery.accessibleNavigationOf(context) &&
         Directionality.of(context) != TextDirection.rtl;
+    if (!renderingLines &&
+        _renderingLines == true &&
+        _modeExit != null &&
+        !_inputModeExitReady) {
+      renderingLines = true;
+      _retireInputForModeChange();
+    } else {
+      _inputModeExitReady = false;
+    }
     if (_renderingLines != null &&
-        _renderingLines != renderingLines &&
-        _focus.hasFocus) {
+        ((_renderingLines != renderingLines && _focus.hasFocus) ||
+            (_refocusAfterModeExit && !_drainingInput))) {
+      _refocusAfterModeExit = false;
+      final controller = widget.controller;
+      final focus = _focus;
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (!mounted) return;
+        if (!mounted ||
+            _inputPaused ||
+            !identical(controller, widget.controller) ||
+            !identical(focus, _focus)) {
+          return;
+        }
         final primary = FocusManager.instance.primaryFocus;
         if (_focus.hasFocus || primary == null || primary is FocusScopeNode) {
           _focus.requestFocus();
@@ -587,6 +794,12 @@ class LongMessageEditorState extends State<LongMessageEditor>
       });
     }
     if (_renderingLines != renderingLines) _schedulePlatformUndoClient();
+    if (_renderingLines == true && !renderingLines && _inputFactory != null) {
+      // Clipboard reads belong to the renderer that initiated them. Retire
+      // its controller after unmount so late replies cannot overwrite the new
+      // paragraph editor, or a later line editor created from its final model.
+      _retireLineController();
+    }
     _renderingLines = renderingLines;
     if (!renderingLines) {
       return RepaintBoundary(
@@ -599,23 +812,40 @@ class LongMessageEditorState extends State<LongMessageEditor>
           minLines: widget.minLines,
           maxLines: widget.maxLines,
           expands: widget.expands,
-          readOnly: widget.readOnly,
+          readOnly: widget.readOnly || _inputPaused,
           onChanged: widget.onChanged,
           onSubmitted: widget.onSubmitted,
           style: widget.style,
           cursorColor: widget.cursorColor,
           textInputAction: widget.textInputAction,
           contentInsertionConfiguration: widget.contentInsertionConfiguration,
-          contextMenuBuilder: (context, state) =>
-              widget.contextMenuBuilder?.call(
-                context,
-                state.contextMenuAnchors,
-                state.contextMenuButtonItems,
-                state.hideToolbar,
-              ) ??
-              AdaptiveTextSelectionToolbar.editableText(
-                editableTextState: state,
-              ),
+          contextMenuBuilder: (context, state) {
+            final items = state.contextMenuButtonItems.map((item) {
+              if (item.type != ContextMenuButtonType.paste ||
+                  _document?.nativeInputEnabled != true) {
+                return item;
+              }
+              return ContextMenuButtonItem(
+                type: item.type,
+                label: item.label,
+                onPressed: () {
+                  if (_inputPaused || widget.readOnly) return;
+                  unawaited(_document!.performCommand('paste'));
+                  state.hideToolbar();
+                },
+              );
+            }).toList();
+            return widget.contextMenuBuilder?.call(
+                  context,
+                  state.contextMenuAnchors,
+                  items,
+                  state.hideToolbar,
+                ) ??
+                AdaptiveTextSelectionToolbar.buttonItems(
+                  anchors: state.contextMenuAnchors,
+                  buttonItems: items,
+                );
+          },
           decoration: widget.decoration,
         ),
       );
@@ -630,13 +860,17 @@ class LongMessageEditorState extends State<LongMessageEditor>
         isFocused: _focus.hasFocus,
         child: RepaintBoundary(
           child: CodeEditor(
+            key: ValueKey((_lines, _inputGeneration)),
             controller: _lines,
             focusNode: _focus,
             autofocus: widget.autofocus,
-            readOnly: widget.readOnly,
+            readOnly: widget.readOnly || _inputPaused,
             showCursorWhenReadOnly: false,
             onSubmitted: widget.onSubmitted,
-            onKeyEvent: widget.onKeyEvent,
+            onKeyEvent: (node, event) => _inputPaused
+                ? KeyEventResult.handled
+                : widget.onKeyEvent?.call(node, event) ??
+                      KeyEventResult.ignored,
             textInputAction: widget.textInputAction,
             contentInsertionConfiguration: widget.contentInsertionConfiguration,
             scrollController: _scroll,
@@ -665,14 +899,17 @@ class LongMessageEditorState extends State<LongMessageEditor>
     );
     // Keep the editor mounted when the composer expands or collapses, retaining
     // its native input connection, selection and render-controller bindings.
-    return ConstrainedBox(
-      constraints: BoxConstraints(
-        maxHeight: widget.maxLines == null
-            ? double.infinity
-            : preferredLineHeight * widget.maxLines! +
-                  (widget.decoration.contentPadding?.vertical ?? 0),
+    return IgnorePointer(
+      ignoring: _inputPaused,
+      child: ConstrainedBox(
+        constraints: BoxConstraints(
+          maxHeight: widget.maxLines == null
+              ? double.infinity
+              : preferredLineHeight * widget.maxLines! +
+                    (widget.decoration.contentPadding?.vertical ?? 0),
+        ),
+        child: editor,
       ),
-      child: editor,
     );
   }
 }

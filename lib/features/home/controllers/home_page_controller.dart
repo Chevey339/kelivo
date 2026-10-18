@@ -1,3 +1,4 @@
+import 'package:Kelivo/shared/text_input/message_editing_controller.dart';
 import '../../../core/database/composer_draft_store.dart';
 import '../../../core/models/composer_draft.dart';
 import '../../../core/services/app_exit_flush.dart';
@@ -269,6 +270,7 @@ class HomePageController extends ChangeNotifier {
   int _composerSwitch = 0;
   bool _applyingComposer = false;
   bool _composerDisposed = false;
+  Future<void>? _composerFinalSave;
   Future<void>? _composerBinding;
   String? _composerBindingTarget;
 
@@ -297,8 +299,10 @@ class HomePageController extends ChangeNotifier {
       if (owner == null || _chatService.isTemporaryConversation(owner)) {
         return Future.value(null);
       }
-      return drafts.beginSubmission(owner, input).catchError((Object error) {
-        _recoverComposerSubmission(owner);
+      return drafts.beginSubmission(owner, input).catchError((
+        Object error,
+      ) async {
+        await _recoverComposerSubmission(owner);
         throw error;
       });
     };
@@ -314,13 +318,27 @@ class HomePageController extends ChangeNotifier {
     if (_composerDisposed) return;
     if (drafts != null && drafts.resetRevision != _composerResetRevision) {
       _composerResetRevision = drafts.resetRevision;
-      _composerSwitch++;
-      _composerOwner = null;
-      _mediaController.draftOwnerId = null;
-      _composerBinding = null;
-      _userMessageEditState = null;
-      _applyComposerValue(const ComposerDraftInput());
-      unawaited(_activateComposerDraft().catchError((Object _) {}));
+      final serial = ++_composerSwitch;
+      // A deliberate store reset must not recreate the erased old draft while
+      // retiring its input connection.
+      _applyingComposer = true;
+      final draining = _drainComposerInput();
+      void reset() {
+        if (_composerDisposed || serial != _composerSwitch) return;
+        _composerOwner = null;
+        _mediaController.draftOwnerId = null;
+        _composerBinding = null;
+        _userMessageEditState = null;
+        _applyComposerValue(const ComposerDraftInput());
+        _applyingComposer = false;
+        unawaited(_activateComposerDraft().catchError((Object _) {}));
+      }
+
+      if (draining == null) {
+        reset();
+      } else {
+        unawaited(draining.then((_) => reset()));
+      }
     }
     if (!_composerDisposed &&
         drafts != null &&
@@ -372,6 +390,9 @@ class HomePageController extends ChangeNotifier {
     if (owner == null || drafts == null || drafts.submitting.contains(owner)) {
       return;
     }
+    final draining = _drainComposerInput();
+    if (draining != null) await draining;
+    if (_composerDisposed || _composerOwner != owner) return;
     _saveComposerDraft();
     final draft = drafts.peek(owner)!;
     final revision = draft.revision;
@@ -398,6 +419,37 @@ class HomePageController extends ChangeNotifier {
     notifyListeners();
   }
 
+  Future<void>? _drainComposerInput() {
+    final input = _inputController;
+    if (input is! MessageEditingController || !input.needsInputDrain) {
+      return null;
+    }
+    _mediaController.finishInputSession();
+    final retiring = input.retireInput();
+    unawaited(
+      retiring.then((_) {
+        // Home retains this model after temporary barriers. A Save page instead
+        // leaves it retired through its pop animation. Binding/overwrite locks
+        // keep input paused until their new draft has been installed.
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!_composerDisposed &&
+              !_applyingComposer &&
+              !_mediaController.restoringDraft) {
+            input.resumeInput();
+          }
+        });
+      }),
+    );
+    return retiring;
+  }
+
+  Future<void> _flushComposerDraft() async {
+    final serial = _composerSwitch;
+    await _inputController.flushMessageInput();
+    if (!_composerDisposed && serial == _composerSwitch) _saveComposerDraft();
+    await _composerDrafts?.flush();
+  }
+
   void _saveComposerDraft() {
     final owner = _composerOwner;
     if (_applyingComposer ||
@@ -406,10 +458,18 @@ class HomePageController extends ChangeNotifier {
         _chatService.isTemporaryConversation(owner)) {
       return;
     }
-    _composerDrafts?.setInput(
-      owner,
-      _mediaController.snapshotDraft(_inputController.text),
-    );
+    final controller = _inputController;
+    var input = _mediaController.snapshotDraft(controller.text);
+    if (controller is MessageEditingController &&
+        controller.nativeInputEnabled) {
+      // Native accepted work can still move the selection after the widget
+      // unbinds. The stock backend retains its existing snapshot behavior.
+      input = input.copyWith(
+        selectionBase: controller.selection.baseOffset,
+        selectionExtent: controller.selection.extentOffset,
+      );
+    }
+    _composerDrafts?.setInput(owner, input);
   }
 
   Future<void> _activateComposerDraft() {
@@ -436,6 +496,13 @@ class HomePageController extends ChangeNotifier {
     Conversation conversation,
   ) async {
     final serial = ++_composerSwitch;
+    final draining = _drainComposerInput();
+    if (draining != null) await draining;
+    if (_composerDisposed ||
+        serial != _composerSwitch ||
+        currentConversation?.id != conversation.id) {
+      return;
+    }
     _saveComposerDraft();
     unawaited(drafts.flush().catchError((Object _) {}));
     _applyingComposer = true;
@@ -490,24 +557,41 @@ class HomePageController extends ChangeNotifier {
   }) {
     final wasApplying = _applyingComposer;
     _applyingComposer = true;
-    _inputController.value = TextEditingValue(
-      text: input.text,
-      selection: TextSelection(
-        baseOffset: input.selectionBase < 0
-            ? input.text.length
-            : input.selectionBase.clamp(0, input.text.length),
-        extentOffset: input.selectionExtent < 0
-            ? input.text.length
-            : input.selectionExtent.clamp(0, input.text.length),
-      ),
-    );
-    _mediaController.restoreDraft(input, resetHistory: resetHistory);
-    _applyingComposer = wasApplying;
+    try {
+      _inputController.value = TextEditingValue(
+        text: input.text,
+        selection: TextSelection(
+          baseOffset: input.selectionBase < 0
+              ? input.text.length
+              : input.selectionBase.clamp(0, input.text.length),
+          extentOffset: input.selectionExtent < 0
+              ? input.text.length
+              : input.selectionExtent.clamp(0, input.text.length),
+        ),
+      );
+      _mediaController.restoreDraft(input, resetHistory: resetHistory);
+      if (_inputController case final MessageEditingController document) {
+        document.resumeInput();
+      }
+    } finally {
+      _applyingComposer = wasApplying;
+    }
   }
 
-  void _recoverComposerSubmission(String owner) {
+  Future<void> _recoverComposerSubmission(String owner) async {
     final drafts = _composerDrafts;
     if (drafts == null) return;
+    final controller = _inputController;
+    if (_composerOwner == owner &&
+        controller is MessageEditingController &&
+        controller.isDraining) {
+      // Do not restore over a closing native model. Its final accepted edits
+      // must reach the active draft before deciding whether recovery conflicts.
+      await controller.flushInput();
+    }
+    // Teardown owns one last snapshot after the same input barrier. Recovering
+    // first could consume pending text that that snapshot would overwrite.
+    if (_composerFinalSave case final finalSave?) await finalSave;
     drafts.restorePending(owner);
     final draft = drafts.peek(owner);
     if (_composerOwner == owner && !_composerDisposed && draft != null) {
@@ -1273,14 +1357,14 @@ class HomePageController extends ChangeNotifier {
       if (await drafts.wasSubmitted(submission.id)) {
         return ChatInputSubmissionResult.sent;
       }
-      _recoverComposerSubmission(submission.conversationId);
+      await _recoverComposerSubmission(submission.conversationId);
       return result;
     } catch (_) {
       if (await drafts.wasSubmitted(submission.id)) {
         await _finishComposerSubmission(submission);
         return ChatInputSubmissionResult.sent;
       }
-      _recoverComposerSubmission(submission.conversationId);
+      await _recoverComposerSubmission(submission.conversationId);
       if (_context.mounted) {
         showAppSnackBar(
           _context,
@@ -1409,6 +1493,18 @@ class HomePageController extends ChangeNotifier {
   }
 
   void _replaceInputWithSuggestion(String text) {
+    final draining = _drainComposerInput();
+    if (draining != null) {
+      final serial = _composerSwitch;
+      unawaited(
+        draining.then((_) {
+          if (!_composerDisposed && serial == _composerSwitch) {
+            _replaceInputWithSuggestion(text);
+          }
+        }),
+      );
+      return;
+    }
     _inputController.value = TextEditingValue(
       text: text,
       selection: TextSelection.collapsed(offset: text.length),
@@ -1426,6 +1522,18 @@ class HomePageController extends ChangeNotifier {
   }
 
   void cancelQueuedMessage() {
+    final draining = _drainComposerInput();
+    if (draining != null) {
+      final serial = _composerSwitch;
+      unawaited(
+        draining.then((_) {
+          if (!_composerDisposed && serial == _composerSwitch) {
+            cancelQueuedMessage();
+          }
+        }),
+      );
+      return;
+    }
     final restored = _viewModel.cancelCurrentQueuedInput();
     if (restored == null) return;
     if (restored.draftSubmission != null && _composerDrafts != null) {
@@ -2049,6 +2157,9 @@ class HomePageController extends ChangeNotifier {
       return;
     }
 
+    final bindingSerial = _composerSwitch;
+    await _inputController.flushMessageInput();
+    if (!ctx.mounted || bindingSerial != _composerSwitch) return;
     final hasDraft =
         _inputController.text.trim().isNotEmpty ||
         _mediaController.hasDraftMedia;
@@ -2078,6 +2189,14 @@ class HomePageController extends ChangeNotifier {
   }
 
   Future<void> saveUserMessageEditOnly() async {
+    final serial = _composerSwitch;
+    final originalEdit = _userMessageEditState;
+    await _inputController.flushMessageInput();
+    if (_composerDisposed ||
+        serial != _composerSwitch ||
+        !identical(originalEdit, _userMessageEditState)) {
+      return;
+    }
     final editState = _userMessageEditState;
     if (editState == null ||
         _mediaController.restoringDraft ||
@@ -2112,7 +2231,7 @@ class HomePageController extends ChangeNotifier {
           editState,
         );
         if (newMessage == null) {
-          _recoverComposerSubmission(owner);
+          await _recoverComposerSubmission(owner);
           return;
         }
         await _finishComposerSubmission(submission);
@@ -2120,7 +2239,7 @@ class HomePageController extends ChangeNotifier {
         if (submission != null && await drafts.wasSubmitted(submission.id)) {
           await _finishComposerSubmission(submission);
         } else {
-          _recoverComposerSubmission(owner);
+          await _recoverComposerSubmission(owner);
         }
       } finally {
         drafts.submissionIdle(owner);
@@ -2140,6 +2259,20 @@ class HomePageController extends ChangeNotifier {
   }
 
   void _enterUserMessageEdit(ChatMessage message) {
+    final draining = _drainComposerInput();
+    if (draining != null) {
+      final serial = _composerSwitch;
+      unawaited(
+        draining.then((_) {
+          if (!_composerDisposed &&
+              serial == _composerSwitch &&
+              currentConversation?.id == message.conversationId) {
+            _enterUserMessageEdit(message);
+          }
+        }),
+      );
+      return;
+    }
     final input = _messageBuilderService.parseInputFromMessage(
       message,
       includeMediaFilePathsAsImages: false,
@@ -2169,6 +2302,21 @@ class HomePageController extends ChangeNotifier {
 
   void _exitUserMessageEdit({required bool clearDraft}) {
     if (_userMessageEditState == null) return;
+    final draining = _drainComposerInput();
+    if (draining != null) {
+      final serial = _composerSwitch;
+      final message = _userMessageEditState;
+      unawaited(
+        draining.then((_) {
+          if (!_composerDisposed &&
+              serial == _composerSwitch &&
+              identical(message, _userMessageEditState)) {
+            _exitUserMessageEdit(clearDraft: clearDraft);
+          }
+        }),
+      );
+      return;
+    }
     _userMessageEditState = null;
     final owner = _composerOwner;
     if (_composerDrafts != null &&
@@ -2993,6 +3141,8 @@ class HomePageController extends ChangeNotifier {
   Future<void> onPickFiles() => _fileUploadService.onPickFiles();
 
   Future<bool> confirmIncomingShare() async {
+    await _inputController.flushMessageInput();
+    if (!_context.mounted) return false;
     if (_inputController.text.isEmpty &&
         !_mediaController.hasDraftMedia &&
         !_mediaController.hasUnreadyImages) {
@@ -3045,6 +3195,13 @@ class HomePageController extends ChangeNotifier {
       if (visible) {
         if (_mediaController.restoringDraft) {
           throw StateError('composer_not_ready');
+        }
+        final draining = _drainComposerInput();
+        if (draining != null) await draining;
+        if (_composerDisposed ||
+            _composerOwner != owner ||
+            currentConversation?.id != owner) {
+          throw StateError('composer_share_changed');
         }
         _saveComposerDraft();
       }
@@ -3181,6 +3338,9 @@ class HomePageController extends ChangeNotifier {
     if (_composerDrafts != null && sourceId != null) {
       final drafts = _composerDrafts!;
       try {
+        final draining = _drainComposerInput();
+        if (draining != null) await draining;
+        if (_composerDisposed || currentConversation?.id != sourceId) return;
         _saveComposerDraft();
         var targetId = destination;
         if (targetId.isEmpty) {
@@ -3206,6 +3366,14 @@ class HomePageController extends ChangeNotifier {
         if (target.revision != revision) {
           throw StateError('composer_transfer_changed');
         }
+        final finalInput = _drainComposerInput();
+        if (finalInput != null) await finalInput;
+        if (_composerDisposed ||
+            currentConversation?.id != visibleId ||
+            target.revision != revision) {
+          throw StateError('composer_transfer_changed');
+        }
+        _saveComposerDraft();
         final bindingOwner = _composerOwner;
         final bindingSerial = _composerSwitch;
         _applyingComposer = true;
@@ -3503,8 +3671,13 @@ class HomePageController extends ChangeNotifier {
 
   void onAppLifecycleStateChanged(AppLifecycleState state) {
     if (state != AppLifecycleState.resumed) {
-      _saveComposerDraft();
-      unawaited(_composerDrafts?.flush().catchError((Object _) {}));
+      unawaited(
+        _flushComposerDraft().catchError((Object error, StackTrace stack) {
+          FlutterError.reportError(
+            FlutterErrorDetails(exception: error, stack: stack),
+          );
+        }),
+      );
     }
     _homeAppVisible =
         state != AppLifecycleState.paused &&
@@ -3663,7 +3836,39 @@ class HomePageController extends ChangeNotifier {
 
   @override
   void dispose() {
-    _saveComposerDraft();
+    final owner = _composerOwner;
+    final drafts = _composerDrafts;
+    final edit = owner == null ? null : drafts?.peek(owner)?.editMessageId;
+    final epoch = owner == null
+        ? null
+        : drafts?.inputEpoch(owner, editMessageId: edit);
+    final draining = _drainComposerInput();
+    if (draining != null) {
+      final finalSave = _composerFinalSave = draining.then((_) async {
+        if (owner != null &&
+            drafts != null &&
+            epoch != null &&
+            !_chatService.isTemporaryConversation(owner)) {
+          final finalInput = _mediaController
+              .snapshotDraft(_inputController.text)
+              .copyWith(
+                selectionBase: _inputController.selection.baseOffset,
+                selectionExtent: _inputController.selection.extentOffset,
+              );
+          drafts.mutateCaptured(owner, epoch, edit, (_) => finalInput);
+        }
+        await drafts?.flush();
+      });
+      unawaited(
+        finalSave.catchError((Object error, StackTrace stack) {
+          FlutterError.reportError(
+            FlutterErrorDetails(exception: error, stack: stack),
+          );
+        }),
+      );
+    } else {
+      _saveComposerDraft();
+    }
     _composerDisposed = true;
     _composerSwitch++;
     _inputController.removeListener(_saveComposerDraft);
