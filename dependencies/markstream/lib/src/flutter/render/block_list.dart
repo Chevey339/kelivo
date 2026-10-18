@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/rendering.dart';
 
-import '../selection/stable_selection_container.dart';
+import '../selection/document_selection.dart';
 
 /// Retains completed Markdown subtrees. An append rebuilds and lays out only
 /// the changed leaf and its ancestors, rather than every previous paragraph.
@@ -18,6 +18,7 @@ class BlockList extends StatefulWidget {
     required this.signature,
     required this.itemBuilder,
     this.cullToViewport = true,
+    this.selectionSeparator = '',
   });
 
   final List<Object> blocks;
@@ -26,6 +27,9 @@ class BlockList extends StatefulWidget {
 
   /// Disable viewport clipping for image/export capture, including nested lists.
   final bool cullToViewport;
+
+  /// Clipboard-only separators between logical blocks, including forest branches.
+  final String selectionSeparator;
 
   @override
   State<BlockList> createState() => _BlockListState();
@@ -88,9 +92,25 @@ class _BlockListState extends State<BlockList> {
           );
     return _BlockCullScope(
       enabled: widget.cullToViewport && _BlockCullScope.of(context),
-      child: observed,
+      child: _BlockSelectionScope(
+        separator: widget.selectionSeparator,
+        child: observed,
+      ),
     );
   }
+}
+
+class _BlockSelectionScope extends InheritedWidget {
+  const _BlockSelectionScope({required this.separator, required super.child});
+  final String separator;
+  static String of(BuildContext context) =>
+      context
+          .dependOnInheritedWidgetOfExactType<_BlockSelectionScope>()
+          ?.separator ??
+      '';
+  @override
+  bool updateShouldNotify(_BlockSelectionScope oldWidget) =>
+      oldWidget.separator != separator;
 }
 
 class _BlockCullScope extends InheritedWidget {
@@ -241,7 +261,12 @@ class _BlockSelectionGroup extends StatefulWidget {
 }
 
 class _BlockSelectionGroupState extends State<_BlockSelectionGroup> {
-  final _delegate = StableSelectionDelegate();
+  final _delegate = DocumentSelectionDelegate(separator: '');
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _delegate.separator = _BlockSelectionScope.of(context);
+  }
 
   @override
   void dispose() {

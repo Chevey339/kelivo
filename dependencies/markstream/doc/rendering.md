@@ -75,3 +75,36 @@ preview action. Native inline HTML remains in the normal text builder.
 and platform clipboard actions. Toolbar widgets are excluded from selection.
 The package still owns no SelectionArea, platform files, URL launcher or app
 settings.
+
+## Document selection and Markdown copy
+
+The caller owns one SelectionArea. `DocumentSelectionDelegate` supplies
+clipboard-only paragraph separators and list markers. `BlockList` passes its
+`selectionSeparator` through retained forest branches; nested text chunks use
+the empty default so visual wrapping never becomes a clipboard newline.
+
+Pass an app-owned `MarkstreamSelectionController` to a view, or put multiple
+views under `MarkstreamSelectionScope`. The controller provides `hasSelection`,
+`selectedPlainText`, `selectedMarkdown`, `selectedDocuments` and
+`copySelectionAsMarkdown()`. `selections` retains each original document, its
+selected AST and source ranges; offsets are local to that original document.
+Multiple views copy in their current visual order, including after reordering.
+Dispose the controller when its owning UI is disposed.
+
+Each mounted leaf uses SelectionListener -> SelectedContentRange -> a TextIndex
+built from its actual selectable projection. Clipping those fragments retains
+selected emphasis, links, code, list numbering, math and image syntax. Folded
+details, collapsed code tails and paginated rows are absent from that projection.
+Partial table copies leave unselected cells empty instead of copying their data.
+Empty visible cells/rows and rules between selected blocks retain their structure.
+Transient native ranges are clamped while a streamed tail is being replaced.
+Selection metadata is installed only for views with a controller.
+
+Custom inline builders return `RenderedInline(span: ..., segments: ...)`; each
+TextSegment declares selectable text, source span and AST node. An atomic
+citation should map its displayed label to the citation node, not WidgetSpan's
+object replacement character. Custom block widgets can use
+`MarkstreamSelectionFragment` with the same explicit contract, or render built-in
+blocks / MarkstreamCodeContent, which already provide their projections. Do not
+nest overlapping fragments or add a SelectionArea. Unregistered extension labels
+copy their selected text rather than an unselected part of the original spelling.

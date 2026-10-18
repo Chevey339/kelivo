@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 
 import '../../core/ast/nodes.dart';
+import '../../core/text_index/text_index.dart';
 import '../../core/serialize/to_plain_text.dart';
 import '../extensions/registry.dart';
+import '../selection/document_selection.dart';
+import '../selection/selection_controller.dart';
 import '../interfaces/renderers.dart';
 import '../theme/markstream_theme.dart';
 import 'inline_builder.dart';
@@ -29,6 +32,7 @@ class MarkstreamRenderer {
   late CodeBlockOptions codeOptions;
   late MarkstreamLabels labels;
   bool exporting = false;
+  bool trackSelection = false;
 
   void update({
     required DocumentNode document,
@@ -41,6 +45,7 @@ class MarkstreamRenderer {
     required CodeBlockOptions codeOptions,
     required MarkstreamLabels labels,
     required bool exporting,
+    required bool trackSelection,
   }) {
     this.document = document;
     this.theme = theme;
@@ -52,6 +57,7 @@ class MarkstreamRenderer {
     this.codeOptions = codeOptions;
     this.labels = labels;
     this.exporting = exporting;
+    this.trackSelection = trackSelection;
     _inline = InlineSpanBuilder(
       theme: theme,
       extensions: extensions,
@@ -75,22 +81,39 @@ class MarkstreamRenderer {
 
   Widget inlineText(
     BuildContext context,
+    MarkdownNode owner,
     List<InlineNode> nodes,
     TextStyle style, {
     required bool streaming,
-  }) => StreamingText(
-    streaming: streaming,
-    text: Text.rich(
-      TextSpan(
+  }) {
+    final projection = trackSelection ? <TextSegment>[] : null;
+    final child = StreamingText(
+      streaming: streaming,
+      text: Text.rich(
+        TextSpan(
+          style: style,
+          children: [
+            for (final node in nodes)
+              _inline.build(
+                context,
+                node,
+                style,
+                streaming: streaming,
+                projection: projection,
+              ),
+          ],
+        ),
         style: style,
-        children: [
-          for (final node in nodes)
-            _inline.build(context, node, style, streaming: streaming),
-        ],
       ),
-      style: style,
-    ),
-  );
+    );
+    return projection == null
+        ? child
+        : MarkstreamSelectionFragment(
+            node: owner,
+            segments: projection,
+            child: child,
+          );
+  }
 
   Widget children(
     BuildContext context,
@@ -128,6 +151,20 @@ class MarkstreamRenderer {
     BlockNode node, {
     required bool streaming,
     TextStyle? style,
+  }) => DocumentSelectionGroup(
+    node: node,
+    separator: node is ListNode ? '\n' : '\n\n',
+    prefix: node is TaskItemNode
+        ? '${node.radio ? '(' : '['}${node.checked ? 'x' : ' '}${node.radio ? ')' : ']'} '
+        : '',
+    child: _build(context, node, streaming: streaming, style: style),
+  );
+
+  Widget _build(
+    BuildContext context,
+    BlockNode node, {
+    required bool streaming,
+    TextStyle? style,
   }) {
     final custom = extensions.blockBuilderFor(node);
     if (custom != null)
@@ -155,7 +192,13 @@ class MarkstreamRenderer {
         streaming: streaming,
       );
     if (node is HtmlBlockNode)
-      return inlineText(context, node.children, body, streaming: streaming);
+      return inlineText(
+        context,
+        node,
+        node.children,
+        body,
+        streaming: streaming,
+      );
     if (node is TableNode)
       return MarkstreamTableBlock(
         node: node,
@@ -164,8 +207,13 @@ class MarkstreamRenderer {
         labels: labels,
         streaming: streaming,
         exporting: exporting,
-        buildCell: (context, cell, style) =>
-            inlineText(context, cell.children, style, streaming: streaming),
+        buildCell: (context, cell, style) => inlineText(
+          context,
+          cell,
+          cell.children,
+          style,
+          streaming: streaming,
+        ),
       );
     if (node is MathBlockNode)
       return MarkstreamMathBlock(
@@ -179,9 +227,12 @@ class MarkstreamRenderer {
         node: node,
         theme: theme,
         summary: summary == null
-            ? Text(labels.details, style: theme.details.summary)
+            ? SelectionContainer.disabled(
+                child: Text(labels.details, style: theme.details.summary),
+              )
             : inlineText(
                 context,
+                summary,
                 summary.children,
                 theme.details.summary,
                 streaming: streaming,
@@ -196,12 +247,19 @@ class MarkstreamRenderer {
     if (node is DetailsSummaryNode)
       return inlineText(
         context,
+        node,
         node.children,
         theme.details.summary,
         streaming: streaming,
       );
     if (node is ParagraphNode)
-      return inlineText(context, node.children, body, streaming: streaming);
+      return inlineText(
+        context,
+        node,
+        node.children,
+        body,
+        streaming: streaming,
+      );
     if (node is HeadingNode)
       return Padding(
         padding: theme.headingPadding,
@@ -209,6 +267,7 @@ class MarkstreamRenderer {
           header: true,
           child: inlineText(
             context,
+            node,
             node.children,
             theme.headings[node.level - 1],
             streaming: streaming,
@@ -245,37 +304,47 @@ class MarkstreamRenderer {
               padding: EdgeInsets.only(
                 top: i == 0 || node.tight ? 0 : theme.blockSpacing,
               ),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.baseline,
-                textBaseline: TextBaseline.alphabetic,
-                children: [
-                  Padding(
-                    padding: theme.listMarkerPadding,
-                    child: SelectionContainer.disabled(
-                      child: node.children[i].checked == null
-                          ? Text(
-                              node.ordered ? '${node.start + i}.' : '•',
-                              style: body,
-                            )
-                          : _TaskIndicator(
-                              checked: node.children[i].checked!,
-                              radio: node.children[i].radio,
-                              theme: theme.task,
-                            ),
+              child: DocumentSelectionGroup(
+                node: node.children[i],
+                prefix:
+                    '${node.ordered ? '${node.start + i}.' : '-'} ${node.children[i].checked == null
+                        ? ''
+                        : node.children[i].radio
+                        ? '(${node.children[i].checked! ? 'x' : ' '}) '
+                        : '[${node.children[i].checked! ? 'x' : ' '}] '}',
+                continuation: '  ',
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.baseline,
+                  textBaseline: TextBaseline.alphabetic,
+                  children: [
+                    Padding(
+                      padding: theme.listMarkerPadding,
+                      child: SelectionContainer.disabled(
+                        child: node.children[i].checked == null
+                            ? Text(
+                                node.ordered ? '${node.start + i}.' : '•',
+                                style: body,
+                              )
+                            : _TaskIndicator(
+                                checked: node.children[i].checked!,
+                                radio: node.children[i].radio,
+                                theme: theme.task,
+                              ),
+                      ),
                     ),
-                  ),
-                  Expanded(
-                    child: children(
-                      context,
-                      node.children[i].children,
-                      streaming: streaming && i == node.children.length - 1,
-                      spacing: node.tight ? 0 : theme.blockSpacing,
-                      firstStyle: node.children[i].checked == true
-                          ? theme.task.checkedText
-                          : null,
+                    Expanded(
+                      child: children(
+                        context,
+                        node.children[i].children,
+                        streaming: streaming && i == node.children.length - 1,
+                        spacing: node.tight ? 0 : theme.blockSpacing,
+                        firstStyle: node.children[i].checked == true
+                            ? theme.task.checkedText
+                            : null,
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
         ],
@@ -298,6 +367,7 @@ class MarkstreamRenderer {
           Expanded(
             child: inlineText(
               context,
+              node,
               node.children,
               node.checked ? theme.task.checkedText : body,
               streaming: streaming,
@@ -308,11 +378,31 @@ class MarkstreamRenderer {
     if (node is ListItemNode)
       return children(context, node.children, streaming: streaming);
     if (node is ReferenceDefinitionNode) return const SizedBox.shrink();
-    // Unregistered block types remain readable through the core text projection.
-    return StreamingText(
+    if (node is NamedBlockNode)
+      return children(context, node.children, streaming: streaming);
+    if (node is DirectiveLabelNode)
+      return inlineText(
+        context,
+        node,
+        node.children,
+        body,
+        streaming: streaming,
+      );
+    // Unregistered leaf types remain readable and expose an atomic projection.
+    final text = toPlainText(node);
+    final child = StreamingText(
       streaming: streaming,
-      text: Text(toPlainText(node), style: body),
+      text: Text(text, style: body),
     );
+    return trackSelection
+        ? MarkstreamSelectionFragment(
+            node: node,
+            segments: [
+              TextSegment(text: text, sourceSpan: node.span, node: node),
+            ],
+            child: child,
+          )
+        : child;
   }
 }
 

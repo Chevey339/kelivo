@@ -176,7 +176,7 @@ void main() {
         .state<SelectableRegionState>(find.byType(SelectableRegion))
         .selectAll(SelectionChangedCause.keyboard);
     await tester.pumpAndSettle();
-    expect(selected, 'אבג x דהו');
+    expect(selected, '- אבג x דהו');
     expect(tester.takeException(), isNull);
   });
 

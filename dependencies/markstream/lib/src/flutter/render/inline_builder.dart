@@ -4,6 +4,7 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 
 import '../../core/ast/nodes.dart';
+import '../../core/text_index/text_index.dart';
 import '../../core/serialize/to_plain_text.dart';
 import '../extensions/registry.dart';
 import '../interfaces/renderers.dart';
@@ -41,10 +42,21 @@ class InlineSpanBuilder {
     TextStyle style, {
     required bool streaming,
     LinkNode? link,
+    List<TextSegment>? projection,
   }) {
     final custom = extensions.inlineBuilderFor(node);
-    if (custom != null)
-      return custom(context, node, renderingContext(context, streaming));
+    if (custom != null) {
+      final rendered = custom(
+        context,
+        node,
+        renderingContext(context, streaming),
+      );
+      projection?.addAll(rendered.segments);
+      return rendered.span;
+    }
+    void emit(String text, MarkdownNode source) => projection?.add(
+      TextSegment(text: text, sourceSpan: source.span, node: source),
+    );
     VoidCallback? openLink(LinkNode? target) =>
         target == null || linkHandler == null
         ? null
@@ -68,6 +80,7 @@ class InlineSpanBuilder {
             childStyle,
             streaming: streaming,
             link: target ?? link,
+            projection: projection,
           ),
       ],
     );
@@ -88,7 +101,8 @@ class InlineSpanBuilder {
       );
     }
 
-    if (node is TextNode)
+    if (node is TextNode) {
+      emit(node.text, node);
       return TextSpan(
         text: node.text,
         style: style,
@@ -97,12 +111,15 @@ class InlineSpanBuilder {
             ? MouseCursor.defer
             : SystemMouseCursors.click,
       );
-    if (node is LineBreakNode)
+    }
+    if (node is LineBreakNode) {
+      emit(node.hard ? "\n" : " ", node);
       return TextSpan(
         text: node.hard ? '\n' : ' ',
         style: style,
         recognizer: recognizer(),
       );
+    }
     if (node is EmphasisNode)
       return children(
         node.children,
@@ -123,6 +140,7 @@ class InlineSpanBuilder {
     if (node is LinkNode)
       return children(node.children, style.merge(theme.link), target: node);
     if (node is CodeSpanNode) {
+      for (final fragment in node.children) emit(fragment.text, fragment);
       Widget capsule = InlineCodeCapsule(
         text: node.code,
         style: theme.inlineCode.text,
@@ -143,6 +161,7 @@ class InlineSpanBuilder {
       );
     }
     if (node is MathInlineNode) {
+      emit(toPlainText(node), node);
       final mathStyle = style.copyWith(
         fontSize:
             (style.fontSize ?? theme.body.fontSize!) * theme.inlineMathScale,
@@ -159,6 +178,7 @@ class InlineSpanBuilder {
     }
     if (node is ImageNode) {
       final alt = node.children.map(toPlainText).join();
+      emit(alt, node);
       final child =
           imageBuilder?.build(context, node, theme) ?? Text(alt, style: style);
       return atom(
@@ -169,8 +189,10 @@ class InlineSpanBuilder {
         alt,
       );
     }
-    if (node is HtmlElementNode && node.tag == 'br')
+    if (node is HtmlElementNode && node.tag == 'br') {
+      emit('\n', node);
       return TextSpan(text: '\n', style: style);
+    }
     return children(node.children.cast<InlineNode>(), style);
   }
 }

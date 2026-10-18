@@ -16,3 +16,11 @@ export 'src/flutter/render/streaming_text.dart';
 export 'src/flutter/markstream_view.dart';
 export 'src/flutter/render/chrome.dart';
 export 'src/flutter/render/blocks/code_content.dart' show MarkstreamCodeContent;
+export 'src/flutter/selection/document_selection.dart'
+    show DocumentSelectionDelegate;
+export 'src/flutter/selection/selection_controller.dart'
+    show
+        MarkstreamSelection,
+        MarkstreamSelectionController,
+        MarkstreamSelectionScope,
+        MarkstreamSelectionFragment;

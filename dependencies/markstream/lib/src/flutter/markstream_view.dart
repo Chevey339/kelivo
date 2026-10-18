@@ -10,6 +10,8 @@ import 'interfaces/renderers.dart';
 import 'render/block_builder.dart';
 import 'render/block_list.dart';
 import 'render/chrome.dart';
+import 'selection/document_selection.dart';
+import 'selection/selection_controller.dart';
 import 'theme/markstream_theme.dart';
 
 /// Renders source or a parsed snapshot inside the caller's SelectionArea.
@@ -31,6 +33,7 @@ class MarkstreamView extends StatefulWidget {
     this.codeOptions = const CodeBlockOptions(),
     this.labels = const MarkstreamLabels(),
     this.exporting = false,
+    this.selectionController,
   }) : assert((source == null) != (document == null));
 
   final String? source;
@@ -48,6 +51,7 @@ class MarkstreamView extends StatefulWidget {
   final CodeBlockOptions codeOptions;
   final MarkstreamLabels labels;
   final bool exporting;
+  final MarkstreamSelectionController? selectionController;
 
   @override
   State<MarkstreamView> createState() => _MarkstreamViewState();
@@ -60,6 +64,7 @@ class _MarkstreamViewState extends State<MarkstreamView> {
   late final MarkstreamRenderer _renderer = MarkstreamRenderer(_recognizerFor);
   final _recognizers = <(int, int, String), TapGestureRecognizer>{};
   List<_BlockEntry> _entries = const [];
+  DocumentSelectionBinding? _binding;
 
   @override
   void initState() {
@@ -121,6 +126,7 @@ class _MarkstreamViewState extends State<MarkstreamView> {
 
   @override
   void dispose() {
+    if (_binding case final binding?) binding.controller.detach(binding);
     for (final recognizer in _recognizers.values) {
       recognizer.dispose();
     }
@@ -136,6 +142,20 @@ class _MarkstreamViewState extends State<MarkstreamView> {
           bodyStyle: TextStyle(color: DefaultTextStyle.of(context).style.color),
           cjk: _cjk.hasMatch(_document.source),
         );
+    final controller =
+        widget.selectionController ?? MarkstreamSelectionScope.maybeOf(context);
+    if (_binding?.controller != controller) {
+      if (_binding case final binding?) binding.controller.detach(binding);
+      _binding = controller == null
+          ? null
+          : DocumentSelectionBinding(
+              _document,
+              controller,
+              () => context.findRenderObject() as RenderBox?,
+            );
+      if (_binding case final binding?) controller!.attach(binding);
+    }
+    _binding?.document = _document;
     _renderer.update(
       document: _document,
       theme: theme,
@@ -147,6 +167,7 @@ class _MarkstreamViewState extends State<MarkstreamView> {
       codeOptions: widget.codeOptions,
       labels: widget.labels,
       exporting: widget.exporting,
+      trackSelection: _binding != null,
     );
     final nodes = _document.children
         .where((node) => node is! ReferenceDefinitionNode)
@@ -167,27 +188,36 @@ class _MarkstreamViewState extends State<MarkstreamView> {
       }
     }
     _entries = entries;
-    return BlockList(
-      blocks: entries,
-      cullToViewport: widget.cullToViewport && !widget.exporting,
-      signature: (
-        theme,
-        widget.extensions,
-        widget.codeHighlighter,
-        widget.mathRenderer,
-        widget.imageBuilder,
-        widget.linkHandler,
-        widget.codeOptions,
-        widget.labels,
-        widget.exporting,
-      ),
-      itemBuilder: (context, index) => Padding(
-        key: ValueKey(entries[index].node.span.start),
-        padding: EdgeInsets.only(top: index == 0 ? 0 : theme.blockSpacing),
-        child: _renderer.build(
-          context,
-          entries[index].node,
-          streaming: entries[index].streaming,
+    return DocumentSelectionScope(
+      binding: _binding,
+      child: DocumentSelectionGroup(
+        node: _document,
+        root: true,
+        child: BlockList(
+          blocks: entries,
+          selectionSeparator: '\n\n',
+          cullToViewport: widget.cullToViewport && !widget.exporting,
+          signature: (
+            theme,
+            widget.extensions,
+            widget.codeHighlighter,
+            widget.mathRenderer,
+            widget.imageBuilder,
+            widget.linkHandler,
+            widget.codeOptions,
+            widget.labels,
+            widget.exporting,
+            _binding != null,
+          ),
+          itemBuilder: (context, index) => Padding(
+            key: ValueKey(entries[index].node.span.start),
+            padding: EdgeInsets.only(top: index == 0 ? 0 : theme.blockSpacing),
+            child: _renderer.build(
+              context,
+              entries[index].node,
+              streaming: entries[index].streaming,
+            ),
+          ),
         ),
       ),
     );

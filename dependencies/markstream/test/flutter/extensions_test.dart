@@ -27,7 +27,16 @@ void main() {
           NamedBlockNode: (_, _, _) => const Text('generic named block'),
         },
         inlines: {
-          NamedInlineNode: (_, _, _) => const TextSpan(text: 'generic inline'),
+          NamedInlineNode: (_, node, _) => RenderedInline(
+            span: const TextSpan(text: 'generic inline'),
+            segments: [
+              TextSegment(
+                text: 'generic inline',
+                sourceSpan: node.span,
+                node: node,
+              ),
+            ],
+          ),
         },
       ),
       codeBlockBuilders: {' DART ': (_, _, _) => const Text('dart custom')},
@@ -36,7 +45,16 @@ void main() {
             rendering.buildBlock(node.children.single as BlockNode),
       },
       namedInlineBuilders: {
-        'BADGE': (_, _, _) => const TextSpan(text: 'badge custom'),
+        'BADGE': (_, node, _) => RenderedInline(
+          span: const TextSpan(text: 'badge custom'),
+          segments: [
+            TextSegment(
+              text: 'badge custom',
+              sourceSpan: node.span,
+              node: node,
+            ),
+          ],
+        ),
       },
     );
     await tester.pumpWidget(
@@ -55,11 +73,13 @@ void main() {
                 rendering(),
               )!,
               Text.rich(
-                extensions.buildInline(
-                  context,
-                  document.children[2].children.single as InlineNode,
-                  rendering(),
-                )!,
+                extensions
+                    .buildInline(
+                      context,
+                      document.children[2].children.single as InlineNode,
+                      rendering(),
+                    )!
+                    .span,
               ),
             ],
           ),

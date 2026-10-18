@@ -5,9 +5,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 
 import '../../../core/ast/nodes.dart';
+import '../../../core/ast/source_span.dart';
+import '../../../core/text_index/text_index.dart';
 import '../../../core/serialize/to_plain_text.dart';
 import '../../interfaces/renderers.dart';
 import '../../selection/code_selection.dart';
+import '../../selection/selection_controller.dart';
 import '../../selection/stable_selection_container.dart';
 import '../../theme/markstream_theme.dart';
 import '../streaming_text.dart';
@@ -149,9 +152,31 @@ class _MarkstreamCodeContentState extends State<MarkstreamCodeContent> {
       textDirection: TextDirection.ltr,
       child: content,
     );
-    return SelectionContainer.maybeOf(context) == null
+    final selected = SelectionContainer.maybeOf(context) == null
         ? body
         : SelectionContainer(delegate: _selection, child: body);
+    if (DocumentSelectionScope.maybeOf(context) == null) return selected;
+    var remaining = _source.length;
+    final segments = <TextSegment>[];
+    for (final part in widget.node.children) {
+      if (remaining <= 0) break;
+      final length = math.min(remaining, part.text.length);
+      segments.add(
+        TextSegment(
+          text: part.text.substring(0, length),
+          node: part,
+          sourceSpan: part.span.length == part.text.length
+              ? SourceSpan(part.span.start, part.span.start + length)
+              : part.span,
+        ),
+      );
+      remaining -= length;
+    }
+    return MarkstreamSelectionFragment(
+      node: widget.node,
+      segments: segments,
+      child: selected,
+    );
   }
 }
 

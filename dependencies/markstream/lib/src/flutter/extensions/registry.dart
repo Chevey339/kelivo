@@ -3,6 +3,7 @@ import 'dart:typed_data';
 import 'package:flutter/widgets.dart';
 
 import '../../core/ast/nodes.dart';
+import '../../core/text_index/text_index.dart';
 import '../../core/parser/syntax/block_syntax.dart';
 import '../../core/parser/syntax/inline_syntax.dart';
 import '../theme/markstream_theme.dart';
@@ -30,7 +31,17 @@ typedef BlockNodeBuilder = Widget Function(
   BlockNode node,
   MarkstreamRenderContext rendering,
 );
-typedef InlineNodeBuilder = InlineSpan Function(
+
+/// The selectable projection is explicit: WidgetSpan's object replacement
+/// character is not the source text of a citation or other custom inline atom.
+class RenderedInline {
+  RenderedInline({required this.span, required List<TextSegment> segments})
+    : segments = List.unmodifiable(segments);
+  final InlineSpan span;
+  final List<TextSegment> segments;
+}
+
+typedef InlineNodeBuilder = RenderedInline Function(
   BuildContext context,
   InlineNode node,
   MarkstreamRenderContext rendering,
@@ -160,7 +171,7 @@ final class MarkstreamExtensions {
     BlockNode node,
     MarkstreamRenderContext rendering,
   ) => blockBuilderFor(node)?.call(context, node, rendering);
-  InlineSpan? buildInline(
+  RenderedInline? buildInline(
     BuildContext context,
     InlineNode node,
     MarkstreamRenderContext rendering,

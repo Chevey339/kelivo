@@ -1,8 +1,10 @@
 import 'package:flutter/widgets.dart';
 
 import '../../../core/ast/nodes.dart';
+import '../../../core/text_index/text_index.dart';
 import '../../interfaces/renderers.dart';
 import '../../selection/selectable_span_adapter.dart';
+import '../../selection/selection_controller.dart';
 import '../../theme/markstream_theme.dart';
 
 class MarkstreamMathBlock extends StatelessWidget {
@@ -16,28 +18,32 @@ class MarkstreamMathBlock extends StatelessWidget {
   final MarkstreamTheme theme;
   final MathRenderer? renderer;
   @override
-  Widget build(BuildContext context) => Padding(
-    padding: theme.mathPadding,
-    child: LayoutBuilder(
-      builder: (context, constraints) => SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        primary: false,
-        child: ConstrainedBox(
-          constraints: BoxConstraints(
-            minWidth: constraints.hasBoundedWidth ? constraints.maxWidth : 0,
-          ),
-          child: Center(
-            child: SelectableSpanAdapter(
-              selectedText: node.tex,
-              child: SelectionContainer.disabled(
-                child:
-                    renderer?.build(
-                      context,
-                      node.tex,
-                      style: theme.body,
-                      displayMode: true,
-                    ) ??
-                    Text(node.tex, style: theme.body),
+  Widget build(BuildContext context) => MarkstreamSelectionFragment(
+    node: node,
+    segments: [TextSegment(text: node.tex, sourceSpan: node.span, node: node)],
+    child: Padding(
+      padding: theme.mathPadding,
+      child: LayoutBuilder(
+        builder: (context, constraints) => SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          primary: false,
+          child: ConstrainedBox(
+            constraints: BoxConstraints(
+              minWidth: constraints.hasBoundedWidth ? constraints.maxWidth : 0,
+            ),
+            child: Center(
+              child: SelectableSpanAdapter(
+                selectedText: node.tex,
+                child: SelectionContainer.disabled(
+                  child:
+                      renderer?.build(
+                        context,
+                        node.tex,
+                        style: theme.body,
+                        displayMode: true,
+                      ) ??
+                      Text(node.tex, style: theme.body),
+                ),
               ),
             ),
           ),
