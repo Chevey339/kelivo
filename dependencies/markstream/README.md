@@ -102,3 +102,17 @@ provides the same source-text bridge for formulas or application citation chips.
 Wrap changing groups in `StableSelectionContainer` and supply one outer
 `SelectionArea` in the application. The package does not create a selection
 menu or selection owner. See `doc/selection_spike.md` for validation boundaries.
+
+## Theme tokens
+
+`MarkstreamTheme.fromColorScheme` supplies the body, headings, links, code,
+quotes, list markers, tasks, tables, rules, images, math and details tokens.
+Applications can provide a base font style, monospace family, CJK letter spacing
+and platform-adjusted weights. Link overrides inherit the enclosing font size.
+Text scaling remains in Flutter's inherited `TextScaler`.
+
+Nested token groups support `copyWith`. Themes compare by value, including
+heading styles, so reconstructing equivalent settings does not invalidate
+cached document prefixes. Heading lists are immutable snapshots. Fill alpha
+constants and the monochrome code-border adjustment follow the existing app
+palette; applications can override individual surfaces in the token groups.
