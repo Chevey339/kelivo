@@ -4550,5 +4550,20 @@
   "mcpOAuthDiscovering": "正在发现授权服务器…",
   "mcpOAuthRegistering": "正在准备授权…",
   "mcpOAuthWaitingBrowser": "等待浏览器授权…",
-  "mcpOAuthExchangingToken": "正在完成登录…"
+  "mcpOAuthExchangingToken": "正在完成登录…",
+  "markdownPlaygroundTitle": "Markdown Playground",
+  "markdownPlaygroundSource": "Markdown 源码",
+  "markdownPlaygroundPreview": "渲染预览",
+  "markdownPlaygroundAst": "AST 语法树",
+  "markdownPlaygroundPlay": "逐字输入",
+  "markdownPlaygroundPause": "暂停",
+  "markdownPlaygroundResume": "继续",
+  "markdownPlaygroundShowAll": "显示全文",
+  "markdownPlaygroundWidth": "预览宽度",
+  "markdownPlaygroundTheme": "预览主题",
+  "markdownPlaygroundPlain": "选区纯文本",
+  "markdownPlaygroundMarkdown": "选区 Markdown",
+  "markdownPlaygroundSelectionHint": "在预览中选择文本，查看复制结果。",
+  "markdownPlaygroundEmpty": "输入 Markdown 开始预览。",
+  "markdownPlaygroundProgress": "已输入 {shown} / {total}"
 }

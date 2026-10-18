@@ -47,6 +47,25 @@ void selectAll(WidgetTester tester) => tester
     .state<SelectableRegionState>(find.byType(SelectableRegion))
     .selectAll(SelectionChangedCause.keyboard);
 void main() {
+  testWidgets('desktop code wraps even when mobile wrapping is disabled', (
+    tester,
+  ) async {
+    final code = List.filled(30, 'longword').join(' ');
+    await tester.pumpWidget(
+      host(MarkstreamView(source: '```text\n$code\n```'), width: 180),
+    );
+    await tester.pumpAndSettle();
+    expect(paragraph('longword').size.width, lessThan(180));
+    expect(
+      find.descendant(
+        of: find.byType(MarkstreamCodeContent),
+        matching: find.byType(SingleChildScrollView),
+      ),
+      findsNothing,
+    );
+    expect(tester.takeException(), isNull);
+  }, variant: TargetPlatformVariant.only(TargetPlatform.macOS));
+
   testWidgets('async highlighter cannot replace newer source or corrupt text', (
     tester,
   ) async {

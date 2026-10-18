@@ -4574,5 +4574,20 @@
   "mcpOAuthDiscovering": "正在探索授權伺服器…",
   "mcpOAuthRegistering": "正在準備授權…",
   "mcpOAuthWaitingBrowser": "等待瀏覽器授權…",
-  "mcpOAuthExchangingToken": "正在完成登入…"
+  "mcpOAuthExchangingToken": "正在完成登入…",
+  "markdownPlaygroundTitle": "Markdown Playground",
+  "markdownPlaygroundSource": "Markdown 原始碼",
+  "markdownPlaygroundPreview": "渲染預覽",
+  "markdownPlaygroundAst": "AST 語法樹",
+  "markdownPlaygroundPlay": "逐字輸入",
+  "markdownPlaygroundPause": "暫停",
+  "markdownPlaygroundResume": "繼續",
+  "markdownPlaygroundShowAll": "顯示全文",
+  "markdownPlaygroundWidth": "預覽寬度",
+  "markdownPlaygroundTheme": "預覽主題",
+  "markdownPlaygroundPlain": "選取範圍純文字",
+  "markdownPlaygroundMarkdown": "選取範圍 Markdown",
+  "markdownPlaygroundSelectionHint": "在預覽中選取文字，檢視複製結果。",
+  "markdownPlaygroundEmpty": "輸入 Markdown 開始預覽。",
+  "markdownPlaygroundProgress": "已輸入 {shown} / {total}"
 }

@@ -23333,6 +23333,96 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Completing sign-in…'**
   String get mcpOAuthExchangingToken;
+
+  /// No description provided for @markdownPlaygroundTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Markdown Playground'**
+  String get markdownPlaygroundTitle;
+
+  /// No description provided for @markdownPlaygroundSource.
+  ///
+  /// In en, this message translates to:
+  /// **'Markdown source'**
+  String get markdownPlaygroundSource;
+
+  /// No description provided for @markdownPlaygroundPreview.
+  ///
+  /// In en, this message translates to:
+  /// **'Preview'**
+  String get markdownPlaygroundPreview;
+
+  /// No description provided for @markdownPlaygroundAst.
+  ///
+  /// In en, this message translates to:
+  /// **'AST'**
+  String get markdownPlaygroundAst;
+
+  /// No description provided for @markdownPlaygroundPlay.
+  ///
+  /// In en, this message translates to:
+  /// **'Stream characters'**
+  String get markdownPlaygroundPlay;
+
+  /// No description provided for @markdownPlaygroundPause.
+  ///
+  /// In en, this message translates to:
+  /// **'Pause'**
+  String get markdownPlaygroundPause;
+
+  /// No description provided for @markdownPlaygroundResume.
+  ///
+  /// In en, this message translates to:
+  /// **'Resume'**
+  String get markdownPlaygroundResume;
+
+  /// No description provided for @markdownPlaygroundShowAll.
+  ///
+  /// In en, this message translates to:
+  /// **'Show complete'**
+  String get markdownPlaygroundShowAll;
+
+  /// No description provided for @markdownPlaygroundWidth.
+  ///
+  /// In en, this message translates to:
+  /// **'Preview width'**
+  String get markdownPlaygroundWidth;
+
+  /// No description provided for @markdownPlaygroundTheme.
+  ///
+  /// In en, this message translates to:
+  /// **'Preview theme'**
+  String get markdownPlaygroundTheme;
+
+  /// No description provided for @markdownPlaygroundPlain.
+  ///
+  /// In en, this message translates to:
+  /// **'Selected plain text'**
+  String get markdownPlaygroundPlain;
+
+  /// No description provided for @markdownPlaygroundMarkdown.
+  ///
+  /// In en, this message translates to:
+  /// **'Selected Markdown'**
+  String get markdownPlaygroundMarkdown;
+
+  /// No description provided for @markdownPlaygroundSelectionHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Select text in the preview to inspect copied content.'**
+  String get markdownPlaygroundSelectionHint;
+
+  /// No description provided for @markdownPlaygroundEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter Markdown to preview it.'**
+  String get markdownPlaygroundEmpty;
+
+  /// No description provided for @markdownPlaygroundProgress.
+  ///
+  /// In en, this message translates to:
+  /// **'Input {shown} / {total}'**
+  String markdownPlaygroundProgress(int shown, int total);
 }
 
 class _AppLocalizationsDelegate

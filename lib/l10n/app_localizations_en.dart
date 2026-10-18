@@ -13072,4 +13072,52 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get mcpOAuthExchangingToken => 'Completing sign-in…';
+
+  @override
+  String get markdownPlaygroundTitle => 'Markdown Playground';
+
+  @override
+  String get markdownPlaygroundSource => 'Markdown source';
+
+  @override
+  String get markdownPlaygroundPreview => 'Preview';
+
+  @override
+  String get markdownPlaygroundAst => 'AST';
+
+  @override
+  String get markdownPlaygroundPlay => 'Stream characters';
+
+  @override
+  String get markdownPlaygroundPause => 'Pause';
+
+  @override
+  String get markdownPlaygroundResume => 'Resume';
+
+  @override
+  String get markdownPlaygroundShowAll => 'Show complete';
+
+  @override
+  String get markdownPlaygroundWidth => 'Preview width';
+
+  @override
+  String get markdownPlaygroundTheme => 'Preview theme';
+
+  @override
+  String get markdownPlaygroundPlain => 'Selected plain text';
+
+  @override
+  String get markdownPlaygroundMarkdown => 'Selected Markdown';
+
+  @override
+  String get markdownPlaygroundSelectionHint =>
+      'Select text in the preview to inspect copied content.';
+
+  @override
+  String get markdownPlaygroundEmpty => 'Enter Markdown to preview it.';
+
+  @override
+  String markdownPlaygroundProgress(int shown, int total) {
+    return 'Input $shown / $total';
+  }
 }

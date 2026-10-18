@@ -82,7 +82,7 @@ class _MarkstreamCodeBlockState extends State<MarkstreamCodeBlock> {
             theme: widget.theme,
             highlighter: widget.highlighter,
             streaming: widget.streaming,
-            wrap: mobile && widget.options.mobileWrap,
+            wrap: !mobile || widget.options.mobileWrap,
             highlight: widget.options.highlight,
             maxLines: expanded ? null : widget.options.collapsedLines,
           ),
